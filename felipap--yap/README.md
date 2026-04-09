@@ -1,0 +1,23 @@
+# yap
+
+> Config by [felipap](https://github.com/felipap/yap) — distributed by [TomeVault](https://tomevault.io/claim/felipap)
+
+## Windsurf Config
+
+The `project-config.md` file in this directory is the project config converted for Windsurf.
+Original source: `AGENTS.md` in [felipap/yap](https://github.com/felipap/yap).
+
+## Also available for
+
+- **Claude Code** — `CLAUDE.md`
+- **GitHub Copilot** — `copilot-instructions.md`
+- **Cursor** — `project-config.mdc`
+- **Gemini CLI** — `GEMINI.md`
+- **Windsurf** — `project-config.md`
+
+Browse all formats: [https://tomevault.io/claim/felipap](https://tomevault.io/claim/felipap)
+
+---
+
+Converted and distributed by [TomeVault](https://tomevault.io) — AI instruction files for every platform.
+Is this your repo? [Claim it](https://tomevault.io/claim/felipap) to manage distribution.
