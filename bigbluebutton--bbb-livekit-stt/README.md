@@ -1,0 +1,23 @@
+# bbb-livekit-stt
+
+> Config by [bigbluebutton](https://github.com/bigbluebutton/bbb-livekit-stt) — distributed by [TomeVault](https://tomevault.io/claim/bigbluebutton)
+
+## Windsurf Config
+
+The `project-config.md` file in this directory is the project config converted for Windsurf.
+Original source: `AGENTS.md` in [bigbluebutton/bbb-livekit-stt](https://github.com/bigbluebutton/bbb-livekit-stt).
+
+## Also available for
+
+- **Claude Code** — `CLAUDE.md`
+- **GitHub Copilot** — `copilot-instructions.md`
+- **Cursor** — `project-config.mdc`
+- **Gemini CLI** — `GEMINI.md`
+- **Windsurf** — `project-config.md`
+
+Browse all formats: [https://tomevault.io/claim/bigbluebutton](https://tomevault.io/claim/bigbluebutton)
+
+---
+
+Converted and distributed by [TomeVault](https://tomevault.io) — AI instruction files for every platform.
+Is this your repo? [Claim it](https://tomevault.io/claim/bigbluebutton) to manage distribution.
