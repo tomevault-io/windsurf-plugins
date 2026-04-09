@@ -1,0 +1,23 @@
+# NutriCalc
+
+> Config by [powerbauer1337](https://github.com/powerbauer1337/NutriCalc) — distributed by [TomeVault](https://tomevault.io/claim/powerbauer1337)
+
+## Windsurf Config
+
+The `project-config.md` file in this directory is the project config converted for Windsurf.
+Original source: `CLAUDE.md` in [powerbauer1337/NutriCalc](https://github.com/powerbauer1337/NutriCalc).
+
+## Also available for
+
+- **Codex** — `AGENTS.md`
+- **GitHub Copilot** — `copilot-instructions.md`
+- **Cursor** — `project-config.mdc`
+- **Gemini CLI** — `GEMINI.md`
+- **Windsurf** — `project-config.md`
+
+Browse all formats: [https://tomevault.io/claim/powerbauer1337](https://tomevault.io/claim/powerbauer1337)
+
+---
+
+Converted and distributed by [TomeVault](https://tomevault.io) — AI instruction files for every platform.
+Is this your repo? [Claim it](https://tomevault.io/claim/powerbauer1337) to manage distribution.
