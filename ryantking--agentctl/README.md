@@ -1,0 +1,23 @@
+# agentctl
+
+> Config by [ryantking](https://github.com/ryantking/agentctl) — distributed by [TomeVault](https://tomevault.io/claim/ryantking)
+
+## Windsurf Config
+
+The `project-config.md` file in this directory is the project config converted for Windsurf.
+Original source: `AGENTS.md` in [ryantking/agentctl](https://github.com/ryantking/agentctl).
+
+## Also available for
+
+- **Claude Code** — `CLAUDE.md`
+- **GitHub Copilot** — `copilot-instructions.md`
+- **Cursor** — `project-config.mdc`
+- **Gemini CLI** — `GEMINI.md`
+- **Windsurf** — `project-config.md`
+
+Browse all formats: [https://tomevault.io/claim/ryantking](https://tomevault.io/claim/ryantking)
+
+---
+
+Converted and distributed by [TomeVault](https://tomevault.io) — AI instruction files for every platform.
+Is this your repo? [Claim it](https://tomevault.io/claim/ryantking) to manage distribution.
