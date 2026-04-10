@@ -1,0 +1,23 @@
+# website-template
+
+> Config by [flechilla](https://github.com/flechilla/website-template) — distributed by [TomeVault](https://tomevault.io/claim/flechilla)
+
+## Windsurf Config
+
+The `project-config.md` file in this directory is the project config converted for Windsurf.
+Original source: `.cursor/rules/*.mdc` in [flechilla/website-template](https://github.com/flechilla/website-template).
+
+## Also available for
+
+- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
+- **GitHub Copilot** — `copilot-instructions.md`
+- **Gemini CLI** — `GEMINI.md`
+- **Windsurf** — `project-config.md`
+
+Browse all formats: [https://tomevault.io/claim/flechilla](https://tomevault.io/claim/flechilla)
+
+---
+
+Converted and distributed by [TomeVault](https://tomevault.io) — AI instruction files for every platform.
+Is this your repo? [Claim it](https://tomevault.io/claim/flechilla) to manage distribution.
