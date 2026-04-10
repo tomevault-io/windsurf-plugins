@@ -1,0 +1,23 @@
+# fvdb-reality-capture
+
+> Config by [openvdb](https://github.com/openvdb/fvdb-reality-capture) — distributed by [TomeVault](https://tomevault.io/claim/openvdb)
+
+## Windsurf Config
+
+The `project-config.md` file in this directory is the project config converted for Windsurf.
+Original source: `AGENTS.md` in [openvdb/fvdb-reality-capture](https://github.com/openvdb/fvdb-reality-capture).
+
+## Also available for
+
+- **Claude Code** — `CLAUDE.md`
+- **GitHub Copilot** — `copilot-instructions.md`
+- **Cursor** — `project-config.mdc`
+- **Gemini CLI** — `GEMINI.md`
+- **Windsurf** — `project-config.md`
+
+Browse all formats: [https://tomevault.io/claim/openvdb](https://tomevault.io/claim/openvdb)
+
+---
+
+Converted and distributed by [TomeVault](https://tomevault.io) — AI instruction files for every platform.
+Is this your repo? [Claim it](https://tomevault.io/claim/openvdb) to manage distribution.
