@@ -4,205 +4,173 @@ description: >-
 ---
 
 
-# CRO Funnel Optimization
+# TYPO3 Content Blocks Development
 
-> **Source:** This skill is adapted from **[AgentKits Marketing](https://github.com/aitytech/agentkits-marketing)** 
-> by AITYTech. Enterprise-grade AI marketing automation (MIT License).
+> **Compatibility:** This skill targets **TYPO3 v14.x** with **Content Blocks 2.x**. Always match the [Packagist `friendsoftypo3/content-blocks`](https://packagist.org/packages/friendsoftypo3/content-blocks) constraint to your Core version.
+> For **Content Blocks 1.x on TYPO3 v13**, upstream typically requires **TYPO3 ≥ 13.1** (not plain 13.0) — confirm on Packagist.
+> Examples use TYPO3 v14 APIs and CB 2.x; adjust `composer.json` if upstream constraints differ.
 
-Full-funnel Conversion Rate Optimization covering every stage from page visit to paid conversion:
+> **TYPO3 API First:** Always use TYPO3's built-in APIs, core features, and established conventions before creating custom implementations. Do not reinvent what TYPO3 already provides. Always verify that the APIs and methods you use exist and are not deprecated in TYPO3 v14 by checking the official TYPO3 documentation.
 
-```
-Visitor → Page CRO → Form CRO → Signup CRO
-     ↓
-  Popup CRO (capture abandoners)
-     ↓
-New User → Onboarding CRO → Activation
-     ↓
-Free User → Paywall CRO → Paid Customer
-```
+## 1. The Single Source of Truth Principle
 
----
+Content Blocks is the **modern approach** to creating custom content types in TYPO3. It eliminates redundancy by providing a **single YAML configuration** that generates:
 
-## 1. Form CRO
+- TCA (Table Configuration Array)
+- Database schema (SQL)
+- TypoScript rendering
+- Backend forms and previews
+- Labels and translations
 
-Optimize lead capture forms, contact forms, demo requests, and quote forms (not signup/registration).
+### Why Content Blocks?
 
-### Core Principles
+| Traditional Approach | Content Blocks Approach |
+|---------------------|------------------------|
+| Multiple TCA files | One `config.yaml` |
+| Manual SQL definitions | Auto-generated schema |
+| Separate TypoScript | Auto-registered rendering |
+| Scattered translations | Single `labels.xlf` |
+| Complex setup | Simple folder structure |
 
-1. **Every Field Has a Cost** - Each field reduces completion by 10-25%
-2. **Value Must Exceed Effort** - Clear value proposition above form
-3. **Reduce Cognitive Load** - One question per field, logical grouping
+## 2. Installation
 
-### The 5-Field Rule
+```bash
+# Install via Composer (DDEV recommended)
+ddev composer require friendsoftypo3/content-blocks
 
-| Fields | Typical Impact |
-|--------|---------------|
-| 3 fields | Baseline |
-| 4-6 fields | 10-25% reduction |
-| 7+ fields | 25-50%+ reduction |
-
-For each field, ask:
-- Is this absolutely necessary before we can help them?
-- Can we get this information another way?
-- Can we ask this later?
-
-### Field Optimization
-
-**Email**: Single field, inline validation, typo detection
-
-**Name**: Test single "Name" vs. First/Last split
-
-**Phone**: Make optional if possible, explain why if required
-
-**Message**: Make optional, expand on focus
-
-### Multi-Step Forms
-
-Use when:
-- More than 5-6 fields needed
-- Logically distinct sections
-- Conditional paths based on answers
-
-Best practices:
-- Progress indicator (step X of Y)
-- Start with easy, end with sensitive
-- Allow back navigation
-- Save progress
-
-### Submit Button Copy
-
-**Weak**: "Submit", "Send"
-
-**Strong**: "[Action] + [What they get]"
-- "Get My Free Quote"
-- "Download the Guide"
-- "Request Demo"
-
----
-
-## 2. Signup Flow CRO
-
-Optimize registration, account creation, and trial activation flows.
-
-### Core Principles
-
-1. **Minimize Required Fields** - Email + Password minimum
-2. **Show Value Before Asking** - Can they experience product first?
-3. **Reduce Perceived Effort** - "Takes 30 seconds"
-
-### Field Priority
-
-| Priority | Fields |
-|----------|--------|
-| Essential | Email, Password |
-| Often needed | Name |
-| Usually deferrable | Company, Role, Team size, Phone |
-
-### Social Auth Options
-
-- B2C: Google, Apple, Facebook
-- B2B: Google, Microsoft, SSO
-- Consider "Sign up with Google" as primary
-
-### Single-Step vs. Multi-Step
-
-**Single-step works**: 3 or fewer fields, simple B2C, high-intent visitors
-
-**Multi-step works**: More than 3-4 fields, B2B needing segmentation
-
-**Progressive commitment pattern**:
-1. Email only (lowest barrier)
-2. Password + name
-3. Customization questions (optional)
-
-### Trust Elements
-
-- "No credit card required" (if true)
-- "Free forever" or "14-day free trial"
-- Privacy note: "We'll never share your email"
-- Testimonial near signup form
-
----
-
-## 3. Onboarding CRO
-
-Optimize post-signup user activation and time-to-value.
-
-### Core Principles
-
-1. **Time-to-Value Is Everything** - How quickly can someone experience core value?
-2. **One Goal Per Session** - Don't teach everything at once
-3. **Do, Don't Show** - Interactive > Tutorial
-4. **Progress Creates Motivation** - Show advancement, celebrate completions
-
-### Define Your Aha Moment
-
-The action that correlates most strongly with retention:
-
-| Product Type | Aha Moment |
-|-------------|------------|
-| Project management | Create first project + add team member |
-| Analytics | Install tracking + see first report |
-| Design tool | Create first design + export/share |
-| Collaboration | Invite first teammate |
-| Marketplace | Complete first transaction |
-
-### Onboarding Checklist Pattern
-
-Best practices:
-- 3-7 items (not overwhelming)
-- Order by value (most impactful first)
-- Start with quick wins
-- Progress bar/completion %
-- Celebration on completion
-
-Example item:
-```
-☐ Connect your first data source (2 min)
-  Get real-time insights from your existing tools
-  [Connect Now]
+# After installation, clear caches
+ddev typo3 cache:flush
 ```
 
-### Empty States
+### Security Configuration (Classic Mode)
 
-Empty states are onboarding opportunities:
-- Explain what this area is for
-- Show what it looks like with data
-- Clear primary action to add first item
-- Optional: Pre-populate with example data
+For non-composer installations, deny web access to ContentBlocks folder:
 
-### Handling Stalled Users
+```apache
+# .htaccess addition
+RewriteRule (?:typo3conf/ext|typo3/sysext|typo3/ext)/[^/]+/(?:Configuration|ContentBlocks|Resources/Private|Tests?|Documentation|docs?)/ - [F]
+```
 
-1. **Detection**: Define "stalled" criteria (X days inactive)
-2. **Email sequence**: Reminder of value, address blockers, offer help
-3. **In-app recovery**: Welcome back message, pick up where left off
-4. **Human touch**: Personal outreach for high-value accounts
+## 3. Content Types Overview
 
----
+Content Blocks supports four content types:
 
-## 4. Popup CRO
+| Type | Folder | Table | Use Case |
+|------|--------|-------|----------|
+| `ContentElements` | `ContentBlocks/ContentElements/` | `tt_content` | Frontend content (hero, accordion, CTA) |
+| `RecordTypes` | `ContentBlocks/RecordTypes/` | Custom/existing | Structured records (news, products, team) |
+| `PageTypes` | `ContentBlocks/PageTypes/` | `pages` | Custom page types (blog, landing page) |
+| `FileTypes` | `ContentBlocks/FileTypes/` | `sys_file_reference` | Extended file references (photographer, copyright) |
 
-Optimize popups, modals, overlays, slide-ins, and banners.
+## 4. Folder Structure
 
-### Core Principles
+```
+EXT:my_sitepackage/
+└── ContentBlocks/
+    ├── ContentElements/
+    │   └── my-hero/
+    │       ├── assets/
+    │       │   └── icon.svg
+    │       ├── language/
+    │       │   └── labels.xlf
+    │       ├── templates/
+    │       │   ├── backend-preview.fluid.html
+    │       │   ├── frontend.fluid.html
+    │       │   └── partials/
+    │       └── config.yaml
+    ├── RecordTypes/
+    │   └── my-record/
+    │       ├── assets/
+    │       │   └── icon.svg
+    │       ├── language/
+    │       │   └── labels.xlf
+    │       └── config.yaml
+    ├── PageTypes/
+    │   └── blog-article/
+    │       ├── assets/
+    │       │   ├── icon.svg
+    │       │   ├── icon-hide-in-menu.svg
+    │       │   └── icon-root.svg
+    │       ├── language/
+    │       │   └── labels.xlf
+    │       ├── templates/
+    │       │   └── backend-preview.fluid.html
+    │       └── config.yaml
+    └── FileTypes/
+        └── image-extended/
+            ├── language/
+            │   └── labels.xlf
+            └── config.yaml
+```
 
-1. **Timing Is Everything** - Too early = annoying, too late = missed opportunity
-2. **Value Must Be Obvious** - Clear, immediate benefit
-3. **Respect the User** - Easy to dismiss, remember preferences
+## 5. Creating Content Elements
 
-### Trigger Strategies
+### Kickstart Command (Recommended)
 
-| Trigger | When to Use | Example |
-|---------|-------------|---------|
-| Scroll-based (25-50%) | Blog posts, long-form content | "You're halfway through—get more" |
-| Exit intent | E-commerce, lead gen | "Wait! Before you go..." |
-| Click-triggered | Lead magnets, demos | Zero annoyance |
-| Time-based (30-60s) | Proven engagement | General site visitors |
+```bash
+# Interactive mode
+ddev typo3 make:content-block
 
-### Popup Types
+# One-liner
+ddev typo3 make:content-block \
+  --content-type="content-element" \
+  --vendor="myvendor" \
+  --name="hero-banner" \
+  --title="Hero Banner" \
+  --extension="my_sitepackage"
 
-**Email Capture**: Newsletter subscription
-- Clear value prop (not just "Subscribe")
+# After creation, update database
+ddev typo3 cache:flush -g system
+ddev typo3 extension:setup --extension=my_sitepackage
+```
+
+### Predefined Basics (content elements)
+
+List under `basics:` to pull in Core field groups: **`TYPO3/Header`**, **`TYPO3/Appearance`**, **`TYPO3/Links`**, **`TYPO3/Categories`**. See the [Content Blocks basics reference](https://docs.typo3.org/p/friendsoftypo3/content-blocks/main/en-us/API/Basics/Index.html).
+
+### Minimal Content Element
+
+```yaml
+# EXT:my_sitepackage/ContentBlocks/ContentElements/hero-banner/config.yaml
+name: myvendor/hero-banner
+fields:
+  - identifier: header
+    useExistingField: true
+  - identifier: bodytext
+    useExistingField: true
+```
+
+### Full Content Element Example
+
+```yaml
+# EXT:my_sitepackage/ContentBlocks/ContentElements/hero-banner/config.yaml
+name: myvendor/hero-banner
+group: default
+description: "A full-width hero banner with image and CTA"
+prefixFields: true
+prefixType: full
+basics:
+  - TYPO3/Appearance
+  - TYPO3/Links
+fields:
+  - identifier: header
+    useExistingField: true
+  - identifier: subheadline
+    type: Text
+    label: Subheadline
+  - identifier: hero_image
+    type: File
+    minitems: 1
+    maxitems: 1
+    allowed: common-image-types
+  - identifier: cta_link
+    type: Link
+    label: Call to Action Link
+  - identifier: cta_text
+    type: Text
+    label: Button Text
+```
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
