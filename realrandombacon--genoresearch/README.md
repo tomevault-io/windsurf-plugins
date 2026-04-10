@@ -1,0 +1,23 @@
+# genoresearch
+
+> Config by [Realrandombacon](https://github.com/Realrandombacon/genoresearch) — distributed by [TomeVault](https://tomevault.io/claim/Realrandombacon)
+
+## Windsurf Config
+
+The `project-config.md` file in this directory is the project config converted for Windsurf.
+Original source: `CLAUDE.md` in [Realrandombacon/genoresearch](https://github.com/Realrandombacon/genoresearch).
+
+## Also available for
+
+- **Codex** — `AGENTS.md`
+- **GitHub Copilot** — `copilot-instructions.md`
+- **Cursor** — `project-config.mdc`
+- **Gemini CLI** — `GEMINI.md`
+- **Windsurf** — `project-config.md`
+
+Browse all formats: [https://tomevault.io/claim/Realrandombacon](https://tomevault.io/claim/Realrandombacon)
+
+---
+
+Converted and distributed by [TomeVault](https://tomevault.io) — AI instruction files for every platform.
+Is this your repo? [Claim it](https://tomevault.io/claim/Realrandombacon) to manage distribution.
