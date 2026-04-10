@@ -1,0 +1,23 @@
+# cat-santhropicopus4.5-jailbreak
+
+> Config by [ACComputing](https://github.com/ACComputing/cat-santhropicopus4.5-jailbreak) — distributed by [TomeVault](https://tomevault.io/claim/ACComputing)
+
+## Windsurf Config
+
+The `project-config.md` file in this directory is the project config converted for Windsurf.
+Original source: `CLAUDE.md` in [ACComputing/cat-santhropicopus4.5-jailbreak](https://github.com/ACComputing/cat-santhropicopus4.5-jailbreak).
+
+## Also available for
+
+- **Codex** — `AGENTS.md`
+- **GitHub Copilot** — `copilot-instructions.md`
+- **Cursor** — `project-config.mdc`
+- **Gemini CLI** — `GEMINI.md`
+- **Windsurf** — `project-config.md`
+
+Browse all formats: [https://tomevault.io/claim/ACComputing](https://tomevault.io/claim/ACComputing)
+
+---
+
+Converted and distributed by [TomeVault](https://tomevault.io) — AI instruction files for every platform.
+Is this your repo? [Claim it](https://tomevault.io/claim/ACComputing) to manage distribution.
