@@ -1,0 +1,23 @@
+# choon-stock-analysis-report
+
+> Config by [flame-choon](https://github.com/flame-choon/choon-stock-analysis-report) — distributed by [TomeVault](https://tomevault.io/claim/flame-choon)
+
+## Windsurf Config
+
+The `project-config.md` file in this directory is the project config converted for Windsurf.
+Original source: `CLAUDE.md` in [flame-choon/choon-stock-analysis-report](https://github.com/flame-choon/choon-stock-analysis-report).
+
+## Also available for
+
+- **Codex** — `AGENTS.md`
+- **GitHub Copilot** — `copilot-instructions.md`
+- **Cursor** — `project-config.mdc`
+- **Gemini CLI** — `GEMINI.md`
+- **Windsurf** — `project-config.md`
+
+Browse all formats: [https://tomevault.io/claim/flame-choon](https://tomevault.io/claim/flame-choon)
+
+---
+
+Converted and distributed by [TomeVault](https://tomevault.io) — AI instruction files for every platform.
+Is this your repo? [Claim it](https://tomevault.io/claim/flame-choon) to manage distribution.
