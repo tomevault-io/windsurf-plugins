@@ -1,0 +1,23 @@
+# xiuxian
+
+> Config by [zhs007](https://github.com/zhs007/xiuxian) — distributed by [TomeVault](https://tomevault.io/claim/zhs007)
+
+## Windsurf Config
+
+The `project-config.md` file in this directory is the project config converted for Windsurf.
+Original source: `AGENTS.md` in [zhs007/xiuxian](https://github.com/zhs007/xiuxian).
+
+## Also available for
+
+- **Claude Code** — `CLAUDE.md`
+- **GitHub Copilot** — `copilot-instructions.md`
+- **Cursor** — `project-config.mdc`
+- **Gemini CLI** — `GEMINI.md`
+- **Windsurf** — `project-config.md`
+
+Browse all formats: [https://tomevault.io/claim/zhs007](https://tomevault.io/claim/zhs007)
+
+---
+
+Converted and distributed by [TomeVault](https://tomevault.io) — AI instruction files for every platform.
+Is this your repo? [Claim it](https://tomevault.io/claim/zhs007) to manage distribution.
