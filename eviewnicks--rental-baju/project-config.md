@@ -1,211 +1,137 @@
 ---
 trigger: always_on
-description: Dokumen ini berisi panduan standar untuk format dokumentasi hasil implementasi task di project Maguru. Panduan ini mengacu pada best practice JIRA Agile Scrum dan memastikan konsistensi pelaporan hasil pengembangan.
+description: - Mendefinisikan sistem desain UI/UX utama untuk aplikasi rental software berbasis gaya Flat Modern Minimalist dengan sentuhan soft neumorphism dan aksen gold/yellow.
 ---
 
+# UI/UX Design System – Rental Software (v2)
 
-# Panduan Dokumentasi Hasil (result-ops-xxx.md)
+## Rules & Instruksi Utama
 
-## Tujuan Panduan
+**Tugas:**
 
-Dokumen ini berisi panduan standar untuk format dokumentasi hasil implementasi task di project Maguru. Panduan ini mengacu pada best practice JIRA Agile Scrum dan memastikan konsistensi pelaporan hasil pengembangan.
+- Mendefinisikan sistem desain UI/UX utama untuk aplikasi rental software berbasis gaya Flat Modern Minimalist dengan sentuhan soft neumorphism dan aksen gold/yellow.
+- Menjadi acuan utama seluruh tim dalam pengembangan, review, dan evaluasi UI/UX.
+- Menjamin konsistensi, aksesibilitas, dan kemudahan scaling di seluruh aplikasi.
 
-# [OPS-XXX] Hasil Implementasi [Nama Fitur]
+**Instruksi Penggunaan:**
 
-**Status**: [🟢 Complete | 🟡 Partial | 🔴 Blocked]  
-**Diimplementasikan**: [Tanggal Mulai] - [Tanggal Selesai]  
-**Developer**: [Nama Developer]  
-**Reviewer**: [Nama Reviewer]  
-**PR**: [Link Pull Request]
+- first of All selalu gunakan compoentn SHadcn UI terlebih dahulu, kemudian custom sesuai dengan kebutuhan.
+- Selalu rujuk dokumen ini sebelum membuat, mengubah, atau mereview komponen UI/UX.
+- Semua token warna, radius, shadow, dan font WAJIB didefinisikan di Tailwind config.
+- Gunakan Shadcn UI sebagai basis, custom hanya jika tidak tersedia.
+- Lakukan review berkala dan dokumentasikan perubahan besar di dokumen ini.
 
 ---
 
-## Daftar Isi
+## 1. **Gaya Visual**
 
-1. [Ringkasan Implementasi](mdc:#ringkasan-implementasi)
-2. [Perubahan dari Rencana Awal](mdc:#perubahan-dari-rencana-awal)
-3. [Status Acceptance Criteria](mdc:#status-acceptance-criteria)
-4. [Detail Implementasi](mdc:#detail-implementasi)
-5. [Kendala dan Solusi](mdc:#kendala-dan-solusi)
-6. [Rekomendasi Selanjutnya](mdc:#rekomendasi-selanjutnya)
+**Flat Modern Minimalist dengan Sentuhan Soft Neumorphism**
 
-## Ringkasan Implementasi (opsional Jika berhbungan dengan pembuatan fitur)
+- **Flat Design:**
+  - Hampir seluruh elemen menggunakan warna solid tanpa efek 3D, emboss, atau glassmorphism.
+  - Tidak ada shadow berat, hanya shadow sangat halus untuk depth minimal.
+- **Minimalist:**
+  - Banyak whitespace, layout sangat bersih, tidak ada elemen dekoratif berlebihan.
+  - Informasi disajikan secara ringkas dan jelas.
+- **Soft Neumorphism Touch:**
+  - Beberapa card memiliki sudut rounded yang sangat lembut, dan ada sedikit efek inner/outer shadow yang sangat subtle, memberi kesan “floating” tanpa berat.
+- **Modern UI:**
+  - Komponen card, button, dan badge tampil dengan bentuk rounded dan outline tipis.
+  - Ikon-ikon minimalis, micro-interaction implied (misal: tombol dengan lingkaran solid, dropdown dengan arrow sederhana).
 
-[Ringkasan singkat (3-5 kalimat) tentang fitur yang diimplementasikan, highlight utama, dan nilai bisnis yang dihasilkan]
+**Ciri Khas Visual:**
 
-### Ruang Lingkup
+- Sudut membulat (rounded corners) pada semua card dan komponen.
+- Grid modular, setiap informasi dalam card terpisah.
+- Visual hierarchy sangat jelas: judul besar, subjudul kecil, data/statistik menonjol.
+- Penggunaan icon dan avatar untuk memperkuat identitas dan affordance.
 
-[Deskripsi singkat tentang apa yang tercakup dalam implementasi dan apa yang tidak]
+---
 
-#### 1. React Components
+## B. Palet Warna
 
-**Server Components**:
+| Warna         | Hex Contoh      | Penggunaan Utama                |
+| ------------- | --------------- | ------------------------------- |
+| Gold          | #FFD700         | Highlight, CTA, progress, badge |
+| Putih         | #FFFFFF         | Background utama, card          |
+| Abu-abu muda  | #F8FAFC         | Background sekunder, card       |
+| Abu kehijauan | #E2E8F0         | Background grid, panel          |
+| Hitam         | #111827         | Teks utama, angka, tombol       |
+| Biru/Olive    | #3B82F6/#84CC16 | Status sekunder, badge          |
 
-- [Nama Komponen]: [Deskripsi singkat]
-- ...
+**Palet Warna:**
 
-**Client Components**:
+- **Dominan:**
+  - Gold (#FFD700 atau sejenis) sebagai warna aksen utama (highlight, progress, CTA).
+  - Putih dan abu-abu muda untuk background card dan area utama.
+  - Abu-abu kehijauan sebagai background utama (bukan putih polos, memberi nuansa modern dan tenang).
+- **Kontras:**
+  - Hitam untuk teks utama dan elemen penting (judul, angka, tombol utama).
+  - Aksen hitam solid pada tombol utama dan beberapa elemen interaktif.
+- **Hierarki Visual:**
+  - Warna aksen digunakan untuk menyorot status, progress, dan elemen penting (misal: tanggal terpilih, progress bar, AI Assistant).
+  - Warna netral untuk background agar konten mudah dibaca.
 
-- [Nama Komponen]: [Deskripsi singkat]
-- ...
+**Tipografi:**
 
-#### 2. State Management
+- **Jenis Huruf:**
+  - Sans-serif modern, kemungkinan besar menggunakan font seperti Inter, Poppins, atau Graphik.
+- **Ukuran & Konsistensi:**
+  - Judul besar, tebal, sangat readable.
+  - Subjudul dan label lebih kecil, tipis, dan konsisten.
+  - Angka/statistik sangat menonjol (besar, bold).
+- **Konsistensi:**
+  - Semua teks rata kiri, spasi antar elemen sangat rapi.
+  - Tidak ada variasi font yang berlebihan, menjaga kesan profesional.
 
-**Context Providers**:
+---
 
-- [Nama Context]: [Deskripsi singkat]
-- ...
+## C. Usage Guidelines
 
-**React Query/State**:
+- **Primary:** Gold untuk tombol utama, highlight, dan progress.
+- **Secondary:** Biru/olive untuk status sekunder, badge, atau notifikasi.
+- **Background:** Putih/abu-abu muda untuk latar utama dan card.
+- **Accent:** Gunakan warna aksen hanya untuk elemen penting, jangan berlebihan.
+- **Kontras:** Pastikan teks hitam di atas warna terang, dan sebaliknya.
 
-- [Nama Hook/Query]: [Deskripsi singkat]
-- ...
+---
 
-#### 3. Custom Hooks
+## E. Border Radius & Shadow
 
-**Feature Hooks**:
+- **Radius:**
+  - `rounded-lg` untuk card/panel utama
+  - `rounded-full` untuk avatar, icon, dan button bulat
+- **Shadow:**
+  - `shadow-md` untuk card utama (subtle, soft neumorphism)
+  - `shadow-sm`/`shadow-none` untuk data card atau elemen sekunder
+- Semua radius dan shadow didefinisikan sebagai token di Tailwind config.
 
-- [Nama Hook]: [Deskripsi singkat]
-- ...
+---
 
-**Utility Hooks**:
+## H. Interactive States
 
-- [Nama Hook]: [Deskripsi singkat]
-- ...
+**Interaksi:**
 
-#### 4. Data Access
+- **Affordance Jelas:**
+  - Button dan dropdown sangat jelas bisa diklik (warna solid, ikon arrow).
+  - Card dengan highlight warna menandakan status aktif/terpilih.
+- **Micro-interaction (Implied):**
+  - Hover state kemungkinan berupa perubahan warna background atau shadow subtle.
+  - Tidak ada animasi berat, menjaga performa dan fokus pada konten.
 
-**Adapters**:
+- **Hover:**
+  - Button: bg-gold-400, scale(1.02), shadow-lg
+  - Card: shadow-xl, border-gold-100
+- **Focus:** Outline 2px solid gold/olive, offset 2px
+- **Active:** scale(0.98), bg-gold-600
+- **Disabled:** opacity-50, cursor-not-allowed
+- Semua state diatur di Tailwind config dan utility class.
 
-- [Nama Adapter]: [Deskripsi singkat]
-- ...
-
-**API Endpoints**:
-
-- `[METHOD] /api/[path]` - [Deskripsi singkat]
-- ...
-
-#### 5. Server-side
-
-**Services**:
-
-- [Nama Service]: [Deskripsi singkat]
-- ...
-
-**Database Schema**:
-
-- [Nama Model/Perubahan]: [Deskripsi singkat]
-- ...
-
-#### 6. Cross-cutting Concerns
-
-**Types**:
-
-- [Nama Type]: [Deskripsi singkat]
-- ...
-
-**Utils**:
-
-- [Nama Util]: [Deskripsi singkat]
-- ...
-
-## Perubahan dari Rencana Awal
-
-[Deskripsi perubahan signifikan dari rencana awal (task-ops-xxx.md) dan justifikasinya]
-
-### Perubahan Desain
-
-| Komponen/Fitur  | Rencana Awal | Implementasi Aktual | Justifikasi |
-| --------------- | ------------ | ------------------- | ----------- |
-| [Nama Komponen] | [Deskripsi]  | [Deskripsi]         | [Alasan]    |
-| [API Endpoint]  | [Deskripsi]  | [Deskripsi]         | [Alasan]    |
-
-### Perubahan Teknis
-
-| Aspek           | Rencana Awal | Implementasi Aktual | Justifikasi |
-| --------------- | ------------ | ------------------- | ----------- |
-| [Struktur Data] | [Deskripsi]  | [Deskripsi]         | [Alasan]    |
-| [Teknologi]     | [Deskripsi]  | [Deskripsi]         | [Alasan]    |
-
-## Status Acceptance Criteria
-
-| Kriteria     | Status | Keterangan                  |
-| ------------ | ------ | --------------------------- |
-| [Kriteria 1] | ✅     | [Keterangan jika perlu]     |
-| [Kriteria 2] | ⚠️     | [Keterangan keterbatasan]   |
-| [Kriteria 3] | ❌     | [Alasan tidak implementasi] |
-
-## Detail Implementasi
-
-> **⚠️ PENTING**: Dokumentasi ini harus fokus pada detail implementasi yang jelas dan ringkas. **HINDARI MENAMPILKAN PSEUDOCODE ATAU IMPLEMENTASI KODE YANG RUMIT**. Berikan penjelasan tingkat tinggi tentang pendekatan yang diambil, pola yang digunakan, dan alasan di balik keputusan teknis. Pengecualian hanya untuk Schema Database dan TypeScript Interface yang perlu ditampilkan sebagaimana diimplementasikan.
-
-### Arsitektur Folder
-
-Implementasi mengikuti struktur folder standar yang didefinisikan dalam arsitektur Maguru:
-
-```
-/features/[feature-name]/
-├── components/         # Komponen React
-│   ├── ComponentName/  # Komponen dengan sub-komponen
-│   │   └── ...
-│   └── ...
-├── context/            # React Context Providers
-│   └── ...
-├── hooks/              # Custom React Hooks
-│   ├── feature/        # Feature-specific hooks
-│   └── shared/         # Shared hooks
-├── adapters/           # Data access adapters (API calls)
-│   └── ...
-├── services/           # Business logic
-│   └── ...
-├── types/              # TypeScript type definitions
-│   └── ...
-└── utils/              # Utility functions
-    └── ...
-```
-
-> **Catatan**: Jika implementasi Anda menyimpang dari struktur standar di atas, jelaskan alasannya di sini.
-
-### Komponen Utama
-
-#### [Nama Komponen]
-
-**File**: `/path/to/component.tsx`
-
-**Deskripsi**:
-[Deskripsi fungsi dan tanggung jawab komponen]
-
-**Pattern yang Digunakan**:
-
-- [Pattern 1]: [Deskripsi]
-- [Pattern 2]: [Deskripsi]
-
-### Alur Data
-
-[Jelaskan alur data dari API ke UI atau sebaliknya dengan fokus pada:
-
-1. Bagaimana data dimuat dari backend
-2. Bagaimana state dikelola (React Query, Context, dll)
-3. Bagaimana state mempengaruhi UI
-4. Bagaimana mutasi/update data dilakukan]
-
-### Database Schema
-
-[Jika ada perubahan skema database, jelaskan di sini]
-
-```prisma
-model UpdatedModel {
-  // Skema yang diimplementasikan
-}
-```
-
-### API Implementation
-
-#### [Endpoint URL]
+---
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Converted and distributed by [TomeVault](https://tomevault.io/claim/EviewNicks) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-09 -->
+<!-- tomevault:4.0:windsurf_rules:2026-04-10 -->
