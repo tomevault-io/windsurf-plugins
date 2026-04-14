@@ -5,14 +5,14 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `.cursor/rules/*.mdc` in [01esyaLebedeva/tsx_view_edit](https://github.com/01esyaLebedeva/tsx_view_edit).
+Original source: `GEMINI.md` in [01esyaLebedeva/tsx_view_edit](https://github.com/01esyaLebedeva/tsx_view_edit).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
-- **Gemini CLI** — `GEMINI.md`
+- **Cursor** — `project-config.mdc`
 - **Windsurf** — `project-config.md`
 
 Available for 6 platforms including Claude Code, Cursor, Windsurf, and more. [Browse all formats](https://tomevault.io/claim/01esyaLebedeva)
