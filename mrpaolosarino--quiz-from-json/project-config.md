@@ -1,168 +1,241 @@
 ---
 trigger: always_on
-description: Tailwind CSS Rules
+description: shadcn/ui Component Rules
 ---
 
 
+# shadcn/ui Components Reference
 
-## General Guidelines
+This project includes the following components in `@/components/ui` (shadcn/ui + custom extensions), all compatible with Vite + React:
 
-- Use Tailwind CSS classes for all styling
-- Avoid custom CSS unless absolutely necessary
-- Use semantic utility classes over arbitrary values
-- Prefer responsive design patterns with Tailwind breakpoints
+## Core Components
 
-## Responsive Design
+- **Button** — Button with variants (default, outline, destructive, ghost, link, secondary, icon, size).
+- **Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter** — Card and its sections for content wrapping.
+- **Badge** — Small label for statuses, tags, etc.
+- **Banner** — Banner for notifications, errors, info.
+- **Avatar, AvatarImage, AvatarFallback** — User avatar with fallback.
+- **Skeleton** — Skeleton loader.
+- **Separator** — Horizontal or vertical divider.
+- **Label** — Form label.
+- **Input** — Text input field.
+- **Textarea** — Multiline text input.
+- **Switch** — Toggle switch.
+- **Checkbox** — Checkbox input.
+- **RadioGroup, RadioGroupItem** — Radio button group.
+- **Select, SelectItem, ...** — Dropdown select.
+- **DropdownMenu, ...** — Context menu.
+- **ContextMenu, ...** — Right-click context menu.
+- **Popover, PopoverContent, ...** — Popover window.
+- **Tooltip, TooltipContent, ...** — Tooltip (hover hint).
+- **Tabs, TabsList, TabsTrigger, TabsContent** — Tab navigation.
+- **Accordion, AccordionItem, AccordionTrigger, AccordionContent** — Accordion sections.
+- **Dialog, DialogContent, ...** — Modal dialog.
+- **AlertDialog, ...** — Confirmation modal dialog.
+- **Sheet, SheetContent, ...** — Sliding side panel.
+- **Drawer, DrawerContent, ...** — Drawer for mobile/desktop.
+- **Toast, ToastProvider, ...** — Toast notifications.
+- **Sonner, Toaster** — Alternative toast (sonner).
+- **Progress** — Progress bar.
+- **Table, TableHeader, TableBody, ...** — Table.
+- **Pagination, PaginationItem, ...** — Pagination controls.
+- **Timeline, TimelineItem, ...** — Timeline/steps.
+- **HeroPill** — Decorative element for hero sections.
+- **Mockup, MockupFrame** — Wrapper for mockups/demos.
+- **CircleProgress** — Circular progress indicator.
+- **Chart, ChartContainer, ...** — Charts (based on recharts).
+- **Multiselect** — Multi-select with search (cmdk).
+- **Command, CommandDialog, ...** — Command palette (cmdk).
+- **ResizablePanel, ResizablePanelGroup, ResizableHandle** — Resizable panels.
+- **Sidebar, SidebarProvider, ...** — Sidebar with groups, menus, triggers.
+- **ThemeToggle** — Light/dark theme toggle.
+- **Tag** — Tag (uses plain `<a>` for links).
 
-Use Tailwind's responsive prefixes:
+## Descriptions and Usage Examples
 
-```typescript
-<div className="w-full md:w-1/2 lg:w-1/3">
-  Responsive width
-</div>
+### Button
 
-<div className="text-sm md:text-base lg:text-lg">
-  Responsive text size
-</div>
+A button with variants and sizes.
+
+```tsx
+import { Button } from "@/components/ui/button"
+<Button>Click me</Button>
+<Button variant="outline">Outline</Button>
+<Button size="icon"><Rocket /></Button>
 ```
 
-Breakpoints:
+### Card
 
-- `sm:` (640px+)
-- `md:` (768px+)
-- `lg:` (1024px+)
-- `xl:` (1280px+)
-- `2xl:` (1536px+)
+A card for wrapping content.
 
-## Layout Patterns
-
-### Flexbox
-
-```typescript
-// Centered content
-<div className="flex items-center justify-center min-h-screen">
-  <div>Centered content</div>
-</div>
-
-// Navigation
-<nav className="flex items-center justify-between p-4">
-  <div>Logo</div>
-  <div className="flex space-x-4">Navigation items</div>
-</nav>
+```tsx
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+<Card>
+  <CardHeader>
+    <CardTitle>Title</CardTitle>
+  </CardHeader>
+  <CardContent>Content</CardContent>
+</Card>;
 ```
 
-### Grid
+### Badge
 
-```typescript
-// Responsive grid
-<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-  <div>Grid item</div>
-  <div>Grid item</div>
-  <div>Grid item</div>
-</div>
+Small label for statuses, tags, etc.
+
+```tsx
+import { Badge } from "@/components/ui/badge";
+<Badge>New</Badge>;
 ```
 
-## Color System
+### Banner
 
-Use design system colors with CSS variables:
+Banner for notifications, errors, info.
 
-```typescript
-// Text colors
-className = "text-foreground text-muted-foreground text-primary";
-
-// Background colors
-className = "bg-background bg-card bg-primary";
-
-// Border colors
-className = "border-border border-input";
+```tsx
+import { Banner } from "@/components/ui/banner";
+<Banner variant="muted">Info message</Banner>;
 ```
 
-## Spacing and Sizing
+### Avatar
 
-### Consistent spacing
+User avatar with fallback.
 
-```typescript
-// Padding
-className = "p-4 px-6 py-2";
-
-// Margin
-className = "m-4 mx-auto my-8";
-
-// Space between children
-className = "space-x-4 space-y-2";
-
-// Gap in flex/grid
-className = "gap-4 gap-x-6 gap-y-2";
+```tsx
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+<Avatar>
+  <AvatarImage src="/user.png" />
+  <AvatarFallback>AB</AvatarFallback>
+</Avatar>;
 ```
 
-### Common patterns
+### Skeleton
 
-```typescript
-// Card spacing
-className = "p-6 space-y-4";
+Skeleton loader.
 
-// Button spacing
-className = "px-4 py-2";
-
-// Section spacing
-className = "py-8 md:py-16";
+```tsx
+import { Skeleton } from "@/components/ui/skeleton";
+<Skeleton className="h-8 w-32" />;
 ```
 
-## Typography
+### Separator
 
-```typescript
-// Headings
-className = "text-4xl font-bold tracking-tight";
-className = "text-2xl font-semibold";
-className = "text-xl font-medium";
+Horizontal or vertical divider.
 
-// Body text
-className = "text-base leading-relaxed";
-className = "text-sm text-muted-foreground";
-
-// Code
-className = "font-mono text-sm bg-muted px-2 py-1 rounded";
+```tsx
+import { Separator } from "@/components/ui/separator";
+<Separator />;
 ```
 
-## Interactive States
+### Label
 
-```typescript
-// Hover effects
-className = "hover:bg-accent hover:text-accent-foreground";
+Form label.
 
-// Focus states
-className = "focus:outline-none focus:ring-2 focus:ring-ring";
-
-// Active states
-className = "active:scale-95";
-
-// Disabled states
-className = "disabled:opacity-50 disabled:pointer-events-none";
+```tsx
+import { Label } from "@/components/ui/label";
+<Label htmlFor="email">Email</Label>;
 ```
 
-## Animations
+### Input
 
-```typescript
-// Transitions
-className = "transition-colors duration-200";
-className = "transition-all duration-300 ease-in-out";
+Text input field.
 
-// Hover animations
-className = "hover:scale-105 transition-transform";
-
-// Loading states
-className = "animate-pulse";
-className = "animate-spin";
+```tsx
+import { Input } from "@/components/ui/input";
+<Input placeholder="Type here..." />;
 ```
 
-## Best Practices
+### Textarea
 
-1. **Use semantic spacing**: Prefer `space-y-4` over individual margins
-2. **Mobile-first**: Start with mobile styles, add responsive prefixes for larger screens
-3. **Consistent sizing**: Use the spacing scale (4px increments)
-4. **Combine utilities**: Group related utilities logically
-5. **Use CSS variables**: Leverage the design system color tokens
+Multiline text input.
+
+```tsx
+import { Textarea } from "@/components/ui/textarea";
+<Textarea placeholder="Type here..." />;
+```
+
+### Switch
+
+Toggle switch.
+
+```tsx
+import { Switch } from "@/components/ui/switch";
+<Switch />;
+```
+
+### Checkbox
+
+Checkbox input.
+
+```tsx
+import { Checkbox } from "@/components/ui/checkbox";
+<Checkbox />;
+```
+
+### RadioGroup
+
+Radio button group.
+
+```tsx
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+<RadioGroup defaultValue="1">
+  <RadioGroupItem value="1" />
+  <RadioGroupItem value="2" />
+</RadioGroup>;
+```
+
+### Select
+
+Dropdown select.
+
+```tsx
+import {
+  Select,
+  SelectItem,
+  SelectTrigger,
+  SelectContent,
+} from "@/components/ui/select";
+<Select>
+  <SelectTrigger />
+  <SelectContent>
+    <SelectItem value="1">One</SelectItem>
+    <SelectItem value="2">Two</SelectItem>
+  </SelectContent>
+</Select>;
+```
+
+### DropdownMenu
+
+Context menu.
+
+```tsx
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
+<DropdownMenu>
+  <DropdownMenuTrigger>Open</DropdownMenuTrigger>
+  <DropdownMenuContent>
+    <DropdownMenuItem>Item 1</DropdownMenuItem>
+  </DropdownMenuContent>
+</DropdownMenu>;
+```
+
+### Popover
+
+Popover window.
+
+```tsx
+import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+} from "@/components/ui/popover";
+<Popover>
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Converted and distributed by [TomeVault](https://tomevault.io/claim/MrPaoloSarino) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-10 -->
+<!-- tomevault:4.0:windsurf_rules:2026-04-14 -->
