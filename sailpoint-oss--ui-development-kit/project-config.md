@@ -1,0 +1,192 @@
+---
+trigger: always_on
+description: This file provides rules and patterns for Cursor AI when working with the SailPoint UI Development Kit codebase.
+---
+
+# UI Development Kit - Cursor Rules
+
+This file provides rules and patterns for Cursor AI when working with the SailPoint UI Development Kit codebase.
+
+## Creating New API Endpoints / Electron IPC Handlers
+
+When creating new endpoints that need to communicate between the Angular frontend and Electron main process, you MUST follow the 5-step pattern documented at: https://developer.sailpoint.com/docs/tools/ui-development-kit/extending-services
+
+### Step-by-Step Pattern
+
+#### Step 1: Add the IPC Handler in Electron Main Process
+
+**File:** `app/main.ts`
+
+Add a new `ipcMain.handle()` inside the `//#region Custom IPC handlers` section:
+
+```typescript
+ipcMain.handle('my-new-method', async (event, param1: string, param2?: number) => {
+  // Implement your logic here
+  // You can:
+  // - Make API calls using fetch
+  // - Access the filesystem using fs
+  // - Call other helper functions
+  // - Return data to the renderer process
+  
+  try {
+    const result = await someOperation(param1, param2);
+    return { success: true, data: result };
+  } catch (error) {
+    console.error('Error in my-new-method:', error);
+    return { success: false, error: error.message };
+  }
+});
+```
+
+**Naming Convention for IPC Channels:**
+- Use kebab-case for channel names: `'my-new-method'`, `'get-user-data'`, `'save-config'`
+- Be descriptive about the action: `'fetch-colab-posts'`, `'deploy-workflow'`, `'validate-transform'`
+
+#### Step 2: Expose the Method in Preload Script
+
+**File:** `app/preload.ts`
+
+Add the method to the `contextBridge.exposeInMainWorld()` call:
+
+```typescript
+contextBridge.exposeInMainWorld('electronAPI', {
+  // ... existing methods ...
+  
+  // Add your new method - match the channel name from Step 1
+  myNewMethod: (param1: string, param2?: number) => ipcMain.invoke('my-new-method', param1, param2),
+});
+```
+
+**Important:**
+- The method name exposed (e.g., `myNewMethod`) should be camelCase
+- Parameters must match what the IPC handler expects
+- Use `ipcMain.invoke()` to call the handler defined in Step 1
+
+#### Step 3: Add Type Definition to ElectronAPIInterface
+
+**File:** `projects/sailpoint-components/src/lib/services/web-api.service.ts`
+
+Add the method signature to the `ElectronAPIInterface`:
+
+```typescript
+export interface ElectronAPIInterface {
+  // ... existing methods ...
+  
+  // Add your new method with full type definitions
+  myNewMethod: (param1: string, param2?: number) => Promise<MyNewMethodResponse>;
+}
+```
+
+**Type Definitions:**
+- Always define response types for better type safety
+- Define types in the same file or import from a shared types file:
+
+```typescript
+export type MyNewMethodResponse = {
+  success: boolean;
+  data?: MyDataType;
+  error?: string;
+};
+```
+
+#### Step 4: Implement the Web API Fallback (Optional but Recommended)
+
+**File:** `projects/sailpoint-components/src/lib/services/web-api.service.ts`
+
+If the application should work in web mode (without Electron), implement the web version:
+
+```typescript
+export class WebApiService implements ElectronAPIInterface {
+  // ... existing methods ...
+  
+  async myNewMethod(param1: string, param2?: number): Promise<MyNewMethodResponse> {
+    // Implement web-compatible version or proxy through backend
+    return this.apiCall<MyNewMethodResponse>('my-new-method', 'POST', { param1, param2 });
+  }
+}
+```
+
+**Note:** The `apiCall` method proxies requests to the backend server defined in the `server/` directory.
+
+#### Step 5: Use the API in Angular Components
+
+**File:** Any Angular component or service (e.g., `*.component.ts`)
+
+```typescript
+import { Component } from '@angular/core';
+import { ElectronApiFactoryService } from 'sailpoint-components';
+
+@Component({
+  selector: 'app-my-component',
+  templateUrl: './my-component.html'
+})
+export class MyComponent {
+  constructor(private apiFactory: ElectronApiFactoryService) {}
+
+  async performAction(): Promise<void> {
+    try {
+      const result = await this.apiFactory.getApi().myNewMethod('test', 42);
+      
+      if (result.success) {
+        console.log('Success:', result.data);
+      } else {
+        console.error('Failed:', result.error);
+      }
+    } catch (error) {
+      console.error('Error calling myNewMethod:', error);
+    }
+  }
+}
+```
+
+---
+
+## Common Response Patterns
+
+Always use consistent response patterns for IPC handlers:
+
+### Success/Error Pattern
+```typescript
+// For operations that succeed or fail
+return { success: true, data: resultData };
+return { success: false, error: 'Error message' };
+```
+
+### Validation Pattern
+```typescript
+// For validation operations
+return { isValid: true };
+return { isValid: false, errors: ['Error 1', 'Error 2'] };
+```
+
+### Status Pattern
+```typescript
+// For status checks
+return { 
+  status: 'active' | 'inactive' | 'pending',
+  details: { /* additional info */ }
+};
+```
+
+---
+
+## File Organization
+
+When adding new features that require IPC handlers, organize code as follows:
+
+```
+app/
+├── main.ts                      # IPC handlers go here
+├── preload.ts                   # Expose handlers here
+├── my-feature/                  # Feature-specific logic
+│   ├── my-feature.ts            # Main feature logic
+│   └── types.ts                 # TypeScript types
+
+projects/sailpoint-components/src/lib/
+├── services/
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Converted and distributed by [TomeVault](https://tomevault.io/claim/sailpoint-oss) — claim your Tome and manage your conversions.
+<!-- tomevault:4.0:windsurf_rules:2026-04-09 -->
