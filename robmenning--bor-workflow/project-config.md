@@ -1,0 +1,107 @@
+---
+trigger: always_on
+description: This project will create a workflow managment service implemented with the Prefect orchestration engine (https://docs.prefect.io/v3/get-started).
+---
+
+This project will create a workflow managment service implemented with the Prefect orchestration engine (https://docs.prefect.io/v3/get-started). 
+A top requirement is that this is a light and simple to admin implementation of Prefect.
+The context is an early stage project composed of docker container services, that has a next.js web application (docker container: bor-app), a node express api (docker container: bor-api), a mysql 8 database (docker container: bor-db), a filestore ftp service (docker container: bor-files), and this workflow service (docker container: bor-workflow). 
+All docker containers are running in separate processes in separate docker containers and are connected by a docker network called bor-network. 
+The bor-files, bor-db, and this bor-workflow share at least one docker persistent volume to be used in ETL and data processing workflows by this project. 
+This bor-workflow service will be responsible for two sub-services: 
+  1. bor-workflow-db: a postgresql database in a docker container using the standard best practice implementation of the database required to host the prefect server using a docker volume to persist the dataf. 
+  2. bor-etl-agent: a service for executing prefect workflows and tasks. 
+
+Initial workflow:
+This service will be used initially in the following business case: a simple ETL ingestion will: 
+1. check for the existence of an import file in the persistent docker volume shared with bor-files and bor-db. 
+2. execute the 'LOAD DATA INFILE' command to ingest the file into a staging table in the 'borarch' database in the bor-db contanerized database called 'FundClassFee'. 
+3. execute the stored procedure bormeta.usp_FundClassFee_Load . 
+A simple and flexible implementation is required because the team has minimal experience with Prefect and just wants a basic but capable framework for scheduling and managing data processing related
+workflows..
+The service will run in peroduction in a docker container called bor-workflow
+
+** Workflows implemented by this project are documented in /.workflows. ** 
+
+https://docs.prefect.io/v3/deploy/infrastructure-examples/docker
+
+
+
+## System port scheme:
+
+container      dev   stage prod  docker-internal
+-----------------------------------------------
+bor-app        4400  4500  4600  3000
+bor-api        4410  4510  4610  4000
+bor-db         4420  4520  4620  3306
+bof-message    4430  4530  4630  9092
+bor-workflow   4440  4540  4640  4200 ** this container/service
+    bor-workflow-db ...to be completed...
+    bor-etl-agent   ...to be completed... (4450  4550  4650  8888)
+bor-svc-calc   4460  4560  4660  5000
+bor-files      4470  4570  4670  21
+
+
+## prefect
+The Prefect subsystem will use a containerized PostgreSQL database for orchestration state, following a simple, maintainable, and industry-standard architecture. The recommended production setup uses three containers:
+
+### 1. Prefect Server/UI/API/CLI Container
+- **Image:** Official Prefect image (`prefecthq/prefect:3-latest`)
+- **Purpose:** Runs the Prefect server, UI, API, and CLI for orchestration, scheduling, and monitoring.
+- **Ports:** Exposes 4640 (UI/API) to the host (e.g., `-p 4440:4200` for dev).
+- **Management:** Start/stop with Docker (NOT Docker Compose). No custom ETL code or dependencies needed here.
+- **Example:**
+  ```bash
+  docker run -d --rm \
+    --name bor-workflow \
+    --network bor-network \
+    -p 4640:4200 \
+    -e PREFECT_API_DATABASE_CONNECTION_URL="postgresql+asyncpg://prefect:prefect@bor-workflow-db:5432/prefect" \
+    prefecthq/prefect:3-latest \
+    prefect server start --host 0.0.0.0
+  ```
+
+### 2. ETL Agent/Worker Container (Custom Image)
+- **Image:** Custom image based on `prefecthq/prefect:3-latest`, with your ETL dependencies (e.g., `mysql-client`, `pandas`, `mysql-connector-python`, etc.) installed.
+- **Purpose:** Runs the Prefect agent, which picks up and executes your ETL flows and tasks.
+- **Management:** Build and run as a separate container. Register this image with your Prefect work pool for flow execution.
+- **Example Dockerfile:**
+  ```dockerfile
+  FROM prefecthq/prefect:3-latest
+  RUN apt-get update && apt-get install -y mysql-client && \
+      pip install pandas mysql-connector-python python-dotenv
+  ```
+- **Example run:**
+  ```bash
+  docker run -d --rm \
+    --name bor-etl-agent \
+    --network bor-network \
+    -e PREFECT_API_URL="http://bor-workflow:4200/api" \
+    custom-etl-image:latest \
+    prefect agent start --work-pool 'default-agent-pool'
+  ```
+
+### 3. PostgreSQL Database Container (bor-workflow-db)
+- **Image:** Official PostgreSQL image (e.g., `postgres:latest`)
+- **Purpose:** Stores Prefect orchestration state and metadata.
+- **Management:** Start/stop with Docker or Docker Compose. Data persisted via Docker volume.
+- **Example:**
+  ```bash
+  docker run -d --name bor-workflow-db \
+    --network bor-network \
+    -v bor-workflow-db-data:/var/lib/postgresql/data \
+    -e POSTGRES_USER=prefect \
+    -e POSTGRES_PASSWORD=prefect \
+    -e POSTGRES_DB=prefect \
+    -p 5432:5432 \
+    postgres:latest
+  ```
+
+### Management and Usage
+- All containers are connected via the `bor-network` Docker network for secure, internal communication.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Converted and distributed by [TomeVault](https://tomevault.io/claim/robmenning) — claim your Tome and manage your conversions.
+<!-- tomevault:4.0:windsurf_rules:2026-04-09 -->
