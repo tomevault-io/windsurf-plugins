@@ -1,222 +1,186 @@
 ---
 trigger: always_on
-description: Complete guide for adding new service integrations to Agentopia with OAuth, API keys, and tool implementation
+description: 1. [Overview](#overview)
 ---
 
+# Token/Credits System SOP - OfferGen AI Platform
 
-# Adding New Integrations - Developer Guide
+## Table of Contents
+1. [Overview](#overview)
+2. [System Architecture](#system-architecture)
+3. [Database Schema](#database-schema)
+4. [Backend Implementation](#backend-implementation)
+5. [Frontend Token Library](#frontend-token-library)
+6. [UI Components](#ui-components)
+7. [Admin Management](#admin-management)
+8. [Integration Guide](#integration-guide)
+9. [Testing Procedures](#testing-procedures)
+10. [Deployment & Monitoring](#deployment--monitoring)
+11. [Troubleshooting](#troubleshooting)
 
 ## Overview
 
-This guide walks through the complete process of adding a new service integration to Agentopia. The process involves database configuration, edge function creation, tool registration, and UI integration.
+The Token/Credits System is a modular, reusable library that provides a unified way to manage AI feature access across the OfferGen AI platform. It acts as a virtual currency system where users purchase tokens and spend them on AI-powered features.
 
-## Integration Types
+### Key Features
+- **Modular Design**: Easy to add/remove from any feature
+- **Real-time Balance**: Live token balance updates
+- **Transaction History**: Complete audit trail
+- **Admin Controls**: Full administrative management
+- **Stripe Integration**: Seamless payment processing
+- **Usage Analytics**: Detailed consumption tracking
+- **Flexible Pricing**: Configurable token costs per feature
 
-Agentopia supports three main integration types:
+## System Architecture
 
-1. **OAuth 2.0**: Services requiring user authorization (Gmail, Microsoft, GitHub)
-2. **API Key**: Services using API key authentication (web search, email APIs)
-3. **SMTP**: Direct email server connections with credentials
+### Core Components
 
-## Step-by-Step Integration Process
+```mermaid
+graph TD
+    A[User Interface] --> B[Token Library]
+    B --> C[Database Layer]
+    B --> D[Stripe Integration]
+    B --> E[Admin Controls]
+    
+    F[AI Features] --> B
+    G[Usage Tracking] --> B
+    H[Analytics] --> C
+    
+    subgraph "Token Library"
+        B1[useTokens Hook]
+        B2[Token Service]
+        B3[Transaction Manager]
+        B4[Balance Calculator]
+    end
+```
 
-### 1. Database Configuration
+### Data Flow
 
-#### Add Service Provider
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant UI as Frontend UI
+    participant TL as Token Library
+    participant DB as Database
+    participant S as Stripe
+    
+    U->>UI: Request AI Feature
+    UI->>TL: Check Token Balance
+    TL->>DB: Query User Balance
+    DB-->>TL: Return Balance
+    TL-->>UI: Balance Status
+    
+    alt Sufficient Tokens
+        UI->>TL: Spend Tokens
+        TL->>DB: Create Transaction
+        TL->>DB: Update Balance
+        UI->>U: Execute AI Feature
+    else Insufficient Tokens
+        UI->>U: Show Purchase Modal
+        U->>S: Purchase Tokens
+        S->>DB: Update Balance
+        DB-->>UI: Refresh Balance
+    end
+```
 
-First, add the new service to the `service_providers` table:
+## Database Schema
+
+### Core Tables
 
 ```sql
--- Example: Adding Slack OAuth integration
-INSERT INTO service_providers (
-  name,
-  display_name,
-  provider_type,
-  authorization_endpoint,
-  token_endpoint,
-  scopes_supported,
-  configuration_metadata
-) VALUES (
-  'slack',
-  'Slack',
-  'oauth',
-  'https://slack.com/oauth/v2/authorize',
-  'https://slack.com/api/oauth.v2.access',
-  '[
-    "chat:write",
-    "channels:read",
-    "groups:read",
-    "im:read",
-    "mpim:read",
-    "users:read"
-  ]'::jsonb,
-  '{
-    "client_id_required": true,
-    "pkce_required": false,
-    "user_info_endpoint": "https://slack.com/api/users.identity",
-    "revoke_endpoint": "https://slack.com/api/auth.revoke",
-    "additional_auth_params": {
-      "user_scope": "identity.basic,identity.email"
-    }
-  }'::jsonb
+-- Token Transactions (Main ledger)
+CREATE TABLE token_transactions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  transaction_type TEXT NOT NULL CHECK (transaction_type IN ('purchase', 'usage', 'refund', 'bonus', 'expiration')),
+  amount INTEGER NOT NULL, -- Positive for credits, negative for debits
+  description TEXT NOT NULL,
+  metadata JSONB DEFAULT '{}',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  expires_at TIMESTAMPTZ, -- For expiring tokens
+  
+  -- Indexes for performance
+  INDEX idx_token_transactions_user_id (user_id),
+  INDEX idx_token_transactions_type (transaction_type),
+  INDEX idx_token_transactions_created (created_at DESC)
+);
+
+-- Token Purchases (Stripe integration)
+CREATE TABLE token_purchases (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  limit_type limit_type NOT NULL,
+  token_amount INTEGER NOT NULL,
+  price_paid NUMERIC(10,2) NOT NULL,
+  stripe_payment_intent_id TEXT,
+  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'completed', 'failed', 'refunded')),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  
+  -- Indexes
+  INDEX idx_token_purchases_user_id (user_id),
+  INDEX idx_token_purchases_status (status)
+);
+
+-- User Usage Tracking (Current balances and limits)
+CREATE TABLE user_usage (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  limit_type limit_type NOT NULL,
+  current_usage INTEGER DEFAULT 0,
+  additional_tokens INTEGER DEFAULT 0, -- Purchased tokens
+  token_balance INTEGER DEFAULT 0, -- Current token balance
+  last_reset_at TIMESTAMPTZ DEFAULT NOW(),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  
+  UNIQUE(user_id, limit_type),
+  INDEX idx_user_usage_user_id (user_id)
+);
+
+-- Admin Settings (Token pricing and rates)
+CREATE TABLE admin_settings (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  setting_key TEXT UNIQUE NOT NULL,
+  setting_value JSONB NOT NULL,
+  description TEXT,
+  updated_by UUID REFERENCES auth.users(id),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 ```
 
-```sql
--- Example: Adding API key service
-INSERT INTO service_providers (
-  name,
-  display_name,
-  provider_type,
-  configuration_metadata
-) VALUES (
-  'openai_api',
-  'OpenAI API',
-  'api_key',
-  '{
-    "api_key_header": "Authorization",
-    "api_key_prefix": "Bearer ",
-    "base_url": "https://api.openai.com/v1",
-    "rate_limits": {
-      "requests_per_minute": 60,
-      "requests_per_hour": 1000
-    },
-    "supported_models": [
-      "gpt-4",
-      "gpt-3.5-turbo",
-      "text-embedding-ada-002"
-    ]
-  }'::jsonb
-);
-```
-
-#### Update Tool Catalog
-
-Add tools to the `tool_catalog` table:
+### Database Functions
 
 ```sql
--- Add Slack tools
-INSERT INTO tool_catalog (
-  tool_name,
-  display_name,
-  description,
-  category,
-  provider_name,
-  function_schema,
-  is_active
-) VALUES 
-(
-  'slack_send_message',
-  'Send Slack Message',
-  'Send a message to a Slack channel or direct message',
-  'communication',
-  'slack',
-  '{
-    "type": "function",
-    "function": {
-      "name": "slack_send_message",
-      "description": "Send a message to a Slack channel or user",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "channel": {
-            "type": "string",
-            "description": "Channel ID or name (e.g., #general, @username)"
-          },
-          "text": {
-            "type": "string",
-            "description": "Message text to send"
-          },
-          "blocks": {
-            "type": "array",
-            "description": "Rich message blocks (optional)",
-            "items": {"type": "object"}
-          }
-        },
-        "required": ["channel", "text"]
-      }
-    }
-  }'::jsonb,
-  true
-),
-(
-  'slack_list_channels',
-  'List Slack Channels',
-  'Get a list of channels in the workspace',
-  'communication',
-  'slack',
-  '{
-    "type": "function",
-    "function": {
-      "name": "slack_list_channels",
-      "description": "List all channels in the Slack workspace",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "types": {
-            "type": "string",
-            "description": "Channel types to include (public_channel,private_channel,mpim,im)",
-            "default": "public_channel,private_channel"
-          },
-          "exclude_archived": {
-            "type": "boolean",
-            "description": "Exclude archived channels",
-            "default": true
-          }
-        }
-      }
-    }
-  }'::jsonb,
-  true
-);
-```
+-- Get user token balance
+CREATE OR REPLACE FUNCTION get_user_token_balance(p_user_id UUID)
+RETURNS INTEGER AS $$
+DECLARE
+  balance INTEGER := 0;
+BEGIN
+  SELECT COALESCE(SUM(amount), 0) INTO balance
+  FROM token_transactions
+  WHERE user_id = p_user_id
+    AND (expires_at IS NULL OR expires_at > NOW());
+  
+  RETURN GREATEST(balance, 0);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
-### 2. Create Edge Function
-
-Create a new Supabase Edge Function for the integration:
-
-```typescript
-// File: supabase/functions/slack-api/index.ts
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
-
-interface SlackAPIRequest {
-  action: string;
-  agent_id: string;
-  user_id: string;
-  params: Record<string, any>;
-}
-
-serve(async (req) => {
-  try {
-    // Parse request
-    const { action, agent_id, user_id, params }: SlackAPIRequest = await req.json();
-    
-    // Initialize Supabase client
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    );
-    
-    // Get user's Slack credentials
-    const credentials = await getUserSlackCredentials(supabase, user_id, agent_id);
-    if (!credentials) {
-      throw new Error('Question: Your Slack workspace needs to be connected. Please set up your Slack integration in the settings.');
-    }
-    
-    // Execute the requested action
-    let result;
-    switch (action) {
-      case 'send_message':
-        result = await sendSlackMessage(credentials.access_token, params);
-        break;
-      case 'list_channels':
-        result = await listSlackChannels(credentials.access_token, params);
-        break;
-      case 'create_channel':
+-- Add tokens to user account
+CREATE OR REPLACE FUNCTION add_user_tokens(
+  p_user_id UUID,
+  p_amount INTEGER,
+  p_transaction_type TEXT,
+  p_description TEXT,
+  p_metadata JSONB DEFAULT '{}'
+) RETURNS BOOLEAN AS $$
+BEGIN
+  INSERT INTO token_transactions (
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Converted and distributed by [TomeVault](https://tomevault.io/claim/maverick-software) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-09 -->
+<!-- tomevault:4.0:windsurf_rules:2026-04-13 -->
