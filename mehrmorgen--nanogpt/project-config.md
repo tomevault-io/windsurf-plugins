@@ -120,29 +120,9 @@ All documentation in this repo must adhere to [DOCUMENTATION.md](project-specifi
 
 **Quality Gates**: Run `uv run tools ci quality-gate` before each commit; see [`DEVELOPMENT.md#quality-gates-mandatory`](project-specific/DEVELOPMENT.md#quality-gates-mandatory) for full rationale.
 
-**Runtime Entry Points**: Use the Typer CLI commands documented in [`SETUP.md#basic-workflow-commands`](project-specific/SETUP.md#basic-workflow-commands) and the flows outlined in [`ARCHITECTURE.md#runtime-entry-points`](project-specific/ARCHITECTURE.md#runtime-entry-points).
 
-## Need Help?
-
-- **Setup issues**: See [SETUP.md](project-specific/SETUP.md) for installation and basic workflow
-- **Development questions**: Check [DEVELOPMENT.md](project-specific/DEVELOPMENT.md) for practices, standards, and architecture pointers
-- **Import problems**: Review [IMPORT_GUIDELINES.md](project-specific/IMPORT_GUIDELINES.md) for strict policies
-- **Troubleshooting**: Consult [TROUBLESHOOTING.md](project-specific/TROUBLESHOOTING.md) for common issues
-
-## 🧪 Testing Docs
-
-- Unit tests: see `tests/unit/README.md` (fast, isolated, pure-Python; no external TOML)
-- Integration tests: see `tests/integration/README.md` (compose real modules via Python APIs)
-- End-to-end (E2E) tests: see `tests/e2e/README.md` (CLI wiring, config merge, logging)
-  - Use explicit tiny defaults for E2E CLI runs:
-    `--exp-config tests/e2e/ml_playground/experiments/test_default_config.toml`
-
-______________________________________________________________________
-
-*This guideline system ensures consistent, high-quality development practices across the ml_playground module. Each
-document focuses on a specific aspect while maintaining coherent overall standards.*
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/mehrmorgen)
-> This is a context snippet only. You'll also want the standalone SKILL.md file — [download at TomeVault](https://tomevault.io/claim/mehrmorgen)
-<!-- tomevault:4.0:windsurf_rules:2026-04-07 -->
+> Converted and distributed by [TomeVault](https://tomevault.io/claim/mehrmorgen) — claim your Tome and manage your conversions.
+<!-- tomevault:4.0:windsurf_rules:2026-04-10 -->
