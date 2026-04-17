@@ -1,0 +1,172 @@
+---
+trigger: always_on
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+---
+
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project Overview
+
+AuditStream is a lightweight Go service for collecting and persisting audit logs. It consumes audit events from a NATS JetStream queue and batch writes them to VictoriaLogs for long-term storage and analysis.
+
+## Build and Development Commands
+
+```bash
+# Build the application
+go build -o auditstream
+
+# Run the application (requires config/values.yml)
+./auditstream
+
+# Run tests
+go test ./...
+
+# Run tests with verbose output
+go test -v ./...
+
+# Tidy dependencies
+go mod tidy
+
+# Build Docker image (build binary first with CGO_ENABLED=0)
+CGO_ENABLED=0 GOOS=linux go build -o auditstream
+docker build -t auditstream .
+```
+
+## Configuration
+
+Configuration is loaded from `config/values.yml`. Copy `config/values.example.yml` to create it:
+
+```yaml
+mode: debug|release      # Logging mode
+namespace: string        # Application namespace (used for stream naming)
+stream: string           # Stream name to consume (full: {namespace}_{stream})
+nats_hosts:              # NATS server addresses
+  - nats://127.0.0.1:4222
+nats_token: string       # NATS authentication token
+victoria: string         # VictoriaLogs endpoint URL
+victoria_path: string    # VictoriaLogs API path with query params
+batch_size: 100          # Flush buffer when reaching this count
+flush_interval: 5s       # Flush buffer at this interval
+```
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     NATS JetStream                          │
+│  ┌─────────────────┐                                        │
+│  │ Stream: {namespace}_{stream}                             │
+│  │ Subject: {namespace}.{stream}                            │
+│  │ Consumer: default (work queue mode)                      │
+│  └────────┬────────┘                                        │
+└───────────┼─────────────────────────────────────────────────┘
+            │
+            │ Consume() - push-based
+            ▼
+┌─────────────────────────────────────────────────────────────┐
+│                     AuditStream Pod                         │
+│                                                             │
+│   ┌─────────┐    ┌──────────────────┐    ┌───────────────┐  │
+│   │  push() │───►│ buffer []Msg     │───►│ write()       │  │
+│   │         │    │ (mutex protected)│    │ POST jsonline │  │
+│   └─────────┘    └──────────────────┘    └───────────────┘  │
+│                          │                                  │
+│              Flush triggers:                                │
+│              - len(buffer) >= batch_size                    │
+│              - ticker every flush_interval                  │
+└─────────────────────────────────────────────────────────────┘
+                           │
+                           ▼
+                  ┌─────────────────────────┐
+                  │      VictoriaLogs       │
+                  │  {victoria}{victoria_path}
+                  └─────────────────────────┘
+```
+
+## Key Source Files
+
+- **main.go** - Entry point, signal handling, graceful shutdown
+- **bootstrap/bootstrap.go** - Initialization (Zap logger, NATS, JetStream)
+- **app/app.go** - Core logic: Stream init, Consume, Buffer, Flush, Write
+- **common/common.go** - Configuration struct (Values) and global logger
+- **transfer/transfer.go** - Client SDK for publishing audit events
+
+## Data Flow
+
+1. **Initialization**: main.go → bootstrap → app.New() → app.Run()
+2. **Stream Setup**: CreateOrUpdateStream + CreateOrUpdateConsumer (auto-create on startup)
+3. **Consume**: JetStream pushes messages via Consume() callback
+4. **Buffer**: push() adds message to buffer, triggers flush if batch_size reached
+5. **Flush Loop**: Ticker triggers flush() every flush_interval
+6. **Write**: write() POSTs JSONL to VictoriaLogs, then ACK/NAK messages
+
+## Stream Initialization
+
+On startup, AuditStream auto-creates stream and consumer if not exist:
+
+```go
+// Stream config
+StreamConfig{
+    Name:        "{namespace}_{stream}",
+    Subjects:    ["{namespace}.{stream}"],
+    Retention:   WorkQueuePolicy,  // 消息被消费后删除
+    Storage:     FileStorage,
+    Compression: S2Compression,
+}
+
+// Consumer config
+ConsumerConfig{
+    Name:      "default",
+    AckPolicy: AckExplicitPolicy,  // 显式 ACK
+}
+```
+
+## Flush Logic
+
+```
+push(msg):
+    lock → append to buffer → unlock
+    if len(buffer) >= batch_size:
+        flush()
+
+flushLoop():
+    every flush_interval:
+        flush()
+    on stop signal:
+        flush() // final flush before shutdown
+
+flush():
+    lock → swap buffer → unlock
+    if empty: return
+    write() → success: ACK all / failure: NAK all
+```
+
+## Key Libraries
+
+- **nats.io/nats.go** - NATS client with JetStream support
+- **go.uber.org/zap** - Structured logging
+- **github.com/bytedance/sonic** - High-performance JSON
+- **gopkg.in/yaml.v3** - YAML configuration parsing
+
+## Transfer SDK
+
+Client SDK for publishing audit events to NATS JetStream.
+
+### Usage
+
+```go
+import "github.com/kainonly/auditstream/v3/transfer"
+
+// Create transfer client
+t, err := transfer.New(nc, "namespace")
+
+// Publish with AuditEvent (recommended)
+event := transfer.NewAuditEvent("audits", "用户登录").
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Converted and distributed by [TomeVault](https://tomevault.io/claim/kainonly) — claim your Tome and manage your conversions.
+<!-- tomevault:4.0:windsurf_rules:2026-04-09 -->
