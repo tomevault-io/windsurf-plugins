@@ -1,0 +1,193 @@
+---
+trigger: always_on
+description: ⚠️ Pre-push hook will REJECT incorrect imports
+---
+
+# Rules
+
+## 1. Material UI Imports (CRITICAL - 500KB+ Bundle Impact)
+
+⚠️ Pre-push hook will REJECT incorrect imports
+
+### ✅ CORRECT (Tree-shakeable):
+```typescript
+// Components - one per line
+import Button from '@mui/material/Button';
+import Box from '@mui/material/Box';
+
+// Icons - one per line
+import SearchIcon from '@mui/icons-material/Search';
+import EditIcon from '@mui/icons-material/Edit';
+
+// Hooks from /styles
+import { useTheme, styled } from '@mui/material/styles';
+
+// Types use 'import type'
+import type { PaletteMode } from '@mui/material';
+import type { SvgIconProps } from '@mui/material/SvgIcon';
+```
+
+### ❌ WRONG (Bloats bundle):
+```typescript
+import { Button, Box } from '@mui/material';           // NO!
+import { Search, Edit } from '@mui/icons-material';    // NO!
+import { PaletteMode } from '@mui/material';           // NO! Use 'import type'
+```
+
+**Common Components Quick Reference**:
+```typescript
+// Layout: Box, Container, Grid, Stack
+// Inputs: Button, TextField, Select, MenuItem, Checkbox, Switch
+// Feedback: Alert, Dialog, Snackbar, CircularProgress
+// Data: Table, TableBody, TableCell, TableHead, TableRow, Chip, Tooltip
+// Navigation: Tabs, Tab, Drawer
+// Utils: IconButton, Divider, Paper, Typography
+```
+
+**Validation**: Run `./scripts/check-mui-imports.sh` or `yarn build:analyze`
+
+## 2. Component File Organization (MANDATORY)
+
+Every component MUST follow the `index.tsx` pattern:
+
+```
+ComponentName/
+├── index.tsx              # Main component (REQUIRED)
+├── SubComponent.tsx       # Sub-components in same dir
+├── helpers.ts             # Component-specific utilities
+├── types.ts               # Component-specific types
+└── styles.css             # Component-specific styles
+```
+
+**Rules**:
+- ✅ Every component dir has `index.tsx` (main entry point)
+- ✅ Sub-components stay in parent directory, named `PascalCase.tsx`
+- ✅ Helper files: `helpers.ts`, `types.ts`, `constants.ts`, `utils.ts`
+- ✅ Shared/reusable → `shared/` or `common/` directory
+- ❌ NO components at root level without directory
+- ❌ NO redundant naming: `MyComponent/MyComponent.tsx` → use `MyComponent/index.tsx`
+
+**Examples**:
+```
+theme-toggle/
+└── index.tsx
+
+admin-console/
+├── index.tsx
+├── layout/index.tsx
+├── maps-page/index.tsx
+└── accounts-page/index.tsx
+
+action-widget/pane/
+├── topic-style-editor/
+│   ├── index.tsx
+│   ├── IconCollection.tsx
+│   └── ColorPicker.tsx
+└── shared/
+    ├── StyledTabs.tsx
+    └── StyledEditorContainer.tsx
+```
+
+**Clean Imports Result**:
+```typescript
+import ThemeToggle from '../common/theme-toggle';        // ✅ Clean
+import MapsPage from '../admin-console/maps-page';       // ✅ Clean
+// vs
+import ThemeToggle from '../common/theme-toggle/ThemeToggle'; // ❌ Redundant
+```
+
+## 3. Code Standards
+
+- **Language**: TypeScript preferred over JavaScript
+- **React**: Functional components + hooks (no class components)
+- **Naming**:
+  - Components: `PascalCase` (`MyComponent.tsx`)
+  - Utilities: `camelCase` (`myUtility.ts`)
+  - Constants: `UPPER_SNAKE_CASE` (`MAX_VALUE`)
+- **Git**:
+  - Clear commit messages
+  - No force push to `main`
+  - Branch names: `feature/name`, `fix/name`
+
+## 4. Performance
+
+- Check for duplicate dependencies before adding packages
+- Use dynamic imports for code splitting when appropriate
+- Run `yarn build:analyze` to verify bundle sizes
+
+## 5. Testing
+
+- Unit tests: `*.test.ts` or `*.test.tsx`
+- Integration tests: Cypress
+- Aim for good coverage on critical paths
+
+## 6. TypeScript Type Safety (CRITICAL)
+
+**MANDATORY**: All TypeScript code must be properly typed. NO exceptions.
+
+### Prohibited:
+- ❌ **NEVER use `any` type** - Always use specific types
+- ❌ **NEVER use `@ts-ignore` or `@ts-expect-error`** without discussion
+- ❌ **NEVER leave implicit `any`** from function parameters or variables
+
+### Required Practices:
+
+#### 1. Import Proper Types:
+```typescript
+// ✅ CORRECT - Import types from mindplot
+import { Topic, Designer } from '@wisemapping/mindplot';
+
+// ❌ WRONG - Using 'any'
+const topic: any = ...;
+```
+
+#### 2. Handle Nullable Types Correctly:
+```typescript
+// ✅ CORRECT - Properly handle Topic | null
+const getTopicDepth = (topic: Topic): number => {
+  let current: Topic | null = topic;
+  while (current && current.getParent() !== null) {
+    current = current.getParent();  // Returns Topic | null
+  }
+};
+
+// ❌ WRONG - Type mismatch
+const getTopicDepth = (topic: Topic): number => {
+  let current = topic;  // TypeScript infers Topic
+  current = current.getParent();  // ERROR: Topic | null not assignable to Topic
+};
+```
+
+#### 3. Use Unknown for Truly Unknown Types:
+```typescript
+// ✅ If you truly don't know the type
+const data: unknown = JSON.parse(str);
+if (typeof data === 'object' && data !== null) {
+  // Type guard before use
+}
+
+// ❌ WRONG
+const data: any = JSON.parse(str);
+```
+
+## 7. Linting and Code Quality (CRITICAL)
+
+**MANDATORY**: AI MUST check linter errors after EVERY file creation or modification.
+
+### When to Run Linter (REQUIRED):
+- ✅ **IMMEDIATELY after creating a new file**
+- ✅ **IMMEDIATELY after modifying an existing file**
+- ✅ **Before declaring a task complete**
+- ✅ **After any code generation or refactoring**
+
+### Linting Workflow (ENFORCED):
+```
+For EACH file created/modified:
+1. Write/modify the code
+2. IMMEDIATELY run read_lints([specific_file_path])
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Converted and distributed by [TomeVault](https://tomevault.io/claim/bashdeban) — claim your Tome and manage your conversions.
+<!-- tomevault:4.0:windsurf_rules:2026-04-09 -->
