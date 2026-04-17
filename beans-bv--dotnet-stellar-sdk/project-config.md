@@ -1,0 +1,32 @@
+---
+trigger: always_on
+description: Error handling patterns for .NET SDK
+---
+
+# Error Handling
+
+**Principles**: Recoverable errors → handle gracefully. Non-recoverable → fail fast. Never silently swallow exceptions.
+
+**Custom exceptions**: In `Exceptions/` folder, inherit from base exception. Include context (status codes, retry info).
+
+**HTTP errors**: Status codes → specific exceptions (`TooManyRequestsException`, `ServiceUnavailableException`, `HttpResponseException`). Include `RetryAfter` when available.
+
+**Pattern**:
+```csharp
+switch (response.StatusCode) {
+    case HttpStatusCode.TooManyRequests:
+        throw new TooManyRequestsException(retryAfter);
+    case HttpStatusCode.ServiceUnavailable:
+        throw new ServiceUnavailableException(retryAfter);
+    default:
+        throw new HttpResponseException(statusCode, message);
+}
+```
+
+**Logging**: Use `System.Diagnostics.Debug` or structured logging. Include exception details, context.
+
+**No crash reporting**: Library code, not app. Let consumers handle logging/crash reporting.
+
+---
+> Converted and distributed by [TomeVault](https://tomevault.io/claim/Beans-BV) — claim your Tome and manage your conversions.
+<!-- tomevault:4.0:windsurf_rules:2026-04-09 -->
