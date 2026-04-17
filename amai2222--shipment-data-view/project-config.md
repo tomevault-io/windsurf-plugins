@@ -1,0 +1,327 @@
+---
+trigger: always_on
+description: **AI助手必须使用简体中文进行所有交流和输出**
+---
+
+# Cursor AI 助手规则配置
+
+## 🌐 语言设置（最重要）
+
+**AI助手必须使用简体中文进行所有交流和输出**
+
+- ✅ AI助手的对话、解释、建议全部使用简体中文
+- ✅ 代码注释使用简体中文
+- ✅ Git提交信息使用简体中文
+- ✅ 文档和README使用简体中文
+- ✅ 错误提示和日志信息使用简体中文
+- ✅ 函数说明和注释使用简体中文
+
+## 💬 AI助手交流规范
+
+### 对话语言
+- **必须使用简体中文**回答用户问题
+- **必须使用简体中文**解释代码逻辑
+- **必须使用简体中文**提供建议和方案
+- 技术术语可保留英文（如React、TypeScript、SQL）
+- 代码变量名使用英文，但注释用中文
+
+### 示例
+```typescript
+// ✅ 正确：中文注释
+// 获取用户列表并按创建时间排序
+const getUserList = async () => {
+  // 调用API获取数据
+  const response = await fetch('/api/users');
+  return response.json();
+};
+
+// ❌ 错误：英文注释
+// Get user list and sort by created time
+const getUserList = async () => {
+  // Call API to fetch data
+  const response = await fetch('/api/users');
+  return response.json();
+};
+```
+
+## 📝 Git提交信息规范
+
+### 格式要求
+- **必须使用简体中文**
+- 格式：`动词 + 具体内容`
+- 简洁明了，一句话说明改动
+
+### 提交信息示例
+
+#### ✅ 好的提交信息（中文）
+```
+添加开票流程状态分区功能
+修复付款审核页面筛选器默认值
+优化申请单列表的分割线样式
+更新StatusBadge组件状态配置
+重构开票审批函数同步更新运单状态
+```
+
+#### ❌ 不好的提交信息（英文）
+```
+Add invoice workflow status partition feature
+Fix payment audit page filter default value
+Optimize application list divider style
+```
+
+## 🎨 代码规范
+
+### 命名规范
+- **变量名**：使用英文驼峰命名（camelCase）
+- **函数名**：使用英文驼峰命名（camelCase）
+- **组件名**：使用英文帕斯卡命名（PascalCase）
+- **注释**：使用简体中文
+- **UI文本**：使用简体中文
+
+### 示例
+```typescript
+// ✅ 正确示例
+interface PaymentRequest {
+  id: string;           // 申请单ID
+  status: string;       // 申请单状态
+  amount: number;       // 申请金额
+  createdAt: string;    // 创建时间
+}
+
+// 处理付款审批
+const handleApproval = async (requestId: string) => {
+  // 检查权限
+  if (!hasPermission) {
+    toast({ title: "权限不足", description: "您没有审批权限" });
+    return;
+  }
+  
+  // 调用审批接口
+  const result = await approvePayment(requestId);
+  
+  // 显示成功提示
+  toast({ title: "审批成功", description: "付款申请已通过审批" });
+};
+```
+
+## 📄 文档规范
+
+### 文档语言
+- **必须使用简体中文**编写所有文档
+- Markdown标题、正文、列表全部使用中文
+- 代码示例中的注释使用中文
+- 技术术语可保留英文（如API、SQL、RPC）
+
+### 文档结构
+```markdown
+# 功能名称（中文）
+
+## 功能概述
+用简体中文描述功能...
+
+## 使用方法
+1. 第一步操作说明（中文）
+2. 第二步操作说明（中文）
+
+## 代码示例
+\`\`\`typescript
+// 中文注释
+const example = () => {
+  // 具体实现
+};
+\`\`\`
+```
+
+## 🔧 SQL函数注释
+
+### 函数说明
+- 函数注释使用简体中文
+- 参数说明使用简体中文
+- 返回值说明使用简体中文
+
+### 示例
+```sql
+-- ============================================================================
+-- 函数名称：审批付款申请
+-- 功能描述：审批付款申请并同步更新运单状态
+-- 参数：
+--   p_request_id: 申请单ID
+-- 返回：JSON对象包含操作结果
+-- ============================================================================
+CREATE OR REPLACE FUNCTION approve_payment_request(
+    p_request_id TEXT
+)
+RETURNS JSONB
+AS $$
+BEGIN
+    -- 检查权限
+    IF NOT is_finance_or_admin() THEN
+        RAISE EXCEPTION '权限不足：只有财务或管理员可以审批';
+    END IF;
+    
+    -- 更新申请单状态
+    UPDATE payment_requests 
+    SET status = 'Approved'
+    WHERE request_id = p_request_id;
+    
+    RETURN jsonb_build_object('success', true, 'message', '审批成功');
+END;
+$$;
+
+COMMENT ON FUNCTION approve_payment_request IS '审批付款申请并同步更新运单状态';
+```
+
+## 🎯 用户界面文本
+
+### UI文本要求
+- **所有按钮文字**：简体中文
+- **所有提示信息**：简体中文
+- **所有表单标签**：简体中文
+- **所有错误信息**：简体中文
+
+### 示例
+```typescript
+// ✅ 正确
+<Button>提交申请</Button>
+toast({ title: "操作成功", description: "数据已保存" });
+<Label>申请单号</Label>
+
+// ❌ 错误
+<Button>Submit</Button>
+toast({ title: "Success", description: "Data saved" });
+<Label>Request ID</Label>
+```
+
+## 📊 数据库对象命名
+
+### 表名和字段名
+- 使用英文下划线命名（snake_case）
+- 注释使用简体中文
+
+```sql
+-- ✅ 正确
+CREATE TABLE payment_requests (
+    id UUID PRIMARY KEY,
+    request_id TEXT NOT NULL,      -- 申请单编号
+    status TEXT NOT NULL,          -- 申请单状态
+    created_at TIMESTAMP,          -- 创建时间
+    total_amount DECIMAL            -- 申请金额
+);
+
+COMMENT ON TABLE payment_requests IS '付款申请单表';
+COMMENT ON COLUMN payment_requests.status IS '申请单状态：Pending-待审核, Approved-已审批待支付, Paid-已支付';
+```
+
+## 🚀 AI助手工作流程
+
+当用户提问时，AI助手应该：
+
+1. **使用中文理解**用户需求
+2. **使用中文解释**解决方案
+3. **使用中文注释**生成代码
+4. **使用中文编写**提交信息
+5. **使用中文创建**文档
+
+## 💡 特殊情况处理
+
+### 技术术语保留英文
+- React, TypeScript, JavaScript
+- SQL, RPC, API, REST
+- Git, GitHub, Supabase
+- UUID, JSON, JSONB
+
+### 混合使用示例
+```
+// ✅ 正确：术语用英文，说明用中文
+// 调用Supabase RPC函数获取付款申请列表
+const { data, error } = await supabase.rpc('get_payment_requests');
+
+// 使用React Hook管理状态
+const [requests, setRequests] = useState<PaymentRequest[]>([]);
+```
+
+---
+
+## ✅ 配置验证
+
+当你看到AI助手：
+- ✅ 用中文回答问题
+- ✅ 用中文解释代码
+- ✅ 生成中文注释
+- ✅ 生成中文提交信息
+- ✅ 创建中文文档
+
+**说明配置生效！** 🎉
+
+---
+
+## 📅 日期同步规则（重要）
+
+### 自动同步当前日期
+
+**AI助手必须使用用户当前的系统日期，而不是AI训练数据的日期。**
+
+#### 日期配置文件
+- **配置文件**：项目根目录 `.cursor-date`
+- **格式**：`CURRENT_DATE=YYYY-MM-DD`
+- **示例**：`CURRENT_DATE=2025-11-16`
+- **自动更新**：运行 `npm run update-date` 自动更新为系统当前日期
+
+#### 日期使用规则
+
+1. **每次对话开始时**：
+   - AI助手必须首先读取 `.cursor-date` 文件
+   - 使用文件中的 `CURRENT_DATE` 作为当前日期
+   - 如果文件不存在或日期格式错误，AI助手应该：
+     1. 首先尝试运行 `npm run update-date` 自动更新日期
+     2. 如果自动更新失败，询问用户当前日期
+
+2. **创建新文件时**：
+   - SQL迁移文件：使用 `YYYYMMDD_` 前缀（如：`20251116_`）
+   - 文档中的日期：使用 `YYYY-MM-DD` 格式（如：`2025-11-16`）
+   - 代码注释中的日期：使用 `YYYY-MM-DD` 格式
+
+3. **更新日期时**：
+   - 当用户提供新日期时，AI助手应该：
+     1. 更新 `.cursor-date` 文件
+     2. 更新所有相关文档和代码中的日期
+     3. 确认日期已同步
+
+4. **日期格式**：
+   - 标准格式：`YYYY-MM-DD`（如：`2025-11-16`）
+   - 文件名格式：`YYYYMMDD`（如：`20251116`）
+   - 文档格式：`YYYY-MM-DD`（如：`2025-11-16`）
+
+#### 示例
+
+```markdown
+# 当创建新迁移文件时
+文件名：supabase/migrations/20251116_add_new_feature.sql
+注释：-- 日期：2025-11-16
+
+# 当创建新文档时
+文档头部：
+## 📅 创建日期
+2025-11-16
+
+**最后更新**：2025-11-16
+```
+
+#### 注意事项
+
+- ✅ **必须**使用 `.cursor-date` 文件中的日期
+- ✅ **必须**在创建新文件时使用当前日期
+- ✅ **必须**在更新文档时同步日期
+- ❌ **禁止**使用AI训练数据中的日期
+- ❌ **禁止**使用硬编码的旧日期
+
+---
+
+**配置文件位置**：项目根目录 `.cursorrules`  
+**日期配置文件**：项目根目录 `.cursor-date`  
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Converted and distributed by [TomeVault](https://tomevault.io/claim/amai2222) — claim your Tome and manage your conversions.
+<!-- tomevault:4.0:windsurf_rules:2026-04-09 -->
