@@ -7,14 +7,14 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `copilot-instructions.md` in [JuliusBrussee/caveman](https://github.com/JuliusBrussee/caveman).
+Original source: `GEMINI.md` in [JuliusBrussee/caveman](https://github.com/JuliusBrussee/caveman).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
+- **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
-- **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
 From [JuliusBrussee/caveman](https://github.com/JuliusBrussee/caveman) — a repo with 38711+ stars on GitHub.
