@@ -1,0 +1,13 @@
+---
+trigger: always_on
+description: Use styled components for the frontend framework.
+---
+
+
+# Overview
+
+When working in the frontend, use styled components for the frontend framework. Only create custom components if absolutely necessary. Always check the latest styled components documentation for the best practices. Use a common file for variables and mixins but keep component specific styles in the component file.
+
+---
+> Converted and distributed by [TomeVault](https://tomevault.io/claim/AcademySoftwareFoundation) — claim your Tome and manage your conversions.
+<!-- tomevault:4.0:windsurf_rules:2026-04-09 -->
