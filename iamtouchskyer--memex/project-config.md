@@ -99,16 +99,22 @@ If you **change sync behavior**:
 - **Hooks fail silently**: They're git sync calls, not user-facing logic. If git is offline, don't crash.
 - **Embedding cache invalidation**: SHA-256 content hash per card. Stale entries cleaned on `embedCards()`. Don't switch to timestamp-based — content hash is correct.
 
-## Platform Integration Files
+## Flomo Integration (Bidirectional Sync)
 
-```
-Claude Code:  hooks/hooks.json, skills/*, .claude-plugin/*
-VS Code:      vscode-extension/
-Pi:           pi-extension/index.ts
-```
+Memex has bidirectional sync with flomo. Two hard rules:
 
-These are separate integration surfaces. Changing core code doesn't require updating them unless you change tool signatures or card format.
+### Flomo → Memex (Import)
+
+- **Digest, never mechanical import.** Flomo memos are fleeting notes, NOT Zettelkasten cards. The agent must read, curate, and rewrite into atomic insights.
+- All imported cards get `source: flomo` in frontmatter.
+- Use `flomoImportCommand` for bulk parsing, or `flomo_import_parse` MCP tool to preview memos before curating.
+- Quality bar: skip garbage (<150 bytes), merge related memos, extract only non-obvious insights.
+
+### Memex → Flomo (Push)
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/iamtouchskyer) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-09 -->
+> Source: [iamtouchskyer/memex](https://github.com/iamtouchskyer/memex) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-04-20 -->
