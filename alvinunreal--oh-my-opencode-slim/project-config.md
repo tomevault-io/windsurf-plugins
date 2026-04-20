@@ -1,0 +1,164 @@
+---
+trigger: always_on
+description: This document provides guidelines for AI agents operating in this repository.
+---
+
+# Agent Coding Guidelines
+
+This document provides guidelines for AI agents operating in this repository.
+
+## Project Overview
+
+**oh-my-opencode-slim** - A lightweight agent orchestration plugin for OpenCode, a slimmed-down fork of oh-my-opencode. Built with TypeScript, Bun, and Biome.
+
+## Commands
+
+| Command | Description |
+|---------|-------------|
+| `bun run build` | Build TypeScript to `dist/` (both index.ts and cli/index.ts) |
+| `bun run typecheck` | Run TypeScript type checking without emitting |
+| `bun test` | Run all tests with Bun |
+| `bun run lint` | Run Biome linter on entire codebase |
+| `bun run format` | Format entire codebase with Biome |
+| `bun run check` | Run Biome check with auto-fix (lint + format + organize imports) |
+| `bun run check:ci` | Run Biome check without auto-fix (CI mode) |
+| `bun run dev` | Build and run with OpenCode |
+
+**Running a single test:** Use Bun's test filtering with the `-t` flag:
+```bash
+bun test -t "test-name-pattern"
+```
+
+## Code Style
+
+### General Rules
+- **Formatter/Linter:** Biome (configured in `biome.json`)
+- **Line width:** 80 characters
+- **Indentation:** 2 spaces
+- **Line endings:** LF (Unix)
+- **Quotes:** Single quotes in JavaScript/TypeScript
+- **Trailing commas:** Always enabled
+
+### TypeScript Guidelines
+- **Strict mode:** Enabled in `tsconfig.json`
+- **No explicit `any`:** Generates a linter warning (disabled for test files)
+- **Module resolution:** `bundler` strategy
+- **Declarations:** Generate `.d.ts` files in `dist/`
+
+### Imports
+- Biome auto-organizes imports on save (`organizeImports: "on"`)
+- Let the formatter handle import sorting
+- Use path aliases defined in TypeScript configuration if present
+
+### Naming Conventions
+- **Variables/functions:** camelCase
+- **Classes/interfaces:** PascalCase
+- **Constants:** SCREAMING_SNAKE_CASE
+- **Files:** kebab-case for most, PascalCase for React components
+
+### Error Handling
+- Use typed errors with descriptive messages
+- Let errors propagate appropriately rather than catching silently
+- Use Zod for runtime validation (already a dependency)
+
+### Git Integration
+- Biome integrates with git (VCS enabled)
+- Commits should pass `bun run check:ci` before pushing
+
+## Project Structure
+
+```
+oh-my-opencode-slim/
+├── src/
+│   ├── agents/       # Agent factories (orchestrator, explorer, oracle, etc.)
+│   ├── background/   # Background task management
+│   ├── cli/          # CLI entry point
+│   ├── config/       # Constants, schemas, MCP defaults
+│   ├── council/      # Council manager (multi-LLM session orchestration)
+│   ├── hooks/        # OpenCode lifecycle hooks
+│   ├── mcp/          # MCP server definitions
+│   ├── skills/       # Skill definitions (included in package publish)
+│   ├── tools/        # Tool definitions (background tasks, council, etc.)
+│   └── utils/        # Shared utilities (tmux, session helpers)
+├── dist/             # Built JavaScript and declarations
+├── docs/             # User-facing documentation
+├── biome.json        # Biome configuration
+├── tsconfig.json     # TypeScript configuration
+└── package.json      # Project manifest and scripts
+```
+
+## Key Dependencies
+
+- `@modelcontextprotocol/sdk` - MCP protocol implementation
+- `@opencode-ai/sdk` - OpenCode AI SDK
+- `zod` - Runtime validation
+- `vscode-jsonrpc` / `vscode-languageserver-protocol` - LSP support
+
+## Development Workflow
+
+1. Make code changes
+2. Update docs when behavior, commands, configuration, workflows, or user-facing output changes
+   - Check `README.md` plus relevant files in `docs/`
+   - Keep examples, command snippets, and feature lists in sync with the code
+   - If no doc update is needed, explicitly confirm that in your final summary
+3. Run `bun run check:ci` to verify linting and formatting
+4. Run `bun run typecheck` to verify types
+5. Run `bun test` to verify tests pass
+6. Commit changes
+
+## Tmux Session Lifecycle Management
+
+When working with tmux integration, understanding the session lifecycle is crucial for preventing orphaned processes and ghost panes.
+
+### Session Lifecycle Flow
+
+```
+Task Launch:
+  session.create() → tmux pane spawned → task runs
+
+Task Completes Normally:
+  session.status (idle) → extract results → session.abort()
+  → session.deleted event → tmux pane closed
+
+Task Cancelled:
+  cancel() → session.abort() → session.deleted event
+  → tmux pane closed
+
+Session Deleted Externally:
+  session.deleted event → task cleanup → tmux pane closed
+```
+
+### Key Implementation Details
+
+**1. Graceful Shutdown (src/utils/tmux.ts)**
+```typescript
+// Always send Ctrl+C before killing pane
+spawn([tmux, "send-keys", "-t", paneId, "C-c"])
+await delay(250)
+spawn([tmux, "kill-pane", "-t", paneId])
+```
+
+**2. Session Abort Timing (src/background/background-manager.ts)**
+- Call `session.abort()` AFTER extracting task results
+- This ensures content is preserved before session termination
+- Triggers `session.deleted` event for cleanup
+
+**3. Event Handlers (src/index.ts)**
+Both handlers must be wired up:
+- `backgroundManager.handleSessionDeleted()` - cleans up task state
+- `tmuxSessionManager.onSessionDeleted()` - closes tmux pane
+
+### Testing Tmux Integration
+
+After making changes to session management:
+
+```bash
+# 1. Build the plugin
+bun run build
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [alvinunreal/oh-my-opencode-slim](https://github.com/alvinunreal/oh-my-opencode-slim) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-04-20 -->
