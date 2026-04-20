@@ -1,37 +1,149 @@
 ---
 trigger: always_on
-description: - `make build` - Build all packages
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-# Agent Guidelines for LangGraphGo
+# CLAUDE.md
 
-## Build/Lint/Test Commands
-- `make build` - Build all packages
-- `make test` - Run all tests; for single test: `go test -v ./path/to/pkg -run TestName`
-- `make test-race` - Run with race detector
-- `make lint` - Run golangci-lint (also run `make fmt`, `make vet` before committing)
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project Overview
+
+**LangGraphGo** (nickname: `lango`) is a Go implementation of LangChain's LangGraph framework for building stateful, multi-agent applications with LLMs. It uses a directed graph structure where nodes are processing units (agents, tools, functions) and edges define execution flow, with state flowing through and evolving at each node.
+
+## Build and Test Commands
+
+```bash
+# Build
+make build              # Build all packages
+
+# Testing
+make test               # Run all tests
+go test -v ./path/to/pkg -run TestName   # Run single test
+make test-race          # Run with race detector
+make test-coverage      # Generate coverage.out, coverage.html, coverage.svg
+make test-checkpoint    # Test checkpointing only
+make test-graph         # Test graph package only
+make test-prebuilt      # Test prebuilt agents only
+make test-ptc           # Test PTC only
+make test-memory        # Test memory only
+
+# Code Quality (run before committing)
+make fmt                # Format code with gofmt
+make fmt-check          # Check formatting
+make vet                # Run go vet
+make lint               # Run golangci-lint
+make check              # Run fmt-check, vet, lint
+make pre-commit         # Run fmt, vet, lint, test
+
+# Dependencies
+make tidy               # Tidy and verify dependencies
+make deps               # Download dependencies
+make install-tools      # Install golangci-lint
+
+# Other
+make examples           # Build all examples
+make showcases          # Build showcases
+make clean              # Clean artifacts
+make info               # Display project info
+```
+
+## Architecture
+
+### Core Graph Engine (`graph/`)
+
+The heart of the framework. Key types:
+- `StateGraph` - Untyped graph using `map[string]any`
+- `StateGraphTyped[S]` - Generic typed version for compile-time safety
+- `StateRunnable` - Compiled executable graph
+- `MessageGraph` - Specialized for message-passing workflows
+
+**Key concepts:**
+- **Nodes** have name, description, and function (signature: `func(ctx context.Context, state S) (S, error)`)
+- **Edges** connect nodes: static (`AddEdge`) or conditional (`AddConditionalEdge`)
+- **Parallel execution**: When multiple nodes share the same starting point, they execute concurrently with thread-safe state merging
+- **Checkpointing**: Save/resume execution state (SQLite, PostgreSQL, Redis, file, memory backends in `store/`)
+- **Streaming**: Real-time event streaming with listeners
+- **Human-in-the-loop**: `InterruptBefore`/`InterruptAfter` for pauses, `UpdateState` for editing history
+
+### State Management
+
+State can be:
+1. **Untyped**: `map[string]any` for flexibility
+2. **Typed**: Use `StateGraphTyped[MyStruct]` for compile-time safety
+3. **Structured**: `StateSchema` with reducers for granular updates
+
+Reducers control how state updates merge:
+- `AppendReducer` - Append slices
+- `AddMessages` - Smart message merging with ID-based upserts
+- Custom reducers supported
+
+### Prebuilt Agents (`prebuilt/`)
+
+Ready-to-use agent factories:
+- `CreateReactAgent` - ReAct (Reasoning + Acting) pattern
+- `CreateSupervisor` - Multi-agent orchestration
+- `CreatePlanningAgent` - Plan creation and execution
+- `CreateReflectionAgent` - Self-correcting
+- `CreateTreeOfThoughts` - Multi-path reasoning
+- `CreatePEVAgent` - Plan-Execute-Verify
+- `CreateChatAgent` - Multi-turn conversations
+- `CreateAgent` - Flexible factory with options
+
+### Programmatic Tool Calling (`ptc/`)
+
+Agents generate code to call tools, reducing latency by ~10x. Supports Python, JavaScript, and Shell execution modes.
+
+### Memory (`memory/`)
+
+Conversation memory strategies:
+- `Buffer` - Simple FIFO
+- `SlidingWindow` - Recent context with overlap
+- `Summarization` - Compress older conversations
+- `Hierarchical` - Multi-level with importance scoring
+- `OSLike` - Paging/eviction
+- `GraphBased` - Graph-structured
+- `Retrieval` - Retrieval-based
+
+### RAG (`rag/`)
+
+Retrieval-Augmented Generation:
+- Vector RAG with various stores
+- GraphRAG with FalkorDB knowledge graphs
+- Hybrid approaches
+- Document loaders, text splitters, retrievers
+
+### Tools (`tool/`)
+
+Web search (Tavily, Brave, Exa, Bocha), file operations, code execution.
+
+### Adapters (`adapter/`)
+
+- `goskills/` - Custom Go-based skills
+- `mcp/` - Model Context Protocol tools
 
 ## Code Style
-- Use `make fmt` to format code with gofmt before committing
-- Exported types/functions: PascalCase; private: camelCase
-- Define errors as package-level variables: `var (ErrX = errors.New("..."))`
-- Write godoc comments for all exported identifiers
-- Tests: Use table-driven tests with `t.Run()`, `t.Parallel()` where appropriate
-- Always check errors (linted by golangci-lint)
-- Run `make check` (fmt-check, vet, lint) and `make test` before committing
 
-## Package Overview
-- graph: Core graph construction and execution engine with state management
-- memory: Various memory strategies for conversational AI applications
-- prebuilt: Ready-to-use agent implementations (ReAct, Supervisor, Planning, etc.)
-- ptc: Programmatic tool calling using generated code (Python, JavaScript, Shell)
-- rag: Retrieval-Augmented Generation with vector and GraphRAG support
-- store: Checkpoint storage backends (SQLite, PostgreSQL, Redis)
-- tool: Collection of tools for web search, file ops, code execution
-- log: Simple leveled logging interface for applications
-- adapter: Integration adapters for GoSkills, MCP, and external systems
+From `AGENTS.md`:
+- Exported: PascalCase; private: camelCase
+- Package-level errors: `var ErrX = errors.New("...")`
+- Godoc comments for all exported identifiers
+- Table-driven tests with `t.Run()`, `t.Parallel()` where appropriate
+- Always check errors
+
+**Clean up generated artifacts**:
+- Delete temporary binary files after tasks complete
+- Use `go run` instead of `go build && ./binary` for one-off executions
+- If you must build binaries, clean them up: `rm -f ./binary_name` or `make clean`
+
+**Logging conventions**:
+- Log messages should start with a lowercase letter (not capitalized)
+- This is because log packages typically add timestamps/prefixes
+- Good: `log.Println("processing request")`  or `log.Printf("user %s not found", userID)`
+- Bad:  `log.Println("Processing request")`  or `log.Printf("User %s not found", userID)`
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/smallnest)
-> This is a context snippet only. You'll also want the standalone SKILL.md file — [download at TomeVault](https://tomevault.io/claim/smallnest)
-<!-- tomevault:4.0:windsurf_rules:2026-04-08 -->
+> Source: [smallnest/langgraphgo](https://github.com/smallnest/langgraphgo) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-04-20 -->
