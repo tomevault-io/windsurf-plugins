@@ -1,137 +1,149 @@
 ---
 trigger: always_on
-description: - Mendefinisikan sistem desain UI/UX utama untuk aplikasi rental software berbasis gaya Flat Modern Minimalist dengan sentuhan soft neumorphism dan aksen gold/yellow.
+description: Dokumen ini berisi protokol standar untuk proses debugging pada aplikasi Maguru, khususnya untuk fitur-fitur kompleks seperti auto-save draft dan toggle mode editor. Protokol ini dirancang untuk membantu developer mengidentifikasi, melacak, dan menyelesaikan masalah secara sistematis.
 ---
 
-# UI/UX Design System – Rental Software (v2)
+# Protokol Debugging Maguru
 
-## Rules & Instruksi Utama
+## 1. Pendahuluan
 
-**Tugas:**
+Dokumen ini berisi protokol standar untuk proses debugging pada aplikasi Maguru, khususnya untuk fitur-fitur kompleks seperti auto-save draft dan toggle mode editor. Protokol ini dirancang untuk membantu developer mengidentifikasi, melacak, dan menyelesaikan masalah secara sistematis.
 
-- Mendefinisikan sistem desain UI/UX utama untuk aplikasi rental software berbasis gaya Flat Modern Minimalist dengan sentuhan soft neumorphism dan aksen gold/yellow.
-- Menjadi acuan utama seluruh tim dalam pengembangan, review, dan evaluasi UI/UX.
-- Menjamin konsistensi, aksesibilitas, dan kemudahan scaling di seluruh aplikasi.
+## 2. Persiapan Debugging
 
-**Instruksi Penggunaan:**
+### 2.1 Konfigurasi Logger
 
-- first of All selalu gunakan compoentn SHadcn UI terlebih dahulu, kemudian custom sesuai dengan kebutuhan.
-- Selalu rujuk dokumen ini sebelum membuat, mengubah, atau mereview komponen UI/UX.
-- Semua token warna, radius, shadow, dan font WAJIB didefinisikan di Tailwind config.
-- Gunakan Shadcn UI sebagai basis, custom hanya jika tidak tersedia.
-- Lakukan review berkala dan dokumentasikan perubahan besar di dokumen ini.
+Sebelum memulai debugging, pastikan sistem logging sudah dikonfigurasi dengan benar:
 
----
+```typescript
+// Pastikan level logging sesuai kebutuhan debugging
+logger.setLevel('debug');
+```
 
-## 1. **Gaya Visual**
+### 2.2 Tools Debugging yang Diperlukan
 
-**Flat Modern Minimalist dengan Sentuhan Soft Neumorphism**
+- Browser DevTools (Chrome/Firefox)
+- React DevTools Extension
+- Redux DevTools (jika menggunakan Redux)
+- Network Monitor pada DevTools
+- Winston Logger yang sudah diimplementasikan
 
-- **Flat Design:**
-  - Hampir seluruh elemen menggunakan warna solid tanpa efek 3D, emboss, atau glassmorphism.
-  - Tidak ada shadow berat, hanya shadow sangat halus untuk depth minimal.
-- **Minimalist:**
-  - Banyak whitespace, layout sangat bersih, tidak ada elemen dekoratif berlebihan.
-  - Informasi disajikan secara ringkas dan jelas.
-- **Soft Neumorphism Touch:**
-  - Beberapa card memiliki sudut rounded yang sangat lembut, dan ada sedikit efek inner/outer shadow yang sangat subtle, memberi kesan “floating” tanpa berat.
-- **Modern UI:**
-  - Komponen card, button, dan badge tampil dengan bentuk rounded dan outline tipis.
-  - Ikon-ikon minimalis, micro-interaction implied (misal: tombol dengan lingkaran solid, dropdown dengan arrow sederhana).
+## 3. Protokol Debugging untuk Toggle Mode Editor
 
-**Ciri Khas Visual:**
+### 3.1 Identifikasi Masalah
 
-- Sudut membulat (rounded corners) pada semua card dan komponen.
-- Grid modular, setiap informasi dalam card terpisah.
-- Visual hierarchy sangat jelas: judul besar, subjudul kecil, data/statistik menonjol.
-- Penggunaan icon dan avatar untuk memperkuat identitas dan affordance.
+1. **Persiapan Lingkungan**:
+   - Buka halaman modul yang memiliki masalah
+   - Buka DevTools (F12) dan pilih tab Console
+   - Aktifkan "Preserve log" pada Console untuk menyimpan log saat navigasi
+   - Filter log dengan string "DocumentHeader" atau "ModuleDraftPageContext"
 
----
+2. **Reproduksi Masalah**:
+   - Catat status awal: `editorMode`, `activePage.status`
+   - Klik tombol toggle mode (Edit/View)
+   - Amati perubahan UI dan log yang muncul
 
-## B. Palet Warna
+3. **Analisis Log**:
+   - Cari log dengan format `=== TOGGLE MODE START: Dari [mode] ke [mode] ===`
+   - Periksa urutan eksekusi langkah-langkah dalam `handleToggleMode`
+   - Identifikasi langkah mana yang gagal atau tidak berjalan sesuai ekspektasi
 
-| Warna         | Hex Contoh      | Penggunaan Utama                |
-| ------------- | --------------- | ------------------------------- |
-| Gold          | #FFD700         | Highlight, CTA, progress, badge |
-| Putih         | #FFFFFF         | Background utama, card          |
-| Abu-abu muda  | #F8FAFC         | Background sekunder, card       |
-| Abu kehijauan | #E2E8F0         | Background grid, panel          |
-| Hitam         | #111827         | Teks utama, angka, tombol       |
-| Biru/Olive    | #3B82F6/#84CC16 | Status sekunder, badge          |
+### 3.2 Pemeriksaan State dan Props
 
-**Palet Warna:**
+1. **Gunakan React DevTools**:
+   - Pilih komponen `DocumentHeader`
+   - Periksa props `editorMode` dan `activePage`
+   - Pilih komponen `RichTextEditor`
+   - Periksa props `readOnly` dan state internal editor
 
-- **Dominan:**
-  - Gold (#FFD700 atau sejenis) sebagai warna aksen utama (highlight, progress, CTA).
-  - Putih dan abu-abu muda untuk background card dan area utama.
-  - Abu-abu kehijauan sebagai background utama (bukan putih polos, memberi nuansa modern dan tenang).
-- **Kontras:**
-  - Hitam untuk teks utama dan elemen penting (judul, angka, tombol utama).
-  - Aksen hitam solid pada tombol utama dan beberapa elemen interaktif.
-- **Hierarki Visual:**
-  - Warna aksen digunakan untuk menyorot status, progress, dan elemen penting (misal: tanggal terpilih, progress bar, AI Assistant).
-  - Warna netral untuk background agar konten mudah dibaca.
+2. **Periksa Context Value**:
+   - Pilih provider `ModuleDraftPageContext.Provider`
+   - Periksa nilai `editorMode` dan fungsi `toggleEditorMode`
+   - Bandingkan dengan nilai yang diharapkan
 
-**Tipografi:**
+### 3.3 Debugging Toggle Mode Step-by-Step
 
-- **Jenis Huruf:**
-  - Sans-serif modern, kemungkinan besar menggunakan font seperti Inter, Poppins, atau Graphik.
-- **Ukuran & Konsistensi:**
-  - Judul besar, tebal, sangat readable.
-  - Subjudul dan label lebih kecil, tipis, dan konsisten.
-  - Angka/statistik sangat menonjol (besar, bold).
-- **Konsistensi:**
-  - Semua teks rata kiri, spasi antar elemen sangat rapi.
-  - Tidak ada variasi font yang berlebihan, menjaga kesan profesional.
+1. **Verifikasi Alur Data**:
+   ```
+   Klik tombol Edit/View
+   → handleToggleMode() di DocumentHeader
+   → toggleEditorMode() di ModuleDraftPageContext
+   → Perubahan status halaman di database
+   → Perubahan state React (editorMode)
+   → Perubahan editor.isEditable di RichTextEditor
+   ```
 
----
+2. **Periksa Race Condition**:
+   - Cek apakah ada flag `isTogglingMode` di sessionStorage
+   - Periksa timing antara perubahan state React dan perubahan status halaman
+   - Cek apakah ada multiple request yang berjalan bersamaan
 
-## C. Usage Guidelines
+3. **Debugging Spesifik untuk Toggle Mode**:
+   - Tambahkan breakpoint di fungsi `handleToggleMode`
+   - Tambahkan breakpoint di fungsi `toggleEditorMode`
+   - Tambahkan breakpoint di useEffect yang merespons perubahan `editorMode` di RichTextEditor
+   - Step through kode untuk melihat alur eksekusi
 
-- **Primary:** Gold untuk tombol utama, highlight, dan progress.
-- **Secondary:** Biru/olive untuk status sekunder, badge, atau notifikasi.
-- **Background:** Putih/abu-abu muda untuk latar utama dan card.
-- **Accent:** Gunakan warna aksen hanya untuk elemen penting, jangan berlebihan.
-- **Kontras:** Pastikan teks hitam di atas warna terang, dan sebaliknya.
+4. **Pemeriksaan Database**:
+   - Verifikasi bahwa status halaman di database berubah sesuai harapan
+   - Gunakan Network tab untuk melihat response dari API
+   - Periksa payload request dan response
 
----
+## 4. Protokol Debugging untuk Auto-save Draft
 
-## E. Border Radius & Shadow
+### 4.1 Identifikasi Masalah Auto-save
 
-- **Radius:**
-  - `rounded-lg` untuk card/panel utama
-  - `rounded-full` untuk avatar, icon, dan button bulat
-- **Shadow:**
-  - `shadow-md` untuk card utama (subtle, soft neumorphism)
-  - `shadow-sm`/`shadow-none` untuk data card atau elemen sekunder
-- Semua radius dan shadow didefinisikan sebagai token di Tailwind config.
+1. **Persiapan Monitoring**:
+   - Filter log dengan string "useRichTextAutosave" atau "DraftFeedbackService"
+   - Aktifkan Network tab dan filter untuk request ke endpoint `/api/module/*/pages/*/draft`
 
----
+2. **Reproduksi Masalah**:
+   - Buat perubahan pada editor
+   - Tunggu 5 detik (waktu debounce default)
+   - Amati apakah request auto-save dikirim
+   - Periksa response dan status yang ditampilkan di UI
 
-## H. Interactive States
+3. **Analisis Status Auto-save**:
+   - Periksa nilai `draftSaveStatus` di context
+   - Cek apakah status berubah dari 'idle' → 'saving' → 'saved'
+   - Periksa apakah `lastSavedAt` diperbarui
 
-**Interaksi:**
+### 4.2 Debugging Auto-save Step-by-Step
 
-- **Affordance Jelas:**
-  - Button dan dropdown sangat jelas bisa diklik (warna solid, ikon arrow).
-  - Card dengan highlight warna menandakan status aktif/terpilih.
-- **Micro-interaction (Implied):**
-  - Hover state kemungkinan berupa perubahan warna background atau shadow subtle.
-  - Tidak ada animasi berat, menjaga performa dan fokus pada konten.
+1. **Verifikasi Trigger Auto-save**:
+   - Tambahkan log di event handler editor yang memicu auto-save
+   - Periksa apakah debounce berfungsi dengan benar
+   - Cek apakah throttle membatasi request sesuai konfigurasi
 
-- **Hover:**
-  - Button: bg-gold-400, scale(1.02), shadow-lg
-  - Card: shadow-xl, border-gold-100
-- **Focus:** Outline 2px solid gold/olive, offset 2px
-- **Active:** scale(0.98), bg-gold-600
-- **Disabled:** opacity-50, cursor-not-allowed
-- Semua state diatur di Tailwind config dan utility class.
+2. **Periksa Proses Penyimpanan**:
+   - Tambahkan breakpoint di fungsi `forceSave` atau handler auto-save
+   - Periksa payload yang dikirim ke server
+   - Verifikasi bahwa content editor diambil dengan benar
 
----
+3. **Analisis Response Server**:
+   - Periksa response dari endpoint `/api/module/*/pages/*/draft`
+   - Cek status code dan body response
+   - Verifikasi bahwa response diproses dengan benar di client
 
+4. **Pemeriksaan Status Draft di Database**:
+   - Verifikasi bahwa `draftData` tersimpan di database
+   - Periksa nilai `hasUnpublishedChanges` dan `draftSavedAt`
+
+## 5. Debugging Integrasi RichTextEditor
+
+### 5.1 Verifikasi Sinkronisasi Mode dan Content
+
+1. **Periksa Konsistensi Mode**:
+   - Log nilai `editorMode` dari context
+   - Log nilai `editor.isEditable` dari instance editor
+   - Verifikasi bahwa keduanya konsisten (edit mode → editable: true)
+
+2. **Verifikasi Content yang Ditampilkan**:
+   - Log hasil dari `getDraftOrPublishedContent`
+   - Bandingkan dengan content yang ditampilkan di editor
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Converted and distributed by [TomeVault](https://tomevault.io/claim/EviewNicks) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-10 -->
+<!-- tomevault:4.0:windsurf_rules:2026-04-13 -->
