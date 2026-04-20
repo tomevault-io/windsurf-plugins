@@ -7,13 +7,13 @@ Interactive AI-driven game to learn Docker, Linux, networking & Kubernetes. Open
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `.cursor/rules/*.mdc` in [ericboy0224/learn-docker-and-k8s](https://github.com/ericboy0224/learn-docker-and-k8s).
+Original source: `AGENTS.md` in [ericboy0224/learn-docker-and-k8s](https://github.com/ericboy0224/learn-docker-and-k8s).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
+- **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
