@@ -1,0 +1,97 @@
+---
+trigger: always_on
+description: Minimal operating guide for AI coding agents in this repo.
+---
+
+# AGENTS.md
+
+Minimal operating guide for AI coding agents in this repo.
+
+## First 60 Seconds
+- Classify task type:
+  - Info-only (triage/review/questions/docs guidance): no code edits and no test runs unless explicitly requested.
+  - Code change: make minimal scoped edits and run only required checks from **Testing Matrix**.
+- State assumptions explicitly. If uncertain, ask.
+- If the task touches tooling/builds/linting, read `package.json` and `tsconfig*.json` before source files.
+- Prefer repo scripts over reconstructing command bundles by hand:
+  - `pnpm check:quick`: lint + typecheck
+  - `pnpm check:tooling`: lint + typecheck + build
+  - `pnpm check:unit`: unit + smoke
+  - `pnpm check`: full non-integration validation
+- Read at most 3 files first:
+  - owning handler/module
+  - one shared helper used by that handler
+  - one downstream platform file if needed
+- Define verifiable success criteria before editing.
+- Decide docs/skills impact up front.
+
+## Scope
+- Solve issues with the smallest context read.
+- Keep changes scoped to one command family or module group.
+- Preserve daemon session semantics and platform behavior.
+- Expand only when contracts cross module boundaries.
+- Do not read both iOS and Android paths unless explicitly cross-platform.
+- If requested fix expands beyond one command family/module group, stop and confirm before broadening scope.
+
+## Code Changes
+- Minimum code that solves the problem. No speculative features.
+- No abstractions for single-use code.
+- Surgical edits only.
+- Match existing style.
+- Remove imports/variables YOUR changes made unused; do not clean unrelated dead code.
+- Keep tests minimal: if TypeScript can enforce a contract or invalid shape, prefer a type-level check over duplicating that assertion in runtime tests.
+- Keep modules small for agent context safety:
+  - target <= 300 LOC per implementation file when practical.
+  - if a file grows past 500 LOC, plan/extract focused submodules before adding new behavior.
+  - exception: generated files, schema/fixture snapshots, and integration test aggregations.
+
+## Routing
+- Keep `src/daemon.ts` as a thin router.
+- Put command logic in handler modules:
+  - session/apps/appstate/open/close/replay/logs: `src/daemon/handlers/session.ts`
+  - click/fill/get/is: `src/daemon/handlers/interaction.ts`
+  - snapshot/wait/alert/settings: `src/daemon/handlers/snapshot.ts`
+  - find: `src/daemon/handlers/find.ts`
+  - record/trace: `src/daemon/handlers/record-trace.ts`
+- Generic passthrough (press/scroll/type) is daemon fallback only after handlers return null.
+
+## Toolchain Snapshot
+- Package manager: `pnpm` only. Do not add or restore `package-lock.json`.
+- Runtime baseline is Node >= 22. Prefer built-in Node APIs such as global `fetch`, Web Streams, and `AbortSignal.timeout` over compatibility wrappers unless the surrounding code needs a lower-level transport.
+- Lint/format stack is OXC:
+  - config: `.oxlintrc.json`, `.oxfmtrc.json`
+- TypeScript is strict enough to surface dead code early: `strict`, `isolatedModules`, `noUnusedLocals`, and `noUnusedParameters` are enabled.
+- The repo emits with `rslib`, not `tsc`. If declaration generation fails, inspect `tsconfig.lib.json` first.
+- `tsconfig.lib.json` needs an explicit `rootDir: "./src"` for declaration layout.
+- Use the aggregate scripts in `package.json` when possible; they encode the expected validation bundles better than ad hoc command lists.
+
+## Cheap Exploration
+- Prefer these first-pass commands over broader reads:
+  - `rg -n "<symbol|command|flag>" src test`
+  - `rg --files src/daemon/handlers src/platforms/ios src/platforms/android`
+  - `git diff -- <path>` for active-branch context
+  - read `.oxlintrc.json` before treating lint output as source-level bugs
+- If build/type errors mention declaration generation, inspect `tsconfig.lib.json` before reading platform code.
+- If lint failures appear after toolchain edits, check whether the rule is from `eslint/*`, `typescript/*`, `import/*`, or `node/*` in `.oxlintrc.json` before assuming source bugs.
+
+## Command Family Lookup
+- `logs`: `src/daemon/handlers/session.ts` -> `src/daemon/app-log.ts` -> `src/daemon/handlers/__tests__/session.test.ts`
+- `open/close/replay/apps/appstate`: `src/daemon/handlers/session.ts` -> `src/daemon/session-store.ts` -> `src/daemon/handlers/__tests__/session.test.ts`
+- `click/fill/get/is`: `src/daemon/handlers/interaction.ts` -> `src/daemon/selectors.ts` -> `src/daemon/handlers/__tests__/interaction.test.ts`
+- `snapshot/wait/settings/alert`: `src/daemon/handlers/snapshot.ts` -> `src/daemon/snapshot-processing.ts` -> `src/daemon/handlers/__tests__/snapshot-handler.test.ts`
+- `record/trace`: `src/daemon/handlers/record-trace.ts` -> `src/platforms/ios/runner-client.ts` -> `src/daemon/handlers/__tests__/record-trace.test.ts`
+
+## iOS Runner Seams
+- Keep dependency direction clean:
+  - `runner-client.ts`: command execution + retry behavior
+  - `runner-transport.ts`: connection/probing/HTTP transport
+  - `runner-contract.ts`: shared `RunnerCommand` type and runner connect/error helpers
+  - `runner-session.ts`: session lifecycle and request/response execution
+  - `runner-xctestrun.ts`: xctestrun preparation/build/cache logic
+- `runner-transport.ts` must not import back from `runner-client.ts`.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [callstackincubator/agent-device](https://github.com/callstackincubator/agent-device) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-04-20 -->
