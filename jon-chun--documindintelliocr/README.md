@@ -15,7 +15,7 @@ Original source: `.cursor/rules/*.mdc` in [jon-chun/DocuMindIntelliOCR](https://
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
-From a repo with 0+ stars on GitHub. [See the full profile](https://tomevault.io/claim/jon-chun)
+From [jon-chun/DocuMindIntelliOCR](https://github.com/jon-chun/DocuMindIntelliOCR) — a repo with 0+ stars on GitHub.
 
 ---
 
@@ -23,6 +23,6 @@ Install this config instantly:
 ```
 npx tomevault install jon-chun/DocuMindIntelliOCR
 ```
-Or browse all formats at [https://tomevault.io/claim/jon-chun](https://tomevault.io/claim/jon-chun).
+Source: [github.com/jon-chun/DocuMindIntelliOCR](https://github.com/jon-chun/DocuMindIntelliOCR).
 
 <!-- genome:a-i-s -->
