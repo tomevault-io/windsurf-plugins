@@ -1,0 +1,147 @@
+---
+trigger: always_on
+description: A portable SIMD abstraction library for Go, inspired by Google's Highway C++ library.
+---
+
+# Go Highway
+
+A portable SIMD abstraction library for Go, inspired by Google's Highway C++ library.
+
+## Go Version
+
+Use `go` for all Go commands in this repository:
+
+```bash
+go build ./...
+go test ./...
+go run ./cmd/hwygen
+```
+
+## SIMD Acceleration
+
+Enable hardware SIMD with the `GOEXPERIMENT=simd` environment variable:
+
+```bash
+# Build with SIMD
+GOEXPERIMENT=simd go build ./...
+
+# Test with SIMD
+GOEXPERIMENT=simd go test ./...
+
+# Force fallback path (for testing pure Go implementation)
+HWY_NO_SIMD=1 GOEXPERIMENT=simd go test ./...
+
+# Disable SME dispatch on ARM64 (falls back to NEON)
+HWY_NO_SME=1 go test ./...
+
+# Disable SVE dispatch on ARM64 Linux (falls back to NEON)
+HWY_NO_SVE=1 go test ./...
+
+# Run benchmarks
+GOEXPERIMENT=simd go test -bench=. -benchmem ./hwy/contrib/algo/...
+GOEXPERIMENT=simd go test -bench=. -benchmem ./hwy/contrib/math/...
+```
+
+## Project Structure
+
+- `hwy/` - Core SIMD operations (Load, Store, Add, Mul, etc.)
+- `hwy/contrib/algo/` - Algorithm transforms (ExpTransform, SinTransform, etc.)
+- `hwy/contrib/math/` - Low-level math functions (Exp_AVX2_F32x8, etc.)
+- `hwy/asm/` - Assembly implementations
+- `hwy/c/` - C source files for GoAT transpilation
+- `cmd/hwygen/` - Code generator for target-specific implementations
+- `examples/` - Example usage (gelu, softmax)
+- `specs/` - Specification files
+
+## Code Generator (hwygen)
+
+Generate optimized target-specific code:
+
+```bash
+go build -o bin/hwygen ./cmd/hwygen
+./bin/hwygen -input mycode.go -target avx2 -output mycode_avx2.go
+```
+
+### hwygen Workflow for New Features
+
+When implementing a new SIMD feature:
+
+1. **Create the base file first** (`*_base.go`) with the `//go:generate` directive:
+   ```go
+   //go:generate go run ../../../cmd/hwygen -input transpose_base.go -output . -targets avx2,avx512,neon,fallback -dispatch transpose
+
+   func BaseTranspose2D[T hwy.Floats](src []T, m, k int, dst []T) { ... }
+   ```
+
+2. **Run hwygen generation before creating any dispatch overrides**:
+   ```bash
+   cd hwy/contrib/matmul && go generate transpose_base.go
+   ```
+   This creates `*_arm64.gen.go`, `*_amd64.gen.go`, `*_fallback.gen.go`, etc.
+
+3. **Generated variable names** follow the pattern `Transpose2DFloat32` (function name + type), not `TransposeFloat32`.
+
+4. **Dispatch overrides are only needed** for functionality not yet in Go's simd package:
+   - SME assembly (via GOAT C files)
+   - NEON assembly for operations Go simd doesn't support
+   - float16/bfloat16 types (not native to Go simd)
+
+5. **Function signatures** should match: `func(src []T, m, k int, dst []T)` (src first, dst last).
+
+### hwygen Directives
+
+Directive comments placed within 5 lines above a `Base*` function:
+
+- `//hwy:gen T={float32, float64}` — explicit type expansion (cross-product for multi-param)
+- `//hwy:specializes <GroupName>` — joins a different `Base*` function's dispatch group (different body, same interface)
+- `//hwy:targets neon,sme` — restricts a function to specific SIMD targets
+
+Specializations are auto-discovered from sibling `*_base.go` files. See `specs/multi-dispatch.md` for details.
+
+### Target Modes: `neon` vs `neon:asm`
+
+hwygen supports three generation modes, selected with a colon suffix on the target name:
+
+| Suffix | Mode | What it generates |
+|--------|------|-------------------|
+| *(none)* | GoSimd | Pure Go calling `asm` or `archsimd` methods |
+| `:asm` | Assembly | C source → GoAT → Go assembly + wrappers |
+| `:c` | C only | C source for inspection (not compiled) |
+
+**Use plain `neon`** (GoSimd mode) for operations that the `hwy/asm` package already supports — arithmetic, loads/stores, reductions, etc. This is the default and produces portable Go code that calls NEON intrinsics through the asm package.
+
+**Use `neon:asm`** when you need bulk assembly — the entire function is compiled from C to Go assembly via GoAT, eliminating per-vector call overhead. This is best for:
+- Compute-heavy kernels (matmul, cross-entropy loss, fused quantized ops)
+- Functions where per-vector function call overhead dominates
+- Operations that benefit from compiler auto-vectorization at `-O3`
+
+Examples from the codebase:
+```go
+// GoSimd mode — calls asm package methods per-vector
+//go:generate go run ../../../cmd/hwygen -input dense_base.go -output . -targets avx2,avx512,neon,fallback
+
+// Assembly mode — compiles entire function to NEON assembly via GoAT
+//go:generate go run ../../../cmd/hwygen -input matmul_fused_int8.go -dispatch fusedint8matmul -output . -targets avx2,avx512,neon:asm,fallback
+```
+
+The `:asm` suffix generates:
+- C source files (in `asm/c/` or kept with `-keepc`)
+- Go assembly (`.s`) via GoAT transpilation
+- `//go:noescape` wrapper functions for slice-to-pointer conversion
+- Dispatch override files (`z_c_slices_*_neon_arm64.gen.go`)
+
+SVE targets (`sve_darwin`, `sve_linux`) are always assembly-only — they have no GoSimd mode since Go's simd package does not support SVE.
+
+## Supported Architectures
+
+| Architecture | SIMD Width | Backend | Status |
+|--------------|------------|---------|--------|
+| AMD64 AVX2 | 256-bit | Go 1.26 `simd/archsimd` | Supported |
+| AMD64 AVX-512 | 512-bit | Go 1.26 `simd/archsimd` | Supported |
+| ARM64 NEON | 128-bit | `hwy/asm` (GoAT assembly) | Supported |
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [ajroetker/go-highway](https://github.com/ajroetker/go-highway) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-04-22 -->
