@@ -1,21 +1,23 @@
 # sdd-pilot
 
-> Tome by [attilaszasz](https://github.com/attilaszasz/sdd-pilot) — distributed by [TomeVault](https://tomevault.io/claim/attilaszasz)
+> Tome by [attilaszasz](https://github.com/attilaszasz/sdd-pilot) — distributed by [TomeVault](https://tomevault.io)
+
+Replace chaotic AI code generation with a disciplined, spec-driven workflow. SDD Pilot enforces structured development phases and quality gates, leveraging AI agents to conduct online research for best practices and plan your architecture before a single line of code is written.
 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `copilot-instructions.md` in [attilaszasz/sdd-pilot](https://github.com/attilaszasz/sdd-pilot).
+Original source: `GEMINI.md` in [attilaszasz/sdd-pilot](https://github.com/attilaszasz/sdd-pilot).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
+- **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
-- **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
-From a repo with 0+ stars on GitHub. [See the full profile](https://tomevault.io/claim/attilaszasz)
+From [attilaszasz/sdd-pilot](https://github.com/attilaszasz/sdd-pilot) — a repo with 62+ stars on GitHub.
 
 ---
 
@@ -23,6 +25,6 @@ Install this config instantly:
 ```
 npx tomevault install attilaszasz/sdd-pilot
 ```
-Or browse all formats at [https://tomevault.io/claim/attilaszasz](https://tomevault.io/claim/attilaszasz).
+Source: [github.com/attilaszasz/sdd-pilot](https://github.com/attilaszasz/sdd-pilot).
 
 <!-- genome:t-i-s -->
