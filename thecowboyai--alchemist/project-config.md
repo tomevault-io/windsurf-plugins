@@ -1,216 +1,188 @@
 ---
 trigger: always_on
-description: DDD-ECS Isomorphic Mapping
+description: Rules for Rust on Nix and NixOS
 ---
 
-# DDD-ECS Isomorphic Mapping
+When planning to write code, ALWAYS respect the documentation in /doc
+If instructions in /doc are unclear for the proposed functionality, ASK FOR CLARITY and add to the documentation before writing code.
 
-## Overview
+YOU HAVE MANY EXAMPLES TO FOLLOW IN /samples
+FOR BEVY AND EGUI CODE REFER TO THESE SAMPLES FOR SYNTAX CLARITY
 
-This document defines the mathematical, structure-preserving functor between Domain-Driven Design (DDD) and Entity Component System (ECS) in our architecture. We maintain a strict isomorphism that preserves the semantic meaning and relationships between these two paradigms.
+NEVER, EVER DOWNGRADE A RUST LIBRARY.
+IF THE CARGO.TOML FILE SPECIFIES A VERSION, YOU MAY ONLY GO UP, NEVER DOWN.
 
-## Core Isomorphism
+DO NOT MAKE TEMPORARY DOWNGRADES, FIX THE PROBLEM AT HAND.
+
+USE `nix build` OR `nix develop -c cargo build` TO LOAD THE RIGHT NIX ENVIRONMENT
+
+For building Bevy applications on NixOS, always use the Nix build toolchain rather than cargo directly, as Nix handles all the proper library paths and dynamic linking that Bevy requires.
+
+ALWAYS be sure we CAN build before building as builds take some time.
+use `nix develop -c cargo build` and `nix develop -c cargo test` to ensure no errors exist before building.
+
+YOU MAY NOT CREATE ORPHANED PLACEHOLDERS
+IF YOU CREATE A VARIABLE, YOU MUST USE IT.
+IF YOU CREATE A FUNCTION YOU MUST IMPLEMENT IT, NOT LEAVE AN EMPTY STUB.
+
+```markdown
+
+# Rust Standard Libraries & Tooling Setup for NixOS (Bevy/Wayland, Nightly Rust 2024)
+
+## Context
+
+This rule ensures consistent and reproducible Rust toolchain and standard library setup in a NixOS environment, specifically for Bevy/Wayland applications using Nightly Rust 2024 edition.
+
+## Best Practices
+
+### 1. Toolchain Management
+
+- **Use oxalica/rust-overlay with flake-parts:**
+  - Configure your flake to pull in `rust-overlay` and set up Nightly Rust with `rust-src` and `rust-analyzer` extensions.
+  - Example:
+    ```
+    rust-nightly = (pkgs.rust-bin.selectLatestNightlyWith (toolchain:
+      toolchain.default.override {
+        extensions = ["rust-src" "rust-analyzer"];
+        targets = ["x86_64-unknown-linux-gnu"];
+      }
+    ));
+    ```
+- **Set `RUST_SRC_PATH`:**
+  - Export `RUST_SRC_PATH` in your shellHook to point to the Nightly Rust standard library.
+    ```
+    shellHook = ''
+      export RUST_SRC_PATH="${rust-nightly}/lib/rustlib/src/rust/library"
+    '';
+    ```
+
+### 2. Environment Setup
+
+- **Include required build inputs:**
+  - Add the following to `buildInputs`:
+    ```
+    buildInputs = with pkgs; [
+      vulkan-loader
+      libxkbcommon
+      wayland
+      udev
+      alsaLib
+      pkg-config
+      xorg.libX11
+    ];
+    ```
+- **Set Wayland environment variables:**
+  - Add to your shellHook:
+    ```
+    export WINIT_UNIX_BACKEND=wayland
+    export RUST_BACKTRACE=full
+    ```
+
+### 3. Project Structure
+
+- **Follow Rust conventions:**
+  - Use `src/` for source code, `main.rs`/`lib.rs` as entry points, `bin/` for multiple binaries, `tests/` for integration tests, and `examples/` for example code[2].
+- **Use a workspace if multi-crate:**
+  - Structure your project as a workspace for modularity.
+
+### 4. Cursor Rule Best Practices
+
+- **Keep rules concise and focused:**
+  - Avoid vague language; provide concrete examples and actionable guidance[1][5].
+- **Specify essential code elements:**
+  - Include critical environment variables, Nix expressions, and Rust toolchain configuration[5].
+- **Use auto-attach for relevant files:**
+  - Attach this rule to `Cargo.toml`, `flake.nix`, and `shell.nix` files for context-aware assistance[1][5].
+
+### 5. Example Shell Hook
 
 ```
-DDD Category                    ECS Category
-────────────────────────────────────────────
-Entity/Aggregate       ←→       Entity
-Value Object          ←→       Component
-Command Handler       ←→       System (Write)
-Query Handler         ←→       System (Read)
-Domain Event          ←→       Event
-Repository            ←→       Query<Components>
-Domain Service        ←→       System (Pure)
-Policy                ←→       System (Reactive)
+shellHook = ''
+  export RUST_SRC_PATH="${rust-nightly}/lib/rustlib/src/1.75.0/library"
+  export WINIT_UNIX_BACKEND=wayland
+  export RUST_BACKTRACE=full
+'';
 ```
 
-## Detailed Mappings
+### 6. Additional Tips
 
-### 1. Entities and Aggregates → ECS Entities
+- **Pin Nightly Rust version:**
+  - Consider using a pinned Nightly Rust date for reproducibility.
+- **Update documentation:**
+  - Keep your README.md updated with setup instructions and environment requirements.
 
-**DDD Entities/Aggregates** map to **ECS Entities** with identity and structure preserved:
+---
 
-```rust
-// DDD Domain Model
-pub struct GraphAggregate {
-    pub id: GraphId,           // Identity
-    pub nodes: HashMap<NodeId, Node>,
-    pub edges: HashMap<EdgeId, Edge>,
-}
-
-// ECS Representation
-#[derive(Component)]
-pub struct GraphEntity {
-    pub aggregate_id: GraphId,  // Same identity
-}
-
-// Spawning preserves identity
-commands.spawn((
-    GraphEntity { aggregate_id: graph_id },
-    // Value objects as components...
-));
+**References:**
+- [Cursor Rules Best Practices][1][5]
+- [Rust Project Structure][2]
 ```
 
-**Key Principles:**
-- One ECS Entity per DDD Aggregate Root
-- Child entities within aggregates also become ECS Entities
-- Identity is preserved through ID components
-- Aggregate boundaries are maintained through entity relationships
+This rule is designed to be concise, actionable, and scoped, providing clear guidance for both AI assistants and human developers working on Bevy/Wayland projects in NixOS with Nightly Rust[1][5][2].
 
-### 2. Value Objects → Components
+# Bevy Dynamic Linking & Nix Build Configuration
 
-**DDD Value Objects** map directly to **ECS Components**:
+## Development Setup
 
-```rust
-// DDD Value Object
-#[derive(Debug, Clone, PartialEq)]
-pub struct Position3D {
-    pub x: f32,
-    pub y: f32,
-    pub z: f32,
-}
-
-// ECS Component (same type, just tagged)
-#[derive(Component, Debug, Clone, PartialEq)]
-pub struct Position3D {
-    pub x: f32,
-    pub y: f32,
-    pub z: f32,
-}
-
-// Usage
-commands.spawn((
-    NodeEntity { node_id },
-    Position3D { x: 0.0, y: 0.0, z: 0.0 },  // Value object as component
-    NodeContent { ... },                     // Another value object
-));
+**Cargo.toml features:**
+```
+[features]
+dev = [
+  "bevy/dynamic_linking",
+  "bevy/asset_processor",
+  "bevy/file_watcher"
+]
 ```
 
-**Key Principles:**
-- Value objects ARE components (not just represented by them)
-- Immutability is preserved - replace whole component, never mutate
-- No identity - compared by value
-- Can be freely copied between entities
+**Nix dev shell configuration:**
+```
+# flake.nix
+devShells.default = pkgs.mkShell {
+  packages = [rust-nightly];
+  buildInputs = with pkgs; [
+    vulkan-loader
+    libxkbcommon
+    wayland
+    udev
+  ];
 
-### 3. Commands → Write Systems
-
-**DDD Command Handlers** map to **ECS Systems** that process commands:
-
-```rust
-// DDD Command
-pub struct MoveNode {
-    pub graph_id: GraphId,
-    pub node_id: NodeId,
-    pub new_position: Position3D,
-}
-
-// ECS System (Command Handler)
-fn handle_move_node_commands(
-    mut commands: Commands,
-    mut events: EventWriter<NodeEvent>,
-    nodes: Query<(Entity, &NodeEntity, &Position3D)>,
-    mut move_commands: EventReader<MoveNodeCommand>,
-) {
-    for cmd in move_commands.read() {
-        // Find the entity
-        if let Some((entity, node, old_pos)) = nodes.iter()
-            .find(|(_, n, _)| n.node_id == cmd.node_id)
-        {
-            // Remove old position (value object)
-            commands.entity(entity).remove::<Position3D>();
-
-            // Add new position (value object)
-            commands.entity(entity).insert(cmd.new_position);
-
-            // Emit domain events
-            events.send(NodeEvent::NodeRemoved { ... });
-            events.send(NodeEvent::NodeAdded { ... });
-        }
-    }
-}
+  shellHook = ''
+    export RUSTFLAGS="-C link-arg=-fuse-ld=lld"
+    export CARGO_FEATURES_DEV="--features dev"
+  '';
+};
 ```
 
-### 4. Queries → Read Systems
+## Production Build Configuration
 
-**DDD Query Handlers** map to **ECS Systems** that read state:
+**Nix package derivation:**
+```
+packages.default = pkgs.rustPlatform.buildRustPackage {
+  cargoLock.lockFile = ./Cargo.lock;
 
-```rust
-// DDD Query
-pub struct FindNodesInRadius {
-    pub center: Position3D,
-    pub radius: f32,
-}
+  buildInputs = with pkgs; [
+    vulkan-loader
+    wayland
+  ];
 
-// ECS System (Query Handler)
-fn find_nodes_in_radius(
-    query: Query<(&NodeEntity, &Position3D)>,
-    requests: EventReader<FindNodesInRadiusRequest>,
-    mut results: EventWriter<QueryResult>,
-) {
-    for request in requests.read() {
-        let nodes: Vec<NodeId> = query.iter()
-            .filter(|(_, pos)| {
-                let distance = calculate_distance(pos, &request.center);
-                distance <= request.radius
-            })
-            .map(|(node, _)| node.node_id)
-            .collect();
+  cargoBuildFlags = "--release --no-default-features";
 
-        results.send(QueryResult::NodesFound { nodes });
-    }
-}
+  # Required for Wayland surface creation
+  LD_LIBRARY_PATH = "${pkgs.lib.makeLibraryPath [
+    pkgs.vulkan-loader
+    pkgs.wayland
+  ]}";
+};
 ```
 
-### 5. Domain Events → ECS Events
+## Build Commands
 
-**DDD Domain Events** map directly to **ECS Events**:
-
-```rust
-// DDD Domain Event
-#[derive(Debug, Clone)]
-pub struct NodeAdded {
-    pub graph_id: GraphId,
-    pub node_id: NodeId,
-    pub position: Position3D,
-}
-
-// ECS Event (same type, implements Event)
-#[derive(Event, Debug, Clone)]
-pub struct NodeAdded {
-    pub graph_id: GraphId,
-    pub node_id: NodeId,
-    pub position: Position3D,
-}
-
-// Event flow preserved
-fn process_domain_events(
-    mut events: EventReader<NodeAdded>,
-    mut commands: Commands,
-) {
-    for event in events.read() {
-        // React to domain events
-        commands.spawn((
-            NodeEntity { node_id: event.node_id },
-            event.position.clone(),
-        ));
-    }
-}
-```
-
-### 6. Repositories → Queries
-
-**DDD Repositories** map to **ECS Queries**:
-
-```rust
-// DDD Repository Interface
-trait NodeRepository {
-    fn find_by_id(&self, id: NodeId) -> Option<Node>;
-    fn find_by_type(&self, node_type: NodeType) -> Vec<Node>;
-}
-
+| Environment | Command                      | Flags                            |
+|-------------|------------------------------|----------------------------------|
+| Development | `nix develop`                | (shellHook auto-applies)         |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Converted and distributed by [TomeVault](https://tomevault.io/claim/TheCowboyAI) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-10 -->
+<!-- tomevault:4.0:windsurf_rules:2026-04-14 -->
