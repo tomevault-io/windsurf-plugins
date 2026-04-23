@@ -1,0 +1,106 @@
+---
+trigger: always_on
+description: - This file applies to the entire repository unless a deeper `AGENTS.md` overrides it.
+---
+
+# Repository Guidelines
+
+## Scope and Precedence
+
+- This file applies to the entire repository unless a deeper `AGENTS.md` overrides it.
+- User instructions always win.
+- A more specific `AGENTS.md` wins over this file for its subtree.
+- `ui/AGENTS.md` is authoritative for files under `ui/`.
+- `CODE_CONVENTION.md` is mandatory reading and remains the detailed source for C# and test conventions.
+- This file intentionally embeds the repository owner's operating rules so contributors do not need any home-directory configuration to work correctly here.
+
+## Mandatory Reading Before Changes
+
+- Read `CODE_CONVENTION.md` before touching C# code or tests.
+- Read `README.md` before non-trivial work so commands, runtime layout, and architecture stay aligned.
+- Read `ui/AGENTS.md` before touching frontend code under `ui/`.
+
+## Repository Map
+
+- `src/`: production .NET projects and shared libraries.
+- `tests/Moongate.Tests/`: automated tests mirroring production domains.
+- `moongate_data/`: runtime data, Lua scripts, templates, world data, and web assets.
+- `ui/`: Vite/React admin UI and player portal.
+- `docs/`: user-facing and developer-facing documentation.
+- `scripts/`: repository automation and tooling scripts.
+- `benchmarks/`: BenchmarkDotNet projects and comparison tooling.
+- `tools/`: standalone tools such as stress clients.
+- `stack/`: local observability and container stack files.
+
+## Working Principles
+
+- Keep architecture KISS.
+- Treat architecture quality and runtime performance as first-class constraints.
+- Preserve existing domain boundaries and naming patterns.
+- Prefer focused changes over wide refactors.
+- Do not restructure unrelated areas while solving a local task.
+- Keep runtime behavior, tests, and docs aligned.
+- Before commit test all projects
+
+## Architecture and Performance
+
+- Prefer explicit registrations, static wiring, and predictable runtime behavior over dynamic magic when it keeps the code easier to reason about.
+- Reflection-heavy, runtime code generation, or serializer-dependent changes must be justified against architecture, debuggability, and performance costs.
+- Keep hot paths allocation-aware, especially in networking, packet handling, game-loop, persistence, and scripting boundaries.
+- Choose designs that keep the architecture easy to reason about under load and easy to debug when performance regresses.
+
+## Generated, Runtime, and Vendor Content
+
+- Do not manually edit generated or vendor-managed output unless the user explicitly asks.
+- Treat these as generated or local-only by default:
+  - `docs/_site/`
+  - `ui/dist/`
+  - `ui/node_modules/`
+  - `BenchmarkDotNet.Artifacts/`
+  - `artifacts/`
+  - runtime/cache/log/save/database folders under `moongate_data/`
+  - runtime NPC memory files under `moongate_data/templates/npc_memories/*.txt` except `.gitkeep`
+
+## C# Conventions Summary
+
+- Follow `CODE_CONVENTION.md` in full.
+- Keep namespace and folder path aligned.
+- Organize code by domain first, not by technical suffix alone.
+- Put enums in domain-specific `Types` namespaces and include the owning domain in the namespace when relevant (for example `...Types.Tcp`).
+- Put DTOs and simple data carriers in `Data`.
+- Put internal-only implementation data in `Data.Internal` or `Internal`, depending on the surrounding project pattern.
+- Keep one primary type (`class`, `record`, or `enum`) per `.cs` file.
+- Separate classes by domain responsibility and keep files aligned with that domain.
+- Place interfaces under `Interfaces` namespaces only.
+- Every interface must have XML docs (`///`).
+- Within classes, keep `private readonly` fields first, then properties, then constructors.
+- `Dispose` and `DisposeAsync` methods must be last.
+- Do not use C# primary constructors.
+- Do not use expression-bodied constructors.
+- Constructors must always use block bodies (`{ }`).
+- Keep files small, explicit, and easy to reason about.
+
+## Test Conventions Summary
+
+- Organize tests by domain/component, mirroring production structure.
+- Do not place new test files directly in the root of `tests/Moongate.Tests/`.
+- Keep test namespaces aligned with folder paths.
+- Preferred layout: `tests/<Project>/<Domain>/<Subdomain>/<Subject>Tests.cs` with namespace `<Project>.Tests.<Domain>.<Subdomain>`.
+- Use one main subject per file.
+- Name files and classes as `<SubjectName>Tests`.
+- Keep integration, contract, and performance tests in dedicated projects or dedicated folders such as `Integration`, `Contract`, or `Performance`.
+- Put shared helpers, fakes, and builders under `Support` or `TestSupport`.
+- Every new test must follow the same taxonomy. If the domain folder does not exist yet, create it instead of falling back to a generic location.
+
+## Workflow Rules
+
+- Use Conventional Commits (`feat:`, `fix:`, `refactor:`, `test:`, `docs:`, and similar).
+- Every new feature or functional development must start from a dedicated `feature/*` branch.
+- Every new feature or functional development must have a GitHub issue created first so the work can reference a tracked issue throughout implementation, review, and merge.
+- Never add `Co-Authored-By: Claude` to commit messages.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [moongate-community/moongate](https://github.com/moongate-community/moongate) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-04-21 -->
