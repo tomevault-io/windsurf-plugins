@@ -1,102 +1,123 @@
 ---
 trigger: always_on
-description: TAGS: [prompt-engineering,ai-guidance,internal-processing,silent-enhancement] | TRIGGERS: prompt,enhancement,internal,understanding,comprehension | SCOPE: global | DESCRIPTION: Silent prompt enhancement protocol that automatically applies prompt generator logic to all user inputs for enhanced comprehension without external explanation.
+description: This tool performs debugging steps for applications
 ---
 
 
-# Master Rule: Silent Prompt Enhancement Protocol
+# Debug Commands
 
-## 1. Core Principle
+// Description: This tool performs debugging steps for applications
+// Recommended Globs: **/*.{js,ts,jsx,tsx,py,html,css,json}
 
-**[STRICT]** All user inputs are automatically enhanced using prompt generator transformation logic **internally and silently**. The enhancement process is never mentioned or explained in responses - it operates transparently to improve understanding quality.
+## Overview
+Debug commands provide a streamlined approach to troubleshooting applications by gathering console logs, network errors, and taking screenshots to help identify and fix issues.
 
-**[STRICT]** This rule applies to **ALL** user inputs, regardless of format, length, or complexity. No exceptions.
+## Core Commands
 
-**[STRICT]** Enhancement validation must occur before any response generation, with measurable quality thresholds (≥95% domain identification accuracy, ≥90% intent clarity, ≥85% specification completeness).
+### `/debug` Command
+When you type `/debug` in the chat, the AI will automatically:
+1. Gather all console logs from the browser
+2. Collect any console errors
+3. Take a screenshot of the current application state
 
----
+## Implementation
 
-## 2. Prompt Generator Logic Patterns
+```javascript
+// Example implementation of debug command handler
+async function handleDebugCommand() {
+  // Gather console logs
+  const consoleLogs = await mcp__getConsoleLogs();
+  
+  // Collect console errors
+  const consoleErrors = await mcp__getConsoleErrors();
+  
+  // Take screenshot
+  const screenshot = await mcp__takeScreenshot();
+  
+  // Analyze and present results
+  return {
+    consoleLogs,
+    consoleErrors,
+    screenshot
+  };
+}
+```
 
-### Pattern 1: Domain Extraction & Role Assignment
+## Usage Examples
 
-**[STRICT]** Extract domain from input keywords and assign appropriate expert role using systematic keyword analysis:
+### Example 1: Debugging a React Application
+```
+User: My React app is showing a blank screen
+AI: Let me help you debug this issue. Type /debug to gather diagnostic information.
+User: /debug
+AI: [Executes debug command and analyzes results]
+    I've found the following issues:
+    1. Console error: "TypeError: Cannot read property 'map' of undefined"
+    The screenshot shows a blank page with React's error boundary not properly configured.
+```
 
-**Domain Mapping Algorithm:**
-1. **Keyword Detection**: Scan input for domain-specific keywords (technical terms, domain jargon, action verbs)
-2. **Context Analysis**: Analyze surrounding context to disambiguate domain when multiple matches exist
-3. **Role Selection**: Map detected domain to appropriate expert role using predefined mapping table
-4. **Confidence Assessment**: Assign confidence level (High ≥80%, Medium 50-79%, Low <50%) based on keyword clarity and context
+### Example 2: Troubleshooting API Integration
+```
+User: My API calls are failing and I'm not sure why
+AI: Let's investigate. Type /debug while the application is making the API call.
+User: /debug
+AI: [Executes debug command and analyzes results]
+    I've found the following issues:
+    1. Console log shows the authorization header is missing
+    Based on the screenshot, you need to add proper authentication to your API calls.
+```
 
-**Domain Mapping Table:**
-- Technical/code → "experienced software developer" / "experienced [language] developer"
-- Web/design → "experienced web developer" / "experienced designer"
-- Learning/education → "expert in [subject]" / "experienced educator"
-- Communication → "communication expert" / "expert in communication strategies"
-- Business → "business expert" / "experienced business consultant"
-- Creative → "creative expert" / "experienced [creative field] professional"
-- General/vague → "expert" / "experienced professional"
+## Best Practices
 
-**Role Format:**
-- "As an [EXPERT_ROLE] [with DOMAIN_EXPERTISE]"
+### When to Use Debug Commands
+- When an application shows unexpected behavior
+- When there are no visible error messages
+- When troubleshooting network or API issues
+- When investigating performance problems
+- When helping users who can't easily access developer tools
 
-**Validation Checkpoint 1.1:**
-**[STRICT]** Before proceeding, verify:
-- ✓ Domain correctly identified with ≥80% confidence (if confidence <80%, use general expert role)
-- ✓ Expert role matches detected domain (cross-reference mapping table)
-- ✓ Role format follows standard structure (validate against template)
+### Interpreting Debug Results
+- Look for patterns in console errors
+- Check for failed network requests
+- Examine the visual state in screenshots
+- Correlate timestamps between different logs
+- Identify missing resources or dependencies
 
-### Pattern 2: Intent Clarification
+### Security Considerations
+- Ensure sensitive information is not captured in logs or screenshots
+- Be cautious with debugging production environments
+- Consider implementing log sanitization for sensitive data
+- Use secure channels when sharing debug information
 
-**[STRICT]** Convert casual/vague language to professional, structured intent using transformation rules with validation:
+## Supported Environments
+- Web browsers (Chrome, Firefox, Safari, Edge)
+- React, Angular, Vue applications
+- Node.js backend services
+- Python applications with proper logging
+- Mobile web applications
 
-**Transformation Rules (Priority Order):**
-1. **Casual requests** → Professional action verbs (with tone preservation)
-2. **Vague descriptions** → Specific, clear objectives (with measurable criteria)
-3. **Implicit needs** → Explicit requirements (with scope boundaries)
-4. **Simple questions** → Comprehensive guidance requests (with depth specification)
+## Additional Commands
 
-**Action Verb Mapping Table:**
-- "help" → "provide guidance" / "offer comprehensive assistance"
-- "make" → "design" / "create" / "develop"
-- "explain" → "provide clear, comprehensive explanation"
-- "learn" → "provide learning roadmap" / "offer comprehensive learning guidance"
-- "write" → "provide script/code" / "develop solution"
+### `/debug:console`
+Focus specifically on console output:
+```
+User: /debug:console
+AI: [Gathers console logs and errors]
+```
 
-**Validation Checkpoint 2.1:**
-**[STRICT]** Before proceeding, verify:
-- ✓ Intent clearly clarified (original intent preserved, enhanced with specificity)
-- ✓ Action verb appropriately selected (matches input intent type)
-- ✓ Professional tone maintained (no loss of original meaning)
+### `/debug:visual`
+Focus specifically on visual issues:
+```
+User: /debug:visual
+AI: [Takes screenshot and analyzes visual elements]
+```
 
-### Pattern 3: Specification Expansion
-
-**[STRICT]** Expand implicit requirements into explicit specifications using systematic expansion rules:
-
-**Expansion Rules (Apply in Order):**
-1. **Context Addition**: Add missing context where logically required (domain context, use case context, technical context)
-2. **Technology Inclusion**: Include relevant domains/technologies when applicable (programming languages, frameworks, tools)
-3. **Quality Criteria**: Specify quality criteria with measurable thresholds (performance metrics, quality standards, best practices)
-4. **Scope Boundaries**: Add scope boundaries to prevent scope creep (inclusions, exclusions, limitations)
-5. **Best Practices**: Include best practices relevant to the domain (industry standards, proven methodologies, established patterns)
-
-**Expansion Examples:**
-- "write code" → "write clean, efficient, maintainable code with proper error handling, following [language] best practices and achieving ≥90% test coverage"
-- "make website" → "design modern, responsive website with professional aesthetic, ensuring WCAG 2.1 AA accessibility compliance and cross-browser compatibility (Chrome, Firefox, Safari, Edge)"
-
-**Validation Checkpoint 3.1:**
-**[STRICT]** Before proceeding, verify:
-- ✓ Specifications adequately expanded (all implicit requirements made explicit)
-- ✓ Quality criteria include measurable thresholds (quantify where possible)
-- ✓ Scope boundaries clearly defined (inclusions and exclusions specified)
-
-### Pattern 4: Quality Enhancement
-
-**[STRICT]** Add quality criteria and outcome focus using systematic quality framework:
-
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+## Resources
+- [Browser DevTools Documentation](https://developer.chrome.com/docs/devtools/)
+- [React Error Boundaries](https://reactjs.org/docs/error-boundaries.html)
+- [JavaScript Debugging Techniques](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Debugging)
+- [Python Debugging Tools](https://docs.python.org/3/library/debug.html)
 
 ---
 > Converted and distributed by [TomeVault](https://tomevault.io/claim/HaymayndzUltra) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-11 -->
+<!-- tomevault:4.0:windsurf_rules:2026-04-13 -->
