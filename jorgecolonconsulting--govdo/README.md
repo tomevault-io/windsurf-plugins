@@ -1,6 +1,6 @@
 # govdo
 
-> Tome by [jorgecolonconsulting](https://github.com/jorgecolonconsulting/govdo) — distributed by [TomeVault](https://tomevault.io/claim/jorgecolonconsulting)
+> Tome by [jorgecolonconsulting](https://github.com/jorgecolonconsulting/govdo) — distributed by [TomeVault](https://tomevault.io)
 
 ## Windsurf Config
 
@@ -15,7 +15,7 @@ Original source: `.cursor/rules/*.mdc` in [jorgecolonconsulting/govdo](https://g
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
-Available for 6 platforms including Claude Code, Cursor, Windsurf, and more. [Browse all formats](https://tomevault.io/claim/jorgecolonconsulting)
+Available for 6 platforms including Claude Code, Cursor, Windsurf, and more. Source: [github.com/jorgecolonconsulting/govdo](https://github.com/jorgecolonconsulting/govdo)
 
 ---
 
@@ -23,6 +23,6 @@ Install this config instantly:
 ```
 npx tomevault install jorgecolonconsulting/govdo
 ```
-Or browse all formats at [https://tomevault.io/claim/jorgecolonconsulting](https://tomevault.io/claim/jorgecolonconsulting).
+Source: [github.com/jorgecolonconsulting/govdo](https://github.com/jorgecolonconsulting/govdo).
 
 <!-- genome:t-i-p -->
