@@ -1,6 +1,6 @@
-# BMAD — distributed by TomeVault
+# BMAD
 
-> Originally from [tborys/BMAD](https://github.com/tborys/BMAD). Converted and distributed by [TomeVault](https://tomevault.io)
+> Source: [tborys/BMAD](https://github.com/tborys/BMAD) — distributed by [TomeVault](https://tomevault.io)
 
 ## Windsurf Config
 
@@ -15,7 +15,7 @@ Original source: `.cursor/rules/*.mdc` in [tborys/BMAD](https://github.com/tbory
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
-Quality verified by TomeVault's automated analysis pipeline. [View quality report](https://tomevault.io/claim/tborys#quality)
+Quality verified by TomeVault's automated analysis pipeline. Source: [github.com/tborys/BMAD](https://github.com/tborys/BMAD)
 
 ---
 
@@ -23,6 +23,6 @@ Install this config instantly:
 ```
 npx tomevault install tborys/BMAD
 ```
-Or browse all formats at [https://tomevault.io/claim/tborys](https://tomevault.io/claim/tborys).
+Source: [github.com/tborys/BMAD](https://github.com/tborys/BMAD).
 
 <!-- genome:d-i-q -->
