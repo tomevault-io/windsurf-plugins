@@ -1,0 +1,286 @@
+---
+trigger: always_on
+description: **CRITICAL**: 在编写或修改代码时，必须同步更新或创建相应的文档。代码与文档必须保持100%一致性。
+---
+
+# Claude Code 开发指令与记忆
+
+## 核心开发原则
+
+### 📋 文档同步开发原则
+**CRITICAL**: 在编写或修改代码时，必须同步更新或创建相应的文档。代码与文档必须保持100%一致性。
+
+### 🔄 开发-文档循环流程
+1. **代码修改时**：立即评估是否需要更新现有文档
+2. **新功能开发时**：同时创建或扩展相关文档
+3. **API 变更时**：必须更新 `API_ENDPOINTS.md` 和 `PROJECT_DOCS.md`
+4. **架构调整时**：更新 `PROJECT_DOCS.md` 中的架构图和说明
+
+## 📚 文档体系结构
+
+### 主要文档文件
+- **`PROJECT_DOCS.md`**: 项目主文档，包含架构、组件、流程图
+- **`API_ENDPOINTS.md`**: 详细的 API 端点文档，包含示例和错误处理
+- **`DEVELOPMENT_PLAN.md`**: 开发计划和功能路线图
+- **`TECHNICAL_DESIGN.md`**: 技术设计决策和架构细节
+- **`CLAUDE.md`** (本文件): Claude Code 开发指令和记忆
+
+### 文档更新触发条件
+
+#### 1. 代码结构变更时
+- 新增/删除 Python 模块 → 更新 `PROJECT_DOCS.md` 项目结构图
+- 修改类/函数接口 → 更新核心组件文档
+- 变更数据库模式 → 更新数据库设计图
+
+#### 2. API 变更时
+- 新增 API 端点 → 在 `API_ENDPOINTS.md` 中添加详细说明
+- 修改 API 参数/响应 → 更新对应端点的文档和示例
+- API 状态码变更 → 更新错误处理部分
+
+#### 3. 架构调整时
+- 新增服务层 → 更新架构图和交互流程
+- 修改依赖关系 → 更新组件关系图
+- 变更数据流 → 更新序列图和流程图
+
+#### 4. 配置变更时
+- 新增配置项 → 更新配置说明文档
+- 环境要求变更 → 更新部署和运行文档
+
+## 🎯 具体执行指令
+
+### 每次代码修改后执行检查列表
+```
+□ 代码修改是否影响 API 接口？
+  ↳ 是 → 更新 API_ENDPOINTS.md 相关部分
+□ 代码修改是否影响项目结构？
+  ↳ 是 → 更新 PROJECT_DOCS.md 项目结构图
+□ 代码修改是否引入新的组件或服务？
+  ↳ 是 → 在 PROJECT_DOCS.md 中添加组件说明
+□ 代码修改是否改变数据流或交互逻辑？
+  ↳ 是 → 更新序列图和流程图
+□ 是否需要创建新的文档文件？
+  ↳ 是 → 创建并链接到主文档
+```
+
+### 新功能开发流程
+```
+1. 分析功能需求
+2. 设计技术方案
+3. 创建/更新设计文档
+4. 编写代码
+5. 同时更新 API 文档（如适用）
+6. 更新项目文档中的相关部分
+7. 验证文档与代码的一致性
+```
+
+## 📝 文档写作标准
+
+### Mermaid 图表要求
+- 项目结构使用 `graph TD` (top-down)
+- 序列图使用 `sequenceDiagram`
+- 类关系使用 `classDiagram`
+- 数据库关系使用 `erDiagram`
+- 流程图使用 `flowchart TD`
+
+### API 文档要求
+- 每个端点必须包含：请求格式、响应示例、错误代码、使用说明
+- 必须提供实际可运行的代码示例
+- 错误处理必须详细说明状态码和错误信息
+- 所有示例必须与实际 API 行为一致
+
+### 代码文档要求
+- 核心类和函数必须包含详细的 docstring
+- 复杂业务逻辑必须有中文注释说明
+- 接口变更必须在文档中标注版本和变更日期
+
+## 🚨 强制执行规则
+
+### 代码提交前检查
+1. **API 一致性**：手动测试 API 端点，确保文档示例可用
+2. **架构一致性**：验证架构图反映实际代码结构
+3. **文档完整性**：确保新功能有对应文档
+4. **示例有效性**：确保所有代码示例可执行
+5. **测试性能**：运行性能基准测试验证优化效果
+6. **文档谦逊性**：避免夸大数据，保持中英文双版本
+
+### 文档质量标准
+- **准确性**：文档内容必须与代码实现100%一致
+- **完整性**：主要功能和 API 必须有完整文档
+- **时效性**：文档更新日期必须及时更新
+- **可用性**：示例代码必须可直接运行
+
+## 🔍 验证机制
+
+### 自动化检查
+```bash
+# API 端点验证脚本
+python test_complete_workflow.py
+
+# 文档链接检查
+# 验证所有内部链接的有效性
+
+# 代码示例验证
+# 确保文档中的代码示例语法正确
+```
+
+### 手动验证
+- 每个 API 端点至少手动测试一次
+- 每个架构图与实际代码结构对比验证
+- 每个序列图与实际调用流程对比验证
+
+## 💡 开发记忆要点
+
+### 项目特征记忆
+- **纯 Web 架构**：已完全移除 PyQt6 依赖
+- **API 优先**：所有功能通过 RESTful API 提供
+- **文档驱动**：架构设计和 API 设计都有详细文档
+- **测试完备**：每个主要功能都有对应测试
+
+### 技术栈记忆
+- **后端**：FastAPI + SQLite + LlamaIndex
+- **前端**：React + TypeScript + Tailwind CSS
+- **API**：RESTful + WebSocket
+- **数据库**：SQLite 3 with Repository Pattern
+- **AI**：Google Gemini API for RAG
+
+### 开发风格记忆
+- **SOLID 原则**：严格遵循面向对象设计原则
+- **依赖注入**：使用 FastAPI 的依赖注入系统
+- **错误处理**：完整的异常处理和日志记录
+- **类型安全**：完整的 Python 类型提示
+- **性能优先**：优化测试执行和CI/CD效率
+- **测试驱动**：共享fixtures和并行执行
+
+## 🎯 特殊注意事项
+
+### API 开发注意
+- 新增端点必须遵循现有的命名约定
+- 响应格式必须一致（success, message, data 结构）
+- 错误处理必须使用标准 HTTP 状态码
+- 所有端点必须有对应的 Pydantic 模型
+
+### 文档维护注意
+- Mermaid 图表必须在 GitHub 和本地都能正确渲染
+- 文档中的文件路径必须使用相对路径
+- 代码示例必须使用正确的语法高亮
+- 更新日期格式统一使用 YYYY-MM-DD
+- **保持谦逊**：避免夸大性能数据和指标
+- **双语文档**：重要文档提供中英文版本
+
+### 代码风格注意
+- 中文注释用于业务逻辑说明
+- 英文注释用于技术实现说明
+- 类和函数名使用英文
+- 变量名使用英文且具有描述性
+
+---
+
+**记忆创建日期**: 2025-07-13
+**最后更新**: 2025-01-12
+**适用版本**: AI Enhanced PDF Scholar v2.1.0+
+**更新要求**: 每次重大架构变更时更新此文档
+
+## ⚡ 最新开发实践
+
+### 📦 DocumentLibraryService 依赖注入重构 (2025-01-12)
+
+#### 🎯 重构目标
+将 DocumentLibraryService 从静态依赖迁移到依赖注入模式，提升可测试性和解耦度。
+
+#### 🔄 架构变更
+
+**修改前（Legacy）:**
+```python
+class DocumentLibraryService:
+    def __init__(self, documents_dir: str | None = None):
+        self.document_repo = DocumentRepository(db)  # Hard-coded dependency
+        # Static method call
+        content_hash = ContentHashService.calculate_content_hash(content)
+```
+
+**修改后（DI Pattern）:**
+```python
+class DocumentLibraryService:
+    def __init__(
+        self,
+        document_repository: IDocumentRepository,  # Injected interface
+        hash_service: IContentHashService,          # Injected interface
+        documents_dir: str | None = None,
+    ):
+        self.document_repo = document_repository
+        self.hash_service = hash_service
+
+    # Instance method call
+    content_hash = self.hash_service.calculate_content_hash(content)
+```
+
+#### 📋 修改文件清单
+
+**核心服务层（1个文件）:**
+1. `src/services/document_library_service.py`
+   - 构造函数：新增2个DI参数
+   - 4处方法调用：从静态调用改为实例方法
+
+**服务集成层（2个文件）:**
+2. `src/services/document_service.py` - 使用DI实例化
+3. `src/controllers/library_controller.py` - Fallback实例化
+
+**测试层（5个文件）:**
+4. `tests/services/test_document_library_service.py` - 主测试文件
+5. `tests/services/test_document_library_service_enhancements.py` - 增强测试
+6. `tests/integration/test_real_document_library.py` - 集成测试
+7. `tests/integration/test_real_pdf_processing.py` - PDF处理测试
+8. `tests/integration/test_mock_replacement_demo.py` - Mock演示
+
+**总计：8个文件更新**
+
+#### ✅ 验证结果
+
+**测试通过率:**
+- 单元测试：13 passed, 1 failed (无关fixture issue), 1 error (无关文件问题)
+- 集成测试：所有DI相关测试通过
+
+**生产环境验证:**
+```bash
+# API 端点测试
+POST /api/documents
+Response: 201 Created
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "file_hash": "fb4489b5938e9206",
+    "content_hash": "4837479125758add"  # ✅ ContentHashService via DI working
+  }
+}
+```
+
+#### 🛠️ 后端启动问题修复
+
+**问题诊断:**
+- `.trunk/tmp` 目录存在循环符号链接
+- Uvicorn WatchFiles 检测到文件系统循环导致崩溃
+- 用户症状：前端 `ERR_CONNECTION_REFUSED`
+
+**解决方案:**
+```bash
+rm -rf .trunk/tmp  # 删除循环符号链接目录
+```
+
+**结果:** 后端成功启动，监听端口 8000
+
+#### 📝 DI模式最佳实践
+
+**依赖注入优势:**
+- ✅ 接口隔离：依赖抽象接口而非具体实现
+- ✅ 可测试性：轻松注入 Mock 对象
+- ✅ 单一职责：服务专注业务逻辑，不负责依赖创建
+- ✅ 解耦合：降低模块间的耦合度
+
+**实例化模式:**
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Converted and distributed by [TomeVault](https://tomevault.io/claim/Jackela) — claim your Tome and manage your conversions.
+<!-- tomevault:4.0:windsurf_rules:2026-04-10 -->
