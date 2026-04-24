@@ -1,110 +1,157 @@
 ---
 trigger: always_on
-description: Auto-load refactoring rules for TypeScript files
+description: Auto-load daisyUI 5 component library rules and best practices
 ---
 
 
-# Refactoring Rules for TypeScript
+# daisyUI 5
 
-## 🚨 CRITICAL: Refactoring Workflow
+daisyUI 5 is a CSS library for Tailwind CSS 4
+daisyUI 5 provides class names for common UI components
 
-**When a refactoring request is made (e.g., "refactor @file.ts"), you MUST:**
+- [daisyUI 5 docs](http://daisyui.com)
+- [Guide: How to use this file in LLMs and code editors](https://daisyui.com/docs/editor/)
+- [daisyUI 5 release notes](https://daisyui.com/docs/v5/)
+- [daisyUI 4 to 5 upgrade guide](https://daisyui.com/docs/upgrade/)
 
-1. **First**: Load and follow `@ai-toolkit-shared/prompts/refactoring/router.md`
-2. **Router will**: Analyze the file, select appropriate specialist(s), request confirmation
-3. **Then**: Apply the rules below as part of the selected specialist workflow
+## daisyUI 5 install notes
 
-**Never skip the router analysis step - it ensures the correct specialist is selected.**
+[install guide](https://daisyui.com/docs/install/)
 
----
+1. daisyUI 5 requires Tailwind CSS 4
+2. `tailwind.config.js` file is deprecated in Tailwind CSS v4. do not use `tailwind.config.js`. Tailwind CSS v4 only needs `@import "tailwindcss";` in the CSS file if it's a node dependency.
+3. daisyUI 5 can be installed using `npm i -D daisyui@latest` and then adding `@plugin "daisyui";` to the CSS file
+4. daisyUI is suggested to be installed as a dependency but if you really want to use it from CDN, you can use Tailwind CSS and daisyUI CDN files:
 
-When refactoring this file, apply these rules:
+```html
+<link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+```
 
-## Type Safety
+5. A CSS file with Tailwind CSS and daisyUI looks like this (if it's a node dependency)
 
-- ❌ Never use `any` type (use `unknown` if truly unknown)
-- ✅ Define interfaces for all data structures
-- ✅ Use `import type` for type-only imports
-- ✅ Enable strict mode in tsconfig
+```css
+@import 'tailwindcss';
+@plugin "daisyui";
+```
 
-## Imports
+## daisyUI 5 usage rules
 
-- ❌ Never use barrel file imports: `from './components'`
-- ❌ Never use index re-exports: `from './index'`
-- ✅ Always use direct imports: `from './components/button'`
+1. We can give styles to a HTML element by adding daisyUI class names to it. By adding a component class name, part class names (if there's any available for that component), and modifier class names (if there's any available for that component)
+2. Components can be customized using Tailwind CSS utility classes if the customization is not possible using the existing daisyUI classes. For example `btn px-10` sets a custom horizontal padding to a `btn`
+3. If customization of daisyUI styles using Tailwind CSS utility classes didn't work because of CSS specificity issues, you can use the `!` at the end of the Tailwind CSS utility class to override the existing styles. For example `btn bg-red-500!` sets a custom background color to a `btn` forcefully. This is a last resort solution and should be used sparingly
+4. If a specific component or something similar to it doesn't exist in daisyUI, you can create your own component using Tailwind CSS utility
+5. when using Tailwind CSS `flex` and `grid` for layout, it should be responsive using Tailwind CSS responsive utility prefixes.
+6. Only allowed class names are existing daisyUI class names or Tailwind CSS utility classes.
+7. Ideally, you won't need to write any custom CSS. Using daisyUI class names or Tailwind CSS utility classes is preferred.
+8. suggested - if you need placeholder images, use https://picsum.photos/200/300 with the size you want
+9. suggested - when designing , don't add a custom font unless it's necessary
+10. don't add `bg-base-100 text-base-content` to body unless it's necessary
+11. For design decisions, use Refactoring UI book best practices
 
-## Naming Conventions
+daisyUI 5 class names are one of the following categories. these type names are only for reference and are not used in the actual code
 
-- Files: `kebab-case.ts` (e.g., `video-player.ts`)
-- Variables: `camelCase` (e.g., `videoPlayer`)
-- Interfaces/Types: `PascalCase` (e.g., `VideoPlayer`)
+- `component`: the required component class
+- `part`: a child part of a component
+- `style`: sets a specific style to component or part
+- `behavior`: changes the behavior of component or part
+- `color`: sets a specific color to component or part
+- `size`: sets a specific size to component or part
+- `placement`: sets a specific placement to component or part
+- `direction`: sets a specific direction to component or part
+- `modifier`: modifies the component or part in a specific way
 
-## Alpine.js Integration
+## Config
 
-- Export functions for Alpine.js use on `window`
-- Keep Alpine components simple, complex logic in TypeScript
-- Define types for Alpine component data
+daisyUI 5 config docs: https://daisyui.com/docs/config/
+daisyUI without config:
 
-## Error Handling
+```css
+@plugin "daisyui";
+```
 
-- Use Result types for expected errors
-- Use try/catch for unexpected errors
-- Provide meaningful error messages
+daisyUI config with `light` theme only:
 
-## Alpine.js Integration
+```css
+@plugin "daisyui" {
+    themes: light --default;
+}
+```
 
-- ✅ Export functions for Alpine.js use on `window`
-- ✅ Keep Alpine components simple, complex logic in TypeScript
-- ✅ Define types for Alpine component data
-- ✅ Use `alpine:init` event for initialization
-- ✅ Register functions globally: `window.functionName = functionName`
-- ✅ Use Result types for expected errors
-- ✅ Provide typed interfaces for component state
+daisyUI with all the default configs:
 
-## Error Handling
+```css
+@plugin "daisyui" {
+    themes:
+        light --default,
+        dark --prefersdark;
+    root: ':root';
+    include:;
+    exclude:;
+    prefix:;
+    logs: true;
+}
+```
 
-- ✅ Use Result types for expected errors: `Result<T, E>`
-- ✅ Use try/catch for unexpected errors
-- ✅ Provide meaningful error messages
-- ✅ Use type guards for runtime validation
-- ✅ Exhaustive switch statements for union types
+An example config:
+In below config, all the built-in themes are enabled while bumblebee is the default theme and synthwave is the prefersdark theme (default dark mode)
+All the other themes are enabled and can be used by adding `data-theme="THEME_NAME"` to the `<html>` element
+root scrollbar gutter is excluded. `daisy-` prefix is used for all daisyUI classes and console.log is disabled
 
-## Generic Patterns
+```css
+@plugin "daisyui" {
+    themes:
+        light,
+        dark,
+        cupcake,
+        bumblebee --default,
+        emerald,
+        corporate,
+        synthwave --prefersdark,
+        retro,
+        cyberpunk,
+        valentine,
+        halloween,
+        garden,
+        forest,
+        aqua,
+        lofi,
+        pastel,
+        fantasy,
+        wireframe,
+        black,
+        luxury,
+        dracula,
+        cmyk,
+        autumn,
+        business,
+        acid,
+        lemonade,
+        night,
+        coffee,
+        winter,
+        dim,
+        nord,
+        sunset,
+        caramellatte,
+        abyss,
+        silk;
+    root: ':root';
+    include:;
+    exclude: rootscrollgutter, checkbox;
+    prefix: daisy-;
+    logs: false;
+}
+```
 
-- ✅ Use generic functions for reusable components
-- ✅ Define constraints for generic types: `<T extends { id: string }>`
-- ✅ Use `Omit`, `Pick`, `Partial` utility types
-- ✅ Create type-safe event emitters with event maps
+## daisyUI 5 colors
 
-## Validation
+### daisyUI color names
 
-- ✅ Create validation schemas with typed rules
-- ✅ Use type guards for runtime type checking
-- ✅ Validate external data with Zod or similar
-- ✅ Return typed validation results
+- `primary`: Primary brand color, The main color of your brand
 
-## API Patterns
-
-- ✅ Define `ApiResponse<T>` interface for API calls
-- ✅ Use typed fetch functions
-- ✅ Handle errors explicitly (no silent failures)
-- ✅ Use async/await with proper error handling
-
-## Checklist
-
-- [ ] No `any` types (use `unknown` if truly unknown)
-- [ ] Direct imports only (no barrel files)
-- [ ] Proper naming conventions (camelCase, PascalCase, kebab-case)
-- [ ] Type-only imports use `import type`
-- [ ] Error handling implemented (Result types or try/catch)
-- [ ] Alpine integration via window exports
-- [ ] Complex Alpine logic extracted to TypeScript
-- [ ] Type guards for runtime validation
-- [ ] Generic patterns for reusable components
-- [ ] Validation schemas for data validation
-- [ ] API responses properly typed
-- [ ] Exhaustive switch statements for union types
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Converted and distributed by [TomeVault](https://tomevault.io/claim/martijnbokma) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-09 -->
+<!-- tomevault:4.0:windsurf_rules:2026-04-13 -->
