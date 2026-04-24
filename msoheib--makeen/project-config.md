@@ -1,141 +1,159 @@
 ---
 trigger: always_on
-description: - **Supabase Project ID**: `fbabpaorcvatejkrelrf`
+description: **Problem Solved:** Hamburger menu button existed but was non-functional, causing navigation errors when clicked.
 ---
 
-# Real Estate Management Database Schema Documentation
+# Real Estate Management App - Progress Memory
 
-## Project Information
-- **Supabase Project ID**: `fbabpaorcvatejkrelrf`
-- **Project Name**: `property-management` 
-- **Region**: `eu-central-1`
-- **Database Version**: PostgreSQL 15.8.1.093
-- **Status**: ACTIVE_HEALTHY
-- **Host**: `db.fbabpaorcvatejkrelrf.supabase.co`
+## Hamburger Menu & Sidebar Navigation Implementation (December 2024)
 
-## Schema Overview
+### ✅ **COMPLETED: Functional Hamburger Menu with Sidebar**
 
-The database is designed for a comprehensive real estate management system supporting property management, tenant/owner relationships, financial transactions, maintenance tracking, document management, and accounting functions.
+**Problem Solved:** Hamburger menu button existed but was non-functional, causing navigation errors when clicked.
 
-### Core Business Entities
-1. **People Management** - `profiles`, `clients`
-2. **Property Management** - `properties`, `property_reservations`
-3. **Contract Management** - `contracts` 
-4. **Maintenance Operations** - `maintenance_requests`, `work_orders`
-5. **Financial Management** - `vouchers`, `invoices`, `accounts`, `cost_centers`
-6. **Communications** - `letters`, `issues`
-7. **Document Management** - `documents`
-8. **Asset Management** - `fixed_assets`
+**Root Issues Identified:**
+1. Missing `@react-navigation/drawer` dependency
+2. Incorrect navigation hierarchy - tabs not properly nested within drawer
+3. Navigation paths pointing to wrong routes
+4. Babel configuration issues with gesture handler
+
+### **Technical Implementation Details:**
+
+#### **1. Navigation Structure Setup**
+- **Fixed Navigation Hierarchy:**
+  ```
+  app/
+  ├── index.tsx ────────────┐ (Redirects to drawer)
+  └── (drawer)/             │
+      ├── index.tsx ────────┤ (Redirects to tabs)
+      ├── _layout.tsx       │ (Drawer navigator with SideBar)
+      └── (tabs)/           │
+          ├── index.tsx ◄───┘ (Dashboard)
+          ├── _layout.tsx     (Tab navigator)
+          ├── tenants.tsx
+          ├── settings.tsx
+          ├── reports.tsx
+          ├── properties.tsx
+          └── [other tabs...]
+  ```
+
+#### **2. Dependencies Installed**
+- `@react-navigation/drawer` - Core drawer navigation functionality
+- `react-native-gesture-handler` (already present) - Gesture support for drawer
+
+#### **3. Code Changes Made**
+
+**Root Layout (`app/_layout.tsx`):**
+- Changed navigation from `(tabs)` to `(drawer)` 
+- Added `import 'react-native-gesture-handler';` for gesture support
+
+**Drawer Layout (`app/(drawer)/_layout.tsx`):**
+- Configured with `SideBar` component as drawer content
+- Properly wraps tab navigation
+
+**ModernHeader Component (`components/ModernHeader.tsx`):**
+- Added drawer navigation context support
+- Hamburger menu now calls `navigation.dispatch(DrawerActions.openDrawer())`
+- Automatic drawer opening when hamburger menu is pressed
+
+**SideBar Component (`components/SideBar.tsx`):**
+- Added drawer close functionality on navigation
+- Updated all navigation paths from `/(tabs)/` to `/(drawer)/(tabs)/`
+- Proper navigation context integration
+
+**Navigation Routes Created:**
+- `app/index.tsx` - Redirects to `/(drawer)`
+- `app/(drawer)/index.tsx` - Redirects to `/(drawer)/(tabs)/`
+
+#### **4. Babel Configuration**
+- Removed problematic `react-native-gesture-handler/babel` plugin
+- Kept essential plugins: `@babel/plugin-proposal-export-namespace-from`, `react-native-reanimated/plugin`
+
+### **Sidebar Menu Structure Implemented:**
+
+```
+Real Estate MG
+├── Home (Dashboard)
+├── Owners and Customers
+│   ├── Owner or Property Manager
+│   ├── Tenant
+│   ├── Buyer
+│   ├── Foreign Tenants
+│   └── Customers and suppliers
+│       ├── Client
+│       └── Supplier
+├── Property Management
+│   ├── Properties List
+│   ├── Rent a property
+│   ├── Foreign Tenant Contracts
+│   ├── List cash property
+│   ├── List installment property
+│   └── Property Reservation List
+├── Accounting & Voucher
+│   ├── Receipt Voucher
+│   ├── Payment Voucher
+│   ├── Entry voucher
+│   ├── Credit notification
+│   ├── Debit notification
+│   └── VAT invoices
+├── Reports
+│   ├── Summary of Reports
+│   └── Invoices Report
+├── Maintenance, letters, issues
+│   ├── List Work Order Reports
+│   ├── Add a maintenance report
+│   ├── List Letters
+│   ├── Add a Letter
+│   ├── List Issues
+│   ├── Add issue
+│   └── Archive documents
+├── Settings
+└── Users
+    ├── Add
+    ├── List
+    └── User Transaction Report
+```
+
+### **Current Functionality:**
+- ✅ **Hamburger menu opens sidebar** - Tap ☰ button in any screen header
+- ✅ **Sidebar slides from left** - Smooth drawer animation
+- ✅ **Expandable menu sections** - Collapsible submenu navigation
+- ✅ **Auto-close on navigation** - Drawer closes when selecting destination
+- ✅ **Gesture support** - Swipe to open/close drawer
+- ✅ **Consistent across all screens** - Works from any tab or screen
+- ✅ **Proper routing** - All navigation goes through drawer context
+
+### **Error Resolution Log:**
+1. **"Module not found @react-navigation/drawer"** → Installed missing package
+2. **"OPEN_DRAWER action not handled"** → Fixed navigation hierarchy and routing
+3. **"Cannot find react-native-gesture-handler/babel"** → Removed problematic babel plugin
+
+### **Files Modified:**
+- `app/_layout.tsx` - Root navigation structure
+- `app/index.tsx` - App entry point routing
+- `app/(drawer)/index.tsx` - Drawer entry point
+- `app/(drawer)/_layout.tsx` - Drawer configuration  
+- `components/ModernHeader.tsx` - Hamburger menu functionality
+- `components/SideBar.tsx` - Sidebar content and navigation
+- `babel.config.js` - Babel plugin configuration
+- Multiple tab screen files - Removed custom menu handlers
+
+### **Next Steps / Future Enhancements:**
+- Consider adding drawer gesture customization
+- Implement navigation badges for notifications
+- Add user profile section to sidebar header
+- Consider drawer width customization for different screen sizes
 
 ---
+**Status:** ✅ **COMPLETE** - Hamburger menu fully functional with comprehensive sidebar navigation
 
-## Table Definitions
+## Database Analysis & Schema Enhancement (December 2024)
 
-### 1. PROFILES
-**Purpose**: Central table for all people in the system (users, tenants, owners, employees, contractors)
+### ✅ **COMPLETED: Supabase Database Analysis and Missing Tables Implementation**
 
-#### Columns
-| Column | Type | Nullable | Default | Constraints |
-|--------|------|----------|---------|-------------|
-| `id` | uuid | NO | `gen_random_uuid()` | Primary Key |
-| `first_name` | text | YES | NULL | |
-| `last_name` | text | YES | NULL | |
-| `email` | text | YES | NULL | Unique |
-| `role` | text | YES | `'tenant'` | CHECK: admin, manager, owner, tenant, buyer, employee, contractor |
-| `phone` | text | YES | NULL | |
-| `address` | text | YES | NULL | |
-| `city` | text | YES | NULL | |
-| `country` | text | YES | NULL | |
-| `nationality` | text | YES | NULL | |
-| `id_number` | text | YES | NULL | |
-| `is_foreign` | boolean | YES | `false` | |
-| `profile_type` | text | YES | NULL | CHECK: owner, tenant, buyer, employee, admin |
-| `status` | text | YES | `'active'` | CHECK: active, inactive, suspended |
-| `created_at` | timestamptz | YES | `now()` | |
-| `updated_at` | timestamptz | YES | `now()` | |
-
-#### Referenced By
-- `properties.owner_id` → `profiles.id`
-- `contracts.tenant_id` → `profiles.id`
-- `maintenance_requests.tenant_id` → `profiles.id`
-- `work_orders.assigned_to` → `profiles.id`
-- `vouchers.tenant_id` → `profiles.id`
-- `vouchers.created_by` → `profiles.id`
-- `invoices.tenant_id` → `profiles.id`
-- `letters.sender_id` → `profiles.id`
-- `issues.reported_by` → `profiles.id`
-- `documents.uploaded_by` → `profiles.id`
-
----
-
-### 2. PROPERTIES
-**Purpose**: Property listings and management information
-
-#### Columns
-| Column | Type | Nullable | Default | Constraints |
-|--------|------|----------|---------|-------------|
-| `id` | uuid | NO | `gen_random_uuid()` | Primary Key |
-| `title` | text | NO | NULL | |
-| `description` | text | YES | NULL | |
-| `property_type` | text | NO | NULL | CHECK: apartment, villa, office, retail, warehouse |
-| `status` | text | YES | `'available'` | CHECK: available, rented, maintenance, reserved |
-| `address` | text | NO | NULL | |
-| `city` | text | NO | NULL | |
-| `country` | text | NO | NULL | |
-| `neighborhood` | text | YES | NULL | |
-| `area_sqm` | numeric | NO | NULL | |
-| `bedrooms` | integer | YES | NULL | |
-| `bathrooms` | integer | YES | NULL | |
-| `price` | numeric | NO | NULL | |
-| `payment_method` | text | YES | `'cash'` | CHECK: cash, installment |
-| `owner_id` | uuid | YES | NULL | FK to profiles.id |
-| `images` | text[] | YES | NULL | |
-| `property_code` | text | YES | NULL | |
-| `floor_number` | integer | YES | NULL | |
-| `building_name` | text | YES | NULL | |
-| `parking_spaces` | integer | YES | `0` | |
-| `amenities` | text[] | YES | NULL | |
-| `is_furnished` | boolean | YES | `false` | |
-| `annual_rent` | numeric | YES | NULL | |
-| `service_charge` | numeric | YES | `0` | |
-| `created_at` | timestamptz | YES | `now()` | |
-| `updated_at` | timestamptz | YES | `now()` | |
-
-#### Foreign Keys
-- `owner_id` → `profiles.id` (ON DELETE RESTRICT)
-
-#### Referenced By
-- `contracts.property_id` → `properties.id`
-- `maintenance_requests.property_id` → `properties.id`
-- `vouchers.property_id` → `properties.id`
-- `invoices.property_id` → `properties.id`
-- `property_reservations.property_id` → `properties.id`
-- `issues.property_id` → `properties.id`
-- `fixed_assets.property_id` → `properties.id`
-
----
-
-### 3. CONTRACTS
-**Purpose**: Rental, sales, and management contracts
-
-#### Columns
-| Column | Type | Nullable | Default | Constraints |
-|--------|------|----------|---------|-------------|
-| `id` | uuid | NO | `gen_random_uuid()` | Primary Key |
-| `property_id` | uuid | YES | NULL | FK to properties.id |
-| `tenant_id` | uuid | YES | NULL | FK to profiles.id |
-| `start_date` | timestamptz | NO | NULL | |
-| `end_date` | timestamptz | NO | NULL | |
-| `rent_amount` | numeric | NO | NULL | |
-| `payment_frequency` | text | YES | `'monthly'` | CHECK: monthly, quarterly, biannually, annually |
-| `security_deposit` | numeric | NO | NULL | |
-| `is_foreign_tenant` | boolean | YES | `false` | |
-| `status` | text | YES | `'active'` | CHECK: active, expired, terminated, renewal |
-| `documents` | text[] | YES | NULL | |
-| `contract_number` | text | YES | NULL | |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Converted and distributed by [TomeVault](https://tomevault.io/claim/msoheib) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-09 -->
+<!-- tomevault:4.0:windsurf_rules:2026-04-13 -->
