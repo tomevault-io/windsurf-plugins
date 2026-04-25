@@ -1,0 +1,80 @@
+---
+trigger: always_on
+description: Agent-native is a framework for building apps where the AI agent and the UI are equal partners. Everything the UI can do, the agent can do. Everything the agent can do, the UI can do. They share the same database, the same state, and they always stay in sync.
+---
+
+# Agent-Native Framework
+
+## Core Philosophy
+
+Agent-native is a framework for building apps where the AI agent and the UI are equal partners. Everything the UI can do, the agent can do. Everything the agent can do, the UI can do. They share the same database, the same state, and they always stay in sync.
+
+The agent can also see what the user is looking at. If an email is open, the agent knows which email. If a slide is selected, the agent knows which slide. If the user selects text and hits Cmd+I to focus the agent, the agent knows what text is selected and can act on just that.
+
+## The Six Rules
+
+1. **Data lives in SQL** — via Drizzle ORM. Any SQL database (SQLite/Postgres/D1/Turso/Supabase/Neon). See `portability` skill.
+2. **All AI goes through the agent chat** — the UI never calls an LLM directly. Use `sendToAgentChat()`. See `delegate-to-agent`.
+3. **Actions are the single source of truth** — define once in `actions/`; the agent calls them as tools, the frontend calls them as HTTP endpoints at `/_agent-native/actions/:name`. See `actions`.
+4. **Polling keeps the UI in sync** — `useDbSync()` polls `/_agent-native/poll` every 2s and invalidates React Query caches. Works on all serverless/edge hosts. See `real-time-sync`.
+5. **The agent can modify code** — components, routes, styles, actions. Design expecting this. See `self-modifying-code`.
+6. **Application state in SQL** — ephemeral UI state in `application_state`. Both sides read and write. See `storing-data`.
+
+## Adding a Feature — The Four Areas
+
+Every new feature MUST update all four areas. Skipping any one breaks the agent-native contract. See `adding-a-feature` for the full checklist.
+
+1. **UI** — the user-facing component/route/page
+2. **Actions** — operations in `actions/` using `defineAction` (serve both agent and frontend)
+3. **Skills / Instructions** — update AGENTS.md and/or add a skill if the feature introduces a pattern
+4. **Application State** — expose navigation and selection so the agent knows what the user sees
+
+If a feature needs user-facing setup (API keys, OAuth), register an onboarding step. See `onboarding`.
+
+MCP servers reach the agent from three sources: local stdio servers in `mcp.config.json`, remote HTTP servers added per-user or per-org via the settings UI, and the workspace MCP hub (Dispatch template) when enabled. Tools appear in the registry prefixed `mcp__<server-id>__`. Compose with them where possible (e.g. delegate browser automation to `mcp__claude-in-chrome__*`).
+
+## Project Structure
+
+```
+app/                   # React frontend
+  root.tsx             # HTML shell + global providers
+  routes/              # File-based page routes
+  components/          # UI components
+  hooks/               # React hooks (including use-navigation-state.ts)
+server/                # Nitro API server
+  routes/api/          # Custom API routes (file uploads, streaming, webhooks only)
+  plugins/             # Server plugins (startup logic)
+  db/                  # Drizzle schema + DB connection
+actions/               # App operations (agent tools + auto-mounted HTTP endpoints)
+.generated/            # Auto-generated types (action-types.d.ts) — gitignored
+.agents/skills/        # Agent skills — detailed guidance for patterns
+```
+
+## Skills
+
+Agent skills in `.agents/skills/` provide detailed guidance. Read the relevant skill before making changes — these are the source of truth for how to do things in this codebase.
+
+| Skill                 | When to use                                                   |
+| --------------------- | ------------------------------------------------------------- |
+| `adding-a-feature`    | Adding any new feature (the four-area checklist)              |
+| `actions`             | Creating or running agent actions                             |
+| `storing-data`        | Adding data models, reading/writing config or state           |
+| `real-time-sync`      | Wiring polling sync, debugging UI not updating, jitter issues |
+| `real-time-collab`    | Multi-user collaborative editing with Yjs CRDT + live cursors |
+| `context-awareness`   | Exposing UI state to the agent, view-screen pattern           |
+| `client-side-routing` | Adding routes without remounting the app shell                |
+| `delegate-to-agent`   | Delegating AI work from UI or actions to the agent            |
+| `self-modifying-code` | Editing app source, components, or styles                     |
+| `portability`         | Keeping code database- and hosting-agnostic                   |
+| `server-plugins`      | Framework plugins and the `/_agent-native/` namespace         |
+| `authentication`      | Auth modes, sessions, orgs, protecting routes                 |
+| `security`            | Input validation, SQL injection, XSS, secrets, data scoping   |
+| `a2a-protocol`        | Enabling inter-agent communication                            |
+| `recurring-jobs`      | Scheduled tasks the agent runs on a cron schedule             |
+| `onboarding`          | Registering setup steps for API keys / OAuth                  |
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [BuilderIO/agent-native](https://github.com/BuilderIO/agent-native) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-04-22 -->
