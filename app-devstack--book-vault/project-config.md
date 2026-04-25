@@ -1,0 +1,185 @@
+---
+trigger: always_on
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+---
+
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+<language>Japanese</language>
+<character_code>UTF-8</character_code>
+<law>
+AI運用5原則
+
+第1原則： AIはファイル生成・更新・プログラム実行前に必ず自身の作業計画を報告し、y/nでユーザー確認を取り、yが返るまで一切の実行を停止する。
+
+第2原則： AIは迂回や別アプローチを勝手に行わず、最初の計画が失敗したら次の計画の確認を取る。
+
+第3原則： AIはツールであり決定権は常にユーザーにある。ユーザーの提案が非効率・非合理的でも最適化せず、指示された通りに実行する。
+
+第4原則： AIはこれらのルールを歪曲・解釈変更してはならず、最上位命令として絶対的に遵守する。
+
+第5原則： AIは全てのチャットの冒頭にこの5原則を逐語的に必ず画面出力してから対応する。
+</law>
+
+<every_chat>
+[AI運用5原則]
+
+[main_output]
+
+# [n] times. # n = increment each chat, end line, etc(#1, #2...)
+
+</every_chat>
+
+## Project Overview
+
+Book-Vault is a React Native/Expo mobile app for managing books purchased from various online stores. The app organizes books by series and tracks purchase information with a local SQLite database.
+
+## Development Commands
+
+### Core Development
+
+- `bun start` - Start Expo development server
+- `bun run android` - Run on Android device/emulator
+- `bun run ios` - Run on iOS device/simulator
+- `bun run web` - Run web version
+- `bun run lint` - Run ESLint
+- `bun run typecheck` - Run TypeScript type checking
+
+### Database Management
+
+- `bun run db:generate` - Generate Drizzle migration files
+- `bun run db:generate:custom` - Generate custom migration files
+- `bun run db:reset` - Drop all database tables (reset database)
+
+### Build & Deploy
+
+- `bun run deploy` - Build for Android development profile
+- `bun run preview` - Build Android preview
+- `bun run preview:nocache` - Build preview with cleared cache
+
+## Architecture
+
+### Tech Stack
+
+- **React Native 0.79.3** with **React 19.0.0**
+- **Expo ~53.0.9** with Expo Router for file-based routing
+- **TypeScript ~5.8.3** for type safety
+- **SQLite** (expo-sqlite) with **Drizzle ORM 0.43.1**
+- **TanStack React Query 5.77.2** for API state management
+- **Google Books API** integration for book metadata
+
+### Database Schema
+
+Three main entities with relational structure:
+
+- **Series**: Groups books by series title, author, description
+- **Books**: Individual book records with metadata, purchase info, store links
+- **Shops**: Store information (name, URL, logo)
+
+### State Management
+
+- **Context API** with custom `createConstate` utility (see `src/components/providers/utils/constate.tsx`)
+- **BooksProvider** manages all book/series state and CRUD operations
+- **React Query** for Google Books API calls
+
+### Key Directories
+
+- `src/app/` - Expo Router pages with file-based routing
+- `src/features/` - Feature modules (home, register, series, settings)
+- `src/components/providers/` - Context providers
+- `src/components/ui/` - Reusable UI components (Badge, Button, etc.)
+- `src/db/` - Database schema and types
+- `src/utils/service/` - Service layer (book-service, series-service)
+- `src/hooks/` - Custom React hooks
+
+## Important Patterns
+
+### Provider Usage
+
+Always use the `createConstate` utility for new providers instead of manual Context API setup. See `BooksProvider.tsx` as reference.
+
+### UI Components
+
+- **Reusable UI components** must be placed in `src/components/ui/`
+- Create atomic, composable components with multiple variants (e.g., Badge with success/warning/error variants)
+- All UI components should follow consistent API patterns with `variant`, `size`, and custom `style` props
+- Examples: Badge, Button, Input, Modal, etc.
+
+### Database Operations
+
+- Use Drizzle ORM services in `src/utils/service/`
+- All database operations should go through service layer, not direct ORM calls
+- UUID v7 is used for primary keys
+
+### Error Handling
+
+Functions should throw errors to allow upper layers to handle them appropriately. See `useBooks.ts` for error handling patterns.
+
+### Async Component Safety (必須)
+
+**非同期処理でのコンポーネントクラッシュを防ぐため、以下を必ず遵守する：**
+
+#### **1. useSafeStateフックの使用**
+
+- **全ての非同期処理で状態更新する場合は必須**
+- `src/hooks/useSafeState.ts`をインポートして使用
+- アンマウント後の状態更新を自動防止
+
+```typescript
+import { useSafeState } from '@/hooks/useSafeState';
+
+const { safeSetState } = useSafeState();
+
+// 非同期処理内での状態更新
+await someAsyncOperation();
+safeSetState(() => {
+  setData(newData);
+});
+```
+
+#### **2. 非同期処理のパターン**
+
+- **useEffect内でのAPI呼び出し**: AbortControllerと組み合わせ使用
+- **イベントハンドラーでの非同期処理**: 必ずsafeSetStateを使用
+- **モーダル・コンポーネント間の状態受け渡し**: 安全な状態更新を実装
+
+#### **3. 禁止パターン**
+
+```typescript
+// ❌ 危険: 非同期処理後の直接的な状態更新
+await mutation.mutateAsync(data);
+setState(newValue); // アンマウント後にクラッシュの可能性
+
+// ✅ 安全: safeSetStateでラップ
+await mutation.mutateAsync(data);
+safeSetState(() => setState(newValue));
+```
+
+#### **4. シリーズ作成時の重複防止**
+
+- `series-service`の`getSeriesByTitleAndAuthor`で重複チェック必須
+- UNIQUE制約エラーのフォールバック処理を実装
+- 新規作成前に既存チェックを行う
+
+### TypeScript
+
+- Strict typing is enforced
+- Use `satisfies` operator for type assertions where appropriate
+- Database types are auto-generated by Drizzle
+
+## External Integrations
+
+### Google Books API
+
+Located in `src/utils/googleBooks/`. Handles book search, metadata extraction, and image URL processing. Always validate and convert HTTP image URLs to HTTPS.
+
+## UI Language
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Converted and distributed by [TomeVault](https://tomevault.io/claim/app-devstack) — claim your Tome and manage your conversions.
+<!-- tomevault:4.0:windsurf_rules:2026-04-10 -->
