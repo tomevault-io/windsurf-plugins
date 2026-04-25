@@ -7,14 +7,14 @@ Replace chaotic AI code generation with a disciplined, spec-driven workflow. SDD
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `GEMINI.md` in [attilaszasz/sdd-pilot](https://github.com/attilaszasz/sdd-pilot).
+Original source: `AGENTS.md` in [attilaszasz/sdd-pilot](https://github.com/attilaszasz/sdd-pilot).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
+- **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
 From [attilaszasz/sdd-pilot](https://github.com/attilaszasz/sdd-pilot) — a repo with 62+ stars on GitHub.
