@@ -1,0 +1,176 @@
+---
+trigger: always_on
+description: oh-pi is a lockstep-versioned pnpm monorepo of pi extensions, themes, prompts, skills, agents, and TUI tooling.
+---
+
+# Agent Rules — oh-pi
+
+oh-pi is a lockstep-versioned pnpm monorepo of pi extensions, themes, prompts, skills, agents, and TUI tooling.
+
+## Essentials
+
+- Use `pnpm` for all workspace commands.
+<!-- {=repoMdtUsageRuleDocs} -->
+
+Use MDT through `pnpm mdt ...`, not a globally installed `mdt` binary. This keeps documentation
+reuse commands pinned to the repo's declared `@ifi/mdt` version and makes local runs, CI, and agent
+instructions consistent.
+
+<!-- {/repoMdtUsageRuleDocs} -->
+- Non-standard repo commands:
+  - `pnpm typecheck` — type-checks the repo with `tsgo` (`@typescript/native-preview`)
+  - `pnpm build` — runs every workspace package build script
+- Every non-release change must include a changeset created with `knope document-change`; changeset frontmatter must use only `default`.
+<!-- {=repoMdtCommandsDocs} -->
+
+```bash
+pnpm mdt list
+pnpm mdt update
+pnpm mdt check
+```
+
+Convenience wrappers remain available too:
+
+```bash
+pnpm docs:list
+pnpm docs:update
+pnpm docs:check
+```
+
+<!-- {/repoMdtCommandsDocs} -->
+- Read only the detailed file that matches the current task:
+  - [Engineering rules](docs/agent-rules/engineering.md)
+  - [Packaging and release rules](docs/agent-rules/packaging-and-release.md)
+  - [Git and PR workflow](docs/agent-rules/git-and-pr-workflow.md)
+
+## Performance Rules
+
+These rules prevent performance regressions identified during the 2025-04 audit. Every change must comply.
+
+### 1. Hoist regexes out of hot paths
+
+Never create `new RegExp(...)` inside a function that runs repeatedly (event handlers, parsers, per-message processors). Instead, compile the regex once at module scope or in a lazy-init singleton.
+
+```ts
+// ❌ Slow — compiles on every call
+function extractPheromones(output: string) {
+  for (const section of sections) {
+    const regex = new RegExp(`#{1,2} ${section}\\n([\\s\\S]*?)(?=\\n#{1,2} |$)`, "i");
+    // ...
+  }
+}
+
+// ✅ Fast — compile once at module scope
+const SECTION_REGEXES = SECTIONS.map(
+  (s) => new RegExp(`#{1,2} ${s}\\n([\\s\\S]*?)(?=\\n#{1,2} |$)`, "i"),
+);
+```
+
+### 2. Debounce disk writes from hot paths
+
+Extensions that write to disk on every usage sample, event, or tick must debounce writes (≥10s). Do not `writeFileSync` on every `recordUsage` call.
+
+```ts
+// ❌ Slow — writes to disk per event
+function recordUsage(sample) {
+  rollingHistory.push(sample);
+  saveRollingHistory(); // writeFileSync on every call!
+}
+
+// ✅ Fast — debounce disk writes
+const PERSIST_DEBOUNCE_MS = 10_000;
+let rollingHistoryDirty = false;
+let rollingHistorySaveTimer: ReturnType<typeof setTimeout> | null = null;
+
+function scheduleRollingHistorySave() {
+  rollingHistoryDirty = true;
+  if (rollingHistorySaveTimer) return;
+  rollingHistorySaveTimer = setTimeout(() => {
+    rollingHistorySaveTimer = null;
+    if (rollingHistoryDirty) {
+      rollingHistoryDirty = false;
+      saveRollingHistory();
+    }
+  }, PERSIST_DEBOUNCE_MS);
+  rollingHistorySaveTimer.unref?.();
+}
+```
+
+### 3. Use O(n) array pruning, not O(n²) splice loops
+
+When pruning aged items from an array, use a write-pointer instead of repeated `splice()` calls:
+
+```ts
+// ❌ O(n²) — each splice shifts elements
+for (let i = arr.length - 1; i >= 0; i--) {
+  if (shouldRemove(arr[i])) arr.splice(i, 1);
+}
+
+// ✅ O(n) — single pass with write pointer
+let write = 0;
+for (let read = 0; read < arr.length; read++) {
+  if (!shouldRemove(arr[read])) arr[write++] = arr[read];
+}
+arr.length = write;
+```
+
+### 4. Avoid unnecessary array copies
+
+Do not spread or `.slice()` arrays when the original won't be mutated:
+
+```ts
+// ❌ Unnecessary copy
+const blockedProviders = [...selectionConfig.disabledProviders];
+
+// ✅ Use the original if it won't be mutated
+const blockedProviders = selectionConfig.disabledProviders;
+```
+
+Only spread/copy when you actually need an independent mutable copy (e.g., before passing to a consumer that may modify it).
+
+### 5. Prefer `for…of` with early exit over `.filter().map()` chains
+
+When you need items matching a predicate and you only use the first few results, use a loop with `break` instead of creating intermediate arrays:
+
+```ts
+// ❌ Creates two intermediate arrays
+const firstMatch = items.filter(predicate).map(transform)[0];
+
+// ✅ No intermediate allocation
+for (const item of items) {
+  if (predicate(item)) {
+    firstMatch = transform(item);
+    break;
+  }
+}
+```
+
+### 6. Cache compiled regex matchers in long-lived objects
+
+When an object creates regex patterns from dynamic strings (e.g., completion signals, search patterns), cache the compiled regex so subsequent calls reuse it:
+
+```ts
+// ❌ Compiles regex on every call to isCompletionDetected
+private isCompletionDetected(task, text) {
+  const signal = task.completionSignal?.trim();
+  if (signal) {
+    const regexMatch = signal.match(/^\/(.*)\/([gimsuy]*)$/);
+    if (regexMatch) return new RegExp(regexMatch[1], regexMatch[2]).test(text);
+  }
+}
+
+// ✅ Cache compiled regex per signal string
+private completionRegexCache = new Map<string, RegExp | null>();
+
+private isCompletionDetected(task, text) {
+  const signal = task.completionSignal?.trim();
+  if (signal) {
+    let cached = this.completionRegexCache.get(signal);
+    if (cached === undefined) {
+      const m = signal.match(/^\/(.*)\/([gimsuy]*)$/);
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [ifiokjr/oh-pi](https://github.com/ifiokjr/oh-pi) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-04-22 -->
