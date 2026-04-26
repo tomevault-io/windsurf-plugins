@@ -1,0 +1,120 @@
+---
+trigger: always_on
+description: Browser extension + MCP server for real-time browser telemetry.
+---
+
+# Kaboom MCP — Core Rules
+
+Browser extension + MCP server for real-time browser telemetry.
+**Stack:** Go (zero deps) | Chrome Extension (MV3) | MCP (JSON-RPC 2.0)
+
+---
+
+## 🔴 Mandatory Rules
+
+1. **TDD** — Write tests first, then implementation
+2. **No `any`** — TypeScript strict mode, no implicit any
+3. **Zero Deps** — No production dependencies in Go or extension
+4. **Compile TS** — Run `make compile-ts` after ANY src/ change
+5. **5 Tools** — observe, generate, configure, interact, analyze
+6. **Performance** — WebSocket < 0.1ms, HTTP < 0.5ms
+7. **Privacy** — All data stays local, no external transmission
+8. **Wire Types** — `wire_*.go` and `wire-*.ts` are the source of truth for HTTP payloads. Changes to either side MUST update the counterpart. Run `make check-wire-drift`
+9. **Docs Cross-Ref (Required)** — EVERY feature and EVERY refactor MUST ship with cross-referenced docs updates (flow map + feature pointers + code/test paths)
+
+## Git Workflow
+
+- Branch from `UNSTABLE`, PR to `UNSTABLE`
+- Never push directly to `stable`
+- Squash commits before merge
+
+---
+
+## Commands
+
+```bash
+make compile-ts    # REQUIRED after src/ changes
+make test          # All tests
+make ci-local      # Full CI locally
+npm run typecheck  # TypeScript check
+npm run lint       # ESLint
+```
+
+## Testing
+
+**Primary UAT Script:** [`scripts/test-all-tools-comprehensive.sh`](scripts/test-all-tools-comprehensive.sh)
+
+Tests: cold start, tool calls, concurrent clients, stdout purity, persistence, graceful shutdown.
+
+```bash
+./scripts/test-all-tools-comprehensive.sh  # Run full UAT
+```
+
+**UAT Rules:**
+
+- **NEVER modify tests during UAT** — run tests as-is, report results
+- If tests have issues, note them and propose changes AFTER UAT completes
+- UAT validates the npm-installed version (`kaboom-agentic-browser` from PATH)
+- Extension must be connected for data flow tests to pass
+
+## Code Standards
+
+**JSON API fields:** ALL JSON fields use `snake_case`. No exceptions. External spec fields (MCP protocol, SARIF) are tagged with `// SPEC:<name>` comments.
+
+**TypeScript:**
+
+- No dynamic imports in service worker (background/)
+- No circular dependencies
+- Content scripts must be bundled (MV3 limitation)
+- All fetch() needs try/catch + response.ok check
+
+**Go:**
+
+- Append-only I/O on hot paths
+- Single-pass eviction (never loop-remove-recheck)
+- File headers required: `// filename.go — Purpose summary.`
+
+**File size:** Max 800 LOC. Refactor if larger.
+
+## Documentation Cross-Reference Contract (Required)
+
+For every feature and every refactor, update docs in the same change:
+
+1. Add or update the canonical flow map in `docs/architecture/flow-maps/`.
+2. Add or update the feature-local `flow-map.md` pointer under `docs/features/feature/<feature>/` when a feature folder exists.
+3. Update the feature `index.md`:
+   - `last_reviewed`
+   - `code_paths` and `test_paths`
+   - link to `flow-map.md`
+4. Update `docs/architecture/flow-maps/README.md` when adding a new canonical flow map.
+5. Keep cross-links bidirectional (feature -> canonical map, and canonical map lists code/test anchors).
+
+No code-only refactor is considered complete until this documentation contract is satisfied.
+
+## Engineering Best Practices Contract (Required)
+
+1. Instruction precedence is strict: system > repo policy > task request > style preference.
+2. If requirements are ambiguous, state assumptions explicitly before implementation.
+3. Definition of done includes code + tests + docs + flow maps in the same change.
+4. Lint/type/test must pass, or known failures must be documented with issue links.
+5. Keep modules single-purpose; avoid god objects and hidden shared state.
+6. Keep public interfaces minimal and explicit; cross-feature calls go through clear boundaries.
+7. Refactors must preserve behavior unless a behavior change is explicitly requested.
+8. Every bug fix must include a regression test that fails before and passes after.
+9. Prefer deterministic tests (mocks/fakes/controlled clocks) over sleep-based timing.
+10. Enforce startup and request latency budgets with explicit timeout/retry/backoff policies.
+11. Use structured logs with correlation IDs; avoid protocol-breaking stdout/stderr noise.
+12. Version public contracts and keep wire schemas synchronized across Go/TS boundaries.
+13. Redact secrets from logs/errors/diagnostics and never commit credentials.
+14. New dependencies require explicit justification; remove unused dependencies promptly.
+15. Reviews and handoffs must cover correctness, modularity, performance, testability, docs quality, and DRY adherence.
+16. CI must block merges on broken docs links, missing required docs, or failing quality gates.
+17. ToolHandler naming convention is strict: `tool*` for top-level MCP mode/action entry points, `handle*` for sub-action handlers/helpers.
+18. Shared extension storage keys (`TRACKED_TAB_*`, recording state, pending intents) must be accessed through feature helpers/modules; avoid new ad-hoc read/write/remove call sites.
+19. Multi-entry-point actions (keyboard, context menu, popup, MCP) must use one shared toggle/start-stop helper so behavior stays identical.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [brennhill/Kaboom-Browser-AI-Devtools-MCP](https://github.com/brennhill/Kaboom-Browser-AI-Devtools-MCP) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-04-22 -->
