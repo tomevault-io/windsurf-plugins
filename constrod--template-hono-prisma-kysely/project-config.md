@@ -1,165 +1,140 @@
 ---
 trigger: always_on
-description: Guidelines for Data Access Layer via Database
+description: These rules define the standard patterns for working with Prisma-generated schemas and integrating them with the application's type system. The guidelines ensure consistent handling of database types across the codebase.
 ---
 
-# Guidelines for Data Access Layer via Database 
+# Guidelines for Prisma Schema Integration
 
 ## Purpose & Overview
-These rules define the standard patterns for implementing CRUD operations in the data access layer. The guidelines are based on the implementation of the 'users' module and should be followed for all database operations to maintain consistency across the codebase.
+These rules define the standard patterns for working with Prisma-generated schemas and integrating them with the application's type system. The guidelines ensure consistent handling of database types across the codebase.
 
-## File Structure
+## Schema Integration Pattern
 
-### Shared Domain
-
-By default, place all data access files in the shared data directory. Only use feature domains when explicitly specified in requirements.
-
-```
-src/data/[entity-name]/
-├── schema.ts               # Entity schema definitions
-├── create-[entity].ts      # Create operation
-├── get-[entity].ts         # Get single entity
-├── update-[entity].ts      # Update operation
-├── delete-[entity].ts      # Delete operation
-├── search-[entity]s.ts     # Search with filters
-└── __test-utils__/         # Test utilities
-```
-
-### Feature Domain
-
-When a prompt/requirement explicitly specifies that code should be organized in a feature domain, follow this structure:
-
-```
-src/features/[feature-name]/
-└── _data/                  # Feature-specific data access layer
-    ├── schema.ts           # Feature's schemas
-    ├── create-[entity].ts  # Create operation
-    ├── get-[entity].ts     # Get single entity
-    ├── update-[entity].ts  # Update operation
-    ├── delete-[entity].ts  # Delete operation
-    ├── search-[entity]s.ts # Search with filters
-    └── __test-utils__/     # Test utilities
-```
-
-## Naming Conventions
-
-### Function Naming
-- `create[Entity]Data`: For creating records
-- `get[Entity]Data`: For retrieving a single record
-- `update[Entity]Data`: For updating records
-- `delete[Entity]Data`: For deleting records
-- `search[Entity]sData`: For searching records with filters
-
-### Type Naming
-- `[Entity]`: Main entity type from schema
-- `Create[Entity]`: Type for creating entity, typically omitting auto-generated fields
-- `Update[Entity]`: Type for updating entity, typically partial of the main entity
-- `[Operation][Entity]DataArgs`: Type for function arguments
-- `[Operation][Entity]DataResponse`: Type for function return value
-
-## Implementation Patterns
-
-## Schema Implementation
-The `schema.ts` file should define the entity's schema, types, and Zod validators:
+### Type Override Pattern
+Follow this pattern for overriding Prisma-generated types to ensure consistent handling of fields:
 
 ```typescript
-// schema.ts
-import { type Entity } from '@/db/schema';
-import { z } from '@hono/zod-openapi';
+/**
+ * Utility type to override specific field types from database tables:
+ * - DATE fields: converted to `Date | string` if not null else do `Date | string | null`
+ * - JSON fields: specific type overrides
+ * - w/ DEFAULT fields: any field with a default value
+ * @example
+ * type SampleTable = {
+ *   id: Generated<string>; // w/o DEFAULT
+ *   name: string; // w/o DEFAULT
+ *   created_at: Generated<Timestamp>; // w/ DEFAULT
+ *   updated_at: Generated<Timestamp>; // w/ DEFAULT
+ *   deleted_at: Timestamp | null; // w/o DEFAULT
+ *   status: Generated<UserStatusType>; // w/ DEFAULT
+ *   json: unknown; // w/o DEFAULT
+ *   is_active: Generated<boolean>; // w/ DEFAULT
+ * };
+ *
+ * type OverrideSampleTable = Omit<OverrideCommonFields<SampleTable>, 'status'> & {
+ *   status: UserStatusType;
+ *   json: SomeJsonType;
+ *   is_active: boolean;
+ * };
+ */
+type OverrideCommonFields<TTable> = Omit<
+  TTable,
+  'id' | 'created_at' | 'updated_at' | 'deleted_at'
+> & {
+  id: string;
+  created_at: Date | string;
+  updated_at: Date | string;
+  deleted_at: Date | string | null;
+};
+```
 
-// Define schema object with Zod validators
-export const [entity]SchemaObject = {
-  id: z.string().uuid(),
-  created_at: z.union([z.coerce.date(), z.string()]).openapi({
-    example: new Date().toISOString(),
-  }),
-  updated_at: z.union([z.coerce.date(), z.string()]).openapi({
-    example: new Date().toISOString(),
-  }),
-  deleted_at: z.union([z.coerce.date(), z.string()]).nullable().openapi({
-    example: null,
-  }),
-  // ... add entity-specific fields with validation and OpenAPI examples
+### Field-Specific Overrides
+For fields requiring specific types beyond common fields:
+
+
+```typescript
+type OverrideEntityName = Omit<OverrideCommonFields<entity_name>, 'specific_field'> & {
+  specific_field: SpecificType;
 };
 
-// Create Zod schema from schema object
-export const [entity]Schema = z.object([entity]SchemaObject) satisfies z.ZodType<Entity>;
-// Create OpenAPI schema for documentation
-export const [entity]SchemaOpenApi = [entity]Schema.openapi('[Entity]');
-// Create fields enum for dynamic field references
-export const [entity]SchemaFields = z.enum(Object.keys([entity]SchemaObject) as [string, ...string[]]);
-// Define derived types for operations
-export type Create[Entity] = Omit<[Entity], 'id' | 'created_at' | 'updated_at' | 'deleted_at'>;
-export type Update[Entity] = Partial<[Entity]>;
+export type EntityName = OverrideEntityName;
 ```
 
-## Schema Registration
-After creating the entity schema, it **must** be registered in the main `schema.ts` file located at `src/data/schema.ts` for OpenAPI documentation:
+## When to Override Types
 
-```typescript
-// src/data/schema.ts
-import { [entity]SchemaOpenApi } from './[entity-name]/schema';
-// ... other schema imports
+1. **Common Fields**:
+   - `id`: Always override to remove `Generated<>` wrapper
+   - `created_at`, `updated_at`: Always override to allow both `Date` and `string` types
+   - `deleted_at`: Always override to allow `Date`, `string`, or `null`
 
-export const schemas = {
-  // ... existing schemas
-  [Entity]: [entity]SchemaOpenApi,
-} as const;
-```
+2. **Specific Fields**:
+   - **Enum Fields**: Override to use the explicit enum type instead of the Prisma-generated type
+   - **JSON Fields**: Override with a properly typed structure rather than `unknown`
+   - **Fields with Defaults**: Override to remove the `Generated<>` wrapper
 
-This registration ensures that the schema is available for OpenAPI documentation generation and is properly included in the API documentation.
+3. **Relation Fields**:
+   - For relation fields, override with the proper entity type
 
-## Test Utilities
-Create test utilities in the `__test-utils__` directory to help with testing:
+## Example Implementation
 
-```typescript
-// __test-utils__/make-fake-entity.ts
-import { type DbClient } from '@/db/create-db-client';
-import { type Entity } from '@/db/schema';
-import { faker } from '@faker-js/faker';
+For a table with the following Prisma schema:
 
-// Create a fake entity with realistic test data
-export function makeFake[Entity] {
-  return {
-    id: faker.string.uuid(),
-    created_at: faker.date.recent(),
-    updated_at: faker.date.recent(),
-    deleted_at: null,
-    // ... entity-specific fields with realistic fake data
-    ...overrides,
-  } satisfies Entity;
-}
-
-// Helper to create test entities in the database
-export type CreateTest[Entity]sInDBArgs = {
-  dbClient: DbClient;
-  values?: Partial<Entity> | Partial<Entity>[];
-};
-
-export async function createTest[Entity]sInDB({ dbClient, values }: CreateTest[Entity]sInDBArgs) {
-  const fake[Entity]s = Array.isArray(values) 
-    ? values.map(makeFakeEntity) 
-    : makeFakeEntity(values);
-    
-  const created[Entity]s = await dbClient
-    .insertInto('[entity_table]')
-    .values(fakeEntities)
-    .returningAll()
-    .execute();
-    
-  return created[Entity]s;
+```prisma
+model Entity {
+  id          String      @id @default(uuid())
+  created_at  DateTime    @default(now())
+  updated_at  DateTime    @updatedAt
+  deleted_at  DateTime?   
+  status      Status      @default(ACTIVE)
+  metadata    Json?
+  // Relations
+  related     Related[]
 }
 ```
 
-### Create Operation
-```typescript
-// create-[entity].ts
-export type Create[Entity]DataArgs = {
-  dbClient: DbClient;
-  values: Create[Entity];
+After creation of Prisma Schema model make sure to also update the `src/db/schema.ts` to make it reusable for zod schemas in the `Data Access Layer's Schema`:
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+```typescript
+// src/db/schema.ts
+import { type entity, type Status } from './types';
+
+type OverrideEntity = Omit<OverrideCommonFields<entity>, 'status' | 'metadata'> & {
+  status: Status;
+  metadata: EntityMetadata | null;
+};
+
+type EntityMetadata = {
+  key1: string;
+  key2: number;
+  // Other metadata fields
+};
+
+export type Entity = OverrideEntity;
+```
+
+## Best Practices
+
+1. **Consistency**: Follow the same pattern for all entity types
+2. **Type Safety**: Ensure proper typing for JSON fields to leverage TypeScript type checking
+3. **Documentation**: Document any complex type overrides with comments
+4. **Minimalism**: Only override fields that need specific typing beyond the Prisma defaults
+5. **Exports**: Export the final overridden types for use throughout the application
+
+## Type Export Convention
+
+Follow this naming convention for exported types:
+
+```typescript
+// Original Prisma-generated type: users
+// Exported type name: User (singular, PascalCase)
+
+export type User = OverrideUsers;
+``` 
+
+## Important Note
+1. Create the Prisma Schema Model
+2. Add the newly added Prisma Schema Model in `src/db/schema.ts`
 
 ---
 > Converted and distributed by [TomeVault](https://tomevault.io/claim/constROD) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-10 -->
+<!-- tomevault:4.0:windsurf_rules:2026-04-14 -->
