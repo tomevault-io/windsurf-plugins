@@ -7,14 +7,14 @@ Infrastructure-as-code for multi-device, multi-agent development environments. M
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `GEMINI.md` in [yabebalFantaye/tenai](https://github.com/yabebalFantaye/tenai).
+Original source: `copilot-instructions.md` in [yabebalFantaye/tenai](https://github.com/yabebalFantaye/tenai).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
-- **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
+- **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
 From [yabebalFantaye/tenai](https://github.com/yabebalFantaye/tenai) — a repo with 8+ stars on GitHub.
