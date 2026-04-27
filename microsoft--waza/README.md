@@ -7,12 +7,12 @@ CLI / Framework for Agent Skills - create, test, measure and improve skill quali
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `copilot-instructions.md` in [microsoft/waza](https://github.com/microsoft/waza).
+Original source: `AGENTS.md` in [microsoft/waza](https://github.com/microsoft/waza).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
+- **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
