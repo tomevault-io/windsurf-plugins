@@ -1,0 +1,145 @@
+---
+trigger: always_on
+description: > Guidelines for AI coding agents operating in this repository.
+---
+
+# AGENTS.md — NVIDIA ALCHEMI toolkit
+
+> Guidelines for AI coding agents operating in this repository.
+
+## Project Overview
+
+`nvalchemi` is an NVIDIA deep-learning framework for atomic simulations. Python 3.12+,
+built with PyTorch, Pydantic, and jaxtyping. Package manager is `uv`, build backend is
+`hatchling`.
+
+## Build & Run Commands
+
+```bash
+# Install all dependencies
+make install                    # or: uv sync --all-extras
+
+# Lint (ruff, pyupgrade, whitespace, debug statements)
+make lint
+
+# Docstring coverage check
+make interrogate
+
+# License header check
+make license
+```
+
+### Testing
+
+This project uses [pytest-testmon](https://testmon.org) to skip tests unaffected by
+recent code changes. A `.testmondata` database tracks which tests depend on which source
+files; only tests whose dependencies changed are re-run.
+
+```bash
+# --- Local development ---
+
+make test                      # Run only affected tests (fast, requires .testmondata)
+make test-all                  # Run ALL tests and rebuild .testmondata
+make pytest                    # Run ALL tests with coverage (no testmon)
+
+# --- CI targets (not intended for local use) ---
+
+make testmon-coverage          # Run with testmon + coverage; used by CI workflows
+
+# --- Targeting specific tests ---
+
+# Run a SINGLE test file
+uv run pytest test/data/test_data_mixin.py
+
+# Run a SINGLE test case
+uv run pytest test/data/test_data_mixin.py::TestMoveObjToDevice::test_move_tensor_to_device
+
+# Run a single test by keyword match
+uv run pytest -k "test_move_tensor" test/
+
+# Run a specific test module (via Makefile target)
+make pytest-target TARGET=test/data/test_data_mixin.py
+
+# Specialized test suites
+make pytest-data               # data, md, training, models, neighborlist
+make pytest-models             # models only
+make pytest-dynamics           # dynamics, md, autobatch, optim
+make pytest-al                 # active learning
+make pytest-utils              # utils, common, help
+```
+
+**Typical local workflow:** run `make test-all` once to build the testmon database,
+then use `make test` for fast iteration. The database persists across runs in
+`.testmondata` (git-ignored).
+
+**Coverage:** the coverage threshold (75%) is configured in `pyproject.toml`
+(`[tool.coverage.report] fail_under`). Branch coverage is disabled for testmon
+compatibility.
+
+## Code Style
+
+### Formatting & Linting
+
+- **Formatters**: `ruff-format` (via pre-commit hooks).
+- **Linter**: `ruff` with rules: `E` (pycodestyle), `F` (pyflakes), `S` (bandit),
+  `I` (isort), `PERF` (performance). Only `I` rules are auto-fixable.
+- **Ignored globally**: `E501` (line length), `S311` (random generators),
+  `F722` and `F821` (break jaxtyping annotations).
+- **Per-file overrides**: `F401` ignored in `__init__.py` and `docs/*.py`;
+  `S101` (assert) ignored in `test/*.py`; `E402` ignored in `examples/*.py`.
+- **pyupgrade**: targets `--py310-plus`.
+- **Docstrings**: `interrogate` enforces 95% coverage (excludes tests, init, magic,
+  private, semiprivate, property decorators, nested functions/classes).
+- **Markdown**: `markdownlint` runs in pre-commit (MD024 disabled).
+
+### License Header
+
+Every `.py` file MUST start with this exact SPDX header (see `test/_license/header.txt`).
+
+The pre-commit hook (`test/_license/header_check.py`) validates this on every commit.
+
+### Imports
+
+- Always use `from __future__ import annotations` at the top of source files.
+- Import order is enforced by ruff/isort: stdlib, third-party, local (`nvalchemi`).
+- Use `TYPE_CHECKING` blocks for imports only needed at type-check time.
+- Unused imports are allowed only in `__init__.py` files (F401 suppressed).
+
+### Type Annotations
+
+- All functions and methods MUST have type annotations.
+- Use `jaxtyping` for tensor shape annotations (e.g., `Float[torch.Tensor, "V 3"]`).
+- Shape dimension aliases are defined in `nvalchemi/_typing.py`:
+  `B` (batch), `V` (nodes), `E` (edges), `H` (hidden), `C` (centroids), `M` (ensemble).
+- Use semantic type aliases from `_typing.py` (e.g., `NodePositions`, `Forces`, `Energy`).
+- Use `Annotated[type, Field(...)]` for Pydantic model fields with descriptions.
+- Use `typing.Protocol` for structural typing / interfaces.
+- Use `TypeAlias` for type alias declarations.
+
+### Naming Conventions
+
+- **Classes**: `PascalCase` — `AtomicData`, `ModelConfig`, `BaseModelMixin`.
+- **Functions/methods**: `snake_case` — `compute_embeddings`, `adapt_input`.
+- **Private**: prefix with `_` — `_adapt_input`, `_verify_request`, `_typing.py`.
+- **Type aliases**: `PascalCase` — `NodePositions`, `GraphEmbeddings`, `ModelOutputs`.
+- **Constants/module-level**: `UPPER_SNAKE_CASE` or `PascalCase` for type vars.
+- **TypeVars**: single uppercase letter or short name — `T`, `F`, `C`.
+- **Test classes**: `Test` prefix — `TestMoveObjToDevice`, `TestDataMixin`.
+- **Test methods**: `test_` prefix with descriptive snake_case — `test_move_tensor_to_device`.
+
+### Docstrings
+
+- NumPy-style docstrings are required (enforced at 95% coverage).
+- Must include `Parameters`, `Returns`, `Raises` sections as applicable.
+- Class docstrings should include `Attributes` section.
+- Use `Examples` section with doctestable code where appropriate.
+
+### Error Handling
+
+- Use `ValueError`, `KeyError`, `TypeError` for validation with descriptive messages.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [NVIDIA/nvalchemi-toolkit](https://github.com/NVIDIA/nvalchemi-toolkit) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-04-23 -->
