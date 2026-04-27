@@ -1,0 +1,10 @@
+---
+trigger: always_on
+description: After finishing changes, run lint, but there's no need to compile every time.
+---
+
+In this project, after finishing changes, run lint, but there's no need to compile every time.
+
+---
+> Converted and distributed by [TomeVault](https://tomevault.io/claim/trevSmart) — claim your Tome and manage your conversions.
+<!-- tomevault:4.0:windsurf_rules:2026-04-10 -->
