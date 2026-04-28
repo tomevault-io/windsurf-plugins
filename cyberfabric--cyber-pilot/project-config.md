@@ -1,13 +1,14 @@
 ---
 trigger: always_on
-description: Invoke when user asks to do something with Cypilot, or wants to analyze/validate artifacts, or create/generate/implement anything using Cypilot workflows, or plan phased execution. Core capabilities: workflow routing (plan/analyze/generate/auto-config); deterministic validation (structure, cross-refs, traceability, TOC); code↔artifact traceability with @cpt-* markers; spec coverage measurement; ID search/navigation; init/bootstrap; adapter + registry discovery; auto-configuration of brownfield p
+description: <!-- @cpt:root-agents -->
 ---
 
-
-
-ALWAYS open and follow `{cypilot_path}/.core/skills/cypilot/SKILL.md`
+<!-- @cpt:root-agents -->
+```toml
+cypilot_path = ".bootstrap"
+```
+<!-- /@cpt:root-agents -->
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/cyberfabric)
-> This is a context snippet only. You'll also want the standalone SKILL.md file — [download at TomeVault](https://tomevault.io/claim/cyberfabric)
-<!-- tomevault:4.0:windsurf_rules:2026-04-08 -->
+> Source: [cyberfabric/cyber-pilot](https://github.com/cyberfabric/cyber-pilot) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-04-23 -->
