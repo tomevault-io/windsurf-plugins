@@ -106,4 +106,4 @@ Before writing new code (especially non-trivial tasks):
 
 ---
 > Converted and distributed by [TomeVault](https://tomevault.io/claim/inixiative) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-09 -->
+<!-- tomevault:4.0:windsurf_rules:2026-04-17 -->
