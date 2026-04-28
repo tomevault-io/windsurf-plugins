@@ -1,0 +1,212 @@
+---
+trigger: always_on
+description: Use this guidance when creating or updating documentation for MPP.
+---
+
+# Agent Notes: MPP Documentation Site
+
+Use this guidance when creating or updating documentation for MPP.
+
+## Reference Sites
+
+When writing docs, reference these sites for patterns and APIs:
+
+- **MPP Spec**: `/specs` — Normative Payment Auth specs
+- **Vocs**: <https://vocs.dev> — Documentation framework (MDX, callouts, Cards)
+- **Viem**: <https://viem.sh> — Ethereum library used in examples
+- **Wagmi**: <https://wagmi.sh> — React hooks for Ethereum (style reference)
+- **Tempo**: <https://tempo.xyz> — Tempo blockchain and TIP-20 tokens
+
+## Source of Truth
+
+Prefer the normative Payment Auth specs at `/specs` for protocol-level details:
+
+- Core Payment HTTP Authentication Scheme
+- Payment methods
+- Payment intents (charge, session)
+- Transport bindings (HTTP, MCP)
+
+Current protocol context from this repo:
+
+- MPP standardizes HTTP 402 with a challenge → credential → receipt flow
+- Challenges live in `WWW-Authenticate`, credentials in `Authorization`
+- Receipts acknowledge successful payment
+- Transports include HTTP and MCP
+
+## File Location
+
+Reference pages live under `src/pages/sdk/typescript/`:
+
+- Client: `src/pages/sdk/typescript/client/{Module}.{method}.mdx`
+- Server: `src/pages/sdk/typescript/server/{Module}.{method}.mdx`
+- Core: `src/pages/sdk/typescript/{Module}.{method}.mdx`
+
+Other SDK docs live here:
+
+- SDK index: `src/pages/sdk/index.mdx`
+- Python: `src/pages/sdk/python/*.mdx`
+- Rust: `src/pages/sdk/rust/*.mdx`
+
+When editing Python or Rust pages, keep the structure aligned with the existing indexes:
+
+- Lead with a short SDK overview and install steps
+- Include a quick-start client/server or core flow example
+- Use language-appropriate fences (`python`, `rust`)
+- Keep examples realistic and consistent with MPP terms (challenge, credential, receipt)
+
+## SDK References
+
+- Typescript: <https://github.com/wevm/mppx>
+- Python: <https://github.com/tempoxyz/pympp>
+- Rust: <https://github.com/tempoxyz/mpp-rs>
+
+## Be Opinionated
+
+When multiple approaches exist, recommend one as the default. Don't present options equally—pick the best path for most users and lead with it.
+
+**Structure for pages with alternatives:**
+
+1. **Lead with the recommended approach**—Show the single best option first, with a complete example
+2. **Move alternatives to "Advanced options"**—Group other approaches under a secondary heading below the main content
+
+**Examples:**
+
+- Client SDK: Lead with `Fetch.polyfill`, move `Fetch.from` and `Mppx.create` to Advanced options
+- Building with AI: Lead with `llms-full.txt`, move MCP/skills/markdown to Advanced options
+- Installation: Show npm first in a code-group, not a table of choices
+
+If you're unsure which option to recommend, prefer:
+- The approach with fewer steps
+- The approach that modifies less existing code
+- The approach labeled "Reference" or "Stable" over "Beta" or "Custom"
+
+## Page Structure
+
+Every reference page follows this structure:
+
+```mdx
+# `{Module}.{method}`
+
+Brief one-line description of what this function does.
+
+## Usage
+
+```ts twoslash [example.ts]
+import { Module } from 'mppx'
+// or 'mppx/client' or 'mppx/server'
+
+const result = Module.method({
+  param1: 'value1',
+  param2: 'value2',
+})
+
+console.log(result)
+// @log: Expected output
+```
+
+### With Custom Transport
+
+Description of what this variant does and when to use it.
+
+```ts twoslash [example.ts]
+import { Module, Transport } from 'mppx'
+
+const result = Module.method({
+  param1: 'value1',
+  transport: Transport.mcp(),
+})
+```
+
+## Return Type
+
+```ts
+type ReturnType = {
+  // describe the return type
+}
+```
+
+## Parameters
+
+### paramName
+
+- **Type:** `TypeName`
+
+Description of what this parameter does.
+
+### optionalParam (optional)
+
+- **Type:** `TypeName`
+
+Description of the optional parameter.
+
+```
+
+## Example: Fetch.from
+
+```mdx
+# `Fetch.from`
+
+Creates a fetch wrapper that automatically handles 402 Payment Required responses.
+
+## Usage
+
+::::code-group
+
+```ts twoslash [example.ts]
+import { Fetch, tempo } from 'mppx/client'
+import { privateKeyToAccount } from 'viem/accounts'
+
+const fetch = Fetch.from({
+  methods: [tempo({ account: privateKeyToAccount('0x...') })],
+})
+
+const res = await fetch('https://api.example.com/resource')
+// @log: Response { status: 200, ... }
+```
+
+::::
+
+## Return Type
+
+```ts
+type ReturnType = (
+  input: RequestInfo | URL,
+  init?: RequestInit & { context?: AnyContextFor<methods> }
+) => Promise<Response>
+```
+
+## Parameters
+
+### methods
+
+- **Type:** `readonly Method.AnyClient[]`
+
+Array of payment methods to use for handling 402 responses.
+
+### fetch (optional)
+
+- **Type:** `typeof globalThis.fetch`
+
+Custom fetch function to wrap. Defaults to `globalThis.fetch`.
+
+## Writing Style
+
+Follow [Stripe's documentation style](https://stripe.com/docs). Key rules:
+
+**Voice**: Active, present tense, second person ("you"). Use contractions.
+- ✅ "The server returns a challenge"
+- ❌ "A challenge will be returned by the server"
+
+**Be concise**: Cut filler words (just, simply, easily, obviously). Don't claim things are "easy" or "fast."
+
+**Formatting**:
+- Sentence case for headings (not Title Case)
+- Bold for UI elements and list labels
+- Code font for parameters, commands, status codes, object names
+- Em dashes with no spaces: "payments immediately—you don't need to"
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [tempoxyz/mpp](https://github.com/tempoxyz/mpp) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-04-23 -->
