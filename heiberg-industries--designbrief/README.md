@@ -1,0 +1,30 @@
+# designbrief
+
+> Tome by [Heiberg-Industries](https://github.com/Heiberg-Industries/designbrief) — distributed by [TomeVault](https://tomevault.io)
+
+Design guardrails, not templates. A library of UI design direction files that give LLMs (and humans) the context to build tasteful, consistent interfaces in any style.
+
+## Windsurf Config
+
+The `project-config.md` file in this directory is the project config converted for Windsurf.
+Original source: `AGENTS.md` in [Heiberg-Industries/designbrief](https://github.com/Heiberg-Industries/designbrief).
+
+## Also available for
+
+- **Claude Code** — `CLAUDE.md`
+- **GitHub Copilot** — `copilot-instructions.md`
+- **Cursor** — `project-config.mdc`
+- **Gemini CLI** — `GEMINI.md`
+- **Windsurf** — `project-config.md`
+
+From [Heiberg-Industries/designbrief](https://github.com/Heiberg-Industries/designbrief) — a repo with 10+ stars on GitHub.
+
+---
+
+Install this config instantly:
+```
+npx tomevault install Heiberg-Industries/designbrief
+```
+Source: [github.com/Heiberg-Industries/designbrief](https://github.com/Heiberg-Industries/designbrief).
+
+<!-- genome:t-i-s -->
