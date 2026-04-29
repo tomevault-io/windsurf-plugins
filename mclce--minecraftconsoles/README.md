@@ -7,11 +7,11 @@ Vanilla LCE intended as an upstream base for other projects. Originally based on
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [MCLCE/MinecraftConsoles](https://github.com/MCLCE/MinecraftConsoles).
+Original source: `CLAUDE.md` in [MCLCE/MinecraftConsoles](https://github.com/MCLCE/MinecraftConsoles).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
