@@ -7,11 +7,11 @@ Write HTML. Render video. Built for agents.
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [heygen-com/hyperframes](https://github.com/heygen-com/hyperframes).
+Original source: `CLAUDE.md` in [heygen-com/hyperframes](https://github.com/heygen-com/hyperframes).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
