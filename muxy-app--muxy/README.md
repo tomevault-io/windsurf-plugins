@@ -7,11 +7,11 @@ Lightweight and Memory efficient terminal for Mac built with SwiftUI and libghos
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [muxy-app/muxy](https://github.com/muxy-app/muxy).
+Original source: `CLAUDE.md` in [muxy-app/muxy](https://github.com/muxy-app/muxy).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
