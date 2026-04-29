@@ -1,0 +1,97 @@
+---
+trigger: always_on
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+---
+
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Commands
+
+All commands use **Bun** as the package manager.
+
+```bash
+bun install              # Install dependencies
+bun run dev              # Start Tauri dev server with HMR frontend
+bun run frontend:dev     # Vite-only dev server (port 1420)
+
+bun run build:frontend   # Typecheck + Vite build → dist/
+bun run build:backend    # Cargo build Tauri binary
+bun run build:all        # Full production build
+
+bun run lint             # ESLint + cargo clippy
+bun run lint:frontend    # ESLint on src/**/*.{ts,tsx}
+bun run lint:backend     # cargo clippy -D warnings
+
+bun run format           # Prettier + cargo fmt
+bun run format:check     # Dry-run format validation
+bun run typecheck        # tsc --noEmit
+
+bun run sandbox:start    # Docker Compose up (pulls Ollama model)
+bun run sandbox:stop     # docker compose down -v (destructive: wipes volume)
+
+bun run test             # Vitest run (frontend tests only)
+bun run test:watch       # Vitest watch mode
+bun run test:coverage    # Vitest with coverage report
+bun run test:backend          # Cargo test (Rust backend tests)
+bun run test:backend:coverage # Cargo test + llvm-cov, enforces 100% line coverage (mirrors CI)
+bun run test:all              # Both Vitest and Cargo test
+
+bun run validate-build   # All gates: lint + format + typecheck + build
+```
+
+## Testing
+
+Tests use **Vitest** for the frontend (React/TypeScript with React Testing Library + happy-dom) and **Cargo test** for the backend (Rust unit tests).
+
+**100% code coverage is mandatory.** Any new or modified code — frontend or backend — must maintain 100% coverage across lines, functions, branches, and statements. PRs that drop below 100% coverage will not be merged.
+
+- **Frontend:** Run `bun run test:coverage` and verify all metrics are 100%.
+- **Backend:** Run `bun run test:backend:coverage` to enforce 100% line coverage (identical to what CI runs). Functions excluded from coverage with `#[cfg_attr(coverage_nightly, coverage(off))]` must be thin wrappers (Tauri commands, filesystem I/O) whose logic is tested through the functions they delegate to.
+
+## Architecture
+
+Thuki is a macOS-only desktop app, a floating AI secretary activated by double-tapping the Control key. It is a **Tauri v2** app (Rust backend + React/TypeScript frontend) that interfaces with a locally running **Ollama** instance at `http://127.0.0.1:11434`.
+
+### Frontend (`src/`)
+
+The UI morphs between two states: a compact spotlight-style input bar → an expanded chat window. This morphing is driven by Framer Motion and a single `isChatMode` boolean in `App.tsx`.
+
+- **`App.tsx`** — orchestrates all state: messages, streaming, window resizing via ResizeObserver + Tauri `setSize()`
+- **`hooks/useOllama.ts`** — Tauri Channel-based streaming hook; emits `Token`, `Done`, `Cancelled`, `Error` variants
+- **`view/ConversationView.tsx`** — smart auto-scroll (pins to bottom unless user scrolls up)
+- **`view/AskBarView.tsx`** — auto-expanding textarea (max 144px), morphs logo size, renders slash command tab-completion suggestions
+- **`components/ChatBubble.tsx`** — markdown rendering via Streamdown (rehype-sanitize for XSS protection)
+- **`config/commands.ts`** — slash command registry: defines supported commands and the `SCREEN_CAPTURE_PLACEHOLDER` sentinel used to show a loading tile in chat while a `/screen` capture is in flight
+
+### Backend (`src-tauri/src/`)
+
+- **`lib.rs`** — app setup: converts window to NSPanel (fullscreen overlay), registers tray, spawns hotkey listener, intercepts close events (hides instead of quits)
+- **`commands.rs`** — `ask_ollama` Tauri command: streams newline-delimited JSON from Ollama, sends chunks via Tauri Channel
+- **`screenshot.rs`** — `capture_full_screen_command` Tauri command: uses CoreGraphics FFI (`CGWindowListCreateImage`) to capture all displays excluding Thuki's own windows, writes a JPEG to a temp dir, and returns the path
+- **`activator.rs`** — Core Graphics event tap watching for double-tap Control key (400ms window, 600ms cooldown). The tap MUST use `CGEventTapLocation::HID` and `CGEventTapOptions::Default` — see the critical constraint note in "Key Design Constraints" below.
+
+### Sandbox (`sandbox/`)
+
+Docker Compose runs Ollama in a hardened container: `cap_drop: ALL`, `no-new-privileges`, read-only model volume, localhost-only port binding (`127.0.0.1:11434`). Two services: `sandbox-init` (one-shot model pull) and `sandbox-server` (long-running daemon). `sandbox:stop` uses `down -v` which wipes the volume.
+
+### IPC Pattern
+
+Frontend calls Tauri commands via `@tauri-apps/api/core`. Streaming uses Tauri's **Channel API** — the Rust side sends typed `StreamChunk` enum variants, the hook accumulates tokens into React state.
+
+### Window Lifecycle
+
+- App starts hidden; hotkey or tray menu shows it
+- Window close button hides (not quits); quit only from tray
+- `ActivationPolicy::Accessory` hides Dock icon
+- `macOSPrivateApi: true` enables NSPanel for fullscreen-app overlay
+
+## Workflow
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [quiet-node/thuki](https://github.com/quiet-node/thuki) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-04-19 -->
