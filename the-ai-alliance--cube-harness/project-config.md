@@ -1,0 +1,107 @@
+---
+trigger: always_on
+description: *(Served as both `AGENTS.md` and `CLAUDE.md` — the latter is a symlink.)*
+---
+
+# Agents guide — cube-harness
+
+*(Served as both `AGENTS.md` and `CLAUDE.md` — the latter is a symlink.)*
+
+You are working in **cube-harness**, the runtime that executes agents against CUBE
+benchmarks and records trajectories. This file is your map; it is deliberately short.
+Read the relevant spec in `openspec/specs/` before modifying any layer.
+
+## What this repo is
+
+cube-harness runs experiments. It consumes the contracts defined by **cube-standard**
+(`Task`, `Benchmark`, `Tool`, `Resource`) and adds: agents, episode loops,
+trajectory storage, OTel tracing, parallel execution (Ray), the XRay viewer, and
+MCP server bridges.
+
+It does NOT define the task/benchmark/tool protocol — that's cube-standard. If you're
+tempted to change base class signatures (`Task.step`, `Benchmark.setup`, etc.), you're
+in the wrong repo; go to cube-standard and start with an openspec change proposal.
+
+## Package layout
+
+```
+src/cube_harness/
+├── core.py                     # AgentOutput, Trajectory, TrajectoryStep, ActionSpace
+├── agent.py                    # AgentConfig, Agent (abstract)
+├── tool.py                     # ToolWithTelemetry, AsyncToolWithTelemetry (OTel wrappers)
+├── llm.py                      # LLM, LLMConfig, Prompt, LLMCall, Usage (LiteLLM wrapper)
+├── episode.py                  # Episode, EpisodeConfig, MAX_STEPS
+├── experiment.py               # Experiment, ExpResult
+├── exp_runner.py               # run_sequentially, run_with_ray
+├── storage.py                  # Storage Protocol, FileStorage (V2 + V1 fallback)
+├── summary.py                  # SummaryProcessor, ExperimentSummary
+├── episode_logs.py             # Per-episode stdout/stderr redirection
+├── utils.py                    # parse_actions, HTML pruning, misc
+├── results.py                  # Higher-level result types
+├── agents/
+│   ├── react.py                # ReAct agent (primary)
+│   ├── genny.py                # Genny agent (context-aware, rolling summaries)
+│   └── legacy_generic_agent.py # Deprecated XML-tag agent — see DEPRECATED.md
+├── tools/
+│   ├── browsergym.py           # BrowserGym integration
+│   ├── computer.py             # Docker-based computer-use
+│   └── mcp.py                  # MCP client tool (consume external MCP servers)
+├── action_spaces/              # Protocol definitions for action sets
+├── benchmarks/                 # Legacy in-tree benchmarks (miniwob, workarena) — most now live in cubes/
+├── metrics/tracer.py           # OpenTelemetry tracer, Ray env-var propagation
+├── analyze/
+│   ├── xray.py                 # Gradio-based XRay viewer
+│   ├── inspect_results.py      # CLI-ish inspection helpers
+│   └── xray_utils.py
+└── mcp/                        # Serve harness tools AS an MCP server
+    ├── server.py
+    └── convert.py
+
+cubes/                          # External benchmark packages (arithmetic, osworld, swebench-*, terminalbench, webarena-verified, workarena, miniwob)
+recipes/                        # Example experiment scripts
+meta_agent/                     # Iterative eval-analyze-fix loop
+tests/                          # pytest suite
+```
+
+## Spec index
+
+Read the spec, then the code. Each spec is the authoritative contract for its layer.
+
+| Layer | Module | Spec |
+|-------|--------|------|
+| Core types (Trajectory, AgentOutput) | `cube_harness.core` | [core/spec.md](openspec/specs/core/spec.md) |
+| Agent | `cube_harness.agent` | [agent/spec.md](openspec/specs/agent/spec.md) |
+| Tool (telemetry wrapper) | `cube_harness.tool` | [tool/spec.md](openspec/specs/tool/spec.md) |
+| LLM wrapper | `cube_harness.llm` | [llm/spec.md](openspec/specs/llm/spec.md) |
+| Episode | `cube_harness.episode` | [episode/spec.md](openspec/specs/episode/spec.md) |
+| Experiment + runners | `cube_harness.experiment`, `cube_harness.exp_runner` | [experiment/spec.md](openspec/specs/experiment/spec.md) |
+| Storage | `cube_harness.storage`, `cube_harness.summary` | [storage/spec.md](openspec/specs/storage/spec.md) |
+| Metrics / OTel | `cube_harness.metrics` | [metrics/spec.md](openspec/specs/metrics/spec.md) |
+| XRay viewer | `cube_harness.analyze` | [analyze/spec.md](openspec/specs/analyze/spec.md) |
+| MCP server | `cube_harness.mcp` | [mcp/spec.md](openspec/specs/mcp/spec.md) |
+
+**External contracts (cube-standard):** Any field typed as `cube.task.Task`,
+`cube.benchmark.Benchmark`, `cube.tool.Tool`, `cube.core.*`, or `cube.resource.*`
+is governed by cube-standard's specs. Don't subclass those here — consume them.
+
+## Workflow for code changes
+
+1. **Find the relevant spec** — which layer? Start there.
+2. **Check "Invariants" and "Gotchas"** — these are the traps.
+3. **Check `openspec/changes/`** — someone may already be proposing your change.
+4. **For substantive contract changes**, write a delta spec
+   (`openspec/changes/<name>/deltas.md` with ADDED / MODIFIED / REMOVED sections)
+   before coding. Archive to `openspec/changes/archive/YYYY-MM-DD-<name>/` when done.
+5. **Constitution alignment:** every change is reviewed against the
+   [constitution](.claude/rules/constitution.md) and [review rules](.claude/rules/review-rules.md).
+
+## Key conventions (already enforced in code)
+
+- **Python is the configuration** — no YAML/Hydra. `AgentConfig`, `LLMConfig`,
+  `Experiment` are all Pydantic `TypedBaseModel`.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [The-AI-Alliance/cube-harness](https://github.com/The-AI-Alliance/cube-harness) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-04-23 -->
