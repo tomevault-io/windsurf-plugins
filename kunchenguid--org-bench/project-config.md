@@ -1,0 +1,78 @@
+---
+trigger: always_on
+description: Benchmarks multi-agent coding topologies on a shared task (build an in-browser spreadsheet in plain vanilla HTML/CSS/JS). Six topologies (`apple`, `amazon`, `microsoft`, `google`, `facebook`, `oracle`), each run once per pilot. Agents coordinate through inbox messages and real GitHub PRs; every run ships a deployed artifact to GitHub Pages (and must also open from `file://`).
+---
+
+# org-bench
+
+Benchmarks multi-agent coding topologies on a shared task (build an in-browser spreadsheet in plain vanilla HTML/CSS/JS). Six topologies (`apple`, `amazon`, `microsoft`, `google`, `facebook`, `oracle`), each run once per pilot. Agents coordinate through inbox messages and real GitHub PRs; every run ships a deployed artifact to GitHub Pages (and must also open from `file://`).
+
+Core design questions are in `PRD.md` and `DESIGN.md`.
+
+## Layout
+
+```
+packages/
+  orchestrator/    # run loop, workspace setup, finalize pipeline (main runtime)
+  judge/           # agent-driven artifact judge (spawns opencode serve + agent-browser)
+  analyst/         # trajectory post-mortem
+  schemas/         # shared zod types
+  viewer/          # public comparison site (GitHub Pages)
+
+configs/
+  <topo>.ts              # adjacency, write access, culture overlay
+  run-<topo>.ts          # entry point passed to `npm run bench` (run-id = <topo>)
+  brief.md               # task brief given to the leader
+
+docs/<topology>/                 # published artifact per topology (Pages root); re-running a topology overwrites it
+$TMPDIR/org-bench-runs/<run-id>/ # per-run scratch; lives OUTSIDE the host repo; wiped at teardown (includes per-run .xdg/opencode/ so topology runs never share opencode state)
+```
+
+## One-time repo setup
+
+The harness assumes **all** `run/**/main` branches on the remote are protected by a repository ruleset that requires a PR for every update. Without this ruleset, agents can (and did, once) force-push work straight onto `run/<topo>/main` and the PR-based culture collapses.
+
+Configure the ruleset on GitHub (Settings → Rules → Rulesets → New branch ruleset):
+
+- **Target branches:** `run/**/main` (include pattern).
+- **Rules:**
+  - Require a pull request before merging (0 required approvals is fine; integrators merge without human review).
+  - Require linear history.
+  - Block force pushes.
+- **Bypass list:** leave empty. The orchestrator itself lands artifacts via `gh pr create` + `gh pr merge`, so it does not need to bypass.
+- **Do not** check "Restrict creations" or "Restrict deletions" - `initWorkspace` creates and recycles `run/<topo>/main` for each run.
+
+If you enable stricter rules (required approvals, required checks, signed commits) you will need to either teach the orchestrator to bypass or add a bot account; out of the box the harness only exercises the three rules above.
+
+## Run model
+
+Every run operates in a disposable clone at `$TMPDIR/org-bench-runs/<run-id>/.git` (bare). Worktrees:
+
+- `$TMPDIR/org-bench-runs/<run-id>/main/` - the shared trunk, branch `run/<run-id>/main`
+- `$TMPDIR/org-bench-runs/<run-id>/worktrees/<agent-name>/` - per-node worktrees, branches `run/<run-id>/<agent-name>`
+
+Scratch lives under `os.tmpdir()` on purpose: it keeps agents from walking `..` into the host repo and accidentally committing there. `initWorkspace` refuses to run if the configured `runScratchRoot` is inside `repoRoot`.
+
+The host repo's `.git` is never touched by agents. All agent pushes, branches, stashes land in the per-run clone.
+
+## Round scheduling
+
+Every node wakes every round. Nodes with empty inboxes see a prompt stub explaining they received no messages this round and offering three options: (a) stand down, (b) continue ongoing work, (c) reach out to peers. This trades tokens for visibility: no node is silently "forgotten" just because nobody pinged them in the previous round.
+
+## Lifecycle
+
+1. **Setup**: bare-clone the remote into `$TMPDIR/org-bench-runs/<run-id>/.git`, push orphan `run/<run-id>/main` (covered by the repo-level ruleset above - no per-run branch-protection call), add per-node worktrees at detached HEAD.
+2. **Rounds**: every node wakes every round; parallel OpenCode sessions per node; outbound messages routed per topology adjacency; agents open PRs against `run/<run-id>/main`; integrators merge.
+3. **Finalize** (in order): snapshot PRs → publish artifact (fetch + reset main worktree to remote, copy worktree source + `trajectory/` to `docs/<topo>/`, excluding `.git`, `node_modules`, `dist`, `.org-bench-artifacts`) → judge → analyst → aggregate meta → close open PRs → delete agent branches on remote → persist `inbox/` + `trajectory/` under `.org-bench-artifacts/` on `run/<run-id>/main` via a `run/<run-id>/artifacts` PR (opened + merged by the orchestrator, not a direct push) → `rm -rf $TMPDIR/org-bench-runs/<run-id>/`.
+
+The judge stage spawns its own dedicated `opencode serve` process (separate from the run's node-facing serve) with `AGENT_BROWSER_SESSION=org-bench-judge-<topo>` in its env, then sends a single prompt asking the agent to drive the artifact through `agent-browser` via bash and return a rubric JSON. There is no separate harness-driven evaluator stage; scoring and scenario exercise both happen inside that one judge session.
+
+Two durable outputs survive teardown:
+
+- `docs/<topo>/` on host main (deployed artifact + viewer data; one entry per topology)
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [kunchenguid/org-bench](https://github.com/kunchenguid/org-bench) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-04-24 -->
