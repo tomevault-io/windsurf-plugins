@@ -7,14 +7,14 @@ Agent-to-Agent MCP communication tool for feedback requests
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `GEMINI.md` in [MrLesk/agents-council](https://github.com/MrLesk/agents-council).
+Original source: `AGENTS.md` in [MrLesk/agents-council](https://github.com/MrLesk/agents-council).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
+- **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
 From [MrLesk/agents-council](https://github.com/MrLesk/agents-council) — a repo with 41+ stars on GitHub.
