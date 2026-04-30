@@ -7,11 +7,11 @@ A native macOS workspace terminal organized around Projects and Worktrees, power
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [vaayne/mori](https://github.com/vaayne/mori).
+Original source: `CLAUDE.md` in [vaayne/mori](https://github.com/vaayne/mori).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
