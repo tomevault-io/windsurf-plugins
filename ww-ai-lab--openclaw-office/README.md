@@ -7,11 +7,11 @@ OpenClaw Office is the visual monitoring and management frontend for the  OpenCl
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [WW-AI-Lab/openclaw-office](https://github.com/WW-AI-Lab/openclaw-office).
+Original source: `CLAUDE.md` in [WW-AI-Lab/openclaw-office](https://github.com/WW-AI-Lab/openclaw-office).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
