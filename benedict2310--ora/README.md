@@ -7,14 +7,14 @@ Privacy-first macOS voice assistant powered by on-device AI
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `GEMINI.md` in [benedict2310/ora](https://github.com/benedict2310/ora).
+Original source: `AGENTS.md` in [benedict2310/ora](https://github.com/benedict2310/ora).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
+- **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
 Available for 6 platforms including Claude Code, Cursor, Windsurf, and more. Source: [github.com/benedict2310/ora](https://github.com/benedict2310/ora)
