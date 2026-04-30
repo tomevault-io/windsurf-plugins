@@ -7,11 +7,11 @@ Manage projects visually with humans and AI agents using Obsidian Canvas.
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [XMihura/Kanvas](https://github.com/XMihura/Kanvas).
+Original source: `CLAUDE.md` in [XMihura/Kanvas](https://github.com/XMihura/Kanvas).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
