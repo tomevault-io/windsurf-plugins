@@ -1,0 +1,84 @@
+---
+trigger: always_on
+description: **Always keep AGENTS.md updated with project status**.
+---
+
+# pi-vscode — VS Code Extension for Pi Coding Agent
+
+**Always keep AGENTS.md updated with project status**.
+
+## Architecture
+
+- **Terminal-based**: Opens pi in a VS Code integrated terminal with full TUI/PTY support
+- **Local IDE bridge**: VS Code starts a localhost HTTP bridge with an auth token and injects it into each pi terminal via env vars
+- **Bundled pi extension**: `bridge/pi-vscode-bridge.js` is passed to pi via `--extension` so the agent can call back into VS Code as custom tools
+- **Minimal**: Small TypeScript extension host plus one bundled pi bridge script, no framework dependencies
+
+## Source Files
+
+- `src/extension.ts` — Thin activation/wiring layer for commands, status bar, terminal profile, chat participant, and bridge lifecycle
+- `src/pi.ts` — Pi binary resolution, install prompt, launch args, bridge env helpers
+- `src/terminal.ts` — Terminal creation, terminal placement, open-with-file context helpers
+- `src/chat.ts` — RPC-backed `@pi` chat handler with terminal fallback
+- `src/sessions.ts` — Per-terminal pi session tracking and restore-on-activation helper (workspaceState-backed)
+- `src/bridge/server.ts` — HTTP server setup, auth, request parsing, VS Code event subscriptions
+- `src/bridge/handlers.ts` — RPC method handlers for editor state/status, diagnostics, symbols, definitions/declarations/implementations, hovers, references, workspace symbol search, code actions, formatting, and edits
+- `src/bridge/serialize.ts` — Selection/status/editor/diagnostic/symbol/code-action serialization helpers
+- `src/bridge/state.ts` — Bridge notification and code-action cache state
+- `src/bridge/types.ts` — Bridge type definitions (selection, editor info, notifications, RPC, state)
+- `src/bridge/utils.ts` — Path resolution, request parsing, range helpers
+- `bridge/pi-vscode-bridge.js` — Bundled pi extension registering VS Code bridge tools for pi
+- `dist/extension.cjs` — CJS wrapper for VS Code (loads ESM bundle via dynamic import)
+
+## Build
+
+- Source is ESM (`"type": "module"` in package.json)
+- Bundled with rolldown → `dist/extension.cjs` (external: vscode)
+- `dist/extension.cjs` is the CJS bundle output by rolldown (source is ESM, bundled to CJS)
+- Tooling: `tsgo` (typecheck), `oxlint` + `oxfmt` (lint/format), `vitest` (tests)
+- `pnpm build` / `pnpm dev` (watch) / `pnpm package`
+- `rolldown.config.ts` should not use unsupported `output.clean`; keep output config minimal to avoid build warnings
+
+## Pre-commit Checks
+
+After finalizing changes, always run both:
+
+- `pnpm fmt` — auto-fix lint and formatting
+- `pnpm typecheck` — ensure no type errors
+
+## Icons
+
+See [.agents/docs/icons.md](.agents/docs/icons.md)
+
+## UI
+
+- **Status bar button** (right-aligned) with `$(pi-logo) Pi` label — opens the pi terminal on click
+- **Packages sidebar view** includes search/install/uninstall package management and an `Upgrade Pi and Packages` button wired to `Pi: Upgrade Pi and Packages`
+- **Pi footer status** in the terminal TUI shows live VS Code context: active file, cursor/selection, language, dirty state, and diagnostic counts
+- No panel webviews — minimal footprint
+- Activation: `onStartupFinished` so the status bar button appears immediately
+
+## Commands
+
+- `Pi: Open` (`Ctrl+Alt+3`) — Opens/focuses the pi terminal
+- `Pi: Open with File` — Opens pi terminal and sends current file path (with selection range if any); also in editor title bar menu
+- `Pi: Send Selection` — Sends editor selection text to the pi terminal
+- `Pi: Upgrade Pi and Packages` — Finds the resolved pi binary, infers npm/bun/pnpm/yarn from its path (prompting if ambiguous), runs the matching global install/update command in a terminal, then runs `pi update` to update installed pi extensions/packages
+- `@pi` chat participant — Uses pi RPC mode for streamed chat responses while preserving the terminal-based workflow for normal Pi commands
+
+## Notes
+
+- One pi terminal profile per window; new launches reuse the same title and colocate beside the editor
+- Terminal cleaned up on close, recreated on next command
+- CJS wrapper pattern allows `"type": "module"` while satisfying VS Code's `require()` loading
+- Pi binary auto-detected from common paths (`~/.bun/bin/pi`, `~/.local/bin/pi`, etc.) or configurable via `pi-vscode.path` setting
+- `Pi: Upgrade Pi and Packages` reuses the binary resolver, guesses the package manager from the discovered binary path, launches the corresponding global install command for `@mariozechner/pi-coding-agent@latest`, and chains `pi update` afterward
+- Terminal shell is the pi binary itself (not a shell running pi)
+- Every pi launch injects `PI_VSCODE_BRIDGE_URL`, `PI_VSCODE_BRIDGE_TOKEN`, and a per-terminal `PI_VSCODE_TERMINAL_ID` plus `--extension bridge/pi-vscode-bridge.js`
+- On `session_start`, the pi bridge reports `{terminalId, sessionFile}` via the `reportTerminalSession` RPC; VS Code stores the map in `workspaceState` under `pi-vscode.terminalSessions` and, on next activation, recreates each terminal with `--session <sessionFile>` so prior pi conversations resume across IDE reloads. Terminals closed explicitly (non-`Shutdown` exit reason) are removed from the map; entries whose session file no longer exists on disk are pruned on activation
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [pithings/pi-vscode](https://github.com/pithings/pi-vscode) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-04-25 -->
