@@ -7,11 +7,11 @@ AI-powered architecture analysis and code intelligence. Detects circular deps, l
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [truecourse-ai/truecourse](https://github.com/truecourse-ai/truecourse).
+Original source: `CLAUDE.md` in [truecourse-ai/truecourse](https://github.com/truecourse-ai/truecourse).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
