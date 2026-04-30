@@ -15,7 +15,7 @@ Original source: `.cursor/rules/*.mdc` in [yezhaocan/vr-management-web](https://
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
-Quality verified by TomeVault's automated analysis pipeline. [View quality report](https://tomevault.io/claim/yezhaocan#quality)
+Quality verified by TomeVault's automated analysis pipeline. Source: [github.com/yezhaocan/vr-management-web](https://github.com/yezhaocan/vr-management-web)
 
 ---
 
