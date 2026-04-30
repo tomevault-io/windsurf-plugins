@@ -7,11 +7,11 @@ A multi-model AI agent desktop client — connect any AI provider, extend with M
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [op7418/CodePilot](https://github.com/op7418/CodePilot).
+Original source: `CLAUDE.md` in [op7418/CodePilot](https://github.com/op7418/CodePilot).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
