@@ -7,11 +7,11 @@ A declarative inline TUI rendering library for Rust, built on Ratatui
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [atuinsh/eye-declare](https://github.com/atuinsh/eye-declare).
+Original source: `CLAUDE.md` in [atuinsh/eye-declare](https://github.com/atuinsh/eye-declare).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
