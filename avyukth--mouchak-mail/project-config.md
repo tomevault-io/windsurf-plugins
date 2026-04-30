@@ -1,103 +1,138 @@
 ---
 trigger: always_on
-description: **mcp-agent-mail-rs** is a Rust implementation of "Gmail for coding agents" - an MCP-compliant mail server for AI agent communication. We're translating from Python using Depyler-assisted transpilation.
+description: Validates test suite effectiveness by introducing mutations and checking if tests catch them:
 ---
 
-# GitHub Copilot Instructions: MCP Agent Mail (Rust)
+# AGENTS.md — Universal Operating Manual for AI Coding Agents
 
-## Project Overview
+> **Quick Start**: Run `cm context "<your task>"` before starting work. Run `bd ready` to find unblocked issues. Run `bd sync` before ending your session.
 
-**mcp-agent-mail-rs** is a Rust implementation of "Gmail for coding agents" - an MCP-compliant mail server for AI agent communication. We're translating from Python using Depyler-assisted transpilation.
+This document provides standardized instructions for ANY AI coding agent (Claude, Gemini, GPT, Codex, etc.) working in this codebase. It is divided into:
 
-**Tech Stack**: Rust (Axum, libsql, git2) + SvelteKit + TailwindCSS + Bun
+1. **Layer 0**: Inviolable safety rules (NEVER break these)
+2. **Layer 1**: Universal tooling (works across all projects)
+3. **Layer 2**: Session workflow (how to start, work, and end sessions)
+4. **Layer 3**: Project-specific configuration (filled in per-project)
+5. **Layer 4**: Language/stack-specific instructions (filled in per-project)
 
-## Issue Tracking with bd (beads)
+---
 
-**CRITICAL**: This project uses **bd (beads)** for ALL task tracking. Do NOT create markdown TODO lists.
+## ⛔ LAYER 0: INVIOLABLE SAFETY RULES
 
-### Essential Commands
+These rules are ABSOLUTE and apply to ALL agents in ALL contexts.
+
+### Rule 1: NO FILE DELETION WITHOUT EXPLICIT PERMISSION
+
+```
+YOU ARE NEVER ALLOWED TO DELETE A FILE WITHOUT EXPRESS WRITTEN PERMISSION.
+```
+
+- Applies to ALL files: user files, test files, temporary files, files you created
+- You must ASK and RECEIVE clear written permission before ANY deletion
+- "I think it's safe" is NEVER acceptable justification
+- This includes: `rm`, `unlink`, file system APIs, git clean operations
+
+### Rule 2: NO DESTRUCTIVE GIT/FILESYSTEM COMMANDS
+
+**Forbidden commands** (unless user provides exact command AND acknowledges consequences in same message):
+
+| Command | Risk |
+|---------|------|
+| `git reset --hard` | Destroys uncommitted work |
+| `git clean -fd` | Deletes untracked files |
+| `rm -rf` | Recursive deletion |
+| `git push` | **NEVER**|
+| `git push --force` | Overwrites remote history |
+| Any command that deletes/overwrites code or data | Potential data loss |
+
+**Mandatory protocol for ANY destructive operation:**
+
+1. **Safer alternatives first**: Use `git status`, `git diff`, `git stash`, or copy to backups
+2. **Explicit plan**: Restate the command verbatim + list exactly what will be affected
+3. **Wait for confirmation**: Do NOT proceed without explicit user approval
+4. **Document**: Record user authorization text, command run, and execution time
+5. **Refuse if ambiguous**: If ANY uncertainty remains, refuse and escalate
+
+### Rule 3: PROTECT CONFIGURATION FILES
+
+- **`.env` files**: NEVER overwrite—they contain secrets and local configuration
+- **Lock files**: Do not delete `package-lock.json`, `Cargo.lock`, `go.sum`, etc.
+- **Database files**: Never delete `.db`, `.sqlite`, or data files without explicit permission
+
+---
+
+## 🧠 LAYER 1: UNIVERSAL TOOLING
+
+These tools work across ALL projects. Learn them once, use them everywhere.
+
+### Quick Reference: Tool Selection
+
+| Task | Tool | Command |
+|------|------|---------|
+| **Start new task** | cm | `cm context "<task>"` |
+| **Find ready issues** | bd | `bd ready --json` |
+| **Search past sessions** | cass | `cass search "query" --robot` |
+| **Graph analysis of issues** | bv | `bv --robot-insights` |
+| **AI-supervised execution** | vc | `vc run` / `vc status` |
+| **Quality gates / TDG** | pmat | `pmat analyze tdg` / `pmat mutate` |
+| **Bug scan before commit** | ubs | `ubs $(git diff --name-only --cached)` |
+| **Structural code search** | ast-grep | `ast-grep run -l <lang> -p 'pattern'` |
+| **Text search** | ripgrep | `rg "pattern"` |
+| **Multi-agent coordination** | Mouchak Mail | `file_reservation_paths(...)` |
+| **AI capability discovery** | mouchak-mail | `--robot-help`, `--robot-examples`, `--robot-status` |
+
+---
+
+### 📚 cm (CASS Memory System) — Context Hydration
+
+**What it does**: Provides "procedural memory" across coding sessions. Before starting ANY non-trivial task, hydrate your context.
+
+**Primary command**:
+```bash
+cm context "<your task description>"
+```
+
+This returns:
+- Relevant rules from the project playbook (scored by task relevance)
+- Anti-patterns to avoid (things that caused problems before)
+- Historical context from past sessions
+
+| Command | Purpose |
+|---------|---------|
+| `cm context "<task>"` | **START HERE** — Get context for your task |
+| `cm doctor` | System health check (exit 0 = healthy) |
+| `cm init` | Initialize playbook for new project |
+| `cm mark <id> --helpful` | Positive feedback on a rule |
+| `cm mark <id> --harmful` | Negative feedback on a rule |
+| `cm stats` | Playbook health metrics |
+| `cm similar "<query>"` | Find similar rules |
+| `cm top` | Top N rules by effectiveness score |
+| `cm forget <id>` | Deprecate a harmful rule |
+| `cm why <id>` | Explain reasoning behind a rule |
+| `cm diary` | Record session as diary entry |
+| `cm project` | Export playbook to AGENTS.md/CLAUDE.md |
+
+**Output conventions**: stdout = data, stderr = diagnostics. Exit 0 = success.
+
+---
+
+### 🔎 cass (Cross-Agent Session Search) — History Search
+
+**What it does**: Indexes conversation histories from ALL AI coding agents (Claude, Codex, Cursor, Gemini, Aider, ChatGPT, etc.) into a unified, searchable archive.
+
+**Before solving a problem from scratch, check if ANY agent already solved something similar.**
+
+⚠️ **CRITICAL**: NEVER run bare `cass` — it launches an interactive TUI. Always use `--robot` or `--json`.
+
+#### Pre-Flight Health Check
 
 ```bash
-# Find work with no blockers
-bd ready --json
+cass health --json
+# Exit 0 = healthy (proceed with searches)
+# Exit 1 = unhealthy (run: cass index --full)
 
-# Create issues
-bd create "Title" -t task|bug|feature -p 0-4 --json
-bd create "Subtask" --parent <epic-id> --json
-
-# Update status
-bd update <id> --status in_progress --json
-
-# Complete work
-bd close <id> --reason "Done" --json
-```
-
-### Current Phase: Phase 2 - SvelteKit Frontend
-
-Ready tasks (run `bd ready --json`):
-- `mcp-agent-mail-rs-k43.1`: Initialize SvelteKit project
-- `mcp-agent-mail-rs-k43.4`: Configure adapter-static
-
-### Workflow
-
-1. **Check ready work**: `bd ready --json`
-2. **Claim task**: `bd update <id> --status in_progress --json`
-3. **Implement**: Write code, tests
-4. **Found new work?**: `bd create "Bug" --deps discovered-from:<id> --json`
-5. **Complete**: `bd close <id> --reason "Done" --json`
-6. **Commit**: `git add -A && git commit -m "feat: X (closes bd-Y)"`
-
-## Project Structure
-
-```
-mcp-agent-mail-rs/
-├── crates/
-│   ├── libs/lib-core/      # Domain logic (Project, Agent, Message BMCs)
-│   └── services/
-│       ├── mcp-server/     # Axum REST API (port 8000)
-│       ├── mcp-cli/        # CLI for testing
-│       └── web-ui/         # SvelteKit frontend (Phase 2)
-├── migrations/             # SQL schema (libsql)
-├── .beads/                 # Issue tracker database
-└── AGENTS.md               # Full agent instructions
-```
-
-## Coding Guidelines
-
-### Rust
-- Use `thiserror` for error types
-- Follow BMC (Backend Model Controller) pattern
-- No `unwrap()` in production code
-- Run `cargo clippy` before committing
-
-### SvelteKit (Phase 2)
-- Use Bun as package manager
-- TailwindCSS for styling
-- adapter-static for embedding in Rust binary
-- API calls to `http://localhost:8000/api/*`
-
-## Quality Gates
-
-Before completing any task:
-- [ ] `cargo build` succeeds
-- [ ] `cargo clippy` has no warnings
-- [ ] `cargo test` passes
-- [ ] Documentation updated if needed
-
-## Important Rules
-
-- ✅ Use `bd` for ALL task tracking
-- ✅ Always use `--json` flag for parsing
-- ✅ Commit `.beads/issues.jsonl` with code
-- ❌ Do NOT create markdown TODO lists
-- ❌ Do NOT skip claiming issues
-
-## References
-
-- [AGENTS.md](../AGENTS.md) - Full agent workflow guide
-- [PROJECT_PLAN.md](../docs/PROJECT_PLAN.md) - Detailed task breakdown
-- [llms.txt](../llms.txt) - LLM-friendly overview
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/Avyukth) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-10 -->
+> Source: [Avyukth/mouchak-mail](https://github.com/Avyukth/mouchak-mail) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-04-24 -->
