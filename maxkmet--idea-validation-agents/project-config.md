@@ -1,10 +1,10 @@
 ---
 trigger: always_on
-description: Skill — user-segmentation-profiler. Classifies the user into an ICP tier (beginner/builder/growth) based on experience, constraints, and goals.
+description: Skill — weakness-detection. Analyzes idea scores to identify weak dimensions, root causes, and probable failure modes.
 ---
 
 
-See [skills/user-segmentation-profiler/SKILL.md](../../skills/user-segmentation-profiler/SKILL.md) for full instructions and output schema.
+See [skills/weakness-detection/SKILL.md](../../skills/weakness-detection/SKILL.md) for full instructions and output schema.
 
 ---
 > Source: [MaxKmet/idea-validation-agents](https://github.com/MaxKmet/idea-validation-agents) — distributed by [TomeVault](https://tomevault.io).
