@@ -1,151 +1,88 @@
 ---
 trigger: always_on
-description: An MIT-licensed, open-source AWS emulator built on top of Moto. Runs as a single Docker container on ARM Mac.
+description: Strategy and learnings for implementing missing Moto operations
 ---
 
-# Robotocore
 
-An MIT-licensed, open-source AWS emulator built on top of Moto. Runs as a single Docker container on ARM Mac.
+# Moto Implementation Strategy
 
-## Project Philosophy
+## What works
 
-- **Free forever**: MIT license, no registration, no telemetry, no paid tiers
-- **Drop-in replacement**: Same port (4566), same request routing, same response format as other AWS emulators
-- **Built on Moto**: Leverage Moto's ~195 service implementations as the foundation
-- **Behavioral fidelity where it matters**: Lambda actually executes, SQS has real visibility timeouts, etc.
-- **Single container**: One `docker run` command to get all of AWS locally
+- **gen_resource_lifecycle_test.py** generates good test skeletons from botocore shapes
+- **gen_moto_impl.py** generates ~80% correct scaffolding but ONLY for response methods — agents often forget backend methods
+- Not-found tests pass reliably — the implementations raise correct exceptions
+- Three protocol patterns are well-understood: JSON (Glue), rest-json catchall (OpenSearch), rest-json explicit URLs (Connect/EKS)
+- Service fixtures (SERVICE_FIXTURES) work well for prerequisite resources
+- **Manual test files** work better than auto-generated for non-CRUD ops (standalone describes, deployment/revision lookups)
 
-## Architecture
+## Critical agent pitfalls
 
-```
-┌──────────────────────────────────────────────┐
-│              Docker Container                │
-│                                              │
-│  ┌────────────────────────────────────────┐  │
-│  │     Gateway (port 4566)                │  │
-│  │  ┌──────────────────────────────────┐  │  │
-│  │  │  Request Router                  │  │  │
-│  │  │  (service detection from headers,│  │  │
-│  │  │   URL patterns, query params)    │  │  │
-│  │  └──────────┬───────────────────────┘  │  │
-│  │             │                          │  │
-│  │  ┌──────────▼───────────────────────┐  │  │
-│  │  │  Protocol Layer                  │  │  │
-│  │  │  (query, json, rest-json,        │  │  │
-│  │  │   rest-xml, ec2)                 │  │  │
-│  │  └──────────┬───────────────────────┘  │  │
-│  │             │                          │  │
-│  │  ┌──────────▼───────────────────────┐  │  │
-│  │  │  Service Providers               │  │  │
-│  │  │  (Moto backends + extensions)    │  │  │
-│  │  └──────────┬───────────────────────┘  │  │
-│  │             │                          │  │
-│  │  ┌──────────▼───────────────────────┐  │  │
-│  │  │  In-Memory Stores                │  │  │
-│  │  │  (per-account, per-region)       │  │  │
-│  │  └─────────────────────────────────-┘  │  │
-│  └────────────────────────────────────────┘  │
-└──────────────────────────────────────────────┘
-```
+### Agents write response methods but forget backend methods
+The most common failure: agent adds `responses.py` methods that call `self.backend.create_foo()` but never adds `create_foo()` to the backend class in `models.py`. Always verify both files.
 
-## Project Layout
+### Cognito-IDP has two backend classes
+`CognitoIdpBackend` (line ~999) and `RegionAgnosticBackend` (line ~2398). Methods must go on `CognitoIdpBackend`, not `RegionAgnosticBackend`. The `update_user_attributes` method at the end of `RegionAgnosticBackend` is a trap — new methods placed after it land on the wrong class.
 
-```
-robotocore/
-├── CLAUDE.md                  # This file
-├── pyproject.toml             # Project config (uv)
-├── Dockerfile                 # Single-container build
-├── docker-compose.yml         # Dev convenience
-├── src/robotocore/
-│   ├── __init__.py
-│   ├── main.py                # Entrypoint
-│   ├── gateway/               # HTTP gateway, request routing
-│   │   ├── __init__.py
-│   │   ├── app.py             # ASGI/WSGI app
-│   │   ├── router.py          # AWS service detection & dispatch
-│   │   └── handler_chain.py   # Request/response handler chain
-│   ├── protocols/             # AWS protocol parsers/serializers
-│   │   ├── __init__.py
-│   │   ├── parser.py          # HTTP → Python objects
-│   │   └── serializer.py      # Python objects → HTTP response
-│   ├── providers/             # Service provider wrappers
-│   │   ├── __init__.py
-│   │   └── moto_bridge.py     # Bridge to forward requests to moto
-│   ├── services/              # Service-specific extensions beyond moto
-│   │   └── __init__.py
-│   ├── stores/                # In-memory state stores
-│   │   └── __init__.py
-│   └── utils/                 # Shared utilities
-│       └── __init__.py
-├── tests/
-│   ├── unit/                  # Fast, no-network tests
-│   ├── integration/           # Tests against running container
-│   └── compatibility/         # Tests that verify AWS parity
-├── scripts/
-│   ├── dev.py                 # Dev server lifecycle & test runner
-│   ├── smoke_test.py          # Cross-service smoke test
-│   ├── probe_service.py       # Discover working operations per service
-│   └── ...                    # gen_provider, gen_compat_tests, batch_register, etc.
-├── vendor/
-│   ├── moto/                  # Git submodule: getmoto/moto
-│   └── localstack/            # Git submodule (reference implementation)
-└── docker/
-    └── entrypoint.sh          # Container entrypoint
-```
+### gen_moto_impl.py has many false positives
+It reports nouns as "missing" if ANY CRUD op is unimplemented. Many services (EKS, EMR, cognito-idp, emr-serverless, stepfunctions) show false positives because:
+- Operations are implemented but with different method names
+- Operations are in a parser/provider submodule
+- The moto module name differs from the boto3 service name (e.g., `emrserverless` vs `emr-serverless`)
 
-## Development
+Always verify with `probe_service.py` before implementing.
 
-### Prerequisites
+### Native providers have separate state from Moto
+Robotocore has native providers for Lambda, SFN, ECS, etc. that maintain their own in-memory state (e.g., `_state_machines`, `EcsStore`). Operations NOT in the native provider's `_ACTION_MAP` are forwarded to Moto, which has a completely separate state store. If a resource was created by the native provider, Moto can't see it. When implementing new operations, check if the service has a native provider at `src/robotocore/services/{svc}/provider.py` and add the new ops there instead of (or in addition to) Moto.
 
-- Python 3.12+
-- uv (Python package manager)
-- Docker (with ARM/aarch64 support)
+### Moto lockfile update requires cache clear
+After pushing moto changes, `uv lock --upgrade-package moto` may return the cached old commit. Use `uv cache clean moto --force` first, then `uv lock --upgrade-package moto`. Also push to the correct remote branch name (`robotocore/all-fixes:robotocore/all-fixes`).
 
-### Setup
+## Test generator features (implemented)
 
-```bash
-git submodule update --init --recursive
-uv sync
-```
+- **ID capture**: Captures server-generated IDs from create responses and threads them through describe/delete calls
+- **Doc-based param aliasing**: When param ends with "Id" but botocore docs mention "name", generates name value (e.g., CloudTrail DashboardId)
+- **Integer min values**: Respects botocore `min` constraints on integer shapes
+- **Required-only strict assertions**: Only asserts `isinstance` for botocore-required output fields, not optional ones
+- **Tagged union shapes**: Generates correct first-member values for union types (e.g., `DataSourceType={"S3GlueDataCatalog": {}}`)
+- **Service fixtures**: Creates prerequisite resources (connect instance, org, vault, cluster, domain, user pool)
 
-### Running locally (development)
+## Service fixtures available
 
-```bash
-uv run python -m robotocore.main
-```
+| Service | Fixture | Creates |
+|---------|---------|---------|
+| connect | `instance_id` | Connect instance |
+| organizations | `org` (autouse) | Organization |
+| backup | `vault_name` | Backup vault |
+| eks | `cluster_name` | EKS cluster + IAM role |
+| opensearch | `domain_name` | OpenSearch domain |
+| cognito-idp | `user_pool_id` | User pool |
 
-### Running in Docker
+## Protocol-specific patterns
 
-```bash
-docker build -t robotocore .
-docker run -p 4566:4566 robotocore
-```
+| Protocol | Params from | Returns | URL changes |
+|----------|------------|---------|-------------|
+| JSON (Glue, EMR, Cognito) | `self.parameters` | `ActionResult(dict)` / `EmptyResult()` | None |
+| rest-json catchall (IoT, OpenSearch) | `self._get_param()` + URL path | `json.dumps(dict)` / `"{}"` | None |
+| rest-json explicit (Connect, EKS) | `self._get_param()`, URL path | `ActionResult(dict)` / `json.dumps(dict)` | Add URL entries to urls.py |
 
-### Testing
+## Worktree workflow for parallel implementation
 
-```bash
-# Unit tests (parallel, no server needed)
-make test                              # or: uv run pytest tests/unit/ -n12
+1. Create worktree: `git worktree add ../robotocore-{svc} -b impl/{svc} HEAD`
+2. Init submodule: `cd worktree && git submodule update --init vendor/moto`
+3. Agent implements in worktree, commits to worktree branch
+4. Copy changed files from worktree to main: `cp worktree/vendor/moto/moto/{svc}/* main/vendor/moto/moto/{svc}/`
+5. Commit in main vendor/moto, push to fork, update lockfile
+6. Clean up: `rm -rf worktree && git worktree prune && git branch -D impl/{svc}`
 
-# Compat tests (auto-starts/stops server)
-make compat-test                       # or: uv run python scripts/dev.py test-compat
+Key lessons:
+- Submodule commits in worktrees can't be cherry-picked (different git databases). Use file copy.
+- Push to the correct remote branch: `git push jackdanger robotocore/all-fixes:robotocore/all-fixes`
+- Always verify installed moto has the new methods after sync (check with `python3 -c "from moto.{svc}.models import ..."`).
 
-# Compat tests (server already running)
-make compat-test-hot
+## Moto update flow
 
-# All tests: unit + compat + integration
-make test-all
-
-# Server lifecycle
-make start                             # Start dev server in background
-make stop                              # Stop dev server
-make status                            # Check if server is running
-```
-
-## Key Technical Decisions
-
-1. **Gateway on port 4566**: Standard AWS emulator port so existing `aws --endpoint-url` configs work unchanged
-2. **Moto as the service layer**: Don't reimplement what Moto already does well. Wrap it, extend it, fix its gaps.
+1. Edit vendor/moto/moto/{service}/models.py + responses.py
+2. Push: `cd vendor/moto && git push jackdanger robotocore/all-fixes:robotocore/all-fixes`
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
