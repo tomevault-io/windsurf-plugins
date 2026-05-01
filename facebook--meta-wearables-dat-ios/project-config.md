@@ -1,85 +1,8 @@
 ---
 trigger: always_on
-description: > Full API reference: [https://wearables.developer.meta.com/llms.txt?full=true](https://wearables.developer.meta.com/llms.txt?full=true)
+description: StreamSession, video frames, photo capture, resolution/frame rate configuration
 ---
 
-# Meta Wearables DAT SDK — AI Instructions
-
-> Full API reference: [https://wearables.developer.meta.com/llms.txt?full=true](https://wearables.developer.meta.com/llms.txt?full=true)
->
-> Developer docs: [https://wearables.developer.meta.com/docs/develop/](https://wearables.developer.meta.com/docs/develop/)
-
-
-# DAT SDK Conventions (iOS)
-
-## Architecture
-
-The SDK is organized into three modules:
-- **MWDATCore**: Device discovery, registration, permissions, device selectors
-- **MWDATCamera**: StreamSession, VideoFrame, photo capture
-- **MWDATMockDevice**: MockDeviceKit for testing without hardware
-
-## Swift Patterns
-
-- Use `async/await` for all SDK operations — the SDK is fully async
-- Use `AsyncSequence` / publisher `.listen {}` for observing streams
-- Annotate UI-updating code with `@MainActor`
-- Never block the main thread with frame processing
-- Handle errors with do/catch — the SDK throws typed errors
-
-## Naming Conventions
-
-| Type | Convention | Example |
-|------|-----------|---------|
-| Entry point | `Wearables.shared` | `Wearables.shared.startRegistration()` |
-| Sessions | `*Session` | `StreamSession`, `DeviceStateSession` |
-| Selectors | `*DeviceSelector` | `AutoDeviceSelector`, `SpecificDeviceSelector` |
-| Config | `*Config` | `StreamSessionConfig` |
-| Publishers | `*Publisher` | `statePublisher`, `videoFramePublisher` |
-
-## Imports
-
-```swift
-import MWDATCore    // Registration, devices, permissions
-import MWDATCamera  // StreamSession, VideoFrame, photo capture
-```
-
-For testing:
-```swift
-import MWDATMockDevice  // MockDeviceKit, MockRaybanMeta, MockCameraKit
-```
-
-## Key Types
-
-- `Wearables` — SDK entry point. Call `Wearables.configure()` at launch, then use `Wearables.shared`
-- `StreamSession` — Camera streaming session. Create with config + device selector
-- `VideoFrame` — Individual video frame with `.makeUIImage()` convenience
-- `AutoDeviceSelector` — Automatically selects the best available device
-- `SpecificDeviceSelector` — Selects a specific device by identifier
-- `StreamSessionConfig` — Configure video codec, resolution, frame rate
-- `MockDeviceKit` — Factory for creating simulated devices in tests
-
-## Error Handling
-
-```swift
-do {
-    try Wearables.configure()
-} catch {
-    // Handle configuration error
-}
-
-do {
-    try Wearables.shared.startRegistration()
-} catch {
-    // Handle registration error
-}
-```
-
-## Links
-
-- [iOS API Reference](https://wearables.developer.meta.com/docs/reference/ios_swift/dat/0.6)
-- [Developer Documentation](https://wearables.developer.meta.com/docs/develop/)
-- [GitHub Repository](https://github.com/facebook/meta-wearables-dat-ios)
 
 
 # Camera Streaming (iOS)
@@ -191,8 +114,27 @@ session.capturePhoto(format: .jpeg)
 
 Resolution and frame rate are constrained by Bluetooth Classic bandwidth. The SDK automatically reduces quality when bandwidth is limited:
 1. First lowers resolution (e.g., High → Medium)
+2. Then reduces frame rate (e.g., 30 → 24), never below 15 FPS
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+Request lower settings for higher visual quality per frame.
+
+## Device selection
+
+Use `AutoDeviceSelector` to let the SDK pick the best device, or `SpecificDeviceSelector` for a known device:
+
+```swift
+// Auto-select
+let auto = AutoDeviceSelector(wearables: wearables)
+
+// Specific device
+let specific = SpecificDeviceSelector(deviceIdentifier: deviceId)
+```
+
+## Links
+
+- [StreamSession API reference](https://wearables.developer.meta.com/docs/reference/ios_swift/dat/0.6/mwdatcamera_streamsession)
+- [StreamSessionConfig API reference](https://wearables.developer.meta.com/docs/reference/ios_swift/dat/0.6/mwdatcamera_streamsessionconfig)
+- [Integration guide](https://wearables.developer.meta.com/docs/build-integration-ios)
 
 ---
 > Source: [facebook/meta-wearables-dat-ios](https://github.com/facebook/meta-wearables-dat-ios) — distributed by [TomeVault](https://tomevault.io).
