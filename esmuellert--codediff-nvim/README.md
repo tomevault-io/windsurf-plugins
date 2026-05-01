@@ -7,11 +7,11 @@ A Neovim plugin that provides VSCode-style diff rendering with two-tier highligh
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [esmuellert/codediff.nvim](https://github.com/esmuellert/codediff.nvim).
+Original source: `CLAUDE.md` in [esmuellert/codediff.nvim](https://github.com/esmuellert/codediff.nvim).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
