@@ -1,7 +1,8 @@
 ---
 trigger: always_on
-description: This file provides guidance to coding agent when working with code in this repository.
+description: Basic instructions for everything in this repo
 ---
+
 
 This file provides guidance to coding agent when working with code in this repository.
 
