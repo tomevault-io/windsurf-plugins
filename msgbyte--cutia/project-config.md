@@ -1,109 +1,211 @@
 ---
 trigger: always_on
-description: Ultracite enforces strict type safety, accessibility standards, and consistent code quality for JavaScript/TypeScript projects using Biome's lightning-fast formatter and linter.
+description: **This file provides an index of exported functions, types, interfaces, classes, and constants in your codebase.**
 ---
 
+---
+alwaysApply: true
+---
 
-# Project Context
+# video-editor-oss Codebase Index
 
-Ultracite enforces strict type safety, accessibility standards, and consistent code quality for JavaScript/TypeScript projects using Biome's lightning-fast formatter and linter.
+**This file provides an index of exported functions, types, interfaces, classes, and constants in your codebase.**
 
-## Key Principles
+Updated in real-time by Twiggy. Use this to discover existing utilities and avoid duplicating code.
 
-- Zero configuration required
-- Subsecond performance
-- Maximum type safety
-- AI-friendly code generation
+## How to Use
 
-## Before Writing Code
+When implementing new features:
+1. Check if similar functionality already exists
+2. Reuse existing types and utilities
+3. Understand the API surface of your codebase
 
-1. Analyze existing patterns in the codebase
-2. Consider edge cases and error scenarios
-3. Follow the rules below strictly
-4. Validate accessibility requirements
+```typescript
+## apps/web/src/constants
 
-## Rules
+editor-constants.ts
+  export const PLATFORM_LAYOUTS: Record<TPlatformLayout, string>
+  export const PANEL_CONFIG
 
-### Accessibility (a11y)
+export-constants.ts
+  export const DEFAULT_EXPORT_OPTIONS
+  export const EXPORT_MIME_TYPES
 
-- Don't use `accessKey` attribute on any HTML element.
-- Don't set `aria-hidden="true"` on focusable elements.
-- Don't add ARIA roles, states, and properties to elements that don't support them.
-- Don't use distracting elements like `<marquee>` or `<blink>`.
-- Only use the `scope` prop on `<th>` elements.
-- Don't assign non-interactive ARIA roles to interactive HTML elements.
-- Make sure label elements have text content and are associated with an input.
-- Don't assign interactive ARIA roles to non-interactive HTML elements.
-- Don't assign `tabIndex` to non-interactive HTML elements.
-- Don't use positive integers for `tabIndex` property.
-- Don't include "image", "picture", or "photo" in img alt prop.
-- Don't use explicit role property that's the same as the implicit/default role.
-- Make static elements with click handlers use a valid role attribute.
-- Always include a `title` element for SVG elements.
-- Give all elements requiring alt text meaningful information for screen readers.
-- Make sure anchors have content that's accessible to screen readers.
-- Assign `tabIndex` to non-interactive HTML elements with `aria-activedescendant`.
-- Include all required ARIA attributes for elements with ARIA roles.
-- Make sure ARIA properties are valid for the element's supported roles.
-- Always include a `type` attribute for button elements.
-- Make elements with interactive roles and handlers focusable.
-- Give heading elements content that's accessible to screen readers (not hidden with `aria-hidden`).
-- Always include a `lang` attribute on the html element.
-- Always include a `title` attribute for iframe elements.
-- Accompany `onClick` with at least one of: `onKeyUp`, `onKeyDown`, or `onKeyPress`.
-- Accompany `onMouseOver`/`onMouseOut` with `onFocus`/`onBlur`.
-- Include caption tracks for audio and video elements.
-- Use semantic elements instead of role attributes in JSX.
-- Make sure all anchors are valid and navigable.
-- Ensure all ARIA properties (`aria-*`) are valid.
-- Use valid, non-abstract ARIA roles for elements with ARIA roles.
-- Use valid ARIA state and property values.
-- Use valid values for the `autocomplete` attribute on input elements.
-- Use correct ISO language/country codes for the `lang` attribute.
+font-constants.ts
+  export interface FontOption {
+    value: string
+    label: string
+    category: "system" | "google" | "custom"
+    weights?: number[]
+    hasClassName?: boolean
+  }
+  export const FONT_OPTIONS: FontOption[]
+  export const DEFAULT_FONT
+  export type FontFamily = (typeof FONT_OPTIONS)[number]["value"]
+  export const getFontByValue = (value: string): FontOption | undefined => ...
+  export const getGoogleFonts = (): FontOption[] => ...
+  export const getSystemFonts = (): FontOption[] => ...
 
-### Code Complexity and Quality
+language-constants.ts
+  export const LANGUAGES
 
-- Don't use consecutive spaces in regular expression literals.
-- Don't use the `arguments` object.
-- Don't use primitive type aliases or misleading types.
-- Don't use the comma operator.
-- Don't use empty type parameters in type aliases and interfaces.
-- Don't write functions that exceed a given Cognitive Complexity score.
-- Don't nest describe() blocks too deeply in test files.
-- Don't use unnecessary boolean casts.
-- Don't use unnecessary callbacks with flatMap.
-- Use for...of statements instead of Array.forEach.
-- Don't create classes that only have static members (like a static namespace).
-- Don't use this and super in static contexts.
-- Don't use unnecessary catch clauses.
-- Don't use unnecessary constructors.
-- Don't use unnecessary continue statements.
-- Don't export empty modules that don't change anything.
-- Don't use unnecessary escape sequences in regular expression literals.
-- Don't use unnecessary fragments.
-- Don't use unnecessary labels.
-- Don't use unnecessary nested block statements.
-- Don't rename imports, exports, and destructured assignments to the same name.
-- Don't use unnecessary string or template literal concatenation.
-- Don't use String.raw in template literals when there are no escape sequences.
-- Don't use useless case statements in switch statements.
-- Don't use ternary operators when simpler alternatives exist.
-- Don't use useless `this` aliasing.
-- Don't use any or unknown as type constraints.
-- Don't initialize variables to undefined.
-- Don't use the void operators (they're not familiar).
-- Use arrow functions instead of function expressions.
-- Use Date.now() to get milliseconds since the Unix Epoch.
-- Use .flatMap() instead of map().flat() when possible.
-- Use literal property access instead of computed property access.
-- Don't use parseInt() or Number.parseInt() when binary, octal, or hexadecimal literals work.
-- Use concise optional chaining instead of chained logical expressions.
-- Use regular expression literals instead of the RegExp constructor when possible.
-- Don't use number literal object member names that aren't base 10 or use underscore separators.
-- Remove redundant terms from logical expressions.
-- Use while loops instead of for loops when you don't need initializer and update expressions.
-- Don't pass children as props.
-- Don't reassign const variables.
+project-constants.ts
+  export const DEFAULT_CANVAS_PRESETS: TCanvasSize[]
+  export const FPS_PRESETS
+  export const BLUR_INTENSITY_PRESETS: { label: string; value: number }[]
+  export const DEFAULT_CANVAS_SIZE: TCanvasSize
+  export const DEFAULT_FPS
+  export const DEFAULT_BLUR_INTENSITY
+  export const DEFAULT_COLOR
+
+site-constants.ts
+  export const SITE_URL
+  export const SITE_INFO
+  export type ExternalTool = {
+  	name: string;
+  	description: string;
+  	url: string;
+  	icon: React.ElementType;
+  }
+  export const EXTERNAL_TOOLS: ExternalTool[]
+  export const DEFAULT_LOGO_URL
+  export const SOCIAL_LINKS
+  export type Sponsor = {
+  	name: string;
+  	url: string;
+  	logo: string;
+  	description: string;
+  }
+  export const SPONSORS: Sponsor[]
+
+stickers-constants.ts
+  export const STICKER_CATEGORIES
+  export const STICKER_CATEGORY_CONFIG: Record<
+  	(typeof STICKER_CATEGORIES)[number],
+  	string | undefined
+  >
+
+text-constants.ts
+  export const DEFAULT_TEXT_ELEMENT: Omit<TextElement, "id">
+
+timeline-constants.tsx
+  export const TRACK_COLORS: Record<TrackType, { background: string }>
+  export const TRACK_HEIGHTS: Record<TrackType, number>
+  export const TRACK_GAP
+  export const TIMELINE_CONSTANTS
+  export const DEFAULT_TIMELINE_VIEW_STATE: TTimelineViewState
+  export const TRACK_ICONS: Record<TrackType, React.ReactNode>
+
+transcription-constants.ts
+  export const TRANSCRIPTION_LANGUAGES
+  export const TRANSCRIPTION_MODELS: TranscriptionModel[]
+  export const DEFAULT_TRANSCRIPTION_MODEL: TranscriptionModelId
+  export const DEFAULT_CHUNK_LENGTH_SECONDS
+  export const DEFAULT_STRIDE_SECONDS
+  export const DEFAULT_WORDS_PER_CAPTION
+  export const MIN_CAPTION_DURATION_SECONDS
+
+## apps/web/src/core
+
+index.ts
+  export class EditorCore {
+    instance: EditorCore | null
+    command: CommandManager
+    playback: PlaybackManager
+    timeline: TimelineManager
+    scenes: ScenesManager
+    project: ProjectManager
+    media: MediaManager
+    renderer: RendererManager
+    save: SaveManager
+    audio: AudioManager
+    selection: SelectionManager
+    static getInstance(): EditorCore
+    static reset(): void
+  }
+
+## apps/web/src/hooks
+
+use-editor.ts
+  export function useEditor(): EditorCore
+
+use-file-upload.ts
+  export function useFileUpload({
+  	accept,
+  	multiple,
+  	onFilesSelected,
+  }: UseFileUploadOptions = {})
+
+use-infinite-scroll.ts
+  export function useInfiniteScroll({
+  	onLoadMore,
+  	hasMore,
+  	isLoading,
+  	threshold = 200,
+  	enabled = true,
+  }: UseInfiniteScrollOptions)
+
+use-keybindings.ts
+  export function useKeybindingsListener()
+  export function useKeybindingDisabler()
+
+use-keyboard-shortcuts-help.ts
+  export interface KeyboardShortcut {
+    id: string
+    keys: string[]
+    description: string
+    category: string
+    action: TAction
+    icon?: React.ReactNode
+  }
+  export function useKeyboardShortcutsHelp()
+
+use-mobile.ts
+  export function useIsMobile()
+
+use-raf-loop.ts
+  export function useRafLoop(callback: ({ time }: { time: number }) => void)
+
+use-reveal-item.ts
+  export function useRevealItem(
+  	highlightId: string | null,
+  	onClearHighlight: () => void,
+  	highlightDuration = 1000,
+  )
+
+use-sound-search.ts
+  export function useSoundSearch({
+  	query,
+  	commercialOnly,
+  }: {
+  	query: string;
+  	commercialOnly: boolean;
+  })
+
+## apps/web/src/hooks/actions
+
+use-action-handler.ts
+  export function useActionHandler(
+  	action: A,
+  	handler: TActionFunc<A>,
+  	isActive: TActionHandlerOptions,
+  )
+
+use-editor-actions.ts
+  export function useEditorActions()
+
+## apps/web/src/hooks/storage
+
+use-local-storage.ts
+  export function useLocalStorage({
+  	key,
+  	defaultValue,
+  }: {
+  	key: string;
+  	defaultValue: T;
+  }): [
+  	T,
+  	({ value }: { value: T | ((previousValue: T) => T) }) => void,
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
