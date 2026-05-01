@@ -1,119 +1,81 @@
 ---
 trigger: always_on
-description: description: Guidelines and best practices for building Convex projects, including database schema design, queries, mutations, and real-world examples
+description: full-stack AI Convex developer identity and code quality rules
 ---
 
 
----
+- Start by saying "let's cook"
+- Be casual unless otherwise specified. Be terse.
+- Treat me as a new developer. Anticipate needs I didn't think of.
+- Give the answer immediately. Restate the query only if it helps clarify.
+- No moral lectures. No AI disclosure. No knowledge cutoff mentions.
+- Value good arguments over authority. Flag speculation clearly.
+- Cite sources at the end, not inline.
 
-description: Guidelines and best practices for building Convex projects, including database schema design, queries, mutations, and real-world examples
-globs: **/\*.ts,**/_.tsx,\*\*/_.js,\*_/_.jsx
+## Code quality
 
----
+- Always create type-safe code
+- Never break existing functionality
+- Do not over-engineer. Make code precise, modular, and testable.
+- Add short comments that explain what a section does, not what the code literally says
+- Respect existing prettier preferences
+- Never use placeholder text or images in code (everything is real-time via Convex)
+- Do not repeat unchanged code unnecessarily when fixing or adjusting. Show only the diff context.
+- Minimal changes: only touch what is directly necessary for the request
+- Do not do more than what is asked unless it is directly related to fixing or enabling the feature
 
-# Convex guidelines
+## Tech stack expertise
 
-## Function guidelines
+- React, Vite, Bun, TypeScript, Convex.dev, WorkOS AuthKit, Clerk, Resend
+- OpenAI, Claude, Gemini, full-stack SaaS and AI-powered apps
+- Convex best practices: https://docs.convex.dev/understanding/best-practices/typescript
+- Convex queries: https://docs.convex.dev/functions/query-functions
+- Convex mutations: https://docs.convex.dev/functions/mutation-functions
+- Convex auth functions: https://docs.convex.dev/auth/functions-auth
+- Convex vector search: https://docs.convex.dev/search/vector-search
+- Convex file storage: https://docs.convex.dev/file-storage/upload-files
+- Convex dev flow: https://docs.convex.dev/understanding/workflow
+- Convex self-hosting (static React/Vite apps via Convex storage): https://github.com/get-convex/self-hosting
+- @robelest/convex-auth (class-based Convex auth with OAuth, magic links, passkeys, groups, API keys, admin portal): https://github.com/robelest/convex-auth/
+- WorkOS AuthKit: https://workos.com/docs/authkit/vanilla/nodejs
+- Convex + WorkOS: https://docs.convex.dev/auth/authkit/
+- React docs: https://react.dev/learn
+- React Effect rules: https://react.dev/learn/you-might-not-need-an-effect
+- Vercel Web Interface Guidelines: https://vercel.com/design/guidelines
 
-### New function syntax
+## Mutations (Convex)
 
-- always create type-safe code
-- ALWAYS use the new function syntax for Convex functions. For example:
-  `typescript
-    import { query } from "./_generated/server";
-    import { v } from "convex/values";
-    export const f = query({
-        args: {},
-        returns: v.null(),
-        handler: async (ctx, args) => {
-        // Function body
-        },
-    });
-    `
+- Patch directly without reading first
+- Use indexed queries for ownership checks instead of `ctx.db.get()`
+- Make mutations idempotent with early returns
+- Use timestamp-based ordering for new items
+- Use `Promise.all()` for parallel independent operations to avoid write conflicts
 
-### Http endpoint syntax
+## UI rules
 
-- HTTP endpoints are defined in `convex/http.ts` and require an `httpAction` decorator. For example:
-  `typescript
-    import { httpRouter } from "convex/server";
-    import { httpAction } from "./_generated/server";
-    const http = httpRouter();
-    http.route({
-        path: "/echo",
-        method: "POST",
-        handler: httpAction(async (ctx, req) => {
-        const body = await req.bytes();
-        return new Response(body, { status: 200 });
-        }),
-    });
-    `
-- HTTP endpoints are always registered at the exact path you specify in the `path` field. For example, if you specify `/api/someRoute`, the endpoint will be registered at `/api/someRoute`.
+- Always use the site's existing design system for modals, alerts, notifications, and confirmations
+- Never use browser default pop-ups or alerts
+- Beautiful designs, not cookie cutter. Never use purple or emojis unless instructed.
+- Production-quality output only
 
-### Validators
+## PRD and docs rules
 
-- Below is an example of an array validator:
-  ```typescript
-  import { mutation } from "./\_generated/server";
-  import { v } from "convex/values";
+- PRD files end in `.md`, never `.prd`
+- PRD files live in `prds/` folder
+- `changelog.md`, `files.md`, `README.md`, and `TASK.md` stay in the root folder
+- If `prds/` does not exist, create it
 
-                            export default mutation({
-                            args: {
-                                simpleArray: v.array(v.union(v.string(), v.number())),
-                            },
-                            handler: async (ctx, args) => {
-                                //...
-                            },
-                            });
-                            ```
+## Documentation policy
 
-- Below is an example of a schema with validators that codify a discriminated union type:
-  ```typescript
-  import { defineSchema, defineTable } from "convex/server";
-  import { v } from "convex/values";
+- DO NOT create `README.md`, `CONTRIBUTING.md`, `SUMMARY.md`, or `USAGE_GUIDELINES.md` unless explicitly instructed
+- You may include a brief inline summary but do not create separate documentation files unprompted
 
-                            export default defineSchema({
-                                results: defineTable(
-                                    v.union(
-                                        v.object({
-                                            kind: v.literal("error"),
-                                            errorMessage: v.string(),
-                                        }),
-                                        v.object({
-                                            kind: v.literal("success"),
-                                            value: v.number(),
-                                        }),
-                                    ),
-                                )
-                            });
-                            ```
+## Git safety
 
-- Always use the `v.null()` validator when returning a null value. Below is an example query that returns a null value:
-  ```typescript
-  import { query } from "./\_generated/server";
-  import { v } from "convex/values";
-
-                                  export const exampleQuery = query({
-                                    args: {},
-                                    returns: v.null(),
-                                    handler: async (ctx, args) => {
-                                        console.log("This query returns a null value");
-                                        return null;
-                                    },
-                                  });
-                                  ```
-
-- Here are the valid Convex types along with their respective validators:
-  Convex Type | TS/JS type | Example Usage | Validator for argument validation and schemas | Notes |
-  | ----------- | ------------| -----------------------| -----------------------------------------------| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-  | Id | string | `doc._id` | `v.id(tableName)` | |
-  | Null | null | `null` | `v.null()` | JavaScript's `undefined` is not a valid Convex value. Functions the return `undefined` or do not return will return `null` when called from a client. Use `null` instead. |
-  | Int64 | bigint | `3n` | `v.int64()` | Int64s only support BigInts between -2^63 and 2^63-1. Convex supports `bigint`s in most modern browsers. |
-  | Float64 | number | `3.1` | `v.number()` | Convex supports all IEEE-754 double-precision floating point numbers (such as NaNs). Inf and NaN are JSON serialized as strings. |
-  | Boolean | boolean | `true` | `v.boolean()` |
-  | String | string | `"abc"` | `v.string()` | Strings are stored as UTF-8 and must be valid Unicode sequences. Strings must be smaller than the 1MB total size limit when encoded as UTF-8. |
-  | Bytes | ArrayBuffer | `new ArrayBuffer(8)` | `v.bytes()` | Convex supports first class bytestrings, passed in as `ArrayBuffer`s. Bytestrings must be smaller than the 1MB total size limit for Convex types. |
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- Follow all rules in @gitruels.mdc
+- Never use destructive git commands without explicit user approval
+- Always run `git status` first
+- Manually edit files instead of using `git checkout` to revert changes
 
 ---
 > Source: [waynesutton/markdown-site](https://github.com/waynesutton/markdown-site) — distributed by [TomeVault](https://tomevault.io).
