@@ -7,11 +7,11 @@ An educational AI coding agent CLI
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [minmaxflow/mini-kode](https://github.com/minmaxflow/mini-kode).
+Original source: `CLAUDE.md` in [minmaxflow/mini-kode](https://github.com/minmaxflow/mini-kode).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
