@@ -1,230 +1,200 @@
 ---
 trigger: always_on
-description: Writing style guide with AI detection avoidance. For tweets, LinkedIn, blogs, READMEs, commits. Activate with @write
+description: Instructions for AI coding agents working on this codebase.
 ---
 
+# AGENTS.md
 
-# Writing style rules
+Instructions for AI coding agents working on this codebase.
 
-Use this rule when writing documentation, README files, comments, commit messages, or any other user facing text.
+## Project overview
 
-## Triggers
+Your content is instantly available to browsers, LLMs, and AI agents.. Write markdown, sync from the terminal. Your content is instantly available to browsers, LLMs, and AI agents. Built on Convex and Netlify.
 
-| Trigger | Output |
-|---|---|
-| `write:tweet` or `write:x` | X or Twitter post |
-| `write:linkedin` | LinkedIn post |
-| `write:blog` | Blog post |
-| `write:readme` | README |
-| `write:commit` | Git commit message |
-| `write:docs` | Developer documentation |
-| `write:feature` | Feature post |
-| `write:convex` | Convex specific content |
-| `write:tip` | Quick tip |
+## Default and legacy modes
 
-Example usage:
-* "write:tweet about real time sync"
-* "write:blog on authentication patterns"
-* "write:feature for our new search API"
+- Default auth mode: `convex-auth`
+- Default hosting mode: `convex-self-hosted`
+- Legacy compatibility mode: `workos` auth + `netlify` hosting
 
-## Rule of one
+**Key features:**
+- Markdown posts with frontmatter
+- Four themes (dark, light, tan, cloud)
+- Full text search with Command+K
+- Real-time analytics at `/stats`
+- RSS feeds and sitemap for SEO
+- API endpoints for AI/LLM access
 
-Every piece of content follows this framework:
+## Current Status
 
-* **One person**: Write to a specific person, not an audience.
-* **One problem**: State the single problem they face.
-* **One cause**: Identify the root cause.
-* **One difference**: Explain what the solution does differently.
-* **One action**: End with one clear next step.
+- **Site Name**: markdown sync
+- **Site Title**: markdown sync framework
+- **Site URL**: https://yoursite.example.com
+- **Total Posts**: 21
+- **Total Pages**: 4
+- **Latest Post**: 2026-03-20
+- **Last Updated**: 2026-03-21T00:12:49.188Z
 
-### Rule of one checklist
+## Tech stack
 
-Before publishing, answer these:
+| Layer | Technology |
+|-------|------------|
+| Frontend | React 18, TypeScript, Vite |
+| Backend | Convex (real-time serverless database) |
+| Styling | CSS variables, no preprocessor |
+| Hosting | Convex self-hosting (default) or Netlify (legacy) |
+| Auth | @robelest/convex-auth (default) or WorkOS (legacy) |
+| Content | Markdown with gray-matter frontmatter |
 
-* [ ] Can I name the one person this is for?
-* [ ] Can the problem fit in one sentence?
-* [ ] Is the root cause obvious?
-* [ ] Can I explain the difference in one breath?
-* [ ] Is there only one action at the end?
+## Setup commands
 
-If any answer is no, revise before publishing.
-
-## When to use this rule
-
-Use it for:
-* X or Twitter posts
-* LinkedIn content
-* Blog posts
-* README files
-* Git commits
-* Product announcements
-* Developer documentation
-* Feature posts
-
-Important: this is for standalone writing. Do not update project files like files.md, changelog.md, or README.md when using this rule.
-
-## Voice styles
-
-Pick a voice that fits the output:
-
-| Style | Characteristics | Use for |
-|---|---|---|
-| Technical educator | Clear, structured, educational | Technical content, tutorials, READMEs |
-| Conversational dev | Warm, witty, approachable | Social posts, personal takes |
-| Analytical thinker | Data driven, bold, opinionated | Thought leadership, threads |
-| Aphorist | Compressed, timeless, pithy | Short posts, one liners |
-| Founder voice | Experience backed, energetic | Startup content, advice |
-| Systems thinker | Frameworks, mental models | Long form, technical takes |
-| Dev culture | Relatable, playful, authentic | Community content, personality |
-| Data storyteller | Visual, analytical, trend focused | AI trends, market insights |
-| Enterprise pro | Professional, strategic, precise | Enterprise SaaS, B2B content |
-| Community builder | Encouraging, personal, supportive | Career growth, DevRel |
-| Learn in public | Educational, transparent, iterative | Developer career, web dev |
-| Product thinker | Community first, growth minded | Community building, growth |
-
-## Core principles
-
-### Stand out by being you
-You do not stand out online by saying the same things as everyone else. Say what you think, feel, and believe. Consensus takes are forgettable. Your take is not.
-
-### Lead with value
-* First sentence does the work
-* Do not bury the takeaway
-* Readers scroll fast
-
-### Be direct, not blunt
-* Say what you mean
-* Confidence without arrogance
-* Contractions are fine
-
-### Technical, not alienating
-* Define terms when helpful
-* Complex ideas deserve simple language
-* Let code speak when it can
-
-### Share what you actually know
-* Personal experience beats generic advice
-* Specific examples beat abstract principles
-* Acknowledge what you do not know
-
-## Formats by content type
-
-### write:tweet (or write:x)
-
-```
-[Clear statement or observation]
-
-[Supporting point or context]
-
-[Optional: question or call to action]
+```bash
+npm install                    # Install dependencies
+npx convex dev                 # Initialize Convex (creates .env.local)
+npm run dev                    # Start dev server at http://localhost:5173
 ```
 
-Rules:
-* First 2 lines visible in preview. Make them count.
-* 280 characters forces compression. Use it.
-* One idea per post.
-* No hashtags.
-* No emojis unless requested.
+## Content sync commands
 
-### write:linkedin
-
-```
-[Hook that stops the scroll]
-
-[Story or context in short paragraphs]
-
-[Insight or lesson]
-
-[Call to action or question]
+```bash
+npm run sync                   # Sync markdown to development Convex
+npm run sync:prod              # Sync markdown to production Convex
+npm run import <url>           # Import external URL as markdown post
 ```
 
-Rules:
-* Short paragraphs for mobile
-* Professional but not corporate
-* Personal stories perform well
-* One clear takeaway
+Content syncs instantly. No rebuild needed for markdown changes.
 
-### write:blog
+## Build and deploy
 
-```
-# Title (sentence case, max 70 characters)
-
-[Opening that states the value immediately]
-
-## Section heading
-[Max 300 words per section]
-
-## Section heading
-[Use bullet points or tables where helpful]
+```bash
+npm run build                  # Build for production
+npx convex deploy              # Deploy Convex functions to production
+npm run deploy                 # Deploy with Convex self-hosting
 ```
 
-Rules:
-* Sentence case for all headings
-* No H3s unless absolutely necessary
-* Fact check everything
-* Lead with why it matters
-* Max 5 sections
-
-### write:readme
-
-```
-# Project name
-
-[One sentence: what this does]
-
-## Getting started
-[Minimal steps to run]
-
-## Usage
-[Code examples]
-
-## API or configuration
-[Reference docs]
+**Netlify build command:**
+```bash
+npm ci --include=dev && npx convex deploy --cmd 'npm run build'
 ```
 
-Rules:
-* Start with what it does, not what it is
-* Code examples over descriptions
-* Keep it scannable
+## Code style guidelines
 
-### write:commit
+- Use TypeScript strict mode
+- Prefer functional components with hooks
+- Use Convex validators for all function arguments and returns
+- Always return `v.null()` when functions don't return values
+- Use CSS variables for theming (no hardcoded colors)
+- No emoji in UI or documentation
+- No em dashes between words
+- Sentence case for headings
 
-```
-[type]: [short description]
+## Convex patterns (read this)
 
-[Optional: longer explanation if needed]
-```
+### Always use validators
 
-Types: feat, fix, docs, style, refactor, test, chore
+Every Convex function needs argument and return validators:
 
-Rules:
-* Present tense: "add feature" not "added feature"
-* 50 characters max for subject line
-* No period at the end
-
-### write:docs
-
-```
-# [Task or concept name]
-
-[One sentence: what this page helps you do]
-
-## Before you start
-[Prerequisites, if any]
-
-## Steps
-1. [Action]
-2. [Action]
-3. [Action]
-
-## Example
-[Code snippet]
-
-## Related
-[Links to related docs]
+```typescript
+export const myQuery = query({
+  args: { slug: v.string() },
+  returns: v.union(v.object({...}), v.null()),
+  handler: async (ctx, args) => {
+    // ...
+  },
+});
 ```
 
-Rules:
+### Always use indexes
+
+Never use `.filter()` on queries. Define indexes in schema and use `.withIndex()`:
+
+```typescript
+// Good
+const post = await ctx.db
+  .query("posts")
+  .withIndex("by_slug", (q) => q.eq("slug", args.slug))
+  .first();
+
+// Bad - causes table scans
+const post = await ctx.db
+  .query("posts")
+  .filter((q) => q.eq(q.field("slug"), args.slug))
+  .first();
+```
+
+### Make mutations idempotent
+
+Mutations should be safe to call multiple times:
+
+```typescript
+export const heartbeat = mutation({
+  args: { sessionId: v.string(), currentPath: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    const existing = await ctx.db
+      .query("activeSessions")
+      .withIndex("by_sessionId", (q) => q.eq("sessionId", args.sessionId))
+      .first();
+
+    if (existing) {
+      // Early return if recently updated with same data
+      if (existing.currentPath === args.currentPath && 
+          now - existing.lastSeen < 10000) {
+        return null;
+      }
+      await ctx.db.patch(existing._id, { currentPath: args.currentPath, lastSeen: now });
+      return null;
+    }
+
+    await ctx.db.insert("activeSessions", { ...args, lastSeen: now });
+    return null;
+  },
+});
+```
+
+### Patch directly without reading
+
+When you only need to update fields, patch directly:
+
+```typescript
+// Good - patch directly
+await ctx.db.patch(args.id, { content: args.content });
+
+// Bad - unnecessary read creates conflict window
+const doc = await ctx.db.get(args.id);
+if (!doc) throw new Error("Not found");
+await ctx.db.patch(args.id, { content: args.content });
+```
+
+### Use event records for counters
+
+Never increment counters on documents. Use separate event records:
+
+```typescript
+// Good - insert event record
+await ctx.db.insert("pageViews", { path, sessionId, timestamp: Date.now() });
+
+// Bad - counter updates cause write conflicts
+await ctx.db.patch(pageId, { views: page.views + 1 });
+```
+
+### Frontend debouncing
+
+Debounce rapid mutations from the frontend. Use refs to prevent duplicate calls:
+
+```typescript
+const isHeartbeatPending = useRef(false);
+const lastHeartbeatTime = useRef(0);
+
+const sendHeartbeat = useCallback(async (path: string) => {
+  if (isHeartbeatPending.current) return;
+  if (Date.now() - lastHeartbeatTime.current < 5000) return;
+  
+  isHeartbeatPending.current = true;
+  lastHeartbeatTime.current = Date.now();
+  
+  try {
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
