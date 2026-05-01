@@ -1,166 +1,73 @@
 ---
 trigger: always_on
-description: Prefer assertions over defensive checks when data is guaranteed to be valid
+description: Prefer object matchers over multiple individual expect().toBe() calls
 ---
 
 
-# Prefer Assertions Over Defensive Checks
+# Prefer Object Matchers Over Multiple Individual Assertions
 
-**CRITICAL**: When data has already been validated, use assertions instead of defensive checks. This eliminates unrealistic test scenarios and makes invalid states unrepresentable.
+**CRITICAL**: When checking multiple related values in a test, use a single object matcher instead of multiple individual `expect().toBe()` calls.
 
 ## The Problem
 
-Defensive checks with optional chaining create code paths that are impossible in practice:
-
-```typescript
-// ❌ WRONG: Defensive check after validation
-if (!contractTable.columns[columnName]) {
-  errorUnknownColumn(columnName, tableName);
-}
-
-const columnMeta = contractTable.columns[columnName];
-const codecId = columnMeta?.codecId; // Optional chaining unnecessary
-if (codecId && paramName) {
-  paramCodecs[paramName] = codecId;
-}
-
-paramDescriptors.push({
-  ...(codecId ? { type: codecId } : {}),
-  ...(columnMeta?.nullable !== undefined ? { nullable: columnMeta.nullable } : {}),
-});
-```
-
-This leads to:
-- **Unrealistic tests**: Tests that use type assertions to bypass TypeScript and test impossible states
-- **Code coverage padding**: Tests added solely to reach coverage thresholds, not to test real scenarios
-- **Maintenance burden**: Tests that break when types are tightened, requiring type assertions to work around
+Multiple individual `expect().toBe()` calls for related values:
+- Create visual clutter
+- Make it harder to see the expected state at a glance
+- Are harder to maintain when adding or removing checks
+- Don't clearly show the relationship between values
 
 ## The Solution
 
-**✅ CORRECT: Use assertions after validation**
+**❌ WRONG: Multiple individual `expect().toBe()` calls**
 
 ```typescript
-// Validate first
-if (!contractTable.columns[columnName]) {
-  errorUnknownColumn(columnName, tableName);
-}
+expect(alias1).toBe('user_id');
+expect(alias2).toBe('user_email');
+expect(tracker.has('user_id')).toBe(true);
+expect(tracker.has('user_email')).toBe(true);
+```
 
-// Assert that data exists (non-null assertion or explicit check)
-const columnMeta = contractTable.columns[columnName]!;
-const codecId = columnMeta.codecId; // Required property, no optional chaining
+**✅ CORRECT: Single object matcher**
 
-if (paramName) {
-  paramCodecs[paramName] = codecId;
-}
-
-paramDescriptors.push({
-  type: codecId,
-  nullable: columnMeta.nullable, // Required property, no optional check
+```typescript
+expect({
+  alias1,
+  alias2,
+  has1: tracker.has('user_id'),
+  has2: tracker.has('user_email'),
+}).toMatchObject({
+  alias1: 'user_id',
+  alias2: 'user_email',
+  has1: true,
+  has2: true,
 });
 ```
 
-## When to Use Assertions
+## When to Use Object Matchers
 
-Use assertions when:
+Use object matchers when:
+- ✅ You have 2+ related `expect().toBe()` calls checking different values
+- ✅ The values are logically related (e.g., multiple aliases, multiple properties)
+- ✅ The checks are part of the same test assertion
 
-1. **Data has been validated**: You've already checked that the data exists/is valid
-2. **Type system guarantees it**: TypeScript types require the property to exist
-3. **Contract validation ensures it**: Runtime validation (e.g., `validateContract`) guarantees the structure
-
-**Example scenarios:**
-- After checking `if (!contractTable.columns[columnName])` → use `columnMeta!` assertion
-- After validating contract structure → access required properties directly
-- After checking `if (!model)` → use `model!` assertion
-
-## When NOT to Use Assertions
-
-Don't use assertions when:
-
-1. **Data is truly optional**: The property might legitimately be missing
-2. **External input**: Data from user input, APIs, or files that hasn't been validated
-3. **Unvalidated contracts**: Contract data that hasn't been validated yet
+**Exception**: Single `expect().toBe()` calls are fine when checking a single isolated value.
 
 ## Benefits
 
-- **Eliminates unrealistic tests**: No need to test impossible states with type assertions
-- **Better type safety**: TypeScript can infer types correctly without optional chaining
-- **Clearer intent**: Code shows that data is guaranteed to exist
-- **Reduced test maintenance**: Fewer tests that break when types are tightened
-- **Better error messages**: Assertions fail fast with clear errors if assumptions are wrong
-
-## Refactoring Pattern
-
-**Before:**
-```typescript
-const columnMeta = contractTable.columns[columnName];
-const codecId = columnMeta?.codecId;
-if (codecId && paramName) {
-  paramCodecs[paramName] = codecId;
-}
-```
-
-**After:**
-```typescript
-const columnMeta = contractTable.columns[columnName]!;
-const codecId = columnMeta.codecId; // Required property
-if (paramName) {
-  paramCodecs[paramName] = codecId;
-}
-```
-
-## Test Cleanup
-
-After refactoring to use assertions, remove tests that:
-- Use type assertions (`as SqlContract<SqlStorage>`) to bypass type checking
-- Test impossible states (e.g., missing required properties)
-- Were added solely for code coverage
-
-**Example of test to remove:**
-```typescript
-// ❌ Remove: Tests impossible state
-it('builds plan without codecId when column codecId is missing', () => {
-  const contractWithoutCodecId = {
-    ...contract,
-    storage: {
-      tables: {
-        user: {
-          columns: {
-            email: { nativeType: 'text', nullable: true } as { nativeType: string; nullable: true; codecId?: string },
-          },
-        },
-      },
-    },
-  } as SqlContract<SqlStorage>; // Type assertion bypasses validation
-
-  // This test is unrealistic - StorageColumn requires 'codecId'
-});
-```
+- **Better readability**: All expected values are visible in one place
+- **Easier maintenance**: Add or remove checks by modifying the object
+- **Clearer intent**: Shows the expected state as a cohesive unit
+- **Less verbose**: Reduces test code size
 
 ## Examples from Codebase
 
 **Good patterns:**
-- Using `columnMeta!` after validating column exists
-- Accessing `columnMeta.codecId` directly (required property)
-- Accessing `columnMeta.nativeType` directly (required property)
-- Using `columnMeta.nullable` directly (required property)
+- Single object matcher with `toMatchObject`
+- Combined related assertions into one object
 
 **Bad patterns (to avoid):**
-- Optional chaining (`columnMeta?.codecId`) after validation
-- Conditional property spreading (`...(columnMeta?.nullable !== undefined ? { nullable: columnMeta.nullable } : {})`) for required properties
-- Tests that use type assertions to test impossible states
-
-## Schema Validation Redundancy
-
-**CRITICAL**: Don't re-validate structural properties that are already validated by schema validators (e.g., Arktype).
-
-**❌ WRONG: Re-validating properties already validated by Arktype**
-
-```typescript
-// validateStructure() re-checking properties that Arktype already validates
-for (const [colName, col] of Object.entries(table.columns)) {
-  if (typeof col.nullable !== 'boolean') {
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- Multiple `expect().toBe()` calls for related values
+- Scattered assertions that could be combined
 
 ---
 > Source: [prisma/prisma-next](https://github.com/prisma/prisma-next) — distributed by [TomeVault](https://tomevault.io).
