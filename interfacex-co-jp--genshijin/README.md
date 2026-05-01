@@ -7,13 +7,13 @@ genshijin 原始人 🗿| Claude Code / Codex等AIエージェント 向け超�
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [InterfaceX-co-jp/genshijin](https://github.com/InterfaceX-co-jp/genshijin).
+Original source: `.cursor/rules/*.mdc` in [InterfaceX-co-jp/genshijin](https://github.com/InterfaceX-co-jp/genshijin).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
-- **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
