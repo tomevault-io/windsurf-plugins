@@ -1,202 +1,69 @@
 ---
 trigger: always_on
-description: Instructions for AI coding agents working on this codebase.
+description: Convex doctor code quality standards maintained at 100/100 score
 ---
 
-# AGENTS.md
 
-Instructions for AI coding agents working on this codebase.
+# Convex doctor code quality
 
-## Project overview
+This codebase maintains a 100/100 convex-doctor score. All new Convex code must follow these patterns to avoid regressions.
 
-Your content is instantly available to browsers, LLMs, and AI agents.. Write markdown, sync from the terminal. Your content is instantly available to browsers, LLMs, and AI agents. Built on Convex and Netlify.
+## Security
 
-## Default and legacy modes
+- Never use `api.*` for server-to-server calls. Always use `internal.*` references.
+- All HTTP actions and public endpoints must check authentication unless they are intentionally public (RSS, sitemap, CORS preflight).
+- Never expose Node actions directly to the browser. Use mutation-scheduled internal actions with a job table for status tracking.
+- Public functions use `query`, `mutation`, `action`. Internal functions use `internalQuery`, `internalMutation`, `internalAction`.
 
-- Default auth mode: `convex-auth`
-- Default hosting mode: `convex-self-hosted`
-- Legacy compatibility mode: `workos` auth + `netlify` hosting
+## Correctness
 
-**Key features:**
-- Markdown posts with frontmatter
-- Four themes (dark, light, tan, cloud)
-- Full text search with Command+K
-- Real-time analytics at `/stats`
-- RSS feeds and sitemap for SEO
-- API endpoints for AI/LLM access
+- Never use `Date.now()` inside a query function. It breaks caching and reactivity. Accept a `now` argument or compute timestamps in mutations/actions.
+- Use `.unique()` for lookups on indexes that enforce uniqueness by design. Use `.first()` only for intentional ordered picks where multiple rows are expected.
+- Never use `.collect().filter()`. Use `.withIndex()` and iterate directly, or use `.take(n)` for bounded results.
 
-## Current Status
+## Performance
 
-- **Site Name**: markdown sync
-- **Site Title**: markdown sync framework
-- **Site URL**: https://yoursite.example.com
-- **Total Posts**: 21
-- **Total Pages**: 4
-- **Latest Post**: 2026-03-20
-- **Last Updated**: 2026-03-21T00:12:49.188Z
+- Bound all public `.collect()` calls with `.take(n)` or pagination.
+- Batch sequential `ctx.runQuery` and `ctx.runMutation` calls in actions. Create a single internal query that returns all needed data instead of making multiple separate calls.
+- Use indexes for all query patterns. Never scan full tables.
+- Avoid N+1 query patterns. Batch document fetches into internal queries that accept arrays of IDs.
 
-## Tech stack
+## Schema
 
-| Layer | Technology |
-|-------|------------|
-| Frontend | React 18, TypeScript, Vite |
-| Backend | Convex (real-time serverless database) |
-| Styling | CSS variables, no preprocessor |
-| Hosting | Convex self-hosting (default) or Netlify (legacy) |
-| Auth | @robelest/convex-auth (default) or WorkOS (legacy) |
-| Content | Markdown with gray-matter frontmatter |
+- Name indexes with `by_` prefix and snake_case: `by_slug`, `by_published`, `by_session_and_context`.
+- Add indexes for foreign key fields that have query patterns against them.
+- Do not add indexes for foreign keys inside nested arrays (Convex cannot index into arrays).
+- Remove redundant indexes that are prefixes of existing compound indexes.
 
-## Setup commands
+## Architecture
 
-```bash
-npm install                    # Install dependencies
-npx convex dev                 # Initialize Convex (creates .env.local)
-npm run dev                    # Start dev server at http://localhost:5173
-```
+- Keep handlers focused. Extract helper functions for email templates, data transformation, and multi-step logic.
+- Per-handler auth checks are intentional in this codebase. Do not extract auth into middleware or shared wrappers.
+- Organize files by domain (posts, pages, newsletter, stats). Do not split purely for file size.
+- Use `ConvexError` instead of `throw new Error(...)` in user-facing handlers when the error message should reach the client.
 
-## Content sync commands
+## Queued job pattern
 
-```bash
-npm run sync                   # Sync markdown to development Convex
-npm run sync:prod              # Sync markdown to production Convex
-npm run import <url>           # Import external URL as markdown post
-```
+For any background work triggered from the browser:
 
-Content syncs instantly. No rebuild needed for markdown changes.
+1. Create a job table in `convex/schema.ts` with `status`, `result`, `error` fields
+2. Public mutation inserts a pending job and calls `ctx.scheduler.runAfter(0, internal...)`
+3. Public query returns job status for the UI
+4. Internal action processes the job and updates status on success or failure
 
-## Build and deploy
+Examples: `aiImageJobs.ts`, `importJobs.ts`, `semanticSearchJobs.ts`
+
+## Suppression config
+
+Intentional suppressions live in `convex-doctor.toml` at the repo root. Each suppression includes rationale. Do not add new suppressions without documenting why.
+
+## Running convex-doctor
 
 ```bash
-npm run build                  # Build for production
-npx convex deploy              # Deploy Convex functions to production
-npm run deploy                 # Deploy with Convex self-hosting
+npx convex-doctor@latest
 ```
 
-**Netlify build command:**
-```bash
-npm ci --include=dev && npx convex deploy --cmd 'npm run build'
-```
-
-## Code style guidelines
-
-- Use TypeScript strict mode
-- Prefer functional components with hooks
-- Use Convex validators for all function arguments and returns
-- Always return `v.null()` when functions don't return values
-- Use CSS variables for theming (no hardcoded colors)
-- No emoji in UI or documentation
-- No em dashes between words
-- Sentence case for headings
-
-## Convex patterns (read this)
-
-### Always use validators
-
-Every Convex function needs argument and return validators:
-
-```typescript
-export const myQuery = query({
-  args: { slug: v.string() },
-  returns: v.union(v.object({...}), v.null()),
-  handler: async (ctx, args) => {
-    // ...
-  },
-});
-```
-
-### Always use indexes
-
-Never use `.filter()` on queries. Define indexes in schema and use `.withIndex()`:
-
-```typescript
-// Good
-const post = await ctx.db
-  .query("posts")
-  .withIndex("by_slug", (q) => q.eq("slug", args.slug))
-  .first();
-
-// Bad - causes table scans
-const post = await ctx.db
-  .query("posts")
-  .filter((q) => q.eq(q.field("slug"), args.slug))
-  .first();
-```
-
-### Make mutations idempotent
-
-Mutations should be safe to call multiple times:
-
-```typescript
-export const heartbeat = mutation({
-  args: { sessionId: v.string(), currentPath: v.string() },
-  returns: v.null(),
-  handler: async (ctx, args) => {
-    const now = Date.now();
-    const existing = await ctx.db
-      .query("activeSessions")
-      .withIndex("by_sessionId", (q) => q.eq("sessionId", args.sessionId))
-      .first();
-
-    if (existing) {
-      // Early return if recently updated with same data
-      if (existing.currentPath === args.currentPath && 
-          now - existing.lastSeen < 10000) {
-        return null;
-      }
-      await ctx.db.patch(existing._id, { currentPath: args.currentPath, lastSeen: now });
-      return null;
-    }
-
-    await ctx.db.insert("activeSessions", { ...args, lastSeen: now });
-    return null;
-  },
-});
-```
-
-### Patch directly without reading
-
-When you only need to update fields, patch directly:
-
-```typescript
-// Good - patch directly
-await ctx.db.patch(args.id, { content: args.content });
-
-// Bad - unnecessary read creates conflict window
-const doc = await ctx.db.get(args.id);
-if (!doc) throw new Error("Not found");
-await ctx.db.patch(args.id, { content: args.content });
-```
-
-### Use event records for counters
-
-Never increment counters on documents. Use separate event records:
-
-```typescript
-// Good - insert event record
-await ctx.db.insert("pageViews", { path, sessionId, timestamp: Date.now() });
-
-// Bad - counter updates cause write conflicts
-await ctx.db.patch(pageId, { views: page.views + 1 });
-```
-
-### Frontend debouncing
-
-Debounce rapid mutations from the frontend. Use refs to prevent duplicate calls:
-
-```typescript
-const isHeartbeatPending = useRef(false);
-const lastHeartbeatTime = useRef(0);
-
-const sendHeartbeat = useCallback(async (path: string) => {
-  if (isHeartbeatPending.current) return;
-  if (Date.now() - lastHeartbeatTime.current < 5000) return;
-  
-  isHeartbeatPending.current = true;
-  lastHeartbeatTime.current = Date.now();
-  
-  try {
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+Run after any changes to Convex functions, schema, or HTTP routes. The score must stay at 100/100 with 0 errors and 0 warnings.
 
 ---
 > Source: [waynesutton/markdown-site](https://github.com/waynesutton/markdown-site) — distributed by [TomeVault](https://tomevault.io).
