@@ -1,132 +1,69 @@
 ---
 trigger: always_on
-description: After cloning, run `/setup` to configure your agent tooling:
+description: File formatting rules for consistent code style
 ---
 
-# QVAC — Agent Context
 
-## Setup (New Developers)
+# File Formatting Rules
 
-After cloning, run `/setup` to configure your agent tooling:
+## Always Add Newline at End of Files
 
-```
-/setup all      # Configure both Claude Code and Cursor
-/setup claude   # Configure Claude Code only
-/setup cursor   # Configure Cursor only
-```
+**CRITICAL**: ALWAYS ensure that EVERY file ends with a newline character (`\n`).
 
-This copies shared config (conduct rules, knowledge docs, agents, skills) from `packages/ocr-onnx/.agent/` into `.claude/` and `.cursor/`. Re-run anytime after pulling changes to `packages/ocr-onnx/.agent/`.
+### Rules
 
-## CRITICAL: Never Skip Tests
+- **ALWAYS add a newline at the end of EVERY file** you create or edit
+- This applies to ALL file types without exception:
+  - All code files (any programming language)
+  - All configuration files (.json, .yml, .yaml, .toml, etc.)
+  - All documentation files (.md, .txt, etc.)
+  - All script files (.sh, .bat, etc.)
+  - Basically EVERY text-based file
 
-NEVER delete, disable, skip, or weaken existing tests. Fix the code or the test. If you cannot fix it, report on Asana and STOP. No exceptions.
+### Why This Matters
 
-## CRITICAL: Bash Command Rules
+- Prevents "No newline at end of file" warnings in git diffs (the red circle)
+- Follows POSIX standard for text files
+- Ensures clean git history and proper file processing
+- Many tools expect and require files to end with newlines
 
-These rules are mandatory. Violating them blocks the automated pipeline.
+### Implementation
 
-- **NEVER use heredocs** (`<< EOF`), `cat >`, or `echo >` to write files — use the Write tool instead
-- **NEVER use `$()` command substitution** in bash — write to a temp file instead (e.g. `git commit -F /tmp/msg.txt`). For `$(nproc)`, query `nproc` first then hardcode the value (e.g. `make -j12`)
-- **NEVER chain commands** with `&&`, `||`, or `;` — make separate Bash tool calls. Use flags like `git -C <path>` instead of `cd <path> && git ...`
-- **NEVER use pipes** (`|`) or redirects (`2>&1`, `2>/dev/null`) — use dedicated tools or separate calls
-- **ALWAYS use dedicated tools**: Write instead of `cat >`, Read instead of `cat`, Grep instead of `grep`, Glob instead of `find`, Edit instead of `sed`
+When using Write, Edit, or MultiEdit tools:
+- **ALWAYS** ensure the content ends with `\n`
+- For multi-line content, add newline after the last line
+- For single-line content, still add the newline
+- This is NOT optional - it's required for every file
 
-## Overview
+### Examples
 
-QVAC (Quantum Versatile AI Compute) is a monorepo for building local-first, P2P AI applications. Cross-platform support for Node.js, Bare runtime, and Expo.
+✅ **Correct** - All files end with newline:
 
-## Build & Test — Quick Reference
-
-### Native Addons (C++ packages, e.g. qvac-lib-infer-llamacpp-llm)
-
-**Prerequisites:** clang-19, libc++-19-dev, libc++abi-19-dev, vcpkg, bare >=1.24, bare-make
-
-```bash
-cd packages/<addon-package>
-npm install                # install JS + native dependencies
-bare-make generate         # generate CMake build files (downloads vcpkg deps)
-bare-make build            # compile C++ addon
-bare-make install          # install .bare prebuild to prebuilds/
-```
-
-Full one-liner: `npm install && bare-make generate && bare-make build && bare-make install`
-
-**Testing:**
-```bash
-npm run test               # run all integration tests (brittle framework)
-npm run test:integration   # same as above (generates all.js then runs bare test/integration/all.js)
-npm run test:cpp           # C++ unit tests (GoogleTest)
-npm run coverage:cpp       # C++ code coverage (llvm-cov-19)
-bare test/integration/<name>.test.js  # run a single integration test
-```
-
-**Linting:**
-```bash
-npx standard <file>        # JS lint (standardjs)
-npm run lint               # lint all JS (excludes addon/)
-```
-
-### SDK (packages/qvac-sdk)
-```bash
-cd packages/qvac-sdk
-bun install
-bun run build       # lint + typecheck + compile
-bun run lint        # eslint + typecheck
-bun run format      # prettier check
-```
-
-**Testing:**
-```bash
-bun run test:unit
-bun run test:security
-bun run test:security:bare
-```
-
-### Environment Variables
-Required tokens (see .env.example):
-- `GH_TOKEN` — GitHub PAT for qvac-registry-vcpkg access
-- `HF_TOKEN` — HuggingFace token for model license verification
-- `NPM_TOKEN` — npm token for @qvac scoped packages
-
-## CI Pipeline
-
-- 85+ GitHub Actions workflows in `.github/workflows/`
-- Path-scoped: only affected packages build/publish
-- PR workflows: `on-pr-*.yml` — sanity checks, C++ linting, tests
-- Expensive tests gated behind `verify` label on PRs
-- Prebuild workflows: `prebuilds-*.yml` — multi-platform native bindings
-- Publishing: `main` → dev builds (GitHub Packages), `release-*` → npm
-
-## Repository Structure
+```javascript
+const foo = "bar";
+module.exports = foo;
 
 ```
-qvac/
-├── CLAUDE.md                  # This file
-├── packages/
-│   ├── ocr-onnx/
-│   │   ├── .agent/                # Shared agent config (canonical source)
-│   │   │   ├── README.md          # Framework documentation
-│   │   │   ├── conduct.md         # Behavioral rules
-│   │   │   ├── agents/            # Agent definitions (implementer, reviewer, etc.)
-│   │   │   ├── knowledge/         # Domain knowledge docs
-│   │   │   ├── skills/            # New skills (orchestrate, release, ci-validate)
-│   │   │   ├── settings.json      # Canonical settings (permission allowlist)
-│   │   │   ├── mcp.json           # Shared MCP server definitions
-│   │   │   └── setup.sh           # Setup script (configures .claude/ or .cursor/)
-├── .claude/                   # Claude Code config (generated by /setup)
-│   ├── skills/setup/          # Bootstrap skill (tracked in git)
-│   ├── agents/                # [GENERATED] from packages/ocr-onnx/.agent/agents/
-│   ├── knowledge/             # [GENERATED] from packages/ocr-onnx/.agent/knowledge/
-│   ├── agent-conduct.md       # [GENERATED] from packages/ocr-onnx/.agent/conduct.md
-│   └── settings.json          # [GENERATED] from packages/ocr-onnx/.agent/settings.json
-├── .cursor/                   # Cursor config
-│   ├── skills/setup/          # Bootstrap skill (tracked in git)
-│   ├── skills/                # Existing skills (addon-changelog, sdk-*, etc.)
-│   ├── commands/              # Existing commands
-│   └── rules/                 # .mdc files with Cursor-specific rules
-│   ├── qvac-sdk/              # Main SDK entry point
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+```json
+{
+  "name": "example",
+  "version": "1.0.0"
+}
+
+```
+
+❌ **Wrong** - Missing newline at end:
+
+```javascript
+const foo = "bar";
+module.exports = foo;```
+
+```json
+{
+  "name": "example",
+  "version": "1.0.0"
+}```
 
 ---
 > Source: [tetherto/qvac](https://github.com/tetherto/qvac) — distributed by [TomeVault](https://tomevault.io).
