@@ -7,11 +7,11 @@ Another desktop dictionary, but way more faster and definition-rich, which makes
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [ahpxex/Aictionary](https://github.com/ahpxex/Aictionary).
+Original source: `CLAUDE.md` in [ahpxex/Aictionary](https://github.com/ahpxex/Aictionary).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
