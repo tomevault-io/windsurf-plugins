@@ -7,14 +7,14 @@ An agentic skills framework orchestration for the 1-Man Army. Implementing Auton
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `GEMINI.md` in [galyarderlabs/galyarder-framework](https://github.com/galyarderlabs/galyarder-framework).
+Original source: `AGENTS.md` in [galyarderlabs/galyarder-framework](https://github.com/galyarderlabs/galyarder-framework).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
+- **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
 From [galyarderlabs/galyarder-framework](https://github.com/galyarderlabs/galyarder-framework) — a repo with 9+ stars on GitHub.
