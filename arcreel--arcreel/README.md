@@ -7,11 +7,11 @@ AI Agent 驱动的开源视频生成工作台 — 小说→角色/场景/道具�
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [ArcReel/ArcReel](https://github.com/ArcReel/ArcReel).
+Original source: `CLAUDE.md` in [ArcReel/ArcReel](https://github.com/ArcReel/ArcReel).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
