@@ -1,89 +1,8 @@
 ---
 trigger: always_on
-description: > Full API reference: [https://wearables.developer.meta.com/llms.txt?full=true](https://wearables.developer.meta.com/llms.txt?full=true)
+description: StreamSession, video frames, photo capture, resolution/frame rate configuration
 ---
 
-# Meta Wearables DAT SDK — AI Instructions
-
-> Full API reference: [https://wearables.developer.meta.com/llms.txt?full=true](https://wearables.developer.meta.com/llms.txt?full=true)
->
-> Developer docs: [https://wearables.developer.meta.com/docs/develop/](https://wearables.developer.meta.com/docs/develop/)
-
-
-# DAT SDK Conventions (Android)
-
-## Architecture
-
-The SDK is organized into three modules:
-- **mwdat-core**: Device discovery, registration, permissions, device selectors
-- **mwdat-camera**: StreamSession, VideoFrame, photo capture
-- **mwdat-mockdevice**: MockDeviceKit for testing without hardware
-
-## Kotlin Patterns
-
-- Use `suspend` functions for async operations — no callbacks
-- Use `StateFlow` / `Flow` for observing state changes
-- Use `DatResult<T, E>` for error handling — not exceptions
-- Prefer immutable collections
-- Use `sealed interface` for state hierarchies
-
-## Error Handling
-
-The SDK uses `DatResult<T, E>` for type-safe error handling:
-
-```kotlin
-val result = Wearables.someOperation()
-result.fold(
-    onSuccess = { value -> /* handle success */ },
-    onFailure = { error -> /* handle error */ }
-)
-
-// Or partial handling:
-result.onSuccess { value -> /* handle success */ }
-result.onFailure { error -> /* handle error */ }
-```
-
-Do **not** use `getOrThrow()` — always handle both paths.
-
-## Naming Conventions
-
-| Suffix | Purpose | Example |
-|--------|---------|---------|
-| `*Manager` | Long-lived resource management | `RegistrationManager` |
-| `*Session` | Short-lived flow component | `StreamSession` |
-| `*Result` | DatResult type aliases | `RegistrationResult` |
-| `*Error` | Error sealed interfaces | `WearablesError` |
-
-Methods: `get*`, `set*`, `check*`, `request*`, `observe*`
-
-## Imports
-
-```kotlin
-import com.meta.wearable.dat.core.Wearables          // Entry point
-import com.meta.wearable.dat.camera.StreamSession     // Camera streaming
-import com.meta.wearable.dat.camera.types.*            // VideoFrame, PhotoData, etc.
-```
-
-For testing:
-```kotlin
-import com.meta.wearable.dat.mockdevice.MockDeviceKit  // MockDeviceKit
-```
-
-## Key Types
-
-- `Wearables` — SDK entry point. Call `Wearables.initialize(context)` at startup
-- `StreamSession` — Camera streaming session
-- `VideoFrame` — Individual video frame with bitmap data
-- `AutoDeviceSelector` — Auto-selects the best available device
-- `SpecificDeviceSelector` — Selects a specific device by identifier
-- `StreamConfiguration` — Configure video quality, frame rate
-- `MockDeviceKit` — Factory for creating simulated devices in tests
-
-## Links
-
-- [Android API Reference](https://wearables.developer.meta.com/docs/reference/android/dat/0.6)
-- [Developer Documentation](https://wearables.developer.meta.com/docs/develop/)
-- [GitHub Repository](https://github.com/facebook/meta-wearables-dat-android)
 
 
 # Camera Streaming (Android)
@@ -179,8 +98,25 @@ session.capturePhoto()
 
 Resolution and frame rate are constrained by Bluetooth Classic bandwidth. The SDK automatically reduces quality when bandwidth is limited:
 1. First lowers resolution (e.g., HIGH -> MEDIUM)
+2. Then reduces frame rate (e.g., 30 -> 24), never below 15 FPS
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+Request lower settings for higher visual quality per frame.
+
+## Device selection
+
+```kotlin
+// Auto-select best available device
+val auto = AutoDeviceSelector()
+
+// Select specific device
+val specific = SpecificDeviceSelector(deviceIdentifier = deviceId)
+```
+
+## Links
+
+- [StreamSession API reference](https://wearables.developer.meta.com/docs/reference/android/dat/0.6/com_meta_wearable_dat_camera_streamsession)
+- [StreamConfiguration API reference](https://wearables.developer.meta.com/docs/reference/android/dat/0.6/com_meta_wearable_dat_camera_types_streamconfiguration)
+- [Integration guide](https://wearables.developer.meta.com/docs/build-integration-android)
 
 ---
 > Source: [facebook/meta-wearables-dat-android](https://github.com/facebook/meta-wearables-dat-android) — distributed by [TomeVault](https://tomevault.io).
