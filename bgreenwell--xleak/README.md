@@ -7,11 +7,11 @@ A fast terminal Excel viewer with an interactive TUI. Features full-text search,
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [bgreenwell/xleak](https://github.com/bgreenwell/xleak).
+Original source: `CLAUDE.md` in [bgreenwell/xleak](https://github.com/bgreenwell/xleak).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
