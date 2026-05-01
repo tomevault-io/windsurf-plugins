@@ -1,185 +1,114 @@
 ---
 trigger: always_on
-description: This document covers security patterns specific to the markdown-blog application, a Convex-powered blog with no authentication.
+description: Guidelines for creating and managing task lists in markdown files to track project progress
 ---
 
-# Security Guidelines for markdown-blog
 
-This document covers security patterns specific to the markdown-blog application, a Convex-powered blog with no authentication.
+---
 
-## App-Specific Security Context
+# Task List Management
 
-### Architecture
+Guidelines for creating and managing task lists in markdown files to track project progress
 
-- **Frontend**: Vite + React 18.2 SPA (client-side only)
-- **Backend**: Convex.dev (serverless database and functions)
-- **Hosting**: Netlify with edge functions
-- **Auth**: None (public blog)
+## Task List Creation
 
-### React Server Components Vulnerabilities
+1. Create task lists in a markdown file (in the project root):
+   - Use `TASKS.md` or a descriptive name relevant to the feature (e.g., `ASSISTANT_CHAT.md`)
+   - Include a clear title and description of the feature being implemented
 
-**Status: NOT AFFECTED**
+2. Structure the file with these sections:
 
-This app does NOT use React Server Components and is NOT affected by:
+   ```markdown
+   # Feature Name Implementation
 
-- CVE-2025-55182 (Remote Code Execution)
-- CVE-2025-55184 (Denial of Service)
-- CVE-2025-55183 (Source Code Exposure)
+   Brief description of the feature and its purpose.
 
-These vulnerabilities affect apps using:
+   ## Completed Tasks
 
-- `react-server-dom-webpack`
-- `react-server-dom-parcel`
-- `react-server-dom-turbopack`
+   - [x] Task 1 that has been completed
+   - [x] Task 2 that has been completed
 
-This app uses standard React 18.2.0 client-side rendering with Vite bundler.
+   ## In Progress Tasks
 
-For the latest information, see:
+   - [ ] Task 3 currently being worked on
+   - [ ] Task 4 to be completed soon
 
-- https://react.dev/blog/2025/12/03/critical-security-vulnerability-in-react-server-components
-- https://react.dev/blog/2025/12/11/denial-of-service-and-source-code-exposure-in-react-server-components
+   ## Future Tasks
 
-## Database Tables
+   - [ ] Task 5 planned for future implementation
+   - [ ] Task 6 planned for future implementation
 
-| Table        | Contains PII | Public Access | Notes                              |
-| ------------ | ------------ | ------------- | ---------------------------------- |
-| `posts`      | No           | Read-only     | Blog content                       |
-| `viewCounts` | No           | Write via API | View counter per post              |
-| `siteConfig` | No           | Internal      | Site settings (not currently used) |
+   ## Implementation Plan
 
-## 1. Public API Security
+   Detailed description of how the feature will be implemented.
 
-### Query Functions (Read-Only)
+   ### Relevant Files
 
-All queries in this app are intentionally public for blog content:
+   - path/to/file1.ts - Description of purpose
+   - path/to/file2.ts - Description of purpose
+   ```
 
-```typescript
-// Public queries - safe for public access
-export const getAllPosts = query({...});      // List published posts
-export const getPostBySlug = query({...});    // Get single post
-export const getViewCount = query({...});     // Get view count
+## Task List Maintenance
+
+1. Update the task list as you progress:
+   - Mark tasks as completed by changing `[ ]` to `[x]`
+   - Add new tasks as they are identified
+   - Move tasks between sections as appropriate
+
+2. Keep "Relevant Files" section updated with:
+   - File paths that have been created or modified
+   - Brief descriptions of each file's purpose
+   - Status indicators (e.g., ✅) for completed components
+
+3. Add implementation details:
+   - Architecture decisions
+   - Data flow descriptions
+   - Technical components needed
+   - Environment configuration
+
+## AI Instructions
+
+When working with task lists, the AI should:
+
+1. Regularly update the task list file after implementing significant components
+2. Mark completed tasks with [x] when finished
+3. Add new tasks discovered during implementation
+4. Maintain the "Relevant Files" section with accurate file paths and descriptions
+5. Document implementation details, especially for complex features
+6. When implementing tasks one by one, first check which task to implement next
+7. After implementing a task, update the file to reflect progress
+
+## Example Task Update
+
+When updating a task from "In Progress" to "Completed":
+
+```markdown
+## In Progress Tasks
+
+- [ ] Implement database schema
+- [ ] Create API endpoints for data access
+
+## Completed Tasks
+
+- [x] Set up project structure
+- [x] Configure environment variables
 ```
 
-### Mutation Functions
+Should become:
 
-| Function             | Risk Level | Notes                            |
-| -------------------- | ---------- | -------------------------------- |
-| `syncPostsPublic`    | Medium     | Build-time sync, no auth         |
-| `incrementViewCount` | Low        | No rate limiting, but low impact |
+```markdown
+## In Progress Tasks
 
-### syncPostsPublic Security Consideration
+- [ ] Create API endpoints for data access
 
-The `syncPostsPublic` mutation allows syncing posts without authentication. This is intentional for build-time deployment but has security implications:
+## Completed Tasks
 
-```typescript
-// Current: No auth check
-export const syncPostsPublic = mutation({
-  args: { posts: v.array(...) },
-  handler: async (ctx, args) => {
-    // Syncs posts directly
-  },
-});
+- [x] Set up project structure
+- [x] Configure environment variables
+- [x] Implement database schema
 ```
 
-**Mitigations in place:**
-
-1. Mutation only affects the `posts` table
-2. Posts require specific schema (slug, title, content, etc.)
-3. Build-time sync uses environment variables
-
-**Recommendations:**
-
-- Consider adding CONVEX_DEPLOY_KEY check for production
-- Monitor for unusual sync activity in Convex dashboard
-
-## 2. HTTP Endpoint Security
-
-### XSS Prevention
-
-All HTTP endpoints properly escape output:
-
-```typescript
-// HTML escaping for Open Graph
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
-// XML escaping for RSS feeds
-function escapeXml(text: string): string {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&apos;");
-}
-```
-
-### CORS Headers
-
-API endpoints include CORS headers for public access:
-
-```typescript
-headers: {
-  "Content-Type": "application/json; charset=utf-8",
-  "Cache-Control": "public, max-age=300, s-maxage=600",
-  "Access-Control-Allow-Origin": "*",
-}
-```
-
-This is intentional for a public blog API.
-
-### HTTP Endpoints
-
-| Route           | Method | Auth | Description                      |
-| --------------- | ------ | ---- | -------------------------------- |
-| `/rss.xml`      | GET    | No   | RSS feed (descriptions)          |
-| `/rss-full.xml` | GET    | No   | Full RSS feed (content for LLMs) |
-| `/sitemap.xml`  | GET    | No   | XML sitemap for SEO              |
-| `/api/posts`    | GET    | No   | JSON post list                   |
-| `/api/post`     | GET    | No   | Single post JSON/markdown        |
-| `/meta/post`    | GET    | No   | Open Graph HTML for crawlers     |
-
-## 3. Edge Function Security
-
-### Bot Detection (botMeta.ts)
-
-The edge function detects social media crawlers and serves Open Graph metadata:
-
-```typescript
-// Bot user agent detection
-const BOTS = [
-  "facebookexternalhit",
-  "twitterbot",
-  // ... more bots
-];
-```
-
-**Security considerations:**
-
-- User agent can be spoofed, but this only affects OG metadata delivery
-- Fallback to SPA for non-bots is secure
-- No sensitive data exposed to bots
-
-## 4. Client-Side Security
-
-### Markdown Rendering
-
-Uses `react-markdown` with controlled components:
-
-- External links open with `rel="noopener noreferrer"`
-- Images use lazy loading
-- No raw HTML injection (markdown only)
-
-### Copy to Clipboard
-
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+**!IMPORTANT**: **DO NOT** externalize or document your work, usage guidelines, or benchmarks (e.g. `README.md`, `CONTRIBUTING.md`, `SUMMARY.md`, `USAGE_GUIDELINES.md` after completing the task, do not use emoji, unless explicitly instructed to do so. You may include a brief summary of your work, but do not create separate documentation files for it.
 
 ---
 > Source: [waynesutton/opensync](https://github.com/waynesutton/opensync) — distributed by [TomeVault](https://tomevault.io).
