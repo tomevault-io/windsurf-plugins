@@ -7,11 +7,11 @@ Personal OpenCode configuration - commands, tools, agents, knowledge
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [joelhooks/opencode-config](https://github.com/joelhooks/opencode-config).
+Original source: `CLAUDE.md` in [joelhooks/opencode-config](https://github.com/joelhooks/opencode-config).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
