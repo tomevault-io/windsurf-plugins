@@ -1,69 +1,213 @@
 ---
 trigger: always_on
-description: Convex doctor code quality standards maintained at 100/100 score
+description: Guidelines for preventing write conflicts when using React, useEffect, and Convex
 ---
 
 
-# Convex doctor code quality
+# Preventing Write Conflicts in Convex with React
 
-This codebase maintains a 100/100 convex-doctor score. All new Convex code must follow these patterns to avoid regressions.
+Write conflicts occur when two functions running in parallel make conflicting changes to the same table or document. This rule provides patterns to avoid these conflicts.
 
-## Security
+## Understanding Write Conflicts
 
-- Never use `api.*` for server-to-server calls. Always use `internal.*` references.
-- All HTTP actions and public endpoints must check authentication unless they are intentionally public (RSS, sitemap, CORS preflight).
-- Never expose Node actions directly to the browser. Use mutation-scheduled internal actions with a job table for status tracking.
-- Public functions use `query`, `mutation`, `action`. Internal functions use `internalQuery`, `internalMutation`, `internalAction`.
+According to [Convex documentation](https://docs.convex.dev/error#1), write conflicts happen when:
 
-## Correctness
+1. Multiple mutations update the same document concurrently
+2. A mutation reads data that changes during execution
+3. Mutations are called more rapidly than Convex can execute them
 
-- Never use `Date.now()` inside a query function. It breaks caching and reactivity. Accept a `now` argument or compute timestamps in mutations/actions.
-- Use `.unique()` for lookups on indexes that enforce uniqueness by design. Use `.first()` only for intentional ordered picks where multiple rows are expected.
-- Never use `.collect().filter()`. Use `.withIndex()` and iterate directly, or use `.take(n)` for bounded results.
+Convex uses optimistic concurrency control and will retry mutations automatically, but will eventually fail permanently if conflicts persist.
 
-## Performance
+## Backend Protection: Idempotent Mutations
 
-- Bound all public `.collect()` calls with `.take(n)` or pagination.
-- Batch sequential `ctx.runQuery` and `ctx.runMutation` calls in actions. Create a single internal query that returns all needed data instead of making multiple separate calls.
-- Use indexes for all query patterns. Never scan full tables.
-- Avoid N+1 query patterns. Batch document fetches into internal queries that accept arrays of IDs.
+### Always Make Mutations Idempotent
 
-## Schema
+Mutations should be safe to call multiple times with the same result.
 
-- Name indexes with `by_` prefix and snake_case: `by_slug`, `by_published`, `by_session_and_context`.
-- Add indexes for foreign key fields that have query patterns against them.
-- Do not add indexes for foreign keys inside nested arrays (Convex cannot index into arrays).
-- Remove redundant indexes that are prefixes of existing compound indexes.
+**Good Pattern:**
 
-## Architecture
+```typescript
+export const completeTask = mutation({
+  args: { taskId: v.id("tasks") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const task = await ctx.db.get(args.taskId);
 
-- Keep handlers focused. Extract helper functions for email templates, data transformation, and multi-step logic.
-- Per-handler auth checks are intentional in this codebase. Do not extract auth into middleware or shared wrappers.
-- Organize files by domain (posts, pages, newsletter, stats). Do not split purely for file size.
-- Use `ConvexError` instead of `throw new Error(...)` in user-facing handlers when the error message should reach the client.
+    // Early return if document doesn't exist
+    if (!task) {
+      return null;
+    }
 
-## Queued job pattern
+    // Early return if already in desired state
+    if (task.status === "completed") {
+      return null;
+    }
 
-For any background work triggered from the browser:
+    // Only update if state change is needed
+    await ctx.db.patch(args.taskId, {
+      status: "completed",
+      completedAt: Date.now(),
+    });
 
-1. Create a job table in `convex/schema.ts` with `status`, `result`, `error` fields
-2. Public mutation inserts a pending job and calls `ctx.scheduler.runAfter(0, internal...)`
-3. Public query returns job status for the UI
-4. Internal action processes the job and updates status on success or failure
-
-Examples: `aiImageJobs.ts`, `importJobs.ts`, `semanticSearchJobs.ts`
-
-## Suppression config
-
-Intentional suppressions live in `convex-doctor.toml` at the repo root. Each suppression includes rationale. Do not add new suppressions without documenting why.
-
-## Running convex-doctor
-
-```bash
-npx convex-doctor@latest
+    return null;
+  },
+});
 ```
 
-Run after any changes to Convex functions, schema, or HTTP routes. The score must stay at 100/100 with 0 errors and 0 warnings.
+**Bad Pattern:**
+
+```typescript
+// This will cause conflicts if called multiple times rapidly
+export const completeTask = mutation({
+  args: { taskId: v.id("tasks") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const task = await ctx.db.get(args.taskId);
+    // No check if already completed
+    await ctx.db.patch(args.taskId, {
+      status: "completed",
+      completedAt: Date.now(),
+    });
+    return null;
+  },
+});
+```
+
+### Avoid Unnecessary Reads - Patch Directly
+
+When you only need to update fields, patch directly without reading first. Database operations throw if the document doesn't exist.
+
+**Good Pattern:**
+
+```typescript
+export const updateNote = mutation({
+  args: { id: v.id("notes"), content: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    // Patch directly without reading first
+    // ctx.db.patch throws if document doesn't exist
+    await ctx.db.patch(args.id, { content: args.content });
+    return null;
+  },
+});
+```
+
+**Bad Pattern:**
+
+```typescript
+export const updateNote = mutation({
+  args: { id: v.id("notes"), content: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    // Reading the document first creates a conflict window
+    const note = await ctx.db.get(args.id);
+    if (!note) throw new Error("Not found");
+
+    // When typing rapidly, multiple mutations fire
+    // Each reads the same version, then all try to write, causing conflicts
+    await ctx.db.patch(args.id, { content: args.content });
+    return null;
+  },
+});
+```
+
+### Minimize Data Reads
+
+Only read the data you need. Avoid querying entire tables when you only need specific documents.
+
+**Good Pattern:**
+
+```typescript
+export const updateUserCount = mutation({
+  args: { userId: v.id("users") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    // Only query tasks for this specific user
+    const tasks = await ctx.db
+      .query("tasks")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .collect();
+
+    await ctx.db.patch(args.userId, {
+      taskCount: tasks.length,
+    });
+
+    return null;
+  },
+});
+```
+
+**Bad Pattern:**
+
+```typescript
+export const updateUserCount = mutation({
+  args: { userId: v.id("users") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    // Reading entire table creates conflicts with any task change
+    const allTasks = await ctx.db.query("tasks").collect();
+    const userTasks = allTasks.filter((t) => t.userId === args.userId);
+
+    await ctx.db.patch(args.userId, {
+      taskCount: userTasks.length,
+    });
+
+    return null;
+  },
+});
+```
+
+### Use Indexes to Reduce Read Scope
+
+Always define and use indexes to limit the scope of data reads.
+
+```typescript
+// In schema.ts
+tasks: defineTable({
+  userId: v.string(),
+  status: v.string(),
+  content: v.string(),
+}).index("by_user", ["userId"])
+  .index("by_user_and_status", ["userId", "status"]),
+```
+
+## Frontend Protection: Preventing Duplicate Calls
+
+### Use Refs to Track Mutation Calls
+
+When mutations should only be called once per state change, use refs to track calls.
+
+**Good Pattern:**
+
+```typescript
+export function TimerComponent() {
+  const [session, setSession] = useState(null);
+  const hasCalledComplete = useRef(false);
+  const completeSession = useMutation(api.timer.completeSession);
+
+  useEffect(() => {
+    if (timeRemaining <= 0 && session && !hasCalledComplete.current) {
+      hasCalledComplete.current = true;
+      completeSession({ sessionId: session._id });
+    }
+  }, [timeRemaining, session, completeSession]);
+
+  // Reset ref when starting new session
+  const handleStartNewSession = async () => {
+    hasCalledComplete.current = false;
+    await startSession();
+  };
+
+  return <div>...</div>;
+}
+```
+
+**Bad Pattern:**
+
+```typescript
+export function TimerComponent() {
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [waynesutton/markdown-site](https://github.com/waynesutton/markdown-site) — distributed by [TomeVault](https://tomevault.io).
