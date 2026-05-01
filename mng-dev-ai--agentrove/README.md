@@ -7,11 +7,11 @@ A self-hosted web and macOS desktop app for Claude Code and Codex, powered by AC
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [Mng-dev-ai/agentrove](https://github.com/Mng-dev-ai/agentrove).
+Original source: `CLAUDE.md` in [Mng-dev-ai/agentrove](https://github.com/Mng-dev-ai/agentrove).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
