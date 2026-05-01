@@ -1,118 +1,213 @@
 ---
 trigger: always_on
-description: Project documentation rule for creating about.md files that explain projects in plain language
+description: Guidelines for preventing write conflicts when using React, useEffect, and Convex
 ---
 
 
-# Project Documentation Rule
+# Preventing Write Conflicts in Convex with React
 
-After completing any significant project or feature, create or update `about.md` with detailed documentation.
+Write conflicts occur when two functions running in parallel make conflicting changes to the same table or document. This rule provides patterns to avoid these conflicts.
 
-## What to include
+## Understanding Write Conflicts
 
-### Technical architecture
+According to [Convex documentation](https://docs.convex.dev/error#1), write conflicts happen when:
 
-Explain how the system works. What are the main components? How do they connect? Draw ASCII diagrams with nicknames for each component.
+1. Multiple mutations update the same document concurrently
+2. A mutation reads data that changes during execution
+3. Mutations are called more rapidly than Convex can execute them
 
-### Codebase structure
+Convex uses optimistic concurrency control and will retry mutations automatically, but will eventually fail permanently if conflicts persist.
 
-Walk through the file tree. Explain what each major file or directory does and why it exists.
+## Backend Protection: Idempotent Mutations
 
-### Technology choices
+### Always Make Mutations Idempotent
 
-List the technologies used and why you picked them over alternatives. Include the tradeoffs you considered.
+Mutations should be safe to call multiple times with the same result.
 
-### Decisions and rationale
+**Good Pattern:**
 
-Document the non-obvious choices. Why this database? Why this API design? Why this folder structure?
+```typescript
+export const completeTask = mutation({
+  args: { taskId: v.id("tasks") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const task = await ctx.db.get(args.taskId);
 
-### Assumptions and invariants
+    // Early return if document doesn't exist
+    if (!task) {
+      return null;
+    }
 
-What must remain true as the code evolves? What are the core constraints the architecture depends on?
+    // Early return if already in desired state
+    if (task.status === "completed") {
+      return null;
+    }
 
-### Lessons learned
+    // Only update if state change is needed
+    await ctx.db.patch(args.taskId, {
+      status: "completed",
+      completedAt: Date.now(),
+    });
 
-This is the most important section. Include:
-
-- Bugs you ran into and how you fixed them
-- Potential pitfalls and how to avoid them
-- New technologies used and what you learned about them
-- How experienced engineers think through problems
-- Best practices you discovered or applied
-- Patterns worth reusing in future projects
-
-### Tests to add next
-
-What tests would make this code more reliable? What edge cases need coverage? This section transfers learning into reliability.
-
-## Writing style
-
-Make it engaging. This is not boring technical documentation.
-
-- Use analogies. Compare unfamiliar concepts to familiar ones.
-- Tell the story. How did the project evolve? What problems did you solve along the way?
-- Include anecdotes. What surprised you? What took longer than expected?
-- Be specific. Name the files, the functions, the exact errors.
-- Write like you're explaining it to a friend who's a developer but hasn't seen this codebase.
-
-## Example: Production line analogy
-
-```
-+-----------------------------------------------------------------------+
-|                        YOUR YOUTUBE NEWSLETTER                         |
-+-----------------------------------------------------------------------+
-|                                                                       |
-|   INTAKE                   PROCESSING                OUTPUT           |
-|   ------------            ------------------      --------------      |
-|                                                                       |
-|   get_videos.py  ->  get_transcripts.py -> write_articles.py         |
-|   (The Scout)        (The Stenographer)    (The Writer)              |
-|       |                       |                    |                  |
-|       v                       v                    v                  |
-|   YouTube API          Transcript API          Claude AI              |
-|                                                                       |
-|                               |                                       |
-|                               v                                       |
-|                          send_email.py                                |
-|                         (The Publisher)                               |
-|                               |                                       |
-|                       +-------+-------+                               |
-|                       v               v                               |
-|                  EPUB Ebook    Email Newsletter                       |
-|                                                                       |
-+-----------------------------------------------------------------------+
-|   CONTROL CENTER                                                      |
-|   ----------------                                                    |
-|   main.py           -> Orchestrates the whole pipeline                |
-|   video_tracker.py  -> Remembers what's already been sent             |
-|   dashboard.py      -> Pretty web interface (no Terminal needed!)     |
-|   *.plist files     -> Mac automation (runs while you sleep)          |
-+-----------------------------------------------------------------------+
+    return null;
+  },
+});
 ```
 
-Each file gets a role and a nickname. The architecture becomes a story about characters doing jobs.
+**Bad Pattern:**
 
-## Why this works
+```typescript
+// This will cause conflicts if called multiple times rapidly
+export const completeTask = mutation({
+  args: { taskId: v.id("tasks") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const task = await ctx.db.get(args.taskId);
+    // No check if already completed
+    await ctx.db.patch(args.taskId, {
+      status: "completed",
+      completedAt: Date.now(),
+    });
+    return null;
+  },
+});
+```
 
-This approach turns "vibe coding" into deliberate practice. You ship code, then you ship the explanation. The act of writing forces you to understand what you built. The document becomes a reference for future projects and a teaching tool for others.
+### Avoid Unnecessary Reads - Patch Directly
 
-The assumptions + invariants section catches the implicit knowledge that usually lives only in the original developer's head. The tests to add next section builds the habit of thinking about reliability even when you don't have time to implement it immediately.
+When you only need to update fields, patch directly without reading first. Database operations throw if the document doesn't exist.
 
-You compound skill by shipping artifacts and explanations together.
+**Good Pattern:**
 
-## Quick checklist
+```typescript
+export const updateNote = mutation({
+  args: { id: v.id("notes"), content: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    // Patch directly without reading first
+    // ctx.db.patch throws if document doesn't exist
+    await ctx.db.patch(args.id, { content: args.content });
+    return null;
+  },
+});
+```
 
-When creating about.md:
+**Bad Pattern:**
 
-1. Technical architecture (with ASCII diagrams and component nicknames)
-2. Codebase structure walkthrough
-3. Technology choices and why
-4. Key decisions and rationale
-5. Assumptions and invariants (what must stay true)
-6. Lessons learned (bugs, fixes, pitfalls, patterns)
-7. Tests to add next
+```typescript
+export const updateNote = mutation({
+  args: { id: v.id("notes"), content: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    // Reading the document first creates a conflict window
+    const note = await ctx.db.get(args.id);
+    if (!note) throw new Error("Not found");
 
-Credit: Inspired by @zarazhangrui and the FORZARA project documentation pattern.
+    // When typing rapidly, multiple mutations fire
+    // Each reads the same version, then all try to write, causing conflicts
+    await ctx.db.patch(args.id, { content: args.content });
+    return null;
+  },
+});
+```
+
+### Minimize Data Reads
+
+Only read the data you need. Avoid querying entire tables when you only need specific documents.
+
+**Good Pattern:**
+
+```typescript
+export const updateUserCount = mutation({
+  args: { userId: v.id("users") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    // Only query tasks for this specific user
+    const tasks = await ctx.db
+      .query("tasks")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .collect();
+
+    await ctx.db.patch(args.userId, {
+      taskCount: tasks.length,
+    });
+
+    return null;
+  },
+});
+```
+
+**Bad Pattern:**
+
+```typescript
+export const updateUserCount = mutation({
+  args: { userId: v.id("users") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    // Reading entire table creates conflicts with any task change
+    const allTasks = await ctx.db.query("tasks").collect();
+    const userTasks = allTasks.filter((t) => t.userId === args.userId);
+
+    await ctx.db.patch(args.userId, {
+      taskCount: userTasks.length,
+    });
+
+    return null;
+  },
+});
+```
+
+### Use Indexes to Reduce Read Scope
+
+Always define and use indexes to limit the scope of data reads.
+
+```typescript
+// In schema.ts
+tasks: defineTable({
+  userId: v.string(),
+  status: v.string(),
+  content: v.string(),
+}).index("by_user", ["userId"])
+  .index("by_user_and_status", ["userId", "status"]),
+```
+
+## Frontend Protection: Preventing Duplicate Calls
+
+### Use Refs to Track Mutation Calls
+
+When mutations should only be called once per state change, use refs to track calls.
+
+**Good Pattern:**
+
+```typescript
+export function TimerComponent() {
+  const [session, setSession] = useState(null);
+  const hasCalledComplete = useRef(false);
+  const completeSession = useMutation(api.timer.completeSession);
+
+  useEffect(() => {
+    if (timeRemaining <= 0 && session && !hasCalledComplete.current) {
+      hasCalledComplete.current = true;
+      completeSession({ sessionId: session._id });
+    }
+  }, [timeRemaining, session, completeSession]);
+
+  // Reset ref when starting new session
+  const handleStartNewSession = async () => {
+    hasCalledComplete.current = false;
+    await startSession();
+  };
+
+  return <div>...</div>;
+}
+```
+
+**Bad Pattern:**
+
+```typescript
+export function TimerComponent() {
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [waynesutton/opensync](https://github.com/waynesutton/opensync) — distributed by [TomeVault](https://tomevault.io).
