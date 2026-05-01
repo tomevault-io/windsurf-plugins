@@ -7,12 +7,12 @@ A lightweight shell & feature system for ASP.NET Core that lets you build modula
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `copilot-instructions.md` in [valence-works/cshells](https://github.com/valence-works/cshells).
+Original source: `AGENTS.md` in [valence-works/cshells](https://github.com/valence-works/cshells).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
+- **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
