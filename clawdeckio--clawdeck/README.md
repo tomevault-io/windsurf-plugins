@@ -7,11 +7,11 @@ Open source mission control for your OpenClaw agents 🦞
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [clawdeckio/clawdeck](https://github.com/clawdeckio/clawdeck).
+Original source: `CLAUDE.md` in [clawdeckio/clawdeck](https://github.com/clawdeckio/clawdeck).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
