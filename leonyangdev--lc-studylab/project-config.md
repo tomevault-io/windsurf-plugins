@@ -1,221 +1,210 @@
 ---
 trigger: always_on
-description: Agents: https://docs.langchain.com/oss/python/langchain/agents
+description: > 一个帮你「看文档、做 RAG、深度调研、规划任务」的一体化智能体系统，用来**把 LangChain v1 + LangGraph + DeepAgents 能玩的东西都串起来**。
 ---
 
 
-# LangChain V1.0.3 最新版本文档
+# LC-StudyLab 智能学习 & 研究助手需求说明
 
-## 1.LangChain
+## 0. **「LC-StudyLab 智能学习 & 研究助手」**
 
-### Core components
+一句话：
 
-Agents: https://docs.langchain.com/oss/python/langchain/agents
+> 一个帮你「看文档、做 RAG、深度调研、规划任务」的一体化智能体系统，用来**把 LangChain v1 + LangGraph + DeepAgents 能玩的东西都串起来**。
 
-Models: https://docs.langchain.com/oss/python/langchain/models
+核心场景：
 
-Messages: https://docs.langchain.com/oss/python/langchain/messages
+- 日常聊天 + 工具调用（create_agent）
+- 对本地/在线文档做 RAG 问答与总结
+- 启动「深度研究模式」，自动查网、读文档、分工给子智能体写研究报告（DeepAgents）
+- 用 LangGraph 搭一个可视化的「学习/研究工作流」：可暂停、可回滚、带记忆
 
-Tools: https://docs.langchain.com/oss/python/langchain/tools
-
-Short-term memory: https://docs.langchain.com/oss/python/langchain/short-term-memory
-
-Streaming: https://docs.langchain.com/oss/python/langchain/streaming
-
-Middleware: https://docs.langchain.com/oss/python/langchain/middleware
-
-Structured output: https://docs.langchain.com/oss/python/langchain/structured-output
-
-
-### Advanced usage
-
-Guardrails: https://docs.langchain.com/oss/python/langchain/guardrails
-
-Runtime: https://docs.langchain.com/oss/python/langchain/runtime
-
-Context engineering in agents: https://docs.langchain.com/oss/python/langchain/context-engineering
-
-Model Context Protocol (MCP): https://docs.langchain.com/oss/python/langchain/mcp
-
-Human-in-the-loop: https://docs.langchain.com/oss/python/langchain/human-in-the-loop
-
-Multi-agent: https://docs.langchain.com/oss/python/langchain/multi-agent
-
-Retrieval: https://docs.langchain.com/oss/python/langchain/retrieval
-
-Long-term memory: https://docs.langchain.com/oss/python/langchain/long-term-memory
-
-### LangChain Reference
-
-https://reference.langchain.com/python/langchain/
-
-## 2.LangGraph
-
-- Quickstart： https://docs.langchain.com/oss/python/langgraph/quickstart
-
-- Run a local server： https://docs.langchain.com/oss/python/langgraph/local-server
-
-- Thinking in LangGraph： https://docs.langchain.com/oss/python/langgraph/thinking-in-langgraph
-
-- Workflows and agents： https://docs.langchain.com/oss/python/langgraph/workflows-agents
-
-### Capabilities
-
-Persistence：https://docs.langchain.com/oss/python/langgraph/persistence
-
-Durable execution： https://docs.langchain.com/oss/python/langgraph/durable-execution
-
-Streaming：https://docs.langchain.com/oss/python/langgraph/streaming
-
-Interrupts： https://docs.langchain.com/oss/python/langgraph/interrupts
-
-Use time-travel：https://docs.langchain.com/oss/python/langgraph/use-time-travel
-
-Memory： https://docs.langchain.com/oss/python/langgraph/add-memory
-
-Subgraphs： https://docs.langchain.com/oss/python/langgraph/use-subgraphs
-
-## 3.Deep Agents
-
-- Quickstart：https://docs.langchain.com/oss/python/deepagents/quickstart
-
-- Customize Deep Agents：https://docs.langchain.com/oss/python/deepagents/customization
-
-- Agent harness capabilities：https://docs.langchain.com/oss/python/deepagents/harness
-
-- Backends：https://docs.langchain.com/oss/python/deepagents/backends
-
-- Subagents：https://docs.langchain.com/oss/python/deepagents/subagents
-
-- Human-in-the-loop： https://docs.langchain.com/oss/python/deepagents/human-in-the-loop
-
-- Long-term memory： https://docs.langchain.com/oss/python/deepagents/long-term-memory
-
-- Deep Agents Middleware：https://docs.langchain.com/oss/python/deepagents/middleware
-
-
-## 4. LangChain Reference
-
-### 🧭 一级目录
-
-* **LangChain**
-  [https://reference.langchain.com/python/langchain/](https://reference.langchain.com/python/langchain/)
+技术栈默认：Python + `langchain` v1 + `langgraph` v1 + `deepagents` + `langchain-openai` 等。
 
 ---
 
-### 📂 二级目录
+## 1. 你要覆盖的 LangChain 生态能力地图
 
-#### langchain
+简单先把「文档特性 → 项目里放哪」说清楚：
 
-* Agents — [https://reference.langchain.com/python/langchain/agents/](https://reference.langchain.com/python/langchain/agents/)
-* Middleware — [https://reference.langchain.com/python/langchain/middleware/](https://reference.langchain.com/python/langchain/middleware/)
-* Models — [https://reference.langchain.com/python/langchain/models/](https://reference.langchain.com/python/langchain/models/)
-* Messages — [https://reference.langchain.com/python/langchain/messages/](https://reference.langchain.com/python/langchain/messages/)
-* Tools — [https://reference.langchain.com/python/langchain/tools/](https://reference.langchain.com/python/langchain/tools/)
-* Embeddings — [https://reference.langchain.com/python/langchain/embeddings/](https://reference.langchain.com/python/langchain/embeddings/)
+1. **LangChain v1 核心**
 
----
+   - 模型统一接口、Runnable / LCEL、流式输出、工具调用、结构化输出、Guardrails、RAG、Agents ([LangChain Docs][1])
+     → 用在所有对话 / RAG / 安全过滤上。
 
-#### langchain-core
+2. **LangGraph v1**
 
-* [https://reference.langchain.com/python/langchain_core/](https://reference.langchain.com/python/langchain_core/)
+   - State / Node / Edge、自定义图、Checkpointer、Memory、Streaming、Human-in-the-loop ([LangChain Docs][2])
+     → 用来做「学习任务工作流」和「复杂 RAG Agent 图」。
 
-  * Caches — [https://reference.langchain.com/python/langchain_core/caches/](https://reference.langchain.com/python/langchain_core/caches/)
-  * Callbacks — [https://reference.langchain.com/python/langchain_core/callbacks/](https://reference.langchain.com/python/langchain_core/callbacks/)
-  * Documents — [https://reference.langchain.com/python/langchain_core/documents/](https://reference.langchain.com/python/langchain_core/documents/)
-  * Document loaders — [https://reference.langchain.com/python/langchain_core/document_loaders/](https://reference.langchain.com/python/langchain_core/document_loaders/)
-  * Embeddings — [https://reference.langchain.com/python/langchain_core/embeddings/](https://reference.langchain.com/python/langchain_core/embeddings/)
-  * Exceptions — [https://reference.langchain.com/python/langchain_core/exceptions/](https://reference.langchain.com/python/langchain_core/exceptions/)
-  * Language models — [https://reference.langchain.com/python/langchain_core/language_models/](https://reference.langchain.com/python/langchain_core/language_models/)
-  * Serialization (load) — [https://reference.langchain.com/python/langchain_core/load/](https://reference.langchain.com/python/langchain_core/load/)
-  * Output parsers — [https://reference.langchain.com/python/langchain_core/output_parsers/](https://reference.langchain.com/python/langchain_core/output_parsers/)
-  * Prompts — [https://reference.langchain.com/python/langchain_core/prompts/](https://reference.langchain.com/python/langchain_core/prompts/)
-  * Rate limiters — [https://reference.langchain.com/python/langchain_core/rate_limiters/](https://reference.langchain.com/python/langchain_core/rate_limiters/)
-  * Retrievers — [https://reference.langchain.com/python/langchain_core/retrievers/](https://reference.langchain.com/python/langchain_core/retrievers/)
-  * Runnables — [https://reference.langchain.com/python/langchain_core/runnables/](https://reference.langchain.com/python/langchain_core/runnables/)
-  * Utilities — [https://reference.langchain.com/python/langchain_core/utils/](https://reference.langchain.com/python/langchain_core/utils/)
-  * Vector stores — [https://reference.langchain.com/python/langchain_core/vectorstores/](https://reference.langchain.com/python/langchain_core/vectorstores/)
+3. **DeepAgents**
+
+   - 深度规划、多轮子任务、文件系统工具、SubAgent 中间件、长程记忆、Human-in-the-loop 研究模式 ([LangChain Docs][3])
+     → 用一个「深度研究模式」单独练。
+
+4. **Guardrails / 安全**
+
+   - LangChain Guardrails（输入/输出过滤、策略）、或集成 GuardrailsAI / Pangea / NeMo Guardrails 等第三方 ([LangChain Docs][4])
+     → 用在对话 & RAG 输出上，顺手练「安全 + 结构化输出」。
+
+5. **RAG / 向量库**
+
+   - Document Loaders、Text Splitters、Vector Stores、Retrievers、Agentic RAG（LangGraph 版） ([LangChain Docs][5])
+     → 「文档问答」子系统。
+
+你可以把项目理解成：**一套统一 API / CLI / Web UI，后面挂着三类智能体：普通 Agent、RAG Agent、Deep Agent**。
 
 ---
 
-#### langchain-text-splitters
+## 2. 项目结构建议（一个 repo 玩全家桶）
 
-* [https://reference.langchain.com/python/langchain_text_splitters/](https://reference.langchain.com/python/langchain_text_splitters/)
+示意结构（Python backend 角度）：
 
-#### langchain-mcp-adapters
+```text
+lc-studylab/
+  backend/  # 后端项目
+    pyproject.toml / requirements.txt
 
-* [https://reference.langchain.com/python/langchain_mcp_adapters/](https://reference.langchain.com/python/langchain_mcp_adapters/)
+    config/
+      settings.py              # 模型、向量库、数据路径等统一配置
+      logging.py
 
-#### langchain-model-profiles
+    core/
+      models.py                # openai:gpt-4o, gpt-5 等模型封装
+      prompts.py               # 系统提示词、模板
+      tools/
+        web_search.py          # 网络搜索工具（如 tavily）
+        filesystem.py          # 读写本地知识库的工具
+        rag_tools.py           # retriever 封装成 tool
+        task_tools.py          # 创建学习任务、记录进度之类
+      guardrails/
+        content_filters.py     # 简单 guardrails，实现输入/输出校验
+        schemas.py             # Pydantic / JSON schema 用于结构化输出
 
-* [https://reference.langchain.com/python/langchain_model_profiles/](https://reference.langchain.com/python/langchain_model_profiles/)
+    rag/
+      loaders.py               # 各种文档加载
+      index_builder.py         # text split + embedding + vector store
+      retriever.py             # retriever 构造
+      agent.py                 # RAG Agent (LangChain create_agent + retriever tool)
+      graph.py                 # Agentic RAG 的 LangGraph 图 (可选)
+
+    agents/
+      base_agent.py            # 通用 create_agent 封装，带 streaming + guardrails
+      study_planner_agent.py   # 学习计划/任务规划 Agent
+      coding_helper_agent.py   # 简单代码助手 Agent（练工具调用）
+
+    workflows/  (LangGraph)
+      study_flow_graph.py      # 「从问题 → 找资料 → 生成学习计划 → 生成练习题」的图
+      eval_quiz_graph.py       # 「答题 → 评分 → 反馈」图（可选）
+
+    deep_research/
+      deep_agent.py            # DeepAgents create_deep_agent，深度研究模式
+      middleware.py            # subagents / filesystem / 人类在环 中间件配置
+
+    api/
+      http_server.py           # FastAPI / Flask 暴露 HTTP 接口
+      routers/
+        chat.py                # /chat -> 统一入口，内部路由到不同 Agent / Graph / DeepAgent
+        rag.py                 # /rag-index, /rag-query
+        deep_research.py       # /deep-research
+
+    scripts/
+      build_index.py           # 初次构建向量索引
+      demo_cli.py              # CLI 入口，方便你本地调试
+
+  frontend/ # 前端项目
+```
+
+后面你学每一章文档，都能「往这个项目某个模块里加东西」，而不是练完就丢。
+
+---
+
+## 3. 分阶段路线：按文档章节循序渐进
+
+### 第 1 阶段：基础 Agent + Streaming + 工具
+
+**目标：** 做出一个「通用聊天 + 工具调用」的智能体，完全基于 `create_agent`，支持流式输出。
+重点练：**LangChain v1 概念 & Agents & Streaming**。([LangChain Docs][1])
+
+功能：
+
+- `/chat` 接口：
+
+  - 默认使用 `create_agent(model="openai:gpt-4o", tools=[web_search, get_time,...])`
+  - 支持 `stream=True`，前端或 CLI 一边打印 token，一边看 reasoning & tool calls 流。
+
+实现要点（放到 `core/` + `agents/base_agent.py`）：
+
+1. 封装模型
+
+   - `langchain-openai` 或其他 provider 封装 chat model。
+
+2. `tools` 模块：
+
+   - `@tool` 写 2–3 个真实工具（如：当前时间、简单计算、网络搜索）。
+
+3. `create_agent`：
+
+   - `system_prompt` 写清「你是学习助手」「工具使用说明」。
+   - 打开 streaming，体验 v1 的 streaming event（tokens + tool calls + reasoning traces）。([LangChain Docs][6])
+
+这一阶段你可以只管「直接用 create_agent」——内部已经帮你接好了 LangGraph 的循环执行逻辑。([LangChain Docs][7])
 
 ---
 
-#### langchain-tests
+### 第 2 阶段：RAG 知识库模块（向量库 + Retrievers + RAG Agent）
 
-* [https://reference.langchain.com/python/langchain_tests/](https://reference.langchain.com/python/langchain_tests/)
+**目标：** 完整实现「上传文档 / 指定文件夹 → 构建向量索引 → RAG 问答 Agent」。
+重点练：**Retrieval / VectorStores / Agentic RAG**。([LangChain Docs][5])
 
-  * Unit tests — [https://reference.langchain.com/python/langchain_tests/unit_tests/](https://reference.langchain.com/python/langchain_tests/unit_tests/)
-  * Integration tests — [https://reference.langchain.com/python/langchain_tests/integration_tests/](https://reference.langchain.com/python/langchain_tests/integration_tests/)
+功能设计：
 
----
+- `/rag-index`：
 
-#### langchain-classic
+  - 读取指定目录 PDF / Markdown / MDX / HTML。
+  - 用 text splitter 分 chunk。
+  - 用 OpenAI embeddings + InMemoryVectorStore / FAISS / Milvus 建索引。
 
-* [https://reference.langchain.com/python/langchain_classic/](https://reference.langchain.com/python/langchain_classic/)
+- `/rag-query`：
 
-  * Agents — [https://reference.langchain.com/python/langchain_classic/agents/](https://reference.langchain.com/python/langchain_classic/agents/)
-  * Callbacks — [https://reference.langchain.com/python/langchain_classic/callbacks/](https://reference.langchain.com/python/langchain_classic/callbacks/)
-  * Chains — [https://reference.langchain.com/python/langchain_classic/chains/](https://reference.langchain.com/python/langchain_classic/chains/)
-  * Chat models — [https://reference.langchain.com/python/langchain_classic/chat_models/](https://reference.langchain.com/python/langchain_classic/chat_models/)
-  * Embeddings — [https://reference.langchain.com/python/langchain_classic/embeddings/](https://reference.langchain.com/python/langchain_classic/embeddings/)
-  * Evaluation — [https://reference.langchain.com/python/langchain_classic/evaluation/](https://reference.langchain.com/python/langchain_classic/evaluation/)
-  * Globals — [https://reference.langchain.com/python/langchain_classic/globals/](https://reference.langchain.com/python/langchain_classic/globals/)
-  * Hub — [https://reference.langchain.com/python/langchain_classic/hub/](https://reference.langchain.com/python/langchain_classic/hub/)
-  * Memory — [https://reference.langchain.com/python/langchain_classic/memory/](https://reference.langchain.com/python/langchain_classic/memory/)
-  * Output parsers — [https://reference.langchain.com/python/langchain_classic/output_parsers/](https://reference.langchain.com/python/langchain_classic/output_parsers/)
-  * Retrievers — [https://reference.langchain.com/python/langchain_classic/retrievers/](https://reference.langchain.com/python/langchain_classic/retrievers/)
-  * Runnables — [https://reference.langchain.com/python/langchain_classic/runnables/](https://reference.langchain.com/python/langchain_classic/runnables/)
-  * LangSmith — [https://reference.langchain.com/python/langchain_classic/smith/](https://reference.langchain.com/python/langchain_classic/smith/)
-  * Storage — [https://reference.langchain.com/python/langchain_classic/storage/](https://reference.langchain.com/python/langchain_classic/storage/)
+  - 基于 retriever 的 RAG Agent：
 
+    - retriever 封装成一个 `@tool`。
+    - 用 `create_agent(model, tools=[retriever_tool])` 得到一个**RAG Agent**。([LangChain][8])
 
-### LangGraph Reference
+推荐路径：
 
-以下是你贴出的 **LangGraph** 目录结构中所有子页面的 URL 整理列表（完整可直接访问）：
+1. `rag/loaders.py`
 
----
+   - 用 LangChain 文档的 loaders & splitters。
 
-### 🌐 LangGraph Reference
+2. `rag/index_builder.py`
 
-**主目录：**
-[https://reference.langchain.com/python/langgraph/](https://reference.langchain.com/python/langgraph/)
+   - 先用 `InMemoryVectorStore` 或 `FAISS`，再换成 Milvus/Pinecone 等。([LangChain Docs][9])
 
----
+3. `rag/retriever.py`
 
-### 📂 二级目录（LangGraph 模块）
+   - `.as_retriever()`，再包装成 `@tool`。
 
-| 模块名            | 对应 URL                                                                                                                         |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| Graphs         | [https://reference.langchain.com/python/langgraph/graphs/](https://reference.langchain.com/python/langgraph/graphs/)           |
-| Functional API | [https://reference.langchain.com/python/langgraph/func/](https://reference.langchain.com/python/langgraph/func/)               |
-| Pregel         | [https://reference.langchain.com/python/langgraph/pregel/](https://reference.langchain.com/python/langgraph/pregel/)           |
-| Checkpointing  | [https://reference.langchain.com/python/langgraph/checkpoints/](https://reference.langchain.com/python/langgraph/checkpoints/) |
-| Storage        | [https://reference.langchain.com/python/langgraph/store/](https://reference.langchain.com/python/langgraph/store/)             |
-| Caching        | [https://reference.langchain.com/python/langgraph/cache/](https://reference.langchain.com/python/langgraph/cache/)             |
-| Types          | [https://reference.langchain.com/python/langgraph/types/](https://reference.langchain.com/python/langgraph/types/)             |
-| Runtime        | [https://reference.langchain.com/python/langgraph/runtime/](https://reference.langchain.com/python/langgraph/runtime/)         |
-| Config         | [https://reference.langchain.com/python/langgraph/config/](https://reference.langchain.com/python/langgraph/config/)           |
-| Errors         | [https://reference.langchain.com/python/langgraph/errors/](https://reference.langchain.com/python/langgraph/errors/)           |
-| Constants      | [https://reference.langchain.com/python/langgraph/constants/](https://reference.langchain.com/python/langgraph/constants/)     |
-| Channels       | [https://reference.langchain.com/python/langgraph/channels/](https://reference.langchain.com/python/langgraph/channels/)       |
+4. `rag/agent.py`
 
-## 5.DeepAgent Reference
+   - 按「RAG Agent」文档里的套路写一个 agent（本质就是 create_agent + retriever tool）。([LangChain][8])
 
-DeepAgent Reference： https://reference.langchain.com/python/deepagents/?_gl=1*1i0c74*_gcl_au*NjA4NjYyNTA2LjE3NTc4MTY4ODg.*_ga*NDM4Njk4NTEwLjE3NTc4MTY4ODg.*_ga_47WX3HKKY2*czE3NjIzNDc0MDMkbzI1JGcxJHQxNzYyMzQ3OTg5JGo1OSRsMCRoMA..#deepagents.create_deep_agent
+你已经在问 LangGraph Agentic RAG 文档了，可以顺势在 `rag/graph.py` 用 LangGraph 重写一版「多步骤 RAG」：
+比如：**重写问题 → 多检索 → 压缩上下文 → 回答** 的 agentic RAG 图。([LangChain Docs][9])
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/leonyangdev)
-> This is a context snippet only. You'll also want the standalone SKILL.md file — [download at TomeVault](https://tomevault.io/claim/leonyangdev)
-<!-- tomevault:4.0:windsurf_rules:2026-04-08 -->
+
+### 第 3 阶段：LangGraph 自定义工作流（Stateful + Checkpointer + HITL）
+
+**目标：** 用 LangGraph 搭一个真正「多步骤、可恢复」的学习任务工作流。
+比如流程：
+
+> 用户提问 → 规划学习路径 → 选文档做 RAG → 生成学习计划 → 生成小测验 → 等用户答题 → 评分 + 反馈。
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [leonyangdev/lc-studylab](https://github.com/leonyangdev/lc-studylab) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-04-20 -->
