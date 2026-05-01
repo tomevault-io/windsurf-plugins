@@ -7,11 +7,11 @@ WinShot - A Windows screenshot tool with annotation, crop, and export features b
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [mrgoonie/winshot](https://github.com/mrgoonie/winshot).
+Original source: `CLAUDE.md` in [mrgoonie/winshot](https://github.com/mrgoonie/winshot).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
