@@ -16,5 +16,5 @@ description: > 🎨 Add unique emoji commits to every file in a repository
 - If a terminal appears unresponsive, kill it and create a new one rather than retrying in the same terminal
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/nirholas) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-10 -->
+> Source: [nirholas/gitpretty](https://github.com/nirholas/gitpretty) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-02 -->
