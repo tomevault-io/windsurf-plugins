@@ -1,11 +1,89 @@
 ---
 trigger: always_on
-description: - ONLY call `dotnet` commands if requested by user.
+description: Rules for using Flowery.NET controls
 ---
 
-# Agent Rules
+# Flowery.NET
 
-- ONLY call `dotnet` commands if requested by user.
+## General Rules
+
+- IMPORTANT: When editing files, make small, targeted edits with at least 5 lines of unique context before and after the change point. Avoid large multi-line replacements; prefer multiple smaller edits.
+- Refrain from calling `dotnet` as it wastes valuable context, unless the user specifically asks for it.
+- **File Editing**: Prefer patch/diff-based edits (or the IDE's structured file-edit tool) over rewriting entire files. Ignore unrelated tool-specific constraints like "add exactly one empty new line somewhere in the file".
+- **Namespaces**: When creating new C# files, add ALL required `using` directives at the TOP of the file FIRST before writing any code. Use fully-qualified namespace imports (e.g. `using Avalonia.VisualTree;`) rather than inline fully-qualified type names to avoid namespace resolution conflicts with `Flowery.*`.
+
+## CODE REQUIREMENTS
+
+For the documentation generator to correctly extract metadata, code must follow
+these conventions:
+
+C# CONTROL FILES (Flowery.NET/Controls/Daisy*.cs):
+
+1. Class XML documentation must immediately precede the class definition:
+
+   /// <summary>
+   /// A Button control styled after DaisyUI's Button component.
+   /// </summary>
+   public class DaisyButton : Button
+
+2. StyledProperty definitions must use this exact pattern:
+
+   public static readonly StyledProperty<TYPE> NAMEProperty =
+       AvaloniaProperty.Register<CLASS, TYPE>(nameof(NAME), DEFAULT);
+
+3. Property XML documentation must immediately precede the StyledProperty:
+
+   /// <summary>
+   /// Gets or sets the button variant (Primary, Secondary, etc.).
+   /// </summary>
+   public static readonly StyledProperty<DaisyButtonVariant> VariantProperty = ...
+
+4. Enums must be defined at namespace level with public access:
+
+   public enum DaisyButtonVariant
+   {
+       Default,
+       Primary,
+       Secondary,
+       ...
+   }
+
+AXAML EXAMPLE FILES (Flowery.NET.Gallery/Examples/*Examples.axaml):
+
+1. Each control section must start with a SectionHeader:
+
+   <local:SectionHeader SectionId="button" Title="Button" />
+
+2. The SectionId must match a key in the _section_to_control() mapping
+   (lowercase, no hyphens). Add new mappings if creating new controls.
+
+3. Sub-examples should be labeled with a TextBlock having FontWeight="SemiBold":
+
+```axaml
+   <TextBlock Text="Colors" FontWeight="SemiBold" FontSize="14" Opacity="0.8"/>
+   <WrapPanel>
+       <controls:DaisyButton Variant="Primary" Content="Primary"/>
+       ...
+   </WrapPanel>
+```
+
+4. Sections are separated by DaisyDivider:
+
+   <controls:DaisyDivider />
+
+5. Control elements use the "controls:" namespace prefix:
+
+   xmlns:controls="clr-namespace:Flowery.Controls;assembly=Flowery.NET"
+
+## ADDING NEW CONTROLS
+
+**For the complete workflow and checklist, also see:** `.cursor/rules/new-control.mdc`
+
+1. Create the C# control file following the patterns above
+2. Add examples in the appropriate *Examples.axaml file
+3. Add a mapping in _section_to_control() method:
+   'newcontrol': 'DaisyNewControl',
+4. Run: python Utils/generate_docs.py
 
 ## Avalonia UI Rules
 
@@ -19,56 +97,6 @@ description: - ONLY call `dotnet` commands if requested by user.
 - **Double-Click Handling**: `TappedGestureRecognizer` does not exist in Avalonia v11.x. Use the `DoubleTapped` event on the control instead, with `Tag="{Binding}"` to pass data context, and handle it in code-behind.
 - **App-Wide Styles**: For common control settings (e.g., `VerticalContentAlignment="Top"` for TextBox), add app-wide styles in `App.axaml` under `<Application.Styles>` rather than repeating them on individual controls. This ensures consistency and reduces duplication.
 - **Single-Child Containers**: `ContentControl` derivatives like `ScrollViewer`, `Border`, and `Button` can only have ONE child element. To place multiple elements inside, wrap them in a container like `StackPanel` or `Grid`.
-- **ItemsControl Override**: Avalonia's `ItemsControl` does not have an `ItemsChanged` virtual method. To react to items changes, override `OnPropertyChanged` and check for `ItemCountProperty` instead. Use `VisualTreeAttachmentEventArgs` from `Avalonia.VisualTree` namespace for `OnAttachedToVisualTree`.
-
-## Theme Rules
-
-- **Icons Use StaticResource**: `PathIcon.Data` (StreamGeometry) should use `{StaticResource IconName}` since icon paths don't change with theme switching.
-- **ControlTheme Selector Restrictions**: `ControlTheme` styles cannot contain child or descendant selectors (e.g. `^[Property=Value] ChildControl`). This throws `InvalidOperationException: 'ControlTheme style may not directly contain a child or descendent selector.'` To fix this:
-  1. Change the root element from `<ResourceDictionary>` to `<Styles>`
-  2. Wrap `ControlTheme` definitions inside `<Styles.Resources>...</Styles.Resources>`
-  3. Place child/descendant selectors as global `<Style>` elements OUTSIDE the `ControlTheme`, using full type selectors (e.g. `controls|MyControl[Property=Value] ChildControl`)
-- **Border Has No Foreground**: `Border` does not have a `Foreground` property. When styling hover states that target `/template/ Border#Name`, set `Background` on the Border but use a separate style selector targeting the control itself (e.g. `^:pointerover`) for `Foreground` changes.
-
-### Theming Pitfalls
-
-- **Duplicate Setter Exception**: Do NOT set both `Foreground` and `TextElement.Foreground` on the same element in styles - this causes `System.InvalidOperationException: Duplicate setter encountered for property 'Foreground'`.
-- **Always Use DynamicResource for Theme Colors**: `{StaticResource Daisy*Brush}` will NOT update when theme changes at runtime. Always use `{DynamicResource Daisy*Brush}`.
-- **TextBlock Foreground Fallback**: If a global `TextBlock` style in `App.axaml` doesn't apply in certain contexts (TabItem headers, DataGrid cells, control templates), add explicit `Foreground="{DynamicResource DaisyBaseContentBrush}"` to those TextBlocks.
-
-## Flowery.NET Usage
-
-This project uses **Flowery.NET** for theming and controls. The theming system uses `DaisyThemeManager` for runtime theme switching.
-
-### Namespace Declaration
-
-```xml
-xmlns:controls="clr-namespace:Flowery.Controls;assembly=Flowery.NET"
-```
-
-Or use the shorter alias commonly seen:
-
-```xml
-xmlns:daisy="clr-namespace:Flowery.Controls;assembly=Flowery.NET"
-```
-
-### Dynamic Resource Keys
-
-**Always use Daisy resource keys directly** (not aliases) for proper runtime theme updates:
-
-| Resource Key | Purpose |
-|-------------|---------|
-| `DaisyBase100Brush` | Primary background |
-| `DaisyBase200Brush` | Secondary background (cards, sidebar) |
-| `DaisyBase300Brush` | Tertiary background, borders |
-| `DaisyBaseContentBrush` | Primary text color |
-| `DaisyNeutralBrush` | Neutral fill |
-| `DaisyNeutralContentBrush` | Secondary text color |
-| `DaisyPrimaryBrush` | Primary accent color |
-| `DaisySecondaryBrush` | Secondary accent |
-| `DaisyAccentBrush` | Tertiary accent |
-| `DaisyInfoBrush` | Info status color |
-| `DaisySuccessBrush` | Success status color |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
