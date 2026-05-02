@@ -1,152 +1,132 @@
 ---
 trigger: always_on
-description: How to create and register local Expo native modules in the modules/ directory
+description: Substreamer project architecture, structure, and conventions
 ---
 
 
-# Local Expo Native Modules
+# Substreamer – Project Overview
 
-Custom native functionality lives in `modules/` as local Expo modules. Current modules: `expo-async-fs`, `expo-ssl-trust`, `expo-gzip`, `expo-backup-exclusions`, `expo-move-to-back`, `expo-image-resize`, `expo-image-colors`, a local fork of `react-native-track-player`, and a local fork of `subsonic-api`. Follow existing modules as reference.
+Substreamer is a React Native music streaming client for Subsonic-compatible servers (Subsonic, Navidrome, etc.), built with Expo SDK 55, React 19, and TypeScript (strict mode).
+
+## Tech Stack
+
+- **Framework:** Expo ~55 / React Native 0.83 (New Architecture enabled)
+- **Routing:** Expo Router (file-based) with Stack + Tab navigators
+- **State:** Zustand with SQLite persistence (`expo-sqlite`)
+- **API:** `subsonic-api` library for Subsonic REST protocol
+- **Audio:** `react-native-track-player` (RNTP, local fork in `modules/`) for streaming and background playback
+- **Lists:** `@shopify/flash-list` v2 (FlashList) for all performant lists – replaces React Native FlatList
+- **Image caching:** Custom disk cache via `expo-file-system`
+- **Animations:** `react-native-reanimated` (v4) for all animations – see `ux-quality` rule for details and exceptions
+- **i18n:** `react-i18next` v17 + `i18next` v26 with `@formatjs/intl-pluralrules` polyfill for Hermes
+- **Styling:** `StyleSheet.create` + inline theme colors (no CSS-in-JS libraries)
+- **Path alias:** `@/*` maps to `./src/*`
 
 ## Directory Structure
 
 ```
-modules/{module-name}/
-  android/
-    build.gradle                                  # REQUIRED — Gradle won't compile the module without it
-    src/main/java/expo/modules/{moduleid}/
-      {ModuleName}Module.kt
-  ios/
-    {ModuleName}.podspec
-    {ModuleName}Module.swift
-  src/
-    {ModuleName}Module.ts    # requireNativeModule + fallback stub
-    index.ts                 # Public typed exports
-  expo-module.config.json
-  package.json
+src/
+  app/            # Expo Router routes (thin wrappers that import from screens/)
+    _layout.tsx   # Root Stack layout, auth guard, splash screen
+    (tabs)/       # Bottom tab navigator group
+    album/[id]    # Dynamic routes for entities
+    artist/[id]
+    playlist/[id]
+  screens/        # Screen components with business logic
+  components/     # Reusable UI components
+  hooks/          # Custom hooks
+  services/       # API clients and external integrations
+  store/          # Zustand stores
+  i18n/           # react-i18next singleton, locale JSON files, language list
+  constants/      # Theme definitions
+  utils/          # Formatting, color, string, and timing helpers
+  assets/         # App icons, splash images
+modules/          # Local Expo native modules (see native-modules rule)
+scripts/          # Build helper scripts
+fastlane/         # Store listing metadata (descriptions, screenshots, release notes)
+  metadata/       # Plain-text metadata files for iOS and Android stores
 ```
 
-## Registration Checklist
+## Key Architectural Patterns
 
-A local module requires **four** registration steps or Metro/native builds will silently leave the module out of the APK (the JS wrapper will hit its fallback stub and log "Native module not found"):
+1. **Route/Screen separation:** Route files in `app/` are thin wrappers; business logic lives in `screens/`. See `routing-and-navigation` rule.
+2. **Zustand stores** manage all app state. See `zustand-stores` rule.
+3. **Services** are plain modules exporting async functions (no classes). See `services-and-api` rule.
+4. **CachedImage** is the standard component for all cover art – never use raw `<Image>` for Subsonic artwork.
+5. **`useTheme()`** provides `{ theme, colors }` – all components consume colors from this hook rather than importing theme constants directly.
+6. **Shared utilities** live in `src/utils/` – common helpers (alphabet indexing via `getFirstLetter`, minimum-delay promises via `minDelay`) are extracted here rather than duplicated.
+7. **All user-facing strings** are translated via `react-i18next`. See `Internationalization` section below.
 
-1. **`expo-module.config.json`** -- declares platform module classes:
+## Internationalization (i18n)
+
+All user-facing strings use `react-i18next`. English is the source language; translations are stored as flat JSON in `src/i18n/locales/`.
+
+### Setup
+
+- **Runtime:** `i18next` v26 + `react-i18next` v17 + `i18next-resources-to-backend` for lazy loading
+- **Hermes polyfill:** `@formatjs/intl-pluralrules/polyfill-force` — imported first in `src/i18n/i18n.ts` (must precede i18next init)
+- **Locale persistence:** `localeStore` (Zustand + SQLite) — `null` = follow device locale
+- **Test setup:** `src/test-utils/i18nSetup.ts` initializes i18next with English resources; included in Jest `setupFiles`
+
+### Usage Patterns
+
+**In React components** — use the `useTranslation` hook:
+
+```tsx
+import { useTranslation } from 'react-i18next';
+
+function MyScreen() {
+  const { t } = useTranslation();
+  return <Text>{t('recentlyAdded')}</Text>;
+}
+```
+
+**In services/stores (outside React)** — import `i18next` directly:
+
+```tsx
+import i18n from 'i18next';
+
+processingOverlayStore.getState().showSuccess(i18n.t('playlistCreated'));
+```
+
+**Module-level constant arrays** — use `labelKey` instead of `label`:
+
+```tsx
+const OPTIONS = [
+  { value: 'recent', labelKey: 'recentlyAdded' },
+];
+// At render: <Text>{t(opt.labelKey)}</Text>
+```
+
+**Interpolation:** `t('greeting', { name: 'Miles' })` → key: `"greeting": "Hello {{name}}"`
+
+**Plurals:** Key-suffix convention with `_one`/`_other`:
+
 ```json
-{
-  "platforms": ["ios", "android"],
-  "ios": { "modules": ["{ModuleName}Module"] },
-  "android": { "modules": ["expo.modules.{moduleid}.{ModuleName}Module"] }
-}
+{ "songCount_one": "{{count}} song", "songCount_other": "{{count}} songs" }
+```
+```tsx
+t('songCount', { count: 5 }) // "5 songs"
 ```
 
-2. **`package.json`** -- standard npm package metadata with `"main": "src/index.ts"`:
-```json
-{
-  "name": "{module-name}",
-  "version": "1.0.0",
-  "main": "src/index.ts",
-  "types": "src/index.ts",
-  "peerDependencies": { "expo": "*", "react": "*", "react-native": "*" }
-}
-```
+### Key Naming Rules
 
-3. **`android/build.gradle`** -- **critical**: without this the Android autolinker finds the module via `expo-module.config.json` but never compiles it into the APK. Follow the canonical template (see `modules/expo-async-fs/android/build.gradle`):
-```gradle
-apply plugin: 'com.android.library'
-apply plugin: 'kotlin-android'
+- Flat camelCase: `recentlyAdded`, not `home.recentlyAdded`
+- Single `translation` namespace (no namespace prefix in `t()` calls)
+- Reuse existing keys for shared strings (`cancel`, `delete`, `save`, `albums`, etc.)
+- Check `src/i18n/locales/en.json` before creating new keys
 
-group = 'expo.modules.{moduleid}'
-version = '1.0.0'
+### What NOT to Translate
 
-def expoModulesCorePlugin = new File(project(":expo-modules-core").projectDir.absolutePath, "ExpoModulesCorePlugin.gradle")
-if (expoModulesCorePlugin.exists()) {
-  apply from: expoModulesCorePlugin
-  applyKotlinExpoModulesCorePlugin()
-}
+- Remote API data (album titles, artist names, track titles)
+- App name "Substreamer"
+- Technical identifiers, log messages, file paths
+- Numeric format strings from formatters (`1h30m`, `1.2 GB`)
 
-android {
-  namespace "expo.modules.{moduleid}"
-  compileSdk rootProject.ext.has("compileSdkVersion") ? rootProject.ext.get("compileSdkVersion") : 35
-  defaultConfig {
-    minSdk rootProject.ext.has("minSdkVersion") ? rootProject.ext.get("minSdkVersion") : 24
-    targetSdk rootProject.ext.has("targetSdkVersion") ? rootProject.ext.get("targetSdkVersion") : 35
-  }
-  compileOptions {
-    sourceCompatibility JavaVersion.VERSION_17
-    targetCompatibility JavaVersion.VERSION_17
-  }
-  kotlinOptions {
-    jvmTarget = JavaVersion.VERSION_17.majorVersion
-  }
-}
+### Crowdin Integration
 
-dependencies {
-  implementation project(':expo-modules-core')
-  implementation "com.facebook.react:react-android"
-}
-```
 
-4. **Root `package.json`** -- **critical**: add a dependency entry, a doctor exclusion, **and** an install exclusion (prevents `expo install` from overwriting the local version):
-```json
-{
-  "dependencies": {
-    "{module-name}": "file:./modules/{module-name}"
-  },
-  "expo": {
-    "install": {
-      "exclude": ["{module-name}"]
-    },
-    "doctor": {
-      "reactNativeDirectoryCheck": {
-        "exclude": ["{module-name}"]
-      }
-    }
-  }
-}
-```
-Then run `npm install` to create the symlink in `node_modules/`.
-
-## Native Code Pattern
-
-Use `AsyncFunction` for background-thread work (the Expo Modules API handles thread dispatch automatically):
-
-```swift
-// iOS
-AsyncFunction("myFunction") { (arg: String) -> String in
-  // Runs on native background thread
-  return result
-}
-```
-
-```kotlin
-// Android
-AsyncFunction("myFunction") { arg: String ->
-  // Runs on native background thread
-  result
-}
-```
-
-## JS Wrapper Pattern
-
-Always provide a graceful fallback when the native module isn't available (e.g. during JS-only development):
-
-```typescript
-// src/{ModuleName}Module.ts
-import { requireNativeModule } from 'expo-modules-core';
-
-let module: NativeInterface;
-try {
-  module = requireNativeModule('{ModuleName}');
-} catch {
-  console.warn('[{module-name}] Native module not found. Rebuild the app.');
-  module = { /* no-op stubs */ } as any;
-}
-export default module;
-```
-
-## After Creating a Module
-
-A **native rebuild** is required (`npx expo run:ios` / `npx expo run:android`). Metro bundling alone is not sufficient for new native modules.
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [ghenry22/substreamer](https://github.com/ghenry22/substreamer) — distributed by [TomeVault](https://tomevault.io).
