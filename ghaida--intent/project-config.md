@@ -1,97 +1,73 @@
 ---
 trigger: always_on
-description: A cross-cutting cognitive mode for sitting with design problems before rushing to solve them. Part of the Intent design strategy system. Activates expansive brainstorming: hyperassociativity, beginner's mind, cross-domain pattern recognition, and suppression of premature idea-dismissal. Works alongside every Intent skill — strategize uses it to reframe briefs, blueprint to question structural assumptions, journey to rethink interaction models, and specify to stress-test specs. Trigger when the u
+description: Bridges design and engineering by producing detailed specs, organized handoff packages, asset inventories, and cross-functional documentation. Part of the Intent design strategy system. Trigger when: writing design specs, preparing engineering handoffs, documenting for development, creating design reviews, writing test plans, building copy matrices, addressing edge cases, aligning stakeholders, packaging designs "for engineering," or saying "write the spec," "prepare the handoff," "document this
 ---
 
 
 
-# The Philosopher — Sit With the Problem
+# Specify — Bridge Design to Engineering
 
 ## Overview
 
-A cross-cutting cognitive mode that shifts how you reason — not how you sound. The philosopher activates broader associative thinking, suppresses premature idea-dismissal, enables cross-domain connection-making, and forces genuine re-examination of assumptions. It works alongside every Intent skill at any stage of the design process, turning shallow problem statements into genuinely complex, interesting ones.
-
-**When to activate:** when a designer says "I'm stuck," "sit with this," "brainstorm," "explore this problem," "go deeper," "what am I missing," "philosopher mode," or "expansive mode." Also activate when a problem is being solved too quickly, when the framing feels shallow, when research findings seem too clean, or when any Intent skill needs to question its own assumptions before moving forward.
+This skill transforms design work into actionable, implementation-ready documentation. It produces structured specs, asset packages, test plans, and stakeholder presentations that ensure design intent survives to production. Use this when design needs to move into engineering, when cross-functional clarity is required, or when you must document decisions in a way that prevents rework.
 
 ---
 
-## How this skill fits the design practice
+## Skill family
 
-The philosopher is not a phase. It's a cognitive mode that any Intent skill
-can enter when the problem needs more exploration before the next move.
+Specify works alongside the full Intent skill system:
 
-Every Intent skill has moments where the philosopher belongs:
+- **`/strategize`**: Their briefs and hypotheses provide the "why" behind everything you specify. Every spec should trace back to a strategic intent — why this feature exists, what hypothesis it tests, what user need it serves.
+- **`/investigate`**: Their research findings ground your use cases in evidence. Real user quotes, observed behaviors, and validated pain points make specs persuasive and accurate, not hypothetical.
+- **`/blueprint`**: Their system architecture constrains and informs your specs. Service dependencies, data flows, and technical constraints shape what's possible and what needs engineering discussion.
+- **`/journey`**: Their flows are what you're specifying — screen sequences, interaction transitions, state changes. Journey designs the experience; specify documents it for implementation.
+- **`/organize`**: Their information architecture informs your navigation specs. Taxonomy, hierarchy, and labeling decisions from organize become the structural backbone of your screen specs.
+- **`/articulate`**: Their copy work feeds directly into your copy matrices. Voice, tone, and content strategy decisions become specific strings in your spec.
+- **`/fortify`**: Their edge case analysis becomes part of your spec. Error states, failure modes, boundary conditions, and recovery patterns — all documented screen by screen.
+- **`/include`**: Their accessibility requirements go into every screen spec. ARIA labels, keyboard navigation, color contrast, screen reader behavior — inclusion is not an appendix, it's woven into every screen.
+- **`/evaluate`**: Their assessment identifies gaps in your specs. Heuristic violations, usability issues, and anti-pattern flags become items to resolve before handoff.
+- **`/measure`**: Their success metrics define your test plan criteria. Every feature spec should include what success looks like, how to measure it, and what to instrument.
+- **`/philosopher`**: A cross-cutting cognitive mode for when specification reveals deeper problems. Invoke when: edge cases keep multiplying, something about the design feels fragile under real conditions, the "pending questions" section keeps growing, or the user says "sit with this", "brainstorm", or "what could go wrong that nobody has imagined?" The philosopher helps think through failure scenarios nobody has considered and whether the spec is documenting the right thing.
 
-### Strategy & Research
+---
 
-**With `/strategize`** — when a brief feels too tidy, when the problem
-statement might be wrong, when the five foundational questions are returning
-obvious answers. The philosopher helps `/strategize` question whether
-they're even asking the right questions. Use it to reframe assumptions,
-find the problem adjacent to the stated problem, and challenge whether the
-opportunity is where everyone thinks it is.
+## Core capabilities
 
-**With `/investigate`** — when research findings seem too clean, when the
-interview data confirms everything you expected (confirmation bias alarm),
-when synthesis is producing obvious themes. "What would we learn if we
-studied the people who don't have this problem?" The philosopher helps
-the researcher question whether the methodology itself is shaping the
-findings.
+### 1. Detailed design specifications
 
-**With `/blueprint`** — when a service blueprint reveals something
-structurally odd, when dependencies seem unnecessarily tangled, or when the
-"how it works today" doesn't explain why it was built that way. The
-philosopher helps `/blueprint` ask "what if this whole structure
-is solving the wrong problem?" and explore alternative organizational
-models from other domains.
+Write comprehensive, screen-by-screen (or state-by-state) specifications that document:
+- Visual design with specific measurements, colors, typography, spacing
+- Interaction logic: what triggers what, in what order, with what conditions
+- Copy: exact text, variants for different contexts/markets/edge cases
+- States: default, hover, active, error, loading, empty, success — all documented visually and logically
+- Constraints: device sizes, performance requirements, accessibility needs
 
-### Experience Design
+Output should be a living spec document (HTML or markdown) that engineers can reference during implementation without guessing.
 
-**With `/journey`** — when a user flow feels logical but lifeless, when the
-"obvious" interaction pattern might not serve the user's actual mental model,
-or when device constraints are being treated as limitations instead of design
-inputs. The philosopher helps the journey designer question the inherited
-patterns and explore what the interaction would look like if current
-conventions didn't exist.
+### 2. Organized engineering handoff packages
 
-**With `/organize`** — when the category system feels natural but users keep
-getting lost. "What if the mental model we're assuming doesn't exist?" When
-labels make sense to the team but not to users. The philosopher helps
-question whether the structure reflects how people actually think about
-the domain, or just how the organization thinks about it.
+Structure deliverables so engineering knows exactly what to build and why:
+- Clear ownership: who decided what and when
+- Problem context: what user need or business problem does this solve
+- Design approach: constraints considered, alternatives rejected and why
+- Use cases: specific, not generic — real user scenarios that expose edge cases
+- Assets: all files organized, named, versioned, with usage notes
+- Test criteria: success metrics and audience-specific test plans
 
-**With `/articulate`** — when the words feel correct but the experience
-still confuses. "What if the language itself is creating the problem?" When
-error messages are accurate but unhelpful, when microcopy is clear but cold.
-The philosopher helps examine whether language is clarifying the experience
-or obscuring it — and whether the voice itself carries unexamined assumptions.
+### 3. Copy and variant matrices
 
-### Quality & Evaluation
+Document all copy variations in one place:
+- Primary copy vs. secondary copy vs. microcopy (labels, hints, errors, empty states)
+- Market variants: tone shifts, cultural considerations, regulatory language
+- Edge cases: character limits, long strings, very short strings, numeric edge cases
+- A/B test variations: explicit copy changes being tested, with success criteria
 
-**With `/evaluate`** — when heuristic evaluation produces passing scores but
-something still feels wrong. "What if the heuristics we're evaluating against
-are wrong for this domain?" The philosopher helps question whether the
-quality framework itself is appropriate, or whether it's measuring the wrong
-things well.
+### 4. Interactive HTML specification documentation
 
-**With `/fortify`** — when edge cases keep multiplying. "What's the most
-embarrassing way this could fail in public?" When the happy path is solid
-but the system feels fragile. The philosopher helps think through failure
-not as a list of cases to handle, but as a structural property of the
-design itself.
-
-**With `/include`** — when accessibility is technically compliant but the
-experience still excludes. "Who are we excluding that we haven't even thought
-to consider?" When the definition of "user" is too narrow. The philosopher
-helps expand the frame beyond compliance toward genuine inclusion — asking
-what it means for an experience to truly welcome someone.
-
-### Adaptation & Measurement
-
-**With `/transpose`** — when adapting for a new platform feels like shrinking
-rather than rethinking. "What if this experience was born on mobile? What
-would we never have added?" The philosopher helps question whether
-cross-platform work is translation or transformation — and what the target
+When appropriate, produce interactive HTML specs that:
+- Show designs inline with explanatory text
+- Link related screens and decisions
+- Include collapsible reference sections (component specs, copy matrices, test plans)
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
