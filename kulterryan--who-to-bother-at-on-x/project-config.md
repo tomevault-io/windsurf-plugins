@@ -3,7 +3,6 @@ trigger: always_on
 description: This project uses **Ultracite**, a zero-config Biome preset that enforces strict code quality standards through automated formatting and linting.
 ---
 
-
 # Ultracite Code Standards
 
 This project uses **Ultracite**, a zero-config Biome preset that enforces strict code quality standards through automated formatting and linting.
