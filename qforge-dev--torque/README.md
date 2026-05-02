@@ -7,13 +7,13 @@ Torque is a Declarative, typesafe DSL for building synthetic LLM datasets — co
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [qforge-dev/torque](https://github.com/qforge-dev/torque).
+Original source: `.cursor/rules/*.mdc` in [qforge-dev/torque](https://github.com/qforge-dev/torque).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
-- **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
