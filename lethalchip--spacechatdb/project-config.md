@@ -1,7 +1,8 @@
 ---
 trigger: always_on
-description: ⛔ MANDATORY: Core SpacetimeDB concepts (all languages).
+description: **If you are migrating existing SpacetimeDB 1.0 code to 2.0, apply `spacetimedb-migration-2.0.mdc` first.** It documents breaking changes (reducer callbacks → event tables, `name`→`accessor`, `sender()` method, etc.) and should be considered before other rules.
 ---
+
 
 # SpacetimeDB Rules (All Languages)
 
@@ -114,6 +115,67 @@ spacetime logs <db-name>
 - Do NOT touch unrelated files, configs, or dependencies
 - Do NOT invent new SpacetimeDB APIs — use only what exists in docs or this repo
 - Do NOT add restrictions the prompt didn't ask for — if "users can do X", implement X for all users
+
+
+
+
+# SpacetimeDB Rust SDK
+
+## ⛔ COMMON MISTAKES — LLM HALLUCINATIONS
+
+These are **actual errors** observed when LLMs generate SpacetimeDB Rust code:
+
+### 1. Wrong Crate for Server vs Client
+
+```rust
+// ❌ WRONG — using client crate for server module
+use spacetimedb_sdk::*;  // This is for CLIENTS only!
+
+// ✅ CORRECT — use spacetimedb for server modules
+use spacetimedb::{table, reducer, Table, ReducerContext, Identity, Timestamp};
+```
+
+### 2. Wrong Table Macro Syntax
+
+```rust
+// ❌ WRONG — using attribute-style like C#
+#[spacetimedb::table]
+#[primary_key]
+pub struct User { ... }
+
+// ❌ WRONG — SpacetimeType on tables (causes conflicts!)
+#[derive(SpacetimeType)]
+#[table(accessor = my_table)]
+pub struct MyTable { ... }
+
+// ✅ CORRECT — use #[table(...)] macro with options, NO SpacetimeType
+#[table(accessor = user, public)]
+pub struct User {
+    #[primary_key]
+    identity: Identity,
+    name: Option<String>,
+}
+```
+
+### 3. Wrong Table Access Pattern
+
+```rust
+// ❌ WRONG — using ctx.Db or ctx.db() method or field access
+ctx.Db.user.Insert(...);
+ctx.db().user().insert(...);
+ctx.db.player;  // Field access
+
+// ✅ CORRECT — ctx.db is a field, table names are methods with parentheses
+ctx.db.user().insert(User { ... });
+ctx.db.user().identity().find(ctx.sender);
+ctx.db.player().id().find(&player_id);
+```
+
+### 4. Wrong Update Pattern
+
+```rust
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [Lethalchip/SpaceChatDB](https://github.com/Lethalchip/SpaceChatDB) — distributed by [TomeVault](https://tomevault.io).
