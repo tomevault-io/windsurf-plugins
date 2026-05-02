@@ -1,195 +1,197 @@
 ---
 trigger: always_on
-description: Error handling patterns for IPC communication between Rust backend and React frontend
+description: Frontend best practices and conventions for the LTK Manager UI
 ---
 
 
-# Error Handling Guide
+# LTK Manager Frontend Guidelines
 
-This document describes the error handling patterns used in the LTK Manager application for communication between the Rust backend and React frontend through Tauri's IPC layer.
+This document outlines the best practices and conventions for the LTK Manager frontend built with React, TypeScript, and Tauri.
 
-## Overview
+## Tech Stack
 
-The application uses a **typed Result pattern** for IPC communication, providing:
-- Type-safe error codes for pattern matching
-- Rich error context for debugging
-- Consistent error handling across the entire application
+- **Framework**: React 19 with TypeScript
+- **Build Tool**: Vite
+- **Desktop Runtime**: Tauri v2
+- **Routing**: TanStack Router (file-based routing)
+- **State Management**: Zustand, TanStack Query
+- **Styling**: Tailwind CSS v4
+- **UI Components**: Base UI (`@base-ui-components/react`)
 
-## Architecture
+## Pattern Matching
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        Rust Backend                              │
-│  ┌──────────────┐    ┌──────────────┐    ┌──────────────────┐   │
-│  │   AppError   │ -> │ AppErrorResp │ -> │  IpcResult<T>    │   │
-│  │  (internal)  │    │  (boundary)  │    │  (serialized)    │   │
-│  └──────────────┘    └──────────────┘    └──────────────────┘   │
-└─────────────────────────────────────────────────────────────────┘
-                              │ JSON
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                      TypeScript Frontend                         │
-│  ┌──────────────┐    ┌──────────────┐    ┌──────────────────┐   │
-│  │  Result<T>   │ -> │   isOk/Err   │ -> │  UI Handling     │   │
-│  │  (received)  │    │  (guards)    │    │  (toast/state)   │   │
-│  └──────────────┘    └──────────────┘    └──────────────────┘   │
-└─────────────────────────────────────────────────────────────────┘
-```
+Use `ts-pattern` for all conditional logic involving multiple cases or complex matching. Avoid nested ternaries.
 
-## Error Types
+```tsx
+// ✅ Preferred: ts-pattern
+import { match } from "ts-pattern";
 
-### Error Codes (Shared)
+const result = match(status)
+  .with("loading", () => <Spinner />)
+  .with("error", () => <ErrorMessage />)
+  .with("success", () => <Content />)
+  .exhaustive();
 
-Error codes are shared between Rust and TypeScript:
+// ✅ Tuple matching for multiple conditions
+const sizeClass = match([isCompact, isIconOnly] as const)
+  .with([true, true], () => "h-6 w-6")
+  .with([true, false], () => "h-6 px-2")
+  .with([false, true], () => "h-8 w-8")
+  .with([false, false], () => "h-8 px-4")
+  .exhaustive();
 
-```typescript
-// @/utils/errors.ts
-type ErrorCode =
-  | "IO"                 // File system errors
-  | "SERIALIZATION"      // JSON parsing errors
-  | "MODPKG"             // Mod package errors
-  | "LEAGUE_NOT_FOUND"   // League installation not found
-  | "INVALID_PATH"       // Invalid file/directory path
-  | "MOD_NOT_FOUND"      // Requested mod doesn't exist
-  | "VALIDATION_FAILED"  // Input validation errors
-  | "INTERNAL_STATE"     // Internal app state errors
-  | "UNKNOWN";           // Unclassified errors
+// ❌ Avoid: Nested ternaries
+const result = isLoading ? <Spinner /> : isError ? <Error /> : <Content />;
 ```
 
-### AppError Interface
+## Class Name Merging
 
-```typescript
-// @/utils/errors.ts
-interface AppError {
-  code: ErrorCode;      // Machine-readable code
-  message: string;      // Human-readable message
-  context?: unknown;    // Optional contextual data
-}
+Always use `tailwind-merge` (`twMerge`) when combining Tailwind classes, especially when accepting className props. This ensures proper class precedence and conflict resolution.
+
+```tsx
+// ✅ Preferred
+import { twMerge } from "tailwind-merge";
+
+const classes = twMerge(baseClasses, variantClasses, sizeClasses, className);
+
+// ❌ Avoid: String concatenation or template literals
+const classes = `${baseClasses} ${variantClasses} ${className}`;
 ```
 
-### Result Type
+## Component Architecture
 
-```typescript
-// @/utils/result.ts
-type Result<T, E = AppError> =
-  | { ok: true; value: T }
-  | { ok: false; error: E };
-```
+### Base UI Components
 
-## Frontend Error Handling Patterns
+Use `@base-ui-components/react` as the foundation for all interactive components. Extend them with custom styles and behavior.
 
-### Pattern 1: Type Guards (Recommended for simple cases)
+```tsx
+// ✅ Preferred: Wrap Base UI components
+import { Button as BaseButton } from "@base-ui-components/react";
 
-Use `isOk` and `isErr` type guards for simple conditional handling:
-
-```typescript
-import { api, isOk, isErr } from "@/lib/tauri";
-
-async function loadMods() {
-  const result = await api.getInstalledMods();
-  
-  if (isOk(result)) {
-    setMods(result.value);
-  } else {
-    console.error("Failed to load mods:", result.error.message);
-    showErrorToast(result.error.message);
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
+  ({ variant, size, className, ...props }, ref) => {
+    const classes = twMerge(baseClasses, variantClasses[variant], className);
+    return <BaseButton ref={ref} className={classes} {...props} />;
   }
+);
+```
+
+### Component File Structure
+
+```tsx
+// 1. External imports (React, libraries)
+import { forwardRef, type ReactNode } from "react";
+import { match } from "ts-pattern";
+
+// 2. Internal imports (base components, utilities)
+import { Button as BaseButton } from "@base-ui-components/react";
+import { twMerge } from "tailwind-merge";
+
+// 3. Types
+export type ButtonVariant = "default" | "filled" | "outline";
+export interface ButtonProps { ... }
+
+// 4. Constants (classes, configs)
+const baseClasses = "...";
+const variantClasses: Record<ButtonVariant, string> = { ... };
+
+// 5. Component implementation
+export const Button = forwardRef<...>(...);
+Button.displayName = "Button";
+```
+
+## Icons
+
+Use `react-icons` for icons. Import from specific icon sets to enable tree-shaking.
+
+```tsx
+// ✅ Preferred: Import from specific set
+import { FiPlus, FiTrash } from "react-icons/fi";
+import { HiOutlineDownload } from "react-icons/hi";
+
+// ❌ Avoid: Importing from root
+import { FiPlus } from "react-icons";
+```
+
+## Styling Conventions
+
+### Tailwind Classes
+
+- Use the custom color palette defined in `app.css` (`brand-*`, `surface-*`, `accent-*`)
+- Prefer semantic color names over raw values
+- Group related classes logically
+
+```tsx
+// ✅ Organized class groups
+const classes = twMerge(
+  // Layout
+  "inline-flex items-center justify-center",
+  // Typography
+  "font-medium text-sm",
+  // Colors
+  "bg-surface-700 text-surface-100",
+  // Interactive states
+  "hover:bg-surface-600 active:bg-surface-800",
+  // Focus
+  "focus-visible:outline-brand-500 focus-visible:outline-2",
+  // Disabled
+  "disabled:opacity-50 disabled:cursor-not-allowed"
+);
+```
+
+### Component Variants
+
+Use Record types for variant mappings:
+
+```tsx
+const variantClasses: Record<ButtonVariant, string> = {
+  default: "bg-surface-700 text-surface-100 hover:bg-surface-600",
+  filled: "bg-brand-600 text-white hover:bg-brand-500",
+  outline: "bg-transparent border border-surface-600",
+};
+```
+
+## TypeScript
+
+- Use strict mode
+- Prefer `interface` for object shapes, `type` for unions/intersections
+- Export types alongside components
+- Use `forwardRef` for components that need ref forwarding
+
+```tsx
+export interface ButtonProps
+  extends Omit<BaseButton.Props, "className" | "children"> {
+  variant?: ButtonVariant;
+  size?: ButtonSize;
+  loading?: boolean;
 }
 ```
 
-### Pattern 2: Match Function (Recommended for exhaustive handling)
+## Routing (TanStack Router)
 
-Use `match` for cleaner handling of both cases:
+- Use file-based routing in `src/routes/`
+- Access route data via `Route.useLoaderData()`, `Route.useParams()`, etc.
+- Use `<Link>` component for navigation with type-safe `to` prop
 
-```typescript
-import { api, match } from "@/lib/tauri";
+## State Management
 
-async function loadSettings() {
-  const result = await api.getSettings();
-  
-  match(result, {
-    ok: (settings) => {
-      setSettings(settings);
-    },
-    err: (error) => {
-      // Handle specific error codes
-      if (error.code === "LEAGUE_NOT_FOUND") {
-        showSetupWizard();
-      } else {
-        showErrorToast(error.message);
-      }
-    },
-  });
-}
+- **Local UI state**: `useState`, `useReducer`
+- **Global client state**: Zustand stores
+- **Server state**: TanStack Query
+- **URL state**: TanStack Router search params
+
+## File Organization
+
 ```
-
-### Pattern 3: Error Code Pattern Matching
-
-Handle errors differently based on error codes:
-
-```typescript
-import { api, isErr } from "@/lib/tauri";
-
-async function installMod(filePath: string) {
-  const result = await api.installMod(filePath);
-  
-  if (isErr(result)) {
-    switch (result.error.code) {
-      case "INVALID_PATH":
-        showError("The selected file doesn't exist or is inaccessible.");
-        break;
-      case "MODPKG":
-        showError("The file is not a valid mod package.");
-        break;
-      case "VALIDATION_FAILED":
-        showError("The mod package failed validation checks.");
-        break;
-      default:
-        showError(`Installation failed: ${result.error.message}`);
-    }
-    return;
-  }
-  
-  // Success case
-  addModToLibrary(result.value);
-  showSuccess("Mod installed successfully!");
-}
+src/
+├── components/       # Reusable UI components
+├── routes/          # TanStack Router file-based routes
+├── stores/          # Zustand stores
+├── hooks/           # Custom React hooks
+├── utils/           # Utility functions
+├── types/           # Shared TypeScript types
+└── styles/          # Global styles (app.css)
 ```
-
-## TanStack Query Integration
-
-TanStack Query expects promises to **reject** on error for its error state to work properly. Since our `IpcResult` always resolves successfully (with errors encoded in the payload), we need adapter functions.
-
-### Unwrapping Results for Queries
-
-Create a utility to throw errors for TanStack Query:
-
-```typescript
-// @/utils/query.ts
-import type { Result } from "./result";
-import { isErr } from "./result";
-import type { AppError } from "./errors";
-
-/**
- * Unwrap a Result for use with TanStack Query.
- * Throws the error if Result is Err, allowing Query to catch it.
- */
-export function unwrapForQuery<T>(result: Result<T>): T {
-  if (isErr(result)) {
-    throw result.error;
-  }
-  return result.value;
-}
-
-/**
- * Wrap an API call for use with TanStack Query.
- * Returns a function that throws on error.
- */
-export function queryFn<T>(
-  fn: () => Promise<Result<T>>
-): () => Promise<T> {
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [LeagueToolkit/ltk-manager](https://github.com/LeagueToolkit/ltk-manager) — distributed by [TomeVault](https://tomevault.io).
