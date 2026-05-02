@@ -1,104 +1,176 @@
 ---
 trigger: always_on
-description: daisyUI 5
+description: This rule outlines the complete workflow for creating a new control in Flowery.NET, whether it's a brand new control or a port from another library.
 ---
 
+# Creating a New Flowery.NET Control
 
-# daisyUI 5
-daisyUI 5 is a CSS library for Tailwind CSS 4
-daisyUI 5 provides class names for common UI components
+This rule outlines the complete workflow for creating a new control in Flowery.NET, whether it's a brand new control or a port from another library.
 
-- [daisyUI 5 docs](http://daisyui.com)
-- [Guide: How to use this file in LLMs and code editors](https://daisyui.com/docs/editor/)
-- [daisyUI 5 release notes](https://daisyui.com/docs/v5/)
-- [daisyUI 4 to 5 upgrade guide](https://daisyui.com/docs/upgrade/)
+## Overview
 
-## daisyUI 5 install notes
-[install guide](https://daisyui.com/docs/install/)
-1. daisyUI 5 requires Tailwind CSS 4
-2. `tailwind.config.js` file is deprecated in Tailwind CSS v4. do not use `tailwind.config.js`. Tailwind CSS v4 only needs `@import "tailwindcss";` in the CSS file if it's a node dependency.
-3. daisyUI 5 can be installed using `npm i -D daisyui@latest` and then adding `@plugin "daisyui";` to the CSS file
-4. daisyUI is suggested to be installed as a dependency but if you really want to use it from CDN, you can use Tailwind CSS and daisyUI CDN files:
-```html
-<link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
-<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-```
-5. A CSS file with Tailwind CSS and daisyUI looks like this (if it's a node dependency)
-```css
-@import "tailwindcss";
-@plugin "daisyui";
-```
+Creating a new control involves these major phases:
 
-## daisyUI 5 usage rules
-1. We can give styles to a HTML element by adding daisyUI class names to it. By adding a component class name, part class names (if there's any available for that component), and modifier class names (if there's any available for that component)
-2. Components can be customized using Tailwind CSS utility classes if the customization is not possible using the existing daisyUI classes. For example `btn px-10` sets a custom horizontal padding to a `btn`
-3. If customization of daisyUI styles using Tailwind CSS utility classes didn't work because of CSS specificity issues, you can use the `!` at the end of the Tailwind CSS utility class to override the existing styles. For example `btn bg-red-500!` sets a custom background color to a `btn` forcefully. This is a last resort solution and should be used sparingly
-4. If a specific component or something similar to it doesn't exist in daisyUI, you can create your own component using Tailwind CSS utility
-5. when using Tailwind CSS `flex` and `grid` for layout, it should be responsive using Tailwind CSS responsive utility prefixes.
-6. Only allowed class names are existing daisyUI class names or Tailwind CSS utility classes.
-7. Ideally, you won't need to write any custom CSS. Using daisyUI class names or Tailwind CSS utility classes is preferred.
-8. suggested - if you need placeholder images, use https://picsum.photos/200/300 with the size you want
-9. suggested - when designing , don't add a custom font unless it's necessary
-10. don't add `bg-base-100 text-base-content` to body unless it's necessary
-11. For design decisions, use Refactoring UI book best practices
+1. **Control Implementation** - C# class with properties and logic
+2. **Theme/Styling** - AXAML theme file for visual appearance
+3. **Gallery Examples** - Demo page in the gallery application
+4. **Sidebar Integration** - Add to the component sidebar
+5. **Documentation** - Markdown file for supplementary docs
 
-daisyUI 5 class names are one of the following categories. These type names are only for reference and are not used in the actual code
-- `component`: the required component class
-- `part`: a child part of a component
-- `style`: sets a specific style to component or part
-- `behavior`: changes the behavior of component or part
-- `color`: sets a specific color to component or part
-- `size`: sets a specific size to component or part
-- `placement`: sets a specific placement to component or part
-- `direction`: sets a specific direction to component or part
-- `modifier`: modifies the component or part in a specific way
-- `variant`: prefixes for utility classes that conditionally apply styles. syntax is `variant:utility-class`
+---
 
-## Config
-daisyUI 5 config docs: https://daisyui.com/docs/config/
-daisyUI without config:
-```css
-@plugin "daisyui";
-```
-daisyUI config with `light` theme only:
-```css
-@plugin "daisyui" {
-  themes: light --default;
+## Phase 1: Control Implementation
+
+### 1.1 Create the C# Control File
+
+**Location:** `Flowery.NET/Controls/Daisy[ControlName].cs`
+
+> If the control is a **custom extension** (not a direct DaisyUI component), place it under:
+>
+> - `Flowery.NET/Controls/Custom/Daisy[ControlName].cs`
+> - Namespace: `Flowery.Controls.Custom`
+
+**Required elements:**
+
+```csharp
+using System;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
+// Add other required usings at the TOP
+
+namespace Flowery.Controls
+{
+    // Define enums at namespace level
+    public enum Daisy[ControlName]Variant
+    {
+        Default,
+        Primary,
+        // ... other values
+    }
+
+    /// <summary>
+    /// Brief description of what the control does.
+    /// </summary>
+    public class Daisy[ControlName] : TemplatedControl // or appropriate base class
+    {
+        // StyleKey override for theming
+        protected override Type StyleKeyOverride => typeof(Daisy[ControlName]);
+
+        /// <summary>
+        /// Gets or sets the property description.
+        /// </summary>
+        public static readonly StyledProperty<Type> PropertyNameProperty =
+            AvaloniaProperty.Register<Daisy[ControlName], Type>(nameof(PropertyName), defaultValue);
+
+        public Type PropertyName
+        {
+            get => GetValue(PropertyNameProperty);
+            set => SetValue(PropertyNameProperty, value);
+        }
+    }
 }
 ```
-daisyUI with all the default configs:
-```css
-@plugin "daisyui" {
-  themes: light --default, dark --prefersdark;
-  root: ":root";
-  include: ;
-  exclude: ;
-  prefix: ;
-  logs: true;
-}
-```
-An example config:
-In below config, all the built-in themes are enabled while bumblebee is the default theme and synthwave is the prefersdark theme (default dark mode)
-All the other themes are enabled and can be used by adding `data-theme="THEME_NAME"` to the `<html>` element
-root scrollbar gutter is excluded. `daisy-` prefix is used for all daisyUI classes and console.log is disabled
-```css
-@plugin "daisyui" {
-  themes: light, dark, cupcake, bumblebee --default, emerald, corporate, synthwave --prefersdark, retro, cyberpunk, valentine, halloween, garden, forest, aqua, lofi, pastel, fantasy, wireframe, black, luxury, dracula, cmyk, autumn, business, acid, lemonade, night, coffee, winter, dim, nord, sunset, caramellatte, abyss, silk;
-  root: ":root";
-  include: ;
-  exclude: rootscrollgutter, checkbox;
-  prefix: daisy-;
-  logs: false;
-}
-```
-## daisyUI 5 colors
 
-### daisyUI color names
-- `primary`: Primary brand color, The main color of your brand
-- `primary-content`: Foreground content color to use on primary color
-- `secondary`: Secondary brand color, The optional, secondary color of your brand
-- `secondary-content`: Foreground content color to use on secondary color
-- `accent`: Accent brand color, The optional, accent color of your brand
+### 1.2 Key Requirements
+
+- **XML Documentation**: Every class and property MUST have `/// <summary>` comments
+- **StyledProperty Pattern**: Use the exact pattern shown above for documentation generator
+- **Enums at Namespace Level**: Define enums outside the class, with `public` access
+- **Using Directives**: Add ALL required usings at the file TOP (avoid inline fully-qualified names)
+- **Preset “modes” / “bases” (optional)**: If the control supports multiple input/format modes (like `DaisyNumericUpDown.NumberBase`), implement them as a `public enum` + `StyledProperty<Enum>` and apply the mode in code-behind when the property changes.
+
+---
+
+## Phase 2: Theme/Styling
+
+### 2.1 Create the Theme File
+
+**Location:** `Flowery.NET/Themes/Daisy[ControlName].axaml`
+
+> If the control is in `Flowery.NET/Controls/Custom/`, put the theme under:
+>
+> - `Flowery.NET/Themes/Custom/Daisy[ControlName].axaml`
+> - and use the matching XAML namespace: `clr-namespace:Flowery.Controls.Custom;assembly=Flowery.NET`
+
+```xml
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:controls="clr-namespace:Flowery.Controls;assembly=Flowery.NET">
+
+    <ControlTheme x:Key="{x:Type controls:Daisy[ControlName]}" TargetType="controls:Daisy[ControlName]">
+        <Setter Property="Template">
+            <ControlTemplate>
+                <!-- Control template here -->
+            </ControlTemplate>
+        </Setter>
+        <!-- Style setters for variants, states, etc. -->
+    </ControlTheme>
+
+</ResourceDictionary>
+```
+
+### 2.2 Register the Theme
+
+Add the theme to `Flowery.NET/DaisyUITheme.axaml`:
+
+```xml
+<ResourceInclude Source="avares://Flowery.NET/Themes/Daisy[ControlName].axaml" />
+```
+
+> For custom controls, include the custom theme path:
+>
+> - `/Themes/Custom/Daisy[ControlName].axaml`
+
+---
+
+## Phase 3: Gallery Examples
+
+### 3.1 Create or Update Examples File
+
+**Location:** `Flowery.NET.Gallery/Examples/[Category]Examples.axaml`
+
+Add a section for the new control:
+
+```xml
+<!-- Control Name -->
+<StackPanel Spacing="12">
+    <local:SectionHeader SectionId="controlname" Title="Control Name" />
+    <TextBlock Text="Description of the control." Opacity="0.7" />
+    <WrapPanel Orientation="Horizontal">
+        <StackPanel Spacing="10" Margin="0,0,40,20">
+            <TextBlock Text="Basic Usage" FontSize="12" Opacity="0.7"/>
+            <controls:Daisy[ControlName] />
+        </StackPanel>
+        <!-- More examples -->
+    </WrapPanel>
+</StackPanel>
+
+<controls:DaisyDivider />
+```
+
+### 3.2 Code-Behind (if needed)
+
+If the examples need event handlers or dynamic behavior, add them to the `.axaml.cs` file.
+
+### 3.3 Implement IScrollableExample
+
+Ensure the examples class implements `IScrollableExample`:
+
+```csharp
+public partial class [Category]Examples : UserControl, IScrollableExample
+{
+    public void ScrollToSection(string sectionName)
+    {
+        // Standard implementation - copy from existing examples
+    }
+}
+```
+
+### 3.4 Register SectionId → Control mapping (required)
+
+If you add a new `<local:SectionHeader SectionId="..." />`, ensure the ID maps to the control name in BOTH places:
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
