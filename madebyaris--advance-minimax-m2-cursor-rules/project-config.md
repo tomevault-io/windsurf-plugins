@@ -1,83 +1,222 @@
 ---
 trigger: always_on
-description: MiniMax M2.7 skill authoring: when to use skills, how to structure them, and how to keep them deep without duplicating the core.
+description: Swift development: SwiftUI, Combine, async/await, iOS patterns, and Apple platform conventions
 ---
 
 
-# Skill Authoring
+# Swift Development Patterns
 
-Use this rule when creating, revising, or evaluating `.cursor/skills/*` content.
+Modern Swift patterns for iOS, macOS, and Apple platform development.
 
-## Rule vs Skill
+## Swift Workflow
 
-- Put durable, universal behavior in always-on rules.
-- Use a skill for repeatable workflows, domain-specific heuristics, or tasks that need examples and reference material.
-- If the content only matters for one file type or one domain, prefer a skill or requestable rule over expanding the core.
+Before changing Swift or Apple-platform code:
 
-## Skill Shape
-
-Each skill should clearly provide:
-
-- what it is for
-- when to use it
-- what to inspect first
-- the workflow or decision sequence
-- any output or verification expectations
-
-## Frontmatter Contract
-
-Use YAML frontmatter on every `SKILL.md`.
-
-Minimum:
-
-```yaml
----
-name: my-skill
-description: >
-  What this skill does and the user-language triggers for when to use it.
-license: MIT
-metadata:
-  version: "1.0.0"
-  category: workflow
-  sources:
-    - Official docs or standards
----
+```text
+1. Determine whether this is a Swift package or an Xcode-managed app
+2. Read `Package.swift` or inspect the existing project structure first
+3. For version-sensitive work, verify current Swift, SDK, or Xcode details with the actual current date
+4. Never hand-edit IDE-managed project metadata
 ```
 
-Rules:
+### ⚠️ CRITICAL: Xcode Project Files
 
-- `name` must match the directory name exactly.
-- `description` must include concrete trigger language, not vague capability claims.
-- `license` should be explicit so skills stay portable outside this repo.
-- `metadata.version` should change when the skill meaningfully evolves.
-- `metadata.category` should describe the domain or workflow.
-- `metadata.sources` should name current authoritative sources when the skill depends on external behavior.
+**NEVER manually create or edit:**
+- `*.xcodeproj/project.pbxproj` - This is a complex binary-like file managed by Xcode
+- `*.xcworkspace/contents.xcworkspacedata`
+- `*.xcodeproj/xcuserdata/*`
 
-## Progressive Disclosure
+**These files MUST be created through:**
+- Xcode IDE (Create New Project)
+- `swift package init` for Swift Package Manager projects
+- `xcodebuild` commands for CI/CD
 
-- Keep `SKILL.md` focused on the main workflow.
-- Move large examples, extended references, and category catalogs into companion files such as `reference.md`.
-- Load deeper material only when the task actually needs it.
+**Why?** The `.pbxproj` file has:
+- UUID references that must be consistent
+- Specific formatting Xcode expects
+- Build settings that are complex to replicate
+- Manual creation will result in CORRUPTED projects
 
-## Skill Contracts
+### CLI-First Swift Development
 
-- State concrete triggers in user-language, not vague capability claims.
-- Define inputs, outputs, stop conditions, and common failure modes.
-- Prefer one coherent workflow per skill over broad omnibus instructions.
+**For Swift Packages (preferred for libraries):**
+```bash
+# Create new package (NEVER manually create Package.swift)
+swift package init --type library
+swift package init --type executable
+swift package init --type tool
 
-## Anti-Duplication
+# Add dependencies
+# Edit Package.swift, then:
+swift package resolve
+swift build
+swift test
+```
 
-- Do not copy the always-on solver loop, status taxonomy, or generic tool discipline into every skill.
-- Let skills deepen the task-specific method, not restate the global contract.
-- Reference existing project patterns or rule files when they already cover shared behavior.
+**For iOS/macOS Apps:**
+```bash
+# You MUST use Xcode to create .xcodeproj
+# There is NO CLI equivalent for full iOS projects
 
-## Quality Bar
+# Build from command line (project must exist)
+xcodebuild -project MyApp.xcodeproj -scheme MyApp -sdk iphonesimulator build
 
-- Keep the opening concise enough that the agent can quickly decide whether to load the skill.
-- Use examples only when they change behavior.
-- Re-read the skill after writing it and remove filler, stale tool names, and redundant policy text.
-- Prefer one small `SKILL.md` plus optional `reference.md` over one giant omnibus file.
-- If the skill references scripts or helper assets, document where outputs go and how success is verified.
+# Run tests
+xcodebuild test -project MyApp.xcodeproj -scheme MyApp -destination 'platform=iOS Simulator,name=iPhone 15'
+```
+
+### Post-Edit Verification
+
+After meaningful Swift changes, run the smallest useful check for the task:
+
+```bash
+# Swift Package
+swift build
+swift test
+
+# Xcode Project
+xcodebuild -project MyApp.xcodeproj -scheme MyApp -sdk iphonesimulator build
+```
+
+Add lint or formatting checks when the repo already uses them or the change is substantial.
+
+### Common Swift Syntax Traps (Avoid These!)
+
+```swift
+// WRONG: Force unwrapping optionals
+let name = user.name!  // Crashes if nil!
+
+// CORRECT: Safe unwrapping
+guard let name = user.name else {
+    return
+}
+
+// Or use optional chaining
+let name = user.name ?? "Unknown"
+
+// WRONG: Strong reference cycles
+class Parent {
+    var child: Child?
+}
+class Child {
+    var parent: Parent?  // Creates retain cycle!
+}
+
+// CORRECT: Use weak or unowned
+class Child {
+    weak var parent: Parent?
+}
+
+// WRONG: Blocking main thread
+func loadData() {
+    let data = URLSession.shared.data(from: url)  // Blocks UI!
+}
+
+// CORRECT: Use async/await
+func loadData() async throws -> Data {
+    let (data, _) = try await URLSession.shared.data(from: url)
+    return data
+}
+
+// WRONG: Not using @MainActor for UI updates
+class ViewModel: ObservableObject {
+    @Published var items: [Item] = []  // May update from background!
+}
+
+// CORRECT: Use @MainActor
+@MainActor
+class ViewModel: ObservableObject {
+    @Published var items: [Item] = []  // Guaranteed main thread
+}
+```
+
+---
+
+## SwiftUI Fundamentals
+
+### View Structure
+```swift
+struct ContentView: View {
+    // State at the top
+    @State private var isLoading = false
+    @State private var items: [Item] = []
+    
+    // Environment and observed objects
+    @EnvironmentObject var appState: AppState
+    @ObservedObject var viewModel: ContentViewModel
+    
+    // Computed properties
+    private var filteredItems: [Item] {
+        items.filter { $0.isActive }
+    }
+    
+    var body: some View {
+        NavigationStack {
+            List(filteredItems) { item in
+                ItemRow(item: item)
+            }
+            .navigationTitle("Items")
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Add", action: addItem)
+                }
+            }
+        }
+        .task {
+            await loadItems()
+        }
+    }
+    
+    // Actions at the bottom
+    private func addItem() { ... }
+    private func loadItems() async { ... }
+}
+```
+
+### Property Wrappers
+
+```swift
+// @State - owned by the view, simple value types
+@State private var count = 0
+@State private var text = ""
+
+// @Binding - reference to parent's state
+struct ChildView: View {
+    @Binding var isPresented: Bool
+}
+
+// @StateObject - owned by the view, reference types (create once)
+@StateObject private var viewModel = ViewModel()
+
+// @ObservedObject - reference from parent (don't create)
+@ObservedObject var viewModel: ViewModel
+
+// @EnvironmentObject - shared app-wide state
+@EnvironmentObject var appState: AppState
+
+// @Environment - system values
+@Environment(\.colorScheme) var colorScheme
+@Environment(\.dismiss) var dismiss
+
+// @AppStorage - UserDefaults persistence
+@AppStorage("username") var username = ""
+```
+
+### View Modifiers
+```swift
+struct ContentView: View {
+    var body: some View {
+        Text("Hello")
+            .font(.headline)
+            .foregroundColor(.primary)
+            .padding()
+            .background(.regularMaterial)
+            .cornerRadius(12)
+            .shadow(radius: 4)
+    }
+}
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [madebyaris/advance-minimax-m2-cursor-rules](https://github.com/madebyaris/advance-minimax-m2-cursor-rules) — distributed by [TomeVault](https://tomevault.io).
