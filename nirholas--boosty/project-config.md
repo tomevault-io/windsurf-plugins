@@ -16,6 +16,5 @@ description: > All-in-One Solana + EVM Volume Booster with a built-in Volume Bot
 - If a terminal appears unresponsive, kill it and create a new one rather than retrying in the same terminal
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/nirholas)
-> This is a context snippet only. You'll also want the standalone SKILL.md file — [download at TomeVault](https://tomevault.io/claim/nirholas)
-<!-- tomevault:4.0:windsurf_rules:2026-04-08 -->
+> Source: [nirholas/boosty](https://github.com/nirholas/boosty) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-02 -->
