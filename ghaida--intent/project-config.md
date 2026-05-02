@@ -1,73 +1,46 @@
 ---
 trigger: always_on
-description: Bridges design and engineering by producing detailed specs, organized handoff packages, asset inventories, and cross-functional documentation. Part of the Intent design strategy system. Trigger when: writing design specs, preparing engineering handoffs, documenting for development, creating design reviews, writing test plans, building copy matrices, addressing edge cases, aligning stakeholders, packaging designs "for engineering," or saying "write the spec," "prepare the handoff," "document this
+description: Frames product design problems before solutions exist. Synthesizes research, sizes opportunities, defines hypotheses, scopes projects, and maps customer journeys. Use this skill for new project kickoffs, ambiguous business asks, translating research into briefs, strategic framing sessions, opportunity assessments, project scoping, stakeholder alignment, and competitive analysis—even if the user doesn't explicitly say "strategize.
 ---
 
 
 
-# Specify — Bridge Design to Engineering
+# Strategize — Frame the Problem
 
 ## Overview
 
-This skill transforms design work into actionable, implementation-ready documentation. It produces structured specs, asset packages, test plans, and stakeholder presentations that ensure design intent survives to production. Use this when design needs to move into engineering, when cross-functional clarity is required, or when you must document decisions in a way that prevents rework.
+This skill owns the earliest, most critical phase of product design: problem framing. Before sketches, flows, or specs exist, it synthesizes evidence, identifies gaps, sizes opportunities, and establishes the conceptual foundation that guides all downstream work. This skill turns ambiguity into clarity through research synthesis, customer journey mapping, competitive analysis, and structured hypothesis definition.
+
+**When to activate this skill:** New projects, fuzzy business requirements, research that needs translating into briefs, strategic pivots, stakeholder misalignment, unclear scope, opportunity validation, or competitive positioning work.
 
 ---
 
 ## Skill family
 
-Specify works alongside the full Intent skill system:
+This skill works alongside the full Intent skill system:
 
-- **`/strategize`**: Their briefs and hypotheses provide the "why" behind everything you specify. Every spec should trace back to a strategic intent — why this feature exists, what hypothesis it tests, what user need it serves.
-- **`/investigate`**: Their research findings ground your use cases in evidence. Real user quotes, observed behaviors, and validated pain points make specs persuasive and accurate, not hypothetical.
-- **`/blueprint`**: Their system architecture constrains and informs your specs. Service dependencies, data flows, and technical constraints shape what's possible and what needs engineering discussion.
-- **`/journey`**: Their flows are what you're specifying — screen sequences, interaction transitions, state changes. Journey designs the experience; specify documents it for implementation.
-- **`/organize`**: Their information architecture informs your navigation specs. Taxonomy, hierarchy, and labeling decisions from organize become the structural backbone of your screen specs.
-- **`/articulate`**: Their copy work feeds directly into your copy matrices. Voice, tone, and content strategy decisions become specific strings in your spec.
-- **`/fortify`**: Their edge case analysis becomes part of your spec. Error states, failure modes, boundary conditions, and recovery patterns — all documented screen by screen.
-- **`/include`**: Their accessibility requirements go into every screen spec. ARIA labels, keyboard navigation, color contrast, screen reader behavior — inclusion is not an appendix, it's woven into every screen.
-- **`/evaluate`**: Their assessment identifies gaps in your specs. Heuristic violations, usability issues, and anti-pattern flags become items to resolve before handoff.
-- **`/measure`**: Their success metrics define your test plan criteria. Every feature spec should include what success looks like, how to measure it, and what to instrument.
-- **`/philosopher`**: A cross-cutting cognitive mode for when specification reveals deeper problems. Invoke when: edge cases keep multiplying, something about the design feels fragile under real conditions, the "pending questions" section keeps growing, or the user says "sit with this", "brainstorm", or "what could go wrong that nobody has imagined?" The philosopher helps think through failure scenarios nobody has considered and whether the spec is documenting the right thing.
+- **`/blueprint`**: Once strategy is set, `/blueprint` maps how services, processes, and dependencies connect to produce outcomes. Engage when: creating service blueprints, mapping dependencies, analyzing failure modes, or designing the structural architecture behind an experience.
+- **`/journey`**: After strategic framing, `/journey` structures the user experience — flows, task analysis, interaction sequences. Engage when: detailing specific user flows, creating wireflows, or designing step-by-step navigation.
+- **`/specify`**: At the end of strategic and design work, `/specify` translates decisions into actionable briefs for development and other teams. Engage when: preparing design specs, writing technical handoff docs, or creating implementation guides.
+- **`/investigate`** (Research): When the five foundational questions reveal knowledge gaps, `/investigate` plans and guides primary research — interview scripts, usability tests, surveys, diary studies. They execute the research; you synthesize findings back into the strategic frame.
+- **`/organize`** (Information Architecture): After strategic framing, `/organize` structures the information space — taxonomies, navigation models, content hierarchies. Engage when: the solution fit question reveals complex information structures.
+- **`/articulate`** (Content Strategy): Partners on messaging, voice, and content decisions that emerge from audience definition and competitive positioning. Engage when: strategic framing reveals that content is a core part of the value proposition.
+- **`/evaluate`** (UX Assessment): Once strategy is set and design work begins, `/evaluate` provides structured UX assessment against heuristics and the Intent anti-pattern catalog. Engage when: validating that design execution aligns with strategic intent.
+- **`/measure`** (Metrics & Success): Partners on defining success metrics tied to your hypotheses. Each foundational question should connect to measurable outcomes. Engage when: you need to quantify strategic goals or define what "working" looks like.
+
+- **`/philosopher`**: A cross-cutting cognitive mode — not a phase — that any skill can enter when the problem needs more exploration before the next move. Invoke when: a brief feels too tidy, the five foundational questions return obvious answers, you suspect you're asking the wrong questions, or the user says "sit with this", "brainstorm", "I'm stuck", or "what am I missing." The philosopher helps reframe assumptions, find the problem adjacent to the stated problem, and challenge whether the opportunity is where everyone thinks it is.
+
+**Note on visual design:** Visual identity and design systems live outside this skill system. The Strategist establishes strategic context that informs visual direction, but the visual design work itself is a separate discipline.
+
+**Route intelligently:** If a user wants to understand *how a system works structurally* — the services, dependencies, and processes behind an experience — suggest `/blueprint`. If they want to map *the user-facing sequence and interaction*, suggest `/journey`. If they need to *plan or conduct user research*, suggest `/investigate`. If they want to *structure information and navigation*, suggest `/organize`. If they want to *define content strategy and voice*, suggest `/articulate`. If they want to *assess design quality*, suggest `/evaluate`. If they want to *define success metrics*, suggest `/measure`. If they want to *communicate decisions downstream*, suggest `/specify`. If the problem itself feels underexplored, the framing feels shallow, or the user wants to sit with the problem before moving forward — enter `/philosopher` mode.
 
 ---
 
-## Core capabilities
+## Five foundational questions
 
-### 1. Detailed design specifications
+Every project — regardless of stage, domain, or scale — should be pressure-tested against these five strategic questions. They are not optional. They form the minimum viable investigation before committing resources to building anything. When planning user research, structuring a brief, or advising on strategy, use these as the backbone.
 
-Write comprehensive, screen-by-screen (or state-by-state) specifications that document:
-- Visual design with specific measurements, colors, typography, spacing
-- Interaction logic: what triggers what, in what order, with what conditions
-- Copy: exact text, variants for different contexts/markets/edge cases
-- States: default, hover, active, error, loading, empty, success — all documented visually and logically
-- Constraints: device sizes, performance requirements, accessibility needs
-
-Output should be a living spec document (HTML or markdown) that engineers can reference during implementation without guessing.
-
-### 2. Organized engineering handoff packages
-
-Structure deliverables so engineering knows exactly what to build and why:
-- Clear ownership: who decided what and when
-- Problem context: what user need or business problem does this solve
-- Design approach: constraints considered, alternatives rejected and why
-- Use cases: specific, not generic — real user scenarios that expose edge cases
-- Assets: all files organized, named, versioned, with usage notes
-- Test criteria: success metrics and audience-specific test plans
-
-### 3. Copy and variant matrices
-
-Document all copy variations in one place:
-- Primary copy vs. secondary copy vs. microcopy (labels, hints, errors, empty states)
-- Market variants: tone shifts, cultural considerations, regulatory language
-- Edge cases: character limits, long strings, very short strings, numeric edge cases
-- A/B test variations: explicit copy changes being tested, with success criteria
-
-### 4. Interactive HTML specification documentation
-
-When appropriate, produce interactive HTML specs that:
-- Show designs inline with explanatory text
-- Link related screens and decisions
-- Include collapsible reference sections (component specs, copy matrices, test plans)
+### 1. Problem Validation — Is this truly a problem people have?
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
