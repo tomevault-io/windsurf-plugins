@@ -1,137 +1,136 @@
 ---
 trigger: always_on
-description: When the user types /discovery or requests quality analysis, code audit, or issue detection
+description: When the user types /plan or asks to create a project plan, feature PRD, or retrospective
 ---
 
 
-# Discovery — Quality Analysis & Issue Detection
+# Plan — Structured Project Planning & PRD Generation
 
-Systematic quality discovery that runs modular probes adapted to the project's tech stack, presents findings interactively, and creates VCS issues for confirmed problems.
-
-## Invocation
-
-- **Standalone** (`/discovery [scope]`): Full flow with interactive triage (Phases 0-5 + Phase 6 stats)
-- **Embedded** (from session-end when `discovery-on-close: true`): Phases 0-3 only, returns structured JSON to caller
-
-Scope accepts: `all` (default), `code`, `infra`, `ui`, `arch`, `session`, or comma-separated like `code,session`.
+Three planning modes with a shared research-driven Q&A engine. Pattern across all modes: **research → questions → document → review → issues**.
 
 ## Phase 0: Read Session Config
 
-Read Session Config from CLAUDE.md. Parse discovery-specific fields:
-- `discovery-probes`, `discovery-exclude-paths`, `discovery-severity-threshold`, `discovery-confidence-threshold`, `discovery-on-close`
+Read Session Config from CLAUDE.md. Required field: `plan-baseline-path`. If missing or absent, stop with error:
 
-## Phase 1: Stack Detection
+> "Error: `plan-baseline-path` is not configured in Session Config. Add it to your CLAUDE.md under `## Session Config`. Example: `plan-baseline-path: ~/Projects/projects-baseline`"
 
-Detect the project's tech stack via marker file checks (Glob):
+Additional fields: `plan-default-visibility`, `plan-prd-location`, `plan-retro-location`, `vcs`. Expand `~` in paths.
 
-| Marker File(s) | Activates |
-|----------------|-----------|
-| `package.json` | JS/TS probes |
-| `tsconfig.json` | TypeScript probes |
-| `requirements.txt` / `pyproject.toml` | Python probes |
-| `Dockerfile` / `docker-compose.yml` | Container probes |
-| `.github/workflows/` | GitHub CI probes |
-| `.gitlab-ci.yml` | GitLab CI probes |
-| `next.config.*` / `nuxt.config.*` | SSR probes |
-| `tailwind.config.*` | Tailwind probes |
-| `.orchestrator/` exists | Session probes |
+## Phase 1: Mode Selection
 
-Build activation set: start with marker-matched probes → intersect `discovery-probes` config (if set) → restrict to scope argument (if passed).
+Parse the argument to determine mode:
 
-Default exclude paths (always apply): `node_modules/`, `.git/`, `dist/`, `build/`, `.next/`, `.nuxt/`, `coverage/`. Add paths from `discovery-exclude-paths`.
+- **`new`** — Project kickoff: scaffolding, architecture decisions, initial setup
+- **`feature`** — Feature PRD: requirements gathering, compact scope, acceptance criteria
+- **`retro`** — Retrospective: data-driven analysis of recent work, learnings extraction
 
-Report: "Discovery: [N] probes active across [categories]. Stack: [detected]. Threshold: [severity]."
+If no mode specified, ask via numbered list:
 
-## Phase 2: Probe Execution
-
-Run probes **sequentially** — Cursor has no parallel agents. One category at a time. Complete each category's analysis before moving to the next.
-
-### 6 Probe Categories
-
-**Code probes** (any project with source files):
-- `hardcoded-values`, `orphaned-annotations`, `dead-code`, `ai-slop`, `type-safety-gaps`, `test-coverage-gaps`, `test-anti-patterns`, `security-basics`
-
-**Infra probes** (when CI/Docker markers found):
-- CI configuration issues, Dockerfile anti-patterns
-
-**UI probes** (when frontend frameworks detected):
-- Accessibility gaps, component anti-patterns
-
-**Arch probes** (any project):
-- Circular dependencies, complexity hotspots, deep nesting
-
-**Session probes** (when `.orchestrator/` exists):
-- Session metric anomalies, recurring failures, stale learnings
-
-For each probe match, record a finding in this exact format:
 ```
-FINDING:
-  probe: <probe_name>
-  category: <category>
-  severity: <critical|high|medium|low>
-  file_path: <absolute path>
-  line_number: <number>
-  matched_text: <exact text from tool output>
-  title: <short title>
-  description: <1-2 sentence description>
-  recommended_fix: <concrete fix suggestion>
+Which planning mode?
+
+1. new (Recommended) — Project kickoff (full PRD, repo setup, issue creation)
+2. feature — Feature PRD (compact scope, acceptance criteria, issues)
+3. retro — Retrospective (metrics analysis, reflection, improvement actions)
 ```
 
-If a probe's activation condition is not met, skip with note. If a probe command fails, skip gracefully and continue.
+## Phase 2: Q&A Engine (Shared Core)
 
-**CRITICAL**: Do NOT fabricate findings. Only report what tool output confirms.
+Every question wave follows the same pattern. This is the core mechanic across all modes.
 
-### Key Detection Patterns
+### 2.1 Pre-Question Research
 
-| Probe | Severity | Pattern |
-|-------|----------|---------|
-| Hardcoded secrets | Critical | `(password\|api_key\|secret\|token)\s*[:=]\s*["'][^"']+["']` (exclude test/env/fixtures) |
-| eval usage | High | `eval\s*\(` |
-| XSS (React) | High | `dangerouslySetInnerHTML` |
-| SQL injection | High | `` `[^`]*SELECT[^`]*\$\{`` |
-| any type | Medium | `:\s*any\b` or `as\s+any\b` |
-| TS suppression | Medium | `@ts-ignore` |
-| AI filler | Medium | `(as you can see\|it's worth noting\|needless to say)` |
+Before each Q&A wave, perform research **sequentially** — Cursor has no parallel agents:
 
-## Phase 3: Verification & Scoring
+1. **Market/online context** — Search for relevant market data, best practices, competitor analysis, or technical patterns for the upcoming questions
+2. **Baseline analysis** — Read projects-baseline templates, rules, and scripts at `$BASELINE_PATH` (Glob, Grep, Read)
+3. **Repo context** — Analyze current repository for patterns, file structure, dependencies, conventions (skip for `/plan new` wave 1)
 
-### 3.1 Verify Each Finding
+### 2.2 Question Presentation
 
-For EACH finding: read the file at `file_path:line_number`. Confirm `matched_text` appears at or near that line (+/-3 lines tolerance). If NOT confirmed, discard as false positive.
+Synthesize research into **5 questions per wave**. Present as numbered Markdown lists — Cursor has no AskUserQuestion:
 
-Report: "Verification: N confirmed, M discarded as false positives"
+- **Option 1 is ALWAYS the recommendation**, marked with `(Recommended)`
+- Include Pros/Cons drawn from the research for each option
+- Include an "Other" option when custom input makes sense
 
-### 3.2 Confidence Scoring
+Example:
+```
+## Architecture (Wave 1, Q1)
 
-Start at 40 baseline, add factor scores, clamp to 0-100. Critical severity findings always get minimum 70.
+Which project archetype fits best?
 
-| Factor | Low (+0) | Medium (+10) | High (+20) |
-|--------|----------|-------------|------------|
-| Pattern specificity | Generic (URL, TODO) | Moderate (orphaned annotation) | Specific (API key regex, eval()) |
-| File context | Test/example/docs | Utility/config/scripts | Production source/API handler |
-| Historical signal | Previously dismissed | No prior data | Recurring issue |
+1. nextjs-saas (Recommended) — Pro: Full SaaS stack with auth, payments. Con: Heavier setup.
+2. express-service — Pro: Lightweight API. Con: No frontend.
+3. docker-service — Pro: Maximum flexibility. Con: More manual setup.
+4. Other — Describe your preferred archetype.
+```
 
-Read `discovery-confidence-threshold` from config (default: 60).
+### 2.3 Adaptive Depth
 
-### 3.3 Deduplication
+Starting wave counts: `new` → 3 waves minimum, `feature` → 1 wave minimum, `retro` → 1 wave minimum. Maximum 5 waves across all modes.
 
-Same `file_path` + overlapping line range (+/-5 lines) + different probes = duplicate. Keep higher severity finding.
+After each wave:
+- **Answers clear** → proceed to document generation
+- **Complexity revealed** → add targeted follow-up wave
+- **User aborts** → proceed with answers gathered
 
-### 3.4 Apply Thresholds
+### 2.4 Answer Tracking
 
-Remove findings below `discovery-severity-threshold` and below `discovery-confidence-threshold`. Log auto-dismissed count.
+After each wave, output a recap:
+```
+## Answers So Far (Wave N/M)
+1. Archetype: nextjs-saas
+2. Visibility: internal
+3. Audience: B2B customers
+```
 
-### 3.5 Embedded Mode Exit
+---
 
-If in embedded mode (called from session-end): STOP HERE. Return this JSON schema:
+## Mode: new — Project Kickoff
 
-```json
-{
-  "findings": [
-    {"probe": "string", "category": "string", "severity": "critical|high|medium|low",
-     "confidence": 0, "file": "string", "line": 0, "description": "string", "recommendation": "string"}
-  ],
-  "stats": {
+**Wave 1** — Core Decisions: archetype (read `$BASELINE_PATH/templates/`), visibility, target audience, core problem, GitLab group.
+
+**Wave 2** — Technical Details (per chosen archetype): tech stack decisions, design style, external integrations, performance requirements, security requirements.
+
+**Wave 3** — Business & Scope: MVP appetite (1w/2w/6w), success criteria (SMART), known risks, post-launch plan, ecosystem dependencies.
+
+Document: 8-section full PRD. Save to `{plan-prd-location}/YYYY-MM-DD-{project-name}.md`.
+
+After PRD approval: run `$BASELINE_PATH/scripts/setup-project.sh`, verify repo, populate CLAUDE.md, commit PRD.
+
+Issues: Epic (project name) + sub-issues per MVP feature from PRD Section 4 (Solution & Scope).
+
+---
+
+## Mode: feature — Feature PRD
+
+**Wave 1** — Feature Core: what to build, why now, who uses it, scope + explicit exclusions, dependencies.
+
+**Wave 2** (conditional — only if Wave 1 reveals multiple subsystems or unclear integration): architecture decisions, integration points, data model changes, edge cases, performance impact.
+
+Document: 5-section compact PRD. Save to `{plan-prd-location}/YYYY-MM-DD-{feature-slug}.md`.
+
+Issues: Epic (feature name) + sub-issues per acceptance criterion group.
+
+---
+
+## Mode: retro — Retrospective
+
+**Phase 1 (automatic, no user input):** Read `.orchestrator/metrics/sessions.jsonl`, run git log analysis, query open issues, compare last 5 vs prior 5 sessions.
+
+**Wave 1** — What went well / what didn't: highlights, blockers with root causes, carryover items, process assessment, data anomalies.
+
+**Wave 2** (conditional — if Wave 1 reveals significant blockers or process issues): improvement actions, priority ranking, ownership, baseline changes, Session Config adjustments.
+
+Artifacts: retro doc → `{plan-retro-location}/YYYY-MM-DD-retro.md`. Improvement issues + learnings update (`.orchestrator/metrics/learnings.jsonl`).
+
+---
+
+## Phase 3: Document Generation
+
+Read the appropriate template from the skill directory:
+- `new` → `prd-full-template.md` (8 sections)
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
