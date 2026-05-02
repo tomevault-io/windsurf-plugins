@@ -7,11 +7,11 @@ A bilingual map of AI engineering evolution, real-world AI usage patterns, and v
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [Qiuner/ai-application-roadmap](https://github.com/Qiuner/ai-application-roadmap).
+Original source: `CLAUDE.md` in [Qiuner/ai-application-roadmap](https://github.com/Qiuner/ai-application-roadmap).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
