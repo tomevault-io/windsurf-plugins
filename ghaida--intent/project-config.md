@@ -1,74 +1,74 @@
 ---
 trigger: always_on
-description: Intent reference: navigation patterns and trade-offs, taxonomy design, mental model theory, wayfinding principles, search behavior models. Load when designing navigation, site structure, taxonomy, or information hierarchy.
+description: Intent reference: form design, state management, validation patterns, feedback loops, progressive disclosure, error recovery, undo/redo. Load when designing forms, interactions, input validation, or state transitions.
 ---
 
 
-# Information Architecture
+# Interaction Patterns
 
-## Navigation Patterns
+## Form Design Principles
 
-Every navigation pattern is a trade-off between findability, scalability, and cognitive load. There is no universally correct pattern — there's the right pattern for your content, users, and context.
+Forms are where users exchange value with your product. Every unnecessary field, confusing label, or unhelpful error message is friction between the user and their goal. The research on form design is extensive and remarkably consistent.
 
-### Hierarchical (Tree)
+### One Thing Per Page
 
-The most common pattern. Content is organized in nested categories: top-level → subcategory → item.
+The Government Digital Service (GDS) pattern, validated across millions of transactions: each screen asks one question or collects one piece of information. Not one form field — one conceptual unit.
 
-**When it works:** Large content sets with clear categorical relationships. Users have a general sense of what category their item belongs to. Content creators can maintain consistent categorization.
+**Why it works:** Reduces cognitive load. Each page has a clear purpose. Error recovery is simpler — the error is on this page, about this thing. Progress feels tangible. Mobile performance improves (less content per load). Analytics are more granular (you know exactly where drop-off occurs).
 
-**When it fails:** When categories overlap significantly (is a "wireless mouse" in Accessories, Computers, or Peripherals?). When the hierarchy is deeper than 3-4 levels — users lose orientation quickly. When the hierarchy reflects organizational structure rather than user mental models ("Products" → "Business Unit A" → "Division 2" → "Team Alpha's Output").
+**When to bend it:** Closely related fields that users think of as one concept (first name + last name, city + state + zip). Editing flows where users need to see multiple fields to understand context. Expert tools where speed matters more than guidance.
 
-**Watch for:** The "miscellaneous" drawer. If you have a category called "Other" or "General" that keeps growing, your hierarchy isn't working. Also: category names that mean something to the organization but nothing to users.
+**When not to bend it:** Checkout flows. Registration. Any flow where drop-off is a risk. Any flow used on mobile.
 
-### Hub-and-Spoke
+### Inline Validation Timing
 
-A central hub connects to independent sections. Each section is largely self-contained. Users return to the hub to navigate between sections.
+When to validate is as important as how to validate. Get the timing wrong and validation becomes harassment.
 
-**When it works:** Mobile apps with distinct functional areas (Messages, Camera, Profile). Products where tasks are independent — you don't need to combine search results with your shopping cart. Kiosk interfaces and set-top boxes where the input model favors focused navigation.
+**Validate on blur (leaving a field), not on keystroke.** Validating while the user is still typing is hostile — they haven't finished their input and you're already telling them it's wrong. Luke Wroblewski's research (2009) confirmed that inline validation improves completion rates, but only when triggered after the user leaves the field.
 
-**When it fails:** When users need to move fluidly between sections. When tasks span multiple sections. When the "hub" becomes a dumping ground for everything that doesn't fit in a spoke.
+**Exception: password strength.** Real-time feedback on password requirements is one of the few cases where keystroke-level validation helps, because the user is building toward a goal and needs to know the criteria as they type.
 
-**Watch for:** The desire to add cross-links between spokes. Once spokes start linking to each other extensively, the hub-and-spoke model is fighting the user's actual workflow. Consider switching to a different pattern.
+**Exception: character counts.** If a field has a maximum length, show the remaining count as the user types. Don't wait until they've written a paragraph to tell them the limit is 140 characters.
 
-### Flat
+**Validate once, then validate on change.** After a field shows an error, re-validate on every change so the error disappears the moment the input becomes valid. Don't make users re-submit the form to discover they've fixed the error.
 
-All content is at the same level. No hierarchy. Often paired with powerful search/filter.
+### Field Grouping
 
-**When it works:** Homogeneous content sets (a photo gallery, a list of transactions, a feed of posts). Content that doesn't have natural categories. Products with excellent search infrastructure.
+Related fields should be visually and semantically grouped. Ungrouped forms feel longer than they are.
 
-**When it fails:** Diverse content types. Large content sets without strong search/filter. Users who browse rather than search.
+**Use fieldsets for conceptual groups:** Personal information, payment details, shipping address — each is a group. The `<fieldset>` element with a `<legend>` provides both visual grouping and accessibility structure.
 
-**Watch for:** The illusion of flatness. Many "flat" architectures are actually filtered hierarchies — the user selects filters that create ad-hoc categories. That's fine, but the filter design is now your navigation design.
+**Limit visible fields.** If a form has 20 fields but only 6 are relevant based on previous answers, show 6. Conditional visibility reduces perceived complexity without hiding options. The user sees a short form that adapts, not a long form that wastes their time.
 
-### Faceted
+**Single-column layout.** Matteo Penzo's eye-tracking research (2006) and Baymard Institute's studies consistently show that single-column forms outperform multi-column forms. Users scan vertically; multi-column layouts create ambiguous reading order and increase completion time.
 
-Multiple independent dimensions for filtering the same content set. Users combine facets freely (color + size + price + brand).
+### Smart Defaults
 
-**When it works:** E-commerce, search results, large databases with multiple attributes. When different users want to slice the same content differently. When the content has natural, independent attributes.
+Default values should serve the user's most likely intent, not the business's preferred outcome.
 
-**When it fails:** When facets aren't independent (selecting "red" and "small" leaves zero results because small items don't come in red). When there are too many facets — 15 filter dimensions overwhelm rather than help. When the vocabulary is inconsistent across facets.
+**Good defaults:** Country pre-filled from IP geolocation. Date pre-filled to today. Quantity defaulting to 1. Shipping address copied from billing address with one click.
 
-**Watch for:** Empty states. Faceted navigation creates combinatorial explosion — many facet combinations will return zero results. Design for graceful degradation: show result counts per facet before selection, disable facets that would return zero.
+**Bad defaults:** Pre-selected premium tier. Pre-checked marketing consent. Default to most expensive option. Privacy settings defaulting to "share with everyone."
 
-### Dashboard
-
-Multiple content types displayed simultaneously, typically with summary views that link to detail.
-
-**When it works:** Monitoring and analytics products. Executive overviews. Products where users need to scan multiple information streams quickly. Return-visit products where users want a status snapshot.
-
-**When it fails:** When the dashboard becomes the entire product — dashboards that require scrolling through 15 widgets have become a flat architecture by accident. When every stakeholder demands their metric on the dashboard, resulting in information overload. When the dashboard shows data but doesn't enable action.
-
-**Watch for:** Dashboard-driven design, where every new feature gets a widget on the dashboard instead of its own proper location. Also: dashboards that show the same data to everyone when different roles need different views.
+**The test:** If 80% of users would choose this value, it's a good default. If the default primarily benefits the business, it's manipulation (see the anti-pattern catalog).
 
 ---
 
-## Taxonomy Design
+## State Machines for UI
 
-Taxonomy is the art of naming and grouping things so that users can find them. Get taxonomy wrong and no amount of visual design will save the navigation.
+Every interactive component exists in multiple states. Enumerating those states before building prevents the most common class of UI bugs: the states nobody designed for.
 
-### Top-Down vs. Bottom-Up
+### Universal Component States
 
-**Top-down** starts with organizational logic: What are the major categories? How do they subdivide? This approach works when domain experts understand the structure well and users share that understanding. Risk: imposing a structure that makes sense internally but not to users.
+**Default/Resting** — The component as it appears before any interaction. This is what the user sees first. It must communicate: what is this, and what can I do with it?
+
+**Hover** — Mouse cursor is over the component. Must communicate: this is interactive, something will happen if you click. Not applicable to touch interfaces — never put essential information in hover states.
+
+**Focus** — Component has keyboard focus. Must be visually distinct from hover AND default. This is a hard accessibility requirement — users navigating by keyboard need to know where they are.
+
+**Active/Pressed** — User is in the process of activating (mouse down, touch start). Must provide immediate tactile feedback that the action is registering.
+
+**Disabled** — Component exists but can't be activated. Must communicate: this exists, but you can't use it right now (and ideally, why). Disabled states that provide no explanation for why they're disabled are a common frustration.
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
