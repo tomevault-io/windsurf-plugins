@@ -1,232 +1,289 @@
 ---
 trigger: always_on
-description: Design system mastery: design tokens, shadcn/ui, Tailwind CSS v4, component composition, theming, animations, and icon systems.
+description: DevOps and infrastructure: Docker, Kubernetes, Terraform, CI/CD pipelines, and cloud deployment patterns
 ---
 
 
-# Design System Mastery
+# DevOps & Infrastructure Patterns
 
-Comprehensive guide for building and using design systems in modern web applications.
+Containerization, orchestration, infrastructure as code, and CI/CD best practices.
 
-## Design Tokens
+## DevOps Workflow
 
-### Color Tokens
+Before changing infrastructure or deployment code:
 
-```javascript
-// tailwind.config.js
-module.exports = {
-  theme: {
-    extend: {
-      colors: {
-        // Semantic colors
-        brand: {
-          50: '#eff6ff',
-          100: '#dbeafe',
-          200: '#bfdbfe',
-          300: '#93c5fd',
-          400: '#60a5fa',
-          500: '#3b82f6',
-          600: '#2563eb',
-          700: '#1d4ed8',
-          800: '#1e40af',
-          900: '#1e3a8a',
-          950: '#172554',
-        },
-        // Status colors
-        success: {
-          DEFAULT: '#22c55e',
-          light: '#4ade80',
-          dark: '#16a34a',
-        },
-        warning: {
-          DEFAULT: '#eab308',
-          light: '#facc15',
-          dark: '#ca8a04',
-        },
-        error: {
-          DEFAULT: '#ef4444',
-          light: '#f87171',
-          dark: '#dc2626',
-        },
-        // Surface colors
-        surface: {
-          primary: '#ffffff',
-          secondary: '#f8fafc',
-          tertiary: '#f1f5f9',
-          muted: '#e2e8f0',
-        },
-      },
-    },
-  },
-};
+```text
+1. Read the existing Docker, Kubernetes, Terraform, or CI files first
+2. Understand the current state and provider/tool versions in use
+3. For version-sensitive work, verify current versions with the actual current date
+4. Validate configurations before recommending apply or deploy steps
 ```
 
-### Typography Tokens
+### CLI-First DevOps Workflow
 
-```javascript
-// tailwind.config.js
-theme: {
-  extend: {
-    fontFamily: {
-      sans: ['Inter var', 'system-ui', 'sans-serif'],
-      display: ['Cal Sans', 'system-ui', 'sans-serif'],
-      mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
-    },
-    fontSize: {
-      'xs': ['0.75rem', { lineHeight: '1rem' }],
-      'sm': ['0.875rem', { lineHeight: '1.25rem' }],
-      'base': ['1rem', { lineHeight: '1.5rem' }],
-      'lg': ['1.125rem', { lineHeight: '1.75rem' }],
-      'xl': ['1.25rem', { lineHeight: '1.75rem' }],
-      '2xl': ['1.5rem', { lineHeight: '2rem' }],
-      '3xl': ['1.875rem', { lineHeight: '2.25rem' }],
-      '4xl': ['2.25rem', { lineHeight: '2.5rem' }],
-    },
-    fontWeight: {
-      normal: '400',
-      medium: '500',
-      semibold: '600',
-      bold: '700',
-    },
-  },
-}
+Prefer CLI validation and dry-run workflows:
+```bash
+# Docker
+docker build -t test:latest .
+docker-compose config  # Validate compose file
+docker-compose up --dry-run  # Test without running
+
+# Kubernetes
+kubectl apply --dry-run=client -f manifest.yaml
+kubectl diff -f manifest.yaml  # See changes before applying
+kubeval manifest.yaml  # Validate against schema
+
+# Terraform
+terraform init
+terraform fmt -recursive
+terraform validate
+terraform plan -out=tfplan  # Prefer planning before apply
+
+# Helm
+helm lint ./my-chart
+helm template ./my-chart  # Render templates locally
+helm install --dry-run --debug my-release ./my-chart
 ```
 
-### Spacing Tokens
+### Post-Edit Verification
 
-```javascript
-theme: {
-  extend: {
-    spacing: {
-      '0': '0',
-      '1': '0.25rem',
-      '2': '0.5rem',
-      '3': '0.75rem',
-      '4': '1rem',
-      '5': '1.25rem',
-      '6': '1.5rem',
-      '8': '2rem',
-      '10': '2.5rem',
-      '12': '3rem',
-      '16': '4rem',
-      '20': '5rem',
-      '24': '6rem',
-      // Component-specific
-      'card-padding': '1.5rem',
-      'section-gap': '4rem',
-      'input-height': '2.5rem',
-    },
-  },
-}
-```
-
-### Border Radius Tokens
-
-```javascript
-theme: {
-  extend: {
-    borderRadius: {
-      none: '0',
-      sm: '0.25rem',
-      DEFAULT: '0.375rem',
-      md: '0.5rem',
-      lg: '0.75rem',
-      xl: '1rem',
-      '2xl': '1.5rem',
-      '3xl': '2rem',
-      full: '9999px',
-      // Semantic
-      card: '12px',
-      button: '8px',
-      input: '6px',
-      avatar: '50%',
-    },
-  },
-}
-```
-
----
-
-## shadcn/ui Patterns
-
-### Initialization
+After meaningful infrastructure changes, run the smallest useful validation for the files you touched:
 
 ```bash
-# Initialize shadcn-ui
-npx shadcn@latest init
+# Docker
+docker build -t test:latest .
 
-# Add components
-npx shadcn@latest add button card input label form
-npx shadcn@latest add dialog dropdown-menu select
-npx shadcn@latest add toast alert accordion
+# Terraform
+terraform fmt -check -recursive
+terraform validate
+terraform plan
+
+# Kubernetes
+kubectl apply --dry-run=client -f manifest.yaml
 ```
 
-### Component Composition
+Use broader checks only when the change warrants them.
 
-```tsx
-import { Button } from '@/components/ui/button';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
+### Common DevOps Syntax Traps (Avoid These!)
 
-// Login form composition
-function LoginForm() {
-  return (
-    <Card className="w-full max-w-md">
-      <CardHeader>
-        <CardTitle>Welcome back</CardTitle>
-        <CardDescription>
-          Enter your email and password to sign in to your account.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input 
-              id="email" 
-              type="email" 
-              placeholder="m@example.com"
-              required 
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
-            <Input 
-              id="password" 
-              type="password" 
-              required 
-            />
-          </div>
-          <div className="flex items-center space-x-2">
-            <Checkbox id="remember" />
-            <label
-              htmlFor="remember"
-              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-            >
-              Remember me
-            </label>
-          </div>
-        </form>
-      </CardContent>
-      <CardFooter className="flex flex-col space-y-4">
-        <Button className="w-full">Sign in</Button>
-        <p className="text-sm text-muted-foreground text-center">
-          Don't have an account?{' '}
-          <a href="/register" className="text-primary hover:underline">
-            Sign up
-          </a>
-        </p>
-      </CardFooter>
-    </Card>
-  );
+```yaml
+# WRONG: YAML indentation with tabs
+services:
+	app:      # Tab character - YAML error!
+		image: nginx
+
+# CORRECT: Always use spaces (2 spaces standard)
+services:
+  app:
+    image: nginx
+
+# WRONG: Missing quotes for special values
+environment:
+  - VERSION=1.0      # Might be parsed as number
+  - ENABLED=true     # Might be parsed as boolean
+
+# CORRECT: Quote string values
+environment:
+  - VERSION="1.0"
+  - ENABLED="true"
+
+# WRONG: Hardcoded secrets in config
+env:
+  - name: DB_PASSWORD
+    value: "supersecret123"  # NEVER do this!
+
+# CORRECT: Use secrets
+env:
+  - name: DB_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: db-secrets
+        key: password
+```
+
+### Infrastructure Version Pinning
+
+Always pin versions explicitly:
+
+```dockerfile
+# WRONG
+FROM node:latest
+FROM python
+
+# CORRECT - Pin major.minor at minimum
+FROM node:20-alpine
+FROM python:3.12-slim
+```
+
+```hcl
+# WRONG
+terraform {
+  required_providers {
+    aws = {
+      source = "hashicorp/aws"
+    }
+  }
+}
+
+# CORRECT - Pin provider versions
+terraform {
+  required_version = ">= 1.6.0"
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
 }
 ```
 
-### Dialog Patterns
+---
 
-```tsx
+## Docker
+
+### Dockerfile Best Practices
+
+```dockerfile
+# Use specific version tags
+FROM node:20-alpine AS builder
+
+# Set working directory
+WORKDIR /app
+
+# Copy dependency files first (better caching)
+COPY package*.json ./
+
+# Install dependencies
+RUN npm ci --only=production
+
+# Copy source code
+COPY . .
+
+# Build application
+RUN npm run build
+
+# Production stage
+FROM node:20-alpine AS production
+
+WORKDIR /app
+
+# Create non-root user
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001
+
+# Copy built assets from builder
+COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist
+COPY --from=builder --chown=nodejs:nodejs /app/node_modules ./node_modules
+
+# Switch to non-root user
+USER nodejs
+
+# Expose port
+EXPOSE 3000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1
+
+# Run application
+CMD ["node", "dist/main.js"]
+```
+
+### Multi-Stage Builds
+
+```dockerfile
+# Build stage
+FROM golang:1.21-alpine AS builder
+WORKDIR /app
+COPY go.* ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux go build -o /app/server ./cmd/server
+
+# Final stage
+FROM alpine:3.18
+RUN apk --no-cache add ca-certificates
+WORKDIR /app
+COPY --from=builder /app/server .
+EXPOSE 8080
+ENTRYPOINT ["./server"]
+```
+
+### Docker Compose
+
+```yaml
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgres://user:pass@db:5432/mydb
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - backend
+
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: pass
+      POSTGRES_DB: mydb
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d mydb"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - backend
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - backend
+
+volumes:
+  postgres_data:
+
+networks:
+  backend:
+    driver: bridge
+```
+
+---
+
+## Kubernetes
+
+### Deployment
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: myapp
+  labels:
+    app: myapp
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: myapp
+  strategy:
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
