@@ -7,13 +7,13 @@ Fast programmable GPU-accelerated terminal emulator built with Zig
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `.cursor/rules/*.mdc` in [semos-labs/attyx](https://github.com/semos-labs/attyx).
+Original source: `CLAUDE.md` in [semos-labs/attyx](https://github.com/semos-labs/attyx).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
+- **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
