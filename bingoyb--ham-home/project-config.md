@@ -1,11 +1,11 @@
 ---
 trigger: always_on
-description: See [docs/ai-work/doc-sync.md](docs/ai-work/doc-sync.md) for the detailed rules.
+description: 节省token
 ---
 
-# Documentation Sync Rules
+# Cursor Rules - Token Saving
 
-See [docs/ai-work/doc-sync.md](docs/ai-work/doc-sync.md) for the detailed rules.
+See [docs/ai-work/token-saving.md](docs/ai-work/token-saving.md) for the detailed rules.
 Strictly follow the guidelines in that file.
 
 ---
