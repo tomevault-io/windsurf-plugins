@@ -7,13 +7,13 @@ Universal debugger CLI built for AI agents. Allows Claude Code and Codex to debu
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `.cursor/rules/*.mdc` in [theodo-group/debug-that](https://github.com/theodo-group/debug-that).
+Original source: `CLAUDE.md` in [theodo-group/debug-that](https://github.com/theodo-group/debug-that).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
+- **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
