@@ -1,0 +1,130 @@
+---
+trigger: always_on
+description: **Lorebrain** is a local-first AI knowledge layer for development. It extracts architectural decisions, patterns, and constraints from your codebase into local SQLite and makes them queryable by AI assistants (like Gemini, Claude, Cursor) via the Model Context Protocol (MCP).
+---
+
+# Lorebrain Context for Gemini
+
+## Project Overview
+
+**Lorebrain** is a local-first AI knowledge layer for development. It extracts architectural decisions, patterns, and constraints from your codebase into local SQLite and makes them queryable by AI assistants (like Gemini, Claude, Cursor) via the Model Context Protocol (MCP).
+
+**Core Value Proposition:**
+
+- **Auto-extraction:** Uses LLM inference to extract architecture from code.
+- **Semantic Search:** Query decisions and trade-offs.
+- **MCP Integration:** Exposes knowledge to AI agents.
+
+## Tech Stack
+
+- **Language:** Go 1.24+
+- **CLI Framework:** Cobra
+- **Database:** SQLite (modernc.org/sqlite) - _Single source of truth_
+- **LLM Orchestration:** CloudWeGo Eino (OpenAI, Anthropic, Gemini, Bedrock, Ollama support)
+- **Frontend (Dashboard):**
+  - React 19
+  - Vite 7
+  - Tailwind CSS 4
+  - Shadcn/UI
+  - Bun (likely runtime/package manager)
+
+## Architecture
+
+The system is composed of a CLI tool with an embedded MCP server and a web dashboard.
+
+### Core Layers (`internal/`)
+
+- **Memory (`internal/memory`):** Repository pattern. Encapsulates SQLite (Source of Truth) and Markdown (Snapshot).
+- **Bootstrap (`internal/bootstrap`):** Analyzes codebases.
+  - `scanner.go`: Heuristic analysis (fast, basic).
+  - `llm_analyzer.go`: Deep analysis using LLMs.
+- **Knowledge (`internal/knowledge`):** `KnowledgeService` centralizes intelligence (RAG, Embeddings, Search).
+- **LLM (`internal/llm`):** Interface for AI providers via Eino (Factory pattern).
+
+### Storage Model (`.lorebrain/memory/`)
+
+1.  **`memory.db`**: SQLite database. **The canonical source of truth.**
+2.  **`index.json`**: Cached index for fast retrieval.
+3.  **`features/*.md`**: Human-readable snapshots (generated via Repository). Do not edit manually.
+
+### Directory Structure
+
+```
+/
+├── cmd/                  # CLI entry points (root, bootstrap, mcp_server, etc.)
+├── internal/             # Private application code
+│   ├── agents/           # Specialized agents (code, doc, git_deps)
+│   ├── bootstrap/        # Codebase analysis logic
+│   ├── knowledge/        # Vector search & classification
+│   ├── llm/              # LLM client factories
+│   ├── memory/           # SQLite storage implementation
+│   └── ui/               # TUI components (Bubble Tea)
+├── dashboard/            # React/Vite web frontend
+├── docs/                 # Documentation (MCP, Roadmap, etc.)
+└── Makefile              # Build & Test automation
+```
+
+## Key Commands
+
+### Backend / CLI
+
+| Command          | Description                            |
+| :--------------- | :------------------------------------- |
+| `make build`     | Build the `lorebrain` binary            |
+| `make test`      | Run all tests (Unit, Integration, MCP) |
+| `make test-unit` | Run only unit tests                    |
+| `make test-mcp`  | Run MCP protocol tests                 |
+| `make lint`      | Run formatters and `golangci-lint`     |
+| `make dev-setup` | Install dev dependencies               |
+
+### CLI Commands
+
+| Command              | Description                               |
+| :------------------- | :---------------------------------------- |
+| `lorebrain bootstrap` | Initialize project memory                 |
+| `lorebrain plan`      | Manage development plans                  |
+| `lorebrain task`      | Manage execution tasks                    |
+| `lorebrain start`     | Start API/watch/dashboard services        |
+
+### Frontend (`dashboard/`)
+
+| Command                   | Description                   |
+| :------------------------ | :---------------------------- |
+| `bun dev` / `npm run dev` | Start Vite development server |
+| `bun build`               | Build for production          |
+
+## Development Conventions
+
+1.  **Source of Truth:** Always treat SQLite as the source of truth. The `Repository` handles synchronization.
+2.  **Global Flags:** CLI commands should respect global flags like `--json`, `--verbose`, `--preview`.
+3.  **Testing:**
+    - Use `make test-quick` for rapid iteration.
+    - Ensure MCP tests pass if modifying server logic.
+    - **New:** Unit tests for `internal/knowledge` and `internal/memory` are required.
+4.  **Style:** Follow standard Go idioms. Use `make lint` to enforce.
+5.  **LLM Integration:** Use the `internal/llm` client factory to support multiple providers (OpenAI, Anthropic, Gemini, Bedrock, Ollama) agnostic of the specific API.
+
+## MCP Integration
+
+Lorebrain exposes an `ask` tool. When working on this feature:
+
+- Ensure responses stay within token budgets (500-1000 tokens).
+- Test with `lorebrain mcp` locally or use `make test-mcp`.
+
+### Autonomous Task Execution (Hooks)
+
+Lorebrain integrates with Claude Code's hook system for autonomous plan execution:
+
+```bash
+lorebrain hook session-init      # Initialize session tracking (SessionStart hook)
+lorebrain hook continue-check    # Check if should continue to next task (Stop hook)
+lorebrain hook session-end       # Cleanup session (SessionEnd hook)
+lorebrain hook status            # View current session state
+```
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [jmerelnyc/lorebrain](https://github.com/jmerelnyc/lorebrain) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-02 -->
