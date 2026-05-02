@@ -1,111 +1,113 @@
 ---
 trigger: always_on
-description: Anything related to Sanity usage
+description: Anything related to Sanity usage with Typescript & App SDK
 ---
 
-# App SDK best practices
+# App SDK and TypeGen
 
-If you’ve worked with Sanity before, your experience querying the Content Lake is likely grounded in building Server-Side Rendered (SSR) or statically generated front-end applications designed for page load time performance.
+> [!NOTE]
+> This page is for using TypeGen with the App SDK. See [the TypeGen article](/docs/apis-and-sdks/sanity-typegen) to generate types for your Studio and front end applications.
 
-Now, with the Sanity App SDK, you can build feature-rich content applications for authoring. However, this requires a different approach: swapping SSR thinking for Single-Page Application (SPA) best practices.
+[Sanity TypeGen](/docs/apis-and-sdks/sanity-typegen) is a tool that generates TypeScript types directly from your Sanity schemas and GROQ queries. When used with the Sanity App SDK, it provides strong type safety and autocompletion suggestions for your documents, query results, and projections.
 
-On top of this, if you’re used to writing React applications, some common patterns for building form-based user interfaces are best avoided when working with App SDK.
-
-## What makes a great content application?
-
-Content applications are defined as distinct, new experiences that give authors a focused environment to perform content operations. Instead of digging through a general-purpose CMS interface, authors work in a fit-for-purpose user interface to get the job done.
-
-Content applications developed with the Sanity App SDK should be:
-
-### Real-time
-
-Any number of documents fetched and rendered into the user interface should continue to update as mutations happen to the source documents. Content applications should avoid concepts that handle stale data like "submit," “save” or "lock" buttons.
-
-### Multiplayer
-
-Two authors looking at the same document should be able to continually make and see edits without fear of overwriting one another’s work.
-
-### Fast
-
-Content rendered in the application should be locally cached, updated optimistically, and kept eventually consistent with the Content Lake.
-
-### Accurate
-
-There should never be stale data in an author's browser as they write content, nor after page load when fetched content is rendered. Updates should be written to and received directly from the Content Lake.
-
-### This is all built-in to Sanity App SDK
-
-These are the baseline expectations that Sanity’s engineers have had while developing Sanity Studio since 2017, and they’re now democratized for everyone to take advantage of via React Hooks in the Sanity App SDK.
-
-## Get comfortable with more fetches
-
-If you’ve built an SSR front end with Sanity before (such as in Next.js), you’ve likely created a Sanity Client and fetched all on-page content in a single query like this.
-
-```tsx
-// The SSR way: query and render "event" type documents
-
-import { client } from "../sanity/client";
-
-export async function Page() {
-  const events = await client.fetch(
-    `*[_type == "event"]`
-  );
-
-  return (
-    <ul>
-      {events.map((event) => (
-        <li key={event._id}>{event.title}</li>
-      ))}
-    </ul>
-  );
-}
-```
-
-This can work great for SSR apps—where only the initial page load is important—since the grunt work of optimization is done behind the scenes, cached and delivered fast in a static format to your end users. But it falls short of a great SPA experience which may involve querying and editing an evolving number and type of documents, while keeping the user interface up to date in real-time.
-
-### Prefer useDocuments over useQuery to fetch documents
-
-Your natural inclination may be to use the App SDK hooks to recreate the "fetch everything in one query" pattern.
-
-```tsx
-// ❌ Do not simply swap client.fetch for useQuery
-// It's too easy to over-fetch!
-
-import { useQuery } from "@sanity/sdk-react";
-
-export function Page() {
-  const { data: events } = useQuery(
-    `*[_type == "event"]`
-  );
-
-  if (!events) return null;
-
-  return (
-    <ul>
-      {events.map((event) => (
-        <li key={event._id}>{event.title}</li>
-      ))}
-    </ul>
-  );
-}
-```
-
-This list of documents will receive real-time updates—an upgrade from `client.fetch`—but may unknowingly fetch 1000’s of documents, each with 100’s of attributes.
+In this guide, we’ll walk through setting up and using TypeGen within your SDK app.
 
 > [!WARNING]
-> Keeping raw GROQ queries performant
-> The query in this particular example is problematic for performance. There’s no “array slicing” such as `[0..10]` to reduce the total number of documents returned, and no projection such as `{ title }` to reduce the number of attributes returned. 
-> High performance is built-in when you use hooks like `useDocuments` and `usePaginatedDocuments` to return a filtered list of [document handles](/docs/app-sdk/document-handles), but your implementation will need to be more carefully considered when fetching by GROQ queries with `useQuery`.
+> Experimental feature
+> TypeGen support in the App SDK is currently in its early stages. We’re actively working on improving this integration and the developer experience around it. For now, some parts of this process may be suboptimal, but we invite the adventurous among you to follow along!
 
-`useQuery` exists to fetch content with a GROQ query should you need to—but makes it your responsibility to maintain your application’s performance. One particular example of where this may be useful is when a parent component needs all the details of child documents. 
+## Setup
 
-In most cases, you should prefer `useDocuments` to fetch a list of document handles, and render components that do their own data fetching for more content.
+Using Typegen involves two main steps: extracting your schema(s) and then generating the types. Both commands are available via the CLI.
 
-> [!TIP]
-> Document handles provide stable `key` values
-> Among the benefits of fetching for and using [document handles](/docs/app-sdk/document-handles) is that they provide a stable `documentId` attribute which can be used as the `key` value when mapping over the response to render a list. 
-> Stable unique identifiers are preferable to using the index when [rendering lists in a real-time React application](https://react.dev/learn/rendering-lists#keeping-list-items-in-order-with-key).
+### Extract schemas
 
+First, you need to extract your Sanity schema(s) into a JSON format that Typegen can understand. **Currently, this step relies on the full** **sanity** **package**, typically used within your Sanity Studio project, as Typegen needs access to the complete schema definition to generate accurate types.
+
+Schema extraction is performed within your Studio setup to generate the `schema.json` file. Once created, this file can be used independently by other tools or parts of your workflow.
+
+> [!NOTE]
+> We recognize that requiring the Studio environment solely for this generation step isn't ideal, and we're actively working on improving this workflow in future App SDK updates to make the process more self-contained.
+
+Use the `sanity schema extract` command within your Studio project or a project that has the `sanity` package installed:
+
+**Terminal**
+
+```sh
+npx sanity schema extract --workspace <workspace-name> --output-path <path/to/schema.json>
+```
+
+This `schema.json` file can be copied to (or the `--output-path` can be set directly to) your Sanity app's repository. Your application itself does *not* need the full `sanity` package as a dependency to use the generated types; it only needs the `schema.json` file for the `typegen generate` step.
+
+If your Studio project defines multiple workspaces or you need types for different schemas (e.g., for different datasets), run the `extract` command for each one, outputting to separate JSON files. For example, you could configure you Studio’s `package.json` as follows:
+
+**package.json**
+
+```json
+{
+  "scripts": {
+    "schema:extract:test": "sanity schema extract --workspace test --output-path ../my-frontend-app/schema-test.json",
+    "schema:extract:prod": "sanity schema extract --workspace production --output-path ../my-frontend-app/schema-prod.json",
+    "schema:extract": "npm run schema:extract:test && npm run schema:extract:prod"
+  }
+}
+```
+
+We plan to improve this schema extraction process as the SDK matures to potentially reduce the dependencies and improve overall developer experience.
+
+### Install (experimental) packages
+
+To use the Typegen features described in this guide, your SDK app needs specific experimental versions of `@sanity/cli` and `groq` installed. Install these packages from within your SDK app directory:
+
+**Terminal**
+
+```sh
+npm install groq@typegen-experimental-2025-04-23
+npm install @sanity/cli@typegen-experimental-2025-04-23 --save-dev
+```
+
+> [!WARNING]
+> Package names and installation
+> These are experimental pre-release versions. The package names and installation process may change as these features stabilize.
+
+### Configure TypeGen (optional)
+
+For the most common use case – a single Sanity schema for your project – **no configuration file is needed**. However, you'll need to create a TypeGen configuration file for more complex use cases, such as:
+
+- Using multiple schemas (e.g., from different workspaces or for different datasets).
+- Needing to explicitly map a single schema to a specific `schemaId` for accurate schema scoping (instead of using the default  `'default'`).
+- Using a different name or location for your schema file(s).
+- Specifying a custom output path for the generated types file.
+
+If you need this level of configuration, create a TypeGen configuration file (`sanity-typegen.json` ) at the root of your SDK app and use the `unstable_schemas` array:
+
+**sanity-typegen.json**
+
+```json
+// sanity-typegen.json
+{
+  "unstable_schemas": [
+    {
+      // Path to the schema
+      "schemaPath": "./schemas/products-schema.json",
+      // The schema ID, formatted as `projectId.datasetName`
+      "schemaId": "your-project-id.products"
+    },
+    {
+      "schemaPath": "./schemas/authors-schema.json",
+      "schemaId": "your-project-id.authors"
+    }
+    // Add more schema objects if needed
+  ],
+  "overloadClientMethods": false // client methods are not needed for the App SDK
+  // Optional: Specify output path for generated types
+  // "outputPath": "./src/generated/sanity-types.ts"
+}
+```
+
+Objects in the `unstable_schemas` array each consist of the following properties:
+
+- **schemaPath:** The path (relative to the project root) to the corresponding extracted schema JSON file.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
