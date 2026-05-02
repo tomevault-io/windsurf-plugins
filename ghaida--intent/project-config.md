@@ -1,69 +1,71 @@
 ---
 trigger: always_on
-description: Intent reference: method selection matrix, sample size guidance, interview techniques, usability testing, survey design, synthesis frameworks. Load when planning or conducting user research.
+description: Intent reference: service blueprinting methodology, frontstage/backstage mapping, touchpoint analysis, moment-of-truth design, channel orchestration. Load when mapping services, systems, or cross-channel experiences.
 ---
 
 
-# Research Methods
+# Service Design
 
-## Method Selection Matrix
+## Service Blueprinting Methodology
 
-Choosing the right research method depends on what you need to learn, how much time and budget you have, and where you are in the design process. There is no universal "best method" — there's the right method for the question you're asking right now.
+A service blueprint is a diagram that maps the complete service delivery process — what the customer sees, what the organization does behind the scenes, and how the technical systems support it all. Lynn Shostack introduced the concept in 1984 to address a fundamental problem: services are invisible, and you can't improve what you can't see.
 
-### Generative Methods (What should we build?)
+### Shostack's Original Model
 
-**Contextual Inquiry**
-- What it is: Observe users in their natural environment while they perform real tasks. Ask questions as they work.
-- When to use: Early exploration. You don't understand the problem space well enough to ask good survey questions yet.
-- Sample size: 4-8 participants per user segment.
-- Time/cost: High. 1-2 hours per session, plus travel. Analysis is intensive.
-- What it reveals: Workarounds, environmental constraints, unspoken needs, the gap between what people say and what they do.
-- Trade-offs: Small samples, not generalizable, observer effect can alter behavior. But the depth of insight is unmatched.
+Shostack's original blueprint was deliberately simple: a horizontal timeline of the service process with a "line of visibility" separating what the customer sees from what they don't. Above the line: the customer's experience. Below the line: the backstage processes that produce that experience.
 
-**Semi-Structured Interviews**
-- What it is: One-on-one conversations guided by a topic framework, not a rigid script. Follow interesting threads.
-- When to use: When you need to understand motivations, mental models, and experiences in depth. Works at any stage.
-- Sample size: 5-8 for pattern identification, 12-20 for saturation (Guest, Bunce & Johnson, 2006).
-- Time/cost: Moderate. 45-60 minutes per session. Analysis takes roughly 3x the interview time.
-- What it reveals: User motivations, pain points, mental models, emotional responses, workarounds.
-- Trade-offs: Self-reported behavior differs from actual behavior. Users are not reliable predictors of their own future actions. But interviews surface the "why" that behavioral data can't.
+**Why it mattered:** Before Shostack, services were designed through intuition and anecdote. The blueprint made the invisible visible — showing where the service was fragile, where it depended on specific people, and where it failed predictably.
 
-**Diary Studies**
-- What it is: Participants record experiences over time (days to weeks), logging entries when specific events occur.
-- When to use: When behavior unfolds over time and can't be observed in a single session. Habit formation, recurring tasks, infrequent events.
-- Sample size: 10-15 participants minimum (high dropout expected — recruit 20-30% more).
-- Time/cost: Study runs 1-4 weeks. Setup is moderate; analysis is substantial.
-- What it reveals: Temporal patterns, context shifts, emotional changes over time, frequency and triggers of behavior.
-- Trade-offs: High participant burden, significant dropout, entries are self-reported and often incomplete. But nothing else captures real behavior over time.
+### Modern Blueprint Layers
 
-**Surveys**
-- What it is: Structured questionnaires distributed to a sample population. Quantitative or mixed-method.
-- When to use: When you have specific hypotheses to validate, when you need quantitative data at scale, or when you need to measure attitudes/preferences across a population.
-- Sample size: 30 minimum for basic statistics, 100+ for segmentation, 400+ for population estimates with reasonable confidence intervals.
-- Time/cost: Low per-respondent. Design is the hard part — a bad survey produces confidently wrong data.
-- What it reveals: Prevalence of behaviors, attitudes, preferences, and demographics across a population.
-- Trade-offs: You only learn what you ask about. Question design bias is pervasive and hard to detect. Response rates are falling across all channels. Self-report limitations apply. But surveys are the only practical way to quantify patterns at scale.
+Contemporary service blueprints expand Shostack's model to five layers, each providing different analytical leverage.
 
-### Evaluative Methods (Is this working?)
+**Layer 1: Customer Actions**
+What the customer does at each stage of the service. Their decisions, interactions, and movements across channels. This is the user journey — but in a service blueprint, it's one layer of a larger picture, not the whole picture.
 
-**Usability Testing (Moderated)**
-- What it is: Observe users attempting tasks with a prototype or product while thinking aloud. Facilitator guides the session.
-- When to use: Whenever you have something testable — wireframes, prototypes, live products. The single most valuable evaluative method.
-- Sample size: 5 participants catch approximately 85% of major usability issues (Nielsen & Landauer, 1993). Run 5 per round, iterate, test again.
-- Time/cost: Moderate. 30-60 minutes per session. Can be done remotely to reduce logistics.
-- What it reveals: Where users succeed, fail, hesitate, and get confused. Task completion rates, error frequencies, and recovery patterns.
-- Trade-offs: Small sample, not statistically generalizable, facilitator skill matters enormously. But 5 users finding the same problem is a signal, not a sample size issue.
+Document: What the customer is trying to accomplish, what they physically do, and what channels they use. Note emotional states where you have evidence — but be careful about projecting emotions you haven't researched.
 
-**Usability Testing (Unmoderated)**
-- What it is: Users complete tasks independently, recorded by software. No facilitator present.
-- When to use: When you need more participants, faster turnaround, or lower cost. Good for benchmarking and A/B comparison.
-- Sample size: 10-20 for qualitative patterns, 50+ for quantitative benchmarking.
-- Time/cost: Low per-session. Platform costs (UserTesting, Maze, Lookback). No facilitator time.
-- What it reveals: Task completion rates, time on task, click paths, self-reported satisfaction.
-- Trade-offs: No ability to probe "why." Users may abandon without explanation. Technical issues go unnoticed. Thinking aloud without a facilitator is less natural and less revealing.
+**Layer 2: Frontstage (Onstage) Actions**
+What the customer-facing parts of the organization do that the customer can see. The website, the app, the retail store, the call center agent, the email. This is the visible surface of the service.
 
-**A/B Testing**
-- What it is: Randomly assign users to different versions of a design and measure behavioral differences.
+Document: Every touchpoint the customer interacts with, and every employee action the customer witnesses. The frontstage is where brand perception is formed — it's also where most organizations focus their design effort, sometimes to the exclusion of everything below.
+
+**Layer 3: Backstage Actions**
+What the organization does that the customer can't see but that directly supports the frontstage. The warehouse worker who picks the order. The algorithm that generates recommendations. The support agent who reviews a flagged transaction. The designer who creates the email template.
+
+Document: Every internal action that supports a frontstage interaction. This is where efficiency, consistency, and quality are determined — and where most service failures originate.
+
+**Layer 4: Support Processes**
+The systems, tools, and organizational processes that enable backstage actions. CRM systems, inventory management, payment processing, identity verification, internal communication tools. These are typically owned by different teams, different departments, sometimes different companies.
+
+Document: The technical systems and organizational processes that backstage actors depend on. This is where cross-functional dependencies live — and where improving one team's process can break another team's workflow.
+
+**Layer 5: Physical Evidence**
+The tangible artifacts the customer encounters at each stage. The packaging, the receipt, the app notification, the confirmation email, the physical product itself. Physical evidence shapes expectations and creates memories.
+
+Document: Every artifact the customer receives, sees, or keeps. Physical evidence persists after the interaction ends — it's what the customer takes away.
+
+### The Lines
+
+Service blueprints are divided by three horizontal lines:
+
+**Line of Interaction** — Between Customer Actions and Frontstage. Where the customer and the service provider interact directly. Every crossing of this line is a moment of truth.
+
+**Line of Visibility** — Between Frontstage and Backstage. What the customer can see vs. what they can't. The strategic question at this line: should we make more of the backstage visible (building trust through transparency) or keep it hidden (reducing complexity)?
+
+**Line of Internal Interaction** — Between Backstage and Support Processes. Where human backstage actors interact with technical systems and organizational processes. This line reveals technology dependencies and process bottlenecks.
+
+---
+
+## Moment-of-Truth Analysis
+
+Not all touchpoints are equal. Moments of truth (a term coined by Jan Carlzon, then CEO of SAS Airlines, in 1987) are the critical interactions that disproportionately shape the customer's overall perception of the service.
+
+### Identifying Moments of Truth
+
+A moment of truth has three characteristics:
+1. **High emotional stakes** — The customer cares about the outcome. The anxiety of a medical test result, the anticipation of a delivery, the frustration of a failed payment.
+2. **Perception formation** — The interaction shapes how the customer perceives the entire service. A smooth onboarding creates a halo effect. A botched recovery from an error colors everything.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
