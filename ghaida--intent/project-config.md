@@ -1,53 +1,62 @@
 ---
 trigger: always_on
-description: Intent reference: WCAG 2.2 for designers, screen reader design, keyboard navigation, cognitive and motor accessibility, inclusive design principles and testing methodology. Load when working on accessibility, a11y audits, inclusive design, or assistive technology.
+description: Intent reference: anti-pattern remediation, dark pattern alternatives, consent design, design ethics frameworks, regulatory compliance patterns. Load when fixing dark patterns, designing consent flows, or reviewing ethical concerns.
 ---
 
 
-# Accessibility Foundations
+# Ethical Design
 
-## WCAG 2.2 for Designers
+## Anti-Pattern Remediation Guide
 
-The Web Content Accessibility Guidelines are organized around four principles: Perceivable, Operable, Understandable, Robust (POUR). Most designers encounter WCAG as a compliance checklist. That's the wrong frame. WCAG is a design specification — it tells you what your design must achieve for the full spectrum of human ability.
+The master skill catalogs anti-patterns. This document explains how to fix them — and how to design the ethical alternative from the start.
 
-### Perceivable
+### Deceptive Patterns → Honest Alternatives
 
-Information and interface components must be presentable to users in ways they can perceive. This means: not everyone sees, not everyone hears, not everyone processes information the same way.
+**Bait and Switch → Consistent Delivery.** What you show is what you deliver. If a button says "Download," it downloads. If a link says "Learn more," it teaches. Test by asking: if a user described what just happened, would their description match the label they clicked?
 
-**Text alternatives (1.1):** Every non-text element that conveys information needs a text equivalent. Images need alt text. Icons need labels. Charts need data tables or summaries. Video needs captions and audio description. The question is always: if this visual element disappeared, would the user lose information?
+**Trick Questions → Plain Language Choices.** Every option should be stateable as an affirmative: "Yes, send me emails" / "No, don't send me emails." Never use double negatives ("Uncheck to not receive..."). Never combine multiple consents into one checkbox. Test by reading the question aloud — if a colleague gets confused, users will too.
 
-**How designers get this wrong:** Decorative images with verbose alt text (screen readers will read "stock photo of a diverse team collaborating in a modern office" for every page — exhausting). Informative images with empty alt text. Complex charts with alt text that says "chart" instead of describing the data. Icons without any programmatic label. The fix is intentional alt text: describe what the image communicates, not what it depicts.
+**Visual Misdirection → Equal Visual Weight.** When presenting choices, the "decline" or "opt-out" option should be equally visible — same size, same visual weight, same position prominence. The user's preferred choice, not the business's preferred choice, should determine which option they pick. Test: cover the page with your hand and peek — can you see both options equally?
 
-**Time-based media (1.2):** Video needs captions (synchronized text of spoken content) and audio description (narration of visual content). Audio needs transcripts. Live content needs real-time captions. This isn't just for deaf users — captions serve anyone in a noisy or quiet environment.
+**Hidden Costs → Upfront Pricing.** Show the total cost, including taxes, fees, and shipping, before the user enters any personal information. The Baymard Institute found that 48% of cart abandonment is caused by extra costs shown too late. The fix isn't just ethical — it converts better.
 
-**Adaptable (1.3):** Information structure must be programmatic, not just visual. A heading that's bold and large but coded as a `<div>` is invisible to screen readers. A data table that's built with positioned divs instead of `<table>` elements loses its row/column relationships. Design decisions about hierarchy, grouping, and sequence must be implementable as semantic structure.
+**Confirmshaming → Neutral Opt-Out.** Opt-out text should be factual, not emotional. "No thanks" is fine. "No thanks, I hate saving money" is manipulation. The test is simple: would you say the opt-out text to someone's face without feeling embarrassed?
 
-**Distinguishable (1.4):** Contrast ratios: 4.5:1 for normal text, 3:1 for large text (18px+ or 14px+ bold), 3:1 for UI components and graphics. These are minimums — aim higher for body text. Color must not be the only means of conveying information — a red error border needs an icon or text too, because not everyone perceives red. Text must be resizable to 200% without loss of content or functionality.
+**Sneak into Basket → Explicit Additions Only.** Nothing enters a cart, plan, or order without a deliberate user action. Pre-selected add-ons, bundled insurance, and automatic upsells all fail this test. If the user didn't click "add," it shouldn't be there.
 
-**New in 2.2 — Dragging movements (2.5.7):** Any functionality that uses dragging must have a non-dragging alternative. Drag-to-reorder must also offer move-up/move-down buttons or an alternative input method.
+### Default Manipulation → Respectful Defaults
 
-### Operable
+**Prechecked Consent → Unchecked by Default.** GDPR requires this explicitly. But beyond regulation — consent means nothing if it's pre-selected. Every consent checkbox should start unchecked. Every permission should start un-granted. The user's first interaction should be a choice, not an override.
 
-Users must be able to operate the interface through multiple input methods — not just mouse and touch.
+**Opt-Out Burden → Symmetrical Effort.** The effort to leave should mirror the effort to join. If signing up takes one click, cancellation should take one click. The FTC's "click to cancel" rule codifies this, but the principle predates the rule: asymmetric friction is manipulation.
 
-**Keyboard accessible (2.1):** Everything must work with a keyboard. Every interactive element must be focusable and activatable. No keyboard traps — users must be able to navigate away from any component. Custom keyboard shortcuts must not conflict with browser or assistive technology shortcuts.
+**Forced Continuity → Clear Trial Endings.** Before a trial ends: notify the user (email and in-app, not just email). On the transition day: require explicit confirmation before charging. After charging: provide easy refund for the first billing period. Making cancellation hard doesn't create loyal customers — it creates resentful ones who warn others.
 
-**Enough time (2.2):** If content has a time limit, users must be able to turn off, adjust, or extend the limit. Session timeouts need warnings and extension options. Auto-updating content needs pause/stop controls. Moving or auto-playing content must be stoppable.
+### Urgency Fabrication → Honest Scarcity
 
-**Seizures and physical reactions (2.3):** No content that flashes more than three times per second. This isn't theoretical — flashing content can trigger seizures in people with photosensitive epilepsy. Motion animations should be reducible (respect prefers-reduced-motion).
+**Fake Timers → Real Deadlines Only.** If a deadline is real (event starts at 8pm, sale ends Sunday), show it. If there's no real deadline, don't invent one. A timer that resets when the page refreshes is not a deadline — it's a lie.
 
-**Navigable (2.4):** Provide a skip navigation link (first focusable element, links to main content). Use descriptive page titles. Focus order must be logical and predictable — typically matching visual reading order. Link text must make sense out of context ("Read more" fails this; "Read our accessibility policy" passes). Headings and labels must be descriptive.
+**Fabricated Scarcity → Actual Inventory.** If you show stock levels, they should be real. "Only 2 left" when you have 2,000 in the warehouse is fraud by implication. If demand genuinely fluctuates, show real-time data. Otherwise, don't show numbers at all.
 
-**New in 2.2 — Focus not obscured (2.4.11):** When a component receives keyboard focus, it must not be entirely hidden by other content (sticky headers, modals, toasts). At least partially visible.
+**Fake Social Proof → Real Activity.** "15 people are viewing this" should reflect actual concurrent viewers, not a random number generator. Fabricated social proof is straightforward deception. Real social proof (verified reviews, actual purchase counts) builds genuine trust.
 
-**New in 2.2 — Target size (2.5.8):** Interactive targets must be at least 24x24 CSS pixels, with certain exceptions (inline links, native browser controls). This benefits motor-impaired users, touch users, and everyone with large fingers on small screens.
+### Addictive Design → Respectful Engagement
 
-### Understandable
+**Infinite Scroll → Natural Boundaries.** Pagination, "load more" buttons, or session summaries create natural stopping points. This doesn't reduce engagement — it shifts it from compulsive to intentional. Instagram's "You're all caught up" is a partial fix; actual pagination is more honest.
 
-Content and interface behavior must be understandable to the user.
+**Variable Ratio Reinforcement → Predictable Value.** Notifications should arrive because something meaningful happened, not because the algorithm determined this is the optimal moment to re-engage. Content should be organized, not randomly dispensed. The value should be in the content, not in the unpredictability of its delivery.
 
-**Readable (3.1):** Set the language of the page (lang attribute). Identify changes in language within the page. Define unusual words, abbreviations, and jargon. These seem like developer concerns, but they're design decisions — the designer decides what terminology to use and how to explain it.
+**Streak Manipulation → Progress Without Punishment.** If you track streaks, breaking one should carry no penalty. "You had a 30-day streak! Start a new one?" is fine. "You lost your 30-day streak forever" is manufactured loss aversion. Duolingo's streak freeze is an admission that their streak mechanic creates unhealthy obligation.
 
+---
+
+## Regulatory Landscape
+
+### GDPR (EU, 2018)
+
+The General Data Protection Regulation is the most comprehensive privacy regulation in force. Key requirements for designers:
+
+**Consent (Article 7, Recitals 32, 42, 43):**
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
