@@ -1,55 +1,51 @@
 ---
 trigger: always_on
-description: Harden designs for real-world use by systematically identifying and designing for every condition outside the happy path. Part of the Intent design strategy system. Covers state inventories, error recovery, empty states, loading patterns, first-run experiences, stress testing, internationalization readiness, and latency handling. Trigger on: edge cases, error states, empty states, loading states, first-run experience, onboarding, offline mode, "what happens when", "what if the user", "stress tes
+description: Design for everyone by treating accessibility as a first-class design discipline, not a compliance checklist. Part of the Intent design strategy system. Covers WCAG 2.2 for designers, screen reader experience design, keyboard navigation, cognitive accessibility, motor accessibility, inclusive design beyond compliance, and accessibility testing methodology. Trigger on: accessibility, a11y, WCAG, screen reader, keyboard navigation, color contrast, alt text, focus management, touch targets, inclusi
 ---
 
 
 
-# Fortify — Harden for Real-World Use
+# Include — Design for Everyone
 
 ## Overview
 
-The happy path is a fantasy. Real users have 47-character last names, 2G connections on the subway, three-year-old phones with cracked screens, browser tabs they haven't closed in six days, and no patience for something that doesn't work the first time they try it.
+Accessibility is not a feature. It's not a phase. It's not something you "add" after the design is "done." It's a design discipline that ensures every person — regardless of ability, device, situation, or context — can use what you build.
 
-Every design starts with the ideal scenario: the user has a stable connection, reasonable data, a modern device, and follows the intended flow without deviation. That scenario accounts for maybe 60% of actual usage. The other 40% is where trust is built or destroyed — the empty state that tells the user nothing, the error message that says "Something went wrong" without explaining what or how to fix it, the loading screen that gives no indication anything is happening, the first-run experience that asks for 12 pieces of information before showing any value.
+One billion people worldwide have a disability. That number alone should end the debate about whether accessibility matters. But accessibility is not just about permanent disability. It's about the full range of human experience: the parent holding a baby in one arm while using their phone with the other. The commuter reading a screen in direct sunlight. The user in a noisy cafe who can't play audio. The person recovering from eye surgery. The aging executive whose eyesight isn't what it was five years ago. The teenager with ADHD trying to focus on a multi-step form.
 
-Fortify systematically identifies every condition your users will actually encounter and ensures the design handles each one with the same care you gave the happy path. This isn't about pessimism — it's about respect for the people using what you build.
+Everyone experiences situational or temporary impairment. Designing for accessibility makes the experience better for all of these people — not just the ones you're "accommodating." Curb cuts were designed for wheelchair users. They're used by everyone with a stroller, a suitcase, a delivery cart, or a bicycle. Good accessible design works the same way.
 
-**When to activate this skill:** Edge case reviews, error state design, empty state design, loading pattern design, first-run experience design, offline mode planning, internationalization readiness checks, stress testing, or any moment someone asks "but what happens when..."
+This skill treats accessibility as a design quality, not a compliance burden. But it doesn't shy away from legal reality — WCAG conformance is legally required in many jurisdictions (ADA in the US, the European Accessibility Act, Section 508 for government, and similar legislation worldwide). Ignoring accessibility is both a design failure and a legal risk.
+
+**When to activate this skill:** Accessibility audits, inclusive design reviews, WCAG compliance checks, screen reader testing guidance, keyboard navigation design, color contrast evaluation, touch target review, or any moment when the question is "can everyone use this?"
 
 ---
 
 ## Skill family
 
-Fortify works alongside the full Intent skill system, with especially tight connections to skills that define the paths you stress-test:
+Include works alongside the full Intent skill system. Accessibility touches everything — every skill produces work that must be accessible.
 
-- **`/journey`** — Their flows define the happy path; you stress-test everything else. Every flow they design generates a set of questions: what happens when this step fails? What if the user abandons midway and returns? What if data from step 2 isn't available at step 4? Your work feeds back into their flow design as additional states and branches.
+- **`/journey`** — Flows must work for keyboard-only users, screen reader users, switch access users, and voice control users — not just mouse and touch. Every flow `/journey` designs should be reviewed for input-method independence. When they design a drag-and-drop interaction, you ensure there's a keyboard alternative. When they design a gesture-based mobile flow, you ensure there's a single-pointer fallback.
 
-- **`/blueprint`** — Their failure mode analysis at the system level feeds your UX-level resilience design. When they identify that a service can timeout, you design what the user sees during that timeout. When they map a dependency that can fail, you design the degraded experience. System-level failure modes become UX-level state designs.
+- **`/articulate`** — Clear writing IS accessible writing. Plain language, short sentences, meaningful link text ("Read the accessibility report" not "Click here"), descriptive headings, and labels that communicate what an input expects. `/articulate` owns the copy; you advise on what makes it accessible.
 
-- **`/include`** — Accessibility and fortification overlap significantly. Designing for slow connections, small screens, one-handed use, and situational impairment is both resilience work and inclusive design. Coordinate to avoid duplication — you own the state and edge case methodology; they own the accessibility methodology and assistive tech requirements.
+- **`/organize`** — Navigation structure must be parseable by assistive technology. Landmarks (header, nav, main, footer), heading hierarchy (H1 through H6 without skipping levels), skip links, and breadcrumbs are information architecture decisions with direct accessibility implications. When `/organize` designs the IA, you ensure it translates to a screen reader experience that makes sense.
 
-- **`/evaluate`** — Their assessment identifies what's failing in the current experience; you design the fixes. When they flag missing error states, absent loading indicators, or unhelpful empty states, those findings route directly to you. Your output feeds back into their next evaluation cycle.
+- **`/fortify`** — Edge case hardening overlaps with accessibility. Designing for slow connections, small screens, one-handed use, and extreme content is both resilience work and inclusive design. Coordinate to avoid duplication — you own the accessibility methodology; they own the state and stress-testing methodology.
 
-- **`/specify`** — Your edge case documentation becomes part of their handoff package. Every state you design, every error recovery flow you define, every stress test result — all of it needs to be in the engineering spec. Coordinate on format: specs that list only the happy path are specs that produce broken products.
+- **`/evaluate`** — Accessibility assessment is part of every UX evaluation. When `/evaluate` runs a heuristic review, accessibility violations surface across multiple heuristics. Your detailed accessibility methodology feeds their assessment framework. Their findings in accessibility categories route to you.
 
-- **`/articulate`** — Error messages, empty state copy, loading messages, first-run guidance — all of it is content that needs to be clear, helpful, and on-brand. You define what needs to be said; they define how to say it.
+- **`/specify`** — Accessibility requirements must be in every handoff spec. ARIA roles, keyboard interaction patterns, focus management behavior, screen reader announcements — these are not "nice to have" annotations. They're core spec requirements. When `/specify` writes the handoff, you ensure accessibility is not a separate section but woven throughout.
 
-- **`/philosopher`** — "What's the most embarrassing way this could fail in public?" "What assumption are we making about our users that would be humiliating if wrong?" The philosopher helps you find the failure modes that nobody's imagined yet — the ones that come from questioning assumptions, not from running checklists.
+- **`/blueprint`** — System architecture affects accessibility. Notification systems need ARIA live regions. Real-time updates need polite announcements. Infinite scroll needs alternative navigation. When `/blueprint` designs the system, you flag where architecture decisions create or prevent accessibility.
+
+- **`/philosopher`** — "Who are we excluding that we haven't even thought to consider?" The philosopher helps surface the assumptions baked into your definition of "everyone" — the user groups you haven't imagined, the contexts you haven't considered, the ways your inclusive design might still be leaving people out.
 
 ---
 
 ## Core capabilities
 
-### 1. State inventory
-
-Every screen, component, and flow has states beyond "default." Most designs only spec the default state. Fortify enumerates all of them.
-
-**The state catalog:**
-
-**Default** — The happy path with normal data. This is what the mockup shows. It's the starting point, not the finish line. Even the default state has questions: what's "normal" data? How much? In what format? What happens when "normal" changes?
-
-**Empty** — No data yet. First use, zero search results, cleared history, new account with no activity. The empty state is the user's first impression of most features — and most empty states are a blank page with no guidance. Design them: explain what will appear here, how to get started, and what the feature does. Show sample data or a preview of the populated state if possible.
+### 1. WCAG 2.2 for designers
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
