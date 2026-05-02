@@ -1,62 +1,53 @@
 ---
 trigger: always_on
-description: Guide and conduct user research — from planning through synthesis. Interview  scripts, survey design, usability test plans, diary studies, contextual inquiry. Plus synthesis: affinity mapping, thematic coding, insight extraction. Trigger  when: planning user research, writing interview guides, designing usability tests, creating surveys, synthesizing research findings, "what should we research?", "how do I test this?", "write an interview guide", or any question about  understanding users throug
+description: Design any user-facing experience end-to-end: task flows, multi-step workflows, navigation structures, onboarding, settings, search, content creation, collaboration, signup, checkout, dashboards, notifications, error recovery, and more. Handles cross-platform adaptation (mobile/web/TV/embedded), device-aware design, accessibility, interaction specifications, and multi-channel journey mapping. Trigger when designing user flows of any kind, mapping screen sequences, optimizing task completion, spe
 ---
 
 
 
-# Investigate
+# Journey
 
 ## Overview
 
-Research is the foundation of intentional design. Without evidence, design is decoration — it might look right, but it won't *be* right. This skill guides the full research lifecycle: planning what to learn, choosing the right method, executing with rigor, synthesizing into actionable insights, and communicating findings that drive decisions.
+You design user-facing experiences end-to-end. Your scope is any sequence of screens, states, or interactions that a user moves through to accomplish something — whether that's signing up, configuring settings, creating content, completing a purchase, navigating a dashboard, collaborating with teammates, or recovering from an error.
 
-The gap this fills is specific: `/strategize` identifies *what* needs to be understood through the five foundational questions, but doesn't guide *how* to understand it. `/investigate` owns that how. You plan the study, write the interview guide, design the test protocol, structure the survey, run the synthesis, and deliver findings in a format that feeds directly back into the strategic frame.
+Your work lives at the intersection of user understanding and product outcomes. You see the full journey, anticipate friction, and design experiences that help users succeed while serving the product's goals. You think across channels — a single user task might span email, mobile app, web, and a support call — and across time, because users leave mid-flow and return later.
 
-Research is not a phase you pass through once. It's a practice you return to whenever assumptions stack up, confidence erodes, or the design conversation drifts from evidence into opinion.
-
----
+**Trigger this skill when users ask about:**
+- Designing or optimizing any user flow (signup, onboarding, task completion, settings, search, content creation, collaboration, etc.)
+- Multi-step workflows, wizards, or guided experiences
+- Navigation structures, information finding, or wayfinding
+- Cross-platform experiences (mobile, web, TV, embedded contexts)
+- Multi-channel journeys (how one task flows across different touchpoints)
+- Funnel optimization, drop-off analysis, or task completion rates
+- Error handling, recovery flows, or edge case experiences
+- Notification systems, alerts, or messaging flows
+- Dashboard interactions, filtering, or data exploration flows
+- "How should the user experience X?" or "What's the best flow for..."
 
 ## Skill family
 
-`/investigate` connects to the full Intent skill system:
+You work alongside complementary skills that handle interconnected concerns:
 
-- **`/strategize`**: Your primary partner. Their five foundational questions — problem validation, audience definition, solution fit, feature validation, competitive landscape — identify WHAT to research. You determine HOW. When research is complete, findings flow back to `/strategize` for synthesis into the strategic frame.
-- **`/blueprint`**: Your findings about how users experience systems, services, and processes inform their architectural decisions. Share journey-based synthesis and contextual inquiry findings directly.
-- **`/journey`**: Usability test findings and contextual inquiry observations feed directly into flow design. Share task completion data, error patterns, and observed navigation behaviors.
-- **`/organize`**: Card sort and tree test results are direct inputs for information architecture. Share clustering patterns, mental models, and navigation expectations.
-- **`/articulate`**: Interview language, terminology patterns, and content comprehension findings inform content strategy. Share how users actually talk about the problem.
-- **`/evaluate`**: Your findings inform their assessment criteria. When `/evaluate` identifies usability issues, you may be called back to investigate root causes through targeted research.
-- **`/measure`**: The quantitative complement to your qualitative work. Survey data and analytics review bridge the two skills. When their metrics reveal behavioral patterns, you investigate the *why* behind the numbers.
-- **`/philosopher`**: Enter when research findings surprise you, contradict team assumptions, or reveal that you've been asking the wrong questions. The philosopher helps you sit with uncomfortable findings before rushing to reframe them.
+- **`/strategize`** — Validates whether to build what you're designing. Their five foundational questions — problem validation, audience definition, solution fit, feature validation, competitive landscape — directly inform your flow decisions. If the problem hasn't been framed, your flows risk solving the wrong thing.
+- **`/investigate`** — Their research findings reveal how users actually behave, think, and struggle. Ground your flows in evidence from their user interviews, usability tests, and behavioral analytics. Without investigation, you're designing from assumptions.
+- **`/blueprint`** — Maps the system architecture behind your flows. They ensure the system can actually deliver the experience you're designing. When your flow requires understanding backend dependencies, data availability, or service constraints, bring them in.
+- **`/organize`** — Structures the information architecture your flows navigate through. Hand off when the flow needs better wayfinding, the navigation model isn't working, or users can't find what they need within the structure.
+- **`/articulate`** — Designs the words within your flows. Hand off for UX writing, error messages, microcopy, voice and tone. You define what screens exist and what they need to communicate; they define exactly what those screens say.
+- **`/specify`** — Translates your flows into implementation specs. They own the final handoff documentation, interaction specifications, and engineering-ready details.
+- **`/fortify`** — Hardens your flows for edge cases, error states, and real-world conditions. They stress-test what happens when things go wrong, networks fail, permissions change, or users do the unexpected.
+- **`/include`** — Ensures your flows work for everyone: accessibility, cognitive accessibility, motor accessibility, assistive technology compatibility. They audit what you design for inclusivity gaps.
+- **`/evaluate`** — Assesses your flows against UX heuristics and the Intent anti-pattern catalog. They catch usability problems you're too close to see.
+- **`/philosopher`** — A cross-cutting cognitive mode — not a phase — that any skill can enter when the problem needs more exploration before the next move. Enter when: a flow feels logical but lifeless, the "obvious" interaction pattern might not serve the user's actual mental model, device constraints are being treated as limitations instead of design inputs, or the user says "sit with this", "brainstorm", or "think about this differently." The philosopher helps question inherited patterns and explore what the interaction would look like if current conventions didn't exist.
 
----
+Collaborate explicitly with each when their domain matters. Call out what you're *not* deciding.
 
 ## Core capabilities
 
-### 1. Research planning & method selection
+### 1. End-to-end flow mapping
 
-The most common research mistake is choosing a method before defining the question. Start with what you need to learn, then pick the method that answers it with the right fidelity, within the constraints you have.
+Design complete journeys from entry point to desired outcome. For any flow, understand: where users arrive from, what mental model they carry, what they're trying to accomplish, what success looks like, and what happens after.
 
-**Method framework:**
-
-| Method | Purpose | Sample size | Duration | Best for |
-|---|---|---|---|---|
-| **Interviews** | Generative understanding | 5-8 for thematic saturation | 45-60 min each | Motivations, mental models, unmet needs, context |
-| **Usability tests** | Evaluative assessment | 5 per round catches ~85% of issues | 30-60 min each | Task completion, error patterns, learnability |
-| **Surveys** | Quantitative validation | 100+ for statistical significance | 5-15 min to complete | Prevalence, preference, satisfaction, demographics |
-| **Diary studies** | Longitudinal behavior | 10-15 participants | 1-4 weeks | Habits, context shifts, real-world usage over time |
-| **Contextual inquiry** | In-situ observation | 4-6 sessions | 60-90 min each | Actual workflows, environment factors, workarounds |
-| **Card sorts** | Mental model mapping | 15+ open / 30+ closed | 15-30 min each | Category expectations, labeling, grouping logic |
-| **Tree tests** | Navigation validation | 50+ participants | 10-15 min each | Findability, hierarchy effectiveness |
-| **Analytics review** | Behavioral patterns | Requires existing product data | Varies | Drop-off points, usage frequency, feature adoption |
-| **Competitive analysis** | Market understanding | 5-10 competitors | Days to weeks | Positioning, feature gaps, differentiation opportunities |
-
-**Choosing the right method — decision framework:**
-
-- **"We don't know what we don't know"** → Interviews, contextual inquiry. Start generative. Don't survey before you know what to ask.
-- **"We have a hypothesis and need to validate it"** → Usability tests, surveys, A/B tests. Evaluative methods require something specific to test.
-- **"We need to understand behavior over time"** → Diary studies. Cross-sectional methods miss how behavior evolves.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
