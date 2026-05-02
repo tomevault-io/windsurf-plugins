@@ -1,289 +1,260 @@
 ---
 trigger: always_on
-description: DevOps and infrastructure: Docker, Kubernetes, Terraform, CI/CD pipelines, and cloud deployment patterns
+description: Flutter development: widget patterns, state management, Dart best practices, and platform channel integration
 ---
 
 
-# DevOps & Infrastructure Patterns
+# Flutter Development Patterns
 
-Containerization, orchestration, infrastructure as code, and CI/CD best practices.
+Modern Flutter patterns for cross-platform mobile, web, and desktop development.
 
-## DevOps Workflow
+## Flutter Workflow
 
-Before changing infrastructure or deployment code:
+Before changing Flutter code:
 
 ```text
-1. Read the existing Docker, Kubernetes, Terraform, or CI files first
-2. Understand the current state and provider/tool versions in use
-3. For version-sensitive work, verify current versions with the actual current date
-4. Validate configurations before recommending apply or deploy steps
+1. Read `pubspec.yaml` and the current app structure first
+2. Check the repo's Flutter and Dart constraints before using newer language or framework features
+3. For new apps, use `flutter create`; do not hand-create `pubspec.yaml`
+4. For new dependencies or version-sensitive work, verify current versions with the actual current date
 ```
 
-### CLI-First DevOps Workflow
+### CLI-First Flutter Development
 
-Prefer CLI validation and dry-run workflows:
+Prefer Flutter CLI workflows:
 ```bash
-# Docker
-docker build -t test:latest .
-docker-compose config  # Validate compose file
-docker-compose up --dry-run  # Test without running
+# Project creation (NEVER manually create pubspec.yaml)
+flutter create my_app
+flutter create --org com.example my_app
+flutter create --template package my_package
 
-# Kubernetes
-kubectl apply --dry-run=client -f manifest.yaml
-kubectl diff -f manifest.yaml  # See changes before applying
-kubeval manifest.yaml  # Validate against schema
+# Add dependencies (NEVER manually edit pubspec.yaml for adding)
+flutter pub add provider
+flutter pub add go_router
+flutter pub add flutter_bloc
+flutter pub add dio
+flutter pub add freezed --dev
+flutter pub add build_runner --dev
 
-# Terraform
-terraform init
-terraform fmt -recursive
-terraform validate
-terraform plan -out=tfplan  # Prefer planning before apply
+# Get dependencies after any pubspec change
+flutter pub get
 
-# Helm
-helm lint ./my-chart
-helm template ./my-chart  # Render templates locally
-helm install --dry-run --debug my-release ./my-chart
+# Code generation (for freezed, json_serializable)
+dart run build_runner build --delete-conflicting-outputs
+
+# Verify project health
+flutter analyze
+flutter test
 ```
 
 ### Post-Edit Verification
 
-After meaningful infrastructure changes, run the smallest useful validation for the files you touched:
+After meaningful Flutter changes, run the smallest useful check for the task:
 
 ```bash
-# Docker
-docker build -t test:latest .
-
-# Terraform
-terraform fmt -check -recursive
-terraform validate
-terraform plan
-
-# Kubernetes
-kubectl apply --dry-run=client -f manifest.yaml
+flutter analyze
+flutter test
+dart format --set-exit-if-changed .
 ```
 
-Use broader checks only when the change warrants them.
+Run `flutter pub get` when `pubspec.yaml` changed rather than after every code edit.
 
-### Common DevOps Syntax Traps (Avoid These!)
+### Common Dart/Flutter Syntax Traps (Avoid These!)
 
-```yaml
-# WRONG: YAML indentation with tabs
-services:
-	app:      # Tab character - YAML error!
-		image: nginx
+```dart
+// WRONG: Missing const for immutable widgets
+Widget build(BuildContext context) {
+  return Container(  // Should be const Container()
+    child: Text('Hello'),
+  );
+}
 
-# CORRECT: Always use spaces (2 spaces standard)
-services:
-  app:
-    image: nginx
+// CORRECT: Use const where possible
+Widget build(BuildContext context) {
+  return const Container(
+    child: Text('Hello'),
+  );
+}
 
-# WRONG: Missing quotes for special values
-environment:
-  - VERSION=1.0      # Might be parsed as number
-  - ENABLED=true     # Might be parsed as boolean
+// WRONG: Not disposing controllers
+class _MyWidgetState extends State<MyWidget> {
+  final controller = TextEditingController();
+  // Missing dispose!
+}
 
-# CORRECT: Quote string values
-environment:
-  - VERSION="1.0"
-  - ENABLED="true"
-
-# WRONG: Hardcoded secrets in config
-env:
-  - name: DB_PASSWORD
-    value: "supersecret123"  # NEVER do this!
-
-# CORRECT: Use secrets
-env:
-  - name: DB_PASSWORD
-    valueFrom:
-      secretKeyRef:
-        name: db-secrets
-        key: password
-```
-
-### Infrastructure Version Pinning
-
-Always pin versions explicitly:
-
-```dockerfile
-# WRONG
-FROM node:latest
-FROM python
-
-# CORRECT - Pin major.minor at minimum
-FROM node:20-alpine
-FROM python:3.12-slim
-```
-
-```hcl
-# WRONG
-terraform {
-  required_providers {
-    aws = {
-      source = "hashicorp/aws"
-    }
+// CORRECT: Always dispose controllers
+class _MyWidgetState extends State<MyWidget> {
+  final controller = TextEditingController();
+  
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
   }
 }
 
-# CORRECT - Pin provider versions
-terraform {
-  required_version = ">= 1.6.0"
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 5.0"
-    }
+// WRONG: Using setState after dispose
+void _onDataLoaded(data) async {
+  await fetchMore();
+  setState(() {  // Might be called after dispose!
+    this.data = data;
+  });
+}
+
+// CORRECT: Check mounted before setState
+void _onDataLoaded(data) async {
+  await fetchMore();
+  if (mounted) {
+    setState(() {
+      this.data = data;
+    });
+  }
+}
+
+// WRONG: Missing required in named parameters (Dart 3+)
+void greet({String name}) { }  // Error in null-safe Dart
+
+// CORRECT: Use required for non-nullable required params
+void greet({required String name}) { }
+```
+
+---
+
+## Widget Fundamentals
+
+### StatelessWidget
+```dart
+class UserCard extends StatelessWidget {
+  const UserCard({
+    super.key,
+    required this.user,
+    this.onTap,
+  });
+
+  final User user;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundImage: NetworkImage(user.avatarUrl),
+        ),
+        title: Text(user.name),
+        subtitle: Text(user.email),
+        onTap: onTap,
+      ),
+    );
+  }
+}
+```
+
+### StatefulWidget
+```dart
+class Counter extends StatefulWidget {
+  const Counter({super.key, this.initialValue = 0});
+
+  final int initialValue;
+
+  @override
+  State<Counter> createState() => _CounterState();
+}
+
+class _CounterState extends State<Counter> {
+  late int _count;
+
+  @override
+  void initState() {
+    super.initState();
+    _count = widget.initialValue;
+  }
+
+  void _increment() {
+    setState(() {
+      _count++;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Text('Count: $_count'),
+        ElevatedButton(
+          onPressed: _increment,
+          child: const Text('Increment'),
+        ),
+      ],
+    );
+  }
+}
+```
+
+### Widget Composition
+```dart
+// Prefer composition over inheritance
+class ProfilePage extends StatelessWidget {
+  const ProfilePage({super.key, required this.user});
+
+  final User user;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text(user.name)),
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            ProfileHeader(user: user),
+            ProfileStats(user: user),
+            ProfileActions(user: user),
+          ],
+        ),
+      ),
+    );
   }
 }
 ```
 
 ---
 
-## Docker
+## State Management
 
-### Dockerfile Best Practices
+### Provider Pattern
+```dart
+// Model
+class CartModel extends ChangeNotifier {
+  final List<Item> _items = [];
 
-```dockerfile
-# Use specific version tags
-FROM node:20-alpine AS builder
+  List<Item> get items => List.unmodifiable(_items);
+  
+  int get totalItems => _items.length;
+  
+  double get totalPrice => _items.fold(0, (sum, item) => sum + item.price);
 
-# Set working directory
-WORKDIR /app
+  void add(Item item) {
+    _items.add(item);
+    notifyListeners();
+  }
 
-# Copy dependency files first (better caching)
-COPY package*.json ./
+  void remove(Item item) {
+    _items.remove(item);
+    notifyListeners();
+  }
 
-# Install dependencies
-RUN npm ci --only=production
+  void clear() {
+    _items.clear();
+    notifyListeners();
+  }
+}
 
-# Copy source code
-COPY . .
-
-# Build application
-RUN npm run build
-
-# Production stage
-FROM node:20-alpine AS production
-
-WORKDIR /app
-
-# Create non-root user
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nodejs -u 1001
-
-# Copy built assets from builder
-COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist
-COPY --from=builder --chown=nodejs:nodejs /app/node_modules ./node_modules
-
-# Switch to non-root user
-USER nodejs
-
-# Expose port
-EXPOSE 3000
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1
-
-# Run application
-CMD ["node", "dist/main.js"]
-```
-
-### Multi-Stage Builds
-
-```dockerfile
-# Build stage
-FROM golang:1.21-alpine AS builder
-WORKDIR /app
-COPY go.* ./
-RUN go mod download
-COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -o /app/server ./cmd/server
-
-# Final stage
-FROM alpine:3.18
-RUN apk --no-cache add ca-certificates
-WORKDIR /app
-COPY --from=builder /app/server .
-EXPOSE 8080
-ENTRYPOINT ["./server"]
-```
-
-### Docker Compose
-
-```yaml
-version: '3.8'
-
-services:
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: development
-    ports:
-      - "3000:3000"
-    volumes:
-      - .:/app
-      - /app/node_modules
-    environment:
-      - NODE_ENV=development
-      - DATABASE_URL=postgres://user:pass@db:5432/mydb
-    depends_on:
-      db:
-        condition: service_healthy
-    networks:
-      - backend
-
-  db:
-    image: postgres:15-alpine
-    environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: pass
-      POSTGRES_DB: mydb
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user -d mydb"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    networks:
-      - backend
-
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    networks:
-      - backend
-
-volumes:
-  postgres_data:
-
-networks:
-  backend:
-    driver: bridge
-```
-
----
-
-## Kubernetes
-
-### Deployment
-
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: myapp
-  labels:
-    app: myapp
-spec:
-  replicas: 3
-  selector:
-    matchLabels:
-      app: myapp
-  strategy:
+// Provider setup
+void main() {
+  runApp(
+    ChangeNotifierProvider(
+      create: (context) => CartModel(),
+      child: const MyApp(),
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
