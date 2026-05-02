@@ -1,242 +1,231 @@
 ---
 trigger: always_on
-description: Python development: modern Python, async/await, FastAPI, Django, data science, and ML patterns
+description: Rust development: ownership, lifetimes, error handling, async patterns, and cargo workflows
 ---
 
 
-# Python Development Patterns
+# Rust Development Patterns
 
-Modern Python (3.10+) best practices for web development, data science, and general programming.
+Idiomatic Rust patterns focusing on ownership, safety, and performance.
 
-## Python Workflow
+## Rust Workflow
 
-Before changing Python code:
+Before changing Rust code:
 
 ```text
-1. Read the existing project files first (`pyproject.toml`, `requirements.txt`, `setup.py`)
-2. Check whether the repo already uses `uv`, `pip`, `poetry`, or another workflow
-3. For new dependencies or version-sensitive work, verify current versions with the actual current date
-4. Prefer the package manager and project conventions already in use
+1. Read `Cargo.toml` and current crate structure first
+2. Check the edition and existing dependency set before recommending new patterns
+3. For new crates, use `cargo new` or `cargo init`; do not hand-create `Cargo.toml`
+4. For new dependencies or version-sensitive work, verify current versions with the actual current date
 ```
 
-### CLI-First Python Development
+### CLI-First Rust Development
 
-Prefer CLI tools and existing repo conventions for package management:
+Prefer standard Cargo workflows:
 ```bash
-# Virtual environment (recommended first step)
-python3 -m venv .venv
-source .venv/bin/activate  # Unix
-.venv\Scripts\activate  # Windows
+# Project creation (NEVER manually create Cargo.toml)
+cargo new my_project
+cargo new --lib my_library
+cargo init  # In existing directory
 
-# Modern: uv (10-100x faster than pip)
-uv venv
-uv pip install fastapi uvicorn
-uv pip sync requirements.txt
+# Add dependencies (NEVER manually edit Cargo.toml for deps)
+cargo add tokio --features full
+cargo add serde --features derive
+cargo add thiserror
+cargo add anyhow
 
-# Traditional: pip
-pip install fastapi uvicorn
-pip install -r requirements.txt
-pip freeze > requirements.txt
+# Development dependencies
+cargo add --dev tokio-test
+cargo add --dev mockall
 
-# Framework CLIs (use these for scaffolding)
-# Django
-django-admin startproject myproject
-python manage.py startapp myapp
+# Build and verify
+cargo build
+cargo check  # Faster than build, just checks
+cargo clippy  # Linting
+cargo fmt  # Format code
 
-# FastAPI with cookiecutter
-pip install cookiecutter
-cookiecutter https://github.com/tiangolo/full-stack-fastapi-template
-
-# Poetry (if project uses it)
-poetry init
-poetry add fastapi
-poetry install
+# Test
+cargo test
+cargo test -- --nocapture  # See println output
 ```
 
 ### Post-Edit Verification
 
-After meaningful Python changes, run the smallest useful check for the task:
+After meaningful Rust changes, run the smallest useful check for the task:
 
 ```bash
-# Common checks when configured in the repo
-mypy src/
-ruff check .
-ruff format --check .
-pytest
+cargo check
+cargo test
+cargo fmt --check
 ```
 
-Scale up only when the change warrants it. Do not force every command after every tiny edit.
+Add `cargo clippy` when the change is substantial, safety-sensitive, or lint-heavy.
 
-### Common Python Syntax Traps (Avoid These!)
+### Common Rust Syntax Traps (Avoid These!)
 
-```python
-# WRONG: Mutable default argument
-def append_to(item, target=[]):  # Bug! List is shared!
-    target.append(item)
-    return target
+```rust
+// WRONG: Using unwrap in production code
+let value = some_option.unwrap();  // Panics on None!
+let data = result.unwrap();  // Panics on Err!
 
-# CORRECT: Use None as default
-def append_to(item, target=None):
-    if target is None:
-        target = []
-    target.append(item)
-    return target
+// CORRECT: Handle errors properly
+let value = some_option.ok_or(MyError::NotFound)?;
+let data = result.map_err(|e| MyError::from(e))?;
 
-# WRONG: Not using context managers for files
-f = open('file.txt')
-data = f.read()
-f.close()  # Might not run if exception occurs!
+// WRONG: Borrowing across await points
+async fn bad_example(data: &mut Data) {
+    let reference = &data.field;
+    async_operation().await;  // reference held across await!
+    use_reference(reference);
+}
 
-# CORRECT: Always use with statement
-with open('file.txt') as f:
-    data = f.read()
+// CORRECT: Clone or restructure
+async fn good_example(data: &mut Data) {
+    let value = data.field.clone();
+    async_operation().await;
+    use_value(value);
+}
 
-# WRONG: Bare except clause
-try:
-    risky_operation()
-except:  # Catches EVERYTHING including KeyboardInterrupt!
-    pass
+// WRONG: Missing Send bound for async traits
+trait MyAsyncTrait {
+    async fn do_work(&self);  // Won't compile in multi-threaded!
+}
 
-# CORRECT: Catch specific exceptions
-try:
-    risky_operation()
-except (ValueError, TypeError) as e:
-    logger.error(f"Operation failed: {e}")
+// CORRECT: Add Send bound when needed
+trait MyAsyncTrait: Send + Sync {
+    fn do_work(&self) -> impl Future<Output = ()> + Send;
+}
 
-# WRONG: Late binding in closures
-funcs = [lambda: i for i in range(3)]
-[f() for f in funcs]  # Returns [2, 2, 2], not [0, 1, 2]!
+// WRONG: String vs &str confusion
+fn greet(name: String) { }  // Takes ownership unnecessarily
+greet("hello".to_string());  // Wasteful allocation
 
-# CORRECT: Capture value as default argument
-funcs = [lambda i=i: i for i in range(3)]
-[f() for f in funcs]  # Returns [0, 1, 2]
-
-# WRONG: Using is for value comparison
-if x is 1:  # Works sometimes, but wrong!
-    pass
-
-# CORRECT: Use == for values, is for identity
-if x == 1:  # Value comparison
-    pass
-if x is None:  # Identity (OK for None, True, False)
-    pass
+// CORRECT: Accept borrowed when possible
+fn greet(name: &str) { }  // Borrows, no allocation needed
+greet("hello");  // Works directly with string literal
 ```
 
-### Python Version-Specific Features
+### Cargo.toml Best Practices
 
-Check Python version before using new features:
+```toml
+[package]
+name = "myproject"
+version = "0.1.0"
+edition = "2021"  # Always specify edition
+rust-version = "1.75"  # Minimum Rust version
 
-```python
-# Python 3.10+ Pattern Matching
-match command:
-    case ["quit"]:
-        return "Goodbye"
-    case _:
-        return "Unknown"
+[dependencies]
+# Pin to semver-compatible range
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
 
-# Python 3.9+ Built-in Generic Types
-def process(items: list[str]) -> dict[str, int]:
-    pass
+[dev-dependencies]
+tokio-test = "0.4"
 
-# Python 3.8+ Walrus Operator
-if (n := len(data)) > 10:
-    print(f"Processing {n} items")
-
-# Check version in code if needed
-import sys
-if sys.version_info >= (3, 10):
-    # Use match statement
-else:
-    # Use if/elif chain
+# Optimize release builds
+[profile.release]
+lto = true
+codegen-units = 1
 ```
 
 ---
 
-## Modern Python Syntax
+## Ownership & Borrowing
 
-### Type Hints
-```python
-# Basic types
-def greet(name: str) -> str:
-    return f"Hello, {name}"
+### Core Principles
+1. Each value has exactly one owner
+2. When the owner goes out of scope, the value is dropped
+3. References must always be valid
+4. Either one mutable reference OR any number of immutable references
 
-# Collections (Python 3.9+)
-def process(items: list[str]) -> dict[str, int]:
-    return {item: len(item) for item in items}
+### Borrowing Patterns
+```rust
+// Immutable borrow - read only
+fn print_length(s: &str) {
+    println!("Length: {}", s.len());
+}
 
-# Optional and Union
-def find_user(id: int) -> User | None:
-    return db.get(id)
+// Mutable borrow - can modify
+fn append_suffix(s: &mut String) {
+    s.push_str("_suffix");
+}
 
-# Generic types
-from typing import TypeVar, Generic
+// Taking ownership - consumes the value
+fn consume_string(s: String) {
+    println!("Consumed: {}", s);
+    // s is dropped here
+}
 
-T = TypeVar('T')
-
-class Repository(Generic[T]):
-    def get(self, id: int) -> T | None: ...
-    def save(self, item: T) -> T: ...
+// Returning ownership
+fn create_string() -> String {
+    String::from("created")
+}
 ```
 
-### Pattern Matching (3.10+)
-```python
-match command:
-    case ["quit"]:
-        return "Goodbye"
-    case ["load", filename]:
-        return load_file(filename)
-    case ["save", filename, *options]:
-        return save_file(filename, options)
-    case _:
-        return "Unknown command"
+### When to Use What
+- `&T`: Reading data, most function parameters
+- `&mut T`: Modifying data in place
+- `T`: Taking ownership, returning from functions, storing in structs
 
-# With guards
-match user:
-    case User(role="admin"):
-        return full_access()
-    case User(role="user", verified=True):
-        return limited_access()
-    case _:
-        return no_access()
-```
+---
 
-### Dataclasses
-```python
-from dataclasses import dataclass, field
-from datetime import datetime
+## Lifetimes
 
-@dataclass
-class User:
-    id: int
-    name: str
-    email: str
-    created_at: datetime = field(default_factory=datetime.now)
-    tags: list[str] = field(default_factory=list)
+### Basic Lifetime Annotations
+```rust
+// The returned reference lives as long as the shortest input lifetime
+fn longest<'a>(x: &'a str, y: &'a str) -> &'a str {
+    if x.len() > y.len() { x } else { y }
+}
+
+// Struct with references
+struct ImportantExcerpt<'a> {
+    part: &'a str,
+}
+
+impl<'a> ImportantExcerpt<'a> {
+    fn level(&self) -> i32 {
+        3
+    }
     
-    def __post_init__(self):
-        self.email = self.email.lower()
+    fn announce_and_return_part(&self, announcement: &str) -> &str {
+        println!("Attention: {}", announcement);
+        self.part
+    }
+}
+```
 
-# Immutable
-@dataclass(frozen=True)
-class Config:
-    host: str
-    port: int
+### Lifetime Elision Rules
+The compiler infers lifetimes when:
+1. Each reference parameter gets its own lifetime
+2. If exactly one input lifetime, it's assigned to all outputs
+3. If `&self` or `&mut self`, that lifetime is assigned to outputs
+
+```rust
+// These are equivalent:
+fn first_word(s: &str) -> &str { ... }
+fn first_word<'a>(s: &'a str) -> &'a str { ... }
 ```
 
 ---
 
-## Async/Await Patterns
+## Error Handling
 
-### Basic Async
-```python
-import asyncio
+### Result and Option
+```rust
+use std::fs::File;
+use std::io::{self, Read};
 
-async def fetch_data(url: str) -> dict:
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url) as response:
-            return await response.json()
+// Using Result
+fn read_file(path: &str) -> Result<String, io::Error> {
+    let mut file = File::open(path)?;
+    let mut contents = String::new();
+    file.read_to_string(&mut contents)?;
+    Ok(contents)
+}
 
-# Parallel execution
+// Using Option
+fn find_user(id: u64) -> Option<User> {
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
