@@ -1,233 +1,83 @@
 ---
 trigger: always_on
-description: Rust development: ownership, lifetimes, error handling, async patterns, and cargo workflows
+description: MiniMax M2.7 skill authoring: when to use skills, how to structure them, and how to keep them deep without duplicating the core.
 ---
 
 
-# Rust Development Patterns
+# Skill Authoring
 
-Idiomatic Rust patterns focusing on ownership, safety, and performance.
+Use this rule when creating, revising, or evaluating `.cursor/skills/*` content.
 
-## Rust Workflow
+## Rule vs Skill
 
-Before changing Rust code:
+- Put durable, universal behavior in always-on rules.
+- Use a skill for repeatable workflows, domain-specific heuristics, or tasks that need examples and reference material.
+- If the content only matters for one file type or one domain, prefer a skill or requestable rule over expanding the core.
 
-```text
-1. Read `Cargo.toml` and current crate structure first
-2. Check the edition and existing dependency set before recommending new patterns
-3. For new crates, use `cargo new` or `cargo init`; do not hand-create `Cargo.toml`
-4. For new dependencies or version-sensitive work, verify current versions with the actual current date
-```
+## Skill Shape
 
-### CLI-First Rust Development
+Each skill should clearly provide:
 
-Prefer standard Cargo workflows:
-```bash
-# Project creation (NEVER manually create Cargo.toml)
-cargo new my_project
-cargo new --lib my_library
-cargo init  # In existing directory
+- what it is for
+- when to use it
+- what to inspect first
+- the workflow or decision sequence
+- any output or verification expectations
 
-# Add dependencies (NEVER manually edit Cargo.toml for deps)
-cargo add tokio --features full
-cargo add serde --features derive
-cargo add thiserror
-cargo add anyhow
+## Frontmatter Contract
 
-# Development dependencies
-cargo add --dev tokio-test
-cargo add --dev mockall
+Use YAML frontmatter on every `SKILL.md`.
 
-# Build and verify
-cargo build
-cargo check  # Faster than build, just checks
-cargo clippy  # Linting
-cargo fmt  # Format code
+Minimum:
 
-# Test
-cargo test
-cargo test -- --nocapture  # See println output
-```
-
-### Post-Edit Verification
-
-After meaningful Rust changes, run the smallest useful check for the task:
-
-```bash
-cargo check
-cargo test
-cargo fmt --check
-```
-
-Add `cargo clippy` when the change is substantial, safety-sensitive, or lint-heavy.
-
-### Common Rust Syntax Traps (Avoid These!)
-
-```rust
-// WRONG: Using unwrap in production code
-let value = some_option.unwrap();  // Panics on None!
-let data = result.unwrap();  // Panics on Err!
-
-// CORRECT: Handle errors properly
-let value = some_option.ok_or(MyError::NotFound)?;
-let data = result.map_err(|e| MyError::from(e))?;
-
-// WRONG: Borrowing across await points
-async fn bad_example(data: &mut Data) {
-    let reference = &data.field;
-    async_operation().await;  // reference held across await!
-    use_reference(reference);
-}
-
-// CORRECT: Clone or restructure
-async fn good_example(data: &mut Data) {
-    let value = data.field.clone();
-    async_operation().await;
-    use_value(value);
-}
-
-// WRONG: Missing Send bound for async traits
-trait MyAsyncTrait {
-    async fn do_work(&self);  // Won't compile in multi-threaded!
-}
-
-// CORRECT: Add Send bound when needed
-trait MyAsyncTrait: Send + Sync {
-    fn do_work(&self) -> impl Future<Output = ()> + Send;
-}
-
-// WRONG: String vs &str confusion
-fn greet(name: String) { }  // Takes ownership unnecessarily
-greet("hello".to_string());  // Wasteful allocation
-
-// CORRECT: Accept borrowed when possible
-fn greet(name: &str) { }  // Borrows, no allocation needed
-greet("hello");  // Works directly with string literal
-```
-
-### Cargo.toml Best Practices
-
-```toml
-[package]
-name = "myproject"
-version = "0.1.0"
-edition = "2021"  # Always specify edition
-rust-version = "1.75"  # Minimum Rust version
-
-[dependencies]
-# Pin to semver-compatible range
-tokio = { version = "1", features = ["full"] }
-serde = { version = "1", features = ["derive"] }
-
-[dev-dependencies]
-tokio-test = "0.4"
-
-# Optimize release builds
-[profile.release]
-lto = true
-codegen-units = 1
-```
-
+```yaml
 ---
-
-## Ownership & Borrowing
-
-### Core Principles
-1. Each value has exactly one owner
-2. When the owner goes out of scope, the value is dropped
-3. References must always be valid
-4. Either one mutable reference OR any number of immutable references
-
-### Borrowing Patterns
-```rust
-// Immutable borrow - read only
-fn print_length(s: &str) {
-    println!("Length: {}", s.len());
-}
-
-// Mutable borrow - can modify
-fn append_suffix(s: &mut String) {
-    s.push_str("_suffix");
-}
-
-// Taking ownership - consumes the value
-fn consume_string(s: String) {
-    println!("Consumed: {}", s);
-    // s is dropped here
-}
-
-// Returning ownership
-fn create_string() -> String {
-    String::from("created")
-}
-```
-
-### When to Use What
-- `&T`: Reading data, most function parameters
-- `&mut T`: Modifying data in place
-- `T`: Taking ownership, returning from functions, storing in structs
-
+name: my-skill
+description: >
+  What this skill does and the user-language triggers for when to use it.
+license: MIT
+metadata:
+  version: "1.0.0"
+  category: workflow
+  sources:
+    - Official docs or standards
 ---
-
-## Lifetimes
-
-### Basic Lifetime Annotations
-```rust
-// The returned reference lives as long as the shortest input lifetime
-fn longest<'a>(x: &'a str, y: &'a str) -> &'a str {
-    if x.len() > y.len() { x } else { y }
-}
-
-// Struct with references
-struct ImportantExcerpt<'a> {
-    part: &'a str,
-}
-
-impl<'a> ImportantExcerpt<'a> {
-    fn level(&self) -> i32 {
-        3
-    }
-    
-    fn announce_and_return_part(&self, announcement: &str) -> &str {
-        println!("Attention: {}", announcement);
-        self.part
-    }
-}
 ```
 
-### Lifetime Elision Rules
-The compiler infers lifetimes when:
-1. Each reference parameter gets its own lifetime
-2. If exactly one input lifetime, it's assigned to all outputs
-3. If `&self` or `&mut self`, that lifetime is assigned to outputs
+Rules:
 
-```rust
-// These are equivalent:
-fn first_word(s: &str) -> &str { ... }
-fn first_word<'a>(s: &'a str) -> &'a str { ... }
-```
+- `name` must match the directory name exactly.
+- `description` must include concrete trigger language, not vague capability claims.
+- `license` should be explicit so skills stay portable outside this repo.
+- `metadata.version` should change when the skill meaningfully evolves.
+- `metadata.category` should describe the domain or workflow.
+- `metadata.sources` should name current authoritative sources when the skill depends on external behavior.
 
----
+## Progressive Disclosure
 
-## Error Handling
+- Keep `SKILL.md` focused on the main workflow.
+- Move large examples, extended references, and category catalogs into companion files such as `reference.md`.
+- Load deeper material only when the task actually needs it.
 
-### Result and Option
-```rust
-use std::fs::File;
-use std::io::{self, Read};
+## Skill Contracts
 
-// Using Result
-fn read_file(path: &str) -> Result<String, io::Error> {
-    let mut file = File::open(path)?;
-    let mut contents = String::new();
-    file.read_to_string(&mut contents)?;
-    Ok(contents)
-}
+- State concrete triggers in user-language, not vague capability claims.
+- Define inputs, outputs, stop conditions, and common failure modes.
+- Prefer one coherent workflow per skill over broad omnibus instructions.
 
-// Using Option
-fn find_user(id: u64) -> Option<User> {
+## Anti-Duplication
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- Do not copy the always-on solver loop, status taxonomy, or generic tool discipline into every skill.
+- Let skills deepen the task-specific method, not restate the global contract.
+- Reference existing project patterns or rule files when they already cover shared behavior.
+
+## Quality Bar
+
+- Keep the opening concise enough that the agent can quickly decide whether to load the skill.
+- Use examples only when they change behavior.
+- Re-read the skill after writing it and remove filler, stale tool names, and redundant policy text.
+- Prefer one small `SKILL.md` plus optional `reference.md` over one giant omnibus file.
+- If the skill references scripts or helper assets, document where outputs go and how success is verified.
 
 ---
 > Source: [madebyaris/advance-minimax-m2-cursor-rules](https://github.com/madebyaris/advance-minimax-m2-cursor-rules) — distributed by [TomeVault](https://tomevault.io).
