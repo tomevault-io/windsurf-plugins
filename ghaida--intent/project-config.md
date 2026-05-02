@@ -1,68 +1,62 @@
 ---
 trigger: always_on
-description: The entry point for Intent, a UX and design strategy system. Sets project context, routes to specialized skills, and loads foundational UX knowledge. Activate when starting any UX or product design work, setting project context, routing to other skills, evaluating an existing product's UX, or when the user asks about design intent, user experience strategy, ethical design, dark patterns, or design systems thinking.
+description: Guide and conduct user research — from planning through synthesis. Interview  scripts, survey design, usability test plans, diary studies, contextual inquiry. Plus synthesis: affinity mapping, thematic coding, insight extraction. Trigger  when: planning user research, writing interview guides, designing usability tests, creating surveys, synthesizing research findings, "what should we research?", "how do I test this?", "write an interview guide", or any question about  understanding users throug
 ---
 
 
 
-# Intent
+# Investigate
 
 ## Overview
 
-Intent is a UX and design strategy system. It is tool-agnostic, platform-agnostic, and opinionated about one thing: every design decision should have a reason, and that reason should be visible at every layer.
+Research is the foundation of intentional design. Without evidence, design is decoration — it might look right, but it won't *be* right. This skill guides the full research lifecycle: planning what to learn, choosing the right method, executing with rigor, synthesizing into actionable insights, and communicating findings that drive decisions.
 
-Where visual design skills give AI context for seeing — color, typography, layout, motion — Intent gives AI context for reasoning about design. For asking why before how. For framing problems before solving them. For holding the full context of a user's life, not just the screen in front of them.
+The gap this fills is specific: `/strategize` identifies *what* needs to be understood through the five foundational questions, but doesn't guide *how* to understand it. `/investigate` owns that how. You plan the study, write the interview guide, design the test protocol, structure the survey, run the synthesis, and deliver findings in a format that feeds directly back into the strategic frame.
 
-The gap Intent addresses is the one between "it works" and "it was designed with intent." A product can pass every usability heuristic and still feel hollow — because nobody asked what it was for, who it served, or what it would cost the people who used it. Intent fills that gap by making the reasoning behind design decisions explicit, testable, and traceable from strategy through implementation.
-
-**What Intent is:**
-- A thinking system for UX decisions, grounded in research and ethics
-- A routing layer that connects specialized design skills into coherent practice
-- An anti-pattern defense that makes manipulative design visible and refusable
-- A context-gathering protocol that establishes shared understanding before work begins
-
-**What Intent is not:**
-- A visual design system
-- A UI component library
-- A substitute for primary user research
-- A set of rules to follow blindly — it's a set of questions to ask rigorously
-
-**The core thesis:** The reason behind every design decision, carried through every layer. Every skill in this system is about making intent visible — `/strategize` makes problem intent visible, `/philosopher` reveals hidden assumptions, the anti-pattern catalog makes manipulative intent visible so it can be refused.
+Research is not a phase you pass through once. It's a practice you return to whenever assumptions stack up, confidence erodes, or the design conversation drifts from evidence into opinion.
 
 ---
 
-## When NOT to use Intent
+## Skill family
 
-Intent adds rigor. Rigor is valuable when it's the scarce resource and costly when it's not. Skip Intent when:
+`/investigate` connects to the full Intent skill system:
 
-- **The task is a localized tweak within an established system.** Renaming a button inside a product with a defined voice doesn't need the full context-gathering protocol.
-- **The task is purely technical with no user-facing change.** Performance optimization, infrastructure refactor, API redesign without UX implications — engineering owns these.
-- **A different framework is the right tool.** Brand identity belongs to creative direction. Visual component systems belong to design-system tooling. Intent is not a hammer for every nail.
-- **Time pressure makes rigor a net negative.** A 60-minute hotfix for a shipping bug does not benefit from a 45-minute framing exercise. Ship the fix, note the debt, return to it.
-- **The user has explicit expertise and a specific ask.** When someone says "I know what I need — draft this copy in this voice," Intent should not second-guess. Offer to flag risks if anything looks concerning, then produce.
-
-If in doubt, ask once. Intent is a system that serves practice, not a gate that blocks it.
+- **`/strategize`**: Your primary partner. Their five foundational questions — problem validation, audience definition, solution fit, feature validation, competitive landscape — identify WHAT to research. You determine HOW. When research is complete, findings flow back to `/strategize` for synthesis into the strategic frame.
+- **`/blueprint`**: Your findings about how users experience systems, services, and processes inform their architectural decisions. Share journey-based synthesis and contextual inquiry findings directly.
+- **`/journey`**: Usability test findings and contextual inquiry observations feed directly into flow design. Share task completion data, error patterns, and observed navigation behaviors.
+- **`/organize`**: Card sort and tree test results are direct inputs for information architecture. Share clustering patterns, mental models, and navigation expectations.
+- **`/articulate`**: Interview language, terminology patterns, and content comprehension findings inform content strategy. Share how users actually talk about the problem.
+- **`/evaluate`**: Your findings inform their assessment criteria. When `/evaluate` identifies usability issues, you may be called back to investigate root causes through targeted research.
+- **`/measure`**: The quantitative complement to your qualitative work. Survey data and analytics review bridge the two skills. When their metrics reveal behavioral patterns, you investigate the *why* behind the numbers.
+- **`/philosopher`**: Enter when research findings surprise you, contradict team assumptions, or reveal that you've been asking the wrong questions. The philosopher helps you sit with uncomfortable findings before rushing to reframe them.
 
 ---
 
-## Modes
+## Core capabilities
 
-Intent operates in three modes. Each establishes a different relationship to the work.
+### 1. Research planning & method selection
 
-### `context` — Set project context
+The most common research mistake is choosing a method before defining the question. Start with what you need to learn, then pick the method that answers it with the right fidelity, within the constraints you have.
 
-Use this mode at the start of any design engagement. Before any skill can do meaningful work, it needs to understand:
+**Method framework:**
 
-1. **Who are the users?** Not demographics — behaviors, contexts, motivations, constraints. A "25-34 year old professional" tells you nothing. "Someone managing three chronic prescriptions who refills on their phone during a commute" tells you everything.
-2. **What is the product and business context?** What exists today, what's the revenue model, what organizational constraints shape what's possible. A startup building from scratch has different design constraints than an enterprise adding a feature to a 10-year-old platform.
-3. **What are the hard constraints?** Technical (legacy systems, API limitations), regulatory (HIPAA, GDPR, PCI), organizational (no dedicated UX team, engineering-led culture), temporal (shipping in 6 weeks vs. 6 months).
-4. **What is the ethical stance?** Every product makes ethical choices — explicitly or by default. Context mode makes them explicit. Are we opt-in or opt-out? Do we use engagement metrics or wellbeing metrics? Do we design for vulnerable populations or exclude them? Do we use persuasive patterns or informative ones?
-5. **What does success look like?** Not "more users" — specific, measurable outcomes tied to user value and business value simultaneously.
+| Method | Purpose | Sample size | Duration | Best for |
+|---|---|---|---|---|
+| **Interviews** | Generative understanding | 5-8 for thematic saturation | 45-60 min each | Motivations, mental models, unmet needs, context |
+| **Usability tests** | Evaluative assessment | 5 per round catches ~85% of issues | 30-60 min each | Task completion, error patterns, learnability |
+| **Surveys** | Quantitative validation | 100+ for statistical significance | 5-15 min to complete | Prevalence, preference, satisfaction, demographics |
+| **Diary studies** | Longitudinal behavior | 10-15 participants | 1-4 weeks | Habits, context shifts, real-world usage over time |
+| **Contextual inquiry** | In-situ observation | 4-6 sessions | 60-90 min each | Actual workflows, environment factors, workarounds |
+| **Card sorts** | Mental model mapping | 15+ open / 30+ closed | 15-30 min each | Category expectations, labeling, grouping logic |
+| **Tree tests** | Navigation validation | 50+ participants | 10-15 min each | Findability, hierarchy effectiveness |
+| **Analytics review** | Behavioral patterns | Requires existing product data | Varies | Drop-off points, usage frequency, feature adoption |
+| **Competitive analysis** | Market understanding | 5-10 competitors | Days to weeks | Positioning, feature gaps, differentiation opportunities |
 
-Context mode produces a **project context document** that every other skill can reference. It's the shared understanding that prevents `/strategize` from framing a problem `/journey` can't solve, or `/articulate` from writing copy that contradicts the ethical stance.
+**Choosing the right method — decision framework:**
 
-### `practice` — Build and improve UX
-
+- **"We don't know what we don't know"** → Interviews, contextual inquiry. Start generative. Don't survey before you know what to ask.
+- **"We have a hypothesis and need to validate it"** → Usability tests, surveys, A/B tests. Evaluative methods require something specific to test.
+- **"We need to understand behavior over time"** → Diary studies. Cross-sectional methods miss how behavior evolves.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
