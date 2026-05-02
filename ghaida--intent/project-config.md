@@ -1,51 +1,52 @@
 ---
 trigger: always_on
-description: Design for everyone by treating accessibility as a first-class design discipline, not a compliance checklist. Part of the Intent design strategy system. Covers WCAG 2.2 for designers, screen reader experience design, keyboard navigation, cognitive accessibility, motor accessibility, inclusive design beyond compliance, and accessibility testing methodology. Trigger on: accessibility, a11y, WCAG, screen reader, keyboard navigation, color contrast, alt text, focus management, touch targets, inclusi
+description: Intent reference: WCAG 2.2 for designers, screen reader design, keyboard navigation, cognitive and motor accessibility, inclusive design principles and testing methodology. Load when working on accessibility, a11y audits, inclusive design, or assistive technology.
 ---
 
 
+# Accessibility Foundations
 
-# Include — Design for Everyone
+## WCAG 2.2 for Designers
 
-## Overview
+The Web Content Accessibility Guidelines are organized around four principles: Perceivable, Operable, Understandable, Robust (POUR). Most designers encounter WCAG as a compliance checklist. That's the wrong frame. WCAG is a design specification — it tells you what your design must achieve for the full spectrum of human ability.
 
-Accessibility is not a feature. It's not a phase. It's not something you "add" after the design is "done." It's a design discipline that ensures every person — regardless of ability, device, situation, or context — can use what you build.
+### Perceivable
 
-One billion people worldwide have a disability. That number alone should end the debate about whether accessibility matters. But accessibility is not just about permanent disability. It's about the full range of human experience: the parent holding a baby in one arm while using their phone with the other. The commuter reading a screen in direct sunlight. The user in a noisy cafe who can't play audio. The person recovering from eye surgery. The aging executive whose eyesight isn't what it was five years ago. The teenager with ADHD trying to focus on a multi-step form.
+Information and interface components must be presentable to users in ways they can perceive. This means: not everyone sees, not everyone hears, not everyone processes information the same way.
 
-Everyone experiences situational or temporary impairment. Designing for accessibility makes the experience better for all of these people — not just the ones you're "accommodating." Curb cuts were designed for wheelchair users. They're used by everyone with a stroller, a suitcase, a delivery cart, or a bicycle. Good accessible design works the same way.
+**Text alternatives (1.1):** Every non-text element that conveys information needs a text equivalent. Images need alt text. Icons need labels. Charts need data tables or summaries. Video needs captions and audio description. The question is always: if this visual element disappeared, would the user lose information?
 
-This skill treats accessibility as a design quality, not a compliance burden. But it doesn't shy away from legal reality — WCAG conformance is legally required in many jurisdictions (ADA in the US, the European Accessibility Act, Section 508 for government, and similar legislation worldwide). Ignoring accessibility is both a design failure and a legal risk.
+**How designers get this wrong:** Decorative images with verbose alt text (screen readers will read "stock photo of a diverse team collaborating in a modern office" for every page — exhausting). Informative images with empty alt text. Complex charts with alt text that says "chart" instead of describing the data. Icons without any programmatic label. The fix is intentional alt text: describe what the image communicates, not what it depicts.
 
-**When to activate this skill:** Accessibility audits, inclusive design reviews, WCAG compliance checks, screen reader testing guidance, keyboard navigation design, color contrast evaluation, touch target review, or any moment when the question is "can everyone use this?"
+**Time-based media (1.2):** Video needs captions (synchronized text of spoken content) and audio description (narration of visual content). Audio needs transcripts. Live content needs real-time captions. This isn't just for deaf users — captions serve anyone in a noisy or quiet environment.
 
----
+**Adaptable (1.3):** Information structure must be programmatic, not just visual. A heading that's bold and large but coded as a `<div>` is invisible to screen readers. A data table that's built with positioned divs instead of `<table>` elements loses its row/column relationships. Design decisions about hierarchy, grouping, and sequence must be implementable as semantic structure.
 
-## Skill family
+**Distinguishable (1.4):** Contrast ratios: 4.5:1 for normal text, 3:1 for large text (18px+ or 14px+ bold), 3:1 for UI components and graphics. These are minimums — aim higher for body text. Color must not be the only means of conveying information — a red error border needs an icon or text too, because not everyone perceives red. Text must be resizable to 200% without loss of content or functionality.
 
-Include works alongside the full Intent skill system. Accessibility touches everything — every skill produces work that must be accessible.
+**New in 2.2 — Dragging movements (2.5.7):** Any functionality that uses dragging must have a non-dragging alternative. Drag-to-reorder must also offer move-up/move-down buttons or an alternative input method.
 
-- **`/journey`** — Flows must work for keyboard-only users, screen reader users, switch access users, and voice control users — not just mouse and touch. Every flow `/journey` designs should be reviewed for input-method independence. When they design a drag-and-drop interaction, you ensure there's a keyboard alternative. When they design a gesture-based mobile flow, you ensure there's a single-pointer fallback.
+### Operable
 
-- **`/articulate`** — Clear writing IS accessible writing. Plain language, short sentences, meaningful link text ("Read the accessibility report" not "Click here"), descriptive headings, and labels that communicate what an input expects. `/articulate` owns the copy; you advise on what makes it accessible.
+Users must be able to operate the interface through multiple input methods — not just mouse and touch.
 
-- **`/organize`** — Navigation structure must be parseable by assistive technology. Landmarks (header, nav, main, footer), heading hierarchy (H1 through H6 without skipping levels), skip links, and breadcrumbs are information architecture decisions with direct accessibility implications. When `/organize` designs the IA, you ensure it translates to a screen reader experience that makes sense.
+**Keyboard accessible (2.1):** Everything must work with a keyboard. Every interactive element must be focusable and activatable. No keyboard traps — users must be able to navigate away from any component. Custom keyboard shortcuts must not conflict with browser or assistive technology shortcuts.
 
-- **`/fortify`** — Edge case hardening overlaps with accessibility. Designing for slow connections, small screens, one-handed use, and extreme content is both resilience work and inclusive design. Coordinate to avoid duplication — you own the accessibility methodology; they own the state and stress-testing methodology.
+**Enough time (2.2):** If content has a time limit, users must be able to turn off, adjust, or extend the limit. Session timeouts need warnings and extension options. Auto-updating content needs pause/stop controls. Moving or auto-playing content must be stoppable.
 
-- **`/evaluate`** — Accessibility assessment is part of every UX evaluation. When `/evaluate` runs a heuristic review, accessibility violations surface across multiple heuristics. Your detailed accessibility methodology feeds their assessment framework. Their findings in accessibility categories route to you.
+**Seizures and physical reactions (2.3):** No content that flashes more than three times per second. This isn't theoretical — flashing content can trigger seizures in people with photosensitive epilepsy. Motion animations should be reducible (respect prefers-reduced-motion).
 
-- **`/specify`** — Accessibility requirements must be in every handoff spec. ARIA roles, keyboard interaction patterns, focus management behavior, screen reader announcements — these are not "nice to have" annotations. They're core spec requirements. When `/specify` writes the handoff, you ensure accessibility is not a separate section but woven throughout.
+**Navigable (2.4):** Provide a skip navigation link (first focusable element, links to main content). Use descriptive page titles. Focus order must be logical and predictable — typically matching visual reading order. Link text must make sense out of context ("Read more" fails this; "Read our accessibility policy" passes). Headings and labels must be descriptive.
 
-- **`/blueprint`** — System architecture affects accessibility. Notification systems need ARIA live regions. Real-time updates need polite announcements. Infinite scroll needs alternative navigation. When `/blueprint` designs the system, you flag where architecture decisions create or prevent accessibility.
+**New in 2.2 — Focus not obscured (2.4.11):** When a component receives keyboard focus, it must not be entirely hidden by other content (sticky headers, modals, toasts). At least partially visible.
 
-- **`/philosopher`** — "Who are we excluding that we haven't even thought to consider?" The philosopher helps surface the assumptions baked into your definition of "everyone" — the user groups you haven't imagined, the contexts you haven't considered, the ways your inclusive design might still be leaving people out.
+**New in 2.2 — Target size (2.5.8):** Interactive targets must be at least 24x24 CSS pixels, with certain exceptions (inline links, native browser controls). This benefits motor-impaired users, touch users, and everyone with large fingers on small screens.
 
----
+### Understandable
 
-## Core capabilities
+Content and interface behavior must be understandable to the user.
 
-### 1. WCAG 2.2 for designers
+**Readable (3.1):** Set the language of the page (lang attribute). Identify changes in language within the page. Define unusual words, abbreviations, and jargon. These seem like developer concerns, but they're design decisions — the designer decides what terminology to use and how to explain it.
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
