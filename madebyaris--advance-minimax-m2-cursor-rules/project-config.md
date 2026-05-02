@@ -1,260 +1,275 @@
 ---
 trigger: always_on
-description: Flutter development: widget patterns, state management, Dart best practices, and platform channel integration
+description: Go development: error handling, interfaces, concurrency, modules, and idiomatic patterns
 ---
 
 
-# Flutter Development Patterns
+# Go Development Patterns
 
-Modern Flutter patterns for cross-platform mobile, web, and desktop development.
+Idiomatic Go patterns focusing on simplicity, clarity, and concurrency.
 
-## Flutter Workflow
+## Go Workflow
 
-Before changing Flutter code:
+Before changing Go code:
 
 ```text
-1. Read `pubspec.yaml` and the current app structure first
-2. Check the repo's Flutter and Dart constraints before using newer language or framework features
-3. For new apps, use `flutter create`; do not hand-create `pubspec.yaml`
+1. Read `go.mod` and existing package structure first
+2. Check the current Go version in the repo before recommending newer features
+3. For new modules, use `go mod init`; do not hand-create `go.mod`
 4. For new dependencies or version-sensitive work, verify current versions with the actual current date
 ```
 
-### CLI-First Flutter Development
+### CLI-First Go Development
 
-Prefer Flutter CLI workflows:
+Prefer standard Go CLI workflows:
 ```bash
-# Project creation (NEVER manually create pubspec.yaml)
-flutter create my_app
-flutter create --org com.example my_app
-flutter create --template package my_package
+# Project initialization (NEVER manually create go.mod)
+go mod init github.com/myorg/myproject
 
-# Add dependencies (NEVER manually edit pubspec.yaml for adding)
-flutter pub add provider
-flutter pub add go_router
-flutter pub add flutter_bloc
-flutter pub add dio
-flutter pub add freezed --dev
-flutter pub add build_runner --dev
+# Add dependencies (NEVER manually edit go.mod)
+go get github.com/gin-gonic/gin@latest
+go get github.com/lib/pq@v1.10.9
 
-# Get dependencies after any pubspec change
-flutter pub get
+# Verify and tidy
+go mod tidy
+go mod verify
 
-# Code generation (for freezed, json_serializable)
-dart run build_runner build --delete-conflicting-outputs
+# Build and test
+go build ./...
+go test ./...
+go vet ./...
 
-# Verify project health
-flutter analyze
-flutter test
+# Format before committing
+go fmt ./...
+gofmt -s -w .
 ```
 
 ### Post-Edit Verification
 
-After meaningful Flutter changes, run the smallest useful check for the task:
+After meaningful Go changes, run the smallest useful check for the task:
 
 ```bash
-flutter analyze
-flutter test
-dart format --set-exit-if-changed .
+go build ./...
+go test ./...
+go vet ./...
 ```
 
-Run `flutter pub get` when `pubspec.yaml` changed rather than after every code edit.
+Run `go mod tidy` when imports or dependencies changed rather than after every tiny edit.
 
-### Common Dart/Flutter Syntax Traps (Avoid These!)
+### Common Go Syntax Traps (Avoid These!)
 
-```dart
-// WRONG: Missing const for immutable widgets
-Widget build(BuildContext context) {
-  return Container(  // Should be const Container()
-    child: Text('Hello'),
-  );
+```go
+// WRONG: Missing error check
+result, _ := doSomething()  // Never ignore errors!
+
+// CORRECT: Always handle errors
+result, err := doSomething()
+if err != nil {
+    return fmt.Errorf("doSomething failed: %w", err)
 }
 
-// CORRECT: Use const where possible
-Widget build(BuildContext context) {
-  return const Container(
-    child: Text('Hello'),
-  );
+// WRONG: Range loop variable capture
+for _, item := range items {
+    go func() {
+        process(item)  // Bug! Captures loop variable
+    }()
 }
 
-// WRONG: Not disposing controllers
-class _MyWidgetState extends State<MyWidget> {
-  final controller = TextEditingController();
-  // Missing dispose!
+// CORRECT: Pass as parameter
+for _, item := range items {
+    go func(i Item) {
+        process(i)
+    }(item)
 }
 
-// CORRECT: Always dispose controllers
-class _MyWidgetState extends State<MyWidget> {
-  final controller = TextEditingController();
-  
-  @override
-  void dispose() {
-    controller.dispose();
-    super.dispose();
-  }
-}
+// WRONG: Nil map write
+var m map[string]int
+m["key"] = 1  // Panic!
 
-// WRONG: Using setState after dispose
-void _onDataLoaded(data) async {
-  await fetchMore();
-  setState(() {  // Might be called after dispose!
-    this.data = data;
-  });
-}
-
-// CORRECT: Check mounted before setState
-void _onDataLoaded(data) async {
-  await fetchMore();
-  if (mounted) {
-    setState(() {
-      this.data = data;
-    });
-  }
-}
-
-// WRONG: Missing required in named parameters (Dart 3+)
-void greet({String name}) { }  // Error in null-safe Dart
-
-// CORRECT: Use required for non-nullable required params
-void greet({required String name}) { }
+// CORRECT: Initialize map
+m := make(map[string]int)
+m["key"] = 1
 ```
 
 ---
 
-## Widget Fundamentals
+## Error Handling
 
-### StatelessWidget
-```dart
-class UserCard extends StatelessWidget {
-  const UserCard({
-    super.key,
-    required this.user,
-    this.onTap,
-  });
+### Basic Error Handling
+```go
+// Always check errors
+result, err := doSomething()
+if err != nil {
+    return fmt.Errorf("doSomething failed: %w", err)
+}
 
-  final User user;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundImage: NetworkImage(user.avatarUrl),
-        ),
-        title: Text(user.name),
-        subtitle: Text(user.email),
-        onTap: onTap,
-      ),
-    );
-  }
+// Wrap errors with context
+if err := db.Query(sql); err != nil {
+    return fmt.Errorf("failed to query users: %w", err)
 }
 ```
 
-### StatefulWidget
-```dart
-class Counter extends StatefulWidget {
-  const Counter({super.key, this.initialValue = 0});
-
-  final int initialValue;
-
-  @override
-  State<Counter> createState() => _CounterState();
+### Custom Error Types
+```go
+// Simple error type
+type NotFoundError struct {
+    Resource string
+    ID       string
 }
 
-class _CounterState extends State<Counter> {
-  late int _count;
+func (e *NotFoundError) Error() string {
+    return fmt.Sprintf("%s with id %s not found", e.Resource, e.ID)
+}
 
-  @override
-  void initState() {
-    super.initState();
-    _count = widget.initialValue;
-  }
+// Checking error types
+if errors.Is(err, sql.ErrNoRows) {
+    return &NotFoundError{Resource: "user", ID: id}
+}
 
-  void _increment() {
-    setState(() {
-      _count++;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Text('Count: $_count'),
-        ElevatedButton(
-          onPressed: _increment,
-          child: const Text('Increment'),
-        ),
-      ],
-    );
-  }
+// Type assertions
+var notFound *NotFoundError
+if errors.As(err, &notFound) {
+    // Handle not found case
 }
 ```
 
-### Widget Composition
-```dart
-// Prefer composition over inheritance
-class ProfilePage extends StatelessWidget {
-  const ProfilePage({super.key, required this.user});
+### Error Handling Patterns
+```go
+// Early return pattern
+func processData(data []byte) error {
+    if len(data) == 0 {
+        return errors.New("empty data")
+    }
+    
+    parsed, err := parse(data)
+    if err != nil {
+        return fmt.Errorf("parse failed: %w", err)
+    }
+    
+    if err := validate(parsed); err != nil {
+        return fmt.Errorf("validation failed: %w", err)
+    }
+    
+    return save(parsed)
+}
 
-  final User user;
+// Error sentinel values
+var (
+    ErrNotFound     = errors.New("not found")
+    ErrUnauthorized = errors.New("unauthorized")
+    ErrInvalidInput = errors.New("invalid input")
+)
+```
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(user.name)),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            ProfileHeader(user: user),
-            ProfileStats(user: user),
-            ProfileActions(user: user),
-          ],
-        ),
-      ),
-    );
-  }
+---
+
+## Interfaces
+
+### Interface Design
+```go
+// Small, focused interfaces
+type Reader interface {
+    Read(p []byte) (n int, err error)
+}
+
+type Writer interface {
+    Write(p []byte) (n int, err error)
+}
+
+type ReadWriter interface {
+    Reader
+    Writer
+}
+
+// Accept interfaces, return structs
+func ProcessData(r io.Reader) (*Result, error) {
+    data, err := io.ReadAll(r)
+    if err != nil {
+        return nil, err
+    }
+    return &Result{Data: data}, nil
+}
+```
+
+### Interface Best Practices
+```go
+// Define interfaces where they're used, not where implemented
+// In consumer package:
+type UserStore interface {
+    Get(id string) (*User, error)
+    Save(user *User) error
+}
+
+type UserService struct {
+    store UserStore  // Accepts any implementation
+}
+
+// Implementation in another package
+type PostgresUserStore struct {
+    db *sql.DB
+}
+
+func (s *PostgresUserStore) Get(id string) (*User, error) { ... }
+func (s *PostgresUserStore) Save(user *User) error { ... }
+```
+
+### Empty Interface and Type Assertions
+```go
+// Avoid interface{} / any when possible
+// When necessary, use type switches
+func process(v any) string {
+    switch x := v.(type) {
+    case string:
+        return x
+    case int:
+        return strconv.Itoa(x)
+    case fmt.Stringer:
+        return x.String()
+    default:
+        return fmt.Sprintf("%v", v)
+    }
 }
 ```
 
 ---
 
-## State Management
+## Concurrency
 
-### Provider Pattern
-```dart
-// Model
-class CartModel extends ChangeNotifier {
-  final List<Item> _items = [];
+### Goroutines and Channels
+```go
+// Basic goroutine
+go func() {
+    result := expensiveOperation()
+    resultChan <- result
+}()
 
-  List<Item> get items => List.unmodifiable(_items);
-  
-  int get totalItems => _items.length;
-  
-  double get totalPrice => _items.fold(0, (sum, item) => sum + item.price);
+// Buffered channel
+jobs := make(chan Job, 100)
 
-  void add(Item item) {
-    _items.add(item);
-    notifyListeners();
-  }
-
-  void remove(Item item) {
-    _items.remove(item);
-    notifyListeners();
-  }
-
-  void clear() {
-    _items.clear();
-    notifyListeners();
-  }
+// Wait for completion
+var wg sync.WaitGroup
+for i := 0; i < numWorkers; i++ {
+    wg.Add(1)
+    go func() {
+        defer wg.Done()
+        for job := range jobs {
+            process(job)
+        }
+    }()
 }
+wg.Wait()
+```
 
-// Provider setup
-void main() {
-  runApp(
-    ChangeNotifierProvider(
-      create: (context) => CartModel(),
-      child: const MyApp(),
+### Context for Cancellation
+```go
+func fetchData(ctx context.Context, url string) ([]byte, error) {
+    req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+    if err != nil {
+        return nil, err
+    }
+    
+    resp, err := http.DefaultClient.Do(req)
+    if err != nil {
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
