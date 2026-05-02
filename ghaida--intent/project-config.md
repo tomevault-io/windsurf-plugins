@@ -1,46 +1,69 @@
 ---
 trigger: always_on
-description: Frames product design problems before solutions exist. Synthesizes research, sizes opportunities, defines hypotheses, scopes projects, and maps customer journeys. Use this skill for new project kickoffs, ambiguous business asks, translating research into briefs, strategic framing sessions, opportunity assessments, project scoping, stakeholder alignment, and competitive analysis—even if the user doesn't explicitly say "strategize.
+description: Rethinks experiences for different platforms and contexts — not just resizing, but reconceiving. Part of the Intent design strategy system. When an experience moves from desktop to mobile, web to TV, consumer app to kiosk, or visual interface to voice, the interaction model, information priority, and user context all change. Trigger when: adapting a design for a new platform, planning multi-device experiences, auditing cross-platform consistency, designing for TV/kiosk/voice/embedded, or when so
 ---
 
 
 
-# Strategize — Frame the Problem
+# Transpose — Adapt Across Contexts
 
 ## Overview
 
-This skill owns the earliest, most critical phase of product design: problem framing. Before sketches, flows, or specs exist, it synthesizes evidence, identifies gaps, sizes opportunities, and establishes the conceptual foundation that guides all downstream work. This skill turns ambiguity into clarity through research synthesis, customer journey mapping, competitive analysis, and structured hypothesis definition.
+Responsive design is a layout concern. Transposition is a UX concern.
 
-**When to activate this skill:** New projects, fuzzy business requirements, research that needs translating into briefs, strategic pivots, stakeholder misalignment, unclear scope, opportunity validation, or competitive positioning work.
+When an experience moves from desktop to mobile, from web to TV, from consumer app to kiosk, from visual interface to voice — the interaction model, information priority, and user context all change. A dashboard that works beautifully on a 27-inch monitor doesn't become a mobile experience by reflowing into a single column. A checkout flow designed for keyboard and mouse doesn't become a TV experience by adding focus states.
+
+Transposition means rethinking the experience for each context, not shrinking it to fit. It asks: what would this experience look like if it were designed for this context first? What would we add? What would we never have included? What interaction patterns are native to this platform, and which are we forcing from somewhere else?
+
+**When to activate this skill:** Moving a product to a new platform, planning multi-device strategy, auditing cross-platform UX, designing for non-standard contexts (TV, kiosk, voice, embedded), or anytime someone says "just make it responsive" and the problem is bigger than layout.
 
 ---
 
 ## Skill family
 
-This skill works alongside the full Intent skill system:
+Transpose works alongside the full Intent skill system:
 
-- **`/blueprint`**: Once strategy is set, `/blueprint` maps how services, processes, and dependencies connect to produce outcomes. Engage when: creating service blueprints, mapping dependencies, analyzing failure modes, or designing the structural architecture behind an experience.
-- **`/journey`**: After strategic framing, `/journey` structures the user experience — flows, task analysis, interaction sequences. Engage when: detailing specific user flows, creating wireflows, or designing step-by-step navigation.
-- **`/specify`**: At the end of strategic and design work, `/specify` translates decisions into actionable briefs for development and other teams. Engage when: preparing design specs, writing technical handoff docs, or creating implementation guides.
-- **`/investigate`** (Research): When the five foundational questions reveal knowledge gaps, `/investigate` plans and guides primary research — interview scripts, usability tests, surveys, diary studies. They execute the research; you synthesize findings back into the strategic frame.
-- **`/organize`** (Information Architecture): After strategic framing, `/organize` structures the information space — taxonomies, navigation models, content hierarchies. Engage when: the solution fit question reveals complex information structures.
-- **`/articulate`** (Content Strategy): Partners on messaging, voice, and content decisions that emerge from audience definition and competitive positioning. Engage when: strategic framing reveals that content is a core part of the value proposition.
-- **`/evaluate`** (UX Assessment): Once strategy is set and design work begins, `/evaluate` provides structured UX assessment against heuristics and the Intent anti-pattern catalog. Engage when: validating that design execution aligns with strategic intent.
-- **`/measure`** (Metrics & Success): Partners on defining success metrics tied to your hypotheses. Each foundational question should connect to measurable outcomes. Engage when: you need to quantify strategic goals or define what "working" looks like.
-
-- **`/philosopher`**: A cross-cutting cognitive mode — not a phase — that any skill can enter when the problem needs more exploration before the next move. Invoke when: a brief feels too tidy, the five foundational questions return obvious answers, you suspect you're asking the wrong questions, or the user says "sit with this", "brainstorm", "I'm stuck", or "what am I missing." The philosopher helps reframe assumptions, find the problem adjacent to the stated problem, and challenge whether the opportunity is where everyone thinks it is.
-
-**Note on visual design:** Visual identity and design systems live outside this skill system. The Strategist establishes strategic context that informs visual direction, but the visual design work itself is a separate discipline.
-
-**Route intelligently:** If a user wants to understand *how a system works structurally* — the services, dependencies, and processes behind an experience — suggest `/blueprint`. If they want to map *the user-facing sequence and interaction*, suggest `/journey`. If they need to *plan or conduct user research*, suggest `/investigate`. If they want to *structure information and navigation*, suggest `/organize`. If they want to *define content strategy and voice*, suggest `/articulate`. If they want to *assess design quality*, suggest `/evaluate`. If they want to *define success metrics*, suggest `/measure`. If they want to *communicate decisions downstream*, suggest `/specify`. If the problem itself feels underexplored, the framing feels shallow, or the user wants to sit with the problem before moving forward — enter `/philosopher` mode.
+- **`/journey`**: Your flows need to work across the contexts transpose identifies. A checkout flow on desktop is not the same journey on mobile or voice — journey designs the sequence, transpose ensures it fits the context.
+- **`/organize`**: Navigation structure may fundamentally change per context. Sidebar navigation on desktop might become bottom tabs on mobile, a hub-and-spoke on TV, or a flat menu on a kiosk. Organize provides the IA; transpose adapts it.
+- **`/include`**: Cross-context design IS inclusive design. Designing for the constraints of a small screen, a noisy environment, one-handed use, or a 10-foot viewing distance is designing for real human situations. Include ensures accessibility; transpose ensures contextual fit.
+- **`/fortify`**: Different contexts have different failure modes. Mobile loses connectivity. TV remotes run out of batteries. Kiosks get touched by greasy fingers. Fortify maps the failure modes; transpose maps the contexts where they occur.
+- **`/blueprint`**: System architecture must support multi-context delivery. APIs need to serve different data shapes. State sync needs infrastructure. Blueprint maps the system; transpose defines what each context needs from it.
+- **`/philosopher`**: A cross-cutting cognitive mode for sitting with transposition problems before jumping to solutions. Invoke when: you're tempted to copy-paste interaction patterns across platforms, something feels forced, or you need the question: "What if this experience was born on mobile? What would we never have added?"
 
 ---
 
-## Five foundational questions
+## Core capabilities
 
-Every project — regardless of stage, domain, or scale — should be pressure-tested against these five strategic questions. They are not optional. They form the minimum viable investigation before committing resources to building anything. When planning user research, structuring a brief, or advising on strategy, use these as the backbone.
+### 1. Context analysis framework
 
-### 1. Problem Validation — Is this truly a problem people have?
+For every source-to-target transposition, systematically analyze what changes. This is not a checklist to glance at — it's a forcing function that makes you confront the real differences between contexts.
+
+**Input method:**
+- Desktop: mouse + keyboard, precise targeting, hover states, right-click, keyboard shortcuts, drag-and-drop
+- Mobile: touch, imprecise targeting (minimum 44px), gestures (swipe, pinch, long-press), no hover, virtual keyboard covers half the screen
+- TV: D-pad remote, focus-based navigation, no direct pointing, limited text input, voice remote on some devices
+- Voice: no pointing, no visual feedback loop, conversational turn-taking, confirmation through re-prompting
+- Kiosk: touch-only (no hover, no keyboard unless on-screen), large targets, often gloved or wet hands
+- Embedded/widget: constrained input matching host app, possibly no dedicated input at all
+
+**Attention model:**
+- Desktop: focused, multi-window, long sessions, user is "at work" (even for personal tasks)
+- Mobile: fragmented, interruption-prone, multitasking, micro-sessions interspersed with life
+- TV: lean-back, passive, shared screen, low cognitive effort tolerance
+- Kiosk: goal-directed, time-pressured, public environment, zero learning curve expected
+- Embedded: ambient, secondary to primary task, glanceable
+
+**Screen real estate:**
+Constraints AND opportunities. Small screens force focus — that's a feature, not a bug. Large screens enable overview and comparison — but also invite clutter. Analyze what each size makes possible, not just what it takes away.
+
+**Connectivity:**
+- Desktop/web: generally reliable broadband, but not always
+- Mobile: spotty, variable speed, metered data in many markets
+- TV: usually reliable home Wi-Fi, but smart TVs have weak processors
+- Kiosk: dedicated connection, but outages happen in retail/public environments
+- Embedded/IoT: intermittent, low-bandwidth, offline-first is often the right default
+
+**Environment:**
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
