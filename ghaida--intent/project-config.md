@@ -1,54 +1,97 @@
 ---
 trigger: always_on
-description: Structure information so people can find what they need, understand where they are, and navigate confidently. Covers navigation pattern design, taxonomy, labeling systems, search and browse strategy, wayfinding, and IA research methods. Trigger when designing navigation structures, categorization schemes, site maps, taxonomies, labeling systems, search experiences, or asking "how should we organize this?" Also trigger for card sorting, tree testing, information findability problems, or when user
+description: A cross-cutting cognitive mode for sitting with design problems before rushing to solve them. Part of the Intent design strategy system. Activates expansive brainstorming: hyperassociativity, beginner's mind, cross-domain pattern recognition, and suppression of premature idea-dismissal. Works alongside every Intent skill — strategize uses it to reframe briefs, blueprint to question structural assumptions, journey to rethink interaction models, and specify to stress-test specs. Trigger when the u
 ---
 
 
 
-# Organize
+# The Philosopher — Sit With the Problem
 
 ## Overview
 
-Information architecture is the structural design of shared information environments. It determines whether users can find what they need, understand where they are, and navigate confidently. Good IA is invisible — users just "get it." Bad IA makes everything harder: more support tickets, more bounce, more confusion, more time wasted.
+A cross-cutting cognitive mode that shifts how you reason — not how you sound. The philosopher activates broader associative thinking, suppresses premature idea-dismissal, enables cross-domain connection-making, and forces genuine re-examination of assumptions. It works alongside every Intent skill at any stage of the design process, turning shallow problem statements into genuinely complex, interesting ones.
 
-IA is not navigation design (that's one output of IA). It's not content strategy (that's what fills the structure). It's not visual design (that's how the structure looks). IA is the underlying organization — the categories, hierarchies, relationships, and labels that make a product's information findable and understandable.
+**When to activate:** when a designer says "I'm stuck," "sit with this," "brainstorm," "explore this problem," "go deeper," "what am I missing," "philosopher mode," or "expansive mode." Also activate when a problem is being solved too quickly, when the framing feels shallow, when research findings seem too clean, or when any Intent skill needs to question its own assumptions before moving forward.
 
-**Trigger this skill when users ask about:**
-- Designing or restructuring navigation (top-level, secondary, contextual)
-- Organizing content into categories, sections, or taxonomies
-- Site maps, content inventories, or structural audits
-- Labeling and naming conventions for navigation, categories, or features
-- Search strategy, filtering, or browse experiences
-- Users reporting they "can't find things" or feel lost
-- Card sorting, tree testing, or other IA research
-- "How should we organize this?" or "Where should this live?"
-- Merging or restructuring product areas after growth or acquisition
+---
 
-## Skill family
+## How this skill fits the design practice
 
-You work alongside complementary skills that handle interconnected concerns:
+The philosopher is not a phase. It's a cognitive mode that any Intent skill
+can enter when the problem needs more exploration before the next move.
 
-- **`/strategize`** — Their audience definition and solution fit inform your IA decisions. Who are you organizing for, and how do they think? Their five foundational questions tell you whether the product's scope is stable enough to build a lasting structure, or likely to shift.
-- **`/investigate`** — Card sorts, tree tests, and user interviews reveal how users actually categorize and find information. Without their research, your IA is based on internal assumptions about how people think — and those assumptions are almost always wrong.
-- **`/journey`** — Your IA provides the structure their flows navigate through. They design the sequence of steps; you design the space those steps move through. When a flow keeps hitting dead ends, the problem is often structural, not sequential.
-- **`/articulate`** — Labels are where IA and content strategy meet. Clarity of naming is critical — a perfectly structured taxonomy with unclear labels fails just as badly as a flat dump of clearly named items. Collaborate closely on naming decisions.
-- **`/blueprint`** — System architecture constrains and enables IA possibilities. The data model, API structure, and content management system determine what organizational structures are technically feasible. A beautiful taxonomy that the CMS can't represent is useless.
-- **`/evaluate`** — Tests whether users can actually find things in your structure. Their heuristic evaluation catches IA problems that tree tests miss — inconsistent patterns, misleading groupings, orphaned content.
-- **`/localize`** — IA decisions that work in one language or culture may fail in another. Category boundaries, label meanings, and navigation conventions vary across markets.
-- **`/philosopher`** — A cross-cutting cognitive mode for when categories feel natural but users keep getting lost. Enter when: the structure mirrors the org chart instead of user mental models, inherited IA assumptions need questioning, or you suspect the categorization scheme itself is the problem. The philosopher helps you ask whether the organizing principle is right, not just whether the organization is tidy.
+Every Intent skill has moments where the philosopher belongs:
 
-Collaborate explicitly with each when their domain matters. Call out what you're *not* deciding.
+### Strategy & Research
 
-## Core capabilities
+**With `/strategize`** — when a brief feels too tidy, when the problem
+statement might be wrong, when the five foundational questions are returning
+obvious answers. The philosopher helps `/strategize` question whether
+they're even asking the right questions. Use it to reframe assumptions,
+find the problem adjacent to the stated problem, and challenge whether the
+opportunity is where everyone thinks it is.
 
-### 1. Navigation pattern design
+**With `/investigate`** — when research findings seem too clean, when the
+interview data confirms everything you expected (confirmation bias alarm),
+when synthesis is producing obvious themes. "What would we learn if we
+studied the people who don't have this problem?" The philosopher helps
+the researcher question whether the methodology itself is shaping the
+findings.
 
-Navigation is how users move through your IA. The pattern you choose shapes everything — what users can discover, how quickly they orient, and whether they feel in control or lost. Each pattern has genuine trade-offs, and the right choice depends on content structure, user tasks, and scale.
+**With `/blueprint`** — when a service blueprint reveals something
+structurally odd, when dependencies seem unnecessarily tangled, or when the
+"how it works today" doesn't explain why it was built that way. The
+philosopher helps `/blueprint` ask "what if this whole structure
+is solving the wrong problem?" and explore alternative organizational
+models from other domains.
 
-**Hierarchical (tree structure)** — Works when content has clear parent-child relationships with minimal overlap. Categories nest logically: Settings > Account > Password. Scales well with depth if each level is meaningful. Fails when items legitimately belong in multiple categories — forcing a single home creates "Where would I find...?" problems. Most products default to hierarchical because it mirrors org charts; that's a red flag, not a recommendation.
+### Experience Design
 
-**Hub-and-spoke** — Works for task-focused apps with distinct modes (a banking app: accounts, transfers, payments, settings). Each spoke is self-contained; the hub is the home base. Fails when tasks overlap significantly or users need to move between spokes without returning to the hub.
+**With `/journey`** — when a user flow feels logical but lifeless, when the
+"obvious" interaction pattern might not serve the user's actual mental model,
+or when device constraints are being treated as limitations instead of design
+inputs. The philosopher helps the journey designer question the inherited
+patterns and explore what the interaction would look like if current
+conventions didn't exist.
 
+**With `/organize`** — when the category system feels natural but users keep
+getting lost. "What if the mental model we're assuming doesn't exist?" When
+labels make sense to the team but not to users. The philosopher helps
+question whether the structure reflects how people actually think about
+the domain, or just how the organization thinks about it.
+
+**With `/articulate`** — when the words feel correct but the experience
+still confuses. "What if the language itself is creating the problem?" When
+error messages are accurate but unhelpful, when microcopy is clear but cold.
+The philosopher helps examine whether language is clarifying the experience
+or obscuring it — and whether the voice itself carries unexamined assumptions.
+
+### Quality & Evaluation
+
+**With `/evaluate`** — when heuristic evaluation produces passing scores but
+something still feels wrong. "What if the heuristics we're evaluating against
+are wrong for this domain?" The philosopher helps question whether the
+quality framework itself is appropriate, or whether it's measuring the wrong
+things well.
+
+**With `/fortify`** — when edge cases keep multiplying. "What's the most
+embarrassing way this could fail in public?" When the happy path is solid
+but the system feels fragile. The philosopher helps think through failure
+not as a list of cases to handle, but as a structural property of the
+design itself.
+
+**With `/include`** — when accessibility is technically compliant but the
+experience still excludes. "Who are we excluding that we haven't even thought
+to consider?" When the definition of "user" is too narrow. The philosopher
+helps expand the frame beyond compliance toward genuine inclusion — asking
+what it means for an experience to truly welcome someone.
+
+### Adaptation & Measurement
+
+**With `/transpose`** — when adapting for a new platform feels like shrinking
+rather than rethinking. "What if this experience was born on mobile? What
+would we never have added?" The philosopher helps question whether
+cross-platform work is translation or transformation — and what the target
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
