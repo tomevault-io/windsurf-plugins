@@ -1,0 +1,192 @@
+---
+trigger: always_on
+description: When the user types `/check`, run all CI/CD checks locally before committing. Execute these commands in order:
+---
+
+# Phoenixd Dashboard - Cursor Rules
+
+## /check Command
+
+When the user types `/check`, run all CI/CD checks locally before committing. Execute these commands in order:
+
+### Quick Check (default)
+
+```bash
+# From project root
+cd /Users/miguelmedeiros/code/phoenixd-dashboard
+
+# 1. Backend checks
+cd backend && npm run db:generate && npm run format:check && npm run lint && npm run test && npm run build && cd ..
+
+# 2. Frontend checks
+cd frontend && npm run format:check && npm run lint && npm run test && npm run build && cd ..
+```
+
+### Full Check (with E2E)
+
+If user requests `/check full` or `/check e2e`, also run:
+
+```bash
+cd e2e && npm run test && cd ..
+```
+
+### Check Summary
+
+After running checks, provide a summary:
+
+- ✅ Format check passed
+- ✅ Lint passed
+- ✅ Tests passed
+- ✅ Build successful
+
+If any check fails, stop and report the error immediately.
+
+---
+
+## Docker Development Workflow
+
+When modifying any Docker-related files (Dockerfile, docker-compose.yml, entrypoint scripts, or configuration files in /services/\*), always:
+
+1. **Rebuild the affected containers** after making changes:
+
+   ```bash
+   docker compose build --no-cache <service-name>
+   ```
+
+2. **Recreate and restart the containers** to apply changes:
+
+   ```bash
+   docker compose up -d --force-recreate <service-name>
+   ```
+
+3. **For changes affecting multiple services**, rebuild all:
+
+   ```bash
+   docker compose down
+   docker compose build --no-cache
+   docker compose up -d
+   ```
+
+4. **Verify the containers are running correctly**:
+   ```bash
+   docker compose ps
+   docker compose logs -f <service-name>
+   ```
+
+## Service-Specific Commands
+
+- **Backend changes**: `docker compose up -d --build backend`
+- **Frontend changes**: `docker compose up -d --build frontend`
+- **Tor changes**: `docker compose --profile tor up -d --build tor`
+- **All services**: `docker compose down && docker compose up -d --build`
+
+## Important Notes
+
+- The Tor service uses a profile (`--profile tor`), so include it when working with Tor
+- Always check logs after rebuilding to ensure services started correctly
+- Use `docker compose logs -f` to follow logs in real-time
+
+## File Structure
+
+Services configuration files are organized under `/services/`:
+
+- `/services/tor/` - Tor SOCKS5 proxy configuration
+- Future: `/services/tailscale/`, `/services/cloudflared/`
+
+---
+
+## Internationalization (i18n) Rules
+
+**CRITICAL**: When adding, modifying, or removing any translation string, you MUST update ALL supported language files.
+
+### Supported Languages (11 total)
+
+| File                            | Language     | Code |
+| ------------------------------- | ------------ | ---- |
+| `frontend/src/messages/en.json` | English      | en   |
+| `frontend/src/messages/pt.json` | Portuguese   | pt   |
+| `frontend/src/messages/es.json` | Spanish      | es   |
+| `frontend/src/messages/fr.json` | French       | fr   |
+| `frontend/src/messages/de.json` | German       | de   |
+| `frontend/src/messages/ar.json` | Arabic (RTL) | ar   |
+| `frontend/src/messages/zh.json` | Chinese      | zh   |
+| `frontend/src/messages/ja.json` | Japanese     | ja   |
+| `frontend/src/messages/ko.json` | Korean       | ko   |
+| `frontend/src/messages/ru.json` | Russian      | ru   |
+| `frontend/src/messages/hi.json` | Hindi        | hi   |
+
+### Workflow
+
+1. **Adding new strings**:
+
+   - Add to `en.json` first (source of truth)
+   - Then add translations to ALL other 10 language files
+   - Use Context7 or web search to get accurate translations
+
+2. **Modifying existing strings**:
+
+   - Update in `en.json` first
+   - Update the corresponding key in ALL other language files
+
+3. **Removing strings**:
+   - Remove from ALL 11 language files
+
+### Translation Guidelines
+
+- Maintain the same JSON structure and key names across all files
+- Keep placeholders like `{count}`, `{amount}`, `{minutes}` unchanged
+- For RTL languages (Arabic), the text direction is handled by the app
+- Prefer native translations over transliterations
+- Keep translations concise for UI elements
+
+### Verification
+
+After any i18n changes, verify all files have the same keys:
+
+```bash
+# Check all translation files have consistent keys
+cd frontend && npm run build
+```
+
+Build will fail if any translation key is missing in a locale.
+
+---
+
+## E2E Tests (Cypress) Structure
+
+**CRITICAL**: The Cypress E2E tests are located ONLY in the `/e2e` folder at the project root.
+
+### Correct Structure
+
+```
+phoenixd-dashboard/
+├── e2e/                    ← All Cypress tests go here
+│   ├── e2e/               ← Test spec files
+│   │   ├── auth.cy.ts
+│   │   ├── channels.cy.ts
+│   │   ├── dashboard.cy.ts
+│   │   ├── lnurl.cy.ts
+│   │   ├── navigation.cy.ts
+│   │   ├── payments.cy.ts
+│   │   ├── receive.cy.ts
+│   │   ├── send.cy.ts
+│   │   └── tools.cy.ts
+│   ├── fixtures/          ← Mock data
+│   ├── support/           ← Commands and setup
+│   ├── cypress.config.ts
+│   └── package.json
+├── frontend/               ← NO cypress folder here!
+└── backend/
+```
+
+### Rules
+
+1. **NEVER create a `frontend/cypress` folder** - all E2E tests live in `/e2e`
+2. **NEVER duplicate test files** between `/e2e` and any other location
+3. To run E2E tests: `npm run test:e2e` from project root or `npm test` from `/e2e`
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [MiguelMedeiros/phoenixd-dashboard](https://github.com/MiguelMedeiros/phoenixd-dashboard) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-04-22 -->
