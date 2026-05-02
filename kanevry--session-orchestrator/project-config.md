@@ -1,136 +1,162 @@
 ---
 trigger: always_on
-description: When the user types /plan or asks to create a project plan, feature PRD, or retrospective
+description: When the user types /evolve or asks about session learnings, pattern extraction, or learning management
 ---
 
 
-# Plan — Structured Project Planning & PRD Generation
+# Evolve — Session Learning Extraction
 
-Three planning modes with a shared research-driven Q&A engine. Pattern across all modes: **research → questions → document → review → issues**.
+Extract patterns from session history into reusable learnings. Three modes of operation.
 
-## Phase 0: Read Session Config
+## Prerequisites
 
-Read Session Config from CLAUDE.md. Required field: `plan-baseline-path`. If missing or absent, stop with error:
+- **Persistence gate**: `persistence: true` must be set in Session Config. If not, abort: "Learnings require persistence to be enabled in Session Config."
+- Session history must exist at `.orchestrator/metrics/sessions.jsonl`
+- Learnings are stored at `.orchestrator/metrics/learnings.jsonl`
+- Config field: `learning-expiry-days` (default: 30) — controls `expires_at` for new and updated learnings
 
-> "Error: `plan-baseline-path` is not configured in Session Config. Add it to your CLAUDE.md under `## Session Config`. Example: `plan-baseline-path: ~/Projects/projects-baseline`"
+## Cursor Adaptation
 
-Additional fields: `plan-default-visibility`, `plan-prd-location`, `plan-retro-location`, `vcs`. Expand `~` in paths.
-
-## Phase 1: Mode Selection
-
-Parse the argument to determine mode:
-
-- **`new`** — Project kickoff: scaffolding, architecture decisions, initial setup
-- **`feature`** — Feature PRD: requirements gathering, compact scope, acceptance criteria
-- **`retro`** — Retrospective: data-driven analysis of recent work, learnings extraction
-
-If no mode specified, ask via numbered list:
-
+**No AskUserQuestion tool on Cursor.** Present all choices as numbered Markdown lists:
 ```
-Which planning mode?
+Which learnings should be saved?
 
-1. new (Recommended) — Project kickoff (full PRD, repo setup, issue creation)
-2. feature — Feature PRD (compact scope, acceptance criteria, issues)
-3. retro — Retrospective (metrics analysis, reflection, improvement actions)
+1. [fragile-file] src/lib/auth.ts — Changed in 4 of last 5 sessions (confidence: 0.5 new)
+2. [scope-guidance] optimal-scope-per-session-type — 3 issues/session works well (+0.15 update)
+3. Skip all — do not save any learnings
+
+Reply with the number(s) of your choice.
 ```
 
-## Phase 2: Q&A Engine (Shared Core)
+## Mode Selection
 
-Every question wave follows the same pattern. This is the core mechanic across all modes.
+Determine mode from user input (default: `analyze`):
 
-### 2.1 Pre-Question Research
-
-Before each Q&A wave, perform research **sequentially** — Cursor has no parallel agents:
-
-1. **Market/online context** — Search for relevant market data, best practices, competitor analysis, or technical patterns for the upcoming questions
-2. **Baseline analysis** — Read projects-baseline templates, rules, and scripts at `$BASELINE_PATH` (Glob, Grep, Read)
-3. **Repo context** — Analyze current repository for patterns, file structure, dependencies, conventions (skip for `/plan new` wave 1)
-
-### 2.2 Question Presentation
-
-Synthesize research into **5 questions per wave**. Present as numbered Markdown lists — Cursor has no AskUserQuestion:
-
-- **Option 1 is ALWAYS the recommendation**, marked with `(Recommended)`
-- Include Pros/Cons drawn from the research for each option
-- Include an "Other" option when custom input makes sense
-
-Example:
-```
-## Architecture (Wave 1, Q1)
-
-Which project archetype fits best?
-
-1. nextjs-saas (Recommended) — Pro: Full SaaS stack with auth, payments. Con: Heavier setup.
-2. express-service — Pro: Lightweight API. Con: No frontend.
-3. docker-service — Pro: Maximum flexibility. Con: More manual setup.
-4. Other — Describe your preferred archetype.
-```
-
-### 2.3 Adaptive Depth
-
-Starting wave counts: `new` → 3 waves minimum, `feature` → 1 wave minimum, `retro` → 1 wave minimum. Maximum 5 waves across all modes.
-
-After each wave:
-- **Answers clear** → proceed to document generation
-- **Complexity revealed** → add targeted follow-up wave
-- **User aborts** → proceed with answers gathered
-
-### 2.4 Answer Tracking
-
-After each wave, output a recap:
-```
-## Answers So Far (Wave N/M)
-1. Archetype: nextjs-saas
-2. Visibility: internal
-3. Audience: B2B customers
-```
+| Mode | Purpose |
+|------|---------|
+| `analyze` | Extract new learnings from session history |
+| `review` | Edit/manage existing learnings interactively |
+| `list` | Display active learnings (read-only) |
 
 ---
 
-## Mode: new — Project Kickoff
+## Mode 1: Analyze
 
-**Wave 1** — Core Decisions: archetype (read `$BASELINE_PATH/templates/`), visibility, target audience, core problem, GitLab group.
+Extract learnings from `.orchestrator/metrics/sessions.jsonl`.
 
-**Wave 2** — Technical Details (per chosen archetype): tech stack decisions, design style, external integrations, performance requirements, security requirements.
+### Step 1: Load Session Data
 
-**Wave 3** — Business & Scope: MVP appetite (1w/2w/6w), success criteria (SMART), known risks, post-launch plan, ecosystem dependencies.
+1. Read all entries from `sessions.jsonl`, parse each line as JSON
+2. Sort by `completed_at` descending (most recent first)
+3. If no sessions found, abort: "No session data available."
 
-Document: 8-section full PRD. Save to `{plan-prd-location}/YYYY-MM-DD-{project-name}.md`.
+### Step 2: Pattern Extraction
 
-After PRD approval: run `$BASELINE_PATH/scripts/setup-project.sh`, verify repo, populate CLAUDE.md, commit PRD.
+Apply these heuristics for each learning type:
 
-Issues: Epic (project name) + sub-issues per MVP feature from PRD Section 4 (Solution & Scope).
+#### fragile-file
+- Same file appears in 3+ waves' `files_changed` within a session, or in 3+ different sessions
+- Subject = relative file path
+
+#### effective-sizing
+- Compare `total_agents` and `total_waves` across session types
+- Calculate average agents per wave per session type
+- Subject = e.g. `deep-session-sizing` or `feature-session-sizing`
+
+#### recurring-issue
+- `agent_summary` shows `failed` or `partial` > 0 across multiple sessions
+- Repeated failures in wave `quality` fields
+- Subject = issue pattern identifier (e.g. `test-failures-in-wave-execution`)
+
+#### scope-guidance
+- Cross-reference `effectiveness.planned_issues` vs `effectiveness.completion_rate`
+- Skip sessions lacking the `effectiveness` field
+- If completion_rate consistently 1.0 with N issues: "N issues per session works well"
+- If completion_rate < 0.7: "scope was too large"
+- Subject = `optimal-scope-per-session-type`
+
+#### deviation-pattern
+- Read `.cursor/STATE.md` if it exists, check `## Deviations` section
+- Cross-reference session duration vs planned waves
+- Subject = pattern name (e.g. `scope-creep-in-feature-sessions`)
+
+### Step 3: Deduplicate
+
+For each extracted pattern, check if a learning with same `type` + `subject` exists in `learnings.jsonl`:
+- **Exists:** propose confidence update (+0.15 if confirmed, -0.2 if contradicted)
+- **New:** propose as new learning with confidence 0.5
+
+### Step 4: Present to User
+
+Present extracted patterns as a numbered Markdown list (see Cursor Adaptation above). Let the user select which to save. Include a "Skip all" option.
+
+If user skips or selects nothing: "No learnings saved."
+
+If zero patterns were extracted, report: "No patterns found in session history." and stop.
+
+### Step 5: Write Confirmed Learnings
+
+Use atomic rewrite strategy:
+1. Read ALL existing lines from `learnings.jsonl` into memory
+2. Apply confidence updates for confirmed existing learnings (+0.15, cap at 1.0)
+3. Apply confidence decrements for contradicted learnings (-0.2)
+4. Append new learnings with confidence 0.5
+5. Prune entries where `expires_at` < current date OR `confidence` <= 0.0
+6. Consolidate duplicates (same `type` + `subject`): keep highest confidence
+7. Write entire result back with `>` (atomic rewrite, NOT append `>>`)
+
+Report: "Saved N new learnings, updated M existing. Total active: K."
 
 ---
 
-## Mode: feature — Feature PRD
+## Mode 2: Review
 
-**Wave 1** — Feature Core: what to build, why now, who uses it, scope + explicit exclusions, dependencies.
+Interactive management of existing learnings.
 
-**Wave 2** (conditional — only if Wave 1 reveals multiple subsystems or unclear integration): architecture decisions, integration points, data model changes, edge cases, performance impact.
+### Step 1: Load and Display
 
-Document: 5-section compact PRD. Save to `{plan-prd-location}/YYYY-MM-DD-{feature-slug}.md`.
+Read `learnings.jsonl`. If empty or missing: "No learnings found. Run `/evolve analyze` first."
 
-Issues: Epic (feature name) + sub-issues per acceptance criterion group.
+Display as a formatted table grouped by type:
+
+```
+## Active Learnings
+
+| # | Type | Subject | Confidence | Expires | Insight |
+|---|------|---------|------------|---------|---------|
+| 1 | fragile-file | src/lib/auth.ts | 0.80 | 2026-07-05 | Changed in 4 of last 5 sessions |
+
+Summary: N active learnings (M high confidence, K expiring soon)
+```
+
+### Step 2: Interactive Management
+
+Present as a numbered Markdown list (see Cursor Adaptation above):
+- **Boost confidence** — select learnings to boost (+0.15, cap 1.0)
+- **Reduce confidence** — select learnings to reduce (-0.2)
+- **Delete specific learnings** — remove selected entries
+- **Extend expiry** — reset `expires_at` to current date + `learning-expiry-days`
+- **Done** — exit without changes
+
+### Step 3: Apply Changes
+
+Same atomic rewrite strategy as analyze mode. Read all, modify selected, prune, consolidate, write all with `>`.
+
+Report: "Updated N learnings. Total active: K."
 
 ---
 
-## Mode: retro — Retrospective
+## Mode 3: List
 
-**Phase 1 (automatic, no user input):** Read `.orchestrator/metrics/sessions.jsonl`, run git log analysis, query open issues, compare last 5 vs prior 5 sessions.
+Read-only display of active learnings.
 
-**Wave 1** — What went well / what didn't: highlights, blockers with root causes, carryover items, process assessment, data anomalies.
+### Output Format
 
-**Wave 2** (conditional — if Wave 1 reveals significant blockers or process issues): improvement actions, priority ranking, ownership, baseline changes, Session Config adjustments.
+Display grouped by type:
 
-Artifacts: retro doc → `{plan-retro-location}/YYYY-MM-DD-retro.md`. Improvement issues + learnings update (`.orchestrator/metrics/learnings.jsonl`).
+```
+## Active Learnings
 
----
-
-## Phase 3: Document Generation
-
-Read the appropriate template from the skill directory:
-- `new` → `prd-full-template.md` (8 sections)
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
