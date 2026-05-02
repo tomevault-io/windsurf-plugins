@@ -7,11 +7,11 @@ AI 小说推文自动化 - 小说一键转短视频（有声书+AI配图），�
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [tyxben/AI_novel](https://github.com/tyxben/AI_novel).
+Original source: `CLAUDE.md` in [tyxben/AI_novel](https://github.com/tyxben/AI_novel).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
