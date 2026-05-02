@@ -5,14 +5,14 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `.cursor/rules/*.mdc` in [LowyShin/giip-dev-agent](https://github.com/LowyShin/giip-dev-agent).
+Original source: `GEMINI.md` in [LowyShin/giip-dev-agent](https://github.com/LowyShin/giip-dev-agent).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
-- **Gemini CLI** — `GEMINI.md`
+- **Cursor** — `project-config.mdc`
 - **Windsurf** — `project-config.md`
 
 Available for 6 platforms including Claude Code, Cursor, Windsurf, and more. Source: [github.com/LowyShin/giip-dev-agent](https://github.com/LowyShin/giip-dev-agent)
