@@ -1,30 +1,99 @@
 ---
 trigger: always_on
-description: Zowe MCP is a Model Context Protocol (MCP) server and VS Code extension that provides AI tools for interacting with z/OS systems. It enables LLMs to work with data sets, jobs, and UNIX System Services on one or more z/OS systems.
+description: Guide agents to automatically update AGENTS.md with important architectural decisions and patterns
 ---
 
-# Zowe MCP - Agent Instructions
 
-## Project Overview
+# AGENTS.md Update Rule
 
-Zowe MCP is a Model Context Protocol (MCP) server and VS Code extension that provides AI tools for interacting with z/OS systems. It enables LLMs to work with data sets, jobs, and UNIX System Services on one or more z/OS systems.
+## When to Update
 
-## Repository Structure
+Update `AGENTS.md` when:
 
-This is an npm workspaces monorepo with four packages:
+1. **Architectural decisions are made**: New patterns, conventions, technology choices, design patterns, or structural changes
+2. **Important patterns are established**: Code organization, naming conventions, error handling, testing approaches, API design patterns
+3. **Gotchas or important notes are discovered**: Common mistakes, special considerations, dependencies, constraints, performance considerations
+4. **Significant changes occur**: Major refactorings, migrations, breaking changes, version upgrades
 
-- `packages/zowe-mcp-common` — Shared utilities (CJS, consumed by all other packages). Exports `plural()`.
-- `packages/zowe-mcp-server` — Standalone MCP server (ESM, npm **`@zowe/mcp-server`**)
-- `packages/zowe-mcp-vscode` — VS Code extension that registers the server (CommonJS) and contributes Zowe and ISPF color themes (`themes/*.json`)
-- `packages/zowe-mcp-evals` — AI evaluations: runs an LLM agent against the MCP server (mock or native), checks tool choice/arguments and answer content, produces a Markdown report. Uses Vercel AI SDK and MCP SDK client. Config: gitignored `evals.config.json` at **repo root** (vLLM, Gemini, or LM Studio). Supports single-model (legacy) or **multi-model** (`models` array with `id` per entry; first is default). Use `--model <id>` to select a model when using multi-model config. LM Studio provider (`"lmstudio"`) uses the OpenAI-compatible endpoint (default `http://localhost:1234/v1`); the runner auto-loads the model via `POST /api/v1/models/load` with `contextLength` (default 32768) so the context window is large enough for tool definitions; when `serverModel` is missing, `loadEvalsConfig` queries `GET /v1/models` and lists available models in the error message. Run from repo root: `npm run evals` (options after `--`). Question sets: YAML files in `questions/` with per-set `repetitions`, `minSuccessRate`, optional `mock`/`native`, optional `systemPrompt`/`systemPromptAddition`, optional `skip` (string reason). Individual questions also support `skip` (string reason). Skipped sets/questions are logged but not executed or counted. Assertions use Ansible-style key-based format (3 types): **toolCall** (unified: tool/tools/oneOf, optional count/minCount/args), **toolCallOrder** (ordered sequence, value is direct array of steps), **answerContains** (substring or pattern). Each assertion can have an optional `name` for failure messages. Composites `allOf`/`anyOf` for logical grouping. **validDsn** is a special key inside `toolCall.args` (or `toolCallOrder` step `args`) whose value is a canonical DSN string (e.g. `USER.SRC.COBOL(CUSTFILE)`); the runner accepts any server-equivalent form (quoted, parenthesized, separate dsn+member). A tool DSN registry (`src/tool-dsn-registry.ts`) maps each tool to its dsnParam/memberParam; using `validDsn` for an unregistered tool fails fast. DSN normalization lives in `src/dsn-utils.ts`.
+## How to Update
 
+### Update Format
+
+1. **Update relevant sections** (Architectural Decisions, Patterns, etc.) if the change affects them
+2. **Be concise but informative** - include enough context for future sessions
+3. **Use clear, actionable language**
+
+### Structure
+
+```markdown
 ## Key Architectural Decisions
+- [Decision name]: [Description and rationale]
 
-- **npm package name (MCP server)**: Published as **`@zowe/mcp-server`**. The CLI executable name remains **`zowe-mcp-server`** (see `bin` in the server `package.json`), so `npx @zowe/mcp-server` and the global binary `zowe-mcp-server` behave the same after install.
-- **CI npm tarball**: GitHub Actions runs `npm pack -w @zowe/mcp-server` after tests pass and uploads the tarball as artifact **`zowe-mcp-server-npm`** (filename pattern `zowe-mcp-server-<version>.tgz`). Locally: `npm run pack:server` writes the same file to the repo root (ignored by `.gitignore`). The **`prepack`** script (`scripts/bundle-for-pack.cjs`) rewrites workspace deps (`zowe-mcp-common` → `.local/`) and file-based tgz deps (`zowex-sdk` → `.unpack/`), copies the rewritten `package.json` to an isolated temp directory outside the monorepo, runs `npm install --omit=dev` there (so deps are not hoisted to the workspace root), copies the resulting `node_modules` back, and adds `bundledDependencies: true` so `npm pack` includes the full tree. The **`postpack`** script restores the original `package.json` and cleans up. **Important**: `bundledDependencies` must NOT be in the committed `package.json` — it would cause `npm install` to skip deps during development (npm marks them as `inBundle` in the lockfile). The prepack script adds it dynamically. Both scripts use shared helpers from `scripts/bundle-production-deps.cjs` (also used by the VSIX `bundle-server.js`). Test airgapped installation with `npm run test:airgap` (uses empty cache, invalid registry, 5ms timeout), `npm run test:airgap:build` (builds and packs first), or `npm run test:airgap:build:native` (also runs a native z/OS smoke test using `native-config.json` and `.env` from the repo root).
-- **Standalone MCP clients (e.g. Roo Code)**: Some clients only read their own MCP config (e.g. `.roo/mcp.json`) and do not use VS Code’s registered MCP providers. Use **`@zowe/mcp-server`** in stdio mode with `--native` / `--mock`, env passwords (`ZOWE_MCP_PASSWORD_*` and/or `ZOWE_MCP_CREDENTIALS` — see **Standalone env passwords** below), optional `--config` for job cards. See **`docs/roo-or-standalone-mcp.md`** and **`docs/examples/roo-mcp.json`**.
+## Common Patterns
+- [Pattern name]: [How to use it, when to use it]
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+## Things to Remember
+- [Important notes and gotchas]
+```
+
+### Examples
+
+**After implementing a new authentication pattern:**
+
+```markdown
+## Key Architectural Decisions
+- Authentication: Use JWT tokens stored in httpOnly cookies (better security than localStorage, works with SSR)
+
+## Common Patterns
+- Authentication: Use `validateJWT()` middleware from `@/lib/auth` for protected routes
+```
+
+**After establishing a new code organization pattern:**
+
+```markdown
+## Key Architectural Decisions
+- File Organization: Organize by feature, not by file type (better scalability and code discoverability)
+
+## Common Patterns
+- File Organization: Use feature-based structure: `features/[name]/components/`, `features/[name]/hooks/`, `features/[name]/utils/`
+```
+
+## Nested AGENTS.md Support
+
+Cursor supports nested `AGENTS.md` files in subdirectories. Instructions from nested files are automatically combined with parent directories, with more specific instructions taking precedence.
+
+### When to Use Nested AGENTS.md
+
+Create nested `AGENTS.md` files when:
+
+- **Area-specific patterns**: Different parts of the codebase have distinct patterns (e.g., frontend vs backend)
+- **Domain-specific instructions**: Specific directories need specialized guidance (e.g., API routes, components, services)
+- **Technology-specific rules**: Different subdirectories use different frameworks or libraries
+
+### Structure Example
+
+```bash
+project/
+  AGENTS.md              # Global instructions
+  frontend/
+    AGENTS.md            # Frontend-specific instructions
+    components/
+      AGENTS.md          # Component-specific instructions
+  backend/
+    AGENTS.md            # Backend-specific instructions
+```
+
+### Update Strategy
+
+- **Global changes**: Update root `AGENTS.md` for project-wide patterns and decisions
+- **Area-specific changes**: Update the relevant nested `AGENTS.md` (e.g., `frontend/AGENTS.md` for frontend patterns)
+- **Scope appropriately**: Place instructions at the most specific level where they apply
+
+## Workflow
+
+- **After completing significant work**: Update AGENTS.md with new patterns, decisions, gotchas, and things to remember
+- **On explicit request**: Update immediately with all relevant context
+- **Proactively**: Update when making significant architectural decisions or establishing reusable patterns, even if not explicitly asked
 
 ---
 > Source: [zowe/zowe-mcp](https://github.com/zowe/zowe-mcp) — distributed by [TomeVault](https://tomevault.io).
