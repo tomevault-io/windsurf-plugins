@@ -1,62 +1,75 @@
 ---
 trigger: always_on
-description: Intent reference: anti-pattern remediation, dark pattern alternatives, consent design, design ethics frameworks, regulatory compliance patterns. Load when fixing dark patterns, designing consent flows, or reviewing ethical concerns.
+description: Intent reference: navigation patterns and trade-offs, taxonomy design, mental model theory, wayfinding principles, search behavior models. Load when designing navigation, site structure, taxonomy, or information hierarchy.
 ---
 
 
-# Ethical Design
+# Information Architecture
 
-## Anti-Pattern Remediation Guide
+## Navigation Patterns
 
-The master skill catalogs anti-patterns. This document explains how to fix them — and how to design the ethical alternative from the start.
+Every navigation pattern is a trade-off between findability, scalability, and cognitive load. There is no universally correct pattern — there's the right pattern for your content, users, and context.
 
-### Deceptive Patterns → Honest Alternatives
+### Hierarchical (Tree)
 
-**Bait and Switch → Consistent Delivery.** What you show is what you deliver. If a button says "Download," it downloads. If a link says "Learn more," it teaches. Test by asking: if a user described what just happened, would their description match the label they clicked?
+The most common pattern. Content is organized in nested categories: top-level → subcategory → item.
 
-**Trick Questions → Plain Language Choices.** Every option should be stateable as an affirmative: "Yes, send me emails" / "No, don't send me emails." Never use double negatives ("Uncheck to not receive..."). Never combine multiple consents into one checkbox. Test by reading the question aloud — if a colleague gets confused, users will too.
+**When it works:** Large content sets with clear categorical relationships. Users have a general sense of what category their item belongs to. Content creators can maintain consistent categorization.
 
-**Visual Misdirection → Equal Visual Weight.** When presenting choices, the "decline" or "opt-out" option should be equally visible — same size, same visual weight, same position prominence. The user's preferred choice, not the business's preferred choice, should determine which option they pick. Test: cover the page with your hand and peek — can you see both options equally?
+**When it fails:** When categories overlap significantly (is a "wireless mouse" in Accessories, Computers, or Peripherals?). When the hierarchy is deeper than 3-4 levels — users lose orientation quickly. When the hierarchy reflects organizational structure rather than user mental models ("Products" → "Business Unit A" → "Division 2" → "Team Alpha's Output").
 
-**Hidden Costs → Upfront Pricing.** Show the total cost, including taxes, fees, and shipping, before the user enters any personal information. The Baymard Institute found that 48% of cart abandonment is caused by extra costs shown too late. The fix isn't just ethical — it converts better.
+**Watch for:** The "miscellaneous" drawer. If you have a category called "Other" or "General" that keeps growing, your hierarchy isn't working. Also: category names that mean something to the organization but nothing to users.
 
-**Confirmshaming → Neutral Opt-Out.** Opt-out text should be factual, not emotional. "No thanks" is fine. "No thanks, I hate saving money" is manipulation. The test is simple: would you say the opt-out text to someone's face without feeling embarrassed?
+### Hub-and-Spoke
 
-**Sneak into Basket → Explicit Additions Only.** Nothing enters a cart, plan, or order without a deliberate user action. Pre-selected add-ons, bundled insurance, and automatic upsells all fail this test. If the user didn't click "add," it shouldn't be there.
+A central hub connects to independent sections. Each section is largely self-contained. Users return to the hub to navigate between sections.
 
-### Default Manipulation → Respectful Defaults
+**When it works:** Mobile apps with distinct functional areas (Messages, Camera, Profile). Products where tasks are independent — you don't need to combine search results with your shopping cart. Kiosk interfaces and set-top boxes where the input model favors focused navigation.
 
-**Prechecked Consent → Unchecked by Default.** GDPR requires this explicitly. But beyond regulation — consent means nothing if it's pre-selected. Every consent checkbox should start unchecked. Every permission should start un-granted. The user's first interaction should be a choice, not an override.
+**When it fails:** When users need to move fluidly between sections. When tasks span multiple sections. When the "hub" becomes a dumping ground for everything that doesn't fit in a spoke.
 
-**Opt-Out Burden → Symmetrical Effort.** The effort to leave should mirror the effort to join. If signing up takes one click, cancellation should take one click. The FTC's "click to cancel" rule codifies this, but the principle predates the rule: asymmetric friction is manipulation.
+**Watch for:** The desire to add cross-links between spokes. Once spokes start linking to each other extensively, the hub-and-spoke model is fighting the user's actual workflow. Consider switching to a different pattern.
 
-**Forced Continuity → Clear Trial Endings.** Before a trial ends: notify the user (email and in-app, not just email). On the transition day: require explicit confirmation before charging. After charging: provide easy refund for the first billing period. Making cancellation hard doesn't create loyal customers — it creates resentful ones who warn others.
+### Flat
 
-### Urgency Fabrication → Honest Scarcity
+All content is at the same level. No hierarchy. Often paired with powerful search/filter.
 
-**Fake Timers → Real Deadlines Only.** If a deadline is real (event starts at 8pm, sale ends Sunday), show it. If there's no real deadline, don't invent one. A timer that resets when the page refreshes is not a deadline — it's a lie.
+**When it works:** Homogeneous content sets (a photo gallery, a list of transactions, a feed of posts). Content that doesn't have natural categories. Products with excellent search infrastructure.
 
-**Fabricated Scarcity → Actual Inventory.** If you show stock levels, they should be real. "Only 2 left" when you have 2,000 in the warehouse is fraud by implication. If demand genuinely fluctuates, show real-time data. Otherwise, don't show numbers at all.
+**When it fails:** Diverse content types. Large content sets without strong search/filter. Users who browse rather than search.
 
-**Fake Social Proof → Real Activity.** "15 people are viewing this" should reflect actual concurrent viewers, not a random number generator. Fabricated social proof is straightforward deception. Real social proof (verified reviews, actual purchase counts) builds genuine trust.
+**Watch for:** The illusion of flatness. Many "flat" architectures are actually filtered hierarchies — the user selects filters that create ad-hoc categories. That's fine, but the filter design is now your navigation design.
 
-### Addictive Design → Respectful Engagement
+### Faceted
 
-**Infinite Scroll → Natural Boundaries.** Pagination, "load more" buttons, or session summaries create natural stopping points. This doesn't reduce engagement — it shifts it from compulsive to intentional. Instagram's "You're all caught up" is a partial fix; actual pagination is more honest.
+Multiple independent dimensions for filtering the same content set. Users combine facets freely (color + size + price + brand).
 
-**Variable Ratio Reinforcement → Predictable Value.** Notifications should arrive because something meaningful happened, not because the algorithm determined this is the optimal moment to re-engage. Content should be organized, not randomly dispensed. The value should be in the content, not in the unpredictability of its delivery.
+**When it works:** E-commerce, search results, large databases with multiple attributes. When different users want to slice the same content differently. When the content has natural, independent attributes.
 
-**Streak Manipulation → Progress Without Punishment.** If you track streaks, breaking one should carry no penalty. "You had a 30-day streak! Start a new one?" is fine. "You lost your 30-day streak forever" is manufactured loss aversion. Duolingo's streak freeze is an admission that their streak mechanic creates unhealthy obligation.
+**When it fails:** When facets aren't independent (selecting "red" and "small" leaves zero results because small items don't come in red). When there are too many facets — 15 filter dimensions overwhelm rather than help. When the vocabulary is inconsistent across facets.
+
+**Watch for:** Empty states. Faceted navigation creates combinatorial explosion — many facet combinations will return zero results. Design for graceful degradation: show result counts per facet before selection, disable facets that would return zero.
+
+### Dashboard
+
+Multiple content types displayed simultaneously, typically with summary views that link to detail.
+
+**When it works:** Monitoring and analytics products. Executive overviews. Products where users need to scan multiple information streams quickly. Return-visit products where users want a status snapshot.
+
+**When it fails:** When the dashboard becomes the entire product — dashboards that require scrolling through 15 widgets have become a flat architecture by accident. When every stakeholder demands their metric on the dashboard, resulting in information overload. When the dashboard shows data but doesn't enable action.
+
+**Watch for:** Dashboard-driven design, where every new feature gets a widget on the dashboard instead of its own proper location. Also: dashboards that show the same data to everyone when different roles need different views.
 
 ---
 
-## Regulatory Landscape
+## Taxonomy Design
 
-### GDPR (EU, 2018)
+Taxonomy is the art of naming and grouping things so that users can find them. Get taxonomy wrong and no amount of visual design will save the navigation.
 
-The General Data Protection Regulation is the most comprehensive privacy regulation in force. Key requirements for designers:
+### Top-Down vs. Bottom-Up
 
-**Consent (Article 7, Recitals 32, 42, 43):**
+**Top-down** starts with organizational logic: What are the major categories? How do they subdivide? This approach works when domain experts understand the structure well and users share that understanding. Risk: imposing a structure that makes sense internally but not to users.
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
