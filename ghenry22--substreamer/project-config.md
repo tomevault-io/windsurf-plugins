@@ -1,129 +1,129 @@
 ---
 trigger: always_on
-description: Substreamer project architecture, structure, and conventions
+description: React Native component patterns, styling, and UI conventions for Substreamer
 ---
 
 
-# Substreamer – Project Overview
+# Component Patterns
 
-Substreamer is a React Native music streaming client for Subsonic-compatible servers (Subsonic, Navidrome, etc.), built with Expo SDK 55, React 19, and TypeScript (strict mode).
+## Structure
 
-## Tech Stack
-
-- **Framework:** Expo ~55 / React Native 0.83 (New Architecture enabled)
-- **Routing:** Expo Router (file-based) with Stack + Tab navigators
-- **State:** Zustand with SQLite persistence (`expo-sqlite`)
-- **API:** `subsonic-api` library for Subsonic REST protocol
-- **Audio:** `react-native-track-player` (RNTP, local fork in `modules/`) for streaming and background playback
-- **Lists:** `@shopify/flash-list` v2 (FlashList) for all performant lists – replaces React Native FlatList
-- **Image caching:** Custom disk cache via `expo-file-system`
-- **Animations:** `react-native-reanimated` (v4) for all animations – see `ux-quality` rule for details and exceptions
-- **i18n:** `react-i18next` v17 + `i18next` v26 with `@formatjs/intl-pluralrules` polyfill for Hermes
-- **Styling:** `StyleSheet.create` + inline theme colors (no CSS-in-JS libraries)
-- **Path alias:** `@/*` maps to `./src/*`
-
-## Directory Structure
-
-```
-src/
-  app/            # Expo Router routes (thin wrappers that import from screens/)
-    _layout.tsx   # Root Stack layout, auth guard, splash screen
-    (tabs)/       # Bottom tab navigator group
-    album/[id]    # Dynamic routes for entities
-    artist/[id]
-    playlist/[id]
-  screens/        # Screen components with business logic
-  components/     # Reusable UI components
-  hooks/          # Custom hooks
-  services/       # API clients and external integrations
-  store/          # Zustand stores
-  i18n/           # react-i18next singleton, locale JSON files, language list
-  constants/      # Theme definitions
-  utils/          # Formatting, color, string, and timing helpers
-  assets/         # App icons, splash images
-modules/          # Local Expo native modules (see native-modules rule)
-scripts/          # Build helper scripts
-fastlane/         # Store listing metadata (descriptions, screenshots, release notes)
-  metadata/       # Plain-text metadata files for iOS and Android stores
-```
-
-## Key Architectural Patterns
-
-1. **Route/Screen separation:** Route files in `app/` are thin wrappers; business logic lives in `screens/`. See `routing-and-navigation` rule.
-2. **Zustand stores** manage all app state. See `zustand-stores` rule.
-3. **Services** are plain modules exporting async functions (no classes). See `services-and-api` rule.
-4. **CachedImage** is the standard component for all cover art – never use raw `<Image>` for Subsonic artwork.
-5. **`useTheme()`** provides `{ theme, colors }` – all components consume colors from this hook rather than importing theme constants directly.
-6. **Shared utilities** live in `src/utils/` – common helpers (alphabet indexing via `getFirstLetter`, minimum-delay promises via `minDelay`) are extracted here rather than duplicated.
-7. **All user-facing strings** are translated via `react-i18next`. See `Internationalization` section below.
-
-## Internationalization (i18n)
-
-All user-facing strings use `react-i18next`. English is the source language; translations are stored as flat JSON in `src/i18n/locales/`.
-
-### Setup
-
-- **Runtime:** `i18next` v26 + `react-i18next` v17 + `i18next-resources-to-backend` for lazy loading
-- **Hermes polyfill:** `@formatjs/intl-pluralrules/polyfill-force` — imported first in `src/i18n/i18n.ts` (must precede i18next init)
-- **Locale persistence:** `localeStore` (Zustand + SQLite) — `null` = follow device locale
-- **Test setup:** `src/test-utils/i18nSetup.ts` initializes i18next with English resources; included in Jest `setupFiles`
-
-### Usage Patterns
-
-**In React components** — use the `useTranslation` hook:
+- All components are **functional** – no class components.
+- Use **`memo()`** for list-rendered items (cards, rows) and frequently re-rendered components.
+- Use **named exports** for components. Wrap memo'd components with a named function:
 
 ```tsx
-import { useTranslation } from 'react-i18next';
+export const AlbumCard = memo(function AlbumCard({ album, width }: { album: AlbumID3; width: number }) {
+  const { colors } = useTheme();
+  // ...
+});
+```
 
-function MyScreen() {
-  const { t } = useTranslation();
-  return <Text>{t('recentlyAdded')}</Text>;
+## Props Typing
+
+Most memo'd components use **inline props** directly in the function signature:
+
+```tsx
+export const AlbumRow = memo(function AlbumRow({ album }: { album: AlbumID3 }) {
+```
+
+Use a named `ComponentNameProps` interface when the props type is complex, shared, or referenced elsewhere:
+
+```tsx
+interface AlphabetScrollerProps {
+  letters: string[];
+  onLetterChange: (letter: string) => void;
+  listRef: RefObject<FlashListRef<unknown>>;
+  sectionMap: Map<string, number>;
 }
+
+export const AlphabetScroller = memo(function AlphabetScroller(props: AlphabetScrollerProps) {
 ```
 
-**In services/stores (outside React)** — import `i18next` directly:
+## Entity Component Pairs
+
+Each entity (Album, Artist, Song, Playlist) follows a Card + Row + ListView pattern:
+
+- **Card** (`AlbumCard`) – grid display with cover art and title
+- **Row** (`AlbumRow`) – list display with thumbnail, title, and metadata
+- **ListView** (`AlbumListView`) – FlashList wrapper supporting list/grid toggle, pull-to-refresh, empty states, and alphabet scrolling
+
+## Styling
+
+- Use `StyleSheet.create()` at module scope for static styles.
+- Apply theme colors inline via `useTheme()`:
 
 ```tsx
-import i18n from 'i18next';
-
-processingOverlayStore.getState().showSuccess(i18n.t('playlistCreated'));
+<Text style={[styles.title, { color: colors.textPrimary }]}>{title}</Text>
 ```
 
-**Module-level constant arrays** — use `labelKey` instead of `label`:
+- Use `useMemo` for dynamic `StyleSheet.create` when many styles depend on theme colors.
+- Use `Pressable` with function styles for pressed states:
 
 ```tsx
-const OPTIONS = [
-  { value: 'recent', labelKey: 'recentlyAdded' },
-];
-// At render: <Text>{t(opt.labelKey)}</Text>
+<Pressable style={({ pressed }) => [styles.row, { backgroundColor: colors.card }, pressed && styles.pressed]}>
 ```
 
-**Interpolation:** `t('greeting', { name: 'Miles' })` → key: `"greeting": "Hello {{name}}"`
+## Cover Art
 
-**Plurals:** Key-suffix convention with `_one`/`_other`:
+Always use `CachedImage` for Subsonic cover art – never raw `<Image>`:
 
-```json
-{ "songCount_one": "{{count}} song", "songCount_other": "{{count}} songs" }
-```
 ```tsx
-t('songCount', { count: 5 }) // "5 songs"
+<CachedImage coverArtId={album.coverArt} size={300} style={styles.cover} resizeMode="cover" />
 ```
 
-### Key Naming Rules
+Standard sizes: 50 (thumbnails), 150 (small), 300 (cards/lists), 600 (hero/detail).
 
-- Flat camelCase: `recentlyAdded`, not `home.recentlyAdded`
-- Single `translation` namespace (no namespace prefix in `t()` calls)
-- Reuse existing keys for shared strings (`cancel`, `delete`, `save`, `albums`, etc.)
-- Check `src/i18n/locales/en.json` before creating new keys
+## FlashList Performance
 
-### What NOT to Translate
+Uses `@shopify/flash-list` v2 (`FlashList`) instead of React Native's `FlatList`. FlashList v2 handles view recycling, batching, and size estimation automatically.
 
-- Remote API data (album titles, artist names, track titles)
-- App name "Substreamer"
-- Technical identifiers, log messages, file paths
-- Numeric format strings from formatters (`1h30m`, `1.2 GB`)
+- Use `keyExtractor={(item) => item.id}`.
+- Memoize `renderItem` with `useCallback`.
+- Do **not** pass `estimatedItemSize` – FlashList v2 removed this prop and handles size estimation automatically.
+- Do **not** pass `windowSize`, `maxToRenderPerBatch`, `initialNumToRender`, `removeClippedSubviews`, or `getItemLayout` – these are FlatList-only concepts that do not exist in FlashList's architecture.
+- Use `drawDistance` (pixels) to control off-screen rendering distance when needed (default 250px is usually sufficient; use 300 for lists with alphabet scrollers).
+- Grid: use `numColumns={2}`. Handle inter-column gaps via padding on individual grid items (FlashList does not support `columnWrapperStyle`):
 
-### Crowdin Integration
+```tsx
+const renderGridItem = ({ item, index }: { item: AlbumID3; index: number }) => {
+  const isLeftColumn = index % GRID_COLUMNS === 0;
+  return (
+    <View style={{
+      flex: 1,
+      paddingLeft: isLeftColumn ? 0 : GRID_GAP / 2,
+      paddingRight: isLeftColumn ? GRID_GAP / 2 : 0,
+    }}>
+      <AlbumCard album={item} width={cardWidth} />
+    </View>
+  );
+};
+```
+
+- Ref type: `useRef<FlashListRef<T>>(null)` (import `FlashListRef` from `@shopify/flash-list`).
+
+**Exception:** Two screens use `ReorderableList` from `react-native-reorderable-list` instead of FlashList because they require drag-to-reorder functionality:
+
+- `src/screens/download-queue.tsx` – the download queue is inherently small (typically under 20 items) and does not need FlashList's virtualization.
+- `src/screens/playlist-detail.tsx` – conditionally renders `ReorderableList` when the user enters edit mode to reorder tracks.
+
+`ReorderableList` is built natively for the New Architecture on Reanimated worklets. Drag is initiated via the `useReorderableDrag()` hook called inside the row component (not threaded as a `drag` prop) and wired to a dedicated drag-handle `Pressable` so the rest of the row body still scrolls normally. Reorder events fire as `{ from, to }` indices; use the exported `reorderItems(data, from, to)` helper to apply the move to local state.
+
+**Exception:** Bounded, static, single-digit-item horizontal carousels may use RN `FlatList` with `getItemLayout`. Example: `src/components/OnboardingGuide.tsx` (4-slide onboarding carousel). FlashList's virtualization adds zero value below ~20 items, and its recycling doesn't pair cleanly with horizontal paging on a fixed list. Always document the carveout with an inline comment.
+
+## Modals and Bottom Sheets
+
+Use RN `Modal` with transparent backdrop for bottom sheets:
+
+```tsx
+<Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+  <Pressable style={styles.backdrop} onPress={onClose} />
+  <View style={[styles.sheet, { backgroundColor: colors.card, paddingBottom: Math.max(insets.bottom, 16) }]}>
+    <View style={[styles.handle, { backgroundColor: colors.border }]} />
+    {/* content */}
+  </View>
+</Modal>
+```
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
