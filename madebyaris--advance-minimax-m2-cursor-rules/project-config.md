@@ -1,121 +1,232 @@
 ---
 trigger: always_on
-description: Cursor runtime guide: choose the right tool, prefer direct tools, and keep execution parallel where safe.
+description: Design system mastery: design tokens, shadcn/ui, Tailwind CSS v4, component composition, theming, animations, and icon systems.
 ---
 
 
-# Cursor Tools Mastery
+# Design System Mastery
 
-Keep durable behavior in the core rule. Use this file for current Cursor tool-selection patterns.
+Comprehensive guide for building and using design systems in modern web applications.
 
-## Cursor 3 workspace
+## Design Tokens
 
-In Cursor 3, agent work is centered in the **Agents** experience. Open it from the command palette: **Agents Window** (for example `Cmd+Shift+P` on macOS, as described in the [Cursor 3 announcement](https://cursor.com/blog/cursor-3)).
+### Color Tokens
 
-- **Multi-workspace / multi-repo:** the UI can surface several workspaces at once. Name the repo or root path when handing off work, opening files, or running commands so edits land in the intended tree.
-- **Integrated browser:** prefer the IDE’s built-in browser for local UI verification when it is exposed in your session; it matches the “snapshot-first” flow in Browser Guidance below.
-
-## Golden Rule
-
-For significant actions:
-
-```text
-Check what exists
-Choose the smallest correct tool
-Act
-Validate with the lightest useful verification
+```javascript
+// tailwind.config.js
+module.exports = {
+  theme: {
+    extend: {
+      colors: {
+        // Semantic colors
+        brand: {
+          50: '#eff6ff',
+          100: '#dbeafe',
+          200: '#bfdbfe',
+          300: '#93c5fd',
+          400: '#60a5fa',
+          500: '#3b82f6',
+          600: '#2563eb',
+          700: '#1d4ed8',
+          800: '#1e40af',
+          900: '#1e3a8a',
+          950: '#172554',
+        },
+        // Status colors
+        success: {
+          DEFAULT: '#22c55e',
+          light: '#4ade80',
+          dark: '#16a34a',
+        },
+        warning: {
+          DEFAULT: '#eab308',
+          light: '#facc15',
+          dark: '#ca8a04',
+        },
+        error: {
+          DEFAULT: '#ef4444',
+          light: '#f87171',
+          dark: '#dc2626',
+        },
+        // Surface colors
+        surface: {
+          primary: '#ffffff',
+          secondary: '#f8fafc',
+          tertiary: '#f1f5f9',
+          muted: '#e2e8f0',
+        },
+      },
+    },
+  },
+};
 ```
 
-## Default Tool Map
+### Typography Tokens
 
-**Composer 2 / Cursor agent (typical names in current desktop agents):** the session usually exposes something close to:
-
-| Step | Tool name | Notes |
-|------|-----------|--------|
-| Read a path | `Read` | Prefer over shell `cat`/`sed` |
-| Search by pattern | `Grep` | Ripgrep-backed; use for exact symbols and strings |
-| Search by meaning | `SemanticSearch` | “Where does X happen?” not exact text |
-| List paths | `Glob` | File discovery by pattern |
-| Edit in place | `StrReplace` | Surgical edits; read the file first |
-| Create or replace whole file | `Write` | Use when there is no stable old_string to patch |
-| Remove file | `Delete` | |
-| Terminal | `Shell` | Builds, tests, git, installs |
-| Web | `WebSearch`, `WebFetch` | |
-| Ask user | `AskQuestion` | |
-| Track steps | `TodoWrite` | |
-| Delegate branch work | `Task` | Subagent-style runs (types such as explore, debugger, verifier—see schema) |
-| MCP servers | `call_mcp_tool` (+ resource helpers if present) | Read MCP tool descriptors before calling |
-| Plan mode | `SwitchMode` | When the product exposes a planning mode |
-| Images | `GenerateImage` | Only when the user asks for generated images |
-| Notebooks | `EditNotebook` | `.ipynb` cell edits |
-| Lint diagnostics | `ReadLints` | After substantive edits when available |
-
-**Browser:** often MCP tools (for example `cursor-ide-browser`) with names like `browser_snapshot`, `browser_navigate`—follow the server’s schema.
-
-**Parallel batching:** issue **multiple independent tool calls in one assistant turn** when the runtime allows it (same idea as batched parallel execution).
-
-**Other Cursor surfaces** (CLI, older builds, API): names may differ (`ReadFile`, `ApplyPatch`, `Subagent`, etc.). The **exact tool list in the current session always wins**—same principle as `model-compatibility.mdc`.
-
-## Read and Search Guidance
-
-- Prefer direct read/search tools over shell equivalents.
-- Batch independent reads and searches in one turn when the session allows parallel calls.
-- Use `SemanticSearch` for "how/where/what handles this?" questions, not exact symbol lookups.
-
-## Editing Guidance
-
-- Read the file first (`Read`).
-- Use `StrReplace` for focused in-file edits; use `Write` for new files or full rewrites when patch context is awkward.
-- Keep edits coherent; avoid thrashing the same file with many tiny changes.
-- Re-read or verify after editing.
-
-## Shell Guidance
-
-Use `Shell` for:
-- builds, tests, typechecks, and linting
-- package-manager or framework CLI commands
-- git inspection
-- long-running verification commands when no dedicated tool exists
-
-Before starting dev servers or watchers, check whether one is already running.
-
-## Browser Guidance
-
-When browser tools exist (including Cursor’s integrated browser in supported builds):
-
-```text
-1. Check tabs
-2. Navigate
-3. Snapshot before interaction
-4. Interact using snapshot refs
-5. Re-snapshot and inspect console/network when behavior is unclear
+```javascript
+// tailwind.config.js
+theme: {
+  extend: {
+    fontFamily: {
+      sans: ['Inter var', 'system-ui', 'sans-serif'],
+      display: ['Cal Sans', 'system-ui', 'sans-serif'],
+      mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
+    },
+    fontSize: {
+      'xs': ['0.75rem', { lineHeight: '1rem' }],
+      'sm': ['0.875rem', { lineHeight: '1.25rem' }],
+      'base': ['1rem', { lineHeight: '1.5rem' }],
+      'lg': ['1.125rem', { lineHeight: '1.75rem' }],
+      'xl': ['1.25rem', { lineHeight: '1.75rem' }],
+      '2xl': ['1.5rem', { lineHeight: '2rem' }],
+      '3xl': ['1.875rem', { lineHeight: '2.25rem' }],
+      '4xl': ['2.25rem', { lineHeight: '2.5rem' }],
+    },
+    fontWeight: {
+      normal: '400',
+      medium: '500',
+      semibold: '600',
+      bold: '700',
+    },
+  },
+}
 ```
 
-Use browser checks for layout-sensitive UI work, interaction bugs, and issues shell commands cannot prove.
-Do not promise a browser-only or canvas-style deliverable until you have confirmed the browser path in the current runtime.
+### Spacing Tokens
 
-## MCP and Plugin Guidance
+```javascript
+theme: {
+  extend: {
+    spacing: {
+      '0': '0',
+      '1': '0.25rem',
+      '2': '0.5rem',
+      '3': '0.75rem',
+      '4': '1rem',
+      '5': '1.25rem',
+      '6': '1.5rem',
+      '8': '2rem',
+      '10': '2.5rem',
+      '12': '3rem',
+      '16': '4rem',
+      '20': '5rem',
+      '24': '6rem',
+      // Component-specific
+      'card-padding': '1.5rem',
+      'section-gap': '4rem',
+      'input-height': '2.5rem',
+    },
+  },
+}
+```
 
-- Prefer direct tools exposed in the prompt over wrapper APIs.
-- If an MCP server exposes resources instead of action tools, use the resource functions the environment provides.
-- Keep repo guidance generic enough to survive tool and server renames.
+### Border Radius Tokens
 
-## Task and subagent guidance
+```javascript
+theme: {
+  extend: {
+    borderRadius: {
+      none: '0',
+      sm: '0.25rem',
+      DEFAULT: '0.375rem',
+      md: '0.5rem',
+      lg: '0.75rem',
+      xl: '1rem',
+      '2xl': '1.5rem',
+      '3xl': '2rem',
+      full: '9999px',
+      // Semantic
+      card: '12px',
+      button: '8px',
+      input: '6px',
+      avatar: '50%',
+    },
+  },
+}
+```
 
-In Composer-style agents the delegation tool is usually **`Task`**, with a `subagent_type` and prompt (see the live schema). Use it for isolated research, broad exploration, debugger or verifier passes, or branches that would otherwise pollute the main context.
+---
 
-When multiple delegations are truly independent:
-- launch them concurrently in the same assistant turn when the schema allows
-- give each run a distinct scope, expected output, and stopping point
-- keep one synthesis step in the main thread after they return
-- avoid overlap that makes two agents inspect the same surface without a reason
+## shadcn/ui Patterns
 
-Good parallel split examples:
-- frontend investigation vs backend investigation
-- version research vs codebase pattern search
-- debugger pass vs verifier pass
+### Initialization
 
-Bad parallel split examples:
+```bash
+# Initialize shadcn-ui
+npx shadcn@latest init
+
+# Add components
+npx shadcn@latest add button card input label form
+npx shadcn@latest add dialog dropdown-menu select
+npx shadcn@latest add toast alert accordion
+```
+
+### Component Composition
+
+```tsx
+import { Button } from '@/components/ui/button';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
+
+// Login form composition
+function LoginForm() {
+  return (
+    <Card className="w-full max-w-md">
+      <CardHeader>
+        <CardTitle>Welcome back</CardTitle>
+        <CardDescription>
+          Enter your email and password to sign in to your account.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="email">Email</Label>
+            <Input 
+              id="email" 
+              type="email" 
+              placeholder="m@example.com"
+              required 
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="password">Password</Label>
+            <Input 
+              id="password" 
+              type="password" 
+              required 
+            />
+          </div>
+          <div className="flex items-center space-x-2">
+            <Checkbox id="remember" />
+            <label
+              htmlFor="remember"
+              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+            >
+              Remember me
+            </label>
+          </div>
+        </form>
+      </CardContent>
+      <CardFooter className="flex flex-col space-y-4">
+        <Button className="w-full">Sign in</Button>
+        <p className="text-sm text-muted-foreground text-center">
+          Don't have an account?{' '}
+          <a href="/register" className="text-primary hover:underline">
+            Sign up
+          </a>
+        </p>
+      </CardFooter>
+    </Card>
+  );
+}
+```
+
+### Dialog Patterns
+
+```tsx
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
