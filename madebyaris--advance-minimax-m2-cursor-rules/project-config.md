@@ -1,275 +1,231 @@
 ---
 trigger: always_on
-description: Go development: error handling, interfaces, concurrency, modules, and idiomatic patterns
+description: Language-agnostic programming patterns: SOLID principles, design patterns, clean code, architecture decisions applicable across all languages
 ---
 
 
-# Go Development Patterns
+# Language-Agnostic Programming Patterns
 
-Idiomatic Go patterns focusing on simplicity, clarity, and concurrency.
+Universal principles and patterns applicable across all programming languages.
 
-## Go Workflow
+## Development Workflow
 
-Before changing Go code:
+### CLI-First Principle
+
+Before manually creating project scaffolding or dependency manifests, check if a CLI tool exists:
+
+| Task | Check for CLI | Example |
+|------|---------------|---------|
+| New project | Scaffolding CLI | `npm create`, `cargo new`, `flutter create` |
+| New component | Generator CLI | `npx shadcn-ui add`, `ng generate`, `rails generate` |
+| New module | Framework CLI | `nest generate module` |
+| Dependencies | Package manager | `npm install`, `pip install` |
+
+### Verification-First Principle
+
+Code is not done until it is verified at a level proportional to the change:
+
+```
+1. Write code
+2. Build/compile: Does it compile?
+3. Lint: Are there warnings?
+4. Run: Does it execute?
+5. Test: Does it work correctly?
+```
+
+### Version-Aware Development
+
+When versions matter:
 
 ```text
-1. Read `go.mod` and existing package structure first
-2. Check the current Go version in the repo before recommending newer features
-3. For new modules, use `go mod init`; do not hand-create `go.mod`
-4. For new dependencies or version-sensitive work, verify current versions with the actual current date
-```
-
-### CLI-First Go Development
-
-Prefer standard Go CLI workflows:
-```bash
-# Project initialization (NEVER manually create go.mod)
-go mod init github.com/myorg/myproject
-
-# Add dependencies (NEVER manually edit go.mod)
-go get github.com/gin-gonic/gin@latest
-go get github.com/lib/pq@v1.10.9
-
-# Verify and tidy
-go mod tidy
-go mod verify
-
-# Build and test
-go build ./...
-go test ./...
-go vet ./...
-
-# Format before committing
-go fmt ./...
-gofmt -s -w .
-```
-
-### Post-Edit Verification
-
-After meaningful Go changes, run the smallest useful check for the task:
-
-```bash
-go build ./...
-go test ./...
-go vet ./...
-```
-
-Run `go mod tidy` when imports or dependencies changed rather than after every tiny edit.
-
-### Common Go Syntax Traps (Avoid These!)
-
-```go
-// WRONG: Missing error check
-result, _ := doSomething()  // Never ignore errors!
-
-// CORRECT: Always handle errors
-result, err := doSomething()
-if err != nil {
-    return fmt.Errorf("doSomething failed: %w", err)
-}
-
-// WRONG: Range loop variable capture
-for _, item := range items {
-    go func() {
-        process(item)  // Bug! Captures loop variable
-    }()
-}
-
-// CORRECT: Pass as parameter
-for _, item := range items {
-    go func(i Item) {
-        process(i)
-    }(item)
-}
-
-// WRONG: Nil map write
-var m map[string]int
-m["key"] = 1  // Panic!
-
-// CORRECT: Initialize map
-m := make(map[string]int)
-m["key"] = 1
+1. Search the current version with the actual month and year
+2. Check compatibility with the current stack
+3. Then recommend installation or migration steps
 ```
 
 ---
 
-## Error Handling
+## SOLID Principles
 
-### Basic Error Handling
-```go
-// Always check errors
-result, err := doSomething()
-if err != nil {
-    return fmt.Errorf("doSomething failed: %w", err)
-}
+### Single Responsibility Principle (SRP)
+A class/module should have only one reason to change.
 
-// Wrap errors with context
-if err := db.Query(sql); err != nil {
-    return fmt.Errorf("failed to query users: %w", err)
-}
+**Apply when:**
+- A function does multiple unrelated things
+- A class has too many dependencies
+- Changes in one area affect unrelated code
+
+**Example Pattern:**
+```
+Bad:  UserService handles auth, profile, notifications, and billing
+Good: AuthService, ProfileService, NotificationService, BillingService
 ```
 
-### Custom Error Types
-```go
-// Simple error type
-type NotFoundError struct {
-    Resource string
-    ID       string
-}
+### Open/Closed Principle (OCP)
+Open for extension, closed for modification.
 
-func (e *NotFoundError) Error() string {
-    return fmt.Sprintf("%s with id %s not found", e.Resource, e.ID)
-}
+**Apply when:**
+- Adding new features requires modifying existing code
+- Switch statements grow with each new type
+- Core logic changes for edge cases
 
-// Checking error types
-if errors.Is(err, sql.ErrNoRows) {
-    return &NotFoundError{Resource: "user", ID: id}
-}
-
-// Type assertions
-var notFound *NotFoundError
-if errors.As(err, &notFound) {
-    // Handle not found case
-}
+**Example Pattern:**
+```
+Bad:  if type == "email" ... elif type == "sms" ... elif type == "push" ...
+Good: NotificationStrategy interface with EmailStrategy, SMSStrategy, PushStrategy
 ```
 
-### Error Handling Patterns
-```go
-// Early return pattern
-func processData(data []byte) error {
-    if len(data) == 0 {
-        return errors.New("empty data")
-    }
-    
-    parsed, err := parse(data)
-    if err != nil {
-        return fmt.Errorf("parse failed: %w", err)
-    }
-    
-    if err := validate(parsed); err != nil {
-        return fmt.Errorf("validation failed: %w", err)
-    }
-    
-    return save(parsed)
-}
+### Liskov Substitution Principle (LSP)
+Subtypes must be substitutable for their base types.
 
-// Error sentinel values
-var (
-    ErrNotFound     = errors.New("not found")
-    ErrUnauthorized = errors.New("unauthorized")
-    ErrInvalidInput = errors.New("invalid input")
-)
+**Apply when:**
+- Derived classes override behavior in unexpected ways
+- Code checks for specific types before operating
+- Inheritance creates illogical hierarchies
+
+**Example Pattern:**
+```
+Bad:  Square extends Rectangle but can't independently set width/height
+Good: Both Square and Rectangle implement Shape interface
 ```
 
----
+### Interface Segregation Principle (ISP)
+Clients shouldn't depend on interfaces they don't use.
 
-## Interfaces
+**Apply when:**
+- Classes implement methods they don't need
+- Interfaces have too many methods
+- Changes affect many unrelated implementations
 
-### Interface Design
-```go
-// Small, focused interfaces
-type Reader interface {
-    Read(p []byte) (n int, err error)
-}
-
-type Writer interface {
-    Write(p []byte) (n int, err error)
-}
-
-type ReadWriter interface {
-    Reader
-    Writer
-}
-
-// Accept interfaces, return structs
-func ProcessData(r io.Reader) (*Result, error) {
-    data, err := io.ReadAll(r)
-    if err != nil {
-        return nil, err
-    }
-    return &Result{Data: data}, nil
-}
+**Example Pattern:**
+```
+Bad:  Animal interface with fly(), swim(), walk() - Penguin can't fly
+Good: Flyable, Swimmable, Walkable interfaces
 ```
 
-### Interface Best Practices
-```go
-// Define interfaces where they're used, not where implemented
-// In consumer package:
-type UserStore interface {
-    Get(id string) (*User, error)
-    Save(user *User) error
-}
+### Dependency Inversion Principle (DIP)
+Depend on abstractions, not concretions.
 
-type UserService struct {
-    store UserStore  // Accepts any implementation
-}
+**Apply when:**
+- High-level modules import low-level modules directly
+- Changing database/service requires code changes
+- Testing requires real dependencies
 
-// Implementation in another package
-type PostgresUserStore struct {
-    db *sql.DB
-}
-
-func (s *PostgresUserStore) Get(id string) (*User, error) { ... }
-func (s *PostgresUserStore) Save(user *User) error { ... }
+**Example Pattern:**
+```
+Bad:  UserService directly imports MySQLDatabase
+Good: UserService depends on DatabaseInterface, injected at runtime
 ```
 
-### Empty Interface and Type Assertions
-```go
-// Avoid interface{} / any when possible
-// When necessary, use type switches
-func process(v any) string {
-    switch x := v.(type) {
-    case string:
-        return x
-    case int:
-        return strconv.Itoa(x)
-    case fmt.Stringer:
-        return x.String()
-    default:
-        return fmt.Sprintf("%v", v)
-    }
-}
+## Common Design Patterns
+
+### Creational Patterns
+
+#### Factory Pattern
+Use when object creation logic is complex or needs to be centralized.
+
+```
+When to use:
+- Multiple similar objects with different configurations
+- Object creation depends on runtime conditions
+- Hiding complex initialization logic
 ```
 
----
+#### Builder Pattern
+Use for constructing complex objects step by step.
 
-## Concurrency
-
-### Goroutines and Channels
-```go
-// Basic goroutine
-go func() {
-    result := expensiveOperation()
-    resultChan <- result
-}()
-
-// Buffered channel
-jobs := make(chan Job, 100)
-
-// Wait for completion
-var wg sync.WaitGroup
-for i := 0; i < numWorkers; i++ {
-    wg.Add(1)
-    go func() {
-        defer wg.Done()
-        for job := range jobs {
-            process(job)
-        }
-    }()
-}
-wg.Wait()
+```
+When to use:
+- Objects with many optional parameters
+- Complex configuration requirements
+- Need for immutable objects with many fields
 ```
 
-### Context for Cancellation
-```go
-func fetchData(ctx context.Context, url string) ([]byte, error) {
-    req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-    if err != nil {
-        return nil, err
-    }
-    
-    resp, err := http.DefaultClient.Do(req)
-    if err != nil {
+#### Singleton Pattern
+Use sparingly for truly global, single-instance resources.
+
+```
+When to use:
+- Configuration managers
+- Connection pools
+- Logger instances
+
+Avoid when:
+- It's just for convenience (use DI instead)
+- Testing would be difficult
+- Multiple instances might be needed later
+```
+
+### Structural Patterns
+
+#### Adapter Pattern
+Convert one interface to another that clients expect.
+
+```
+When to use:
+- Integrating third-party libraries
+- Working with legacy code
+- Unifying different data sources
+```
+
+#### Decorator Pattern
+Add behavior to objects dynamically.
+
+```
+When to use:
+- Adding features without subclassing
+- Composable behaviors
+- Middleware-like patterns
+```
+
+#### Facade Pattern
+Provide a simplified interface to a complex subsystem.
+
+```
+When to use:
+- Simplifying complex library usage
+- Creating API boundaries
+- Reducing coupling between layers
+```
+
+### Behavioral Patterns
+
+#### Strategy Pattern
+Define a family of interchangeable algorithms.
+
+```
+When to use:
+- Multiple algorithms for the same task
+- Runtime algorithm selection
+- Avoiding complex conditionals
+```
+
+#### Observer Pattern
+Notify dependents of state changes.
+
+```
+When to use:
+- Event-driven systems
+- Pub/sub messaging
+- Reactive data flows
+```
+
+#### Command Pattern
+Encapsulate requests as objects.
+
+```
+When to use:
+- Undo/redo functionality
+- Queueing operations
+- Macro recording
+```
+
+## Clean Code Principles
+
+### Naming Conventions
+
+#### Variables and Functions
+- Use intention-revealing names
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
