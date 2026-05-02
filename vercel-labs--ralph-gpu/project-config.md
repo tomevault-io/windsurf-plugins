@@ -1,212 +1,234 @@
 ---
 trigger: always_on
-description: Complete guide for using ralph-gpu - a minimal WebGPU shader library for creative coding and real-time graphics.
+description: How to use Leva controls to create interactive debug UI for experiments
 ---
 
 
-# ralph-gpu Usage Guide
+# Leva Controls Setup
 
-ralph-gpu is a WebGPU shader library for creative coding and real-time graphics. This rule provides comprehensive guidance on using the library effectively.
+This project uses [Leva](https://github.com/pmndrs/leva) to create interactive debug UIs for controlling shader parameters, material properties, and scene configurations.
 
 ## Installation
 
-```bash
-npm install ralph-gpu
-# or
-pnpm add ralph-gpu
-```
-
-For TypeScript support (recommended):
+Already included in `package.json`:
 
 ```bash
-npm install -D @webgpu/types
+pnpm add leva
 ```
 
-## Core Concepts
+## Basic Usage
 
-| Concept    | Description                                             |
-| ---------- | ------------------------------------------------------- |
-| `gpu`      | Module entry point for initialization                   |
-| `ctx`      | GPU context — manages state and rendering               |
-| `pass`     | Fullscreen shader (fragment only, uses internal quad)   |
-| `material` | Shader with custom vertex code (particles, geometry)    |
-| `target`   | Render target (offscreen texture)                       |
-| `pingPong` | Pair of render targets for iterative effects            |
-| `compute`  | Compute shader for GPU-parallel computation             |
-| `storage`  | Storage buffer for large data (particles, simulations)  |
-| `sampler`  | Custom texture sampler with explicit filtering/wrapping |
-| `texture`  | Load images, canvases, video, or raw data as GPU textures |
+### Import
 
-## Auto-Injected Globals
-
-Every shader automatically has access to these uniforms via `globals`:
-
-```wgsl
-struct Globals {
-  resolution: vec2f,  // Current render target size in pixels
-  time: f32,          // Seconds since init (affected by timeScale)
-  deltaTime: f32,     // Seconds since last frame
-  frame: u32,         // Frame count since init
-  aspect: f32,        // resolution.x / resolution.y
-}
-@group(0) @binding(0) var<uniform> globals: Globals;
+```typescript
+import { useControls } from "leva";
+// Or with additional utilities
+import { useControls, button, folder as levaFolder } from "leva";
 ```
 
-**Usage in shaders:**
+### Simple Controls
 
-```wgsl
-let uv = pos.xy / globals.resolution;        // Normalized UV coordinates
-let t = globals.time;                         // Animated time
-let dt = globals.deltaTime;                   // Frame delta
-let ar = globals.aspect;                      // Aspect ratio
+For basic boolean or simple value controls:
+
+```typescript
+const { debug, postEnabled } = useControls({
+  debug: false,
+  postEnabled: {
+    value: true,
+    label: "PostProcessing",
+  },
+});
 ```
 
-## Basic Patterns
+### Numeric Controls with Range
 
-### 1. Initialization with React
+```typescript
+const { exposure, rotationX, lightIntensity } = useControls({
+  rotationX: { value: 0, min: -Math.PI, max: Math.PI, step: 0.01 },
+  exposure: { value: 2.8, min: -5, max: 5, step: 0.1 },
+  lightIntensity: { value: 1.3, min: 0, max: 5, step: 0.01 },
+});
+```
 
-```tsx
-"use client";
+### Vector Controls (Position/Direction)
 
-import { useEffect, useRef } from "react";
-import { gpu, GPUContext, Pass, Sampler, RenderTarget } from "ralph-gpu";
+Leva auto-detects `{x, y, z}` objects as 3D vectors:
 
-export default function ShaderComponent() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+```typescript
+const { lightPos } = useControls({
+  lightPos: { value: { x: -0.53, y: 0.33, z: 0.1 }, step: 0.01 },
+});
+```
 
-  useEffect(() => {
-    let ctx: GPUContext | null = null;
-    let pass: Pass;
-    let animationId: number;
-    let disposed = false;
+### Color Controls
 
-    async function init() {
-      if (!canvasRef.current) return;
+Leva auto-detects hex strings as colors:
 
-      // Always check WebGPU support first
-      if (!gpu.isSupported()) {
-        console.error("WebGPU is not supported");
-        return;
-      }
+```typescript
+const { lightColor } = useControls({
+  lightColor: { value: "#8c8c8c" },
+});
+```
 
-      ctx = await gpu.init(canvasRef.current, {
-        autoResize: true, // Automatically handles canvas sizing and DPR
-        debug: true,
-      });
+### Dropdown/Select Controls
 
-      // Handle disposal during async init
-      if (disposed) {
-        ctx.dispose();
-        return;
-      }
+```typescript
+const DITHER_METHODS = {
+  None: "none",
+  "Bayer 2x2": "bayer2x2",
+  "Bayer 4x4": "bayer4x4",
+  "Bayer 8x8": "bayer8x8",
+} as const;
 
-      pass = ctx.pass(/* wgsl */ `
-        @fragment
-        fn main(@builtin(position) pos: vec4f) -> @location(0) vec4f {
-          let uv = pos.xy / globals.resolution;
-          return vec4f(uv, sin(globals.time) * 0.5 + 0.5, 1.0);
-        }
-      `);
+const { ditherMethod } = useControls({
+  ditherMethod: {
+    value: "bayer4x4",
+    options: DITHER_METHODS,
+    label: "Dithering",
+  },
+});
+```
 
-      function frame() {
-        if (disposed) return;
-        pass.draw();
-        animationId = requestAnimationFrame(frame);
-      }
-      frame();
-    }
+## Advanced Patterns
 
-    init();
+### Functional Form with Buttons
 
-    return () => {
-      disposed = true;
-      cancelAnimationFrame(animationId);
-      ctx?.dispose();
+Use the functional form `useControls(() => ({...}))` when you need access to the `get` function for buttons:
+
+```typescript
+const [{ rotationX, exposure }] = useControls(() => ({
+  rotationX: { value: 0, min: -Math.PI, max: Math.PI, step: 0.01 },
+  exposure: { value: 5, min: -5, max: 5, step: 0.1 },
+  "Copy Settings": button((get) => {
+    const settings = {
+      rotationX: get("rotationX"),
+      exposure: get("exposure"),
     };
-  }, []);
-
-  return (
-    <canvas
-      ref={canvasRef}
-      style={{ width: "100%", height: "100%" }}
-      width={800}
-      height={600}
-    />
-  );
-}
+    navigator.clipboard.writeText(JSON.stringify(settings, null, 2));
+    console.log("Settings copied to clipboard:", settings);
+  }),
+}));
 ```
 
-### 2. Fullscreen Pass (Fragment Shader)
+### onChange Handlers for Immediate Updates
 
-Use `ctx.pass()` for fullscreen effects. It has two modes:
+Use `onChange` when you need to update values immediately without re-renders:
 
-#### Simple Mode (Recommended)
+```typescript
+const turnProgressTarget = useRef(0);
+const coverOpenTarget = useRef(0);
 
-Pass an object with plain values. WGSL bindings are auto-generated and uniforms are available via the `uniforms` struct.
-
-```tsx
-const wave = ctx.pass(
-  /* wgsl */ `
-  @fragment
-  fn main(@builtin(position) pos: vec4f) -> @location(0) vec4f {
-    let uv = pos.xy / globals.resolution;
-    // Bindings for uTexture, uSampler, and uniforms struct are auto-generated!
-    let tex = textureSample(uTexture, uSampler, uv);
-    return tex * vec4f(uniforms.color, 1.0) * uniforms.intensity;
-  }
-`,
-  {
-    uTexture: someTarget,
-    color: [1, 0, 0],
-    intensity: 0.5,
-  }
-);
-
-// Update values directly
-wave.set("intensity", 0.8);
-```
-
-#### Manual Mode (Explicit Bindings)
-
-Define uniforms with `{ value: X }` wrapper for reactive updates. Requires manual `@group(1)` declarations in WGSL.
-
-```tsx
-const gradient = ctx.pass(
-  /* wgsl */ `
-  struct MyUniforms { color: vec3f }
-  @group(1) @binding(0) var<uniform> u: MyUniforms;
-
-  @fragment
-  fn main(@builtin(position) pos: vec4f) -> @location(0) vec4f {
-    let uv = pos.xy / globals.resolution;
-    return vec4f(u.color, 1.0);
-  }
-`,
-  {
-    uniforms: {
-      color: { value: [1, 0, 0] },
+const { debugPageTurn } = useControls({
+  topRotation: {
+    value: 0,
+    min: 0,
+    max: 1,
+    step: 0.01,
+    label: "Cover open",
+    onChange: (v: number) => {
+      coverOpenTarget.current = v;
     },
-  }
-);
-
-// Update value
-gradient.uniforms.color.value = [0, 1, 0];
+  },
+  pageTurn: {
+    value: 0,
+    min: 0,
+    max: 1,
+    label: "Page turn",
+    onChange: (v: number) => {
+      turnProgressTarget.current = v;
+    },
+  },
+  debugPageTurn: false,
+});
 ```
 
-// In render loop
-wave.draw();
+### Folder Organization
 
-````
+Group related controls into collapsible folders:
 
-### 3. Custom Uniforms (Reactive Pattern)
+```typescript
+import { folder as levaFolder, useControls } from "leva";
 
-Define uniforms with `{ value: X }` wrapper for reactive updates:
+const { debugTarget } = useControls({
+  DebugTextures: levaFolder({
+    debugTarget: {
+      value: "screen",
+      options: ["screen", "baseColor", "debug", "all"],
+      onChange: (value) => {
+        window.history.pushState(
+          {},
+          "",
+          window.location.pathname + "?debugTarget=" + value
+        );
+      },
+      transient: false,
+    },
+  }),
+});
+```
 
-```tsx
-// Define uniforms object
-const uniforms = {
-  amplitude: { value: 0.5 },
-  frequency: { value: 10.0 },
+### URL Sync Pattern
+
+Sync control values with URL parameters for shareable states:
+
+```typescript
+function getInitialSelectedTexture(defaultTexture: string, textures: string[]) {
+  const query =
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("debugTarget") ||
+        defaultTexture
+      : defaultTexture;
+
+  if (textures.includes(query)) {
+    return query;
+  }
+  return defaultTexture;
+}
+
+const { debugTarget } = useControls({
+  debugTarget: {
+    value: getInitialSelectedTexture("screen", Object.keys(textures)),
+    options: Object.keys(textures).concat("all"),
+    onChange: (value) => {
+      if (typeof window !== "undefined") {
+        window.history.pushState(
+          {},
+          "",
+          window.location.pathname + "?debugTarget=" + value
+        );
+      }
+    },
+    transient: false,
+  },
+});
+```
+
+## Integration with THREE.js Uniforms
+
+### Pattern: Direct Uniform Updates
+
+The standard pattern for syncing Leva controls with THREE.js uniforms:
+
+```typescript
+function Scene() {
+  const { rotationX, lightPos, lightIntensity, lightColor } = useControls({
+    rotationX: { value: 0, min: -Math.PI, max: Math.PI, step: 0.01 },
+    lightPos: { value: { x: 0, y: -1.11, z: 0.87 }, step: 0.01 },
+    lightIntensity: { value: 3.64, min: 0, max: 10, step: 0.01 },
+    lightColor: { value: "#8c8c8c" },
+  });
+
+  // Create uniforms once
+  const baseUniforms = useUniforms(() => ({
+    rotationX: new THREE.Uniform(rotationX),
+    lightPos: new THREE.Uniform(
+      new THREE.Vector3(lightPos.x, lightPos.y, lightPos.z)
+    ),
+    lightIntensity: new THREE.Uniform(lightIntensity),
+    lightColor: new THREE.Uniform(new THREE.Color(lightColor)),
+  }));
+
+  // Update uniforms each render (outside useFrame for reactive updates)
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
