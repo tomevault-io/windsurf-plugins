@@ -1,228 +1,58 @@
 ---
 trigger: always_on
-description: 3D graphics development with Three.js, React Three Fiber, and WebGL. Scene setup, performance optimization, 3D models, animations, and best practices.
+description: MiniMax M2.7 agent teams: role boundaries, handoffs, escalation, and serial vs parallel team structure.
 ---
 
 
-# 3D Graphics Development
+# Agent Teams
 
-Complete guide for building 3D experiences in the browser using Three.js, React Three Fiber, and WebGL.
+Use this rule when the work is best handled by multiple agents or explicitly separated roles.
 
-## CRITICAL: Container Dimensions
+## Team Shape
 
-**NEVER forget container heights for 3D canvases.**
+- Define roles before delegating: planner, explorer, implementer, verifier, or another bounded role.
+- Give each role a distinct objective, owned surface, and stopping point.
+- Do not create overlapping ownership without a clear reason.
 
-```jsx
-// WRONG - Will cause rendering issues
-<div>
-  <Canvas>
-    <Scene />
-  </Canvas>
-</div>
+## Multiple concurrent Cursor sessions
 
-// CORRECT - Fixed height container REQUIRED
-<div style={{ height: '500px', width: '100%' }}>
-  <Canvas>
-    <Scene />
-  </Canvas>
-</div>
-```
+Cursor 3 can run **several agent sessions in parallel** (for example from the sidebar). The same rules apply as for parallel roles or subagent branches: use parallel sessions only for **independent** workstreams, keep **non-overlapping ownership** of files and decisions, and **serialize** anything that would race the same artifact. More sessions visible at once does not make conflicting edits safer.
 
-```javascript
-// Three.js - WRONG
-renderer.setSize(window.innerWidth, window.innerHeight);
+## Handoff Contract
 
-// Three.js - CORRECT with container
-const container = document.getElementById('canvas-container');
-renderer.setSize(container.clientWidth, container.clientHeight);
-renderer.domElement.style.width = '100%';
-renderer.domElement.style.height = '400px'; // REQUIRED
-```
+Every handoff should state:
 
----
+- current goal
+- **which repo or workspace root** when more than one is in play
+- files, dirs, or questions owned
+- findings or artifacts produced
+- open risks or assumptions
+- exact next step for the receiving role
 
-## Three.js Essentials
+## Serial vs Parallel
 
-### Scene Setup
+- Use parallel teams only for independent branches.
+- Use serial teams when one role depends on another role's findings.
+- If two agents may touch the same file or decision, centralize that step instead of racing them.
 
-```javascript
-import * as THREE from 'three';
+## Challenge And Review
 
-// Create scene
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x1a1a1a);
+- At least one role should challenge assumptions, edge cases, or weak evidence on non-trivial work.
+- Reviewer or verifier roles should critique the work, not merely restate it.
+- Keep disagreement evidence-based and scoped to the task.
 
-// Create camera
-const camera = new THREE.PerspectiveCamera(
-  75, // FOV
-  window.innerWidth / window.innerHeight, // Aspect ratio
-  0.1, // Near plane
-  1000 // Far plane
-);
-camera.position.set(0, 0, 5);
+## Human Escalation
 
-// Create renderer
-const renderer = new THREE.WebGLRenderer({ 
-  antialias: true, // Smooth edges
-  alpha: true, // Transparent background
-  powerPreference: 'high-performance'
-});
-renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Performance
-renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
+Escalate to the user when:
 
-// Add to DOM
-document.body.appendChild(renderer.domElement);
+- a branch changes architecture or product direction
+- safety, destructive actions, or irreversible changes appear
+- two valid team recommendations lead to meaningfully different outcomes
 
-// Animation loop
-function animate() {
-  requestAnimationFrame(animate);
-  renderer.render(scene, camera);
-}
-animate();
+## Closeout
 
-// Handle resize
-window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-});
-```
-
-### Basic Geometries
-
-```javascript
-// Box
-const boxGeometry = new THREE.BoxGeometry(1, 1, 1);
-const boxMaterial = new THREE.MeshStandardMaterial({ color: 0x0077ff });
-const box = new THREE.Mesh(boxGeometry, boxMaterial);
-
-// Sphere
-const sphereGeometry = new THREE.SphereGeometry(1, 32, 32);
-const sphere = new THREE.Mesh(sphereGeometry, material);
-
-// Plane
-const planeGeometry = new THREE.PlaneGeometry(10, 10);
-const plane = new THREE.Mesh(planeGeometry, material);
-
-// Custom geometry
-const geometry = new THREE.BufferGeometry();
-const vertices = new Float32Array([
-  0, 0, 0,
-  1, 0, 0,
-  0, 1, 0
-]);
-geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
-```
-
-### Materials
-
-```javascript
-// Basic materials
-const basicMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
-const standardMat = new THREE.MeshStandardMaterial({
-  color: 0x0077ff,
-  metalness: 0.5,
-  roughness: 0.5,
-});
-const physicalMat = new THREE.MeshPhysicalMaterial({
-  color: 0xffffff,
-  metalness: 0,
-  roughness: 0,
-  transmission: 1, // Glass-like
-  thickness: 0.5,
-});
-
-// With textures
-const textureLoader = new THREE.TextureLoader();
-const texture = textureLoader.load('/textures/wood.jpg');
-texture.wrapS = THREE.RepeatWrapping;
-texture.wrapT = THREE.RepeatWrapping;
-texture.repeat.set(2, 2);
-
-const texturedMat = new THREE.MeshStandardMaterial({
-  map: texture,
-  normalMap: normalTexture,
-  roughnessMap: roughnessTexture,
-});
-```
-
-### Lighting
-
-```javascript
-// Ambient light - base illumination
-const ambient = new THREE.AmbientLight(0xffffff, 0.5);
-
-// Directional light - sun-like
-const directional = new THREE.DirectionalLight(0xffffff, 1);
-directional.position.set(5, 5, 5);
-directional.castShadow = true;
-directional.shadow.mapSize.width = 2048;
-directional.shadow.mapSize.height = 2048;
-
-// Point light - lightbulb
-const point = new THREE.PointLight(0xff0000, 1, 100);
-point.position.set(0, 0, 0);
-
-// Spot light - focused beam
-const spot = new THREE.SpotLight(0xffffff, 1);
-spot.position.set(0, 10, 0);
-spot.angle = Math.PI / 6;
-spot.penumbra = 0.5;
-
-// Hemisphere light - sky/ground
-const hemisphere = new THREE.HemisphereLight(0xffffff, 0x444444, 0.5);
-
-scene.add(ambient, directional, point, spot, hemisphere);
-```
-
----
-
-## React Three Fiber
-
-### Canvas Setup
-
-```jsx
-import { Canvas } from '@react-three/fiber';
-import { OrbitControls, PerspectiveCamera } from '@react-three/drei';
-
-function Scene() {
-  return (
-    <div style={{ height: '500px', width: '100%' }}>
-      <Canvas
-        shadows
-        dpr={[1, 2]} // Device pixel ratio
-        gl={{ 
-          antialias: true,
-          alpha: true,
-          powerPreference: 'high-performance'
-        }}
-      >
-        <PerspectiveCamera makeDefault position={[0, 0, 5]} />
-        <OrbitControls enableDamping dampingFactor={0.05} />
-        
-        <ambientLight intensity={0.5} />
-        <directionalLight position={[5, 5, 5]} castShadow />
-        
-        <MeshComponent />
-      </Canvas>
-    </div>
-  );
-}
-```
-
-### Mesh Components
-
-```jsx
-import { useRef, useFrame } from 'react';
-import { Mesh } from 'three';
-
-function AnimatedBox() {
-  const meshRef = useRef<Mesh>(null);
-  
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- Synthesize in the main thread before acting on team output.
+- Final user-facing claims must follow the always-on status and verification contract.
 
 ---
 > Source: [madebyaris/advance-minimax-m2-cursor-rules](https://github.com/madebyaris/advance-minimax-m2-cursor-rules) — distributed by [TomeVault](https://tomevault.io).
