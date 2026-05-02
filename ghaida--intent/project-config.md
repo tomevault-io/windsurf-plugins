@@ -1,63 +1,55 @@
 ---
 trigger: always_on
-description: Structured UX evaluation that produces quantitative assessments, identifies specific issues, and routes to the right Intent skill for resolution. Part of the Intent design strategy system. Runs heuristic evaluations, cognitive walkthroughs, anti-pattern detection, and task success analysis. Scores, categorizes, and prioritizes findings — then maps every issue to the skill that fixes it. Trigger on: UX review, design audit, heuristic evaluation, usability assessment, "review this design", "what's
+description: Harden designs for real-world use by systematically identifying and designing for every condition outside the happy path. Part of the Intent design strategy system. Covers state inventories, error recovery, empty states, loading patterns, first-run experiences, stress testing, internationalization readiness, and latency handling. Trigger on: edge cases, error states, empty states, loading states, first-run experience, onboarding, offline mode, "what happens when", "what if the user", "stress tes
 ---
 
 
 
-# Evaluate — Assess UX Quality
+# Fortify — Harden for Real-World Use
 
 ## Overview
 
-You run structured UX evaluations that produce specific, scored, actionable findings. This is not a vague design review where someone says "the navigation feels off" and everyone nods. This is a systematic methodology that examines an experience against established heuristics, walks through tasks step by step, scans for manipulative patterns, and measures whether users can actually accomplish what they came to do.
+The happy path is a fantasy. Real users have 47-character last names, 2G connections on the subway, three-year-old phones with cracked screens, browser tabs they haven't closed in six days, and no patience for something that doesn't work the first time they try it.
 
-Every finding you produce includes four things: what the issue is, where it occurs, why it matters (the user impact), and what to do about it (which Intent skill to engage). You are the diagnostic entry point of the Intent system — you identify and prioritize the problems, then route each one to the specialist skill that owns the fix.
+Every design starts with the ideal scenario: the user has a stable connection, reasonable data, a modern device, and follows the intended flow without deviation. That scenario accounts for maybe 60% of actual usage. The other 40% is where trust is built or destroyed — the empty state that tells the user nothing, the error message that says "Something went wrong" without explaining what or how to fix it, the loading screen that gives no indication anything is happening, the first-run experience that asks for 12 pieces of information before showing any value.
 
-You also identify what works well. Evaluation is not just criticism. Knowing what's strong is as important as knowing what's broken — it tells the team what to protect during redesign and what patterns to replicate elsewhere.
+Fortify systematically identifies every condition your users will actually encounter and ensures the design handles each one with the same care you gave the happy path. This isn't about pessimism — it's about respect for the people using what you build.
 
-**When to activate this skill:** Design reviews, UX audits, pre-launch assessments, post-launch quality checks, competitive UX analysis, accessibility audits, dark pattern scans, or any moment when someone needs an honest, structured answer to "how good is this experience?"
+**When to activate this skill:** Edge case reviews, error state design, empty state design, loading pattern design, first-run experience design, offline mode planning, internationalization readiness checks, stress testing, or any moment someone asks "but what happens when..."
 
 ---
 
 ## Skill family
 
-Evaluate is unique in the Intent system because it routes to every other skill. Your job is diagnosis and prioritization — the specialist skills own the treatment.
+Fortify works alongside the full Intent skill system, with especially tight connections to skills that define the paths you stress-test:
 
-- **`/organize`** — Navigation confused? Users can't find things? Information architecture is unclear or inconsistent? Route to `/organize` for taxonomy, navigation structure, and content hierarchy work.
+- **`/journey`** — Their flows define the happy path; you stress-test everything else. Every flow they design generates a set of questions: what happens when this step fails? What if the user abandons midway and returns? What if data from step 2 isn't available at step 4? Your work feeds back into their flow design as additional states and branches.
 
-- **`/articulate`** — Copy unclear? Labels ambiguous? Error messages unhelpful? Instructions confusing? Route to `/articulate` for content strategy, voice, and UX writing.
+- **`/blueprint`** — Their failure mode analysis at the system level feeds your UX-level resilience design. When they identify that a service can timeout, you design what the user sees during that timeout. When they map a dependency that can fail, you design the degraded experience. System-level failure modes become UX-level state designs.
 
-- **`/journey`** — Flow broken? Users drop off mid-task? Steps feel out of order? The interaction model doesn't match the user's mental model? Route to `/journey` for flow redesign and interaction sequence work.
+- **`/include`** — Accessibility and fortification overlap significantly. Designing for slow connections, small screens, one-handed use, and situational impairment is both resilience work and inclusive design. Coordinate to avoid duplication — you own the state and edge case methodology; they own the accessibility methodology and assistive tech requirements.
 
-- **`/fortify`** — Edge cases failing? Empty states unhelpful? Error recovery missing? Loading states absent? First-run experience neglected? Route to `/fortify` for resilience design and state coverage.
+- **`/evaluate`** — Their assessment identifies what's failing in the current experience; you design the fixes. When they flag missing error states, absent loading indicators, or unhelpful empty states, those findings route directly to you. Your output feeds back into their next evaluation cycle.
 
-- **`/include`** — Inaccessible? Keyboard navigation broken? Screen reader experience missing? Color contrast insufficient? Touch targets too small? Route to `/include` for accessibility methodology and inclusive design.
+- **`/specify`** — Your edge case documentation becomes part of their handoff package. Every state you design, every error recovery flow you define, every stress test result — all of it needs to be in the engineering spec. Coordinate on format: specs that list only the happy path are specs that produce broken products.
 
-- **`/blueprint`** — System architecture problems? The UX issue traces back to a service dependency, a team handoff, or a backend constraint? Route to `/blueprint` for systems analysis and structural redesign.
+- **`/articulate`** — Error messages, empty state copy, loading messages, first-run guidance — all of it is content that needs to be clear, helpful, and on-brand. You define what needs to be said; they define how to say it.
 
-- **`/measure`** — Metrics undefined? No way to know if the experience is succeeding? Success criteria missing or measuring the wrong things? Route to `/measure` for metrics framework and measurement strategy.
-
-- **`/investigate`** — Need more research? Your evaluation surfaced questions that can't be answered without talking to users? Route to `/investigate` for research planning and execution.
-
-- **`/strategize`** — Problem framing unclear? The experience seems well-built but aimed at the wrong problem? The five foundational questions haven't been asked? Route to `/strategize` for strategic reframing.
-
-- **`/specify`** — Findings need to become engineering specs? Remediation requires detailed handoff documentation? Route to `/specify` for implementation-ready documentation.
-
-- **`/philosopher`** — Something feels wrong but you can't name it? The experience is technically sound but emotionally hollow? The design is competent but forgettable? Enter `/philosopher` mode to sit with the discomfort before diagnosing.
-
-- **Dark patterns detected?** — Flag the specific pattern, reference the Intent anti-pattern catalog, assign severity, and note the regulatory implications. Dark pattern findings are always P0 or P1 — they represent potential user harm, not just degraded experience.
-
-**Route intelligently:** When your evaluation surfaces 12 issues across 6 categories, don't just list them. Organize them by the skill that owns the fix, prioritize within each group, and give the team a clear sequence for remediation. The goal is a roadmap, not a laundry list.
+- **`/philosopher`** — "What's the most embarrassing way this could fail in public?" "What assumption are we making about our users that would be humiliating if wrong?" The philosopher helps you find the failure modes that nobody's imagined yet — the ones that come from questioning assumptions, not from running checklists.
 
 ---
 
 ## Core capabilities
 
-### 1. Heuristic evaluation
+### 1. State inventory
 
-Apply Nielsen's 10 usability heuristics as a structured evaluation framework. For each heuristic, examine the experience systematically, score what you find, and document specific violations with evidence.
+Every screen, component, and flow has states beyond "default." Most designs only spec the default state. Fortify enumerates all of them.
 
-**Scoring scale:** 0 = No issues found. 1 = Cosmetic issue (fix if time allows). 2 = Minor usability issue (low priority fix). 3 = Major usability issue (important to fix, high priority). 4 = Catastrophic (must fix before release, blocks core functionality or causes harm).
+**The state catalog:**
+
+**Default** — The happy path with normal data. This is what the mockup shows. It's the starting point, not the finish line. Even the default state has questions: what's "normal" data? How much? In what format? What happens when "normal" changes?
+
+**Empty** — No data yet. First use, zero search results, cleared history, new account with no activity. The empty state is the user's first impression of most features — and most empty states are a blank page with no guidance. Design them: explain what will appear here, how to get started, and what the feature does. Show sample data or a preview of the populated state if possible.
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
