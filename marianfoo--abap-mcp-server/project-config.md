@@ -1,184 +1,134 @@
 ---
 trigger: always_on
-description: **Complete guide for adding new GitHub repositories as documentation sources to the SAP docs MCP project.**
+description: **Complete guide for understanding when to use which MCP tool in the SAP docs system.**
 ---
 
-# Adding New GitHub Documentation Sources (Rule)
+# SAP Docs MCP Tool Usage Guide (Rule)
 
-**Complete guide for adding new GitHub repositories as documentation sources to the SAP docs MCP project.**
+**Complete guide for understanding when to use which MCP tool in the SAP docs system.**
 
-## Overview
+## Tool Overview (5 Tools Available)
 
-The SAP docs MCP uses a metadata-driven architecture that makes adding new GitHub sources straightforward. The process involves 5 main steps:
+The SAP docs MCP provides 5 specialized tools for different types of SAP documentation and content:
 
-1. **Git Submodule Setup** - Add repository as submodule
-2. **Metadata Configuration** - Define source in `src/metadata.json`
-3. **Build Configuration** - Add to build scripts
-4. **URL Generation** - Configure URL patterns
-5. **Testing & Validation** - Add tests and verify functionality
+### **General Documentation Tools**
+1. **`search`** - Multi-source documentation search (alias: `sap_docs_search`)
+2. **`fetch`** - Retrieve specific documentation (alias: `sap_docs_get`)
 
-## Step-by-Step Process
+### **Community & Help Tools**  
+3. **`sap_community_search`** - SAP Community blog posts and discussions
+4. **`sap_help_search`** - SAP Help Portal product documentation
+5. **`sap_help_get`** - Retrieve SAP Help content
 
-### 1. Git Submodule Setup
+## When to Use Which Tool
 
-Add the new repository as a Git submodule in `.gitmodules`:
+### **`search` - Unified SAP Development Search**
+**Use for:**
+- **UI5 controls and components** (Button, Table, Wizard)
+- **CAP framework concepts** (entities, services, annotations)
+- **ABAP documentation** (all versions 7.52-7.58 + latest)
+- **Development frameworks** (wdi5 testing, UI5 Tooling)
+- **Best practices and examples** (ABAP cheat sheets, Clean ABAP)
+- **Fiori Elements showcases and patterns**
+- **TypeScript integration and setup**
+- **Cloud SDK and deployment topics**
 
-```bash
-# Example: Adding UI5 TypeScript source
-[submodule "sources/ui5-typescript"]
-    path = sources/ui5-typescript
-    url = https://github.com/UI5/typescript.git
-    branch = gh-pages  # Specify the correct branch
+**Examples:**
+```
+search: "button properties"                # UI5 Button documentation
+search: "fiori elements annotations"       # Fiori Elements patterns  
+search: "wdi5 testing"                     # Testing framework
+search: "clean abap practices"             # Style guidelines
+search: "SELECT statements 7.58"           # ABAP syntax (specific version)
+search: "inline declarations"              # ABAP latest (default)
+search: "LOOP 7.57"                        # Auto-detects ABAP 7.57
 ```
 
-**Key considerations:**
+**ABAP Integration:**
+- ABAP docs are fully integrated (no separate tools needed)
+- Latest ABAP shown by default for general queries
+- Version auto-detection from query (e.g., "LOOP 7.57" searches ABAP 7.57)
+- 40,761+ ABAP files across 8 versions (7.52-7.58 + latest)
 
-- Use descriptive path names under `sources/`
-- Specify the correct branch (main, master, gh-pages, etc.)
-- Ensure the repository contains documentation files (typically `.md` files)
+### **Tool Selection Matrix**
 
-### 2. Metadata Configuration
+| Query Type | Use This Tool | Reasoning |
+|------------|---------------|-----------|
+| "How do I create a Button?" | `search` | UI5 control examples and guides |
+| "SELECT statement syntax" | `search` | ABAP integrated - add version if needed |
+| "Fiori Elements annotations" | `search` | Cross-platform examples and showcases |
+| "TRY CATCH in ABAP 7.57" | `search` | ABAP with version auto-detection |
+| "Clean ABAP practices" | `search` | Style guides and best practices |
+| "LOOP AT internal table" | `search` | ABAP latest (or add version) |
+| "wdi5 testing setup" | `search` | Testing framework documentation |
+| "CDS view annotations" | `search` | CAP and examples unified |
+| "Community discussions on errors" | `sap_community_search` | Real-world solutions and discussions |
+| "S/4HANA configuration" | `sap_help_search` | Official product documentation |
 
-Add source definition to `src/metadata.json` in the `sources` array:
+## Content Sources by Tool
 
+### **`search` Sources (27 total, including 8 ABAP versions)**
+- **ABAP**: 40,761+ files across 8 versions (7.52-7.58 + latest), cheat sheets, style guides, Fiori showcase
+- **UI5**: SAPUI5, OpenUI5 API/Samples, TypeScript, Custom Controls, Tooling, Web Components
+- **CAP**: Framework docs, Fiori Elements showcase  
+- **Testing**: wdi5 framework and examples
+- **Cloud**: Cloud SDK (JS/Java), AI SDK, Cloud MTA Build Tool
+- **Guidelines**: SAP style guides, community best practices
+
+### **Version Management (ABAP)**
+- **Latest by default**: General ABAP queries show latest version only
+- **Version auto-detection**: "LOOP 7.57" automatically filters to ABAP 7.57
+- **Smart filtering**: Prevents duplicate results across versions
+- **Context boosting**: Requested versions get 2.0x score boost
+
+## Advanced Usage Patterns
+
+### **Progressive Discovery**
+1. **Start broad**: Use `search` for general concepts (all sources)
+2. **Get specific**: Add version numbers for ABAP-specific versions
+3. **Cross-reference**: Use `sap_community_search` for real-world examples
+4. **Deep dive**: Use `sap_help_search` for product documentation
+
+### **ABAP Version-Specific Queries**
+```
+search: "NEW operator"              # Shows latest ABAP version
+search: "NEW operator 7.58"         # Targets ABAP 7.58 specifically
+search: "NEW operator 7.54"         # Targets ABAP 7.54 for compatibility check
+search: "LOOP 7.57"                 # Auto-detects and filters to ABAP 7.57
+```
+
+### **Comprehensive Multi-Source Coverage**
+```
+# For Fiori Elements development:
+search: "fiori elements annotations"          # Official docs + showcases
+sap_community_search: "fiori elements tips"   # Community insights
+sap_help_search: "Fiori Elements setup"       # Product guides
+
+# For ABAP development:
+search: "SELECT statements"                   # Latest ABAP + best practices
+search: "SELECT statements 7.53"              # Version-specific syntax
+sap_community_search: "ABAP SELECT performance" # Real-world tips
+```
+
+## Tool Response Formats
+
+### **Search Tools** (`search`, `sap_community_search`, `sap_help_search`)
+**Standard Output:**
+```
+Found X results for 'query':
+
+⭐️ **document-id** (Score: X.XX)
+   Title and description
+   Use in fetch
+```
+
+**ChatGPT/JSON Format:**
 ```json
 {
-  "id": "ui5-typescript",
-  "type": "documentation",
-  "lang": "en",
-  "boost": 0.1,
-  "tags": ["ui5", "typescript", "types", "frontend"],
-  "description": "UI5 TypeScript",
-  "libraryId": "/ui5-typescript",
-  "sourcePath": "ui5-typescript",
-  "baseUrl": "https://github.com/UI5/typescript/blob/gh-pages",
-  "pathPattern": "/{file}",
-  "anchorStyle": "github"
-}
-```
-
-**Required fields:**
-
-- `id`: Unique identifier for the source
-- `type`: "documentation", "api", or "samples"
-- `libraryId`: Library identifier (usually `/` + id)
-- `sourcePath`: Path under `sources/` directory
-- `baseUrl`: Base URL for generated documentation links
-- `pathPattern`: URL pattern (`{file}` is replaced with filename)
-- `anchorStyle`: "github", "docsify", or "custom"
-
-**Optional enhancements:**
-
-- Add to `synonyms` array for query expansion
-- Add to `acronyms` object for abbreviation handling
-- Add to `contextBoosts` for intelligent query routing
-- Add to `libraryMappings` for ID resolution
-- Add to `contextEmojis` for UI presentation
-
-### 3. Build Configuration
-
-Add source to `scripts/build-index.ts` in the `SOURCES` array:
-
-```typescript
-{
-  repoName: "ui5-typescript",
-  absDir: join("sources", "ui5-typescript"),
-  id: "/ui5-typescript",
-  name: "UI5 TypeScript",
-  description: "Official entry point to anything TypeScript related for UI5",
-  filePattern: "*.md",  // Adjust pattern as needed
-  type: "markdown" as const
-}
-```
-
-**File patterns:**
-
-- `*.md` - Root level markdown files only
-- `**/*.md` - All markdown files recursively
-- `**/*.mdx` - MDX files (like Cloud SDK sources)
-- Custom patterns for specific structures
-
-### 4. URL Generation Configuration
-
-Add source to URL generator registry in `src/lib/url-generation/index.ts`:
-
-```typescript
-const URL_GENERATORS: Record<string, new (libraryId: string, config: DocUrlConfig) => BaseUrlGenerator> = {
-  // ... existing generators ...
-  '/ui5-typescript': GenericUrlGenerator,  // Use appropriate generator
-  '/ui5-cc-spreadsheetimporter': GenericUrlGenerator,
-};
-```
-
-**Generator types:**
-
-- `GenericUrlGenerator` - For standard GitHub repos or documentation sites
-- `CloudSdkUrlGenerator` - For Cloud SDK-style documentation
-- `SapUi5UrlGenerator` - For UI5 API documentation
-- `CapUrlGenerator` - For CAP-style documentation
-- `Wdi5UrlGenerator` - For wdi5-style documentation
-
-### 5. Testing & Validation
-
-Add test cases to `test/comprehensive-url-generation.test.ts`:
-
-```typescript
-// Add path mapping in getSourceFilePath function
-const pathMappings: Record<string, { basePath: string; transform?: (relFile: string) => string }> = {
-  // ... existing mappings ...
-  '/ui5-typescript': { basePath: 'sources/ui5-typescript' },
-  '/ui5-cc-spreadsheetimporter': { basePath: 'sources/ui5-cc-spreadsheetimporter/docs' }
-};
-
-// Add test case in testCases array
-{
-  name: 'UI5 TypeScript - FAQ Documentation',
-  libraryId: '/ui5-typescript',
-  relFile: 'faq.md',
-  expectedUrl: 'https://github.com/UI5/typescript/blob/gh-pages/faq#faq---frequently-asked-questions-for-the-ui5-type-definitions',
-  frontmatter: '',
-  content: '# FAQ - Frequently Asked Questions for the UI5 Type Definitions\n\nWhile the [main page](README.md) answers the high-level questions...'
-}
-```
-
-## Common URL Pattern Examples
-
-### GitHub Repository URLs
-
-```json
-{
-  "baseUrl": "https://github.com/UI5/typescript/blob/gh-pages",
-  "pathPattern": "/{file}",
-  "anchorStyle": "github"
-}
-// Generates: https://github.com/UI5/typescript/blob/gh-pages/faq.md
-```
-
-### Documentation Site URLs
-
-```json
-{
-  "baseUrl": "https://docs.spreadsheet-importer.com",
-  "pathPattern": "/pages/{file}/",
-  "anchorStyle": "github"
-}
-// Generates: https://docs.spreadsheet-importer.com/pages/Checks/
-```
-
-### GitHub Pages URLs
-
-```json
-{
-  "baseUrl": "https://sap.github.io/ui5-tooling/v4",
-  "pathPattern": "/pages/{file}",
-  "anchorStyle": "github"
-}
-// Generates: https://sap.github.io/ui5-tooling/v4/pages/Builder
-```
-
-## Build and Deployment Commands
-
-```bash
+  "results": [
+    {
+      "id": "/cap/guides/domain-modeling",
+      "title": "Domain Modeling in CAP",
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
