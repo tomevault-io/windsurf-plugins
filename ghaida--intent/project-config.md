@@ -1,53 +1,61 @@
 ---
 trigger: always_on
-description: Design any user-facing experience end-to-end: task flows, multi-step workflows, navigation structures, onboarding, settings, search, content creation, collaboration, signup, checkout, dashboards, notifications, error recovery, and more. Handles cross-platform adaptation (mobile/web/TV/embedded), device-aware design, accessibility, interaction specifications, and multi-channel journey mapping. Trigger when designing user flows of any kind, mapping screen sequences, optimizing task completion, spe
+description: Adapts experiences across cultures and languages — not just translation, but cultural reconception. Part of the Intent design strategy system. When a product enters a new market, everything is in play: information density, navigation patterns, color meaning, icon comprehension, date formats, trust signals, payment flows, and the fundamental assumptions about how people make decisions. Trigger when: planning international expansion, auditing i18n readiness, adapting designs for RTL languages, rev
 ---
 
 
 
-# Journey
+# Localize — Design Across Cultures
 
 ## Overview
 
-You design user-facing experiences end-to-end. Your scope is any sequence of screens, states, or interactions that a user moves through to accomplish something — whether that's signing up, configuring settings, creating content, completing a purchase, navigating a dashboard, collaborating with teammates, or recovering from an error.
+Localization is not translation. Translation converts words; localization adapts the experience.
 
-Your work lives at the intersection of user understanding and product outcomes. You see the full journey, anticipate friction, and design experiences that help users succeed while serving the product's goals. You think across channels — a single user task might span email, mobile app, web, and a support call — and across time, because users leave mid-flow and return later.
+When a product enters a new market, everything is in play: information density, navigation patterns, color meaning, icon comprehension, date formats, trust signals, payment flows, legal compliance, and the fundamental assumptions about how people make decisions. A checkout flow designed for US consumers doesn't become a Japanese experience by translating the strings. A trust-building pattern that works in Germany may be irrelevant in Brazil and offensive in Saudi Arabia.
 
-**Trigger this skill when users ask about:**
-- Designing or optimizing any user flow (signup, onboarding, task completion, settings, search, content creation, collaboration, etc.)
-- Multi-step workflows, wizards, or guided experiences
-- Navigation structures, information finding, or wayfinding
-- Cross-platform experiences (mobile, web, TV, embedded contexts)
-- Multi-channel journeys (how one task flows across different touchpoints)
-- Funnel optimization, drop-off analysis, or task completion rates
-- Error handling, recovery flows, or edge case experiences
-- Notification systems, alerts, or messaging flows
-- Dashboard interactions, filtering, or data exploration flows
-- "How should the user experience X?" or "What's the best flow for..."
+Design for localization from the start, or pay for it exponentially later. Retrofitting RTL support, plural rules, and cultural adaptation into a product that assumed English-speaking Western users is one of the most expensive kinds of design debt.
+
+**When to activate this skill:** International expansion planning, i18n readiness audits, new market entry design, RTL adaptation, cultural review of existing designs, localization testing strategy, or anytime someone says "just translate it" and the problem is deeper than language.
+
+---
 
 ## Skill family
 
-You work alongside complementary skills that handle interconnected concerns:
+Localize works alongside the full Intent skill system:
 
-- **`/strategize`** — Validates whether to build what you're designing. Their five foundational questions — problem validation, audience definition, solution fit, feature validation, competitive landscape — directly inform your flow decisions. If the problem hasn't been framed, your flows risk solving the wrong thing.
-- **`/investigate`** — Their research findings reveal how users actually behave, think, and struggle. Ground your flows in evidence from their user interviews, usability tests, and behavioral analytics. Without investigation, you're designing from assumptions.
-- **`/blueprint`** — Maps the system architecture behind your flows. They ensure the system can actually deliver the experience you're designing. When your flow requires understanding backend dependencies, data availability, or service constraints, bring them in.
-- **`/organize`** — Structures the information architecture your flows navigate through. Hand off when the flow needs better wayfinding, the navigation model isn't working, or users can't find what they need within the structure.
-- **`/articulate`** — Designs the words within your flows. Hand off for UX writing, error messages, microcopy, voice and tone. You define what screens exist and what they need to communicate; they define exactly what those screens say.
-- **`/specify`** — Translates your flows into implementation specs. They own the final handoff documentation, interaction specifications, and engineering-ready details.
-- **`/fortify`** — Hardens your flows for edge cases, error states, and real-world conditions. They stress-test what happens when things go wrong, networks fail, permissions change, or users do the unexpected.
-- **`/include`** — Ensures your flows work for everyone: accessibility, cognitive accessibility, motor accessibility, assistive technology compatibility. They audit what you design for inclusivity gaps.
-- **`/evaluate`** — Assesses your flows against UX heuristics and the Intent anti-pattern catalog. They catch usability problems you're too close to see.
-- **`/philosopher`** — A cross-cutting cognitive mode — not a phase — that any skill can enter when the problem needs more exploration before the next move. Enter when: a flow feels logical but lifeless, the "obvious" interaction pattern might not serve the user's actual mental model, device constraints are being treated as limitations instead of design inputs, or the user says "sit with this", "brainstorm", or "think about this differently." The philosopher helps question inherited patterns and explore what the interaction would look like if current conventions didn't exist.
+- **`/articulate`**: Everything they write will be localized. Content strategy must design for translation from the start — sentence structure, concatenation, tone, humor, idiom. If the English copy is clever, the localized copy may be incomprehensible. Articulate designs translatable content; localize ensures it survives translation.
+- **`/organize`**: Navigation and labeling may need cultural adaptation. Category structures that make sense in one culture may be arbitrary in another. Menu labels that are concise in English may expand to unwieldy lengths in German or Finnish.
+- **`/fortify`**: i18n technical readiness — text expansion breaking layouts, RTL rendering bugs, date/number format parsing failures, character encoding issues. Fortify maps the failure modes; localize defines the requirements that prevent them.
+- **`/strategize`**: Market analysis and audience definition per locale. Which markets, in what order, with what level of adaptation? `/strategize` defines the business case; `/localize` defines the design implications.
+- **`/investigate`**: Cultural research methods for unfamiliar markets. When your assumptions about a market are based on stereotypes rather than evidence, investigate plans the research to validate or challenge them.
+- **`/philosopher`**: A cross-cutting cognitive mode for confronting invisible assumptions. Invoke when: your design team is monocultural and can't see its own biases, the "obvious" user flow is obvious only to people from your culture, or you need the question: "What cultural assumptions are invisible to us because we're inside them?"
 
-Collaborate explicitly with each when their domain matters. Call out what you're *not* deciding.
+---
 
 ## Core capabilities
 
-### 1. End-to-end flow mapping
+### 1. Cultural dimension analysis for UX
 
-Design complete journeys from entry point to desired outcome. For any flow, understand: where users arrive from, what mental model they carry, what they're trying to accomplish, what success looks like, and what happens after.
+Cultural frameworks provide starting hypotheses for design adaptation — not stereotypes to design by. Use them to generate questions, then validate with research.
 
+**High-context vs. low-context (Hall):**
+- High-context cultures (Japan, China, Arab countries, Korea): communication is implicit, relationships matter before transactions, visual density is expected (not cluttered), social proof and authority signals carry weight, indirectness is politeness.
+- Low-context cultures (US, Germany, Scandinavia, Netherlands): communication is explicit, task-first flows are preferred, minimal UI is valued, direct calls to action work, users expect to self-serve.
+- UX implications: onboarding flows, help text density, social features, the balance between guidance and autonomy.
+
+**Power distance (Hofstede):**
+- High power distance: formal tone, hierarchical navigation, respect for authority in copy ("Approved by Dr. [Name]"), institutional trust signals.
+- Low power distance: informal tone, flat navigation, peer trust signals ("1,000 users like you chose this"), egalitarian messaging.
+- UX implications: form of address, tone of voice, error messages, authority signals.
+
+**Individualism vs. collectivism:**
+- Individualist cultures: personal accounts, individual preferences, "my" dashboard, solo decision-making flows.
+- Collectivist cultures: family/group accounts, shared decision-making, social features, gift-giving flows, group purchase patterns.
+- UX implications: account models, sharing features, decision-making flows, social proof patterns.
+
+**Uncertainty avoidance:**
+- High uncertainty avoidance (Japan, Germany, Greece): detailed explanations, confirmation steps, progress indicators, safety nets, explicit guarantees.
+- Low uncertainty avoidance (Singapore, Denmark, UK): tolerance for ambiguity, fewer confirmation steps, willingness to explore, comfort with uncertainty.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
