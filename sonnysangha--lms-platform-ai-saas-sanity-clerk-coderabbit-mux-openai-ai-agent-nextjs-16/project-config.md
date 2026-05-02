@@ -1,141 +1,75 @@
 ---
 trigger: always_on
-description: You are a principal-level TypeScript and React engineer who writes best-practice, high performance code. You are also an expert on structured content modelling.
+description: Shadcn usage
 ---
 
+# shadcn/ui
 
-## Your role
+> shadcn/ui is a collection of beautifully-designed, accessible components and a code distribution platform. It is built with TypeScript, Tailwind CSS, and Radix UI primitives. It supports multiple frameworks including Next.js, Vite, Remix, Astro, and more. Open Source. Open Code. AI-Ready. It also comes with a command-line tool to install and manage components and a registry system to publish and distribute code.
 
-You are a principal-level TypeScript and React engineer who writes best-practice, high performance code. You are also an expert on structured content modelling.
+## Overview
 
-## UI/UX
+- [Introduction](https://ui.shadcn.com/docs): Core principles—Open Code, Composition, Distribution, Beautiful Defaults, and AI-Ready design.
+- [CLI](https://ui.shadcn.com/docs/cli): Command-line tool for installing and managing components.
+- [components.json](https://ui.shadcn.com/docs/components-json): Configuration file for customizing the CLI and component installation.
+- [Theming](https://ui.shadcn.com/docs/theming): Guide to customizing colors, typography, and design tokens.
+- [Changelog](https://ui.shadcn.com/docs/changelog): Release notes and version history.
+- [About](https://ui.shadcn.com/docs/about): Credits and project information.
 
-Always use Shadcn components and Tailwind CSS where possible, use the Shadcn MCP server to identify which components are available and how to install them.
-- NEVER try to create a Shadcn component yourself, it must always come through the command line
-- NEVER modify the actual component once imported, use classNames to modify an imported component instead.
+## Installation
 
-## Sanity Studio Schema Types
+- [Next.js](https://ui.shadcn.com/docs/installation/next): Install shadcn/ui in a Next.js project.
+- [Vite](https://ui.shadcn.com/docs/installation/vite): Install shadcn/ui in a Vite project.
+- [Remix](https://ui.shadcn.com/docs/installation/remix): Install shadcn/ui in a Remix project.
+- [Astro](https://ui.shadcn.com/docs/installation/astro): Install shadcn/ui in an Astro project.
+- [Laravel](https://ui.shadcn.com/docs/installation/laravel): Install shadcn/ui in a Laravel project.
+- [Gatsby](https://ui.shadcn.com/docs/installation/gatsby): Install shadcn/ui in a Gatsby project.
+- [React Router](https://ui.shadcn.com/docs/installation/react-router): Install shadcn/ui in a React Router project.
+- [TanStack Router](https://ui.shadcn.com/docs/installation/tanstack-router): Install shadcn/ui in a TanStack Router project.
+- [TanStack Start](https://ui.shadcn.com/docs/installation/tanstack): Install shadcn/ui in a TanStack Start project.
+- [Manual Installation](https://ui.shadcn.com/docs/installation/manual): Manually install shadcn/ui without the CLI.
 
-### Content modelling
+## Components
 
-Unless explicitly modelling web pages or app views, model content that describes what things are, not what they look like:
+### Form & Input
 
-- Good examples describe what things are: `status`, `tone`, `visibility`, `role`
-- Bad examples describe what things look like: `color`, `font-size`, `border-radius`
+- [Form](https://ui.shadcn.com/docs/components/form): Building forms with React Hook Form and Zod validation.
+- [Field](https://ui.shadcn.com/docs/components/field): Field component for form inputs with labels and error messages.
+- [Button](https://ui.shadcn.com/docs/components/button): Button component with multiple variants.
+- [Button Group](https://ui.shadcn.com/docs/components/button-group): Group multiple buttons together.
+- [Input](https://ui.shadcn.com/docs/components/input): Text input component.
+- [Input Group](https://ui.shadcn.com/docs/components/input-group): Input component with prefix and suffix addons.
+- [Input OTP](https://ui.shadcn.com/docs/components/input-otp): One-time password input component.
+- [Textarea](https://ui.shadcn.com/docs/components/textarea): Multi-line text input component.
+- [Checkbox](https://ui.shadcn.com/docs/components/checkbox): Checkbox input component.
+- [Radio Group](https://ui.shadcn.com/docs/components/radio-group): Radio button group component.
+- [Select](https://ui.shadcn.com/docs/components/select): Select dropdown component.
+- [Switch](https://ui.shadcn.com/docs/components/switch): Toggle switch component.
+- [Slider](https://ui.shadcn.com/docs/components/slider): Slider input component.
+- [Calendar](https://ui.shadcn.com/docs/components/calendar): Calendar component for date selection.
+- [Date Picker](https://ui.shadcn.com/docs/components/date-picker): Date picker component combining input and calendar.
+- [Combobox](https://ui.shadcn.com/docs/components/combobox): Searchable select component with autocomplete.
+- [Label](https://ui.shadcn.com/docs/components/label): Form label component.
 
-### Basic schema types
+### Layout & Navigation
 
-- ALWAYS use the `defineType`, `defineField`, and `defineArrayMember` helper functions
-- ALWAYS write schema types to their own files and export a named `const` that matches the filename
-- ONLY use a `name` attribute in fields unless the `title` needs to be something other than a title-case version of the `name`
-- ANY `string` field type with an `options.list` array with fewer than 5 options must use `options.layout: "radio"`
-- ANY `image` field must include `options.hotspot: true`
-- INCLUDE brief, useful `description` values if the intention of a field is not obvious
-- INCLUDE `rule.warning()` for fields that would benefit from being a certain length
-- INCLUDE brief, useful validation errors in `rule.required().error('<Message>')` that signal why the field must be correct before publishing is allowed
-- AVOID `boolean` fields, write a `string` field with an `options.list` configuration
-- ONLY use a single reference when there is no possibility that more than one value will be required: examples include `city`, `country`
-- ALWAYS use an array of references when there is any possibility more than one value will be required: examples include `authors`, `categories`
-- CONSIDER the order of fields, from most important and relevant first, to least often used last
+- [Accordion](https://ui.shadcn.com/docs/components/accordion): Collapsible accordion component.
+- [Breadcrumb](https://ui.shadcn.com/docs/components/breadcrumb): Breadcrumb navigation component.
+- [Navigation Menu](https://ui.shadcn.com/docs/components/navigation-menu): Accessible navigation menu with dropdowns.
+- [Sidebar](https://ui.shadcn.com/docs/components/sidebar): Collapsible sidebar component for app layouts.
+- [Tabs](https://ui.shadcn.com/docs/components/tabs): Tabbed interface component.
+- [Separator](https://ui.shadcn.com/docs/components/separator): Visual divider between content sections.
+- [Scroll Area](https://ui.shadcn.com/docs/components/scroll-area): Custom scrollable area with styled scrollbars.
+- [Resizable](https://ui.shadcn.com/docs/components/resizable): Resizable panel layout component.
 
-```ts
-// ./src/schemaTypes/lessonType.ts
+### Overlays & Dialogs
 
-import { defineField, defineType } from "sanity";
-
-export const lessonType = defineType({
-  name: "lesson",
-  title: "Lesson",
-  type: "document",
-  fields: [
-    defineField({
-      name: "title",
-      type: "string",
-    }),
-    defineField({
-      name: "categories",
-      type: "array",
-      of: [defineArrayMember({ type: "reference", to: { type: "category" } })],
-    }),
-  ],
-});
-```
-
-### Schema type with custom input components
-
-- If a schema type has input components, they should be colocated with the schema type file. The schema type should have the same named export but stored in a `[typeName]/index.ts` file:
-
-```ts
-// ./src/schemaTypes/seoType/index.ts
-
-import { defineField, defineType } from "sanity";
-
-import seoInput from "./seoInput";
-
-export const seoType = defineType({
-  name: "seo",
-  title: "SEO",
-  type: "object",
-  components: { input: seoInput },
-  // ...
-});
-```
-
-### No anonymous reusable schema types
-
-Any field type that can be reused in multiple document types should be registered as its own custom schema type.
-
-```ts
-// ./src/schemaTypes/blockContentType.ts
-
-import { defineField, defineType } from "sanity";
-
-export const blockContentType = defineType({
-  name: "blockContent",
-  title: "Block content",
-  type: "array",
-  of: [defineField({ name: "block", type: "block" })],
-});
-```
-
-### Decorating schema types
-
-Every `document` and `object` schema type should:
-
-- Have an `icon` property from `@sanity/icons`
-- Have a customized `preview` property that shows rich contextual details about the document
-- Use `groups` when the schema type has more than a few fields to collate related fields and only show the most important group by default. These `groups` should use the icon property as well.
-- Use `fieldsets` with `options: {columns: 2}` if related fields could be grouped visually together, such as `startDate` and `endDate`
-
-### Validation rules for fields
-
-- ALWAYS make fields `required` if a document should not be published without that field meeting a criteria
-- ALWAYS give a validation `warning` if a field value should meet a certain criteria
-- ALWAYS contain a custom `error` message to signal why the field must be correct, or how it could be improved to satisfy the rule
-- ALWAYS put validation rules in an array, and order them from most important to least important
-- Use `.custom()` to enforce validation rules that cannot be expressed with other validation methods, such as checking the value of another field from the document
-
-```ts
-// ./src/schemaTypes/slugType/index.ts
-
-import { defineField, defineType } from "sanity";
-
-export const slugType = defineType({
-  name: "slug",
-  title: "Slug",
-  type: "object",
-  validation: (Rule) => [
-    Rule.custom((value, context) =>
-      value?.current && value?.current.length > 100
-        ? "Slug cannot be longer than 100 characters"
-        : true
-    ),
-    Rule.required().error("Required to generate a URL"),
-  ],
-  // ...
-});
-```
-
+- [Dialog](https://ui.shadcn.com/docs/components/dialog): Modal dialog component.
+- [Alert Dialog](https://ui.shadcn.com/docs/components/alert-dialog): Alert dialog for confirmation prompts.
+- [Sheet](https://ui.shadcn.com/docs/components/sheet): Slide-out panel component (drawer).
+- [Drawer](https://ui.shadcn.com/docs/components/drawer): Mobile-friendly drawer component using Vaul.
+- [Popover](https://ui.shadcn.com/docs/components/popover): Floating popover component.
+- [Tooltip](https://ui.shadcn.com/docs/components/tooltip): Tooltip component for additional context.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
