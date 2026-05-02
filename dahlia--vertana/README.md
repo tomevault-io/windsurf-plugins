@@ -7,14 +7,14 @@ LLM-powered agentic translation library for JavaScript/TypeScript
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `GEMINI.md` in [dahlia/vertana](https://github.com/dahlia/vertana).
+Original source: `copilot-instructions.md` in [dahlia/vertana](https://github.com/dahlia/vertana).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
-- **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
+- **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
 Available for 6 platforms including Claude Code, Cursor, Windsurf, and more. Source: [github.com/dahlia/vertana](https://github.com/dahlia/vertana)
