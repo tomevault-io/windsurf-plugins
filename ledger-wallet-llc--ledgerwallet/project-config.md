@@ -1,87 +1,52 @@
 ---
 trigger: always_on
-description: <!-- Source: .cursor/agents/code-reviewer.md -->
+description: Coin-specific logic must live in families/; generic UI uses the families contract only (no if (family === "evm") in shared code)
 ---
 
-<!-- Source: .cursor/agents/code-reviewer.md -->
-<!-- Last synced: 2026-03-13 -->
 
-# Ledger Live Monorepo
+# Coin families contract (Desktop & Mobile UI)
 
-This is the **ledger-live** monorepo — a pnpm + turborepo workspace containing:
+**Principle:** Coin-specific UI and behavior must live in **families/**. Generic screens, hooks, and components must **not** branch on `family === "evm"` (or any family name). They must use the **families contract**: optional slots defined in the family type, implemented per family, and consumed via a single lookup (e.g. `getLLDCoinFamily(currency.family).SlotName`). This keeps generic code family-agnostic and supports **modularisation and lazy loading**.
 
-- `apps/ledger-live-desktop` — Electron desktop wallet (React, TypeScript)
-- `apps/ledger-live-mobile` — React Native mobile wallet (iOS/Android)
-- `libs/` — shared libraries (`ledger-live-common`, `client-ids`, `coin-modules`, etc.)
+## Do not do (anti-patterns)
 
-## Code Review Philosophy
+- **Generic code** (outside `families/<family>/`):
+  - `if (currency.family === "evm")` / `if (transaction.family === "solana")` to render or behave differently.
+  - Coin-specific hooks or logic in shared ViewModels / screens (e.g. Canton onboarding branch inside a generic Scan Device VM).
+  - Importing a specific coin module (e.g. `@ledgerhq/coin-canton`) in generic UI to branch on that coin.
+- **Exception:** Type-narrowing inside a **family folder** (e.g. `invariant(transaction.family === "bitcoin", "...")` in `families/bitcoin/`) is acceptable; the rule applies to **generic** (shared) code only.
 
-- Flag only **clear violations** of the rules described in these instructions.
-- Prefer **quality over quantity** — a few high-confidence comments are more valuable than many speculative ones.
-- Focus on bugs, security issues, architecture violations, and missing tests before style nits.
+## Do (correct pattern)
 
-## Changeset Requirement
+1. **Define a slot on the contract**  
+   - **Desktop:** Add an optional property to `LLDCoinFamily` in `apps/ledger-live-desktop/src/renderer/families/types.ts` (e.g. `NoAssociatedAccounts?: React.ComponentType<...>`).
+   - **Mobile:** Use the same idea: a typed contract (or generated map like `noAssociatedAccountsByFamily`) that families can optionally fill.
 
-Every PR that changes user-facing behavior or library APIs must include a changeset (`pnpm changeset`). Flag PRs that add features or fix bugs without one.
+2. **Implement only in the family**  
+   - Put the component or logic in `families/<family>/` (e.g. `families/hedera/NoAssociatedAccounts.tsx`) and export it from the family index (Desktop: in the object passed to `generated`; Mobile: in the generated aggregation if applicable).
 
-## Privacy & Security — `@ledgerhq/client-ids`
+3. **Use the contract in generic code**  
+   - Generic code looks up by family and uses the slot if present, with **no** `if (family === "hedera")`:
+   - **Desktop:** `getLLDCoinFamily(currency.family).NoAssociatedAccounts` → use it when defined.
+   - **Mobile:** e.g. `getCustomNoAssociatedAccounts(currency)` returning a component from a family map, then pass it to the screen (e.g. as `CustomNoAssociatedAccounts` in route params).
 
-Sensitive identifiers (DeviceId, UserId, DatadogId) must always use the `@ledgerhq/client-ids` library:
+## Reference example: Scan Device “no associated accounts”
 
-- **Never** use raw string IDs for devices, users, or analytics.
-- **Always** use `DeviceId`, `UserId`, or `DatadogId` classes from `@ledgerhq/client-ids/ids`.
-- ID values are only accessible through explicit export methods (e.g., `exportUserIdForSomething()`).
-- Every export method must be allowlisted in `libs/client-ids/export-rules.json` with a justification.
-- Export IDs only at system boundaries (API calls, persistence) — never in the middle of processing.
-- `toString()` and `toJSON()` return `[DeviceId:REDACTED]` by default — this is by design.
+- **Contract (Desktop):**  
+  `apps/ledger-live-desktop/src/renderer/families/types.ts` — `NoAssociatedAccounts?: React.ComponentType<AddAccountsStepProps>` on `LLDCoinFamily`.
+- **Family implementation:**  
+  `apps/ledger-live-desktop/src/renderer/families/hedera/NoAssociatedAccounts.tsx` and `hedera/index.ts` exporting it in the family object.
+- **Generic usage (Desktop):**  
+  `StepImport.tsx` / `useScanAccounts.ts`: `getLLDCoinFamily(mainCurrency.family).NoAssociatedAccounts` — no Hedera-specific branch.
+- **Generic usage (Mobile):**  
+  `useScanDeviceAccountsViewModel.ts`: `getCustomNoAssociatedAccounts(currency)` from `~/generated/NoAssociatedAccounts`; result passed as `CustomNoAssociatedAccounts` to the NoAssociatedAccounts screen. No `if (family === "hedera")` in the VM.
 
-## Dependency Review
+When you need **new** coin-specific behavior in a generic flow (e.g. post-add-account navigation, custom empty state): **extend the contract** (add a new optional slot and document it), implement it in the relevant family folder, and have the generic code only read from the contract. Do not add new `if (family === "…")` branches in shared UI.
 
-When a PR adds or updates dependencies in any `package.json`:
+## Paths
 
-- The dependency must be justified (not duplicating an existing capability).
-- Peer dependency compatibility must be verified.
-
-## Lockfile (pnpm-lock.yaml) Review
-
-When a PR touches `pnpm-lock.yaml`, check that the diff is **scoped to what the PR author actually changed** (e.g. the packages they added/updated in `package.json`). Flag the PR if the lockfile diff:
-
-- **Unrelated version bumps** — Resolutions or versions of packages that were not added, removed, or updated in this PR’s `package.json` changes.
-- **Large accidental rewrites** — Big reformatting, reordering, or mass version changes that go beyond the intended dependency change (e.g. running `pnpm install` in a different environment or with different pnpm/node).
-- **Unwanted bundle or duplicate entries** — New lockfile entries (packages or versions) that don’t correspond to the PR’s stated dependency changes, or duplicate/conflicting entries that suggest lockfile corruption or merge issues.
-
-If in doubt, the lockfile diff should be explainable by the set of `package.json` edits in the same PR; otherwise ask the author to regenerate the lockfile from a clean `pnpm install` and ensure only the intended dependency changes remain.
-
-## Coin-specific logic and families contract
-
-**Do not add coin-specific branches in generic UI.** Flag PRs that introduce `if (family === "evm")` (or similar) or coin-specific hooks in shared screens/ViewModels. Coin-specific behavior must live in **families/** and be exposed through the **families contract**:
-
-- **Desktop:** Optional slots on `LLDCoinFamily` in `apps/ledger-live-desktop/src/renderer/families/types.ts`; families implement in `families/<family>/`; generic code uses `getLLDCoinFamily(currency.family).SlotName` only (no family-name checks).
-- **Mobile:** Same idea: optional slots or generated maps (e.g. `NoAssociatedAccounts`), implemented per family; generic code looks up by contract, not by `family === "…"`.
-
-When a flow needs new coin-specific behaviour, the fix is to **extend the contract** (new optional slot) and implement it in the family folder, not to add branching in generic code. This keeps the codebase ready for modularisation and lazy loading. See `.cursor/rules/coin-families-contract.mdc` for the full rule and the Scan Device “no associated accounts” example.
-
-If a PR changes the coin-framework interface (`libs/coin-framework/src/api/types.ts`), the author should also update the developer portal accordingly (repository: https://github.com/LedgerHQ/developer-portal).
-
-## coin-modules
-
-Each blockchain family lives in its own package under `libs/coin-modules/coin-<family>`. We should not create a new coin-module if it fits the ecosystem of an existing one. No packages other than coin-modules are allowed in this folder.
-
-Package name: `@ledgerhq/coin-<family>`
-
-### Module directory layout
-
-Every coin module must follow this layout:
-
-| Directory / file | Purpose |
-|---|---|
-| `api/` | Alpaca API surface — implements `AlpacaApi` from `@ledgerhq/coin-framework/api/types`, types from `@ledgerhq/types-live` are not allowed |
-| `logic/` | Core blockchain logic, agnostic of Bridge or API interfaces; only depends on `network/` and external libs, not required if only implementing Alpaca API |
-| `network/` | Communication with explorer / indexer / node |
-| `types/` | Model definitions for the coin-module, not related to network |
-| `bridge/` (legacy) | Bridge implementation (`CurrencyBridge` + `AccountBridge`), relates to types in  `@ledgerhq/types-live` package |
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- **Desktop:** `apps/ledger-live-desktop/src/renderer/families/` — contract in `types.ts`, implementations per family, aggregation in `generated.ts`; generic code under `renderer/`, `mvvm/`.
+- **Mobile:** `apps/ledger-live-mobile/src/families/` — family-specific UI and flows; generic code under `mvvm/`, `screens/`. Use generated maps or a small helper (e.g. `getCustomNoAssociatedAccounts`) so generic code never branches on family name.
 
 ---
 > Source: [Ledger-Wallet-LLC/ledgerwallet](https://github.com/Ledger-Wallet-LLC/ledgerwallet) — distributed by [TomeVault](https://tomevault.io).
