@@ -1,78 +1,83 @@
 ---
 trigger: always_on
-description: This describes additional architecture for the synergy between the part 1 database aggregator tool and part 2 aggregator-compiler tool.
+description: Enables OpenRouter integration with automatic LM Studio fallback, plus boost controls and research metrics in the workflow panel.
 ---
 
+# API Key Controls & Workflow Management System
 
-## The Unified Mode Design:
+## Overview
 
- This describes additional architecture for the synergy between the part 1 database aggregator tool and part 2 aggregator-compiler tool.
+Enables OpenRouter integration with automatic LM Studio fallback, plus boost controls and research metrics in the workflow panel.
 
- NOTE: This is a continuously-running program that does not stop itself, the user selects the aggregator to start, then starts the compiler when they desire, and then the user choses when to turn off each selective mode by turning the off switch. There is no "solution stop token" as in normal AI solution generation.
- 
- 
- ## Aggregator start-up workflow
-1.) The aggregator runs initially with no compiler running.
-2.) The compiler does not begin running until the user starts it manually. Aggregator can run on its own for a head-start for as long as the operator would like. If the operator desires the aggregator can also run by itself without any compilation.
+**Key Features:**
+- **Per-Role OpenRouter Selection**: Each role independently uses LM Studio or OpenRouter
+- **Global OpenRouter API Key**: Single key for all per-role OpenRouter selections. Boost can reuse it when no explicit boost-only override key is provided.
+- **LM Studio Fallback**: Optional fallback per role on credit exhaustion
+- **Free Model Cooldown Handling**: SERIAL BOTTLENECK pause, free model looping, and auto-selector backup (see below)
+- **Boost Mode**: Selective task acceleration via two modes, using either an explicit boost override key or the active global OpenRouter key:
+  - **Boost Next X Calls**: Counter-based, next X API calls regardless of task ID
+  - **Category Boost**: Role-based, boosts all calls for specific role categories (Aggregator and Compiler only; Autonomous agents inherit from their parent roles automatically)
+- **System works without LM Studio**: Defaults to OpenRouter when LM Studio unavailable
 
-## GUI Design
+---
 
-The user should be able to save any mid-way progress of the aggregation database and the current compilation results separately as the program is still running.
+## Architecture Components
 
-The live-constructing aggregation results should be viewable in one tab and also a save function that allows the user to save the whole current aggregation database to a .txt file. This aggregation database should be viewable in rea-time as the aggregation submittors write it.
+### Boost and Parallel Execution
 
-The live-constructing compiler-written paper should be viewable in one tab and also a save function that allows the user to save the whole current aggregation database to a .txt file. This paper should be viewable in real-time as the compiler constructs it.
+**Boost is a ROUTING decision, NOT a CONCURRENCY decision.**
+- Boost affects which API endpoint is used, NOT whether submitters run in parallel or serial
+- Aggregation submitters ALWAYS run in parallel regardless of boost status (unless single-model mode)
+- Single-model mode: triggered when all submitters AND validator use the SAME configured model ID. Boost routing does NOT trigger single-model mode.
 
+### Backend Core
 
-## Autonomous Research Mode (Part 3) - User Controls
+#### OpenRouterClient (`backend/shared/openrouter_client.py`)
+- Async HTTP client. Base URL: `https://openrouter.ai/api/v1`
+- App Attribution Headers: `HTTP-Referer: https://intrafere.com/moto-autonomous-home-ai/`, `X-Title: MOTO Deep Research Harness`
+- Credit exhaustion detection: HTTP 402 OR error messages containing "credit", "insufficient", "balance", "quota", "key limit", "limit exceeded"
+- Raises `CreditExhaustionError` on exhaustion (no retries). Retries transient errors (max 3).
+- Temperature=0.0 default. No stop sequences (removed — caused premature truncation with certain models).
 
-**Manual Paper Writing Trigger**: During active brainstorm aggregation (Tier 1), the user can manually force transition to paper writing by clicking "Force Paper Writing" in the UI. This bypasses the automatic completion review and allows the user to act as a special submitter reviewer, deciding when the brainstorm is sufficient for paper compilation.
+#### APIClientManager (`backend/shared/api_client_manager.py`)
+- Central router for all API calls: boost check → role's OpenRouter (with resettable fallback) → LM Studio
+- Tracks fallback state per role: `_role_fallback_state: Dict[str, str]`
+- `reset_openrouter_fallbacks()`: Resets all roles originally configured for OpenRouter back from LM Studio fallback. Called automatically on API key set, or manually via reset endpoint.
+- Lazy initialization: OpenRouter client initializes from `rag_config.openrouter_api_key` when first needed
 
-**How it works**:
-- Button appears in the brainstorm status section only when tier1_aggregation is active
-- Requires confirmation before executing (prevents accidental clicks)
-- Stops the brainstorm aggregator immediately upon confirmation
-- Marks brainstorm as complete
-- Transitions to paper compilation workflow (Tier 2) with all selected reference papers
-- Does NOT run completion review (bypassed entirely - user decision is final)
+**CRITICAL REQUIREMENT - Role Configuration:**
+- **EVERY role calling `api_client_manager.generate_completion()` MUST be configured via `api_client_manager.configure_role()`**
+- This includes: aggregator submitters/validator, compiler submitters/validator/critique, autonomous agents, Tier 3 final answer agents
 
-**API Endpoint**: `POST /api/auto-research/force-paper-writing`
+**Boost Mode Priority** (`should_use_boost(task_id)`):
+1. Boost Next X: `boost_next_count > 0` → True
+2. Category Boost: `_extract_role_prefix(task_id) in boosted_categories` → True
 
-**Use Case**: User may have domain knowledge that the brainstorm has explored sufficient territory before the automatic 10-acceptance interval, saving time and allowing manual control over the autonomous workflow.
+**Counter Decrement:** `boost_next_count` decrements ONLY on successful boost API calls. Failed/exhausted calls do NOT decrement.
 
-## Multi-Submitter Architecture (Aggregator Only)
+**Resettable Fallback:** When a role hits credit exhaustion, it falls back to LM Studio for subsequent calls. User can reset all fallen-back roles via `POST /api/openrouter/reset-exhaustion` or by re-setting the API key (auto-resets). Each role has independent fallback state. If no fallback configured: raises RuntimeError.
 
-**Distinction**: Multiple submitters are only available for the Aggregator (Part 1 and Part 3 brainstorm aggregation). The Compiler (Part 2) uses a fixed single-submitter sequential Markov chain workflow.
+**Categories from role_id:**
+- `aggregator_submitter_*` → "Aggregator Submitters"
+- `aggregator_validator` → "Aggregator Validator"
+- `compiler_high_context` → "Compiler High-Context"
+- `compiler_high_param` → "Compiler High-Param"
+- `compiler_validator` → "Compiler Validator"
+- `autonomous_*` → "Autonomous"
 
-### Aggregator Multi-Submitter (Part 1 & Part 3)
-- Configurable 1-10 parallel submitters (default: 3)
-- Each submitter can have its own model, context window, and max output tokens
-- Enables multi-model exploration of different solution basins simultaneously
-- Single validator maintains coherent Markov chain evolution for database alignment
-- UI labels: "Submitter 1 (Main Submitter)", "Submitter 2", "Submitter 3", etc.
-- "Copy Main to All" button for quick configuration
+#### BoostManager (`backend/shared/boost_manager.py`)
+- Singleton. Key methods: `set_boost_config`, `clear_boost`, `set_boost_next_count`, `toggle_category_boost`, `should_use_boost` (main check for coordinators), `consume_boost_count` (only after successful boost call)
+- Boost can use an **explicit override** OpenRouter API key, or it falls back to the active global OpenRouter key. A temporary `OpenRouterClient` is created per boosted task and closed immediately after.
+- **Autonomous agent task ID inheritance**: All autonomous orchestration agents use parent role task ID prefixes — Topic Selector/Completion Reviewer/Reference Selector/Paper Title Selector/Tier 3 agents use `agg_sub1_*`; Topic Validator/Redundancy Checker use `agg_val_*`. Boosting a parent role automatically covers all autonomous agents that run on that model.
 
-### Compiler Single-Submitter (Part 2)
-- Fixed 2-submitter architecture (NOT configurable):
-  - **High-Context Submitter**: Handles outline_create, outline_update, construction, review modes
-  - **High-Parameter Submitter**: Handles rigor enhancement mode
-- Sequential Markov chain workflow (only one submission at a time)
-- Each compiler submitter has its own model, context, and max token settings (separate from aggregator)
-- UI shows these as separate "High-Context Submitter" and "High-Parameter Submitter" sections
+#### BoostLogger (`backend/shared/boost_logger.py`)
+- Singleton. Log file: `backend/data/boost_api_log.txt`
+- Methods: `log_api_call`, `get_logs(limit)`, `clear_logs`, `get_stats`
+- Boost logs are merged into the main API call log view; boost endpoints remain available for boost-only debugging.
 
-**Why Single Validator?**: Multiple validators would cause divergent evolution of the database, breaking the coherent Markov chain required for solution alignment. The single validator ensures all submissions are evaluated against the same evolving database state.
-
-## Additional Traits Shared Between Aggregator-Submitters and Compiler-Submitters
-
-- The JSON of aggregator-subbmiters and compiler-submitters should include a "reasoning:" request below its "submission:" line. (This forces the submitter to explain the thoughts behind there reasoning and can also reveal deception for additional context for the validator.)
-
-## API Call Output Notes (User-Configurable)
-- **All `max_tokens` limits are user-configurable via GUI settings** (like context window sizes). Users can adjust these per model role based on their specific models' capabilities.
-- **Aggregator defaults**: submitter=25000 tokens, validator=25000 tokens (reasoning models need 15K-25K for internal reasoning + output)
-- **Compiler defaults**: validator=25000, high-context=25000 (for outline_create/outline_update/construction/review), high-param=25000 (for rigor mode)
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/Intrafere) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-09 -->
+> Source: [Intrafere/MOTO-Autonomous-ASI](https://github.com/Intrafere/MOTO-Autonomous-ASI) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-04-24 -->
