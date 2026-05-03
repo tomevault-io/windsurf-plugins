@@ -16,5 +16,5 @@ description: > Multi-chain dust sweeper that consolidates small token balances i
 - If a terminal appears unresponsive, kill it and create a new one rather than retrying in the same terminal
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/Sperax) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-13 -->
+> Source: [Sperax/sweep](https://github.com/Sperax/sweep) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-03 -->
