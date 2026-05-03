@@ -1,95 +1,77 @@
 ---
 trigger: always_on
-description: Main Architecture layout/design of the distillation/compiler portion of the two-part aggregation-distillation LLM workflow.
+description: Validates the topic submitter's choice to ensure it represents the best use of research resources.
 ---
 
 
-Main Architecture layout/design of the distillation/compiler portion of the two-part aggregation-distillation LLM workflow.
+# Part 3 (Adding an Autonomous-Controlling Tier in Hierarchy Over Part 1 and 2) - Autonomous Research Mode Design Specification
 
-## Workflow Compiler Note
-Compiler runs independently from aggregator (manual start via API only). Strict Markov-chain: one compiler-submitter runs, submits to validator, waits for validation result before resuming. Only 1 submission in queue at a time.
+## Overview
 
-## Compile/Distillation Tool Outline
+The Autonomous Research Mode is Part 3 of the MOTO Math Variant system. It is a self-directing three-tier research system that autonomously generates brainstorm topics, builds knowledge databases, produces complete mathematical research papers, and can synthesize a final answer based on a high-level research topic centered around the user prompt.
 
-Reads aggregator database + user prompt, distills into a single coherent paper. 1 high-context submitter + 1 high-param submitter + 1 validator. Sequential workflow (no parallel submitters).
+**Example User Prompt**: "Solve the Langlands Bridge problem" or "Advance understanding of the Riemann Hypothesis"
 
-Aggregator/brainstorm database material is high-priority optional source context, not a mandatory checklist. Compiler submitters may selectively use, synthesize beyond, or depart from database material when that better serves the user's prompt and remains rigorous. Validator must not reject solely for selective non-use of database material.
+**Key Difference from Manual Modes**: 
+- Part 1 (Aggregator) requires user-provided topic prompts
+- Part 2 (Compiler) requires user-directed paper compilation prompts
+- Part 3 (Autonomous Research) self-directs topic selection, brainstorming, and paper generation
 
-**Context Anchors**:
-- **Paper Anchor**: `[HARD CODED END-OF-PAPER MARK -- ALL CONTENT SHOULD BE ABOVE THIS LINE]`
-- **Outline Anchor** (two lines): `[HARD CODED BRACKETED DESIGNATION THAT SHOWS END-OF-PAPER DESIGNATION MARK]` then `[HARD CODED END-OF-OUTLINE MARK -- ALL OUTLINE CONTENT SHOULD BE ABOVE THIS LINE]`
+**Three-Tier Architecture**:
+- **Tier 1**: Brainstorm aggregation databases (mathematical concept exploration)
+- **Tier 2**: Finished mathematical research papers (compiled from brainstorm databases)
+- **Tier 3**: Final answer synthesis (short-form answer or long-form volume from Tier 2 papers)
 
-**Section Placeholders** (paper only):
-- `[HARD CODED PLACEHOLDER FOR THE ABSTRACT SECTION - TO BE WRITTEN AFTER THE INTRODUCTION IS COMPLETE]`
-- `[HARD CODED PLACEHOLDER FOR INTRODUCTION SECTION - TO BE WRITTEN AFTER THE CONCLUSION SECTION IS COMPLETE]`
-- `[HARD CODED PLACEHOLDER FOR THE CONCLUSION SECTION - TO BE WRITTEN AFTER THE BODY SECTION IS COMPLETE]`
+## Design Philosophy
 
-Placeholders are STRUCTURAL MARKERS ONLY. Submissions must never include them — any that appear will be silently stripped before validation.
+**Self-Directing Research**: The AI autonomously identifies the most valuable research avenues based on the high-level goal prompt.
 
-**Marker Integrity System (Automatic Repair)**:
-Before every `_pre_validate_exact_string_match()`, system calls `paper_memory.ensure_markers_intact()` (or `outline_memory.ensure_anchor_intact()` for outline_update). If markers were missing, they are added and document is re-fetched before validation. Mode-aware: paper operations check placeholders + anchor; outline operations check outline anchor only.
+**Basin Exploration**: Each brainstorm topic represents a "basin" of related mathematical concepts. The system explores each basin until sufficiently complete, then generates a paper.
 
-**Outline is ALWAYS fully injected (never RAGed)** into all compiler mode prompts.
+**Cumulative Knowledge**: All brainstorm databases and papers persist, building a comprehensive research library over time.
 
-**Provider Selection**: Each compiler role (validator, high-context, high-param, critique submitter) can independently use LM Studio or OpenRouter with optional host provider and LM Studio fallback.
+**Model Weight Exploration**: Completion review uses SPECIAL SELF-VALIDATION MODE because only the same model can assess whether its own weights have been exhausted for a given topic.
 
-**Aggregator RAG refresh**: Every 10 accepted aggregator submissions (not immediate like aggregator).
-
-**Enhanced Rejection Feedback Format** (`compiler_rejection_log.py`):
-- Header: "🚫 REJECTED BECAUSE: [Failure Reason]"
-- `validation_stage`: pre-validation (exact string check) or LLM validation (placement context)
-- Full validator reasoning + 300-char submission preview
-- "WHAT TO FIX" with specific instructions per failure type
-- Diagnostics: needle/haystack previews (first/last 200 chars) when exact match fails
-
-Last 10 rejections and 10 acceptances: direct injected if fit, RAG only if too large.
+**External Verification Allowed**: The autonomous system may use the model's pre-trained mathematical knowledge, RAG context from prior work, user prompt, and external verification/search when the selected model/provider supports it. Internal AI-generated context remains non-authoritative and should be treated skeptically.
 
 ---
 
-## Phase-Based Paper Construction
+## Integration Architecture
 
-**PHASE ORDER (strictly enforced):** BODY → CONCLUSION → INTRODUCTION → ABSTRACT
+### Part 1 Aggregator Integration (Tier 1)
+The autonomous coordinator USES actual Part 1 aggregator infrastructure for brainstorm aggregation:
+- Creates separate `Coordinator` instance per brainstorm topic
+- Configures with topic-specific database path (`data/auto_brainstorms/brainstorm_{topic_id}.txt`)
+- Runs configurable 1-10 submitters + 1 validator workflow (default 3 submitters)
+- Each submitter can have its own model, context window, and max output tokens for multi-model exploration
+- SINGLE validator maintains coherent Markov chain evolution (same constraint as Part 1)
+- Monitors acceptance count for completion triggers (every 10 acceptances)
+- Handles pruning (every 7 acceptances) automatically via aggregator
+- Uses global RAG lock to prevent collision with manual aggregator mode
 
-**Explicit completion signals**: Submitter sets `section_complete: true` when phase is done. Coordinator advances ONLY on explicit signal AND verifies section header exists via regex. Paper complete when abstract phase receives `section_complete: true`.
+**Implementation Details**:
+- Temporarily overrides `system_config.shared_training_file` to point to brainstorm-specific database
+- Calls `shared_training_memory.reload_insights_from_current_path()` after path change to prevent data loss (without reload, old insights from rag_shared_training.txt would overwrite brainstorm file)
+- Sets WebSocket broadcaster to propagate aggregator events through autonomous coordinator
+- Monitors aggregator stats in real-time to track acceptances/rejections
+- Stops aggregator when completion review decides to write paper
+- **Phase enforcement**: Construction submitter must check current phase before declaring completion
+- **Premature decline rejection**: Coordinator rejects declines if required sections are missing based on current phase
 
-**Implementation**:
-- Phase-specific prompt functions in `construction_prompts.py`
-- Phase tracking via `autonomous_section_phase` in `compiler_coordinator.py`
-- `CompilerSubmission` model includes `section_complete` field
+### Part 2 Compiler Integration (Tier 2)
+The autonomous coordinator USES actual Part 2 compiler infrastructure for paper compilation:
+- Creates separate `CompilerCoordinator` instance per paper
+- Configures with brainstorm database as high-priority optional source material
+- Adds selected reference papers to RAG context if selected (topic-cycle cap 3; Tier 3 short-form cap 6)
+- Monitors compiler progress to detect abstract completion (final section)
+- Extracts abstract from completed paper for metadata storage
 
-`needs_construction=true` requires non-empty `content`/`new_string` — contradictory pattern causes infinite rejection loops.
+Compiler submitters may selectively use, synthesize beyond, or depart from brainstorm material when that better serves the user's prompt and remains rigorous. Validator must not reject solely for selective non-use of brainstorm/database material.
 
-**Section Placeholder System**:
-1. First body section accepted → `paper_memory.initialize_with_placeholders()` sets up all placeholders
-2. Each phase completion → `paper_memory.replace_placeholder()` replaces placeholder with validated content
-3. AI sees placeholders in CURRENT DOCUMENT PROGRESS = section not yet written
-
-**Placeholder Boundary Invariant**:
-```
-[ABSTRACT_PLACEHOLDER]
-[INTRO_PLACEHOLDER]
-II. Body Section 1        <-- Body content goes here
-[CONCLUSION_PLACEHOLDER]  <-- HARD BOUNDARY: Body content NEVER crosses this
-[PAPER_ANCHOR]
-```
-Body content is ALWAYS inserted BEFORE CONCLUSION_PLACEHOLDER. `_apply_edit()` auto-corrects: if old_string anchor falls after placeholder, automatically relocates insertion to just before it.
-
-**Paper state is ALWAYS shown** in all construction phases. Empty paper shows "(EMPTY - no content written yet)" so model uses `operation='full_content'`.
-
-| Phase | Paper Shown | Reason |
-|-------|-------------|--------|
-| BODY (first) | YES (EMPTY) | Must use full_content |
-| BODY (continuation) | YES | See existing sections |
-| CONCLUSION | YES | Summarize body |
-| INTRODUCTION | YES | Preview body+conclusion |
-| ABSTRACT | YES | Summarize entire paper |
-
----
-
-## Submitter-Validator Cycle
-
-**Outline Creation (Phase 1 — Iterative):**
-1. HC submitter generates outline → validator reviews (accept/reject + feedback)
+**Critical Implementation Details**:
+- **system_config propagation (REQUIRED)**: Before creating `CompilerCoordinator`, autonomous mode MUST write all compiler context/token settings to `system_config` (e.g., `system_config.compiler_high_context_context_window = self._high_context_context`). Compiler modules read from `system_config` at init — the manual `/api/compiler/start` route does this, but autonomous mode bypasses that route and must do it explicitly. Applies to both `_compile_paper_from_brainstorm()` and `_compile_tier3_paper()`.
+- Constrains section order: Body → Conclusion → Introduction → Abstract
+- Paper is considered complete when abstract is detected in paper content
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
