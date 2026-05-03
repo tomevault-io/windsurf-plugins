@@ -1,69 +1,76 @@
 ---
 trigger: always_on
-description: AdLoop MCP orchestration — Google Ads + GA4 + codebase intelligence
+description: How to release AdLoop to PyPI — version bumping, tagging, and publishing
 ---
 
 
-# AdLoop — AI Orchestration Rules
+# Releasing AdLoop
 
-You have access to AdLoop MCP tools that connect Google Ads and Google Analytics (GA4) data. These rules teach you how to use them intelligently.
+## How publishing works
 
-## Tool Inventory
+AdLoop uses **PyPI Trusted Publishing** via GitHub Actions. No API tokens or secrets are stored in the repo. PyPI verifies the publish request came from this exact repo and workflow via OIDC.
 
-### Diagnostics
+- **CI** (`.github/workflows/ci.yml`): runs tests on every push to `main` and every PR, across Python 3.11-3.13.
+- **Release** (`.github/workflows/release.yml`): triggered by pushing a `v*` tag. Builds the package, publishes to PyPI, and creates a GitHub Release.
 
-| Tool | When to Use | Key Parameters |
-|------|-------------|----------------|
-| `health_check` | First thing to run when tools are failing — tests OAuth token, GA4, and Ads connectivity | (none) |
+## When to release
 
-**If health_check reports auth errors:** Tell the user to delete `~/.adloop/token.json` and re-run any tool to trigger re-authorization. If tokens keep expiring weekly, the GCP consent screen needs to be published from "Testing" to "In production".
+Release after merging PRs that add features, fix bugs, or change the public tool interface. Not every merge needs a release — batch small fixes.
 
-### GA4 Read Tools
+## Release process
 
-| Tool | When to Use | Key Parameters |
-|------|-------------|----------------|
-| `get_account_summaries` | First-time discovery — find which GA4 properties exist | (none — uses config) |
-| `run_ga4_report` | Any analytics question — sessions, users, conversions, page performance | `dimensions`, `metrics`, `date_range_start`, `date_range_end`, `limit` |
-| `run_realtime_report` | After code deploys — verify tracking fires correctly | `dimensions`, `metrics` |
-| `get_tracking_events` | Understanding what events are configured and their volume | `date_range_start`, `date_range_end` |
+When the user asks to release, or after significant changes are merged:
 
-### Google Ads Read Tools
+1. **Decide the version bump** following semver:
+   - **Patch** (0.2.1): bug fixes, doc changes, internal refactors
+   - **Minor** (0.3.0): new tools, new parameters on existing tools, new features
+   - **Major** (1.0.0): breaking changes to tool signatures or config format
 
-| Tool | When to Use | Key Parameters |
-|------|-------------|----------------|
-| `list_accounts` | First-time discovery — find which Ads accounts exist | (none — uses MCC from config) |
-| `get_campaign_performance` | Campaign-level metrics — impressions, clicks, cost, conversions | `date_range_start`, `date_range_end` |
-| `get_ad_performance` | Ad copy analysis — which headlines/descriptions work | `date_range_start`, `date_range_end` |
-| `get_keyword_performance` | Keyword analysis — quality scores, competitive metrics | `date_range_start`, `date_range_end` |
-| `get_search_terms` | Find negative keyword opportunities and understand user intent | `date_range_start`, `date_range_end` |
-| `get_negative_keywords` | List direct campaign-level negative keywords (not inside SharedSets) | `campaign_id` (optional) |
-| `get_negative_keyword_lists` | List all shared negative keyword lists — names, IDs, status, keyword count | (none) |
-| `get_negative_keyword_list_keywords` | List the keywords inside a specific shared negative keyword list | `shared_set_id` (required) |
-| `get_negative_keyword_list_campaigns` | List which campaigns a shared negative keyword list is attached to | `shared_set_id` (optional) |
-| `get_recommendations` | Google's auto-generated recommendations with estimated impact — budget, keyword, bid strategy, ad copy suggestions | `recommendation_types` (optional filter), `campaign_id` (optional) |
-| `get_pmax_performance` | Performance Max campaign metrics with network breakdown + asset group ad strength | `date_range_start`, `date_range_end` |
-| `get_asset_performance` | Per-asset details for PMax — field type, serving status, content. Use with `get_detailed_asset_performance` for quality signals | `campaign_id` (optional) |
-| `get_detailed_asset_performance` | Top-performing asset combinations — which headline+description+image combos Google selects most | `campaign_id` (optional) |
-| `get_audience_performance` | Audience segment metrics — remarketing, in-market, affinity, demographics | `date_range_start`, `date_range_end`, `campaign_id` (optional) |
-| `run_gaql` | Custom queries not covered by other tools | `query`, `format` (table/json/csv) |
+2. **Bump the version in both places** (they must match):
+   - `pyproject.toml` → `version = "X.Y.Z"`
+   - `src/adloop/__init__.py` → `__version__ = "X.Y.Z"`
 
-**Return format notes:**
-- Ads read tools automatically compute `metrics.cost` and `metrics.cpa` from `metrics.cost_micros` — no manual division needed. `metrics.currency` contains the account's currency code (auto-detected).
-- `metrics.average_cpc_amount` is also pre-computed where available.
-- `get_ad_performance` returns full `headlines` and `descriptions` lists for RSAs.
-- `get_recommendations` returns `estimated_improvement` per recommendation (potential minus base metrics) and `insights[]` that flag self-serving budget recommendations.
-- PMax tools: `get_pmax_performance` returns `insights[]` flagging weak ad strength and zero-conversion asset groups. `segments.ad_network_type` includes MIXED — a Google catch-all for most PMax traffic. Full channel splits (Search vs YouTube vs Display vs Discover) are not available via the API.
-- `get_asset_performance` returns `by_status` and `by_field_type` summaries. Note: per-asset performance labels (BEST/GOOD/LOW) are not available for PMax assets in API v23. Use `get_detailed_asset_performance` for quality signals via top combinations.
-- `get_audience_performance` works for campaigns with explicit audience targeting. PMax audience targeting is automatic and may not appear in this report.
+3. **Commit and tag**:
+   ```bash
+   git add pyproject.toml src/adloop/__init__.py
+   git commit -m "Release vX.Y.Z: <one-line headline>"
+   git tag vX.Y.Z
+   git push && git push --tags
+   ```
 
-### Cross-Reference Tools (GA4 + Ads combined)
+4. **GitHub Actions handles the build and publish**: tests run, package builds, publishes to PyPI, creates a GitHub Release. The auto-created release body is just a compare link — the human-written notes go on next (step 5).
 
-| Tool | When to Use | Key Parameters |
-|------|-------------|----------------|
-| `analyze_campaign_conversions` | "What's my real CPA?", paid vs organic comparison, GDPR gap analysis | `date_range_start`, `date_range_end`, `campaign_name` (optional filter) |
-| `landing_page_analysis` | "Which landing pages convert?", identify pages with traffic but no conversions | `date_range_start`, `date_range_end` |
+5. **Write the GitHub Release notes** — this is the canonical changelog. We do **not** maintain a `CHANGELOG.md`; every version's notes live on its GitHub Release page (e.g. https://github.com/kLOsk/adloop/releases/tag/v0.6.0). Draft the notes locally, then attach them once the release workflow has finished creating the release:
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+   ```bash
+   gh release edit vX.Y.Z --notes-file /tmp/adloop-vX.Y.Z-notes.md
+   ```
+
+   Format matches recent releases (v0.6.0 is the reference):
+
+   - **H2 title** — `## vX.Y.Z — <headline>`.
+   - **Lede paragraph** — what the release does and who's affected, in plain language.
+   - **H3 sections**, chosen based on the kind of release. Pick what applies:
+     - *The bug / the fix* (bug-fix releases) — explain the root cause end-to-end and the fix, with links to any upstream issues.
+     - *New tools* — one bullet per tool with signature, behaviour, and what it's for.
+     - *Updated orchestration rules* — when `.cursor/rules/adloop.mdc` or `.claude/rules/adloop.md` changed.
+     - *Safety* — how the change flows through the preview / dry-run / confirm pipeline, or any new guardrails.
+     - *Verification* — test counts (unit + behavioural), live API verification, anything else run to validate.
+     - *Also in this release* — smaller, related items bundled with the headline change.
+     - *Action for maintainers* — if the release introduces a temporary workaround, deprecation, or follow-up task, spell out the exact condition under which to remove it.
+   - **Install / upgrade** — `pipx upgrade adloop`, `pip install --upgrade adloop`, or `uvx adloop@X.Y.Z`. Mention restarting the MCP host when relevant.
+   - **Credits** — named contributors (GitHub handles) and what they contributed. Link the PR.
+   - **Full Changelog compare link** at the bottom: `**Full Changelog**: https://github.com/kLOsk/adloop/compare/vPREV...vX.Y.Z`.
+
+   Keep the notes narrative and useful — explain *why* the release matters, not just what changed. Match the tone of https://github.com/kLOsk/adloop/releases/tag/v0.6.0 and https://github.com/kLOsk/adloop/releases/tag/v0.6.3.
+
+6. **Verify**: check the Actions tab on GitHub, confirm the package appears on https://pypi.org/project/adloop/, and eyeball the rendered release page to make sure the markdown looks right.
+
+## Troubleshooting
+
+- If the release workflow fails on the publish step, the user needs to verify that the trusted publisher is configured on PyPI: https://pypi.org/manage/project/adloop/settings/publishing/ (Owner: `kLOsk`, Repo: `adloop`, Workflow: `release.yml`, Environment: `pypi`).
+- If tests fail in the release workflow, the tag still exists. Fix the issue, delete the tag (`git tag -d vX.Y.Z && git push origin :refs/tags/vX.Y.Z`), then re-tag after the fix.
+- The version in `pyproject.toml` and `__init__.py` must always match. If they drift, fix both before releasing.
 
 ---
 > Source: [kLOsk/adloop](https://github.com/kLOsk/adloop) — distributed by [TomeVault](https://tomevault.io).
