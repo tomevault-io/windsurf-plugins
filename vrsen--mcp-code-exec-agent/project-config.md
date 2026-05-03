@@ -1,21 +1,15 @@
 ---
 trigger: always_on
-description: Agency Swarm is the framework built on the OpenAI Agents SDK. It allows anyone to create a collaborative swarm of agents (Agencies), each with distinct roles and capabilities. Your primary role is to architect tools and agents that fulfill specific needs within the agency. Helpful references for building agents include:
+description: AI Agent Creator Instructions for Agency Swarm Framework
 ---
 
-# Agent Creator Agent Instructions
 
-Agency Swarm is the framework built on the OpenAI Agents SDK. It allows anyone to create a collaborative swarm of agents (Agencies), each with distinct roles and capabilities. Your primary role is to architect tools and agents that fulfill specific needs within the agency. Helpful references for building agents include:
+Agency Swarm is the framework built on the OpenAI Agents SDK. It allows anyone to create a collaborative swarm of agents (Agencies), each with distinct roles and capabilities. Your primary role is to architect tools and agents that fulfill specific needs within the agency.
 
-- Official docs: <https://agency-swarm.ai>
-- Source code: <https://github.com/VRSEN/agency-swarm>
-- Examples repository: <https://github.com/VRSEN/agency-swarm/tree/main/examples>
+The following steps outline how to build AI agents with Agency Swarm:
 
-Fetch these resources to familiarize yourself with the framework as needed.
-
-The following steps outline how to build agents from a single prompt:
-
-1. **PRD Creation:** Gather information to draft a Product Requirements Document (PRD) for the agency.
+0. **Setup**: Create a to-do list for yourself and activate a virtual environment. If virtual environment does not exist, create it.
+1. **Project Exploration:** Understand the existing project structure, check for PRD, and remove example agents if present.
 2. **Folder Structure and Template Creation:** Create the Agent Templates for each agent using the CLI Commands provided below.
 3. **Tool Development:** Develop each tool and place it in the correct agent's tools folder, ensuring it is robust and ready for production environments.
 4. **Agent Creation:** Create agent classes and instructions for each agent, ensuring correct folder structure.
@@ -25,66 +19,109 @@ The following steps outline how to build agents from a single prompt:
 
 You will find a detailed guide for each of the steps below. Read this entire file first before proceeding.
 
-# Step 1: PRD Creation
+# Step 1: Project Exploration
 
-First, ask the user to provide all necessary details:
+Before starting any work, you must understand the current state of the project and prepare it for agent creation.
 
-- Agency Name
-- Purpose (a high-level description of what the agency aims to achieve, its target market, and its value proposition)
-- Communication Flows (between agents and from agents to user)
-- Agents (for each agent: name, role, tools with descriptions)
+## Exploration Checklist
 
-Once you have gathered all details, create the file `./prd.txt` using the following template:
+1. **Check root directory structure**: List files and folders in the project root
+2. **Look for PRD**: Check if `prd.txt` exists in the root directory
+3. **Check for example agents**: Look for folders like `example_agent/` or `example_agent2/`
+4. **Review existing files**: Read `agency.py`, `shared_instructions.md`, `agent_name/instructions.md`, `agent_name/tools/`, etc.
 
-```md
-# [Agency Name]
+## Actions Required
 
----
+### If PRD exists:
 
-- **Purpose:** [A high-level description of what the agency aims to achieve, its target market, and the value it offers to its clients.]
-- **Communication Flows:**
-  - **Between Agents:**
-    - [Description of the communication protocols and flows between different agents within the agency, including any shared resources or data.]
-    - **Example Flow:**
-      - **Agent A -> Agent B:** [Description of the interaction, including trigger conditions and expected outcomes.]
-      - **Agent B -> Agent C:** [Description of the interaction, including trigger conditions and expected outcomes.]
-  - **Agent to User Communication:** [Description of how agents will communicate with end-users, including any user interfaces or channels used.]
+- Read the entire `prd.txt` file to understand the agency structure
+- Verify agent roles are realistic (modeled after real job positions)
+- Confirm tool specifications are clear and actionable
+- Proceed to Step 2 (Folder Structure)
 
----
+### If PRD does not exist:
 
-## Agent Name
+- **Proceed directly with user instructions**
 
-### **Role within the Agency**
+### If example agents exist:
 
-[Description of the agent's specific role and responsibilities within the agency.]
+- **Remove all example agent folders**: Delete `example_agent/` and `example_agent2/` completely
+- **Clean up agency.py**: Remove example agent imports and communication flows
 
-### Tools
+### If the task required connecting to external systems (slack, notion, etc):
 
-- **ToolName:**
-  - **Description**: [Description on what this tool should do and how it will be used]
-  - **Inputs**:
-    - [name] (type) - description
-  - **Validation**:
-    - [Condition] - description
-  - **Core Functions:** [List of the main functions the tool must perform.]
-  - **APIs**: [List of APIs the tool will use]
-  - **Output**: [Description of the expected output of the tool. Output must be a string or a JSON object.]
-
----
-
-...repeat for each agent
-```
-
-After the user provides the requested details, proceed to drafting the PRD file right away. Provide file path to the PRD file in the response and ask the user to edit it if needed. Once approved, read the PRD file contents again and proceed to the next step.
-
-### Best Practices
-
-- **Each tool must perform a specific realistic task**: Do not create tools that do not correspond to real world tasks. Each tool should focus on a specific action a human typically would perform. For example, "FetchLeadsFromInstagram" is a valid tool, but "OptimizeEmailSubject" is not. Optimizing email subjects is not a real task. Typically, a tool either: 1) connects to an external API, 2) performs a specific action on local files, 3) uses AI inside.
-- **4-16 Tools Per Agent**: Each agent should have between 4 and 16 tools. Avoid breaking down the agency into too many agents, unless their responsibilities are significantly different, or the user has requested it. **Avoid creating tools that the user has not requested.** If it's unclear what tools the agent will need, ask the user for clarification or continue without them. Note: Each MCP typically contains multiple tools. Count each as 5-10 tools, depending on MCP complexity and capabilities.
-- **Ask for API keys before creating any tools**: If a tool requires an API key or access token, ask the user to add it to the .env file. Do not proceed with creating the tool until the API key is added, otherwise you will not be able to test them.
+- Check if the user has added the API keys to the .env file.
+- If not, ask the user to add the API keys before proceeding with the task.
+- Do not proceed with the task until the API keys are added, otherwise you will not be able to test them.
 
 # Step 2: Folder Structure and Template Creation
 
+After exploration, setup the folder structure for each agent.
+
+The basic folder structure is already created for you:
+
+```
+├── example_agent/
+│   ├── __init__.py
+│   ├── example_agent.py
+│   ├── instructions.md
+│   ├── files/
+│   └── tools/
+│       ├── ToolName.py
+│       ├── ToolName2.py
+│       ├── ToolName3.py
+│       ├── ...
+├── example_agent2/
+│   ├── __init__.py
+│   ├── example_agent2.py
+│   ├── instructions.md
+│   ├── files/
+│   └── tools/
+│       ├── ToolName.py
+│       ├── ToolName2.py
+│       ├── ToolName3.py
+│       ├── ...
+├── agency.py
+├── shared_instructions.md
+├── requirements.txt
+├── .env
+└──...
+```
+
+**Rules for the folder structure:**
+
+- Agency folder must be named in lowercase, with underscores instead of spaces.
+- Each agency and agent has its own dedicated folder.
+- Within each agent folder:
+
+  - A 'tools' folder contains all tools for that agent.
+  - An 'instructions.md' file provides agent-specific instructions.
+  - An '**init**.py' file contains the import of the agent.
+
+- Tool Import Process:
+
+  - Create a file in the 'tools' folder with the same name as the tool class.
+  - Tools are automatically imported to the agent class.
+  - All new requirements must be added to the requirements.txt file.
+
+- Agency Configuration:
+  - The 'agency.py' file is the main file where all new agents are imported.
+  - When creating a new agency folder, use descriptive names, like for example: marketing_agency, development_agency, etc.
+  - Create a `.env` file in the root folder and add a placeholder for `OPENAI_API_KEY` and any other API keys that are required by the tools for the user to fill in.
+
+Follow this folder structure when further creating or modifying any files. Replace example_agent folders with the actual agents when creating agents for the first time.
+
+**To create a new agent template, use the following command:**
+
+```bash
+agency-swarm create-agent-template --description "Description of the agent" --model "gpt-5" --reasoning "medium" "agent_name"
+```
+
+### Best Practices for Agent Structures
+
+- **Realistic Agent Roles**: Model agents after actual job positions, not task-specific roles
+  - ✅ Good: "Data Analyst", "Campaign Manager", "Financial Advisor"
+  - ❌ Bad: "Chart Creator", "Email Sender", "Report Generator"
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
