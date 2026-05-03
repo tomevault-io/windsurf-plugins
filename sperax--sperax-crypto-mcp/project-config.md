@@ -16,5 +16,5 @@ description: > MCP server and plugin for Sperax Protocol – USDs, SPA, veSPA & 
 - If a terminal appears unresponsive, kill it and create a new one rather than retrying in the same terminal
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/Sperax) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-09 -->
+> Source: [Sperax/sperax-crypto-mcp](https://github.com/Sperax/sperax-crypto-mcp) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-03 -->
