@@ -1,0 +1,120 @@
+---
+trigger: always_on
+description: Minimal cron daemon for Claude Code. Schedules recurring AI sessions via HEARTBEAT.md prompt files — each tick spawns a fresh Claude session with full tool access. The daemon only schedules and logs; all integration logic lives in the heartbeat prompt.
+---
+
+# Murmur
+
+Minimal cron daemon for Claude Code. Schedules recurring AI sessions via HEARTBEAT.md prompt files — each tick spawns a fresh Claude session with full tool access. The daemon only schedules and logs; all integration logic lives in the heartbeat prompt.
+
+## Key Files
+
+| File                                     | Role                                                                           |
+| ---------------------------------------- | ------------------------------------------------------------------------------ |
+| `src/cli.ts`                             | CLI entry point (start, stop, status, beat, init, watch)                       |
+| `src/daemon.ts`                          | Core scheduling loop; spawns heartbeats on tick                                |
+| `src/heartbeat.ts`                       | Single heartbeat execution; reads HEARTBEAT.md, calls agent, classifies result |
+| `src/config.ts`                          | Config management (~/.murmur/config.json)                                      |
+| `src/frontmatter.ts`                     | YAML frontmatter parser; merges HEARTBEAT.md metadata with config              |
+| `src/types.ts`                           | Shared type definitions                                                        |
+| `src/agents/adapter.ts`                  | Abstract agent interface + registry                                            |
+| `src/agents/claude-code.ts`              | Claude Code CLI adapter                                                        |
+| `src/agents/pi.ts`                       | Pi agent adapter                                                               |
+| `src/tui.ts`                             | Terminal UI for real-time daemon monitoring                                    |
+| `src/socket.ts`                          | Unix socket server for TUI ↔ daemon communication                              |
+| `.agents/skills/heartbeat-cron/SKILL.md` | Heartbeat creation skill (see below)                                           |
+
+## Heartbeat-Cron Skill
+
+The skill at `.agents/skills/heartbeat-cron/` is a first-class citizen — it's the primary onboarding interface for creating heartbeats. **When the murmur API changes (frontmatter fields, CLI commands, config format, response protocol), update the skill immediately.** Key files to keep in sync:
+
+- `.agents/skills/heartbeat-cron/SKILL.md` — main skill definition
+- `.agents/skills/heartbeat-cron/references/examples.md` — example heartbeats
+
+# Bun
+
+Default to using Bun instead of Node.js.
+
+- Use `bun <file>` instead of `node <file>` or `ts-node <file>`
+- Use `bun test` instead of `jest` or `vitest`
+- Use `bun build <file.html|file.ts|file.css>` instead of `webpack` or `esbuild`
+- Use `bun install` instead of `npm install` or `yarn install` or `pnpm install`
+- Use `bun run <script>` instead of `npm run <script>` or `yarn run <script>` or `pnpm run <script>`
+- Use `bunx <package> <command>` instead of `npx <package> <command>`
+- Bun automatically loads .env, so don't use dotenv.
+
+## APIs
+
+- `Bun.serve()` supports WebSockets, HTTPS, and routes. Don't use `express`.
+- `bun:sqlite` for SQLite. Don't use `better-sqlite3`.
+- `Bun.redis` for Redis. Don't use `ioredis`.
+- `Bun.sql` for Postgres. Don't use `pg` or `postgres.js`.
+- `WebSocket` is built-in. Don't use `ws`.
+- Prefer `Bun.file` over `node:fs`'s readFile/writeFile
+- Bun.$`ls` instead of execa.
+
+## Testing & Quality
+
+```bash
+# Format + lint + type-check
+bun run check
+
+# Unit tests only (fast, no binary needed)
+bun run test
+
+# E2E tests (build binary before)
+bun run build
+bun run test:e2e
+```
+
+A pre-commit hook runs `lint-staged` automatically — formatting (oxfmt) and linting with type-checking (oxlint) on every commit.
+
+## Frontend
+
+Use HTML imports with `Bun.serve()`. Don't use `vite`. HTML imports fully support React, CSS, Tailwind.
+
+Server:
+
+```ts#index.ts
+Bun.serve({
+...
+})
+```
+
+HTML files can import .tsx, .jsx or .js files directly and Bun's bundler will transpile & bundle automatically. `<link>` tags can point to stylesheets and Bun's CSS bundler will bundle.
+
+For more information, read the Bun API docs in `node_modules/bun-types/docs/**.mdx`.
+
+## Commits
+
+Use [Conventional Commits](https://www.conventionalcommits.org/). Format:
+
+```
+type(scope): description
+```
+
+Allowed types: `feat`, `fix`, `refactor`, `chore`, `docs`, `test`, `perf`, `ci`
+
+Scope is optional. Examples:
+
+- `feat: add cron scheduling support`
+- `fix(daemon): handle socket timeout`
+- `refactor(tui): extract screen buffer`
+- `chore(release): v0.2.0`
+
+Breaking changes: add `BREAKING CHANGE:` in the commit body or `!` after type (e.g. `feat!: redesign config format`).
+
+Skills and heartbeats use `chore(skill)` — only `heartbeat-cron` is a first-class feature (`feat(skill)`).
+
+## Releasing
+
+Run `bun run release <version>` (e.g. `bun run release 0.2.0`). This bumps package.json, generates CHANGELOG.md via git-cliff, commits, tags, and pushes. The existing CI workflow handles the GitHub release + Homebrew update.
+
+**Code Quality**
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [t0dorakis/murmur](https://github.com/t0dorakis/murmur) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-03 -->
