@@ -1,245 +1,223 @@
 ---
 trigger: always_on
-description: Each implementation round must produce an implementation report Markdown file (YAML frontmatter + body) in the round evidence directory:
+description: When Context7 is required for a round:
 ---
 
 
-# Implementation Report Markdown is required per round
+# Context7 evidence markers required when post-training packages are used
 
 ## Body
-Each implementation round must produce an implementation report Markdown file (YAML frontmatter + body) in the round evidence directory:
-- Include summary, changed files, automation outputs, Context7 packages queried, follow-ups, and blockers.
-- Do not invent new report paths or filenames; follow the project’s configured schema/locations.
+When Context7 is required for a round:
+- Create a `context7-<package>.txt` marker per detected package in the round evidence directory.
+- Notes in task/QA text are not accepted as evidence; use marker files only.
 
-Reference: `guidelines/agents/OUTPUT_FORMAT.md`
+Reference: `guidelines/shared/CONTEXT7.md`
 
 ---
-id: RULE.PRISMA.ENUMS_FOR_CONSTRAINTS
-title: Use Enums for Constrained Values
-category: implementation
+id: RULE.EVIDENCE.COMMANDS_VIA_TASKS_READY
+title: Automation evidence must be captured via tasks/ready
+category: validation
 blocking: false
 contexts: []
 origins:
-- pack:prisma
+- core
 source:
-  file: packs/prisma/guidelines/includes/prisma/schema-design.md
+  file: guidelines/shared/VALIDATION.md
 ---
 
-# Use Enums for Constrained Values
+# Automation evidence must be captured via tasks/ready
 
 ## Body
-Use enums for constrained value sets to ensure type safety.
+Capture automation evidence through guarded tooling:
+- Use the Edison guard/runner to generate command outputs and evidence markers.
+- Do not paste manual command output into docs as a substitute for evidence files.
+
+Reference: `guidelines/shared/VALIDATION.md`
 
 ---
-id: RULE.PRISMA.EXPLICIT_RELATIONS
-title: Explicit Relation Definitions
-category: implementation
+id: RULE.EVIDENCE.ROUND_COMMANDS_REQUIRED
+title: Preset-required command evidence must be captured
+category: validation
 blocking: false
 contexts: []
 origins:
-- pack:prisma
+- core
 source:
-  file: packs/prisma/guidelines/includes/prisma/relationships.md
+  file: guidelines/shared/VALIDATION.md
 ---
 
-# Explicit Relation Definitions
+# Preset-required command evidence must be captured
 
 ## Body
-Define explicit relations using @relation attribute for clarity and maintainability.
+Before executing validators, ensure preset-required command evidence exists and passes for the current repo fingerprint:
+- Inspect: `edison evidence status <task-id> [--preset <preset>]`
+- Capture: `edison evidence capture <task-id> [--preset <preset>]`
+- Evidence is snapshot-based (shared across rounds/tasks when the repo fingerprint is unchanged). Do not redirect output into files manually.
+
+Reference: `guidelines/shared/VALIDATION.md`
 
 ---
-id: RULE.PRISMA.INDEXES_AND_CONSTRAINTS
-title: Add Indexes and Unique Constraints
-category: implementation
+id: RULE.EVIDENCE.ROUND_IMMUTABLE_APPEND
+title: Evidence rounds are append-only
+category: validation
 blocking: false
 contexts: []
 origins:
-- pack:prisma
+- core
 source:
-  file: packs/prisma/guidelines/includes/prisma/schema-design.md
+  file: guidelines/shared/VALIDATION.md
 ---
 
-# Add Indexes and Unique Constraints
+# Evidence rounds are append-only
 
 ## Body
-Add unique constraints and indexes as needed for performance and data integrity.
+Evidence is append-only:
+- Each re-run creates a new round directory; do not overwrite previous evidence.
+- Never edit old evidence outputs to “make it look green”; rerun commands.
+
+Reference: `guidelines/shared/VALIDATION.md`
 
 ---
-id: RULE.PRISMA.MIGRATION_SAFETY
-title: Safe Migration Practices
-category: implementation
+id: RULE.QA.NO_DUPLICATE
+title: No Duplicate QA Briefs
+category: validation
+blocking: false
+contexts: []
+origins:
+- core
+source:
+  file: guidelines/shared/VALIDATION.md
+---
+
+# No Duplicate QA Briefs
+
+## Body
+Do not create duplicate QA briefs:
+- Before creating a QA, search for an existing QA for the same task.
+- If one exists, reuse it (move it through states), don’t create a new file.
+
+Reference: `guidelines/shared/VALIDATION.md`
+
+---
+id: RULE.QA.PAIR_ON_WIP
+title: Create QA brief when task enters wip
+category: validation
+blocking: false
+contexts: []
+origins:
+- core
+source:
+  file: guidelines/orchestrators/SESSION_WORKFLOW.md
+---
+
+# Create QA brief when task enters wip
+
+## Body
+Pair QA early:
+- As soon as a task enters wip, create (or move) its QA brief into waiting and add both to session scope.
+- Do not defer QA creation until validation time.
+
+Reference: `guidelines/orchestrators/SESSION_WORKFLOW.md`
+
+---
+id: RULE.QA.ROUND_HISTORY
+title: QA Round History On Rejection
+category: validation
+blocking: false
+contexts: []
+origins:
+- core
+source:
+  file: guidelines/shared/VALIDATION.md
+---
+
+# QA Round History On Rejection
+
+## Body
+On any rejection:
+- Append a new “Round N” section to the QA brief summarizing findings and linking evidence.
+- Create a new round evidence directory; never overwrite prior rounds.
+
+Reference: `guidelines/shared/VALIDATION.md`
+
+---
+id: RULE.QA.WAITING_TO_TODO_TASK_DONE
+title: QA waiting→todo allowed only when task is done
+category: validation
+blocking: false
+contexts: []
+origins:
+- core
+source:
+  file: guidelines/shared/VALIDATION.md
+---
+
+# QA waiting→todo allowed only when task is done
+
+## Body
+Promotion gating:
+- QA may move from waiting → todo only when the task is in done.
+- If QA is “todo” while task is not done, treat it as a state mismatch and correct it.
+
+Reference: `guidelines/shared/VALIDATION.md`
+
+---
+id: RULE.VALIDATION.BUNDLE_APPROVED_MARKER
+title: Bundle Approved Marker Required
+category: validation
 blocking: true
-contexts: []
+contexts:
+- validation
+- transition
 origins:
-- pack:prisma
+- core
 source:
-  file: packs/prisma/guidelines/includes/prisma/migrations.md
+  file: guidelines/shared/VALIDATION.md
 ---
 
-# Safe Migration Practices
+# Bundle Approved Marker Required
 
 ## Body
-Follow safe migration practices; review migrations before applying to production.
+Bundle approval must be explicitly recorded:
+- After ALL blocking validators approve, ensure the configured “bundle approved” marker exists in the round evidence directory.
+- Promotions that require approval must fail-closed if the marker is missing or indicates not approved.
+
+Reference: `guidelines/shared/VALIDATION.md`
 
 ---
-id: RULE.PRISMA.NORMALIZATION
-title: Appropriate Schema Normalization
-category: implementation
+id: RULE.VALIDATION.BUNDLE_FIRST
+title: Bundle-First Validation Policy
+category: validation
+blocking: false
+contexts:
+- validation
+origins:
+- core
+source:
+  file: guidelines/shared/VALIDATION.md
+---
+
+# Bundle-First Validation Policy
+
+## Body
+Always validate from a bundle/manifest first:
+- Generate the bundle/manifest before launching any validator.
+- Validators must review only what the bundle lists (task(s), QA, evidence paths, diffs).
+
+Reference: `guidelines/shared/VALIDATION.md`
+
+---
+id: RULE.VALIDATION.CONCURRENCY_CAP
+title: Respect validator concurrency cap and batch overflow
+category: validation
 blocking: false
 contexts: []
 origins:
-- pack:prisma
+- core
 source:
-  file: packs/prisma/guidelines/includes/prisma/schema-design.md
+  file: guidelines/shared/VALIDATION.md
 ---
 
-# Appropriate Schema Normalization
-
-## Body
-Normalize appropriately; avoid excessive denormalization unless justified by performance requirements.
-
----
-id: RULE.PRISMA.QUERY_OPTIMIZATION
-title: Query Optimization Patterns
-category: implementation
-blocking: false
-contexts: []
-origins:
-- pack:prisma
-source:
-  file: packs/prisma/guidelines/includes/prisma/query-optimization.md
----
-
-# Query Optimization Patterns
-
-## Body
-Follow Prisma query optimization patterns for efficient database access.
-
----
-id: RULE.PRISMA.UUID_PRIMARY_KEYS
-title: Use UUID Primary Keys
-category: implementation
-blocking: false
-contexts: []
-origins:
-- pack:prisma
-source:
-  file: packs/prisma/guidelines/includes/prisma/schema-design.md
----
-
-# Use UUID Primary Keys
-
-## Body
-Use UUID primary keys; prefer explicit relations with @relation.
-
----
-id: RULE.REACT.ACCESSIBILITY
-title: Accessibility Requirements (WCAG 2.1 AA)
-category: implementation
-blocking: true
-contexts: []
-origins:
-- pack:react
-source:
-  file: packs/react/guidelines/includes/react/accessibility.md
----
-
-# Accessibility Requirements (WCAG 2.1 AA)
-
-## Body
-All components must meet accessibility standards (WCAG 2.1 AA minimum): semantic HTML, ARIA labels, keyboard navigation.
-
----
-id: RULE.REACT.COMPONENT_COMPOSITION
-title: Component Composition Over Inheritance
-category: implementation
-blocking: false
-contexts: []
-origins:
-- pack:react
-source:
-  file: packs/react/guidelines/includes/react/component-design.md
----
-
-# Component Composition Over Inheritance
-
-## Body
-Favor composition over inheritance; extract pure presentational pieces.
-
----
-id: RULE.REACT.FORM_ACTIONS
-title: Server Actions for Forms (React 19)
-category: implementation
-blocking: false
-contexts: []
-origins:
-- pack:react
-source:
-  file: packs/react/guidelines/includes/react/server-client-components.md
----
-
-# Server Actions for Forms (React 19)
-
-## Body
-Prefer Server Actions with form elements over client-side data fetching in React 19.
-
----
-id: RULE.REACT.HOOKS_PATTERNS
-title: React Hooks Best Practices
-category: implementation
-blocking: false
-contexts: []
-origins:
-- pack:react
-source:
-  file: packs/react/guidelines/includes/react/hooks-patterns.md
----
-
-# React Hooks Best Practices
-
-## Body
-Follow React hooks best practices and patterns.
-
----
-id: RULE.REACT.NO_USE_EFFECT_FETCHING
-title: Avoid useEffect for Data Fetching (React 19)
-category: implementation
-blocking: false
-contexts: []
-origins:
-- pack:react
-source:
-  file: packs/react/guidelines/includes/react/HOOKS.md
----
-
-# Avoid useEffect for Data Fetching (React 19)
-
-## Body
-In React 19, prefer Server Components or use() hook over useEffect for data fetching to improve performance.
-
----
-id: RULE.REACT.RULES_OF_HOOKS
-title: Rules of Hooks (React 19)
-category: implementation
-blocking: true
-contexts: []
-origins:
-- pack:react
-source:
-  file: packs/react/guidelines/includes/react/HOOKS.md
----
-
-# Rules of Hooks (React 19)
-
-## Body
-Only call hooks at top level; no conditional hooks, hooks in loops, or in nested functions.
-
----
-id: RULE.REACT.SEMANTIC_HTML
-title: Use Semantic HTML
-category: implementation
-blocking: false
-contexts: []
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
