@@ -1,0 +1,184 @@
+---
+trigger: always_on
+description: Modern, type-safe Java 21 SDK for Ethereum/EVM. Inspired by viem (TS) and alloy (Rust).
+---
+
+# Brane SDK - Claude Context
+
+Modern, type-safe Java 21 SDK for Ethereum/EVM. Inspired by viem (TS) and alloy (Rust).
+
+## Quick Reference
+
+| Module | Purpose | Key Classes |
+|--------|---------|-------------|
+| `brane-primitives` | Hex/RLP utilities (zero deps) | `Hex`, `Rlp` |
+| `brane-core` | Types, ABI, crypto, EIP-712, EIP-3009, models | `Address`, `Wei`, `Abi`, `PrivateKey`, `MnemonicWallet`, `TypedData`, `Eip3009`, `TxBuilder`, `Blob`, `BlobSidecar`, `Eip4844Builder` |
+| `brane-kzg` | KZG commitments for EIP-4844 blobs | `CKzg`, `Kzg` |
+| `brane-rpc` | JSON-RPC client layer | `Brane`, `Brane.Reader`, `Brane.Signer`, `Brane.Tester`, `BraneProvider` |
+| `brane-contract` | Contract binding (no codegen) | `BraneContract.bind()`, `ReadOnlyContract` |
+| `brane-examples` | Usage examples & integration tests | Various `*Example.java` |
+| `brane-benchmark` | JMH performance benchmarks | `*Benchmark.java` |
+| `brane-smoke` | E2E integration tests | `SmokeApp.java` |
+
+## Critical Rules
+
+1. **Java 21 Only**: Records, sealed classes, pattern matching, virtual threads
+2. **No web3j in Public API**: web3j is vendored under `sh.brane.internal.web3j.*` - NEVER expose it
+3. **Type Safety**: Use `Address`, `Wei`, `HexData`, `Hash` - avoid raw `String`/`BigInteger`
+4. **Virtual Threads**: Write simple blocking code - no reactive chains
+5. **Use `var` When Type is Obvious**: Use `var` for local variables when the type is immediately clear from the RHS (right-hand side), such as constructor calls (`var map = new LinkedHashMap<>()`), but keep explicit types for domain types (`Address`, `Wei`, `Hash`) where the type name documents intent
+
+## Module Dependencies
+
+```
+brane-primitives (no deps)
+       ↓
+   brane-core (BouncyCastle, Jackson)
+       ↓
+   ┌───┴───┐
+brane-kzg  brane-rpc (Netty, Disruptor)
+(c-kzg)        ↓
+          brane-contract
+```
+
+## Common Commands
+
+```bash
+# Compile
+./gradlew compileJava
+
+# Run specific test
+./gradlew test --tests "sh.brane.core.MyTest"
+
+# Full verification (requires Anvil running)
+./verify_all.sh
+
+# Publish to local Maven (~/.m2/repository)
+./gradlew publishToMavenLocal
+
+# Stage release artifacts (verify before publishing)
+./gradlew stageRelease
+
+# Deploy to Maven Central (requires credentials)
+./gradlew jreleaserDeploy
+```
+
+## Key Patterns
+
+### Type-Safe Values
+```java
+Address addr = Address.from("0x...");
+Wei amount = Wei.fromEther("1.5");
+HexData data = HexData.from("0x...");
+```
+
+### Contract Binding (No Codegen)
+```java
+interface MyToken {
+    BigInteger balanceOf(Address owner);
+    Hash transfer(Address to, BigInteger amount);
+}
+MyToken token = BraneContract.bind(MyToken.class, abi, address, client);
+```
+
+### Transaction Building
+```java
+Eip1559Builder.create()
+    .to(recipient)
+    .value(Wei.fromEther("0.1"))
+    .data(calldata)
+    .build(signer, client);
+```
+
+### Blob Transactions (EIP-4844)
+```java
+// Load KZG trusted setup
+Kzg kzg = CKzg.loadFromClasspath();
+
+// Build blob transaction from raw data
+BlobTransactionRequest request = Eip4844Builder.create()
+    .to(recipient)
+    .blobData(rawBytes)
+    .build(kzg);
+
+// Send blob transaction
+TransactionReceipt receipt = signer.sendBlobTransactionAndWait(request);
+
+// Decode data from blobs
+byte[] decoded = BlobDecoder.decode(request.sidecar().blobs());
+```
+
+### HD Wallet (BIP-39/BIP-44)
+```java
+// Restore wallet from mnemonic phrase
+MnemonicWallet wallet = MnemonicWallet.fromPhrase("abandon abandon ... about");
+
+// Derive signers for different addresses (m/44'/60'/0'/0/N)
+Signer account0 = wallet.derive(0);
+Signer account1 = wallet.derive(1);
+
+// Custom derivation path
+Signer custom = wallet.derive(new DerivationPath(1, 5)); // m/44'/60'/1'/0/5
+
+// Generate new wallet (save phrase securely!)
+MnemonicWallet newWallet = MnemonicWallet.generatePhrase();
+String phrase = newWallet.phrase();
+```
+
+### EIP-712 Typed Data Signing
+```java
+var domain = Eip712Domain.builder()
+    .name("MyDapp")
+    .version("1")
+    .chainId(1L)
+    .verifyingContract(contractAddress)
+    .build();
+
+// Type-safe signing with records
+var typedData = TypedData.create(domain, Permit.DEFINITION, permit);
+Signature sig = typedData.sign(signer);
+Hash hash = typedData.hash();
+
+// JSON parsing (WalletConnect, dapp requests)
+TypedData<?> fromJson = TypedDataJson.parseAndValidate(jsonString);
+```
+
+### EIP-3009 Gasless Token Transfers
+```java
+// USDC domain (name="USD Coin", version="2" across all chains)
+var domain = Eip3009.usdcDomain(8453L, usdcAddress);  // Base mainnet
+
+// Create authorization (auto nonce + 1 hour validity)
+var auth = Eip3009.transferAuthorization(
+    signer.address(), recipient,
+    BigInteger.valueOf(1_000_000),  // 1 USDC
+    3600                            // valid for 1 hour
+);
+
+// Sign and extract v/r/s for on-chain submission
+Signature sig = Eip3009.sign(auth, domain, signer);
+int v = sig.v();
+byte[] r = sig.r();
+byte[] s = sig.s();
+```
+
+### Integration Testing with Brane.Tester
+```java
+// Connect to local Anvil
+Brane.Tester tester = Brane.connectTest();
+
+// Snapshot/revert for test isolation
+SnapshotId snapshot = tester.snapshot();
+try {
+    tester.setBalance(address, Wei.fromEther("1000"));
+    // ... test operations ...
+} finally {
+    tester.revert(snapshot);
+}
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [noise-xyz/brane](https://github.com/noise-xyz/brane) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-02 -->
