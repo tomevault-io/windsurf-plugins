@@ -7,11 +7,11 @@ A Cli, a webUI, and a MCP server for the Z-Image-Turbo text-to-image generation 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [iconben/z-image-studio](https://github.com/iconben/z-image-studio).
+Original source: `CLAUDE.md` in [iconben/z-image-studio](https://github.com/iconben/z-image-studio).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
