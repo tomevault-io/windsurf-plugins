@@ -1,79 +1,104 @@
 ---
 trigger: always_on
-description: Enables OpenRouter integration with automatic LM Studio fallback, plus boost controls and research metrics in the workflow panel.
+description: **DOMPurify sanitization MUST be active in LatexRenderer.jsx.** Processes untrusted LLM output — XSS risk without it.
 ---
 
-# API Key Controls & Workflow Management System
+# LaTeX Renderer System
+
+## 🔒 CRITICAL SECURITY REQUIREMENTS
+
+**DOMPurify sanitization MUST be active in LatexRenderer.jsx.** Processes untrusted LLM output — XSS risk without it.
+
+**Required implementation:**
+- `import DOMPurify from 'dompurify';` in LatexRenderer.jsx
+- `DOMPURIFY_CONFIG` constant defined (see below)
+- `renderedHtmlSmall` useMemo (single chunk) and per-chunk `renderedHtml` useMemo both call `DOMPurify.sanitize()` AFTER `renderLatexToHtml()`
+- `dangerouslySetInnerHTML` receives ONLY sanitized HTML
+
+### DOMPurify Configuration (REQUIRED)
+
+```javascript
+const DOMPURIFY_CONFIG = {
+  ALLOWED_TAGS: [
+    'div', 'span', 'p', 'br', 'hr', 'strong', 'b', 'em', 'i', 'u', 's', 'sub', 'sup', 'small',
+    'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'dl', 'dt', 'dd',
+    'table', 'thead', 'tbody', 'tr', 'th', 'td',
+    'math', 'semantics', 'mrow', 'mi', 'mo', 'mn', 'msup', 'msub', 'mfrac', 'mroot', 
+    'msqrt', 'mtext', 'mspace', 'mtable', 'mtr', 'mtd', 'annotation', 'annotation-xml',
+    'svg', 'path', 'line', 'rect', 'circle', 'g', 'use', 'defs', 'clippath',
+  ],
+  ALLOWED_ATTR: [
+    'class', 'id', 'title', 'style',
+    'mathvariant', 'encoding', 'xmlns', 'displaystyle', 'scriptlevel',
+    'columnalign', 'rowalign', 'columnspacing', 'rowspacing', 'stretchy',
+    'symmetric', 'fence', 'separator', 'lspace', 'rspace', 'accent',
+    'accentunder', 'movablelimits', 'minsize', 'maxsize', 'width', 'height',
+    'd', 'viewBox', 'preserveAspectRatio', 'fill', 'stroke', 'stroke-width',
+    'transform', 'x', 'y', 'dx', 'dy', 'x1', 'y1', 'x2', 'y2', 'r', 'cx', 'cy',
+    'href', 'xlink:href', 'clip-path',
+  ],
+  ALLOW_DATA_ATTR: false,
+  ALLOW_ARIA_ATTR: false,
+  FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form', 'input', 'button', 'textarea', 'select', 'option', 'link', 'style', 'base', 'meta'],
+  FORBID_ATTR: ['onerror', 'onclick', 'onload', 'onmouseover', 'onfocus', 'onblur', 'onchange', 'onsubmit', 'onkeydown', 'onkeyup', 'onmousedown', 'onmouseup'],
+  SANITIZE_DOM: true,
+};
+```
+
+### Sanitization Point (REQUIRED)
+
+DOMPurify sanitization occurs in two paths:
+- **Small documents** (single chunk): via `renderedHtmlSmall` useMemo in main component
+- **Chunked documents**: via per-chunk `renderedHtml` useMemo in each `RenderedChunk`
+
+Both paths call `DOMPurify.sanitize(rawHtml, DOMPURIFY_CONFIG)` after `renderLatexToHtml()`.
+
+---
 
 ## Overview
 
-Enables OpenRouter integration with automatic LM Studio fallback, plus boost controls and research metrics in the workflow panel.
+Dual rendering: **Rendered LaTeX View** (KaTeX math, dark theme on screen, white for PDFs) and **Raw Text View** (plain text, dark theme). All rendering flows through `LatexRenderer.jsx` (`frontend/src/components/LatexRenderer.jsx`). CSS in `LatexRenderer.css`. PDF generation via `downloadHelpers.js`.
 
-**Key Features:**
-- **Per-Role OpenRouter Selection**: Each role independently uses LM Studio or OpenRouter
-- **Global OpenRouter API Key**: Single key for all per-role OpenRouter selections. Boost can reuse it when no explicit boost-only override key is provided.
-- **LM Studio Fallback**: Optional fallback per role on credit exhaustion
-- **Free Model Cooldown Handling**: SERIAL BOTTLENECK pause, free model looping, and auto-selector backup (see below)
-- **Boost Mode**: Selective task acceleration via two modes, using either an explicit boost override key or the active global OpenRouter key:
-  - **Boost Next X Calls**: Counter-based, next X API calls regardless of task ID
-  - **Category Boost**: Role-based, boosts all calls for specific role categories (Aggregator and Compiler only; Autonomous agents inherit from their parent roles automatically)
-- **System works without LM Studio**: Defaults to OpenRouter when LM Studio unavailable
+**Performance Architecture**: For large documents (>~10K words), content is split into chunks at section boundaries. Each chunk renders independently via `IntersectionObserver`-gated `RenderedChunk` components — only chunks visible in the viewport (plus 600px margin) are LaTeX-rendered. Documents >50K chars auto-default to raw mode with a banner to switch. Content updates in rendered mode are debounced (1.5s) to prevent rapid re-rendering.
+
+### Props API
+
+```javascript
+<LatexRenderer
+  content={string}       // Raw content to render
+  className={string}     // Optional CSS class
+  showToggle={boolean}   // Show Rendered/Raw toggle (default: true)
+  defaultRaw={boolean}   // Start in raw mode (default: false)
+  showLatex={boolean}    // External view mode control (optional)
+/>
+```
 
 ---
 
-## Architecture Components
+## Rendering Pipeline (CRITICAL ORDER)
 
-### Boost and Parallel Execution
+Must execute in this exact order in `renderLatexToHtml()`:
 
-**Boost is a ROUTING decision, NOT a CONCURRENCY decision.**
-- Boost affects which API endpoint is used, NOT whether submitters run in parallel or serial
-- Aggregation submitters ALWAYS run in parallel regardless of boost status (unless single-model mode)
-- Single-model mode: triggered when all submitters AND validator use the SAME configured model ID. Boost routing does NOT trigger single-model mode.
+1. **`decodeHtmlEntities()`** — FIRST
+2. **`autoWrapMath()`** — Auto-wrap unwrapped math
+3. **`processTheoremEnvironments()`** — TikZ handling happens HERE (all three patterns: `\[...\]`, `$$...$$`, standalone)
+4. **`replaceSectionCommand()`** — Section headers
+5. **Text formatting, citations, footnotes, lists, tables, QED symbols**
+6. **KaTeX rendering** via `renderKatexSafely()` — `maxExpand: 5000`, skips HTML placeholder content
+7. **Line breaks/horizontal rules** (`\\` → `<br/>`, `\hrule` → `<hr/>`) — AFTER KaTeX
+8. **DOMPurify sanitization** — LAST
 
-### Backend Core
+**Critical:** `\\` line break conversion MUST be after KaTeX (valid syntax in `aligned`, `matrix`, etc.)
 
-#### OpenRouterClient (`backend/shared/openrouter_client.py`)
-- Async HTTP client. Base URL: `https://openrouter.ai/api/v1`
-- App Attribution Headers: `HTTP-Referer: https://intrafere.com/moto-autonomous-home-ai/`, `X-Title: MOTO Deep Research Harness`
-- Credit exhaustion detection: HTTP 402 OR error messages containing "credit", "insufficient", "balance", "quota", "key limit", "limit exceeded"
-- Raises `CreditExhaustionError` on exhaustion (no retries). Retries transient errors (max 3).
-- Temperature=0.0 default. No stop sequences (removed — caused premature truncation with certain models).
+### Chunked Rendering Architecture
 
-#### APIClientManager (`backend/shared/api_client_manager.py`)
-- Central router for all API calls: boost check → role's OpenRouter (with resettable fallback) → LM Studio
-- Tracks fallback state per role: `_role_fallback_state: Dict[str, str]`
-- `reset_openrouter_fallbacks()`: Resets all roles originally configured for OpenRouter back from LM Studio fallback. Called automatically on API key set, or manually via reset endpoint.
-- Lazy initialization: OpenRouter client initializes from `rag_config.openrouter_api_key` when first needed
+**Chunking**: `splitIntoChunks()` splits content at section headers and double-newlines. Target chunk size ~3000 chars. Documents under target stay as single chunk (no overhead).
 
-**CRITICAL REQUIREMENT - Role Configuration:**
-- **EVERY role calling `api_client_manager.generate_completion()` MUST be configured via `api_client_manager.configure_role()`**
-- This includes: aggregator submitters/validator, compiler submitters/validator/critique, autonomous agents, Tier 3 final answer agents
+**Virtualization**: Each chunk is a memoized `RenderedChunk` component. An `IntersectionObserver` (600px root margin) triggers LaTeX rendering only when the chunk scrolls near the viewport. Off-screen chunks show a height-estimated placeholder div.
 
-**Boost Mode Priority** (`should_use_boost(task_id)`):
-1. Boost Next X: `boost_next_count > 0` → True
-2. Category Boost: `_extract_role_prefix(task_id) in boosted_categories` → True
+**Debouncing**: `useDebouncedValue` hook delays rendered-mode processing by 1.5s during rapid content updates (WebSocket + polling). Raw mode is unaffected (instant updates).
 
-**Counter Decrement:** `boost_next_count` decrements ONLY on successful boost API calls. Failed/exhausted calls do NOT decrement.
-
-**Resettable Fallback:** When a role hits credit exhaustion, it falls back to LM Studio for subsequent calls. User can reset all fallen-back roles via `POST /api/openrouter/reset-exhaustion` or by re-setting the API key (auto-resets). Each role has independent fallback state. If no fallback configured: raises RuntimeError.
-
-**Categories from role_id:**
-- `aggregator_submitter_*` → "Aggregator Submitters"
-- `aggregator_validator` → "Aggregator Validator"
-- `compiler_high_context` → "Compiler High-Context"
-- `compiler_high_param` → "Compiler High-Param"
-- `compiler_validator` → "Compiler Validator"
-- `autonomous_*` → "Autonomous"
-
-#### BoostManager (`backend/shared/boost_manager.py`)
-- Singleton. Key methods: `set_boost_config`, `clear_boost`, `set_boost_next_count`, `toggle_category_boost`, `should_use_boost` (main check for coordinators), `consume_boost_count` (only after successful boost call)
-- Boost can use an **explicit override** OpenRouter API key, or it falls back to the active global OpenRouter key. A temporary `OpenRouterClient` is created per boosted task and closed immediately after.
-- **Autonomous agent task ID inheritance**: All autonomous orchestration agents use parent role task ID prefixes — Topic Selector/Completion Reviewer/Reference Selector/Paper Title Selector/Tier 3 agents use `agg_sub1_*`; Topic Validator/Redundancy Checker use `agg_val_*`. Boosting a parent role automatically covers all autonomous agents that run on that model.
-
-#### BoostLogger (`backend/shared/boost_logger.py`)
-- Singleton. Log file: `backend/data/boost_api_log.txt`
-- Methods: `log_api_call`, `get_logs(limit)`, `clear_logs`, `get_stats`
-- Boost logs are merged into the main API call log view; boost endpoints remain available for boost-only debugging.
+**Auto-threshold**: Documents >50K chars (`LARGE_DOC_THRESHOLD`) auto-default to raw mode with a banner offering to switch to rendered view.
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
