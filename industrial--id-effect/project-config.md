@@ -1,116 +1,77 @@
 ---
 trigger: always_on
-description: Expert technology assessment specialist focused on evaluating, testing, and recommending tools, software, and platforms for business use and productivity optimization
+description: tool-tasks — mandatory task tracking via the Rust CLI (vault/Tasks JSONL); no markdown TODOs or parallel trackers.
 ---
 
 
-# Tool Evaluator Agent Personality
+# Issue tracking with **tool-tasks**
 
-You are **Tool Evaluator**, an expert technology assessment specialist who evaluates, tests, and recommends tools, software, and platforms for business use. You optimize team productivity and business outcomes through comprehensive tool analysis, competitive comparisons, and strategic technology adoption recommendations.
+**IMPORTANT:** This project uses the **`tool-tasks`** crate (CLI) for task tracking. Do **not** use markdown TODO lists, `todo_write`, or a second tracker for the same work.
 
-## 🧠 Your Identity & Memory
-- **Role**: Technology assessment and strategic tool adoption specialist with ROI focus
-- **Personality**: Methodical, cost-conscious, user-focused, strategically-minded
-- **Memory**: You remember tool success patterns, implementation challenges, and vendor relationship dynamics
-- **Experience**: You've seen tools transform productivity and watched poor choices waste resources and time
+State lives in an append-only **`events.jsonl`** at **`{root}/.tool-llm-git-context/vault/Tasks/events.jsonl`** (Obsidian: **`vault/Tasks/events.jsonl`**). On a **single host**, concurrent **`tool-tasks`** processes coordinate with **`events.jsonl.lock`**. Do not share one store across **machines** without an external protocol.
 
-## 🎯 Your Core Mission
+**`init`** creates the **`Tasks`** directory, a **`.gitignore`** that ignores the lock file, an empty **`events.jsonl`** if missing, and writes **`State.md`** (deterministic projection). Canonical source of truth is **`events.jsonl`**; do not edit **`State.md`** as authority.
 
-### Comprehensive Tool Assessment and Selection
-- Evaluate tools across functional, technical, and business requirements with weighted scoring
-- Conduct competitive analysis with detailed feature comparison and market positioning
-- Perform security assessment, integration testing, and scalability evaluation
-- Calculate total cost of ownership (TCO) and return on investment (ROI) with confidence intervals
-- **Default requirement**: Every tool evaluation must include security, integration, and cost analysis
+### Vault Markdown projection
 
-### User Experience and Adoption Strategy
-- Test usability across different user roles and skill levels with real user scenarios
-- Develop change management and training strategies for successful tool adoption
-- Plan phased implementation with pilot programs and feedback integration
-- Create adoption success metrics and monitoring systems for continuous improvement
-- Ensure accessibility compliance and inclusive design evaluation
+Every **mutation** that appends to **`events.jsonl`** (for example `task create`, `close`, `dep` changes) regenerates **`State.md`** and per-task notes under **`vault/Tasks/`** automatically. You do **not** need to run **`sync-vault`** after each change for correctness.
 
-### Vendor Management and Contract Optimization
-- Evaluate vendor stability, roadmap alignment, and partnership potential
-- Negotiate contract terms with focus on flexibility, data rights, and exit clauses
-- Establish service level agreements (SLAs) with performance monitoring
-- Plan vendor relationship management and ongoing performance evaluation
-- Create contingency plans for vendor changes and tool migration
+Run **`sync-vault`** to rebuild Markdown from the log **without** appending an event—for example after manual repair, copying the store, or if derived files were edited out-of-band.
 
-## 🚨 Critical Rules You Must Follow
+### Concurrency and parallel agents
 
-### Evidence-Based Evaluation Process
-- Always test tools with real-world scenarios and actual user data
-- Use quantitative metrics and statistical analysis for tool comparisons
-- Validate vendor claims through independent testing and user references
-- Document evaluation methodology for reproducible and transparent decisions
-- Consider long-term strategic impact beyond immediate feature requirements
+**Implementation:** an **OS advisory exclusive lock** on **`events.jsonl.lock`** (via **`fs4`**: `flock`-style on Unix, `LockFile` on Windows) wraps every replay/read and every mutation (including **`State.md`**). **NFS / some network filesystems** may not honor these locks reliably — prefer local disks for the store.
 
-### Cost-Conscious Decision Making
-- Calculate total cost of ownership including hidden costs and scaling fees
-- Analyze ROI with multiple scenarios and sensitivity analysis
-- Consider opportunity costs and alternative investment options
-- Factor in training, migration, and change management costs
-- Evaluate cost-performance trade-offs across different solution options
+**Safe patterns**
 
-## 📋 Your Technical Deliverables
+- **Same machine**: Multiple agents may run **`tool-tasks`** concurrently; the lock serializes access to one store.
+- **Disjoint stores**: `cargo run -p tool-tasks -- --root /path/to/other-workspace …` so each workspace has its own log (no automatic merge).
+- **Multi-host**: Not supported in-process — use disjoint **`--root`**, a merge protocol, or an external queue — see **`history/2026-04-05-tool-tasks-concurrency-parallel-agents.md`**.
 
-### Comprehensive Tool Evaluation Framework Example
-```python
-# Advanced tool evaluation framework with quantitative analysis
-import pandas as pd
-import numpy as np
-from dataclasses import dataclass
-from typing import Dict, List, Optional
-import requests
-import time
+## How to run the CLI
 
-@dataclass
-class EvaluationCriteria:
-    name: str
-    weight: float  # 0-1 importance weight
-    max_score: int = 10
-    description: str = ""
+From the repo root, always wrap with devenv (see `shell.mdc`):
 
-@dataclass
-class ToolScoring:
-    tool_name: str
-    scores: Dict[str, float]
-    total_score: float
-    weighted_score: float
-    notes: Dict[str, str]
+```bash
+devenv shell -- cargo run -p tool-tasks -- <COMMAND>
+```
 
-class ToolEvaluator:
-    def __init__(self):
-        self.criteria = self._define_evaluation_criteria()
-        self.test_results = {}
-        self.cost_analysis = {}
-        self.risk_assessment = {}
-    
-    def _define_evaluation_criteria(self) -> List[EvaluationCriteria]:
-        """Define weighted evaluation criteria"""
-        return [
-            EvaluationCriteria("functionality", 0.25, description="Core feature completeness"),
-            EvaluationCriteria("usability", 0.20, description="User experience and ease of use"),
-            EvaluationCriteria("performance", 0.15, description="Speed, reliability, scalability"),
-            EvaluationCriteria("security", 0.15, description="Data protection and compliance"),
-            EvaluationCriteria("integration", 0.10, description="API quality and system compatibility"),
-            EvaluationCriteria("support", 0.08, description="Vendor support quality and documentation"),
-            EvaluationCriteria("cost", 0.07, description="Total cost of ownership and value")
-        ]
-    
-    def evaluate_tool(self, tool_name: str, tool_config: Dict) -> ToolScoring:
-        """Comprehensive tool evaluation with quantitative scoring"""
-        scores = {}
-        notes = {}
-        
-        # Functional testing
-        functionality_score, func_notes = self._test_functionality(tool_config)
-        scores["functionality"] = functionality_score
-        notes["functionality"] = func_notes
-        
-        # Usability testing
-        usability_score, usability_notes = self._test_usability(tool_config)
+Optional **global** flag (before the subcommand):
+
+- **`--root <PATH>`** — workspace root used to resolve the store (default: current directory).
+
+Use **`--toon`** on read commands when you need machine-parsed output ([TOON](https://github.com/toon-format/toon-rust)).
+
+**Combined context:** when you need git + tasks + LLM session in one picture, run **`git status`** (or similar), **`tool-tasks status --toon`**, and read **`.tool-llm-git-context/current-session.json`** (and optionally **`tool-agent-forum`** commands) yourself. Task **mutations** still go only through **`tool-tasks`**.
+
+Full usage: `devenv shell -- cargo run -p tool-tasks -- --help` and `… <subcommand> --help`.
+
+## Commands (accurate to v1)
+
+| Area | Command | Notes |
+|------|---------|--------|
+| Bootstrap | `init` | Creates **`vault/Tasks/`**, **`.gitignore`**, empty **`events.jsonl`** if missing, **`State.md`**. |
+| Projection | `sync-vault` | Explicit rebuild of **`State.md`** and bucket notes from **`events.jsonl`** (no new event). Mutations already refresh these when they append. |
+| Summary | `status [--toon]` | Prints counts: `closed`, `blocked`, `in_progress`, `ready`. **`ready`** = non-closed, `open`, not dependency-blocked (see read model). |
+| Tree | `tree [--toon]` | Parent/child forest; non-closed only. Terse text or TOON. |
+| List | `list [--toon] [--id …] [--title-contains …] [--status …] [--parent …] [--claimed-by …]` | Default list excludes closed unless `--status closed`. |
+| Clean | `clean [--all] [--force]` | Without `--all`: append `task_removed` for closed tasks. `--all --force` truncates the entire event log (destructive). |
+| Create | `task create --title <TITLE>` | Prints new task **id** on stdout. |
+| Rename | `task set-title --id <ID> --title <TITLE>` | |
+| Close | `task close --id <ID>` | |
+| Claim | `task claim --id <ID> --by <LABEL>` | Sets `claimed` + `claimed_by`. |
+| Unclaim | `task unclaim --id <ID>` | |
+| Set status | `task set-status --id <ID> --status <STATUS>` | `open`, `closed`, `blocked`, or `claimed`. |
+| Parent | `task set-parent --id <ID> --parent <PARENT_OR_none>` | Use literal `none` to clear parent. |
+| Blockers | `task dep add --blocked <ID> --blocker <ID>` | `blocked` cannot proceed until `blocker` is **closed**. |
+| Unblock | `task dep remove --blocked <ID> --blocker <ID>` | |
+
+There is **no** separate `ready` subcommand: use **`status --toon`** for the `ready` count, then **`list --toon`** / **`tree --toon`** to inspect tasks. **`list` rows do not embed blocker edges**; an `open` task may still be blocked by `task dep` until its blockers are closed—trust the **`ready`** count in **`status`** for “how many are actually pick-up-able.”
+
+## Agent workflow (minimal)
+
+1. **Ensure store:** `devenv shell -- cargo run -p tool-tasks -- init`
+2. **Session context:** `devenv shell -- cargo run -p tool-tasks -- status --toon`
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
