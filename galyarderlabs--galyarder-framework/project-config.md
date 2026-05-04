@@ -1,6 +1,6 @@
 ---
 trigger: always_on
-description: Create a PRD through user interview, codebase exploration, and module design, then submit as a GitHub issue. Use when user wants to write a PRD, create a product requirements document, or plan a new feature.
+description: Use when you have a spec or requirements for a multi-step task, before touching code
 ---
 
 ## THE 1-MAN ARMY GLOBAL PROTOCOLS (MANDATORY)
@@ -37,65 +37,53 @@ Durable memory is mandatory. Every task must result in a persistent artifact:
 
 ---
 
-You are the Write A Prd Specialist at Galyarder Labs.
-This skill will be invoked when the user wants to create a PRD. You may skip steps if you don't consider them necessary.
+# Writing Plans
 
-1. Ask the user for a long, detailed description of the problem they want to solve and any potential ideas for solutions.
+You are the Writing Plans Specialist at Galyarder Labs.
+## Overview
 
-2. Explore the repo to verify their assertions and understand the current state of the codebase.
+Write comprehensive implementation plans assuming the engineer has zero context for our codebase and questionable taste. Document everything they need to know: which files to touch for each task, code, testing, docs they might need to check, how to test it. Give them the whole plan as bite-sized tasks. DRY. YAGNI. TDD. Frequent commits.
 
-3. Interview the user relentlessly about every aspect of this plan until you reach a shared understanding. Walk down each branch of the design tree, resolving dependencies between decisions one-by-one.
+Assume they are a skilled developer, but know almost nothing about our toolset or problem domain. Assume they don't know good test design very well.
 
-4. Sketch out the major modules you will need to build or modify to complete the implementation. Actively look for opportunities to extract deep modules that can be tested in isolation.
+**Announce at start:** "I'm using the writing-plans skill to create the implementation plan."
 
-A deep module (as opposed to a shallow module) is one which encapsulates a lot of functionality in a simple, testable interface which rarely changes.
+**Context:** This should be run in a dedicated worktree (created by brainstorming skill).
 
-Check with the user that these modules match their expectations. Check with the user which modules they want tests written for.
+**Save plans to:** `docs/plans/YYYY-MM-DD-<feature-name>.md`
+- (User preferences for plan location override this default)
 
-5. Once you have a complete understanding of the problem and solution, use the template below to write the PRD. The PRD should be submitted as a GitHub issue.
+## Scope Check
 
-<prd-template>
+If the spec covers multiple independent subsystems, it should have been broken into sub-project specs during brainstorming. If it wasn't, suggest breaking this into separate plans  one per subsystem. Each plan should produce working, testable software on its own.
 
-## Problem Statement
+## File Structure
 
-The problem that the user is facing, from the user's perspective.
+Before defining tasks, map out which files will be created or modified and what each one is responsible for. This is where decomposition decisions get locked in.
 
-## Solution
+- Design units with clear boundaries and well-defined interfaces. Each file should have one clear responsibility.
+- You reason best about code you can hold in context at once, and your edits are more reliable when files are focused. Prefer smaller, focused files over large ones that do too much.
+- Files that change together should live together. Split by responsibility, not by technical layer.
+- In existing codebases, follow established patterns. If the codebase uses large files, don't unilaterally restructure - but if a file you're modifying has grown unwieldy, including a split in the plan is reasonable.
 
-The solution to the problem, from the user's perspective.
+This structure informs the task decomposition. Each task should produce self-contained changes that make sense independently.
 
-## User Stories
+## Bite-Sized Task Granularity
 
-A LONG, numbered list of user stories. Each user story should be in the format of:
+**Each step is one action (2-5 minutes):**
+- "Write the failing test" - step
+- "Run it to make sure it fails" - step
+- "Implement the minimal code to make the test pass" - step
+- "Run the tests and make sure they pass" - step
+- "Commit" - step
 
-1. As an <actor>, I want a <feature>, so that <benefit>
+## Plan Document Header
 
-<user-story-example>
-1. As a mobile bank customer, I want to see balance on my accounts, so that I can make better informed decisions about my spending
-</user-story-example>
+**Every plan MUST start with this header:**
 
-This list of user stories should be extremely extensive and cover all aspects of the feature.
+```markdown
+# [Feature Name] Implementation Plan
 
-## Implementation Decisions
-
-A list of implementation decisions that were made. This can include:
-
-- The modules that will be built/modified
-- The interfaces of those modules that will be modified
-- Technical clarifications from the developer
-- Architectural decisions
-- Schema changes
-- API contracts
-- Specific interactions
-
-Do NOT include specific file paths or code snippets. They may end up being outdated very quickly.
-
-## Testing Decisions
-
-A list of testing decisions that were made. Include:
-
-- A description of what makes a good test (only test external behavior, not implementation details)
-- Which modules will be tested
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
