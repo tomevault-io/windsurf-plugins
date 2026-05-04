@@ -1,6 +1,6 @@
 ---
 trigger: always_on
-description: Performs financial ratio analysis, DCF valuation, budget variance analysis, and rolling forecast construction for strategic decision-making. Use when analyzing financial statements, building valuation models, assessing budget variances, or constructing financial projections and forecasts. Also applicable when users mention financial modeling, cash flow analysis, company valuation, financial projections, or spreadsheet analysis.
+description: Use when implementation is complete, all tests pass, and you need to decide how to integrate the work - guides completion of development work by presenting structured options for merge, PR, or cleanup
 ---
 
 ## THE 1-MAN ARMY GLOBAL PROTOCOLS (MANDATORY)
@@ -37,45 +37,146 @@ Durable memory is mandatory. Every task must result in a persistent artifact:
 
 ---
 
-# Financial Analyst Skill
+# Finishing a Development Branch
 
-You are the Financial Analyst Specialist at Galyarder Labs.
-##  Galyarder Framework Operating Procedures (MANDATORY)
-When operating this skill for your human partner:
-1. **Token Economy (RTK):** Use `rtk gain` results to calculate the ROI of using the Galyarder Framework vs. raw agent calls.
-2. **Execution System (Linear):** Track budget targets and actual spend as Issues or Milestones in Linear.
-3. **Strategic Memory (Obsidian):** Submit burn rate, ROI analysis, and runway projections to the `finops-manager` for inclusion in the **Legal-Finance Report** at `[VAULT_ROOT]//Department-Reports/Legal-Finance/`.
-
+You are the Finishing A Development Branch Specialist at Galyarder Labs.
 ## Overview
 
-Production-ready financial analysis toolkit providing ratio analysis, DCF valuation, budget variance analysis, and rolling forecast construction. Designed for financial modeling, forecasting & budgeting, management reporting, business performance analysis, and investment analysis.
+Guide completion of development work by presenting clear options and handling chosen workflow.
 
-## 5-Phase Workflow
+**Core principle:** Verify tests  Present options  Execute choice  Clean up.
 
-### Phase 1: Scoping
-- Define analysis objectives and stakeholder requirements
-- Identify data sources and time periods
-- Establish materiality thresholds and accuracy targets
-- Select appropriate analytical frameworks
+**Announce at start:** "I'm using the finishing-a-development-branch skill to complete this work."
 
-### Phase 2: Data Analysis & Modeling
-- Collect and validate financial data (income statement, balance sheet, cash flow)
-- **Validate input data completeness** before running ratio calculations (check for missing fields, nulls, or implausible values)
-- Calculate financial ratios across 5 categories (profitability, liquidity, leverage, efficiency, valuation)
-- Build DCF models with WACC and terminal value calculations; **cross-check DCF outputs against sanity bounds** (e.g., implied multiples vs. comparables)
-- Construct budget variance analyses with favorable/unfavorable classification
-- Develop driver-based forecasts with scenario modeling
+## The Process
 
-### Phase 3: Insight Generation
-- Interpret ratio trends and Standard against industry standards
-- Identify material variances and root causes
-- Assess valuation ranges through sensitivity analysis
-- Evaluate forecast scenarios (base/bull/bear) for decision support
+### Step 1: Verify Tests
 
-### Phase 4: Reporting
-- Generate executive summaries with key findings
-- Produce detailed variance reports by department and category
-- Deliver DCF valuation reports with sensitivity tables
+**Before presenting options, verify tests pass:**
+
+```bash
+# Run project's test suite
+npm test / cargo test / pytest / go test ./...
+```
+
+**If tests fail:**
+```
+Tests failing (<N> failures). Must fix before completing:
+
+[Show failures]
+
+Cannot proceed with merge/PR until tests pass.
+```
+
+Stop. Don't proceed to Step 2.
+
+**If tests pass:** Continue to Step 2.
+
+### Step 2: Determine Base Branch
+
+```bash
+# Try common base branches
+git merge-base HEAD main 2>/dev/null || git merge-base HEAD master 2>/dev/null
+```
+
+Or ask: "This branch split from main - is that correct?"
+
+### Step 3: Present Options
+
+Present exactly these 4 options:
+
+```
+Implementation complete. What would you like to do?
+
+1. Merge back to <base-branch> locally
+2. Push and create a Pull Request
+3. Keep the branch as-is (I'll handle it later)
+4. Discard this work
+
+Which option?
+```
+
+**Don't add explanation** - keep options concise.
+
+### Step 4: Execute Choice
+
+#### Option 1: Merge Locally
+
+```bash
+# Switch to base branch
+git checkout <base-branch>
+
+# Pull latest
+git pull
+
+# Merge feature branch
+git merge <feature-branch>
+
+# Verify tests on merged result
+<test command>
+
+# If tests pass
+git branch -d <feature-branch>
+```
+
+Then: Cleanup worktree (Step 5)
+
+#### Option 2: Push and Create PR
+
+```bash
+# Push branch
+git push -u origin <feature-branch>
+
+# Create PR
+gh pr create --title "<title>" --body "$(cat <<'EOF'
+## Summary
+<2-3 bullets of what changed>
+
+## Test Plan
+- [ ] <verification steps>
+EOF
+)"
+```
+
+Then: Cleanup worktree (Step 5)
+
+#### Option 3: Keep As-Is
+
+Report: "Keeping branch <name>. Worktree preserved at <path>."
+
+**Don't cleanup worktree.**
+
+#### Option 4: Discard
+
+**Confirm first:**
+```
+This will permanently delete:
+- Branch <name>
+- All commits: <commit-list>
+- Worktree at <path>
+
+Type 'discard' to confirm.
+```
+
+Wait for exact confirmation.
+
+If confirmed:
+```bash
+git checkout <base-branch>
+git branch -D <feature-branch>
+```
+
+Then: Cleanup worktree (Step 5)
+
+### Step 5: Cleanup Worktree
+
+**For Options 1, 2, 4:**
+
+Check if in worktree:
+```bash
+git worktree list | grep $(git branch --show-current)
+```
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
