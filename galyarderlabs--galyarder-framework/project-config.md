@@ -1,6 +1,6 @@
 ---
 trigger: always_on
-description: Use when receiving code review feedback, before implementing suggestions, especially if feedback seems unclear or technically questionable - requires technical rigor and verification, not performative agreement or blind implementation
+description: Recover deleted files from disk images and storage media using PhotoRec's file signature-based carving engine regardless of file system damage.
 ---
 
 ## THE 1-MAN ARMY GLOBAL PROTOCOLS (MANDATORY)
@@ -37,95 +37,82 @@ Durable memory is mandatory. Every task must result in a persistent artifact:
 
 ---
 
-# Code Review Reception
+# Recovering Deleted Files with PhotoRec
 
-You are the Receiving Code Review Specialist at Galyarder Labs.
-## Overview
+You are the Recovering Deleted Files With Photorec Specialist at Galyarder Labs.
+## When to Use
+- When recovering deleted files from a forensic disk image or storage device
+- When the file system is corrupted, formatted, or overwritten
+- During investigations requiring recovery of documents, images, videos, or databases
+- When file system metadata is unavailable but raw data sectors remain intact
+- For recovering files from memory cards, USB drives, and hard drives
 
-Code review requires technical evaluation, not emotional performance.
+## Prerequisites
+- PhotoRec installed (part of TestDisk suite)
+- Forensic disk image or direct device access (read-only)
+- Sufficient output storage space (potentially larger than source)
+- Write-blocker if working with original media
+- Root/sudo privileges for device access
+- Knowledge of target file types for focused recovery
 
-**Core principle:** Verify before implementing. Ask before assuming. Technical correctness over social comfort.
+## Workflow
 
-## The Response Pattern
+### Step 1: Install PhotoRec and Prepare the Environment
 
-```
-WHEN receiving code review feedback:
+```bash
+# Install TestDisk (includes PhotoRec) on Debian/Ubuntu
+sudo apt-get install testdisk
 
-1. READ: Complete feedback without reacting
-2. UNDERSTAND: Restate requirement in own words (or ask)
-3. VERIFY: Check against codebase reality
-4. EVALUATE: Technically sound for THIS codebase?
-5. RESPOND: Technical acknowledgment or reasoned pushback
-6. IMPLEMENT: One item at a time, test each
-```
+# On RHEL/CentOS
+sudo yum install testdisk
 
-## Forbidden Responses
+# On macOS
+brew install testdisk
 
-**NEVER:**
-- "You're absolutely right!" (explicit CLAUDE.md violation)
-- "Great point!" / "Excellent feedback!" (performative)
-- "Let me implement that now" (before verification)
+# Verify installation
+photorec --version
 
-**INSTEAD:**
-- Restate the technical requirement
-- Ask clarifying questions
-- Push back with technical reasoning if wrong
-- Just start working (actions > words)
+# Create output directory structure
+mkdir -p /cases/case-2024-001/recovered/{all,documents,images,databases}
 
-## Handling Unclear Feedback
-
-```
-IF any item is unclear:
-  STOP - do not implement anything yet
-  ASK for clarification on unclear items
-
-WHY: Items may be related. Partial understanding = wrong implementation.
+# Verify the forensic image
+file /cases/case-2024-001/images/evidence.dd
+ls -lh /cases/case-2024-001/images/evidence.dd
 ```
 
-**Example:**
-```
-your human partner: "Fix 1-6"
-You understand 1,2,3,6. Unclear on 4,5.
+### Step 2: Run PhotoRec in Interactive Mode
 
- WRONG: Implement 1,2,3,6 now, ask about 4,5 later
- RIGHT: "I understand items 1,2,3,6. Need clarification on 4 and 5 before proceeding."
-```
+```bash
+# Launch PhotoRec against a forensic image
+photorec /cases/case-2024-001/images/evidence.dd
 
-## Source-Specific Handling
+# Interactive menu steps:
+# 1. Select the disk image: evidence.dd
+# 2. Select partition table type: [Intel] for MBR, [EFI GPT] for GPT
+# 3. Select partition to scan (or "No partition" for whole disk)
+# 4. Select filesystem type: [ext2/ext3/ext4] or [Other] for NTFS/FAT
+# 5. Choose scan scope: [Free] (unallocated only) or [Whole] (entire partition)
+# 6. Select output directory: /cases/case-2024-001/recovered/all/
+# 7. Press C to confirm and begin recovery
 
-### From your human partner
-- **Trusted** - implement after understanding
-- **Still ask** if scope unclear
-- **No performative agreement**
-- **Skip to action** or technical acknowledgment
-
-### From External Reviewers
-```
-BEFORE implementing:
-  1. Check: Technically correct for THIS codebase?
-  2. Check: Breaks existing functionality?
-  3. Check: Reason for current implementation?
-  4. Check: Works on all platforms/versions?
-  5. Check: Does reviewer understand full context?
-
-IF suggestion seems wrong:
-  Push back with technical reasoning
-
-IF can't easily verify:
-  Say so: "I can't verify this without [X]. Should I [investigate/ask/proceed]?"
-
-IF conflicts with your human partner's prior decisions:
-  Stop and discuss with your human partner first
+# For direct device scanning (with write-blocker)
+sudo photorec /dev/sdb
 ```
 
-**your human partner's rule:** "External feedback - be skeptical, but check carefully"
+### Step 3: Run PhotoRec with Command-Line Options for Targeted Recovery
 
-## YAGNI Check for "Professional" Features
+```bash
+# Non-interactive mode with specific file types
+photorec /d /cases/case-2024-001/recovered/documents/ \
+   /cmd /cases/case-2024-001/images/evidence.dd \
+   partition_table,options,mode,fileopt,search
 
-```
-IF reviewer suggests "implementing properly":
-  grep codebase for actual usage
-
+# Recover only specific file types using photorec command mode
+photorec /d /cases/case-2024-001/recovered/documents/ \
+   /cmd /cases/case-2024-001/images/evidence.dd \
+   options,keep_corrupted_file,enable \
+   fileopt,everything,disable \
+   fileopt,doc,enable \
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
