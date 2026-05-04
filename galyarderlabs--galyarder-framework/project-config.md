@@ -1,6 +1,6 @@
 ---
 trigger: always_on
-description: >-
+description: React and Next.js performance optimization guidelines from Vercel Engineering. This skill should be used when writing, reviewing, or refactoring React/Next.js code to ensure optimal performance patterns. Triggers on tasks involving React components, Next.js pages, data fetching, bundle optimization, or performance improvements.
 ---
 
 ## THE 1-MAN ARMY GLOBAL PROTOCOLS (MANDATORY)
@@ -37,82 +37,61 @@ Durable memory is mandatory. Every task must result in a persistent artifact:
 
 ---
 
-# Validating Backup Integrity for Recovery
+# Vercel React Best Practices
 
-You are the Validating Backup Integrity For Recovery Specialist at Galyarder Labs.
-## When to Use
+You are the Vercel React Best Practices Specialist at Galyarder Labs.
+Comprehensive performance optimization guide for React and Next.js applications, maintained by Vercel. Contains 45 rules across 8 categories, prioritized by impact to guide automated refactoring and code generation.
 
-Use this skill when:
-- Verifying backup integrity before relying on backups for ransomware recovery
-- Building automated backup validation pipelines that run after each backup job
-- Auditing backup infrastructure to confirm recoverability for compliance (SOC 2, ISO 27001, NIST CSF RC.RP-03)
-- Detecting silent data corruption (bit rot) in backup storage before a disaster occurs
-- Validating that immutable or air-gapped backups have not been tampered with
+## When to Apply
 
-**Do not use** for initial backup configuration or scheduling. This skill focuses on post-backup validation.
+Reference these guidelines when:
+- Writing new React components or Next.js pages
+- Implementing data fetching (client or server-side)
+- Reviewing code for performance issues
+- Refactoring existing React/Next.js code
+- Optimizing bundle size or load times
 
-## Prerequisites
+## Rule Categories by Priority
 
-- Access to backup storage (local, NAS, S3, Azure Blob, GCS)
-- Python 3.9+ with `hashlib` (standard library)
-- Backup manifests or baseline hash files for comparison
-- Isolated restore environment for restore testing
-- Backup tool CLI access (restic, borgbackup, rclone, or vendor-specific)
+| Priority | Category | Impact | Prefix |
+|----------|----------|--------|--------|
+| 1 | Eliminating Waterfalls | CRITICAL | `async-` |
+| 2 | Bundle Size Optimization | CRITICAL | `bundle-` |
+| 3 | Server-Side Performance | HIGH | `server-` |
+| 4 | Client-Side Data Fetching | MEDIUM-HIGH | `client-` |
+| 5 | Re-render Optimization | MEDIUM | `rerender-` |
+| 6 | Rendering Performance | MEDIUM | `rendering-` |
+| 7 | JavaScript Performance | LOW-MEDIUM | `js-` |
+| 8 | Advanced Patterns | LOW | `advanced-` |
 
-## Workflow
+## Quick Reference
 
-### Step 1: Generate Baseline Hash Manifest
+### 1. Eliminating Waterfalls (CRITICAL)
 
-Create a cryptographic fingerprint of every file at backup time:
+- `async-defer-await` - Move await into branches where actually used
+- `async-parallel` - Use Promise.all() for independent operations
+- `async-dependencies` - Use better-all for partial dependencies
+- `async-api-routes` - Start promises early, await late in API routes
+- `async-suspense-boundaries` - Use Suspense to stream content
 
-```bash
-# Generate SHA-256 manifest for a directory
-find /data/production -type f -exec sha256sum {} \; > /manifests/prod_baseline_$(date +%Y%m%d).sha256
+### 2. Bundle Size Optimization (CRITICAL)
 
-# Verify manifest format
-head -5 /manifests/prod_baseline_20260319.sha256
-# e3b0c44298fc1c149afbf4c8996fb924...  /data/production/config.yaml
-# a7ffc6f8bf1ed76651c14756a061d662...  /data/production/database.sql
-```
+- `bundle-barrel-imports` - Import directly, avoid barrel files
+- `bundle-dynamic-imports` - Use next/dynamic for heavy components
+- `bundle-defer-third-party` - Load analytics/logging after hydration
+- `bundle-conditional` - Load modules only when feature is activated
+- `bundle-preload` - Preload on hover/focus for perceived speed
 
-### Step 2: Verify Backup Archive Integrity
+### 3. Server-Side Performance (HIGH)
 
-Check that the backup archive itself is not corrupted:
+- `server-cache-react` - Use React.cache() for per-request deduplication
+- `server-cache-lru` - Use LRU cache for cross-request caching
+- `server-serialization` - Minimize data passed to client components
+- `server-parallel-fetching` - Restructure components to parallelize fetches
+- `server-after-nonblocking` - Use after() for non-blocking operations
 
-```bash
-# Restic: verify backup repository integrity
-restic -r s3:s3.amazonaws.com/backup-bucket check --read-data
+### 4. Client-Side Data Fetching (MEDIUM-HIGH)
 
-# Borg: verify backup archive
-borg check --verify-data /backup/repo::archive-2026-03-19
-
-# Tar with gzip: verify archive integrity
-gzip -t backup_20260319.tar.gz && echo "Archive OK" || echo "Archive CORRUPTED"
-
-# AWS S3: verify object checksums
-aws s3api head-object --bucket backup-bucket --key daily/2026-03-19.tar.gz \
-  --checksum-mode ENABLED
-```
-
-### Step 3: Perform Restore Test to Isolated Environment
-
-```bash
-# Restore to isolated test directory
-restic -r s3:s3.amazonaws.com/backup-bucket restore latest --target /restore-test/
-
-# Generate hash manifest of restored data
-find /restore-test -type f -exec sha256sum {} \; > /manifests/restored_$(date +%Y%m%d).sha256
-
-# Compare baseline and restored manifests
-diff <(sort /manifests/prod_baseline_20260319.sha256) \
-     <(sort /manifests/restored_20260319.sha256)
-```
-
-### Step 4: Validate Data Completeness
-
-```bash
-# Count files in original vs restored
-echo "Original: $(find /data/production -type f | wc -l) files"
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
