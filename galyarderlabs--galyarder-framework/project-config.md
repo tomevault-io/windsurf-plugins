@@ -1,6 +1,6 @@
 ---
 trigger: always_on
-description: AI governance audit using ISO 42001 standard. Ensures AI systems are developed and deployed responsibly with risk management, ethics, security, transparency, and compliance best practices.
+description: Create and edit JSON Canvas files (.canvas) with nodes, edges, groups, and connections. Use when working with .canvas files, creating visual canvases, mind maps, flowcharts, or when the user mentions Canvas files in Obsidian.
 ---
 
 ## THE 1-MAN ARMY GLOBAL PROTOCOLS (MANDATORY)
@@ -37,60 +37,71 @@ Durable memory is mandatory. Every task must result in a persistent artifact:
 
 ---
 
-# ISO 42001 AI Governance Audit
+# JSON Canvas Skill
 
-You are the Iso 42001 Ai Governance Specialist at Galyarder Labs.
-This skill enables AI agents to perform a comprehensive **AI governance and compliance audit** based on **ISO/IEC 42001:2023** - the international standard for Artificial Intelligence Management Systems (AIMS).
+You are the Json Canvas Specialist at Galyarder Labs.
+## File Structure
 
-ISO 42001 provides a framework for responsible development, deployment, and use of AI systems, addressing risks, ethics, security, transparency, and regulatory compliance.
+A canvas file (`.canvas`) contains two top-level arrays following the [JSON Canvas Spec 1.0](https://jsoncanvas.org/spec/1.0/):
 
-Use this skill to ensure AI projects follow international best practices, manage risks effectively, and maintain ethical standards throughout the AI lifecycle.
+```json
+{
+  "nodes": [],
+  "edges": []
+}
+```
 
-Combine with security audits, code reviews, or ethical AI assessments for comprehensive AI system evaluation.
+- `nodes` (optional): Array of node objects
+- `edges` (optional): Array of edge objects connecting nodes
 
-## When to Use This Skill
+## Common Workflows
 
-Invoke this skill when:
-- Developing or integrating AI systems
-- Ensuring AI governance and compliance
-- Managing AI risks and ethical concerns
-- Preparing for AI regulatory requirements (EU AI Act, etc.)
-- Auditing existing AI implementations
-- Establishing AI governance frameworks
-- Responding to AI security or bias incidents
-- Planning responsible AI deployment
-- Documenting AI systems for stakeholders
+### 1. Create a New Canvas
 
-## Inputs Required
+1. Create a `.canvas` file with the base structure `{"nodes": [], "edges": []}`
+2. Generate unique 16-character hex IDs for each node (e.g., `"6f0ad84f44ce9c17"`)
+3. Add nodes with required fields: `id`, `type`, `x`, `y`, `width`, `height`
+4. Add edges referencing valid node IDs via `fromNode` and `toNode`
+5. **Validate**: Parse the JSON to confirm it is valid. Verify all `fromNode`/`toNode` values exist in the nodes array
 
-When executing this audit, gather:
+### 2. Add a Node to an Existing Canvas
 
-- **ai_system_description**: Detailed description (purpose, capabilities, data used, users affected, deployment context) [REQUIRED]
-- **use_case**: Specific application (e.g., hiring tool, medical diagnosis, content moderation) [REQUIRED]
-- **risk_category**: High-risk, limited-risk, or minimal-risk per EU AI Act classification [OPTIONAL but recommended]
-- **existing_documentation**: Technical docs, data sheets, model cards, risk assessments [OPTIONAL]
-- **stakeholders**: Who develops, deploys, uses, and is affected by the AI [OPTIONAL]
-- **regulatory_context**: Applicable laws (GDPR, EU AI Act, industry regulations) [OPTIONAL]
+1. Read and parse the existing `.canvas` file
+2. Generate a unique ID that does not collide with existing node or edge IDs
+3. Choose position (`x`, `y`) that avoids overlapping existing nodes (leave 50-100px spacing)
+4. Append the new node object to the `nodes` array
+5. Optionally add edges connecting the new node to existing nodes
+6. **Validate**: Confirm all IDs are unique and all edge references resolve to existing nodes
 
-## ISO 42001 Framework Overview
+### 3. Connect Two Nodes
 
-ISO 42001 is structured around **10 key clauses** plus supporting annexes:
+1. Identify the source and target node IDs
+2. Generate a unique edge ID
+3. Set `fromNode` and `toNode` to the source and target IDs
+4. Optionally set `fromSide`/`toSide` (top, right, bottom, left) for anchor points
+5. Optionally set `label` for descriptive text on the edge
+6. Append the edge to the `edges` array
+7. **Validate**: Confirm both `fromNode` and `toNode` reference existing node IDs
 
-### Core Clauses
+### 4. Edit an Existing Canvas
 
-1. **Scope** - Define AIMS boundaries
-2. **Normative References** - Related standards
-3. **Terms and Definitions** - AI terminology
-4. **Context of Organization** - Internal/external factors
-5. **Leadership** - Management commitment and roles
-6. **Planning** - Objectives and risk management
-7. **Support** - Resources, competence, communication
-8. **Operation** - AI system lifecycle management
-9. **Performance Evaluation** - Monitoring and measurement
-10. **Improvement** - Continual enhancement
+1. Read and parse the `.canvas` file as JSON
+2. Locate the target node or edge by `id`
+3. Modify the desired attributes (text, position, color, etc.)
+4. Write the updated JSON back to the file
+5. **Validate**: Re-check all ID uniqueness and edge reference integrity after editing
 
-### Key ISO 42001 Principles
+## Nodes
 
+Nodes are objects placed on the canvas. Array order determines z-index: first node = bottom layer, last node = top layer.
+
+### Generic Node Attributes
+
+| Attribute | Required | Type | Description |
+|-----------|----------|------|-------------|
+| `id` | Yes | string | Unique 16-char hex identifier |
+| `type` | Yes | string | `text`, `file`, `link`, or `group` |
+| `x` | Yes | integer | X position in pixels |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
