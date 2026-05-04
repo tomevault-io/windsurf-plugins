@@ -1,6 +1,6 @@
 ---
 trigger: always_on
-description: Use when starting any conversation - establishes how to find and use skills, requiring Skill tool invocation before ANY response including clarifying questions
+description: Use when starting feature work that needs isolation from current workspace or before executing implementation plans - creates isolated git worktrees with smart directory selection and safety verification
 ---
 
 ## THE 1-MAN ARMY GLOBAL PROTOCOLS (MANDATORY)
@@ -37,50 +37,115 @@ Durable memory is mandatory. Every task must result in a persistent artifact:
 
 ---
 
-<SUBAGENT-STOP>
-If you were dispatched as a subagent to execute a specific task, skip this skill.
-</SUBAGENT-STOP>
+# Using Git Worktrees
 
-<EXTREMELY-IMPORTANT>
-If you think there is even a 1% chance a skill might apply to what you are doing, you ABSOLUTELY MUST invoke the skill.
+You are the Using Git Worktrees Specialist at Galyarder Labs.
+## Overview
 
-IF A SKILL APPLIES TO YOUR TASK, YOU DO NOT HAVE A CHOICE. YOU MUST USE IT.
+Git worktrees create isolated workspaces sharing the same repository, allowing work on multiple branches simultaneously without switching.
 
-This is not negotiable. This is not optional. You cannot rationalize your way out of this.
-</EXTREMELY-IMPORTANT>
+**Core principle:** Systematic directory selection + safety verification = reliable isolation.
 
-## Instruction Priority
+**Announce at start:** "I'm using the using-git-worktrees skill to set up an isolated workspace."
 
-Galyarder Framework skills override default system prompt behavior, but **user instructions always take precedence**:
+## Directory Selection Process
 
-1. **User's explicit instructions** (CLAUDE.md, GEMINI.md, AGENTS.md, direct requests)  highest priority
-2. **Galyarder Framework skills**  override default system behavior where they conflict
-3. **Default system prompt**  lowest priority
+Follow this priority order:
 
-If CLAUDE.md, GEMINI.md, or AGENTS.md says "don't use TDD" and a skill says "always use TDD," follow the user's instructions. The user is in control.
+### 1. Check Existing Directories
 
-## How to Access Skills
+```bash
+# Check in priority order
+ls -d .worktrees 2>/dev/null     # Preferred (hidden)
+ls -d worktrees 2>/dev/null      # Alternative
+```
 
-**In Claude Code:** Use the `Skill` tool. When you invoke a skill, its content is loaded and presented to youfollow it directly. Never use the Read tool on skill files.
+**If found:** Use that directory. If both exist, `.worktrees` wins.
 
-**In Copilot CLI:** Use the `skill` tool. Skills are auto-discovered from installed plugins. The `skill` tool works the same as Claude Code's `Skill` tool.
+### 2. Check CLAUDE.md
 
-**In Gemini CLI:** Skills activate via the `activate_skill` tool. Gemini loads skill metadata at session start and activates the full content on demand.
+```bash
+grep -i "worktree.*director" CLAUDE.md 2>/dev/null
+```
 
-**In other environments:** Check your platform's documentation for how skills are loaded.
+**If preference specified:** Use it without asking.
 
-## Platform Adaptation
+### 3. Ask User
 
-Skills use Claude Code tool names. Non-CC platforms: see `references/copilot-tools.md` (Copilot CLI), `references/codex-tools.md` (Codex) for tool equivalents. Gemini CLI users get the tool mapping loaded automatically via GEMINI.md.
+If no directory exists and no CLAUDE.md preference:
 
-## Recommended MCP Stack
+```
+No worktree directory found. Where should I create worktrees?
 
-For peak "1-Man Army" efficiency, we recommend the following MCP servers:
-- **[[RTK](https://github.com/rtk-ai/rtk)]**: Mandatory proxy for all shell commands to save 60-90% tokens.
-- **[[Linear](https://linear.app/docs/mcp)]**: For real-time project management and issue tracking.
-- **[[Stitch](https://stitch.withgoogle.com/docs/mcp/setup)]**: For rapid UI generation and design token management.
-- **[[BrowserOS](https://docs.browseros.com/features/use-with-claude-code)]**: For automated browser testing and external service integration.
-- **[Context7](https://context7.com/docs/resources/all-clients)**: For up-to-date documentation and API references.
+1. .worktrees/ (project-local, hidden)
+2. ~/.config/worktrees/<project-name>/ (global location)
+
+Which would you prefer?
+```
+
+## Safety Verification
+
+### For Project-Local Directories (.worktrees or worktrees)
+
+**MUST verify directory is ignored before creating worktree:**
+
+```bash
+# Check if directory is ignored (respects local, global, and system gitignore)
+git check-ignore -q .worktrees 2>/dev/null || git check-ignore -q worktrees 2>/dev/null
+```
+
+**If NOT ignored:**
+
+Per Jesse's rule "Fix broken things immediately":
+1. Add appropriate line to .gitignore
+2. Commit the change
+3. Proceed with worktree creation
+
+**Why critical:** Prevents accidentally committing worktree contents to repository.
+
+### For Global Directory (~/.config/worktrees)
+
+No .gitignore verification needed - outside project entirely.
+
+## Creation Steps
+
+### 1. Detect Project Name
+
+```bash
+project=$(basename "$(git rev-parse --show-toplevel)")
+```
+
+### 2. Create Worktree
+
+```bash
+# Determine full path
+case $LOCATION in
+  .worktrees|worktrees)
+    path="$LOCATION/$BRANCH_NAME"
+    ;;
+  ~/.config/worktrees/*)
+    path="~/.config/worktrees/$project/$BRANCH_NAME"
+    ;;
+esac
+
+# Create worktree with new branch
+git worktree add "$path" -b "$BRANCH_NAME"
+cd "$path"
+```
+
+### 3. Run Project Setup
+
+Auto-detect and run appropriate setup:
+
+```bash
+# Node.js
+if [ -f package.json ]; then npm install; fi
+
+# Rust
+if [ -f Cargo.toml ]; then cargo build; fi
+
+# Python
+if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
