@@ -7,6 +7,8 @@ description: Documentation for LangChain products hosted on Mintlify. These guid
 
 Documentation for LangChain products hosted on Mintlify. These guidelines apply to manually authored docs only—not `**/reference/**` directories or build artifacts.
 
+For full guidelines, see `CLAUDE.md` in the repository root.
+
 ## Critical rules
 
 1. **Always ask for clarification** rather than making assumptions
@@ -124,5 +126,5 @@ Follow [Google Developer Documentation Style Guide](https://developers.google.co
 - No H5 or H6 headings
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/langchain-ai) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-10 -->
+> Source: [langchain-ai/docs](https://github.com/langchain-ai/docs) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-04 -->
