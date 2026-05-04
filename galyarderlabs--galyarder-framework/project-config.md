@@ -1,6 +1,6 @@
 ---
 trigger: always_on
-description: Analyzes campaign performance with multi-touch attribution, funnel conversion analysis, and ROI calculation for marketing optimization. Use when analyzing marketing campaigns, ad performance, attribution models, conversion rates, or calculating marketing ROI, ROAS, CPA, and campaign metrics across channels.
+description: |
 ---
 
 ## THE 1-MAN ARMY GLOBAL PROTOCOLS (MANDATORY)
@@ -37,79 +37,7 @@ Durable memory is mandatory. Every task must result in a persistent artifact:
 
 ---
 
-# Campaign Analytics
-
-You are the Campaign Analytics Specialist at Galyarder Labs.
-##  Galyarder Framework Operating Procedures (MANDATORY)
-When executing this skill for your human partner during Phase 5 (Growth):
-1. **Token Economy (RTK):** Process large analytics exports using `rtk` mediated scripts to minimize token overhead.
-2. **Execution System (Linear):** Update Linear issues with actual performance data (ROI, CPA, CVR) once a campaign milestone is reached.
-3. **Strategic Memory (Obsidian):** Provide attribution insights and budget reallocation advice to the `growth-strategist` for inclusion in the weekly **Growth Report** at `[VAULT_ROOT]//Department-Reports/Growth/`. No standalone files unless requested.
-
-Production-grade campaign performance analysis with multi-touch attribution modeling, funnel conversion analysis, and ROI calculation. Three Python CLI tools provide deterministic, repeatable analytics using standard library only -- no external dependencies, no API calls, no ML models.
-
----
-
-## Input Requirements
-
-All scripts accept a JSON file as positional input argument. See `assets/sample_campaign_data.json` for complete examples.
-
-### Attribution Analyzer
-
-```json
-{
-  "journeys": [
-    {
-      "journey_id": "j1",
-      "touchpoints": [
-        {"channel": "organic_search", "timestamp": "2025-10-01T10:00:00", "interaction": "click"},
-        {"channel": "email", "timestamp": "2025-10-05T14:30:00", "interaction": "open"},
-        {"channel": "paid_search", "timestamp": "2025-10-08T09:15:00", "interaction": "click"}
-      ],
-      "converted": true,
-      "revenue": 500.00
-    }
-  ]
-}
-```
-
-### Funnel Analyzer
-
-```json
-{
-  "funnel": {
-    "stages": ["Awareness", "Interest", "Consideration", "Intent", "Purchase"],
-    "counts": [10000, 5200, 2800, 1400, 420]
-  }
-}
-```
-
-### Campaign ROI Calculator
-
-```json
-{
-  "campaigns": [
-    {
-      "name": "Spring Email Campaign",
-      "channel": "email",
-      "spend": 5000.00,
-      "revenue": 25000.00,
-      "impressions": 50000,
-      "clicks": 2500,
-      "leads": 300,
-      "customers": 45
-    }
-  ]
-}
-```
-
-### Input Validation
-
-Before running scripts, verify your JSON is valid and matches the expected schema. Common errors:
-
-- **Missing required keys** (e.g., `journeys`, `funnel.stages`, `campaigns`)  script exits with a descriptive `KeyError`
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+2026 Galyarder Labs. Galyarder Framework.
 
 ---
 > Source: [galyarderlabs/galyarder-framework](https://github.com/galyarderlabs/galyarder-framework) — distributed by [TomeVault](https://tomevault.io).
