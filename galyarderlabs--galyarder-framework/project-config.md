@@ -1,6 +1,6 @@
 ---
 trigger: always_on
-description: Implement GDPR data protection requirements. Configure consent management, data subject rights, and privacy by design. Use when processing EU personal data.
+description: >
 ---
 
 ## THE 1-MAN ARMY GLOBAL PROTOCOLS (MANDATORY)
@@ -37,77 +37,60 @@ Durable memory is mandatory. Every task must result in a persistent artifact:
 
 ---
 
-# GDPR Compliance
+# Generating Threat Intelligence Reports
 
-You are the Gdpr Compliance Specialist at Galyarder Labs.
-Implement General Data Protection Regulation requirements for organizations that process personal data of EU/EEA residents, covering lawful processing, data subject rights, and technical safeguards.
-
+You are the Generating Threat Intelligence Reports Specialist at Galyarder Labs.
 ## When to Use
 
-- Processing personal data of EU/EEA residents in any capacity
-- Building consent management and preference centers
-- Implementing Data Subject Access Request (DSAR) workflows
-- Conducting Data Protection Impact Assessments (DPIAs)
-- Setting up data processing agreements with third-party processors
-- Designing systems with privacy by design and by default principles
+Use this skill when:
+- Producing weekly, monthly, or quarterly threat intelligence summaries for security leadership
+- Creating a rapid intelligence assessment in response to a breaking threat (e.g., new zero-day, active ransomware campaign)
+- Generating sector-specific threat briefings for executive decision-making on security investments
 
-## Key Principles and Legal Bases
+**Do not use** this skill for raw IOC distribution  use TIP/MISP for automated IOC sharing and reserve report generation for analyzed, finished intelligence.
 
-```yaml
-gdpr_principles:
-  article_5:
-    lawfulness_fairness_transparency:
-      description: "Process data lawfully, fairly, and transparently"
-      implementation:
-        - Document legal basis for every processing activity
-        - Provide clear privacy notices
-        - No hidden or deceptive data collection
+## Prerequisites
 
-    purpose_limitation:
-      description: "Collect for specified, explicit, and legitimate purposes"
-      implementation:
-        - Define purpose before collection
-        - Do not repurpose data without new legal basis
-        - Document all processing purposes in ROPA
+- Completed analysis from collection and processing phase (PIRs partially or fully answered)
+- Audience profile: technical level, decision-making authority, information classification clearance
+- TLP classification decision for the product
+- Organization-specific reporting template aligned to audience expectations
 
-    data_minimization:
-      description: "Adequate, relevant, and limited to what is necessary"
-      implementation:
-        - Collect only required fields
-        - Review data models for unnecessary fields
-        - Remove optional fields that are not used
+## Workflow
 
-    accuracy:
-      description: "Accurate and kept up to date"
-      implementation:
-        - Provide self-service profile editing
-        - Implement data validation at point of entry
-        - Schedule regular data quality reviews
+### Step 1: Determine Report Type and Audience
 
-    storage_limitation:
-      description: "Kept no longer than necessary"
-      implementation:
-        - Define retention periods per data category
-        - Automate deletion when retention expires
-        - Document retention schedule
+Select the appropriate intelligence product type:
 
-    integrity_and_confidentiality:
-      description: "Appropriate security measures"
-      implementation:
-        - Encryption at rest and in transit
-        - Access controls and audit logging
-        - Pseudonymization where appropriate
+**Strategic Intelligence Report**: For C-suite, board, risk committee
+- Content: Threat landscape trends, adversary intent vs. capability, risk to business objectives
+- Format: 13 pages, minimal jargon, business impact language, recommended decisions
+- Frequency: Monthly/Quarterly
 
-    accountability:
-      description: "Demonstrate compliance"
-      implementation:
-        - Maintain Records of Processing Activities
-        - Conduct DPIAs for high-risk processing
-        - Appoint DPO if required
+**Operational Intelligence Report**: For CISO, security directors, IR leads
+- Content: Active campaigns, adversary TTPs, defensive recommendations, sector peer incidents
+- Format: 38 pages, moderate technical detail, mitigation priority list
+- Frequency: Weekly
 
-legal_bases:
-  article_6:
-    consent: "Freely given, specific, informed, unambiguous"
+**Tactical Intelligence Bulletin**: For SOC analysts, threat hunters, vulnerability management
+- Content: Specific IOCs, YARA rules, Sigma detections, CVEs, patching guidance
+- Format: Structured tables, code blocks, 12 pages
+- Frequency: Daily or as-needed
+
+**Flash Report**: Urgent notification for imminent or active threats
+- Content: What is happening, immediate risk, what to do right now
+- Format: 1 page maximum, distributed within 2 hours of threat identification
+- Frequency: As-needed (zero-day, active campaign targeting sector)
+
+### Step 2: Structure Report Using Intelligence Standards
+
+Apply intelligence writing standards from government and professional practice:
+
+**Headline/Key Judgment**: Lead with the most important finding in plain language.
+- Bad: "This report examines threat actor TTPs associated with Cl0p ransomware"
+- Good: "Cl0p ransomware group is actively exploiting CVE-2024-20353 in Cisco ASA devices to gain initial access; organizations using unpatched ASA appliances face imminent ransomware risk"
+
+**Confidence Qualifiers** (use language from DNI ICD 203):
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
