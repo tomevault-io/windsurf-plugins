@@ -1,6 +1,6 @@
 ---
 trigger: always_on
-description: Create and edit Obsidian Bases (.base files) with views, filters, formulas, and summaries. Use when working with .base files, creating database-like views of notes, or when the user mentions Bases, table views, card views, filters, or formulas in Obsidian.
+description: Interact with Obsidian vaults using the Obsidian CLI to read, create, search, and manage notes, tasks, properties, and more. Also supports plugin and theme development with commands to reload plugins, run JavaScript, capture errors, take screenshots, and inspect the DOM. Use when the user asks to interact with their Obsidian vault, manage notes, search vault content, perform vault operations from the command line, or develop and debug Obsidian plugins and themes.
 ---
 
 ## THE 1-MAN ARMY GLOBAL PROTOCOLS (MANDATORY)
@@ -37,83 +37,83 @@ Durable memory is mandatory. Every task must result in a persistent artifact:
 
 ---
 
-# Obsidian Bases Skill
+# Obsidian CLI
 
-You are the Obsidian Bases Specialist at Galyarder Labs.
-## Workflow
+You are the Obsidian Cli Specialist at Galyarder Labs.
+Use the `obsidian` CLI to interact with a running Obsidian instance. Requires Obsidian to be open.
 
-1. **Create the file**: Create a `.base` file in the vault with valid YAML content
-2. **Define scope**: Add `filters` to select which notes appear (by tag, folder, property, or date)
-3. **Add formulas** (optional): Define computed properties in the `formulas` section
-4. **Configure views**: Add one or more views (`table`, `cards`, `list`, or `map`) with `order` specifying which properties to display
-5. **Validate**: Verify the file is valid YAML with no syntax errors. Check that all referenced properties and formulas exist. Common issues: unquoted strings containing special YAML characters, mismatched quotes in formula expressions, referencing `formula.X` without defining `X` in `formulas`
-6. **Test in Obsidian**: Open the `.base` file in Obsidian to confirm the view renders correctly. If it shows a YAML error, check quoting rules below
+## Command reference
 
-## Schema
+Run `obsidian help` to see all available commands. This is always up to date. Full docs: https://help.obsidian.md/cli
 
-Base files use the `.base` extension and contain valid YAML.
+## Syntax
 
-```yaml
-# Global filters apply to ALL views in the base
-filters:
-  # Can be a single filter string
-  # OR a recursive filter object with and/or/not
-  and: []
-  or: []
-  not: []
+**Parameters** take a value with `=`. Quote values with spaces:
 
-# Define formula properties that can be used across all views
-formulas:
-  formula_name: 'expression'
-
-# Configure display names and settings for properties
-properties:
-  property_name:
-    displayName: "Display Name"
-  formula.formula_name:
-    displayName: "Formula Display Name"
-  file.ext:
-    displayName: "Extension"
-
-# Define custom summary formulas
-summaries:
-  custom_summary_name: 'values.mean().round(3)'
-
-# Define one or more views
-views:
-  - type: table | cards | list | map
-    name: "View Name"
-    limit: 10                    # Optional: limit results
-    groupBy:                     # Optional: group results
-      property: property_name
-      direction: ASC | DESC
-    filters:                     # View-specific filters
-      and: []
-    order:                       # Properties to display in order
-      - file.name
-      - property_name
-      - formula.formula_name
-    summaries:                   # Map properties to summary formulas
-      property_name: Average
+```bash
+obsidian create name="My Note" content="Hello world"
 ```
 
-## Filter Syntax
+**Flags** are boolean switches with no value:
 
-Filters narrow down results. They can be applied globally or per-view.
+```bash
+obsidian create name="My Note" silent overwrite
+```
 
-### Filter Structure
+For multiline content use `\n` for newline and `\t` for tab.
 
-```yaml
-# Single filter
-filters: 'status == "done"'
+## File targeting
 
-# AND - all conditions must be true
-filters:
-  and:
-    - 'status == "done"'
-    - 'priority > 3'
+Many commands accept `file` or `path` to target a file. Without either, the active file is used.
 
-# OR - any condition can be true
+- `file=<name>`  resolves like a wikilink (name only, no path or extension needed)
+- `path=<path>`  exact path from vault root, e.g. `folder/note.md`
+
+## Vault targeting
+
+Commands target the most recently focused vault by default. Use `vault=<name>` as the first parameter to target a specific vault:
+
+```bash
+obsidian vault="My Vault" search query="test"
+```
+
+## Common patterns
+
+```bash
+obsidian read file="My Note"
+obsidian create name="New Note" content="# Hello" template="Template" silent
+obsidian append file="My Note" content="New line"
+obsidian search query="search term" limit=10
+obsidian daily:read
+obsidian daily:append content="- [ ] New task"
+obsidian property:set name="status" value="done" file="My Note"
+obsidian tasks daily todo
+obsidian tags sort=count counts
+obsidian backlinks file="My Note"
+```
+
+Use `--copy` on any command to copy output to clipboard. Use `silent` to prevent files from opening. Use `total` on list commands to get a count.
+
+## Plugin development
+
+### Develop/test cycle
+
+After making code changes to a plugin or theme, follow this workflow:
+
+1. **Reload** the plugin to pick up changes:
+   ```bash
+   obsidian plugin:reload id=my-plugin
+   ```
+2. **Check for errors**  if errors appear, fix and repeat from step 1:
+   ```bash
+   obsidian dev:errors
+   ```
+3. **Verify visually** with a screenshot or DOM inspection:
+   ```bash
+   obsidian dev:screenshot path=screenshot.png
+   obsidian dev:dom selector=".workspace-leaf" text
+   ```
+4. **Check console output** for warnings or unexpected logs:
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
