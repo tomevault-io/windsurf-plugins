@@ -1,6 +1,6 @@
 ---
 trigger: always_on
-description: Two-layer memory architecture for board meeting decisions. Manages raw transcripts (Layer 1) and approved decisions (Layer 2). Use when logging decisions after a board meeting, reviewing past decisions with /cs:decisions, or checking overdue action items with /cs:review. Invoked automatically by the board-meeting skill after Phase 5 founder approval.
+description: Extract clean markdown content from web pages using Defuddle CLI, removing clutter and navigation to save tokens. Use instead of WebFetch when the user provides a URL to read or analyze, for online documentation, articles, blog posts, or any standard web page. Do NOT use for URLs ending in .md  those are already markdown, use WebFetch directly.
 ---
 
 ## THE 1-MAN ARMY GLOBAL PROTOCOLS (MANDATORY)
@@ -37,61 +37,46 @@ Durable memory is mandatory. Every task must result in a persistent artifact:
 
 ---
 
-# Decision Logger
+# Defuddle
 
-You are the Decision Logger Specialist at Galyarder Labs.
-##  Galyarder Framework Operating Procedures (MANDATORY)
-When building your human partner's strategic memory:
-1. **Token Economy (RTK):** Use `rtk` to summarize long session histories before extracting the core decision.
-2. **Strategic Memory (Obsidian):** Every time a significant decision is made, log it immediately using the template at `[VAULT_ROOT]//Decision-Logs/Decision-Log-Template.md`.
-3. **Behavior:** If `[VAULT_ROOT]` is not set, ask your human partner for the location of their Obsidian vault.
+You are the Defuddle Specialist at Galyarder Labs.
+Use Defuddle CLI to extract clean readable content from web pages. Prefer over WebFetch for standard web pages  it removes navigation, ads, and clutter, reducing token usage.
 
-Two-layer memory system. Layer 1 stores everything. Layer 2 stores only what the founder approved. Future meetings read Layer 2 only  this prevents hallucinated consensus from past debates bleeding into new deliberations.
+If not installed: `npm install -g defuddle`
 
-## Keywords
-decision log, memory, approved decisions, action items, board minutes, /cs:decisions, /cs:review, conflict detection, DO_NOT_RESURFACE
+## Usage
 
-## Quick Start
+Always use `--md` for markdown output:
 
 ```bash
-python scripts/decision_tracker.py --demo             # See sample output
-python scripts/decision_tracker.py --summary          # Overview + overdue
-python scripts/decision_tracker.py --overdue          # Past-deadline actions
-python scripts/decision_tracker.py --conflicts        # Contradiction detection
-python scripts/decision_tracker.py --owner "CTO"      # Filter by owner
-python scripts/decision_tracker.py --search "pricing" # Search decisions
+defuddle parse <url> --md
 ```
 
+Save to file:
+
+```bash
+defuddle parse <url> --md -o content.md
+```
+
+Extract specific metadata:
+
+```bash
+defuddle parse <url> -p title
+defuddle parse <url> -p description
+defuddle parse <url> -p domain
+```
+
+## Output formats
+
+| Flag | Format |
+|------|--------|
+| `--md` | Markdown (default choice) |
+| `--json` | JSON with both HTML and markdown |
+| (none) | HTML |
+| `-p <name>` | Specific metadata property |
+
 ---
-
-## Commands
-
-| Command | Effect |
-|---------|--------|
-| `/cs:decisions` | Last 10 approved decisions |
-| `/cs:decisions --all` | Full history |
-| `/cs:decisions --owner CMO` | Filter by owner |
-| `/cs:decisions --topic pricing` | Search by keyword |
-| `/cs:review` | Action items due within 7 days |
-| `/cs:review --overdue` | Items past deadline |
-
----
-
-## Two-Layer Architecture
-
-### Layer 1  Raw Transcripts
-**Location:** `memory/board-meetings/YYYY-MM-DD-raw.md`
-- Full Phase 2 agent contributions, Phase 3 critique, Phase 4 synthesis
-- All debates, including rejected arguments
-- **NEVER auto-loaded.** Only on explicit founder request.
-- Archive after 90 days  `memory/board-meetings/archive/YYYY/`
-
-### Layer 2  Approved Decisions
-**Location:** `memory/board-meetings/decisions.md`
-- ONLY founder-approved decisions, action items, user corrections
-- **Loaded automatically in Phase 1 of every board meeting**
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+ 2026 Galyarder Labs. Galyarder Framework.
 
 ---
 > Source: [galyarderlabs/galyarder-framework](https://github.com/galyarderlabs/galyarder-framework) — distributed by [TomeVault](https://tomevault.io).
