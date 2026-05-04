@@ -1,6 +1,6 @@
 ---
 trigger: always_on
-description: Use when starting feature work that needs isolation from current workspace or before executing implementation plans - creates isolated git worktrees with smart directory selection and safety verification
+description: >-
 ---
 
 ## THE 1-MAN ARMY GLOBAL PROTOCOLS (MANDATORY)
@@ -37,115 +37,82 @@ Durable memory is mandatory. Every task must result in a persistent artifact:
 
 ---
 
-# Using Git Worktrees
+# Validating Backup Integrity for Recovery
 
-You are the Using Git Worktrees Specialist at Galyarder Labs.
-## Overview
+You are the Validating Backup Integrity For Recovery Specialist at Galyarder Labs.
+## When to Use
 
-Git worktrees create isolated workspaces sharing the same repository, allowing work on multiple branches simultaneously without switching.
+Use this skill when:
+- Verifying backup integrity before relying on backups for ransomware recovery
+- Building automated backup validation pipelines that run after each backup job
+- Auditing backup infrastructure to confirm recoverability for compliance (SOC 2, ISO 27001, NIST CSF RC.RP-03)
+- Detecting silent data corruption (bit rot) in backup storage before a disaster occurs
+- Validating that immutable or air-gapped backups have not been tampered with
 
-**Core principle:** Systematic directory selection + safety verification = reliable isolation.
+**Do not use** for initial backup configuration or scheduling. This skill focuses on post-backup validation.
 
-**Announce at start:** "I'm using the using-git-worktrees skill to set up an isolated workspace."
+## Prerequisites
 
-## Directory Selection Process
+- Access to backup storage (local, NAS, S3, Azure Blob, GCS)
+- Python 3.9+ with `hashlib` (standard library)
+- Backup manifests or baseline hash files for comparison
+- Isolated restore environment for restore testing
+- Backup tool CLI access (restic, borgbackup, rclone, or vendor-specific)
 
-Follow this priority order:
+## Workflow
 
-### 1. Check Existing Directories
+### Step 1: Generate Baseline Hash Manifest
 
-```bash
-# Check in priority order
-ls -d .worktrees 2>/dev/null     # Preferred (hidden)
-ls -d worktrees 2>/dev/null      # Alternative
-```
-
-**If found:** Use that directory. If both exist, `.worktrees` wins.
-
-### 2. Check CLAUDE.md
-
-```bash
-grep -i "worktree.*director" CLAUDE.md 2>/dev/null
-```
-
-**If preference specified:** Use it without asking.
-
-### 3. Ask User
-
-If no directory exists and no CLAUDE.md preference:
-
-```
-No worktree directory found. Where should I create worktrees?
-
-1. .worktrees/ (project-local, hidden)
-2. ~/.config/worktrees/<project-name>/ (global location)
-
-Which would you prefer?
-```
-
-## Safety Verification
-
-### For Project-Local Directories (.worktrees or worktrees)
-
-**MUST verify directory is ignored before creating worktree:**
+Create a cryptographic fingerprint of every file at backup time:
 
 ```bash
-# Check if directory is ignored (respects local, global, and system gitignore)
-git check-ignore -q .worktrees 2>/dev/null || git check-ignore -q worktrees 2>/dev/null
+# Generate SHA-256 manifest for a directory
+find /data/production -type f -exec sha256sum {} \; > /manifests/prod_baseline_$(date +%Y%m%d).sha256
+
+# Verify manifest format
+head -5 /manifests/prod_baseline_20260319.sha256
+# e3b0c44298fc1c149afbf4c8996fb924...  /data/production/config.yaml
+# a7ffc6f8bf1ed76651c14756a061d662...  /data/production/database.sql
 ```
 
-**If NOT ignored:**
+### Step 2: Verify Backup Archive Integrity
 
-Per Jesse's rule "Fix broken things immediately":
-1. Add appropriate line to .gitignore
-2. Commit the change
-3. Proceed with worktree creation
-
-**Why critical:** Prevents accidentally committing worktree contents to repository.
-
-### For Global Directory (~/.config/worktrees)
-
-No .gitignore verification needed - outside project entirely.
-
-## Creation Steps
-
-### 1. Detect Project Name
+Check that the backup archive itself is not corrupted:
 
 ```bash
-project=$(basename "$(git rev-parse --show-toplevel)")
+# Restic: verify backup repository integrity
+restic -r s3:s3.amazonaws.com/backup-bucket check --read-data
+
+# Borg: verify backup archive
+borg check --verify-data /backup/repo::archive-2026-03-19
+
+# Tar with gzip: verify archive integrity
+gzip -t backup_20260319.tar.gz && echo "Archive OK" || echo "Archive CORRUPTED"
+
+# AWS S3: verify object checksums
+aws s3api head-object --bucket backup-bucket --key daily/2026-03-19.tar.gz \
+  --checksum-mode ENABLED
 ```
 
-### 2. Create Worktree
+### Step 3: Perform Restore Test to Isolated Environment
 
 ```bash
-# Determine full path
-case $LOCATION in
-  .worktrees|worktrees)
-    path="$LOCATION/$BRANCH_NAME"
-    ;;
-  ~/.config/worktrees/*)
-    path="~/.config/worktrees/$project/$BRANCH_NAME"
-    ;;
-esac
+# Restore to isolated test directory
+restic -r s3:s3.amazonaws.com/backup-bucket restore latest --target /restore-test/
 
-# Create worktree with new branch
-git worktree add "$path" -b "$BRANCH_NAME"
-cd "$path"
+# Generate hash manifest of restored data
+find /restore-test -type f -exec sha256sum {} \; > /manifests/restored_$(date +%Y%m%d).sha256
+
+# Compare baseline and restored manifests
+diff <(sort /manifests/prod_baseline_20260319.sha256) \
+     <(sort /manifests/restored_20260319.sha256)
 ```
 
-### 3. Run Project Setup
-
-Auto-detect and run appropriate setup:
+### Step 4: Validate Data Completeness
 
 ```bash
-# Node.js
-if [ -f package.json ]; then npm install; fi
-
-# Rust
-if [ -f Cargo.toml ]; then cargo build; fi
-
-# Python
-if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+# Count files in original vs restored
+echo "Original: $(find /data/production -type f | wc -l) files"
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
