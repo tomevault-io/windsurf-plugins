@@ -1,210 +1,199 @@
 ---
 trigger: always_on
-description: - **kebab-case** for all file names
+description: Entities transform database data to output schemas. Each entity has three files:
 ---
 
-# Naming Conventions
+# Code Patterns
 
-## File Naming
+## Entity Pattern
 
-### General Rules
+Entities transform database data to output schemas. Each entity has three files:
 
-- **kebab-case** for all file names
-- Use descriptive, clear names
-- Group related files in feature folders
+### Structure
 
-### Examples
-
-```text
-✅ Correct:
-- use-orders.ts
-- orders-list.tsx
-- sign-in-form.tsx
-- store-service.ts
-
-❌ Incorrect:
-- useOrders.ts (camelCase)
-- OrdersList.tsx (PascalCase)
-- sign_in_form.tsx (snake_case)
+```
+packages/common/src/entities/{entity-name}/
+  ├── entity.ts      # Transformation logic (getSimpleRo, getRo)
+  ├── query.ts       # Prisma query builders (getInclude, getWhere, getOrder)
+  └── index.ts       # Exports
 ```
 
-## TypeScript Files
-
-### Components (React/Next.js)
-
-- **kebab-case** for file names
-- **PascalCase** for component names (exported)
-- File name should match component name (lowercase)
+### Entity Class Pattern
 
 ```typescript
-// File: orders-list.tsx
-export default function OrdersList() { ... }
-
-// File: sign-in-form.tsx
-export function SignInForm() { ... }
-```
-
-### Hooks
-
-- **kebab-case** with `use-` prefix
-- **camelCase** for hook function names
-
-```typescript
-// File: use-orders.ts
-export function useOrders(input: ListOrdersInput) { ... }
-
-// File: use-dashboard-stats.ts
-export function useDashboardStats() { ... }
-```
-
-**Dashboard / Storefront `shared/lib/` hooks:** domain logic lives under `shared/lib/{domain}/` with these suffixes:
-- `controller.hook.ts` — screen-level orchestration (composes Zustand store + `appQueries` + `appMutations`)
-- `.hook.ts` — domain-specific hooks (including **form field** hooks such as `variants-field.hook.ts` under `shared/lib/variant/` — not a `controller`)
-- `.util.ts` — pure utility functions
-- `.store.ts` — Zustand store definitions
-
-Queries and mutations are accessed via `appQueries` / `appMutations` from `shared/api/`, not via individual hook files. See `.cursor/rules/apps/dashboard.mdc` and `.cursor/rules/apps/storefront.mdc`.
-
-### Utilities
-
-- **kebab-case** for file names
-- **camelCase** for function names
-
-```typescript
-// File: format-currency.ts
-export function formatCurrency(amount: number): string { ... }
-
-// File: generate-id.ts
-export function generateId(): string { ... }
-```
-
-### Services
-
-- **kebab-case** for file names with `-service` suffix
-- **PascalCase** for class names with `Service` suffix
-- **camelCase** for static methods
-
-```typescript
-// File: store-service.ts
-export class StoreService {
-  static async getAllStores(userId: string) { ... }
-  static async getStoreById(id: string, userId: string) { ... }
-}
-```
-
-### Entities
-
-- **kebab-case** for folder names
-- **PascalCase** for class names with `Entity` or `Query` suffix
-- **camelCase** for methods
-
-```typescript
-// File: packages/common/src/entities/store/entity.ts
+// entity.ts
 export class StoreEntity {
-  static getSimpleRo(entity: StoreSimpleDbData): StoreSimpleOutput { ... }
-  static getRo(entity: StoreIncludeDbData): StoreIncludeOutput { ... }
-}
+  static getSimpleRo(entity: StoreSimpleDbData): StoreSimpleOutput {
+    return { id: entity.id, name: entity.name };
+  }
 
-// File: packages/common/src/entities/store/query.ts
+  static getRo(entity: StoreIncludeDbData): StoreIncludeOutput {
+    return {
+      ...this.getSimpleRo(entity),
+      owner: UserEntity.getSimpleRo(entity.owner),
+      products: entity.products.map(ProductEntity.getSimpleRo),
+    };
+  }
+}
+```
+
+### Query Class Pattern
+
+```typescript
+// query.ts
 export class StoreQuery {
-  static getSimpleInclude() { ... }
-  static getInclude() { ... }
+  static getSimpleInclude() {
+    return {} satisfies Prisma.StoreInclude;
+  }
+
+  static getInclude() {
+    return {
+      ...this.getSimpleInclude(),
+      owner: UserQuery.getSimpleInclude(),
+      products: ProductQuery.getSimpleInclude(),
+    } satisfies Prisma.StoreInclude;
+  }
+
+  static getWhere(storeIds: string[], filters?: FilterOptions) {
+    return {
+      id: { in: storeIds },
+      ...(filters?.search && { name: { contains: filters.search } }),
+    } satisfies Prisma.StoreWhereInput;
+  }
+
+  static getOrder(direction: "asc" | "desc", field: string) {
+    return { [field]: direction } satisfies Prisma.StoreOrderByWithRelationInput;
+  }
 }
 ```
 
-### Schemas
+## Schema Pattern
 
-- **kebab-case** for folder names
-- **camelCase** for schema variable names with descriptive suffix
-- **PascalCase** for TypeScript types
+Schemas define input/output validation using Zod.
 
-```typescript
-// File: packages/common/src/schemas/store/input.ts
-export const storeInputSchema = z.object({ ... });
-export const createStoreInputSchema = storeInputSchema.extend({ ... });
-export type StoreInput = z.infer<typeof storeInputSchema>;
-export type CreateStoreInput = z.infer<typeof createStoreInputSchema>;
+### Structure
 
-// File: packages/common/src/schemas/store/output.ts
-export const storeSimpleOutputSchema = z.object({ ... });
-export const storeIncludeOutputSchema = storeSimpleOutputSchema.extend({ ... });
-export type StoreSimpleOutput = z.infer<typeof storeSimpleOutputSchema>;
-export type StoreIncludeOutput = z.infer<typeof storeIncludeOutputSchema>;
+```
+packages/common/src/schemas/{entity-name}/
+  ├── input.ts       # Input validation schemas
+  ├── output.ts      # Output type schemas
+  ├── enums.ts       # Enum schemas
+  └── index.ts       # Exports
 ```
 
-### Routers
-
-- **kebab-case** for file names
-- **camelCase** for router object names with `Router` suffix
-- **camelCase** for procedure names
+### Input Schema Pattern
 
 ```typescript
-// File: packages/orpc/src/routers/store.ts
+export const createStoreInputSchema = z.object({
+  name: z.string().min(1),
+  slug: z.string().min(1),
+  description: z.string().optional(),
+});
+
+export const listStoresInputSchema = z.object({
+  page: z.number().int().min(1).default(1),
+  limit: z.number().int().min(1).max(100).default(10),
+  search: z.string().optional(),
+});
+
+export type CreateStoreInput = z.infer<typeof createStoreInputSchema>;
+export type ListStoresInput  = z.infer<typeof listStoresInputSchema>;
+```
+
+## Service Pattern
+
+Services contain business logic and database operations.
+
+```typescript
+// packages/common/src/services/{entity}-service.ts
+export class StoreService {
+  static async getAllStores(userId: string): Promise<StoreSimpleOutput[]> {
+    const stores = await database.store.findMany({
+      where: { ownerId: userId },
+      include: StoreQuery.getClientSafeInclude(),
+    });
+    return stores.map(StoreEntity.getSimpleRo);
+  }
+}
+```
+
+## Router Pattern
+
+Routers define API endpoints using oRPC.
+
+```typescript
+// packages/orpc/src/routers/{entity}.ts
 export const storeRouter = {
-  getAll: protectedProcedure.handler(async ({ context }) => { ... }),
-  getById: protectedProcedure.handler(async ({ input, context }) => { ... }),
+  getAll: protectedProcedure
+    .input(listStoresInputSchema.optional())
+    .handler(async ({ context }) => {
+      return await StoreService.getAllStores(context.session.user.id);
+    }),
+
+  getById: protectedProcedure
+    .input(getStoreInputSchema)
+    .handler(async ({ input, context }) => {
+      return await StoreService.getStoreById(input.id, context.session.user.id);
+    }),
 };
 ```
 
-## Variable Naming
+## Query and Mutation Pattern
 
-### Constants
+Queries and mutations are accessed through centralized `appQueries` and `appMutations` in `shared/api/`.
+Never call `api.x.queryOptions` directly in components — always go through `appQueries`.
 
-- **UPPER_SNAKE_CASE** for environment variables and constants
-- **camelCase** for regular constants
-
-```typescript
-const DATABASE_URL = process.env.DATABASE_URL;
-const maxRetries = 3;
-```
-
-### Functions
-
-- **camelCase** for function names
-- Use descriptive verbs: `get`, `create`, `update`, `delete`, `find`, `list`
+### Query pattern
 
 ```typescript
-function getAllStores(userId: string) { ... }
-function createOrder(input: CreateOrderInput) { ... }
-function updateOrderStatus(id: string, status: OrderStatus) { ... }
+import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
+import { appQueries } from "@/shared/api/queries";
+
+const { data, isLoading } = useQuery(appQueries.order.all({ input: { page, limit } }));
+const { data: product }   = useSuspenseQuery(appQueries.product.byId({ input: { id } }));
 ```
 
-### Classes
-
-- **PascalCase** for class names
-- Use descriptive suffixes: `Entity`, `Service`, `Query`, `Router`
+### Mutation pattern
 
 ```typescript
-class StoreEntity { ... }
-class StoreService { ... }
-class StoreQuery { ... }
+import { useMutation } from "@tanstack/react-query";
+import { appMutations } from "@/shared/api/mutations";
+
+// appMutations handle cache invalidation automatically.
+// Any onSuccess/onError you pass runs AFTER the built-in behavior — it's chained, not replaced.
+const createMutation = useMutation(appMutations.product.create());
+
+const deleteMutation = useMutation(
+  appMutations.product.delete({
+    onSuccess: () => router.push("/products"),  // ← safe: runs after invalidation
+  })
+);
+
+// ❌ Never spread and override onSuccess — it drops the built-in invalidation
+const bad = useMutation({
+  ...appMutations.product.create(),
+  onSuccess: () => {},  // ← this silently removes cache invalidation
+});
 ```
 
-### Types and Interfaces
+## Query Data Type Extraction
 
-- **PascalCase** for type and interface names
-- Use descriptive suffixes: `Input`, `Output`, `SimpleOutput`, `IncludeOutput`, `DbData`
+Use `QueryData<T>` to extract the resolved data type from any `appQueries` factory at the type level:
 
 ```typescript
-type StoreInput = z.infer<typeof storeInputSchema>;
-type StoreSimpleOutput = z.infer<typeof storeSimpleOutputSchema>;
-type StoreIncludeDbData = Prisma.StoreGetPayload<{ ... }>;
-```
+import type { QueryData } from "@/shared/api/queries";
 
-## Folder Structure
+// Extract types without calling the function or importing server-only code
+type ProductList = QueryData<typeof appQueries.product.all>;
+type CurrentUser = QueryData<typeof appQueries.account.currentUser>;
+type StoreList   = QueryData<typeof appQueries.store.all>;
 
-### Feature-Based Organization
+// Use in component props
+interface Props {
+  product: QueryData<typeof appQueries.product.byId>;
+}
 
-Group files by feature/domain, not by file type:
-
-```text
-✅ Correct:
-src/
-  components/
-    app/
-      orders/
-        orders-list.tsx
-      products/
+// Use to annotate return values
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
