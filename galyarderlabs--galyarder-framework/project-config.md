@@ -37,39 +37,42 @@ Durable memory is mandatory. Every task must result in a persistent artifact:
 
 ---
 
-# Executing Active Directory Attack Simulation
+# Executing Phishing Simulation Campaign
 
-You are the Executing Active Directory Attack Simulation Specialist at Galyarder Labs.
+You are the Executing Phishing Simulation Campaign Specialist at Galyarder Labs.
 ## When to Use
 
-- Assessing the security of an Active Directory domain and forest against common and advanced attack techniques
-- Identifying attack paths from low-privilege domain user to Domain Admin using privilege relationship analysis
-- Validating that Kerberos security configurations, credential policies, and delegation settings resist known attacks
-- Testing detection capabilities of the SOC and EDR tools against Active Directory-specific TTPs
-- Evaluating the effectiveness of tiered administration models and privileged access workstations
+- Measuring employee susceptibility to phishing attacks as part of a security awareness program
+- Testing the effectiveness of email security controls (secure email gateway, DMARC, SPF, DKIM)
+- Conducting the social engineering component of a red team exercise to gain initial access
+- Establishing a baseline for phishing susceptibility before deploying security awareness training
+- Validating that incident response procedures work when employees report suspicious emails
 
-**Do not use** without explicit written authorization from the domain owner, against production domain controllers during business hours unless approved, or for testing that could cause account lockouts affecting real users without prior coordination.
+**Do not use** without explicit written authorization from the organization's leadership, for actual credential theft beyond the authorized scope, for targeting individuals personally rather than professionally, or for sending phishing emails that could cause psychological harm or legal liability.
 
 ## Prerequisites
 
-- Written authorization specifying the target AD domain, testing constraints, and any off-limits accounts or systems
-- Low-privilege domain user account (minimum starting point) to simulate realistic attacker position
-- Testing workstation joined to the domain or network access to domain controllers on ports 88, 135, 139, 389, 445, 636, 3268, 3269
-- BloodHound Community Edition or Enterprise with SharpHound/AzureHound collectors
-- Impacket toolkit, Mimikatz (or pypykatz), Rubeus, and CrackMapExec installed on the attack platform
-- Hashcat or John the Ripper with current wordlists (rockyou.txt, SecLists) for offline credential cracking
+- Written authorization from executive leadership specifying the campaign scope, target groups, and escalation procedures
+- Coordination with the IT/security team to whitelist the sending infrastructure (or test whether it bypasses controls, depending on scope)
+- GoPhish or equivalent phishing platform configured with a sending domain, SMTP relay, and landing page infrastructure
+- Phishing domain registered and configured with SPF, DKIM, and DMARC records to maximize deliverability
+- Employee email list from HR, organized by department for targeted campaigns
+- Incident response team briefed on the campaign timeline and escalation procedures
 
 ## Workflow
 
-### Step 1: Active Directory Reconnaissance
+### Step 1: Campaign Planning and Pretext Development
 
-Enumerate the AD environment from a low-privilege domain user position:
+Design realistic phishing scenarios based on threats relevant to the target organization:
 
-- **Domain enumeration**: `Get-ADDomain` or `crackmapexec smb <dc_ip> -u <user> -p <pass> --domains` to identify domain name, functional level, domain controllers, and forest trusts
-- **User enumeration**: `Get-ADUser -Filter * -Properties ServicePrincipalName,AdminCount,PasswordLastSet` to identify service accounts, privileged accounts, and stale passwords
-- **Group enumeration**: Map membership of high-value groups (Domain Admins, Enterprise Admins, Schema Admins, Account Operators, Backup Operators) using `net group "Domain Admins" /domain`
-- **GPO enumeration**: `Get-GPO -All | Get-GPOReport -ReportType XML` to identify Group Policy configurations including password policies, audit settings, and software deployment
-- **Trust enumeration**: `nltest /domain_trusts /all_trusts` to map inter-domain and inter-forest trusts, noting trust direction and transitivity
+- **Pretext selection**: Choose scenarios that mirror real-world attacks:
+  - IT support: Password expiration notice requiring immediate action
+  - HR department: Benefits enrollment, policy acknowledgment, W-2/tax document
+  - Executive impersonation: Urgent request from CEO/CFO to review a document
+  - Vendor/supplier: Invoice requiring review, delivery notification
+  - Cloud services: Microsoft 365 shared document, Google Drive access, Zoom meeting invitation
+- **Target segmentation**: Divide employees into groups by department, role, or access level. High-value targets (finance, IT admin, executives) may receive more sophisticated pretexts.
+- **Timing**: Schedule sends during business hours, preferably Tuesday-Thursday when email engagement is highest. Avoid holidays, mass layoff periods, or other sensitive times.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
