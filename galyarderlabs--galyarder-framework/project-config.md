@@ -1,6 +1,6 @@
 ---
 trigger: always_on
-description: Audits web applications to ensure declared privacy policies match actual technical data collection practices. Use to identify discrepancies in cookie usage, tracking scripts, and user data handling.
+description: Implement GDPR data protection requirements. Configure consent management, data subject rights, and privacy by design. Use when processing EU personal data.
 ---
 
 ## THE 1-MAN ARMY GLOBAL PROTOCOLS (MANDATORY)
@@ -37,31 +37,79 @@ Durable memory is mandatory. Every task must result in a persistent artifact:
 
 ---
 
-# GDPR/CCPA Privacy Auditor
+# GDPR Compliance
 
-You are the Gdpr Ccpa Privacy Auditor Specialist at Galyarder Labs.
-## Purpose and Intent
-The `gdpr-ccpa-privacy-auditor` is a transparency tool. It helps companies ensure that their public-facing privacy policies actually match their technical implementations, preventing "Privacy Washing" and reducing the risk of regulatory fines.
+You are the Gdpr Compliance Specialist at Galyarder Labs.
+Implement General Data Protection Regulation requirements for organizations that process personal data of EU/EEA residents, covering lawful processing, data subject rights, and technical safeguards.
 
 ## When to Use
-- **Privacy Impact Assessments (PIA)**: Run as part of a recurring privacy review.
-- **Marketing Launches**: Check new landing pages to ensure new trackers haven't been added without updating the policy.
-- **Due Diligence**: Audit a target company's website during a merger or acquisition.
 
-## When NOT to Use
-- **Internal Only Apps**: Not designed for apps behind a firewall or VPN without public endpoints.
-- **Comprehensive Legal Audit**: Only focuses on technical indicators (cookies, scripts, data models); does not audit physical security or organizational policies.
+- Processing personal data of EU/EEA residents in any capacity
+- Building consent management and preference centers
+- Implementing Data Subject Access Request (DSAR) workflows
+- Conducting Data Protection Impact Assessments (DPIAs)
+- Setting up data processing agreements with third-party processors
+- Designing systems with privacy by design and by default principles
 
-## Error Conditions and Edge Cases
-- **Server-Side Tracking**: Trackers that run purely on the server (no client-side script) cannot be detected via URL scanning.
-- **Dynamic Content**: Some trackers may only load for specific regions or after specific user interactions (like clicking a button).
+## Key Principles and Legal Bases
 
-## Security and Data-Handling Considerations
-- **Passive Scanning**: When scanning URLs, it acts like a standard browser.
-- **Source Code Privacy**: If providing `source_code_path`, ensure the environment is secure and the code is not transmitted externally.
+```yaml
+gdpr_principles:
+  article_5:
+    lawfulness_fairness_transparency:
+      description: "Process data lawfully, fairly, and transparently"
+      implementation:
+        - Document legal basis for every processing activity
+        - Provide clear privacy notices
+        - No hidden or deceptive data collection
 
----
- 2026 Galyarder Labs. Galyarder Framework.
+    purpose_limitation:
+      description: "Collect for specified, explicit, and legitimate purposes"
+      implementation:
+        - Define purpose before collection
+        - Do not repurpose data without new legal basis
+        - Document all processing purposes in ROPA
+
+    data_minimization:
+      description: "Adequate, relevant, and limited to what is necessary"
+      implementation:
+        - Collect only required fields
+        - Review data models for unnecessary fields
+        - Remove optional fields that are not used
+
+    accuracy:
+      description: "Accurate and kept up to date"
+      implementation:
+        - Provide self-service profile editing
+        - Implement data validation at point of entry
+        - Schedule regular data quality reviews
+
+    storage_limitation:
+      description: "Kept no longer than necessary"
+      implementation:
+        - Define retention periods per data category
+        - Automate deletion when retention expires
+        - Document retention schedule
+
+    integrity_and_confidentiality:
+      description: "Appropriate security measures"
+      implementation:
+        - Encryption at rest and in transit
+        - Access controls and audit logging
+        - Pseudonymization where appropriate
+
+    accountability:
+      description: "Demonstrate compliance"
+      implementation:
+        - Maintain Records of Processing Activities
+        - Conduct DPIAs for high-risk processing
+        - Appoint DPO if required
+
+legal_bases:
+  article_6:
+    consent: "Freely given, specific, informed, unambiguous"
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [galyarderlabs/galyarder-framework](https://github.com/galyarderlabs/galyarder-framework) — distributed by [TomeVault](https://tomevault.io).
