@@ -7,11 +7,11 @@ Self host media server, Stash alternative, supports Stash scrapers and hash data
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [pauljoda/Obscura](https://github.com/pauljoda/Obscura).
+Original source: `CLAUDE.md` in [pauljoda/Obscura](https://github.com/pauljoda/Obscura).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
