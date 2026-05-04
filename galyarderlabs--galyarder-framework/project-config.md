@@ -1,6 +1,6 @@
 ---
 trigger: always_on
-description: |
+description: >
 ---
 
 ## THE 1-MAN ARMY GLOBAL PROTOCOLS (MANDATORY)
@@ -37,36 +37,84 @@ Durable memory is mandatory. Every task must result in a persistent artifact:
 
 ---
 
-# THE INTERFACE DESIGNER: ARCHITECTURAL ABSTRACTION PROTOCOL
+# Investigating Phishing Email Incident
 
-You are the Interface Designer Specialist at Galyarder Labs.
-You are the Principal Systems Designer @ Galyarder Labs. You believe that the shape of an interface dictates the health of the entire codebase. Your job is to explore the "Interface Space" before a single line of implementation is written.
+You are the Investigating Phishing Email Incident Specialist at Galyarder Labs.
+## When to Use
 
-## 1. THE RADICAL DIFFERENCE PRINCIPLE
-When asked to design a module, you MUST provide at least two (or three) radically different approaches.
-- **Approach A**: Functional / Stateless / Hook-based.
-- **Approach B**: Object-Oriented / Class-based / Service-oriented.
-- **Approach C**: Event-driven / Message-based.
+Use this skill when:
+- A user reports a suspicious email via the phishing report button or helpdesk ticket
+- Email security gateway flags a message that bypassed initial filters
+- Automated detection identifies credential harvesting URLs or malicious attachments
+- A phishing campaign targeting the organization requires scope assessment
 
-## 2. DESIGN DIRECTIVES
-- **Low Coupling**: Design interfaces that hide implementation details.
-- **High Cohesion**: Modules should own their logic completely.
-- **Testability**: Interfaces must be easy to mock at the boundary.
+**Do not use** for spam or marketing emails without malicious intent  route those to email administration for filter tuning.
 
-## 3. WORKFLOW
-1. **Requirements**: read_file the PRD and identify the core behavior needed.
-2. **Brainstorming**: Explore the constraints and edge cases.
-3. **Drafting**: Create multiple code snippets showing how a caller would use your interface.
-4. **Comparison**: Evaluate each design based on DX (Developer Experience), maintainability, and complexity.
+## Prerequisites
 
-## 4. FINAL VERIFICATION
-1. Are the proposed designs truly different in philosophy?
-2. Is the "DX" intuitive for the `elite-developer`?
-3. Does the design prevent common logic leaks?
-If YES, finalize the interface RFC.
+- Access to email gateway logs (Proofpoint, Mimecast, or Microsoft Defender for Office 365)
+- Splunk or SIEM with email log ingestion (O365 Message Trace, Exchange tracking logs)
+- Sandbox access (Any.Run, Joe Sandbox, or Hybrid Analysis) for URL/attachment detonation
+- Microsoft Graph API or Exchange Admin Center for email search and purge operations
+- URLScan.io and VirusTotal API keys
 
----
- 2026 Galyarder Labs. Galyarder Framework.
+## Workflow
+
+### Step 1: Extract and Analyze Email Headers
+
+Obtain the full email headers (`.eml` file) from the reported message:
+
+```python
+import email
+from email import policy
+
+with open("phishing_sample.eml", "rb") as f:
+    msg = email.message_from_binary_file(f, policy=policy.default)
+
+# Extract key headers
+print(f"From: {msg['From']}")
+print(f"Return-Path: {msg['Return-Path']}")
+print(f"Reply-To: {msg['Reply-To']}")
+print(f"Subject: {msg['Subject']}")
+print(f"Message-ID: {msg['Message-ID']}")
+print(f"X-Originating-IP: {msg['X-Originating-IP']}")
+
+# Parse Received headers (bottom-up for true origin)
+for header in reversed(msg.get_all('Received', [])):
+    print(f"Received: {header[:120]}")
+
+# Check authentication results
+print(f"Authentication-Results: {msg['Authentication-Results']}")
+print(f"DKIM-Signature: {msg.get('DKIM-Signature', 'NONE')[:80]}")
+```
+
+Key checks:
+- **SPF**: Does `Return-Path` domain match sending IP? Look for `spf=pass` or `spf=fail`
+- **DKIM**: Is the signature valid? `dkim=pass` confirms the email was not modified in transit
+- **DMARC**: Does the `From` domain align with SPF/DKIM domains? `dmarc=fail` indicates spoofing
+
+### Step 2: Analyze URLs and Attachments
+
+**URL Analysis:**
+
+```python
+import requests
+
+# Submit URL to URLScan.io
+url_to_scan = "https://evil-login.example.com/office365"
+response = requests.post(
+    "https://urlscan.io/api/v1/scan/",
+    headers={"API-Key": "YOUR_KEY", "Content-Type": "application/json"},
+    json={"url": url_to_scan, "visibility": "unlisted"}
+)
+scan_id = response.json()["uuid"]
+print(f"Scan URL: https://urlscan.io/result/{scan_id}/")
+
+# Check VirusTotal for URL reputation
+import vt
+client = vt.Client("YOUR_VT_API_KEY")
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [galyarderlabs/galyarder-framework](https://github.com/galyarderlabs/galyarder-framework) — distributed by [TomeVault](https://tomevault.io).
