@@ -1,231 +1,159 @@
 ---
 trigger: always_on
-description: Professional investment analysis prompts for Gemini CLI. 18 universal frameworks for comprehensive stock market evaluation.
+description: This repository contains 18 professional investment analysis frameworks for US stock markets. When working in this workspace, Copilot automatically loads these analysis methodologies to provide institutional-quality investment analysis.
 ---
 
-# InvestSkill for Gemini CLI
+# InvestSkill — GitHub Copilot Setup & Usage Guide
 
-Professional investment analysis prompts for Gemini CLI. 18 universal frameworks for comprehensive stock market evaluation.
+This repository contains 18 professional investment analysis frameworks for US stock markets. When working in this workspace, Copilot automatically loads these analysis methodologies to provide institutional-quality investment analysis.
 
-**For multi-platform setup**, see [README.md](README.md)
+## Installation & Setup
 
----
+### Automatic Setup
 
-## Quick Start
+GitHub Copilot automatically loads this file when you work in the InvestSkill repository. **No manual installation required.**
 
-### Installation
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/yennanliu/InvestSkill.git
+   cd InvestSkill
+   ```
 
-Gemini CLI automatically loads `GEMINI.md` when you run it in the project directory.
+2. **Open in your editor:**
+   - **VS Code**: `code .`
+   - **JetBrains IDE** (IntelliJ, PyCharm, etc.): Open the folder
+   - **GitHub.com Web Editor**: Click `.` key in any GitHub repo view
 
-```bash
-# Navigate to InvestSkill
-cd /path/to/InvestSkill
+3. **Open Copilot Chat** (usually `Ctrl+K` or `Cmd+K`)
+   - Copilot automatically loads `copilot-instructions.md`
+   - You now have access to all 18 analysis frameworks
 
-# Start Gemini CLI
-gemini
+### Verify Setup
 
-# GEMINI.md auto-loaded!
+In Copilot Chat, try:
+```
+Use the stock-valuation framework to analyze Apple (AAPL)
 ```
 
-### First Analysis
-
-In Gemini CLI:
-
-```
-> @prompts/stock-eval.md Evaluate Apple (AAPL)
-```
-
-Or reference directly:
-
-```
-> @prompts/stock-valuation.md What's a fair valuation for Microsoft?
-```
+If Copilot references the frameworks, setup is complete!
 
 ---
 
-## All 18 Frameworks
+## Available Analysis Frameworks (20 Total)
 
-### Core Analysis (6)
-```
-@prompts/stock-eval.md                  # Stock evaluation with quality scoring
-@prompts/stock-valuation.md             # Multi-method valuation (DCF + comps + EV)
-@prompts/fundamental-analysis.md        # Financial statement analysis
-@prompts/technical-analysis.md          # Chart patterns and indicators
-@prompts/dcf-valuation.md              # DCF intrinsic value model
-@prompts/economics-analysis.md          # Macro indicators and recession risk
-```
+### Core Stock Analysis (6 frameworks)
 
-### Financial Reports (2)
-```
-@prompts/financial-report-analyst.md    # 10-K, 10-Q, annual report analysis
-@prompts/earnings-call-analysis.md      # Earnings call sentiment and themes
-```
+| Framework | File | Best For |
+|-----------|------|----------|
+| Stock Evaluation | `prompts/stock-eval.md` | Comprehensive stock quality scoring |
+| Stock Valuation | `prompts/stock-valuation.md` | Multi-method valuation (DCF + comps + EV) |
+| Fundamental Analysis | `prompts/fundamental-analysis.md` | Deep financial statement dive |
+| Technical Analysis | `prompts/technical-analysis.md` | Chart patterns and indicators |
+| DCF Valuation | `prompts/dcf-valuation.md` | Intrinsic value modeling |
+| Economics Analysis | `prompts/economics-analysis.md` | Macro outlook and recession risk |
 
-### Market Monitoring (4)
-```
-@prompts/insider-trading.md             # SEC Form 4 insider activity
-@prompts/institutional-ownership.md     # 13F institutional holdings tracking
-@prompts/dividend-analysis.md           # Dividend safety and yield analysis
-@prompts/short-interest.md              # Short squeeze potential
-```
+### Financial Report Analysis (2 frameworks)
 
-### Advanced Analysis (4)
-```
-@prompts/competitor-analysis.md         # Economic moat and Porter's Five Forces
-@prompts/options-analysis.md            # Options strategy selection
-@prompts/portfolio-review.md            # Portfolio allocation and optimization
-@prompts/sector-analysis.md             # Sector rotation opportunities
-```
+| Framework | File | Best For |
+|-----------|------|----------|
+| Financial Report Analyst | `prompts/financial-report-analyst.md` | 10-K/10-Q analysis |
+| Earnings Call Analysis | `prompts/earnings-call-analysis.md` | Management tone and guidance |
 
-### Comprehensive Research (2)
-```
-@prompts/research-bundle.md             # All frameworks combined
-```
+### Market Monitoring (4 frameworks)
+
+| Framework | File | Best For |
+|-----------|------|----------|
+| Insider Trading | `prompts/insider-trading.md` | Form 4 insider activity tracking |
+| Institutional Ownership | `prompts/institutional-ownership.md` | 13F smart money moves |
+| Dividend Analysis | `prompts/dividend-analysis.md` | Dividend safety and sustainability |
+| Short Interest | `prompts/short-interest.md` | Squeeze potential and bearish thesis |
+
+### Advanced Analysis (4 frameworks)
+
+| Framework | File | Best For |
+|-----------|------|----------|
+| Competitor Analysis | `prompts/competitor-analysis.md` | Moat and competitive positioning |
+| Options Analysis | `prompts/options-analysis.md` | Greeks, strategy selection, earnings plays |
+| Portfolio Review | `prompts/portfolio-review.md` | Allocation optimization |
+| Sector Analysis | `prompts/sector-analysis.md` | Sector rotation opportunities |
+
+### Full Research Bundle (2 frameworks)
+
+| Framework | File | Best For |
+|-----------|------|----------|
+| Research Bundle | `prompts/research-bundle.md` | Comprehensive multi-framework analysis |
+| (Combined) | (all frameworks) | Complete investment thesis |
+
+### Meta-Analysis & Visualization (2 frameworks)
+
+| Framework | File | Best For |
+|-----------|------|----------|
+| Result Validator | `prompts/result-validator.md` | Validate any analysis + confidence score (0–100) |
+| Chart Master | `prompts/chart-master.md` | Generate Mermaid/ASCII/HTML charts from financial data |
 
 ---
 
 ## Usage Examples
 
-### Basic Stock Analysis
+### Natural Language Queries
+
+Copilot understands the frameworks context naturally:
 
 ```
-# Stock evaluation
-> @prompts/stock-eval.md Evaluate Apple (AAPL) using Piotroski F-Score
+# Evaluate a stock
+Perform a stock evaluation of Microsoft using the Piotroski F-Score methodology
 
 # Valuation analysis
-> @prompts/stock-valuation.md What's a fair valuation for Microsoft?
+What's a fair valuation for Apple using DCF, comparable companies, and EV multiples?
 
-# Fundamental deep dive
-> @prompts/fundamental-analysis.md Deep analysis of NVIDIA's financials
+# Financial statement analysis
+Deep dive into Tesla's balance sheet and cash flow quality
+
+# Market context
+What's the current economic outlook? Is recession likely?
 
 # Technical setup
-> @prompts/technical-analysis.md What are Tesla's key technical levels?
+What are the key technical levels for NVDA?
 
-# Economic context
-> @prompts/economics-analysis.md Is a recession likely in the next 12 months?
+# Combined analysis
+Analyze Nvidia from both fundamental and technical perspectives
 ```
 
-### Financial Data Analysis
+### Explicit Framework References
 
-**Analyze 10-K filing:**
-```
-> @prompts/financial-report-analyst.md
-[paste 10-K text here]
-
-Extract key accounting red flags and management quality indicators
-```
-
-**Analyze earnings transcript:**
-```
-> @prompts/earnings-call-analysis.md
-[paste earnings call transcript]
-
-What's the management tone and guidance outlook?
-```
-
-**Review portfolio:**
-```
-> @prompts/portfolio-review.md
-AAPL: 30%
-MSFT: 25%
-NVDA: 20%
-JNJ: 15%
-TSLA: 10%
-
-Is my allocation optimal?
-```
-
-### Stock Comparison
+Reference specific prompt files for precise methodology:
 
 ```
-# Compare valuations
-> @prompts/stock-valuation.md Compare AAPL vs MSFT valuations
+# Stock valuation with all methods
+Use the framework in prompts/stock-valuation.md to analyze AAPL
 
-# Compare fundamentals
-> @prompts/fundamental-analysis.md Compare AAPL and MSFT balance sheets
+# Fundamental deep dive
+Apply prompts/fundamental-analysis.md to Microsoft's financials
 
-# Multi-stock research
-> @prompts/research-bundle.md Provide comprehensive analysis and comparison:
-- AAPL
-- MSFT
-- GOOGL
+# Technical analysis
+Reference prompts/technical-analysis.md for Tesla chart patterns
+
+# Financial report analysis
+Use prompts/financial-report-analyst.md to analyze this 10-K filing: [paste text]
+
+# Earnings transcript analysis
+Apply prompts/earnings-call-analysis.md to this earnings call: [paste transcript]
 ```
 
-### Specialized Analysis
+### With Financial Data
 
 ```
-# Dividend safety
-> @prompts/dividend-analysis.md Is the JNJ dividend safe?
+# Paste financial statements
+Use the fundamental-analysis framework to analyze these financial statements:
+[paste balance sheet, income statement, cash flow]
 
-# Short squeeze
-> @prompts/short-interest.md What's the short squeeze potential in GME?
-
-# Options strategy
-> @prompts/options-analysis.md Find bullish option strategies for AAPL earnings
-
-# Competitive moat
-> @prompts/competitor-analysis.md Does Apple have a defensible moat?
-
-# Insider activity
-> @prompts/insider-trading.md What are insiders buying at Tesla?
-
-# Smart money tracking
-> @prompts/institutional-ownership.md Which institutions are rotating into tech?
-
-# Sector opportunities
-> @prompts/sector-analysis.md Which sectors should I rotate into?
-```
-
-### Full Research Bundle
-
-```
-# Complete analysis (all frameworks)
-> @prompts/research-bundle.md Provide complete analysis on Apple (AAPL)
-
-# Quick version
-> @prompts/research-bundle.md Quick analysis of Microsoft (MSFT)
-
-# Multi-stock comparison
-> @prompts/research-bundle.md Compare AAPL, MSFT, and GOOGL comprehensively
-```
-
----
-
-## Features
-
-✅ **18 Professional Analysis Frameworks**
-- Universal prompts (AI-agnostic)
-- No Gemini-specific syntax needed
-- Works with any AI model via Gemini CLI
-
-✅ **File Reference Support**
-- Use `@prompts/<name>.md` syntax
-- Auto-loads from project directory
-- Supports all 18 analysis types
-
-✅ **Financial Data Integration**
-- Paste SEC filings (10-K, 10-Q)
-- Paste earnings transcripts
-- Paste financial statements
-- Reference documents inline
-
-✅ **Session Memory**
-- Gemini CLI remembers conversation context
-- Ask follow-up questions naturally
-- Multi-turn analysis chains
-
-✅ **Model Agnostic**
-- Works with all Gemini models
-- Works with any Claude model
-- Works with any AI accessible via Gemini CLI
-
----
-
-## Installation & Troubleshooting
+# Paste SEC filings
+Use the financial-report-analyst framework on this 10-Q:
+[paste 10-Q text]
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/yennanliu) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-10 -->
+> Source: [yennanliu/InvestSkill](https://github.com/yennanliu/InvestSkill) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-04 -->
