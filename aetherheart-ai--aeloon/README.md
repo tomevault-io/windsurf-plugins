@@ -7,11 +7,11 @@ Aeloon Agent
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [AetherHeart-AI/Aeloon](https://github.com/AetherHeart-AI/Aeloon).
+Original source: `CLAUDE.md` in [AetherHeart-AI/Aeloon](https://github.com/AetherHeart-AI/Aeloon).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
