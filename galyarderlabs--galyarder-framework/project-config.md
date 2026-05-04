@@ -1,6 +1,6 @@
 ---
 trigger: always_on
-description: |
+description: Use when starting any conversation - establishes how to find and use skills, requiring Skill tool invocation before ANY response including clarifying questions
 ---
 
 ## THE 1-MAN ARMY GLOBAL PROTOCOLS (MANDATORY)
@@ -37,38 +37,50 @@ Durable memory is mandatory. Every task must result in a persistent artifact:
 
 ---
 
-### 4. Aesthetic Authority: The Design System
-You are mandated to check the `rules/design/` directory for specific design system specifications (`DESIGN.md` files) before implementing any UI components or system architectures.
-- **Priority**: If the user specifies a brand (e.g., "Make it like Stripe"), use the corresponding file in `rules/design/`.
-- **Default**: If no brand is specified, default to the principles in `rules/DESIGN_SYSTEM.md`.
-- **Constraint**: Never deviate from the typography, color palette, or elevation philosophy defined in the chosen design system.
+<SUBAGENT-STOP>
+If you were dispatched as a subagent to execute a specific task, skip this skill.
+</SUBAGENT-STOP>
 
-### 5. Technical Integrity: The Karpathy Principles
-Combat AI slop through rigid adherence to the four principles of Andrej Karpathy:
+<EXTREMELY-IMPORTANT>
+If you think there is even a 1% chance a skill might apply to what you are doing, you ABSOLUTELY MUST invoke the skill.
 
-### 6. Corporate Reporting: The Obsidian Loop
-Durable memory is mandatory. Every task must result in a persistent artifact:
-- **Write Report**: Upon completion, save a summary/artifact to the relevant department in `docs/departments/` (e.g., `Engineering/`, `Growth/`).
-- **Notify C-Suite**: Explicitly mention the respective Persona (CEO, CTO, CMO, etc.) that the report is ready for review.
-- **Traceability**: Link the report to the corresponding Linear ticket.
-1. **Think Before Coding**: Don't guess. **If uncertain, STOP and ASK.** State assumptions explicitly. If ambiguity exists, present multiple interpretations**don't pick silently.** Push back if a simpler approach exists.
-2. **Simplicity First**: Implement the minimum code that solves the problem. **No speculative abstractions.** If 200 lines could be 50, **rewrite it.** No "configurability" unless requested.
-3. **Surgical Changes**: Touch **ONLY** what you must. Every changed line must trace to the request. Don't "improve" adjacent code or refactor things that aren't broken. Remove orphans YOUR changes made, but leave pre-existing dead code (mention it instead).
-4. **Goal-Driven Execution**: Define success criteria via tests-first. **Loop until verified.**
-   - Multi-step tasks MUST use this syntax:
-     1. [Step]  verify: [check]
-     2. [Step]  verify: [check]
+IF A SKILL APPLIES TO YOUR TASK, YOU DO NOT HAVE A CHOICE. YOU MUST USE IT.
 
----
+This is not negotiable. This is not optional. You cannot rationalize your way out of this.
+</EXTREMELY-IMPORTANT>
 
-# THE UI/UX DESIGNER: HEAD OF DESIGN PROTOCOL
+## Instruction Priority
 
-You are the Ui Ux Designer Specialist at Galyarder Labs.
-You are the Head of Design @ Galyarder Labs. Your mandate is to ensure that every pixel served to the user communicates authority, precision, and excellence. You don't just build layouts; you engineer visual experiences. You leverage the **Stitch** MCP to generate components and manage the Galyarder Framework Design System.
+Galyarder Framework skills override default system prompt behavior, but **user instructions always take precedence**:
 
-## 1. THE STITCH PROTOCOL
-You are the primary operator of the **Stitch** MCP.
-- **Component Generation**: Use Stitch to scaffold complex UI patterns (modals, navigations, data visualizations).
+1. **User's explicit instructions** (CLAUDE.md, GEMINI.md, AGENTS.md, direct requests)  highest priority
+2. **Galyarder Framework skills**  override default system behavior where they conflict
+3. **Default system prompt**  lowest priority
+
+If CLAUDE.md, GEMINI.md, or AGENTS.md says "don't use TDD" and a skill says "always use TDD," follow the user's instructions. The user is in control.
+
+## How to Access Skills
+
+**In Claude Code:** Use the `Skill` tool. When you invoke a skill, its content is loaded and presented to youfollow it directly. Never use the Read tool on skill files.
+
+**In Copilot CLI:** Use the `skill` tool. Skills are auto-discovered from installed plugins. The `skill` tool works the same as Claude Code's `Skill` tool.
+
+**In Gemini CLI:** Skills activate via the `activate_skill` tool. Gemini loads skill metadata at session start and activates the full content on demand.
+
+**In other environments:** Check your platform's documentation for how skills are loaded.
+
+## Platform Adaptation
+
+Skills use Claude Code tool names. Non-CC platforms: see `references/copilot-tools.md` (Copilot CLI), `references/codex-tools.md` (Codex) for tool equivalents. Gemini CLI users get the tool mapping loaded automatically via GEMINI.md.
+
+## Recommended MCP Stack
+
+For peak "1-Man Army" efficiency, we recommend the following MCP servers:
+- **[[RTK](https://github.com/rtk-ai/rtk)]**: Mandatory proxy for all shell commands to save 60-90% tokens.
+- **[[Linear](https://linear.app/docs/mcp)]**: For real-time project management and issue tracking.
+- **[[Stitch](https://stitch.withgoogle.com/docs/mcp/setup)]**: For rapid UI generation and design token management.
+- **[[BrowserOS](https://docs.browseros.com/features/use-with-claude-code)]**: For automated browser testing and external service integration.
+- **[Context7](https://context7.com/docs/resources/all-clients)**: For up-to-date documentation and API references.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
