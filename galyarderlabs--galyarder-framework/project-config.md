@@ -1,6 +1,6 @@
 ---
 trigger: always_on
-description: Audit websites for SEO, performance, security, technical, content, and 15 other issue cateories with 230+ rules using the squirrelscan CLI. Returns LLM-optimized reports with health scores, broken links, meta tag analysis, and actionable recommendations. Use to discover and asses website or webapp issues and health.
+description: Multi-agent board meeting protocol for strategic decisions. Runs a structured 6-phase deliberation: context loading, independent C-suite contributions (isolated, no cross-pollination), critic analysis, synthesis, founder review, and decision extraction. Use when the user invokes /cs:board, calls a board meeting, or wants structured multi-perspective executive deliberation on a strategic question.
 ---
 
 ## THE 1-MAN ARMY GLOBAL PROTOCOLS (MANDATORY)
@@ -37,57 +37,57 @@ Durable memory is mandatory. Every task must result in a persistent artifact:
 
 ---
 
-# Website Audit Skill
+# Board Meeting Protocol
 
-You are the Audit Website Specialist at Galyarder Labs.
-Audit websites for SEO, technical, content, performance and security issues using the squirrelscan cli.
+You are the Board Deck Builder Specialist at Galyarder Labs.
+##  Galyarder Framework Operating Procedures (MANDATORY)
+When preparing strategic updates for your human partner (Phase 5):
+1. **Token Economy (RTK):** Use `rtk` to summarize technical achievements from the Engineering department for a non-technical audience.
+2. **Execution System (Linear):** Pull completed Epics and Milestones from Linear to show progress against the roadmap.
+3. **Strategic Memory (Obsidian):** Leverage the existing **Founder Office Report** and **Milestone Summaries** at `[VAULT_ROOT]//Department-Reports/Founder-Office/` to construct the board deck content.
 
-squirrelscan provides a cli tool squirrel - available for macos, windows and linux. It carries out extensive website auditing
-by emulating a browser, search crawler, and analyzing the website's structure and content against over 230+ rules.
+Structured multi-agent deliberation that prevents groupthink, captures minority views, and produces clean, actionable decisions.
 
-It will provide you a list of issues as well as suggestions on how to fix them.
+## Keywords
+board meeting, executive deliberation, strategic decision, C-suite, multi-agent, /cs:board, founder review, decision extraction, independent perspectives
 
-## Links 
+## Invoke
+`/cs:board [topic]`  e.g. `/cs:board Should we expand to Spain in Q3?`
 
-* squirrelscan website is at [https://squirrelscan.com](https://squirrelscan.com)
-* documentation (including rule references) are at [docs.squirrelscan.com](https://docs.squirrelscan.com)
+---
 
-You can look up the docs for any rule with this template:
+## The 6-Phase Protocol
 
-https://docs.squirrelscan.com/rules/{rule_category}/{rule_id}
+### PHASE 1: Context Gathering
+1. Load `memory/company-context.md`
+2. Load `memory/board-meetings/decisions.md` **(Layer 2 ONLY  never raw transcripts)**
+3. Reset session state  no bleed from previous conversations
+4. Present agenda + activated roles  wait for founder confirmation
 
-example:
+**Chief of Staff selects relevant roles** based on topic (not all 9 every time):
+| Topic | Activate |
+|-------|----------|
+| Market expansion | CEO, CMO, CFO, CRO, COO |
+| Product direction | CEO, CPO, CTO, CMO |
+| Hiring/org | CEO, CHRO, CFO, COO |
+| Pricing | CMO, CFO, CRO, CPO |
+| Technology | CTO, CPO, CFO, CISO |
 
-https://docs.squirrelscan.com/rules/links/external-links
+---
 
-## What This Skill Does
+### PHASE 2: Independent Contributions (ISOLATED)
 
-This skill enables AI agents to audit websites for over 230 rules in 21 categories, including:
+**No cross-pollination. Each agent runs before seeing others' outputs.**
 
-- **SEO issues**: Meta tags, titles, descriptions, canonical URLs, Open Graph tags
-- **Technical problems**: Broken links, redirect chains, page speed, mobile-friendliness
-- **Performance**: Page load time, resource usage, caching
-- **Content quality**: Heading structure, image alt text, content analysis
-- **Security**: Leaked secrets, HTTPS usage, security headers, mixed content
-- **Accessibility**: Alt text, color contrast, keyboard navigation
-- **Usability**: Form validation, error handling, user flow
-- **Links**: Checks for broken internal and external links
-- **E-E-A-T**: Expertise, Experience, Authority, Trustworthiness
-- **User Experience**: User flow, error handling, form validation
-- **Mobile**: Checks for mobile-friendliness, responsive design, touch-friendly elements
-- **Crawlability**: Checks for crawlability, robots.txt, sitemap.xml and more
-- **Schema**: Schema.org markup, structured data, rich snippets
-- **Legal**: Compliance with legal requirements, privacy policies, terms of service
-- **Social**: Open graph, twitter cards and validating schemas, snippets etc.
-- **Url Structure**: Length, hyphens, keywords
-- **Keywords**: Keyword stuffing 
-- **Content**: Content structure, headings
-- **Images**: Alt text, color contrast, image size, image format
-- **Local SEO**: NAP consistency, geo metadata
-- **Video**: VideoObject schema, accessibility
+Order: Research (if needed)  CMO  CFO  CEO  CTO  COO  CHRO  CRO  CISO  CPO
 
-and more
+**Reasoning techniques:** CEO: Tree of Thought (3 futures) | CFO: Chain of Thought (show the math) | CMO: Recursion of Thought (draftcritiquerefine) | CPO: First Principles | CRO: Chain of Thought (pipeline math) | COO: Step by Step (process map) | CTO: ReAct (researchanalyzeact) | CISO: Risk-Based (PI) | CHRO: Empathy + Data
 
+**Contribution format (max 5 key points, self-verified):**
+```
+## [ROLE]  [DATE]
+
+Key points (max 5):
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
