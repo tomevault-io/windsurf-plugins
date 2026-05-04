@@ -1,0 +1,30 @@
+# AI instruction files for nice-vibes
+
+> Sourced from [Alyxion/nice-vibes](https://github.com/Alyxion/nice-vibes) and converted for every major platform by [TomeVault](https://tomevault.io)
+
+NiceVibes - Teach AI agents to build beautiful NiceGUI applications
+
+## Windsurf Config
+
+The `project-config.md` file in this directory is the project config converted for Windsurf.
+Original source: `.cursor/rules/*.mdc` in [Alyxion/nice-vibes](https://github.com/Alyxion/nice-vibes).
+
+## Also available for
+
+- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
+- **GitHub Copilot** — `copilot-instructions.md`
+- **Gemini CLI** — `GEMINI.md`
+- **Windsurf** — `project-config.md`
+
+From [Alyxion/nice-vibes](https://github.com/Alyxion/nice-vibes) — a repo with 13+ stars on GitHub.
+
+---
+
+Install this config instantly:
+```
+npx tomevault install Alyxion/nice-vibes
+```
+Source: [github.com/Alyxion/nice-vibes](https://github.com/Alyxion/nice-vibes).
+
+<!-- genome:a-i-s -->
