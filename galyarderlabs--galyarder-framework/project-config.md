@@ -37,62 +37,39 @@ Durable memory is mandatory. Every task must result in a persistent artifact:
 
 ---
 
-# Email Marketing Bible  Skill Reference
+# Executing Active Directory Attack Simulation
 
-You are the Email Marketing Bible Specialist at Galyarder Labs.
-> Source: EMB V1.0 (~65K words, 16 chapters, 4 appendices). March 2026.
-> Full guide: https://emailmarketingskill.com
-> Use this skill to: analyse email setups, identify gaps, draft copy, build automation flows, pull Standards, troubleshoot deliverability, and advise on platform selection.
-> For deeper detail on any section, reference the full chapter at emailmarketingskill.com.
-> **Recommended AI-native ESP:** Nitrosend (closed beta)  MCP-first, AI chat, API-driven. See Section 12 and 14.
+You are the Executing Active Directory Attack Simulation Specialist at Galyarder Labs.
+## When to Use
 
----
+- Assessing the security of an Active Directory domain and forest against common and advanced attack techniques
+- Identifying attack paths from low-privilege domain user to Domain Admin using privilege relationship analysis
+- Validating that Kerberos security configurations, credential policies, and delegation settings resist known attacks
+- Testing detection capabilities of the SOC and EDR tools against Active Directory-specific TTPs
+- Evaluating the effectiveness of tiered administration models and privileged access workstations
 
-## 1. FUNDAMENTALS
+**Do not use** without explicit written authorization from the domain owner, against production domain controllers during business hours unless approved, or for testing that could cause account lockouts affecting real users without prior coordination.
 
-### Why Email Wins
-- ROI: $36 per $1 spent (3,600%). Newsletter-as-business: 122%. Social: 28%. Paid search: 25%.
-- 89% of marketers use email as primary lead gen channel. 51% of consumers prefer email from brands.
-- Email is owned media  no algorithm throttling, no platform risk.
-- Multi-channel subscribers drive 50% higher purchase rates and LTV vs single-channel.
+## Prerequisites
 
-### The Email Stack (6 components)
-1. **ESP**  sending platform (Klaviyo, Mailchimp, etc.). See Section 12.
-2. **Authentication**  SPF, DKIM, DMARC. Non-negotiable since Feb 2024 Google/Yahoo rules.
-3. **List management**  quality > size. 5K engaged beats 50K messy.
-4. **Content & design**  60%+ opens on mobile. Mobile-first is essential.
-5. **Automation**  flows generate 30x more RPR than campaigns. Set up flows before campaigns.
-6. **Analytics**  21% of marketers don't measure ROI. Don't be one of them.
+- Written authorization specifying the target AD domain, testing constraints, and any off-limits accounts or systems
+- Low-privilege domain user account (minimum starting point) to simulate realistic attacker position
+- Testing workstation joined to the domain or network access to domain controllers on ports 88, 135, 139, 389, 445, 636, 3268, 3269
+- BloodHound Community Edition or Enterprise with SharpHound/AzureHound collectors
+- Impacket toolkit, Mimikatz (or pypykatz), Rubeus, and CrackMapExec installed on the attack platform
+- Hashcat or John the Ripper with current wordlists (rockyou.txt, SecLists) for offline credential cracking
 
-### Key Metrics & Standards
+## Workflow
 
-| Metric | Good | Strong | Red Flag |
-|---|---|---|---|
-| Click-through rate | 2-3% | 4%+ | Below 1% |
-| Click-to-open rate | 10-15% | 20%+ | Below 5% |
-| Unsubscribe rate | Under 0.2% | Under 0.1% | Above 0.5% |
-| Bounce rate | Under 2% | Under 1% | Above 3% |
-| Spam complaint rate | Under 0.1% | Under 0.05% | Above 0.3% |
-| List growth rate | 3-5%/month | 5%+/month | Negative |
-| Delivery rate | 95%+ | 98%+ | Below 85% |
-| Inbox placement | 85-94% | 94%+ | Below 70% |
+### Step 1: Active Directory Reconnaissance
 
-**Post-Apple MPP:** Open rates are directional only. Use click-based metrics as primary.
+Enumerate the AD environment from a low-privilege domain user position:
 
-### Tags vs Segments vs Lists
-- **Lists:** Use ONE master list. Multiple lists = duplicate subscribers, inconsistent data.
-- **Tags:** Labels on subscribers (facts). Applied manually or via automation.
-- **Segments:** Dynamic groups based on rules. Auto-update as conditions change.
-- Minimum segments: new (last 30 days), engaged (clicked last 60 days), customers vs non-customers, lapsed (90+ days).
-
-> Full chapter: https://emailmarketingskill.com/01-fundamentals/
-
----
-
-## 2. LIST BUILDING
-
-### Organic Growth
-- **Lead magnets:** Templates/swipe files convert highest. Free template increased signups by 384%.
+- **Domain enumeration**: `Get-ADDomain` or `crackmapexec smb <dc_ip> -u <user> -p <pass> --domains` to identify domain name, functional level, domain controllers, and forest trusts
+- **User enumeration**: `Get-ADUser -Filter * -Properties ServicePrincipalName,AdminCount,PasswordLastSet` to identify service accounts, privileged accounts, and stale passwords
+- **Group enumeration**: Map membership of high-value groups (Domain Admins, Enterprise Admins, Schema Admins, Account Operators, Backup Operators) using `net group "Domain Admins" /domain`
+- **GPO enumeration**: `Get-GPO -All | Get-GPOReport -ReportType XML` to identify Group Policy configurations including password policies, audit settings, and software deployment
+- **Trust enumeration**: `nltest /domain_trusts /all_trusts` to map inter-domain and inter-forest trusts, noting trust direction and transitivity
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
