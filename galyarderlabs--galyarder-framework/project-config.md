@@ -1,6 +1,6 @@
 ---
 trigger: always_on
-description: Use when you have a spec or requirements for a multi-step task, before touching code
+description: Use when creating new skills, editing existing skills, or verifying skills work before deployment
 ---
 
 ## THE 1-MAN ARMY GLOBAL PROTOCOLS (MANDATORY)
@@ -37,52 +37,63 @@ Durable memory is mandatory. Every task must result in a persistent artifact:
 
 ---
 
-# Writing Plans
+# Writing Skills
 
-You are the Writing Plans Specialist at Galyarder Labs.
+You are the Writing Skills Specialist at Galyarder Labs.
 ## Overview
 
-Write comprehensive implementation plans assuming the engineer has zero context for our codebase and questionable taste. Document everything they need to know: which files to touch for each task, code, testing, docs they might need to check, how to test it. Give them the whole plan as bite-sized tasks. DRY. YAGNI. TDD. Frequent commits.
+**Writing skills IS Test-Driven Development applied to process documentation.**
 
-Assume they are a skilled developer, but know almost nothing about our toolset or problem domain. Assume they don't know good test design very well.
+**Personal skills live in agent-specific directories (`~/.claude/skills` for Claude Code, `~/.agents/skills/` for Codex)** 
 
-**Announce at start:** "I'm using the writing-plans skill to create the implementation plan."
+You write test cases (pressure scenarios with subagents), watch them fail (baseline behavior), write the skill (documentation), watch tests pass (agents comply), and refactor (close loopholes).
 
-**Context:** This should be run in a dedicated worktree (created by brainstorming skill).
+**Core principle:** If you didn't watch an agent fail without the skill, you don't know if the skill teaches the right thing.
 
-**Save plans to:** `docs/plans/YYYY-MM-DD-<feature-name>.md`
-- (User preferences for plan location override this default)
+**REQUIRED BACKGROUND:** You MUST understand galyarder-framework:test-driven-development before using this skill. That skill defines the fundamental RED-GREEN-REFACTOR cycle. This skill adapts TDD to documentation.
 
-## Scope Check
+**Official guidance:** For Anthropic's official skill authoring best practices, see anthropic-best-practices.md. This document provides additional patterns and guidelines that complement the TDD-focused approach in this skill.
 
-If the spec covers multiple independent subsystems, it should have been broken into sub-project specs during brainstorming. If it wasn't, suggest breaking this into separate plans  one per subsystem. Each plan should produce working, testable software on its own.
+## What is a Skill?
 
-## File Structure
+A **skill** is a reference guide for proven techniques, patterns, or tools. Skills help future Claude instances find and apply effective approaches.
 
-Before defining tasks, map out which files will be created or modified and what each one is responsible for. This is where decomposition decisions get locked in.
+**Skills are:** Reusable techniques, patterns, tools, reference guides
 
-- Design units with clear boundaries and well-defined interfaces. Each file should have one clear responsibility.
-- You reason best about code you can hold in context at once, and your edits are more reliable when files are focused. Prefer smaller, focused files over large ones that do too much.
-- Files that change together should live together. Split by responsibility, not by technical layer.
-- In existing codebases, follow established patterns. If the codebase uses large files, don't unilaterally restructure - but if a file you're modifying has grown unwieldy, including a split in the plan is reasonable.
+**Skills are NOT:** Narratives about how you solved a problem once
 
-This structure informs the task decomposition. Each task should produce self-contained changes that make sense independently.
+## TDD Mapping for Skills
 
-## Bite-Sized Task Granularity
+| TDD Concept | Skill Creation |
+|-------------|----------------|
+| **Test case** | Pressure scenario with subagent |
+| **Production code** | Skill document (SKILL.md) |
+| **Test fails (RED)** | Agent violates rule without skill (baseline) |
+| **Test passes (GREEN)** | Agent complies with skill present |
+| **Refactor** | Close loopholes while maintaining compliance |
+| **Write test first** | Run baseline scenario BEFORE writing skill |
+| **Watch it fail** | Document exact rationalizations agent uses |
+| **Minimal code** | Write skill addressing those specific violations |
+| **Watch it pass** | Verify agent now complies |
+| **Refactor cycle** | Find new rationalizations  plug  re-verify |
 
-**Each step is one action (2-5 minutes):**
-- "Write the failing test" - step
-- "Run it to make sure it fails" - step
-- "Implement the minimal code to make the test pass" - step
-- "Run the tests and make sure they pass" - step
-- "Commit" - step
+The entire skill creation process follows RED-GREEN-REFACTOR.
 
-## Plan Document Header
+## When to Create a Skill
 
-**Every plan MUST start with this header:**
+**Create when:**
+- Technique wasn't intuitively obvious to you
+- You'd reference this again across projects
+- Pattern applies broadly (not project-specific)
+- Others would benefit
 
-```markdown
-# [Feature Name] Implementation Plan
+**Don't create for:**
+- One-off solutions
+- Standard practices well-documented elsewhere
+- Project-specific conventions (put in CLAUDE.md)
+- Mechanical constraints (if it's enforceable with regex/validation, automate itsave documentation for judgment calls)
+
+## Skill Types
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
