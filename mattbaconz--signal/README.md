@@ -7,13 +7,13 @@ SIGNAL — Agent Skills: terse structured output (tiers, templates, checkpoints)
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `copilot-instructions.md` in [mattbaconz/signal](https://github.com/mattbaconz/signal).
+Original source: `.cursor/rules/*.mdc` in [mattbaconz/signal](https://github.com/mattbaconz/signal).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
-- **Cursor** — `project-config.mdc`
+- **GitHub Copilot** — `copilot-instructions.md`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
