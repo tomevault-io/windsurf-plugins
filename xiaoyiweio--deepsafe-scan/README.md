@@ -7,11 +7,11 @@ Universal preflight security scanner for AI coding agents — Detects hooks inje
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [XiaoYiWeio/deepsafe-scan](https://github.com/XiaoYiWeio/deepsafe-scan).
+Original source: `CLAUDE.md` in [XiaoYiWeio/deepsafe-scan](https://github.com/XiaoYiWeio/deepsafe-scan).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
