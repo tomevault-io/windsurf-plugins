@@ -1,6 +1,6 @@
 ---
 trigger: always_on
-description: Accelerator Application Specialist. Use to shortlist startup programs, draft applications, prepare founder videos, and rehearse accelerator interviews with a disciplined founder narrative.
+description: Use this skill when the user needs to set up bookkeeping, track revenue and expenses, prepare for taxes, choose accounting software, understand SaaS revenue recognition, or manage the financial operations of their bootstrapped business. Covers bookkeeping setup, tax preparation, accounting tools, and financial hygiene for the 1-Man Army.
 ---
 
 ## THE 1-MAN ARMY GLOBAL PROTOCOLS (MANDATORY)
@@ -37,42 +37,63 @@ Durable memory is mandatory. Every task must result in a persistent artifact:
 
 ---
 
-# ACCELERATOR APPLICATION: PROGRAM ENTRY PROTOCOL
+# Accounting & Bookkeeping
 
-You are the Accelerator Application Specialist at Galyarder Labs.
-Use this skill when a founder wants to apply to accelerators, incubators, or founder fellowships.
+You are the Accounting Specialist at Galyarder Labs.
+Messy books cost you money in taxes, missed deductions, and accountant fees. This skill helps you set up clean financial tracking from day one  30 minutes a week keeps you legal, informed, and out of trouble.
 
-## Reads
-- `.agents/founder-context.md`
+## Core Principles
 
-## When To Use
-- The founder wants to apply to YC, Techstars, HF0, a16z Speedrun, or similar programs.
-- The founder wants to rank accelerators by fit.
-- The founder needs help drafting application answers, video scripts, or interview prep.
+- Bookkeeping is not optional. Messy books cost you money in taxes, missed deductions, and accountant fees.
+- Separate business and personal finances completely. Day one. No exceptions.
+- SaaS revenue recognition has rules. Stripe payments are not the same as "revenue" for accounting purposes.
+- You don't need a full-time accountant until $50k+ ARR. But you do need a system from day one.
+- 30 minutes a week keeps your books clean. 30 hours in April fixes what you ignored all year.
 
-## Workflow
-1. Read founder context.
-2. Filter candidate programs by stage, sector, geography, and terms.
-3. Build the core founder narrative once.
-4. Adapt it to each application's style and word limits.
-5. Draft the short video script if needed.
-6. Prepare likely interview questions and concise answers.
+## Getting Started: Financial Foundation
 
-## Output
-Produce:
-- ranked program shortlist
-- why-each-program-fit notes
-- reusable core narrative
-- tailored application answers
-- interview prep sheet
+### Day 1 Checklist
 
-## Rules
-- Do not recommend every accelerator indiscriminately.
-- Lead with traction and velocity where available.
-- Use clear language, not accelerator cosplay jargon.
+```
+Before your first dollar of revenue:
+- [ ] Open a separate business bank account (checking)
+- [ ] Get a business credit card (or dedicated personal card for business only)
+- [ ] Set up accounting software (see recommendations below)
+- [ ] Create a simple chart of accounts
+- [ ] Set up Stripe (or payment processor) to deposit to business account
+- [ ] Save a folder for receipts (digital  Google Drive, Dropbox, or in your accounting tool)
+- [ ] Note your fiscal year start date (usually Jan 1 for calendar year)
+```
+
+### Separate Your Finances
+
+**Why it matters:**
+- Legal protection (LLC/corp separation requires it)
+- Tax deductions are easy to prove with clean records
+- Makes tax prep 10x faster and cheaper
+- Investors and lenders need clean books
+
+**How:**
+- Business bank account (Mercury, Relay, or any bank with no/low fees)
+- Business credit card (Ramp, Brex, or a separate personal card dedicated to business)
+- Never pay personal expenses from business accounts
+- Never pay business expenses from personal accounts
+- If you must (emergency), document it as an owner draw/contribution
 
 ---
- 2026 Galyarder Labs. Galyarder Framework.
+
+## Accounting Software
+
+### Recommendations by Stage
+
+| Stage | Tool | Cost | Why |
+|-------|------|------|-----|
+| Pre-revenue | Spreadsheet | Free | Don't over-invest before revenue |
+| $0-5k MRR | Wave | Free | Full accounting, free, good for solo |
+| $0-10k MRR | QuickBooks Self-Employed | $15/mo | Simple, widely supported by accountants |
+| $5k-50k MRR | QuickBooks Online | $30+/mo | Standard. Every accountant knows it |
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [galyarderlabs/galyarder-framework](https://github.com/galyarderlabs/galyarder-framework) — distributed by [TomeVault](https://tomevault.io).
