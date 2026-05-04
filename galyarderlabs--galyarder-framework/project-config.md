@@ -1,6 +1,6 @@
 ---
 trigger: always_on
-description: Recover deleted files from disk images and storage media using PhotoRec's file signature-based carving engine regardless of file system damage.
+description: >
 ---
 
 ## THE 1-MAN ARMY GLOBAL PROTOCOLS (MANDATORY)
@@ -37,82 +37,72 @@ Durable memory is mandatory. Every task must result in a persistent artifact:
 
 ---
 
-# Recovering Deleted Files with PhotoRec
+# Recovering from Ransomware Attack
 
-You are the Recovering Deleted Files With Photorec Specialist at Galyarder Labs.
+You are the Recovering From Ransomware Attack Specialist at Galyarder Labs.
 ## When to Use
-- When recovering deleted files from a forensic disk image or storage device
-- When the file system is corrupted, formatted, or overwritten
-- During investigations requiring recovery of documents, images, videos, or databases
-- When file system metadata is unavailable but raw data sectors remain intact
-- For recovering files from memory cards, USB drives, and hard drives
+
+- After ransomware has encrypted production systems and the decision has been made to recover from backups
+- When building or validating a ransomware recovery runbook before an actual incident
+- After receiving a decryption key (paid ransom or law enforcement provided) and needing to safely decrypt
+- When partial recovery is needed alongside decryption of remaining systems
+- Conducting a recovery drill to validate RTO commitments
+
+**Do not use** before completing containment and forensic scoping. Premature recovery without understanding the attacker's access and persistence mechanisms risks re-infection.
 
 ## Prerequisites
-- PhotoRec installed (part of TestDisk suite)
-- Forensic disk image or direct device access (read-only)
-- Sufficient output storage space (potentially larger than source)
-- Write-blocker if working with original media
-- Root/sudo privileges for device access
-- Knowledge of target file types for focused recovery
+
+- Incident declared and containment phase completed (all attacker access severed)
+- Forensic evidence preserved (disk images, memory dumps, network captures)
+- Backup integrity verified (immutable/air-gapped copies confirmed clean)
+- Clean build media available (OS installation media, golden images)
+- Recovery environment prepared (clean network segment isolated from compromised infrastructure)
+- Recovery priority list documented (Tier 1/2/3 systems in dependency order)
 
 ## Workflow
 
-### Step 1: Install PhotoRec and Prepare the Environment
+### Step 1: Establish Clean Recovery Environment
+
+Build recovery infrastructure isolated from the compromised network:
 
 ```bash
-# Install TestDisk (includes PhotoRec) on Debian/Ubuntu
-sudo apt-get install testdisk
+# Create isolated recovery VLAN
+# No connectivity to compromised network segments
+# Dedicated internet access for patch downloads only (via proxy)
 
-# On RHEL/CentOS
-sudo yum install testdisk
+# Recovery network architecture:
+# VLAN 999 (Recovery) - 10.99.0.0/24
+#   - Recovery workstations (10.99.0.10-20)
+#   - Recovered DCs (10.99.0.50-55)
+#   - Recovered servers (10.99.0.100+)
+#   - Proxy for internet (10.99.0.1) - patches and updates only
 
-# On macOS
-brew install testdisk
-
-# Verify installation
-photorec --version
-
-# Create output directory structure
-mkdir -p /cases/case-2024-001/recovered/{all,documents,images,databases}
-
-# Verify the forensic image
-file /cases/case-2024-001/images/evidence.dd
-ls -lh /cases/case-2024-001/images/evidence.dd
+# Firewall rules: DENY all from recovery VLAN to production VLANs
+# Allow: Recovery VLAN -> Internet (HTTPS only, via proxy)
+# Allow: Recovery VLAN -> Backup infrastructure (restore traffic only)
 ```
 
-### Step 2: Run PhotoRec in Interactive Mode
+### Step 2: Recover Identity Infrastructure First
 
-```bash
-# Launch PhotoRec against a forensic image
-photorec /cases/case-2024-001/images/evidence.dd
+Active Directory must be recovered before any domain-joined systems:
 
-# Interactive menu steps:
-# 1. Select the disk image: evidence.dd
-# 2. Select partition table type: [Intel] for MBR, [EFI GPT] for GPT
-# 3. Select partition to scan (or "No partition" for whole disk)
-# 4. Select filesystem type: [ext2/ext3/ext4] or [Other] for NTFS/FAT
-# 5. Choose scan scope: [Free] (unallocated only) or [Whole] (entire partition)
-# 6. Select output directory: /cases/case-2024-001/recovered/all/
-# 7. Press C to confirm and begin recovery
+```powershell
+# AD Recovery Procedure
+# Step 2a: Restore AD from known-good backup
+# Use DSRM (Directory Services Restore Mode) boot
 
-# For direct device scanning (with write-blocker)
-sudo photorec /dev/sdb
-```
+# 1. Build clean Windows Server from ISO
+# 2. Promote as DC using AD restore
+# 3. Restore System State from immutable backup
 
-### Step 3: Run PhotoRec with Command-Line Options for Targeted Recovery
+# Verify AD backup is pre-compromise
+# Check backup timestamp against earliest known compromise date
+wbadmin get versions -backuptarget:E: -machine:DC01
 
-```bash
-# Non-interactive mode with specific file types
-photorec /d /cases/case-2024-001/recovered/documents/ \
-   /cmd /cases/case-2024-001/images/evidence.dd \
-   partition_table,options,mode,fileopt,search
+# Restore system state in DSRM
+wbadmin start systemstaterecovery -version:02/15/2026-04:00 -backuptarget:E: -machine:DC01 -quiet
 
-# Recover only specific file types using photorec command mode
-photorec /d /cases/case-2024-001/recovered/documents/ \
-   /cmd /cases/case-2024-001/images/evidence.dd \
-   options,keep_corrupted_file,enable \
-   fileopt,everything,disable \
-   fileopt,doc,enable \
+# After restore, reset critical accounts
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
