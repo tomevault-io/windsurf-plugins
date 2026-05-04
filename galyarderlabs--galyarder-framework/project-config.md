@@ -1,6 +1,6 @@
 ---
 trigger: always_on
-description: |
+description: Create and edit Obsidian Bases (.base files) with views, filters, formulas, and summaries. Use when working with .base files, creating database-like views of notes, or when the user mentions Bases, table views, card views, filters, or formulas in Obsidian.
 ---
 
 ## THE 1-MAN ARMY GLOBAL PROTOCOLS (MANDATORY)
@@ -37,40 +37,85 @@ Durable memory is mandatory. Every task must result in a persistent artifact:
 
 ---
 
-# THE OBSIDIAN ARCHITECT: VISUAL KNOWLEDGE PROTOCOL
+# Obsidian Bases Skill
 
-You are the Lead Librarian and Visual Architect at Galyarder Labs. Your mission is to transform ephemeral thoughts into a durable, visual Digital Garden inside Obsidian.
+You are the Obsidian Bases Specialist at Galyarder Labs.
+## Workflow
 
-## 1. CORE DIRECTIVES
+1. **Create the file**: Create a `.base` file in the vault with valid YAML content
+2. **Define scope**: Add `filters` to select which notes appear (by tag, folder, property, or date)
+3. **Add formulas** (optional): Define computed properties in the `formulas` section
+4. **Configure views**: Add one or more views (`table`, `cards`, `list`, or `map`) with `order` specifying which properties to display
+5. **Validate**: Verify the file is valid YAML with no syntax errors. Check that all referenced properties and formulas exist. Common issues: unquoted strings containing special YAML characters, mismatched quotes in formula expressions, referencing `formula.X` without defining `X` in `formulas`
+6. **Test in Obsidian**: Open the `.base` file in Obsidian to confirm the view renders correctly. If it shows a YAML error, check quoting rules below
 
-### 1.1 Visual first
-When explaining complex logic, prefer creating or updating an `Architecture.canvas`. Use `json-canvas` to map nodes and edges that represent system flows.
+## Schema
 
-### 1.2 Knowledge Persistence
-Every `/brainstorm` and `/plan` must result in a structured markdown file in the `02 - Knowledge Base/` directory. Use wikilinks (`[[Note Name]]`) to connect related concepts.
+Base files use the `.base` extension and contain valid YAML.
 
-### 1.3 The Living Journal
-Maintain the `03 - Activity Log.md`. For every major milestone or session end, append a concise summary of what was built, why, and the impact.
+```yaml
+# Global filters apply to ALL views in the base
+filters:
+  # Can be a single filter string
+  # OR a recursive filter object with and/or/not
+  and: []
+  or: []
+  not: []
 
-## 2. WORKFLOWS
+# Define formula properties that can be used across all views
+formulas:
+  formula_name: 'expression'
 
-### Phase: Discovery & Design
-- Use `defuddle` to extract clean data from research URLs.
-- Scaffold the project folder in the Vault if it doesn't exist.
-- Initialize the `00 - Dashboard.base`.
+# Configure display names and settings for properties
+properties:
+  property_name:
+    displayName: "Display Name"
+  formula.formula_name:
+    displayName: "Formula Display Name"
+  file.ext:
+    displayName: "Extension"
 
-### Phase: Technical Mapping
-- Generate `01 - Architecture.canvas` for database schemas or state machines.
-- Use `obsidian-markdown` to ensure all notes follow Galyarder Framework's aesthetic standards.
+# Define custom summary formulas
+summaries:
+  custom_summary_name: 'values.mean().round(3)'
 
-## 3. FINAL VERIFICATION
-1. Is the visual map updated to reflect the current state?
-2. Are all technical decisions documented in the Knowledge Base?
-3. Is the Activity Log updated with the latest session progress?
-If YES, sync the changes and notify the Master Orchestrator.
+# Define one or more views
+views:
+  - type: table | cards | list | map
+    name: "View Name"
+    limit: 10                    # Optional: limit results
+    groupBy:                     # Optional: group results
+      property: property_name
+      direction: ASC | DESC
+    filters:                     # View-specific filters
+      and: []
+    order:                       # Properties to display in order
+      - file.name
+      - property_name
+      - formula.formula_name
+    summaries:                   # Map properties to summary formulas
+      property_name: Average
+```
 
----
- 2026 Galyarder Labs. Galyarder Framework.
+## Filter Syntax
+
+Filters narrow down results. They can be applied globally or per-view.
+
+### Filter Structure
+
+```yaml
+# Single filter
+filters: 'status == "done"'
+
+# AND - all conditions must be true
+filters:
+  and:
+    - 'status == "done"'
+    - 'priority > 3'
+
+# OR - any condition can be true
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [galyarderlabs/galyarder-framework](https://github.com/galyarderlabs/galyarder-framework) — distributed by [TomeVault](https://tomevault.io).
