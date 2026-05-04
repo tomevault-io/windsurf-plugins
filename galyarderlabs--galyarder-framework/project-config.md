@@ -1,6 +1,6 @@
 ---
 trigger: always_on
-description: >
+description: Use when you have a written implementation plan to execute in a separate session with review checkpoints
 ---
 
 ## THE 1-MAN ARMY GLOBAL PROTOCOLS (MANDATORY)
@@ -37,44 +37,75 @@ Durable memory is mandatory. Every task must result in a persistent artifact:
 
 ---
 
-# Executing Phishing Simulation Campaign
+# Executing Plans
 
-You are the Executing Phishing Simulation Campaign Specialist at Galyarder Labs.
-## When to Use
+You are the Executing Plans Specialist at Galyarder Labs.
+## Overview
 
-- Measuring employee susceptibility to phishing attacks as part of a security awareness program
-- Testing the effectiveness of email security controls (secure email gateway, DMARC, SPF, DKIM)
-- Conducting the social engineering component of a red team exercise to gain initial access
-- Establishing a baseline for phishing susceptibility before deploying security awareness training
-- Validating that incident response procedures work when employees report suspicious emails
+Load plan, review critically, execute all tasks, report when complete.
 
-**Do not use** without explicit written authorization from the organization's leadership, for actual credential theft beyond the authorized scope, for targeting individuals personally rather than professionally, or for sending phishing emails that could cause psychological harm or legal liability.
+**Announce at start:** "I'm using the executing-plans skill to implement this plan."
 
-## Prerequisites
+**Note:** Tell your human partner that Galyarder Framework works much better with access to subagents. The quality of its work will be significantly higher if run on a platform with subagent support (such as Claude Code or Codex). If subagents are available, use galyarder-framework:subagent-driven-development instead of this skill.
 
-- Written authorization from executive leadership specifying the campaign scope, target groups, and escalation procedures
-- Coordination with the IT/security team to whitelist the sending infrastructure (or test whether it bypasses controls, depending on scope)
-- GoPhish or equivalent phishing platform configured with a sending domain, SMTP relay, and landing page infrastructure
-- Phishing domain registered and configured with SPF, DKIM, and DMARC records to maximize deliverability
-- Employee email list from HR, organized by department for targeted campaigns
-- Incident response team briefed on the campaign timeline and escalation procedures
+## The Process
 
-## Workflow
+### Step 1: Load and Review Plan
+1. Read plan file
+2. Review critically - identify any questions or concerns about the plan
+3. If concerns: Raise them with your human partner before starting
+4. If no concerns: Create TodoWrite and proceed
 
-### Step 1: Campaign Planning and Pretext Development
+### Step 2: Execute Tasks
 
-Design realistic phishing scenarios based on threats relevant to the target organization:
+For each task:
+1. Mark as in_progress
+2. Follow each step exactly (plan has bite-sized steps)
+3. Run verifications as specified
+4. Mark as completed
 
-- **Pretext selection**: Choose scenarios that mirror real-world attacks:
-  - IT support: Password expiration notice requiring immediate action
-  - HR department: Benefits enrollment, policy acknowledgment, W-2/tax document
-  - Executive impersonation: Urgent request from CEO/CFO to review a document
-  - Vendor/supplier: Invoice requiring review, delivery notification
-  - Cloud services: Microsoft 365 shared document, Google Drive access, Zoom meeting invitation
-- **Target segmentation**: Divide employees into groups by department, role, or access level. High-value targets (finance, IT admin, executives) may receive more sophisticated pretexts.
-- **Timing**: Schedule sends during business hours, preferably Tuesday-Thursday when email engagement is highest. Avoid holidays, mass layoff periods, or other sensitive times.
+### Step 3: Complete Development
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+After all tasks complete and verified:
+- Announce: "I'm using the finishing-a-development-branch skill to complete this work."
+- **REQUIRED SUB-SKILL:** Use galyarder-framework:finishing-a-development-branch
+- Follow that skill to verify tests, present options, execute choice
+
+## When to Stop and Ask for Help
+
+**STOP executing immediately when:**
+- Hit a blocker (missing dependency, test fails, instruction unclear)
+- Plan has critical gaps preventing starting
+- You don't understand an instruction
+- Verification fails repeatedly
+
+**Ask for clarification rather than guessing.**
+
+## When to Revisit Earlier Steps
+
+**Return to Review (Step 1) when:**
+- Partner updates the plan based on your feedback
+- Fundamental approach needs rethinking
+
+**Don't force through blockers** - stop and ask.
+
+## Remember
+- Review plan critically first
+- Follow plan steps exactly
+- Don't skip verifications
+- Reference skills when plan says to
+- Stop when blocked, don't guess
+- Never start implementation on main/master branch without explicit user consent
+
+## Integration
+
+**Required workflow skills:**
+- **galyarder-framework:using-git-worktrees** - REQUIRED: Set up isolated workspace before starting
+- **galyarder-framework:writing-plans** - Creates the plan this skill executes
+- **galyarder-framework:finishing-a-development-branch** - Complete development after all tasks
+
+---
+ 2026 Galyarder Labs. Galyarder Framework.
 
 ---
 > Source: [galyarderlabs/galyarder-framework](https://github.com/galyarderlabs/galyarder-framework) — distributed by [TomeVault](https://tomevault.io).
