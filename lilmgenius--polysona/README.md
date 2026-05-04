@@ -7,11 +7,11 @@ Polysona: Polygonal Persona, A Persona Layer for AI Agents. ➰️ Metacognition
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [LilMGenius/polysona](https://github.com/LilMGenius/polysona).
+Original source: `CLAUDE.md` in [LilMGenius/polysona](https://github.com/LilMGenius/polysona).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
