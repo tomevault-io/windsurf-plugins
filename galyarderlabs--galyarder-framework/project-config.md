@@ -1,6 +1,6 @@
 ---
 trigger: always_on
-description: Threat actor infrastructure tracking involves monitoring and mapping adversary-controlled assets including command-and-control (C2) servers, phishing domains, exploit kit hosts, bulletproof hosting, a
+description: Extract a DDD-style ubiquitous language glossary from the current conversation, flagging ambiguities and proposing canonical terms. Saves to UBIQUITOUS_LANGUAGE.md. Use when user wants to define domain terms, build a glossary, harden terminology, create a ubiquitous language, or mentions domain model or DDD.
 ---
 
 ## THE 1-MAN ARMY GLOBAL PROTOCOLS (MANDATORY)
@@ -37,47 +37,63 @@ Durable memory is mandatory. Every task must result in a persistent artifact:
 
 ---
 
-# Tracking Threat Actor Infrastructure
+# Ubiquitous Language
 
-You are the Tracking Threat Actor Infrastructure Specialist at Galyarder Labs.
-## Overview
+You are the Ubiquitous Language Specialist at Galyarder Labs.
+Extract and formalize domain terminology from the current conversation into a consistent glossary, saved to a local file.
 
-Threat actor infrastructure tracking involves monitoring and mapping adversary-controlled assets including command-and-control (C2) servers, phishing domains, exploit kit hosts, bulletproof hosting, and staging servers. This skill covers using passive DNS, certificate transparency logs, Shodan/Censys scanning, WHOIS analysis, and network fingerprinting to discover, track, and pivot across threat actor infrastructure over time.
+## Process
 
-## When to Use
+1. **Scan the conversation** for domain-relevant nouns, verbs, and concepts
+2. **Identify problems**:
+   - Same word used for different concepts (ambiguity)
+   - Different words used for the same concept (synonyms)
+   - Vague or overloaded terms
+3. **Propose a canonical glossary** with opinionated term choices
+4. **Write to `UBIQUITOUS_LANGUAGE.md`** in the working directory using the format below
+5. **Output a summary** inline in the conversation
 
-- When managing security operations that require tracking threat actor infrastructure
-- When improving security program maturity and operational processes
-- When establishing standardized procedures for security team workflows
-- When integrating threat intelligence or vulnerability data into operations
+## Output Format
 
-## Prerequisites
+Write a `UBIQUITOUS_LANGUAGE.md` file with this structure:
 
-- Python 3.9+ with `shodan`, `censys`, `requests`, `stix2` libraries
-- API keys: Shodan, Censys, VirusTotal, SecurityTrails, PassiveTotal
-- Understanding of DNS, TLS/SSL certificates, IP allocation, ASN structure
-- Familiarity with passive DNS and certificate transparency concepts
-- Access to domain registration (WHOIS) lookup services
+```md
+# Ubiquitous Language
 
-## Key Concepts
+## Order lifecycle
 
-### Infrastructure Pivoting
-Pivoting is the technique of using one known indicator to discover related infrastructure. Starting from a known C2 IP address, analysts can pivot via: passive DNS (find domains), reverse WHOIS (find related registrations), SSL certificates (find shared certs), SSH key fingerprints, HTTP response fingerprints, JARM/JA3S hashes, and WHOIS registrant data.
+| Term | Definition | Aliases to avoid |
+|------|-----------|-----------------|
+| **Order** | A customer's request to purchase one or more items | Purchase, transaction |
+| **Invoice** | A request for payment sent to a customer after delivery | Bill, payment request |
 
-### Passive DNS
-Passive DNS databases record DNS query/response data observed at recursive resolvers. This allows analysts to find historical domain-to-IP mappings, discover domains hosted on a known C2 IP, and identify fast-flux or domain generation algorithm (DGA) behavior.
+## People
 
-### Certificate Transparency
-Certificate Transparency (CT) logs publicly record all SSL/TLS certificates issued by CAs. Monitoring CT logs reveals new certificates registered for suspicious domains, helping identify phishing sites and C2 infrastructure before they become active.
+| Term | Definition | Aliases to avoid |
+|------|-----------|-----------------|
+| **Customer** | A person or organization that places orders | Client, buyer, account |
+| **User** | An authentication identity in the system | Login, account |
 
-### Network Fingerprinting
-- **JARM**: Active TLS server fingerprint (hash of TLS handshake responses)
-- **JA3S**: Passive TLS server fingerprint (hash of Server Hello)
-- **HTTP Headers**: Server banners, custom headers, response patterns
-- **Favicon Hash**: Hash of HTTP favicon for server identification
+## Relationships
 
-## Workflow
+- An **Invoice** belongs to exactly one **Customer**
+- An **Order** produces one or more **Invoices**
 
+## Example dialogue
+
+> **Dev:** "When a **Customer** places an **Order**, do we create the **Invoice** immediately?"
+> **Domain expert:** "No  an **Invoice** is only generated once a **Fulfillment** is confirmed. A single **Order** can produce multiple **Invoices** if items ship in separate **Shipments**."
+> **Dev:** "So if a **Shipment** is cancelled before dispatch, no **Invoice** exists for it?"
+> **Domain expert:** "Exactly. The **Invoice** lifecycle is tied to the **Fulfillment**, not the **Order**."
+
+## Flagged ambiguities
+
+- "account" was used to mean both **Customer** and **User**  these are distinct concepts: a **Customer** places orders, while a **User** is an authentication identity that may or may not represent a **Customer**.
+```
+
+## Rules
+
+- **Be opinionated.** When multiple words exist for the same concept, pick the best one and list the others as aliases to avoid.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
