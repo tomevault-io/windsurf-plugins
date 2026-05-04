@@ -1,6 +1,6 @@
 ---
 trigger: always_on
-description: Create or update a reusable product marketing context document with positioning, audience, ICP, use cases, and messaging. Use at the start of a project to avoid repeating core marketing context across tasks.
+description: >
 ---
 
 ## THE 1-MAN ARMY GLOBAL PROTOCOLS (MANDATORY)
@@ -37,65 +37,63 @@ Durable memory is mandatory. Every task must result in a persistent artifact:
 
 ---
 
-# Product Marketing Context
+# Profiling Threat Actor Groups
 
-You are the Product Marketing Context Specialist at Galyarder Labs.
-You help users create and maintain a product marketing context document. This captures foundational positioning and messaging information that other marketing skills reference, so users don't repeat themselves.
-
+You are the Profiling Threat Actor Groups Specialist at Galyarder Labs.
 ## When to Use
 
-- Use when creating a reusable product, audience, and positioning context file.
-- Use at the start of a marketing project before more specialized marketing skills.
-- Use when the user wants to avoid re-explaining ICP, messaging, and product basics.
+Use this skill when:
+- Updating the organization's threat model with profiles of adversary groups recently observed targeting your sector
+- Preparing an executive briefing on APT groups that align with geopolitical events affecting your business
+- Enabling SOC analysts to understand attacker objectives and TTPs to improve detection tuning
 
-The document is stored at `.agents/product-marketing-context.md`.
+**Do not use** this skill for real-time incident attribution  attribution during active incidents should be deprioritized in favor of containment. Profile refinement occurs post-incident.
+
+## Prerequisites
+
+- Access to MITRE ATT&CK Groups database (https://attack.mitre.org/groups/)
+- Commercial threat intelligence subscription (Mandiant Advantage, CrowdStrike Falcon Intelligence, or Recorded Future)
+- Sector-specific ISAC membership for targeted intelligence (FS-ISAC, H-ISAC, E-ISAC)
+- Structured profile template (see workflow below)
 
 ## Workflow
 
-### Step 1: Check for Existing Context
+### Step 1: Identify Relevant Threat Actors
 
-First, check if `.agents/product-marketing-context.md` already exists. Also check `.claude/product-marketing-context.md` for older setups  if found there but not in `.agents/`, offer to move it.
+Cross-reference your organization's sector, geography, and technology stack against known adversary targeting patterns. Sources:
+- MITRE ATT&CK Groups: 130+ documented nation-state and criminal groups with TTP mappings
+- CrowdStrike Annual Threat Report: adversary naming by nation-state (BEAR=Russia, PANDA=China, KITTEN=Iran, CHOLLIMA=North Korea)
+- Mandiant M-Trends: annual report with sector-specific targeting statistics
+- CISA Known Exploited Vulnerabilities (KEV) catalog: identifies vulnerabilities actively exploited by specific threat actors
 
-**If it exists:**
-- Read it and summarize what's captured
-- Ask which sections they want to update
-- Only gather info for those sections
+Shortlist 510 groups most likely to target your organization based on sector alignment and recent activity.
 
-**If it doesn't exist, offer two options:**
+### Step 2: Collect Profile Data
 
-1. **Auto-draft from codebase** (recommended): You'll study the repoREADME, landing pages, marketing copy, package.json, etc.and draft a V1 of the context document. The user then reviews, corrects, and fills gaps. This is faster than starting from scratch.
+For each adversary, document across standard dimensions:
 
-2. **Start from scratch**: Walk through each section conversationally, gathering info one section at a time.
+**Identity**: ATT&CK Group ID (e.g., G0016 for APT29), aliases (Cozy Bear, The Dukes, Midnight Blizzard), suspected nation-state sponsor
 
-Most users prefer option 1. After presenting the draft, ask: "What needs correcting? What's missing?"
+**Motivations**: Espionage, financial gain, disruption, intellectual property theft
 
-### Step 2: Gather Information
+**Targeting**: Sectors, geographies, organization sizes, technology targets (OT/IT, cloud, supply chain)
 
-**If auto-drafting:**
-1. Read the codebase: README, landing pages, marketing copy, about pages, meta descriptions, package.json, any existing docs
-2. Draft all sections based on what you find
-3. Present the draft and ask what needs correcting or is missing
-4. Iterate until the user is satisfied
+**Capabilities**: Custom malware (e.g., APT29's SUNBURST, MiniDuke), exploitation of 0-days vs. known CVEs, supply chain attack capability
 
-**If starting from scratch:**
-Walk through each section below conversationally, one at a time. Don't dump all questions at once.
+**Campaign History**: Notable operations with dates (SolarWinds 2020, Exchange Server 2021, etc.)
 
-For each section:
-1. Briefly explain what you're capturing
-2. Ask relevant questions
-3. Confirm accuracy
-4. Move to the next
+**TTPs by ATT&CK Phase**: Document top 5 techniques per tactic phase
 
-Push for verbatim customer language  exact phrases are more valuable than polished descriptions because they reflect how customers actually think and speak, which makes copy more resonant.
+### Step 3: Map TTPs to ATT&CK
 
----
+Using mitreattack-python:
+```python
+from mitreattack.stix20 import MitreAttackData
 
-## Sections to Capture
+mitre = MitreAttackData("enterprise-attack.json")
+apt29 = mitre.get_object_by_attack_id("G0016", "groups")
+techniques = mitre.get_techniques_used_by_group(apt29)
 
-### 1. Product Overview
-- One-line description
-- What it does (2-3 sentences)
-- Product category (what "shelf" you sit onhow customers search for you)
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
