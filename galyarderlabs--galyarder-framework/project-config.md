@@ -1,6 +1,6 @@
 ---
 trigger: always_on
-description: Use when implementing any feature or bugfix, before writing implementation code
+description: Threat actor infrastructure tracking involves monitoring and mapping adversary-controlled assets including command-and-control (C2) servers, phishing domains, exploit kit hosts, bulletproof hosting, a
 ---
 
 ## THE 1-MAN ARMY GLOBAL PROTOCOLS (MANDATORY)
@@ -37,115 +37,46 @@ Durable memory is mandatory. Every task must result in a persistent artifact:
 
 ---
 
-# Test-Driven Development (TDD)
+# Tracking Threat Actor Infrastructure
 
-You are the Test Driven Development Specialist at Galyarder Labs.
+You are the Tracking Threat Actor Infrastructure Specialist at Galyarder Labs.
 ## Overview
 
-Write the test first. Watch it fail. Write minimal code to pass.
-
-**Core principle:** If you didn't watch the test fail, you don't know if it tests the right thing.
-
-**Violating the letter of the rules is violating the spirit of the rules.**
+Threat actor infrastructure tracking involves monitoring and mapping adversary-controlled assets including command-and-control (C2) servers, phishing domains, exploit kit hosts, bulletproof hosting, and staging servers. This skill covers using passive DNS, certificate transparency logs, Shodan/Censys scanning, WHOIS analysis, and network fingerprinting to discover, track, and pivot across threat actor infrastructure over time.
 
 ## When to Use
 
-**Always:**
-- New features
-- Bug fixes
-- Refactoring
-- Behavior changes
+- When managing security operations that require tracking threat actor infrastructure
+- When improving security program maturity and operational processes
+- When establishing standardized procedures for security team workflows
+- When integrating threat intelligence or vulnerability data into operations
 
-**Exceptions (ask your human partner):**
-- Throwaway prototypes
-- Generated code
-- Configuration files
+## Prerequisites
 
-Thinking "skip TDD just this once"? Stop. That's rationalization.
+- Python 3.9+ with `shodan`, `censys`, `requests`, `stix2` libraries
+- API keys: Shodan, Censys, VirusTotal, SecurityTrails, PassiveTotal
+- Understanding of DNS, TLS/SSL certificates, IP allocation, ASN structure
+- Familiarity with passive DNS and certificate transparency concepts
+- Access to domain registration (WHOIS) lookup services
 
-## The Iron Law
+## Key Concepts
 
-```
-NO PRODUCTION CODE WITHOUT A FAILING TEST FIRST
-```
+### Infrastructure Pivoting
+Pivoting is the technique of using one known indicator to discover related infrastructure. Starting from a known C2 IP address, analysts can pivot via: passive DNS (find domains), reverse WHOIS (find related registrations), SSL certificates (find shared certs), SSH key fingerprints, HTTP response fingerprints, JARM/JA3S hashes, and WHOIS registrant data.
 
-Write code before the test? Delete it. Start over.
+### Passive DNS
+Passive DNS databases record DNS query/response data observed at recursive resolvers. This allows analysts to find historical domain-to-IP mappings, discover domains hosted on a known C2 IP, and identify fast-flux or domain generation algorithm (DGA) behavior.
 
-**No exceptions:**
-- Don't keep it as "reference"
-- Don't "adapt" it while writing tests
-- Don't look at it
-- Delete means delete
+### Certificate Transparency
+Certificate Transparency (CT) logs publicly record all SSL/TLS certificates issued by CAs. Monitoring CT logs reveals new certificates registered for suspicious domains, helping identify phishing sites and C2 infrastructure before they become active.
 
-Implement fresh from tests. Period.
+### Network Fingerprinting
+- **JARM**: Active TLS server fingerprint (hash of TLS handshake responses)
+- **JA3S**: Passive TLS server fingerprint (hash of Server Hello)
+- **HTTP Headers**: Server banners, custom headers, response patterns
+- **Favicon Hash**: Hash of HTTP favicon for server identification
 
-## Red-Green-Refactor
-
-```dot
-digraph tdd_cycle {
-    rankdir=LR;
-    red [label="RED\nWrite failing test", shape=box, style=filled, fillcolor="#ffcccc"];
-    verify_red [label="Verify fails\ncorrectly", shape=diamond];
-    green [label="GREEN\nMinimal code", shape=box, style=filled, fillcolor="#ccffcc"];
-    verify_green [label="Verify passes\nAll green", shape=diamond];
-    refactor [label="REFACTOR\nClean up", shape=box, style=filled, fillcolor="#ccccff"];
-    next [label="Next", shape=ellipse];
-
-    red -> verify_red;
-    verify_red -> green [label="yes"];
-    verify_red -> red [label="wrong\nfailure"];
-    green -> verify_green;
-    verify_green -> refactor [label="yes"];
-    verify_green -> green [label="no"];
-    refactor -> verify_green [label="stay\ngreen"];
-    verify_green -> next;
-    next -> red;
-}
-```
-
-### RED - Write Failing Test
-
-Write one minimal test showing what should happen.
-
-<Good>
-```typescript
-test('retries failed operations 3 times', async () => {
-  let attempts = 0;
-  const operation = () => {
-    attempts++;
-    if (attempts < 3) throw new Error('fail');
-    return 'success';
-  };
-
-  const result = await retryOperation(operation);
-
-  expect(result).toBe('success');
-  expect(attempts).toBe(3);
-});
-```
-Clear name, tests real behavior, one thing
-</Good>
-
-<Bad>
-```typescript
-test('retry works', async () => {
-  const mock = jest.fn()
-    .mockRejectedValueOnce(new Error())
-    .mockRejectedValueOnce(new Error())
-    .mockResolvedValueOnce('success');
-  await retryOperation(mock);
-  expect(mock).toHaveBeenCalledTimes(3);
-});
-```
-Vague name, tests mock not code
-</Bad>
-
-**Requirements:**
-- One behavior
-- Clear name
-- Real code (no mocks unless unavoidable)
-
-### Verify RED - Watch It Fail
+## Workflow
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
