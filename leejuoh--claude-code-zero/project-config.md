@@ -1,0 +1,115 @@
+---
+trigger: always_on
+description: > Source of truth for this repository. CLAUDE.md imports this file; GEMINI.md and other agent entry points should do the same.
+---
+
+# AGENTS.md
+
+> Source of truth for this repository. CLAUDE.md imports this file; GEMINI.md and other agent entry points should do the same.
+>
+> This file is a **map**, not an encyclopedia. Detailed knowledge lives in `docs/` — see `docs/INDEX.md`. Non-obvious traps live in `docs/reference/gotchas.md`.
+
+## Repository Overview
+
+Personal marketplace for Claude Code plugins. Plugins are developed under `plugins/` and released through `.claude-plugin/marketplace.json`.
+
+- Release-ready plugins: `notebooklm-connector`, `toolbox`, `vibeproxy-kit`, `vision-powers`, `worktree-plus`, `skill-creator-pro`, `codex-advisor`, `rubber-duck-tutor`
+- Lab plugins (prefix `lab-` or `category: lab`): `e2e-test-runner`, `claw-mo`, `claw-mux`, `lab-harness-zero` (external repo)
+
+## Directory Structure
+
+```
+.claude-plugin/marketplace.json   # Plugin registry (versions + sources)
+plugins/<plugin-name>/            # Local plugin source (git-committed)
+docs/                             # Knowledge base — see docs/INDEX.md
+data/                             # Session and operational data
+video/                            # Demo videos and media assets (gitignored)
+references/                       # External reference repos (gitignored)
+```
+
+## Knowledge Map
+
+Everything detailed is in `docs/`. Direct entry points:
+
+| Topic | Pointer |
+|---|---|
+| Full knowledge index | `docs/INDEX.md` |
+| Known traps and silent failures | `docs/reference/gotchas.md` |
+| Skill design spec | `docs/reference/skill-building-guide.md` |
+| Skill practical guide | `docs/reference/skill-lessons-from-anthropic.md` |
+| Release process (8 steps) | `docs/release-workflow.md` |
+| Active plans & specs | `docs/superpowers/plans/`, `docs/superpowers/specs/` |
+| Marketplace schema, hooks, SKILL.md format, env vars | Official docs — see below |
+
+## Official Claude Code Docs
+
+Always start with `https://code.claude.com/docs/llms.txt` — the full index of every Claude Code docs page. Fetch specific pages as `https://code.claude.com/docs/en/<page>`. Don't rely on memory or plan-internal citations; the index is the only authoritative source.
+
+**Mandatory fetch when:**
+- Creating new plugins, components (skills/agents/hooks/MCP), or schema changes
+- Reviewing plans (`docs/superpowers/plans/*.md`) that cite official docs — verify each cited number against source. Plan-internal tables may contain invented or outdated values.
+
+Skip only for minor text edits or bug fixes inside existing logic.
+
+**Common starting pages (not exhaustive):** `plugins.md`, `plugins-reference.md`, `plugin-marketplaces.md`, `hooks.md`, `hooks-guide.md`, `skills.md`, `sub-agents.md`, `memory.md`, `env-vars.md`, `context-window.md`, `costs.md`, `how-claude-code-works.md`, `settings.md`.
+
+**Other agents' docs:** For Codex (OpenAI): `https://developers.openai.com/llms.txt`.
+
+## Plugin Development
+
+Plugin creation and iteration is handled by the **skill-creator-pro** plugin — invoke `/skill-creator-pro` for all plugin development work.
+
+### Plugin Component Structure
+
+Standard layout inside `plugins/<plugin-name>/`:
+
+```
+.claude-plugin/plugin.json   # Plugin manifest
+commands/                     # Slash commands (legacy; prefer skills/)
+skills/                       # Skills with SKILL.md
+agents/                       # Sub-agents (*.md)
+hooks/                        # Hooks (hooks.json + scripts)
+.mcp.json                    # MCP server config (optional)
+.lsp.json                    # LSP server config (optional)
+settings.json                # Only { "agent": "name" } is honored
+```
+
+Components (`commands/`, `skills/`, `agents/`, `hooks/`) live at the **plugin root**, not inside `.claude-plugin/`. See `docs/reference/gotchas.md` for the silent-fail modes.
+
+### Workflow (creation, modification, refactoring)
+
+1. **Docs** — For new plugins or structural changes, consult `docs/reference/` and official docs (`https://code.claude.com/docs/llms.txt`).
+2. **Analysis** — User provides the goal and specific reference files. Read **only** those files.
+3. **Implementation** — Create or modify files under `plugins/`. Never modify files in `references/`.
+4. **Documentation** — If plugin behavior changed, update `README.md`. Also update the `description` in **both** `plugin.json` and `marketplace.json` — removed features must be removed from descriptions too.
+5. **Registration** — Add new plugins to `.claude-plugin/marketplace.json`.
+6. **Validation** — Run `unset CLAUDECODE && claude plugin validate .` (unset avoids nested-session errors).
+
+### Local Testing
+
+```bash
+claude --plugin-dir ./plugins/<plugin-name>
+```
+
+If the same plugin is installed from the marketplace, both versions load and the cached copy may win. Disable the marketplace version before testing:
+
+```bash
+claude plugin disable <plugin-name>@claude-code-zero
+claude plugin enable  <plugin-name>@claude-code-zero
+```
+
+## references/ Folder
+
+Git-ignored. External open-source code for local reference only. Clone research repos into `references/<repo-name>`. **Never modify** — read, benchmark, and mine for patterns only.
+
+## Git Workflow
+
+### Branching
+
+- **`develop`** — Working branch. All development happens here.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [LeeJuOh/claude-code-zero](https://github.com/LeeJuOh/claude-code-zero) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-02 -->
