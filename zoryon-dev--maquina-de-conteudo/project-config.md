@@ -1,147 +1,257 @@
 ---
 trigger: always_on
-description: Visão geral do projeto Máquina de Conteúdo - Content Studio
+description: Padrões e convenções para o sistema de filas (background jobs)
 ---
 
 
-# Máquina de Conteúdo - Content Studio
+# Sistema de Filas (Background Jobs)
 
-## Visão Geral
+## Arquitetura
 
-Estúdio de conteúdo alimentado por IA que permite criar, editar e gerenciar posts para redes sociais usando agentes especialistas.
+### Stack
+- **Queue**: Upstash Redis (HTTP REST API)
+- **Persistência**: PostgreSQL (tabela `jobs`)
+- **Workers**: API Routes (`/api/workers`) - Serverless-friendly
 
-## Tech Stack Principal
+### Por que Serverless?
+- Não requer worker process contínuo
+- Escala automaticamente
+- Free tier generoso (500K requests/dia)
+- Zero infraestrutura adicional
 
-- **Framework**: Next.js 16.1.1 (App Router)
-- **Linguagem**: TypeScript 5 (strict mode)
-- **Estilização**: Tailwind CSS 4 + shadcn/ui (New York style)
-- **Autenticação**: Clerk (@clerk/nextjs)
-- **Banco de Dados**: Neon PostgreSQL (serverless) + Drizzle ORM
-- **State Management**: Zustand
-- **LLM Provider**: OpenRouter (multi-modelo)
-- **Queue System**: Upstash Redis
-- **Ícones**: Lucide React
-- **Animações**: Framer Motion + GSAP
-
-## Estrutura de Diretórios
+## Estrutura de Arquivos
 
 ```
-src/
-├── app/                    # Next.js App Router
-│   ├── (app)/             # Rotas protegidas (grupo de rotas)
-│   │   ├── dashboard/     # Chat com IA
-│   │   ├── library/       # Biblioteca de conteúdo
-│   │   ├── calendar/      # Calendário de posts
-│   │   ├── sources/       # Fontes de conteúdo
-│   │   └── settings/      # Configurações
-│   ├── api/               # API Routes
-│   │   ├── jobs/          # CRUD de jobs
-│   │   ├── workers/       # Worker para processar jobs
-│   │   └── webhooks/      # Webhooks (Clerk)
-│   ├── sign-in/           # Página de login
-│   ├── sign-up/           # Página de registro
-│   └── layout.tsx         # Root layout (ClerkProvider)
-├── components/
-│   ├── app-layout.tsx     # Layout principal (header + nav)
-│   ├── auth/              # Componentes de autenticação
-│   ├── ui/                # Componentes shadcn/ui
-│   └── dashboard/         # Componentes específicos do dashboard
-├── db/
-│   ├── index.ts           # Cliente Drizzle (Neon serverless)
-│   └── schema.ts          # Schema do banco (8 tabelas)
-├── lib/
-│   ├── queue/             # Sistema de filas (Upstash Redis)
-│   ├── models.ts          # Modelos de IA disponíveis
-│   └── utils.ts           # Utilitários (cn, etc)
-└── hooks/                 # React hooks customizados
+src/lib/queue/
+├── types.ts      # JobType, JobStatus, JobPayload types
+├── client.ts     # Redis client (enqueue, dequeue)
+└── jobs.ts       # CRUD de jobs (createJob, updateJobStatus)
 ```
 
-## Principais Funcionalidades
+## Tipos de Jobs
 
-### 1. Chat com IA
-- Interface conversacional para criar conteúdo
-- Multi-modelo via OpenRouter (GPT, Claude, Gemini, Grok)
-- Histórico de conversas persistido no banco
+### JobType Enum
 
-### 2. Biblioteca de Conteúdo
-- Textos, imagens, carrosséis, vídeos, stories
-- Status: draft, scheduled, published, archived
-- Agendamento de publicação
-
-### 3. Sistema de Filas (Background Jobs)
-- Upstash Redis para processamento assíncrono
-- Tipos: geração de texto/imagem, criação de carrossel, scraping, publicação agendada
-- Workers via API routes (serverless-friendly)
-
-### 4. Base de Conhecimento
-- Upload de documentos
-- Indexação para RAG (futuro)
-- Consulta contextual
-
-### 5. Autenticação
-- Clerk com OAuth (Google, GitHub)
-- Middleware de proteção de rotas (`src/proxy.ts`)
-- Webhook para sincronização de usuários
-
-## Design System
-
-### Cores Principais
-- **Background**: `#0a0a0f` (dark)
-- **Cards**: Glassmorphism com `bg-[#0a0a0f]/80 backdrop-blur-xl`
-- **Borders**: `border-white/10`
-- **Primary**: HSL `84 76% 55%` (verde/amarelo)
-
-### Padrões Visuais
-- Glassmorphism em cards e header
-- Bordas sutis com opacidade
-- Glow effects em hover
-- Transições suaves
-
-### Componentes UI
-- shadcn/ui (New York style)
-- Componentes acessíveis (Radix UI)
-- Dark mode por padrão
-
-## Variáveis de Ambiente
-
-```env
-# Database
-DATABASE_URL=postgresql://...
-
-# Clerk Auth
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_...
-CLERK_SECRET_KEY=sk_...
-CLERK_WEBHOOK_SECRET=whsec_...
-
-# APIs
-OPENROUTER_API_KEY=sk-or-...
-TAVILY_API_KEY=tvly-...
-FIRECRAWL_API_KEY=fc-...
-APIFY_API_KEY=apify-...
-
-# Queue System
-UPSTASH_REDIS_REST_URL=https://...
-UPSTASH_REDIS_REST_TOKEN=...
+```typescript
+type JobType =
+  | "ai_text_generation"      // Geração de texto com IA
+  | "ai_image_generation"      // Geração de imagem com IA
+  | "carousel_creation"        // Criação de carrossel
+  | "scheduled_publish"        // Publicação agendada
+  | "web_scraping"             // Web scraping
 ```
 
-## Comandos Úteis
+### JobStatus Enum
 
-```bash
-# Desenvolvimento
-npm run dev
-
-# Build
-npm run build
-
-# Lint
-npm run lint
-
-# Database
-npm run db:generate    # Gerar migration
-npm run db:migrate     # Executar migration
-npm run db:studio      # UI visual do banco
-npm run db:push        # Push schema (sem migration)
+```typescript
+type JobStatus =
+  | "pending"      // Aguardando processamento
+  | "processing"   // Em processamento
+  | "completed"    // Concluído com sucesso
+  | "failed"       // Falhou após tentativas
 ```
+
+### JobPayload Types
+
+```typescript
+// Definidos em src/lib/queue/types.ts
+interface AITextGenerationPayload {
+  prompt: string
+  model: string
+  // ...
+}
+
+interface AIImageGenerationPayload {
+  prompt: string
+  model: string
+  // ...
+}
+```
+
+## Fluxo de Processamento
+
+### 1. Criação de Job
+
+```typescript
+// Client → POST /api/jobs
+import { createJob } from "@/lib/queue/jobs"
+
+const jobId = await createJob(userId, "ai_text_generation", {
+  prompt: "Write a blog post about...",
+  model: "openai/gpt-5.2"
+}, {
+  priority: 10, // Opcional
+  scheduledFor: new Date("2024-01-20") // Opcional
+})
+```
+
+**O que acontece:**
+1. Insere job no banco (status: `pending`)
+2. Se não agendado, enfileira no Redis (`enqueueJob`)
+3. Retorna `jobId`
+
+### 2. Enfileiramento (Redis)
+
+```typescript
+// src/lib/queue/client.ts
+export async function enqueueJob(jobId: number, priority = 0) {
+  // Formato: priority:timestamp:jobId
+  const score = `${String(999999 - priority).padStart(6, "0")}:${Date.now()}:${jobId}`
+  await redis.lpush(JOB_QUEUE, score)
+}
+```
+
+**Chaves Redis:**
+- `jobs:pending` - Fila de jobs pendentes
+- `jobs:processing` - Jobs em processamento
+
+### 3. Processamento (Worker)
+
+```typescript
+// Agendador/Cron → POST /api/workers
+import { dequeueJob } from "@/lib/queue/client"
+import { getJob, updateJobStatus } from "@/lib/queue/jobs"
+
+// 1. Desenfileirar
+const jobId = await dequeueJob()
+
+// 2. Buscar job no banco
+const job = await getJob(jobId)
+
+// 3. Marcar como processando
+await markAsProcessing(jobId)
+await updateJobStatus(jobId, "processing")
+
+// 4. Processar (handlers por tipo)
+const handler = jobHandlers[job.type]
+const result = await handler(job.payload)
+
+// 5. Atualizar status
+await updateJobStatus(jobId, "completed", { result })
+await removeFromProcessing(jobId)
+```
+
+### 4. Handlers de Jobs
+
+```typescript
+// src/app/api/workers/route.ts
+const jobHandlers: Record<JobType, (payload: JobPayload) => Promise<unknown>> = {
+  ai_text_generation: async (payload) => {
+    // Chamar OpenRouter API
+    // Retornar texto gerado
+  },
+  ai_image_generation: async (payload) => {
+    // Chamar OpenRouter Image API
+    // Retornar URL da imagem
+  },
+  // ...
+}
+```
+
+## Funções Principais
+
+### Client (Redis)
+
+```typescript
+// src/lib/queue/client.ts
+
+// Enfileirar job
+enqueueJob(jobId: number, priority?: number): Promise<void>
+
+// Desenfileirar próximo job
+dequeueJob(): Promise<number | null>
+
+// Marcar como processando
+markAsProcessing(jobId: number): Promise<void>
+
+// Remover de processamento
+removeFromProcessing(jobId: number): Promise<void>
+
+// Tamanho da fila
+getQueueSize(): Promise<number>
+
+// Jobs em processamento
+getProcessingCount(): Promise<number>
+```
+
+### Jobs (Database)
+
+```typescript
+// src/lib/queue/jobs.ts
+
+// Criar job
+createJob<T extends JobPayload>(
+  userId: string,
+  type: JobType,
+  payload: T,
+  options?: {
+    priority?: number
+    scheduledFor?: Date
+    maxAttempts?: number
+  }
+): Promise<number>
+
+// Buscar job
+getJob(jobId: number): Promise<Job | null>
+
+// Atualizar status
+updateJobStatus(
+  jobId: number,
+  status: "processing" | "completed" | "failed",
+  data?: { result?: unknown; error?: string }
+): Promise<void>
+
+// Listar jobs do usuário
+listUserJobs(
+  userId: string,
+  options?: { limit?: number; offset?: number; status?: JobStatus }
+): Promise<Job[]>
+```
+
+## Retry Logic
+
+### Configuração
+
+```typescript
+// Ao criar job
+createJob(userId, type, payload, {
+  maxAttempts: 3 // Padrão: 3
+})
+
+// No worker
+if (job.attempts < job.maxAttempts) {
+  // Re-enfileirar com prioridade reduzida
+  await enqueueJob(jobId, job.priority - 1)
+  await updateJobStatus(jobId, "pending", {
+    attempts: job.attempts + 1
+  })
+} else {
+  // Marcar como failed
+  await updateJobStatus(jobId, "failed", {
+    error: "Max attempts reached"
+  })
+}
+```
+
+## Agendamento
+
+### Jobs Agendados
+
+```typescript
+// Criar job agendado
+const jobId = await createJob(userId, type, payload, {
+  scheduledFor: new Date("2024-01-20T10:00:00Z")
+})
+
+// Não enfileira imediatamente
+// Worker verifica jobs agendados antes de processar
+```
+
+### Verificação de Agendamento
+
+```typescript
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [zoryon-dev/maquina-de-conteudo](https://github.com/zoryon-dev/maquina-de-conteudo) — distributed by [TomeVault](https://tomevault.io).
