@@ -1,11 +1,13 @@
 ---
 trigger: always_on
-description: Always use the ./.ai/GUIDELINES.md
+description: ALWAYS open and follow `{cypilot_path}/.core/skills/cypilot/SKILL.md`
 ---
 
+# Cypilot
 
-Always use the ./.ai/GUIDELINES.md
+
+ALWAYS open and follow `{cypilot_path}/.core/skills/cypilot/SKILL.md`
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/cyberfabric) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-09 -->
+> Source: [cyberfabric/frontx](https://github.com/cyberfabric/frontx) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-05 -->
