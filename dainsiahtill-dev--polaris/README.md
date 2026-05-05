@@ -7,11 +7,11 @@ Polaris 是一个事务驱动的 AI 软件工厂内核。它不是聊天式编�
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [dainsiahtill-dev/Polaris](https://github.com/dainsiahtill-dev/Polaris).
+Original source: `CLAUDE.md` in [dainsiahtill-dev/Polaris](https://github.com/dainsiahtill-dev/Polaris).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
