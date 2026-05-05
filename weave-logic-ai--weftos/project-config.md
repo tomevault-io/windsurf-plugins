@@ -1,0 +1,160 @@
+---
+trigger: always_on
+description: - Do what has been asked; nothing more, nothing less
+---
+
+# Claude Code Configuration - Claude Flow V3
+
+## Behavioral Rules (Always Enforced)
+
+- Do what has been asked; nothing more, nothing less
+- NEVER create files unless they're absolutely necessary for achieving your goal
+- ALWAYS prefer editing an existing file to creating a new one
+- NEVER proactively create documentation files (*.md) or README files unless explicitly requested
+- NEVER save working files, text/mds, or tests to the root folder
+- Never continuously check status after spawning a swarm — wait for results
+- ALWAYS read a file before editing it
+- NEVER commit secrets, credentials, or .env files
+
+## File Organization
+
+- NEVER save to root folder — use the directories below
+- Use `/src` for source code files
+- Use `/tests` for test files
+- Use `/docs` for documentation and markdown files
+- Use `/config` for configuration files
+- Use `/scripts` for utility scripts
+- Use `/examples` for example code
+
+## Project Architecture
+
+- Follow Domain-Driven Design with bounded contexts
+- Keep files under 500 lines
+- Use typed interfaces for all public APIs
+- Prefer TDD London School (mock-first) for new code
+- Use event sourcing for state changes
+- Ensure input validation at system boundaries
+
+### Project Config
+
+- **Topology**: hierarchical-mesh
+- **Max Agents**: 15
+- **Memory**: hybrid
+- **HNSW**: Enabled
+- **Neural**: Enabled
+
+## Build & Test
+
+**MANDATORY: Use `scripts/build.sh` for ALL build, test, check, and lint operations.**
+Do NOT run `cargo build`, `cargo test`, `cargo check`, or `cargo clippy` directly
+unless you are debugging a specific compilation issue that requires direct cargo
+flags not exposed by the script. If that happens, extend `scripts/build.sh` with
+the new capability so future builds use it.
+
+```bash
+# Build native CLI (release)
+scripts/build.sh native
+
+# Build native CLI (debug, fast iteration)
+scripts/build.sh native-debug
+
+# Build with extra features
+scripts/build.sh native --features voice,channels
+
+# Run workspace tests
+scripts/build.sh test
+
+# Fast compile check (no codegen)
+scripts/build.sh check
+
+# Lint (clippy, warnings as errors)
+scripts/build.sh clippy
+
+# Build WASM targets
+scripts/build.sh wasi
+scripts/build.sh browser
+
+# Build everything (native + wasi + browser + ui)
+scripts/build.sh all
+
+# Full phase gate (11 checks — use before committing)
+scripts/build.sh gate
+
+# Preview what a command would do
+scripts/build.sh native --dry-run
+
+# See all commands and options
+scripts/build.sh --help
+```
+
+- ALWAYS run `scripts/build.sh test` after making code changes
+- ALWAYS run `scripts/build.sh check` (or `gate`) before committing
+- If a new feature needs build flags not in the script, ADD them to `scripts/build.sh`
+- Agents MUST use `scripts/build.sh`, not raw cargo, except for critical debugging
+
+## Security Rules
+
+- NEVER hardcode API keys, secrets, or credentials in source files
+- NEVER commit .env files or any file containing secrets
+- Always validate user input at system boundaries
+- Always sanitize file paths to prevent directory traversal
+- Run `npx @claude-flow/cli@latest security scan` after security-related changes
+
+## Concurrency: 1 MESSAGE = ALL RELATED OPERATIONS
+
+- All operations MUST be concurrent/parallel in a single message
+- Use Claude Code's Task tool for spawning agents, not just MCP
+- ALWAYS batch ALL todos in ONE TodoWrite call (5-10+ minimum)
+- ALWAYS spawn ALL agents in ONE message with full instructions via Task tool
+- ALWAYS batch ALL file reads/writes/edits in ONE message
+- ALWAYS batch ALL Bash commands in ONE message
+
+## Swarm Orchestration
+
+- MUST initialize the swarm using CLI tools when starting complex tasks
+- MUST spawn concurrent agents using Claude Code's Task tool
+- Never use CLI tools alone for execution — Task tool agents do the actual work
+- MUST call CLI tools AND Task tool in ONE message for complex work
+
+### 3-Tier Model Routing (ADR-026)
+
+| Tier | Handler | Latency | Cost | Use Cases |
+|------|---------|---------|------|-----------|
+| **1** | Agent Booster (WASM) | <1ms | $0 | Simple transforms (var→const, add types) — Skip LLM |
+| **2** | Haiku | ~500ms | $0.0002 | Simple tasks, low complexity (<30%) |
+| **3** | Sonnet/Opus | 2-5s | $0.003-0.015 | Complex reasoning, architecture, security (>30%) |
+
+- Always check for `[AGENT_BOOSTER_AVAILABLE]` or `[TASK_MODEL_RECOMMENDATION]` before spawning agents
+- Use Edit tool directly when `[AGENT_BOOSTER_AVAILABLE]`
+
+## Swarm Configuration & Anti-Drift
+
+- ALWAYS use hierarchical topology for coding swarms
+- Keep maxAgents at 6-8 for tight coordination
+- Use specialized strategy for clear role boundaries
+- Use `raft` consensus for hive-mind (leader maintains authoritative state)
+- Run frequent checkpoints via `post-task` hooks
+- Keep shared memory namespace for all agents
+
+```bash
+npx @claude-flow/cli@latest swarm init --topology hierarchical --max-agents 8 --strategy specialized
+```
+
+## Swarm Execution Rules
+
+- ALWAYS use `run_in_background: true` for all agent Task calls
+- ALWAYS put ALL agent Task calls in ONE message for parallel execution
+- After spawning, STOP — do NOT add more tool calls or check status
+- Never poll TaskOutput or check swarm status — trust agents to return
+- When agent results arrive, review ALL results before proceeding
+
+## V3 CLI Commands
+
+### Core Commands
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [weave-logic-ai/weftos](https://github.com/weave-logic-ai/weftos) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-04-22 -->
