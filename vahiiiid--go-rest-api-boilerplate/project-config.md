@@ -3,227 +3,217 @@ trigger: always_on
 description: **Last Updated**: 2025-12-10
 ---
 
-# GRAB Development Rules for Windsurf
+# GitHub Copilot Instructions for GRAB (Go REST API Boilerplate)
 
 **Version**: v2.0.0  
 **Last Updated**: 2025-12-10  
-**Purpose**: Developer guidelines for building APIs with GRAB (Go REST API Boilerplate)  
-**Activation**: Always On
+**Purpose**: Developer-focused guidelines for building APIs with GRAB
 
 ---
 
-## Core Principles
+## 📋 What is GRAB?
 
-### 1. Clean Architecture
-Every domain follows: **Handler → Service → Repository**
+GRAB (Go REST API Boilerplate) is a production-ready Go REST API starter with:
+- **Clean Architecture** (Handler → Service → Repository)
+- **JWT Authentication** with refresh token rotation
+- **Role-Based Access Control (RBAC)**
+- **Database Migrations** (golang-migrate)
+- **Docker-First Development**
+- **89.81% Test Coverage**
+- **Comprehensive Documentation**: https://vahiiiid.github.io/go-rest-api-docs/
+
+---
+
+## 🎯 Core Development Principles
+
+### 1. **Environment Detection - Don't Hardcode Versions**
+Instead of stating "Go 1.24" or "PostgreSQL 15", show how to check:
+
+```bash
+# Check Go version
+go version
+
+# Check Docker version
+docker --version
+
+# Check PostgreSQL version (inside container)
+make exec-db
+psql --version
+```
+
+### 2. **Docker-First Development**
+- Developers run `make` commands on host
+- **Makefile automatically detects** if Docker container is running
+- Commands execute in container if available, host otherwise
+- **No need to manually enter container** - the Makefile handles execution context
+
+```bash
+# Start containers first
+make up
+
+# Run tests (automatically in container if running)
+make test
+
+# Run linting (automatically in container if running)
+make lint
+
+# Apply lint fixes (automatically in container if running)
+make lint-fix
+
+# Generate Swagger docs (automatically in container if running)
+make swag
+```
+
+### 3. **Clean Architecture Pattern**
+Every domain follows this structure:
+
+```
+internal/
+└── <domain>/
+    ├── model.go       # Domain models (GORM)
+    ├── dto.go         # Data Transfer Objects (API contracts)
+    ├── repository.go  # Database access layer
+    ├── service.go     # Business logic layer
+    ├── handler.go     # HTTP handlers (Gin)
+    └── *_test.go      # Tests for each layer
+```
+
+**Key Rules**:
+- Handler → Service → Repository (never skip layers)
 - No business logic in handlers
 - No HTTP concerns in services
 - Repository only talks to database
 
-### 2. Docker-First Development
-Developers run `make` on host, Makefile detects Docker and executes commands automatically:
+---
+
+## 🚀 Common Development Tasks
+
+### Adding a New Domain/Entity
+
+**Example**: Adding a "Todo" entity
+
+1. **Create directory structure**:
 ```bash
-make up          # Start containers
-make test        # Run tests (in container if available)
-make lint        # Run linting (in container if available)
-make lint-fix    # Auto-fix linting issues
-make swag        # Generate Swagger docs
+mkdir -p internal/todo
 ```
 
-### 3. Migration Naming Pattern
-Format: `YYYYMMDDHHMMSS_verb_noun_table`
-
-Examples:
-- `20251025225126_create_users_table`
-- `20251028000000_create_refresh_tokens_table`
-- `20251210120000_add_avatar_to_users_table`
-
-Commands:
-```bash
-make migrate-create NAME=create_todos_table
-make migrate-up
-make migrate-down
-make migrate-status
-```
-
-### 4. Version Checking
-Never hardcode versions. Show how to check:
-```bash
-go version                    # Check Go version
-docker --version              # Check Docker
-make exec-db                  # Enter DB container
-psql --version                # Check PostgreSQL
-```
-
----
-
-## Domain Structure
-
-```
-internal/<domain>/
-├── model.go       # GORM models
-├── dto.go         # API contracts (request/response)
-├── repository.go  # Database layer
-├── service.go     # Business logic
-├── handler.go     # HTTP handlers (Gin)
-└── *_test.go      # Tests
-```
-
-**Example**: See `internal/user/` for complete reference implementation.
-
----
-
-## Adding New Entities
-
-1. **Create directory**: `mkdir -p internal/<domain>`
-2. **Define model** with GORM tags
-3. **Create DTOs** for request/response validation
-4. **Implement repository** interface and methods
-5. **Implement service** with business logic
-6. **Create handler** with Swagger annotations
-7. **Generate migration**: `make migrate-create NAME=create_<table>_table`
-8. **Register routes** in `internal/server/router.go`
-9. **Write tests** for all layers
-10. **Run**: `make migrate-up && make test && make lint && make swag`
-
----
-
-## Authentication & Authorization
-
-**Get current user**:
+2. **Create model** (`internal/todo/model.go`):
 ```go
-import "github.com/vahiiiid/go-rest-api-boilerplate/internal/contextutil"
+package todo
 
-userID := contextutil.GetUserID(c)
-userEmail := contextutil.GetEmail(c)
-userName := contextutil.GetUserName(c)
-userRoles := contextutil.GetRoles(c)
-isAdmin := contextutil.IsAdmin(c)
-hasRole := contextutil.HasRole(c, "moderator")
-```
-
-**Protect routes**:
-```go
-import "github.com/vahiiiid/go-rest-api-boilerplate/internal/middleware"
-
-// Admin-only route
-v1.Use(middleware.RequireAdmin()).
-   POST("/admin/users", handler.CreateUser)
-
-// Specific role required
-v1.Use(middleware.RequireRole("admin")).
-   POST("/admin/reports", handler.CreateReport)
-```
-
----
-
-## Error Handling
-
-```go
 import (
-    "errors"
-    apiErrors "github.com/vahiiiid/go-rest-api-boilerplate/internal/errors"
+    "time"
+    "gorm.io/gorm"
 )
 
-// Validation errors
-if err := c.ShouldBindJSON(&req); err != nil {
-    _ = c.Error(apiErrors.FromGinValidation(err))
-    return
+type Todo struct {
+    ID          uint           `gorm:"primarykey" json:"id"`
+    Title       string         `gorm:"not null" json:"title"`
+    Description string         `json:"description"`
+    Completed   bool           `gorm:"default:false" json:"completed"`
+    UserID      uint           `gorm:"not null" json:"user_id"`
+    CreatedAt   time.Time      `json:"created_at"`
+    UpdatedAt   time.Time      `json:"updated_at"`
+    DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
 }
-
-// Service errors - check specific errors first
-result, err := h.service.GetResource(ctx, id)
-if err != nil {
-    if errors.Is(err, ErrNotFound) {
-        _ = c.Error(apiErrors.NotFound("Resource not found"))
-        return
-    }
-    if errors.Is(err, ErrUnauthorized) {
-        _ = c.Error(apiErrors.Unauthorized("Authentication required"))
-        return
-    }
-    _ = c.Error(apiErrors.InternalServerError(err))
-    return
-}
-
-c.JSON(http.StatusOK, apiErrors.Success(result))
 ```
 
----
-
-## Testing
-
-**Table-driven tests**:
+3. **Create DTO** (`internal/todo/dto.go`):
 ```go
-tests := []struct {
-    name        string
-    input       interface{}
-    setupMocks  func(*Mock)
-    expectError bool
-    errorType   error
-}{
-    {name: "success", input: validInput, setupMocks: func(m *Mock) {...}},
-    {name: "validation_error", input: invalidInput, expectError: true},
+package todo
+
+type CreateTodoRequest struct {
+    Title       string `json:"title" binding:"required,min=3,max=200"`
+    Description string `json:"description" binding:"max=1000"`
 }
 
-for _, tt := range tests {
-    t.Run(tt.name, func(t *testing.T) {
-        // Test implementation
-    })
+type UpdateTodoRequest struct {
+    Title       string `json:"title" binding:"omitempty,min=3,max=200"`
+    Description string `json:"description" binding:"omitempty,max=1000"`
+    Completed   *bool  `json:"completed"`
+}
+
+type TodoResponse struct {
+    ID          uint      `json:"id"`
+    Title       string    `json:"title"`
+    Description string    `json:"description"`
+    Completed   bool      `json:"completed"`
+    UserID      uint      `json:"user_id"`
+    CreatedAt   time.Time `json:"created_at"`
+    UpdatedAt   time.Time `json:"updated_at"`
 }
 ```
 
-**Commands**:
-```bash
-make test              # Run all tests
-make test-coverage     # Generate coverage report
-make test-verbose      # Verbose output
-```
-
----
-
-## Swagger Documentation
-
-**Annotations**:
+4. **Create repository** (`internal/todo/repository.go`):
 ```go
-// @Summary Create todo
-// @Description Create a new todo item
-// @Tags todos
-// @Accept json
-// @Produce json
-// @Security BearerAuth
-// @Param request body CreateTodoRequest true "Todo data"
-// @Success 201 {object} errors.Response{success=bool,data=TodoResponse}
-// @Failure 400 {object} errors.Response{success=bool,error=errors.ErrorInfo} "Validation error"
-// @Router /api/v1/todos [post]
-func (h *Handler) CreateTodo(c *gin.Context) {...}
+package todo
+
+import (
+    "context"
+    "gorm.io/gorm"
+)
+
+type Repository interface {
+    Create(ctx context.Context, todo *Todo) error
+    FindByID(ctx context.Context, id uint) (*Todo, error)
+    FindByUserID(ctx context.Context, userID uint) ([]Todo, error)
+    Update(ctx context.Context, todo *Todo) error
+    Delete(ctx context.Context, id uint) error
+}
+
+type repository struct {
+    db *gorm.DB
+}
+
+func NewRepository(db *gorm.DB) Repository {
+    return &repository{db: db}
+}
+
+// Implementation methods...
 ```
 
-**Update docs**: `make swag`
+5. **Create service** (`internal/todo/service.go`):
+```go
+package todo
 
----
+import (
+    "context"
+    "go-rest-api-boilerplate/internal/errors"
+)
 
-## Pre-Commit Workflow
+type Service interface {
+    CreateTodo(ctx context.Context, userID uint, req *CreateTodoRequest) (*TodoResponse, error)
+    GetTodo(ctx context.Context, userID, todoID uint) (*TodoResponse, error)
+    GetUserTodos(ctx context.Context, userID uint) ([]TodoResponse, error)
+    UpdateTodo(ctx context.Context, userID, todoID uint, req *UpdateTodoRequest) (*TodoResponse, error)
+    DeleteTodo(ctx context.Context, userID, todoID uint) error
+}
 
-```bash
-make lint-fix    # Auto-fix issues
-make lint        # Check remaining issues
-make test        # Run tests
-make swag        # Update Swagger (if API changed)
+type service struct {
+    repo Repository
+}
+
+func NewService(repo Repository) Service {
+    return &service{repo: repo}
+}
+
+// Implementation methods...
 ```
 
----
+6. **Create handler** (`internal/todo/handler.go`):
+```go
+package todo
 
-## Out-of-the-Box Features
-
-GRAB includes:
-- ✅ JWT Authentication with refresh tokens
-- ✅ RBAC (Role-Based Access Control)
-- ✅ Database migrations (golang-migrate)
-- ✅ Health checks (`/health`, `/live`, `/ready`)
+import (
+    "net/http"
+    "strconv"
+    
+    "github.com/gin-gonic/gin"
+    "github.com/vahiiiid/go-rest-api-boilerplate/internal/contextutil"
+    apiErrors "github.com/vahiiiid/go-rest-api-boilerplate/internal/errors"
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/vahiiiid) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-13 -->
+> Source: [vahiiiid/go-rest-api-boilerplate](https://github.com/vahiiiid/go-rest-api-boilerplate) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-05 -->
