@@ -1,137 +1,128 @@
 ---
 trigger: always_on
-description: Zustand state management patterns and conventions
+description: Substreamer is a React Native music streaming client for Subsonic-compatible servers (Subsonic, Navidrome, etc.), built with Expo SDK 55, React 19, and TypeScript (strict mode).
 ---
 
+# Substreamer – Project Overview
 
-# Zustand Store Patterns
+Substreamer is a React Native music streaming client for Subsonic-compatible servers (Subsonic, Navidrome, etc.), built with Expo SDK 55, React 19, and TypeScript (strict mode).
 
-## Store Structure
+## Tech Stack
 
-Each store is a separate file in `src/store/` following this pattern:
+- **Framework:** Expo ~55 / React Native 0.83 (New Architecture enabled)
+- **Routing:** Expo Router (file-based) with Stack + Tab navigators
+- **State:** Zustand with SQLite persistence (`expo-sqlite`)
+- **API:** `subsonic-api` library for Subsonic REST protocol
+- **Audio:** `react-native-track-player` (RNTP, local fork in `modules/`) for streaming and background playback
+- **Lists:** `@shopify/flash-list` v2 (FlashList) for all performant lists – replaces React Native FlatList
+- **Image caching:** Custom disk cache via `expo-file-system`
+- **Animations:** `react-native-reanimated` (v4) for all animations – see `ux-quality` rule for details and exceptions
+- **i18n:** `react-i18next` v17 + `i18next` v26 with `@formatjs/intl-pluralrules` polyfill for Hermes
+- **Styling:** `StyleSheet.create` + inline theme colors (no CSS-in-JS libraries)
+- **Path alias:** `@/*` maps to `./src/*`
 
-```typescript
-import { create } from 'zustand';
-import { createJSONStorage, persist } from 'zustand/middleware';
+## Directory Structure
 
-import { sqliteStorage } from './sqliteStorage';
+```
+src/
+  app/            # Expo Router routes (thin wrappers that import from screens/)
+    _layout.tsx   # Root Stack layout, auth guard, splash screen
+    (tabs)/       # Bottom tab navigator group
+    album/[id]    # Dynamic routes for entities
+    artist/[id]
+    playlist/[id]
+  screens/        # Screen components with business logic
+  components/     # Reusable UI components
+  hooks/          # Custom hooks
+  services/       # API clients and external integrations
+  store/          # Zustand stores
+  i18n/           # react-i18next singleton, locale JSON files, language list
+  constants/      # Theme definitions
+  utils/          # Formatting, color, string, and timing helpers
+  assets/         # App icons, splash images
+modules/          # Local Expo native modules (see native-modules rule)
+scripts/          # Build helper scripts
+fastlane/         # Store listing metadata (descriptions, screenshots, release notes)
+  metadata/       # Plain-text metadata files for iOS and Android stores
+```
 
-interface MyState {
-  data: Item[];
-  loading: boolean;
-  error: string | null;
-  fetchData: () => Promise<void>;
+## Key Architectural Patterns
+
+1. **Route/Screen separation:** Route files in `app/` are thin wrappers; business logic lives in `screens/`. See `routing-and-navigation` rule.
+2. **Zustand stores** manage all app state. See `zustand-stores` rule.
+3. **Services** are plain modules exporting async functions (no classes). See `services-and-api` rule.
+4. **CachedImage** is the standard component for all cover art – never use raw `<Image>` for Subsonic artwork.
+5. **`useTheme()`** provides `{ theme, colors }` – all components consume colors from this hook rather than importing theme constants directly.
+6. **Shared utilities** live in `src/utils/` – common helpers (alphabet indexing via `getFirstLetter`, minimum-delay promises via `minDelay`) are extracted here rather than duplicated.
+7. **All user-facing strings** are translated via `react-i18next`. See `Internationalization` section below.
+
+## Internationalization (i18n)
+
+All user-facing strings use `react-i18next`. English is the source language; translations are stored as flat JSON in `src/i18n/locales/`.
+
+### Setup
+
+- **Runtime:** `i18next` v26 + `react-i18next` v17 + `i18next-resources-to-backend` for lazy loading
+- **Hermes polyfill:** `@formatjs/intl-pluralrules/polyfill-force` — imported first in `src/i18n/i18n.ts` (must precede i18next init)
+- **Locale persistence:** `localeStore` (Zustand + SQLite) — `null` = follow device locale
+- **Test setup:** `src/test-utils/i18nSetup.ts` initializes i18next with English resources; included in Jest `setupFiles`
+
+### Usage Patterns
+
+**In React components** — use the `useTranslation` hook:
+
+```tsx
+import { useTranslation } from 'react-i18next';
+
+function MyScreen() {
+  const { t } = useTranslation();
+  return <Text>{t('recentlyAdded')}</Text>;
 }
-
-export const myStore = create<MyState>()(
-  persist(
-    (set, get) => ({
-      data: [],
-      loading: false,
-      error: null,
-      fetchData: async () => {
-        set({ loading: true, error: null });
-        try {
-          const result = await someService();
-          set({ data: result, loading: false });
-        } catch (e) {
-          set({ loading: false, error: e instanceof Error ? e.message : 'Failed to load' });
-        }
-      },
-    }),
-    {
-      name: 'substreamer-my-data',
-      storage: createJSONStorage(() => sqliteStorage),
-      partialize: (state) => ({ data: state.data }),
-    }
-  )
-);
 ```
 
-Persistence uses a shared SQLite adapter (`src/store/sqliteStorage.ts`) backed by `expo-sqlite` with database `substreamer7.db`. This provides identical behavior on iOS and Android.
+**In services/stores (outside React)** — import `i18next` directly:
 
-## Key Conventions
+```tsx
+import i18n from 'i18next';
 
-1. **Export the store directly** (not a hook): `export const myStore = create<MyState>()(...)`.
-2. **Persist key naming:** `'substreamer-{domain}'` (e.g. `'substreamer-auth'`, `'substreamer-theme'`).
-3. **`partialize`** to exclude transient state (`loading`, `error`) from persistence.
-4. **Types co-located** with the store – define interfaces and type aliases in the same file.
-5. **Non-persistent stores** omit the `persist` wrapper (e.g. `playerStore`, `searchStore`, `migrationStore`).
-
-## Consuming Stores
-
-In components, use selector pattern for minimal re-renders:
-
-```typescript
-const isLoggedIn = authStore((s) => s.isLoggedIn);
-const albums = albumListsStore((s) => s.recentlyAdded);
+processingOverlayStore.getState().showSuccess(i18n.t('playlistCreated'));
 ```
 
-Outside React (services, other stores), use `getState()`:
+**Module-level constant arrays** — use `labelKey` instead of `label`:
 
-```typescript
-const { serverUrl, username } = authStore.getState();
-albumListsStore.getState().refreshAll();
+```tsx
+const OPTIONS = [
+  { value: 'recent', labelKey: 'recentlyAdded' },
+];
+// At render: <Text>{t(opt.labelKey)}</Text>
 ```
 
-## Existing Stores
+**Interpolation:** `t('greeting', { name: 'Miles' })` → key: `"greeting": "Hello {{name}}"`
 
-| Store | Persisted | Purpose |
-|-------|-----------|---------|
-| `authStore` | Yes | Server URL, credentials, login state |
-| `themeStore` | Yes | Theme preference (light/dark/system), primary color |
-| `albumListsStore` | Yes | Home screen album lists (recent, frequent, etc.) |
-| `albumLibraryStore` | Yes | Full album library with sorting |
-| `albumDetailStore` | Yes | Cached album detail data by ID |
-| `artistLibraryStore` | Yes | Artist library |
-| `artistDetailStore` | Yes | Cached artist detail data (albums, info, top songs) |
-| `playlistLibraryStore` | Yes | Playlist library |
-| `playlistDetailStore` | Yes | Cached playlist detail data with songs |
-| `favoritesStore` | Yes | Starred albums, artists, songs |
-| `layoutPreferencesStore` | Yes | List/grid toggle, sort order per view |
-| `playbackSettingsStore` | Yes | Stream format, bitrate, content length |
-| `serverInfoStore` | Yes | Server version, type, extensions |
-| `imageCacheStore` | Yes | Cache statistics (total bytes, file count) |
-| `completedScrobbleStore` | Yes | Completed scrobble records |
-| `pendingScrobbleStore` | Yes | Pending scrobble entries awaiting submission |
-| `scanStatusStore` | Yes | Library scan status and timestamps |
-| `sslCertStore` | Yes | Trusted SSL certificate fingerprints by hostname |
-| `musicCacheStore` | Yes | Downloaded music cache stats and download queue |
-| `offlineModeStore` | Yes | Offline mode toggle |
-| `shareSettingsStore` | Yes | Share expiration/download settings |
-| `sharesStore` | Yes | Server shares list |
-| `storageLimitStore` | Yes | Storage usage limit tracking |
-| `ratingStore` | Yes | Optimistic rating overrides synced with server |
-| `mbidOverrideStore` | Yes | Manual MusicBrainz ID overrides per artist |
-| `backupStore` | Yes | Auto-backup toggle and last backup timestamp |
-| `migrationStore` | Yes | Migration version tracking |
-| `playerStore` | No | Current track, queue, playback position |
-| `searchStore` | No | Search query and results |
-| `addToPlaylistStore` | No | Add-to-playlist sheet state |
-| `connectivityStore` | No | Network reachability state |
-| `createShareStore` | No | Create-share sheet state |
-| `editShareStore` | No | Edit-share sheet state |
-| `filterBarStore` | No | Filter bar visibility/query |
-| `moreOptionsStore` | No | More-options sheet state |
-| `playbackToastStore` | No | Playback toast overlay state |
-| `processingOverlayStore` | No | Processing overlay state |
-| `setRatingStore` | No | Set-rating sheet state |
-| `mbidSearchStore` | No | MBID search sheet state |
+**Plurals:** Key-suffix convention with `_one`/`_other`:
 
-## Cross-Store Subscriptions
-
-When one store needs to react to changes in another, use Zustand's `subscribe()` API at module scope in the **dependent** store's file. This avoids circular dependencies and `setTimeout + require` hacks:
-
-```typescript
-// At the bottom of albumLibraryStore.ts
-import { layoutPreferencesStore } from './layoutPreferencesStore';
-
-layoutPreferencesStore.subscribe((state, prevState) => {
-  if (state.albumSortOrder !== prevState.albumSortOrder) {
-    albumLibraryStore.getState().resortAlbums();
-  }
-});
+```json
+{ "songCount_one": "{{count}} song", "songCount_other": "{{count}} songs" }
 ```
+```tsx
+t('songCount', { count: 5 }) // "5 songs"
+```
+
+### Key Naming Rules
+
+- Flat camelCase: `recentlyAdded`, not `home.recentlyAdded`
+- Single `translation` namespace (no namespace prefix in `t()` calls)
+- Reuse existing keys for shared strings (`cancel`, `delete`, `save`, `albums`, etc.)
+- Check `src/i18n/locales/en.json` before creating new keys
+
+### What NOT to Translate
+
+- Remote API data (album titles, artist names, track titles)
+- App name "Substreamer"
+- Technical identifiers, log messages, file paths
+- Numeric format strings from formatters (`1h30m`, `1.2 GB`)
+
+### Crowdin Integration
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
