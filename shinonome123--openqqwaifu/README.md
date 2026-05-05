@@ -7,11 +7,11 @@ openqqwaifu 是一个独立运行的 QQ Waifu 控制台与运行时。  它把�
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [shinonome123/openqqwaifu](https://github.com/shinonome123/openqqwaifu).
+Original source: `CLAUDE.md` in [shinonome123/openqqwaifu](https://github.com/shinonome123/openqqwaifu).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
