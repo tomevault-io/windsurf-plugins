@@ -7,11 +7,11 @@ Ship with less chaos. Flux is a fast, simple Kanban board with MCP integration s
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [sirsjg/flux](https://github.com/sirsjg/flux).
+Original source: `CLAUDE.md` in [sirsjg/flux](https://github.com/sirsjg/flux).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
