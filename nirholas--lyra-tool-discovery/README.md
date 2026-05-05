@@ -7,14 +7,14 @@ AI powered automation toolkit which acts as an agent that discovers MCP servers 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `GEMINI.md` in [nirholas/lyra-tool-discovery](https://github.com/nirholas/lyra-tool-discovery).
+Original source: `AGENTS.md` in [nirholas/lyra-tool-discovery](https://github.com/nirholas/lyra-tool-discovery).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
+- **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
 Available for 6 platforms including Claude Code, Cursor, Windsurf, and more. Source: [github.com/nirholas/lyra-tool-discovery](https://github.com/nirholas/lyra-tool-discovery)
