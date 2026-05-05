@@ -1,170 +1,119 @@
 ---
 trigger: always_on
-description: This document provides comprehensive guidelines for AI agents (Claude, GPT, Cursor, etc.) working with the Evolution API codebase.
+description: Core development principles and standards for Evolution API development
 ---
 
-# Evolution API - AI Agent Guidelines
 
-This document provides comprehensive guidelines for AI agents (Claude, GPT, Cursor, etc.) working with the Evolution API codebase.
+# Evolution API Development Standards
 
-## Project Overview
+## Cross-References
+- **Project Context**: @project-context.mdc for Evolution API-specific patterns
+- **Specialized Rules**: 
+  - @specialized-rules/service-rules.mdc for service layer patterns
+  - @specialized-rules/controller-rules.mdc for controller patterns
+  - @specialized-rules/dto-rules.mdc for DTO validation patterns
+  - @specialized-rules/guard-rules.mdc for authentication/authorization
+  - @specialized-rules/route-rules.mdc for router patterns
+  - @specialized-rules/type-rules.mdc for TypeScript definitions
+  - @specialized-rules/util-rules.mdc for utility functions
+  - @specialized-rules/validate-rules.mdc for validation schemas
+  - @specialized-rules/integration-channel-rules.mdc for channel integrations
+  - @specialized-rules/integration-chatbot-rules.mdc for chatbot integrations
+  - @specialized-rules/integration-storage-rules.mdc for storage integrations
+  - @specialized-rules/integration-event-rules.mdc for event integrations
+- **TypeScript/Node.js**: Node.js 20+ + TypeScript 5+ best practices
+- **Express/Prisma**: Express.js + Prisma ORM patterns
+- **WhatsApp Integrations**: Baileys + Meta Business API patterns
 
-**Evolution API** is a production-ready, multi-tenant WhatsApp API platform built with Node.js, TypeScript, and Express.js. It supports multiple WhatsApp providers and extensive integrations with chatbots, CRM systems, and messaging platforms.
+## Senior Engineer Context - Evolution API Platform
+- You are a senior software engineer working on a WhatsApp API platform
+- Focus on Node.js + TypeScript + Express.js full-stack development
+- Specialized in real-time messaging, WhatsApp integrations, and event-driven architecture
+- Apply scalable patterns for multi-tenant API platform
+- Consider WhatsApp integration workflow implications and performance at scale
 
-## Project Structure & Module Organization
+## Fundamental Principles
 
-### Core Directories
-- **`src/`** – TypeScript source code with modular architecture
-  - `api/controllers/` – HTTP route handlers (thin layer)
-  - `api/services/` – Business logic (core functionality)
-  - `api/routes/` – Express route definitions (RouterBroker pattern)
-  - `api/integrations/` – External service integrations
-    - `channel/` – WhatsApp providers (Baileys, Business API, Evolution)
-    - `chatbot/` – AI/Bot integrations (OpenAI, Dify, Typebot, Chatwoot)
-    - `event/` – Event systems (WebSocket, RabbitMQ, SQS, NATS, Pusher)
-    - `storage/` – File storage (S3, MinIO)
-  - `dto/` – Data Transfer Objects (simple classes, no decorators)
-  - `guards/` – Authentication/authorization middleware
-  - `types/` – TypeScript type definitions
-  - `repository/` – Data access layer (Prisma)
-- **`prisma/`** – Database schemas and migrations
-  - `postgresql-schema.prisma` / `mysql-schema.prisma` – Provider-specific schemas
-  - `postgresql-migrations/` / `mysql-migrations/` – Provider-specific migrations
-- **`config/`** – Environment and application configuration
-- **`utils/`** – Shared utilities and helper functions
-- **`validate/`** – JSONSchema7 validation schemas
-- **`exceptions/`** – Custom HTTP exception classes
-- **`cache/`** – Redis and local cache implementations
+### Code Quality Standards
+- **Simplicity First**: Always prefer simple solutions over complex ones
+- **DRY Principle**: Avoid code duplication - check for existing similar functionality before implementing
+- **Single Responsibility**: Each function/class should have one clear purpose
+- **Readable Code**: Write code that tells a story - clear naming and structure
 
-### Build & Deployment
-- **`dist/`** – Build output (do not edit directly)
-- **`public/`** – Static assets and media files
-- **`Docker*`**, **`docker-compose*.yaml`** – Containerization and local development stack
+### Problem Resolution Approach
+- **Follow Existing Patterns**: Use established Service patterns, DTOs, and Integration patterns
+- **Event-Driven First**: Leverage EventEmitter2 for event publishing when adding new features
+- **Integration Pattern**: Follow existing WhatsApp integration patterns for new channels
+- **Conservative Changes**: Prefer extending existing services over creating new architecture
+- **Clean Migration**: Remove deprecated patterns when introducing new ones
+- **Incremental Changes**: Break large changes into smaller, testable increments with proper migrations
 
-## Build, Test, and Development Commands
+### File and Function Organization - Node.js/TypeScript Structure
+- **Services**: Keep services focused and under 200 lines
+- **Controllers**: Keep controllers thin - only routing and validation
+- **DTOs**: Use JSONSchema7 for all input validation
+- **Integrations**: Follow `src/api/integrations/` structure for new integrations
+- **Utils**: Extract common functionality into well-named utilities
+- **Types**: Define clear TypeScript interfaces and types
 
-### Development Workflow
-```bash
-# Development server with hot reload
-npm run dev:server
+### Code Analysis and Reflection
+- After writing code, deeply reflect on scalability and maintainability
+- Provide 1-2 paragraph analysis of code changes
+- Suggest improvements or next steps based on reflection
+- Consider performance, security, and maintenance implications
 
-# Direct execution for testing
-npm start
+## Development Standards
 
-# Production build and run
-npm run build
-npm run start:prod
-```
+### TypeScript Standards
+- **Strict Mode**: Always use TypeScript strict mode
+- **No Any**: Avoid `any` type - use proper typing
+- **Interfaces**: Define clear contracts with interfaces
+- **Enums**: Use enums for constants and status values
+- **Generics**: Use generics for reusable components
 
-### Code Quality
-```bash
-# Linting and formatting
-npm run lint        # ESLint with auto-fix
-npm run lint:check  # ESLint check only
+### Error Handling Standards
+- **HTTP Exceptions**: Use appropriate HTTP status codes
+- **Logging**: Structured logging with context
+- **Retry Logic**: Implement retry for external services
+- **Graceful Degradation**: Handle service failures gracefully
 
-# Commit with conventional commits
-npm run commit      # Interactive commit with Commitizen
-```
+### Security Standards
+- **Input Validation**: Validate all inputs with JSONSchema7
+- **Authentication**: Use API keys and JWT tokens
+- **Rate Limiting**: Implement rate limiting for APIs
+- **Data Sanitization**: Sanitize sensitive data in logs
 
-### Database Management
-```bash
-# Set database provider first (CRITICAL)
-export DATABASE_PROVIDER=postgresql  # or mysql
+### Performance Standards
+- **Caching**: Use Redis for frequently accessed data
+- **Database**: Optimize Prisma queries with proper indexing
+- **Memory**: Monitor memory usage and implement cleanup
+- **Async**: Use async/await properly with error handling
 
-# Generate Prisma client
-npm run db:generate
+## Communication Standards
 
-# Development migrations (with provider sync)
-npm run db:migrate:dev      # Unix/Mac
-npm run db:migrate:dev:win  # Windows
+### Language Requirements
+- **User Communication**: Always respond in Portuguese (PT-BR)
+- **Code Comments**: English for technical documentation
+- **API Documentation**: English for consistency
+- **Error Messages**: Portuguese for user-facing errors
 
-# Production deployment
-npm run db:deploy      # Unix/Mac
-npm run db:deploy:win  # Windows
+### Documentation Standards
+- **Code Comments**: Document complex business logic
+- **API Documentation**: Document all public endpoints
+- **README**: Keep project documentation updated
+- **Changelog**: Document breaking changes
 
-# Database tools
-npm run db:studio      # Open Prisma Studio
-```
+## Quality Assurance
 
-### Docker Development
-```bash
-# Start local services (Redis, PostgreSQL, etc.)
-docker-compose up -d
+### Testing Standards
+- **Unit Tests**: Test business logic in services
+- **Integration Tests**: Test API endpoints
+- **Mocks**: Mock external dependencies
+- **Coverage**: Aim for 70%+ test coverage
 
-# Full development stack
-docker-compose -f docker-compose.dev.yaml up -d
-```
-
-## Coding Standards & Architecture Patterns
-
-### Code Style (Enforced by ESLint + Prettier)
-- **TypeScript strict mode** with full type coverage
-- **2-space indentation**, single quotes, trailing commas
-- **120-character line limit**
-- **Import order** via `simple-import-sort`
-- **File naming**: `feature.kind.ts` (e.g., `whatsapp.baileys.service.ts`)
-- **Naming conventions**:
-  - Classes: `PascalCase`
-  - Functions/variables: `camelCase`
-  - Constants: `UPPER_SNAKE_CASE`
-  - Files: `kebab-case.type.ts`
-
-### Architecture Patterns
-
-#### Service Layer Pattern
-```typescript
-export class ExampleService {
-  constructor(private readonly waMonitor: WAMonitoringService) {}
-  
-  private readonly logger = new Logger('ExampleService');
-  
-  public async create(instance: InstanceDto, data: ExampleDto) {
-    // Business logic here
-    return { example: { ...instance, data } };
-  }
-  
-  public async find(instance: InstanceDto): Promise<ExampleDto | null> {
-    try {
-      const result = await this.waMonitor.waInstances[instance.instanceName].findData();
-      return result || null; // Return null on not found (Evolution pattern)
-    } catch (error) {
-      this.logger.error('Error finding data:', error);
-      return null; // Return null on error (Evolution pattern)
-    }
-  }
-}
-```
-
-#### Controller Pattern (Thin Layer)
-```typescript
-export class ExampleController {
-  constructor(private readonly exampleService: ExampleService) {}
-  
-  public async createExample(instance: InstanceDto, data: ExampleDto) {
-    return this.exampleService.create(instance, data);
-  }
-}
-```
-
-#### RouterBroker Pattern
-```typescript
-export class ExampleRouter extends RouterBroker {
-  constructor(...guards: any[]) {
-    super();
-    this.router.post(this.routerPath('create'), ...guards, async (req, res) => {
-      const response = await this.dataValidate<ExampleDto>({
-        request: req,
-        schema: exampleSchema, // JSONSchema7
-        ClassRef: ExampleDto,
-        execute: (instance, data) => controller.createExample(instance, data),
-      });
-      res.status(201).json(response);
-    });
-  }
-}
-```
-
-#### DTO Pattern (Simple Classes)
+### Code Review Standards
+- **Peer Review**: All code must be reviewed
+- **Automated Checks**: ESLint, Prettier, TypeScript
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
