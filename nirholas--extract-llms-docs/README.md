@@ -7,14 +7,14 @@ Extract documentation for AI agents from any site with llms.txt support. Feature
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `GEMINI.md` in [nirholas/extract-llms-docs](https://github.com/nirholas/extract-llms-docs).
+Original source: `AGENTS.md` in [nirholas/extract-llms-docs](https://github.com/nirholas/extract-llms-docs).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
+- **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
 Quality verified by TomeVault's automated analysis pipeline. Source: [github.com/nirholas/extract-llms-docs](https://github.com/nirholas/extract-llms-docs)
