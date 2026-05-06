@@ -1,0 +1,74 @@
+---
+trigger: always_on
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+---
+
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Repository Purpose
+
+This is a personal collection of Claude Code plugins. Plugins extend Claude Code's functionality through custom tools, hooks, and integrations via the Claude Code plugin system.
+
+## Development Commands
+
+This repository doesn't require a build step - it's a collection of markdown-based plugin definitions. Key operations:
+
+- **Validate marketplace structure**: Ensure `.claude-plugin/marketplace.json` is valid JSON
+- **Test plugin locally**: Use `/plugin marketplace add /Users/scott.jungling/Work/sjungling-claude-plugins` to add this marketplace
+- **Install plugin**: Use `/plugin install <plugin-name>@sjungling-plugins` to test installation
+- **Validate agent/command syntax**: Check YAML frontmatter in markdown files is properly formatted
+- **Bump plugin version**: Always increment `version` in `plugins/<plugin-name>/.claude-plugin/plugin.json` when making any changes to a plugin. Claude Code won't detect updates on reinstall without a version bump.
+
+## Architecture
+
+### Plugin Marketplace Structure
+
+The repository uses a marketplace configuration (`.claude-plugin/marketplace.json`) that:
+- Defines the plugin root location (`plugins/` directory at repository root)
+- Lists all available plugins with metadata (version, description, keywords, category)
+- Maps plugin components (agents, commands) to their file locations
+- Enables plugin installation via `/plugin install <name>@sjungling-plugins`
+
+### Plugin Component Types
+
+Each plugin can contain:
+- **Agents** (`agents/` subdirectory): Custom agent definitions with specialized prompts and behaviors
+- **Commands** (`commands/` subdirectory): Slash command implementations that execute workflows
+- **Skills** (`skills/` subdirectory): Reusable prompt templates that Claude automatically invokes based on context
+- Components are defined in markdown files with YAML frontmatter (skills and agents require frontmatter, commands don't)
+
+### Current Plugins
+
+**swift-engineer** (`plugins/swift-engineer/`):
+- Skill: `ios-swift-expert` - Elite iOS and macOS development expertise that automatically activates when working with Swift, SwiftUI, UIKit, Xcode projects, or Apple frameworks
+- Command: `swift-lint.md` - Runs swift-format for code formatting and linting
+- Command: `generate-docs.md` - Builds symbol graph documentation via xcodebuild docbuild, extracts .symbolgraph.json files to .build/symbol-graphs/, and updates the target project's CLAUDE.md with jq query examples for LLM-friendly API discovery
+- Agent (legacy): `ios-swift-expert.md` - Original agent implementation (prefer skills for automatic activation)
+
+**cli-developer** (`plugins/cli-developer/`):
+- Agent: `cli-ux-designer.md` - Expert CLI/TUI design consultant for command structure, visual design, accessibility, and UX patterns
+
+**technical-writer** (`plugins/technical-writer/`):
+- Skill: `technical-writer` - Expert in technical documentation (README, API docs, guides, tutorials, quickstarts, specs, release notes) that automatically activates when working with .md files in docs/ directories or README files
+- Skill: `pdf-generation` - Generate a PDF book from a directory of ordered markdown chapters using pandoc and weasyprint. Includes print-optimized CSS, table of contents, and inter-chapter link resolution.
+- Command: `/technical-overview [output-dir]` - Create or update a comprehensive Beej's-Guide-style technical manual with parallel chapter writing via teammates, then generate a PDF
+- Command: `/walkthrough [path-to-source]` - Generate a code walkthrough using showboat
+- Agent: `technical-writer.md` - Legacy agent implementation (prefer skill for automatic activation)
+- Agent: `obsidian-vault-manager.md` - Obsidian vault management specialist using obsidian-cli
+
+**git-tools** (`plugins/git-tools/`):
+- Skill: `git-bisect-debugging` - Systematic workflow for using git bisect to identify which commit introduced a bug. Supports automated test scripts, manual verification, and hybrid approaches with subagent architecture for isolated execution. Integrates with superpowers:systematic-debugging for root cause analysis.
+
+**workflow** (`plugins/workflow/`):
+- Command: `/spotlight [on|off|status]` - Spotlight worktree changes into main worktree for testing (like Conductor Spotlight). Merges committed worktree changes via `git merge --no-commit` so you can test in the main worktree's environment, then cleanly abort when done.
+- Command: `/review-unstaged` - Review unstaged changes for code quality, style, and potential issues
+- Command: `/create-issue [file-path]` - Create a GitHub issue from session context. Auto-discovers superpowers specs/plans, Claude plan files, or generates a conversation summary. Uses `gh` CLI with `--body-file`.
+- Command: `/post-pr-comments` - Post inline code review comments from conversation onto the current branch's PR. Writes a comments JSON file, then uses `gh api` to post a pull request review with targeted line comments.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [sjungling/sjungling-claude-plugins](https://github.com/sjungling/sjungling-claude-plugins) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-06 -->
