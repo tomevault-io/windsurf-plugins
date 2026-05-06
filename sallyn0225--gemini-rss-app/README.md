@@ -7,11 +7,11 @@ RSS 聚合 + AI 翻译与总结的资讯阅读器，支持多源订阅、按日�
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [Sallyn0225/gemini-rss-app](https://github.com/Sallyn0225/gemini-rss-app).
+Original source: `CLAUDE.md` in [Sallyn0225/gemini-rss-app](https://github.com/Sallyn0225/gemini-rss-app).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
