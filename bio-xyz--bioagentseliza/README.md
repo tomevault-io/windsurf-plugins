@@ -2,6 +2,8 @@
 
 > Source: [bio-xyz/BioAgentsEliza](https://github.com/bio-xyz/BioAgentsEliza) — distributed by [TomeVault](https://tomevault.io)
 
+Agentic framework for scientific research and analysis.
+
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
