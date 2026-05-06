@@ -1,0 +1,162 @@
+---
+trigger: always_on
+description: OpenTab is a minimal Python implementation of a TabPFN-style Prior-Data Fitted Network for tabular data. It uses in-context learning: a Transformer trained on synthetic SCM-generated datasets makes predictions at inference time without gradient updates.
+---
+
+# OpenTab — Agent Guidelines
+
+OpenTab is a minimal Python implementation of a TabPFN-style Prior-Data Fitted Network for tabular data. It uses in-context learning: a Transformer trained on synthetic SCM-generated datasets makes predictions at inference time without gradient updates.
+
+## Repository Layout
+
+```
+opentab/
+├── model.py           # Transformer architecture + sklearn-compatible wrappers
+├── generate_data.py   # SCM-based synthetic tabular data generation
+├── train.py           # Training loop (offline HDF5 or online generation)
+├── evaluate.py        # Evaluation: sklearn quick-eval + TabArena benchmark
+├── __init__.py        # Empty package marker
+├── pyproject.toml     # Project metadata, deps, tool config
+├── data/              # Gitignored — pre-generated HDF5 datasets
+├── checkpoints/       # Gitignored — .pt model checkpoints
+└── eval_results/      # Gitignored — evaluation output CSVs
+```
+
+All source lives in four flat `.py` files at the repo root. There is no `src/` layout and no subdirectories for source code.
+
+## Environment Setup
+
+```bash
+# Recommended (uses uv lockfile for reproducibility)
+uv sync
+
+# Alternative
+pip install -e ".[dev]"
+
+# With optional extras
+pip install -e ".[dev,training,benchmark]"
+```
+
+Requires Python ≥ 3.11.
+
+## Commands
+
+### Data Generation
+```bash
+python generate_data.py --n_datasets 1000000 --output data/synthetic.h5
+# or after install:
+opentab-generate --n_datasets 1000000 --output data/synthetic.h5
+```
+
+### Training
+```bash
+python train.py --online --steps 100000
+python train.py --dataset data/synthetic.h5 --steps 50000  # offline HDF5
+opentab-train --online --steps 100000
+```
+
+### Evaluation
+```bash
+python evaluate.py --checkpoint checkpoints/final_model.pt --mode lite
+python evaluate.py --mode leaderboard --results eval_results --method OpenTab
+opentab-evaluate --checkpoint checkpoints/final_model.pt --mode lite
+```
+
+### Linting and Formatting
+```bash
+ruff check .          # lint
+ruff check --fix .    # lint with auto-fix
+black .               # format
+ruff format .         # format (alternative)
+```
+
+### Testing
+```bash
+pytest                                          # all tests
+pytest tests/test_foo.py                        # single file
+pytest tests/test_foo.py::test_function_name    # single test
+pytest -x                                       # stop on first failure
+pytest -k "keyword"                             # filter by name
+```
+
+Tests go in `tests/` with filenames matching `test_*.py`. There are currently no tests; add them as `tests/test_<module>.py`.
+
+## Code Style
+
+### Formatter: Black
+- Line length: **100**
+- Configured in `pyproject.toml` under `[tool.black]`
+
+### Linter: Ruff
+- Line length: **100**
+- Rules enabled: `E` (pycodestyle errors), `F` (pyflakes), `W` (pycodestyle warnings), `I` (isort)
+- `E501` (line-too-long) is ignored — Black handles line length
+- Configured in `pyproject.toml` under `[tool.ruff]`
+
+Always run `ruff check --fix . && black .` before committing.
+
+## Naming Conventions
+
+| Entity | Style | Examples |
+|---|---|---|
+| Files | `snake_case.py` | `model.py`, `generate_data.py` |
+| Classes | `PascalCase` | `OpenTabModel`, `SCMDataGenerator`, `TrainConfig` |
+| Functions / methods | `snake_case` | `sample_hyperparameters()`, `get_random_activation()` |
+| Variables / parameters | `snake_case` | `embedding_dim`, `batch_size`, `missing_mask` |
+| Constants / module-level flags | `UPPER_SNAKE_CASE` | `HAS_H5PY`, `ACTIVATION_FUNCTIONS` |
+| Private / internal | leading `_` | `_build_tree()`, `_evaluate()`, `_fit()` |
+| Dataclass fields | `snake_case` | `train_size`, `n_features`, `checkpoint_dir` |
+
+## Type Annotations
+
+Use type hints on all function signatures and dataclass fields. Use `typing` module types for Python 3.9 compatibility:
+
+```python
+from typing import Optional, Tuple, Dict, List, Union, Callable, Iterator
+
+def foo(x: np.ndarray, n: int = 10) -> Optional[torch.Tensor]:
+    ...
+```
+
+Use `@dataclass` for all configuration/hyperparameter objects rather than plain dicts or `argparse.Namespace`.
+
+## Import Conventions
+
+- **Absolute imports only** — no relative imports.
+- **Import order (enforced by ruff/isort):** standard library → third-party → local modules.
+- **Optional dependencies** use a guarded `try/except ImportError` pattern with a boolean flag:
+
+```python
+try:
+    import h5py
+    HAS_H5PY = True
+except ImportError:
+    HAS_H5PY = False
+```
+
+- Check the flag before use and raise `ImportError` with an install hint:
+
+```python
+if not HAS_H5PY:
+    raise ImportError("h5py required: pip install h5py")
+```
+
+- Cross-module imports use direct module names: `from model import OpenTabModel`.
+- `__init__.py` is intentionally empty — do not add re-exports.
+
+## Error Handling
+
+1. **Precondition violations** → raise `ValueError` (sklearn convention):
+   ```python
+   if self.X_train_ is None:
+       raise ValueError("Must call fit() first")
+   ```
+
+2. **Hot-path exceptions** (data generation, training loop) → `except Exception: continue` to keep long runs alive. Log or count skips where useful.
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [snedelkoski/opentab](https://github.com/snedelkoski/opentab) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-02 -->
