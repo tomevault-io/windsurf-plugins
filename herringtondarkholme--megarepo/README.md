@@ -7,14 +7,14 @@ a repo with all ai setup
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `GEMINI.md` in [HerringtonDarkholme/megarepo](https://github.com/HerringtonDarkholme/megarepo).
+Original source: `.cursor/rules/*.mdc` in [HerringtonDarkholme/megarepo](https://github.com/HerringtonDarkholme/megarepo).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
-- **Cursor** — `project-config.mdc`
+- **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
 Available for 6 platforms including Claude Code, Cursor, Windsurf, and more. Source: [github.com/HerringtonDarkholme/megarepo](https://github.com/HerringtonDarkholme/megarepo)
