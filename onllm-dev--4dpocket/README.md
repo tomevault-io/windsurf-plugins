@@ -7,11 +7,11 @@ Self-hosted AI-powered personal knowledge base. Save content from 17+ platforms,
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [onllm-dev/4DPocket](https://github.com/onllm-dev/4DPocket).
+Original source: `CLAUDE.md` in [onllm-dev/4DPocket](https://github.com/onllm-dev/4DPocket).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
