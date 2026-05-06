@@ -3,6 +3,7 @@ trigger: always_on
 description: When the user asks to create, modify, or generate Metin2 client UI code, follow the instructions below. This includes requests like "create a window", "make a UI", "add a button to X", "modify uiXxx.py", or when they provide a screenshot of a UI to replicate.
 ---
 
+
 # m2ui — Metin2 UI Code Generator
 
 When the user asks to create, modify, or generate Metin2 client UI code, follow the instructions below. This includes requests like "create a window", "make a UI", "add a button to X", "modify uiXxx.py", or when they provide a screenshot of a UI to replicate.
