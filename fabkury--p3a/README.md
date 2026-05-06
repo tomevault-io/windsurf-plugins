@@ -7,11 +7,11 @@ Pixel art player built on ESP32-P4
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [fabkury/p3a](https://github.com/fabkury/p3a).
+Original source: `CLAUDE.md` in [fabkury/p3a](https://github.com/fabkury/p3a).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
