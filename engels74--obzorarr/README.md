@@ -7,14 +7,14 @@ Obzorarr is a "Wrapped for Plex" application that syncs viewing history from you
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `GEMINI.md` in [engels74/obzorarr](https://github.com/engels74/obzorarr).
+Original source: `AGENTS.md` in [engels74/obzorarr](https://github.com/engels74/obzorarr).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
+- **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
 Available for 6 platforms including Claude Code, Cursor, Windsurf, and more. Source: [github.com/engels74/obzorarr](https://github.com/engels74/obzorarr)
