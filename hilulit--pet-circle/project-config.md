@@ -1,93 +1,152 @@
 ---
 trigger: always_on
-description: Screen-by-screen guide for Pet Circle. Phase 1 complete, Phase 2 in progress. Tracks navigation, role system, auth flow, remaining work, and feature backlog.
+description: State management architecture for Pet Circle. Covers store patterns, access conventions, seeding from mock data, and how screens should read/write app state.
 ---
 
 
-# Pet Circle -- Screen Completion Guide
+# Pet Circle -- State Management Rules
 
-## Phase Status: Phase 1 COMPLETE, Phase 2 IN PROGRESS
+## Architecture Overview
 
-Phase 2 adds Firebase Auth, Firestore persistence, and the full dual-layer role architecture.
-
-## Navigation Structure
+Pet Circle uses **global `ChangeNotifier` stores** for all shared app state. Global preferences (locale, dark mode) use `ValueNotifier`. No third-party state management packages are required.
 
 ```
-Auth flow (kEnableFirebase = true):
-  /auth-gate --> /welcome --> /role-selection --> /auth --> /verify-email --> /auth-gate --> /onboarding or /main-shell
-
-Auth flow (kEnableFirebase = false):
-  / (welcome) --> /role-selection --> /main-shell
-
-Bottom Nav: Home(0) | Trends(1) | Measure(2) | Medication(3)
-Trends: single unified view (stats + chart + history, no tabs)
-Notifications: bell icon drawer only (no dedicated tab)
-Medication: standalone screen at lib/screens/medication/medication_screen.dart
-Active pet: global via petStore.activePetIndex, switched from header pet chip
+lib/stores/
+├── pet_store.dart            # Pet profiles, active pet, care circle ops
+├── measurement_store.dart    # SRR measurements per pet
+├── note_store.dart           # Clinical notes per pet
+├── medication_store.dart     # Medications per pet
+├── notification_store.dart   # In-app notifications
+├── user_store.dart           # Current user and role
+└── settings_store.dart       # Thresholds, preferences
 ```
 
-## Auth Screens
+## Store Pattern
 
-| Screen | File | Purpose |
-|--------|------|---------|
-| AuthGate | `lib/screens/auth/auth_gate.dart` | Routes based on `AuthProvider.routeState`. Handles deep link invitation acceptance. |
-| WelcomeScreen | `lib/screens/welcome_screen.dart` | Sign Up / Sign In entry point |
-| RoleSelectionScreen | `lib/screens/auth/role_selection_screen.dart` | Vet / Pet Owner. Creates Firestore profile if user already authenticated. |
-| AuthScreen | `lib/screens/auth/auth_screen.dart` | Email/password + Google/Apple sign-in |
-| VerifyEmailScreen | `lib/screens/auth/verify_email_screen.dart` | Polls for verification, calls `authProvider.refresh()` |
+Every store follows the same structure:
 
-## Role System (Dual-Layer Architecture)
+```dart
+import 'package:flutter/foundation.dart';
 
-**Layer 1 -- App-Level Roles** (selected at sign-up, stored in Firestore `/users/{uid}`):
-- **Owner**: Creates pets, manages care circles, takes measurements
-- **Vet**: Views vet dashboard, adds clinical notes, cannot create pets
+class ExampleStore extends ChangeNotifier {
+  List<Item> _items = [];
 
-**Layer 2 -- Care Circle Roles** (per-pet, stored in `/pets/{petId}/careCircle`):
-- **Admin**: Full control (edit, delete, measure, manage circle). Auto-assigned to pet creator.
-- **Member**: Can measure, view, add notes. Cannot edit pet or manage circle.
-- **Viewer**: Read-only. Can view data and add notes. Cannot measure or edit.
+  List<Item> get items => List.unmodifiable(_items);
 
-**Permission enforcement:**
-- `CareCirclePermissions` extension: `canMeasure`, `canEditPet`, `canManageCircle`, `canAddNotes`, `canDeletePet`
-- `PetStore.currentUserRoleFor(petName)` resolves user's role (matches on uid first, falls back to name)
-- Pet detail edit button: admin-only
-- Dashboard delete (long-press): admin-only
-- Dashboard measure button: hidden for viewers
-- Measurement screen: lock screen for viewers
-- Settings invite/remove: admin-only
-- Invite flow: offers Admin/Member/Viewer role selection
+  void addItem(Item item) {
+    _items.add(item);
+    notifyListeners();
+  }
 
-## Shared Widgets
+  void seed(List<Item> initial) {
+    _items = List.of(initial);
+    notifyListeners();
+  }
+}
+```
 
-| Widget | File | Used In |
-|--------|------|---------|
-| `BreedSearchField` | `lib/widgets/breed_search_field.dart` | Onboarding Step 1, Pet Detail edit sheet |
-| `OnboardingShell` | `lib/widgets/onboarding_shell.dart` | All 4 onboarding steps (Back/Next buttons) |
-| `BottomNavBar` | `lib/widgets/bottom_nav_bar.dart` | MainShell (Home, Trends, Measure, Medication) |
+### Rules
 
-## Remaining Work
+- IMPORTANT: Stores extend `ChangeNotifier`, **not** `ValueNotifier`
+- IMPORTANT: All public getters return **unmodifiable** views (`List.unmodifiable`, `Map.unmodifiable`)
+- IMPORTANT: Every mutation method MUST call `notifyListeners()` at the end
+- State fields are private (`_items`), exposed only through getters
+- Stores live in `lib/stores/`, one store per file, `snake_case.dart`
+- Each store has a `seed()` method for initialization from mock data
 
-### Phase 2 -- Remaining Firebase/Data Work
-| Item | Details |
-|------|---------|
-| Push notifications | Current notification support is Firestore-backed in-app alerts; FCM is not yet integrated |
-| Firestore security rules | Repo-managed `firestore.rules` are deployed, and invitation acceptance now requires a trusted pet-side `pendingInvites` entry that the rules can verify |
+## Global Store Instances
 
-### Polish (Optional)
-| Item | Details |
-|------|---------|
-| VisionRR placeholder | `measurement_screen.dart` -- Phase 3 feature |
-| Care circle role change | Can remove members but can't change existing roles |
-| Care circle pending invites | No display of pending invitations in UI |
-| CSV file download | Export dialogs show preview but don't write actual files |
+Each store file exports its own global singleton instance:
 
-## Feature Backlog
+```dart
+// In lib/stores/pet_store.dart:
+final petStore = PetStore();
 
-| ID | Feature | Details | Priority |
-|----|---------|---------|----------|
-| FB-001 | Pet photo upload | Replace photo URL text field with image picker + Firebase Storage upload. Affects onboarding step 1, pet detail edit sheet, and pet card display. Uses `image_picker` (already in pubspec). Requires adding `firebase_storage` dependency and a `StorageService` for upload/download URLs. | Medium |
-| FB-002 | Invitation email delivery | Currently, care circle invitations generate a deep link copied to clipboard but no email is sent. Need to integrate an email delivery mechanism (Firebase Extensions "Trigger Email", a Cloud Function with SendGrid/Mailgun, or similar) so that when an invitation is created via `InvitationService.createInvitation()`, the invited person receives an email with the invite link, pet name, inviter name, and assigned role. Affects onboarding step 4 invites, Settings > Care Circle > Invite, and Settings > Share with Vet. | High |
-| FB-003 | Pet form validation | Add proper validation to pet onboarding and edit forms: required pet name (non-empty, max length), breed selection required, age validation (numeric, reasonable range), photo URL format check. Affects `onboarding_step1.dart`, `onboarding_step2.dart`, `pet_detail_screen.dart` edit sheet. Currently no fields are validated -- user can submit empty/invalid data. | Medium |
+// In lib/stores/measurement_store.dart:
+final measurementStore = MeasurementStore();
+```
+
+Stores are seeded in `main()` before `runApp()` via `_seedMockStores()` (only when `kEnableFirebase == false`). When Firebase is enabled, `PetStore` subscribes to Firestore streams via `subscribeForUser(uid)` in `AuthGate` and coordinates Firestore subcollection subscriptions for measurements, notes, and medications.
+
+## Accessing Stores in Widgets
+
+### Reading (rebuilds on change)
+
+Use `ListenableBuilder` to rebuild a widget subtree when a store changes:
+
+```dart
+@override
+Widget build(BuildContext context) {
+  return ListenableBuilder(
+    listenable: petStore,
+    builder: (context, _) {
+      final pets = petStore.ownerPets;
+      return ListView(
+        children: pets.map((p) => PetCard(pet: p)).toList(),
+      );
+    },
+  );
+}
+```
+
+For multiple stores, use `Listenable.merge`:
+
+```dart
+ListenableBuilder(
+  listenable: Listenable.merge([petStore, measurementStore]),
+  builder: (context, _) {
+    // Rebuilds when either store changes
+  },
+)
+```
+
+### Writing (mutations)
+
+Call store methods directly -- no context needed:
+
+```dart
+onPressed: () {
+  measurementStore.addMeasurement(petStore.activePet!.id!, Measurement(
+    bpm: calculatedBpm,
+    recordedAt: DateTime.now(),
+  ));
+}
+```
+
+### One-time reads (no rebuild)
+
+Access store getters directly when you don't need reactive rebuilds:
+
+```dart
+final currentUser = userStore.currentUser;
+final activePet = petStore.activePet;
+```
+
+## Import Convention
+
+```dart
+import 'package:pet_circle/stores/pet_store.dart';
+import 'package:pet_circle/stores/measurement_store.dart';
+```
+
+The global instance (e.g. `petStore`) is exported from the store file itself, NOT from `main.dart`.
+
+## Store Registry
+
+| Store | Global | Key Methods |
+|-------|--------|-------------|
+| `PetStore` | `petStore` | `addPet`, `createPetWithFirestore`, `updatePet`, `updatePetWithFirestore`, `removePet`, `removePetWithFirestore`, `getPetByName`, `getPetById`, `activePet`, `activePetIndex`, `setActivePetIndex`, `currentUserRoleFor`, `removeCareCircleMember`, `removeCareCircleMemberWithFirestore`, `subscribeForUser`, `cancelSubscription` |
+| `MeasurementStore` | `measurementStore` | `addMeasurement`, `removeMeasurement`, `getMeasurements`, `latestForPet`, `countForPet`, `thisWeekCount`, `subscribeForPets`, `cancelSubscriptions` |
+| `NoteStore` | `noteStore` | `addNote`, `getNotes`, `subscribeForPets`, `cancelSubscriptions` |
+| `MedicationStore` | `medicationStore` | `addMedication`, `updateMedication`, `removeMedication`, `toggleMedication`, `getMedications`, `getActiveMedications`, `subscribeForPets`, `cancelSubscriptions` |
+| `NotificationStore` | `notificationStore` | `seed`, `reset`, `subscribeForUser`, `cancelSubscription`, `addNotification`, `markRead`, `markAllRead`, `unreadCount` |
+| `UserStore` | `userStore` | `seed`, `seedFromAppUser`, `setUser`, `setRole`, `currentUser`, `appUser`, `role`, `isVet`, `isOwner`, `currentUserUid`, `currentUserEmail`, `currentUserDisplayName`, `currentUserAvatarUrl` |
+| `SettingsStore` | `settingsStore` | `seedFromAppUser`, `reset`, `updateThresholds`, `setPushNotifications`, `togglePushNotifications`, `setEmergencyAlerts`, `toggleEmergencyAlerts`, `setVisionRREnabled`, `toggleVisionRR`, `setAutoExport`, `toggleAutoExport`, `classifyStatus` |
+
+## Providers
+
+| Provider | Global | Purpose |
+|----------|--------|---------|
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
