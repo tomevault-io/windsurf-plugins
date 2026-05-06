@@ -1,132 +1,81 @@
 ---
 trigger: always_on
-description: React coding standards and best practices for the LabelStudio clientside application
+description: How to add a new storage or data connector for Label Studio
 ---
 
+# Implementing New Storage Providers in Label Studio
 
-# React Best Practices
+## Overview
+This document describes the process and best practices for adding a new storage provider to Label Studio using the declarative provider schema system.
 
-## Project Structure
-- All frontend code lives in the `web` directory
-- Main application code is in `web/apps/labelstudio`
-- Shared libraries are in `web/libs`
-- Follow the established directory structure:
-  - `components/`: Reusable UI components
-  - `pages/`: Top-level page components
-  - `utils/`: Utility functions
-  - `hooks/`: Custom React hooks
-  - `atoms/`: Jotai atom state definitions
-  - `providers/`: Context providers
-  - `services/`: API and other services
-  - `types/`: TypeScript type definitions
-  - `assets/`: Static assets
+Label Studio supports 2 types of cloud storages:
+1. **Import Storages** (Source Cloud Storages) - for importing tasks/data
+2. **Export Storages** (Target Cloud Storages) - for exporting annotations
 
-## Component Structure
-- Use functional components over class components
-- Keep components small and focused
-- Extract reusable logic into custom hooks
-- Use composition over inheritance
-- Implement proper prop types with TypeScript
-- Split large components into smaller, focused ones
-- Follow a consistent file organization pattern:
-  ```
-  component-name/
-    component-name.tsx
-    component-name.module.scss
-    component-name.test.tsx
-    index.ts
-  ```
+See comprehensive overview about storages @io_storages/README.md. 
 
-## Hooks
-- Follow the Rules of Hooks
-- Use custom hooks for reusable logic
-- Keep hooks focused and simple
-- Avoid useEffect unless absolutely required
-- Use appropriate dependency arrays in useEffect
-- Implement cleanup in useEffect when needed
-- Avoid nested hooks
 
-## State Management
-- Use useState for local component state
-- Use Jotai atoms and not the Context API for shared state
-- Implement atomWithReducer for complex state logic
-- Implement atomWithQuery for any API requests for data
-- Keep state as close to where it's used as possible
-- Avoid prop drilling through proper state management
-- Only use Jotai as the single source of truth of global state management
+## Implementation Checklist
 
-## Performance
-- Implement proper memoization (useMemo, useCallback)
-- Use React.memo for expensive components
-- Avoid unnecessary re-renders
-- Implement proper lazy loading
-- Use proper key props in lists
-- Profile and optimize render performance
+Follow all steps below to implement a new storage. More details follow after the checklist; review them all. Do it on your best, until all items are done and tests are passing. 
 
-## Tooling
-- Use Biome for code linting and formatting
-- Follow CSS/SCSS linting rules defined in .stylelintrc.json
-- Use TypeScript for type safety
-- Keep bundle size in check by monitoring imports
+### 1. Exploration and preparation
+1. [ ] Carefully read @io_storages/README.md
+2. [ ] Search official documentation for the new storage you want to add
+  - [ ] Determine whether pre-signed URLs are supported, or whether only direct reads are possible. In case of direct reads, we should hide pre-signed URLs toggle and use Label Studio proxy. 
+  - [ ] Determine whether writes are supported, and how annotations will be stored (objects/blobs, files, rows/strings in a table, etc.)
+  - [ ] Understand the provider's Python API/SDK, especially how to read, write, and list objects. If SDK is available, use SDK
+3. If the requester hasn't specified the target edition, recommend Open Source or Enterprise and confirm the choice
+4. Check storage directory structure in `label_studio/io_storages` (or `label_studio_enterprise/lse_io_storages` for Enterprise) and the `s3` (or `s3s` for Enterprise) subfolder
+5. [ ] Create the new provider directory structure based on the pattern you observed
+6. [ ] Create a README.md file in the new provider folder
+7. [ ] Add a brief Overview section about the new storage and your findings from step 2
+8. [ ] Add a section on how to configure the storage from scratch for users unfamiliar with it. Provide clear, correct, up-to-date steps with links to official docs to reduce manual QA time
 
-## Forms
-- Use controlled components for form inputs
-- Implement proper form validation
-- Handle form submission states properly
-- Show appropriate loading and error states
-- Use form libraries for complex forms
-- Implement proper accessibility for forms
+### 2. Backend Implementation
+1. [ ] Implement storage mixin with common fields:
+  - [ ] Basic fields: bucket, prefix, regex_filter, use_blob_urls (pre-signed URLs on/off), recursive_scan (if applicable)
+  - [ ] URL resolution: presign, presign_ttl (if applicable to the storage)
+  - [ ] Provider credentials: api_key, secret_key, endpoint_url
+  - [ ] Common methods: get_client(), validate_connection()
+2. [ ] Create import storage base class with required methods:
+  - [ ] `iter_objects()` - iterate over storage objects
+  - [ ] `get_data()` - load task data from objects
+  - [ ] `generate_http_url()` - create HTTP URLs
+  - [ ] `can_resolve_url()` - check URL resolution capability
+  - [ ] `validate_connection()` - validate credentials and that the prefix contains files
+3. [ ] Create export storage class with required methods:
+  - [ ] `save_annotation()` - save single annotation to storage
+  - [ ] `delete_annotation()` - delete annotation from storage (optional)
+  - [ ] `validate_connection()` - validate credentials and bucket access (NO prefix check)
+4. [ ] Create non-abstract provider-specific concrete classes for import and export
+5. [ ] Implement storage link models:
+  - [ ] ImportStorageLink for tracking task imports
+  - [ ] ExportStorageLink for tracking annotation exports
+6. [ ] **CRITICAL: Add `app_label = 'io_storages'` to Meta classes** - All concrete storage models (ImportStorage, ExportStorage, and StorageLink classes) must include `app_label = 'io_storages'` in their Meta class to avoid Django app registration errors. This is required because storage providers are in subdirectories of `io_storages` but need to be registered under the main `io_storages` app. **Note**: Enterprise providers do NOT need app_label - see enterprise guide.
+7. [ ] Create serializers with validation logic
+8. [ ] Implement API views following existing patterns
+9. [ ] Register URLs in storage URL configuration
+10. [ ] Add signal handlers for auto-export functionality:
+  - [ ] post_save signal for automatic annotation export
+  - [ ] pre_delete signal for automatic annotation deletion
+  - [ ] Async export functions with error handling
+11. [ ] If you use SDK: add provider SDK library to pyproject.toml
+  - [ ] Make poetry lock: `poetry install && poetry lock`
+12. [ ] Create database migrations using `poetry run python manage.py makemigrations` only!   
+13. [ ] Ensure that you correctly handle token and security fields; they should not be displayed on the frontend or backend after they are initially entered and saved. Verify how this works with other storage codes.
 
-## Error Handling
-- Implement Error Boundaries
-- Handle async errors properly
-- Show user-friendly error messages
-- Implement proper fallback UI
-- Log errors appropriately
-- Handle edge cases gracefully
+### 3. Frontend Implementation  
+1. [ ] Check examples: for Open Source see: `label-studio/web/apps/labelstudio/src/pages/Settings/StorageSettings/providers/`, for Enterprise see: `label-studio-enterprise/web/apps/labelstudio/src/pages/Settings/StorageSettings/providers/`
+2. [ ] Create a provider configuration file in `web/apps/labelstudio/src/pages/Settings/StorageSettings/providers/` with:
+  - [ ] All required fields with proper types
+  - [ ] Zod validation schemas
+  - [ ] Meaningful labels and placeholders
+  - [ ] Proper field layout definition
+3. [ ] Register provider in central registry
+4. [ ] Mark credential fields with `accessKey: true`
 
-## Testing
-- Write unit tests for components
-- Implement integration tests for complex flows
-- Use React Testing Library
-- Test user interactions
-- Test error scenarios
-- Implement proper mock data
-
-## Accessibility
-- Ensure components meet WCAG 2.1 AA standards
-- Use semantic HTML elements
-- Implement proper ARIA attributes
-- Ensure keyboard navigation
-- Test with screen readers
-- Handle focus management
-- Provide proper alt text for images
-
-## Code Organization
-- Use proper file naming conventions which is kebab-case ie. ListItem -> `list-item.tsx`
-- Prefer one component per folder, but group related components together when necessary, and ensure there is only one component per file.
-- Component folders should have a SCSS `.module.scss` with the name of the component kebab-case ie. ListItem -> `list-item.module.scss`
-- Implement proper directory structure
-- UI components live within `web/libs/ui`
-- Application components that are shared across applications such as certain page-level blocks live within `web/libs/app-common`
-- Code in `web/apps` can only import code from `web/libs` and `web/libs` cannot import from `web/apps`
-- Code in `web/libs/app-common` can only import code from other `web/libs` or `web/apps`. No other `web/libs` can import from `web/libs/app-common`
-- Keep atoms in a global atoms folder with the name of the file matching the entity or intent of state
-- Add all components and their states to Storybook by co-locating the story file next to the component file ie. `list-item.stories.tsx`
-- Use the `@humansignal/ui` package for UI components
-- Use the `@humansignal/icons` package for icons
-- Use the `@humansignal/core` package for core utilities/functions
-- Use the `@humansignal/app-common` package for application components
-
-## Best Practices
-- No cyclic imports
-- Use proper imports/exports
-- Follow established import ordering
-- Compose components rather than extending them
-- Keep components focused on a single responsibility
-- Document complex logic with clear comments
-- Follow the project's folder structure and naming conventions
-- Prefer controlled components over uncontrolled ones 
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [cycle123582/label-studio-Chinese](https://github.com/cycle123582/label-studio-Chinese) — distributed by [TomeVault](https://tomevault.io).
