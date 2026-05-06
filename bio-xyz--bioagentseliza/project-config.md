@@ -1,175 +1,171 @@
 ---
 trigger: always_on
-description: ElizaOS API / Client Architecture
+description: Repository: https://github.com/elizaos/eliza
 ---
 
-> You are an expert in creating robust API client integrations for ElizaOS plugins. You focus on writing clear, maintainable, and resilient code that follows best practices for security, error handling, and performance.
+# ElizaOS 1.0.0 Development Rules
 
-## API Client Architecture
+Repository: https://github.com/elizaos/eliza
 
-When a plugin needs to communicate with an external API, it should encapsulate all API logic within a dedicated client module. This promotes reusability and separates API concerns from the core plugin logic (actions, providers, etc.).
+## Package structure
 
-```mermaid
-graph TD
-    A[Plugin Component] -->|Calls Action/Provider| B(Action/Provider);
-    B -->|Calls API Client Method| C(API Client Module);
-    C -->|Validates Config| D(Environment Util);
-    D -->|API Key, Base URL| E[process.env / runtime.getSetting()];
-    C -->|Builds Request| F(Request Builder);
-    C -->|Makes HTTP Call| G(HTTP Library e.g., Axios/Fetch);
-    G --> H[External API];
-    H --> G;
-    G -->|Handles Response/Error| C;
-    C --> B;
-    B --> A;
-```
+packages/core - @elizaos/core - the runtime and types
+packages/client - The frontend GUI that is displayed by the CLI running
+packages/app - The desktop and mobile application, built in Tauri, wrapping the core GUI and CLI
+packages/cli - The CLI which contains the agent runtime and starts up the REST API, GUI, and loads agents and projects
+-> This is what runs in most 'bun run test' and 'bun run start' cases, etc
+-> 'elizaos' command is from here
+packages/plugin-bootstrap - Default event handlers, actions and providers
+packages/plugin-sql - DatabaseAdapter for Postgres and PGLite, soon others
 
-## Project Structure
+There are others but they are not as important
 
-Organize your API client logic into a dedicated directory within your plugin's `src`.
+## Core Development Principles
 
-```
-plugin-my-api/
-├── src/
-│   ├── index.ts               # Main plugin definition
-│   ├── actions/               # Actions that use the client
-│   │   └── someAction.ts
-│   └── client/                # All API client logic
-│       ├── index.ts           # Exports client functions
-│       ├── request.ts         # Core request/sender function
-│       ├── builder.ts         # Request payload builder
-│       ├── validator.ts       # API key and param validation
-│       └── types.ts           # TypeScript types for API req/res
-├── ...
-└── package.json
-```
+### 1. Flow - Always Plan First
 
-## Core Implementation Patterns
+- **Bug Fixes**: First identify the bug, research ALL related files, create complete change plan
+- **Impact Analysis**: Identify all possible errors and negative outcomes from changes
+- **Documentation**: Create thorough PRD and implementation plan BEFORE writing any code
+- **Identify risks and approaches**: Thoroughly outline all risks and offer multiple possible approaches, choosing your favorite
+- **Just do it**: Once the plan is in place, start writing code. Don't wait for response from the user.
 
-This pattern is based on the implementation in `@elizaos/plugin-openai`.
+### 2. No Stubs or Incomplete Code
 
-### 1. Validator (`validator.ts`)
+- **Never** use stubs, fake code, or incomplete implementations
+- **Always** continue writing until all stubs are replaced with finished, working code
+- **No POCs**: Never deliver proof-of-concepts - only finished, detailed code
+- **Iteration**: Work on files until they are perfect, looping testing and fixing until all tests pass
 
-Create functions to validate configuration and parameters before making an API call. This fails fast and provides clear errors.
+### 3. Test-Driven Development
 
-```typescript
-// src/client/validator.ts
+- Models hallucinate frequently - thorough testing is critical
+- Verify tests are complete and passing before declaring changes correct
+- First attempts are usually incorrect - test thoroughly
+- Write tests before implementation when possible
 
-// ✅ DO: Validate the presence and format of the API key
-export function validateApiKey(runtime: IAgentRuntime): string {
-  const apiKey = runtime.getSetting("MY_API_KEY");
-  if (!apiKey) {
-    throw new Error("MY_API_KEY is not set in the .env file or agent settings.");
-  }
-  return apiKey;
-}
+## Testing Infrastructure
 
-// ✅ DO: Validate the input parameters for an API call
-export function validatePrompt(prompt: string): void {
-  if (!prompt || !prompt.trim()) {
-    throw new Error("Prompt cannot be empty.");
-  }
-  if (prompt.length > 8000) { // Example limit
-    throw new Error("Prompt exceeds maximum length.");
-  }
-}
-```
+### Command Structure
 
-### 2. Request Builder (`builder.ts`)
+- **Main Command**: `elizaos test` (run from packages/cli)
+- **Test Framework**: vitest
+- **Subcommands**:
+  - `component`: Run component tests using Vitest
+  - `e2e`: Run end-to-end runtime tests
+  - `all`: Run both component and e2e tests (default)
 
-A builder function separates the logic of creating the request payload from the act of sending it. It should handle defaults and parameter mapping.
+### Test Types
 
-```typescript
-// src/client/builder.ts
-import { DEFAULT_MODEL, DEFAULT_MAX_TOKENS } from "./constants";
-import { type MyApiRequestData } from "./types";
+- **E2E Tests**:
+  - Use actual runtime
+  - Cannot use vitest state (interferes with internal elizaos vitest instance)
+  - Test real integrations and workflows
+- **Unit Tests**:
+  - Use vitest with standard primitives
+  - Test individual components in isolation
 
-// ✅ DO: Centralize request payload creation
-export function buildRequestData(
-  prompt: string,
-  model: string = DEFAULT_MODEL,
-  maxTokens: number = DEFAULT_MAX_TOKENS
-): MyApiRequestData {
-  return {
-    model,
-    prompt,
-    max_tokens: maxTokens,
-  };
-}
-```
+## Architecture Details
 
-### 3. Core Request Function (`request.ts`)
+### Core Dependencies
 
-This is the heart of the client. It uses an HTTP library like `axios` or `fetch` to make the actual API call, handling headers, authentication, and errors.
+- **Central Dependency**: Everything depends on @elizaos/core or packages/core
+- **No Circular Dependencies**: Core cannot depend on other packages
+- **Import Pattern**: Use @elizaos/core in package code, packages/core in internal references
 
-```typescript
-// src/client/request.ts
-import axios, { type AxiosRequestConfig } from "axios";
-import { type MyApiRequestData, type MyApiResponse } from "./types";
-import { API_BASE_URL, DEFAULT_TIMEOUT } from "./constants";
+### Key Files
 
-// ✅ DO: Create a single, reusable function to call the API
-export async function callMyApi<T extends MyApiResponse>(
-  endpoint: string,
-  data: MyApiRequestData,
-  apiKey: string,
-): Promise<T> {
-  try {
-    const config: AxiosRequestConfig = {
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      timeout: DEFAULT_TIMEOUT,
-    };
+- **Types**: `packages/core/src/types.ts` - All core type definitions
+- **Runtime**: `packages/core/src/runtime.ts` - Main runtime implementation
+- **Plugin Compatibility**: Shim everything through /specs (currently defaulting to v2)
 
-    const response = await axios.post<T>(`${API_BASE_URL}/${endpoint}`, data, config);
-    return response.data;
+### Abstraction Layers
 
-  } catch (error) {
-    console.error("Error communicating with My API:", error.message);
-    
-    // ✅ DO: Handle specific API errors like rate limiting
-    if (axios.isAxiosError(error) && error.response?.status === 429) {
-      throw new Error("My API rate limit exceeded. Please try again later.");
-    }
+- **Channel → Room Mapping**:
+  - Discord/Twitter/GUI channels become "rooms"
+  - All IDs swizzled with agent's UUID into deterministic UUIDs
+  - Maintains consistency across platforms
+- **Server → World Mapping**:
+  - Servers become "worlds" in agent memory
+  - Some connectors (MMO games) may use "world" on both sides
+- **Messaging Server Abstractions**:
+  - CLI uses: server, channel, user
+  - Frontend client unaware of worlds/rooms
+  - These are purely agent-side abstractions
 
-    // Throw a generic error for other issues
-    throw new Error("Failed to communicate with My API.");
-  }
-}
-```
+### Service Architecture
 
-### 4. Putting It Together in an Action
+- Services maintain system state
+- Access pattern: `getService(serviceName)`
+- Services can call each other
+- Actions can access services
 
-The plugin's actions (or providers) use the exported client functions to perform their logic.
+## Component Specifications
 
-```typescript
-// src/actions/someAction.ts
-import { type Action, type IAgentRuntime } from "@elizaos/core";
-import { 
-  validateApiKey, 
-  validatePrompt, 
-  buildRequestData, 
-  callMyApi 
-} from '../client';
+### Actions
 
-export const someAction: Action = {
-  name: "do-something-with-api",
-  description: "An action that calls My API.",
-  async handler(runtime: IAgentRuntime, message) {
-    // 1. Validate config and input
-    const apiKey = validateApiKey(runtime);
-    const prompt = message.content.text || "";
-    validatePrompt(prompt);
+**Purpose**: Define agent capabilities and response mechanisms
 
-    // 2. Build the request data
-    const requestData = buildRequestData(prompt);
+**Decision Flow**:
 
-    // 3. Call the API
+1. Message received
+2. Agent evaluates all actions via validation functions
+3. Valid actions provided to LLM via actionsProvider
+4. LLM decides which action(s) to execute
+5. Handler generates response with "thought" component
+6. Response processed and sent
+
+### Providers
+
+**Purpose**: Supply dynamic contextual information - agent's "senses"
+
+**Functionality**:
+
+- Inject real-time information into agent context
+- Bridge between agent and external systems
+- Format information for conversation templates
+- Maintain consistent data access
+
+**Examples**:
+
+- News provider: Fetch and format news
+- Terminal provider: Game terminal information
+- Wallet provider: Current asset information
+- Time provider: Current date/time injection
+
+**Execution**: Run during or before action execution
+
+### Evaluators
+
+**Purpose**: Post-interaction cognitive processing
+
+**Capabilities**:
+
+- Knowledge extraction and storage
+- Relationship tracking between entities
+- Conversation quality self-reflection
+- Goal tracking and achievement
+- Tone analysis for future adjustments
+
+**Execution**: Run after response generation with AgentRuntime
+
+### Tasks
+
+**Purpose**: Manage deferred, scheduled, and interactive operations
+
+**Features**:
+
+- Queue work for later execution
+- Repeat actions at defined intervals
+- Await user input
+- Implement multi-interaction workflows
+- Task workers registered by name with runtime
+
+### Plugins
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/bio-xyz) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-10 -->
+> Source: [bio-xyz/BioAgentsEliza](https://github.com/bio-xyz/BioAgentsEliza) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-05 -->
