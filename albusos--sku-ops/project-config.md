@@ -1,83 +1,56 @@
 ---
 trigger: always_on
-description: Backend Python conventions — architecture patterns, anti-patterns, decision rules
+description: Production deployment requirements — Docker, DigitalOcean, Vercel, CORS, pool, auth, observability
 ---
 
 
-# Backend Conventions
+# Deployment Hardening
 
-## Layer structure
+Deviations are bugs, not preferences.
 
-```
-shared/kernel/         ← pure primitives, zero deps
-shared/infrastructure/ ← db, redis, config, middleware
-{ctx}/domain/          ← shared/kernel + stdlib + pydantic only
-{ctx}/infrastructure/  ← domain + shared/infrastructure
-{ctx}/application/     ← orchestrates via own infra + other contexts' facades
-{ctx}/api/             ← thin HTTP transport, own application + shared/api only
-```
+## Deployment targets
 
-Violations are bugs. Cross-context mutation goes through the owning context's application facade.
+Primary: **DigitalOcean** (or equivalent API host for the backend) + **Vercel** (frontend) + **Supabase** (auth + Postgres).
 
-## Repos: persistence only
+Optional: `docker-compose.yml` runs **Redis + backend** locally for container smoke checks. Database is always Supabase (local or hosted). It is not the production topology.
 
-No business validation, no orchestration, no cross-context mutations, no state transitions. Analytics queries go in `queries.py` or `application/ledger_queries.py`.
+There are three environments: `development`, `test`, `production`. There is no staging.
 
-## Application layer shape
+## Backend host (production)
 
-Every application function must have:
-- **Named input contract** — typed parameters or a command dataclass. The caller must know exactly what they're passing.
-- **Named output contract** — a named typed model (dataclass or Pydantic). The caller must know exactly what they're getting. An anonymous `dict` is not a contract — it has no name, no schema, no OpenAPI visibility, and drifts silently.
-- **Module-level collaborators** — no imports inside function bodies
-- **Transaction boundary** — `async with transaction():` for all writes
-- **Structured log** — `logger.info("action", extra={...})` on every mutation
+- Ship the same `backend/Dockerfile` image; the host sets listen `PORT` (e.g. `${PORT:-8000}` in CMD).
+- Postgres uses Supavisor **session pooler** (port 5432, IPv4) in production. Direct connections (`db.xxx.supabase.co`) resolve to IPv6 only, which DO App Platform cannot route. Session mode preserves per-connection state and supports asyncpg prepared statements. Do NOT use the transaction pooler (port 6543) - asyncpg prepared statements are incompatible with transaction pooling. `PUBLIC_DB_USER=postgres.<project-ref>`, `PUBLIC_DB_HOST=aws-0-<region>.pooler.supabase.com`, `PUBLIC_DB_PORT=5432`, `PUBLIC_DB_SSL_MODE=require` are committed in `backend/.env.production`. `PRIVATE_DB_PASSWORD` comes from secrets. A single `PRIVATE_DATABASE_URL` secret is still supported; config normalizes it to `postgresql+asyncpg://`.
+- `PRIVATE_JWT_SECRET` must be the Supabase project's JWT secret — not a random value.
+- `PUBLIC_CORS_ORIGINS` must include all stable Vercel domains. `PUBLIC_CORS_ORIGIN_REGEX` can match preview deploys.
+- `PUBLIC_FRONTEND_URL` needed for Xero OAuth redirects.
+- Health check path used in CI smoke tests: `GET /api/beta/shared/health`.
 
-```python
-# NO CONTRACT — caller can't introspect, OpenAPI can't document, type checker can't verify
-async def sales_report(...) -> dict: ...
+## Vercel
 
-# EXPLICIT CONTRACT — named, typed, versioned, visible
-@dataclass(frozen=True)
-class SalesReport:
-    gross_revenue: Decimal
-    gross_profit: Decimal
-    gross_margin_pct: float
-    total_transactions: int
+- **Single** root `vercel.json` at repo root controls the Vercel project (build `cd frontend && pnpm install --frozen-lockfile && pnpm run build`, output, CSP, `git.deploymentEnabled`). No second `frontend/vercel.json` (avoids drift). `VERCEL_ORG_ID` / `VERCEL_PROJECT_ID` are **not** committed in `vercel.json`; use GitHub Environment secrets or gitignored `.vercel/project.json` after `vercel link`.
+- Output: `frontend/dist`. SPA rewrite: all routes → `index.html`.
+- Three `VITE_*` env vars are build-time (baked into JS). Source of truth for production: committed `frontend/.env.production` (loaded by Vite when `pnpm run build` runs in mode production). Changing requires redeploy.
+- **Git vs Actions:** Repo sets `git.deploymentEnabled` with the production branch name (e.g. `main: false`) so Vercel’s [GitHub integration](https://vercel.com/docs/git/vercel-for-github) does not auto-deploy that branch while GitHub Actions runs `pull` + `build --prod --yes` + `deploy --prebuilt --prod --yes` (see [GitHub Actions + Vercel](https://vercel.com/docs/git/vercel-for-github#using-github-actions)). The key must match the **Production Branch** in Vercel project settings. Pin CLI with `npx vercel@50` under pixi. Deploy job attaches `--meta` (`githubCommitSha`, `githubCommitRef`, `githubRepo`, `githubActionsRunId`) for filtering in `vercel list --meta`. Environment secrets: `frontend_vercel_deployment` with `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`.
+- Optional: Vercel can emit [`repository_dispatch`](https://vercel.com/docs/git/vercel-for-github#repository-dispatch-events) to GitHub (e.g. `vercel.deployment.success`) for post-deploy E2E; prefer that over `deployment_status` if you disable deployment notifications in Vercel Git settings.
+- Security headers set in `vercel.json`: `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`.
+- Immutable cache headers on `/assets/`.
+- Build-time env template: `frontend/.env.example`.
 
-async def sales_report(...) -> SalesReport: ...
-```
+## Docker
 
-`dict` is fine as an internal intermediate. It is not acceptable as a public output contract of an application function.
+- Two-stage build: `builder` (compilers, uv sync) → `runtime` (venv only, no headers)
+- uv is pinned via `COPY --from=ghcr.io/astral-sh/uv:0.7` in the builder stage
+- Non-root: `appuser:appgroup` uid/gid 1001, `USER appuser` before `CMD`
+- `ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1` in runtime stage — required for log streaming
+- `CMD` uses gunicorn with `uvicorn.workers.UvicornWorker` for process management. Pass `--worker-tmp-dir /dev/shm` - DigitalOcean App Platform's container runtime can break gunicorn's default worker temp dir ([Dockerfile build reference](https://docs.digitalocean.com/products/app-platform/reference/dockerfile/)). No `uv run` wrapper in production.
+- `devtools/` never copied into image
 
-## API layer
+## CI/CD
 
-Route handlers only: parse request → call one application function → map to response → log audit. No SQL, no repos, no orchestration.
+- GitHub Actions **CI** (`.github/workflows/ci.yml`): standalone on **push to `dev`**, all **pull requests** to `main`/`dev`, **`workflow_dispatch`**, and **`workflow_call`** from **CD**. On **`main` pushes** there is **no** standalone CI - only the CD workflow runs and calls `ci.yml` as the CI gate (avoids duplicate test runs).
+- **`dorny/paths-filter@v4`** drives **all four CI jobs**. Backend lint and test run when `backend/**` or `supabase/**` changed. Frontend lint runs when `frontend/**` changed. Frontend test runs when backend, supabase, **or** frontend changed (cross-stack regressions). If nothing in those dirs changed, all jobs skip.
 
-## Auditability
-
-Every mutation that changes state visible to users must either dispatch a typed domain event via `dispatch(event)` or write an audit record in the same transaction.
-
-## Error handling
-
-Do not swallow exceptions. Raise a typed `DomainError` subclass with a user-readable message, or let infrastructure errors propagate for the API layer to translate.
-
-## Forbidden patterns
-
-| Pattern | Fix |
-|---|---|
-| `_wiring = {}` / `set_*_getter()` | Fix the boundary; module-level import from facade |
-| Import inside function body | Module-level collaborator |
-| `conn` on repo/port signatures | Repos call `get_connection()` directly |
-| Raw SQL in API routes | Delegate to application → infra |
-| Cross-context infra imports | Application facade on owning context |
-| Calling a flow "idempotent" without defining dedupe key + guard | Define it explicitly |
-
-## Decision rules
-
-- **Port?** Only if: multiple implementations plausible AND consumers need test isolation AND boundary is stable. Otherwise concrete.
-- **Domain vs application?** Domain if pure computation on entity state. Application if IO, multi-aggregate, or use-case-specific.
-- **Split file?** By dependency graph, not by endpoint or alphabet. Different imports → different files.
-- **File too large?** Split into `{ctx}/application/use_cases/` — one function per module.
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [albusOS/sku-ops](https://github.com/albusOS/sku-ops) — distributed by [TomeVault](https://tomevault.io).
