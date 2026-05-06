@@ -1,100 +1,160 @@
 ---
 trigger: always_on
-description: Modular monolith in production. Python/FastAPI backend, React frontend. Architecture remediation complete. These rules encode what was learned — follow them precisely.
+description: FastAPI versioned API layout, router composition, and per-feature directory structure
 ---
 
-# SKU-Ops — Agent Rules
 
-Modular monolith in production. Python/FastAPI backend, React frontend. Architecture remediation complete. These rules encode what was learned — follow them precisely.
+# API Router Structure
 
-Consult `.cursor/rules/known-good-patterns.mdc` before any structural backend change.
-Consult `.cursor/rules/deployment-hardening.mdc` before any Docker, CORS, or auth change.
+This document defines the FastAPI layout for versioned APIs.
 
----
+Use this structure when refactoring an existing FastAPI app so routing, versioning, and application startup stay predictable.
 
-## 1. Structural law
+## Intent
 
-### Layer dependencies (strict, not aspirational)
+- Keep application startup in one place: `src/<package_name>/main.py`
+- Keep API version boundaries explicit under `src/<package_name>/api/`
+- Keep router registration centralized in each version's `api.py`
+- Keep feature endpoints inside version-local `routers/`
+- Let a top-level feature own both its own endpoints and nested sub-feature routers
+- Make it easy to run `v1` and `beta` side by side during migrations
+- Keep versioned HTTP contracts at the edge; share business logic in `core`
 
+## Canonical Layout
+
+```text
+src/<package_name>/
+├── main.py
+├── core/ # shared business logic services, standard models, and dependencies
+│   ├── services/
+│   ├── standard_models/
+│   └── dependencies/
+└── api/
+    ├── __init__.py
+    ├── beta/
+    │   ├── __init__.py          # exports api_router
+    │   ├── api.py
+    │   └── routers/
+    │       ├── __init__.py
+    │       └── <feature>/
+    │           ├── __init__.py
+    │           ├── <feature>_router.py
+    │           ├── <feature>_models.py
+    │           ├── <feature>_service.py
+    │           ├── <feature>_dependencies.py
+    │           ├── <feature>_adapter.py
+    │           └── sub_routers/
+    │               ├── __init__.py
+    │               └── <sub_feature>/
+    │                   ├── __init__.py
+    │                   ├── <sub_feature>_router.py
+    │                   ├── <sub_feature>_models.py
+    │                   ├── <sub_feature>_service.py
+    │                   ├── <sub_feature>_dependencies.py
+    │                   └── <sub_feature>_adapter.py
+    └── v1/
+        ├── __init__.py          # exports api_router
+        ├── api.py
+        └── routers/
+            ├── __init__.py
+            └── <feature>/
+                ├── __init__.py
+                ├── <feature>_router.py
+                ├── <feature>_models.py
+                ├── <feature>_service.py
+                ├── <feature>_dependencies.py
+                ├── <feature>_adapter.py
+                └── sub_routers/
+                    ├── __init__.py
+                    └── <sub_feature>/
+                        ├── __init__.py
+                        ├── <sub_feature>_router.py
+                        ├── <sub_feature>_models.py
+                        ├── <sub_feature>_service.py
+                        ├── <sub_feature>_dependencies.py
+                        └── <sub_feature>_adapter.py
 ```
-shared/kernel/              → zero deps (pure domain primitives)
-shared/infrastructure/      → shared/kernel only
-{context}/domain/           → shared/kernel + stdlib + pydantic only
-{context}/ports/            → domain + shared/kernel only
-{context}/infrastructure/   → domain + shared/infrastructure
-{context}/application/      → own domain + own infra + other contexts' application facades
-{context}/api/              → own application + shared/api only
-```
 
-Violations of this graph are bugs, not tech debt.
+Every feature router gets a directory. No flat files for routers. A top-level feature may also contain its own nested `sub_routers/` directory for sub-features. The `<feature>` and `<sub_feature>` templates show the full scope of files a router package may include; omit any file that is not needed for a given feature.
 
-### Cross-context ownership
+## Directory Responsibilities
 
-Each bounded context owns its tables, state transitions, and invariants. Cross-context mutation goes through the owning context's application facade.
+### `src/<package_name>/main.py`
+
+Own the application lifecycle and top-level app wiring only.
+
+- Create the FastAPI `app`
+- Define the lifespan context manager
+- Register middleware
+- Register exception handlers
+- Mount static assets if needed
+- Include version routers by importing `api_router` from version packages
+- Define only non-versioned endpoints (e.g. `/`)
+
+Do not define versioned endpoints (e.g. `/api/v1/...` or `/api/beta/...`) in `main.py`. All versioned HTTP surface belongs under `src/<package_name>/api/<version>/...`.
+
+Do not spread app startup, middleware setup, or version registration across multiple files.
+
+Minimal pattern:
 
 ```python
-# BUG — finance mutating operations' table directly
-await conn.execute("UPDATE withdrawals SET payment_status = 'invoiced' WHERE id = ?", (wid,))
+from contextlib import asynccontextmanager
+from collections.abc import AsyncGenerator
 
-# CORRECT — operations owns the mutation
-from operations.application.withdrawal_facade import link_to_invoice
-await link_to_invoice(withdrawal_ids, invoice_id, org_id)
+from fastapi import FastAPI
+
+from <package_name>.api import beta
+from <package_name>.api import v1
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    # Initialize shared resources here.
+    yield
+    # Tear down shared resources here.
+
+
+app = FastAPI(lifespan=lifespan)
+
+app.include_router(v1.api_router)
+app.include_router(beta.api_router)
 ```
 
-### API routes are thin
+### Version Package Exports
 
-A route handler may only: parse request, call one application function, map result to response, log audit. No business logic, no orchestration, no raw SQL, no direct repo imports.
+`src/<package_name>/api/v1/__init__.py` and `src/<package_name>/api/beta/__init__.py` export `api_router` directly so `main.py` imports the version package contract, not internal `api.py` paths.
 
-### Repos are pure persistence
+```python
+# api/v1/__init__.py
+from <package_name>.api.v1.api import api_router
 
-Repos do CRUD and queries. No business validation, no orchestration, no cross-context access, no state machine logic.
+__all__ = ["api_router"]
+```
 
----
+```python
+# api/beta/__init__.py
+from <package_name>.api.beta.api import api_router
 
-## 2. Forbidden patterns
+__all__ = ["api_router"]
+```
 
-| Pattern | Why forbidden | What to do instead |
-|---------|--------------|-------------------|
-| `_wiring = {}` / `set_*_getter()` | Mutable global state hiding circular deps | Fix the boundary design; use module-level imports from application facades |
-| `from x.infrastructure.y import z` inside function body | Service reaching through to infra details | Import collaborators at module level |
-| Giant service file (15+ functions, mixed concerns) | Dumping ground; untestable | One module per important use case under `application/use_cases/` |
-| `dict` as primary contract for mutation flows | No type safety, silent schema drift | Typed command/result dataclasses |
-| `conn=None` on port signatures | Infrastructure leaking through abstraction | Repos call `get_connection()` directly; no `conn` parameters |
-| Raw SQL in API routes | Persistence logic in transport layer | Delegate to application → infrastructure |
-| Cross-context raw SQL | Invisible coupling, ownership violation | Application facade on the owning context |
-| Inline JWT claim path-sniffing | Provider-specific logic scattered everywhere | Use `resolve_claims()` from `shared/api/auth_provider.py` |
-| Claiming idempotency without defining mechanism | False safety guarantee | Define dedupe key, state guard, failure modes before implementation |
+### `src/<package_name>/api/`
 
----
+This directory is the versioning boundary for the HTTP API.
 
-## 3. Required patterns for important flows
+- `api/beta/` is the first pass at an API surface before contracts and behavior are hardened
+- `api/v1/` contains the hardened, stable versioned routes
+- Future versions follow the same pattern: `api/v2/`, `api/v3/`, and so on
 
-Any mutation that crosses context boundaries or interacts with external systems must have:
+The top-level `api/` directory should not hold endpoint logic directly. It only organizes versions.
 
-1. **Typed input** — command dataclass or explicit typed parameters
-2. **Typed result** — result dataclass, not dict
-3. **Module-level collaborators** — no runtime wiring, no function-body imports
-4. **Explicit transaction boundary** — `async with transaction():` owned by the use case
-5. **Explicit cross-context contract** — typed read models from the owning context's facade
-6. **Defined idempotency** — dedupe key, DB constraint or state guard, failure recovery
+### `src/<package_name>/api/<version>/api.py`
 
----
+This file is the composition point for a single API version.
 
-## 4. Infrastructure facts (must know before writing backend code)
-
-### Database layer
-
-- **Postgres everywhere** — dev, test, and production. No SQLite. Local dev uses the local Supabase stack.
-- **All SQL is native Postgres** — `$1`/`$2` placeholders, `NOW()`, `ON CONFLICT`, `::date` casts. No dialect abstraction.
-- **Pool proxy:** `get_connection()` inside `transaction()` returns the dedicated transactional connection (not the pool proxy). These are the same object only because of the contextvar Unit of Work — do not call `get_connection()` outside a `transaction()` block in application code.
-- **Pool config:** `PG_POOL_MIN`, `PG_POOL_MAX`, `PG_ACQUIRE_TIMEOUT`, `PG_COMMAND_TIMEOUT` — all in `config.py` and `docker-compose.yml`. Always set these explicitly in production.
-
-### Event system
-
-`shared/infrastructure/domain_events.py` — handler registry. Register with `@on(EventType)`, dispatch with `await dispatch(event)`. Import handler modules at startup to trigger registration. `event_hub.emit()` is only called from `shared/infrastructure/ws_bridge.py` — never call it directly from application code.
-
-### Auth provider
-
+- Define the version prefix once
+- Import router modules from that version's `routers/` directory
+- Register routers declaratively via a `ROUTER_MODULES` tuple and loop
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
