@@ -1,54 +1,90 @@
 ---
 trigger: always_on
-description: Production deployment requirements — Docker, DigitalOcean, Vercel, CORS, pool, auth, observability
+description: Local dev workflow — how to run, seed, test, and verify the stack
 ---
 
 
-# Deployment Hardening
+# Local Dev Workflow
 
-Deviations are bugs, not preferences.
+## Daily development (default)
 
-## Deployment targets
+Use this for all feature work. Hot-reload, local Supabase, and seed scripts work.
 
-Primary: **DigitalOcean** (or equivalent API host for the backend) + **Vercel** (frontend) + **Supabase** (auth + Postgres).
+```bash
+pixi run start            # doctor + local Supabase + backend + frontend (from repo root)
+```
 
-Optional: `docker-compose.yml` runs **Redis + backend** locally for container smoke checks. Database is always Supabase (local or hosted). It is not the production topology.
+Equivalent step-by-step: `pixi run doctor`, then `pixi run supabase` (or `pixi run supabase start`), then `pixi run dev`. Or skip doctor and run `pixi run supabase` then `pixi run dev` when the toolchain is already known good.
 
-There are three environments: `development`, `test`, `production`. There is no staging.
+- Backend: uvicorn with `--reload` on http://localhost:8000
+- Frontend: Vite dev server on http://localhost:3000
+- DB: Supabase local Postgres on localhost:54322
+- Tasks `backend`, `frontend`, and `dev` depend on `_is_supabase_running`, which starts local Supabase if it is not already up
+- Seed local data (run once after first start, or after schema changes):
 
-## Backend host (production)
+```bash
+pixi run supabase reset                    # migrations + SQL seeds (org, departments, dev users)
+pixi run import -- --vendors --products    # real Hike POS data
+```
 
-- Ship the same `backend/Dockerfile` image; the host sets listen `PORT` (e.g. `${PORT:-8000}` in CMD).
-- Postgres uses Supavisor **session pooler** (port 5432, IPv4) in production. Direct connections (`db.xxx.supabase.co`) resolve to IPv6 only, which DO App Platform cannot route. Session mode preserves per-connection state and supports asyncpg prepared statements. Do NOT use the transaction pooler (port 6543) - asyncpg prepared statements are incompatible with transaction pooling. `PUBLIC_DB_USER=postgres.<project-ref>`, `PUBLIC_DB_HOST=aws-0-<region>.pooler.supabase.com`, `PUBLIC_DB_PORT=5432`, `PUBLIC_DB_SSL_MODE=require` are committed in `backend/.env.production`. `PRIVATE_DB_PASSWORD` comes from secrets. A single `PRIVATE_DATABASE_URL` secret is still supported; config normalizes it to `postgresql+asyncpg://`.
-- `PRIVATE_JWT_SECRET` must be the Supabase project's JWT secret — not a random value.
-- `PUBLIC_CORS_ORIGINS` must include all stable Vercel domains. `PUBLIC_CORS_ORIGIN_REGEX` can match preview deploys.
-- `PUBLIC_FRONTEND_URL` needed for Xero OAuth redirects.
-- Health check path used in CI smoke tests: `GET /api/beta/shared/health`.
+## Optional Docker stack
 
-## Vercel
+`docker compose up` from the repo root runs Redis + backend inside containers (see `docker-compose.yml`). Database is always Supabase (start local Supabase first with `pixi run supabase start`). Set `DATABASE_URL` in your `.env` to point at local Supabase (`postgresql://postgres:postgres@host.docker.internal:54322/postgres`). `devtools/` scripts are intentionally excluded from the Docker image — run seeds in native dev (`pixi run dev`) instead. Docker build context: `docker build -f backend/Dockerfile .`
 
-- **Single** root `vercel.json` at repo root controls the Vercel project (build `cd frontend && pnpm install --frozen-lockfile && pnpm run build`, output, CSP, `git.deploymentEnabled`). No second `frontend/vercel.json` (avoids drift). `VERCEL_ORG_ID` / `VERCEL_PROJECT_ID` are **not** committed in `vercel.json`; use GitHub Environment secrets or gitignored `.vercel/project.json` after `vercel link`.
-- Output: `frontend/dist`. SPA rewrite: all routes → `index.html`.
-- Three `VITE_*` env vars are build-time (baked into JS). Source of truth for production: committed `frontend/.env.production` (loaded by Vite when `pnpm run build` runs in mode production). Changing requires redeploy.
-- **Git vs Actions:** Repo sets `git.deploymentEnabled` with the production branch name (e.g. `main: false`) so Vercel’s [GitHub integration](https://vercel.com/docs/git/vercel-for-github) does not auto-deploy that branch while GitHub Actions runs `pull` + `build --prod --yes` + `deploy --prebuilt --prod --yes` (see [GitHub Actions + Vercel](https://vercel.com/docs/git/vercel-for-github#using-github-actions)). The key must match the **Production Branch** in Vercel project settings. Pin CLI with `npx vercel@50` under pixi. Deploy job attaches `--meta` (`githubCommitSha`, `githubCommitRef`, `githubRepo`, `githubActionsRunId`) for filtering in `vercel list --meta`. Environment secrets: `frontend_vercel_deployment` with `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`.
-- Optional: Vercel can emit [`repository_dispatch`](https://vercel.com/docs/git/vercel-for-github#repository-dispatch-events) to GitHub (e.g. `vercel.deployment.success`) for post-deploy E2E; prefer that over `deployment_status` if you disable deployment notifications in Vercel Git settings.
-- Security headers set in `vercel.json`: `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`.
-- Immutable cache headers on `/assets/`.
-- Build-time env template: `frontend/.env.example`.
+## Key ports
 
-## Docker
+| Service  | Native dev | Docker compose |
+|----------|------------|----------------|
+| Backend  | :8000      | :8000          |
+| Frontend | :3000      | —              |
+| Postgres | :54322     | :54322 (Supabase local)  |
 
-- Two-stage build: `builder` (compilers, uv sync) → `runtime` (venv only, no headers)
-- uv is pinned via `COPY --from=ghcr.io/astral-sh/uv:0.7` in the builder stage
-- Non-root: `appuser:appgroup` uid/gid 1001, `USER appuser` before `CMD`
-- `ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1` in runtime stage — required for log streaming
-- `CMD` uses gunicorn with `uvicorn.workers.UvicornWorker` for process management. Pass `--worker-tmp-dir /dev/shm` - DigitalOcean App Platform's container runtime can break gunicorn's default worker temp dir ([Dockerfile build reference](https://docs.digitalocean.com/products/app-platform/reference/dockerfile/)). No `uv run` wrapper in production.
-- `devtools/` never copied into image
+## Common dev commands
 
-## CI/CD
+Install [Pixi](https://pixi.sh) once (`curl -fsSL https://pixi.sh/install.sh | sh`). The binary lives in `~/.pixi/bin` — use a **new shell** or `export PATH="$HOME/.pixi/bin:$PATH"` until your `~/.zshrc` is sourced.
 
-- GitHub Actions **CI** (`.github/workflows/ci.yml`): standalone on **push to `dev`**, all **pull requests** to `main`/`dev`, **`workflow_dispatch`**, and **`workflow_call`** from **CD**. On **`main` pushes** there is **no** standalone CI - only the CD workflow runs and calls `ci.yml` as the CI gate (avoids duplicate test runs).
-- **`dorny/paths-filter@v4`** drives **all four CI jobs**. Backend lint and test run when `backend/**` or `supabase/**` changed. Frontend lint runs when `frontend/**` changed. Frontend test runs when backend, supabase, **or** frontend changed (cross-stack regressions). If nothing in those dirs changed, all jobs skip.
+After cloning: `pixi install` (pulls Python 3.13, uv, Node 20, pnpm per [pixi.toml](pixi.toml) / [pixi.lock](pixi.lock)), then `pixi run doctor` to confirm nothing resolves from Homebrew/nvm/globals, then `pixi run uv sync --dev --directory backend` and `pixi run pnpm --dir frontend install --frozen-lockfile`.
+
+All commands below run from the **project root** via `pixi run <task>` (`pixi task list` for discoverability). Do not use global `npm` / `npx` for this repo — use **pnpm** via `pixi run pnpm …` so the binary comes from the pixi env.
+
+```bash
+pixi run doctor                  # toolchain check (pixi python, uv, node, pnpm)
+pixi run start                   # doctor + supabase start + dev (daily stack)
+pixi run tests                    # all tests (backend then frontend then e2e)
+pixi run tests backend -- …       # backend only; … = pytest args (one -- separates them from pixi task args)
+pixi run tests frontend           # frontend tests only (vitest)
+pixi run tests e2e -- …          # e2e only; … = extra args to Playwright after one --
+pixi run lint [all|backend|frontend]    # default all (ruff + ESLint)
+pixi run format [all|backend|frontend]  # default all (ruff + Prettier)
+pixi run format-check [all|backend|frontend] # verify formatting without modifying (default all)
+pixi run check [all|backend|frontend]   # lint then format (default all)
+pixi run commit                  # commitizen conventional commit
+pixi run backend                 # backend only
+pixi run frontend                # frontend only
+pixi run eval -- …               # extra args for evals
+pixi run supabase                # start local Supabase stack (default action)
+pixi run supabase stop           # stop local Supabase stack
+pixi run supabase reset          # reset local DB from migrations + seeds
+pixi run supabase typegen        # regenerate SQLModel types from local Supabase schema
+pixi run clean                   # wipe backend venv + Python caches (see devtools/scripts/clean_repo.sh)
+```
+
+Never suggest `pip`, `python -m pytest`, or `ruff` directly. Python tooling runs through **`uv`** from the **pixi** environment, invoked as **`pixi run uv run --directory backend ...`** or via pixi tasks. After `pixi run clean`, recreate the venv with `pixi run uv sync --dev --directory backend` and re-run `pixi run doctor`. Production and dev dependencies, plus Ruff/pytest/commitizen config, live in **`backend/pyproject.toml`**; **`backend/uv.lock`** and **`backend/.venv`** are the uv project artifacts (`backend/.venv` must reference the interpreter under **`.pixi/envs/default/`**).
+
+## Monorepo layout
+
+```
+sku-ops/
+├── backend/          # deployable app + its tests + pyproject.toml + uv.lock
+│   ├── pyproject.toml # Python deps (prod + dev), ruff, pytest, commitizen
+│   ├── uv.lock
+│   └── tests/        # backend unit/integration/api tests
+├── frontend/         # React SPA (co-located unit tests in src/__tests__/)
+├── e2e/              # cross-stack Playwright tests
+├── devtools/         # seeds, evals, scripts — not deployed
+└── pixi.toml         # task runner (dev, tests, supabase, …)
+```
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
