@@ -7,11 +7,11 @@ Pure Whisper. Nothing else.
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [jicaiinc/nanowhisper](https://github.com/jicaiinc/nanowhisper).
+Original source: `CLAUDE.md` in [jicaiinc/nanowhisper](https://github.com/jicaiinc/nanowhisper).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
