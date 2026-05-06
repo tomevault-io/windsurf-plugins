@@ -1,134 +1,206 @@
 ---
 trigger: always_on
-description: - Long-running schema changes (e.g. index creation on very large tables modifications)
+description: Writing and updating cypress integration tests
 ---
 
-# Async Migrations Best Practices
+## Cypress Test Generation Rules for Label Studio
 
-## When to Use Async Migrations
-- Long-running schema changes (e.g. index creation on very large tables modifications)
-- Operations that risk exceeding CI/CD migration timeouts (e.g. > 5 minutes)
-- DDL (Data Definition Language - it's a subset of SQL statements used to define and modify the structure of a database) that blocks writes if run normally (concurrent index builds, data backfills)
-- To avoid production downtime during heavy migrations or data migrations
+### Project Structure and Organization
 
-## Why Can't We Use Simple Django Migrations with Concurrency?
+**Test File Structure:**
+- Tests should be placed in `web/libs/editor/tests/integration/e2e/` with semantic folder organization
+- Follow the existing folder structure: `core/`, `image_segmentation/`, `control_tags/`, `audio/`, `video/`, `timeseries/`, `relations/`, `outliner/`, `bulk_mode/`, `config/`, `drafts/`, `linking_modes/`, `ner/`, `sync/`, `view_all/`
+- Test files should end with `.cy.ts` extension
+- Test data should be placed in `web/libs/editor/tests/integration/data/` following the same folder structure
 
-Even though Django provides `AddIndexConcurrently` and similar operations, they still cause deployment problems:
+**File Naming Convention:**
+- Use descriptive names that reflect the feature being tested
+- Use kebab-case for file names (e.g., `audio-regions.cy.ts`, `image-segmentation.cy.ts`)
+- Group related tests in logical folders
 
-**The Migration Runner Problem:**
-- Django's migration runner is fundamentally **synchronous** 
-- It waits for each operation to complete before marking the migration as "Applied"
-- Even `AddIndexConcurrently` blocks the **CI/CD pipeline** until the index finishes building (the database itself is not blocked)
-- Large tables (100M+ rows) can take **hours** to build indexes, far exceeding CI/CD timeouts (usually 5-15 minutes)
+### Import Standards
 
-**What Happens During Deployment:**
-```python
-# This STILL blocks the CI/CD deployment process
-operations = [
-    AddIndexConcurrently(
-        model_name="task", 
-        index=BrinIndex(fields=["updated_at"])
-    )
-]
-# ↑ CI/CD pipeline waits here until index creation completes
-# Database writes are NOT blocked, but deployment fails if it takes longer than timeout
+**Required Imports:**
+Always import helpers from the centralized helper library:
+```typescript
+import { LabelStudio, ImageView, Sidebar, Labels, Hotkeys } from "@humansignal/frontend-test/helpers/LSF";
 ```
 
-## How Async Migrations Work
-- Mark the migration `atomic = False` to disable wrapping in a transaction
-- In migration, a custom operation enqueues the real DDL via `start_job_async_or_sync` that is running as asyncronios rqworker job
-- DDL uses `CREATE INDEX CONCURRENTLY ...` (or `DROP INDEX CONCURRENTLY`) for non-blocking behavior
-- Track progress in a table (e.g. `AsyncMigrationStatus`) before and after execution
-- Background workers (RQ, Celery) execute the migration job independently of the main process
-- **Migration completes immediately** after queuing the job, allowing deployment to proceed
+**Test Data Imports:**
+Import test data from the data folder with relative paths:
+```typescript
+import { configName, dataName, resultName } from "../../data/folder_name/file_name";
+```
 
-## Example Template
-```python
-from django.db import migrations, connection
-from django.conf import settings
-from core.redis import start_job_async_or_sync
-from core.models import AsyncMigrationStatus
-import logging
+**Available Helpers:**
+- `LabelStudio` - Core initialization and control
+- `ImageView` - Image interaction and drawing
+- `VideoView` - Video playback and interaction  
+- `AudioView` - Audio playback and regions
+- `Sidebar` - Outliner and region management
+- `Labels` - Label selection and management
+- `Hotkeys` - Cross-platform keyboard shortcuts (Mac/PC compatibility)
+- `Taxonomy`, `Choices`, `DateTime`, `Number`, `Rating`, `Textarea` - Control tag helpers
+- `Relations` - Relationship management
+- `ToolBar` - Toolbar interactions
+- `Modals` - Modal dialog handling
+- `Tooltip` - Tooltip verification
 
-logger = logging.getLogger(__name__)
-migration_name = '0054_add_brin_index_updated_at'
+### Test Structure Standards
 
-# Actual DDL to run
-def forward_migration(migration_name):
-    migration = AsyncMigrationStatus.objects.create(
-        name=migration_name,
-        status=AsyncMigrationStatus.STATUS_STARTED,
-    )
-    logger.debug(f'Start async migration {migration_name}')
-    
-    # Check database backend and use appropriate SQL
-    if connection.vendor == 'postgresql':
-        # PostgreSQL: Use CONCURRENTLY and specific index types (BRIN, GIN, etc.)
-        sql = '''
-        CREATE INDEX CONCURRENTLY IF NOT EXISTS "task_updated_at_brin_idx" 
-        ON "task" USING BRIN ("updated_at");
-        '''
-    else:
-        # SQLite/Other: Fallback to standard B-tree index
-        sql = '''
-        CREATE INDEX IF NOT EXISTS "task_updated_at_brin_idx" 
-        ON "task" ("updated_at");
-        '''
-    
-    with connection.cursor() as cursor:
-        cursor.execute(sql)
-    
-    migration.status = AsyncMigrationStatus.STATUS_FINISHED
-    migration.save()
-    logger.debug(f'Async migration {migration_name} complete')
+**Basic Test Structure:**
+```typescript
+describe("Feature Name - Specific Area", () => {
+  it("should perform specific action", () => {
+    // Test implementation
+  });
+});
+```
 
-# Reverse DDL
-def reverse_migration(migration_name):
-    migration = AsyncMigrationStatus.objects.create(
-        name=migration_name,
-        status=AsyncMigrationStatus.STATUS_STARTED,
-    )
-    logger.debug(f'Start async migration rollback {migration_name}')
-    
-    # Drop index (handle database differences)
-    if connection.vendor == 'postgresql':
-        sql = 'DROP INDEX CONCURRENTLY IF EXISTS "task_updated_at_brin_idx";'
-    else:
-        sql = 'DROP INDEX IF EXISTS "task_updated_at_brin_idx";'
-    
-    with connection.cursor() as cursor:
-        cursor.execute(sql)
-    
-    migration.status = AsyncMigrationStatus.STATUS_FINISHED
-    migration.save()
-    logger.debug(f'Async migration rollback {migration_name} complete')
+**Nested Describes:**
+Use nested describe blocks for logical grouping:
+```typescript
+describe("Image Segmentation", () => {
+  describe("Rectangle Tool", () => {
+    it("should draw rectangle", () => {
+      // Test implementation
+    });
+  });
+});
+```
 
-# Hook into Django migration
-def forwards(apps, schema_editor):
-    start_job_async_or_sync(forward_migration, migration_name=migration_name)
+### LabelStudio Initialization Patterns
 
-def backwards(apps, schema_editor):
-    start_job_async_or_sync(reverse_migration, migration_name=migration_name)
+**Simple Initialization:**
+```typescript
+LabelStudio.init({
+  config: configString,
+  task: {
+    id: 1,
+    annotations: [{ id: 1001, result: [] }],
+    predictions: [],
+    data: { image: "url" },
+  },
+});
+```
 
-class Migration(migrations.Migration):
-    atomic = False
-    dependencies = [
-        ('tasks', '0053_annotation_bulk_created'),
-    ]
-    operations = [
-        migrations.RunPython(forwards, backwards),
-    ]
-```  
+**Fluent API Initialization (Preferred):**
+```typescript
+LabelStudio.params()
+  .config(configString)
+  .data(dataObject)
+  .withResult(expectedResult)
+  .init();
+```
 
-## Other Important Points
-- Label Studio uses two databases: SQLite and Postgres. All migrations should be designed for both of 
-- Always use `CREATE INDEX CONCURRENTLY` and `DROP INDEX CONCURRENTLY` for non-blocking index operations in Postgres
-- Check `connection.vendor` to handle database differences (PostgreSQL vs SQLite/others)
-- SQLite doesn't support CONCURRENTLY, BRIN, GIN, or other PostgreSQL-specific features
-- Ensure `atomic = False` so the concurrent DDL can run outside a transaction
-- Monitor and retry async jobs on failure; ensure your worker pool is healthy
-- Test async migrations in a staging environment with realistic data volumes
-- Clean up completed migrations and maintain migration history for on-prem rollouts
+**With Additional Parameters:**
+```typescript
+LabelStudio.params()
+  .config(config)
+  .data(data)
+  .withResult([])
+  .withInterface("panel")
+  .withEventListener("eventName", handlerFunction)
+  .withParam("customParam", value)
+  .init();
+```
+
+### Required Test Preparation Steps
+
+**Always Include:**
+1. LabelStudio initialization
+2. Wait for objects ready: `LabelStudio.waitForObjectsReady();`
+3. (optional, usually waitForObjectsReady is enough) Wait for media loading (for image/video/audio): `ImageView.waitForImage();`
+4. Initial state verification: `Sidebar.hasNoRegions();`
+5. (optional, if possible) Some state verification after actions, for example: `Sidebar.hasRegions(count);`
+
+### Interaction Patterns
+
+**Image Interactions:**
+```typescript
+// Wait for image to load
+ImageView.waitForImage();
+
+// Select tools
+ImageView.selectRectangleToolByButton();
+ImageView.selectPolygonToolByButton();
+
+// Drawing operations
+ImageView.drawRect(x, y, width, height);
+ImageView.drawRectRelative(0.1, 0.1, 0.4, 0.8); // Preferred
+
+// Click interactions
+ImageView.clickAt(x, y);
+ImageView.clickAtRelative(0.5, 0.5); // Preferred
+
+// Screenshot comparisons
+ImageView.capture("screenshot_name");
+ImageView.canvasShouldChange("screenshot_name", threshold);
+```
+
+**Label Management:**
+```typescript
+// Select labels before drawing
+Labels.select("Label Name");
+
+// Verify label selection
+Labels.isSelected("Label Name");
+```
+
+**Sidebar Operations:**
+```typescript
+// Region verification
+Sidebar.hasRegions(count);
+Sidebar.hasNoRegions();
+Sidebar.hasSelectedRegions(count);
+
+// Region manipulation
+Sidebar.toggleRegionVisibility(index);
+Sidebar.toggleRegionSelection(index);
+```
+
+### Assertion Patterns
+
+**Standard Cypress Assertions:**
+```typescript
+cy.get(selector).should("be.visible");
+cy.get(selector).should("have.text", "expected text");
+cy.get(selector).should("have.class", "class-name");
+```
+
+**Custom Helper Assertions:**
+```typescript
+Sidebar.hasRegions(expectedCount);
+Sidebar.hasSelectedRegions(expectedCount);
+ImageView.canvasShouldChange("screenshot", threshold);
+```
+
+**Window Object Access:**
+```typescript
+cy.window().then((win) => {
+  expect(win.Htx.annotationStore.selected.names.get("image")).to.exist;
+});
+```
+
+### Test Data Structure
+
+**Configuration Format:**
+```typescript
+export const configName = `
+  <View>
+    <Image name="img" value="$image"/>
+    <RectangleLabels name="tag" toName="img">
+      <Label value="Planet"/>
+      <Label value="Moonwalker" background="blue"/>
+    </RectangleLabels>
+  </View>
+`;
+```
+
+**Data Format:**
+```typescript
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [cycle123582/label-studio-Chinese](https://github.com/cycle123582/label-studio-Chinese) — distributed by [TomeVault](https://tomevault.io).
