@@ -1,18 +1,20 @@
 ---
 trigger: always_on
-description: USE WHEN: starting a new task or resuming work.
+description: USE WHEN: external context is required (issues, docs, tickets, schemas).
 ---
 
 
-# Context & Memory
+# MCP Usage
 
-## Read First
-- project_profile.md (repo truths)
-- MASTER_RULES.md (canonical rules)
+## When to Use MCP
+- You need authoritative requirements (Jira/Linear/Trello).
+- You need current PR/issue context (GitHub/GitLab).
+- You need live schema or data (DB MCP).
+- You need external docs or API references.
 
-## Memory Bank
-- Use MEMORY_BANK.md and AGENTS.md as single source of truth.
-- After major changes, update decisions and lessons learned.
+## Rule
+- Fetch missing context before implementing.
+- Cite the source of truth in notes.
 
 ---
 > Source: [zoxknez/ai-coding-rules](https://github.com/zoxknez/ai-coding-rules) — distributed by [TomeVault](https://tomevault.io).
