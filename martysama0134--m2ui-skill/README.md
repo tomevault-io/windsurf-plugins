@@ -7,13 +7,13 @@ AI coding skill for generating and modifying Metin2 client UI code from screensh
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `copilot-instructions.md` in [martysama0134/m2ui-skill](https://github.com/martysama0134/m2ui-skill).
+Original source: `.cursor/rules/*.mdc` in [martysama0134/m2ui-skill](https://github.com/martysama0134/m2ui-skill).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
-- **Cursor** — `project-config.mdc`
+- **GitHub Copilot** — `copilot-instructions.md`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
