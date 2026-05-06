@@ -1,208 +1,242 @@
 ---
 trigger: always_on
-description: **File chính**: [components/modal/static-method-confirm.tsx](mdc:components/modal/static-method-confirm.tsx)
+description: Hệ thống Credit Management hỗ trợ tùy chỉnh màu sắc giao diện theo từng người dùng. Tất cả màu sắc phải sử dụng theme variables thay vì hardcode để đảm bảo tính nhất quán và khả năng tùy chỉnh.
 ---
 
-# Quy ước sử dụng Static Method Confirm
 
-## 1. File và Location
+# Quy ước sử dụng Theme Colors
 
-**File chính**: [components/modal/static-method-confirm.tsx](mdc:components/modal/static-method-confirm.tsx)
+## 1. Tổng quan
 
-Static method confirm được sử dụng để hiển thị modal xác nhận với API đơn giản, không cần quản lý state trong component.
+Hệ thống Credit Management hỗ trợ tùy chỉnh màu sắc giao diện theo từng người dùng. Tất cả màu sắc phải sử dụng theme variables thay vì hardcode để đảm bảo tính nhất quán và khả năng tùy chỉnh.
 
-## 2. Import và sử dụng
+## 2. CSS Variables có sẵn
 
-### Import:
-
-```typescript
-import { showConfirm } from '@/components/modal/static-method-confirm';
+```css
+/* Theme colors được set trong :root */
+--theme-main: #15bec6; /* Màu chính */
+--theme-hover: #1d4ed8; /* Màu khi hover */
+--theme-text: #1f2937; /* Màu chữ chính */
+--theme-disabled: #9ca3af; /* Màu khi disabled */
+--theme-border: #e5e7eb; /* Màu viền */
+--theme-background: #ffffff; /* Màu nền */
 ```
 
-### Sử dụng cơ bản:
+## 3. Sử dụng trong CSS/Tailwind
 
-```typescript
-showConfirm({
-  title: 'Xác nhận xóa',
-  content: 'Bạn có chắc chắn muốn xóa item này không?',
-  onConfirm: () => {
-    // Logic xử lý khi confirm
-    console.log('Confirmed');
-  },
-  onCancel: () => {
-    // Logic xử lý khi cancel (optional)
-    console.log('Cancelled');
-  },
-});
-```
+### ✅ ĐÚNG - Sử dụng CSS variables
 
-## 3. API Interface
+```css
+/* Trong CSS files */
+.my-button {
+  background-color: var(--theme-main);
+  color: var(--theme-text);
+  border: 1px solid var(--theme-border);
+}
 
-```typescript
-interface ConfirmOptions {
-  title: string; // Tiêu đề modal
-  content: string; // Nội dung thông báo
-  onConfirm: () => void; // Callback khi nhấn confirm
-  onCancel?: () => void; // Callback khi nhấn cancel (optional)
-  confirmText?: string; // Text cho button confirm (default: "Xác nhận")
-  cancelText?: string; // Text cho button cancel (default: "Hủy bỏ")
-  type?: 'warning' | 'danger' | 'info'; // Loại modal (default: 'warning')
+.my-button:hover {
+  background-color: var(--theme-hover);
+}
+
+.my-button:disabled {
+  background-color: var(--theme-disabled);
+  color: var(--theme-disabled);
 }
 ```
 
-## 4. Các trường hợp sử dụng
+```tsx
+// Trong Tailwind CSS với arbitrary values
+<button
+  className="bg-[var(--theme-main)] text-[var(--theme-neutral-11)]
+             border border-theme-main
+             hover:bg-[var(--theme-hover)]
+             disabled:bg-theme-neutral-6 disabled:text-theme-neutral-7"
+>
+  Button
+</button>
 
-### Xóa item:
-
-```typescript
-const handleDelete = (itemId: string, itemName: string) => {
-  showConfirm({
-    title: t('admin.common.confirmDelete'),
-    content: t('admin.common.confirmDeleteMessage', { name: itemName }),
-    type: 'danger',
-    onConfirm: () => {
-      // Call delete API
-      deleteItem(itemId);
-    },
-  });
-};
+// HOẶC sử dụng theme classes đã định nghĩa
+<button
+  className="bg-theme-main text-theme-neutral-11
+             border border-theme-main
+             hover:bg-theme-hover
+             disabled:bg-theme-neutral-6 disabled:text-theme-neutral-7"
+>
+  Button
+</button>
 ```
 
-### Bulk actions:
+### ❌ SAI - Hardcode màu sắc
 
-```typescript
-const handleBulkUpdate = () => {
-  showConfirm({
-    title: t('admin.credits.bulkActions.collectionModal.title'),
-    content: t('admin.credits.bulkActions.collectionModal.content', {
-      count: selectedItems.length,
-    }),
-    onConfirm: () => {
-      // Call bulk update API
-      updateCreditsStatus(selectedItems, 'collection');
-    },
-  });
-};
-```
+```css
+/* KHÔNG làm thế này */
+.my-button {
+  background-color: #2563eb; /* Hardcode màu */
+  color: #1f2937; /* Hardcode màu */
+}
 
-### Status change:
-
-```typescript
-const handleStatusChange = (itemId: string, newStatus: string) => {
-  showConfirm({
-    title: t('admin.common.confirmStatusChange'),
-    content: t('admin.common.confirmStatusChangeMessage', {
-      status: newStatus,
-    }),
-    onConfirm: () => {
-      // Call status update API
-      updateStatus(itemId, newStatus);
-    },
-  });
-};
-```
-
-## 5. i18n Integration
-
-Luôn sử dụng i18n cho title và content:
-
-```typescript
-// ✅ ĐÚNG
-showConfirm({
-  title: t('admin.machines.deleteModal.title'),
-  content: t('admin.machines.deleteModal.content', { name: machineName }),
-  onConfirm: () => deleteMachine(machineId),
-});
-
-// ❌ SAI - hardcode text
-showConfirm({
-  title: 'Xóa máy giặt',
-  content: 'Bạn có chắc chắn muốn xóa máy giặt này?',
-  onConfirm: () => deleteMachine(machineId),
-});
-```
-
-## 6. Quy tắc đặt tên i18n key
-
-### Cho modal confirm:
-
-- `admin.[module].deleteModal.title`
-- `admin.[module].deleteModal.content`
-- `admin.[module].bulkActions.[action]Modal.title`
-- `admin.[module].bulkActions.[action]Modal.content`
-
-### Ví dụ:
-
-```typescript
-// File i18n
-{
-  admin: {
-    credits: {
-      deleteModal: {
-        title: "Xác nhận xóa khoản vay",
-        content: "Bạn có chắc chắn muốn xóa khoản vay {{name}} không?"
-      },
-      bulkActions: {
-        collectionModal: {
-          title: "Xác nhận chuyển thu nợ",
-          content: "Bạn có chắc chắn muốn chuyển {{count}} khoản vay sang thu nợ không?"
-        }
-      }
-    }
-  }
+.my-button:hover {
+  background-color: #1d4ed8; /* Hardcode màu */
 }
 ```
 
-## 7. Best Practices
+```tsx
+// KHÔNG làm thế này
+<button
+  className="bg-blue-600 text-gray-800 border border-gray-200
+             hover:bg-blue-700 disabled:bg-gray-400 disabled:text-gray-400"
+>
+  Button
+</button>
+```
 
-### ✅ NÊN:
+## 4. Sử dụng trong React Components
 
-- Sử dụng cho các action quan trọng (delete, status change, bulk actions)
-- Luôn dùng i18n cho text
-- Truyền parameters vào i18n để dynamic content
-- Sử dụng type phù hợp ('danger' cho delete, 'warning' cho update)
-- Handle cả onConfirm và onCancel nếu cần
+### ✅ ĐÚNG - Sử dụng CSS variables trong inline styles
 
-### ❌ KHÔNG NÊN:
-
-- Hardcode text trong title/content
-- Sử dụng cho action không quan trọng
-- Quên handle loading state trong onConfirm
-- Nest nhiều modal confirm
-
-## 8. Ví dụ hoàn chỉnh
-
-```typescript
-// Component
-import { showConfirm } from '@/components/modal/static-method-confirm';
-
-const handleDeleteCredit = (creditId: string, creditCode: string) => {
-  showConfirm({
-    title: t('admin.credits.deleteModal.title'),
-    content: t('admin.credits.deleteModal.content', { name: creditCode }),
-    type: 'danger',
-    confirmText: t('admin.common.delete'),
-    cancelText: t('admin.common.cancel'),
-    onConfirm: async () => {
-      try {
-        await deleteCreditApi(creditId);
-        toastHelpers.success({ title: t('admin.credits.deleteSuccess') });
-        refetch(); // Refresh data
-      } catch (error) {
-        toastHelpers.error({ title: t('admin.common.errorOccurred') });
-      }
-    },
-  });
+```tsx
+const MyButton = () => {
+  return (
+    <button
+      className="px-4 py-2 rounded border"
+      style={{
+        backgroundColor: 'var(--theme-main)',
+        color: 'var(--theme-text)',
+        borderColor: 'var(--theme-border)',
+      }}
+      onMouseEnter={e => {
+        e.currentTarget.style.backgroundColor = 'var(--theme-hover)';
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.backgroundColor = 'var(--theme-main)';
+      }}
+    >
+      Button
+    </button>
+  );
 };
 ```
 
-## 9. Lưu ý
+### ❌ SAI - Hardcode màu trong React components
 
-- Static method không cần quản lý state trong component
-- Modal sẽ tự động close sau khi confirm/cancel
-- Có thể customize button text và icon theo type
-- Support async operations trong onConfirm callback
-- Tự động focus vào button confirm khi mở modal
+```tsx
+const MyButton = () => {
+  return (
+    <button
+      className="bg-blue-600 text-gray-800 border border-gray-200 px-4 py-2 rounded"
+      style={{
+        backgroundColor: '#2563eb', // Hardcode!
+        color: '#1f2937', // Hardcode!
+      }}
+    >
+      Button
+    </button>
+  );
+};
+```
+
+## 5. Sử dụng với Shadcn/UI Components
+
+### Button Component
+
+```tsx
+import { Button } from '@/components/ui/button';
+
+// ✅ ĐÚNG - Sử dụng theme classes
+const ThemedButton = () => {
+  return (
+    <Button
+      className="bg-theme-main text-theme-neutral-1
+                 hover:bg-theme-hover
+                 border-theme-main"
+    >
+      Themed Button
+    </Button>
+  );
+};
+
+// HOẶC sử dụng arbitrary values
+const ThemedButtonAlt = () => {
+  return (
+    <Button
+      className="bg-[var(--theme-main)] text-[var(--theme-neutral-1)]
+                 hover:bg-[var(--theme-hover)]
+                 border-[var(--theme-main)]"
+    >
+      Themed Button
+    </Button>
+  );
+};
+```
+
+### Input Component
+
+```tsx
+import { Input } from '@/components/ui/input';
+
+const ThemedInput = () => {
+  return (
+    <Input
+      className="border-theme-neutral-4
+                 focus:border-theme-main
+                 text-theme-neutral-11
+                 placeholder:text-theme-neutral-6"
+      placeholder="Enter text..."
+    />
+  );
+};
+```
+
+### Card Component
+
+```tsx
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
+
+const ThemedCard = () => {
+  return (
+    <Card className="border-theme-neutral-4 bg-theme-neutral-1">
+      <CardHeader className="text-theme-neutral-11">Card Title</CardHeader>
+      <CardContent>
+        <p className="text-theme-neutral-9">Card content with themed colors</p>
+      </CardContent>
+    </Card>
+  );
+};
+```
+
+## 6. Sử dụng với Data Tables
+
+### Table Headers
+
+```tsx
+const TableHeader = () => {
+  return (
+    <thead className="bg-[var(--theme-background)] border-b border-[var(--theme-border)]">
+      <tr>
+        <th className="text-left text-[var(--theme-text)] font-medium p-4">
+          Column 1
+        </th>
+        <th className="text-left text-[var(--theme-text)] font-medium p-4">
+          Column 2
+        </th>
+      </tr>
+    </thead>
+  );
+};
+```
+
+### Table Rows
+
+```tsx
+const TableRow = ({ isSelected }: { isSelected?: boolean }) => {
+  return (
+    <tr
+      className={`border-b border-[var(--theme-border)]
+                  hover:bg-[var(--theme-background)]`}
+      style={{
+        backgroundColor: isSelected ? 'var(--theme-main)' : 'transparent',
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [HiuNT-Tech/backlog-clone-fe](https://github.com/HiuNT-Tech/backlog-clone-fe) — distributed by [TomeVault](https://tomevault.io).
