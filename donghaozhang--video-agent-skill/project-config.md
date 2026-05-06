@@ -1,165 +1,154 @@
 ---
 trigger: always_on
-description: **⚠️ ALWAYS start with FREE tests before ANY paid content generation**
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-# Development Guidelines for AI Content Generation
+# CLAUDE.md
 
-## CRITICAL: Cost Protection First
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-**⚠️ ALWAYS start with FREE tests before ANY paid content generation**
+## Git Workflow Commands
 
-Every development workflow must begin with:
-1. **FREE environment tests** (`test_setup.py`)
-2. **FREE API connection tests** (`test_api_only.py` for video)
-3. **Only then proceed** to paid generation with explicit user confirmation
-
-## Project Architecture
-
-### Multi-Platform AI Content Generation
-This project provides comprehensive AI content generation capabilities:
-
-1. **Video Generation** (Google Veo + FAL AI Dual-Model)
-2. **Avatar Generation** (FAL AI Triple-Mode with lip-sync)
-3. **Text-to-Image Generation** (FAL AI Quad-Model)
-4. **Text-to-Speech Generation** (ElevenLabs TTS Package with modular architecture)
-
-### Directory Structure Standards
-```
-<content_type>_<platform>/
-├── <platform>_<content_type>_generator.py  # Main generator class
-├── demo.py                                 # Cost-conscious interactive demo
-├── test_setup.py                          # FREE environment validation
-├── test_<specific>.py                     # PAID generation tests
-├── requirements.txt                       # Dependencies
-├── .env                                   # API configuration
-├── README.md                              # Complete documentation
-├── output/                                # Generated content
-└── test_output/                           # Test-generated content
+**Always run after each successful implementation:**
+```bash
+git add .
+git commit -m "descriptive commit message"
+git push origin main
 ```
 
-### Implementation Standards
+## Project Overview
 
-#### Generator Class Architecture
-All generator classes follow consistent patterns:
-```python
-class <Platform><ContentType>Generator:
-    def __init__(self, api_key: Optional[str] = None):
-        """Initialize with API key from .env or parameter"""
-        
-    def generate_<content_type>(self, **kwargs) -> Dict[str, Any]:
-        """Universal generation method with model/mode selection"""
-        
-    def generate_<content_type>_with_<specific_model>(self, **kwargs) -> Dict[str, Any]:
-        """Model-specific optimized methods"""
-        
-    def test_connection(self) -> bool:
-        """FREE API connectivity test"""
+This is the **AI Content Pipeline** - a unified Python package for multi-modal AI content generation.
+
+- **Unified Interface**: Single package with console commands `ai-content-pipeline` and `aicp`
+- **73 AI models across 12 categories** — see [Models Reference](docs/reference/models.md)
+- **Central Model Registry**: Single source of truth in `registry.py` + `registry_data.py`
+- **Click-based CLI**: All commands use Click framework, vimax available as `aicp vimax` subgroup
+- **Unix-style flags**: `--json`, `--quiet`, `--stream`, `--input` for scripting and CI
+- **YAML Configuration**: Multi-step content generation workflows
+- **Parallel Execution**: 2-3x speedup with `PIPELINE_PARALLEL_ENABLED=true`
+
+## Environment Setup
+
+### Python Virtual Environment (Required)
+```bash
+# Create and activate virtual environment (run from project root)
+python3 -m venv venv
+source venv/bin/activate  # Linux/Mac
+# or venv\Scripts\activate  # Windows
+
+# Install all dependencies from root
+pip install -e .
+# or: pip install -r requirements.txt
 ```
 
-#### Cost-Conscious Testing Framework
-Every module must include:
-1. **FREE Tests**: Environment, dependencies, API connectivity
-2. **PAID Tests**: Actual content generation with cost warnings
-3. **Official Examples**: Documentation compliance (for avatar generation)
-4. **Interactive Demos**: User-friendly testing with cost confirmations
+**Memory**: Virtual environment at project root `venv/`. Always activate before running scripts (`venv\Scripts\activate` on Windows, `source venv/bin/activate` on Linux/Mac).
 
-## Implementation Patterns
+## Common Commands
 
-### FAL AI Video Generation (Dual-Model)
-**Location**: `fal_video_generation/`
-**Models**: MiniMax Hailuo-02, Kling Video 2.1
-**Key Features**: 
-- Universal methods with model selection
-- Model-specific optimization methods
-- Prompt optimization (Hailuo), CFG scale and negative prompts (Kling)
+### CLI Commands
+```bash
+# List available AI models
+aicp list-models
 
-```python
-# Universal interface with model selection
-generator.generate_video_from_image(
-    prompt="Description",
-    image_url="path/to/image.jpg",
-    model="hailuo",  # or "kling"
-    duration="6"
-)
+# Generate single image
+aicp generate-image --text "A beautiful sunset" --model flux_dev
 
-# Model-specific optimization
-generator.generate_video_with_hailuo(prompt_optimizer=True)
-generator.generate_video_with_kling(cfg_scale=0.7, negative_prompt="blur")
+# Create video from text (text -> image -> video)
+aicp create-video --text "A beautiful sunset"
+
+# Run pipeline from YAML config
+aicp run-chain --config input/pipelines/config.yaml
+
+# Run with parallel execution (2-3x speedup)
+PIPELINE_PARALLEL_ENABLED=true aicp run-chain --config config.yaml
+
+# Analyze video with AI (Gemini 3 Pro via FAL)
+aicp analyze-video -i video.mp4
+
+# Generate avatar with lip-sync
+aicp generate-avatar --image-url "https://..." --audio-url "https://..."
+
+# Transcribe audio
+aicp transcribe --input audio.mp3
+
+# Generate image grid
+aicp generate-grid --text "mountain landscape" --layout 2x2
+
+# Upscale image
+aicp upscale-image --image photo.png --upscale 2
+
+# Transfer motion from video to image
+aicp transfer-motion --image-url "https://..." --video-url "https://..."
+
+# Novel-to-video pipeline (vimax subgroup)
+aicp vimax idea2video --idea "A samurai's journey at sunrise"
+aicp vimax novel2movie --novel novel.txt --storyboard-only
+
+# JSON output for scripting
+aicp list-models --json | jq '.text_to_video[]'
 ```
 
-### FAL AI Avatar Generation (Triple-Mode)
-**Location**: `fal_avatar_generation/`
-**Modes**: Text-to-Speech, Audio-to-Avatar, Multi-Audio Conversation
-**Key Features**:
-- 20 voice options with official example compliance
-- Natural lip-sync and expression generation
-- Conversation support with seamless transitions
-- Official FAL AI example reproduction
+See [CLI Reference](docs/reference/cli-commands.md) for full command documentation.
 
-```python
-# Text-to-Speech Mode (20 voices available)
-generator.generate_avatar_video(
-    image_url="path/to/image.jpg",
-    text_input="Your text here",
-    voice="Bill",  # Official example default
-    num_frames=136,  # Official example frames
-    seed=42,  # Official example seed
-    turbo=True
-)
+### Testing Commands
+```bash
+# Run full pytest suite (~844 tests)
+python -m pytest tests/ -v
 
-# Audio-to-Avatar Mode
-generator.generate_avatar_from_audio(
-    image_url="path/to/image.jpg",
-    audio_url="path/to/audio.mp3",
-    num_frames=145  # Default for audio mode
-)
+# Registry tests only
+python -m pytest tests/test_registry.py tests/test_registry_data.py tests/test_auto_discovery.py -v
 
-# Multi-Audio Conversation Mode
-generator.generate_multi_avatar_conversation(
-    image_url="path/to/image.jpg",
-    first_audio_url="path/to/person1.mp3",
-    second_audio_url="path/to/person2.mp3",
-    num_frames=181  # Default for multi-audio mode
-)
+# Click CLI tests
+python -m pytest tests/test_click_app.py tests/test_main_cli_flags.py -v
 
-# Official Example Reproduction
-generator.generate_official_example()  # Exact documentation compliance
+# Quick smoke tests
+python tests/test_core.py
+
+# Validate registry consistency
+python scripts/validate_registry.py
 ```
 
-### FAL AI Text-to-Image Generation (Quad-Model)
-**Location**: `fal_text_to_image/`
-**Models**: Imagen4, Seedream, FLUX Schnell, FLUX Dev
-**Key Features**:
-- Batch generation with multiple models
-- Cost-conscious design with confirmation prompts
-- Dragon generation for testing scenarios
+## Architecture
 
-```python
-# Single model generation
-generator.generate_image(
-    prompt="A beautiful dragon",
-    model="imagen4",
-    negative_prompt="blur, artifacts"
-)
-
-# Batch generation with multiple models
-generator.batch_generate(
-    prompt="A magical forest",
-    models=["imagen4", "flux_schnell"],
-    auto_confirm=False  # Cost confirmation required
-)
+### Package Structure
+```
+ai-content-pipeline/
+├── packages/
+│   ├── core/
+│   │   ├── ai_content_pipeline/     # Main pipeline + central registry + Click CLI
+│   │   │   ├── registry.py          # ModelDefinition + ModelRegistry (source of truth)
+│   │   │   ├── registry_data.py     # All 73 model registrations
+│   │   │   ├── _version.py          # Single source of truth for version
+│   │   │   └── cli/                 # Click CLI (click_app.py + commands/)
+│   │   └── ai_content_platform/     # Platform framework + vimax subgroup (aicp vimax)
+│   ├── providers/
+│   │   ├── google/veo/              # Google Veo integration
+│   │   └── fal/                     # FAL AI services
+│   │       ├── text-to-image/       # Image generation (8 models)
+│   │       ├── image-to-image/      # Image transformation (8 models)
+│   │       ├── text-to-video/       # Video generation (10 models)
+│   │       ├── image-to-video/      # Image-to-video (15 models)
+│   │       ├── video-to-video/      # Video-to-video (4 models)
+│   │       ├── avatar-generation/   # Avatar creation (10 models)
+│   │       └── speech-to-text/      # Speech transcription (1 model)
+│   └── services/
+│       ├── text-to-speech/          # ElevenLabs TTS
+│       └── video-tools/             # Video processing
+├── scripts/                         # Validation scripts
+├── input/                           # Configuration files
+├── output/                          # Generated content
+├── tests/                           # Test suites (pytest, ~844 tests)
+├── docs/                            # Documentation (see docs/index.md)
+└── setup.py                         # Package installation
 ```
 
-### ElevenLabs Text-to-Speech Generation (Modular Package)
-**Location**: `text_to_speech/`
-**Features**: Professional modular architecture, 3000+ voices, AI content pipeline
-**Key Benefits**: Clean imports, comprehensive TTS capabilities, OpenRouter AI integration
+See [Architecture Overview](docs/reference/architecture.md) and [Package Structure](docs/reference/package-structure.md) for details.
 
-```python
+### Key Architecture Points
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/donghaozhang) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-10 -->
+> Source: [donghaozhang/video-agent-skill](https://github.com/donghaozhang/video-agent-skill) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-06 -->
