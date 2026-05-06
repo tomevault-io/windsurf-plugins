@@ -7,11 +7,11 @@ A powerful, flexible, and feature-rich WebView wrapper for Jetpack Compose and C
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [parkwoocheol/compose-webview](https://github.com/parkwoocheol/compose-webview).
+Original source: `CLAUDE.md` in [parkwoocheol/compose-webview](https://github.com/parkwoocheol/compose-webview).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
