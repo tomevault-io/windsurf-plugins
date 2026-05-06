@@ -1,162 +1,83 @@
 ---
 trigger: always_on
-description: FastAPI versioned API layout, router composition, and per-feature directory structure
+description: Backend Python conventions — architecture patterns, anti-patterns, decision rules
 ---
 
 
-# API Router Structure
+# Backend Conventions
 
-This document defines the FastAPI layout for versioned APIs.
+## Layer structure
 
-Use this structure when refactoring an existing FastAPI app so routing, versioning, and application startup stay predictable.
-
-## Intent
-
-- Keep application startup in one place: `src/<package_name>/main.py`
-- Keep API version boundaries explicit under `src/<package_name>/api/`
-- Keep router registration centralized in each version's `api.py`
-- Keep feature endpoints inside version-local `routers/`
-- Let a top-level feature own both its own endpoints and nested sub-feature routers
-- Make it easy to run `v1` and `beta` side by side during migrations
-- Keep versioned HTTP contracts at the edge; share business logic in `core`
-
-## Canonical Layout
-
-```text
-src/<package_name>/
-├── main.py
-├── core/ # shared business logic services, standard models, and dependencies
-│   ├── services/
-│   ├── standard_models/
-│   └── dependencies/
-└── api/
-    ├── __init__.py
-    ├── beta/
-    │   ├── __init__.py          # exports api_router
-    │   ├── api.py
-    │   └── routers/
-    │       ├── __init__.py
-    │       └── <feature>/
-    │           ├── __init__.py
-    │           ├── <feature>_router.py
-    │           ├── <feature>_models.py
-    │           ├── <feature>_service.py
-    │           ├── <feature>_dependencies.py
-    │           ├── <feature>_adapter.py
-    │           └── sub_routers/
-    │               ├── __init__.py
-    │               └── <sub_feature>/
-    │                   ├── __init__.py
-    │                   ├── <sub_feature>_router.py
-    │                   ├── <sub_feature>_models.py
-    │                   ├── <sub_feature>_service.py
-    │                   ├── <sub_feature>_dependencies.py
-    │                   └── <sub_feature>_adapter.py
-    └── v1/
-        ├── __init__.py          # exports api_router
-        ├── api.py
-        └── routers/
-            ├── __init__.py
-            └── <feature>/
-                ├── __init__.py
-                ├── <feature>_router.py
-                ├── <feature>_models.py
-                ├── <feature>_service.py
-                ├── <feature>_dependencies.py
-                ├── <feature>_adapter.py
-                └── sub_routers/
-                    ├── __init__.py
-                    └── <sub_feature>/
-                        ├── __init__.py
-                        ├── <sub_feature>_router.py
-                        ├── <sub_feature>_models.py
-                        ├── <sub_feature>_service.py
-                        ├── <sub_feature>_dependencies.py
-                        └── <sub_feature>_adapter.py
+```
+shared/kernel/         ← pure primitives, zero deps
+shared/infrastructure/ ← db, redis, config, middleware
+{ctx}/domain/          ← shared/kernel + stdlib + pydantic only
+{ctx}/infrastructure/  ← domain + shared/infrastructure
+{ctx}/application/     ← orchestrates via own infra + other contexts' facades
+{ctx}/api/             ← thin HTTP transport, own application + shared/api only
 ```
 
-Every feature router gets a directory. No flat files for routers. A top-level feature may also contain its own nested `sub_routers/` directory for sub-features. The `<feature>` and `<sub_feature>` templates show the full scope of files a router package may include; omit any file that is not needed for a given feature.
+Violations are bugs. Cross-context mutation goes through the owning context's application facade.
 
-## Directory Responsibilities
+## Repos: persistence only
 
-### `src/<package_name>/main.py`
+No business validation, no orchestration, no cross-context mutations, no state transitions. Analytics queries go in `queries.py` or `application/ledger_queries.py`.
 
-Own the application lifecycle and top-level app wiring only.
+## Application layer shape
 
-- Create the FastAPI `app`
-- Define the lifespan context manager
-- Register middleware
-- Register exception handlers
-- Mount static assets if needed
-- Include version routers by importing `api_router` from version packages
-- Define only non-versioned endpoints (e.g. `/`)
-
-Do not define versioned endpoints (e.g. `/api/v1/...` or `/api/beta/...`) in `main.py`. All versioned HTTP surface belongs under `src/<package_name>/api/<version>/...`.
-
-Do not spread app startup, middleware setup, or version registration across multiple files.
-
-Minimal pattern:
+Every application function must have:
+- **Named input contract** — typed parameters or a command dataclass. The caller must know exactly what they're passing.
+- **Named output contract** — a named typed model (dataclass or Pydantic). The caller must know exactly what they're getting. An anonymous `dict` is not a contract — it has no name, no schema, no OpenAPI visibility, and drifts silently.
+- **Module-level collaborators** — no imports inside function bodies
+- **Transaction boundary** — `async with transaction():` for all writes
+- **Structured log** — `logger.info("action", extra={...})` on every mutation
 
 ```python
-from contextlib import asynccontextmanager
-from collections.abc import AsyncGenerator
+# NO CONTRACT — caller can't introspect, OpenAPI can't document, type checker can't verify
+async def sales_report(...) -> dict: ...
 
-from fastapi import FastAPI
+# EXPLICIT CONTRACT — named, typed, versioned, visible
+@dataclass(frozen=True)
+class SalesReport:
+    gross_revenue: Decimal
+    gross_profit: Decimal
+    gross_margin_pct: float
+    total_transactions: int
 
-from <package_name>.api import beta
-from <package_name>.api import v1
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    # Initialize shared resources here.
-    yield
-    # Tear down shared resources here.
-
-
-app = FastAPI(lifespan=lifespan)
-
-app.include_router(v1.api_router)
-app.include_router(beta.api_router)
+async def sales_report(...) -> SalesReport: ...
 ```
 
-### Version Package Exports
+`dict` is fine as an internal intermediate. It is not acceptable as a public output contract of an application function.
 
-`src/<package_name>/api/v1/__init__.py` and `src/<package_name>/api/beta/__init__.py` export `api_router` directly so `main.py` imports the version package contract, not internal `api.py` paths.
+## API layer
 
-```python
-# api/v1/__init__.py
-from <package_name>.api.v1.api import api_router
+Route handlers only: parse request → call one application function → map to response → log audit. No SQL, no repos, no orchestration.
 
-__all__ = ["api_router"]
-```
+## Auditability
 
-```python
-# api/beta/__init__.py
-from <package_name>.api.beta.api import api_router
+Every mutation that changes state visible to users must either dispatch a typed domain event via `dispatch(event)` or write an audit record in the same transaction.
 
-__all__ = ["api_router"]
-```
+## Error handling
 
-### `src/<package_name>/api/`
+Do not swallow exceptions. Raise a typed `DomainError` subclass with a user-readable message, or let infrastructure errors propagate for the API layer to translate.
 
-This directory is the versioning boundary for the HTTP API.
+## Forbidden patterns
 
-- `api/beta/` is the first pass at an API surface before contracts and behavior are hardened
-- `api/v1/` contains the hardened, stable versioned routes
-- Future versions follow the same pattern: `api/v2/`, `api/v3/`, and so on
+| Pattern | Fix |
+|---|---|
+| `_wiring = {}` / `set_*_getter()` | Fix the boundary; module-level import from facade |
+| Import inside function body | Module-level collaborator |
+| `conn` on repo/port signatures | Repos call `get_connection()` directly |
+| Raw SQL in API routes | Delegate to application → infra |
+| Cross-context infra imports | Application facade on owning context |
+| Calling a flow "idempotent" without defining dedupe key + guard | Define it explicitly |
 
-The top-level `api/` directory should not hold endpoint logic directly. It only organizes versions.
+## Decision rules
 
-### `src/<package_name>/api/<version>/api.py`
-
-This file is the composition point for a single API version.
-
-- Define the version prefix once
-- Import router modules from that version's `routers/` directory
-- Register routers declaratively via a `ROUTER_MODULES` tuple and loop
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- **Port?** Only if: multiple implementations plausible AND consumers need test isolation AND boundary is stable. Otherwise concrete.
+- **Domain vs application?** Domain if pure computation on entity state. Application if IO, multi-aggregate, or use-case-specific.
+- **Split file?** By dependency graph, not by endpoint or alphabet. Different imports → different files.
+- **File too large?** Split into `{ctx}/application/use_cases/` — one function per module.
 
 ---
 > Source: [albusOS/sku-ops](https://github.com/albusOS/sku-ops) — distributed by [TomeVault](https://tomevault.io).
