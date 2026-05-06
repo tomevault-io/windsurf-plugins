@@ -1,206 +1,132 @@
 ---
 trigger: always_on
-description: Writing and updating cypress integration tests
+description: React coding standards and best practices for the LabelStudio clientside application
 ---
 
-## Cypress Test Generation Rules for Label Studio
 
-### Project Structure and Organization
+# React Best Practices
 
-**Test File Structure:**
-- Tests should be placed in `web/libs/editor/tests/integration/e2e/` with semantic folder organization
-- Follow the existing folder structure: `core/`, `image_segmentation/`, `control_tags/`, `audio/`, `video/`, `timeseries/`, `relations/`, `outliner/`, `bulk_mode/`, `config/`, `drafts/`, `linking_modes/`, `ner/`, `sync/`, `view_all/`
-- Test files should end with `.cy.ts` extension
-- Test data should be placed in `web/libs/editor/tests/integration/data/` following the same folder structure
+## Project Structure
+- All frontend code lives in the `web` directory
+- Main application code is in `web/apps/labelstudio`
+- Shared libraries are in `web/libs`
+- Follow the established directory structure:
+  - `components/`: Reusable UI components
+  - `pages/`: Top-level page components
+  - `utils/`: Utility functions
+  - `hooks/`: Custom React hooks
+  - `atoms/`: Jotai atom state definitions
+  - `providers/`: Context providers
+  - `services/`: API and other services
+  - `types/`: TypeScript type definitions
+  - `assets/`: Static assets
 
-**File Naming Convention:**
-- Use descriptive names that reflect the feature being tested
-- Use kebab-case for file names (e.g., `audio-regions.cy.ts`, `image-segmentation.cy.ts`)
-- Group related tests in logical folders
+## Component Structure
+- Use functional components over class components
+- Keep components small and focused
+- Extract reusable logic into custom hooks
+- Use composition over inheritance
+- Implement proper prop types with TypeScript
+- Split large components into smaller, focused ones
+- Follow a consistent file organization pattern:
+  ```
+  component-name/
+    component-name.tsx
+    component-name.module.scss
+    component-name.test.tsx
+    index.ts
+  ```
 
-### Import Standards
+## Hooks
+- Follow the Rules of Hooks
+- Use custom hooks for reusable logic
+- Keep hooks focused and simple
+- Avoid useEffect unless absolutely required
+- Use appropriate dependency arrays in useEffect
+- Implement cleanup in useEffect when needed
+- Avoid nested hooks
 
-**Required Imports:**
-Always import helpers from the centralized helper library:
-```typescript
-import { LabelStudio, ImageView, Sidebar, Labels, Hotkeys } from "@humansignal/frontend-test/helpers/LSF";
-```
+## State Management
+- Use useState for local component state
+- Use Jotai atoms and not the Context API for shared state
+- Implement atomWithReducer for complex state logic
+- Implement atomWithQuery for any API requests for data
+- Keep state as close to where it's used as possible
+- Avoid prop drilling through proper state management
+- Only use Jotai as the single source of truth of global state management
 
-**Test Data Imports:**
-Import test data from the data folder with relative paths:
-```typescript
-import { configName, dataName, resultName } from "../../data/folder_name/file_name";
-```
+## Performance
+- Implement proper memoization (useMemo, useCallback)
+- Use React.memo for expensive components
+- Avoid unnecessary re-renders
+- Implement proper lazy loading
+- Use proper key props in lists
+- Profile and optimize render performance
 
-**Available Helpers:**
-- `LabelStudio` - Core initialization and control
-- `ImageView` - Image interaction and drawing
-- `VideoView` - Video playback and interaction  
-- `AudioView` - Audio playback and regions
-- `Sidebar` - Outliner and region management
-- `Labels` - Label selection and management
-- `Hotkeys` - Cross-platform keyboard shortcuts (Mac/PC compatibility)
-- `Taxonomy`, `Choices`, `DateTime`, `Number`, `Rating`, `Textarea` - Control tag helpers
-- `Relations` - Relationship management
-- `ToolBar` - Toolbar interactions
-- `Modals` - Modal dialog handling
-- `Tooltip` - Tooltip verification
+## Tooling
+- Use Biome for code linting and formatting
+- Follow CSS/SCSS linting rules defined in .stylelintrc.json
+- Use TypeScript for type safety
+- Keep bundle size in check by monitoring imports
 
-### Test Structure Standards
+## Forms
+- Use controlled components for form inputs
+- Implement proper form validation
+- Handle form submission states properly
+- Show appropriate loading and error states
+- Use form libraries for complex forms
+- Implement proper accessibility for forms
 
-**Basic Test Structure:**
-```typescript
-describe("Feature Name - Specific Area", () => {
-  it("should perform specific action", () => {
-    // Test implementation
-  });
-});
-```
+## Error Handling
+- Implement Error Boundaries
+- Handle async errors properly
+- Show user-friendly error messages
+- Implement proper fallback UI
+- Log errors appropriately
+- Handle edge cases gracefully
 
-**Nested Describes:**
-Use nested describe blocks for logical grouping:
-```typescript
-describe("Image Segmentation", () => {
-  describe("Rectangle Tool", () => {
-    it("should draw rectangle", () => {
-      // Test implementation
-    });
-  });
-});
-```
+## Testing
+- Write unit tests for components
+- Implement integration tests for complex flows
+- Use React Testing Library
+- Test user interactions
+- Test error scenarios
+- Implement proper mock data
 
-### LabelStudio Initialization Patterns
+## Accessibility
+- Ensure components meet WCAG 2.1 AA standards
+- Use semantic HTML elements
+- Implement proper ARIA attributes
+- Ensure keyboard navigation
+- Test with screen readers
+- Handle focus management
+- Provide proper alt text for images
 
-**Simple Initialization:**
-```typescript
-LabelStudio.init({
-  config: configString,
-  task: {
-    id: 1,
-    annotations: [{ id: 1001, result: [] }],
-    predictions: [],
-    data: { image: "url" },
-  },
-});
-```
+## Code Organization
+- Use proper file naming conventions which is kebab-case ie. ListItem -> `list-item.tsx`
+- Prefer one component per folder, but group related components together when necessary, and ensure there is only one component per file.
+- Component folders should have a SCSS `.module.scss` with the name of the component kebab-case ie. ListItem -> `list-item.module.scss`
+- Implement proper directory structure
+- UI components live within `web/libs/ui`
+- Application components that are shared across applications such as certain page-level blocks live within `web/libs/app-common`
+- Code in `web/apps` can only import code from `web/libs` and `web/libs` cannot import from `web/apps`
+- Code in `web/libs/app-common` can only import code from other `web/libs` or `web/apps`. No other `web/libs` can import from `web/libs/app-common`
+- Keep atoms in a global atoms folder with the name of the file matching the entity or intent of state
+- Add all components and their states to Storybook by co-locating the story file next to the component file ie. `list-item.stories.tsx`
+- Use the `@humansignal/ui` package for UI components
+- Use the `@humansignal/icons` package for icons
+- Use the `@humansignal/core` package for core utilities/functions
+- Use the `@humansignal/app-common` package for application components
 
-**Fluent API Initialization (Preferred):**
-```typescript
-LabelStudio.params()
-  .config(configString)
-  .data(dataObject)
-  .withResult(expectedResult)
-  .init();
-```
-
-**With Additional Parameters:**
-```typescript
-LabelStudio.params()
-  .config(config)
-  .data(data)
-  .withResult([])
-  .withInterface("panel")
-  .withEventListener("eventName", handlerFunction)
-  .withParam("customParam", value)
-  .init();
-```
-
-### Required Test Preparation Steps
-
-**Always Include:**
-1. LabelStudio initialization
-2. Wait for objects ready: `LabelStudio.waitForObjectsReady();`
-3. (optional, usually waitForObjectsReady is enough) Wait for media loading (for image/video/audio): `ImageView.waitForImage();`
-4. Initial state verification: `Sidebar.hasNoRegions();`
-5. (optional, if possible) Some state verification after actions, for example: `Sidebar.hasRegions(count);`
-
-### Interaction Patterns
-
-**Image Interactions:**
-```typescript
-// Wait for image to load
-ImageView.waitForImage();
-
-// Select tools
-ImageView.selectRectangleToolByButton();
-ImageView.selectPolygonToolByButton();
-
-// Drawing operations
-ImageView.drawRect(x, y, width, height);
-ImageView.drawRectRelative(0.1, 0.1, 0.4, 0.8); // Preferred
-
-// Click interactions
-ImageView.clickAt(x, y);
-ImageView.clickAtRelative(0.5, 0.5); // Preferred
-
-// Screenshot comparisons
-ImageView.capture("screenshot_name");
-ImageView.canvasShouldChange("screenshot_name", threshold);
-```
-
-**Label Management:**
-```typescript
-// Select labels before drawing
-Labels.select("Label Name");
-
-// Verify label selection
-Labels.isSelected("Label Name");
-```
-
-**Sidebar Operations:**
-```typescript
-// Region verification
-Sidebar.hasRegions(count);
-Sidebar.hasNoRegions();
-Sidebar.hasSelectedRegions(count);
-
-// Region manipulation
-Sidebar.toggleRegionVisibility(index);
-Sidebar.toggleRegionSelection(index);
-```
-
-### Assertion Patterns
-
-**Standard Cypress Assertions:**
-```typescript
-cy.get(selector).should("be.visible");
-cy.get(selector).should("have.text", "expected text");
-cy.get(selector).should("have.class", "class-name");
-```
-
-**Custom Helper Assertions:**
-```typescript
-Sidebar.hasRegions(expectedCount);
-Sidebar.hasSelectedRegions(expectedCount);
-ImageView.canvasShouldChange("screenshot", threshold);
-```
-
-**Window Object Access:**
-```typescript
-cy.window().then((win) => {
-  expect(win.Htx.annotationStore.selected.names.get("image")).to.exist;
-});
-```
-
-### Test Data Structure
-
-**Configuration Format:**
-```typescript
-export const configName = `
-  <View>
-    <Image name="img" value="$image"/>
-    <RectangleLabels name="tag" toName="img">
-      <Label value="Planet"/>
-      <Label value="Moonwalker" background="blue"/>
-    </RectangleLabels>
-  </View>
-`;
-```
-
-**Data Format:**
-```typescript
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+## Best Practices
+- No cyclic imports
+- Use proper imports/exports
+- Follow established import ordering
+- Compose components rather than extending them
+- Keep components focused on a single responsibility
+- Document complex logic with clear comments
+- Follow the project's folder structure and naming conventions
+- Prefer controlled components over uncontrolled ones 
 
 ---
 > Source: [cycle123582/label-studio-Chinese](https://github.com/cycle123582/label-studio-Chinese) — distributed by [TomeVault](https://tomevault.io).
