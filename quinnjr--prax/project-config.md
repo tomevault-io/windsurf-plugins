@@ -1,233 +1,226 @@
 ---
 trigger: always_on
-description: This project provides a public API for ORM operations. Follow these guidelines for consistent, ergonomic, and safe API design.
+description: This project prioritizes **asynchronous and parallel execution** over synchronous code. All I/O operations, database queries, and potentially blocking operations must be async.
 ---
 
-# API Design Guidelines
+# Async/Parallel-First Design
 
-This project provides a public API for ORM operations. Follow these guidelines for consistent, ergonomic, and safe API design.
+This project prioritizes **asynchronous and parallel execution** over synchronous code. All I/O operations, database queries, and potentially blocking operations must be async.
 
-## Builder Pattern
+## Core Principles
 
-### Use Builders for Complex Construction
+### 1. Default to Async
 
-```rust
-// ✅ Good: Builder pattern for many options
-let query = client
-    .user()
-    .find_many()
-    .where_(user::status::equals("active"))
-    .where_(user::age::gte(18))
-    .order_by(user::created_at::desc())
-    .take(10)
-    .skip(20)
-    .select(user::select!([id, email, name]))
-    .exec()
-    .await?;
-
-// ✅ Good: Builder with required fields enforced by types
-let config = DatabaseConfig::builder()
-    .url("postgres://...")  // Required
-    .max_connections(10)    // Optional
-    .build()?;              // Validates required fields
-```
-
-### Return Self for Chaining
+Every function that performs I/O should be `async`:
 
 ```rust
-pub struct QueryBuilder {
-    filter: Option<Filter>,
-    order_by: Option<OrderBy>,
-    take: Option<usize>,
+// ✅ Good: Async by default
+pub async fn find_user(id: i64) -> Result<User> {
+    let row = client.query_one("SELECT * FROM users WHERE id = $1", &[&id]).await?;
+    Ok(User::from_row(row))
 }
 
-impl QueryBuilder {
-    // ✅ Good: Return Self for chaining
-    pub fn where_(mut self, filter: Filter) -> Self {
-        self.filter = Some(filter);
-        self
+// ❌ Bad: Synchronous I/O
+pub fn find_user(id: i64) -> Result<User> {
+    let row = client.query_one("SELECT * FROM users WHERE id = $1", &[&id])?;
+    Ok(User::from_row(row))
+}
+```
+
+### 2. Parallel by Default
+
+When multiple independent operations exist, execute them in parallel:
+
+```rust
+// ✅ Good: Parallel execution
+let (users, posts, comments) = tokio::try_join!(
+    client.user().find_many().exec(),
+    client.post().find_many().exec(),
+    client.comment().find_many().exec(),
+)?;
+
+// ❌ Bad: Sequential when parallel is possible
+let users = client.user().find_many().exec().await?;
+let posts = client.post().find_many().exec().await?;
+let comments = client.comment().find_many().exec().await?;
+```
+
+### 3. Use `tokio::spawn` for CPU-bound Work
+
+Offload CPU-intensive tasks to avoid blocking the async runtime:
+
+```rust
+// ✅ Good: Spawn blocking work
+let parsed = tokio::task::spawn_blocking(move || {
+    expensive_parsing_operation(&data)
+}).await?;
+
+// ❌ Bad: Blocking in async context
+let parsed = expensive_parsing_operation(&data); // blocks the runtime
+```
+
+### 4. Prefer `tokio::select!` for Racing
+
+When you need the first result from multiple futures:
+
+```rust
+// ✅ Good: Race with select
+tokio::select! {
+    result = primary_db.query(&sql) => handle_result(result),
+    result = replica_db.query(&sql) => handle_result(result),
+    _ = tokio::time::sleep(timeout) => return Err(Error::Timeout),
+}
+```
+
+## Required Patterns
+
+### Connection Pools
+
+Always use async connection pools:
+
+```rust
+// Use deadpool-postgres or bb8
+use deadpool_postgres::{Config, Pool, Runtime};
+
+pub struct DatabasePool {
+    pool: Pool,
+}
+
+impl DatabasePool {
+    pub async fn get(&self) -> Result<PooledConnection> {
+        self.pool.get().await.map_err(Into::into)
     }
+}
+```
 
-    pub fn order_by(mut self, order: OrderBy) -> Self {
-        self.order_by = Some(order);
-        self
+### Streaming Results
+
+For large result sets, use async streams:
+
+```rust
+use futures::Stream;
+use tokio_stream::StreamExt;
+
+pub fn find_all(&self) -> impl Stream<Item = Result<User>> {
+    // Return a stream instead of Vec for memory efficiency
+    async_stream::try_stream! {
+        let mut rows = client.query_raw(&sql, &[]).await?;
+        while let Some(row) = rows.next().await {
+            yield User::from_row(row?);
+        }
     }
-
-    pub fn take(mut self, n: usize) -> Self {
-        self.take = Some(n);
-        self
-    }
 }
 ```
 
-### Use `#[must_use]` for Builders
+### Batch Operations
+
+Batch multiple queries for efficiency:
 
 ```rust
-#[must_use = "queries do nothing until .exec() is called"]
-pub struct QueryBuilder { ... }
+// ✅ Good: Batch inserts
+pub async fn create_many(users: Vec<CreateUser>) -> Result<Vec<User>> {
+    let futures: Vec<_> = users
+        .into_iter()
+        .map(|u| self.create(u))
+        .collect();
 
-#[must_use = "this returns a new builder and does not modify self"]
-pub fn where_(self, filter: Filter) -> Self { ... }
-```
-
-## Type-Safe APIs
-
-### Use Enums Instead of Strings
-
-```rust
-// ✅ Good: Type-safe ordering
-pub enum SortDirection {
-    Asc,
-    Desc,
-}
-
-pub fn order_by(column: &str, direction: SortDirection) -> OrderBy { ... }
-
-// ❌ Bad: Stringly typed
-pub fn order_by(column: &str, direction: &str) -> OrderBy { ... }
-// Caller can pass "ascending", "ASC", "up", etc.
-```
-
-### Use Newtypes for Domain Concepts
-
-```rust
-// ✅ Good: Newtypes prevent mixing up arguments
-#[derive(Debug, Clone, Copy)]
-pub struct UserId(pub i64);
-
-#[derive(Debug, Clone, Copy)]
-pub struct PostId(pub i64);
-
-pub fn get_posts_by_user(user_id: UserId) -> Vec<Post> { ... }
-
-// ❌ Bad: Easy to mix up i64 arguments
-pub fn get_posts_by_user(user_id: i64) -> Vec<Post> { ... }
-// get_posts_by_user(post_id) compiles but is wrong!
-```
-
-### Use `Into` for Flexible Input
-
-```rust
-// ✅ Good: Accept multiple input types
-pub fn where_<F: Into<Filter>>(self, filter: F) -> Self {
-    self.filter = Some(filter.into());
-    self
-}
-
-// Caller can use:
-// .where_(Filter::Equals(...))
-// .where_(user::id::equals(1))
-// .where_("id = 1")  // if impl Into<Filter> for &str
-```
-
-## Error Handling in APIs
-
-### Return Result for Fallible Operations
-
-```rust
-// ✅ Good: Result for operations that can fail
-pub async fn exec(self) -> Result<Vec<User>, QueryError> { ... }
-
-// ✅ Good: Option for "not found" scenarios
-pub async fn find_unique(self) -> Result<Option<User>, QueryError> { ... }
-
-// ❌ Bad: Panic on error
-pub async fn exec(self) -> Vec<User> {
-    self.try_exec().unwrap() // Don't panic in library code!
+    futures::future::try_join_all(futures).await
 }
 ```
 
-### Document Error Conditions
+### Timeouts
+
+Always include timeouts for async operations:
 
 ```rust
-/// Execute the query and return results.
-///
-/// # Errors
-///
-/// Returns `QueryError::Connection` if the database is unreachable.
-/// Returns `QueryError::Timeout` if the query exceeds the configured timeout.
-/// Returns `QueryError::InvalidFilter` if the filter references unknown columns.
-pub async fn exec(self) -> Result<Vec<User>, QueryError> { ... }
+use tokio::time::{timeout, Duration};
+
+pub async fn query_with_timeout(&self, sql: &str) -> Result<Vec<Row>> {
+    timeout(Duration::from_secs(30), self.client.query(sql, &[]))
+        .await
+        .map_err(|_| Error::Timeout)?
+        .map_err(Into::into)
+}
 ```
 
-## Naming Conventions
+## Trait Definitions
 
-### Methods
+All database traits must be async:
 
 ```rust
-// Constructors: new, with_*, from_*
-pub fn new() -> Self { ... }
-pub fn with_capacity(n: usize) -> Self { ... }
-pub fn from_row(row: Row) -> Self { ... }
+// ✅ Good: Async trait (Rust 2024 supports this natively)
+pub trait Repository {
+    async fn find(&self, id: i64) -> Result<Option<Model>>;
+    async fn find_many(&self, filter: Filter) -> Result<Vec<Model>>;
+    async fn create(&self, data: CreateInput) -> Result<Model>;
+    async fn update(&self, id: i64, data: UpdateInput) -> Result<Model>;
+    async fn delete(&self, id: i64) -> Result<()>;
+}
 
-// Queries: is_*, has_*, can_*
-pub fn is_empty(&self) -> bool { ... }
-pub fn has_filter(&self) -> bool { ... }
-
-// Getters: no prefix, or get_* for clarity
-pub fn len(&self) -> usize { ... }
-pub fn get_column(&self, name: &str) -> Option<&Column> { ... }
-
-// Setters: set_* or builder-style
-pub fn set_filter(&mut self, filter: Filter) { ... }
-pub fn filter(self, filter: Filter) -> Self { ... } // Builder
-
-// Conversions: to_*, into_*, as_*
-pub fn to_sql(&self) -> String { ... }           // Allocates
-pub fn into_inner(self) -> T { ... }             // Consumes self
-pub fn as_str(&self) -> &str { ... }             // Borrows
+// ❌ Bad: Sync trait
+pub trait Repository {
+    fn find(&self, id: i64) -> Result<Option<Model>>;
+}
 ```
 
-### Types
+## Concurrency Primitives
+
+### Use `tokio::sync` Not `std::sync`
 
 ```rust
-// Traits: Verb or -able/-ible
-pub trait Execute { ... }
-pub trait Filterable { ... }
+// ✅ Good: Tokio's async-aware primitives
+use tokio::sync::{RwLock, Mutex, Semaphore, broadcast, mpsc};
 
-// Builders: *Builder
-pub struct QueryBuilder { ... }
-pub struct ConfigBuilder { ... }
-
-// Errors: *Error
-pub enum QueryError { ... }
-pub enum ParseError { ... }
-
-// Results: Use type aliases
-pub type QueryResult<T> = Result<T, QueryError>;
+// ❌ Bad: std sync primitives block the runtime
+use std::sync::{RwLock, Mutex};
 ```
 
-## Documentation
+### Prefer `RwLock` Over `Mutex`
 
-### Document Public Items
+When reads dominate writes:
 
 ```rust
-/// A type-safe query builder for database operations.
-///
-/// # Examples
-///
-/// ```rust
-/// let users = client
-///     .user()
-///     .find_many()
-///     .where_(user::active::equals(true))
-///     .take(10)
-///     .exec()
-///     .await?;
-/// ```
-///
-/// # Panics
-///
-/// This method never panics.
-///
-/// # Errors
-///
-/// Returns `QueryError` if the database query fails.
-pub struct QueryBuilder { ... }
+// ✅ Good: RwLock for read-heavy cache
+let cache: Arc<RwLock<HashMap<K, V>>> = Arc::new(RwLock::new(HashMap::new()));
+
+// Read path (many concurrent readers)
+let value = cache.read().await.get(&key).cloned();
+
+// Write path (exclusive access)
+cache.write().await.insert(key, value);
 ```
 
-### Provide Examples in Docs
+## Error Handling in Async
 
+### Propagate Errors with `?`
+
+```rust
+pub async fn complex_operation(&self) -> Result<Output> {
+    let a = self.step_a().await?;
+    let b = self.step_b(&a).await?;
+    let c = self.step_c(&b).await?;
+    Ok(c)
+}
+```
+
+### Use `try_join!` for Parallel Error Handling
+
+```rust
+// All succeed or first error is returned
+let (a, b, c) = tokio::try_join!(
+    self.fetch_a(),
+    self.fetch_b(),
+    self.fetch_c(),
+)?;
+```
+
+## Cancellation Safety
+
+Document cancellation behavior for all public async functions:
+
+```rust
+/// Executes a database query.
+///
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
