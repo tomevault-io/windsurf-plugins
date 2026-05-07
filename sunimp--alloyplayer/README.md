@@ -7,11 +7,11 @@ Swift 视频播放框架，协议驱动插件式架构，覆盖 ZFPlayer 大部�
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [sunimp/AlloyPlayer](https://github.com/sunimp/AlloyPlayer).
+Original source: `CLAUDE.md` in [sunimp/AlloyPlayer](https://github.com/sunimp/AlloyPlayer).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
