@@ -1,208 +1,237 @@
 ---
 trigger: always_on
-description: This project uses [Criterion.rs](https://github.com/bheisler/criterion.rs) for benchmarks. Follow these guidelines to write meaningful, reliable benchmarks.
+description: This project provides a tiered caching layer with in-memory and Redis backends. Follow these guidelines for effective cache usage.
 ---
 
-# Benchmarking Guidelines
+# Data Caching Guidelines
 
-This project uses [Criterion.rs](https://github.com/bheisler/criterion.rs) for benchmarks. Follow these guidelines to write meaningful, reliable benchmarks.
+This project provides a tiered caching layer with in-memory and Redis backends. Follow these guidelines for effective cache usage.
 
-## Benchmark File Organization
+## Cache Architecture
 
-### Location
+### Tiered Cache (Recommended)
 
-All benchmarks live in `prax-query/benches/`:
-
-```
-prax-query/benches/
-├── operations_bench.rs      # Core filter and SQL builder
-├── aggregation_bench.rs     # Aggregation and grouping
-├── pagination_bench.rs      # Cursor and offset pagination
-├── advanced_features_bench.rs # Window functions, CTEs
-├── tenant_bench.rs          # Multi-tenancy overhead
-├── async_bench.rs           # Concurrent execution
-├── mem_optimize_bench.rs    # Memory optimizations
-├── database_bench.rs        # Database-specific SQL
-└── throughput_bench.rs      # Queries-per-second
-```
-
-### Registration
-
-Add new benchmarks to `Cargo.toml`:
-
-```toml
-[[bench]]
-name = "my_new_bench"
-harness = false
-```
-
-## Writing Good Benchmarks
-
-### Use `black_box` to Prevent Optimization
+Use L1 (memory) + L2 (Redis) for best performance:
 
 ```rust
-use criterion::black_box;
+use prax_query::data_cache::{TieredCache, MemoryCache, RedisCache};
 
-// ✅ Good: Result consumed by black_box
-group.bench_function("filter_creation", |b| {
-    b.iter(|| {
-        let filter = Filter::Equals("id".into(), FilterValue::Int(1));
-        black_box(filter)
-    });
-});
+// L1: Fast in-memory cache
+let memory = MemoryCache::builder()
+    .max_capacity(10_000)
+    .time_to_live(Duration::from_secs(60))
+    .build();
 
-// ❌ Bad: Compiler may optimize away unused result
-group.bench_function("filter_creation", |b| {
-    b.iter(|| {
-        let filter = Filter::Equals("id".into(), FilterValue::Int(1));
-        // filter is dropped immediately, compiler may skip creation
-    });
-});
+// L2: Distributed Redis cache
+let redis = RedisCache::builder()
+    .url("redis://localhost:6379")
+    .key_prefix("myapp:")
+    .default_ttl(Duration::from_secs(300))
+    .build()
+    .await?;
+
+// Tiered: Check L1 first, then L2
+let cache = TieredCache::new(memory, redis);
 ```
 
-### Separate Setup from Measurement
+### Memory-Only Cache
+
+For single-instance deployments:
 
 ```rust
-// ✅ Good: Setup outside the measurement loop
-group.bench_function("filter_to_sql", |b| {
-    // Setup: Create filter once
-    let filter = Filter::and(vec![
-        Filter::Equals("status".into(), FilterValue::String("active".into())),
-        Filter::Gt("age".into(), FilterValue::Int(18)),
-    ]);
+use prax_query::data_cache::MemoryCache;
 
-    // Measure: Only the to_sql() call
-    b.iter(|| black_box(filter.to_sql(0)))
-});
-
-// ❌ Bad: Setup included in measurement
-group.bench_function("filter_to_sql", |b| {
-    b.iter(|| {
-        let filter = Filter::and(vec![
-            Filter::Equals("status".into(), FilterValue::String("active".into())),
-            Filter::Gt("age".into(), FilterValue::Int(18)),
-        ]);
-        black_box(filter.to_sql(0))
-    });
-});
+let cache = MemoryCache::builder()
+    .max_capacity(50_000)
+    .time_to_live(Duration::from_secs(300))
+    .time_to_idle(Duration::from_secs(60))
+    .build();
 ```
 
-### Use Throughput for Batch Operations
+### Redis-Only Cache
+
+For distributed caching without local cache:
 
 ```rust
-// ✅ Good: Throughput shows operations/second
-for batch_size in [10, 50, 100, 500] {
-    group.throughput(Throughput::Elements(batch_size as u64));
+use prax_query::data_cache::RedisCache;
 
-    group.bench_function(BenchmarkId::new("batch_insert", batch_size), |b| {
-        b.iter(|| {
-            // Process batch_size items
-        });
-    });
+let cache = RedisCache::builder()
+    .url("redis://localhost:6379")
+    .pool_size(10)
+    .key_prefix("myapp:")
+    .default_ttl(Duration::from_secs(3600))
+    .build()
+    .await?;
+```
+
+## Cache Keys
+
+### Use Structured Keys
+
+```rust
+use prax_query::data_cache::CacheKey;
+
+// ✅ Good: Structured, predictable keys
+let key = CacheKey::entity("User", 123);           // "User:123"
+let key = CacheKey::query("users", &filter_hash);  // "query:users:{hash}"
+let key = CacheKey::custom("feature_flags", "v1"); // "feature_flags:v1"
+
+// ❌ Bad: Unstructured keys
+let key = format!("user_{}", id);  // No namespace, hard to invalidate
+```
+
+### Include Tenant in Keys (Multi-Tenant)
+
+```rust
+// ✅ Good: Tenant-scoped keys
+let key = CacheKey::tenant_entity(tenant_id, "User", user_id);
+// "tenant:123:User:456"
+
+// ✅ Good: Tenant prefix in Redis
+let redis = RedisCache::builder()
+    .key_prefix(format!("tenant:{}:", tenant_id))
+    .build()
+    .await?;
+
+// ❌ DANGEROUS: Shared keys across tenants
+let key = CacheKey::entity("User", user_id);
+// Tenant A might see Tenant B's cached data!
+```
+
+## Cache Operations
+
+### Basic Get/Set
+
+```rust
+// Get with type inference
+let user: Option<User> = cache.get(&key).await?;
+
+// Set with default TTL
+cache.set(&key, &user).await?;
+
+// Set with custom TTL
+cache.set_with_ttl(&key, &user, Duration::from_secs(600)).await?;
+
+// Get or compute
+let user = cache.get_or_set(&key, || async {
+    db.user().find_unique(user::id::equals(id)).exec().await
+}).await?;
+```
+
+### Batch Operations
+
+```rust
+// Get multiple keys
+let keys = vec![
+    CacheKey::entity("User", 1),
+    CacheKey::entity("User", 2),
+    CacheKey::entity("User", 3),
+];
+let users: Vec<Option<User>> = cache.get_many(&keys).await?;
+
+// Set multiple
+cache.set_many(&[(key1, user1), (key2, user2)]).await?;
+```
+
+## Invalidation Strategies
+
+### Entity-Based Invalidation
+
+```rust
+// Invalidate single entity
+cache.invalidate(&CacheKey::entity("User", user_id)).await?;
+
+// Invalidate all entities of a type
+cache.invalidate_pattern("User:*").await?;
+
+// Invalidate related entities
+async fn update_user(id: i64, data: UpdateUser) -> Result<User> {
+    let user = db.user().update(id, data).exec().await?;
+
+    // Invalidate user cache
+    cache.invalidate(&CacheKey::entity("User", id)).await?;
+
+    // Invalidate related caches
+    cache.invalidate(&CacheKey::entity("UserProfile", id)).await?;
+    cache.invalidate_pattern(&format!("query:users:*")).await?;
+
+    Ok(user)
 }
 ```
 
-### Group Related Benchmarks
+### Tag-Based Invalidation
 
 ```rust
-fn bench_filter_creation(c: &mut Criterion) {
-    let mut group = c.benchmark_group("filter_creation");
+use prax_query::data_cache::EntityTag;
 
-    group.bench_function("equals_int", |b| { /* ... */ });
-    group.bench_function("equals_string", |b| { /* ... */ });
-    group.bench_function("in_filter", |b| { /* ... */ });
-    group.bench_function("complex_and_or", |b| { /* ... */ });
+// Cache with tags
+cache.set_with_tags(
+    &key,
+    &user,
+    &[EntityTag::entity("User"), EntityTag::record("User", user_id)],
+).await?;
 
-    group.finish();
+// Invalidate by tag
+cache.invalidate_tag(&EntityTag::entity("User")).await?;
+// All User caches invalidated
+```
+
+### Write-Through Pattern
+
+```rust
+// Update database and cache atomically
+async fn update_user(id: i64, data: UpdateUser) -> Result<User> {
+    // Update DB
+    let user = db.user().update(id, data).exec().await?;
+
+    // Update cache (not invalidate)
+    cache.set(&CacheKey::entity("User", id), &user).await?;
+
+    Ok(user)
 }
 ```
 
-## Benchmark Categories
-
-### Micro-benchmarks
-
-Test individual operations in isolation:
+### Cache-Aside Pattern
 
 ```rust
-// Filter creation
-group.bench_function("create_equals", |b| {
-    b.iter(|| black_box(Filter::Equals("id".into(), FilterValue::Int(1))))
-});
+// Read: Check cache first
+async fn get_user(id: i64) -> Result<User> {
+    let key = CacheKey::entity("User", id);
 
-// SQL generation
-group.bench_function("simple_to_sql", |b| {
-    let filter = Filter::Equals("id".into(), FilterValue::Int(1));
-    b.iter(|| black_box(filter.to_sql(0)))
-});
+    // Try cache
+    if let Some(user) = cache.get(&key).await? {
+        return Ok(user);
+    }
+
+    // Cache miss: load from DB
+    let user = db.user()
+        .find_unique(user::id::equals(id))
+        .exec()
+        .await?
+        .ok_or(Error::NotFound)?;
+
+    // Populate cache
+    cache.set(&key, &user).await?;
+
+    Ok(user)
+}
 ```
 
-### Throughput Benchmarks
+## TTL Configuration
 
-Measure sustained operations per second:
+### Choose Appropriate TTLs
 
 ```rust
-group.throughput(Throughput::Elements(1000));
-group.measurement_time(Duration::from_secs(10));
+// ✅ Good: Different TTLs for different data types
 
-group.bench_function("1000_queries", |b| {
-    b.iter(|| {
-        for i in 0..1000 {
-            let filter = Filter::Equals("id".into(), FilterValue::Int(i));
-            black_box(filter.to_sql(0));
-        }
-    });
-});
-```
+// Rarely changes, long TTL
+let feature_flags = CachePolicy::new()
+    .ttl(Duration::from_secs(3600))  // 1 hour
+    .stale_while_revalidate(Duration::from_secs(300));
 
-### Realistic Scenario Benchmarks
-
-Simulate actual usage patterns:
-
-```rust
-group.bench_function("ecommerce_search", |b| {
-    b.iter(|| {
-        let filter = Filter::and(vec![
-            Filter::Contains("name".into(), FilterValue::String("laptop".into())),
-            Filter::Gte("price".into(), FilterValue::Float(500.0)),
-            Filter::Lte("price".into(), FilterValue::Float(2000.0)),
-            Filter::Equals("in_stock".into(), FilterValue::Bool(true)),
-        ]);
-        let (sql, params) = filter.to_sql(0);
-        black_box((format!("SELECT * FROM products WHERE {} LIMIT 24", sql), params))
-    });
-});
-```
-
-### Comparative Benchmarks
-
-Compare different approaches:
-
-```rust
-// Compare with and without optimization
-group.bench_function("without_interning", |b| {
-    b.iter(|| {
-        let mut strings: Vec<String> = Vec::new();
-        for i in 0..100 {
-            strings.push(format!("field_{}", i % 10));
-        }
-        black_box(strings)
-    });
-});
-
-group.bench_function("with_interning", |b| {
-    let interner = GlobalInterner::get();
-    b.iter(|| {
-        let mut strings = Vec::new();
-        for i in 0..100 {
-            strings.push(interner.intern(&format!("field_{}", i % 10)));
-        }
-        black_box(strings)
-    });
-});
-```
-
-## Running Benchmarks
-
+// User data, medium TTL
+let user_data = CachePolicy::new()
+    .ttl(Duration::from_secs(300))  // 5 minutes
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
