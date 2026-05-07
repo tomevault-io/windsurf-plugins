@@ -7,11 +7,11 @@ The Control Plane for MCP — secure vault, managed runtime, audit trail, and po
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [dunialabs/peta-core](https://github.com/dunialabs/peta-core).
+Original source: `CLAUDE.md` in [dunialabs/peta-core](https://github.com/dunialabs/peta-core).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
