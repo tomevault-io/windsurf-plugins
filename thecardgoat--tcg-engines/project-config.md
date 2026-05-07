@@ -1,259 +1,90 @@
 ---
 trigger: always_on
-description: Backend-as-a-Service (BaaS) with optimistic updates, multiplayer, offline support, and relational data. Firebase alternative with relations.
+description: This repository is a **Disney Lorcana TCG simulator and card database** built as a Turborepo monorepo.
 ---
 
-# What is InstantDB
+# GitHub Copilot Instructions for Lorcanito
 
-Backend-as-a-Service (BaaS) with optimistic updates, multiplayer, offline support, and relational data. Firebase alternative with relations.
+This repository is a **Disney Lorcana TCG simulator and card database** built as a Turborepo monorepo.
 
-## Core Features
+## Quick Reference
 
-* Optimistic updates
-* Real-time multiplayer sync
-* Offline-first architecture
-* Relational data support
-* Web and mobile compatible
+- **Runtime**: Bun 1.2.14 (not Node.js)
+- **Framework**: Next.js 15, React 19, TypeScript (strict mode)
+- **Monorepo**: Turborepo with apps (simulator, lorcanary, nakama, server) and packages (lorcana-engine, core-engine, persistence, shared)
+- **Testing**: TDD required - write tests first, use `bun test`
+- **State**: MobX for client state, Drizzle ORM + Instant DB for persistence
 
-## API
+## Core Principles
 
-CRITICAL: These are the only APIs from the react package you need to know. do not hallucinate other APIs.
+Read these standards before making changes:
 
-```
-// Initialization
-init<Schema>(config: InstantConfig<Schema>): InstantReactWebDatabase<Schema>
+1. **Code Style**: `.agent-os/standards/code-style/`
+   - `clean-code.md` - Meaningful names, single responsibility, DRY
+   - `code-quality.md` - File-by-file changes, no apologies, preserve existing code
+   - `typescript.md` - Strict mode, no `any` types
+   - `react.md` - React 19 patterns
+   - `next-js.md` - Next.js 15 conventions
+   - `tailwind.md` - TailwindCSS patterns
 
-// Transaction builder
-tx: TxChunk<Schema>
-id(): string
-lookup(attribute: string, value: any): Lookup
+2. **Development Workflow**: `CLAUDE.md` in root
+   - Test-Driven Development (TDD) is mandatory
+   - Run `bun run ci-check` before committing
+   - Never run dev servers, DB migrations, or SQL commands without asking user
+   - Make changes file-by-file
 
-// Schema builder
-i.schema({ entities, links?, rooms? })
-i.entity(attrs)
-i.string(), i.number(), i.boolean(), i.date(), i.json(), i.any()
+3. **Architecture**: `CLAUDE.md` + `.agent-os/product/tech-stack.md`
 
-// Core Database Methods (on db instance)
-db.transact(chunks)
+## Common Commands
 
-// React Hooks (on db instance)
-db.useQuery(query, opts?)
-db.useAuth()
-db.room(type?, id?)
+```bash
+# Testing
+bun test                    # Run all tests
+bun test "test name"        # Run specific test
+bun run ci-check           # All checks (format, lint, types, test)
 
-// Auth Methods (on db.auth)
-db.auth.sendMagicCode({ email })
-db.auth.signInWithMagicCode({ email, code })
-db.auth.signOut(opts?)
+# Type checking
+bun run check-types
 
-// Room Hooks (on db.rooms) - IMPORTANT: These are called on db.rooms, not on room instances
-db.rooms.useTopicEffect(room, topic, onEvent)
-db.rooms.usePublishTopic(room, topic) // returns: (data) => void
-db.rooms.usePresence(room, opts?) // returns: { peers, user, publishPresence, isLoading }
-db.rooms.useSyncPresence(room, data, deps?)
-db.rooms.useTypingIndicator(room, inputName, opts?) // returns: { active, setActive, inputProps }
-
-// Components
-<Cursors room={room} {...props} />
+# Linting/Formatting
+bun run lint               # oxlint linter
+bun run format             # oxfmt formatter
 ```
 
-# How to initialize DB
+## App-Specific Context
 
-Create a central DB instance (single connection maintained per app ID):
+When working in specific apps, check their documentation:
 
-```typescript
-// lib/db.ts
-import { init } from '@instantdb/react';
-import schema from '../instant.schema';
+- **Simulator**: `apps/simulator/` - Main Next.js web app
+- **Lorcanary**: `apps/lorcanary/` - Card database Next.js app
+- **Nakama**: `apps/nakama/CLAUDE.md` - Game server (Goja runtime, no Node.js APIs)
+- **Lorcana Engine**: `packages/lorcana-engine/CLAUDE.md` - Game rules implementation
 
-export const db = init({
-  // Get your app ID from https://instantdb.com
-  appId: 'your-app-id',
-  schema
-});
-```
+## Additional Resources
 
-`init` accepts the following parameters:
+- **LLM Documentation**:
+  - `packages/persistence/src/drizzle/llm-full.txt` - Drizzle ORM docs
+  - `packages/persistence/src/instant/llm-full.txt` - Instant DB docs
 
-```typescript
-export type InstantConfig<S extends InstantSchemaDef<any, any, any>> = {
-  appId: string;
-  schema?: S;
-};
-```
+- **Product Specs**: `.agent-os/apps/{app-name}/specs/` - Feature specifications
+- **Mission & Roadmap**: `.agent-os/product/` - Product context
 
-# How to do queries
+## Critical Rules
 
-## Core Concepts
-- **Namespaces**: Entity collections (tables)
-- **Queries**: JS objects describing data needs
-- **Associations**: Entity relationships
+❌ **Never**:
+- Use `any` types or skip type safety
+- Test implementation details (test public APIs only)
+- Skip TDD (always write tests first)
+- Run database migrations or SQL commands
+- Add apologies or summaries in responses
 
-## Query Structure
-```typescript
-{
-  namespace1: {
-    $: { /* operators */ },
-    linkedNamespace: { $: { /* operators */ } }
-  },
-  namespace2: { /* ... */ }
-}
-```
-
-## Basic Usage
-
-**Required**: Handle `isLoading` and `error` states:
-```typescript
-const { isLoading, data, error } = db.useQuery({ todos: {} })
-if (isLoading) return
-if (error) return (<div>Error: {error.message}</div>)
-return <pre>{JSON.stringify(data, null, 2)}</pre>
-```
-
-### Fetch Operations
-```typescript
-// Single namespace
-const query = { goals: {} }
-
-// Multiple namespaces
-const query = { goals: {}, todos: {} }
-```
-
-## Filtering
-
-### By ID
-```typescript
-const query = {
-  goals: {
-    $: { where: { id: 'goal-1' } }
-  }
-}
-```
-
-### Multiple Conditions (AND)
-```typescript
-const query = {
-  todos: {
-    $: { where: { completed: true, priority: 'high' } }
-  }
-}
-```
-
-## Associations (JOINs)
-
-### Fetch Related
-```typescript
-// Goals with todos
-const query = { goals: { todos: {} } }
-
-// Inverse: Todos with goals
-const query = { todos: { goals: {} } }
-```
-
-### Filter by Association
-```typescript
-// Dot notation for associated values
-const query = {
-  goals: {
-    $: { where: { 'todos.title': 'Go running' } },
-    todos: {}
-  }
-}
-```
-
-### Filter Associated Entities
-```typescript
-const query = {
-  goals: {
-    todos: {
-      $: { where: { completed: true } }
-    }
-  }
-}
-```
-
-## Operators
-
-### Logical
-```typescript
-// AND
-where: { and: [{ 'todos.priority': 'high' }, { 'todos.dueDate': { $lt: tomorrow } }] }
-
-// OR
-where: { or: [{ priority: 'high' }, { dueDate: { $lt: tomorrow } }] }
-```
-
-### Comparison (indexed fields only)
-- `$gt`, `$lt`, `$gte`, `$lte`
-```typescript
-where: { timeEstimate: { $gt: 2 } }
-```
-
-### Other Operators
-```typescript
-// IN
-where: { priority: { $in: ['high', 'critical'] } }
-
-// NOT
-where: { location: { $not: 'work' } }
-
-// NULL check
-where: { location: { $isNull: true } }
-
-// Pattern matching (indexed strings)
-where: { title: { $like: 'Get%' } }     // Case-sensitive
-where: { title: { $ilike: 'get%' } }    // Case-insensitive
-```
-
-Pattern syntax:
-- `'prefix%'` - Starts with
-- `'%suffix'` - Ends with
-- `'%substring%'` - Contains
-
-## Pagination & Ordering
-
-### Pagination (top-level only)
-```typescript
-$: { limit: 10, offset: 10 }
-```
-
-### Ordering (indexed fields)
-```typescript
-$: { order: { dueDate: 'asc' } }  // or 'desc'
-```
-
-## Field Selection
-```typescript
-// Select specific fields
-$: { fields: ['title', 'status'] }
-
-// With nested associations
-goals: {
-  $: { fields: ['title'] },
-  todos: { $: { fields: ['status'] } }
-}
-```
-
-## Deferred Queries
-```typescript
-const query = user ? { todos: { $: { where: { userId: user.id } } } } : null
-```
-
-## Complex Example
-```typescript
-const query = {
-  goals: {
-    $: {
-      where: { or: [{ status: 'active' }, { 'todos.priority': 'high' }] },
-      limit: 5,
-      order: { serverCreatedAt: 'desc' },
-      fields: ['title', 'description']
-    },
-    todos: {
-      $: {
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+✅ **Always**:
+- Write tests before implementation (TDD)
+- Use oxlint for linting
+- Preserve existing code and functionality
+- Make file-by-file changes
+- Ask user before running long-running commands
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/TheCardGoat) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-09 -->
+> Source: [TheCardGoat/tcg-engines](https://github.com/TheCardGoat/tcg-engines) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-07 -->
