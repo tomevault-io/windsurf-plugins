@@ -1,219 +1,249 @@
 ---
 trigger: always_on
-description: This project includes comprehensive memory profiling tools for detecting leaks and analyzing memory usage patterns.
+description: Guidelines for maintaining README.md documentation for the Prax ORM project
 ---
 
-# Memory Profiling Guidelines
 
-This project includes comprehensive memory profiling tools for detecting leaks and analyzing memory usage patterns.
+# README Guidelines
 
-## Profiling Module Overview
+This document provides guidelines for maintaining the project README to ensure clear, accurate, and helpful documentation.
 
-The `prax_query::profiling` module provides:
+## README Structure
 
-- **Allocation Tracking**: Track every allocation/deallocation
-- **Memory Snapshots**: Capture and compare memory state
-- **Leak Detection**: Identify memory that wasn't freed
-- **Heap Profiling**: System-level heap analysis
+The README should follow this structure:
 
+```markdown
+# Prax
+
+<badges and shields>
+
+<brief description>
+
+## Features
+## Installation
+## Quick Start
+## Query Operations
+## Architecture
+## CLI
+## Comparison
+## Contributing
+## License
+## Acknowledgments
+```
+
+## When to Update
+
+### Always Update When:
+- ✅ Adding new public API methods
+- ✅ Changing installation requirements
+- ✅ Adding new features mentioned in examples
+- ✅ Changing CLI commands
+- ✅ Adding new database backend support
+- ✅ Adding new framework integrations
+- ✅ Changing minimum Rust version
+
+### Consider Updating When:
+- 🤔 Fixing bugs that affect documented behavior
+- 🤔 Improving performance significantly
+- 🤔 Adding new optional features
+
+### Don't Update For:
+- ❌ Internal refactoring
+- ❌ Test changes
+- ❌ Minor bug fixes
+- ❌ Dependency updates (unless breaking)
+
+## Section Guidelines
+
+### Header & Badges
+
+```markdown
+# Prax
+
+<p align="center">
+  <strong>A next-generation, type-safe ORM for Rust</strong>
+</p>
+
+<p align="center">
+  <a href="https://crates.io/crates/prax"><img src="https://img.shields.io/crates/v/prax.svg" alt="crates.io"></a>
+  <a href="https://docs.rs/prax"><img src="https://docs.rs/prax/badge.svg" alt="docs.rs"></a>
+  <a href="https://github.com/pegasusheavy/prax/actions"><img src="https://github.com/pegasusheavy/prax/workflows/CI/badge.svg" alt="CI"></a>
+  <img src="https://img.shields.io/badge/rust-1.85%2B-blue.svg" alt="Rust 1.85+">
+  <a href="#license"><img src="https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg" alt="License"></a>
+</p>
+```
+
+### Features Section
+
+List features with emoji icons for scannability:
+
+```markdown
+## Features
+
+- 🔒 **Type-Safe Queries** - Compile-time checked queries
+- ⚡ **Async-First** - Built on Tokio
+- 🎯 **Fluent API** - Intuitive query builder
+- 🔗 **Relations** - Eager and lazy loading
+- 📦 **Migrations** - Schema management
+- 🛠️ **Code Generation** - Proc-macro models
+- 🗄️ **Multi-Database** - PostgreSQL, MySQL, SQLite
+- 🔌 **Framework Integration** - Armature, Axum, Actix-web
+```
+
+### Installation Section
+
+Always show:
+1. Basic installation
+2. Feature flags for different backends
+3. Minimum Rust version requirement
+
+```markdown
+## Installation
+
+Add Prax to your `Cargo.toml`:
+
+\`\`\`toml
+[dependencies]
+prax = "0.1"
+\`\`\`
+
+**Requires Rust 1.85+** (Edition 2024)
+
+### Feature Flags
+
+| Feature | Description |
+|---------|-------------|
+| `postgres` | PostgreSQL support (default) |
+| `mysql` | MySQL support |
+| `sqlite` | SQLite support |
+| `runtime-tokio` | Tokio runtime (default) |
+```
+
+### Quick Start Section
+
+Provide a complete, copy-pasteable example:
+
+```markdown
 ## Quick Start
 
-```rust
-use prax_query::profiling::{MemoryProfiler, with_profiling, enable_profiling};
+\`\`\`rust
+use prax::prelude::*;
 
-// Option 1: Use with_profiling wrapper
-let (result, leak_report) = with_profiling(|| {
-    // Your code here
-    perform_operations()
-});
-
-if leak_report.has_leaks() {
-    eprintln!("⚠️  Potential leaks: {}", leak_report);
+#[derive(Model)]
+#[prax(table = "users")]
+pub struct User {
+    #[prax(id)]
+    pub id: i32,
+    pub email: String,
 }
 
-// Option 2: Use MemoryProfiler directly
-let profiler = MemoryProfiler::new();
-let before = profiler.snapshot();
+#[tokio::main]
+async fn main() -> Result<(), prax::Error> {
+    let client = PraxClient::new("postgresql://localhost/mydb").await?;
 
-// ... do work ...
+    let users = client.user().find_many().exec().await?;
 
-let after = profiler.snapshot();
-let diff = after.diff(&before);
-println!("{}", diff.report());
+    Ok(())
+}
+\`\`\`
 ```
 
-## Enabling Profiling
+### Code Examples
 
-Profiling has runtime overhead. Enable only when needed:
+#### DO ✅
 
 ```rust
-// Enable globally
-prax_query::profiling::enable_profiling();
+// Good: Complete, runnable example
+use prax::prelude::*;
 
-// Or use RAII guard
-let detector = LeakDetector::new();
-let _guard = detector.start(); // Enables profiling
-// ... profiling active ...
-// guard dropped - profiling disabled
+let users = client
+    .user()
+    .find_many()
+    .where_(user::active::equals(true))
+    .order_by(user::created_at::desc())
+    .take(10)
+    .exec()
+    .await?;
 ```
 
-## Leak Detection Patterns
-
-### Detecting Repeated Allocations
+#### DON'T ❌
 
 ```rust
-use prax_query::profiling::{LeakDetector, LeakSeverity};
-use std::time::Duration;
-
-let detector = LeakDetector::with_threshold(Duration::from_secs(30));
-let report = detector.analyze(&tracker);
-
-for leak in &report.potential_leaks {
-    match leak.severity {
-        LeakSeverity::High => eprintln!("🔴 High severity: {}", leak.pattern.description()),
-        LeakSeverity::Medium => eprintln!("🟡 Medium: {}", leak.pattern.description()),
-        LeakSeverity::Low => eprintln!("🟢 Low: {}", leak.pattern.description()),
-    }
-}
+// Bad: Incomplete, won't compile
+let users = client.user().find_many()...
 ```
 
-### Memory Growth Analysis
+### API Documentation
 
-```rust
-use prax_query::profiling::snapshot::SnapshotSeries;
+When documenting query operations, use tables for clarity:
 
-let mut series = SnapshotSeries::new(100);
+```markdown
+## Query Operations
 
-// Periodically capture snapshots
-for _ in 0..10 {
-    series.add(profiler.snapshot());
-    tokio::time::sleep(Duration::from_secs(1)).await;
-}
+### Filtering
 
-if series.has_growth_trend() {
-    eprintln!("⚠️  Memory growing at {:.2} bytes/sec", series.growth_rate());
-}
+| Method | SQL Equivalent | Example |
+|--------|---------------|---------|
+| `equals(v)` | `= v` | `user::id::equals(1)` |
+| `not_equals(v)` | `!= v` | `user::status::not_equals("banned")` |
+| `contains(v)` | `LIKE %v%` | `user::name::contains("john")` |
+| `gt(v)` | `> v` | `user::age::gt(18)` |
 ```
 
-## Testing for Leaks
+### Architecture Section
 
-### In Unit Tests
+Keep the directory tree updated:
 
-```rust
-#[test]
-fn test_no_memory_leak() {
-    let (_, report) = prax_query::profiling::with_profiling(|| {
-        // Create and drop resources
-        let filter = Filter::and(vec![
-            Filter::Equals("id".into(), FilterValue::Int(1)),
-            Filter::Equals("status".into(), FilterValue::String("active".into())),
-        ]);
-        drop(filter);
-    });
+```markdown
+## Architecture
 
-    assert!(!report.has_high_severity_leaks(), "Memory leak detected: {}", report);
-}
+\`\`\`
+prax/
+├── prax-core/           # Core types and traits
+├── prax-schema/         # Schema parser
+├── prax-codegen/        # Proc-macros
+├── prax-query/          # Query builder
+├── prax-postgres/       # PostgreSQL driver
+├── prax-mysql/          # MySQL driver
+├── prax-sqlite/         # SQLite driver
+├── prax-migrate/        # Migrations
+├── prax-cli/            # CLI tool
+├── prax-armature/       # Armature integration
+└── prax/                # Main crate
+\`\`\`
 ```
 
-### In Integration Tests
+### Comparison Table
 
-```rust
-#[tokio::test]
-async fn test_connection_pool_no_leak() {
-    let profiler = MemoryProfiler::new();
-    let before = profiler.snapshot();
+Keep comparisons fair and up-to-date:
 
-    // Simulate many connections
-    for _ in 0..100 {
-        let conn = pool.get().await.unwrap();
-        conn.query("SELECT 1").await.unwrap();
-        drop(conn);
-    }
+```markdown
+## Comparison
 
-    let after = profiler.snapshot();
-    let diff = after.diff(&before);
-
-    assert!(
-        diff.bytes_delta < 10_000,  // Allow some variance
-        "Excessive memory growth: {} bytes", diff.bytes_delta
-    );
-}
+| Feature | Prax | Diesel | SeaORM | SQLx |
+|---------|------|--------|--------|------|
+| Async | ✅ | ❌ | ✅ | ✅ |
+| Type-Safe | ✅ | ✅ | ✅ | ✅ |
+| Schema DSL | ✅ | ❌ | ❌ | ❌ |
+| Migrations | ✅ | ✅ | ✅ | ✅ |
 ```
 
-## Benchmark Memory Usage
+## Writing Style
 
-```rust
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+### Tone
+- Professional but approachable
+- Confident but not arrogant
+- Technical but accessible
 
-fn bench_memory_efficiency(c: &mut Criterion) {
-    let mut group = c.benchmark_group("memory");
+### Formatting
+- Use code blocks with language hints
+- Use tables for structured data
+- Use emoji sparingly for visual scanning
+- Keep paragraphs short (2-3 sentences max)
 
-    group.bench_function("interned_vs_string", |b| {
-        let interner = GlobalInterner::get_instance();
-
-        b.iter(|| {
-            // Compare interned vs regular strings
-            for _ in 0..100 {
-                black_box(interner.intern("field_name"));
-            }
-        });
-    });
-}
-```
-
-## CI Integration
-
-The `.github/workflows/memory-check.yml` workflow runs:
-
-1. **Leak Detection Tests**: Run profiling module tests
-2. **Valgrind Analysis**: Check for definite memory leaks
-3. **AddressSanitizer**: Runtime memory error detection
-4. **DHAT Profiling**: Heap allocation analysis
-
-## Using TrackedAllocator
-
-For comprehensive tracking, use the custom allocator:
-
-```rust
-// In main.rs or lib.rs (ONE location only)
-use prax_query::profiling::TrackedAllocator;
-
-#[global_allocator]
-static ALLOC: TrackedAllocator = TrackedAllocator::new();
-
-// Now all allocations are tracked automatically
-fn main() {
-    prax_query::profiling::enable_profiling();
-
-    // ... your code ...
-
-    let stats = prax_query::profiling::GLOBAL_TRACKER.stats();
-    println!("Total allocations: {}", stats.total_allocations);
-    println!("Current bytes: {}", stats.current_bytes);
-    println!("Peak bytes: {}", stats.peak_bytes);
-}
-```
-
-## Memory Optimization Tips
-
-### Use String Interning
-
-```rust
-// ❌ Bad: Many allocations for repeated strings
-for _ in 0..1000 {
-    let field = "user_id".to_string();
-}
-
-// ✅ Good: Single allocation, shared reference
-let interner = GlobalInterner::get_instance();
-for _ in 0..1000 {
-    let field = interner.intern("user_id");
-}
-```
-
-### Use Arena Allocation
-
-```rust
+### Links
+- Link to detailed docs for complex topics
+- Use relative links for repo files: `[CONTRIBUTING](./CONTRIBUTING.md)`
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
