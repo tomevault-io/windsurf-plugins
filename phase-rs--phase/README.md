@@ -7,11 +7,11 @@ A Magic: The Gathering rules engine and game client — Rust + WASM + React
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [phase-rs/phase](https://github.com/phase-rs/phase).
+Original source: `CLAUDE.md` in [phase-rs/phase](https://github.com/phase-rs/phase).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
