@@ -1,211 +1,219 @@
 ---
 trigger: always_on
-description: TypeScript coding standards and style guidelines
+description: Core testing patterns and best practices for writing clear, maintainable, and effective tests using Vitest.
 ---
 
+# Vitest Guidelines
 
-# TypeScript Style Guide
-
-TypeScript coding standards and style guidelines for our codebase. These guidelines ensure consistency, maintainability, and high code quality across TypeScript projects.
+Core testing patterns and best practices for writing clear, maintainable, and effective tests using Vitest.
 
 ## Core Principles
+- **Clarity** - Always write tests that clearly communicate their purpose
+- **Structure** - Always follow consistent test organization patterns
+- **Isolation** - Always ensure tests are independent and atomic
+- **Completeness** - Always cover both happy and error paths
+- **Readability** - Always structure tests to read like specifications
 
-- **KISS (Keep It Simple, Stupid)** - Always choose the simplest, most maintainable solution
-- **TypeScript First** - Always use TypeScript with strict typing (`strict: true`) everywhere
-- **Less is More** - Always avoid unnecessary complexity, the best code is no code
-- **Self-Documenting** - Always make code obvious and clear without comments
+## Test Organization
 
-## File Organization
-
-### Directory Structure
-
-- Always organize code in a predictable and scalable way
-- Always keep related code close together
-- Always use clear, descriptive directory names
-- Always follow consistent patterns across the project
-- Always use singular for categories/domains (e.g. `auth/`, `user/`, `product/`)
-- Always use plural for collections/lists (e.g. `components/`, `hooks/`, `utils/`)
+### File Structure
+- Always place tests next to the source file they test
+- Always use `.test.ts` or `.test.tsx` extension for test files
+- Always name test files to match their source file
 
 ✅ Good:
-
 ```typescript
 src/
-  auth/              # Singular: domain
-    components/      # Plural: collection
-    hooks/          # Plural: collection
-    lib/            # Singular: category
-
-  user/             # Singular: domain
-    components/     # Plural: collection
-    hooks/         # Plural: collection
-    lib/           # Singular: category
-
-  lib/             # Singular: core category
-  components/      # Plural: shared collection
-  hooks/          # Plural: shared collection
-```
-
-❌ Bad:
-
-```typescript
-src/
-  auths/           # Wrong: Category should be singular
-    component/     # Wrong: Collection should be plural
-
-  users/          # Wrong: Category should be singular
-    hook/         # Wrong: Collection should be plural
-
-  libraries/      # Wrong: Category should be singular
-  shared-components/ # Wrong: Use simple plural
-```
-
-### Files & Directories
-
-- Always use consistent and predictable naming patterns
-- Always make names descriptive and purpose-indicating
-- Always follow established community conventions
-
-✅ Good:
-
-```typescript
-// Directories (kebab-case)
-src/
-  auth/
+  utils/
+    to-hex.ts
+    to-hex.test.ts
   components/
-  hooks/
-  lib/
-
-// Regular Files (kebab-case)
-user-service.ts
-jwt-utils.ts
-date-formatter.ts
-api-client.ts
-
-// Component Files (PascalCase)
-UserProfileCard.tsx
-OrderSummaryTable.tsx
-PaymentMethodSelector.tsx
-ButtonPrimary.tsx
-
-// Class Files (PascalCase)
-OrderProcessor.ts
-PaymentGateway.ts
-CacheManager.ts
+    Button.tsx
+    Button.test.tsx
 ```
 
 ❌ Bad:
-
 ```typescript
-// Directories (mixed case)
-src/
-  UserManagement/     # Wrong: PascalCase directory
-  order_processing/   # Wrong: snake_case directory
-  PAYMENT/           # Wrong: UPPERCASE directory
-  Shared-Utils/      # Wrong: Mixed kebab-case and PascalCase
-
-// Files (inconsistent)
-userService.ts      # Wrong: camelCase
-USER_HELPERS.ts    # Wrong: SNAKE_CASE
-payment.utilities.ts # Wrong: dot notation
-Api.Client.ts      # Wrong: PascalCase with dots
+tests/                    # Wrong: Tests separated from source
+  utils/
+    hexTests.ts          # Wrong: Inconsistent naming
+  components/
+    ButtonSpec.tsx       # Wrong: Inconsistent extension
 ```
 
-### Code Identifiers
-
-- Always use clear, descriptive names that indicate purpose
-- Always follow TypeScript community standards
-- Always maintain consistent prefixing for special types
+### Test Structure
+- Always import test utilities from vitest
+- Always use descriptive `describe` blocks for context
+- Always start `it` statements with "should"
+- Always group related tests logically
 
 ✅ Good:
-
 ```typescript
-// Variables & Functions (camelCase)
-const currentUser = getCurrentUser();
-const isValidEmail = validateEmail(email);
-function calculateTotalPrice(items: TOrderItem[]): number {
-	return items.reduce((sum, item) => sum + item.price, 0);
-}
+import { describe, expect, it } from 'vitest';
+import { toHex } from './to-hex';
 
-// Interfaces (T prefix) - Always use for object shapes
-interface TUser {
-	id: string;
-	email: string;
-	profile: TUserProfile;
-}
-
-interface TOrderItem {
-	id: string;
-	productId: string;
-	quantity: number;
-	price: number;
-}
-
-// Types (T prefix) - Only use when interface is not possible
-type TOrderStatus = 'pending' | 'processing' | 'completed'; // Union
-type TUserOrNull = TUser | null; // Union with null
-type TPartialUser = Partial<TUser>; // Mapped type
-type TUserConfig = Required<TUserOptions>; // Utility type
-
-// Enums (E prefix)
-enum EOrderStatus {
-	Pending = 'pending',
-	Processing = 'processing',
-	Completed = 'completed',
-	Cancelled = 'cancelled'
-}
-
-enum EUserRole {
-	Admin = 'admin',
-	Customer = 'customer',
-	Guest = 'guest'
-}
-
-// Schemas (S prefix)
-const SUserProfile = z.object({
-	firstName: z.string().min(2),
-	lastName: z.string().min(2),
-	dateOfBirth: z.iso.datetime().optional(),
-	phoneNumber: z
-		.string()
-		.regex(/^\+?[1-9]\d{1,14}$/)
-		.optional()
-});
-
-const SOrderCreate = z.object({
-	userId: z.string().uuid(),
-	items: z.array(
-		z.object({
-			productId: z.string().uuid(),
-			quantity: z.number().int().positive()
-		})
-	)
+// Top-level description of what's being tested
+describe('toHex function', () => {
+  it('should convert Uint8Array to hex string', () => {
+    const buffer = new Uint8Array([10, 255]);
+    expect(toHex(buffer)).toBe('0AFF');
+  });
 });
 ```
 
 ❌ Bad:
-
 ```typescript
-// Variables & Functions (inconsistent)
-const CurrentUser = getCurrentUser();  // Wrong: PascalCase
-const valid_email = validate_email();  // Wrong: snake_case
-const CALCULATE_PRICE = () => {};      // Wrong: UPPER_CASE
+import { test } from 'vitest';  // Wrong: Inconsistent imports
 
-// Types & Interfaces (missing prefix or wrong keyword)
-type User = {                         // Wrong: Missing T prefix
-  ID: string;                        // Wrong: UPPER_CASE
-  Email: string;                     // Wrong: PascalCase
-};
+test('toHex', () => {          // Wrong: Missing proper describe
+  const result = toHex([10]);  // Wrong: No "should" in description
+  expect(result).toBe('0A');
+});
+```
 
-type TOrderItem = {                   // Wrong: Use interface for objects
-  product_id: string;               // Wrong: snake_case
-  Quantity: number;                 // Wrong: PascalCase
-};
+### Complex Test Organization
+- Always use nested `describe` blocks for method grouping
+- Always add descriptive comments for complex test scenarios
+- Always separate different aspects of functionality
 
-interface TUserStatus = 'active' | 'inactive'; // Wrong: Can't use interface for unions
+✅ Good:
+```typescript
+describe('User class', () => {
+    describe('login method', () => {
+      it('should authenticate with valid credentials', () => {
+        // Test implementation
+      });
 
-// Enums (inconsistent)
+      it('should reject invalid credentials', () => {
+        // Test implementation
+      });
+    });
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+    describe('logout method', () => {
+      it('should clear user session', () => {
+        // Test implementation
+      });
+    });
+});
+```
+
+❌ Bad:
+```typescript
+describe('User', () => {
+  it('login works', () => {})      // Wrong: Poor description
+  it('logout', () => {})           // Wrong: Missing "should"
+  it('test password reset', () => {}) // Wrong: Inconsistent naming
+});
+```
+
+## Test Cases
+
+### Test Structure Pattern
+- Always use Prepare/Act/Assert pattern for complex tests
+- Always keep tests focused and atomic
+- Always use clear variable names that indicate purpose
+
+✅ Good:
+```typescript
+describe('UndoManager', () => {
+  it('should handle multiple undos correctly', () => {
+    // Prepare
+    const state = withUndo(createState('initial'));
+
+    // Act
+    state.set('first');
+    state.set('second');
+    state.undo();
+    state.undo();
+
+    // Assert
+    expect(state.get()).toBe('initial');
+  });
+});
+```
+
+❌ Bad:
+```typescript
+it('undo works', () => {
+  const s = withUndo(createState('i'));  // Wrong: Unclear names
+  s.set('a');
+  s.set('b');
+  s.undo();
+  s.undo();
+  expect(s.get()).toBe('i');  // Wrong: No structure
+});
+```
+
+### Assertions
+- Always use explicit assertions
+- Always test one concept per test case
+- Always use appropriate matchers
+- Always include error cases
+
+✅ Good:
+```typescript
+describe('parseConfig function', () => {
+  it('should parse valid configuration', () => {
+    const input = '{"key": "value"}';
+    const result = parseConfig(input);
+    expect(result).toEqual({ key: 'value' });
+  });
+
+  it('should throw error for invalid JSON', () => {
+    const input = '{invalid}';
+    expect(() => parseConfig(input)).toThrow('Invalid JSON');
+  });
+});
+```
+
+❌ Bad:
+```typescript
+it('parsing works', () => {
+  // Wrong: Testing multiple concepts
+  expect(parseConfig('{"a":"b"}')).toEqual({a:'b'});
+  expect(parseConfig('{}')).toEqual({});
+  expect(() => parseConfig('{')).toThrow();
+});
+```
+
+### Async Testing
+- Always use async/await for asynchronous tests
+- Always test both success and error cases
+- Always ensure proper error handling
+
+✅ Good:
+```typescript
+describe('UserAPI', () => {
+  it('should fetch user details successfully', async () => {
+    const userId = '123';
+    const user = await UserAPI.getUser(userId);
+    expect(user).toEqual({
+      id: '123',
+      name: 'Test User'
+    });
+  });
+
+  it('should handle user not found error', async () => {
+    const userId = 'invalid';
+    await expect(
+      UserAPI.getUser(userId)
+    ).rejects.toThrow('User not found');
+  });
+});
+```
+
+❌ Bad:
+```typescript
+it('fetches user', () => {  // Wrong: Missing async
+  UserAPI.getUser('123')    // Wrong: No await
+    .then(user => {
+      expect(user.id).toBe('123');
+    });
+});
+```
+
+## Related Rules
+- [style-guide.mdc](mdc:.cursor/rules/style-guide.mdc): Core coding standards
 
 ---
 > Source: [builder-group/focuscat](https://github.com/builder-group/focuscat) — distributed by [TomeVault](https://tomevault.io).
