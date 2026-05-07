@@ -1,226 +1,208 @@
 ---
 trigger: always_on
-description: This project prioritizes **asynchronous and parallel execution** over synchronous code. All I/O operations, database queries, and potentially blocking operations must be async.
+description: This project uses [Criterion.rs](https://github.com/bheisler/criterion.rs) for benchmarks. Follow these guidelines to write meaningful, reliable benchmarks.
 ---
 
-# Async/Parallel-First Design
+# Benchmarking Guidelines
 
-This project prioritizes **asynchronous and parallel execution** over synchronous code. All I/O operations, database queries, and potentially blocking operations must be async.
+This project uses [Criterion.rs](https://github.com/bheisler/criterion.rs) for benchmarks. Follow these guidelines to write meaningful, reliable benchmarks.
 
-## Core Principles
+## Benchmark File Organization
 
-### 1. Default to Async
+### Location
 
-Every function that performs I/O should be `async`:
+All benchmarks live in `prax-query/benches/`:
+
+```
+prax-query/benches/
+├── operations_bench.rs      # Core filter and SQL builder
+├── aggregation_bench.rs     # Aggregation and grouping
+├── pagination_bench.rs      # Cursor and offset pagination
+├── advanced_features_bench.rs # Window functions, CTEs
+├── tenant_bench.rs          # Multi-tenancy overhead
+├── async_bench.rs           # Concurrent execution
+├── mem_optimize_bench.rs    # Memory optimizations
+├── database_bench.rs        # Database-specific SQL
+└── throughput_bench.rs      # Queries-per-second
+```
+
+### Registration
+
+Add new benchmarks to `Cargo.toml`:
+
+```toml
+[[bench]]
+name = "my_new_bench"
+harness = false
+```
+
+## Writing Good Benchmarks
+
+### Use `black_box` to Prevent Optimization
 
 ```rust
-// ✅ Good: Async by default
-pub async fn find_user(id: i64) -> Result<User> {
-    let row = client.query_one("SELECT * FROM users WHERE id = $1", &[&id]).await?;
-    Ok(User::from_row(row))
-}
+use criterion::black_box;
 
-// ❌ Bad: Synchronous I/O
-pub fn find_user(id: i64) -> Result<User> {
-    let row = client.query_one("SELECT * FROM users WHERE id = $1", &[&id])?;
-    Ok(User::from_row(row))
+// ✅ Good: Result consumed by black_box
+group.bench_function("filter_creation", |b| {
+    b.iter(|| {
+        let filter = Filter::Equals("id".into(), FilterValue::Int(1));
+        black_box(filter)
+    });
+});
+
+// ❌ Bad: Compiler may optimize away unused result
+group.bench_function("filter_creation", |b| {
+    b.iter(|| {
+        let filter = Filter::Equals("id".into(), FilterValue::Int(1));
+        // filter is dropped immediately, compiler may skip creation
+    });
+});
+```
+
+### Separate Setup from Measurement
+
+```rust
+// ✅ Good: Setup outside the measurement loop
+group.bench_function("filter_to_sql", |b| {
+    // Setup: Create filter once
+    let filter = Filter::and(vec![
+        Filter::Equals("status".into(), FilterValue::String("active".into())),
+        Filter::Gt("age".into(), FilterValue::Int(18)),
+    ]);
+
+    // Measure: Only the to_sql() call
+    b.iter(|| black_box(filter.to_sql(0)))
+});
+
+// ❌ Bad: Setup included in measurement
+group.bench_function("filter_to_sql", |b| {
+    b.iter(|| {
+        let filter = Filter::and(vec![
+            Filter::Equals("status".into(), FilterValue::String("active".into())),
+            Filter::Gt("age".into(), FilterValue::Int(18)),
+        ]);
+        black_box(filter.to_sql(0))
+    });
+});
+```
+
+### Use Throughput for Batch Operations
+
+```rust
+// ✅ Good: Throughput shows operations/second
+for batch_size in [10, 50, 100, 500] {
+    group.throughput(Throughput::Elements(batch_size as u64));
+
+    group.bench_function(BenchmarkId::new("batch_insert", batch_size), |b| {
+        b.iter(|| {
+            // Process batch_size items
+        });
+    });
 }
 ```
 
-### 2. Parallel by Default
-
-When multiple independent operations exist, execute them in parallel:
+### Group Related Benchmarks
 
 ```rust
-// ✅ Good: Parallel execution
-let (users, posts, comments) = tokio::try_join!(
-    client.user().find_many().exec(),
-    client.post().find_many().exec(),
-    client.comment().find_many().exec(),
-)?;
+fn bench_filter_creation(c: &mut Criterion) {
+    let mut group = c.benchmark_group("filter_creation");
 
-// ❌ Bad: Sequential when parallel is possible
-let users = client.user().find_many().exec().await?;
-let posts = client.post().find_many().exec().await?;
-let comments = client.comment().find_many().exec().await?;
-```
+    group.bench_function("equals_int", |b| { /* ... */ });
+    group.bench_function("equals_string", |b| { /* ... */ });
+    group.bench_function("in_filter", |b| { /* ... */ });
+    group.bench_function("complex_and_or", |b| { /* ... */ });
 
-### 3. Use `tokio::spawn` for CPU-bound Work
-
-Offload CPU-intensive tasks to avoid blocking the async runtime:
-
-```rust
-// ✅ Good: Spawn blocking work
-let parsed = tokio::task::spawn_blocking(move || {
-    expensive_parsing_operation(&data)
-}).await?;
-
-// ❌ Bad: Blocking in async context
-let parsed = expensive_parsing_operation(&data); // blocks the runtime
-```
-
-### 4. Prefer `tokio::select!` for Racing
-
-When you need the first result from multiple futures:
-
-```rust
-// ✅ Good: Race with select
-tokio::select! {
-    result = primary_db.query(&sql) => handle_result(result),
-    result = replica_db.query(&sql) => handle_result(result),
-    _ = tokio::time::sleep(timeout) => return Err(Error::Timeout),
+    group.finish();
 }
 ```
 
-## Required Patterns
+## Benchmark Categories
 
-### Connection Pools
+### Micro-benchmarks
 
-Always use async connection pools:
+Test individual operations in isolation:
 
 ```rust
-// Use deadpool-postgres or bb8
-use deadpool_postgres::{Config, Pool, Runtime};
+// Filter creation
+group.bench_function("create_equals", |b| {
+    b.iter(|| black_box(Filter::Equals("id".into(), FilterValue::Int(1))))
+});
 
-pub struct DatabasePool {
-    pool: Pool,
-}
-
-impl DatabasePool {
-    pub async fn get(&self) -> Result<PooledConnection> {
-        self.pool.get().await.map_err(Into::into)
-    }
-}
+// SQL generation
+group.bench_function("simple_to_sql", |b| {
+    let filter = Filter::Equals("id".into(), FilterValue::Int(1));
+    b.iter(|| black_box(filter.to_sql(0)))
+});
 ```
 
-### Streaming Results
+### Throughput Benchmarks
 
-For large result sets, use async streams:
+Measure sustained operations per second:
 
 ```rust
-use futures::Stream;
-use tokio_stream::StreamExt;
+group.throughput(Throughput::Elements(1000));
+group.measurement_time(Duration::from_secs(10));
 
-pub fn find_all(&self) -> impl Stream<Item = Result<User>> {
-    // Return a stream instead of Vec for memory efficiency
-    async_stream::try_stream! {
-        let mut rows = client.query_raw(&sql, &[]).await?;
-        while let Some(row) = rows.next().await {
-            yield User::from_row(row?);
+group.bench_function("1000_queries", |b| {
+    b.iter(|| {
+        for i in 0..1000 {
+            let filter = Filter::Equals("id".into(), FilterValue::Int(i));
+            black_box(filter.to_sql(0));
         }
-    }
-}
+    });
+});
 ```
 
-### Batch Operations
+### Realistic Scenario Benchmarks
 
-Batch multiple queries for efficiency:
+Simulate actual usage patterns:
 
 ```rust
-// ✅ Good: Batch inserts
-pub async fn create_many(users: Vec<CreateUser>) -> Result<Vec<User>> {
-    let futures: Vec<_> = users
-        .into_iter()
-        .map(|u| self.create(u))
-        .collect();
-
-    futures::future::try_join_all(futures).await
-}
+group.bench_function("ecommerce_search", |b| {
+    b.iter(|| {
+        let filter = Filter::and(vec![
+            Filter::Contains("name".into(), FilterValue::String("laptop".into())),
+            Filter::Gte("price".into(), FilterValue::Float(500.0)),
+            Filter::Lte("price".into(), FilterValue::Float(2000.0)),
+            Filter::Equals("in_stock".into(), FilterValue::Bool(true)),
+        ]);
+        let (sql, params) = filter.to_sql(0);
+        black_box((format!("SELECT * FROM products WHERE {} LIMIT 24", sql), params))
+    });
+});
 ```
 
-### Timeouts
+### Comparative Benchmarks
 
-Always include timeouts for async operations:
+Compare different approaches:
 
 ```rust
-use tokio::time::{timeout, Duration};
+// Compare with and without optimization
+group.bench_function("without_interning", |b| {
+    b.iter(|| {
+        let mut strings: Vec<String> = Vec::new();
+        for i in 0..100 {
+            strings.push(format!("field_{}", i % 10));
+        }
+        black_box(strings)
+    });
+});
 
-pub async fn query_with_timeout(&self, sql: &str) -> Result<Vec<Row>> {
-    timeout(Duration::from_secs(30), self.client.query(sql, &[]))
-        .await
-        .map_err(|_| Error::Timeout)?
-        .map_err(Into::into)
-}
+group.bench_function("with_interning", |b| {
+    let interner = GlobalInterner::get();
+    b.iter(|| {
+        let mut strings = Vec::new();
+        for i in 0..100 {
+            strings.push(interner.intern(&format!("field_{}", i % 10)));
+        }
+        black_box(strings)
+    });
+});
 ```
 
-## Trait Definitions
+## Running Benchmarks
 
-All database traits must be async:
-
-```rust
-// ✅ Good: Async trait (Rust 2024 supports this natively)
-pub trait Repository {
-    async fn find(&self, id: i64) -> Result<Option<Model>>;
-    async fn find_many(&self, filter: Filter) -> Result<Vec<Model>>;
-    async fn create(&self, data: CreateInput) -> Result<Model>;
-    async fn update(&self, id: i64, data: UpdateInput) -> Result<Model>;
-    async fn delete(&self, id: i64) -> Result<()>;
-}
-
-// ❌ Bad: Sync trait
-pub trait Repository {
-    fn find(&self, id: i64) -> Result<Option<Model>>;
-}
-```
-
-## Concurrency Primitives
-
-### Use `tokio::sync` Not `std::sync`
-
-```rust
-// ✅ Good: Tokio's async-aware primitives
-use tokio::sync::{RwLock, Mutex, Semaphore, broadcast, mpsc};
-
-// ❌ Bad: std sync primitives block the runtime
-use std::sync::{RwLock, Mutex};
-```
-
-### Prefer `RwLock` Over `Mutex`
-
-When reads dominate writes:
-
-```rust
-// ✅ Good: RwLock for read-heavy cache
-let cache: Arc<RwLock<HashMap<K, V>>> = Arc::new(RwLock::new(HashMap::new()));
-
-// Read path (many concurrent readers)
-let value = cache.read().await.get(&key).cloned();
-
-// Write path (exclusive access)
-cache.write().await.insert(key, value);
-```
-
-## Error Handling in Async
-
-### Propagate Errors with `?`
-
-```rust
-pub async fn complex_operation(&self) -> Result<Output> {
-    let a = self.step_a().await?;
-    let b = self.step_b(&a).await?;
-    let c = self.step_c(&b).await?;
-    Ok(c)
-}
-```
-
-### Use `try_join!` for Parallel Error Handling
-
-```rust
-// All succeed or first error is returned
-let (a, b, c) = tokio::try_join!(
-    self.fetch_a(),
-    self.fetch_b(),
-    self.fetch_c(),
-)?;
-```
-
-## Cancellation Safety
-
-Document cancellation behavior for all public async functions:
-
-```rust
-/// Executes a database query.
-///
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
