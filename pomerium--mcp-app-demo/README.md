@@ -7,13 +7,13 @@ Demo application showcasing how to build and secure MCP servers and clients with
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `.cursor/rules/*.mdc` in [pomerium/mcp-app-demo](https://github.com/pomerium/mcp-app-demo).
+Original source: `copilot-instructions.md` in [pomerium/mcp-app-demo](https://github.com/pomerium/mcp-app-demo).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
-- **GitHub Copilot** — `copilot-instructions.md`
+- **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
