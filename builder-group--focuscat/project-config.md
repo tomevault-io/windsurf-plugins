@@ -1,40 +1,19 @@
 ---
 trigger: always_on
-description: Swift and SwiftUI coding standards and style guidelines
+description: TypeScript coding standards and style guidelines
 ---
 
 
-# Swift Style Guide
+# TypeScript Style Guide
 
-Swift and SwiftUI coding standards and style guidelines for our iOS codebase. These guidelines ensure consistency, maintainability, and high code quality across Swift projects.
+TypeScript coding standards and style guidelines for our codebase. These guidelines ensure consistency, maintainability, and high code quality across TypeScript projects.
 
 ## Core Principles
 
 - **KISS (Keep It Simple, Stupid)** - Always choose the simplest, most maintainable solution
-- **SwiftUI First** - Always prefer SwiftUI over UIKit when possible
+- **TypeScript First** - Always use TypeScript with strict typing (`strict: true`) everywhere
 - **Less is More** - Always avoid unnecessary complexity, the best code is no code
 - **Self-Documenting** - Always make code obvious and clear without comments
-
-## Linter Errors and False Positives
-
-### Ignoring False Positive Errors
-
-**Always ignore false positive linter errors from Cursor/VS Code** when working with Swift code. The Swift language server in VS Code/Cursor cannot properly resolve Swift symbols and dependencies that are correctly configured in Xcode.
-
-**Common false positive errors to ignore:**
-
-- `Cannot find 'X' in scope` - When X is clearly defined in the codebase
-- `Reference to member 'X' cannot be resolved without a contextual type` - When X is a valid SwiftUI/UIKit type
-- `No such module 'X'` - When the module is correctly imported in Xcode
-- `Value of type 'X' has no member 'Y'` - When Y is a valid member in Xcode
-- Any reference errors for custom views, models, or utilities that compile successfully in Xcode
-
-**Workflow:**
-
-- Use Cursor for AI assistance and code generation
-- Use Xcode for actual development and compilation
-- Only report real compilation errors from Xcode, not linter errors from Cursor/VS Code
-- Trust Xcode's build system over Cursor's language server for Swift
 
 ## File Organization
 
@@ -44,161 +23,187 @@ Swift and SwiftUI coding standards and style guidelines for our iOS codebase. Th
 - Always keep related code close together
 - Always use clear, descriptive directory names
 - Always follow consistent patterns across the project
-- Always use singular for categories/domains (e.g. `Feature/`, `Model/`, `View/`)
-- Always use plural for collections/lists (e.g. `Features/`, `Models/`, `Views/`)
+- Always use singular for categories/domains (e.g. `auth/`, `user/`, `product/`)
+- Always use plural for collections/lists (e.g. `components/`, `hooks/`, `utils/`)
 
 ✅ Good:
 
-```swift
-Tapling/
-  Features/
-    Collectible/
-      Environment/
-        Models/
-        CollectibleRegistry.swift
-      Views/
-  Routes/
-    Settings/
-      SettingsView.swift
-  Views/
-    ActionRowView.swift
+```typescript
+src/
+  auth/              # Singular: domain
+    components/      # Plural: collection
+    hooks/          # Plural: collection
+    lib/            # Singular: category
+
+  user/             # Singular: domain
+    components/     # Plural: collection
+    hooks/         # Plural: collection
+    lib/           # Singular: category
+
+  lib/             # Singular: core category
+  components/      # Plural: shared collection
+  hooks/          # Plural: shared collection
 ```
 
 ❌ Bad:
 
-```swift
-Tapling/
-  feature/           // Wrong: Should be Features (plural)
-    collectible/     // Wrong: Should be Collectible (PascalCase)
-      model/         // Wrong: Should be Models (plural)
+```typescript
+src/
+  auths/           # Wrong: Category should be singular
+    component/     # Wrong: Collection should be plural
+
+  users/          # Wrong: Category should be singular
+    hook/         # Wrong: Collection should be plural
+
+  libraries/      # Wrong: Category should be singular
+  shared-components/ # Wrong: Use simple plural
 ```
 
-### File Naming
+### Files & Directories
 
-- Always use `PascalCase` for Swift files (e.g. `SettingsView.swift`, `TaplingSettings.swift`)
-- Always match the file name to the primary type/struct/class it contains
-- Always use descriptive names that indicate purpose
+- Always use consistent and predictable naming patterns
+- Always make names descriptive and purpose-indicating
+- Always follow established community conventions
 
 ✅ Good:
 
-```swift
-SettingsView.swift        // Contains SettingsView struct
-TaplingSettings.swift     // Contains TaplingSettings class
-ActionRowView.swift       // Contains ActionRowView struct
+```typescript
+// Directories (kebab-case)
+src/
+  auth/
+  components/
+  hooks/
+  lib/
+
+// Regular Files (kebab-case)
+user-service.ts
+jwt-utils.ts
+date-formatter.ts
+api-client.ts
+
+// Component Files (PascalCase)
+UserProfileCard.tsx
+OrderSummaryTable.tsx
+PaymentMethodSelector.tsx
+ButtonPrimary.tsx
+
+// Class Files (PascalCase)
+OrderProcessor.ts
+PaymentGateway.ts
+CacheManager.ts
 ```
 
 ❌ Bad:
 
-```swift
-settings.swift           // Wrong: Should be PascalCase
-Settings.swift           // Wrong: Too generic
-View.swift               // Wrong: Not descriptive
+```typescript
+// Directories (mixed case)
+src/
+  UserManagement/     # Wrong: PascalCase directory
+  order_processing/   # Wrong: snake_case directory
+  PAYMENT/           # Wrong: UPPERCASE directory
+  Shared-Utils/      # Wrong: Mixed kebab-case and PascalCase
+
+// Files (inconsistent)
+userService.ts      # Wrong: camelCase
+USER_HELPERS.ts    # Wrong: SNAKE_CASE
+payment.utilities.ts # Wrong: dot notation
+Api.Client.ts      # Wrong: PascalCase with dots
 ```
 
-## SwiftUI View Structure
+### Code Identifiers
 
-### View Organization
-
-- Always follow the 3-layer structure: Variables → UI → Actions
-- Always use `// MARK: - UI` to separate UI components from actions
-- Always use `// MARK: - Actions` to separate actions from UI
-- Never add more than these 2 MARKs - if you need more organization, split the view
+- Always use clear, descriptive names that indicate purpose
+- Always follow TypeScript community standards
+- Always maintain consistent prefixing for special types
 
 ✅ Good:
 
-```swift
-struct SettingsView: View {
-    // Variables (no MARK needed)
-    @State private var isEnabled = false
-    @QuerySingleton private var settings: Settings
-
-    // MARK: - UI
-
-    var body: some View {
-        Form {
-            headerSection
-        }
-    }
-
-    private var headerSection: some View {
-        Section {
-            Toggle("Enabled", isOn: isEnabledBinding)
-        }
-    }
-
-    // MARK: - Actions
-
-    private func saveSettings() {
-        try? modelContext.save()
-    }
-}
-```
-
-❌ Bad:
-
-```swift
-struct SettingsView: View {
-    // MARK: - Properties  // Wrong: No MARK for variables
-    @State private var isEnabled = false
-
-    // MARK: - UI
-    var body: some View { }
-
-    // MARK: - Search UI     // Wrong: Too many MARKs
-    // MARK: - Filter UI     // Wrong: Split into separate views instead
-    // MARK: - Actions
-}
-```
-
-### View Components
-
-- Always use computed properties for view sections
-- Always use descriptive names ending with `Section`, `View`, or `Button` (e.g. `headerSection`, `settingsForm`, `saveButton`)
-- Always keep view components private unless they need to be reused elsewhere
-
-✅ Good:
-
-```swift
-private var headerSection: some View {
-    VStack {
-        Text("Title")
-    }
+```typescript
+// Variables & Functions (camelCase)
+const currentUser = getCurrentUser();
+const isValidEmail = validateEmail(email);
+function calculateTotalPrice(items: TOrderItem[]): number {
+	return items.reduce((sum, item) => sum + item.price, 0);
 }
 
-private var settingsForm: some View {
-    Form {
-        // ...
-    }
+// Interfaces (T prefix) - Always use for object shapes
+interface TUser {
+	id: string;
+	email: string;
+	profile: TUserProfile;
 }
+
+interface TOrderItem {
+	id: string;
+	productId: string;
+	quantity: number;
+	price: number;
+}
+
+// Types (T prefix) - Only use when interface is not possible
+type TOrderStatus = 'pending' | 'processing' | 'completed'; // Union
+type TUserOrNull = TUser | null; // Union with null
+type TPartialUser = Partial<TUser>; // Mapped type
+type TUserConfig = Required<TUserOptions>; // Utility type
+
+// Enums (E prefix)
+enum EOrderStatus {
+	Pending = 'pending',
+	Processing = 'processing',
+	Completed = 'completed',
+	Cancelled = 'cancelled'
+}
+
+enum EUserRole {
+	Admin = 'admin',
+	Customer = 'customer',
+	Guest = 'guest'
+}
+
+// Schemas (S prefix)
+const SUserProfile = z.object({
+	firstName: z.string().min(2),
+	lastName: z.string().min(2),
+	dateOfBirth: z.iso.datetime().optional(),
+	phoneNumber: z
+		.string()
+		.regex(/^\+?[1-9]\d{1,14}$/)
+		.optional()
+});
+
+const SOrderCreate = z.object({
+	userId: z.string().uuid(),
+	items: z.array(
+		z.object({
+			productId: z.string().uuid(),
+			quantity: z.number().int().positive()
+		})
+	)
+});
 ```
 
 ❌ Bad:
 
-```swift
-var header: some View { }        // Wrong: Not descriptive
-public var section: some View { } // Wrong: Should be private unless reused
-```
+```typescript
+// Variables & Functions (inconsistent)
+const CurrentUser = getCurrentUser();  // Wrong: PascalCase
+const valid_email = validate_email();  // Wrong: snake_case
+const CALCULATE_PRICE = () => {};      // Wrong: UPPER_CASE
 
-## Naming Conventions
+// Types & Interfaces (missing prefix or wrong keyword)
+type User = {                         // Wrong: Missing T prefix
+  ID: string;                        // Wrong: UPPER_CASE
+  Email: string;                     // Wrong: PascalCase
+};
 
-### Types and Structures
+type TOrderItem = {                   // Wrong: Use interface for objects
+  product_id: string;               // Wrong: snake_case
+  Quantity: number;                 // Wrong: PascalCase
+};
 
-- Always use `PascalCase` for types, structs, classes, enums, protocols
-- Always use descriptive names that clearly indicate purpose
-- Always prefix protocols with descriptive names (e.g. `SingletonModel`, not `Model`)
+interface TUserStatus = 'active' | 'inactive'; // Wrong: Can't use interface for unions
 
-✅ Good:
-
-```swift
-struct SettingsView: View { }
-class DataContainer { }
-protocol SingletonModel { }
-enum Rarity { }
-```
-
-❌ Bad:
-
-```swift
+// Enums (inconsistent)
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
