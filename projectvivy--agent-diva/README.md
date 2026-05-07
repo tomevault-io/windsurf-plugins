@@ -7,11 +7,11 @@ Next Generation AI Agent(AKA:nanobot-rs-pro)
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [ProjectViVy/agent-diva](https://github.com/ProjectViVy/agent-diva).
+Original source: `CLAUDE.md` in [ProjectViVy/agent-diva](https://github.com/ProjectViVy/agent-diva).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
