@@ -7,13 +7,13 @@ idk man it's funny
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [bmdavis419/opencode-hosted-docs-nonsense](https://github.com/bmdavis419/opencode-hosted-docs-nonsense).
+Original source: `.cursor/rules/*.mdc` in [bmdavis419/opencode-hosted-docs-nonsense](https://github.com/bmdavis419/opencode-hosted-docs-nonsense).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
-- **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
