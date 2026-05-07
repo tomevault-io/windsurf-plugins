@@ -1,96 +1,172 @@
 ---
 trigger: always_on
-description: - Maintain `.cursor/memories.md`, `.cursor\rules\lessons-learned.mdc`, and `.cursor/scratchpad.md` for all interactions
+description: Provides unified interface for Stripe, PayPal, and Square payments.
 ---
 
-# PROJECT SYSTEM RULES
+# GitHub Copilot Instructions
 
-## CORE WORKFLOW
-- Maintain `.cursor/memories.md`, `.cursor\rules\lessons-learned.mdc`, and `.cursor/scratchpad.md` for all interactions
-- Use chain-of-thought reasoning for problems, cross-reference existing documentation
-- Follow Mode System for task execution control
+This file provides comprehensive guidance to AI to assist with development tasks in this Python project. Follow these instructions for all code generation, documentation, and testing activities.
 
-## MODE SYSTEM
+## 🐍 Python Development Standards
 
-### Plan Mode (trigger: "plan")
-1. Create session in `.cursor/scratchpad.md`:
-```
-# Mode: PLAN 🎯
-Current Task: [specific task from user input]
-Understanding: [requirements and constraints]
-Questions: [numbered list, minimum 3]
-Confidence: [percentage based on unknowns]
-Next Steps: [bullet points]
-```
-2. Generate clarifying questions until 95%+ confidence
-3. Calculate and update confidence after each response
+### Code Style & Structure
+- **Base Standard**: Google Python Style Guide with PEP 8 compliance
+- **Line Length**: 120 characters maximum
+- **Purpose Documentation**: Every file and class must explain its purpose with detailed docstrings
+- **Readability First**: Code is read more often than written - prioritize clarity
+- **Linting**: Use `ruff check` and `ruff format` for code quality and formatting
+- **Type Checking**: Use `mypy` for static type checking to catch type-related issues early
 
-### Agent Mode (trigger: "agent")
-**Activation Requirements:**
-- Confidence ≥ 95%
-- All questions answered
-- Tasks defined in scratchpad
-- No blocking issues
+### Import Organization
+```python
+from __future__ import annotations
 
-**Enabled Capabilities:**
-- Code modifications with descriptive comments
-- File operations and command execution
-- System changes and scratchpad updates
+# Standard library
+import os
+from typing import Dict, List, Optional
 
-## TASK MANAGEMENT
+# Third-party
+import requests
+from pydantic import BaseModel, Field
 
-### Scratchpad Format (.cursor/scratchpad.md)
-```
-Current Phase: [PHASE-X]
-Mode Context: [FROM_MODE_SYSTEM]
-Status: [Active/Planning/Review]
-Confidence: [percentage]
-Last Updated: [version]
-
-Tasks:
-[ID-001] Description
-Status: [X/[-]/[ ]/[!]/[?]] Priority: [High/Medium/Low]
-Dependencies: [blockers]
-Progress Notes: [version] details
+# Project imports
+from mixins.mixin_secrets import SecretsMixin
+from our_utils.our_logger import get_formatted_logger
 ```
 
-### Status Markers
-- `[X]` Completed
-- `[-]` In Progress  
-- `[ ]` Planned
-- `[!]` Blocked
-- `[?]` Needs Review
+### Class Documentation Pattern
+```python
+class PaymentProcessor:
+    """Processes payments through multiple payment gateways.
+    
+    Provides unified interface for Stripe, PayPal, and Square payments.
+    Handles validation, error handling, and transaction logging with
+    automatic retry logic for failed transactions.
+    
+    Attributes:
+        retry_attempts: Number of retries for failed transactions.
+        supported_currencies: List of supported currency codes.
+    """
+```
 
-## DOCUMENTATION PROTOCOL
+### Error Handling Patterns
+- Use specific exception types with descriptive messages
+- Implement fallback mechanisms - avoid crashes when possible
+- Log errors but continue with sane defaults
+- Use `ToolException` for external service errors
 
-### Memories (.cursor/memories.md)
-Update after every interaction with single-line entries:
-- `[Version] Development:` Exhaustive description of changes, decisions, implementation details, and outcomes
-- `[Version] Manual Update:` (when user uses "mems" keyword) Planning discussions, requirements, strategic decisions
+```python
+from langchain_core.tools import ToolException
 
-### Lessons Learned (.cursor\rules\lessons-learned.mdc)
-Format: `Category: Issue → Solution → Impact`
-Categories: Component Development, Error Resolution, Performance, Security, Accessibility, Code Organization, Testing
+def process_data(data: str) -> dict:
+    """Process user data with proper error handling."""
+    try:
+        result = external_service.process(data)
+        LOGGER.info("Data processed successfully", data_size=len(data))
+        return result
+    except ValidationError as e:
+        LOGGER.error("Validation failed", error=str(e), data=data)
+        raise ToolException(f"Invalid data format: {e}")
+    except ExternalServiceError as e:
+        LOGGER.error("External service failed", service="processor", error=str(e))
+        raise ToolException("Service temporarily unavailable. Please try again.")
+```
 
-### Phase Documentation
-On completion, create `/docs/phases/PHASE-X/[FEATURE-NAME].md` with:
-- Implemented components
-- Technical decisions
-- Code examples
-- Best practices
-- Lessons learned
+### Domain Models with Pydantic
+```python
+from pydantic import BaseModel, Field
+from datetime import datetime
 
-## DEVELOPMENT RULES
-- Keep all code comments (fix typos, adjust to new code, never remove)
-- Add descriptive inline comments for long-term memory
-- Use Pydantic models for type safety
-- Follow established patterns (see memories for context)
-- Ignore `./nodejs` folder (early stage)
+class User(BaseModel):
+    """Domain aggregate for user data and business logic."""
+    
+    id: str = Field(..., description="Unique user identifier")
+    preferences: Dict[str, Any] = Field(
+        default_factory=dict, 
+        description="User preferences and settings"
+    )
+    created_at: datetime = Field(
+        default_factory=datetime.now,
+        description="User creation timestamp"
+    )
+    
+    def has_active_subscription(self) -> bool:
+        """Check if user has an active subscription."""
+        return self.subscription is not None and self.subscription.is_active
+```
 
-## MODE TYPES
-1. **Implementation**: New features - Plan → 95% confidence → Agent
-2. **Bug Fix**: Issue resolution - Plan → Chain of thought → Agent
+## 🧪 Testing Standards
+
+### Test Structure & Organization
+- **Directory Structure**: Mirror source code structure in `tests/unit/` and `tests/integration/`
+- **File Naming**: Prefix with `test_` and mirror source structure
+- **Given-When-Then Pattern**: Mandatory for all tests
+
+### Test Template
+```python
+class TestMyComponent:
+    """Tests for MyComponent class."""
+    
+    def test_basic_functionality(self, component):
+        """Test basic component functionality."""
+        # given
+        input_data = "test input"
+        
+        # when
+        result = component.process(input_data)
+        
+        # then
+        assert result == "expected output"
+    
+    @pytest.mark.parametrize("input_data, expected", [
+        pytest.param("input1", "output1", id="scenario1"),
+        pytest.param("input2", "output2", id="scenario2"),
+    ])
+    def test_multiple_scenarios(self, input_data, expected):
+        """Test multiple scenarios with different inputs."""
+        # given
+        component = ComponentUnderTest()
+        
+        # when
+        result = component.process(input_data)
+        
+        # then
+        assert result == expected
+```
+
+### Async Testing
+```python
+@pytest.mark.asyncio
+async def test_async_functionality(self):
+    """Test async operations."""
+    # given
+    mock_service = AsyncMock()
+    mock_service.process.return_value = "async_result"
+    
+    # when
+    result = await component.async_method()
+    
+    # then
+    assert result == "async_result"
+    mock_service.process.assert_called_once()
+```
+
+### Testing Best Practices
+- Use Given-When-Then structure for all tests
+- Group related tests in classes
+- Use descriptive test names explaining what is being tested
+- Leverage autouse fixtures - don't manually mock what's auto-mocked
+- Test both success and error paths
+- Use parametrization for multiple scenarios
+- Keep tests focused with one assertion per test concept
+
+## 📝 Documentation Standards
+
+### Inline Code Documentation
+- **Keep all existing comments** - only remove if wrong, not helpful, or outdated
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/Nantero1) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-09 -->
+> Source: [Nantero1/ai-first-devops-toolkit](https://github.com/Nantero1/ai-first-devops-toolkit) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-07 -->
