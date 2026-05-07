@@ -1,0 +1,79 @@
+---
+trigger: always_on
+description: This repository is a skill/plugin repo for Claude Code and Codex, not an application service. The primary artifacts are prompt specifications, packaging metadata, and their validation harness:
+---
+
+# AGENTS.md
+
+## Purpose
+
+This repository is a skill/plugin repo for Claude Code and Codex, not an application service. The primary artifacts are prompt specifications, packaging metadata, and their validation harness:
+
+- `SKILL.md` is the host-agnostic orchestration engine.
+- `.claude-plugin/` and `.codex-plugin/` are first-class packaging/discovery targets.
+- `skills/slot-machine/SKILL.md` is the Codex-packaged mirror of the repo-root `SKILL.md`.
+- `scripts/codex-slot-runner.py` is the supported Codex slot runtime helper; it invokes `codex exec`, captures raw logs, and normalizes Codex slot results into stable artifacts.
+- `scripts/install-claude-skill.sh` and `scripts/update-claude-skill.sh` define the supported Claude install/update flow and keep `~/.claude/skills/slot-machine` pointed at the intended source checkout.
+- `scripts/build-codex-runtime-skill.sh`, `scripts/install-codex-skill.sh`, and `scripts/update-codex-skill.sh` define the supported Codex runtime install/update flow.
+- `scripts/install-codex-standalone-skill.sh` is a compatibility wrapper for materializing a plain bundle at an arbitrary destination.
+- `profiles/` contains task-specific profile configs and agent prompts.
+- `tests/` contains shell-based contract checks, real implementer/reviewer smoke tests, scaffolded higher-tier checks, fixtures, and benchmarks.
+
+Treat prompt wording, documented variables, status strings, and output contracts as code. Small text edits can break downstream parsing.
+
+## Repo Map
+
+- `SKILL.md`
+  - Frontmatter `description` must describe trigger conditions only, not workflow details.
+  - Defines the universal variable set, slot configuration rules, artifact paths, and orchestration behavior.
+- `.claude-plugin/`, `.codex-plugin/`, and `skills/slot-machine/SKILL.md`
+  - Keep Claude and Codex packaging aligned when discovery changes.
+  - `skills/slot-machine/SKILL.md` must remain byte-for-byte synchronized with the repo-root `SKILL.md`.
+  - `scripts/install-claude-skill.sh` must create the stable `~/.claude/skills/slot-machine` link for script-managed Claude installs.
+  - `scripts/update-claude-skill.sh` must refresh that Claude link while remaining compatible with legacy direct git checkouts in the Claude skill directory.
+  - `scripts/build-codex-runtime-skill.sh` must keep producing a standalone Codex skill directory with a real `SKILL.md`, linked built-in assets, and no `.codex-plugin` metadata.
+  - The standalone Codex runtime bundle must expose `scripts/codex-slot-runner.py` under `scripts/` so installed Codex skills use the same runtime helper as the repo checkout.
+  - `scripts/install-codex-skill.sh` must rebuild that runtime bundle into the Codex runtime root and point the stable `~/.agents/skills/slot-machine` link at it.
+  - `scripts/update-codex-skill.sh` must rebuild from install metadata so Codex updates do not depend on manual path reconstruction.
+- `profiles/coding/` and `profiles/writing/`
+  - `0-profile.md` holds frontmatter and approach hints.
+  - `1-implementer.md`, `2-reviewer.md`, `3-judge.md`, `4-synthesizer.md` are the phase prompts.
+- `tests/`
+  - `test-contracts.sh`, `test-skill-structure.sh`, and `test-harness-integrity.sh` are the fast checks that currently run in normal local validation.
+  - `test-implementer-smoke.sh`, `test-reviewer-smoke.sh`, and `test-judge-smoke.sh` are real headless smoke tests for the implementer, reviewer, and judge phases.
+  - `test-e2e-happy-path.sh` is a real headless happy-path E2E test.
+  - `test-e2e-edge-cases.sh` and `test-reviewer-accuracy.sh` still skip until their headless `claude -p` assertions are wired in.
+  - `benchmark/` contains long-running benchmark scripts.
+- `README.md`, `CONTRIBUTING.md`, `CLAUDE.md`, `AGENTS.md`
+  - Keep these aligned with actual workflow and test coverage when behavior changes.
+
+## Change Rules
+
+When editing this repo, preserve these invariants:
+
+1. Keep status values synchronized across `SKILL.md`, profile prompts, and tests:
+   - `DONE`
+   - `DONE_WITH_CONCERNS`
+   - `BLOCKED`
+   - `NEEDS_CONTEXT`
+2. Keep judge verdict values synchronized everywhere:
+   - `PICK`
+   - `SYNTHESIZE`
+   - `NONE_ADEQUATE`
+3. Every `{{VARIABLE}}` used in any profile prompt must be documented in `SKILL.md`.
+4. If you change slot configuration, artifact layout, profile loading, or Codex dispatch behavior, update both docs and contract tests in the same change.
+5. Preserve the run artifact contract under `.slot-machine/runs/`, including `.slot-machine/runs/latest/result.json` if you change result generation.
+6. Do not add workflow details to the `SKILL.md` frontmatter description.
+7. Project config can live in `AGENTS.md` or `CLAUDE.md`; docs should treat both as first-class sources.
+8. Describe harness routing host-relatively: native path on the active host, with Codex slots using the slot runtime helper in their slot workspace, which in turn runs `codex exec`, and Claude-as-other-harness using `claude -p`.
+
+## Editing Guidance
+
+- Follow the existing repo style: Markdown and shell first, minimal ceremony.
+- Prefer focused edits. Avoid wholesale prompt rewrites unless the task requires a behavior change.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [pejmanjohn/slot-machine](https://github.com/pejmanjohn/slot-machine) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-03 -->
