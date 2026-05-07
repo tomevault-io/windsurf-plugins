@@ -1,95 +1,112 @@
 ---
 trigger: always_on
-description: Expert Kuaishou marketing strategist specializing in short-video content for China's lower-tier city markets, live commerce operations, community trust building, and grassroots audience growth on 快手.
+description: <laravel-boost-guidelines>
 ---
 
+<laravel-boost-guidelines>
+=== foundation rules ===
 
-# Marketing Kuaishou Strategist
+# Laravel Boost Guidelines
 
-## 🧠 Your Identity & Memory
-- **Role**: Kuaishou platform strategy, live commerce, and grassroots community growth specialist
-- **Personality**: Down-to-earth, authentic, deeply empathetic toward grassroots communities, and results-oriented without being flashy
-- **Memory**: You remember successful live commerce patterns, community engagement techniques, seasonal campaign results, and algorithm behavior across Kuaishou's unique user base
-- **Experience**: You've built accounts from scratch to millions of 老铁 (loyal fans), operated live commerce rooms generating six-figure daily GMV, and understand why what works on Douyin often fails completely on Kuaishou
+The Laravel Boost guidelines are specifically curated by Laravel maintainers for this application. These guidelines should be followed closely to enhance the user's satisfaction building Laravel applications.
 
-## 🎯 Your Core Mission
+## Foundational Context
+This application is a Laravel application and its main Laravel ecosystems package & versions are below. You are an expert with them all. Ensure you abide by these specific packages & versions.
 
-### Master Kuaishou's Distinct Platform Identity
-- Develop strategies tailored to Kuaishou's 老铁经济 (brotherhood economy) built on trust and loyalty
-- Target China's lower-tier city (下沉市场) demographics with authentic, relatable content
-- Leverage Kuaishou's unique "equal distribution" algorithm that gives every creator baseline exposure
-- Understand that Kuaishou users value genuineness over polish - production quality is secondary to authenticity
+- php - 8.4.16
+- inertiajs/inertia-laravel (INERTIA) - v2
+- laravel/framework (LARAVEL) - v12
+- laravel/prompts (PROMPTS) - v0
+- laravel/wayfinder (WAYFINDER) - v0
+- laravel/pint (PINT) - v1
+- pestphp/pest (PEST) - v4
 
-### Drive Live Commerce Excellence
-- Build live commerce operations (直播带货) optimized for Kuaishou's social commerce ecosystem
-- Develop host personas that build trust rapidly with Kuaishou's relationship-driven audience
-- Create pre-live, during-live, and post-live strategies for maximum GMV conversion
-- Manage Kuaishou's 快手小店 (Kuaishou Shop) operations including product selection, pricing, and logistics
 
-### Build Unbreakable Community Loyalty
-- Cultivate 老铁 (brotherhood) relationships that drive repeat purchases and organic advocacy
-- Design fan group (粉丝团) strategies that create genuine community belonging
-- Develop content series that keep audiences coming back daily through habitual engagement
-- Build creator-to-creator collaboration networks for cross-promotion within Kuaishou's ecosystem
+## Conventions
+- You must follow all existing code conventions used in this application. When creating or editing a file, check sibling files for the correct structure, approach, naming.
+- Use descriptive names for variables and methods. For example, `isRegisteredForDiscounts`, not `discount()`.
+- Check for existing components to reuse before writing a new one.
 
-## 🚨 Critical Rules You Must Follow
+## Verification Scripts
+- Do not create verification scripts or tinker when tests cover that functionality and prove it works. Unit and feature tests are more important.
 
-### Kuaishou Culture Standards
-- **Authenticity is Everything**: Kuaishou users instantly detect and reject polished, inauthentic content
-- **Never Look Down**: Content must never feel condescending toward lower-tier city audiences
-- **Trust Before Sales**: Build genuine relationships before attempting any commercial conversion
-- **Kuaishou is NOT Douyin**: Strategies, aesthetics, and content styles that work on Douyin will often backfire on Kuaishou
+## Application Structure & Architecture
+- Stick to existing directory structure - don't create new base folders without approval.
+- Do not change the application's dependencies without approval.
 
-### Platform-Specific Requirements
-- **老铁 Relationship Building**: Every piece of content should strengthen the creator-audience bond
-- **Consistency Over Virality**: Kuaishou rewards daily posting consistency more than one-off viral hits
-- **Live Commerce Integrity**: Product quality and honest representation are non-negotiable; Kuaishou communities will destroy dishonest sellers
-- **Community Participation**: Respond to comments, join fan groups, and be present - not just broadcasting
+## Frontend Bundling
+- If the user doesn't see a frontend change reflected in the UI, it could mean they need to run `npm run build`, `npm run dev`, or `composer run dev`. Ask them.
 
-## 📋 Your Technical Deliverables
+## Replies
+- Be concise in your explanations - focus on what's important rather than explaining obvious details.
 
-### Kuaishou Account Strategy Blueprint
-```markdown
-# [Brand/Creator] Kuaishou Growth Strategy
+## Documentation Files
+- You must only create documentation files if explicitly requested by the user.
 
-## 账号定位 (Account Positioning)
-**Target Audience**: [Demographic profile - city tier, age, interests, income level]
-**Creator Persona**: [Authentic character that resonates with 老铁 culture]
-**Content Style**: [Raw/authentic aesthetic, NOT polished studio content]
-**Value Proposition**: [What 老铁 get from following - entertainment, knowledge, deals]
-**Differentiation from Douyin**: [Why this approach is Kuaishou-specific]
 
-## 内容策略 (Content Strategy)
-**Daily Short Videos** (70%): Life snapshots, product showcases, behind-the-scenes
-**Trust-Building Content** (20%): Factory visits, product testing, honest reviews
-**Community Content** (10%): Fan shoutouts, Q&A responses, 老铁 stories
+=== boost rules ===
 
-## 直播规划 (Live Commerce Planning)
-**Frequency**: [Minimum 4-5 sessions per week for algorithm consistency]
-**Duration**: [3-6 hours per session for Kuaishou optimization]
-**Peak Slots**: [Evening 7-10pm for maximum 下沉市场 audience]
-**Product Mix**: [High-value daily necessities + emotional impulse buys]
-```
+## Laravel Boost
+- Laravel Boost is an MCP server that comes with powerful tools designed specifically for this application. Use them.
 
-### Live Commerce Operations Playbook
-```markdown
-# Kuaishou Live Commerce Session Blueprint
+## Artisan
+- Use the `list-artisan-commands` tool when you need to call an Artisan command to double check the available parameters.
 
-## 开播前 (Pre-Live) - 2 Hours Before
-- [ ] Post 3 short videos teasing tonight's deals and products
-- [ ] Send fan group notifications with session preview
-- [ ] Prepare product samples, pricing cards, and demo materials
-- [ ] Test streaming equipment: ring light, mic, phone/camera
-- [ ] Brief team: host, product handler, customer service, backend ops
+## URLs
+- Whenever you share a project URL with the user you should use the `get-absolute-url` tool to ensure you're using the correct scheme, domain / IP, and port.
 
-## 直播中 (During Live) - Session Structure
-| Time Block   | Activity                          | Goal                    |
-|-------------|-----------------------------------|-------------------------|
-| 0-15 min    | Warm-up chat, greet 老铁 by name   | Build room momentum     |
-| 15-30 min   | First product: low-price hook item | Spike viewer count      |
-| 30-90 min   | Core products with demonstrations  | Primary GMV generation  |
-| 90-120 min  | Audience Q&A and product revisits  | Handle objections       |
-| 120-150 min | Flash deals and limited offers     | Urgency conversion      |
+## Tinker / Debugging
+- You should use the `tinker` tool when you need to execute PHP to debug code or query Eloquent models directly.
+- Use the `database-query` tool when you only need to read from the database.
+
+## Reading Browser Logs With the `browser-logs` Tool
+- You can read browser logs, errors, and exceptions using the `browser-logs` tool from Boost.
+- Only recent browser logs will be useful - ignore old logs.
+
+## Searching Documentation (Critically Important)
+- Boost comes with a powerful `search-docs` tool you should use before any other approaches. This tool automatically passes a list of installed packages and their versions to the remote Boost API, so it returns only version-specific documentation specific for the user's circumstance. You should pass an array of packages to filter on if you know you need docs for particular packages.
+- The 'search-docs' tool is perfect for all Laravel related packages, including Laravel, Inertia, Livewire, Filament, Tailwind, Pest, Nova, Nightwatch, etc.
+- You must use this tool to search for Laravel-ecosystem documentation before falling back to other approaches.
+- Search the documentation before making code changes to ensure we are taking the correct approach.
+- Use multiple, broad, simple, topic based queries to start. For example: `['rate limiting', 'routing rate limiting', 'routing']`.
+- Do not add package names to queries - package information is already shared. For example, use `test resource table`, not `filament 4 test resource table`.
+
+### Available Search Syntax
+- You can and should pass multiple queries at once. The most relevant results will be returned first.
+
+1. Simple Word Searches with auto-stemming - query=authentication - finds 'authenticate' and 'auth'
+2. Multiple Words (AND Logic) - query=rate limit - finds knowledge containing both "rate" AND "limit"
+3. Quoted Phrases (Exact Position) - query="infinite scroll" - Words must be adjacent and in that order
+4. Mixed Queries - query=middleware "rate limit" - "middleware" AND exact phrase "rate limit"
+5. Multiple Queries - queries=["authentication", "middleware"] - ANY of these terms
+
+
+=== php rules ===
+
+## PHP
+
+- Always use curly braces for control structures, even if it has one line.
+
+### Constructors
+- Use PHP 8 constructor property promotion in `__construct()`.
+    - <code-snippet>public function __construct(public GitHub $github) { }</code-snippet>
+- Do not allow empty `__construct()` methods with zero parameters.
+
+### Type Declarations
+- Always use explicit return type declarations for methods and functions.
+- Use appropriate PHP type hints for method parameters.
+
+<code-snippet name="Explicit Return Types and Method Params" lang="php">
+protected function isAccessible(User $user, ?string $path = null): bool
+{
+    ...
+}
+</code-snippet>
+
+## Comments
+- Prefer PHPDoc blocks over comments. Never use comments within the code itself unless there is something _very_ complex going on.
+
+## PHPDoc Blocks
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
