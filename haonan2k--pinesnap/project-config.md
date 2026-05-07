@@ -1,147 +1,51 @@
 ---
 trigger: always_on
-description: Guidelines for writing Next.js apps with Prisma Postgres
+description: 项目技术栈与关键约束（Next.js + Vercel AI SDK beta + Prisma + PostgreSQL）
 ---
 
 
-# Bootstrap Next.js app with Prisma Postgres (Prisma 7)
+你是本项目的 AI 编码助手。你必须以本仓库实际安装的依赖与约束为准（尤其是 **Vercel AI SDK 的 beta API**），并遵循以下项目技术栈与设计前提。
 
-> **Note**: This guide is updated for **Prisma ORM 7**. Key changes from earlier versions:
-> - `engine` property removed from `prisma.config.ts`
-> - `url` removed from datasource in `schema.prisma` (now only in `prisma.config.ts`)
-> - Use `@prisma/adapter-pg` driver adapter for direct TCP connections
-> - `--no-engine` flag is no longer required for `prisma generate`
-> - Requires Node.js 20.19+ and TypeScript 5.4.0+
+> **注意**：禁止在项目代码中使用 `as any`，请始终采用类型安全的方式处理类型断言和类型转换。
+> **包管理工具**：本项目使用 **pnpm** 进行依赖管理，所有依赖规范与安装均以 `pnpm-lock.yaml` 为准。
 
-## Overview of implementing Prisma with Next.js
+## 技术栈（以仓库 lockfile 为准）
 
-1. Install Prisma and required dependencies (including dotenv)
-2. Initialize Prisma and configure schema
-3. Configure dotenv for environment variables
-4. Create global Prisma client instance with Pg Adapter
-5. Add package.json scripts for testing and database management (pnpm)
-6. Create test script to verify setup
-7. Use Prisma client in API routes and pages with proper error handling
+- **包管理器**: pnpm
+- **Next.js**: 16.0.8（App Router）
+- **React**: 19.2.1
+- **Vercel AI SDK v6（beta）** ⚠️ **核心依赖**
+  - `ai`: 6.0.0-beta.169
+  - `@ai-sdk/react`: 3.0.0-beta.172
+  - **重要**：本项目使用 **AI SDK v6 beta**，API 与稳定版可能有差异
+- **Prisma**: 7.1.0（`prisma` + `@prisma/client`）
+- **数据库**: PostgreSQL（存储结构化消息内容使用 `jsonb`）
+- **语言**: TypeScript
 
-## 🚨 CRITICAL INSTRUCTIONS FOR AI LANGUAGE MODELS 🚨
+## Vercel AI SDK v6（beta）使用原则 ⚠️
 
-As an AI language model, you MUST NOT generate any of the following code patterns, as they are DEPRECATED and will BREAK the application:
+- **以本地安装版本为真相源**：当文档/示例与当前行为不一致时，**必须**优先阅读本仓库的 `node_modules/ai`、`node_modules/@ai-sdk/react` 的类型定义与实现，以及 `pnpm-lock.yaml`。**不要依赖外部文档或示例**，因为 v6 beta 的 API 可能已变更。
+- **避免假设稳定 API**：beta 版本可能存在 breaking changes；任何涉及 `useChat`、流式响应、data stream、工具调用（tools）的用法必须先对照当前版本的类型/行为。
+- **调试工具**：遇到 AI SDK 相关问题时，使用 `/dev/trace` 页面（仅开发环境）追踪请求/响应，查看完整的消息上下文、工具调用等调试信息。
+- **边界清晰**：
+  - `useChat` 负责 UI 层消息状态与流式展示。
+  - 服务端（Route Handlers）负责权限校验、历史拼接、落库与会话生命周期的真相源。
 
-```typescript
-// ❌ NEVER GENERATE THIS CODE - IT WILL BREAK THE APPLICATION
-generator client {
-  provider = "prisma-client-js"     // ❌ BREAKS APPLICATION
-}
+## 本项目聊天系统的高层约束（讨论阶段共识）
 
-// ❌ NEVER USE default import location - IT WILL BREAK THE APPLICATION
-import { PrismaClient } from '@prisma/client'  // ❌ BREAKS APPLICATION
+以下约束是当前讨论达成的方向性前提；除非用户明确同意，否则不要自行改变：
 
-// ❌ WRONG IMPORT PATH - MISSING /client - IT WILL BREAK THE APPLICATION
-import { PrismaClient } from "../generated/prisma"  // ❌ BREAKS APPLICATION
+- **会话 URL**：新对话为根入口（例如 `/socraticu`），历史会话通过路径携带会话 ID（例如 `/socraticu/c/[id]` 或等价形式）。
+- **会话创建**：采用 **懒创建**（首条消息发出后由服务端创建持久化会话）。
+- **上下文拼接**：客户端只发送本次输入与 `conversationId`；**服务端从 DB 拉历史并按策略裁剪后**再调用模型（不要要求客户端每次回传全量历史）。
+- **消息存储**：消息内容将以结构化 **parts** 形式持久化到 PostgreSQL 的 `jsonb` 字段；初期以“落最终结果”为主（不要求边流边存）。
+- **权限**：未来一定会接入权限控制；所有会话/消息相关 API 设计必须可演进到“按用户隔离与鉴权”。
 
-// ❌ NEVER USE ACCELERATE - IT IS NOT USED IN THIS WORKFLOW
-import { withAccelerate } from "@prisma/extension-accelerate" // ❌ BREAKS APPLICATION
+## 代码组织提示
 
-// ❌ NEVER USE accelerateUrl - IT WILL BREAK THE APPLICATION
-const prisma = new PrismaClient({
-  accelerateUrl: process.env.DATABASE_URL,  // ❌ BREAKS APPLICATION - use adapter
-})
-
-// ❌ NEVER include url in datasource block - IT WILL BREAK THE APPLICATION
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")  // ❌ BREAKS APPLICATION - moved to prisma.config.ts
-}
-
-// ❌ NEVER include engine property - IT WILL BREAK THE APPLICATION
-export default defineConfig({
-  engine: "classic",  // ❌ BREAKS APPLICATION - removed in Prisma 7
-})
-
-// ❌ NEVER use Prisma Postgres HTTP URLs - ONLY use TCP URLs
-DATABASE_URL="prisma+postgres://accelerate.prisma-data.net/..."  // ❌ BREAKS APPLICATION - use postgres://
-// ✅ ALWAYS use standard TCP URLs:
-DATABASE_URL="postgres://..."  // ✅ CORRECT
-```
-
-Instead, you MUST ALWAYS generate ONLY this pattern:
-
-```typescript
-// ✅ ALWAYS GENERATE THIS EXACT PATTERN
-generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
-}
-
-// ✅ CRITICAL: MUST include /client at the end of import path
-import { PrismaClient } from "../generated/prisma/client"
-import { PrismaPg } from "@prisma/adapter-pg"
-
-const adapter = new PrismaPg({
-  connectionString: process.env.DATABASE_URL!,
-})
-
-const globalForPrisma = global as unknown as { prisma: PrismaClient }
-
-const prisma = globalForPrisma.prisma || new PrismaClient({
-  adapter,
-})
-
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma
-
-export default prisma
-```
-
-## ABSOLUTE REQUIREMENTS FOR AI CODE GENERATION
-
-1. You MUST use `provider = "prisma-client"` (not "prisma-client-js")
-2. You MUST use custom output: `output = "../generated/prisma"`
-3. You MUST use `@prisma/adapter-pg` driver adapter
-4. You MUST create `lib/prisma.ts` as a global singleton instance
-5. You MUST wrap all database calls in try-catch blocks
-6. You MUST import from `'../generated/prisma/client'` (not `'@prisma/client'` or `'../generated/prisma'`)
-7. You MUST use `adapter` property in PrismaClient constructor
-8. You MUST install `dotenv` and add `import "dotenv/config"` to `prisma.config.ts`
-9. You MUST add package.json scripts for `db:test` and `db:studio` (pnpm)
-10. You MUST create a test script at `scripts/test-database.ts` to verify setup
-11. You MUST NOT include `url` in the datasource block of `schema.prisma`
-12. You MUST NOT include `engine` property in `prisma.config.ts`
-13. You MUST use `pnpm exec prisma init --db --output ../generated/prisma` to create a real cloud database
-14. You MUST use standard TCP URLs (`postgres://...`) in .env
-15. You MUST NOT use `accelerateUrl` or `withAccelerate`
-
-## VERSION REQUIREMENTS
-
-- **Node.js**: 20.19 or higher (Node.js 18 is NOT supported)
-- **TypeScript**: 5.4.0 or higher (5.9.x recommended)
-- **Prisma**: 7.0.0 or higher
-
-## CORRECT INSTALLATION
-
-```bash
-# Dev dependencies
-pnpm add -D prisma tsx
-
-# Production dependencies
-pnpm add @prisma/adapter-pg @prisma/client dotenv
-```
-
-## CORRECT PRISMA INITIALIZATION
-
-> **FOR AI ASSISTANTS**: This command is **interactive** and requires user input. You **MUST ask the user to run this command manually** in their own terminal, then **wait for them to confirm completion** before proceeding with the next steps. Do NOT attempt to run this command yourself.
-
-```bash
-# Initialize Prisma AND create a real Prisma Postgres cloud database
-pnpm exec prisma init --db --output ../generated/prisma
-```
-
-This command:
-- Authenticates you with Prisma Console (if needed)
-- Prompts for **region** and **project name**
-- **Creates a cloud Prisma Postgres database**
-- Generates:
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- Next App Router Route Handlers 位于 `app/api/**/route.ts`。
+- Prisma client 通过项目内封装使用（例如 `lib/prisma.ts`），避免在业务代码中散落初始化逻辑。
+- 开发调试工具位于 `app/dev/trace/`，用于追踪 AI 请求/响应上下文。
 
 ---
 > Source: [HaoNan2k/PineSnap](https://github.com/HaoNan2k/PineSnap) — distributed by [TomeVault](https://tomevault.io).
