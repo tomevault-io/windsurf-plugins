@@ -1,197 +1,135 @@
 ---
 trigger: always_on
-description: Frontend best practices and conventions for the LTK Manager UI
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
+# CLAUDE.md
 
-# LTK Manager Frontend Guidelines
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-This document outlines the best practices and conventions for the LTK Manager frontend built with React, TypeScript, and Tauri.
+This file is the primary guidance document for the ltk-manager codebase.
 
-## Tech Stack
+## Commands
 
-- **Framework**: React 19 with TypeScript
-- **Build Tool**: Vite
-- **Desktop Runtime**: Tauri v2
-- **Routing**: TanStack Router (file-based routing)
-- **State Management**: Zustand, TanStack Query
-- **Styling**: Tailwind CSS v4
-- **UI Components**: Base UI (`@base-ui-components/react`)
+All commands run from the repo root.
 
-## Pattern Matching
+```bash
+# Full dev mode (Rust backend + React frontend with hot reload)
+pnpm tauri dev
 
-Use `ts-pattern` for all conditional logic involving multiple cases or complex matching. Avoid nested ternaries.
+# Frontend only (skip Rust rebuild, faster iteration on UI)
+pnpm dev
 
-```tsx
-// ✅ Preferred: ts-pattern
-import { match } from "ts-pattern";
+# Type check / lint / format / all three
+pnpm typecheck
+pnpm lint
+pnpm format
+pnpm check          # typecheck + lint + format:check
 
-const result = match(status)
-  .with("loading", () => <Spinner />)
-  .with("error", () => <ErrorMessage />)
-  .with("success", () => <Content />)
-  .exhaustive();
+# Production build
+pnpm tauri build
 
-// ✅ Tuple matching for multiple conditions
-const sizeClass = match([isCompact, isIconOnly] as const)
-  .with([true, true], () => "h-6 w-6")
-  .with([true, false], () => "h-6 px-2")
-  .with([false, true], () => "h-8 w-8")
-  .with([false, false], () => "h-8 px-4")
-  .exhaustive();
+# Rust-only operations (from workspace root)
+cargo clippy -p ltk-manager
+cargo fmt -p ltk-manager
 
-// ❌ Avoid: Nested ternaries
-const result = isLoading ? <Spinner /> : isError ? <Error /> : <Content />;
+# Verbose backend logging
+RUST_LOG=ltk_manager=trace,tauri=info pnpm tauri dev
 ```
 
-## Class Name Merging
+## Editing Rules
 
-Always use `tailwind-merge` (`twMerge`) when combining Tailwind classes, especially when accepting className props. This ensures proper class precedence and conflict resolution.
+**Always read files before editing them.** Never assume file contents from memory or prior context. When making bulk edits across multiple files, read all target files first, then perform edits.
 
-```tsx
-// ✅ Preferred
-import { twMerge } from "tailwind-merge";
+## Code Style
 
-const classes = twMerge(baseClasses, variantClasses, sizeClasses, className);
+From `.cursorrules`: avoid trivially descriptive comments. Only comment non-obvious business logic, workarounds, edge cases, or "why" decisions. Document all public Rust APIs with `///` doc comments.
 
-// ❌ Avoid: String concatenation or template literals
-const classes = `${baseClasses} ${variantClasses} ${className}`;
-```
+**No redundant comments.** Do not add inline comments that restate what the code already expresses. If the code is descriptive enough (clear variable names, well-known patterns like temp-file-then-rename, obvious API calls), leave it uncommented. This applies to AI-generated code and suggestions too — strip narration comments before committing.
 
-## Component Architecture
+### JSX Conditional Rendering
 
-### Base UI Components
-
-Use `@base-ui-components/react` as the foundation for all interactive components. Extend them with custom styles and behavior.
+**Avoid ternary operators in JSX.** Use early returns or `{condition && <Component />}` instead.
 
 ```tsx
-// ✅ Preferred: Wrap Base UI components
-import { Button as BaseButton } from "@base-ui-components/react";
+// Good — early return
+if (isLoading) return <LoadingState />;
+if (error) return <ErrorState error={error} />;
+return <Content />;
 
-export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ variant, size, className, ...props }, ref) => {
-    const classes = twMerge(baseClasses, variantClasses[variant], className);
-    return <BaseButton ref={ref} className={classes} {...props} />;
-  }
-);
-```
+// Good — single-line conditional
+{
+  hasItems && <ItemList items={items} />;
+}
 
-### Component File Structure
-
-```tsx
-// 1. External imports (React, libraries)
-import { forwardRef, type ReactNode } from "react";
-import { match } from "ts-pattern";
-
-// 2. Internal imports (base components, utilities)
-import { Button as BaseButton } from "@base-ui-components/react";
-import { twMerge } from "tailwind-merge";
-
-// 3. Types
-export type ButtonVariant = "default" | "filled" | "outline";
-export interface ButtonProps { ... }
-
-// 4. Constants (classes, configs)
-const baseClasses = "...";
-const variantClasses: Record<ButtonVariant, string> = { ... };
-
-// 5. Component implementation
-export const Button = forwardRef<...>(...);
-Button.displayName = "Button";
-```
-
-## Icons
-
-Use `react-icons` for icons. Import from specific icon sets to enable tree-shaking.
-
-```tsx
-// ✅ Preferred: Import from specific set
-import { FiPlus, FiTrash } from "react-icons/fi";
-import { HiOutlineDownload } from "react-icons/hi";
-
-// ❌ Avoid: Importing from root
-import { FiPlus } from "react-icons";
-```
-
-## Styling Conventions
-
-### Tailwind Classes
-
-- Use the custom color palette defined in `app.css` (`brand-*`, `surface-*`, `accent-*`)
-- Prefer semantic color names over raw values
-- Group related classes logically
-
-```tsx
-// ✅ Organized class groups
-const classes = twMerge(
-  // Layout
-  "inline-flex items-center justify-center",
-  // Typography
-  "font-medium text-sm",
-  // Colors
-  "bg-surface-700 text-surface-100",
-  // Interactive states
-  "hover:bg-surface-600 active:bg-surface-800",
-  // Focus
-  "focus-visible:outline-brand-500 focus-visible:outline-2",
-  // Disabled
-  "disabled:opacity-50 disabled:cursor-not-allowed"
-);
-```
-
-### Component Variants
-
-Use Record types for variant mappings:
-
-```tsx
-const variantClasses: Record<ButtonVariant, string> = {
-  default: "bg-surface-700 text-surface-100 hover:bg-surface-600",
-  filled: "bg-brand-600 text-white hover:bg-brand-500",
-  outline: "bg-transparent border border-surface-600",
-};
-```
-
-## TypeScript
-
-- Use strict mode
-- Prefer `interface` for object shapes, `type` for unions/intersections
-- Export types alongside components
-- Use `forwardRef` for components that need ref forwarding
-
-```tsx
-export interface ButtonProps
-  extends Omit<BaseButton.Props, "className" | "children"> {
-  variant?: ButtonVariant;
-  size?: ButtonSize;
-  loading?: boolean;
+// Bad — ternary in JSX
+{
+  isLoading ? <LoadingState /> : error ? <ErrorState /> : <Content />;
 }
 ```
 
-## Routing (TanStack Router)
+### Import Conventions
 
-- Use file-based routing in `src/routes/`
-- Access route data via `Route.useLoaderData()`, `Route.useParams()`, etc.
-- Use `<Link>` component for navigation with type-safe `to` prop
+**Always import from barrel exports, never from subdirectories.** This keeps import paths stable and encapsulates internal structure.
 
-## State Management
+- **Global components:** import from `@/components`, not `@/components/Button`, `@/components/Toast`, etc.
+- **Modules:** import from `@/modules/{module}`, not `@/modules/{module}/components` or `@/modules/{module}/api`.
 
-- **Local UI state**: `useState`, `useReducer`
-- **Global client state**: Zustand stores
-- **Server state**: TanStack Query
-- **URL state**: TanStack Router search params
+```ts
+// Good
+import { Button, IconButton, useToast } from "@/components";
+import { ModCard, useInstalledMods } from "@/modules/library";
 
-## File Organization
-
+// Bad — reaches into internals
+import { Button } from "@/components/Button";
+import { useToast } from "@/components/Toast";
+import { ModCard } from "@/modules/library/components";
 ```
-src/
-├── components/       # Reusable UI components
-├── routes/          # TanStack Router file-based routes
-├── stores/          # Zustand stores
-├── hooks/           # Custom React hooks
-├── utils/           # Utility functions
-├── types/           # Shared TypeScript types
-└── styles/          # Global styles (app.css)
-```
+
+### State Consumption — Hooks Over Prop Drilling
+
+**Consume global state (hooks, queries, stores) directly in the component that needs it.** Do not drill Zustand state, TanStack Query data, or mutation callbacks through intermediate components as props.
+
+- Patcher status → call `usePatcherStatus()` in the component that checks it
+- Mod toggle/uninstall → call `useToggleMod()` / `useUninstallMod()` in `ModCard`, not passed from a parent
+- Folder toggle → call `useFolderToggle()` in `FolderRow`/`FolderCard`, not received as a prop
+
+TanStack Query deduplicates identical queries, so multiple components calling the same hook is efficient and correct.
+
+**Exception:** Props are appropriate for coordinating parent-owned UI state (e.g., `onViewDetails` that opens a sibling dialog, `onReorder` where reorder target varies by context).
+
+## Backend (Rust) — `src-tauri/src/`
+
+### Module Layout
+
+- `main.rs` — Tauri setup, command registration in `generate_handler![]`, logging init
+- `error.rs` — `AppError`, `AppErrorResponse`, `IpcResult<T>`, `MutexResultExt`
+- `state.rs` — `SettingsState(Mutex<Settings>)`, settings persistence
+- `commands/` — `#[tauri::command]` wrappers (one file per domain: `mods.rs`, `profiles.rs`, `patcher.rs`, `settings.rs`, `workshop.rs`, `shell.rs`, `app.rs`)
+- `mods/mod.rs` — Business logic for mod install/uninstall/toggle, profile CRUD, library index management
+- `overlay/` — Overlay building, content providers (`modpkg_content.rs`, `fantome_content.rs`)
+- `patcher/` — Patcher lifecycle (start/stop/status), thread management with `Arc<AtomicBool>` stop flag
+- `legacy_patcher/` — FFI integration with `cslol-dll.dll`
+
+### State
+
+Two Tauri-managed states:
+
+- `SettingsState` — App settings (league path, storage path, theme). Access via `State<SettingsState>`, lock with `.0.lock().mutex_err()?.clone()`.
+- `PatcherState` — Patcher thread handle and stop flag. Access via `State<PatcherState>`.
+
+### Error Codes
+
+`ErrorCode` enum variants (serialized as `SCREAMING_SNAKE_CASE`): `Io`, `Serialization`, `Modpkg`, `Fantome`, `LeagueNotFound`, `InvalidPath`, `ModNotFound`, `ValidationFailed`, `InternalState`, `MutexLockFailed`, `PatcherRunning`, `Unknown`, `WorkshopNotConfigured`, `ProjectNotFound`, `ProjectAlreadyExists`, `PackFailed`, `Wad`, `Zip`.
+
+Errors can carry JSON context: `AppErrorResponse::new(code, msg).with_context(json!({ "modId": id }))`.
+
+## Frontend (React + TypeScript) — `src/`
+
+### Key Files
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [LeagueToolkit/ltk-manager](https://github.com/LeagueToolkit/ltk-manager) — distributed by [TomeVault](https://tomevault.io).
