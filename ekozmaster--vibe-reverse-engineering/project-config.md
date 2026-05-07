@@ -1,64 +1,79 @@
 ---
 trigger: always_on
-description: Subagent delegation rules — when to delegate static analysis vs run livetools directly, parallel work patterns
+description: Catalog of all RE tools -- pick the right tool for the job
 ---
 
 
-# Subagent Workflow
+# Tool Catalog
 
-The main agent orchestrates and focuses on **live tools**, **dx9tracer capture**, **user interaction**, and **synthesis**. Heavy static analysis and web research are delegated to subagents so the user isn't blocked.
+**BEFORE FIRST USE**: Run `python verify_install.py` from the repo root. Do NOT proceed with any tool until every required check passes. If pyghidra/Ghidra shows as WARN, run `python verify_install.py --setup` to auto-download JDK 21 + Ghidra + pyghidra. Common failures: missing `git lfs pull` (LFS pointer stubs instead of binaries), missing `pip install -r requirements.txt`.
 
-## Pre-flight: Ensure Ghidra Backend
+All tools work on PE binaries (`.exe` and `.dll`). `$B` = path to binary, `$VA` = hex address, `$D` = path to minidump `.dmp` file. Check tools help command for more info on usage.
+Always consult this catalog before making any move to take the best decision on what to use with best bang for your buck.
+Run all tools from the repo root directory using `python -m <module>` syntax (e.g. `python -m retools.search`). Do NOT modify files inside `retools/`, `livetools/`, or `graphics/` unless working on the tools themselves.
 
-Before first use of pyghidra, the `static-analyzer` subagent should check if Ghidra is available. Run `python verify_install.py` — if pyghidra/Ghidra shows WARN, run `python verify_install.py --setup` to auto-download JDK 21 + Ghidra 11.4.3 + pyghidra. This is a one-time setup (~600MB download). Skip if pyghidra already shows PASS.
+IMPORTANT: Collecting MORE INFORMATION per command run is encouraged over minor snippets of data/output that don't reveal the whole picture.
 
-## Bootstrap First — New Binaries
+## Decision Guide
 
-When analyzing a binary for the first time (no existing or sparsely populated `patches/<project>/kb.h`), **always bootstrap before other static analysis**:
+### Run Directly (main agent)
 
-1. The `static-analyzer` subagent auto-pulls `signatures.db` if missing (pre-flight check). Spawn it to run `bootstrap.py <binary> --project <Name>` — this seeds `patches/<project>/kb.h` with RTTI classes, CRT/library function IDs, compiler info, and propagated labels. **Bootstrap takes 2-5 minutes.** Tell the user it's running and do other work while it completes. The output goes to `patches/<project>/kb.h` — verify this file exists and has content after bootstrap returns. **Bootstrap speeds up all subsequent decompilation**: when `--types kb.h` is passed to the decompiler, it pre-analyzes every known function (`af` per KB entry) so cross-references resolve to named functions, callees get inlined signatures, and you avoid the expensive full-binary `aaa` analysis pass.
-2. **In parallel**, spawn a second `static-analyzer` to run `pyghidra_backend.py analyze <binary> --project patches/<Name>`. This runs Ghidra's full analysis (PE loader, MSVC calling convention detection, type propagation, RTTI parsing) and saves a reusable project. **Takes 5-15 minutes.** Once complete, all subsequent decompilations via `--backend auto --project patches/<Name>` will use Ghidra's higher-quality output.
-3. Any other static analysis subagents should run in parallel, but their decompilation output will be richer if bootstrap finishes first
-4. After bootstrap, all subsequent `decompiler.py` calls **must** use `--types patches/<project>/kb.h`
-5. After pyghidra analyze, all subsequent `decompiler.py` calls should also use `--project patches/<project>` so `--backend auto` prefers Ghidra when available
+These are fast (<5s) and allowed inline:
 
-**How to detect "needs bootstrap":** Check if `patches/<project>/kb.h` exists AND has real content (function signatures `@`, globals `$`, or struct definitions beyond section headers). An empty or stub KB with only comment headers counts as sparse — bootstrap it. Quick check: `grep -cE '^[@$]|^struct |^enum ' patches/<project>/kb.h` — if the count is under 50, bootstrap.
+- "What compiler built this?" → `python -m retools.sigdb fingerprint $B`
+- "Is this a known library function?" → `python -m retools.sigdb identify $B $VA`
+- "Get full context before reasoning about a function" → `python -m retools.context assemble $B $VA --project $P`
+- "Clean up decompiler output with known names" → pipe through `python -m retools.context postprocess`
+- "Read a typed value from the PE file" → `python -m retools.readmem $B $VA $TYPE`
+- "What constant flows into this register?" → `python -m retools.dataflow $B $VA --constants`
+- "Trace where this value comes from" → `python -m retools.dataflow $B $VA --slice TARGET_VA:REG`
+- "Build an ASI patch DLL" → `python -m retools.asi_patcher build spec.json`
 
-**How to detect "needs pyghidra analyze":** Check if `patches/<project>/ghidra/<binary_stem>.gpr` exists. If not, spawn `pyghidra_backend.py analyze`. If kb.h also needs bootstrap, spawn both in parallel.
+### Delegate to `static-analyzer` subagent
 
-## Delegation Rules
+Everything else. Tell the subagent WHAT you need, not HOW to run it — it has the full tool catalog.
 
-| Task | Where |
-|------|-------|
-| Static analysis (`retools`: decompiler, disasm, xrefs, search, structrefs, callgraph, rtti, datarefs, dumpinfo, throwmap) | `static-analyzer` subagent |
-| Web research (docs, API refs, format specs, SDK docs) | `web-researcher` subagent |
-| Live tools (`livetools`: attach, trace, bp, memwatch, dipcnt, mem read/write) | Main agent — directly |
-| dx9tracer trigger/capture | Main agent — directly |
-| dx9tracer analyze (offline JSONL analysis) | `static-analyzer` subagent |
-| Bootstrap new binary (`bootstrap.py`) | `static-analyzer` subagent -- takes 2-5 min |
-| pyghidra analyze (first-time Ghidra analysis) | `static-analyzer` subagent -- takes 5-15 min |
-| Decompiler with `--backend ghidra` (subsequent) | `static-analyzer` subagent -- fast (JVM ~3s + decompile <1s) |
-| Bulk signature scan (`sigdb.py scan`) | `static-analyzer` subagent -- takes 1-3 min |
-| Signature DB build (`sigdb.py build`) | `static-analyzer` subagent -- takes 1-5 min |
-| Single function ID (`sigdb.py identify`, `fingerprint`) | Main agent -- fast (<5s) |
-| Context assembly (`context.py assemble`) | Main agent -- fast (<5s) |
-| Decompiler postprocess (`context.py postprocess`) | Main agent -- instant |
-| Dataflow: constants + backward slice (`dataflow.py`) | Main agent -- fast (<5s) |
-| File editing, patch specs, builds | Main agent — directly |
-| KB updates from subagent findings | `static-analyzer` writes to `kb.h`; main agent may refine |
+**D3D9-specific questions?** Check the DX analysis scripts section below first — they're faster and more targeted than general retools for D3D API usage, device calls, shader constants, and vertex formats.
 
-## Subagent Output Files
+- "What does this function do?" → decompile + callgraph + xrefs + dataflow --constants
+- "Who calls this function?" → xrefs or callgraph --up
+- "What does this function call?" → callgraph --down (add --indirect for vtable calls)
+- "Who calls this virtual method?" → xrefs --indirect + filter by vtable slot offset
+- "What constant reaches this call?" → dataflow --constants or --slice VA:REG
+- "Resolve a switch/jump table" → cfg (auto-resolves MSVC switch patterns)
+- "Find a string and who uses it" → string search with xrefs
+- "Where is this global read/written?" → datarefs
+- "Where is struct field +0x54 used?" → structrefs
+- "What does this struct look like?" → structrefs --aggregate
+- "What C++ class is this vtable?" → RTTI resolution
+- "What type was a caught/thrown exception?" → RTTI throwinfo
+- "Find instructions using a specific constant" → instruction search
+- "What crashed and what was the error message?" → dump diagnosis + throwmap
+- "Map all throw sites to error strings" → throwmap list
+- "First time analyzing a binary?" → bootstrap (2-5 min) + pyghidra analyze (5-15 min) in parallel
+- "Bulk signature scan" → sigdb scan (1-3 min)
+- Any combination of the above
 
-Subagents write detailed findings to `patches/<project>/findings.md` (appended, not overwritten). When a subagent returns, it states the file path — **read the file** for full details including decompilation output, address tables, and suggested livetools commands. The return message is just a summary.
+### Live tools (main agent, requires attached process)
 
-## Parallel Work
+- "Is this function reached at runtime?" → `livetools trace` or `collect`
+- "What are the actual register values?" → `livetools trace --read` or `bp` + `regs`
+- "How many draw calls happen?" → `livetools dipcnt`
+- "Who writes to this memory address?" → `livetools memwatch`
 
-When both static and dynamic analysis are needed:
-1. Spawn `static-analyzer` **in background** for the static questions
-2. **Immediately ask the user** if the game/process is running or ask them to launch it — don't wait for static results
-3. While the subagent works, prepare livetools (attach, set up traces) or discuss the approach with the user
-4. Synthesize findings when the subagent returns
+### DX analysis scripts (main agent, fast first-pass)
 
+These are targeted D3D9 scanners under `rtx_remix_tools/dx/scripts/`. They run in seconds and surface D3D-specific patterns that general-purpose retools would take longer to find. **Use these BEFORE retools** when the question is about D3D9 API usage, device calls, shaders, or vertex formats. Run as `python rtx_remix_tools/dx/scripts/<script> <args>`.
+
+- "How does the game use D3D9?" → `find_d3d_calls.py <game.exe>` (imports + call sites)
+- "Which VS constant registers hold matrices?" → `find_vs_constants.py <game.exe>` (SetVertexShaderConstantF call sites with register/count)
+- "Which PS constant registers are used?" → `find_ps_constants.py <game.exe>` (SetPixelShaderConstantF/I/B with register/count)
+- "Where does the game call the D3D device?" → `find_device_calls.py <game.exe>` (vtable call patterns + device pointer refs)
+- "What render states does the game set?" → `find_render_states.py <game.exe>` (SetRenderState args: culling, blending, depth, fog)
+- "How does the texture pipeline work?" → `find_texture_ops.py <game.exe>` (SetTexture stages, TSS ops, sampler filter/address modes)
+- "Which transform types are used?" → `find_transforms.py <game.exe>` (SetTransform: World, View, Projection, Texture)
+- "What surface formats does the game create?" → `find_surface_formats.py <game.exe>` (CreateTexture/RT/DS format extraction)
+- "Does the game use state blocks?" → `find_stateblocks.py <game.exe>` (state block creation/recording/apply)
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
