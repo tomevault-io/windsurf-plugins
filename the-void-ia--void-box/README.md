@@ -7,11 +7,11 @@ Composable agent runtime with enforced isolation boundaries
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [the-void-ia/void-box](https://github.com/the-void-ia/void-box).
+Original source: `CLAUDE.md` in [the-void-ia/void-box](https://github.com/the-void-ia/void-box).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
