@@ -7,12 +7,12 @@ SkillSwitch 是一款跨平台桌面应用，专为 AI 编程助手的用户打�
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `copilot-instructions.md` in [DargonLee/skill-switch](https://github.com/DargonLee/skill-switch).
+Original source: `AGENTS.md` in [DargonLee/skill-switch](https://github.com/DargonLee/skill-switch).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
+- **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
