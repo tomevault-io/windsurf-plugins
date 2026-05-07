@@ -1,162 +1,219 @@
 ---
 trigger: always_on
-description: Never bypass git hooks - fix the underlying issues instead
+description: This project prioritizes performance. Follow these guidelines to write efficient, allocation-conscious code.
 ---
 
+# Performance Optimization Guidelines
 
-# Never Skip Git Hooks
+This project prioritizes performance. Follow these guidelines to write efficient, allocation-conscious code.
 
-**CRITICAL**: Never use `--no-verify` or `-n` flags to bypass git hooks. Always fix the underlying issue.
+## Memory Optimization
 
-## Forbidden Commands
+### Use String Interning
 
-```bash
-# ❌ NEVER DO THIS
-git commit --no-verify
-git commit -n
-git push --no-verify
-git merge --no-verify
+For repeated identifiers (column names, table names):
 
-# ❌ ALSO NEVER DO THIS
-HUSKY=0 git commit
-HUSKY_SKIP_HOOKS=1 git commit
+```rust
+use prax_query::mem_optimize::interning::{GlobalInterner, ScopedInterner};
+
+// ✅ Good: Intern repeated field names
+let interner = GlobalInterner::get();
+let field = interner.intern("user_id"); // Shared across all uses
+
+// ✅ Good: Use scoped interner for request-local interning
+let mut scoped = ScopedInterner::new();
+for column in &columns {
+    let interned = scoped.intern(column);
+    // Memory freed when scoped is dropped
+}
+
+// ❌ Bad: Repeated String allocations
+for _ in 0..1000 {
+    let field = "user_id".to_string(); // 1000 allocations!
+}
 ```
 
-## Why This Matters
+### Use Arena Allocation
 
-The git hooks enforce:
-- **pre-commit**: Code formatting (`cargo fmt`) and linting (`cargo clippy`)
-- **pre-push**: Full test suite passes
-- **commit-msg**: Conventional commit format
+For query building with many temporary allocations:
 
-Bypassing these hooks:
-- Introduces unformatted code to the repository
-- Allows linting errors into the codebase
-- Breaks CI/CD pipelines
-- Creates inconsistent commit history
-- Causes problems for other contributors
+```rust
+use prax_query::mem_optimize::arena::QueryArena;
 
-## What to Do Instead
+// ✅ Good: Arena-based query building
+let arena = QueryArena::new();
+let sql = arena.scope(|scope| {
+    let filter = scope.and(vec![
+        scope.eq("active", true),
+        scope.or(vec![
+            scope.gt("age", 18),
+            scope.is_not_null("email"),
+        ]),
+    ]);
+    scope.build_select("users", filter)
+});
+// Arena memory freed, sql String is owned
 
-### Hook: pre-commit (format/lint issues)
-
-```bash
-# Fix formatting
-cargo fmt --all
-
-# Fix clippy warnings
-cargo clippy --fix --allow-dirty --allow-staged
-
-# Then commit normally
-git commit -m "feat: your message"
+// ❌ Bad: Many small heap allocations
+let filter = Filter::and(vec![
+    Filter::Equals("active".into(), FilterValue::Bool(true)),
+    Filter::or(vec![
+        Filter::Gt("age".into(), FilterValue::Int(18)),
+        Filter::IsNotNull("email".into()),
+    ]),
+]);
 ```
 
-### Hook: pre-push (test failures)
+### Use Lazy Parsing
 
-```bash
-# Run tests and fix failures
-cargo test --all-features
+For large schemas where not all data is needed:
 
-# Check specific failing test
-cargo test test_name -- --nocapture
+```rust
+use prax_query::mem_optimize::lazy::LazySchema;
 
-# Fix the issue, then push
-git push
+// ✅ Good: Lazy schema - only parses what you access
+let schema = LazySchema::from_json(large_json)?;
+
+// Table names available immediately (no parsing)
+for name in schema.table_names() {
+    if name == "users" {
+        // Only now parse the users table
+        let table = schema.get_table(name)?;
+        for col in table.columns() {
+            // Columns parsed on first access
+        }
+    }
+}
+
+// ❌ Bad: Parse everything eagerly
+let schema: DatabaseSchema = serde_json::from_str(large_json)?;
+// All tables and columns parsed upfront
 ```
 
-### Hook: commit-msg (message format)
+### Avoid Unnecessary Allocations
 
-```bash
-# Use correct format: type(scope): description
-git commit -m "feat(query): add nested filter support"
-git commit -m "fix(postgres): handle connection timeout"
-git commit -m "docs: update README examples"
+```rust
+// ✅ Good: Use references and slices
+fn process(data: &[u8]) -> &str { ... }
 
-# Valid types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert
+// ✅ Good: Use Cow for conditional ownership
+use std::borrow::Cow;
+
+fn normalize(s: &str) -> Cow<'_, str> {
+    if needs_normalization(s) {
+        Cow::Owned(s.to_lowercase())
+    } else {
+        Cow::Borrowed(s)
+    }
+}
+
+// ✅ Good: Reuse buffers
+let mut buf = String::with_capacity(1024);
+for item in items {
+    buf.clear();
+    write!(&mut buf, "{}", item)?;
+    process(&buf);
+}
+
+// ❌ Bad: Allocate in a loop
+for item in items {
+    let s = format!("{}", item); // Allocation each iteration
+    process(&s);
+}
 ```
 
-## Common Issues and Solutions
+### Use SmallVec for Small Collections
 
-### "Formatting check failed"
+```rust
+use smallvec::SmallVec;
 
-```bash
-# Problem: Code not formatted
-cargo fmt --all
-git add -u
-git commit -m "your message"
+// ✅ Good: Inline storage for common case
+let columns: SmallVec<[&str; 8]> = SmallVec::new();
+// No heap allocation until > 8 elements
+
+// ❌ Bad: Always heap allocate
+let columns: Vec<&str> = Vec::new();
 ```
 
-### "Clippy found issues"
+## Query Performance
 
-```bash
-# Problem: Linting warnings
-cargo clippy --all-targets --all-features
-# Read the warnings and fix them, then:
-git add -u
-git commit -m "your message"
+### Batch Operations
+
+```rust
+// ✅ Good: Single multi-row INSERT
+let mut builder = SqlBuilder::postgres();
+builder.push("INSERT INTO events (user_id, type) VALUES ");
+for (i, event) in events.iter().enumerate() {
+    if i > 0 { builder.push(", "); }
+    builder.push("(");
+    builder.push_param(FilterValue::Int(event.user_id));
+    builder.push(", ");
+    builder.push_param(FilterValue::String(event.event_type.clone()));
+    builder.push(")");
+}
+
+// ❌ Bad: Multiple INSERT statements
+for event in events {
+    execute("INSERT INTO events (user_id, type) VALUES ($1, $2)", &[...]).await?;
+}
 ```
 
-### "Tests failed"
+### Use Prepared Statements
 
-```bash
-# Problem: Tests don't pass
-cargo test --all-features
-# Fix failing tests, then:
-git add -u
-git commit -m "your message"
-git push
+```rust
+// ✅ Good: Prepare once, execute many
+let stmt = client.prepare("SELECT * FROM users WHERE id = $1").await?;
+for id in ids {
+    let row = client.query_one(&stmt, &[&id]).await?;
+}
+
+// ❌ Bad: Re-parse query each time
+for id in ids {
+    let row = client.query_one("SELECT * FROM users WHERE id = $1", &[&id]).await?;
+}
 ```
 
-### "Invalid commit message"
+### Efficient IN Clauses
 
-```bash
-# Problem: Wrong format
-# Instead of: "fixed the bug"
-# Use: "fix(module): resolve specific issue"
+```rust
+// ✅ Good: Use ANY with array parameter (PostgreSQL)
+let sql = "SELECT * FROM users WHERE id = ANY($1)";
+let ids: Vec<i64> = vec![1, 2, 3, 4, 5];
+client.query(sql, &[&ids]).await?;
 
-git commit --amend -m "fix(postgres): handle null values in query results"
+// ✅ Good: Generate IN clause efficiently
+let placeholders = postgres_in_pattern(1, ids.len());
+let sql = format!("SELECT * FROM users WHERE id IN ({})", placeholders);
+
+// ❌ Bad: Dynamic SQL with many parameters
+let sql = format!(
+    "SELECT * FROM users WHERE id IN ({})",
+    ids.iter().map(|_| "?").collect::<Vec<_>>().join(", ")
+);
 ```
 
-### "I need to commit work-in-progress"
+### Select Only Needed Columns
 
-```bash
-# Use a WIP branch instead of bypassing hooks
-git stash
-# or
-git checkout -b wip/my-feature
-# Make a proper commit when ready
+```rust
+// ✅ Good: Select specific columns
+let select = Select::fields(["id", "email", "name"]);
+
+// ❌ Bad: Select all columns when only few needed
+let select = Select::all(); // SELECT * includes unused columns
 ```
 
-## Emergency Situations
+## Async Performance
 
-If you genuinely believe you need to bypass hooks (you almost certainly don't):
+### Use Concurrent Execution
 
-1. **Stop and ask**: Is this really necessary?
-2. **Document why**: Create an issue explaining the situation
-3. **Get approval**: Discuss with the team first
-4. **Fix immediately**: The next commit must fix what you bypassed
+```rust
+use prax_query::async_optimize::ConcurrentExecutor;
 
-**There is virtually never a legitimate reason to skip hooks in this project.**
+// ✅ Good: Execute independent queries in parallel
+let executor = ConcurrentExecutor::new(config);
+let results = executor.execute_batch(vec![
 
-## For AI Assistants
-
-When a user asks to bypass git hooks or encounters hook failures:
-
-1. **Never suggest** `--no-verify`, `-n`, or similar flags
-2. **Diagnose the actual problem** by reading the error message
-3. **Provide the fix** for the underlying issue
-4. **Explain why** hooks exist and why bypassing is harmful
-
-Example response:
-```
-I see the pre-commit hook failed due to formatting issues.
-Let me fix that:
-
-cargo fmt --all
-
-Now the commit should succeed. Never use --no-verify
-as it bypasses important quality checks.
-```
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [quinnjr/prax](https://github.com/quinnjr/prax) — distributed by [TomeVault](https://tomevault.io).
