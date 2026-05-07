@@ -3,6 +3,7 @@ trigger: always_on
 description: - Read `tasks/lessons.md` before doing any work. Apply relevant lessons.
 ---
 
+
 # Operational Guidelines
 
 ## Session Start
@@ -30,7 +31,7 @@ description: - Read `tasks/lessons.md` before doing any work. Apply relevant les
 ### Verification
 
 - Never mark a task complete without proving it works — run tests, check logs, demonstrate correctness.
-- After every feature/story: use `post-feature-qa` skill (`.github/skills/post-feature-qa/`).
+- After every feature/story: use `post-feature-qa` skill (`.cursor/skills/post-feature-qa/`).
 - Ask yourself: "Would a staff engineer approve this?"
 
 ### Elegance
