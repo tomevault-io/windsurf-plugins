@@ -1,223 +1,215 @@
 ---
 trigger: always_on
-description: Git-flow branching strategy and workflow conventions for the Prax project
+description: This project provides multi-tenancy support with multiple isolation strategies. Follow these guidelines for secure and performant tenant isolation.
 ---
 
+# Multi-Tenancy Guidelines
 
-# Git-Flow Workflow
+This project provides multi-tenancy support with multiple isolation strategies. Follow these guidelines for secure and performant tenant isolation.
 
-This project follows the **Git-Flow** branching model for organized development and releases.
+## Isolation Strategies
 
-## Branch Structure
+### Row-Level Security (RLS) - Recommended
 
-```
-main (production)
-  │
-  └── develop (integration)
-        │
-        ├── feature/* (new features)
-        ├── bugfix/* (non-critical fixes)
-        ├── release/* (release preparation)
-        └── hotfix/* (critical production fixes)
-```
+Most efficient for shared-table tenancy:
 
-## Primary Branches
+```rust
+use prax_query::tenant::{RlsManager, RlsConfig};
 
-### `main`
-- **Purpose**: Production-ready code only
-- **Protection**: Protected, requires PR approval
-- **Deploys to**: Production / crates.io releases
-- **Never commit directly** - only merge from `release/*` or `hotfix/*`
+// Configure RLS
+let rls = RlsManager::new(
+    RlsConfig::new("tenant_id")
+        .with_session_variable("app.current_tenant")
+        .add_tables(["users", "orders", "products"])
+);
 
-### `develop`
-- **Purpose**: Integration branch for features
-- **Contains**: Latest delivered development changes
-- **Base for**: All `feature/*` and `bugfix/*` branches
-- **Merged to**: `release/*` branches
+// Apply to connection
+rls.set_tenant(&conn, tenant_id).await?;
 
-## Supporting Branches
-
-### Feature Branches: `feature/<name>`
-
-For new features and enhancements.
-
-```bash
-# Create feature branch from develop
-git checkout develop
-git pull origin develop
-git checkout -b feature/query-builder
-
-# Work on feature...
-git add .
-git commit -m "feat(query): implement basic query builder"
-
-# Keep up to date with develop
-git fetch origin develop
-git rebase origin/develop
-
-# Push and create PR to develop
-git push -u origin feature/query-builder
+// All queries automatically filtered by tenant_id
+let users = client.user().find_many().exec().await?;
+// SQL: SELECT * FROM users WHERE tenant_id = current_setting('app.current_tenant')
 ```
 
-**Naming convention**: `feature/<scope>-<description>`
-- `feature/query-builder`
-- `feature/postgres-connection-pool`
-- `feature/schema-parser`
+### Schema-Based Isolation
 
-### Bugfix Branches: `bugfix/<name>`
+For stronger isolation with separate schemas:
 
-For non-critical bug fixes during development.
+```rust
+use prax_query::tenant::{TenantPoolManager, SchemaIsolation};
 
-```bash
-git checkout develop
-git checkout -b bugfix/connection-timeout
+let manager = TenantPoolManager::new(base_pool)
+    .with_isolation(SchemaIsolation::Schema);
 
-# Fix the bug...
-git commit -m "fix(postgres): handle connection timeout gracefully"
-
-git push -u origin bugfix/connection-timeout
+// Get tenant-specific pool
+let pool = manager.get_pool(tenant_id).await?;
+// Queries run against schema_{tenant_id}.users
 ```
 
-**Naming convention**: `bugfix/<scope>-<description>`
-- `bugfix/query-null-handling`
-- `bugfix/migration-rollback`
+### Database-Based Isolation
 
-### Release Branches: `release/<version>`
+Maximum isolation with separate databases:
 
-For preparing a new production release.
+```rust
+let manager = TenantPoolManager::new(base_pool)
+    .with_isolation(SchemaIsolation::Database);
 
-```bash
-# Create release branch from develop
-git checkout develop
-git checkout -b release/0.1.0
-
-# Update version in Cargo.toml
-# Update CHANGELOG.md
-# Final testing and bug fixes only
-
-git commit -m "chore(release): prepare v0.1.0"
-
-# Merge to main
-git checkout main
-git merge --no-ff release/0.1.0
-git tag -a v0.1.0 -m "Release v0.1.0"
-
-# Merge back to develop
-git checkout develop
-git merge --no-ff release/0.1.0
-
-# Delete release branch
-git branch -d release/0.1.0
+// Each tenant has own database
+let pool = manager.get_pool(tenant_id).await?;
+// Connects to tenant_{tenant_id} database
 ```
 
-**Naming convention**: `release/<semver>`
-- `release/0.1.0`
-- `release/1.0.0`
-- `release/2.3.1`
+## Context Propagation
 
-### Hotfix Branches: `hotfix/<name>`
+### Use Task-Local Context (Zero Allocation)
 
-For critical production fixes that can't wait.
+```rust
+use prax_query::tenant::task_local::with_tenant;
 
-```bash
-# Create hotfix from main
-git checkout main
-git checkout -b hotfix/security-vulnerability
+// Set tenant context for async block
+with_tenant("tenant-123", async {
+    // All queries in this block use tenant-123
+    let users = client.user().find_many().exec().await?;
+    let orders = client.order().find_many().exec().await?;
+    Ok(())
+}).await?;
 
-# Fix the issue...
-git commit -m "fix(security): patch SQL injection vulnerability"
-
-# Merge to main
-git checkout main
-git merge --no-ff hotfix/security-vulnerability
-git tag -a v0.1.1 -m "Hotfix v0.1.1"
-
-# Merge to develop (or current release branch)
-git checkout develop
-git merge --no-ff hotfix/security-vulnerability
-
-# Delete hotfix branch
-git branch -d hotfix/security-vulnerability
+// ❌ Bad: Manual tenant filter on each query
+let users = client.user()
+    .find_many()
+    .where_(user::tenant_id::equals(tenant_id)) // Easy to forget!
+    .exec()
+    .await?;
 ```
 
-**Naming convention**: `hotfix/<description>`
-- `hotfix/security-patch`
-- `hotfix/critical-query-fix`
+### Thread-Local for Sync Code
 
-## Workflow Diagrams
+```rust
+use prax_query::tenant::thread_local::{set_tenant, get_tenant};
 
-### Feature Development
-```
-develop ─────●─────────────●─────────────●───────
-              \           /
-feature/*      ●────●────●
-               ↑    ↑    ↑
-            commits on feature
+// In request handler
+set_tenant(tenant_id);
+
+// Deep in call stack
+let current = get_tenant().expect("tenant not set");
 ```
 
-### Release Process
-```
-main    ─────────────────────●────── (v0.1.0)
-                            /
-release/0.1.0    ●────●────●
-                /
-develop ───●───●─────────────●───────
-```
+## Security Rules
 
-### Hotfix Process
-```
-main    ────●─────────────●────── (v0.1.1)
-             \           /
-hotfix/*      ●────●────●
-                        \
-develop ─────────────────●───────
-```
+### Never Trust Client-Provided Tenant ID
 
-## Commit Message Format
+```rust
+// ✅ Good: Extract tenant from authenticated session
+async fn handler(session: Session, req: Request) -> Response {
+    let tenant_id = session.tenant_id(); // From verified JWT/session
 
-All commits **MUST** follow [Conventional Commits](https://conventionalcommits.org/) with **REQUIRED scope**:
+    with_tenant(tenant_id, async {
+        // Process request
+    }).await
+}
 
-```
-<type>(<scope>): <description>
-
-[optional body]
-
-[optional footer]
+// ❌ DANGEROUS: Accept tenant from request
+async fn handler(req: Request) -> Response {
+    let tenant_id = req.header("X-Tenant-ID"); // Attacker can set this!
+    // ...
+}
 ```
 
-### ⚠️ Scope is REQUIRED
+### Validate Cross-Tenant References
 
-Every commit must include a scope. This is enforced by the `commit-msg` git hook.
+```rust
+// ✅ Good: Validate foreign key belongs to same tenant
+async fn create_order(tenant_id: TenantId, user_id: UserId) -> Result<Order> {
+    // Verify user belongs to tenant
+    let user = client.user()
+        .find_unique(user::id::equals(user_id))
+        .exec()
+        .await?
+        .ok_or(Error::NotFound)?;
 
-**Valid scopes:**
-- Crate names: `query`, `postgres`, `mysql`, `sqlite`, `mssql`, `mongodb`, `duckdb`, `schema`, `codegen`, `migrate`, `cli`
-- Special: `deps`, `ci`, `docs`, `release`, `security`
+    if user.tenant_id != tenant_id {
+        return Err(Error::CrossTenantAccess);
+    }
 
-### Valid Types
-
-| Type | Description | Example |
-|------|-------------|---------|
-| `feat` | New feature | `feat(query): add nested filter support` |
-| `fix` | Bug fix | `fix(postgres): handle connection timeout` |
-| `docs` | Documentation | `docs(readme): add installation guide` |
-| `style` | Formatting | `style(query): fix indentation` |
-| `refactor` | Code refactoring | `refactor(schema): simplify parser logic` |
-| `perf` | Performance | `perf(query): optimize SQL generation` |
-| `test` | Tests | `test(postgres): add connection tests` |
-| `build` | Build system | `build(deps): update tokio to 1.35` |
-| `ci` | CI/CD | `ci(github): add benchmark workflow` |
-| `chore` | Maintenance | `chore(release): bump version to 0.3.3` |
-| `revert` | Revert commit | `revert(query): undo filter changes` |
-
-### Breaking Changes
-
-Add `!` before `:` for breaking changes:
-```
-feat(api)!: change query builder interface
+    // Proceed with order creation
+}
 ```
 
-### Types by Branch
+### Enable RLS at Database Level
 
+```sql
+-- PostgreSQL RLS setup
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY tenant_isolation ON users
+    USING (tenant_id = current_setting('app.current_tenant')::int);
+
+-- Force RLS even for table owners
+ALTER TABLE users FORCE ROW LEVEL SECURITY;
+```
+
+## Performance Patterns
+
+### Use Statement Caching
+
+```rust
+use prax_query::tenant::cache::StatementCache;
+
+// Global mode: Share prepared statements across tenants (with RLS)
+let cache = StatementCache::global();
+
+// Per-tenant mode: Separate caches for schema-based isolation
+let cache = StatementCache::per_tenant(1000); // LRU size per tenant
+```
+
+### Use Tenant Cache with TTL
+
+```rust
+use prax_query::tenant::cache::ShardedTenantCache;
+
+// High-concurrency tenant cache
+let cache = ShardedTenantCache::high_concurrency(10_000);
+
+// With TTL
+cache.insert(tenant_id, config, Duration::from_secs(300));
+
+// Get or load
+let config = cache.get_or_insert(tenant_id, || {
+    load_tenant_config(tenant_id)
+}).await?;
+```
+
+### Warm Up Tenant Pools
+
+```rust
+// Pre-warm pools for known active tenants
+let active_tenants = get_active_tenant_ids().await?;
+manager.warmup(&active_tenants).await?;
+
+// Lazy pools for less active tenants
+// Created on first access, evicted after idle timeout
+```
+
+## Testing Multi-Tenancy
+
+### Test Tenant Isolation
+
+```rust
+#[tokio::test]
+async fn test_tenant_isolation() {
+    let tenant_a = create_test_tenant().await;
+    let tenant_b = create_test_tenant().await;
+
+    // Create data for tenant A
+    with_tenant(tenant_a.id, async {
+        client.user().create(user::create! { name: "Alice" }).exec().await?;
+        Ok::<_, Error>(())
+    }).await?;
+
+    // Verify tenant B cannot see tenant A's data
+    with_tenant(tenant_b.id, async {
+        let users = client.user().find_many().exec().await?;
+        assert!(users.is_empty(), "Tenant B should not see Tenant A's users");
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
