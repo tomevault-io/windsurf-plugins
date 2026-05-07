@@ -1,61 +1,75 @@
 ---
 trigger: always_on
-description: This is a reverse engineering toolkit for PE binaries (`.exe` / `.dll`) combining static analysis (`retools`), dynamic analysis (`livetools` via Frida), and D3D9 frame tracing. Work is organized around knowledge base files (`kb.h`) that accumulate discoveries and feed back into richer decompilation.
+description: DX9 FFP Proxy porting guide for RTX Remix compatibility. Use when porting a DX9 shader-based game to the fixed-function pipeline.
 ---
 
-# Vibe Reverse Engineering — Copilot Instructions
 
-This is a reverse engineering toolkit for PE binaries (`.exe` / `.dll`) combining static analysis (`retools`), dynamic analysis (`livetools` via Frida), and D3D9 frame tracing. Work is organized around knowledge base files (`kb.h`) that accumulate discoveries and feed back into richer decompilation.
+# DX9 FFP Proxy — Game Porting Guide
 
+You are helping a user port a DX9 shader-based game to the fixed-function pipeline. Each game folder under `patches/<GameName>/` is a self-contained remix-comp-proxy project (copied from the template at `rtx_remix_tools/dx/remix-comp-proxy/`). The goal is RTX Remix compatibility: Remix requires FFP geometry to inject path-traced lighting and replaceable assets. Also use the Vibe RE tools (retools, livetools) for static and dynamic analysis to assist with developing this wrapper. They are meant to be used together.
 
-## Bootstrap
+**SKINNING IS OFF BY DEFAULT.** Do NOT enable skinning, modify skinning code, or discuss skinning infrastructure unless the user explicitly asks for character model / bone / skeletal animation support. Until then, treat skinning as non-existent. When the user does request it, read `src/comp/modules/skinning.hpp` and `src/comp/modules/skinning.cpp` for the full implementation.
 
-On first use, or if `kb.h` is missing or contains only minimal content, automatically run:
-`python -m retools.bootstrap <binary> --project <ProjectName>`
-before any further static or dynamic analysis. **Bootstrap takes 2-5 minutes** — it scans for RTTI classes, identifies CRT/library functions, and propagates labels. The output goes to `patches/<ProjectName>/kb.h` — verify this file exists and has content after bootstrap returns. All subsequent `decompiler.py` calls must use `--types patches/<ProjectName>/kb.h`. **Bootstrap speeds up all subsequent decompilation**: `--types` pre-analyzes every known function so cross-references resolve to named functions and you avoid the expensive full-binary analysis pass. Tell the user it's running and do other work while it completes.
+**SKINNING APPROACH: FFP indexed vertex blending, NOT CPU matrix math.** When skinning is enabled, keep BLENDINDICES and BLENDWEIGHT in the vertex declaration and buffer, upload bone matrices via `SetTransform(D3DTS_WORLDMATRIX(n), &boneMatrix[n])`, enable `D3DRS_INDEXEDVERTEXBLENDENABLE = TRUE`, and set `D3DRS_VERTEXBLEND` to the weight count. CPU-side vertex skinning is a **last resort** -- it is extremely expensive and tanks frame rate. Always prefer the hardware path.
 
-**In parallel with bootstrap**, run `python retools/pyghidra_backend.py analyze <binary> --project patches/<ProjectName>` to create a reusable Ghidra project. This takes 5-15 minutes but makes all subsequent pyghidra decompilations near-instant. Both bootstrap and pyghidra analyze can run simultaneously.
+---
 
-Run `python verify_install.py` from the repo root before first use. If pyghidra/Ghidra shows as WARN, run `python verify_install.py --setup` to auto-download JDK 21 + Ghidra + pyghidra (~600MB one-time download). Common failures: missing `git lfs pull` (LFS pointer stubs instead of real binaries), missing `pip install -r requirements.txt`.
+## What remix-comp-proxy Does
 
-## Delegation Rule
+Each game's remix-comp-proxy folder is a C++20 compatibility mod based on remix-comp-base that intercepts `IDirect3DDevice9` and:
 
-**Never run static analysis tools (`retools`) directly in sequence.** Delegate to the `static-analyzer` agent for all offline analysis. Exceptions — run these inline (all <5s):
+1. Captures vertex shader constants (View, Projection, World matrices) from `SetVertexShaderConstantF`
+2. Parses `SetVertexDeclaration` to detect per-element attributes: BLENDWEIGHT+BLENDINDICES (skinned), POSITIONT (screen-space), NORMAL presence, and per-element byte offsets and types
+3. Routes `DrawIndexedPrimitive` by vertex layout:
+   - No NORMAL -> HUD/UI pass-through (uses different VS constant layout than world geometry)
+   - Skinned with skinning module enabled -> FFP indexed vertex blending
+   - Rigid 3D (has NORMAL) -> NULLs shaders, applies FFP transforms, draws
+4. Routes `DrawPrimitive` by declaration state: world-space draws (have decl, no POSITIONT, not skinned) engage FFP; screen-space and no-decl draws pass through
+5. Applies captured matrices via `SetTransform` (FFP)
+6. Sets up texture stages and lighting for FFP rendering (stages 1-7 disabled to prevent stale auxiliary textures reaching Remix)
+7. Chain-loads RTX Remix (`d3d9_remix.dll`)
 
-- `sigdb.py identify` / `fingerprint` — single-function ID or compiler detection
-- `context.py assemble` / `postprocess` — context gathering and decompiler annotation (assemble now includes forward constant propagation by default; use `--no-dataflow` on large functions)
-- `dataflow.py --constants` / `--slice` — single-function constant propagation or backward register trace
-- `readmem.py` — single typed read from a PE file
-- `asi_patcher.py build` — build step, not analysis
-- `pyghidra_backend.py status` — project existence check (<1s)
+## Source File Map
 
-If you're about to run a second `retools` command in the same turn, stop and delegate everything to a subagent.
+| File | Role |
+|------|------|
+| `src/comp/main.cpp` | DLL entry, module loading, initialization |
+| `src/comp/modules/renderer.cpp` | Draw call routing -- `on_draw_indexed_prim()` and `on_draw_primitive()` |
+| `src/comp/modules/renderer.hpp` | Renderer class, `drawcall_mod_context` for save/restore state |
+| `src/comp/modules/d3d9ex.cpp` | `IDirect3DDevice9` hook layer -- intercepts all 119 methods |
+| `src/comp/modules/d3d9ex.hpp` | D3D9 hook declarations |
+| `src/comp/modules/skinning.cpp` | Skinning module (vertex expansion, bone upload, FFP blending) |
+| `src/comp/modules/skinning.hpp` | Skinning class interface |
+| `src/comp/modules/diagnostics.cpp` | Diagnostic logging to `ffp_proxy.log` |
+| `src/comp/modules/diagnostics.hpp` | Diagnostics class interface |
+| `src/comp/modules/imgui.cpp` | ImGui debug overlay (F4 toggle) |
+| `src/shared/common/ffp_state.cpp` | FFP state tracker -- engage/disengage, matrix transforms, texture stages |
+| `src/shared/common/ffp_state.hpp` | `ffp_state` class with all state accessors |
+| `src/shared/common/config.cpp` | INI config parser for `remix-comp-proxy.ini` |
+| `src/shared/common/config.hpp` | Config structures: `ffp_settings`, `skinning_settings`, etc. |
+| `remix-comp-proxy.ini` (in `assets/`) | Runtime config: `[FFP]`, `[Skinning]`, `[Diagnostics]`, `[Remix]`, `[Chain]` |
+| `build.bat` | Build script: outputs d3d9.dll proxy |
 
-Run all tools from the repo root using `python -m <module>` syntax (e.g. `python -m retools.search`).
+The codebase is C++20 with a `build.bat` build script, component module system for extensibility.
 
-## Live Tools First
+## What Needs to Change Per Game
 
-The main agent owns `livetools` — always use them to verify static findings and act on leads from subagents. Use `attach <name_or_pid>` for running processes, or `attach <path> --spawn` to launch + instrument before init code runs. When a subagent returns addresses or candidates, immediately follow up with live tools (trace, breakpoint, mem read/write) rather than spawning more static analysis. Static analysis finds clues; live tools confirm and act on them. Do not wait idle for subagents — use live tools to explore independently while static analysis runs in the background.
+The VS constant register layout is defined in `src/shared/common/ffp_state.hpp` as member defaults. Edit these when porting, then rebuild:
 
-## Dual-Backend Decompilation
+```cpp
+int vs_reg_view_start_ = 0;    int vs_reg_view_end_ = 4;
+int vs_reg_proj_start_ = 4;    int vs_reg_proj_end_ = 8;
+int vs_reg_world_start_ = 16;  int vs_reg_world_end_ = 20;
+int vs_reg_bone_threshold_ = 20;   // first register treated as bone palette
+int vs_regs_per_bone_ = 3;        // 3 = 4x3 packed, 4 = full 4x4
+int vs_bone_min_regs_ = 3;        // min count to qualify as bone upload
+```
 
-The decompiler supports two backends with different strengths:
+**Bone config:** Run `find_skinning.py` to determine bone start register and upload pattern. Some games upload all bones at once; others upload in groups until hitting a max (e.g., groups of 15, max 75). If grouped, lower `vs_bone_min_regs_`. If bone uploads overlap with non-bone constants, raise `vs_reg_bone_threshold_`.
 
-- **pyghidra (preferred)** — better MSVC type propagation, library call resolution, larger function scope detection. Requires a Ghidra project (`pyghidra_backend.py analyze` creates one). Use when `patches/<project>/ghidra/<binary>.gpr` exists.
-- **r2ghidra (fallback)** — better `__thiscall` on small functions, no JVM startup. Always available.
-
-**Auto mode**: `python -m retools.decompiler binary.exe 0x401000 --types patches/proj/kb.h --project patches/proj` tries pyghidra first, falls back to r2ghidra. Use `--project` alongside `--types` for auto selection.
-
-**Dual-backend deep analysis**: For complex exploratory tasks (finding subsystems, mapping call chains), run both backends in parallel on the same functions and merge findings. r2ghidra results go to `findings_r2.md`, pyghidra to `findings.md`. Neither backend finds everything alone -- merging both gives the most complete picture.
-
-## Engineering Standards
-
-Every change should make the codebase better, not just make the problem go away. If a solution needs a paragraph to justify why it's not a hack, it's a hack.
-
-**Remove:** fixes in the wrong layer, tolerance inflation, catch-all exception swallowing, excessive null-guard chains, god methods (200+ lines), leaky abstractions.
-
-**Design for:** single responsibility (if you need "and" to describe it, split it), ownership (the component that creates the problem owns the fix), minimal public surface.
-
+Beyond the INI config, users may need to modify:
+- `renderer.cpp` `on_draw_indexed_prim()` -- draw call routing (which draws get FFP vs shader pass-through)
+- `renderer.cpp` `on_draw_primitive()` -- UI/particle handling
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
