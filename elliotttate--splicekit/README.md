@@ -7,11 +7,11 @@ Final Cut Pro, unlocked. A Command Palette, MCP server, and an open plugin frame
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [elliotttate/SpliceKit](https://github.com/elliotttate/SpliceKit).
+Original source: `CLAUDE.md` in [elliotttate/SpliceKit](https://github.com/elliotttate/SpliceKit).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
