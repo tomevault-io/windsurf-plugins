@@ -2,6 +2,8 @@
 
 > Tome by [ofershap](https://github.com/ofershap/cursor-office) — distributed by [TomeVault](https://tomevault.io)
 
+A living pixel art office for your Cursor AI agent — watch it work, click things, discover easter eggs
+
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
