@@ -1,78 +1,102 @@
 ---
 trigger: always_on
-description: Guidelines and best practices for building Convex projects, including database schema design, queries, mutations, and real-world examples
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
+# CLAUDE.md
 
-# Convex guidelines
-## Function guidelines
-### Http endpoint syntax
-- HTTP endpoints are defined in `convex/http.ts` and require an `httpAction` decorator. For example:
-```typescript
-import { httpRouter } from "convex/server";
-import { httpAction } from "./_generated/server";
-const http = httpRouter();
-http.route({
-    path: "/echo",
-    method: "POST",
-    handler: httpAction(async (ctx, req) => {
-    const body = await req.bytes();
-    return new Response(body, { status: 200 });
-    }),
-});
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+<!-- v2.1.1 -->
+
+## Package
+
+`@djpanda/convex-authz` — a Convex component providing RBAC/ABAC/ReBAC authorization with O(1) indexed lookups (inspired by Google Zanzibar). Published as a Convex component via `defineComponent("authz")`.
+
+## Commands
+
+```bash
+npm test                 # Run vitest (run mode + type checking)
+npm run test:watch       # Vitest in watch mode
+npm run build            # Compile via tsconfig.build.json → dist/
+npm run build:clean      # Remove dist + tsbuildinfo, full codegen rebuild
+npm run build:codegen    # Generate Convex component code + rebuild
+npm run lint             # ESLint on all files
+npm run typecheck        # tsc --noEmit across src, example, and example/convex
+npm run dev              # Parallel: convex dev + vite (example app) + build watcher
 ```
-- HTTP endpoints are always registered at the exact path you specify in the `path` field. For example, if you specify `/api/someRoute`, the endpoint will be registered at `/api/someRoute`.
 
-### Validators
-- Below is an example of an array validator:
+Run a single test file: `npx vitest run src/component/queries.test.ts`
+Run a single test by name: `npx vitest run -t "test name pattern"`
+Debug tests: `npm run test:debug` (enables Node inspector, no file parallelism).
+
+## Architecture
+
+### Unified Architecture (v2)
+
+One `Authz` class provides O(1) reads, ABAC policy support, and ReBAC — all in one.
+
+**Dual-layer design:** Source tables store ground truth; effective tables store pre-computed O(1) lookups. All writes go to BOTH layers via `unified.ts` mutations.
+
+- **Source tables**: `roleAssignments`, `userAttributes`, `permissionOverrides`, `relationships`, `auditLog`
+- **Effective tables**: `effectivePermissions`, `effectiveRoles`, `effectiveRelationships`
+
+**Permission check (`can()`) tiered resolution:**
+1. O(1) exact lookup in `effectivePermissions` (covers RBAC + overrides)
+2. If `policyResult == "deferred"` → evaluate ABAC policy at read time
+3. Wildcard pattern fallback for `docs:*` style permissions
+
+**ABAC policy classification:**
+- **Static** (`type: "static"`) — evaluated at write time, result stored in `effectivePermissions.policyResult`
+- **Deferred** (`type: "deferred"`) — evaluated at read time via `canWithContext()`
+
+**Three authorization models** (RBAC, ABAC, ReBAC) all available on the single `Authz` class. `IndexedAuthz` is a deprecated alias.
+
+### Scope System
+
+Scope (`{ type: string; id: string }`) enables resource-level permissions. A role/permission can be global (no scope) or scoped to a resource (e.g., `{ type: "team", id: "team_123" }`). Indexed tables use `scopeKey` field: `"global"` or `"type:id"`.
+
+### Key File Map
+
+- `src/component/schema.ts` — 8 tables with all indexes
+- `src/component/unified.ts` — **v2 core**: tiered checkPermission query + dual-write mutations (assignRoleUnified, revokeRoleUnified, grantPermissionUnified, denyPermissionUnified, addRelationUnified, removeRelationUnified, setAttributeWithRecompute, recomputeUser)
+- `src/component/mutations.ts` — source-table mutations (offboardUser, deprovisionUser, cleanup, audit)
+- `src/component/queries.ts` — read queries (getUserRoles, hasRole, getUserAttributes, getAuditLog). `checkPermission`/`checkPermissions` are now internal.
+- `src/component/indexed.ts` — O(1) read queries (checkPermissionFast, hasRoleFast, hasRelationFast, getUserPermissionsFast, getUserRolesFast). Write mutations are now internal.
+- `src/component/rebac.ts` — relationship traversal (checkRelationWithTraversal, listAccessibleObjects, listUsersWithAccess)
+- `src/component/helpers.ts` — `matchesPermissionPattern`, scope matching, policy context
+- `src/client/index.ts` — unified `Authz` class + `definePermissions`, `defineRoles`, `definePolicies`, `defineTraversalRules`, `defineRelationPermissions`, `defineCaveats` helpers. `IndexedAuthz` is a deprecated alias.
+- `src/client/validation.ts` — input validation for client methods
+- `src/react/index.ts` — `AuthzProvider`, `useCanUser`, `useUserRoles`, `PermissionGate`
+
+### Package Exports
+
+- `.` → `dist/client/index.js` (unified Authz class, define* helpers, deprecated IndexedAuthz alias)
+- `./react` → `dist/react/index.js` (React hooks/components)
+- `./convex.config` → `dist/component/convex.config.js` (component registration)
+
+### Type-Safe Permission/Role Definitions
+
+`definePermissions()` and `defineRoles(permissions, ...)` use generics so that role definitions are type-checked against declared permissions. Roles support `inherits` (single parent) and `includes` (multiple roles) with cycle detection via `flattenRolePermissions()`.
+
+### Wildcard Permissions
+
+Permission strings support patterns: `"*"` (all), `"resource:*"` (all actions on resource), `"*:action"` (action on all resources). Matching happens in `matchesPermissionPattern()`.
+
+## Test Pattern
+
+Tests use `convex-test`:
+
 ```typescript
-import { mutation } from "./_generated/server";
-import { v } from "convex/values";
+import { convexTest } from "convex-test";
+import schema from "./schema.js";
+import { api } from "./_generated/api.js";
 
-export default mutation({
-args: {
-    simpleArray: v.array(v.union(v.string(), v.number())),
-},
-handler: async (ctx, args) => {
-    //...
-},
-});
+const t = convexTest(schema, import.meta.glob("./**/*.ts"));
+await t.mutation(api.mutations.assignRole, { userId, role, ... });
+const result = await t.query(api.queries.hasRole, { userId, role, ... });
 ```
-- Below is an example of a schema with validators that codify a discriminated union type:
-```typescript
-import { defineSchema, defineTable } from "convex/server";
-import { v } from "convex/values";
 
-export default defineSchema({
-    results: defineTable(
-        v.union(
-            v.object({
-                kind: v.literal("error"),
-                errorMessage: v.string(),
-            }),
-            v.object({
-                kind: v.literal("success"),
-                value: v.number(),
-            }),
-        ),
-    )
-});
-```
-- Here are the valid Convex types along with their respective validators:
-Convex Type  | TS/JS type  |  Example Usage         | Validator for argument validation and schemas  | Notes                                                                                                                                                                                                 |
-| ----------- | ------------| -----------------------| -----------------------------------------------| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Id          | string      | `doc._id`              | `v.id(tableName)`                              |                                                                                                                                                                                                       |
-| Null        | null        | `null`                 | `v.null()`                                     | JavaScript's `undefined` is not a valid Convex value. Functions the return `undefined` or do not return will return `null` when called from a client. Use `null` instead.                             |
-| Int64       | bigint      | `3n`                   | `v.int64()`                                    | Int64s only support BigInts between -2^63 and 2^63-1. Convex supports `bigint`s in most modern browsers.                                                                                              |
-| Float64     | number      | `3.1`                  | `v.number()`                                   | Convex supports all IEEE-754 double-precision floating point numbers (such as NaNs). Inf and NaN are JSON serialized as strings.                                                                      |
-| Boolean     | boolean     | `true`                 | `v.boolean()`                                  |
-| String      | string      | `"abc"`                | `v.string()`                                   | Strings are stored as UTF-8 and must be valid Unicode sequences. Strings must be smaller than the 1MB total size limit when encoded as UTF-8.                                                         |
-| Bytes       | ArrayBuffer | `new ArrayBuffer(8)`   | `v.bytes()`                                    | Convex supports first class bytestrings, passed in as `ArrayBuffer`s. Bytestrings must be smaller than the 1MB total size limit for Convex types.                                                     |
-| Array       | Array       | `[1, 3.2, "abc"]`      | `v.array(values)`                              | Arrays can have at most 8192 values.                                                                                                                                                                  |
-| Object      | Object      | `{a: "abc"}`           | `v.object({property: value})`                  | Convex only supports "plain old JavaScript objects" (objects that do not have a custom prototype). Objects can have at most 1024 entries. Field names must be nonempty and not start with "$" or "_". |
-| Record      | Record      | `{"a": "1", "b": "2"}` | `v.record(keys, values)`                       | Records are objects at runtime, but can have dynamic keys. Keys must be only ASCII characters, nonempty, and not start with "$" or "_".                                                               |
-
-### Function registration
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
