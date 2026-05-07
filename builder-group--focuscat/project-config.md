@@ -1,229 +1,204 @@
 ---
 trigger: always_on
-description: Rust coding standards and style guidelines for Tauri applications
+description: Swift and SwiftUI coding standards and style guidelines
 ---
 
 
-# Rust Style Guide
+# Swift Style Guide
 
-Rust coding standards and style guidelines for our Tauri applications. These guidelines ensure consistency, maintainability, and high code quality across Rust codebases.
+Swift and SwiftUI coding standards and style guidelines for our iOS codebase. These guidelines ensure consistency, maintainability, and high code quality across Swift projects.
 
 ## Core Principles
 
 - **KISS (Keep It Simple, Stupid)** - Always choose the simplest, most maintainable solution
-- **Type Safety First** - Always leverage Rust's type system to prevent errors at compile time
+- **SwiftUI First** - Always prefer SwiftUI over UIKit when possible
 - **Less is More** - Always avoid unnecessary complexity, the best code is no code
-- **Intent-Driven Comments** - Always use comments to explain intent and categorize code, never to restate what the code does
+- **Self-Documenting** - Always make code obvious and clear without comments
 
-## Code Organization
+## Linter Errors and False Positives
 
-### Module Structure
+### Ignoring False Positive Errors
+
+**Always ignore false positive linter errors from Cursor/VS Code** when working with Swift code. The Swift language server in VS Code/Cursor cannot properly resolve Swift symbols and dependencies that are correctly configured in Xcode.
+
+**Common false positive errors to ignore:**
+
+- `Cannot find 'X' in scope` - When X is clearly defined in the codebase
+- `Reference to member 'X' cannot be resolved without a contextual type` - When X is a valid SwiftUI/UIKit type
+- `No such module 'X'` - When the module is correctly imported in Xcode
+- `Value of type 'X' has no member 'Y'` - When Y is a valid member in Xcode
+- Any reference errors for custom views, models, or utilities that compile successfully in Xcode
+
+**Workflow:**
+
+- Use Cursor for AI assistance and code generation
+- Use Xcode for actual development and compilation
+- Only report real compilation errors from Xcode, not linter errors from Cursor/VS Code
+- Trust Xcode's build system over Cursor's language server for Swift
+
+## File Organization
+
+### Directory Structure
+
 - Always organize code in a predictable and scalable way
 - Always keep related code close together
-- Always use clear, descriptive module names
+- Always use clear, descriptive directory names
 - Always follow consistent patterns across the project
+- Always use singular for categories/domains (e.g. `Feature/`, `Model/`, `View/`)
+- Always use plural for collections/lists (e.g. `Features/`, `Models/`, `Views/`)
 
 ✅ Good:
-```rust
-src/
-  features/
-    activity_window/
-      mod.rs
-      types.rs
-      repository.rs
-      watcher.rs
-      commands.rs
-  common/
-    db.rs
-    time.rs
+
+```swift
+Tapling/
+  Features/
+    Collectible/
+      Environment/
+        Models/
+        CollectibleRegistry.swift
+      Views/
+  Routes/
+    Settings/
+      SettingsView.swift
+  Views/
+    ActionRowView.swift
 ```
 
 ❌ Bad:
-```rust
-src/
-  features/
-    ActivityWindow/     # Wrong: PascalCase directory
-    activity_window/
-      Types.rs          # Wrong: PascalCase file
-      repository.rs
-      watcher.rs
+
+```swift
+Tapling/
+  feature/           // Wrong: Should be Features (plural)
+    collectible/     // Wrong: Should be Collectible (PascalCase)
+      model/         // Wrong: Should be Models (plural)
 ```
 
 ### File Naming
-- Always use `snake_case` for Rust files
-- Always use descriptive, purpose-indicating names
-- Always follow Rust community conventions
+
+- Always use `PascalCase` for Swift files (e.g. `SettingsView.swift`, `TaplingSettings.swift`)
+- Always match the file name to the primary type/struct/class it contains
+- Always use descriptive names that indicate purpose
 
 ✅ Good:
-```rust
-user_service.rs
-jwt_utils.rs
-activity_repository.rs
+
+```swift
+SettingsView.swift        // Contains SettingsView struct
+TaplingSettings.swift     // Contains TaplingSettings class
+ActionRowView.swift       // Contains ActionRowView struct
 ```
 
 ❌ Bad:
-```rust
-UserService.rs      # Wrong: PascalCase
-user-service.rs     # Wrong: kebab-case
-USER_UTILS.rs       # Wrong: UPPER_SNAKE_CASE
+
+```swift
+settings.swift           // Wrong: Should be PascalCase
+Settings.swift           // Wrong: Too generic
+View.swift               // Wrong: Not descriptive
 ```
 
-## Comments and Documentation
+## SwiftUI View Structure
 
-### Comment Philosophy
-- Always use comments to explain **intent** and **context**, not to restate code
-- Always use comments to **categorize** and **section** code into logical blocks
-- Always use comments to provide **context** that isn't obvious from the code
-- Never restate what the code already makes clear
-- Never add comments that become outdated quickly
+### View Organization
+
+- Always follow the 3-layer structure: Variables → UI → Actions
+- Always use `// MARK: - UI` to separate UI components from actions
+- Always use `// MARK: - Actions` to separate actions from UI
+- Never add more than these 2 MARKs - if you need more organization, split the view
 
 ✅ Good:
-```rust
-/// Upsert item (insert or update if exists).
-pub async fn upsert(input: &UpsertInput) -> Result<i64, Error> {
-    // Try to find existing item
-    let existing: Option<i64> = query("SELECT id FROM items WHERE key = ?")
-        .bind(&input.key)
-        .fetch_optional(pool)
-        .await?;
 
-    // Update existing item
-    if let Some(id) = existing {
-        query("UPDATE items SET name = ? WHERE id = ?")
-            .execute(pool)
-            .await?;
-        return Ok(id);
+```swift
+struct SettingsView: View {
+    // Variables (no MARK needed)
+    @State private var isEnabled = false
+    @QuerySingleton private var settings: Settings
+
+    // MARK: - UI
+
+    var body: some View {
+        Form {
+            headerSection
+        }
     }
-    // Insert new item
-    else {
-        let id = query("INSERT INTO items ... RETURNING id")
-            .fetch_one(pool)
-            .await?;
-        return Ok(id);
+
+    private var headerSection: some View {
+        Section {
+            Toggle("Enabled", isOn: isEnabledBinding)
+        }
+    }
+
+    // MARK: - Actions
+
+    private func saveSettings() {
+        try? modelContext.save()
     }
 }
 ```
 
 ❌ Bad:
-```rust
-// This function upserts an item
-pub async fn upsert(input: &UpsertInput) -> Result<i64, Error> {
-    // Get current timestamp
-    let now = current_timestamp();
 
-    // Query the database
-    let existing = query("SELECT id...")
-        .bind(&input.key)  // Bind key
-        .fetch_optional(pool)  // Fetch optional
-        .await?;  // Await
+```swift
+struct SettingsView: View {
+    // MARK: - Properties  // Wrong: No MARK for variables
+    @State private var isEnabled = false
 
-    // Check if existing exists
-    if let Some(id) = existing {
-        // Update the item
-        query("UPDATE...").execute(pool).await?;
-        // Return the id
-        return Ok(id);
-    }
+    // MARK: - UI
+    var body: some View { }
+
+    // MARK: - Search UI     // Wrong: Too many MARKs
+    // MARK: - Filter UI     // Wrong: Split into separate views instead
+    // MARK: - Actions
 }
 ```
 
-### Section Dividers
-- Always use `// MARK: -` style section dividers (Xcode convention)
-- Always use section dividers to organize large files into logical sections
-- Always place dividers before major sections, not between every function
+### View Components
+
+- Always use computed properties for view sections
+- Always use descriptive names ending with `Section`, `View`, or `Button` (e.g. `headerSection`, `settingsForm`, `saveButton`)
+- Always keep view components private unless they need to be reused elsewhere
 
 ✅ Good:
-```rust
-// MARK: - App Repository
 
-pub struct AppRepository;
-
-impl AppRepository {
-    // ...
+```swift
+private var headerSection: some View {
+    VStack {
+        Text("Title")
+    }
 }
 
-// MARK: - App Activity Repository
-
-pub struct AppActivityRepository;
-```
-
-❌ Bad:
-```rust
-// App Repository
-pub struct AppRepository;
-
-// Implementation
-impl AppRepository {
-    // Upsert method
-    pub async fn upsert(...) {
-        // ...
-    }
-    // Get method
-    pub async fn get(...) {
+private var settingsForm: some View {
+    Form {
         // ...
     }
 }
 ```
 
-### Doc Comments
-- Always use doc comments (`///`) for public APIs
-- Always explain behavior, edge cases, and return values
-- Always use doc comments for structs, enums, and public functions
+❌ Bad:
+
+```swift
+var header: some View { }        // Wrong: Not descriptive
+public var section: some View { } // Wrong: Should be private unless reused
+```
+
+## Naming Conventions
+
+### Types and Structures
+
+- Always use `PascalCase` for types, structs, classes, enums, protocols
+- Always use descriptive names that clearly indicate purpose
+- Always prefix protocols with descriptive names (e.g. `SingletonModel`, not `Model`)
 
 ✅ Good:
-```rust
-/// Insert new session.
-/// Returns None if duration is zero or negative (entry skipped).
-pub async fn insert(input: &UpsertInput) -> Result<Option<i64>, Error> {
-    // Skip entries with zero or negative duration
-    if input.end_time <= input.start_time {
-        return Ok(None);
-    }
-    // ...
-}
+
+```swift
+struct SettingsView: View { }
+class DataContainer { }
+protocol SingletonModel { }
+enum Rarity { }
 ```
 
 ❌ Bad:
-```rust
-// Insert activity
-pub async fn insert(input: &UpsertInput) -> Result<Option<i64>, Error> {
-    // ...
-}
-```
 
-## Return Statements
-
-### Explicit Returns
-- Always use explicit `return` keyword for return statements
-- Always prefer clarity over implicit returns
-- Always use `return` for early returns
-
-✅ Good:
-```rust
-pub async fn upsert(input: &UpsertInput) -> Result<i64, Error> {
-    if let Some(id) = existing {
-        update_item(id).await?;
-        return Ok(id);
-    } else {
-        let id = insert_item(input).await?;
-        return Ok(id);
-    }
-}
-
-fn validate(input: &str) -> Result<(), Error> {
-    if input.is_empty() {
-        return Err(Error::InvalidInput);
-    }
-    if input.len() > 100 {
-        return Err(Error::InputTooLong);
-    }
-    Ok(())
-}
-```
-
-❌ Bad:
-```rust
-pub async fn upsert(input: &UpsertInput) -> Result<i64, Error> {
+```swift
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
