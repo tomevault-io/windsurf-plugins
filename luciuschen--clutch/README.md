@@ -7,11 +7,11 @@ Interactive database client for Emacs — MySQL, PostgreSQL, SQLite (pure Elisp)
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [LuciusChen/clutch](https://github.com/LuciusChen/clutch).
+Original source: `CLAUDE.md` in [LuciusChen/clutch](https://github.com/LuciusChen/clutch).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
