@@ -1,81 +1,67 @@
 ---
 trigger: always_on
-description: codingbuddy Agent auto-activation based on file patterns
+description: codingbuddy common rules - applied to all conversations
 ---
 
 
-# codingbuddy Agent System
+# codingbuddy Rules
 
-## Required: Mode Keyword Detection
+## Workflow
 
-When user message starts with `PLAN`, `ACT`, `EVAL`, `AUTO` (or localized variants: 자동, 自動, 自动, AUTOMÁTICO):
+- **PLAN** → **ACT** → **PLAN** (default flow)
+- **EVAL** only on explicit request
+- **AUTO** for autonomous PLAN → ACT → EVAL cycle until quality achieved
 
-→ **Immediately** call `parse_mode` MCP tool
+## Required Actions
 
-## File Context → Agent Mapping
+When `PLAN`, `ACT`, `EVAL`, `AUTO` keywords detected → **Immediately** call `parse_mode` MCP tool
 
-| File Pattern | Recommended Agent | MCP Call |
-|--------------|-------------------|----------|
-| `*.tsx`, `*.ts` | frontend-developer | `get_agent_details("frontend-developer")` |
-| `*.go`, `*.py`, `*.java`, `*.rs` | backend-developer | `get_agent_details("backend-developer")` |
-| `Dockerfile`, `*.yml` | devops-engineer | `get_agent_details("devops-engineer")` |
-| `*.json` (agents/) | agent-architect | `get_agent_details("agent-architect")` |
+## Context Persistence
 
-## Specialist Auto-Recommendation
+After completing work in any mode → call `update_context` MCP tool to persist decisions and notes.
 
-| Detected Topic | Recommended Specialist |
-|----------------|------------------------|
-| Security, auth, XSS, CSRF | security-specialist |
-| Accessibility, ARIA, a11y, WCAG | accessibility-specialist |
-| Performance, bundle, optimization | performance-specialist |
-| Testing, TDD, coverage | test-strategy-specialist |
-| Architecture, layers, dependencies | architecture-specialist |
+## Quality Tools
 
-## Pre-Analysis
+- `analyze_task` — Pre-planning task analysis with risk assessment
+- `generate_checklist` — Contextual checklists for security, accessibility, performance
+- `search_rules` — Search project rules and guidelines
+- `get_code_conventions` — Get code conventions and style guide
 
-Before starting specialist analysis, optionally call `analyze_task` MCP tool for:
-- Risk assessment of the current task
-- Recommended specialists (may differ from file-pattern defaults)
-- Contextual checklists
+## Core Principles
 
-## Specialist Execution Pattern
+- TDD: Red → Green → Refactor
+- Test coverage 90%+
+- TypeScript strict (no `any`)
+- Server Components first
 
-When `parse_mode` returns `parallelAgentsRecommendation`:
+## Project Config
 
-1. Call `prepare_parallel_agents` MCP tool with the recommended specialists
-2. Execute each specialist **sequentially** (one at a time):
-   - Announce: "🔍 Analyzing from [icon] [specialist-name] perspective..."
-   - Apply specialist system prompt to analyze target code
-   - Record findings
-3. Present consolidated findings summary
+Use `get_project_config` MCP tool to retrieve project-specific settings (language, tech stack, conventions).
 
-See `packages/rules/.ai-rules/adapters/cursor.md` for full details.
+## Skills
 
-## Available Agents
+When a skill might apply to the user's task:
+1. Call `recommend_skills` with the user's prompt
+2. If recommendations returned, call `get_skill` with the top skillName
+3. Follow the loaded skill instructions
 
-| Agent | Description | Expertise |
-|-------|-------------|-----------|
-| Accessibility Specialist | Accessibility expert for Planning, Implementation, and Evaluation modes - unified specialist for WCAG 2.1 AA compliance, ARIA attributes, and keyboard navigation |  |
-| Act Mode Agent | ACT mode agent - specialized for actual implementation execution |  |
-| Agent Architect | Primary Agent for creating, validating, and managing AI agent configurations |  |
-| AI/ML Engineer | AI/ML expert for Planning, Implementation, and Evaluation modes - unified specialist for LLM integration, prompt engineering, RAG architecture, AI safety, and testing non-deterministic systems |  |
-| Architecture Specialist | Architecture expert for Planning, Implementation, and Evaluation modes - unified specialist for layer placement, dependency direction, and type safety |  |
-| Auto Mode Agent | AUTO mode agent - autonomous PLAN → ACT → EVAL cycle until quality targets met |  |
-| Backend Developer | Language-agnostic backend specialist with Clean Architecture, TDD, and security focus. Supports Node.js, Python, Go, Java, and other backend stacks. |  |
-| Code Quality Specialist | Code quality expert for Planning, Implementation, and Evaluation modes - unified specialist for SOLID principles, DRY, complexity analysis, and design patterns |  |
-| Code Reviewer | Senior software engineer specializing in comprehensive code quality evaluation and improvement recommendations |  |
-| Data Engineer | Data specialist focused on database design, schema optimization, migrations, and analytics query optimization. Handles data modeling, ETL patterns, and reporting data structures. |  |
-| Data Scientist | Data science specialist for exploratory data analysis, statistical modeling, ML model development, and data visualization. Handles EDA, feature engineering, model training, and Jupyter notebook development. |  |
-| DevOps Engineer | Docker, Datadog monitoring, and Next.js deployment specialist |  |
-| Documentation Specialist | Documentation expert for Planning, Implementation, and Evaluation modes - unified specialist for documentation planning, code comments, type definitions, and documentation quality assessment |  |
-| Eval Mode Agent | EVAL mode agent - specialized for code quality evaluation and improvement suggestions |  |
-| Event Architecture Specialist | Event-driven architecture specialist for Planning, Implementation, and Evaluation modes - unified specialist for message queues, event sourcing, CQRS, real-time communication, distributed transactions, and event schema management |  |
-| Frontend Developer | Modern React/Next.js specialist with Server Components/Actions, TDD, and accessibility focus |  |
-| i18n Specialist | Internationalization expert for Planning, Implementation, and Evaluation modes - unified specialist for i18n library setup, translation key structure, formatting, and RTL support |  |
-| Integration Specialist | External service integration specialist for Planning, Implementation, and Evaluation modes - unified specialist for API integrations, webhooks, OAuth flows, and failure isolation patterns |  |
-| Migration Specialist | Cross-cutting migration coordinator for legacy system modernization, framework upgrades, database migrations, and API versioning - unified specialist for Strangler Fig, Branch by Abstraction, and zero-downtime migration patterns |  |
+Key skill triggers:
+- Bug/error/debug → `systematic-debugging`
+- New feature/build → `brainstorming` → `writing-plans`
+- TDD/test → `test-driven-development`
+- Plan execution → `executing-plans`
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+## Detailed Rules
+
+All details in Single Source of Truth:
+
+- [`packages/rules/.ai-rules/rules/augmented-coding.md`](../../packages/rules/.ai-rules/rules/augmented-coding.md)
+- [`packages/rules/.ai-rules/rules/clarification-guide.md`](../../packages/rules/.ai-rules/rules/clarification-guide.md)
+- [`packages/rules/.ai-rules/rules/core.md`](../../packages/rules/.ai-rules/rules/core.md)
+- [`packages/rules/.ai-rules/rules/parallel-execution.md`](../../packages/rules/.ai-rules/rules/parallel-execution.md)
+- [`packages/rules/.ai-rules/rules/project.md`](../../packages/rules/.ai-rules/rules/project.md)
+- [`packages/rules/.ai-rules/rules/structured-reasoning-guide.md`](../../packages/rules/.ai-rules/rules/structured-reasoning-guide.md)
+- [`packages/rules/.ai-rules/agents/README.md`](../../packages/rules/.ai-rules/agents/README.md)
 
 ---
 > Source: [JeremyDev87/codingbuddy](https://github.com/JeremyDev87/codingbuddy) — distributed by [TomeVault](https://tomevault.io).
