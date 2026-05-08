@@ -1,105 +1,228 @@
 ---
 trigger: always_on
-description: DOTS, ECS, Job System, Burst, ISystem, IJobEntity
+description: Guidelines for working with the New Input System in Unity 6.2
 ---
 
 
-# Unity ECS & DOTS (Unity 6.2+)
+# Unity Input System Rules
 
-## Core Principles
+> Note: All private fields in the examples use camelCase names with a leading underscore, following common Microsoft C# naming conventions for fields.[web:17]
 
-1.  **Prefer `ISystem` (struct)** over `SystemBase` (class) to avoid GC overhead.
-2.  **Always use `[BurstCompile]`** for Systems and Jobs to unlock native performance.
-3.  **Use `IJobEntity`** for component iteration; it handles chunking and multithreading automatically.
-4.  **Follow Microsoft Naming Conventions**: Use **PascalCase** for public fields in Jobs and Components.
+## REQUIRED: New Input System
 
-## Entity Component System
+⚠️ **Legacy Input System is FORBIDDEN for new projects**
 
-### 1. Component Data
+### Package installation
+
 ```
-using Unity.Entities;
-using Unity.Mathematics;
+Package Manager → Input System → Install
+```
 
-public struct MovementSpeed : IComponentData
+In Project Settings → Player → Active Input Handling:
+- Select **"Input System Package (New)"**
+
+## Input Actions Asset
+
+### Creating Input Actions
+
+```
+// ✅ DO: Create an Input Actions Asset
+// Assets → Create → Input Actions
+```
+
+### Input Actions structure
+
+```
+PlayerInputActions
+├── Gameplay
+│   ├── Move (Value, Vector2)
+│   ├── Look (Value, Vector2)
+│   ├── Jump (Button)
+│   ├── Fire (Button)
+│   └── Interact (Button)
+├── UI
+│   ├── Navigate (Value, Vector2)
+│   ├── Submit (Button)
+│   └── Cancel (Button)
+└── Menu
+    ├── Pause (Button)
+    └── OpenInventory (Button)
+```
+
+## PlayerInput Component Approach
+
+### Automatic wiring via PlayerInput
+
+```
+using UnityEngine;
+using UnityEngine.InputSystem;
+
+/// <summary>
+/// Handles player input via the PlayerInput component.
+/// </summary>
+public class PlayerInputHandler : MonoBehaviour
 {
-    public float Value;
-}
-```
+    [Header("References")]
+    [SerializeField] private PlayerInput _playerInput;
 
-### 2. System (ISystem + IJobEntity)
-This is the modern standard. It separates data iteration (Job) from the system lifecycle (System).
+    private Vector2 _moveInput;
+    private Vector2 _lookInput;
+    private bool _jumpPressed;
 
-```
-using Unity.Entities;
-using Unity.Transforms;
-using Unity.Burst;
-using Unity.Mathematics;
-
-[BurstCompile]
-partial struct MovementSystem : ISystem
-{
-    [BurstCompile]
-    public void OnCreate(ref SystemState state)
+    private void Awake()
     {
-        // Prevents the system from running if no entities have MovementSpeed
-        state.RequireForUpdate<MovementSpeed>();
-    }
-
-    [BurstCompile]
-    public void OnUpdate(ref SystemState state)
-    {
-        // Pass delta time into the job
-        float deltaTime = SystemAPI.Time.DeltaTime;
-
-        // Schedule the job to run in parallel across available worker threads
-        new MoveJob
+        if (_playerInput == null)
         {
-            DeltaTime = deltaTime
-        }.ScheduleParallel();
+            _playerInput = GetComponent<PlayerInput>();
+            if (_playerInput == null)
+            {
+                Debug.LogError("PlayerInput component is missing on PlayerInputHandler.");
+                enabled = false;
+            }
+        }
     }
-}
 
-// The Source Generator automatically creates the optimized chunk iteration code for this job
-[BurstCompile]
-partial struct MoveJob : IJobEntity
-{
-    public float DeltaTime;
-
-    // Use 'in' for read-only data to improve performance
-    private void Execute(ref LocalTransform transform, in MovementSpeed speed)
+    // ✅ DO: Use message methods (automatically called by PlayerInput)
+    // NOTE: Prefer InputAction.CallbackContext over InputValue
+    public void OnMove(InputAction.CallbackContext context)
     {
-        transform.Position += new float3(0, speed.Value * DeltaTime, 0);
+        _moveInput = context.ReadValue<Vector2>();
     }
-}
-```
 
-## Job System (Native Arrays)
-
-Use this pattern when processing raw memory (`NativeArray`) outside of the ECS framework.
-
-```
-using Unity.Jobs;
-using Unity.Collections;
-using Unity.Burst;
-using Unity.Mathematics;
-
-[BurstCompile]
-public struct VelocityJob : IJobParallelFor
-{
-    // Microsoft Style: Public fields should be PascalCase
-    public NativeArray<float3> Velocity;
-    
-    [ReadOnly] 
-    public NativeArray<float3> Acceleration;
-    
-    public float DeltaTime;
-    
-    public void Execute(int index)
+    public void OnLook(InputAction.CallbackContext context)
     {
-        Velocity[index] += Acceleration[index] * DeltaTime;
+        _lookInput = context.ReadValue<Vector2>();
+    }
+
+    public void OnJump(InputAction.CallbackContext context)
+    {
+        _jumpPressed = context.ReadValueAsButton();
+
+        if (_jumpPressed)
+        {
+            PerformJump();
+        }
+    }
+
+    public void OnFire(InputAction.CallbackContext context)
+    {
+        if (context.performed)
+        {
+            PerformFire();
+        }
+    }
+
+    private void Update()
+    {
+        // Use cached values for continuous input
+        ProcessMovement(_moveInput);
+        ProcessLook(_lookInput);
+
+        // Example: reset one-frame jump flag if it is meant to be transient
+        _jumpPressed = false;
+    }
+
+    private void ProcessMovement(Vector2 input)
+    {
+        // Movement logic
+    }
+
+    private void ProcessLook(Vector2 input)
+    {
+        // Look logic
+    }
+
+    private void PerformJump()
+    {
+        // Jump logic
+    }
+
+    private void PerformFire()
+    {
+        // Fire logic
     }
 }
 ```
+
+## Manual Input Actions Approach
+
+### Working directly with InputActionAsset
+
+```
+using UnityEngine;
+using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.InputActionRebindingExtensions;
+
+/// <summary>
+/// Controls input via direct references to Input Actions.
+/// </summary>
+public class ManualInputController : MonoBehaviour
+{
+    [Header("Input Actions")]
+    [SerializeField] private InputActionAsset _inputActions;
+
+    private InputActionMap _gameplayActionMap;
+    private InputAction _moveAction;
+    private InputAction _jumpAction;
+    private InputAction _fireAction;
+
+    private void Awake()
+    {
+        if (_inputActions == null)
+        {
+            Debug.LogError("InputActionAsset reference is missing on ManualInputController.");
+            enabled = false;
+            return;
+        }
+
+        // ✅ DO: Retrieve actions from the asset
+        _gameplayActionMap = _inputActions.FindActionMap("Gameplay", throwIfNotFound: true);
+        _moveAction = _gameplayActionMap.FindAction("Move", throwIfNotFound: true);
+        _jumpAction = _gameplayActionMap.FindAction("Jump", throwIfNotFound: true);
+        _fireAction = _gameplayActionMap.FindAction("Fire", throwIfNotFound: true);
+    }
+
+    private void OnEnable()
+    {
+        // ✅ DO: Subscribe to events
+        _jumpAction.performed += OnJumpPerformed;
+        _jumpAction.canceled += OnJumpCanceled;
+        _fireAction.performed += OnFirePerformed;
+
+        // ✅ DO: Prefer enabling the entire action map
+        _gameplayActionMap.Enable();
+    }
+
+    private void OnDisable()
+    {
+        // ✅ DO: ALWAYS unsubscribe and disable
+        _jumpAction.performed -= OnJumpPerformed;
+        _jumpAction.canceled -= OnJumpCanceled;
+        _fireAction.performed -= OnFirePerformed;
+
+        _gameplayActionMap.Disable();
+    }
+
+    private void Update()
+    {
+        // ✅ DO: Read values in Update for continuous input
+        Vector2 moveInput = _moveAction.ReadValue<Vector2>();
+        ProcessMovement(moveInput);
+    }
+
+    private void OnJumpPerformed(InputAction.CallbackContext context)
+    {
+        Debug.Log("Jump performed!");
+        PerformJump();
+    }
+
+    private void OnJumpCanceled(InputAction.CallbackContext context)
+    {
+        Debug.Log("Jump released!");
+    }
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [Common-ka/ai-agent-unity-rules](https://github.com/Common-ka/ai-agent-unity-rules) — distributed by [TomeVault](https://tomevault.io).
