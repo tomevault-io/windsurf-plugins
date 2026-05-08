@@ -1,228 +1,89 @@
 ---
 trigger: always_on
-description: Guidelines for working with the New Input System in Unity 6.2
+description: Netcode for GameObjects
 ---
 
 
-# Unity Input System Rules
+# Netcode for GameObjects
 
-> Note: All private fields in the examples use camelCase names with a leading underscore, following common Microsoft C# naming conventions for fields.[web:17]
-
-## REQUIRED: New Input System
-
-⚠️ **Legacy Input System is FORBIDDEN for new projects**
-
-### Package installation
+## NetworkBehaviour
 
 ```
-Package Manager → Input System → Install
-```
-
-In Project Settings → Player → Active Input Handling:
-- Select **"Input System Package (New)"**
-
-## Input Actions Asset
-
-### Creating Input Actions
-
-```
-// ✅ DO: Create an Input Actions Asset
-// Assets → Create → Input Actions
-```
-
-### Input Actions structure
-
-```
-PlayerInputActions
-├── Gameplay
-│   ├── Move (Value, Vector2)
-│   ├── Look (Value, Vector2)
-│   ├── Jump (Button)
-│   ├── Fire (Button)
-│   └── Interact (Button)
-├── UI
-│   ├── Navigate (Value, Vector2)
-│   ├── Submit (Button)
-│   └── Cancel (Button)
-└── Menu
-    ├── Pause (Button)
-    └── OpenInventory (Button)
-```
-
-## PlayerInput Component Approach
-
-### Automatic wiring via PlayerInput
-
-```
+using System;
+using Unity.Netcode;
 using UnityEngine;
-using UnityEngine.InputSystem;
 
-/// <summary>
-/// Handles player input via the PlayerInput component.
-/// </summary>
-public class PlayerInputHandler : MonoBehaviour
+public class NetworkPlayer : NetworkBehaviour
 {
-    [Header("References")]
-    [SerializeField] private PlayerInput _playerInput;
+    // Modern Standard: Use _camelCase for private fields, remove "m_" prefix
+    // Security: NetworkVariable should usually be read-only for others
+    private readonly NetworkVariable<int> _health = new NetworkVariable<int>(
+        100, 
+        NetworkVariableReadPermission.Everyone, 
+        NetworkVariableWritePermission.Server
+    );
 
-    private Vector2 _moveInput;
-    private Vector2 _lookInput;
-    private bool _jumpPressed;
+    // Reactivity: Event to update UI/Animations when health changes
+    public event Action<int> OnHealthChanged;
 
-    private void Awake()
+    public override void OnNetworkSpawn()
     {
-        if (_playerInput == null)
+        // Subscribe to changes to update UI automatically
+        _health.OnValueChanged += HandleHealthChanged;
+        
+        // Initialize state immediately on spawn
+        HandleHealthChanged(0, _health.Value);
+
+        if (IsOwner)
         {
-            _playerInput = GetComponent<PlayerInput>();
-            if (_playerInput == null)
-            {
-                Debug.LogError("PlayerInput component is missing on PlayerInputHandler.");
-                enabled = false;
-            }
+            // Owner only logic (e.g., Input handling)
+        }
+        
+        if (IsServer)
+        {
+            // Server only logic
         }
     }
 
-    // ✅ DO: Use message methods (automatically called by PlayerInput)
-    // NOTE: Prefer InputAction.CallbackContext over InputValue
-    public void OnMove(InputAction.CallbackContext context)
+    public override void OnNetworkDespawn()
     {
-        _moveInput = context.ReadValue<Vector2>();
+        _health.OnValueChanged -= HandleHealthChanged;
     }
 
-    public void OnLook(InputAction.CallbackContext context)
+    private void HandleHealthChanged(int previousValue, int newValue)
     {
-        _lookInput = context.ReadValue<Vector2>();
+        // Update UI or play local sounds here
+        OnHealthChanged?.Invoke(newValue);
     }
-
-    public void OnJump(InputAction.CallbackContext context)
+    
+    // FIX: Removed insecure [ServerRpc] that allowed clients to dictate damage.
+    // Replaced with a Server-side method. This should be called by the server
+    // when a projectile hits or an explosion occurs.
+    public void TakeDamage(int damage)
     {
-        _jumpPressed = context.ReadValueAsButton();
+        // Security check: Only the server can modify state
+        if (!IsServer) return;
+        
+        // Validation: Prevent negative damage or logic errors
+        if (damage < 0) return;
 
-        if (_jumpPressed)
+        // State safety: Clamp values to prevent underflow
+        int newHealth = _health.Value - damage;
+        _health.Value = Mathf.Clamp(newHealth, 0, 100);
+
+        if (_health.Value == 0)
         {
-            PerformJump();
+            // Handle death
         }
     }
-
-    public void OnFire(InputAction.CallbackContext context)
+    
+    [ClientRpc]
+    public void PlayEffectClientRpc()
     {
-        if (context.performed)
-        {
-            PerformFire();
-        }
-    }
-
-    private void Update()
-    {
-        // Use cached values for continuous input
-        ProcessMovement(_moveInput);
-        ProcessLook(_lookInput);
-
-        // Example: reset one-frame jump flag if it is meant to be transient
-        _jumpPressed = false;
-    }
-
-    private void ProcessMovement(Vector2 input)
-    {
-        // Movement logic
-    }
-
-    private void ProcessLook(Vector2 input)
-    {
-        // Look logic
-    }
-
-    private void PerformJump()
-    {
-        // Jump logic
-    }
-
-    private void PerformFire()
-    {
-        // Fire logic
+        // Play visual/audio effect on all clients
     }
 }
 ```
-
-## Manual Input Actions Approach
-
-### Working directly with InputActionAsset
-
-```
-using UnityEngine;
-using UnityEngine.InputSystem;
-using UnityEngine.InputSystem.InputActionRebindingExtensions;
-
-/// <summary>
-/// Controls input via direct references to Input Actions.
-/// </summary>
-public class ManualInputController : MonoBehaviour
-{
-    [Header("Input Actions")]
-    [SerializeField] private InputActionAsset _inputActions;
-
-    private InputActionMap _gameplayActionMap;
-    private InputAction _moveAction;
-    private InputAction _jumpAction;
-    private InputAction _fireAction;
-
-    private void Awake()
-    {
-        if (_inputActions == null)
-        {
-            Debug.LogError("InputActionAsset reference is missing on ManualInputController.");
-            enabled = false;
-            return;
-        }
-
-        // ✅ DO: Retrieve actions from the asset
-        _gameplayActionMap = _inputActions.FindActionMap("Gameplay", throwIfNotFound: true);
-        _moveAction = _gameplayActionMap.FindAction("Move", throwIfNotFound: true);
-        _jumpAction = _gameplayActionMap.FindAction("Jump", throwIfNotFound: true);
-        _fireAction = _gameplayActionMap.FindAction("Fire", throwIfNotFound: true);
-    }
-
-    private void OnEnable()
-    {
-        // ✅ DO: Subscribe to events
-        _jumpAction.performed += OnJumpPerformed;
-        _jumpAction.canceled += OnJumpCanceled;
-        _fireAction.performed += OnFirePerformed;
-
-        // ✅ DO: Prefer enabling the entire action map
-        _gameplayActionMap.Enable();
-    }
-
-    private void OnDisable()
-    {
-        // ✅ DO: ALWAYS unsubscribe and disable
-        _jumpAction.performed -= OnJumpPerformed;
-        _jumpAction.canceled -= OnJumpCanceled;
-        _fireAction.performed -= OnFirePerformed;
-
-        _gameplayActionMap.Disable();
-    }
-
-    private void Update()
-    {
-        // ✅ DO: Read values in Update for continuous input
-        Vector2 moveInput = _moveAction.ReadValue<Vector2>();
-        ProcessMovement(moveInput);
-    }
-
-    private void OnJumpPerformed(InputAction.CallbackContext context)
-    {
-        Debug.Log("Jump performed!");
-        PerformJump();
-    }
-
-    private void OnJumpCanceled(InputAction.CallbackContext context)
-    {
-        Debug.Log("Jump released!");
-    }
-
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [Common-ka/ai-agent-unity-rules](https://github.com/Common-ka/ai-agent-unity-rules) — distributed by [TomeVault](https://tomevault.io).
