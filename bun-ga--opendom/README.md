@@ -7,14 +7,14 @@ Multi-provider domain management from your terminal. No upsells, no popups, no c
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `GEMINI.md` in [bun-ga/opendom](https://github.com/bun-ga/opendom).
+Original source: `AGENTS.md` in [bun-ga/opendom](https://github.com/bun-ga/opendom).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
+- **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
 From [bun-ga/opendom](https://github.com/bun-ga/opendom) — a repo with 11+ stars on GitHub.
