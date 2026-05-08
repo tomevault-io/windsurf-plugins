@@ -1,15 +1,15 @@
 ---
 trigger: always_on
-description: Breadcrumb component accessibility compliance pattern
+description: Carousel component accessibility compliance pattern
 ---
 
-# Breadcrumb Accessibility
+# Carousel Accessibility Standards
 
-Ensures breadcrumb components follow WCAG compliance and WAI-ARIA Breadcrumb Pattern specifications.
+Ensures carousel components follow WCAG compliance and WAI-ARIA Carousel Pattern specifications.
 
 <rule>
-name: breadcrumb_accessibility_standards
-description: Enforce breadcrumb component accessibility standards and WAI-ARIA Breadcrumb Pattern compliance
+name: carousel_accessibility_standards
+description: Enforce carousel component accessibility standards and WAI-ARIA Carousel Pattern compliance
 filters:
   - type: file_extension
     pattern: "\\.(vue|jsx|tsx|html|liquid|php|js|ts)$"
@@ -17,93 +17,94 @@ filters:
 actions:
   - type: enforce
     conditions:
-      # Navigation landmark requirement
-      - pattern: "(?i)<nav[^>]*(?:breadcrumb|navigation)[^>]*>"
-        pattern_negate: "(aria-label|aria-labelledby)=\"[^\"]+\""
-        message: "Breadcrumb navigation must have aria-label or aria-labelledby attribute."
+      # Carousel container role requirement
+      - pattern: "(?i)<(div|section)[^>]*(?:carousel|slider|slideshow)[^>]*>"
+        pattern_negate: "(role=\"(region|group)\"|aria-roledescription=\"carousel\")"
+        message: "Carousel container must have role='region' or role='group' and aria-roledescription='carousel'."
 
-      # Current page aria-current requirement
-      - pattern: "(?i)<[^>]*(?:breadcrumb.*current|current.*breadcrumb)[^>]*>"
-        pattern_negate: "aria-current=\"page\""
-        message: "Current page in breadcrumb must have aria-current='page' attribute."
+      # Carousel label requirement
+      - pattern: "(?i)<[^>]*role=\"(region|group)\"[^>]*aria-roledescription=\"carousel\"[^>]*>"
+        pattern_negate: "(aria-labelledby|aria-label)=\"[^\"]+\""
+        message: "Carousel must have either aria-labelledby or aria-label for accessibility."
 
-      # List structure requirement
-      - pattern: "(?i)<nav[^>]*(?:breadcrumb|navigation)[^>]*>"
-        pattern_negate: "<ol[^>]*>"
-        message: "Breadcrumb navigation should use ordered list (ol) for proper structure."
+      # Slide role requirement
+      - pattern: "(?i)<(div|section)[^>]*(?:slide|carousel-item)[^>]*>"
+        pattern_negate: "(role=\"group\"|aria-roledescription=\"slide\")"
+        message: "Slide containers must have role='group' and aria-roledescription='slide'."
+
+      # Slide label requirement
+      - pattern: "(?i)<[^>]*role=\"group\"[^>]*aria-roledescription=\"slide\"[^>]*>"
+        pattern_negate: "(aria-labelledby|aria-label)=\"[^\"]+\""
+        message: "Slides must have either aria-labelledby or aria-label for accessibility."
+
+      # Rotation control requirement
+      - pattern: "(?i)<button[^>]*(?:rotation|auto-play|autoplay)[^>]*>"
+        pattern_negate: "aria-label=\"[^\"]*(?:Start|Stop)[^\"]*slide[^\"]*rotation[^\"]*\""
+        message: "Rotation control must have aria-label indicating its current state (Start/Stop slide rotation)."
+
+      # Navigation controls requirement
+      - pattern: "(?i)<button[^>]*(?:next|previous|prev)[^>]*>"
+        pattern_negate: "aria-label=\"[^\"]*(?:Next|Previous)[^\"]*slide[^\"]*\""
+        message: "Navigation controls must have aria-label indicating their purpose (Next/Previous slide)."
+
+      # Navigation button disabling check
+      - pattern: "(?i)\\.disabled.*next|previous.*disabled"
+        message: "Navigation buttons should not be disabled. Implement wrap-around navigation to first/last slide instead for better user experience."
+
+      # Missing keyboard event handlers
+      - pattern: "(?i)<button[^>]*(?:rotation|next|previous|prev)[^>]*>"
+        pattern_negate: "(onKeyDown|onkeydown|@keydown|v-on:keydown)"
+        message: "Carousel controls should handle keyboard events (Enter, Space)."
+
+      # Auto-rotation interval check (WCAG 2.2.2)
+      - pattern: "setInterval\\([^,]+,\\s*(?:[0-4]\\d{3}|[0-9]{1,4})\\)"
+        message: "Auto-rotation interval must be at least 5000ms (5 seconds) to comply with WCAG 2.2.2 Pause, Stop, Hide."
+
+      # Mouse hover event handlers check
+      - pattern: "(?i)<(div|section)[^>]*(?:carousel|slider|slideshow)[^>]*>"
+        pattern_negate: "(onMouseEnter|onmouseenter|@mouseenter|v-on:mouseenter|onMouseLeave|onmouseleave|@mouseleave|v-on:mouseleave)"
+        message: "Carousel must handle mouseenter/mouseleave events to pause/resume auto-rotation."
+
+      # aria-live attribute check
+      - pattern: "(?i)<[^>]*aria-live=\"[^\"]*\"[^>]*>"
+        pattern_negate: "aria-live=\"(off|polite)\""
+        message: "Carousel container must have aria-live set to 'off' during rotation and 'polite' when paused."
 
   - type: suggest
     message: |
-      **Breadcrumb Component Accessibility Best Practices:**
+      **Carousel Component Accessibility Best Practices:**
 
       **Required ARIA Attributes:**
-      - **aria-label/aria-labelledby:** On navigation element to describe the breadcrumb trail
-      - **aria-current="page":** On the current page link or element
-      - **role="navigation":** Implicit on nav element, but can be explicit if needed
+      - **role='region' or role='group':** Set on carousel container
+      - **aria-roledescription='carousel':** Set on carousel container
+      - **aria-labelledby/aria-label:** Set on carousel container
+      - **role='group':** Set on slide containers
+      - **aria-roledescription='slide':** Set on slide containers
+      - **aria-labelledby/aria-label:** Set on slide containers
+      - **aria-label:** Set on rotation control (changes with state)
+      - **aria-label:** Set on navigation controls
+      - **aria-live:** Set to 'off' during rotation, 'polite' when paused
 
-      **Structure Requirements:**
-      - Use `<nav>` element as container
-      - Use ordered list (`<ol>`) for breadcrumb items
-      - Use list items (`<li>`) for each breadcrumb level
-      - Current page should be the last item in the list
-      - Use appropriate heading level for the breadcrumb container
+      **Optional ARIA Attributes:**
+      - **aria-atomic='false':** On slide wrapper
+      - **aria-hidden='true':** Set on inactive slides to hide from screen readers
+      - **visibility: hidden:** CSS property on inactive slides to hide from keyboard and visual users
 
-      **Implementation Patterns:**
+      **Keyboard Interaction Requirements:**
+      - **Tab/Shift+Tab:** Navigate through interactive elements
+      - **Enter/Space:** Activate controls
+      - **Auto-rotation:** Stops on focus or mouse hover, resumes on blur or mouse away
+      - **Rotation Control:** First in tab sequence
 
-      **Basic Breadcrumb:**
-      ```html
-      <nav aria-label="Breadcrumb">
-        <ol class="breadcrumb">
-          <li class="breadcrumb-item">
-            <a href="/">Home</a>
-          </li>
-          <li class="breadcrumb-item">
-            <a href="/products">Products</a>
-          </li>
-          <li class="breadcrumb-item" aria-current="page">
-            <a href="/products/electronics">Electronics</a>
-          </li>
-        </ol>
-      </nav>
-      ```
+      **Navigation Button Best Practices:**
+      - **Always Enabled:** Navigation buttons should never be disabled
+      - **Wrap-Around Navigation:** Next button wraps to first slide, Previous button wraps to last slide
+      - **Consistent Behavior:** Users can always navigate in both directions
+      - **Better UX:** Prevents users from getting "stuck" at slide boundaries
 
-      **With aria-labelledby:**
-      ```html
-      <nav aria-labelledby="breadcrumb-heading">
-        <h2 id="breadcrumb-heading" class="visually-hidden">Breadcrumb Navigation</h2>
-        <ol class="breadcrumb">
-          <li class="breadcrumb-item">
-            <a href="/">Home</a>
-          </li>
-          <li class="breadcrumb-item" aria-current="page">
-            <span>Current Page</span>
-          </li>
-        </ol>
-      </nav>
-      ```
+      **Auto-rotation Requirements (WCAG 2.2.2):**
 
-      **Accessibility Notes:**
-      - Navigation landmark helps screen readers identify the breadcrumb trail
-      - Ordered list provides semantic structure for the navigation hierarchy
-      - aria-current helps users identify their current location
-      - Consider using visually-hidden text for better screen reader context
-      - Ensure sufficient color contrast for all breadcrumb elements
-      - Maintain clear visual separation between items
-      - Use clear, descriptive labels for each level
-
-      **Testing Checklist:**
-      - Verify navigation landmark is present and properly labeled
-      - Confirm ordered list structure is used
-      - Check aria-current is present on current page
-      - Test with screen readers to ensure proper announcement
-      - Verify visual hierarchy is clear and consistent
-      - Ensure all links are keyboard accessible
-      - Check color contrast meets WCAG requirements
-
-metadata:
-  priority: high
-  version: 1.0
-</rule>
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [Shopify/horizon](https://github.com/Shopify/horizon) — distributed by [TomeVault](https://tomevault.io).
