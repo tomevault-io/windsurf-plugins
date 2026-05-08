@@ -1,95 +1,143 @@
 ---
 trigger: always_on
-description: Chat window component accessibility compliance and WCAG compliance for real-time communication features
+description: Text and user interface color contrast compliance with WCAG 2.2 1.4.3 and 1.4.11
 ---
 
-# Chat Window Component Accessibility Standards
+# Color Contrast Accessibility Standards
 
-Ensures chat window components follow WCAG compliance and provide proper accessibility for real-time communication, notifications, and assistive technology support.
+Ensures color contrast meets WCAG 2.2 1.4.3: Contrast (Minimum) and 1.4.11: Non-text Contrast requirements.
 
 <rule>
-name: chat_window_accessibility_standards
-description: Enforce chat window component accessibility standards and WCAG compliance for real-time communication features
+name: color_contrast_accessibility_standards
+description: Enforce color contrast accessibility standards per WCAG 2.2 1.4.3 and 1.4.11
 filters:
   - type: file_extension
-    pattern: "\\.(vue|jsx|tsx|html|liquid|php|js|ts|css|scss|sass|less)$"
+    pattern: "\\.(css|scss|sass|less|vue|jsx|tsx|html|liquid|php|js|ts)$"
 
 actions:
   - type: enforce
     conditions:
-      # Chat window missing proper landmark role
-      - pattern: "(?i)<(div|section)[^>]*(?:chat|conversation|messages)[^>]*>"
-        pattern_negate: "role=\"(log|region|dialog)\""
-        message: "Chat window containers must have role='log' for message history, role='region' for general chat areas, or role='dialog' for popup windows."
+      # Common low-contrast text color combinations
+      - pattern: "color:\\s*#[89abcdefABCDEF]{6}"
+        message: "Light text colors may not meet 4.5:1 contrast ratio requirement. Verify contrast against background."
 
-      # Chat log missing accessible name
-      - pattern: "(?i)<[^>]*role=\"log\"[^>]*>"
-        pattern_negate: "(aria-labelledby|aria-label)"
-        message: "Chat log elements must have accessible names via aria-labelledby or aria-label for screen reader identification."
+      - pattern: "color:\\s*#[0-6]{6}"
+        message: "Very light text colors likely fail contrast requirements. Use darker colors for better accessibility."
 
-      # Chat messages missing author identification
-      - pattern: "(?i)<(p|div)[^>]*(?:message|chat|conversation)[^>]*>"
-        pattern_negate: "(aria-label|aria-labelledby|class.*visually-hidden|class.*sr-only)"
-        message: "Chat messages must include author identification via visible text, aria-label, or visually hidden content for screen reader users."
+      # Light gray text (common accessibility issue)
+      - pattern: "color:\\s*(#[cdefCDEF]{3,6}|lightgray|lightgrey|silver)"
+        message: "Light gray text often fails WCAG contrast requirements (4.5:1 minimum). Use darker colors."
 
-      # Chat messages in wrong DOM order
-      - pattern: "(?i)<div[^>]*class=\"[^\"]*(?:left|right|user|agent)[^\"]*\"[^>]*>"
-        pattern_negate: "(role=\"log\"|aria-live)"
-        message: "Chat messages must maintain chronological order in DOM structure. Avoid using separate columns that break reading sequence."
+      # Common problematic color combinations
+      - pattern: "background.*#fff.*color.*#[89abcdefABCDEF]"
+        message: "Light text on white background may not meet 4.5:1 contrast ratio requirement."
 
-      # Chat notifications relying only on sound
-      - pattern: "(?i)(audio|sound|play|new.*message)"
-        pattern_negate: "(aria-live|role=\"status\"|visual.*notification|title.*change|notification.*badge)"
-        message: "Chat notifications must use multiple sensory channels. Combine sound with visual indicators, aria-live announcements, title changes, and notification badges."
+      - pattern: "background.*#f[0-9a-fA-F]{5}.*color.*#[89abcdefABCDEF]"
+        message: "Light text on light background may not meet contrast requirements."
 
-      # Chat window missing keyboard support
-      - pattern: "(?i)<(div|section)[^>]*(?:chat|conversation)[^>]*>"
-        pattern_negate: "(onKeyDown|onkeydown|@keydown|v-on:keydown|tabindex)"
-        message: "Chat windows must support keyboard navigation for opening, closing, and message interaction."
+      # UI component border/focus indicators
+      - pattern: "border.*#[cdefCDEF]{3,6}"
+        message: "Light borders may not meet 3:1 non-text contrast requirement for UI components."
 
-      # Chat popup missing focus management
-      - pattern: "(?i)<(div|section)[^>]*role=\"dialog\"[^>]*(?:chat|conversation)[^>]*>"
-        pattern_negate: "(aria-modal|focus|tabindex)"
-        message: "Chat popup windows must implement proper focus management and aria-modal='true' for accessibility."
+      - pattern: "outline.*#[cdefCDEF]{3,6}"
+        message: "Light focus outlines may not meet 3:1 contrast requirement for UI component identification."
 
-      # Chat launcher missing aria-haspopup
-      - pattern: "(?i)<(button|div)[^>]*(?:chat|conversation|support)[^>]*>"
-        pattern_negate: "aria-haspopup=\"dialog\""
-        message: "Chat launcher buttons must include aria-haspopup='dialog' to inform users a dialog will open."
+      # Button states with insufficient contrast
+      - pattern: "button.*background.*#[cdefCDEF]{3,6}"
+        message: "Light button backgrounds may not provide sufficient 3:1 contrast for UI component identification."
 
-      # Chat window missing focus trap
-      - pattern: "(?i)<[^>]*role=\"dialog\"[^>]*(?:chat|conversation)[^>]*>"
-        pattern_negate: "(focus.*trap|tabindex|aria-modal)"
-        message: "Chat popup windows must implement focus trapping to prevent keyboard navigation outside the dialog."
+      # Form input borders
+      - pattern: "input.*border.*#[defDEF]{3,6}"
+        message: "Very light input borders may not meet 3:1 contrast requirement for form field identification."
 
-      # Chat input missing proper labeling
-      - pattern: "(?i)<(input|textarea)[^>]*(?:chat|message|reply)[^>]*>"
-        pattern_negate: "(aria-label|aria-labelledby|label|placeholder)"
-        message: "Chat input fields must have proper labels via label elements, aria-label, or aria-labelledby for screen reader context."
+      # SVG icon fill colors that may lack contrast
+      - pattern: "fill=\"#[cdefCDEF]{3,6}\""
+        message: "Light SVG fill colors may not meet 3:1 contrast requirement for icon identification."
 
-      # Chat button missing accessible name
-      - pattern: "(?i)<(button|div)[^>]*(?:chat|conversation|support)[^>]*>"
-        pattern_negate: "(aria-label|aria-labelledby|>.*[A-Za-z]{10,})"
-        message: "Chat buttons must have accessible names via visible text, aria-label, or aria-labelledby for screen reader identification."
+      # SVG stroke colors for icon outlines
+      - pattern: "stroke=\"#[defDEF]{3,6}\""
+        message: "Very light SVG stroke colors may not provide sufficient contrast for icon visibility."
 
-      # Chat button missing proper role
-      - pattern: "(?i)<(div|span)[^>]*(?:chat|conversation|support)[^>]*>"
-        pattern_negate: "(role=\"button\"|<button)"
-        message: "Chat controls styled as buttons must have role='button' or use native button elements for proper semantics."
+      # Missing prefers-contrast considerations
+      - pattern: "@media\\s*\\(prefers-contrast:\\s*more\\)"
+        pattern_negate: "color|background|border"
+        message: "prefers-contrast: more media query should include enhanced color/contrast properties."
 
-      # Chat window missing expandable state management
-      - pattern: "(?i)<(button|div)[^>]*(?:chat|conversation)[^>]*>"
-        pattern_negate: "aria-expanded=\"(true|false)\""
-        message: "Expandable chat windows must have aria-expanded attribute to indicate open/closed state for screen readers."
+  - type: suggest
+    message: |
+      **WCAG 2.2 Color Contrast Requirements:**
 
-      # Chat window missing aria-controls
-      - pattern: "(?i)<(button|div)[^>]*(?:chat|conversation)[^>]*>"
-        pattern_negate: "aria-controls=\"[^\"]+\""
-        message: "Chat controls must have aria-controls referencing the chat window ID for proper association."
+      **1.4.3: Text Contrast (Minimum) - Level AA:**
+      - **Normal Text:** Minimum 4.5:1 contrast ratio
+      - **Large Text:** Minimum 3:1 contrast ratio (18pt+ regular or 14pt+ bold)
+      - **Enhanced (Level AAA):** 7:1 for normal text, 4.5:1 for large text
 
-      # Chat timeout missing user notification
-      - pattern: "(?i)(timeout|session.*expir|inactive)"
-        pattern_negate: "(notification|warning|extend|20.*second)"
+      **1.4.11: Non-text Contrast - Level AA:**
+      - **UI Components:** Minimum 3:1 contrast ratio for component identification
+      - **Focus Indicators:** Minimum 3:1 contrast ratio for focus visibility
+      - **Graphical Objects:** Minimum 3:1 contrast ratio for content understanding
+
+      **Exceptions (No Contrast Requirement):**
+      - Inactive/disabled UI components
+      - Pure decorative elements
+      - Text in logos or brand names
+      - Text that is not visible to users
+      - Graphics where specific presentation is essential
+
+      **High Contrast Color Combinations:**
+
+      **Dark Text on Light Backgrounds:**
+      - `#212529` on `#ffffff` - 16.6:1 ✅
+      - `#495057` on `#ffffff` - 8.3:1 ✅
+      - `#6c757d` on `#ffffff` - 5.4:1 ✅
+      - `#343a40` on `#f8f9fa` - 11.7:1 ✅
+
+      **Light Text on Dark Backgrounds:**
+      - `#ffffff` on `#212529` - 16.6:1 ✅
+      - `#f8f9fa` on `#495057` - 7.0:1 ✅
+      - `#ffffff` on `#0056b3` - 7.7:1 ✅
+      - `#ffffff` on `#dc3545` - 5.8:1 ✅
+
+      **UI Component Colors (3:1 minimum):**
+      - Focus outlines: `#0056b3`, `#dc3545`, `#198754`
+      - Border colors: `#ced4da`, `#adb5bd`, `#6c757d`
+      - Button states: `#0056b3`, `#157347`, `#b02a37`
+
+      **Implementation Examples:**
+
+      **CSS Text Contrast:**
+      ```css
+      /* Good: High contrast text */
+      .primary-text {
+        color: #212529;
+        background: #ffffff;
+      }
+
+      .secondary-text {
+        color: #495057;
+        background: #ffffff;
+      }
+
+      /* Good: Large text with 3:1 minimum */
+      .large-heading {
+        font-size: 18px;
+        font-weight: normal;
+        color: #6c757d;
+        background: #ffffff;
+      }
+      ```
+
+      **CSS UI Component Contrast:**
+      ```css
+      /* Good: Form inputs with sufficient border contrast */
+      .form-control {
+        border: 2px solid #ced4da; /* 3:1+ contrast */
+        background: #ffffff;
+      }
+
+      .form-control:focus {
+        border-color: #0056b3; /* High contrast focus */
+        outline: 3px solid #0056b3;
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
