@@ -1,145 +1,159 @@
 ---
 trigger: always_on
-description: **These rules are NON-NEGOTIABLE. Follow them at ALL times, without exception.**
+description: All code in GoClaw MUST include appropriate logging to aid debugging and observability. Use the logging package with dot import for convenience:
 ---
 
 
-# Ground Rules for GoClaw Development
+# GoClaw Development Guidelines
 
-**These rules are NON-NEGOTIABLE. Follow them at ALL times, without exception.**
+## Logging Standards
 
----
-
-## THINK BEFORE CODING
-
-**Don't assume. Don't hide confusion. Surface tradeoffs.**
-
-Before implementing:
-- State your assumptions explicitly. If uncertain, ask.
-- If multiple interpretations exist, present them - don't pick silently.
-- If a simpler approach exists, say so. Push back when warranted.
-- If something is unclear, stop. Name what's confusing. Ask.
-
-## DISCUSS BEFORE IMPLEMENTING
-
-**Always discuss proposed changes before making them.**
-
-When a problem is identified:
-1. Explain the issue
-2. Propose options/solutions
-3. **Wait for approval** before writing any code
-
-DO NOT:
-- Start implementing a fix immediately after identifying a problem
-- Assume a solution is acceptable without asking
-- Make "obvious" changes without confirmation
-
-The user decides what approach to take. Your job is to present options, not make decisions.
-
-Whenever you output the text "Let me start." or something similar STOP! Do not proceed until given permission.
-
-## FORBIDDEN TOOLS
-
-Do not use rsync for anything, or ssh. You're not allowed.
-
-## Manager patterns
-We like global singletons, for manager patterns */manager.go must be a singleton, passing references  around is just silly for things that have one global use and instance requirement, if we are the only people eating our own dogfood. This is not a library, this is an application.
-
-## Command patterns
-When adding "/commands" and other things remember that we have global infrastructure to handle this, do NOT add stuff to the channels such as http and telegram bot. Use the global command pattern
-
-## Logging - USE THE RIGHT FUNCTIONS
-
-**ONLY use the logging functions from `internal/logging`:**
+All code in GoClaw MUST include appropriate logging to aid debugging and observability. Use the logging package with dot import for convenience:
 
 ```go
 import . "github.com/roelfdiedericks/goclaw/internal/logging"
-
-// Use these:
-L_trace("message", "key", value)
-L_debug("message", "key", value)
-L_info("message", "key", value)
-L_warn("message", "key", value)
-L_error("message", "key", value)
 ```
 
-**DO NOT:**
-- Import `"github.com/charmbracelet/log"` directly
-- Import standard `"log"` package
-- Use `log.Debug()`, `log.Info()`, etc.
-- Use `fmt.Println()` for logging
+### Log Levels
 
-**Log Level Guidelines:**
-- `L_info` - Summary information (totals, counts, status changes)
-- `L_warn` - Specific failures WITH context (what failed and why)
-- `L_debug` - Per-item details (only visible with `-d` flag)
-- `L_trace` - Very verbose (only visible with `-t` flag)
+**L_trace** - Very detailed, low-level information
+- Individual iterations, data transformations
+- File contents being read/written
+- Only visible with `-t` flag
+- Example: `L_trace("parsing json field", "field", name, "value", val)`
 
-**Example - Good logging:**
+**L_debug** - Information useful for debugging
+- Function entry/exit with key parameters
+- Configuration values being used
+- External API calls (request/response summaries)
+- State changes and decisions
+- Visible with `-d` flag
+- Example: `L_debug("sending request to Anthropic", "model", model, "messages", len(msgs))`
+
+**L_info** - Normal operational information
+- Service startup/shutdown
+- Significant events (user authenticated, agent run started/completed)
+- Always visible
+- Example: `L_info("telegram bot started", "username", bot.Username)`
+
+**L_warn** - Potential issues that don't stop execution
+- Unknown users attempting access
+- Retryable errors
+- Deprecated feature usage
+- Example: `L_warn("unknown telegram user ignored", "userID", id)`
+
+**L_error** - Errors that affect functionality
+- Failed API calls
+- Configuration errors
+- Tool execution failures
+- Example: `L_error("failed to send message", "error", err)`
+
+### Required Logging Points
+
+Every package MUST log:
+
+1. **Initialization**: Log when the component is created with key config values
+2. **External calls**: Log before/after any external API or system call
+3. **State changes**: Log significant state transitions
+4. **Errors**: Always log errors with context
+5. **User actions**: Log user-initiated actions with user identity
+
+### Format Guidelines
+
+- Use structured logging with key-value pairs: `L_info("message", "key1", val1, "key2", val2)`
+- Keep messages lowercase and concise
+- Include relevant IDs (runID, userID, sessionID) for correlation
+- For sensitive data, log length not content: `"tokenLength", len(token)`
+- Prefix with package/component: `"config: loading file"`, `"telegram: user authenticated"`
+
+### Example Implementation
+
 ```go
-// INFO: Summary only
-L_info("skills: loaded", "total", 55, "failed", 2)
-
-// WARN: Each failure with details
-L_warn("skills: failed to load", "skill", "foo", "error", err)
-
-// DEBUG: Per-item details
-L_debug("skills: ineligible", "skill", "bar", "reason", "binary: mytool")
+func (b *Bot) handleMessage(c tele.Context) error {
+    userID := fmt.Sprintf("%d", c.Sender().ID)
+    
+    L_debug("telegram: message received", "userID", userID, "chatID", c.Chat().ID)
+    
+    user := b.users.FromIdentity("telegram", userID)
+    if user == nil {
+        L_warn("telegram: unknown user ignored", "userID", userID)
+        return nil
+    }
+    
+    L_info("telegram: processing message", "user", user.Name, "role", user.Role)
+    
+    result, err := b.process(c.Text())
+    if err != nil {
+        L_error("telegram: processing failed", "error", err, "userID", userID)
+        return err
+    }
+    
+    L_debug("telegram: message processed", "responseLength", len(result))
+    return nil
+}
 ```
 
-## Git Commands - RESTRICTED
+## Code Style
 
-**You are NOT allowed to run any git commands except `git log, status or diff`.**
+- Use meaningful variable names
+- Keep functions focused and small
+- Document exported functions and types
+- Handle errors explicitly, never ignore them silently
+- Use context.Context for cancellation and timeouts
 
-Forbidden commands include but are not limited to:
-- `git restore` - DO NOT USE, this wipes uncommitted work
-- `git checkout`
-- `git reset`
-- `git clean`
-- `git stash`
-- `git add`
-- `git commit`
-- `git push`
-- `git pull`
-- `git merge`
-- `git rebase`
+## Build patterns
+
+- Avoid running gofmt, and lint all the time. It can be done once after a major iteration
+
+## Config Form Patterns
+
+Default pattern:
+
+- Bind web/TUI forms directly to the real runtime config structs.
+- Treat this as the default for new config sections unless there is a very clear reason not to.
+
+Allowed exception:
+
+- Only add a separate form-data wrapper when the UI truly needs temporary or synthetic fields that must not live on the runtime struct.
+- `VoiceLLM` is the model for this pattern. It is the exception, not the default.
+
+Do not do this:
+
+- Do not invent a parallel wrapper just to carry presets, derived values, or save-time expansions for a section that should round-trip to `goclaw.json`.
+- If a selector or field must persist to disk, it belongs on the real config struct.
+
+Preset / derived-field rule:
+
+- For preset-backed config, store the persisted selector on the real config struct.
+- Put the preset/default expansion logic in one shared normalization helper on the real config type.
+- Do not duplicate that logic in separate web-only or TUI-only code paths.
+
+Required wiring:
+
+- If a section needs normalization, call the shared normalization helper in all relevant paths:
+- Web section save handler
+- TUI accept/save path
+- Runtime config load/default path
+
+Testing rule:
+
+- For persistence bugs, add a focused regression test that inspects the raw JSON written to disk.
+- Do not rely only on reload-through-`config.LoadFromPath(...)` tests, because runtime defaults and normalization can hide bad on-disk state.
+
+Checklist before merging:
+
+- Is the form bound to the real runtime config struct?
+- If not, is there a genuine UI-only reason for a wrapper?
+- Are presets/derived fields normalized by one shared helper?
+- Are web, TUI, and runtime load paths all using that helper?
+- Is there a raw-file persistence regression test?
+
+---
+
+## CHANGELOG.md updates
 
 
-The user will handle all git operations manually.
-
-## Testing
-
-- **DO NOT run `goclaw gateway` or `make run/debug/tui`** - the user will test manually
-- Running the gateway could interfere with existing instances
-
-## Use the Makefile
-
-**ALWAYS use Makefile targets instead of running tools directly.**
-
-```bash
-# CORRECT
-make build
-make lint
-make audit
-make test
-
-# WRONG - do not run tools directly
-go build ./...
-golangci-lint run ./...
-gosec ./...
-go test ./...
-```
-
-The Makefile has the correct flags, environment variables, and configuration. Running tools directly bypasses this and causes problems.
-
-Do not run "make lint" or do lintian checks when busy with todo items. Do it after a major run of coding, at the end.
-Linting wastes time and tokens between each todo item. A simple "make build" is good enough.
-
-## Why These Rules Exist
-
-**Git:** On 2026-02-02, a `git restore` command wiped out an entire day's worth of uncommitted work including all files in `internal/skills/`. This happened because the assistant panicked and ran `git restore` without understanding the situation. **Never again.**
-
-**Logging:** Using `charmbracelet/log` directly bypasses the project's log level filtering and caller info. The `L_*` functions provide consistent formatting with file:line info and proper level filtering.
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [roelfdiedericks/goclaw](https://github.com/roelfdiedericks/goclaw) — distributed by [TomeVault](https://tomevault.io).
