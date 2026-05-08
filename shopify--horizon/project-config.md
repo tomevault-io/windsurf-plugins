@@ -1,155 +1,106 @@
 ---
 trigger: always_on
-description: Accordion component accessibility compliance and WAI-ARIA Accordion Pattern
+description: Enforce animation accessibility standards per WCAG 2.2.2 Pause Stop Hide, 2.3.1 Three Flashes or Below Threshold, and 2.3.3 Animation from Interactions requirements
 ---
 
 
-# Accordion Component Accessibility Standards
+# Animation Accessibility Standards
 
-Ensures accordion components follow WCAG compliance and WAI-ARIA Accordion Pattern specifications.
+Ensures animations follow WCAG compliance and provide inclusive motion design for users with different accessibility needs including photosensitivity, motion sickness, and cognitive impairments.
 
 <rule>
-name: accordion_accessibility_standards
-description: Enforce accordion component accessibility standards and WAI-ARIA Accordion Pattern compliance
+name: animation_accessibility_standards
+description: Enforce animation accessibility standards per WCAG 2.2.2 Pause Stop Hide, 2.3.1 Three Flashes or Below Threshold, and 2.3.3 Animation from Interactions requirements
 filters:
   - type: file_extension
-    pattern: "\\.(vue|jsx|tsx|html|liquid|php|js|ts)$"
+    pattern: "\\.(vue|jsx|tsx|html|liquid|php|js|ts|css|scss|sass|less)$"
 
 actions:
+  - type: enforce
+    conditions:
+      # Missing prefers-reduced-motion media query for animations
+      - pattern: "(animation|transition|transform|@keyframes)"
+        pattern_negate: "@media\\s*\\(prefers-reduced-motion:\\s*reduce\\)"
+        message: "Animations should include prefers-reduced-motion: reduce media query to provide safer alternatives for motion-sensitive users."
 
-- type: enforce
-  conditions:
+      # Flashing animations exceeding 3Hz frequency
+      - pattern: "animation.*(?:pulse|flash|blink|flicker)"
+        pattern_negate: "animation-duration:\\s*[0-9]*\\.?[0-9]+s|animation-duration:\\s*[0-9]*\\.?[0-9]+ms"
+        message: "Flashing animations must have duration ensuring frequency is below 3Hz (0.33s) to prevent seizures per WCAG 2.3.1."
 
-  # Accordion header button role requirement
+      # Rapid color transitions that may trigger photosensitivity
+      - pattern: "transition.*color.*[0-9]*\\.?[0-9]+s|transition.*background.*[0-9]*\\.?[0-9]+s"
+        pattern_negate: "transition.*color.*[0-9]*\\.?[0-9]+s.*[0-9]*\\.?[0-9]+s|transition.*background.*[0-9]*\\.?[0-9]+s.*[0-9]*\\.?[0-9]+s"
+        message: "Color transitions should be slow and smooth to avoid triggering photosensitivity. Use longer durations and easing functions."
 
-  - pattern: "(?i)<button[^>]_(?:accordion|expand|collapse)[^>]_>"
-    pattern_negate: "role=\"button\""
-    message: "Accordion header buttons should have role='button' (or use native button element which has implicit role)."
+      # Large spatial movements without reduced motion alternatives
+      - pattern: "transform.*translate\\([^)]*[0-9]{2,}[^)]*\\)|transform.*translate\\([^)]*-[0-9]{2,}[^)]*\\)"
+        pattern_negate: "@media\\s*\\(prefers-reduced-motion:\\s*reduce\\)"
+        message: "Large spatial movements should have reduced motion alternatives using prefers-reduced-motion media query."
 
-  # Accordion header missing aria-expanded
+      # Parallax effects without user control
+      - pattern: "(parallax|scroll.*jack|scroll.*hijack)"
+        pattern_negate: "(prefers-reduced-motion|user.*control|pause.*animation)"
+        message: "Parallax and scroll jacking effects should respect user motion preferences and provide controls to pause/disable."
 
-  - pattern: "(?i)<button[^>]_(?:accordion|expand|collapse)[^>]_>"
-    pattern_negate: "aria-expanded=\"(true|false)\""
-    message: "Accordion header buttons must have aria-expanded attribute set to 'true' or 'false'."
+      # Auto-playing animations without pause controls
+      - pattern: "animation.*infinite|animation.*loop"
+        pattern_negate: "(pause.*control|user.*control|prefers-reduced-motion)"
+        message: "Looping animations must provide pause controls and respect prefers-reduced-motion preferences."
 
-  # Accordion header missing aria-controls
+      # Unexpected system-triggered animations
+      - pattern: "animation.*(?:appear|fade.*in|slide.*in)"
+        pattern_negate: "(user.*interaction|click|hover|focus|prefers-reduced-motion)"
+        message: "System-triggered animations should be subtle and respect user motion preferences."
 
-  - pattern: "(?i)<button[^>]_(?:accordion|expand|collapse)[^>]_>"
-    pattern_negate: "aria-controls=\"[^\"]+\""
-    message: "Accordion header buttons must have aria-controls attribute referencing the ID of the associated panel."
+      # Missing animation alternatives for essential UI changes
+      - pattern: "(?:loading|spinner|progress|status)"
+        pattern_negate: "(animation|transition|@keyframes)"
+        message: "Essential UI elements like loading indicators should have appropriate animations to communicate state changes."
 
-  # Heading wrapper missing role
+      # Excessive animation duration that may cause motion sickness
+      - pattern: "animation-duration:\\s*[5-9]\\.[0-9]+s|animation-duration:\\s*[0-9]{2,}s"
+        message: "Long animation durations may cause motion sickness. Consider shorter durations and provide reduced motion alternatives."
 
-  - pattern: "(?i)<(div|section)[^>]*(?:accordion.*header|header._accordion)[^>]_>"
-    pattern_negate: "role=\"heading\""
-    message: "Accordion header wrappers should have role='heading' or use native heading elements (h1-h6)."
+      # Missing focus indicators for animated interactive elements
+      - pattern: "(?:button|a|input|select|textarea).*\\{[^}]*animation"
+        pattern_negate: "(focus|focus-visible|outline|box-shadow)"
+        message: "Animated interactive elements must have visible focus indicators for keyboard navigation accessibility."
 
-  # Heading role missing aria-level
+      # Animation without meaningful purpose or context
+      - pattern: "animation.*(?:bounce|wiggle|shake|rotate)"
+        pattern_negate: "(loading|status|feedback|interaction)"
+        message: "Animations should serve a meaningful purpose. Avoid decorative animations that may distract or confuse users."
 
-  - pattern: "(?i)<[^>]_role=\"heading\"[^>]_>"
-    pattern_negate: "aria-level=\"[1-6]\""
-    message: "Elements with role='heading' must have aria-level attribute set to appropriate level (1-6)."
+      # Missing animation state management
+      - pattern: "animation.*(?:play|pause|stop)"
+        pattern_negate: "(prefers-reduced-motion|user.*control|aria.*live)"
+        message: "Animation state changes should be communicated to assistive technology and respect user preferences."
 
-  # Panel missing proper identification
+  - type: suggest
+    message: |
+      **Animation Accessibility Best Practices:**
 
-  - pattern: "(?i)<(div|section)[^>]*(?:accordion.*panel|panel._accordion)[^>]_>"
-    pattern_negate: "id=\"[^\"]+\""
-    message: "Accordion panels must have unique ID attributes for aria-controls reference."
+      **1. Respect Motion Preferences (WCAG 2.3.3):**
+      ```css
+      /* Default animation */
+      .fade-in {
+        animation: fadeIn 0.3s ease-in-out;
+      }
 
-  # Panel with region role missing aria-labelledby
+      /* Reduced motion alternative */
+      @media (prefers-reduced-motion: reduce) {
+        .fade-in {
+          animation: none;
+          opacity: 1;
+        }
+      }
+      ```
 
-  - pattern: "(?i)<[^>]_role=\"region\"[^>]_>"
-    pattern_negate: "aria-labelledby=\"[^\"]+\""
-    message: "Accordion panels with role='region' must have aria-labelledby referencing the heading element."
-
-  # Missing keyboard event handlers
-
-  - pattern: "(?i)<button[^>]_(?:accordion|expand|collapse)[^>]_>"
-    pattern_negate: "(onKeyDown|onkeydown|@keydown|v-on:keydown)"
-    message: "Accordion header buttons should handle keyboard events (Enter, Space, optionally Arrow keys)."
-
-  # Missing Escape key support for accordion content
-
-  - pattern: "(?i)<(div|section)[^>]*(?:accordion.*panel|panel._accordion)[^>]_>"
-    pattern_negate: "(onKeyDown|onkeydown|@keydown|v-on:keydown)"
-    message: "Accordion panels should handle Escape key to close panel and return focus to header."
-
-- type: suggest
-  message: |
-  **Accordion Component Accessibility Best Practices:**
-
-  **Required ARIA Attributes:**
-
-  - **role='button':** Set on accordion header elements (or use native button)
-  - **role='heading':** Set on accordion header container with aria-level
-  - **aria-expanded:** 'true' if panel is visible, 'false' if collapsed
-  - **aria-controls:** Reference to the ID of the associated panel content
-  - **aria-level:** Appropriate heading level (1-6) for information architecture
-  - **aria-disabled:** 'true' if panel cannot be collapsed (optional)
-
-  **Optional ARIA Attributes:**
-
-  - **role='region':** On panel content containers (avoid with >6 panels)
-  - **aria-labelledby:** On panels with role='region', referencing the heading element
-
-  **Keyboard Interaction Requirements:**
-
-  - **Enter/Space:** Toggle panel expansion/collapse
-  - **Tab/Shift+Tab:** Move through all focusable elements in page order
-  - **Down/Up Arrow:** (Optional) Navigate between accordion headers
-  - **Home/End:** (Optional) Jump to first/last accordion header
-  - **Escape:** Close open panel and return focus to header button
-
-  **Structure Requirements:**
-
-  - Header button must be the only element inside heading container
-  - Each panel must have unique ID for aria-controls reference
-  - Use native heading elements (h1-h6) when possible instead of role='heading'
-  - Avoid role='region' on panels when many accordions exist (>6 panels)
-
-  **Implementation Patterns:**
-
-  **Single Accordion Item:**
-
-  ```html
-  <div class="accordion-item">
-    <h3
-      role="heading"
-      aria-level="3"
-      id="header-1"
-    >
-      <button
-        aria-expanded="false"
-        aria-controls="panel-1"
-      >
-        Section Title
-      </button>
-    </h3>
-    <div
-      id="panel-1"
-      role="region"
-      aria-labelledby="header-1"
-      hidden
-    >
-      <p>Panel content...</p>
-    </div>
-  </div>
-  ```
-
-  **JavaScript for Accordion with Escape Support:**
-
-  ```javascript
-  function toggleAccordion(button) {
-    const isExpanded = button.getAttribute('aria-expanded') === 'true';
-    const panel = document.getElementById(button.getAttribute('aria-controls'));
-
-    button.setAttribute('aria-expanded', !isExpanded);
-    panel.hidden = isExpanded;
-
-    if (!isExpanded) {
-      // Add escape key listener to panel
-      panel.addEventListener('keydown', handleAccordionEscapeKey);
-    } else {
+      **2. Seizure Prevention (WCAG 2.3.1):**
+      ```css
+      /* Safe flashing animation - below 3Hz threshold */
+      .pulse {
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
