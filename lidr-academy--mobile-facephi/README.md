@@ -7,11 +7,11 @@ Repositorio con el contenido de la Sesion de Mobile de Facephi
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [LIDR-academy/mobile-facephi](https://github.com/LIDR-academy/mobile-facephi).
+Original source: `CLAUDE.md` in [LIDR-academy/mobile-facephi](https://github.com/LIDR-academy/mobile-facephi).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
