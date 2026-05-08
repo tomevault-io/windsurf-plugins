@@ -1,102 +1,95 @@
 ---
 trigger: always_on
-description: Cart drawer component accessibility compliance pattern
+description: Chat window component accessibility compliance and WCAG compliance for real-time communication features
 ---
 
-# Cart Drawer Component Accessibility Standards
+# Chat Window Component Accessibility Standards
 
-Ensures cart drawer components follow WCAG compliance and ARIA Dialog Pattern specifications for ecommerce applications.
+Ensures chat window components follow WCAG compliance and provide proper accessibility for real-time communication, notifications, and assistive technology support.
 
 <rule>
-name: cart_drawer_accessibility_standards
-description: Enforce cart drawer component accessibility standards and ARIA Dialog Pattern compliance
+name: chat_window_accessibility_standards
+description: Enforce chat window component accessibility standards and WCAG compliance for real-time communication features
 filters:
   - type: file_extension
-    pattern: "\\.(vue|jsx|tsx|html|liquid|php|js|ts)$"
+    pattern: "\\.(vue|jsx|tsx|html|liquid|php|js|ts|css|scss|sass|less)$"
 
 actions:
   - type: enforce
     conditions:
-      # Cart activator missing aria-haspopup
-      - pattern: "(?i)<button[^>]*(?:cart|basket|shopping)[^>]*>"
-        pattern_negate: "aria-haspopup=\"dialog\""
-        message: "Cart activator buttons must include aria-haspopup='dialog' to inform users a dialog will open."
+      # Chat window missing proper landmark role
+      - pattern: "(?i)<(div|section)[^>]*(?:chat|conversation|messages)[^>]*>"
+        pattern_negate: "role=\"(log|region|dialog)\""
+        message: "Chat window containers must have role='log' for message history, role='region' for general chat areas, or role='dialog' for popup windows."
 
-      # Cart container missing dialog role
-      - pattern: "(?i)<(div|section|aside)[^>]*(?:cart|basket|drawer)[^>]*>"
-        pattern_negate: "role=\"dialog\""
-        message: "Cart drawer containers must have role='dialog' attribute."
-
-      # Cart container missing aria-modal
-      - pattern: "(?i)<[^>]*role=\"dialog\"[^>]*(?:cart|basket|drawer)[^>]*>"
-        pattern_negate: "aria-modal=\"true\""
-        message: "Cart drawer dialog elements must have aria-modal='true' attribute."
-
-      # Cart container missing proper labeling
-      - pattern: "(?i)<[^>]*role=\"dialog\"[^>]*(?:cart|basket|drawer)[^>]*>"
+      # Chat log missing accessible name
+      - pattern: "(?i)<[^>]*role=\"log\"[^>]*>"
         pattern_negate: "(aria-labelledby|aria-label)"
-        message: "Cart drawer dialog elements must have either aria-labelledby or aria-label for accessibility."
+        message: "Chat log elements must have accessible names via aria-labelledby or aria-label for screen reader identification."
 
-      # Empty aria-label check
-      - pattern: "(?i)<[^>]*role=\"dialog\"[^>]*(?:cart|basket|drawer)[^>]*aria-label=\"\"[^>]*>"
-        message: "Cart drawer aria-label should not be empty; provide a meaningful description like 'Shopping Cart'."
+      # Chat messages missing author identification
+      - pattern: "(?i)<(p|div)[^>]*(?:message|chat|conversation)[^>]*>"
+        pattern_negate: "(aria-label|aria-labelledby|class.*visually-hidden|class.*sr-only)"
+        message: "Chat messages must include author identification via visible text, aria-label, or visually hidden content for screen reader users."
 
-      # Close button missing proper functionality
-      - pattern: "(?i)<button[^>]*(?:close|dismiss|cancel)[^>]*(?:cart|basket|drawer)[^>]*>"
-        pattern_negate: "(onClick|onclick|@click|v-on:click)"
-        message: "Cart drawer close buttons should have proper click handlers to close the dialog."
+      # Chat messages in wrong DOM order
+      - pattern: "(?i)<div[^>]*class=\"[^\"]*(?:left|right|user|agent)[^\"]*\"[^>]*>"
+        pattern_negate: "(role=\"log\"|aria-live)"
+        message: "Chat messages must maintain chronological order in DOM structure. Avoid using separate columns that break reading sequence."
 
-      # Close button missing aria-label
-      - pattern: "(?i)<button[^>]*(?:close|dismiss|×|&times;)[^>]*(?:cart|basket|drawer)[^>]*>"
-        pattern_negate: "aria-label=\"[^\"]*[Cc]lose[^\"]*\""
-        message: "Cart drawer close buttons should have aria-label='Close cart' or similar descriptive text."
+      # Chat notifications relying only on sound
+      - pattern: "(?i)(audio|sound|play|new.*message)"
+        pattern_negate: "(aria-live|role=\"status\"|visual.*notification|title.*change|notification.*badge)"
+        message: "Chat notifications must use multiple sensory channels. Combine sound with visual indicators, aria-live announcements, title changes, and notification badges."
 
-      # Missing focus management indicators
-      - pattern: "(?i)(?:openCart|showCart|toggleCart|openDrawer)\\s*\\("
-        message: "When opening cart drawers, ensure focus management is implemented (focus should move to first focusable element inside the dialog)."
+      # Chat window missing keyboard support
+      - pattern: "(?i)<(div|section)[^>]*(?:chat|conversation)[^>]*>"
+        pattern_negate: "(onKeyDown|onkeydown|@keydown|v-on:keydown|tabindex)"
+        message: "Chat windows must support keyboard navigation for opening, closing, and message interaction."
 
-      # Missing checkout button accessibility
-      - pattern: "(?i)<button[^>]*(?:checkout|proceed|purchase)[^>]*(?:cart|basket|drawer)[^>]*>"
-        pattern_negate: "(aria-label|aria-describedby)"
-        message: "Cart drawer checkout buttons should have proper labeling for screen readers."
+      # Chat popup missing focus management
+      - pattern: "(?i)<(div|section)[^>]*role=\"dialog\"[^>]*(?:chat|conversation)[^>]*>"
+        pattern_negate: "(aria-modal|focus|tabindex)"
+        message: "Chat popup windows must implement proper focus management and aria-modal='true' for accessibility."
 
-      # Quantity inputs missing aria-live for screen reader announcements
-      - pattern: "(?i)<input[^>]*type=\"number\"[^>]*(?:quantity|qty)[^>]*>"
-        pattern_negate: "aria-live=\"polite\""
-        message: "Cart quantity inputs must have aria-live='polite' to announce value changes to screen readers."
+      # Chat launcher missing aria-haspopup
+      - pattern: "(?i)<(button|div)[^>]*(?:chat|conversation|support)[^>]*>"
+        pattern_negate: "aria-haspopup=\"dialog\""
+        message: "Chat launcher buttons must include aria-haspopup='dialog' to inform users a dialog will open."
 
-      # Missing focus management for item removal
-      - pattern: "(?i)(?:removeItem|remove.*item|delete.*item)\\s*\\("
-        pattern_negate: "focus\\(|focus\\(\\).*close|close.*focus\\(\\"
-        message: "When removing cart items, implement focus management to shift focus to a logical location (e.g., close button) for better user experience."
+      # Chat window missing focus trap
+      - pattern: "(?i)<[^>]*role=\"dialog\"[^>]*(?:chat|conversation)[^>]*>"
+        pattern_negate: "(focus.*trap|tabindex|aria-modal)"
+        message: "Chat popup windows must implement focus trapping to prevent keyboard navigation outside the dialog."
 
-  - type: suggest
-    message: |
-      **Cart Drawer Component Accessibility Best Practices:**
+      # Chat input missing proper labeling
+      - pattern: "(?i)<(input|textarea)[^>]*(?:chat|message|reply)[^>]*>"
+        pattern_negate: "(aria-label|aria-labelledby|label|placeholder)"
+        message: "Chat input fields must have proper labels via label elements, aria-label, or aria-labelledby for screen reader context."
 
-      **Required ARIA Attributes:**
-      - **aria-haspopup='dialog':** Set on cart activator buttons to inform users a dialog will open
-      - **role='dialog':** Set on the cart drawer container element
-      - **aria-modal='true':** Indicates the cart drawer is modal and traps focus
-      - **aria-labelledby:** Reference to visible cart title, OR
-      - **aria-label:** Descriptive label like "Shopping Cart" if no visible title exists
+      # Chat button missing accessible name
+      - pattern: "(?i)<(button|div)[^>]*(?:chat|conversation|support)[^>]*>"
+        pattern_negate: "(aria-label|aria-labelledby|>.*[A-Za-z]{10,})"
+        message: "Chat buttons must have accessible names via visible text, aria-label, or aria-labelledby for screen reader identification."
 
-      **Keyboard Interaction Requirements:**
-      - **Initial Focus:** When cart drawer opens, focus must move to the first focusable element (typically close button)
-      - **Tab Cycling:** Tab key should cycle through focusable elements within the cart drawer only
-      - **Shift+Tab:** Should cycle backwards through focusable elements within the cart drawer
-      - **Escape Key:** Must close the cart drawer and return focus to the activator
-      - **Focus Trap:** Focus should be contained within the cart drawer while open
+      # Chat button missing proper role
+      - pattern: "(?i)<(div|span)[^>]*(?:chat|conversation|support)[^>]*>"
+        pattern_negate: "(role=\"button\"|<button)"
+        message: "Chat controls styled as buttons must have role='button' or use native button elements for proper semantics."
 
-      **Focus Management:**
-      - Implement focus trapping to prevent tab navigation outside the cart drawer
-      - Return focus to the cart activator when drawer closes
-      - Move focus to the close button (first focusable element) when drawer opens
-      - Ensure close button is positioned first in DOM order within the dialog container
-      - **Item Removal Focus:** When removing cart items, shift focus to the close button for logical positioning
-      - **Quantity Changes:** Maintain focus on quantity controls during updates to prevent focus loss
+      # Chat window missing expandable state management
+      - pattern: "(?i)<(button|div)[^>]*(?:chat|conversation)[^>]*>"
+        pattern_negate: "aria-expanded=\"(true|false)\""
+        message: "Expandable chat windows must have aria-expanded attribute to indicate open/closed state for screen readers."
 
-      **Screen Reader Interaction:**
+      # Chat window missing aria-controls
+      - pattern: "(?i)<(button|div)[^>]*(?:chat|conversation)[^>]*>"
+        pattern_negate: "aria-controls=\"[^\"]+\""
+        message: "Chat controls must have aria-controls referencing the chat window ID for proper association."
+
+      # Chat timeout missing user notification
+      - pattern: "(?i)(timeout|session.*expir|inactive)"
+        pattern_negate: "(notification|warning|extend|20.*second)"
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
