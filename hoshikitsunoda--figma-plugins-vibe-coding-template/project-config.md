@@ -1,150 +1,106 @@
 ---
 trigger: always_on
-description: Think and act as an experienced design technologist — someone who bridges design and engineering with care, curiosity, and clarity.
+description: Converting Plugin API data to JSON for postMessage or export.
 ---
 
 
-# Design Technologist Mindset
+# Figma Serialization Patterns
 
-Think and act as an experienced design technologist — someone who bridges design and engineering with care, curiosity, and clarity.
+Converting Plugin API data to JSON for postMessage or export.
 
-## Attention to Detail
+## Clone Readonly Arrays
 
-- Care about edge cases and polish, not just "does it work?"
-- Consider how things feel from the designer's perspective
-- Think about the workflow: what happens before and after this action?
+Paint and effect arrays are readonly — clone before modifying or sending:
 
-## Curiosity for New Technology
+```typescript
+// ✓ Clone with JSON round-trip
+const fills = JSON.parse(JSON.stringify(node.fills))
 
-- Explore what Figma's API can do — suggest creative solutions
-- Stay current with plugin capabilities and best practices
-- When unsure, check the official docs rather than guessing
-
-## Clear Communication of Intent
-
-- Explain the reasoning behind decisions, not just the implementation
-- Connect technical choices to user goals
-- Make the invisible visible — why this approach over alternatives?
-
----
-
-# Figma Plugin Architecture
-
-This is a Figma plugin built with React + Vite + TypeScript. Understanding the two-context architecture is critical.
-
-## The Sandbox Model
-
-Figma plugins run in **two separate JavaScript contexts** that cannot directly share memory:
-
-```
-┌─────────────────────────┐     postMessage      ┌─────────────────────────┐
-│     MAIN THREAD         │ ◄──────────────────► │      UI THREAD          │
-│   (Plugin Sandbox)      │                      │      (iframe)           │
-├─────────────────────────┤                      ├─────────────────────────┤
-│ ✓ figma.* API           │                      │ ✓ DOM / React           │
-│ ✓ SceneNode access      │                      │ ✓ fetch() / XHR         │
-│ ✓ Document manipulation │                      │ ✓ window / localStorage │
-│ ✗ NO DOM                │                      │ ✗ NO figma.* API        │
-│ ✗ NO fetch              │                      │ ✗ NO direct node access │
-│ ✗ NO window             │                      │                         │
-└─────────────────────────┘                      └─────────────────────────┘
+// ✓ Or use spread for shallow clone
+const effects = [...node.effects]
 ```
 
-## Project Structure
+## Handle Special Types
 
+### Colors
+
+Figma colors use 0-1 range, not 0-255:
+
+```typescript
+interface Color {
+  r: number // 0-1
+  g: number // 0-1
+  b: number // 0-1
+}
+
+// Convert to hex if needed
+const toHex = (c: Color) =>
+  '#' +
+  [c.r, c.g, c.b]
+    .map((v) => Math.round(v * 255).toString(16).padStart(2, '0'))
+    .join('')
 ```
-manifest.json       # Plugin config - update name and id for your plugin
-src/
-  plugin/           # Main thread code (runs in Figma sandbox)
-    main.ts         # Entry point, message router
-    handlers/       # Message handlers
-    utils/          # Figma API utilities
-  ui/               # UI thread code (React app in iframe)
-    App.tsx
-    components/
-    hooks/
-  shared/           # Shared types (message definitions)
-    messages.ts     # PluginMessage & UIMessage types
-```
 
-## Plugin Manifest
+### Image Paints
 
-Update `manifest.json` with your plugin's name and a unique id:
+Image fills contain `imageHash`, not actual bytes:
 
-```json
-{
-  "name": "Your Plugin Name",
-  "id": "your-plugin-id",
-  "api": "1.0.0",
-  "main": "dist/plugin.js",
-  "ui": "dist/index.html",
-  "editorType": ["figma"]
+```typescript
+if (fill.type === 'IMAGE') {
+  // imageHash is a string reference
+  const hash = fill.imageHash
+
+  // To get actual bytes, use:
+  const image = figma.getImageByHash(hash)
+  const bytes = await image.getBytesAsync()
 }
 ```
 
-## Critical Rules
-
-1. **Never try to access `figma.*` from UI code** - It doesn't exist in the iframe context
-2. **Never try to use `fetch()` from plugin code** - Network requests must happen in UI thread
-3. **Never pass Figma node references via postMessage** - They can't be serialized. Pass `node.id` strings instead
-4. **Always use typed messages** - Define message types in `src/shared/messages.ts`
-5. **Use `@figma/plugin-typings`** - Don't manually define Figma API types. The package provides all node types, properties, and API definitions
-
-## Security
-
-### API Keys and Secrets - PROACTIVE HANDLING
-
-**CRITICAL: Always handle API keys securely. Never hardcode them in source files.**
-
-#### When Implementing Code That Needs API Keys
-
-1. **Ask about API keys FIRST** - Before writing code that uses external APIs:
-   - "This will need an API key. Do you have one, or should I add a UI field for users to enter it?"
-   - "Where should the API key come from? User input or environment variable?"
-   - Guide users to use `.env` files (see `.env.example`) or `figma.clientStorage`
-
-2. **Detect API key patterns** - If you see or user mentions:
-   - Keys starting with `figd_` (Figma API keys)
-   - Keys starting with `sk-` (OpenAI, Stripe)
-   - Any hardcoded strings that look like API keys
-   - **STOP and ask**: "I notice this looks like an API key. Should we move it to `.env` or `figma.clientStorage` instead?"
-
-3. **Never hardcode keys** - If user provides an API key:
-   - **DO NOT** put it directly in source code
-   - **DO** ask: "I'll set this up to use `.env` (for build-time) or `figma.clientStorage` (for runtime). Which do you prefer?"
-   - **DO** show them how to add it to `.env.example` → `.env`
-
-#### Implementation Patterns
-
-**For personal plugins (recommended):**
-
-Use `figma.clientStorage` - Persists locally, never in code:
+### Font Names
 
 ```typescript
-// In plugin code (main.ts)
-// Save key from user input
-await figma.clientStorage.setAsync('apiKey', key)
-
-// Retrieve key
-const key = await figma.clientStorage.getAsync('apiKey')
+if (node.type === 'TEXT') {
+  // FontName is { family: string, style: string }
+  const font = node.fontName
+  // May be mixed — check for figma.mixed symbol
+  if (font !== figma.mixed) {
+    console.log(font.family, font.style)
+  }
+}
 ```
 
-**For build-time keys (if using bundler with env support):**
+## Skip Non-Serializable Properties
 
-Use `.env` files - Never commit `.env`, only `.env.example`:
+These will break `JSON.stringify()`:
 
 ```typescript
-// In UI code (App.tsx) - if using Vite/env variables
-const apiKey = import.meta.env.VITE_API_KEY
+// ❌ Don't include in serialized output
+node.parent // Circular reference
+node.removed // Runtime state
+node.reactions // Contains functions
 
-// Always check .env.example exists and guide user to copy it
+// ✓ Extract only needed data
+function serializeNode(node: SceneNode) {
+  return {
+    id: node.id,
+    name: node.name,
+    type: node.type,
+    // ... other safe properties
+  }
+}
 ```
 
-#### Detection Rules
+## Mixed Values
 
-- **If user says**: "I have an API key" or "Use this key: figd\_..."
+Some properties can be `figma.mixed` when values vary (e.g., mixed fonts in text):
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+```typescript
+if (node.fontSize === figma.mixed) {
+  // Handle mixed case
+} else {
+  // Use the value directly
+}
+```
 
 ---
 > Source: [hoshikitsunoda/figma-plugins-vibe-coding-template](https://github.com/hoshikitsunoda/figma-plugins-vibe-coding-template) — distributed by [TomeVault](https://tomevault.io).
