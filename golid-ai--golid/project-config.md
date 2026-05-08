@@ -1,72 +1,151 @@
 ---
 trigger: always_on
-description: How to write, update, and maintain Cursor rules — use when creating a new rule or updating an existing one
+description: Patterns for writing tests — integration tests with TestDB, unit tests for pure logic, test data seeding
 ---
 
 
-# Writing Cursor Rules
+# Writing Tests
 
-> **Thesis:** Every rule opens with a thesis. The thesis is the contract —
-> everything below it is the implementation.
+## Integration Tests (Service Layer)
 
-## Structure
+Test real SQL against a real PostgreSQL instance using `testutil.WithTestDB`.
 
-1. **Thesis (required)** — one sentence after the heading. States what the rule
-   enforces and why. This is the most important line — a thesis enables the AI
-   to generalize to novel situations; a pointer only enables pattern-matching.
+```go
+//go:build integration
 
-2. **Reference files** — "Follow the established patterns in X" goes here,
-   not in the thesis. The thesis says _what_; references say _where_.
+package service_test
 
-3. **Sections** — BAD/GOOD examples for the highest-consequence patterns.
-   Keep examples minimal — one BAD, one GOOD, showing the exact mistake and fix.
+import (
+    "testing"
+    "github.com/golid-ai/golid/backend/internal/service"
+    "github.com/golid-ai/golid/backend/internal/testutil"
+)
 
-## When to Create a New Rule
+func TestItemService_Create(t *testing.T) {
+    testutil.WithTestDB(t, func(pool *pgxpool.Pool) {
+        svc := service.NewItemService(pool, 20, 100)
 
-- A pattern has been explained 3+ times across conversations
-- A bug was caused by violating a convention that isn't written down
-- A new file category has no glob coverage
+        // Seed prerequisite data with raw SQL
+        _, err := pool.Exec(ctx, `INSERT INTO users (...) VALUES (...)`)
+        // ...
 
-## When to Extend an Existing Rule
+        // Test the service method
+        result, err := svc.Create(ctx, &service.CreateItemInput{...})
+        if err != nil { t.Fatalf("expected no error, got %v", err) }
+        if result.Title != "Test Item" { t.Errorf("expected title 'Test Item', got %s", result.Title) }
+    })
+}
+```
 
-- The new guidance applies to the same file glob
-- It's a sub-pattern of an existing rule's thesis
+### Key Rules
 
-## Updating Rules During Execution
+- **Build tag**: `//go:build integration` at the top of the file.
+- **File naming**: `x_integration_test.go` (not `x_test.go`) to make it clear.
+- **Seed with raw SQL**: Use `pool.Exec` with INSERT statements. Never use service methods to seed — they have their own validation and side effects.
+- **Test one thing per function**: Each test function should test one behavior (happy path, error case, permission check, etc.).
+- **Clean state**: `WithTestDB` provides a fresh database for each test. No cleanup needed.
 
-When a code change invalidates or reveals a gap in an existing rule, update the
-rule in the same pass — not as a follow-up task. Stale rules are worse than
-missing rules because they actively mislead.
+### What to Test
 
-Update triggers (only these — don't edit rules speculatively):
+- **Happy paths**: Create, Read, Update, Delete with valid inputs.
+- **Permission checks**: Wrong user type, non-owner, non-member. Expect `FORBIDDEN`.
+- **Status guards**: Operation on wrong-status parent. Expect `BAD_REQUEST`.
+- **Not found**: Non-existent ID. Expect `NOT_FOUND`.
+- **Conflict**: Duplicate entries. Expect `CONFLICT`.
+- **Edge cases**: Empty arrays, null optional fields, boundary values.
 
-- Bug fix exposed an unwritten convention → add to the relevant domain rule
-- Refactor moved/renamed files referenced by a rule → update the references
-- New pattern discovered (naming conflict, type safety convention) → add to
-  the rule covering that file category
-- Audit finding that should be enforced going forward → add to audit checklist
-  AND the relevant domain rule
+Reference: existing `_integration_test.go` files in `backend/internal/service/`
 
-Keep rule edits minimal — update the specific line or section affected, don't
-rewrite the entire rule. The goal is accuracy, not polish.
+## Unit Tests (Pure Logic)
 
-## Naming
+For validation helpers, parsing functions, and other pure logic — no build tag needed.
 
-`{domain}-{concern}.mdc` — e.g., `go-service`, `frontend-forms`, `write-tests`.
-Workflow rules use verb phrases: `plan-feature`, `document-module`, `audit-bugs`.
+```go
+package service
 
-## Activation
+import "testing"
 
-- **Glob-triggered** for domain rules (fires when editing matching files)
-- **Description-triggered** for workflow rules (fires when the task matches)
-- **alwaysApply** only for universal guardrails — every line costs context on
-  every interaction, so this is reserved for codebase-standards and
-  parallel-subagents
+func TestNormalizePagination(t *testing.T) {
+    tests := []struct {
+        page, perPage   int
+        wantP, wantPP   int
+    }{
+        {0, 0, 1, 20},
+        {-1, 200, 1, 20},
+        {5, 10, 5, 10},
+    }
+    for _, tt := range tests {
+        p, pp := NormalizePagination(tt.page, tt.perPage, 20, 100)
+        if p != tt.wantP || pp != tt.wantPP {
+            t.Errorf("NormalizePagination(%d, %d) = (%d, %d), want (%d, %d)",
+                tt.page, tt.perPage, p, pp, tt.wantP, tt.wantPP)
+        }
+    }
+}
+```
 
-## Size
+### Key Rules
 
-Aim for 40-80 lines of content (excluding frontmatter). Over 120 lines suggests
-the rule covers two concerns and should be split.
+- **No build tag** — runs on every `go test`.
+- **Same package** — test unexported functions directly (e.g., `NormalizePagination`).
+- **Table-driven tests** — use `[]struct` pattern for multiple cases.
+- **File naming**: `x_test.go` in the same directory as the code.
+
+Reference: existing `_test.go` files in `backend/internal/service/`
+
+## Mock-based Handler Tests
+
+Create a mock struct implementing the service interface. Set function fields for methods under test. Unimplemented methods panic. Inject mock directly into handler struct: `h := &AuthHandler{authService: &mockAuthService{...}}`. See `handler/auth_test.go` for examples.
+
+## Scaffold-Generated Tests
+
+`make new-module name=items` automatically generates `handler/item_test.go` with:
+
+- A `mockItemService` struct implementing the `itemServicer` interface
+- A `testItemDetail()` helper returning sample data
+- 5 test stubs: Create success, Create validation error, List, GetByID not found, Delete
+
+After scaffolding, fill in test bodies for your specific validation rules, error paths, and edge cases. The generated tests follow the same pattern as `auth_test.go`.
+
+## Always Test Error Paths
+
+Don't just test happy paths. Every service method should have tests for:
+
+- **Permission denied** — wrong user type, non-owner, non-member → expect `FORBIDDEN`
+- **Invalid status** — operation on wrong-status entity → expect `BAD_REQUEST`
+- **Not found** — non-existent ID → expect `NOT_FOUND`
+- **Duplicate/conflict** — re-creating existing entity → expect `CONFLICT`
+
+These are the bugs that slip through manual testing and break in production.
+
+## Component Unit Tests (SolidJS)
+
+Use `@solidjs/testing-library` for component-level tests. Test the public API: renders, accepts props, fires events.
+
+```tsx
+import { render, screen, fireEvent } from "@solidjs/testing-library";
+import { Button } from "./Button";
+
+test("calls onClick", async () => {
+  const handler = vi.fn();
+  render(() => <Button onClick={handler}>Click</Button>);
+  await fireEvent.click(screen.getByText("Click"));
+  expect(handler).toHaveBeenCalledTimes(1);
+});
+```
+
+Place test files next to the component: `Button.test.tsx` alongside `Button.tsx`. Vitest discovers `src/**/*.test.{ts,tsx}` automatically.
+
+**Important:** `vitest.config.ts` must have `resolve.conditions: ["development", "browser"]` to prevent Solid from resolving server-side bundles in jsdom.
+
+### Test Quality Bar
+
+Every component test must assert at least one **behavioral property**, not just existence. "Renders without crashing" is not a test.
+
+```tsx
+// BAD — tests nothing meaningful
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [golid-ai/golid](https://github.com/golid-ai/golid) — distributed by [TomeVault](https://tomevault.io).
