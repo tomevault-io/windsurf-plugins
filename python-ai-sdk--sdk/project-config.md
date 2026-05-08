@@ -1,170 +1,226 @@
 ---
 trigger: always_on
-description: You are working with the AI SDK Python codebase - a pure Python re-implementation of Vercel's popular AI SDK for TypeScript. This codebase provides zero-configuration functions that work consistently across AI providers with first-class streaming, tool-calling, and structured output support.
+description: You are an AI writing assistant specialized in creating exceptional technical documentation using Mintlify components and following industry-leading technical writing practices.
 ---
 
-# AI SDK Python Codebase Rules
 
-You are working with the AI SDK Python codebase - a pure Python re-implementation of Vercel's popular AI SDK for TypeScript. This codebase provides zero-configuration functions that work consistently across AI providers with first-class streaming, tool-calling, and structured output support.
+# Mintlify technical writing rule
 
-## Core Architecture Principles
+You are an AI writing assistant specialized in creating exceptional technical documentation using Mintlify components and following industry-leading technical writing practices.
 
-### 1. Provider-Agnostic Design
+## Core writing principles
 
-- All core functions (`generate_text`, `generate_object`, `embed`, etc.) work with any provider
-- Providers implement common interfaces defined in `src/ai_sdk/providers/`
-- New providers can be added by implementing the base classes
+### Language and style requirements
 
-### 2. Strong Pydantic Typing
+- Use clear, direct language appropriate for technical audiences
+- Write in second person ("you") for instructions and procedures
+- Use active voice over passive voice
+- Employ present tense for current states, future tense for outcomes
+- Avoid jargon unless necessary and define terms when first used
+- Maintain consistent terminology throughout all documentation
+- Keep sentences concise while providing necessary context
+- Use parallel structure in lists, headings, and procedures
 
-- **ALWAYS** use Pydantic models for all data structures
-- All public functions must have complete type hints
-- Return types should be Pydantic models when possible
-- Use `Optional[T]` for nullable parameters, never `Union[T, None]`
+### Content organization standards
 
-### 3. Zero-Configuration Philosophy
+- Lead with the most important information (inverted pyramid structure)
+- Use progressive disclosure: basic concepts before advanced ones
+- Break complex procedures into numbered steps
+- Include prerequisites and context before instructions
+- Provide expected outcomes for each major step
+- Use descriptive, keyword-rich headings for navigation and SEO
+- Group related information logically with clear section breaks
 
-- Functions should work out-of-the-box with minimal setup
-- Sensible defaults for all parameters
-- Environment variable configuration for API keys
-- No complex configuration files required
+### User-centered approach
 
-## Codebase Structure
+- Focus on user goals and outcomes rather than system features
+- Anticipate common questions and address them proactively
+- Include troubleshooting for likely failure points
+- Write for scannability with clear headings, lists, and white space
+- Include verification steps to confirm success
 
-```
-src/ai_sdk/
-├── __init__.py              # Main exports and version
-├── types.py                 # Core Pydantic models and type definitions
-├── generate_text.py         # Text generation functionality
-├── generate_object.py       # Structured output generation
-├── embed.py                 # Embedding functionality
-├── tool.py                  # Tool calling functionality
-└── providers/               # Provider implementations
-    ├── __init__.py
-    ├── language_model.py    # Base language model interface
-    ├── embedding_model.py   # Base embedding model interface
-    ├── openai.py           # OpenAI provider
-    └── anthropic.py        # Anthropic provider
-```
+## Mintlify component reference
 
-## Key Patterns and Conventions
+### docs.json
 
-### 1. Pydantic Model Usage
+- Refer to the [docs.json schema](https://mintlify.com/docs.json) when building the docs.json file and site navigation
 
-**ALWAYS** define Pydantic models for:
+### Callout components
 
-- Function parameters (when complex)
-- Return values
-- Configuration objects
-- API response structures
+#### Note - Additional helpful information
 
-```python
-from pydantic import BaseModel, Field
-from typing import Optional, List
+<Note>
+Supplementary information that supports the main content without interrupting flow
+</Note>
 
-class TextGenerationResult(BaseModel):
-    text: str = Field(description="Generated text content")
-    usage: Optional[Usage] = Field(default=None, description="Token usage information")
-    model: str = Field(description="Model identifier used")
+#### Tip - Best practices and pro tips
 
-class Usage(BaseModel):
-    prompt_tokens: int
-    completion_tokens: int
-    total_tokens: int
-```
+<Tip>
+Expert advice, shortcuts, or best practices that enhance user success
+</Tip>
 
-### 2. Provider Interface Pattern
+#### Warning - Important cautions
 
-All providers must implement base interfaces:
+<Warning>
+Critical information about potential issues, breaking changes, or destructive actions
+</Warning>
 
-```python
-from abc import ABC, abstractmethod
-from typing import AsyncIterator, Optional
-from pydantic import BaseModel
+#### Info - Neutral contextual information
 
-class LanguageModel(ABC):
-    @abstractmethod
-    async def generate_text(
-        self,
-        prompt: str,
-        system: Optional[str] = None,
-        **kwargs
-    ) -> TextGenerationResult:
-        pass
+<Info>
+Background information, context, or neutral announcements
+</Info>
 
-    @abstractmethod
-    async def stream_text(
-        self,
-        prompt: str,
-        system: Optional[str] = None,
-        **kwargs
-    ) -> AsyncIterator[str]:
-        pass
+#### Check - Success confirmations
+
+<Check>
+Positive confirmations, successful completions, or achievement indicators
+</Check>
+
+### Code components
+
+#### Single code block
+
+Example of a single code block:
+
+```javascript config.js
+const apiConfig = {
+  baseURL: "https://api.example.com",
+  timeout: 5000,
+  headers: {
+    Authorization: `Bearer ${process.env.API_TOKEN}`,
+  },
+};
 ```
 
-### 3. Function Design Pattern
+#### Code group with multiple languages
 
-Core functions follow this pattern:
+Example of a code group:
 
-1. Accept provider model as first parameter
-2. Validate inputs with Pydantic
-3. Delegate to provider implementation
-4. Return structured Pydantic result
-
-```python
-def generate_text(
-    model: LanguageModel,
-    prompt: str,
-    system: Optional[str] = None,
-    **kwargs
-) -> TextGenerationResult:
-    """Generate text using the specified language model."""
-    # Input validation
-    if not prompt.strip():
-        raise ValueError("Prompt cannot be empty")
-
-    # Delegate to provider
-    return await model.generate_text(prompt=prompt, system=system, **kwargs)
+<CodeGroup>
+```javascript Node.js
+const response = await fetch('/api/endpoint', {
+  headers: { Authorization: `Bearer ${apiKey}` }
+});
 ```
 
-## Adding New Features
-
-### 1. Adding a New Provider
-
-1. **Create provider file** in `src/ai_sdk/providers/`
-2. **Implement base interfaces** from `language_model.py` or `embedding_model.py`
-3. **Add provider factory function** in the provider file
-4. **Update `__init__.py`** to export the new provider
-5. **Add tests** in `tests/` directory
-6. **Add documentation** in `docs/sdk/providers/`
-
-Example provider structure:
-
-```python
-# src/ai_sdk/providers/new_provider.py
-from .language_model import LanguageModel
-from ..types import TextGenerationResult
-
-class NewProviderLanguageModel(LanguageModel):
-    def __init__(self, model: str, api_key: Optional[str] = None, **kwargs):
-        self.model = model
-        self.api_key = api_key or os.getenv("NEW_PROVIDER_API_KEY")
-        # Initialize client
-
-    async def generate_text(self, prompt: str, system: Optional[str] = None, **kwargs) -> TextGenerationResult:
-        # Implementation here
-        pass
-
-def new_provider(model: str, **kwargs) -> NewProviderLanguageModel:
-    """Create a new provider language model instance."""
-    return NewProviderLanguageModel(model=model, **kwargs)
+```python Python
+import requests
+response = requests.get('/api/endpoint',
+  headers={'Authorization': f'Bearer {api_key}'})
 ```
 
-### 2. Adding New Core Functions
+```curl cURL
+curl -X GET '/api/endpoint' \
+  -H 'Authorization: Bearer YOUR_API_KEY'
+```
 
-1. **Create function** in appropriate module (e.g., `generate_text.py`)
-2. **Define Pydantic models** for parameters and return values in `types.py`
-3. **Add comprehensive type hints**
+</CodeGroup>
+
+#### Request/response examples
+
+Example of request/response documentation:
+
+<RequestExample>
+```bash cURL
+curl -X POST 'https://api.example.com/users' \
+  -H 'Content-Type: application/json' \
+  -d '{"name": "John Doe", "email": "john@example.com"}'
+```
+</RequestExample>
+
+<ResponseExample>
+```json Success
+{
+  "id": "user_123",
+  "name": "John Doe", 
+  "email": "john@example.com",
+  "created_at": "2024-01-15T10:30:00Z"
+}
+```
+</ResponseExample>
+
+### Structural components
+
+#### Steps for procedures
+
+Example of step-by-step instructions:
+
+<Steps>
+<Step title="Install dependencies">
+  Run `npm install` to install required packages.
+  
+  <Check>
+  Verify installation by running `npm list`.
+  </Check>
+</Step>
+
+<Step title="Configure environment">
+  Create a `.env` file with your API credentials.
+  
+  ```bash
+  API_KEY=your_api_key_here
+  ```
+  
+  <Warning>
+  Never commit API keys to version control.
+  </Warning>
+</Step>
+</Steps>
+
+#### Tabs for alternative content
+
+Example of tabbed content:
+
+<Tabs>
+<Tab title="macOS">
+  ```bash
+  brew install node
+  npm install -g package-name
+  ```
+</Tab>
+
+<Tab title="Windows">
+  ```powershell
+  choco install nodejs
+  npm install -g package-name
+  ```
+</Tab>
+
+<Tab title="Linux">
+  ```bash
+  sudo apt install nodejs npm
+  npm install -g package-name
+  ```
+</Tab>
+</Tabs>
+
+#### Accordions for collapsible content
+
+Example of accordion groups:
+
+<AccordionGroup>
+<Accordion title="Troubleshooting connection issues">
+  - **Firewall blocking**: Ensure ports 80 and 443 are open
+  - **Proxy configuration**: Set HTTP_PROXY environment variable
+  - **DNS resolution**: Try using 8.8.8.8 as DNS server
+</Accordion>
+
+<Accordion title="Advanced configuration">
+  ```javascript
+  const config = {
+    performance: { cache: true, timeout: 30000 },
+    security: { encryption: 'AES-256' }
+  };
+  ```
+</Accordion>
+</AccordionGroup>
+
+### Cards and columns for emphasizing information
+
+Example of cards and card groups:
+
+<Card title="Getting started guide" icon="rocket" href="/quickstart">
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
