@@ -1,65 +1,185 @@
 ---
 trigger: always_on
-description: **During multi-tool execution**: If an approach isn't working after 3 attempts, **ASK** before trying something different. Do NOT:
+description: This rule outlines the complete workflow for creating a new control in Flowery.Uno, whether it's a brand new control or a port from another library.
 ---
 
+# Creating a New Flowery.Uno Control (Uno Platform / WinUI)
 
-# Must Read
+This rule outlines the complete workflow for creating a new control in Flowery.Uno, whether it's a brand new control or a port from another library.
 
-## ⛔ 3-Iteration Rule (No Silent Scope/Approach Changes)
+> **Platform**: Uno Platform / WinUI (NOT Avalonia). Use `Microsoft.UI.Xaml.*` namespaces, `.xaml` files, and `DependencyProperty`.
 
-**During multi-tool execution**: If an approach isn't working after 3 attempts, **ASK** before trying something different. Do NOT:
+## Overview
 
-- Silently decide "this is too complex, let me rewrite/simplify it"
-- Expand scope from a targeted fix to a multi-hundred-line refactor
-- Switch fundamental approaches mid-execution without user awareness
+Creating a new control involves these major phases:
 
-The rule prevents the AI from *unilaterally* changing direction. Interactive discussion with the user is always fine.
+1. **Control Implementation** - C# class with properties and logic
+2. **Theme/Styling** - XAML ResourceDictionary for visual appearance
+3. **Gallery Examples** - Demo page in the gallery application
+4. **Sidebar Integration** - Add to the sidebar data
+5. **Documentation** - Markdown file for supplementary docs
 
-**"Fix Root Cause" vs "Minimal Change"** — These are NOT contradictory:
+---
 
-- ✅ Fix root causes across multiple files if needed — just mention what you're doing
-- ❌ Don't refactor unrelated code "while you're there"
-- ⚠️ Pause and ask only for *significant* scope changes (10-line fix → 200-line rewrite, architecture changes)
+## Phase 1: Control Implementation
 
-## ⚠️ Git Bash CRLF Rule
+### 1.1 Create the C# Control File
 
-When using `sed`, `cat`, `head`, `tail` on Windows files, **ALWAYS** pipe through `| tr -d '\r'`:
+**Location:** `Flowery.Uno/Controls/Daisy[ControlName].cs`
 
-```bash
-sed -n '100,110p' file.cs | tr -d '\r'
+> If the control is a **custom extension** (not a direct DaisyUI component), place it under:
+>
+> - `Flowery.Uno/Controls/Custom/Daisy[ControlName].cs`
+> - Namespace: `Flowery.Controls`
+
+**Required elements:**
+
+```csharp
+using System;
+using Flowery.Theming;
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
+using Windows.UI;
+// Add other required usings at the TOP
+
+namespace Flowery.Controls
+{
+    // Define enums at namespace level
+    public enum Daisy[ControlName]Variant
+    {
+        Default,
+        Primary,
+        // ... other values
+    }
+
+    /// <summary>
+    /// Brief description of what the control does (Uno/WinUI).
+    /// </summary>
+    public partial class Daisy[ControlName] : ContentControl // or appropriate base class
+    {
+        /// <summary>
+        /// Gets or sets the property description.
+        /// </summary>
+        public static readonly DependencyProperty VariantProperty =
+            DependencyProperty.Register(
+                nameof(Variant),
+                typeof(Daisy[ControlName]Variant),
+                typeof(Daisy[ControlName]),
+                new PropertyMetadata(Daisy[ControlName]Variant.Default, OnAppearanceChanged));
+
+        public Daisy[ControlName]Variant Variant
+        {
+            get => (Daisy[ControlName]Variant)GetValue(VariantProperty);
+            set => SetValue(VariantProperty, value);
+        }
+
+        private static void OnAppearanceChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            if (d is Daisy[ControlName] control)
+            {
+                control.ApplyAll();
+            }
+        }
+
+        public Daisy[ControlName]()
+        {
+            DefaultStyleKey = typeof(Daisy[ControlName]);
+            Loaded += OnLoaded;
+            Unloaded += OnUnloaded;
+        }
+
+        private void OnLoaded(object sender, RoutedEventArgs e)
+        {
+            BuildVisualTree();
+            ApplyAll();
+        }
+
+        private void OnUnloaded(object sender, RoutedEventArgs e)
+        {
+            // Cleanup (unsubscribe from events, etc.)
+        }
+
+        private void BuildVisualTree()
+        {
+            // Build control's visual tree programmatically
+        }
+
+        private void ApplyAll()
+        {
+            // Apply sizing, colors, states
+        }
+    }
+}
 ```
 
-Otherwise output will be garbled due to CRLF line endings.
+### 1.2 Key Requirements
 
-## "No Change" Is Valid
+- **XML Documentation**: Every class and property MUST have `/// <summary>` comments
+- **DependencyProperty Pattern**: Use WinUI's `DependencyProperty.Register` with `PropertyMetadata`
+- **Enums at Namespace Level**: Define enums outside the class, with `public` access
+- **Using Directives**: Add ALL required usings at the file TOP (avoid inline fully-qualified names)
+- **Partial class**: Mark class as `partial` for Uno source generators
+- **DefaultStyleKey**: Set in constructor for templated controls
 
-When investigating issues without a specified fix, ASK before coding. Don't go on a "coding spree" - the behavior may be intentional.
+### 1.3 Common Base Classes
 
-## Search Tool Quirks
+| Base Class | Use Case |
+|------------|----------|
+| `ContentControl` | Controls with single content slot |
+| `Button` | Button-like controls (inherits click handling) |
+| `Control` | Generic base for custom controls |
+| `ItemsControl` | Controls with item collections |
+| `UserControl` | Simple composite controls with XAML |
 
-Some agents' search tools fail silently on single-file paths. If search returns 0 results unexpectedly:
+---
 
-- Try searching a **directory** instead, with a filter for the specific file
-- Fall back to terminal `rg` if the native tool misbehaves
+## Phase 2: Theme/Styling
 
-## Terminal Search
+### 2.1 Programmatic Visual Tree (Recommended)
 
-When native search tools fail or for complex regex searches, use terminal `rg` (ripgrep):
+Most Flowery.Uno controls build their visual tree in code-behind for runtime flexibility:
 
-```bash
-clear && rg "pattern" path/to/search
+```csharp
+private void BuildVisualTree()
+{
+    _rootGrid = new Grid();
+    // Build tree...
+    Content = _rootGrid;
+}
 ```
 
-## Code Generation
+### 2.2 XAML Template (Alternative)
 
-- **No Trailing Whitespace**: Never generate lines with trailing spaces or tabs
+If using XAML templates, add to `Flowery.Uno/Themes/DaisyControls.xaml`:
 
-## Refactoring Standards
+```xml
+<!-- In DaisyControls.xaml -->
+<Style TargetType="controls:Daisy[ControlName]">
+    <Setter Property="Template">
+        <Setter.Value>
+            <ControlTemplate TargetType="controls:Daisy[ControlName]">
+                <Grid>
+                    <!-- Control template here -->
+                </Grid>
+            </ControlTemplate>
+        </Setter.Value>
+    </Setter>
+</Style>
+```
 
-- **Property/Field Sync**: When renaming/deleting, search file-wide for ALL references
-- **Verify Infrastructure**: Check constructors/fields exist before using them
-- **Constructor Fallback**: Use property initializers `{ Prop = value }` if no matching constructor
+### 2.3 Theme Registration
+
+Themes are merged in `Flowery.Uno/Themes/Generic.xaml`:
+
+```xml
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [tobitege/Flowery.Uno](https://github.com/tobitege/Flowery.Uno) — distributed by [TomeVault](https://tomevault.io).
