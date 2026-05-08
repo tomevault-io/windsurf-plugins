@@ -1,66 +1,17 @@
 ---
 trigger: always_on
-description: Comprehensive project overview, architecture patterns, and development workflow for Swift 6.1+ iOS applications using SwiftUI and SPM. Apply when working on project structure, general Swift coding patterns, or need orientation about the codebase architecture.
+description: Modern SwiftUI patterns using @Observable, state management with MV architecture, async operations with .task modifier, accessibility guidelines, and performance optimizations. Apply when creating or modifying SwiftUI views, handling state, or implementing UI interactions.
 ---
 
+name: "SwiftUI Development Patterns"
+description: "Modern SwiftUI patterns using @Observable, state management with MV architecture, async operations with .task modifier, accessibility guidelines, and performance optimizations. Apply when creating or modifying SwiftUI views, handling state, or implementing UI interactions."
+agent_requested: true
+applies_to: ["**/Sources/**/*View.swift", "**/Sources/**/*Screen.swift", "**/*View.swift", "**/*Screen.swift"]
+---
 
-# Project-wide AI coding guidelines for Cursor (Swift iOS app)
+# SwiftUI Development Patterns (2025)
 
-## Project Overview
-
-This is a native **iOS application** built with **Swift 6.1+** and **SwiftUI**. The codebase targets **iOS 18.0 and later**, allowing full use of the latest Swift and iOS APIs without backward compatibility concerns. All concurrency is handled with **Swift Concurrency** (async/await, actors, @MainActor isolation) ensuring thread-safe code.
-
-- **Frameworks & Tech:** SwiftUI for UI, Swift Concurrency with strict mode, Swift Package Manager for modular architecture
-- **Architecture:** Model-View (MV) pattern using pure SwiftUI state management. We avoid MVVM and instead leverage SwiftUI's built-in state mechanisms (@State, @Observable, @Environment, @Binding)
-- **Testing:** Swift Testing framework with modern @Test macros and #expect/#require assertions
-- **Platform:** iOS (Simulator and Device)
-- **Accessibility:** Full accessibility support using SwiftUI's accessibility modifiers
-
-## Project Structure
-
-The project follows a **workspace + SPM package** architecture:
-
-```
-YourApp/
-├── Config/                         # XCConfig build settings
-│   ├── Debug.xcconfig
-│   ├── Release.xcconfig
-│   ├── Shared.xcconfig
-│   └── Tests.xcconfig
-├── YourApp.xcworkspace/            # Workspace container
-├── YourApp.xcodeproj/              # App shell (minimal wrapper)
-├── YourApp/                        # App target - just the entry point
-│   ├── Assets.xcassets/
-│   ├── YourAppApp.swift           # @main entry point only
-│   └── YourApp.xctestplan
-├── YourAppPackage/                 # All features and business logic
-│   ├── Package.swift
-│   ├── Sources/
-│   │   └── YourAppFeature/        # Feature modules
-│   └── Tests/
-│       └── YourAppFeatureTests/   # Swift Testing tests
-└── YourAppUITests/                 # UI automation tests
-```
-
-**Important:** All development work should be done in the **YourAppPackage** Swift Package, not in the app project. The app project is merely a thin wrapper that imports and launches the package features.
-
-# Code Quality & Style Guidelines
-
-## Swift Style & Conventions
-
-- **Naming:** Use `UpperCamelCase` for types, `lowerCamelCase` for properties/functions. Choose descriptive names (e.g., `calculateMonthlyRevenue()` not `calcRev`)
-- **Value Types:** Prefer `struct` for models and data, use `class` only when reference semantics are required
-- **Enums:** Leverage Swift's powerful enums with associated values for state representation
-- **Early Returns:** Prefer early return pattern over nested conditionals to avoid pyramid of doom
-
-## Optionals & Error Handling
-
-- Use optionals with `if let`/`guard let` for nil handling
-- Never force-unwrap (`!`) without absolute certainty - prefer `guard` with failure path
-- Use `do/try/catch` for error handling with meaningful error types
-- Handle or propagate all errors - no empty catch blocks
-
-## Modern SwiftUI Architecture Guidelines (2025)
+## Modern SwiftUI Architecture Guidelines
 
 ### No ViewModels - Use Native SwiftUI Data Flow
 **New features MUST follow these patterns:**
@@ -108,13 +59,100 @@ YourApp/
    - Pass state via bindings between views
    - Never reach for a ViewModel as the solution
 
-## SwiftUI State Management (MV Pattern)
+## State Management (MV Pattern)
 
-- **@State:** For all state management, including observable model objects
-- **@Observable:** Modern macro for making model classes observable (replaces ObservableObject)
-- **@Environment:** For dependency injection and shared app state
-- **@Binding:** For two-way data flow between parent and child views
-- **@Bindable:** For creating bindings to @Observable objects
+SwiftUI views should follow the Model-View pattern using modern Swift state management:
+
+### @Observable Classes
+Use @Observable for model classes that need to be observed by SwiftUI:
+
+```swift
+@Observable
+class UserSettings {
+    var theme: Theme = .light
+    var fontSize: Double = 16.0
+}
+```
+
+### View State Usage
+```swift
+@MainActor
+struct ContentView: View {
+    @State private var settings = UserSettings()
+    
+    var body: some View {
+        VStack {
+            // Direct property access, no $ prefix needed
+            Text("Font Size: \(settings.fontSize)")
+            
+            // For bindings, use @Bindable
+            @Bindable var settings = settings
+            Slider(value: $settings.fontSize, in: 10...30)
+        }
+    }
+}
+```
+
+### Environment for Shared State
+```swift
+@MainActor
+struct ContentView: View {
+    @State private var userSettings = UserSettings()
+    
+    var body: some View {
+        NavigationStack {
+            MainView()
+                .environment(userSettings)
+        }
+    }
+}
+
+@MainActor
+struct MainView: View {
+    @Environment(UserSettings.self) private var settings
+    
+    var body: some View {
+        Text("Current theme: \(settings.theme)")
+    }
+}
+```
+
+## iOS 26 Features (Optional)
+
+**Note**: If your app targets iOS 26+, you can take advantage of these cutting-edge SwiftUI APIs introduced in June 2025. These features are optional and should only be used when your deployment target supports iOS 26.
+
+### Available iOS 26 SwiftUI APIs
+
+When targeting iOS 26+, consider using these new APIs:
+
+#### Liquid Glass Effects
+- `glassEffect(_:in:isEnabled:)` - Apply Liquid Glass effects to views
+- `buttonStyle(.glass)` - Apply Liquid Glass styling to buttons
+- `ToolbarSpacer` - Create visual breaks in toolbars with Liquid Glass
+
+#### Enhanced Scrolling
+- `scrollEdgeEffectStyle(_:for:)` - Configure scroll edge effects
+- `backgroundExtensionEffect()` - Duplicate, mirror, and blur views around edges
+
+#### Tab Bar Enhancements
+- `tabBarMinimizeBehavior(_:)` - Control tab bar minimization behavior
+- Search role for tabs with search field replacing tab bar
+- `TabViewBottomAccessoryPlacement` - Adjust accessory view content based on placement
+
+#### Animation
+- `@Animatable` macro - SwiftUI synthesizes custom animatable data properties
+
+#### UI Components
+- `Slider` with automatic tick marks when using step parameter
+- `windowResizeAnchor(_:)` - Set window anchor point for resizing
+
+#### Text Enhancements
+- `TextEditor` now supports `AttributedString`
+- `AttributedTextSelection` - Handle text selection with attributed text
+- `AttributedTextFormattingDefinition` - Define text styling in specific contexts
+- `FindContext` - Create find navigator in text editing views
+
+### iOS 26 Usage Guidelines
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
