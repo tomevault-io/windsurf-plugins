@@ -7,11 +7,11 @@ A terminal UI for browsing and inspecting vector databases
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [armgabrielyan/lazyvec](https://github.com/armgabrielyan/lazyvec).
+Original source: `CLAUDE.md` in [armgabrielyan/lazyvec](https://github.com/armgabrielyan/lazyvec).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
