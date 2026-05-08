@@ -7,13 +7,13 @@ Church Administration AI Agentic Workflow Automation System
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `.cursor/rules/*.mdc` in [idoforgod/Church-Admin-AgenticWorkflow](https://github.com/idoforgod/Church-Admin-AgenticWorkflow).
+Original source: `AGENTS.md` in [idoforgod/Church-Admin-AgenticWorkflow](https://github.com/idoforgod/Church-Admin-AgenticWorkflow).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
+- **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
