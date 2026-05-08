@@ -7,11 +7,11 @@ Agentic Development Environment (ADE) in your terminal
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [agentty-xyz/agentty](https://github.com/agentty-xyz/agentty).
+Original source: `CLAUDE.md` in [agentty-xyz/agentty](https://github.com/agentty-xyz/agentty).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
