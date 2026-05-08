@@ -1,143 +1,73 @@
 ---
 trigger: always_on
-description: >-
+description: You are an expert SvelteKit engineer. Follow these rules ALWAYS when generating or editing code.
 ---
 
 
-# Engineering Patterns for SvelteKit
+# Cursor Project Rules — SvelteKit (latest) + Runes + TS + Supabase Auth + Postgres + shadcn-svelte
 
-This project runs in SPA mode (`ssr = false`). All code executes in the browser — there are no server routes, server hooks, or server-side rendering.
-
-SPA implications for pattern selection:
-- Module-level singletons are safe (one user per tab, no cross-request leakage).
-- Strategies wrap client-side SDKs or call external APIs/edge functions.
-- Observer patterns use Svelte 5 runes; event buses are client-side only.
-- Services and repositories run entirely in the browser via the Supabase client SDK.
-- If the project ever migrates to SSR, re-evaluate Singleton and Observer patterns for per-request safety.
-
-Composition flow — patterns layer in one direction:
-
-```
-Component → Service → Repository → Adapter (wraps SDK)
-                                  ↑
-                            Singleton (shared client)
-```
-
-Components call services. Services enforce business rules and call repositories. Repositories abstract data access. Adapters wrap third-party SDKs. Singletons provide shared client instances. Strategies and Factories are cross-cutting — used wherever swappable behavior or complex construction is needed.
+You are an expert SvelteKit engineer. Follow these rules ALWAYS when generating or editing code.
 
 ============================================================
-1) Factory — centralized object creation
+0) Core principles
 ============================================================
-Use a factory when constructing objects requires conditional logic, defaults, or async setup that callers should not repeat.
-
-- Export a plain function (or async function) that returns a fully configured instance.
-- Keep construction details hidden; callers receive a typed result.
-- Prefer a factory over a class constructor when multiple creation paths exist.
-- For costly async setup (remote config, auth token exchange), await the factory once at init time and reuse the result.
-
-```typescript
-// src/lib/api/create-api-client.ts
-import type { ApiClient } from './types';
-
-// Async factory — resolves auth headers before returning a ready client.
-export async function createApiClient(baseUrl: string): Promise<ApiClient> {
-  const token = await fetchServiceToken();
-  const headers = { Authorization: `Bearer ${token}` };
-
-  return {
-    get: async (path) => fetch(`${baseUrl}${path}`, { headers }).then((r) => r.json()),
-    post: async (path, body) =>
-      fetch(`${baseUrl}${path}`, {
-        method: 'POST',
-        headers: { ...headers, 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      }).then((r) => r.json()),
-  };
-}
-```
-
-Avoid:
-- Scattering construction logic across multiple call sites — centralize it in the factory.
-- Returning partially initialized objects — the factory's output must be ready to use.
+- Prefer clarity + consistency over cleverness.
+- Make changes minimal and localized.
+- Never introduce new dependencies unless explicitly requested. If a dependency is truly necessary, explain why and propose alternatives.
+- Preserve existing patterns in the codebase (naming, folder structure, error handling, UI primitives).
+- Avoid breaking public APIs/exports without updating all usage sites.
+- Default to shadcn-svelte components for UI primitives unless a plain semantic element is clearly better.
+- MCP usage (required):
+  - Use the Supabase MCP for database/auth inspection and project context in READ-ONLY mode by default.
+  - Do not run mutating Supabase MCP operations (writes, deletes, schema changes) unless explicitly requested by the user.
+  - Use the Svelte MCP whenever Svelte/SvelteKit development is involved.
+  - For Svelte MCP workflows: run `list-sections` first and then fetch ALL relevant sections via `get-documentation` after reviewing `use_cases`.
+  - Use `svelte-autofixer` whenever writing/editing Svelte code, and keep running it until no issues/suggestions remain.
+  - Use `playground-link` only when the user explicitly asks for a playground link, and never when code is being written directly to project files.
 
 ============================================================
-2) Repository — data access abstraction
+1) SvelteKit conventions
 ============================================================
-Encapsulate all Supabase table operations behind a repository interface so business logic never depends on Supabase directly.
+- Use SvelteKit file conventions correctly:
+  - Route components: +page.svelte, layouts: +layout.svelte, data: +page.ts/+layout.ts.
+  - Avoid putting business logic in route files; move reusable logic to src/lib.
+- In SPA mode (ssr=false), do not rely on server-only behavior. Keep Supabase client-side with browser-safe env vars only.
+- Use $app/navigation (goto) and $app/state (page, navigating, updated) for routing concerns.
+  - NEVER use deprecated $app/stores - it's for legacy SvelteKit <2.12 only.
+  - Import page from $app/state: `import { page } from '$app/state'`
+  - Use `page.url.pathname` directly (no $ prefix needed - it's already reactive with runes).
+- Redirects/guards must be done in layouts for sections (e.g., protected area), not sprinkled across many pages.
+- Never compare pathnames with raw string equality — SvelteKit may add or omit trailing slashes.
+  - Always normalize paths before comparing (strip trailing slash if length > 1).
+  - Prefer comparing parsed identifiers (e.g., step numbers, route params) over raw pathname strings.
+- Load function invalidation with `depends`/`invalidate`:
+  - When a `+layout.ts` or `+page.ts` load function depends on auth state, call `depends('auth:session')` inside it so it can be re-run on demand.
+  - After login, logout, or any auth state change, call `invalidate('auth:session')` (from `$app/navigation`) to trigger re-runs of every load function that declared the dependency.
+  - This keeps load functions reactive to auth changes without sprinkling manual checks across pages.
+  - The dependency key is a custom string — not a URL. SvelteKit matches it by exact string equality.
 
-- Define an interface describing the data operations (find, create, update, delete).
-- Implement with Supabase queries; export the concrete implementation as the default.
-- For tests, provide a mock factory that satisfies the same interface with in-memory storage.
-- Place repositories in `src/lib/database/repositories/`.
-- Select only the columns you need — avoid `select('*')`.
-- Let Supabase errors propagate — the service layer is responsible for catching and transforming them.
-
-```typescript
-// src/lib/database/repositories/types.ts
-export interface ProjectRepository {
-  findById(id: string): Promise<Project | null>;
-  findByOwner(ownerId: string): Promise<Project[]>;
-  create(data: CreateProjectInput): Promise<Project>;
-  update(id: string, data: UpdateProjectInput): Promise<Project>;
-  remove(id: string): Promise<void>;
-}
-```
-
-```typescript
-// src/lib/database/repositories/project-repository.ts
-import { supabase } from '$lib/supabase/client';
-import type { ProjectRepository } from './types';
-
-export const projectRepository: ProjectRepository = {
-  async findById(id) {
-    const { data, error } = await supabase
-      .from('projects')
-      .select('id, name, owner_id, created_at')
-      .eq('id', id)
-      .maybeSingle();
-    if (error) throw error;
-    return data;
-  },
-  // ... remaining methods follow the same shape
-};
-```
-
-```typescript
-// src/lib/database/repositories/project-repository.mock.ts
-import type { ProjectRepository } from './types';
-
-// In-memory mock for unit tests — no Supabase dependency.
-export function createMockProjectRepository(
-  seed: Project[] = []
-): ProjectRepository {
-  const store = new Map(seed.map((p) => [p.id, p]));
-
-  return {
-    async findById(id) {
-      return store.get(id) ?? null;
-    },
-    async findByOwner(ownerId) {
-      return [...store.values()].filter((p) => p.owner_id === ownerId);
-    },
-    async create(data) {
-      const project = {
-        ...data,
-        id: crypto.randomUUID(),
-        created_at: new Date().toISOString(),
-      } as Project;
-      store.set(project.id, project);
-      return project;
-    },
-    async update(id, data) {
-      const existing = store.get(id);
-      if (!existing) throw new Error('Not found');
-      const updated = { ...existing, ...data };
-      store.set(id, updated);
-      return updated;
-    },
-    async remove(id) {
-      store.delete(id);
-    },
+============================================================
+2) Runes + state management
+============================================================
+- Use Runes ($state, $derived, $effect) and avoid legacy writable stores.
+- $derived must be side-effect free:
+  - Never call `goto()`, network requests, or mutate $state inside $derived.
+  - $derived is for pure computations only — use $effect for side effects that react to derived values.
+  - Example: derive a `redirecting` flag with `$derived(status === 'needs-auth')`, then perform `goto()` in a separate `$effect` that reads `status`.
+- Avoid module-level side effects that register listeners on import (especially auth listeners). Use an explicit init function called once (e.g., from root layout onMount) or idempotent subscription guards.
+- Keep state minimal:
+  - Put global app/auth state in src/lib (e.g., src/lib/auth/state.svelte.ts).
+  - Keep page-local state inside the page component unless it must be shared.
+- $effect must be cleanup-safe:
+  - Always return cleanup functions when subscribing to listeners.
+  - Prevent duplicate subscriptions in dev/HMR.
+- $effect dependency tracking is synchronous only:
+  - Svelte 5 only tracks reactive reads that happen synchronously in the $effect body.
+  - Any reactive value read inside an async callback (.then(), await, setTimeout) is NOT tracked.
+  - If an $effect needs to re-run when a reactive value changes, read it into a local variable at the TOP of the effect body, before any async code.
+  - Example: `$effect(() => { const path = page.url.pathname; void fetchData().then(() => { /* use path here */ }); });`
+- Layout guards that gate children rendering must account for all valid sub-states:
+  - If a layout conditionally renders `{@render children()}`, ensure every legitimate child route has a state that passes the gate.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
