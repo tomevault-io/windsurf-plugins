@@ -1,202 +1,225 @@
 ---
 trigger: always_on
-description: Guidelines for developing AI agents and tools using pydantic-ai
+description: Code style, patterns, and best practices for Python development
 ---
 
 
-# AI Agent Development Guidelines
+# Code Patterns and Best Practices
 
-## Agent Architecture
+## Python Style
 
-### Multi-Agent Coordination
-
-The system uses **concurrent multi-agent execution** with error isolation:
-
-```python
-# Example from AnalyzerAgent
-async def run(self):
-    agent_tasks = {}
-    
-    if not self._config.exclude_code_structure:
-        agent_tasks["Structure"] = self._run_agent(
-            agent=self._structure_analyzer_agent,
-            user_prompt=self._render_prompt("agents.structure_analyzer.user_prompt"),
-            file_path=self._config.repo_path / ".ai" / "docs" / "structure_analysis.md",
-        )
-    
-    # Run all agents concurrently
-    results = await asyncio.gather(*agent_tasks.values(), return_exceptions=True)
-    
-    # Validate partial success
-    self.validate_succession(analysis_files)
+### Ruff Configuration
+```toml
+line-length = 120
+indent-width = 4
+target-version = "py313"
+lint.select = ["I", "F401"]  # Import sorting and unused imports
 ```
 
-### Agent Configuration Pattern
+### Type Hints
+- **Always use type hints** for function parameters and return values
+- Use `from typing import Optional, Type, TypeVar` for complex types
+- Use `Path` from `pathlib` for file paths (never strings)
+- Use `BaseModel` from `pydantic` for all configuration and data models
 
 ```python
-class MyAgentConfig(BaseModel):
-    repo_path: Path = Field(..., description="Repository path")
-    exclude_feature: bool = Field(default=False, description="Exclude feature")
-    custom_setting: str = Field(default="default", description="Custom setting")
+from pathlib import Path
+from typing import Optional, Type, TypeVar
+from pydantic import BaseModel, Field
 
-class MyAgent:
-    def __init__(self, cfg: MyAgentConfig) -> None:
-        self._config = cfg
-        self._prompt_manager = PromptManager(
-            file_path=Path(__file__).parent / "prompts" / "my_agent.yaml"
-        )
+T = TypeVar("T", bound=BaseModel)
+
+def load_config(args, handler_config: Type[T], file_key: str = "") -> T:
+    # Implementation
+    pass
 ```
 
-## LLM Model Configuration
+## Pydantic Patterns
 
-### Model Property Pattern
-
+### Configuration Models
 ```python
-@property
-def _llm_model(self) -> Tuple[Model, ModelSettings]:
-    retrying_http_client = create_retrying_client()
+class HandlerConfig(BaseModel):
+    repo_path: Path = Field(..., description="The path to the repository")
+    exclude_something: bool = Field(default=False, description="Exclude something")
     
-    # Support multiple providers
-    if "gemini" in config.MY_LLM_MODEL:
-        model = GeminiModel(
-            model_name=config.MY_LLM_MODEL,
-            provider=CustomGeminiGLA(
-                api_key=config.MY_LLM_API_KEY,
-                base_url=config.MY_LLM_BASE_URL,
-                http_client=retrying_http_client,
-            ),
-        )
+    @model_validator(mode="after")
+    def validate_paths(self) -> "HandlerConfig":
+        if not self.repo_path.exists():
+            raise ValueError(f"repo_path {self.repo_path} does not exist")
+        return self
+```
+
+### Field Descriptions
+- **Always provide descriptions** for CLI argument generation
+- Use clear, concise language
+- Include defaults in description when helpful
+
+## Async/Await Patterns
+
+### Handler Methods
+```python
+class MyHandler(BaseHandler):
+    async def handle(self):
+        # All handler methods are async
+        result = await self.agent.run()
+        return result
+```
+
+### Concurrent Execution
+```python
+# Run multiple agents concurrently with error isolation
+tasks = [agent1.run(), agent2.run(), agent3.run()]
+results = await asyncio.gather(*tasks, return_exceptions=True)
+
+# Check results
+for i, result in enumerate(results):
+    if isinstance(result, Exception):
+        Logger.error(f"Agent #{i} failed: {result}", exc_info=True)
     else:
-        model = OpenAIModel(
-            model_name=config.MY_LLM_MODEL,
-            provider=OpenAIProvider(
-                base_url=config.MY_LLM_BASE_URL,
-                api_key=config.MY_LLM_API_KEY,
-                http_client=retrying_http_client,
-            ),
-        )
-    
-    settings = ModelSettings(
-        temperature=config.MY_LLM_TEMPERATURE,
-        max_tokens=config.MY_LLM_MAX_TOKENS,
-        timeout=config.MY_LLM_TIMEOUT,
-        parallel_tool_calls=config.MY_PARALLEL_TOOL_CALLS,
-    )
-    
-    return model, settings
+        Logger.info(f"Agent #{i} completed successfully")
 ```
 
-### Agent Instantiation
+## Configuration Loading
+
+### Multi-Source Configuration Pattern
 
 ```python
-@property
-def _my_specialized_agent(self) -> Agent:
-    model, model_settings = self._llm_model
-    
-    return Agent(
-        name="My Specialized Agent",
-        model=model,
-        model_settings=model_settings,
-        system_prompt=self._render_prompt("agents.my_agent.system_prompt"),
-        tools=[
-            FileReadTool().get_tool(),
-            ListFilesTool().get_tool(),
-        ],
-        retries=config.MY_AGENT_RETRIES,
-    )
+# Load configuration with precedence: defaults → file → CLI
+config = load_config(args, HandlerConfig, file_key="section.subsection")
+
+# File-based config (YAML)
+file_config = load_config_from_file(args, "analyzer")
+
+# CLI arguments
+cli_config = load_config_as_dict(args, HandlerConfig)
+
+# Merge with precedence
+final_config = merge_dicts(file_config, cli_config)
 ```
 
-## Prompt Management
-
-### YAML Prompt Structure
-
-```yaml
-# src/agents/prompts/my_agent.yaml
-agents:
-  my_agent:
-    system_prompt: |
-      You are a specialized code analyzer.
-      
-      Your task is to analyze {{ repo_path }} and provide insights.
-      
-      Available tools:
-      - Read-File: Read file contents with line ranges
-      - List-Files: List directory contents with filtering
-    
-    user_prompt: |
-      Analyze the repository at {{ repo_path }}.
-      
-      Focus on:
-      1. Architecture patterns
-      2. Code organization
-      3. Key components
-```
-
-### Prompt Rendering
+### Environment Variables
 
 ```python
-def _render_prompt(self, key: str) -> str:
-    return self._prompt_manager.render_prompt(
-        key=key,
-        repo_path=str(self._config.repo_path),
-        custom_var=self._config.custom_setting,
-    )
+# Required variables (raise KeyError if missing)
+MY_API_KEY = os.environ["MY_API_KEY"]
+
+# Optional with defaults
+MY_TIMEOUT = int(os.getenv("MY_TIMEOUT", "180"))
+
+# Boolean conversion
+MY_FLAG = str_to_bool(os.getenv("MY_FLAG", "true"))
 ```
 
-## Tool Development
+## Logging Patterns
 
-### Tool Interface
-
+### Logger Usage
 ```python
-from pydantic_ai import Tool
-from pydantic_ai.exceptions import ModelRetry
-from opentelemetry import trace
-import config
 from utils import Logger
 
-class MyCustomTool:
-    def get_tool(self):
-        return Tool(
-            self._run,
-            name="My-Custom-Tool",
-            takes_ctx=False,
-            max_retries=config.TOOL_MY_CUSTOM_TOOL_MAX_RETRIES,
-        )
+# Initialize once per execution
+Logger.init(logs_dir, file_level=logging.INFO, console_level=logging.WARNING)
+
+# Use throughout code
+Logger.info("Starting process")
+Logger.debug("Debug details", {"key": "value"})
+Logger.warning("Warning message")
+Logger.error("Error occurred", exc_info=True)
+```
+
+### Structured Logging
+```python
+# Pass dictionaries for structured data
+Logger.info("Agent completed", {
+    "agent_name": agent.name,
+    "total_tokens": result.usage().total_tokens,
+    "execution_time": elapsed_time,
+})
+```
+
+## OpenTelemetry Tracing
+
+### Span Creation
+```python
+from opentelemetry import trace
+
+tracer = trace.get_tracer("my-component")
+
+with tracer.start_as_current_span("Operation Name") as span:
+    span.set_attributes({
+        "repo_path": str(repo_path),
+        "config_key": config_value,
+    })
+    span.add_event(name="Starting operation", attributes={"detail": "value"})
     
-    def _run(self, param1: str, param2: int = 10) -> str:
-        """
-        Tool description that the LLM sees.
-        
-        Args:
-            param1: Description of param1
-            param2: Description of param2 (default: 10)
-        
-        Returns:
-            Description of return value
-        """
-        Logger.debug(f"Running My-Custom-Tool with param1={param1}, param2={param2}")
-        
-        span = trace.get_current_span()
-        span.set_attribute("tool.input.param1", param1)
-        span.set_attribute("tool.input.param2", param2)
-        
-        try:
-            # Tool implementation
-            result = self._do_work(param1, param2)
-            
-            span.set_attribute("tool.output", result)
-            Logger.debug(f"My-Custom-Tool completed successfully")
-            
-            return result
-        
-        except FileNotFoundError as e:
-            raise ModelRetry(message=f"File not found: {e}")
-        except PermissionError as e:
-            raise ModelRetry(message=f"Permission denied: {e}")
-        except Exception as e:
+    # Do work
+    result = await do_work()
+    
+    span.set_attribute("result_size", len(result))
+```
+
+## Error Handling
+
+### Graceful Degradation
+```python
+# Partial success is acceptable
+if len(missing_files) == len(analysis_files):
+    Logger.error("Complete failure: no files generated")
+    raise ValueError("Complete failure")
+
+if missing_files:
+    Logger.warning(f"Partial success: {successful_count}/{len(analysis_files)} files")
+    # Continue execution
+```
+
+### Cleanup Guarantees
+```python
+try:
+    # Operations
+    await process_project(project)
+finally:
+    # Always cleanup
+    cleanup_project(project)
+```
+
+## File Operations
+
+### Path Handling
+```python
+from pathlib import Path
+
+# Always use Path objects
+repo_path = Path("/path/to/repo")
+config_path = repo_path / ".ai" / "config.yaml"
+
+# Check existence
+if config_path.exists():
+    content = config_path.read_text()
+
+# Create directories
+output_dir = repo_path / ".ai" / "docs"
+output_dir.mkdir(parents=True, exist_ok=True)
+
+# Write files
+output_file = output_dir / "analysis.md"
+output_file.write_text(content)
+```
+
+## CLI Argument Generation
+
+### Dynamic Argument Creation
+
+```python
+def _add_field_arg(parser: argparse.ArgumentParser, field_name: str, field_info: FieldInfo):
+    arg_name = f"--{field_name.replace('_', '-')}"
+    help_text = field_info.description
+    
+    # Boolean flags use store_true with None default
+    if field_info.annotation in [bool, Optional[bool]]:
+        parser.add_argument(
+            arg_name,
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/divar-ir) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-09 -->
+> Source: [divar-ir/ai-doc-gen](https://github.com/divar-ir/ai-doc-gen) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-04 -->
