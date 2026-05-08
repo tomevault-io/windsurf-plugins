@@ -1,75 +1,111 @@
 ---
 trigger: always_on
-description: Shadcn usage
+description: Anything related to Sanity usage
 ---
 
-# shadcn/ui
+# App SDK best practices
 
-> shadcn/ui is a collection of beautifully-designed, accessible components and a code distribution platform. It is built with TypeScript, Tailwind CSS, and Radix UI primitives. It supports multiple frameworks including Next.js, Vite, Remix, Astro, and more. Open Source. Open Code. AI-Ready. It also comes with a command-line tool to install and manage components and a registry system to publish and distribute code.
+If you’ve worked with Sanity before, your experience querying the Content Lake is likely grounded in building Server-Side Rendered (SSR) or statically generated front-end applications designed for page load time performance.
 
-## Overview
+Now, with the Sanity App SDK, you can build feature-rich content applications for authoring. However, this requires a different approach: swapping SSR thinking for Single-Page Application (SPA) best practices.
 
-- [Introduction](https://ui.shadcn.com/docs): Core principles—Open Code, Composition, Distribution, Beautiful Defaults, and AI-Ready design.
-- [CLI](https://ui.shadcn.com/docs/cli): Command-line tool for installing and managing components.
-- [components.json](https://ui.shadcn.com/docs/components-json): Configuration file for customizing the CLI and component installation.
-- [Theming](https://ui.shadcn.com/docs/theming): Guide to customizing colors, typography, and design tokens.
-- [Changelog](https://ui.shadcn.com/docs/changelog): Release notes and version history.
-- [About](https://ui.shadcn.com/docs/about): Credits and project information.
+On top of this, if you’re used to writing React applications, some common patterns for building form-based user interfaces are best avoided when working with App SDK.
 
-## Installation
+## What makes a great content application?
 
-- [Next.js](https://ui.shadcn.com/docs/installation/next): Install shadcn/ui in a Next.js project.
-- [Vite](https://ui.shadcn.com/docs/installation/vite): Install shadcn/ui in a Vite project.
-- [Remix](https://ui.shadcn.com/docs/installation/remix): Install shadcn/ui in a Remix project.
-- [Astro](https://ui.shadcn.com/docs/installation/astro): Install shadcn/ui in an Astro project.
-- [Laravel](https://ui.shadcn.com/docs/installation/laravel): Install shadcn/ui in a Laravel project.
-- [Gatsby](https://ui.shadcn.com/docs/installation/gatsby): Install shadcn/ui in a Gatsby project.
-- [React Router](https://ui.shadcn.com/docs/installation/react-router): Install shadcn/ui in a React Router project.
-- [TanStack Router](https://ui.shadcn.com/docs/installation/tanstack-router): Install shadcn/ui in a TanStack Router project.
-- [TanStack Start](https://ui.shadcn.com/docs/installation/tanstack): Install shadcn/ui in a TanStack Start project.
-- [Manual Installation](https://ui.shadcn.com/docs/installation/manual): Manually install shadcn/ui without the CLI.
+Content applications are defined as distinct, new experiences that give authors a focused environment to perform content operations. Instead of digging through a general-purpose CMS interface, authors work in a fit-for-purpose user interface to get the job done.
 
-## Components
+Content applications developed with the Sanity App SDK should be:
 
-### Form & Input
+### Real-time
 
-- [Form](https://ui.shadcn.com/docs/components/form): Building forms with React Hook Form and Zod validation.
-- [Field](https://ui.shadcn.com/docs/components/field): Field component for form inputs with labels and error messages.
-- [Button](https://ui.shadcn.com/docs/components/button): Button component with multiple variants.
-- [Button Group](https://ui.shadcn.com/docs/components/button-group): Group multiple buttons together.
-- [Input](https://ui.shadcn.com/docs/components/input): Text input component.
-- [Input Group](https://ui.shadcn.com/docs/components/input-group): Input component with prefix and suffix addons.
-- [Input OTP](https://ui.shadcn.com/docs/components/input-otp): One-time password input component.
-- [Textarea](https://ui.shadcn.com/docs/components/textarea): Multi-line text input component.
-- [Checkbox](https://ui.shadcn.com/docs/components/checkbox): Checkbox input component.
-- [Radio Group](https://ui.shadcn.com/docs/components/radio-group): Radio button group component.
-- [Select](https://ui.shadcn.com/docs/components/select): Select dropdown component.
-- [Switch](https://ui.shadcn.com/docs/components/switch): Toggle switch component.
-- [Slider](https://ui.shadcn.com/docs/components/slider): Slider input component.
-- [Calendar](https://ui.shadcn.com/docs/components/calendar): Calendar component for date selection.
-- [Date Picker](https://ui.shadcn.com/docs/components/date-picker): Date picker component combining input and calendar.
-- [Combobox](https://ui.shadcn.com/docs/components/combobox): Searchable select component with autocomplete.
-- [Label](https://ui.shadcn.com/docs/components/label): Form label component.
+Any number of documents fetched and rendered into the user interface should continue to update as mutations happen to the source documents. Content applications should avoid concepts that handle stale data like "submit," “save” or "lock" buttons.
 
-### Layout & Navigation
+### Multiplayer
 
-- [Accordion](https://ui.shadcn.com/docs/components/accordion): Collapsible accordion component.
-- [Breadcrumb](https://ui.shadcn.com/docs/components/breadcrumb): Breadcrumb navigation component.
-- [Navigation Menu](https://ui.shadcn.com/docs/components/navigation-menu): Accessible navigation menu with dropdowns.
-- [Sidebar](https://ui.shadcn.com/docs/components/sidebar): Collapsible sidebar component for app layouts.
-- [Tabs](https://ui.shadcn.com/docs/components/tabs): Tabbed interface component.
-- [Separator](https://ui.shadcn.com/docs/components/separator): Visual divider between content sections.
-- [Scroll Area](https://ui.shadcn.com/docs/components/scroll-area): Custom scrollable area with styled scrollbars.
-- [Resizable](https://ui.shadcn.com/docs/components/resizable): Resizable panel layout component.
+Two authors looking at the same document should be able to continually make and see edits without fear of overwriting one another’s work.
 
-### Overlays & Dialogs
+### Fast
 
-- [Dialog](https://ui.shadcn.com/docs/components/dialog): Modal dialog component.
-- [Alert Dialog](https://ui.shadcn.com/docs/components/alert-dialog): Alert dialog for confirmation prompts.
-- [Sheet](https://ui.shadcn.com/docs/components/sheet): Slide-out panel component (drawer).
-- [Drawer](https://ui.shadcn.com/docs/components/drawer): Mobile-friendly drawer component using Vaul.
-- [Popover](https://ui.shadcn.com/docs/components/popover): Floating popover component.
-- [Tooltip](https://ui.shadcn.com/docs/components/tooltip): Tooltip component for additional context.
+Content rendered in the application should be locally cached, updated optimistically, and kept eventually consistent with the Content Lake.
+
+### Accurate
+
+There should never be stale data in an author's browser as they write content, nor after page load when fetched content is rendered. Updates should be written to and received directly from the Content Lake.
+
+### This is all built-in to Sanity App SDK
+
+These are the baseline expectations that Sanity’s engineers have had while developing Sanity Studio since 2017, and they’re now democratized for everyone to take advantage of via React Hooks in the Sanity App SDK.
+
+## Get comfortable with more fetches
+
+If you’ve built an SSR front end with Sanity before (such as in Next.js), you’ve likely created a Sanity Client and fetched all on-page content in a single query like this.
+
+```tsx
+// The SSR way: query and render "event" type documents
+
+import { client } from "../sanity/client";
+
+export async function Page() {
+  const events = await client.fetch(
+    `*[_type == "event"]`
+  );
+
+  return (
+    <ul>
+      {events.map((event) => (
+        <li key={event._id}>{event.title}</li>
+      ))}
+    </ul>
+  );
+}
+```
+
+This can work great for SSR apps—where only the initial page load is important—since the grunt work of optimization is done behind the scenes, cached and delivered fast in a static format to your end users. But it falls short of a great SPA experience which may involve querying and editing an evolving number and type of documents, while keeping the user interface up to date in real-time.
+
+### Prefer useDocuments over useQuery to fetch documents
+
+Your natural inclination may be to use the App SDK hooks to recreate the "fetch everything in one query" pattern.
+
+```tsx
+// ❌ Do not simply swap client.fetch for useQuery
+// It's too easy to over-fetch!
+
+import { useQuery } from "@sanity/sdk-react";
+
+export function Page() {
+  const { data: events } = useQuery(
+    `*[_type == "event"]`
+  );
+
+  if (!events) return null;
+
+  return (
+    <ul>
+      {events.map((event) => (
+        <li key={event._id}>{event.title}</li>
+      ))}
+    </ul>
+  );
+}
+```
+
+This list of documents will receive real-time updates—an upgrade from `client.fetch`—but may unknowingly fetch 1000’s of documents, each with 100’s of attributes.
+
+> [!WARNING]
+> Keeping raw GROQ queries performant
+> The query in this particular example is problematic for performance. There’s no “array slicing” such as `[0..10]` to reduce the total number of documents returned, and no projection such as `{ title }` to reduce the number of attributes returned. 
+> High performance is built-in when you use hooks like `useDocuments` and `usePaginatedDocuments` to return a filtered list of [document handles](/docs/app-sdk/document-handles), but your implementation will need to be more carefully considered when fetching by GROQ queries with `useQuery`.
+
+`useQuery` exists to fetch content with a GROQ query should you need to—but makes it your responsibility to maintain your application’s performance. One particular example of where this may be useful is when a parent component needs all the details of child documents. 
+
+In most cases, you should prefer `useDocuments` to fetch a list of document handles, and render components that do their own data fetching for more content.
+
+> [!TIP]
+> Document handles provide stable `key` values
+> Among the benefits of fetching for and using [document handles](/docs/app-sdk/document-handles) is that they provide a stable `documentId` attribute which can be used as the `key` value when mapping over the response to render a list. 
+> Stable unique identifiers are preferable to using the index when [rendering lists in a real-time React application](https://react.dev/learn/rendering-lists#keeping-list-items-in-order-with-key).
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
