@@ -7,11 +7,11 @@ A next-generation platform for diabetes management
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [nightscout/nocturne](https://github.com/nightscout/nocturne).
+Original source: `CLAUDE.md` in [nightscout/nocturne](https://github.com/nightscout/nocturne).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
