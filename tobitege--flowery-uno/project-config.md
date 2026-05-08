@@ -1,183 +1,73 @@
 ---
 trigger: always_on
-description: This rule outlines the complete workflow for creating a new control in Flowery.Uno, whether it's a brand new control or a port from another library.
+description: This file captures learnings and patterns discovered during Flowery.Uno development for future reference.
 ---
 
-# Creating a New Flowery.Uno Control (Uno Platform / WinUI)
+# Flowery.Uno MANDATORY Development Notes
 
-This rule outlines the complete workflow for creating a new control in Flowery.Uno, whether it's a brand new control or a port from another library.
+This file captures learnings and patterns discovered during Flowery.Uno development for future reference.
 
-> **Platform**: Uno Platform / WinUI (NOT Avalonia). Use `Microsoft.UI.Xaml.*` namespaces, `.xaml` files, and `DependencyProperty`.
+## 🚨 READ THIS FIRST (top crash-prevention rules)
 
-## Overview
+If you only read the first ~50 lines of this file, read this section. These rules prevent the most common Uno “mystery” runtime crashes:
 
-Creating a new control involves these major phases:
+- **ContentControls that rebuild `Content`**: ALWAYS detach before re-parenting.
+  - Pattern: `_userContent = Content; Content = null; BuildVisualTree(); _presenter.Content = _userContent;`
+  - See **“UIElement can only have one parent”** (search for `### 19`).
+- **Never bind a `ContentPresenter` back to `this.Content`** in a control that later sets `Content = _rootGrid` (creates self-parenting / re-parenting issues).
+  - See the anti-pattern example under `### 19`.
+- **Don’t use `PathIcon` dynamically in code-behind** (Uno can throw `ArgumentException: Value does not fall within the expected range.`).
+  - Use `Microsoft.UI.Xaml.Shapes.Path` or `Flowery.Helpers.FloweryPathHelpers` instead (search for `### 18`).
+- **Use `DaisyControlExtensions.Icon` for button icons** - This is the GOLD STANDARD (see section below).
+- **Ambiguous type names**: `Path`, `Color`, etc. often need aliasing/qualification.
+  - Example: `using Path = Microsoft.UI.Xaml.Shapes.Path;` (search for `### 12`).
+- **Do NOT merge `ms-appx:///uno.toolkit.*/Styles/Generic.xaml`**.
+  - `Uno.Toolkit.*` packages do not ship `Styles/Generic.xaml`. Adding that dictionary will fail to load resources and can crash at startup. ShadowContainer only needs the package reference.
 
-1. **Control Implementation** - C# class with properties and logic
-2. **Theme/Styling** - XAML ResourceDictionary for visual appearance
-3. **Gallery Examples** - Demo page in the gallery application
-4. **Sidebar Integration** - Add to the sidebar data
-5. **Documentation** - Markdown file for supplementary docs
+## Neumorphic Takeaways
 
----
+For the distilled, field-tested fixes and integration notes from recent stability work, see `llms-static/neumorphic.md` → **Field-Tested Integration Notes (Session Takeaways)**.
 
-## Phase 1: Control Implementation
+### ThemeShadow + Elevation Learnings
 
-### 1.1 Create the C# Control File
+- **ThemeShadow requires explicit receivers**: add the receiver to `ThemeShadow.Receivers` (see Uno tests in `!uno/src/SamplesApp/UITests.Shared/Windows_UI_Xaml_Media/ThemeShadowTests`).
+- **Translation.Z defines shadow depth**: the casting element must have a `Translation` Z (e.g., `0,0,6`).
+- **CornerRadius is respected** when ThemeShadow is applied directly to `Border` or `Rectangle` with radius properties (no custom masking required).
+- **WASM/Skia elevation**: for rounded shadows, apply `SetElevation` to the template’s `Border` (e.g., `ButtonBorder`), not the `Button` control itself.
 
-**Location:** `Flowery.Uno/Controls/Daisy[ControlName].cs`
+## Pitfalls (Session)
 
-> If the control is a **custom extension** (not a direct DaisyUI component), place it under:
->
-> - `Flowery.Uno/Controls/Custom/Daisy[ControlName].cs`
-> - Namespace: `Flowery.Controls`
+These are compile-time issues that should be avoided up front:
 
-**Required elements:**
-
-```csharp
-using System;
-using Flowery.Theming;
-using Microsoft.UI.Xaml;
-using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Input;
-using Microsoft.UI.Xaml.Media;
-using Windows.UI;
-// Add other required usings at the TOP
-
-namespace Flowery.Controls
-{
-    // Define enums at namespace level
-    public enum Daisy[ControlName]Variant
-    {
-        Default,
-        Primary,
-        // ... other values
-    }
-
-    /// <summary>
-    /// Brief description of what the control does (Uno/WinUI).
-    /// </summary>
-    public partial class Daisy[ControlName] : ContentControl // or appropriate base class
-    {
-        /// <summary>
-        /// Gets or sets the property description.
-        /// </summary>
-        public static readonly DependencyProperty VariantProperty =
-            DependencyProperty.Register(
-                nameof(Variant),
-                typeof(Daisy[ControlName]Variant),
-                typeof(Daisy[ControlName]),
-                new PropertyMetadata(Daisy[ControlName]Variant.Default, OnAppearanceChanged));
-
-        public Daisy[ControlName]Variant Variant
-        {
-            get => (Daisy[ControlName]Variant)GetValue(VariantProperty);
-            set => SetValue(VariantProperty, value);
-        }
-
-        private static void OnAppearanceChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
-        {
-            if (d is Daisy[ControlName] control)
-            {
-                control.ApplyAll();
-            }
-        }
-
-        public Daisy[ControlName]()
-        {
-            DefaultStyleKey = typeof(Daisy[ControlName]);
-            Loaded += OnLoaded;
-            Unloaded += OnUnloaded;
-        }
-
-        private void OnLoaded(object sender, RoutedEventArgs e)
-        {
-            BuildVisualTree();
-            ApplyAll();
-        }
-
-        private void OnUnloaded(object sender, RoutedEventArgs e)
-        {
-            // Cleanup (unsubscribe from events, etc.)
-        }
-
-        private void BuildVisualTree()
-        {
-            // Build control's visual tree programmatically
-        }
-
-        private void ApplyAll()
-        {
-            // Apply sizing, colors, states
-        }
-    }
-}
-```
-
-### 1.2 Key Requirements
-
-- **XML Documentation**: Every class and property MUST have `/// <summary>` comments
-- **DependencyProperty Pattern**: Use WinUI's `DependencyProperty.Register` with `PropertyMetadata`
-- **Enums at Namespace Level**: Define enums outside the class, with `public` access
-- **Using Directives**: Add ALL required usings at the file TOP (avoid inline fully-qualified names)
-- **Partial class**: Mark class as `partial` for Uno source generators
-- **DefaultStyleKey**: Set in constructor for templated controls
-
-### 1.3 Common Base Classes
-
-| Base Class | Use Case |
-|------------|----------|
-| `ContentControl` | Controls with single content slot |
-| `Button` | Button-like controls (inherits click handling) |
-| `Control` | Generic base for custom controls |
-| `ItemsControl` | Controls with item collections |
-| `UserControl` | Simple composite controls with XAML |
+- Do not use `??` with different operand types (e.g., `Border ?? DaisyCard`). Cast to a shared base like `FrameworkElement` first.
+- Do not assign `UIElement` to `FrameworkElement` without an explicit cast and a null/type check.
+- Do not reference non-existent WinUI/Uno members like `FrameworkElement.IsVisibleChanged`; use supported events or `RegisterPropertyChangedCallback`.
+- Do not access internal or private helpers (e.g., `PlatformCompatibility`) from outside their assembly.
+- Do not set `null` into non-nullable reference types; update the type or use a nullable value.
+- Do not use `x:Bind` paths that are not real properties on the page (e.g., `Localization`); ensure the property exists and follow the required localization binding pattern.
 
 ---
 
-## Phase 2: Theme/Styling
+## WASM/Browser (Skia) Heads-Up (Session)
 
-### 2.1 Programmatic Visual Tree (Recommended)
+These are the practical fixes and gotchas encountered when getting the Browser head running with Skia:
 
-Most Flowery.Uno controls build their visual tree in code-behind for runtime flexibility:
-
-```csharp
-private void BuildVisualTree()
-{
-    _rootGrid = new Grid();
-    // Build tree...
-    Content = _rootGrid;
-}
-```
-
-### 2.2 XAML Template (Alternative)
-
-If using XAML templates, add to `Flowery.Uno/Themes/DaisyControls.xaml`:
-
-```xml
-<!-- In DaisyControls.xaml -->
-<Style TargetType="controls:Daisy[ControlName]">
-    <Setter Property="Template">
-        <Setter.Value>
-            <ControlTemplate TargetType="controls:Daisy[ControlName]">
-                <Grid>
-                    <!-- Control template here -->
-                </Grid>
-            </ControlTemplate>
-        </Setter.Value>
-    </Setter>
-</Style>
-```
-
-### 2.3 Theme Registration
-
-Themes are merged in `Flowery.Uno/Themes/Generic.xaml`:
-
-```xml
-<ResourceDictionary
-    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-
+- Use `Microsoft.NET.Sdk.WebAssembly` for the Browser head when using `Uno.WinUI.Runtime.Skia.WebAssembly.Browser`. Do NOT reference `Uno.WinUI.Runtime.WebAssembly` (triggers `UNOB0017`).
+- Target `net9.0` with `RuntimeIdentifier=browser-wasm` and run via `dotnet run` on the project (not the output folder) to avoid `hostpolicy.dll` self-contained errors.
+- Use `HostBuilder.UseWebAssembly()` directly; avoid reflection-based host builder hacks (inaccessible method errors).
+- Fix culture crashes by disabling invariant globalization and including ICU data:
+  - `<InvariantGlobalization>false</InvariantGlobalization>`
+  - `<WasmIncludeFullIcuData>true</WasmIncludeFullIcuData>`
+- Keep SkiaSharp versions aligned across managed + native:
+  - `SkiaSharp` and `SkiaSharp.NativeAssets.WebAssembly` MUST match (e.g., `3.119.1`) or you will hit undefined symbol errors.
+- Static web assets duplicates (library layout + root assets) cause:
+  - `Two assets found targeting the same path with incompatible asset kinds`
+  - Fix by disabling root asset copies for `net9.0` library projects and using `ms-appx:///Flowery.Uno.Gallery/Assets/...` paths.
+  - Add a Browser-head build target that `RemoveDuplicates` on `@(UnoAllCopyToOutputItems)` before `_UnoAssetsGetCopyToPublishDirectoryItems`.
+- CSP warnings (workers, `unsafe-eval`) and `WEBGL_invalid_enum` messages are expected in debug and are not fatal.
+- Keep Browser script ports aligned (5236) to avoid mismatched logs vs URL.
+- `ms-appx:///` is the correct scheme for Content assets in Uno (including WASM); it is supported by `Image`/`BitmapImage`.
+- Referencing assets in code can use `ms-appx:///Assets/...` or `ms-appx:///AssemblyName/Assets/...` and can be bound as a string.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
