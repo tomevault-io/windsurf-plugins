@@ -1,0 +1,173 @@
+---
+trigger: always_on
+description: You are working with the AI SDK Python codebase - a pure Python re-implementation of Vercel's popular AI SDK for TypeScript. This codebase provides zero-configuration functions that work consistently across AI providers with first-class streaming, tool-calling, and structured output support.
+---
+
+# AI SDK Python Codebase Rules
+
+You are working with the AI SDK Python codebase - a pure Python re-implementation of Vercel's popular AI SDK for TypeScript. This codebase provides zero-configuration functions that work consistently across AI providers with first-class streaming, tool-calling, and structured output support.
+
+## Core Architecture Principles
+
+### 1. Provider-Agnostic Design
+
+- All core functions (`generate_text`, `generate_object`, `embed`, etc.) work with any provider
+- Providers implement common interfaces defined in `src/ai_sdk/providers/`
+- New providers can be added by implementing the base classes
+
+### 2. Strong Pydantic Typing
+
+- **ALWAYS** use Pydantic models for all data structures
+- All public functions must have complete type hints
+- Return types should be Pydantic models when possible
+- Use `Optional[T]` for nullable parameters, never `Union[T, None]`
+
+### 3. Zero-Configuration Philosophy
+
+- Functions should work out-of-the-box with minimal setup
+- Sensible defaults for all parameters
+- Environment variable configuration for API keys
+- No complex configuration files required
+
+## Codebase Structure
+
+```
+src/ai_sdk/
+├── __init__.py              # Main exports and version
+├── types.py                 # Core Pydantic models and type definitions
+├── generate_text.py         # Text generation functionality
+├── generate_object.py       # Structured output generation
+├── embed.py                 # Embedding functionality
+├── tool.py                  # Tool calling functionality
+└── providers/               # Provider implementations
+    ├── __init__.py
+    ├── language_model.py    # Base language model interface
+    ├── embedding_model.py   # Base embedding model interface
+    ├── openai.py           # OpenAI provider
+    └── anthropic.py        # Anthropic provider
+```
+
+## Key Patterns and Conventions
+
+### 1. Pydantic Model Usage
+
+**ALWAYS** define Pydantic models for:
+
+- Function parameters (when complex)
+- Return values
+- Configuration objects
+- API response structures
+
+```python
+from pydantic import BaseModel, Field
+from typing import Optional, List
+
+class TextGenerationResult(BaseModel):
+    text: str = Field(description="Generated text content")
+    usage: Optional[Usage] = Field(default=None, description="Token usage information")
+    model: str = Field(description="Model identifier used")
+
+class Usage(BaseModel):
+    prompt_tokens: int
+    completion_tokens: int
+    total_tokens: int
+```
+
+### 2. Provider Interface Pattern
+
+All providers must implement base interfaces:
+
+```python
+from abc import ABC, abstractmethod
+from typing import AsyncIterator, Optional
+from pydantic import BaseModel
+
+class LanguageModel(ABC):
+    @abstractmethod
+    async def generate_text(
+        self,
+        prompt: str,
+        system: Optional[str] = None,
+        **kwargs
+    ) -> TextGenerationResult:
+        pass
+
+    @abstractmethod
+    async def stream_text(
+        self,
+        prompt: str,
+        system: Optional[str] = None,
+        **kwargs
+    ) -> AsyncIterator[str]:
+        pass
+```
+
+### 3. Function Design Pattern
+
+Core functions follow this pattern:
+
+1. Accept provider model as first parameter
+2. Validate inputs with Pydantic
+3. Delegate to provider implementation
+4. Return structured Pydantic result
+
+```python
+def generate_text(
+    model: LanguageModel,
+    prompt: str,
+    system: Optional[str] = None,
+    **kwargs
+) -> TextGenerationResult:
+    """Generate text using the specified language model."""
+    # Input validation
+    if not prompt.strip():
+        raise ValueError("Prompt cannot be empty")
+
+    # Delegate to provider
+    return await model.generate_text(prompt=prompt, system=system, **kwargs)
+```
+
+## Adding New Features
+
+### 1. Adding a New Provider
+
+1. **Create provider file** in `src/ai_sdk/providers/`
+2. **Implement base interfaces** from `language_model.py` or `embedding_model.py`
+3. **Add provider factory function** in the provider file
+4. **Update `__init__.py`** to export the new provider
+5. **Add tests** in `tests/` directory
+6. **Add documentation** in `docs/sdk/providers/`
+
+Example provider structure:
+
+```python
+# src/ai_sdk/providers/new_provider.py
+from .language_model import LanguageModel
+from ..types import TextGenerationResult
+
+class NewProviderLanguageModel(LanguageModel):
+    def __init__(self, model: str, api_key: Optional[str] = None, **kwargs):
+        self.model = model
+        self.api_key = api_key or os.getenv("NEW_PROVIDER_API_KEY")
+        # Initialize client
+
+    async def generate_text(self, prompt: str, system: Optional[str] = None, **kwargs) -> TextGenerationResult:
+        # Implementation here
+        pass
+
+def new_provider(model: str, **kwargs) -> NewProviderLanguageModel:
+    """Create a new provider language model instance."""
+    return NewProviderLanguageModel(model=model, **kwargs)
+```
+
+### 2. Adding New Core Functions
+
+1. **Create function** in appropriate module (e.g., `generate_text.py`)
+2. **Define Pydantic models** for parameters and return values in `types.py`
+3. **Add comprehensive type hints**
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [python-ai-sdk/sdk](https://github.com/python-ai-sdk/sdk) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-04 -->
