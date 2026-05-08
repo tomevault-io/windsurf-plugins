@@ -1,303 +1,176 @@
 ---
 trigger: always_on
-description: 本文档介绍 `lib` 目录下的所有公共库文件和函数，包括 ABI 工具、配置文件、合约封装和第三方服务。
+description: 1. **简洁明了**：只记录核心内容，能快速理解即可
 ---
 
-# 公共库文件文档
 
-本文档介绍 `lib` 目录下的所有公共库文件和函数，包括 ABI 工具、配置文件、合约封装和第三方服务。
+# 如何编写学习笔记
 
-## 目录结构
+## 编写原则
 
+1. **简洁明了**：只记录核心内容，能快速理解即可
+2. **结构清晰**：使用统一的文档结构，便于查阅
+3. **代码为主**：以实际代码示例为核心，辅以简要说明和中文注释
+4. **快速查阅**：作为学习笔记，应该能快速找到关键信息
+5. **便于理解**：代码示例添加中文注释，帮助读者理解实现逻辑
+6. **面向初学者**：假设读者对技术概念不了解，需要详细解释
+7. **只引用公开库**：代码示例只使用 Viem、Wagmi 等公开库，不引用项目内部的 lib 库
+
+## 文档结构
+
+### 1. 标题
+
+使用简洁的问题式标题，如：
+
+- `如何链接钱包`
+- `如何查询余额`
+- `如何实现转账`
+
+### 2. 技术栈
+
+列出实现该功能所需的核心工具库，格式：
+
+```markdown
+## 技术栈
+
+- **库名**: 简要说明其作用
+- **库名**: 简要说明其作用
 ```
-lib/
-├── abi/             # ABI 工具库
-│   ├── types.ts          # ABI 相关类型定义
-│   ├── utils.ts          # ABI 工具函数（使用 viem）
-│   ├── parser.ts         # 事件日志解析器（使用 viem）
-├── config/          # 配置文件
-│   ├── addresses.ts      # 合约地址配置
-│   ├── chains.ts         # 链配置
-│   ├── etherscan.ts      # Etherscan API 配置
-├── services/        # 第三方服务封装
-│   └── etherscan.ts      # Etherscan API 服务
-└── utils.ts         # 通用工具函数（Tailwind CSS）
+
+示例：
+
+```markdown
+- **Wagmi**: React Hooks 库，提供 `useAccount`、`useBalance` 等 Hook
+- **RainbowKit**: 钱包连接 UI 组件库，提供 `<ConnectButton />`
 ```
 
----
+**重要**：技术栈中列出的函数/Hook，需要简要说明其用途。不要假设读者了解这些工具，要让读者知道「这个工具是做什么的」。
 
-## ABI 工具库 (lib/abi/)
+示例（详细说明版）：
 
-ABI 工具库提供了处理智能合约 ABI（Application Binary Interface）的工具函数。
-本模块使用 viem 库提供的函数来实现核心功能，避免重复实现。
+```markdown
+- **Viem**: 以太坊工具库
+  - `encodeFunctionData`: 将合约函数调用编码为十六进制数据，用于构造交易的 data 字段
+  - `parseUnits`: 将人类可读的数字（如 "100"）转换为区块链使用的最小单位（如 100000000）
+```
 
-### types.ts
+### 3. 实现概览
 
-**文件路径**: `lib/abi/types.ts`
+**重要**：这是快速理解实现方案的关键部分。
 
-**作用**: 
-- 定义 ABI 相关的 TypeScript 类型
-- 定义事件解析相关的类型
+使用 **"用 XX 的 XX 实现 XX"** 的格式，列出实现该功能所需的关键工具和功能：
 
-**导出类型**:
+```markdown
+## 实现概览
+
+- 用 **库名** 的 `功能/API` 实现 `目的`
+- 用 **库名** 的 `功能/API` 实现 `目的`
+```
+
+示例：
+
+```markdown
+- 用 **RainbowKit** 的 `getDefaultConfig` 和 `RainbowKitProvider` 实现钱包连接配置和 UI 组件
+- 用 **Wagmi** 的 `useAccount` Hook 获取钱包地址和网络信息
+```
+
+**要求**：
+
+- 不需要详细代码样例
+- 只说明工具和功能的对应关系
+- 让读者快速了解"用什么实现什么"
+
+### 4. 核心实现详情
+
+分步骤展示关键代码实现，每个步骤包含：
+
+- 步骤标题（简洁描述功能，不需要文件路径）
+- 代码示例（使用代码块）
+- 必要时添加简要注释
+
+**重要**：代码示例的要求：
+
+- **关注核心内容**：代码示例的目的是帮助理解实现思路，不是为了直接运行
+- **保留关键部分**：只展示实现该功能的核心代码，省略不重要的部分
+- **添加中文注释**：为关键代码添加中文注释，方便阅读理解，说明代码的作用和逻辑
+- **不需要完整代码**：可以省略类型定义、错误处理、边界情况、导入语句等不重要的内容
+- **不需要文件路径**：步骤标题中不需要包含文件路径，只描述功能即可
+- **只使用公开库**：代码示例只能使用 Viem、Wagmi、RainbowKit 等公开库，不能引用项目内部的 lib 库（如 `@/lib/services/etherscan`）
+- **解释技术概念**：遇到专业术语（如 Gas、ABI、Wei 等）时，要解释清楚含义
+
+参考示例：
+
+````markdown
+## 核心实现详情
+
+### 1. 基本查询余额
 
 ```typescript
-/**
- * 事件 ABI 输入参数定义
- */
-export interface EventAbiInput {
-  indexed: boolean;  // 是否为 indexed 参数
-  name: string;      // 参数名称，如 "from"、"to"、"value"
-  type: string;      // 参数类型，如 "address"、"uint256"
-}
+import { useAccount, useBalance } from "wagmi";
+import { formatEther } from "viem";
 
-/**
- * 事件 ABI 定义
- */
-export interface EventAbiItem {
-  anonymous: boolean;           // 是否为匿名事件
-  inputs: readonly EventAbiInput[];  // 参数列表
-  name: string;                 // 事件名称
-  type: "event";                // 固定为 "event"
-}
+export function WalletConnection() {
+  // 获取钱包地址
+  const { address } = useAccount();
+  // 查询余额，返回的数据包含 value（BigInt 类型，单位为 wei）
+  const { data: balanceData } = useBalance({ address });
 
-/**
- * 原始事件日志数据（来自 Etherscan API）
- */
-export interface RawEventLog {
-  topics: string[];      // topics[0] 是事件签名，后续是 indexed 参数
-  data: string;          // 非 indexed 参数的 ABI 编码数据
-  blockNumber: string;
-  timeStamp: string;
-  logIndex: string;
-  transactionHash: string;
-}
-
-/**
- * 解析后的事件数据
- */
-export interface ParsedEvent {
-  eventName: string;
-  transactionHash: string;
-  blockNumber: string;
-  timeStamp: string;
-  logIndex: string;
-  params: Record<string, string>;  // 参数名 -> 参数值
-}
-```
-
----
-
-### utils.ts
-
-**文件路径**: `lib/abi/utils.ts`
-
-**作用**: 
-- 提供事件签名计算（使用 viem 的 toEventSelector）
-- 构建事件名称和 topic0 的映射关系
-- 查找事件 ABI 定义
-
-**导出函数**:
-
-#### getEventTopic0
-
-```typescript
-/**
- * 获取事件的 topic0（事件选择器）
- * 使用 viem 的 toEventSelector 计算事件签名的 keccak256 哈希
- * 
- * @param eventAbi - 事件的 ABI 定义
- * @returns 事件签名的 keccak256 哈希值（十六进制字符串）
- */
-export function getEventTopic0(eventAbi: EventAbiItem): string;
-```
-
-**使用示例**:
-
-```typescript
-import { getEventTopic0 } from "@/lib/abi/utils";
-
-const transferAbi = {
-  name: "Transfer",
-  type: "event" as const,
-  anonymous: false,
-  inputs: [
-    { indexed: true, name: "from", type: "address" },
-    { indexed: true, name: "to", type: "address" },
-    { indexed: false, name: "value", type: "uint256" },
-  ],
-};
-
-const topic0 = getEventTopic0(transferAbi);
-// 返回: "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
-```
-
-#### buildEventTopicsMap
-
-```typescript
-/**
- * 构建事件名称到 topic0 的映射表
- * 
- * @param eventAbiList - 事件 ABI 数组
- * @returns 事件名称到 topic0 的映射对象
- */
-export function buildEventTopicsMap(
-  eventAbiList: readonly EventAbiItem[]
-): Record<string, string>;
-```
-
-#### buildTopicToEventNameMap
-
-```typescript
-/**
- * 构建 topic0 到事件名称的反向映射表
- * 用于根据 topic0 反查事件名称
- * 
- * @param eventAbiList - 事件 ABI 数组
- * @returns topic0 到事件名称的映射对象
- */
-export function buildTopicToEventNameMap(
-  eventAbiList: readonly EventAbiItem[]
-): Record<string, string>;
-```
-
-#### getEventNames
-
-```typescript
-/**
- * 从事件 ABI 数组中提取所有事件名称
- * 
- * @param eventAbiList - 事件 ABI 数组
- * @returns 事件名称数组
- */
-export function getEventNames(eventAbiList: readonly EventAbiItem[]): string[];
-```
-
-#### findEventAbi
-
-```typescript
-/**
- * 根据事件名称查找对应的 ABI 定义
- * 
- * @param eventAbiList - 事件 ABI 数组
- * @param eventName - 要查找的事件名称
- * @returns 找到的事件 ABI，如果未找到则返回 undefined
- */
-export function findEventAbi(
-  eventAbiList: readonly EventAbiItem[],
-  eventName: string
-): EventAbiItem | undefined;
-```
-
----
-
-### parser.ts
-
-**文件路径**: `lib/abi/parser.ts`
-
-**作用**: 
-- 使用 viem 的 decodeEventLog 解析事件日志
-- 将原始事件数据转换为可读格式
-
-**导出函数**:
-
-#### parseEventLog
-
-```typescript
-/**
- * 使用 viem 解析单个事件日志
- * 
- * @param log - 原始事件日志数据
- * @param eventAbiList - 合约的所有事件 ABI 列表
- * @param topicToEventName - topic0 到事件名称的映射表
- * @returns 解析后的事件对象，如果事件无法识别则返回 null
- */
-export function parseEventLog(
-  log: RawEventLog,
-  eventAbiList: readonly EventAbiItem[],
-  topicToEventName: Record<string, string>
-): ParsedEvent | null;
-```
-
-#### parseEventLogs
-
-```typescript
-/**
- * 批量解析事件日志
- * 自动过滤掉无法识别的事件，可选按时间戳排序
- * 
- * @param logs - 原始事件日志数组
- * @param eventAbiList - 合约的所有事件 ABI 列表
- * @param sortDesc - 是否按时间戳倒序排列，默认 true
- * @returns 解析后的事件数组
- */
-export function parseEventLogs(
-  logs: RawEventLog[],
-  eventAbiList: readonly EventAbiItem[],
-  sortDesc?: boolean
-): ParsedEvent[];
-```
-
-**使用示例**:
-
-```typescript
-import { parseEventLogs } from "@/lib/abi/parser";
-import { USDT_EVENT_ABI } from "@/lib/abi/usdt";
-
-// 解析事件日志
-const events = parseEventLogs(response.result, USDT_EVENT_ABI, true);
-
-for (const event of events) {
-  console.log(`${event.eventName}: from=${event.params.from}, to=${event.params.to}`);
+  return (
+    <p>
+      {/* formatEther 将 wei 转换为 ETH 字符串 */}
+      余额: {formatEther(balanceData?.value || 0n)}
+    </p>
+  );
 }
 ```
+````
 
----
+## 重要注意事项
 
-## Config 配置文件 (lib/config/)
+### 不要引用内部 lib 库
 
-### tokens.ts
+文档的目标读者是想学习 Web3 开发的初学者。他们阅读文档是为了学习 Viem、Wagmi 等公开库的用法，而不是学习我们项目内部封装的 lib 库。
 
-**文件路径**: `lib/config/tokens.ts`
-
-**作用**: 
-- 集中管理所有代币名称常量
-- 提供类型安全的代币名称引用
-- 避免代币名称拼写错误
-- 方便 TypeScript 类型检查
-
-**导出内容**:
+**错误示例**：
 
 ```typescript
-/**
- * 代币符号常量
- * 使用 as const 确保类型安全
- */
-export const TOKENS = {
-  USDT: "USDT",
-  ETH: "ETH",
-} as const;
+// ❌ 不要这样写，读者不知道 getGasOracle 是什么
+import { getGasOracle } from "@/lib/services/etherscan";
+const gasPrice = await getGasOracle(1);
+```
 
-/**
- * 代币符号类型
- */
-export type TokenSymbol = (typeof TOKENS)[keyof typeof TOKENS];
+**正确示例**：
 
-/**
- * 代币信息接口
- */
-export interface TokenInfo {
-  symbol: TokenSymbol;
-  name: string;
-  decimals: number;
-}
+```typescript
+// ✅ 直接展示 API 调用，读者可以学习到完整的实现方式
+const params = new URLSearchParams({
+  chainid: "1",
+  module: "gastracker",
+  action: "gasoracle",
+  apikey: "YOUR_API_KEY",
+});
 
-/**
- * 代币信息配置
- */
-export const TOKEN_INFO = {
+const response = await fetch(
+  `https://api.etherscan.io/v2/api?${params.toString()}`
+);
+const result = await response.json();
+```
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+### 解释专业术语
+
+遇到区块链相关的专业术语时，需要解释清楚：
+
+- **Gas**：以太坊网络中衡量计算量的单位
+- **Wei**：以太坊的最小单位，1 ETH = 10^18 Wei
+- **Gwei**：1 Gwei = 10^9 Wei，常用于表示 Gas 价格
+- **ABI**：Application Binary Interface，合约接口定义
+- **ERC20**：代币标准，定义了 transfer、approve 等函数
+
+### 适度详细
+
+- 核心概念要解释清楚，让初学者能理解
+- 但不要过于啰嗦，保持简洁
+- 代码注释要有意义，不要写显而易见的注释
 
 ---
 > Source: [sdjl/learn-web3](https://github.com/sdjl/learn-web3) — distributed by [TomeVault](https://tomevault.io).
