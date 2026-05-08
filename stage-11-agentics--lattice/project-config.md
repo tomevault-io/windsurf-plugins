@@ -1,0 +1,149 @@
+---
+trigger: always_on
+description: Stage 11 Agentics' file-based, agent-native task tracker with an event-sourced core.
+---
+
+# Lattice
+
+Stage 11 Agentics' file-based, agent-native task tracker with an event-sourced core.
+
+## Disambiguation: "Lattice" the Codebase vs. "Lattice" the Instance
+
+This project **dogfoods itself**. Two distinct things called "Lattice":
+
+1. **The Lattice source code** — the Python project under `src/lattice/`. This is what `git` tracks.
+2. **The `.lattice/` data directory** — a live Lattice instance for tracking dev tasks. Gitignored in this repo (heavy test/dev churn would pollute diffs).
+
+**Rule:** Never confuse changes to `src/lattice/` (source code) with changes to `.lattice/` (instance data). They are independent. Editing source code does not affect the running instance until you reinstall (`uv pip install -e ".[dev]"`).
+
+## Global Tool — Editable Install
+
+The global `lattice` command is installed in editable mode, pointing directly at the source tree:
+
+```bash
+uv tool install -e /Users/atin/Projects/Stage11/code/Lattice --force
+```
+
+This means **all changes to `src/` are immediately live** — Python code, static files, templates. No rebuild, no publish step, no cache issues. Just edit and run.
+
+The `.pth` file at `~/.local/share/uv/tools/lattice-tracker/` redirects imports to `code/Lattice/src/`. Both `lattice` (bare) and `uv run lattice` read from the same source tree.
+
+**If the editable install ever breaks** (e.g., after moving the repo), reinstall:
+```bash
+uv cache clean lattice-tracker && uv tool install -e /Users/atin/Projects/Stage11/code/Lattice --force
+```
+
+**Note for dashboards:** After editing static files (HTML/JS/CSS), a running dashboard still serves from memory. Restart it to pick up changes (`lattice restart` or stop/start).
+
+## Quick Reference
+
+| Item | Value |
+|------|-------|
+| Language | Python 3.12+ |
+| CLI framework | Click |
+| Testing | pytest |
+| Linting | ruff |
+| Package manager | uv |
+| Entry point | `lattice` (via `[project.scripts]`) |
+
+## Key Documents
+
+| Document | Purpose |
+|----------|---------|
+| `ProjectRequirements_v1.md` | Full specification — object model, schemas, CLI commands, invariants |
+| `Decisions.md` | Architectural decisions with rationale (append-only log) |
+| `docs/architecture/README.md` | Index for all architecture deep dives |
+
+**Read `ProjectRequirements_v1.md` before making any architectural change.**
+
+## Layer Boundaries
+
+- **`core/`** — pure business logic. No filesystem calls.
+- **`storage/`** — all filesystem I/O. Atomic writes, locking, directory traversal.
+- **`cli/`** — wires core + storage via Click commands. Output formatting.
+- **`dashboard/`** — read-only. Reads `.lattice/` files, serves JSON + static HTML.
+
+## Development Setup
+
+```bash
+cd lattice
+uv venv
+uv pip install -e ".[dev]"
+uv run pytest
+uv run ruff check src/ tests/
+uv run ruff format src/ tests/
+uv run lattice --help
+```
+
+## Dependencies
+
+### Runtime
+- `click` — CLI framework
+- `python-ulid` — ULID generation
+- `filelock` — Cross-platform file locking
+
+### Dev
+- `pytest` — testing
+- `ruff` — linting and formatting
+
+Minimize dependencies. The dashboard uses only stdlib. Do not add dependencies without justification.
+
+## Coding Conventions
+
+### JSON Output
+
+```python
+# Snapshots: sorted keys, 2-space indent, trailing newline
+json.dumps(data, sort_keys=True, indent=2) + "\n"
+
+# Events (JSONL): compact separators, one line
+json.dumps(event, sort_keys=True, separators=(",", ":")) + "\n"
+```
+
+### Error Handling
+
+- Human-readable errors to stderr, non-zero exit codes.
+- `--json` mode: `{"ok": true, "data": ...}` or `{"ok": false, "error": {"code": "...", "message": "..."}}`.
+- Never silently swallow errors.
+
+### Testing
+
+- CLI commands → integration tests (invoke Click, check `.lattice/` state).
+- Core modules → unit tests (pure logic, no filesystem).
+- Storage → tests with real temp directories (`tmp_path` fixture).
+
+## Where Things Live
+
+- **Task plans** → `.lattice/plans/<task_id>.md`
+- **Task notes** → `.lattice/notes/<task_id>.md`
+- **Repo `notes/`** — code reviews, retrospectives, working documents NOT tied to a specific task.
+- **Repo `docs/`** — user-facing documentation, guides, architecture deep dives.
+- **Repo `prompts/`** — prompt templates and implementation checklists.
+- **Repo `research/`** — external research, competitive analysis, reference material.
+- **Don't duplicate** — a document should live in one place.
+
+## Branching Model
+
+**Two-branch model.**
+
+- **`main`** — development branch. All feature branches merge here.
+- **`prod`** — stable release branch. Merges from `main` when a release is ready.
+- Feature work: short-lived branches off `main` (`feat/`, `fix/`, `refactor/`, `test/`, `chore/`).
+- Conventional commit messages (`feat:`, `fix:`, etc.).
+- Before merging to `main`: all tests pass, ruff clean.
+- Before merging to `prod`: same gates + manual confirmation.
+- Schema changes: bump `schema_version`, maintain forward compatibility.
+- New decisions: append to `Decisions.md`.
+
+## Hosting & Remote
+
+Lattice is a **public project** hosted on **GitHub** (`origin` → `github.com/Stage-11-Agentics/lattice`). Although Stage 11's other projects use Forgejo, Lattice stays on GitHub for public visibility. Push to `origin` (GitHub), not Forgejo.
+
+## What Not to Build (v0)
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [Stage-11-Agentics/lattice](https://github.com/Stage-11-Agentics/lattice) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-03 -->
