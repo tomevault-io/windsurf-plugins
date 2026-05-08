@@ -1,190 +1,109 @@
 ---
 trigger: always_on
-description: Development standards and best practices for creating/configuring/styling theme blocks, including static and nested blocks, schema configuration, CSS, and usage examples
+description: Breadcrumb component accessibility compliance pattern
 ---
 
+# Breadcrumb Accessibility
 
-# Theme Blocks Development Standards
+Ensures breadcrumb components follow WCAG compliance and WAI-ARIA Breadcrumb Pattern specifications.
 
-Follow [Shopify's theme blocks documentation](mdc:https:/shopify.dev/docs/storefronts/themes/architecture/blocks/theme-blocks/quick-start?framework=liquid.txt).
+<rule>
+name: breadcrumb_accessibility_standards
+description: Enforce breadcrumb component accessibility standards and WAI-ARIA Breadcrumb Pattern compliance
+filters:
+  - type: file_extension
+    pattern: "\\.(vue|jsx|tsx|html|liquid|php|js|ts)$"
 
-## Theme Block Fundamentals
+actions:
+  - type: enforce
+    conditions:
+      # Navigation landmark requirement
+      - pattern: "(?i)<nav[^>]*(?:breadcrumb|navigation)[^>]*>"
+        pattern_negate: "(aria-label|aria-labelledby)=\"[^\"]+\""
+        message: "Breadcrumb navigation must have aria-label or aria-labelledby attribute."
 
-Theme blocks are reusable components defined at the theme level that can be:
+      # Current page aria-current requirement
+      - pattern: "(?i)<[^>]*(?:breadcrumb.*current|current.*breadcrumb)[^>]*>"
+        pattern_negate: "aria-current=\"page\""
+        message: "Current page in breadcrumb must have aria-current='page' attribute."
 
-- Nested under sections and blocks
-- Configured using settings in the theme editor
-- Given presets and added by merchants
-- Used as [static blocks](mdc:https:/shopify.dev/docs/storefronts/themes/architecture/blocks/theme-blocks/static-blocks#statically-vs-dynamically-rendered-theme-blocks) by theme developers
+      # List structure requirement
+      - pattern: "(?i)<nav[^>]*(?:breadcrumb|navigation)[^>]*>"
+        pattern_negate: "<ol[^>]*>"
+        message: "Breadcrumb navigation should use ordered list (ol) for proper structure."
 
-Blocks render in the editor and storefront when they are referenced in [template files](mdc:.cursor/rules/templates.mdc).
+  - type: suggest
+    message: |
+      **Breadcrumb Component Accessibility Best Practices:**
 
-### Basic Block Structure
+      **Required ARIA Attributes:**
+      - **aria-label/aria-labelledby:** On navigation element to describe the breadcrumb trail
+      - **aria-current="page":** On the current page link or element
+      - **role="navigation":** Implicit on nav element, but can be explicit if needed
 
-```liquid
-{% doc %}
-  Block description and usage examples
+      **Structure Requirements:**
+      - Use `<nav>` element as container
+      - Use ordered list (`<ol>`) for breadcrumb items
+      - Use list items (`<li>`) for each breadcrumb level
+      - Current page should be the last item in the list
+      - Use appropriate heading level for the breadcrumb container
 
-  @example
-  {% content_for 'block', type: 'block-name', id: 'unique-id' %}
-{% enddoc %}
+      **Implementation Patterns:**
 
-<div
-  {{ block.shopify_attributes }}
-  class='block-name'
->
-  <!-- Block content using block.settings -->
-</div>
+      **Basic Breadcrumb:**
+      ```html
+      <nav aria-label="Breadcrumb">
+        <ol class="breadcrumb">
+          <li class="breadcrumb-item">
+            <a href="/">Home</a>
+          </li>
+          <li class="breadcrumb-item">
+            <a href="/products">Products</a>
+          </li>
+          <li class="breadcrumb-item" aria-current="page">
+            <a href="/products/electronics">Electronics</a>
+          </li>
+        </ol>
+      </nav>
+      ```
 
-{% stylesheet %}
-  /*
-    Scoped CSS for this block
+      **With aria-labelledby:**
+      ```html
+      <nav aria-labelledby="breadcrumb-heading">
+        <h2 id="breadcrumb-heading" class="visually-hidden">Breadcrumb Navigation</h2>
+        <ol class="breadcrumb">
+          <li class="breadcrumb-item">
+            <a href="/">Home</a>
+          </li>
+          <li class="breadcrumb-item" aria-current="page">
+            <span>Current Page</span>
+          </li>
+        </ol>
+      </nav>
+      ```
 
-    Use BEM structure
-    CSS written in here should be for components that are exclusively in this block.  If the CSS will be used elsewhere, it should instead be written in [assets/base.css](mdc:@assets/base.css)
-  */
-{% endstylesheet %}
+      **Accessibility Notes:**
+      - Navigation landmark helps screen readers identify the breadcrumb trail
+      - Ordered list provides semantic structure for the navigation hierarchy
+      - aria-current helps users identify their current location
+      - Consider using visually-hidden text for better screen reader context
+      - Ensure sufficient color contrast for all breadcrumb elements
+      - Maintain clear visual separation between items
+      - Use clear, descriptive labels for each level
 
-{% schema %}
-{
-  "name": "Block Name",
-  "settings": [],
-  "presets": []
-}
-{% endschema %}
-```
+      **Testing Checklist:**
+      - Verify navigation landmark is present and properly labeled
+      - Confirm ordered list structure is used
+      - Check aria-current is present on current page
+      - Test with screen readers to ensure proper announcement
+      - Verify visual hierarchy is clear and consistent
+      - Ensure all links are keyboard accessible
+      - Check color contrast meets WCAG requirements
 
-### Static Block Usage
-
-Static blocks are theme blocks that are rendered directly in Liquid templates by developers, rather than being dynamically added through the theme editor. This allows for predetermined block placement with optional default settings.
-
-**Basic Static Block Syntax:**
-
-```liquid
-{% content_for 'block', type: 'text', id: 'header-announcement' %}
-```
-
-**Example: Product Template with Mixed Static and Dynamic Blocks**
-
-```liquid
-<!-- templates/product.liquid -->
-<div class='product-page'>
-  {% comment %} Static breadcrumb block {% endcomment %}
-  {% content_for 'block', type: 'breadcrumb', id: 'product-breadcrumb' %}
-
-  <div class='product-main'>
-    <div class='product-media'>
-      {% comment %} Static product gallery block {% endcomment %}
-      {%
-        content_for 'block', type: 'product-gallery', id: 'main-gallery', settings: {
-        enable_zoom: true,
-        thumbnails_position: "bottom"
-        }
-      %}
-    </div>
-
-    <div class='product-info'>
-      {% comment %} Static product info blocks {% endcomment %}
-      {% content_for 'block', type: 'product-title', id: 'product-title' %}
-      {% content_for 'block', type: 'product-price', id: 'product-price' %}
-      {% content_for 'block', type: 'product-form', id: 'product-form' %}
-
-      {% comment %} Dynamic blocks area for additional content {% endcomment %}
-      <div class='product-extra-content'>
-        {% content_for 'blocks' %}
-      </div>
-    </div>
-  </div>
-
-  {% comment %} Static related products block {% endcomment %}
-  {%
-    content_for 'block', type: 'related-products', id: 'related-products', settings: {
-    heading: "You might also like",
-    limit: 4
-    }
-  %}
-</div>
-```
-
-**Key Points about Static Blocks:**
-
-- They have a fixed `id` that makes them identifiable in the theme editor
-- Settings can be overridden in the theme editor despite having defaults
-- They appear in the theme editor as locked blocks that can't be removed or reordered
-- Useful for consistent layout elements that should always be present
-- Can be mixed with dynamic block areas using `{% content_for 'blocks' %}`
-
-## Schema Configuration
-
-See [schemas.mdc](mdc:.cursor/rules/schemas.mdc) for rules on schemas
-
-### Advanced Schema Features
-
-#### Exclude wrapper
-
-```json
-{
-  "tag": null // No wrapper - must include {{ block.shopify_attributes }} for proper editor function
-}
-```
-
-## Block Implementation Patterns
-
-### Accessing Block Data
-
-**Block Settings:**
-
-```liquid
-{{ block.settings.text }}
-{{ block.settings.heading | escape }}
-{{ block.settings.image | image_url: width: 800 }}
-```
-
-**Block Properties:**
-
-```liquid
-{{ block.id }} // Unique block identifier {{ block.type }} // Block type name {{ block.shopify_attributes }} // Required
-for theme editor
-```
-
-**Section Context:**
-
-```liquid
-{{ section.id }} // Parent section ID
-{{ section.settings.heading | escape }}
-{{ section.settings.image | image_url: width: 800 }}
-```
-
-## Nested Blocks Implementation
-
-### Critical Constraint: Single `content_for 'blocks'` Per File
-
-**IMPORTANT:** There can only be **ONE** `{% content_for 'blocks' %}` call per Liquid file. If you need to use the blocks content in multiple places (e.g., in conditional branches), you must capture it first:
-
-```liquid
-{% comment %} ✅ CORRECT - Capture once, use multiple times {% endcomment %}
-{% capture blocks_content %}
-  {% content_for 'blocks' %}
-{% endcapture %}
-
-{% if condition %}
-  <div class='layout-a'>
-    {{ blocks_content }}
-  </div>
-{% else %}
-  <div class='layout-b'>
-    {{ blocks_content }}
-  </div>
-{% endif %}
-```
-
-```liquid
-{% comment %} ❌ INCORRECT - Multiple content_for calls will cause errors {% endcomment %}
-{% if condition %}
-  <div class='layout-a'>
-    {% content_for 'blocks' %}
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+metadata:
+  priority: high
+  version: 1.0
+</rule>
 
 ---
 > Source: [Shopify/horizon](https://github.com/Shopify/horizon) — distributed by [TomeVault](https://tomevault.io).
