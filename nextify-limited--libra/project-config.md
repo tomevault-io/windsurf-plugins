@@ -1,136 +1,203 @@
 ---
 trigger: always_on
-description: Read this when user asks you to auto commit as you go.
+description: Guidelines for writing clean, maintainable, and human-readable code. Apply these rules when writing or reviewing code to ensure consistency and quality.
 ---
 
-<git-commit-guidelines>
 
-When making changes to code, commit your changes incrementally as you work. Follow these commit conventions:
+## Core Principles
 
-<commit-format>
+**Why** Implementing consistent development philosophy across the project maximizes collaboration efficiency and reduces long-term maintenance costs.
+
+**When** Check against these principles before writing or reviewing any code.
+
+**Key Takeaways**
+1. Follow project conventions (Biome / shadcn / Tailwind)
+2. Keep it simple – avoid over-engineering
+3. Scout principle – make code better with every change
+4. Root cause analysis – use type system to prevent issues
+
+### Example Summary
+```typescript
+// Single responsibility example
+function validateEmail(email: string): boolean {
+  return /^\S+@\S+\.\S+$/.test(email)
+}
 ```
-<type>[optional scope]: <subject>
 
-[optional body]
+---
+
+## Architecture Design Principles
+
+**Why** Good architecture makes code sustainably evolve and easily extensible.
+
+**When** Apply when designing new modules or refactoring existing ones.
+
+**Key Takeaways**
+1. Centralized, type-safe configuration management
+2. Composition over inheritance
+3. Concurrency handling: React 19 + Suspense
+4. Moderate configuration / dependency injection / principle of least knowledge
+
+### Example Summary
+```typescript
+// Dependency injection example
+class OrderProcessor {
+  constructor(private payment: PaymentService) {}
+  async process(order: Order) {
+    await this.payment.pay(order.total)
+  }
+}
 ```
-</commit-format>
 
-<types>
-- feat: New feature or functionality
-- fix: Bug fix
-- chore: Maintenance tasks, dependency updates, configuration changes
-- docs: Documentation only changes
-- style: Code style/formatting changes (no functional changes)
-- refactor: Code restructuring without changing functionality
-- test: Adding or modifying tests
-- perf: Performance improvements
-- ci: Changes to CI configuration files and scripts
-- build: Changes to build system or external dependencies
-- revert: Reverts a previous commit
-</types>
+---
 
-<rules>
+## Code Readability Techniques
 
-<subject-line>
-- Maximum 50 characters (hard limit: 72)
-- Start with lowercase letter
-- No period at the end
-- Use imperative mood ("add" not "adds" or "added")
-- Be concise but descriptive
-</subject-line>
+**Why** Readable code allows future you (or colleagues) to quickly understand business intent.
 
-<scope-rules>
-- Optional component/module/area affected (e.g., "auth", "api", "ui")
-- Use lowercase
-- Keep short and meaningful
-- Examples: feat(auth): add login validation, fix(api): handle null responses
-</scope-rules>
+**When** Should always be considered during writing, refactoring, or code review.
 
-<body-rules>
-- Separate from subject with blank line
-- Wrap lines at 72 characters for readability
-- Explain what and why, not how
-- Only include when the change requires additional context
-- Use bullet points for multiple changes if needed
-</body-rules>
+**Key Takeaways**
+1. Consistent naming and style
+2. Use explanatory variables and positive conditions
+3. Encapsulate boundary conditions & extract functions
+4. Avoid logical dependencies and side effects
 
-<commit-frequency>
-- Commit after each logical unit of change
-- Each commit should represent one coherent change
-- Don't bundle unrelated changes
-</commit-frequency>
-</rules>
-
-<examples>
-
-<example type="good">
+### Example Summary
+```typescript
+// Explanatory variable example
+const isProUser = user.plan === 'pro'
+const hasActiveSub = user.subscription === 'active'
+if (isProUser && hasActiveSub) {
+  /* ... */
+}
 ```
-feat(auth): add user authentication middleware
 
-Implements JWT-based authentication for API routes.
-Includes token validation and refresh logic.
-```
-</example>
+---
 
-<example type="good">
-```
-fix(api): resolve null pointer in user lookup
-```
-</example>
+## Naming Conventions
 
-<example type="good">
-```
-chore: update dependencies to latest versions
-```
-</example>
+**Why** Clear, consistent naming minimizes team communication costs.
 
-<example type="good">
-```
-docs(readme): add installation instructions
-```
-</example>
+**When** When defining any variables, functions, files, or branch names.
 
-<example type="bad">
-```
-feat: added new feature to the application that allows users to authenticate using JWT tokens and also fixed some bugs and updated dependencies
-```
-Reason: Too long, bundles multiple unrelated changes, uses past tense
-</example>
+**Key Takeaways**
+1. Descriptive and searchable
+2. Meaningful distinctions, not numeric suffixes
+3. Use named constants instead of magic values
+4. Avoid encoding prefixes (Hungarian notation)
 
-<example type="bad">
+### Example Summary
+```typescript
+// Constants example
+const MAX_RETRY = 3
 ```
-fix: Fixed bug.
+
+---
+
+## Function Design Principles
+
+**Why** Small, focused functions are easy to test and reuse.
+
+**When** When implementing new features or evaluating existing function complexity.
+
+**Key Takeaways**
+1. Single responsibility & descriptive function names
+2. Minimal parameter count (object parameter passing)
+3. Avoid side effects and boolean flag parameters
+
+### Example Summary
+```typescript
+interface CreateProjectParams {
+  name: string
+  type: ProjectType
+}
+function createProject({ name, type }: CreateProjectParams) {
+  /* ... */
+}
 ```
-Reason: Capitalized subject, vague description, ends with period
-</example>
 
-<example type="bad">
+---
+
+## Comment Best Practices
+
+**Why** High-quality comments supplement, not replace, readable code.
+
+**When** When explaining intent, complex algorithms, or potential risks.
+
+**Key Takeaways**
+1. Self-documenting code is better than comments
+2. Avoid redundant/noise comments
+3. Delete unused code instead of commenting it out
+4. Use JSDoc to document interfaces and examples
+
+### Example Summary
+```typescript
+/**
+ * Calculate discounted price
+ */
+function calcDiscount(price: number, rate: number) {
+  return price * (1 - rate)
+}
 ```
-Update stuff
-```
-Reason: Missing type, vague, capitalized
-</example>
-</examples>
 
-<key-principles>
-- Be concise but descriptive
-- One commit = one logical change
-- Commit message should make sense without looking at the code
-- Skip the body if the subject line is self-explanatory
-- Use present tense, imperative mood
-- Focus on what the change does, not what you did
-- Make each commit atomic and reversible
-</key-principles>
+---
 
-<workflow-tips>
-- Stage related changes together: `git add <files>`
-- Review changes before committing: `git diff --staged`
-- Use `git commit -m "message"` for simple commits
-- Use `git commit` (without -m) for commits needing a body
-- Amend the last commit if needed: `git commit --amend`
-</workflow-tips>
+## Code Organization Structure
 
-</git-commit-guidelines>
+**Why** Proper organization reduces module cross-dependencies and cognitive load.
+
+**When** When creating new files or reorganizing existing logic.
+
+**Key Takeaways**
+1. Vertical separation of concepts & related code stays close
+2. Declare variables/functions near their usage
+3. Maintain line length and group with blank lines
+
+### Example Summary
+```typescript
+// Good vertical separation - related concepts tightly organized
+class UserService {
+  // Private fields concentrated at the top
+  private readonly userRepository: UserRepository
+  private readonly emailService: EmailService
+
+  constructor(userRepo: UserRepository, emailSvc: EmailService) {
+    this.userRepository = userRepo
+    this.emailService = emailSvc
+  }
+
+  // Public methods organized by call hierarchy
+  async createUser(userData: CreateUserData): Promise<User> {
+    const validatedData = this.validateUserData(userData)
+    const user = await this.saveUser(validatedData)
+    await this.sendWelcomeEmail(user)
+    return user
+  }
+
+  // Private helper methods follow closely after the public methods that call them
+  private validateUserData(data: CreateUserData): ValidatedUserData {
+    if (!data.email || !data.name) {
+      throw new Error('Missing required fields')
+    }
+    return { ...data, createdAt: new Date() }
+  }
+
+  private async saveUser(data: ValidatedUserData): Promise<User> {
+    return await this.userRepository.save(data)
+  }
+
+  private async sendWelcomeEmail(user: User): Promise<void> {
+    await this.emailService.sendWelcome(user.email, user.name)
+  }
+}
+
+// Poor vertical separation - concepts scattered
+class BadUserService {
+  private userRepository: UserRepository
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [nextify-limited/libra](https://github.com/nextify-limited/libra) — distributed by [TomeVault](https://tomevault.io).
