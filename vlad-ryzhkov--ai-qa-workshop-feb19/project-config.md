@@ -1,22 +1,20 @@
 ---
 trigger: always_on
-description: SKILL: Generate Ktor/JUnit API Tests (use for /api-tests)
+description: SKILL: Analyze UI Screenshots for defects & L10N (use for /screenshot-analyze)
 ---
 
-# SKILL: API AUTOMATION
+# SKILL: SCREENSHOT ANALYSIS
 
 ## TRIGGER
-Use this when writing actual executable API tests in Kotlin.
+Use this when an image is attached or referenced for UI review.
 
 ## LOGIC SOURCE
-**EXECUTE the instruction set defined in:** `.claude/skills/api-tests/SKILL.md`
+**EXECUTE the instruction set defined in:** `.claude/skills/screenshot-analyze/SKILL.md`
 
-@.claude/skills/api-tests/SKILL.md
+@.claude/skills/screenshot-analyze/SKILL.md
 
-## CRITICAL REMINDERS
-- Use `ApiRequestBaseJson` wrapper as defined in the skill.
-- Assertions must use JUnit 5 format.
-- Link tests to Allure IDs.
+## OUTPUT
+Provide a structured list of UI/UX defects, localization issues, and layout bugs.
 
 ---
 > Source: [vlad-ryzhkov/AI-QA-workshop-feb19](https://github.com/vlad-ryzhkov/AI-QA-workshop-feb19) — distributed by [TomeVault](https://tomevault.io).
