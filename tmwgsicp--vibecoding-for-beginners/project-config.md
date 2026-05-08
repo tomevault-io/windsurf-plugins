@@ -1,0 +1,259 @@
+---
+trigger: always_on
+description: - Keep it simple, practical, iterative
+---
+
+## Core Principles
+
+- Keep it simple, practical, iterative
+- Code is documentation (clear naming + minimal comments)
+- **Comment only when necessary** (complex logic, non-obvious decisions, business rules)
+- **NO EMOJI** in code/comments/logs
+- **Bilingual comments** (English + Chinese) for important explanations only
+
+---
+
+## Documentation Discipline
+
+### When to Write Documentation
+
+**ONLY create documentation for**:
+- ✅ Core architecture designs (database schema, API design)
+- ✅ Critical technical solution documents
+- ✅ User-facing usage guides
+
+### Absolutely Forbidden
+
+**DO NOT create documentation for**:
+- ❌ Summary docs after each conversation/task
+- ❌ Design docs for simple/straightforward tasks
+- ❌ Overly detailed changelogs
+- ❌ Documenting what code already clearly expresses
+
+### Principle: Code as Documentation
+
+优先使用以下方式表达意图,而非写文档:
+- Clear naming (descriptive variable/function/class names)
+- Type hints (Python type annotations, TypeScript types)
+- Minimal inline comments (only for complex logic)
+- Self-documenting code structure
+
+**Remember**: 在开发过程中对文档撰写保持克制。不要浪费时间和资源在非核心文档上。
+
+---
+
+## Python Standards
+
+### File Structure
+
+```python
+#!/usr/bin/env python3
+# Copyright (C) {YEAR} {PROJECT} Contributors
+# Licensed under {LICENSE}
+
+"""
+Module brief description.
+模块简要说明。
+"""
+
+# 1. Standard library
+import os
+from typing import Dict, List, Optional, Any
+
+# 2. Third-party
+from fastapi import FastAPI
+
+# 3. Local
+from app.core import BaseClass
+```
+
+### Naming Conventions
+
+| Type | Convention | Example |
+|------|-----------|---------|
+| Module/Package | `snake_case` | `user_manager.py` |
+| Class | `PascalCase` | `UserManager` |
+| Function/Method | `snake_case` | `get_user()` |
+| Variable | `snake_case` | `user_name` |
+| Constant | `UPPER_SNAKE` | `MAX_RETRY` |
+| Private | `_leading` | `_internal()` |
+
+### Type Hints (Required)
+
+```python
+def process_data(
+    data: str,
+    max_length: int = 100,
+    options: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    """Process data with max length limit."""
+    return {"result": data[:max_length]}
+```
+
+### Docstrings (Bilingual for Public APIs)
+
+```python
+def get_user(user_id: str) -> Dict:
+    """
+    Get user information by ID.
+    根据ID获取用户信息。
+    """
+    return {}
+
+def process_batch(items: List[Dict], batch_size: int = 10) -> List[Dict]:
+    """
+    Process items in batches.
+    批量处理数据项。
+    
+    Args:
+        items: List of items to process / 待处理的数据项列表
+        batch_size: Number of items per batch / 每批次的数据项数量
+    
+    Returns:
+        List of processed results / 处理结果列表
+    
+    Raises:
+        ValueError: When items is empty / 当items为空时抛出
+    """
+    if not items:
+        raise ValueError("Items cannot be empty")
+    return []
+```
+
+### Comments (Only When Necessary)
+
+**When to comment** (bilingual preferred):
+- Complex algorithms / 复杂算法
+- Non-obvious business logic / 非显而易见的业务逻辑
+- Important design decisions / 重要的设计决策
+- Workarounds / 临时方案
+
+**When NOT to comment**:
+- Self-explanatory code
+- Simple variable assignments
+- Obvious operations
+
+```python
+# Good - explains WHY for complex logic
+# Apply exponential decay for time sensitivity / 对时间敏感度应用指数衰减
+weight = math.exp(-0.1 * data['age'])
+
+# Bad - repeats WHAT code does
+x = x + 1  # Increment x by 1
+
+# Tags (can be English-only)
+# TODO: Implement caching layer
+# FIXME: Race condition in user updates
+# HACK: Temporary fix, refactor needed
+```
+
+### CRITICAL - NO EMOJI
+
+```python
+# WRONG
+logger.info("✅ Test passed")
+print("📊 Statistics")
+
+# CORRECT
+logger.info("Test passed")
+print("Statistics")
+```
+
+---
+
+## JavaScript/Vue Standards
+
+### Naming Conventions
+
+| Type | Convention | Example |
+|------|-----------|---------|
+| File | `kebab-case` | `user-list.js` |
+| Component | `PascalCase` | `UserList.vue` |
+| Function/Variable | `camelCase` | `getUserList()` |
+| Constant | `UPPER_SNAKE` | `MAX_COUNT` |
+
+### Vue Component (Minimal Comments)
+
+```vue
+<!--
+  Copyright (C) {YEAR} {PROJECT} Contributors
+  Licensed under {LICENSE}
+-->
+
+<template>
+  <div class="component-name">
+    <h1>{{ title }}</h1>
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted } from 'vue'
+
+const props = defineProps({
+  title: String
+})
+
+const count = ref(0)
+
+function handleClick() {
+  count.value++
+}
+
+onMounted(() => {
+  // Complex initialization only / 仅在复杂初始化时注释
+})
+</script>
+
+<style scoped>
+.component-name {
+  padding: 16px;
+}
+</style>
+```
+
+---
+
+## Copyright Headers
+
+### Python
+```python
+#!/usr/bin/env python3
+# Copyright (C) 2026 PocketFlow Contributors
+# Licensed under MIT
+
+"""Module description / 模块说明."""
+```
+
+### JavaScript/Vue
+```javascript
+/**
+ * Copyright (C) 2026 PocketFlow Contributors
+ * Licensed under MIT
+ */
+```
+
+---
+
+## Database Design Guidelines
+
+### Naming Conventions
+
+| Type | Convention | Example |
+|---|-----|---|
+| Table | `snake_case`, plural | `workflows`, `executions` |
+| Column | `snake_case` | `user_id`, `created_at` |
+| Primary Key | `id` | `id` (UUID string) |
+| Foreign Key | `{table}_id` | `workflow_id`, `user_id` |
+| Boolean | `is_*` / `has_*` | `is_active`, `has_permission` |
+| Timestamp | `*_at` | `created_at`, `updated_at`, `deleted_at` |
+| Index | `idx_{columns}` | `idx_user_id`, `idx_created_at` |
+
+### Design Principles
+
+1. **Separation of Concerns** (关注点分离)
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [tmwgsicp/vibecoding-for-beginners](https://github.com/tmwgsicp/vibecoding-for-beginners) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-04 -->
