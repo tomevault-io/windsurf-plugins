@@ -1,110 +1,213 @@
 ---
 trigger: always_on
-description: Rules for core modules of SGR Agent Core
+description: Implementation order for new features - one class at a time
 ---
 
 
-# Rules for Core Modules
+# Implementation Order: One Class at a Time
 
-## Base Classes
+## "One Class at a Time" Principle
 
-### BaseAgent (`sgr_agent_core/base_agent.py`)
-- Parent class for all agents
-- Implements three-phase execution cycle: Reasoning → Select Action → Action
-- Manages agent context, conversation history, and streaming
-- Must be subclassed to implement `_reasoning_phase()`, `_select_action_phase()`, `_action_phase()`
-- Automatically registered in `AgentRegistry` via `AgentRegistryMixin`
-- Key attributes:
-  - `id`: Unique agent identifier (format: `{def_name or name}_{uuid}`)
-  - `name`: Agent class name
-  - `task_messages`: Initial task messages in OpenAI format
-  - `config`: AgentConfig instance with all settings
-  - `openai_client`: AsyncOpenAI client for LLM API
-  - `toolkit`: List of tool classes available to agent
-  - `_context`: AgentContext instance with execution state
-  - `conversation`: List of messages in OpenAI format for LLM context
-  - `streaming_generator`: OpenAIStreamingGenerator for streaming responses
-  - `logger`: Logger instance for agent logging
-  - `log`: List of execution logs
-  - `creation_time`: Datetime when agent was created
-- Key methods:
-  - `execute()`: Main execution loop (called externally)
-  - `_execution_step()`: Single step of execution cycle (can be overridden)
-  - `_prepare_context()`: Prepare conversation context (can be overridden)
-  - `_prepare_tools()`: Prepare available tools (can be overridden)
-  - `provide_clarification()`: Receive clarification from external source
-  - `_log_reasoning()`: Log reasoning phase results
-  - `_log_tool_execution()`: Log tool execution results
-  - `_save_agent_log()`: Save execution log to file
+When adding new functionality, follow **"one class at a time"** principle, starting from lower architecture layers.
 
-### BaseTool (`sgr_agent_core/base_tool.py`)
-- Parent class for all tools (Pydantic `BaseModel`)
-- Class variables: `tool_name` (ClassVar[str]), `description` (ClassVar[str])
-- Must implement `__call__(context: AgentContext, config: AgentConfig, **kwargs) -> str`
-- Returns string or JSON string from `__call__()`
-- Automatically registered in `ToolRegistry` via `ToolRegistryMixin`
-- `tool_name` defaults to class name (lowercase) if not set
-- `description` defaults to class docstring if not set
+## Architecture Layers (Bottom to Top)
 
-### MCPBaseTool (`sgr_agent_core/base_tool.py`)
-- Base class for MCP-integrated tools (inherits from `BaseTool`)
-- Class variable: `_client` (ClassVar[Client | None]) - MCP client instance
-- `__call__()`: Calls MCP tool via `fastmcp.Client.call_tool()`
-- Converts MCP responses to JSON string
-- Respects `mcp_context_limit` from `ExecutionConfig`
-- Handles errors gracefully (returns error message as string)
+1. **Layer 1**: Base classes (BaseAgent, BaseTool, Models)
+2. **Layer 2**: Configuration and Registry
+3. **Layer 3**: Factory and Services
+4. **Layer 4**: Agent Implementations
+5. **Layer 5**: Tools
+6. **Layer 6**: Server and API
 
-## Configuration Modules
+## Implementation Steps
 
-### GlobalConfig (`sgr_agent_core/agent_config.py`)
-- Singleton pattern for global configuration
-- All calls to `GlobalConfig()` return the same instance
-- Loads from YAML files via `from_yaml()` method
-- Loads from environment variables via `pydantic-settings` (prefix `SGR__`)
-- Contains: `llm`, `execution`, `prompts`, `mcp`, `agents`, `tools`
-- `agents`: Dictionary of `AgentDefinition` instances by name
-- `tools`: Dictionary of tool definitions by name
-- `definitions_from_yaml()`: Loads agent definitions from YAML (merges with existing)
+### 1. Determine Layer
+Determine which layer the new functionality belongs to (see @architecture.mdc)
 
-### AgentDefinition (`sgr_agent_core/agent_definition.py`)
-- Definition template for creating agents
-- Inherits from `AgentConfig` (has all config fields)
-- Additional fields: `name`, `base_class`, `tools`
-- `base_class`: Can be class, ImportString (e.g., `"sgr_agent_core.agents.SGRAgent"`), or registry name
-- `tools`: List of `ToolDefinition` objects (resolved from names, classes, or dicts)
-- Supports YAML loading via `GlobalConfig.definitions_from_yaml()`
-- Validates import strings point to existing files
-- Automatically merges with `GlobalConfig` defaults (tools: global kwargs merged with agent-level kwargs)
+### 2. Write Test First
+- Create test file `tests/test_<module_name>.py`
+- Write minimal unit tests for class
+- Test must **fail** (red) because class doesn't exist
+- Run test:
+  - **Linux/macOS**: `source .venv/bin/activate && pytest tests/test_<module_name>.py::test_name -v`
+  - **Windows**: `.venv\Scripts\activate && pytest tests/test_<module_name>.py::test_name -v`
+- Verify test fails for correct reason
 
-### AgentConfig (`sgr_agent_core/agent_definition.py`)
-- Runtime configuration for agent instance
-- Combines: `LLMConfig`, `ExecutionConfig`, `PromptsConfig`, `MCPConfig`
-- Note: Search settings (`tavily_api_key`, `max_results`, etc.) are NOT in `AgentConfig`; they are configured per-tool in the `tools:` section as `SearchConfig` kwargs
-- Supports hierarchical inheritance from `GlobalConfig`
-- Uses `extra="allow"` to support custom fields for agent-specific parameters
+### 3. Implement Class
+- Create class with minimal implementation
+- Use type hints
+- Add docstrings in English
+- Follow rules from @code-style.mdc
+- Place in appropriate layer directory
 
-## Factory and Services
+### 4. Verify Test Passes
+- Run test:
+  - **Linux/macOS**: `source .venv/bin/activate && pytest tests/test_<module_name>.py::test_name -v`
+  - **Windows**: `.venv\Scripts\activate && pytest tests/test_<module_name>.py::test_name -v`
+- Test must **pass** (green)
+- Make sure implementation is correct
 
-### AgentFactory (`sgr_agent_core/agent_factory.py`)
-- Creates agent instances from `AgentDefinition`
-- Resolves agent classes from `AgentRegistry` (by name or ImportString)
-- Resolves tools from `ToolRegistry` or `config.tools` section
-- Tool resolution order:
-  1. Tools defined in `config.tools` section
-  2. Tools in `ToolRegistry` by name (snake_case or PascalCase)
-  3. Auto-conversion snake_case → PascalCase for backward compatibility
-- Builds MCP tools via `MCP2ToolConverter`
-- Creates OpenAI client with proxy support via `httpx.AsyncClient`
-- `get_definitions_list()`: Returns all agent definitions from `GlobalConfig`
+### 5. Run All Tests
+- Execute:
+  - **Linux/macOS**: `source .venv/bin/activate && pytest tests/ -v`
+  - **Windows**: `.venv\Scripts\activate && pytest tests/ -v`
+- All tests must pass
+- Fix any regressions
 
-### AgentRegistry (`sgr_agent_core/services/registry.py`)
-- Registry for agent classes (subclass of `Registry[BaseAgent]`)
-- Automatic registration via `AgentRegistryMixin` in `BaseAgent.__init_subclass__()`
-- Registers by class name (lowercase) and `name` attribute
-- Supports lookup by name (case-insensitive)
+### 6. Run Linter
+- Execute:
+  - **Linux/macOS**: `source .venv/bin/activate && pre-commit run -a`
+  - **Windows**: `.venv\Scripts\activate && pre-commit run -a`
+- Fix all linting errors
+- Repeat until all checks pass
 
-### ToolRegistry (`sgr_agent_core/services/registry.py`)
-- Registry for tool classes (subclass of `Registry[BaseTool]`)
+### 7. Move to Next Layer
+Only after lower layer class is ready and tested, move to upper layer classes.
+
+## Example: Adding New Tool
+
+### Step 1: Write Test
+```python
+# tests/test_custom_tool.py
+@pytest.mark.asyncio
+async def test_custom_tool_execution():
+    """Test CustomTool execution."""
+    tool = CustomTool(param="value")
+    result = await tool(context, config)
+    assert result == "expected_result"
+```
+
+### Step 2: Run Test (Should Fail)
+
+**Linux/macOS:**
+```bash
+source .venv/bin/activate
+pytest tests/test_custom_tool.py::test_custom_tool_execution -v
+# Expected: FAILED - CustomTool doesn't exist
+```
+
+**Windows:**
+```powershell
+.venv\Scripts\Activate.ps1
+pytest tests/test_custom_tool.py::test_custom_tool_execution -v
+# Expected: FAILED - CustomTool doesn't exist
+```
+
+### Step 3: Implement Tool (Layer 5)
+```python
+# sgr_agent_core/tools/custom_tool.py
+class CustomTool(BaseTool):
+    """Custom tool for specific functionality."""
+    tool_name: str = "custom_tool"
+    description: str = "Does custom thing"
+
+    param: str
+
+    async def __call__(self, context: AgentContext, config: AgentConfig) -> str:
+        """Execute custom tool."""
+        return "expected_result"
+```
+
+### Step 4: Verify Test Passes
+
+**Linux/macOS:**
+```bash
+source .venv/bin/activate
+pytest tests/test_custom_tool.py::test_custom_tool_execution -v
+# Expected: PASSED
+```
+
+**Windows:**
+```powershell
+.venv\Scripts\Activate.ps1
+pytest tests/test_custom_tool.py::test_custom_tool_execution -v
+# Expected: PASSED
+```
+
+### Step 5: Run All Tests
+
+**Linux/macOS:**
+```bash
+source .venv/bin/activate
+pytest tests/ -v
+# Expected: All tests pass
+```
+
+**Windows:**
+```powershell
+.venv\Scripts\Activate.ps1
+pytest tests/ -v
+# Expected: All tests pass
+```
+
+### Step 6: Run Linter
+
+**Linux/macOS:**
+```bash
+source .venv/bin/activate
+pre-commit run -a
+# Expected: All checks pass
+```
+
+**Windows:**
+```powershell
+.venv\Scripts\Activate.ps1
+pre-commit run -a
+# Expected: All checks pass
+```
+
+## Example: Adding New Agent
+
+### Step 1: Write Test
+```python
+# tests/test_custom_agent.py
+@pytest.mark.asyncio
+async def test_custom_agent_creation():
+    """Test CustomAgent creation."""
+    agent_def = AgentDefinition(
+        name="custom_agent",
+        base_class=CustomAgent,
+        tools=[ReasoningTool],
+        ...
+    )
+    agent = await AgentFactory.create(agent_def, task_messages=[...])
+    assert isinstance(agent, CustomAgent)
+```
+
+### Step 2: Implement Agent (Layer 4)
+```python
+# sgr_agent_core/agents/custom_agent.py
+class CustomAgent(BaseAgent):
+    """Custom agent implementation."""
+    name: str = "custom_agent"
+
+    async def _reasoning_phase(self) -> ReasoningTool:
+        """Reasoning phase implementation."""
+        ...
+
+    async def _select_action_phase(self, reasoning: ReasoningTool) -> BaseTool:
+        """Select action phase implementation."""
+        ...
+
+    async def _action_phase(self, tool: BaseTool) -> str:
+        """Action phase implementation."""
+        ...
+```
+
+## Forbidden
+
+❌ Implement multiple classes simultaneously
+❌ Move to upper layers before lower ones are ready
+❌ Skip writing tests
+❌ Skip running tests
+❌ Skip running linter
+❌ Implement functionality without understanding architecture
+
+## Allowed
+
+✅ Implement one class at a time
+✅ Write tests first (TDD)
+✅ Verify test fails before implementation
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
