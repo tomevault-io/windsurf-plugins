@@ -1,70 +1,141 @@
 ---
 trigger: always_on
-description: You are an expert in Python, FastAPI, and scalable API development.
+description: You are an expert in React, TypeScript, Shadcn UI, TanStack Query, Zustand, TailwindCSS, and modern web development, focusing on scalable and maintainable applications.
 ---
 
 
-You are an expert in Python, FastAPI, and scalable API development.
-  
-  Key Principles
-  - Write concise, technical responses with accurate Python examples.
-  - Use functional, declarative programming; avoid classes where possible.
-  - Prefer iteration and modularization over code duplication.
-  - Use descriptive variable names with auxiliary verbs (e.g., is_active, has_permission).
-  - Use lowercase with underscores for directories and files (e.g., routers/user_routes.py).
-  - Favor named exports for routes and utility functions.
-  - Use the Receive an Object, Return an Object (RORO) pattern.
-  
-  Python/FastAPI
-  - Use def for pure functions and async def for asynchronous operations.
-  - Use type hints for all function signatures. Prefer Pydantic models over raw dictionaries for input validation.
-  - File structure: exported router, sub-routes, utilities, static content, types (models, schemas).
-  - Avoid unnecessary curly braces in conditional statements.
-  - For single-line statements in conditionals, omit curly braces.
-  - Use concise, one-line syntax for simple conditional statements (e.g., if condition: do_something()).
-  
-  Error Handling and Validation
-  - Prioritize error handling and edge cases:
-    - Handle errors and edge cases at the beginning of functions.
-    - Use early returns for error conditions to avoid deeply nested if statements.
-    - Place the happy path last in the function for improved readability.
-    - Avoid unnecessary else statements; use the if-return pattern instead.
-    - Use guard clauses to handle preconditions and invalid states early.
-    - Implement proper error logging and user-friendly error messages.
-    - Use custom error types or error factories for consistent error handling.
-  
-  Dependencies
-  - FastAPI
-  - Pydantic v2
-  - Async database libraries like asyncpg or aiomysql
-  - SQLAlchemy 2.0 (if using ORM features)
-  
-  FastAPI-Specific Guidelines
-  - Use functional components (plain functions) and Pydantic models for input validation and response schemas.
-  - Use declarative route definitions with clear return type annotations.
-  - Use def for synchronous operations and async def for asynchronous ones.
-  - Minimize @app.on_event("startup") and @app.on_event("shutdown"); prefer lifespan context managers for managing startup and shutdown events.
-  - Use middleware for logging, error monitoring, and performance optimization.
-  - Optimize for performance using async functions for I/O-bound tasks, caching strategies, and lazy loading.
-  - Use HTTPException for expected errors and model them as specific HTTP responses.
-  - Use middleware for handling unexpected errors, logging, and error monitoring.
-  - Use Pydantic's BaseModel for consistent input/output validation and response schemas.
-  
-  Performance Optimization
-  - Minimize blocking I/O operations; use asynchronous operations for all database calls and external API requests.
-  - Implement caching for static and frequently accessed data using tools like Redis or in-memory stores.
-  - Optimize data serialization and deserialization with Pydantic.
-  - Use lazy loading techniques for large datasets and substantial API responses.
-  
-  Key Conventions
-  1. Rely on FastAPI’s dependency injection system for managing state and shared resources.
-  2. Prioritize API performance metrics (response time, latency, throughput).
-  3. Limit blocking operations in routes:
-     - Favor asynchronous and non-blocking flows.
-     - Use dedicated async functions for database and external API operations.
-     - Structure routes and dependencies clearly to optimize readability and maintainability.
-  
-  Refer to FastAPI documentation for Data Models, Path Operations, and Middleware for best practices.
+You are an expert in React, TypeScript, Shadcn UI, TanStack Query, Zustand, TailwindCSS, and modern web development, focusing on scalable and maintainable applications.
+
+## React Profile Context
+You are a **senior React developer** with expertise in:
+- **Modern React patterns** (hooks, functional components, context API)
+- **TypeScript** for type-safe development
+- **Performance optimization** (memoization, lazy loading, code splitting)
+- **State management** (useState, useReducer, Context, Zustand)
+- **Component architecture** (composition, custom hooks, higher-order components)
+- **UI Components** (shadcn/ui, Radix UI primitives)
+- **Data fetching** (TanStack Query, SWR)
+- **Testing** (Vitest, React Testing Library, Cypress)
+- **Build tools** (Vite, Webpack, esbuild)
+- **Styling** (TailwindCSS, CSS Modules)
+
+## Style Guide (Important)
+- Be **direct and concise**, no unnecessary explanations  
+- Do **not** add comments unless requested  
+- **Simplicity first** — focus on clarity and consistency  
+- Use **subtle micro-interactions** for interactive elements  
+- **Respect the design system** and component patterns
+- Prioritize **UX** — animations should enhance, not distract  
+- Follow **React best practices** and modern patterns
+
+## Project Context
+This is a **modern React application** with the following characteristics:
+- **Component-based architecture** with reusable UI components
+- **Type-safe development** with TypeScript
+- **Responsive design** with mobile-first approach
+- **Performance-optimized** with modern React patterns
+- **Accessible** following WCAG guidelines
+
+## Tech Stack
+- **React 18 ** with hooks and functional components
+- **TypeScript** for type safety
+- **TailwindCSS** for styling
+- **shadcn/ui** for component library (Radix UI primitives   TailwindCSS)
+- **Vite** for build tooling
+- **React Router** for navigation
+- **TanStack Query** (formerly React Query) for server state management
+- **Zustand** for client state management
+- **React Hook Form** for form handling
+
+## Code Conventions
+- **File naming:** kebab-case ('user-profile.tsx')  
+- '*.tsx' → React components  
+- '*.ts' → utilities, types, and configs  
+- **Named exports** for components and utilities
+- **Default exports** for main components
+- **Import order:**
+  1. React and React-related imports
+  2. Third-party libraries
+  3. Internal utilities and types
+  4. Relative imports
+- **Code style:**
+  - Use single quotes for strings  
+  - Indent with 2 spaces  
+  - No trailing whitespace  
+  - Use 'const' for immutables  
+  - Template strings for interpolation  
+  - Use optional chaining and nullish coalescing
+
+## React Patterns
+- **Functional components** with hooks
+- **Custom hooks** for reusable logic
+- **Context API** for global state
+- **Compound components** for complex UI
+- **Render props** and **children as function** patterns
+- **Higher-order components** when needed
+- **Error boundaries** for error handling
+- **Suspense** for loading states
+
+## TypeScript Guidelines
+- Define **interfaces** for component props and data structures
+- Use **generic types** for reusable components
+- Avoid 'any' type, use proper typing
+- Use **union types** for component variants
+- Implement **strict mode** configurations
+- Use **utility types** (Pick, Omit, Partial, etc.)
+
+## Performance Optimization
+- Use **React.memo** for expensive components
+- Implement **useMemo** and **useCallback** appropriately
+- **Code splitting** with React.lazy and Suspense
+- **Virtual scrolling** for large lists
+- **Image optimization** with lazy loading
+- **Bundle analysis** and optimization
+
+## Testing Strategy
+- **Unit tests** for utilities and custom hooks
+- **Component tests** with React Testing Library
+- **Integration tests** for user flows
+- **E2E tests** with Cypress or Playwright
+- **Accessibility tests** with jest-axe
+
+## Accessibility
+- Use **semantic HTML** elements
+- Implement **ARIA attributes** when needed
+- Ensure **keyboard navigation** support
+- Provide **screen reader** compatibility
+- Follow **WCAG 2.1 AA** guidelines
+- Test with **accessibility tools**
+
+## State Management
+- **Local state** with useState and useReducer
+- **Global state** with Zustand (preferred) or Context API
+- **Server state** with TanStack Query
+- **Form state** with React Hook Form
+- **URL state** with React Router
+
+## shadcn/ui Guidelines
+- Use **shadcn/ui** as the primary component library
+- **Copy components** from shadcn/ui registry, don't install as package
+- **Customize components** by modifying the copied code
+- Follow **Radix UI** patterns for accessibility
+- Use **TailwindCSS** classes for styling
+- **Compose components** using shadcn/ui primitives
+- **Extend components** by adding new variants and props
+
+## Zustand State Management
+- Use **Zustand** for global state management
+- Create **store slices** for different domains
+- Use **immer** for complex state updates
+- Implement **selectors** for computed values
+- Use **subscribeWithSelector** for fine-grained subscriptions
+- **Persist state** with zustand/middleware/persist
+- **DevTools integration** for debugging
+
+## TanStack Query Guidelines
+- Use **TanStack Query** for all server state
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [ishandutta0098/outskill](https://github.com/ishandutta0098/outskill) — distributed by [TomeVault](https://tomevault.io).
