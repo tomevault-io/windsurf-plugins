@@ -1,90 +1,70 @@
 ---
 trigger: always_on
-description: Rule Name: mcp-inspector
+description: This file, `safari.mdc`, serves as a repository for detailed working notes, observations, and learnings acquired during the process of automating Safari interactions, particularly for the MCP Inspector UI. It's intended to capture the nuances of trial-and-error, debugging steps, and insights into what worked, what didn't, and why.
 ---
 
-Rule Name: mcp-inspector
-Description: Debugging and verifying the `macos-automator-mcp` server via the MCP Inspector, using Playwright for UI automation and direct terminal commands for server management. This rule prioritizes stability and detailed verification through Playwright's introspection capabilities.
+### Meta Note
 
-**Required Tools:**
-- `run_terminal_cmd`
-- `mcp_playwright_browser_navigate`
-- `mcp_playwright_browser_type`
-- `mcp_playwright_browser_click`
-- `mcp_playwright_browser_snapshot`
-- `mcp_playwright_browser_console_messages`
-- `mcp_playwright_browser_wait_for`
+This file, `safari.mdc`, serves as a repository for detailed working notes, observations, and learnings acquired during the process of automating Safari interactions, particularly for the MCP Inspector UI. It's intended to capture the nuances of trial-and-error, debugging steps, and insights into what worked, what didn't, and why.
 
-**User Workspace Path Placeholder:**
-- The path to the `start.sh` script will be specified as `[WORKSPACE_PATH]/start.sh`.
-- The AI assistant executing this rule **MUST** replace `[WORKSPACE_PATH]` with the absolute path to the user's current project workspace (e.g., as found in the `<user_info>` context block during rule execution).
-- Example of a resolved path if the workspace is `/Users/username/Projects/my-mcp-project`: `/Users/username/Projects/my-mcp-project/start.sh`.
+This contrasts with `mcp-inspector.mdc`, which is designed to be the concise, polished, and operational ruleset for future automated runs once a specific automation flow (like connecting to the MCP Inspector) has been stabilized and proven reliable. `mcp-inspector.mdc` should contain the 'final' working scripts and minimal necessary commentary, while `safari.mdc` is the space for the extended antechamber of discovery.
 
 ---
-**Main Flow:**
 
-**Phase 1: Start MCP Inspector Server**
-1.  **Kill Existing Inspector Processes:**
-    *   Action: Call `run_terminal_cmd`.
-    *   `command`: `pkill -f 'npx @modelcontextprotocol/inspector' || true`
-    *   `is_background`: `false`
-    *   Expected: Cleans up any lingering Inspector processes.
-2.  **Start New Inspector Process:**
-    *   Action: Call `run_terminal_cmd`.
-    *   `command`: `npx @modelcontextprotocol/inspector`
-    *   `is_background`: `true`
-    *   Expected: MCP Inspector starts in the background.
-3.  **Wait for Inspector Initialization:**
-    *   Action: Call `mcp_playwright_browser_wait_for`.
-    *   `time`: `10` (seconds)
-    *   Expected: Allows ample time for the Inspector server to be ready. This step requires an active Playwright page, so it's implicitly preceded by navigation in Phase 2 if the browser isn't already open.
+### Key Learnings and Observations from Safari Automation (MCP Inspector)
 
-**Phase 2: Connect to Server via Playwright**
-1.  **Navigate to Inspector URL:**
-    *   Action: Call `mcp_playwright_browser_navigate`.
-    *   `url`: `http://127.0.0.1:6274`
-    *   Expected: Playwright opens the MCP Inspector web UI.
-    *   Snapshot: Take a snapshot (`mcp_playwright_browser_snapshot`) to confirm page load and identify initial form element references (`ref`).
-2.  **Fill Form (Command & Args only):**
-    *   **Set Command:**
-        *   Action: Call `mcp_playwright_browser_type`.
-        *   `element`: "Command textbox" (Obtain `ref` from snapshot).
-        *   `text`: `macos-automator-mcp`
-    *   **Set Arguments:**
-        *   Action: Call `mcp_playwright_browser_type`.
-        *   `element`: "Arguments textbox" (Obtain `ref` from snapshot).
-        *   `text`: `[WORKSPACE_PATH]/start.sh` (This placeholder MUST be replaced by the AI executing the rule with the absolute path to the user's current workspace).
-    *   *(Note: Environment Variables are skipped in this flow for simplicity and stability, as issues were previously observed when setting LOG_LEVEL=DEBUG during connection.)*
-3.  **Click "Connect":**
-    *   Action: Call `mcp_playwright_browser_click`.
-    *   `element`: "Connect button" (Obtain `ref` from snapshot).
-    *   Expected: Connection to the `macos-automator-mcp` server is established.
-    *   Snapshot: Take a snapshot. Verify connection status (e.g., text changes to "Connected") and check for initial server logs in the UI.
+#### 1. Managing Safari Windows and Tabs for the Inspector
 
-**Phase 3: Interact with a Tool via Playwright**
-1.  **List Tools:**
-    *   Action: Call `mcp_playwright_browser_click`.
-    *   `element`: "List Tools button" (Obtain `ref` from the latest snapshot).
-    *   Expected: The list of available tools from the `macos-automator-mcp` server is displayed.
-    *   Snapshot: Take a snapshot. Verify tools like `execute_script` and `get_scripting_tips` are visible.
-2.  **Select 'get_scripting_tips' Tool:**
-    *   Action: Call `mcp_playwright_browser_click`.
-    *   `element`: "get_scripting_tips tool in list" (Obtain `ref` by identifying it in the snapshot's tool list).
-    *   Expected: The parameters form for `get_scripting_tips` is displayed in the right-hand panel.
-    *   Snapshot: Take a snapshot. Verify the right panel shows details for `get_scripting_tips` (e.g., its name, description, and parameter fields like 'searchTerm', 'listCategories', etc.).
-3.  **Execute 'get_scripting_tips' (default parameters):**
-    *   Action: Call `mcp_playwright_browser_click`.
-    *   `element`: "Run Tool button" (Obtain `ref` for the 'Run Tool' button specific to the `get_scripting_tips` form in the right panel from the snapshot).
-    *   Expected: The `get_scripting_tips` tool is executed with its default parameters.
-    *   Snapshot: Take a snapshot.
+*   **Objective:** Reliably direct Safari to the MCP Inspector URL (`http://127.0.0.1:6274`) in a predictable way, preferably using a single, consistent browser window and tab to avoid disrupting the user's workspace or losing context.
+*   **Initial Challenges & Evolution:
+    *   Simply using `make new document with properties {URL:"..."}` could lead to multiple windows/tabs if not managed.
+    *   Attempts to close all existing Inspector tabs first (`repeat with w in windows... close t...`) were functional but could be overly aggressive if the user had other work in Safari.
+    *   Identifying and reusing an *existing specific tab* for the Inspector requires careful targeting (e.g., `first tab whose URL starts with "..."`). If this tab was from a previous, unconfigured session, just switching to it wasn't enough; it needed to be reloaded/reset.
+*   **Refined & Recommended Approach (as implemented in `mcp-inspector.mdc`):
+    ```applescript
+    tell application "Safari"
+      activate
+      delay 0.2 -- Allow Safari to become the frontmost application
+      if (count of windows) is 0 then
+        -- No Safari windows are open, so create a new one.
+        make new document with properties {URL:"http://127.0.0.1:6274"}
+      else
+        -- Safari has windows open; use the frontmost one.
+        tell front window
+          set inspectorTab to missing value
+          try
+            -- Check if a tab for the Inspector is already open in this window.
+            set inspectorTab to (first tab whose URL starts with "http://127.0.0.1:6274")
+          end try
+          
+          if inspectorTab is not missing value then
+            -- An Inspector tab exists: set its URL again (to refresh/reset) and make it active.
+            set URL of inspectorTab to "http://127.0.0.1:6274"
+            set current tab to inspectorTab
+          else
+            -- No specific Inspector tab found: set the URL of the *current active tab*.
+            set URL of current tab to "http://127.0.0.1:6274"
+          end if
+        end tell
+      end if
+      delay 1 -- Pause to allow the page to begin loading.
+    end tell
+    ```
+    This logic aims to use the existing front window and either reuse/refresh an Inspector tab or repurpose the current active tab, falling back to creating a new window only if Safari isn't open.
 
-**Phase 4: Verify Tool Execution and Logs in Playwright**
-1.  **Check for Results in UI:**
-    *   Action: Examine the latest snapshot.
-    *   Look for: The results of the `get_scripting_tips` call (e.g., a list of script categories if `listCategories` was implicitly true by default, or an empty result if no default search term was run).
-    *   The results should appear in the 'Result from tool' or a similarly named section within the right-hand panel where the tool's form was.
-2.  **Check Console Logs (Optional but Recommended):**
-    *   Action: Call `mcp_playwright_browser_console_messages`.
+#### 2. Clicking Elements Programmatically (The "Connect" Button Saga)
+
+*   **The Core Challenge:** Programmatically clicking the "Connect" button in the MCP Inspector UI to initiate the server connection.
+*   **Strategies Explored & Lessons:
+    *   **CSS Selectors (`querySelector`):**
+        *   Simple selectors like `[data-testid='env-vars-button']` worked for some buttons but required escaping single quotes in AppleScript: `do JavaScript "document.querySelector('[data-testid=\\\'env-vars-button\\']').click();"`.
+        *   A complex `querySelector` for the "Connect" button (e.g., `'button[data-testid*=connect-button], button:not([disabled])... > span:contains(Connect)...'.click()`) ran without JS error but didn't reliably establish the connection, suggesting it might not have found the exact interactable element or the click wasn't registering correctly.
+    *   **XPath (`document.evaluate`):**
+        *   **Highly Specific XPaths:** An initial XPath based on the rule (`//button[contains(., 'Connect') and .//svg[.//polygon[@points='6 3 20 12 6 21 6 3']]]`) was very difficult to embed correctly in AppleScript due to nested single quotes requiring complex escaping (`\'`). This often led to AppleScript parsing errors (`-2741`).
+        *   **`character id 39` for AppleScript String Construction:** To combat escaping issues, building the JavaScript string in AppleScript using `set sQuote to character id 39` for internal single quotes was effective for getting the AppleScript parser to accept the command. Example:
+            ```applescript
+            set sQuote to character id 39
+            set jsConnectText to "Connect"
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
