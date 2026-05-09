@@ -7,11 +7,11 @@ AI Governance Infrastructure — local evaluation. The governance layer for AI a
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [systempromptio/systemprompt-template](https://github.com/systempromptio/systemprompt-template).
+Original source: `CLAUDE.md` in [systempromptio/systemprompt-template](https://github.com/systempromptio/systemprompt-template).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
