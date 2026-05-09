@@ -1,153 +1,211 @@
 ---
 trigger: always_on
-description: Interface and method validation before code generation
+description: **MANDATORY**: All final service images MUST use the standardized registry prefix:
 ---
 
-# Interface and Method Validation Mandate - ENHANCED
+# Container and Deployment Standards
 
-## 🔍 **MANDATORY: Interface and Method Validation Before Code Generation**
+## 🐳 **Container Image Standards - MANDATORY**
 
-### Critical Validation Process - ENHANCED
-**MANDATORY**: Before generating ANY test code that calls methods or uses types:
+### Final Service Image Registry
+**MANDATORY**: All final service images MUST use the standardized registry prefix:
 
-1. **Interface Verification**: Use `codebase_search` to verify actual interface definitions
-2. **Method Existence Check**: Confirm all called methods exist with EXACT signatures
-3. **Type Validation**: Verify all referenced types and struct fields exist
-4. **Import Validation**: Ensure all imported packages and types are available
-5. **🆕 COMPILATION VERIFICATION**: MANDATORY compilation check after interface usage
-6. **🆕 TYPE COMPATIBILITY CHECK**: Verify parameter and return type compatibility
-
-### 🆕 **MANDATORY CODE GENERATION HALT PROTOCOL - ENHANCED**
-**BEFORE generating ANY line of code:**
-
-1. **MANDATORY SEARCH**: Run `codebase_search "existing [ComponentType] real implementations"` first, then `codebase_search "existing [ComponentType] mock implementations"`
-2. **MANDATORY VERIFICATION**: If real business logic exists, PREFER it over mocks; if using mocks, use existing ones
-3. **🆕 BUILD ERROR PREVENTION**: Check for common build error patterns
-4. **🆕 IMPORT CONSISTENCY**: Verify all imports exist and are properly used
-5. **VIOLATION RESPONSE**: If attempting to create duplicate mocks, IMMEDIATELY STOP and use existing
-
-**ENFORCEMENT TRIGGER WORDS**:
-- Creating any type with "Mock" in name → TRIGGER validation
-- Using `NewMock*` → TRIGGER existing pattern search
-- Implementing interfaces → TRIGGER interface validation
-
-**VIOLATION AUTO-DETECTION - ENHANCED**:
-```bash
-# If you find yourself typing any of these, STOP:
-type Mock* struct          # ❌ VIOLATION: Check existing mocks first
-func NewMock*             # ❌ VIOLATION: Use existing patterns
-*Mock struct {            # ❌ VIOLATION: Reuse existing mocks
-logrus.New()              # ❌ VIOLATION: Use existing mocks.NewMockLogger()
-mockLogger                # ❌ VIOLATION: Check variable declaration
-import.*logrus.*\n.*not   # ❌ VIOLATION: Unused import detected
+```
+quay.io/jordigilh/
 ```
 
-**🆕 COMMON BUILD ERROR PATTERNS TO PREVENT**:
-```bash
-# These patterns MUST trigger immediate validation:
-mockLogger.*without.*var  # ❌ Undefined variable usage
-import.*unused           # ❌ Unused import statements
-mocks\..*without.*import  # ❌ Mock usage without import
-NewMock.*duplicate       # ❌ Duplicate mock creation
+### Base Image Strategy
+**IMPORTANT DISTINCTION**:
+- **Base Images**: Use official upstream images (Red Hat UBI, Alpine, etc.)
+- **Final Service Images**: Use `quay.io/jordigilh/` registry
+
+### Image Naming Convention
+**Final Service Images Format**: `quay.io/jordigilh/{service-name}:{version}`
+
+**Examples**:
+```dockerfile
+# ✅ CORRECT: Use official base images for building
+FROM registry.access.redhat.com/ubi10/go-toolset:1.25 AS builder
+FROM registry.access.redhat.com/ubi10/ubi-minimal:latest
+
+# OR for Alpine-based services
+FROM golang:1.23-alpine AS builder
+FROM alpine:latest
+
+# Final service images use quay.io/jordigilh/ registry
+# Built image will be: quay.io/jordigilh/webhook-service:v1.0.0
 ```
 
----
+### Base Image Preferences
+**Priority Order**:
+1. **Red Hat UBI** (Universal Base Images) - Preferred for enterprise
+2. **Alpine Linux** - For minimal footprint
+3. **Distroless** - For maximum security
+4. **Official language images** - For build stages only
 
-## 🚨 **MANDATORY VALIDATION SEQUENCE - ENHANCED**
+```dockerfile
+# ✅ PREFERRED: Red Hat UBI for enterprise services
+FROM registry.access.redhat.com/ubi10/go-toolset:1.25 AS builder
+FROM registry.access.redhat.com/ubi10/ubi-minimal:latest
 
-### **Step 1: Interface Discovery and Verification**
-```bash
-# MANDATORY: Search for existing interfaces before creating/using
-codebase_search "existing [InterfaceName] interface definitions"
-codebase_search "existing [InterfaceName] implementations"
+# ✅ ACCEPTABLE: Alpine for minimal services
+FROM golang:1.23-alpine AS builder
+FROM alpine:latest
 
-# Verify interface exists and get exact signature
-grep -r "type.*[InterfaceName].*interface" pkg/ --include="*.go"
+# ❌ AVOID: Random third-party base images
+FROM some-random-registry/custom-image:latest
 ```
 
-**Example Validation**:
-```bash
-# Before using WorkflowEngine interface
-codebase_search "existing WorkflowEngine interface definitions"
-# Result should show: pkg/workflow/engine/interfaces.go
+## 🏗️ **Dockerfile Standards**
 
-# Verify method signatures
-grep -A 10 "type WorkflowEngine interface" pkg/workflow/engine/interfaces.go
+### Multi-Stage Build Pattern
+**MANDATORY**: Use multi-stage builds for all services
+
+```dockerfile
+# Build stage - Use official base images
+FROM registry.access.redhat.com/ubi10/go-toolset:1.25 AS builder
+
+USER root
+RUN dnf update -y && dnf install -y git ca-certificates && dnf clean all
+USER 1001
+
+WORKDIR /opt/app-root/src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux go build -o service-name ./cmd/service-name
+
+# Runtime stage - Use official base images
+FROM registry.access.redhat.com/ubi10/ubi-minimal:latest
+
+RUN microdnf update -y && microdnf install -y ca-certificates && microdnf clean all
+RUN useradd -r -u 1001 -g root service-user
+
+COPY --from=builder /opt/app-root/src/service-name /usr/local/bin/
+USER 1001
+EXPOSE 8080
+ENTRYPOINT ["/usr/local/bin/service-name"]
+
+# Final image will be pushed as: quay.io/jordigilh/service-name:v1.0.0
 ```
 
-### **Step 2: Method Signature Validation**
-```bash
-# MANDATORY: Verify exact method signatures before calling
-grep -A 20 "type.*[InterfaceName].*interface" [interface_file.go]
+### Security Standards
+**MANDATORY**: All containers must follow security best practices
 
-# Check method parameters and return types
-grep "[MethodName].*(" [interface_file.go]
+```dockerfile
+# ✅ REQUIRED: Non-root user
+RUN useradd -r -u 1001 -g root service-user
+USER service-user
+
+# ✅ REQUIRED: Minimal attack surface
+FROM quay.io/jordigilh/kubernaut-minimal:latest
+
+# ✅ REQUIRED: Health checks
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD ["/usr/local/bin/service-name", "--health-check"] || exit 1
+
+# ✅ REQUIRED: Proper labels
+LABEL name="kubernaut-service-name" \
+      vendor="Kubernaut" \
+      version="1.0.0" \
+      maintainer="kubernaut-team@example.com"
 ```
 
-**Example Method Validation**:
-```go
-// ✅ CORRECT: Verify method signature first
-// From pkg/workflow/engine/interfaces.go:
-// CreateWorkflow(ctx context.Context, alert AlertData) (*Workflow, error)
+## 📦 **Image Versioning Strategy**
 
-// Then use in test:
-workflow, err := workflowEngine.CreateWorkflow(ctx, alertData)
+### Version Tags
+**Format**: Semantic versioning with environment tags
+
+```bash
+# Production releases
+quay.io/jordigilh/webhook-service:v1.2.3
+quay.io/jordigilh/webhook-service:v1.2
+quay.io/jordigilh/webhook-service:v1
+quay.io/jordigilh/webhook-service:latest
+
+# Development builds
+quay.io/jordigilh/webhook-service:dev-abc123f
+quay.io/jordigilh/webhook-service:pr-456
+quay.io/jordigilh/webhook-service:main-latest
+
+# Environment-specific
+quay.io/jordigilh/webhook-service:staging-v1.2.3
+quay.io/jordigilh/webhook-service:prod-v1.2.3
 ```
 
-### **Step 3: Mock Existence and Reuse Check**
-```bash
-# MANDATORY: Check for existing mocks before creating new ones
-find pkg/testutil/mocks/ -name "*[ComponentName]*" -type f
-grep -r "Mock[ComponentName]" pkg/testutil/ --include="*.go"
+### Build Automation
+**MANDATORY**: Use consistent build process
 
-# If mocks exist, REUSE them
-# If no mocks exist, check if real component should be used instead
+```yaml
+# .github/workflows/build.yml
+- name: Build and push image
+  run: |
+    IMAGE_TAG="quay.io/jordigilh/${SERVICE_NAME}:${VERSION}"
+    docker build -t ${IMAGE_TAG} .
+    docker push ${IMAGE_TAG}
 ```
 
-**Mock Reuse Decision Matrix**:
-| Component Type | Action |
-|---------------|--------|
-| **External Services** (AI, K8s, DB) | Use existing mocks from `pkg/testutil/mocks/` |
-| **Business Logic** (Engine, Analytics) | Use REAL components |
-| **Configuration** | Use real config with test values |
-| **Utilities** | Use real utilities |
+## 🚀 **Deployment Standards**
 
-### **🆕 Step 4: Compilation Verification**
-```bash
-# MANDATORY: Test compilation after interface usage
-go build ./test/[test_package]/ 2>&1 | tee build_check.log
+### Kubernetes Manifests
+**MANDATORY**: Use standardized image references
 
-# Check for common errors:
-grep "undefined:" build_check.log    # Undefined symbols
-grep "cannot use" build_check.log    # Type mismatches
-grep "not enough arguments" build_check.log  # Parameter mismatches
+```yaml
+# deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webhook-service
+spec:
+  template:
+    spec:
+      containers:
+      - name: webhook-service
+        image: quay.io/jordigilh/webhook-service:v1.2.3
+        imagePullPolicy: IfNotPresent
 ```
 
-### **🆕 Step 5: Import Consistency Check**
-```bash
-# MANDATORY: Verify all imports are used and correct
-go mod tidy
-goimports -w [test_file.go]
+### Helm Charts
+**MANDATORY**: Parameterize registry in values
 
-# Check for unused imports
-go build [test_file.go] 2>&1 | grep "imported and not used"
+```yaml
+# values.yaml
+image:
+  registry: quay.io/jordigilh
+  repository: webhook-service
+  tag: v1.2.3
+  pullPolicy: IfNotPresent
+
+# templates/deployment.yaml
+image: "{{ .Values.image.registry }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}"
 ```
 
----
+## 🔧 **Development Workflow**
 
-## 🔧 **AUTOMATED VALIDATION TOOLS**
+### Local Development
+**Pattern**: Use consistent local image names
 
-### **Interface Validation Script**
 ```bash
-#!/bin/bash
-# scripts/validate-interface-usage.sh
+# Build local development image
+docker build -t quay.io/jordigilh/webhook-service:dev .
 
-INTERFACE_NAME="$1"
-TEST_FILE="$2"
+# Run locally
+docker run -p 8080:8080 quay.io/jordigilh/webhook-service:dev
+```
 
-echo "🔍 VALIDATING INTERFACE USAGE: $INTERFACE_NAME in $TEST_FILE"
+### CI/CD Integration
+**MANDATORY**: Standardized pipeline variables
 
-# Step 1: Find interface definition
+```bash
+# Environment variables
+export REGISTRY="quay.io/jordigilh"
+export SERVICE_NAME="webhook-service"
+export IMAGE_TAG="${REGISTRY}/${SERVICE_NAME}:${VERSION}"
+
+# Build command
+docker build -t ${IMAGE_TAG} -f docker/${SERVICE_NAME}.Dockerfile .
+```
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
