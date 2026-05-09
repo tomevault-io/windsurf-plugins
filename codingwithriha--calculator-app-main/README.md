@@ -7,11 +7,11 @@ Interactive Calculator App with Dynamic Theme Switching📟
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [codingwithriha/calculator-app-main](https://github.com/codingwithriha/calculator-app-main).
+Original source: `CLAUDE.md` in [codingwithriha/calculator-app-main](https://github.com/codingwithriha/calculator-app-main).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
