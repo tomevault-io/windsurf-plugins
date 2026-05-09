@@ -1,125 +1,58 @@
 ---
 trigger: always_on
-description: You are an expert Dart programmer with experience in the Flutter framework and a preference for clean programming and design patterns.
+description: Global Rule. This rule should ALWAYS be loaded
 ---
 
-# Flutter
+vibe-tools is a CLI tool that allows you to interact with AI models and other tools.
+vibe-tools is installed on this machine and it is available to you to execute. You're encouraged to use it.
 
-You are an expert Dart programmer with experience in the Flutter framework and a preference for clean programming and design patterns.
+<vibe-tools Integration>
+# Instructions
+Use the following commands to get AI assistance:
 
-Generate code, corrections, and refactorings that comply with the basic principles and nomenclature.
+**Direct Model Queries:**
+`vibe-tools ask "<your question>" --provider <provider> --model <model>` - Ask any model from any provider a direct question (e.g., `vibe-tools ask "What is the capital of France?" --provider openai --model o3-mini`). Note that this command is generally less useful than other commands like `repo` or `plan` because it does not include any context from your codebase or repository. In general you should not use the ask command because it does not include any context. The other commands like `web`, `doc`, `repo`, or `plan` are usually better. If you are using it, make sure to include in your question all the information and context that the model might need to answer usefully.
 
-## Dart General Guidelines
+**Ask Command Options:**
+--provider=<provider>: AI provider to use (openai, anthropic, perplexity, gemini, modelbox, openrouter, or xai)
+--model=<model>: Model to use (required for the ask command)
+--reasoning-effort=<low|medium|high>: Control the depth of reasoning for supported models (OpenAI o1/o3-mini models and Claude 4 Sonnet). Higher values produce more thorough responses for complex questions.
+--with-doc=<doc_url>: Fetch content from one or more document URLs and include it as context. Can be specified multiple times (e.g., `--with-doc=<url1> --with-doc=<url2>`).
 
-### Basic Principles
+**Implementation Planning:**
+`vibe-tools plan "<query>"` - Generate a focused implementation plan using AI (e.g., `vibe-tools plan "Add user authentication to the login page"`)
+The plan command uses multiple AI models to:
+1. Identify relevant files in your codebase (using Gemini by default)
+2. Extract content from those files
+3. Generate a detailed implementation plan (using OpenAI o3-mini by default)
 
-- Use English for all code and documentation.
-- Always declare the type of each variable and function (parameters and return value).
-  - Avoid using dynamic and Object without justification.
-  - Create necessary types.
-- One export per file.
+**Plan Command Options:**
+--fileProvider=<provider>: Provider for file identification (gemini, openai, anthropic, perplexity, modelbox, openrouter, or xai)
+--thinkingProvider=<provider>: Provider for plan generation (gemini, openai, anthropic, perplexity, modelbox, openrouter, or xai)
+--fileModel=<model>: Model to use for file identification
+--thinkingModel=<model>: Model to use for plan generation
+--with-doc=<doc_url>: Fetch content from one or more document URLs and include it as context for both file identification and planning. Can be specified multiple times (e.g., `--with-doc=<url1> --with-doc=<url2>`).
 
-### Nomenclature
+**Web Search:**
+`vibe-tools web "<your question>"` - Get answers from the web using a provider that supports web search (e.g., Perplexity models and Gemini Models either directly or from OpenRouter or ModelBox) (e.g., `vibe-tools web "latest shadcn/ui installation instructions"`)
+Note: web is a smart autonomous agent with access to the internet and an extensive up to date knowledge base. Web is NOT a web search engine. Always ask the agent for what you want using a proper sentence, do not just send it a list of keywords. In your question to web include the context and the goal that you're trying to acheive so that it can help you most effectively.
+when using web for complex queries suggest writing the output to a file somewhere like local-research/<query summary>.md.
 
-- Use PascalCase for classes.
-- Use camelCase for variables, functions, and methods.
-- Use underscores_case for file and directory names.
-- Use UPPERCASE for environment variables.
-  - Avoid magic numbers and define constants.
-- Start each function with a verb.
-- Use verbs for boolean variables. Example: isLoading, hasError, canDelete, etc.
-- Use complete words instead of abbreviations and correct spelling.
-  - Except for standard abbreviations like API, URL, etc.
-  - Except for well-known abbreviations:
-    - i, j for loops
-    - err for errors
-    - ctx for contexts
+**IMPORTANT: Do NOT use the `web` command for specific URLs.** If a user provides a specific URL (documentation link, GitHub repo, article, etc.), you should always use commands that support the `--with-doc` parameter instead, such as `repo`, `plan`, `doc`, or `ask`. Using `--with-doc` ensures the exact content of the URL is processed correctly and completely.
 
-### Functions
+**Web Command Options:**
+--provider=<provider>: AI provider to use (perplexity, gemini, modelbox, or openrouter)
 
-- In this context, what is understood as a function will also apply to a method.
-- Write short functions with a single purpose. Less than 20 instructions.
-- Name functions with a verb and something else.
-  - If it returns a boolean, use isX or hasX, canX, etc.
-  - If it doesn't return anything, use executeX or saveX, etc.
-- Avoid nesting blocks by:
-  - Early checks and returns.
-  - Extraction to utility functions.
-- Use higher-order functions (map, filter, reduce, etc.) to avoid function nesting.
-  - Use arrow functions for simple functions (less than 3 instructions).
-  - Use named functions for non-simple functions.
-- Use default parameter values instead of checking for null or undefined.
-- Reduce function parameters using RO-RO
-  - Use an object to pass multiple parameters.
-  - Use an object to return results.
-  - Declare necessary types for input arguments and output.
-- Use a single level of abstraction.
+**Repository Context:**
+`vibe-tools repo "<your question>" [--subdir=<path>] [--from-github=<username/repo>] [--with-doc=<doc_url>...]` - Get context-aware answers about this repository using Google Gemini (e.g., `vibe-tools repo "explain authentication flow"`)
+Use the optional `--subdir` parameter to analyze a specific subdirectory instead of the entire repository (e.g., `vibe-tools repo "explain the code structure" --subdir=src/components`). Use the optional `--from-github` parameter to analyze a remote GitHub repository without cloning it locally (e.g., `vibe-tools repo "explain the authentication system" --from-github=username/repo-name`). Use the optional `--with-doc` parameter multiple times to include content from several URLs as additional context (e.g., `vibe-tools repo "summarize findings" --with-doc=https://example.com/spec1 --with-doc=https://example.com/spec2`).
 
-### Data
+**Documentation Generation:**
+`vibe-tools doc [options] [--with-doc=<doc_url>...]` - Generate comprehensive documentation for this repository (e.g., `vibe-tools doc --output docs.md`). Can incorporate document context from multiple URLs (e.g., `vibe-tools doc --with-doc=https://example.com/existing-docs --with-doc=https://example.com/new-spec`).
 
-- Don't abuse primitive types and encapsulate data in composite types.
-- Avoid data validations in functions and use classes with internal validation.
-- Prefer immutability for data.
-  - Use final for runtime constants and const for compile-time constants.
-  - Use const constructors and const literals where possible.
+**YouTube Video Analysis:**
 
-### Classes
-
-- Follow SOLID principles.
-- Prefer composition over inheritance.
-- Declare interfaces to define contracts.
-- Write small classes with a single purpose.
-  - Less than 200 instructions.
-  - Less than 10 public methods.
-  - Less than 10 properties.
-
-### Exceptions
-
-- Use exceptions to handle errors you don't expect.
-- If you catch an exception, it should be to:
-  - Fix an expected problem.
-  - Add context.
-  - Otherwise, use a global handler.
-
-### Testing
-
-- Follow the Arrange-Act-Assert convention for tests.
-- Name test variables clearly.
-  - Follow the convention: inputX, mockX, actualX, expectedX, etc.
-- Write unit tests for each public function.
-  - Use test doubles to simulate dependencies.
-    - Except for third-party dependencies that are not expensive to execute.
-- Write acceptance tests for each module.
-  - Follow the Given-When-Then convention.
-
-## Specific to Flutter
-
-### Basic Principles
-
-- Use flutter_rust_bridge to access core functionality of the app
-- Use the whitenoise rust crate (via flutter_rust_bridge) as the source of all data and only way to trigger changes in our data model
-- Use Riverpod to manage state
-  - use StreamProviders to watch for state changes that come from the rust api.
-  - see keepAlive if you need to keep the state alive
-- Use freezed to manage UI states
-- Controller always takes methods as input and updates the UI state that effects the UI
-- Use AutoRoute to manage routes
-  - Use extras to pass data between pages
-- Use extensions to manage reusable code
-- Use ThemeData to manage themes
-- Use AppLocalizations to manage translations
-- Use constants to manage constants values
-- When a widget tree becomes too deep, it can lead to longer build times and increased memory usage. Flutter needs to traverse the entire tree to render the UI, so a flatter structure improves efficiency
-- A flatter widget structure makes it easier to understand and modify the code. Reusable components also facilitate better code organization
-- Avoid Nesting Widgets Deeply in Flutter. Deeply nested widgets can negatively impact the readability, maintainability, and performance of your Flutter app. Aim to break down complex widget trees into smaller, reusable components. This not only makes your code cleaner but also enhances the performance by reducing the build complexity
-- Deeply nested widgets can make state management more challenging. By keeping the tree shallow, it becomes easier to manage state and pass data between widgets
-- Break down large widgets into smaller, focused widgets
-- Utilize const constructors wherever possible to reduce rebuilds
-
-### Testing
-
-- Use the standard widget testing for flutter
-- Use integration tests for each api module.
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [marmot-protocol/whitenoise-archive](https://github.com/marmot-protocol/whitenoise-archive) — distributed by [TomeVault](https://tomevault.io).
