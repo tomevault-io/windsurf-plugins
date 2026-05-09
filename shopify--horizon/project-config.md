@@ -1,15 +1,15 @@
 ---
 trigger: always_on
-description: Dropdown Navigation component accessibility compliance pattern
+description: Flip Card component accessibility compliance pattern
 ---
 
-# Dropdown Navigation Component Accessibility Standards
+# Flip Card Component Accessibility Standards
 
-Ensures dropdown navigation components follow WCAG compliance and proper navigation semantics, including mobile modal patterns and disclosure controls.
+Ensures flip card components follow WCAG compliance and provide proper state management for screen reader users.
 
 <rule>
-name: dropdown_navigation_accessibility_standards
-description: Enforce dropdown navigation component accessibility standards and proper navigation semantics
+name: flip_card_accessibility_standards
+description: Enforce flip card component accessibility standards and proper state management
 filters:
   - type: file_extension
     pattern: "\\.(vue|jsx|tsx|html|liquid|php|js|ts)$"
@@ -17,89 +17,120 @@ filters:
 actions:
   - type: enforce
     conditions:
-      # Navigation landmark requirement
-      - pattern: "(?i)<nav[^>]*(?:navigation|menu|dropdown)[^>]*>"
-        pattern_negate: "(aria-label|aria-labelledby)=\"[^\"]+\""
-        message: "Navigation elements must have aria-label or aria-labelledby attribute for accessibility."
+      # Flip button requirement
+      - pattern: "(?i)<(div|section)[^>]*(?:card|flip)[^>]*>"
+        pattern_negate: "<button[^>]*aria-pressed"
+        message: "Flip cards must contain a button with aria-pressed attribute to control card state."
 
-      # Navigation list structure requirement
-      - pattern: "(?i)<nav[^>]*(?:navigation|menu|dropdown)[^>]*>"
-        pattern_negate: "<ul[^>]*>"
-        message: "Navigation should use unordered list (ul) for proper semantic structure."
+      # aria-pressed attribute requirement
+      - pattern: "(?i)<button[^>]*(?:flip|card)[^>]*>"
+        pattern_negate: "aria-pressed=\"(true|false)\""
+        message: "Flip card buttons must have aria-pressed attribute set to 'true' or 'false'."
 
-      # Dropdown button role requirement
-      - pattern: "(?i)<(button|div|span)[^>]*(?:dropdown|expand|collapse)[^>]*>"
-        pattern_negate: "role=\"button\""
-        message: "Dropdown controls must have role='button' (or use native button element which has implicit role)."
+      # Card front/back structure requirement
+      - pattern: "(?i)<(div|section)[^>]*(?:card|flip)[^>]*>"
+        pattern_negate: "(card--front|card--back|front|back)"
+        message: "Flip cards must have both front and back content sections for proper structure."
 
-      # Dropdown button aria-expanded requirement
-      - pattern: "(?i)<[^>]*role=\"button\"[^>]*(?:dropdown|expand|collapse)[^>]*>"
-        pattern_negate: "aria-expanded=\"(true|false)\""
-        message: "Dropdown controls must have aria-expanded attribute set to 'true' or 'false'."
+      # Unique accessible name requirement
+      - pattern: "(?i)<button[^>]*aria-pressed[^>]*>"
+        pattern_negate: "(aria-label|aria-labelledby|>.*[A-Za-z]{10,})"
+        message: "Flip card buttons must have unique, descriptive accessible names that reference visible card content."
 
-      # Dropdown content missing proper identification
-      - pattern: "(?i)<(div|section)[^>]*(?:dropdown.*content|content.*dropdown)[^>]*>"
-        pattern_negate: "id=\"[^\"]+\""
-        message: "Dropdown content must have unique ID attributes for aria-controls reference."
+      # Keyboard focus indicator requirement
+      - pattern: "(?i)<(div|section)[^>]*(?:card|flip)[^>]*>"
+        pattern_negate: "(focus|:focus|focus-visible|:focus-visible)"
+        message: "Flip card containers should have visible keyboard focus indicators when the flip button is focused."
 
-      # Missing aria-current on navigation items
-      - pattern: "(?i)<a[^>]*(?:nav|navigation)[^>]*>"
-        pattern_negate: "aria-current=\"(page|false)\""
-        message: "Navigation links should have aria-current attribute set to 'page' for active items or 'false' for inactive."
+      # Content visibility management
+      - pattern: "(?i)aria-pressed=\"(true|false)\""
+        pattern_negate: "(visibility.*hidden|display.*none|hidden)"
+        message: "Use aria-pressed state to control content visibility - false shows front, true shows back. Prefer visibility: hidden/visible for smooth animations."
 
-      # Mobile modal missing dialog role
-      - pattern: "(?i)<(div|section)[^>]*(?:mobile.*nav|nav.*mobile|modal.*nav)[^>]*>"
-        pattern_negate: "role=\"dialog\""
-        message: "Mobile navigation modal containers must have role='dialog' attribute."
+      # Missing flip button type
+      - pattern: "(?i)<button[^>]*(?:flip|card)[^>]*>"
+        pattern_negate: "type=\"button\""
+        message: "Flip card buttons should have type='button' to prevent form submission behavior."
 
-      # Mobile modal missing aria-modal
-      - pattern: "(?i)<[^>]*role=\"dialog\"[^>]*(?:mobile.*nav|nav.*mobile)[^>]*>"
-        pattern_negate: "aria-modal=\"true\""
-        message: "Mobile navigation dialog elements must have aria-modal='true' attribute."
-
-      # Mobile modal missing proper labeling
-      - pattern: "(?i)<[^>]*role=\"dialog\"[^>]*(?:mobile.*nav|nav.*mobile)[^>]*>"
-        pattern_negate: "(aria-labelledby|aria-label)"
-        message: "Mobile navigation dialog elements must have either aria-labelledby or aria-label for accessibility."
-
-      # Mobile launcher missing aria-haspopup
-      - pattern: "(?i)<button[^>]*(?:mobile.*nav|nav.*mobile|hamburger|menu)[^>]*>"
-        pattern_negate: "aria-haspopup=\"dialog\""
-        message: "Mobile navigation launcher buttons must include aria-haspopup='dialog' to inform users a dialog will open."
-
-      # Mobile close button missing aria-label
-      - pattern: "(?i)<button[^>]*(?:close|dismiss|×|&times;)[^>]*(?:mobile.*nav|nav.*mobile)[^>]*>"
-        pattern_negate: "aria-label=\"[^\"]*[Cc]lose[^\"]*\""
-        message: "Mobile navigation close buttons should have aria-label='Close navigation' or similar descriptive text."
-
-      # Missing keyboard event handlers for dropdown
-      - pattern: "(?i)<[^>]*role=\"button\"[^>]*(?:dropdown|expand|collapse)[^>]*>"
-        pattern_negate: "(onKeyDown|onkeydown|@keydown|v-on:keydown)"
-        message: "Dropdown controls should handle keyboard events (Enter, Space, and Escape)."
-
-      # Missing Escape key support for dropdown content
-      - pattern: "(?i)<div[^>]*(?:dropdown.*content|content.*dropdown)[^>]*>"
-        pattern_negate: "(onKeyDown|onkeydown|@keydown|v-on:keydown)"
-        message: "Dropdown content areas should handle Escape key to close dropdown and return focus to launcher."
-
-      # Incorrect menu role usage
-      - pattern: "(?i)role=\"(menu|menuitem|menubar|menuitemcheckbox|menuitemradio)\""
-        message: "Navigation components should NOT use menu roles. Use proper navigation semantics with ul/li/a elements."
-
-      # Incorrect aria-haspopup usage
-      - pattern: "(?i)aria-haspopup=\"(true|menu|listbox)\""
-        pattern_negate: "aria-haspopup=\"dialog\""
-        message: "Navigation components should NOT use aria-haspopup except for mobile modal launchers with aria-haspopup='dialog'."
+      # Incomplete card structure
+      - pattern: "(?i)<div[^>]*class=\"card[^>]*>"
+        pattern_negate: "(card--front.*card--back|card--back.*card--front)"
+        message: "Flip cards must contain both front and back content sections for proper functionality."
 
   - type: suggest
     message: |
-      **Dropdown Navigation Component Accessibility Best Practices:**
+      **Flip Card Component Accessibility Best Practices:**
 
-      **Navigation Semantics:**
-      - **role='navigation':** Implicit on nav element, provides landmark
-      - **aria-label/aria-labelledby:** On nav element to describe the navigation
-      - **aria-current:** Set on active navigation items ('page' for current page, 'false' for inactive)
-      - **ul + li + a:** Use semantic list structure for navigation items
+      **Required ARIA Attributes:**
+      - **aria-pressed:** 'false' shows front content, 'true' shows back content
+      - **type="button":** Prevents form submission behavior
+      - **Unique accessible name:** Should reference visible card content
+
+      **DOM Structure Requirements:**
+      - Card container with front and back content sections
+      - Flip button positioned between or adjacent to content sections
+      - Use CSS display: none to hide non-visible content
+      - Maintain logical reading order in the DOM
+
+      **Content Visibility Management:**
+      - **aria-pressed="false":** Show front content, hide back content
+      - **aria-pressed="true":** Show back content, hide front content
+      - Use CSS display property for smooth transitions
+      - Ensure only one side is visible at a time
+
+      **Keyboard and Focus Requirements:**
+      - **Enter:** Toggle card state
+      - **Space:** Toggle card state
+      - **Tab:** Move focus to next focusable element
+      - **Shift+Tab:** Move focus to previous focusable element
+      - **Focus indicator:** Should wrap the card content container
+      - **Hover state:** Blue border matching focus indicator for visual consistency
+
+      **Implementation Example:**
+      ```html
+      <!-- ✅ Correct: Proper flip card structure -->
+      <div class="card">
+        <div class="card--front">
+          <h3>Card Title</h3>
+          <img src="front-image.jpg" alt="Front view of the product">
+        </div>
+
+        <button type="button"
+                class="flip-button"
+                aria-pressed="false"
+                aria-label="More about Card Title">
+        </button>
+
+        <div class="card--back">
+          <p class="card--tagline">Inspiring content</p>
+          <img src="back-image-1.jpg" alt="Product detail view 1">
+          <img src="back-image-2.jpg" alt="Product detail view 2">
+          <img src="back-image-3.jpg" alt="Product detail view 3">
+          <p>More detailed content about the product</p>
+          <a href="/product-details">
+            <img src="link-icon.svg" alt="View full product details">
+          </a>
+        </div>
+      </div>
+      ```
+
+      **CSS Implementation:**
+      ```css
+      .card {
+        position: relative;
+        perspective: 1000px;
+        /* Focus indicator for keyboard navigation */
+        outline: 2px solid transparent;
+        outline-offset: 2px;
+        /* Visual affordance for clickable card */
+        cursor: pointer;
+      }
+
+      .card:focus-within {
+        outline-color: #0056b3;
+        outline-width: 3px;
+      }
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
