@@ -1,130 +1,202 @@
 ---
 trigger: always_on
-description: DatastarUI is a Go/templ port of shadcn/ui components that maintains pixel-perfect visual and behavioral parity while eliminating JavaScript dependencies (except for the 15KB Datastar library for reactivity).
+description: Generates Go code from templ files.
 ---
 
-# DatastarUI Component Development Guide
+# Injection attacks
 
-## Project Overview
+templ is designed to prevent user-provided data from being used to inject vulnerabilities.
 
-DatastarUI is a Go/templ port of shadcn/ui components that maintains pixel-perfect visual and behavioral parity while eliminating JavaScript dependencies (except for the 15KB Datastar library for reactivity).
+`<script>` and `<style>` tags could allow user data to inject vulnerabilities, so variables are not permitted in these sections.
 
-### Key Features
-
-- **Pixel-perfect shadcn/ui components** ported to Go/templ
-- **Globally Scoped Datastar signals** for interactive components. Signals are global on the page & scoped using `props.ID`. Datastar evaluated signals in the order they appear on the page.
-- **Simple Usage Examples** signal creation complexity is managed by the DatastarUI components. The usage examples do not use `data-signals` attributes.
-
-### Project Structure
-
-```
-datastarui/
-├── components/                    # Reusable UI components
-│   ├── button/
-│   │   ├── button.templ          # Component template
-│   │   ├── props.go              # Props and types
-│   │   └── variants.go           # CSS variants
-│   ├── form/                     # Form components
-│   ├── input/                    # Input component
-│   └── ...                       # Other components
-├── pages/
-│   ├── components/               # Component demo pages
-│   │   ├── buttonpage/
-│   │   │   └── button_page.templ # Button demo page
-│   │   └── ...                   # Other demo pages
-│   ├── home_page.templ           # Home page
-│   └── docs_page.templ           # Documentation page
-├── layouts/                      # Page layouts and navigation
-├── static/                       # Static assets (CSS, JS)
-└── main.go                       # Server and routing
+```html
+templ Example() {
+  <script>
+    function showAlert() {
+      alert("hello");
+    }
+  </script>
+  <style type="text/css">
+    /* Only CSS is allowed */
+  </style>
+}
 ```
 
-## IMPORTANT
+`onClick` attributes, and other `on*` attributes are used to execute JavaScript. To prevent user data from being unescaped, `on*` attributes accept a `templ.ComponentScript`.
 
-The developer is running a live reload server wathcing for file changes. Do not try to run the compiled binary as it is already running. Templ files will be automatically generated, but feel free to run `templ generate` to check for errors.
-
-Other than checking for Templ compilation errors, do not try to check the results yourself. The developer will check the results and give you screen shots if needed. Do not run `go run main.go` do not run `go build`.
-
-### Tailwind CSS Watch Process
-
-**IMPORTANT**: Tailwind CSS is running in watch mode during development. The developer has `tailwindcss --watch` running automatically, which means:
-
-- CSS changes in `static/css/index.css` are automatically compiled to `static/css/build.css`
-- The watch process monitors all `.templ` files for class changes
-- Only run `tailwind` or similar commands if there are CSS compilation issues that need debugging
-
-## The Datastar Way - Best Practices
-
-### Stop Overcomplicating It
-
-Most of the time, if you run into issues when using Datastar, you are probably **overcomplicating it™**.
-
-Datastar is a **hypermedia framework**, not a JavaScript framework. If you approach it like a JavaScript framework, you are likely to run into complications.
-
-### The Hypermedia Approach
-
-Between attribute plugins and action plugins, Datastar provides everything you need to build hypermedia-driven applications. Using this approach:
-
-- **Backend drives state** to the frontend and acts as the single source of truth
-- **Server determines** what actions the user can take next
-- **State flows down through props, events flow up** - always encapsulate state and send props down, events up
-
-
-**Alternative: Using `data-bind` with web components:**
-
-```go
-// Binding directly to web component value
-<input data-bind-foo />
-<my-component
-    data-attr-src="$foo"
-    data-bind-result
-></my-component>
-<span data-text="$result"></span>
-```
-
-```javascript
-class MyComponent extends HTMLElement {
-  static get observedAttributes() {
-    return ["src"];
-  }
-
-  attributeChangedCallback(name, oldValue, newValue) {
-    this.value = `You entered ${newValue}`;
-    this.dispatchEvent(new Event("change")); // Required for data-bind
-  }
+```html
+script onClickHandler(msg string) {
+  alert(msg);
 }
 
-customElements.define("my-component", MyComponent);
+templ Example(msg string) {
+  <div onClick={ onClickHandler(msg) }>
+    { "will be HTML encoded using templ.Escape" }
+  </div>
+}
 ```
 
-### Key Principles
+Style attributes cannot be expressions, only constants, to avoid escaping vulnerabilities. templ style templates (`css className()`) should be used instead.
 
-1. **Think hypermedia first** - let the server drive state and available actions
-2. **Use data-\* attributes** for all reactive behavior when possible
-3. **Extract complex logic** into external scripts or web components
-4. **Follow props down, events up** - encapsulate functionality and communicate via well-defined interfaces
-5. **Avoid JavaScript framework patterns** - resist the urge to manage state in the frontend
-6. **Keep it simple** - if it feels complicated, you're probably overengineering it
+```html
+templ Example() {
+  <div style={ "will throw an error" }></div>
+}
+```
 
-### DatastarUI Component Guidelines
+Class names are sanitized by default. A failed class name is replaced by `--templ-css-class-safe-name`. The sanitization can be bypassed using the `templ.SafeClass` function, but the result is still subject to escaping.
 
-When building DatastarUI components:
+```html
+templ Example() {
+  <div class={ "unsafe</style&gt;-will-sanitized", templ.SafeClass("&sanitization bypassed") }></div>
+}
+```
 
-- **Prefer server-driven state** over complex client-side logic
-- **Use Datastar expressions** for simple reactive behavior
-- **Extract complex interactions** into web components when needed
-- **Follow the hypermedia mindset** - components should be declarative and server-controlled
-- **Test with minimal JavaScript** - the goal is to eliminate JavaScript dependencies while maintaining full functionality
+Rendered output:
 
-# Go/templ Patterns
+```html
+<div class="--templ-css-class-safe-name &amp;sanitization bypassed"></div>
+```
 
-- **Use templ.Attributes** for flexible HTML attribute passing
+```html
+templ Example() {
+  <div>Node text is not modified at all.</div>
+  <div>{ "will be escaped using templ.EscapeString" }</div>
+}
+```
 
-```go
-templ RefExample(props RefExampleProps) {
-    {{
-        refName := props.ID + "_ref"
-        refAttrName := "data-ref-" + refName
+`href` attributes must be a `templ.SafeURL` and are sanitized to remove JavaScript URLs unless bypassed.
+
+```html
+templ Example() {
+  <a href="http://constants.example.com/are/not/sanitized">Text</a>
+  <a href={ templ.URL("will be sanitized by templ.URL to remove potential attacks") }</a>
+  <a href={ templ.SafeURL("will not be sanitized by templ.URL") }</a>
+}
+```
+
+Within css blocks, property names, and constant CSS property values are not sanitized or escaped.
+
+```css
+css className() {
+	background-color: #ffffff;
+}
+```
+
+CSS property values based on expressions are passed through `templ.SanitizeCSS` to replace potentially unsafe values with placeholders.
+
+```css
+css className() {
+	color: { red };
+}
+```
+# Content security policy
+
+## Nonces
+
+In templ [script templates](mdc:syntax-and-usage/script-templates#script-templates) are rendered as inline `<script>` tags.
+
+Strict Content Security Policies (CSP) can prevent these inline scripts from executing.
+
+By setting a nonce attribute on the `<script>` tag, and setting the same nonce in the CSP header, the browser will allow the script to execute.
+
+:::info
+It's your responsibility to generate a secure nonce. Nonces should be generated using a cryptographically secure random number generator.
+
+See https://content-security-policy.com/nonce/ for more information.
+:::
+
+## Setting a nonce
+
+The `templ.WithNonce` function can be used to set a nonce for templ to use when rendering scripts.
+
+It returns an updated `context.Context` with the nonce set.
+
+In this example, the `alert` function is rendered as a script element by templ.
+
+```templ title="templates.templ"
+package main
+
+import "context"
+import "os"
+
+script onLoad() {
+    alert("Hello, world!")
+}
+
+templ template() {
+    @onLoad()
+}
+```
+
+```go title="main.go"
+package main
+
+import (
+	"fmt"
+	"log"
+	"net/http"
+	"time"
+)
+
+func withNonce(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		nonce := securelyGenerateRandomString()
+		w.Header().Add("Content-Security-Policy", fmt.Sprintf("script-src 'nonce-%s'", nonce))
+		// Use the context to pass the nonce to the handler.
+		ctx := templ.WithNonce(r.Context(), nonce)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+func main() {
+	mux := http.NewServeMux()
+
+	// Handle template.
+	mux.HandleFunc("/", templ.Handler(template()))
+
+	// Apply middleware.
+	withNonceMux := withNonce(mux)
+
+	// Start the server.
+	fmt.Println("listening on :8080")
+	if err := http.ListenAndServe(":8080", withNonceMux); err != nil {
+		log.Printf("error listening: %v", err)
+	}
+}
+```
+
+```html title="Output"
+<script nonce="randomly generated nonce">
+  function __templ_onLoad_5a85() {
+    alert("Hello, world!")
+  }
+</script>
+<script nonce="randomly generated nonce">
+  __templ_onLoad_5a85()
+</script>
+```
+# Code signing
+
+Binaries are created by the GitHub Actions workflow at https://github.com/a-h/templ/blob/main/.github/workflows/release.yml
+
+Binaries are signed by cosign. The public key is stored in the repository at https://github.com/a-h/templ/blob/main/cosign.pub
+
+Instructions for key verification at https://docs.sigstore.dev/verifying/verify/
+---
+sidebar_position: 1
+---
+
+# Introduction
+
+## templ - build HTML with Go
+
+Create components that render fragments of HTML and compose them to create screens, pages, documents, or apps.
+
+* Server-side rendering: Deploy as a serverless function, Docker container, or standard Go program.
+* Static rendering: Create static HTML files to deploy however you choose.
+* Compiled code: Components are compiled into performant Go code.
+* Use Go: Call any Go code, and use standard `if`, `switch`, and `for` statements.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
