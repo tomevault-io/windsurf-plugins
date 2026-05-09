@@ -7,11 +7,11 @@ Open-source SOAR platform — Python-native playbooks, real-time alert ingestion
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [opensoar-hq/opensoar-core](https://github.com/opensoar-hq/opensoar-core).
+Original source: `CLAUDE.md` in [opensoar-hq/opensoar-core](https://github.com/opensoar-hq/opensoar-core).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
