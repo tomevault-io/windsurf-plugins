@@ -1,224 +1,163 @@
 ---
 trigger: always_on
-description: description: Mintlify writing assistant guidelines
+description: Anytime you see a lucide-react or react-icons icon, you should replace it with the corresponding Nucleo icon.
 ---
 
----
-description: Mintlify writing assistant guidelines
-type: always
----
-# Mintlify technical writing assistant
+Anytime you see a lucide-react or react-icons icon, you should replace it with the corresponding Nucleo icon.
 
-You are an AI writing assistant specialized in creating exceptional technical documentation using Mintlify components and following industry-leading technical writing practices.
+# Nucleo Icon Migration Guide
 
-## Core writing principles
 
-### Language and style requirements
-- Use clear, direct language appropriate for technical audiences
-- Write in second person ("you") for instructions and procedures
-- Use active voice over passive voice
-- Employ present tense for current states, future tense for outcomes
-- Maintain consistent terminology throughout all documentation
-- Keep sentences concise while providing necessary context
-- Use parallel structure in lists, headings, and procedures
 
-### Content organization standards
-- Lead with the most important information (inverted pyramid structure)
-- Use progressive disclosure: basic concepts before advanced ones
-- Break complex procedures into numbered steps
-- Include prerequisites and context before instructions
-- Provide expected outcomes for each major step
-- End sections with next steps or related information
-- Use descriptive, keyword-rich headings for navigation and SEO
+This guide helps you efficiently replace lucide-react and react-icons with Nucleo icons using the MCP.
 
-### User-centered approach
-- Focus on user goals and outcomes rather than system features
-- Anticipate common questions and address them proactively
-- Include troubleshooting for likely failure points
-- Provide multiple pathways when appropriate (beginner vs advanced), but offer an opinionated path for people to follow to avoid overwhelming with options
+## Initial Setup
 
-## Mintlify component reference
+1. **Configure Icon Directory** (One-time setup)
+   ```
+   mcp_Nucleo_Icons_updateConfig with iconDirectory: "/home/ubuntu/dev/inbound-simplify/components/icons"
+   ```
+   - Always use absolute path to ensure icons are saved in the correct location
+   - Verify with `mcp_Nucleo_Icons_getConfig` after configuration
 
-### Callout components
+## Efficient Icon Search Strategy
 
-#### Note - Additional helpful information
+### 1. Use Simple, Single-Word Searches
+Nucleo search works best with simple terms:
+- ❌ BAD: "mail plus", "add mail", "email icon"
+- ✅ GOOD: "mail", "envelope", "plus"
 
-<Note>
-Supplementary information that supports the main content without interrupting flow
-</Note>
+### 2. Common Icon Mappings
+Based on successful migrations:
+- `MailIcon` → search "envelope" → use `envelope-2`
+- `CalendarIcon` → search "calendar" → use `calendar-2`
+- `SettingsIcon` → search "gear" → use `gear-2`
+- `ActivityIcon` → search "activity" → use `chart-activity-2`
+- `ShieldCheckIcon` → search "shield" → use `shield-2`
+- `GlobeIcon` → search "globe" → use `globe-2`
+- `CloudIcon` → search "cloud" → use `cloud-2`
+- `CodeIcon` → search "code" → use `code-2`
+- `MailPlusIcon` → search "envelope" → use `envelope-plus`
+- `LogOutIcon` → search "logout" → use `circle-logout`
+- `CreditCardIcon` → search "card" → use `credit-card-2`
 
-#### Tip - Best practices and pro tips
+### 3. Search Workflow
+AA. Make sure to check the icon directory first to see if the icon exists, then if it doesn't you can search with the tool. 
+1. Start with the base word (e.g., "mail" not "mailbox")
+2. If no results, try synonyms (e.g., "envelope" for mail)
+3. Look for numbered variants (many icons have `-2` versions)
+4. Check for action variants (e.g., `envelope-plus`, `envelope-check`)
 
-<Tip>
-Expert advice, shortcuts, or best practices that enhance user success
-</Tip>
+## Import Process
 
-#### Warning - Important cautions
+### 1. Batch Imports Efficiently
+- Import 3-4 icons at a time to avoid timeouts
+- If importing many icons, split into smaller batches:
+  ```
+  ["icon1", "icon2", "icon3"] // First batch
+  ["icon4", "icon5", "icon6"] // Second batch
+  ```
 
-<Warning>
-Critical information about potential issues, breaking changes, or destructive actions
-</Warning>
-
-#### Info - Neutral contextual information
-
-<Info>
-Background information, context, or neutral announcements
-</Info>
-
-#### Check - Success confirmations
-
-<Check>
-Positive confirmations, successful completions, or achievement indicators
-</Check>
-
-### Code components
-
-#### Single code block
-
-```javascript config.js
-const apiConfig = {
-baseURL: 'https://api.example.com',
-timeout: 5000,
-headers: {
-    'Authorization': `Bearer ${process.env.API_TOKEN}`
-}
-};
+### 2. Verify Imports
+Always check the components/icons directory after importing:
+```
+list_dir with relative_workspace_path: "components/icons"
 ```
 
-#### Code group with multiple languages
+## Icon Usage Patterns
 
-<CodeGroup>
-```javascript Node.js
-const response = await fetch('/api/endpoint', {
-    headers: { Authorization: `Bearer ${apiKey}` }
-});
+### 1. Import Syntax
+Nucleo icons use default exports:
+```typescript
+// ❌ Named import (incorrect)
+import { Envelope2 } from "@/components/icons/envelope-2"
+
+// ✅ Default import (correct)
+import Envelope2 from "@/components/icons/envelope-2"
 ```
 
-```python Python
-import requests
-response = requests.get('/api/endpoint', 
-    headers={'Authorization': f'Bearer {api_key}'})
+### 2. Props Differences
+Nucleo icons don't accept `size` prop, use `width` and `height`:
+```tsx
+// ❌ Lucide style
+<MailIcon size="15" />
+
+// ✅ Nucleo style
+<Envelope2 width="15" height="15" />
 ```
 
-```curl cURL
-curl -X GET '/api/endpoint' \
-    -H 'Authorization: Bearer YOUR_API_KEY'
-```
-</CodeGroup>
-
-#### Request/Response examples
-
-<RequestExample>
-```bash cURL
-curl -X POST 'https://api.example.com/users' \
-    -H 'Content-Type: application/json' \
-    -d '{"name": "John Doe", "email": "john@example.com"}'
-```
-</RequestExample>
-
-<ResponseExample>
-```json Success
-{
-    "id": "user_123",
-    "name": "John Doe", 
-    "email": "john@example.com",
-    "created_at": "2024-01-15T10:30:00Z"
+### 3. TypeScript Types
+Update navigation interfaces to accept both icon types:
+```typescript
+export interface NavigationItem {
+  icon?: LucideIcon | React.ComponentType<any>
 }
 ```
-</ResponseExample>
 
-### Structural components
+## Migration Workflow
 
-#### Steps for procedures
+### 1. Find All Icon Imports
+```
+grep_search with query: 'from "lucide-react"' and include_pattern: "*.tsx"
+grep_search with query: 'from "react-icons' and include_pattern: "*.tsx"
+```
 
-<Steps>
-<Step title="Install dependencies">
-    Run `npm install` to install required packages.
-    
-    <Check>
-    Verify installation by running `npm list`.
-    </Check>
-</Step>
+### 2. Prioritize Core Components
+Focus on these files first:
+- `lib/navigation.ts` - Central navigation config
+- `components/app-sidebar.tsx` - Main sidebar
+- `components/nav-main.tsx` - Primary navigation
+- `components/nav-user.tsx` - User menu
+- `components/login-form.tsx` - Authentication UI
 
-<Step title="Configure environment">
-    Create a `.env` file with your API credentials.
-    
-    ```bash
-    API_KEY=your_api_key_here
-    ```
-    
-    <Warning>
-    Never commit API keys to version control.
-    </Warning>
-</Step>
-</Steps>
+### 3. Update in Batches
+1. Search for appropriate Nucleo replacements
+2. Import icons in small batches
+3. Update imports in files
+4. Fix any prop differences (size → width/height)
 
-#### Tabs for alternative content
+## Common Issues & Solutions
 
-<Tabs>
-<Tab title="macOS">
-    ```bash
-    brew install node
-    npm install -g package-name
-    ```
-</Tab>
+### Issue: Icon Not Found
+- Try simpler search terms
+- Look for synonyms (mail → envelope, settings → gear)
+- Check plural/singular variations
 
-<Tab title="Windows">
-    ```powershell
-    choco install nodejs
-    npm install -g package-name
-    ```
-</Tab>
+### Issue: Import Timeout
+- Reduce batch size to 3-4 icons
+- Import one at a time if necessary
 
-<Tab title="Linux">
-    ```bash
-    sudo apt install nodejs npm
-    npm install -g package-name
-    ```
-</Tab>
-</Tabs>
+### Issue: TypeScript Errors
+- Ensure default imports (not named)
+- Update interface types to accept `React.ComponentType<any>`
+- Check prop compatibility
 
-#### Accordions for collapsible content
+## Best Practices
 
-<AccordionGroup>
-<Accordion title="Troubleshooting connection issues">
-    - **Firewall blocking**: Ensure ports 80 and 443 are open
-    - **Proxy configuration**: Set HTTP_PROXY environment variable
-    - **DNS resolution**: Try using 8.8.8.8 as DNS server
-</Accordion>
+1. **Keep HiIcons**: Per user preference, keep react-icons/hi icons
+2. **Test Visually**: Some Nucleo icons may have different visual weights
+3. **Document Mappings**: Keep track of icon replacements for consistency
+4. **Parallel Updates**: Use parallel tool calls when updating multiple files
 
-<Accordion title="Advanced configuration">
-    ```javascript
-    const config = {
-    performance: { cache: true, timeout: 30000 },
-    security: { encryption: 'AES-256' }
-    };
-    ```
-</Accordion>
-</AccordionGroup>
+## Quick Reference Commands
 
-### API documentation components
+```typescript
+// Check current config
+mcp_Nucleo_Icons_getConfig
 
-#### Parameter fields
+// Search icons
+mcp_Nucleo_Icons_searchIcons with query: "envelope", limit: 20
 
-<ParamField path="user_id" type="string" required>
-Unique identifier for the user. Must be a valid UUID v4 format.
-</ParamField>
+// Import icons
+mcp_Nucleo_Icons_importIcons with iconNames: ["envelope-2", "calendar-2"]
 
-<ParamField body="email" type="string" required>
-User's email address. Must be valid and unique within the system.
-</ParamField>
-
-<ParamField query="limit" type="integer" default="10">
-Maximum number of results to return. Range: 1-100.
-</ParamField>
-
-<ParamField header="Authorization" type="string" required>
-Bearer token for API authentication. Format: `Bearer YOUR_API_KEY`
-</ParamField>
-
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+// Find all lucide imports
+grep_search with query: 'from "lucide-react"', include_pattern: "*.tsx"
+```
+description:
+globs:
+alwaysApply: false
+---
 
 ---
 > Source: [inboundemail/inbound](https://github.com/inboundemail/inbound) — distributed by [TomeVault](https://tomevault.io).
