@@ -7,11 +7,11 @@ Federated event hosting and place check-in
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [moim-social/moim](https://github.com/moim-social/moim).
+Original source: `CLAUDE.md` in [moim-social/moim](https://github.com/moim-social/moim).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
