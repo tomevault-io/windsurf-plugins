@@ -7,11 +7,11 @@ Autonomous sales agent — bulk outreach, inbox classification, research-driven 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [Dominien/hubspot-sales-agent](https://github.com/Dominien/hubspot-sales-agent).
+Original source: `CLAUDE.md` in [Dominien/hubspot-sales-agent](https://github.com/Dominien/hubspot-sales-agent).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
