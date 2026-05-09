@@ -1,8 +1,7 @@
 ---
 trigger: always_on
-description: Setup and validation commands required for this repository.
+description: These instructions apply to all coding agents in this repository (Cursor, Claude Code, Codex).
 ---
-
 
 # Agent Instructions
 
