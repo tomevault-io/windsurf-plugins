@@ -1,16 +1,16 @@
 ---
 trigger: always_on
-description: Form component accessibility standards and WCAG compliance for form inputs, labels, instructions, and error handling
+description: Global scope accessibility standards per WCAG requirements for page language, viewport, title attributes, and skip links
 ---
 
 
-# Form Accessibility Standards
+# Global Scope Accessibility Standards
 
-Ensures form components follow WCAG compliance and provide proper accessibility for all users including screen reader users and keyboard-only users.
+Ensures global accessibility best practices are followed including page language, viewport meta tag, title attribute usage, and skip link implementation for WCAG compliance.
 
 <rule>
-name: form_accessibility_standards
-description: Enforce form component accessibility standards and WCAG compliance for form inputs, labels, instructions, and error handling
+name: global_accessibility_standards
+description: Enforce global scope accessibility standards per WCAG requirements for page language, viewport, title attributes, and skip links
 filters:
   - type: file_extension
     pattern: "\\.(vue|jsx|tsx|html|liquid|php|js|ts)$"
@@ -18,81 +18,93 @@ filters:
 actions:
   - type: enforce
     conditions:
-      # Missing label association for form inputs
-      - pattern: "(?i)<(input|textarea|select)[^>]*>"
-        pattern_negate: "(<label[^>]*for|id.*for|aria-label|aria-labelledby|title=)"
-        message: "Form inputs must have programmatically associated labels via label/for, aria-label, aria-labelledby, or title attributes."
+      # Missing lang attribute on html element
+      - pattern: "<html[^>]*>"
+        pattern_negate: "lang=\"[a-z]{2}(?:-[A-Z]{2})?\""
+        message: "HTML element must have lang attribute set to ensure proper pronunciation by assistive technology. Use lang=\"en\" for English or appropriate language code."
 
-      # Empty or meaningless labels
-      - pattern: "(?i)<label[^>]*>\\s*(?:label|input|field|required)\\s*</label>"
-        message: "Form labels must contain meaningful text that describes the input purpose, not generic terms."
+      # Invalid language code format
+      - pattern: "lang=\"[^a-z]{2}(?:-[^A-Z]{2})?\""
+        message: "Language code must follow ISO 639-1 format (e.g., lang=\"en\", lang=\"fr-CA\")."
 
-      # Placeholder as only label
-      - pattern: "(?i)<input[^>]*placeholder=\"[^\"]+\"[^>]*>"
-        pattern_negate: "(<label|aria-label|aria-labelledby|title=)"
-        message: "Placeholder text cannot be the only method of providing a label. Add a proper label element or aria-label."
+      # Missing viewport meta tag
+      - pattern: "<head[^>]*>"
+        pattern_negate: "<meta[^>]*name=\"viewport\""
+        message: "Viewport meta tag is required for responsive design and accessibility. Include <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">."
 
-      # Missing required field indicators
-      - pattern: "(?i)<(input|textarea|select)[^>]*required[^>]*>"
-        pattern_negate: "(data-required|aria-required=\"true\"|\\*|aria-describedby)"
-        message: "Required fields should use data-required='true' instead of native required attribute, with visual indicators and aria-required='true' for screen readers."
+      # Viewport meta tag preventing zoom
+      - pattern: "<meta[^>]*name=\"viewport\"[^>]*>"
+        pattern_negate: "(maximum-scale=1\\.0|user-scalable=no)"
+        message: "Viewport meta tag should not prevent zooming. Avoid maximum-scale=1.0 and user-scalable=no to maintain accessibility for low-vision users."
 
-      # Missing fieldset for grouped inputs
-      - pattern: "(?i)<input[^>]*type=\"(radio|checkbox)\"[^>]*name=\"[^\"]+\"[^>]*>"
-        pattern_negate: "(<fieldset|<div[^>]*role=\"group\")"
-        message: "Radio button and checkbox groups should be wrapped in fieldset or have role='group' for proper grouping."
+      # Problematic viewport attributes
+      - pattern: "(maximum-scale=1\\.0|user-scalable=no)"
+        message: "Viewport meta tag contains attributes that prevent zooming, which creates accessibility issues for low-vision users. Remove maximum-scale=1.0 and user-scalable=no."
 
-      # Missing legend for fieldset
-      - pattern: "(?i)<fieldset[^>]*>"
-        pattern_negate: "<legend"
-        message: "Fieldset elements must have legend elements to provide context for the group."
+      # Title attribute on non-iframe elements
+      - pattern: "(?i)<[^>]*title=\"[^\"]+\"[^>]*>"
+        pattern_negate: "(iframe|IFRAME)"
+        message: "Avoid using title attribute on non-iframe elements as it creates accessibility issues. Use visible text, aria-label, or custom tooltips instead."
 
-      # Missing input purpose identification
-      - pattern: "(?i)<input[^>]*type=\"(text|email|tel|url|password)\"[^>]*>"
-        pattern_negate: "(autocomplete|aria-describedby|aria-label|placeholder)"
-        message: "Text inputs should have autocomplete attributes or other methods to identify their purpose for personal data collection."
+      # Missing title on iframe elements
+      - pattern: "<iframe[^>]*>"
+        pattern_negate: "title=\"[^\"]+\""
+        message: "Iframe elements must have title attribute to provide context for screen reader users."
 
-      # Missing error association
-      - pattern: "(?i)<[^>]*aria-invalid=\"true\"[^>]*>"
-        pattern_negate: "(aria-describedby|aria-errormessage)"
-        message: "Inputs with aria-invalid='true' should have error messages associated via aria-describedby or aria-errormessage."
+      # Empty or meaningless iframe title
+      - pattern: "<iframe[^>]*title=\"\\s*(?:iframe|frame|content|page)\\s*\"[^>]*>"
+        message: "Iframe title should be descriptive and meaningful, not generic terms like 'iframe' or 'content'."
 
-      # Missing error message visibility
-      - pattern: "(?i)<[^>]*class=\"[^\"]*(?:error|invalid)[^\"]*\"[^>]*>"
-        pattern_negate: "(display.*none|visibility.*hidden|hidden|aria-hidden=\"true\")"
-        message: "Error messages should be visible to users and not hidden with CSS or aria-hidden."
+      # Missing skip link
+      - pattern: "<body[^>]*>"
+        pattern_negate: "<a[^>]*href=\"#[^\"]*\"[^>]*(?:skip|main|content)"
+        message: "Skip link is required for keyboard navigation accessibility. Add a skip link at the top of the page to bypass repeated content."
 
-      # Missing focus management for error summaries
-      - pattern: "(?i)<(div|section)[^>]*(?:error.*summary|summary.*error)[^>]*>"
-        pattern_negate: "(tabindex|focus|scrollIntoView)"
-        message: "Error summary containers should implement focus management to shift focus to the error banner heading when errors appear, improving user experience and accessibility."
+      # Skip link not at top of page
+      - pattern: "<a[^>]*href=\"#[^\"]*\"[^>]*(?:skip|main|content)[^>]*>"
+        pattern_negate: "(<body|<header|<nav)"
+        message: "Skip link should be one of the first elements in the document, typically within the header or at the top of the body."
 
-      # Missing form instructions association
-      - pattern: "(?i)<(div|p)[^>]*(?:instruction|help|hint)[^>]*>"
-        pattern_negate: "(aria-describedby|aria-labelledby|id=)"
-        message: "Form instructions should be programmatically associated with their corresponding inputs via aria-describedby."
+      # Skip link without proper target
+      - pattern: "<a[^>]*href=\"#[^\"]*\"[^>]*(?:skip|main|content)[^>]*>"
+        pattern_negate: "href=\"#(main|content|primary|skip-content)\""
+        message: "Skip link href should target main content area (e.g., href=\"#main\")."
 
-      # Missing success message
-      - pattern: "(?i)<form[^>]*>.*</form>"
-        pattern_negate: "(role=\"alert\"|aria-live|success|confirmation)"
-        message: "Forms should provide success confirmation messages, especially for critical operations like financial transactions."
+      # Skip link target missing tabindex
+      - pattern: "<a[^>]*href=\"#(main|content|primary|skip-content)\"[^>]*>"
+        pattern_negate: "<(main|div|section)[^>]*id=\"(main|content|primary|skip-content)\"[^>]*tabindex=\"-1\""
+        message: "Skip link target element must have tabindex=\"-1\" to receive keyboard focus when skip link is activated."
 
-      # Missing focus management for success messages
-      - pattern: "(?i)<(div|section)[^>]*(?:success|confirmation)[^>]*>"
-        pattern_negate: "(tabindex|focus|scrollIntoView)"
-        message: "Success message containers should implement focus management to shift focus to the success banner heading when messages appear, improving user experience and accessibility."
+      # Skip link without proper CSS classes
+      - pattern: "<a[^>]*href=\"#[^\"]*\"[^>]*(?:skip|main|content)[^>]*>"
+        pattern_negate: "(class=\"[^\"]*(?:visuallyhidden|sr-only|skip-link)[^\"]*\"|style=\"[^\"]*(?:position:\\s*absolute|clip:\\s*rect|overflow:\\s*hidden)[^\"]*\")"
+        message: "Skip link should have CSS classes or styles to hide it visually while keeping it accessible to screen readers and keyboard users."
 
-      # Missing focusable headings for error/success messages
-      - pattern: "(?i)<(h2|h3)[^>]*(?:error|success|confirmation)[^>]*>"
-        pattern_negate: "tabindex=\"-1\""
-        message: "Error and success message headings should have tabindex='-1' to make them programmatically focusable for focus management."
+      # Skip link not properly hidden
+      - pattern: "<a[^>]*href=\"#[^\"]*\"[^>]*(?:skip|main|content)[^>]*>"
+        pattern_negate: "(display:\\s*none|visibility:\\s*hidden)"
+        message: "Skip link should not use display:none or visibility:hidden as these hide it from screen readers. Use visuallyhidden or sr-only classes instead."
 
-      # Missing time limit controls
-      - pattern: "(?i)<form[^>]*>.*(?:time.*limit|session.*expir|expir.*time)"
-        pattern_negate: "(extend|turn.*off|adjust|customize|20.*hour)"
-        message: "Forms with time limits must provide options to extend, turn off, or adjust the time limit, or allow at least 20 hours."
+  - type: suggest
+    message: |
+      **Global Scope Accessibility Best Practices:**
 
-      # Missing error prevention for critical forms
+      **1. Page Language (WCAG 3.1.1 Language of Page):**
+      ```html
+      <!-- Good: Proper language declaration -->
+      <!DOCTYPE html>
+      <html lang="en">
+        <head>
+          <title>Page Title</title>
+        </head>
+        <body>
+          <!-- Content in English -->
+        </body>
+      </html>
+
+      <!-- Good: Language toggle with proper lang attributes -->
+      <nav>
+        <a href="/en" lang="en">English</a>
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
