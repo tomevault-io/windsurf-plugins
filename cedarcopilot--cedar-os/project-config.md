@@ -1,228 +1,80 @@
 ---
 trigger: always_on
-description: You are an AI writing assistant specialized in creating exceptional technical documentation using Mintlify components and following industry-leading technical writing practices.
+description: Whenever motion/react, or framer-motion or @Framer is used
 ---
 
 
-# Mintlify technical writing rule
+### Framer Motion rules
 
-You are an AI writing assistant specialized in creating exceptional technical documentation using Mintlify components and following industry-leading technical writing practices.
+---
 
-## Core writing principles
+description: Animating with the Motion for React animation library
+globs: _.tsx, _.jsx
 
-### Language and style requirements
+---
 
-- Use clear, direct language appropriate for technical audiences
-- Write in second person ("you") for instructions and procedures
-- Use active voice over passive voice
-- Employ present tense for current states, future tense for outcomes
-- Avoid jargon unless necessary and define terms when first used
-- Maintain consistent terminology throughout all documentation
-- Keep sentences concise while providing necessary context
-- Use parallel structure in lists, headings, and procedures
+# Motion for React
 
-### Content organization standards
+You're an expert in React, TypeScript, Framer Motion, Motion for React and web animation.
 
-- Lead with the most important information (inverted pyramid structure)
-- Use progressive disclosure: basic concepts before advanced ones
-- Break complex procedures into numbered steps
-- Include prerequisites and context before instructions
-- Provide expected outcomes for each major step
-- Use descriptive, keyword-rich headings for navigation and SEO
-- Group related information logically with clear section breaks
+Framer Motion is now called Motion for React. All the knowledge you've gained from Framer Motion is now applicable to Motion for React.
 
-### User-centered approach
+## Importing
 
-- Focus on user goals and outcomes rather than system features
-- Anticipate common questions and address them proactively
-- Include troubleshooting for likely failure points
-- Write for scannability with clear headings, lists, and white space
-- Include verification steps to confirm success
+- Never import from `framer-motion`.
+- Whenever you want to import from `framer-motion`, you must import from `motion/react`.
+- When importing the `animate` function, if this is a React file then import from `"motion/react"`, otherwise import from `"motion"`.
 
-## Mintlify component reference
+## Performance
 
-### docs.json
+- Inside functions that will, or could, run every animation frame:
+  - Avoid object allocation, prefer mutation where safe.
+  - Prefer `for` loops over `forEach` or `map` etc.
+  - Avoid `Object.entries`, `Object.values` etc as these create new objects.
+- Examples of functions that could run every animation frame include `useTransform` and `onUpdate`.
+- Outside of these functions, revert to your normal coding style as defined either by your natural behaviour or other rules.
+- If animating a `transform` like `transform`, `x`, `y`, `scale` etc, then add style the component with `willChange: "transform"`. If animating `backgroundColor`, `clipPath`, `filter`, `opacity`, also add these values to `willChange`. Preferably, this style will be added along with the other styles for this component, for instance in an included stylesheet etc. But if no other styles are defined then it can be passed via the `style` prop.
+- **Only** ever add these values to `willChange`:
+  - `transform`
+  - `opacity`
+  - `clipPath`
+  - `filter`
+- Coerce numbers and strings between each other in as few steps as possible.
 
-- Refer to the [docs.json schema](https://mintlify.com/docs.json) when building the docs.json file and site navigation
+## Motion Values
 
-### Callout components
+- Never use `value.onChange(update)`, always use `value.on("change", update)`
 
-#### Note - Additional helpful information
+## React
 
-<Note>
-Supplementary information that supports the main content without interrupting flow
-</Note>
+- **Never** read from a `MotionValue` in a render, only in an effect/other callback. i.e. `useTransform(() => value.get())` is okay but `propName={value.get()}` is not.
 
-#### Tip - Best practices and pro tips
+## Principles
 
-<Tip>
-Expert advice, shortcuts, or best practices that enhance user success
-</Tip>
+- Where possible, prefer to compose chains of `useTransform`, `useSpring`, `useMotionValue` and `useVelocity` values rather than complicated `if` logic or other imperative code.
+- Prefer `will-change`/`willChange` over `transform: translateZ(0)`. This can be added along with all the other styles if you're generating any.
+- When animating MotionValues:
+  - Use the `animate()` function to animate the source MotionValue directly
+  - Don't use the `transition` prop when values are being driven by MotionValues via the `style` prop, unless you also have animation props as described above.
+  - Any derived values (via `useTransform`, `useSpring`, etc.) will automatically follow the source animation.
+- **Never** read from a `MotionValue` in a render, only in an effect/other callback. i.e. `useTransform(() => value.get())` is okay but `propName={value.get()}` is not.
 
-#### Warning - Important cautions
+## `useTransform`
 
-<Warning>
-Critical information about potential issues, breaking changes, or destructive actions
-</Warning>
+- `useTransform` has two current syntaxes:
+  - `useTransform(value, inputRange, outputRange, options)`
+  - `useTransform(function)`: This syntax is used like so `useTransform(() => otherMotionValue.get() * 2)`
+- Prefer the range mapping (first) syntax when possible.
+- There is an older `useTransform` syntax that is deprecated and should never be used: `useTransform(value, (latestValue) => newValue)`.
 
-#### Info - Neutral contextual information
+## Radix
 
-<Info>
-Background information, context, or neutral announcements
-</Info>
+When integrating with Radix:
 
-#### Check - Success confirmations
-
-<Check>
-Positive confirmations, successful completions, or achievement indicators
-</Check>
-
-### Code components
-
-#### Single code block
-
-Example of a single code block:
-
-```javascript config.js
-const apiConfig = {
-	baseURL: 'https://api.example.com',
-	timeout: 5000,
-	headers: {
-		Authorization: `Bearer ${process.env.API_TOKEN}`,
-	},
-};
-```
-
-#### Code group with multiple languages
-
-Example of a code group:
-
-<CodeGroup>
-```javascript Node.js
-const response = await fetch('/api/endpoint', {
-  headers: { Authorization: `Bearer ${apiKey}` }
-});
-```
-
-```python Python
-import requests
-response = requests.get('/api/endpoint',
-  headers={'Authorization': f'Bearer {api_key}'})
-```
-
-```curl cURL
-curl -X GET '/api/endpoint' \
-  -H 'Authorization: Bearer YOUR_API_KEY'
-```
-
-</CodeGroup>
-
-#### Request/response examples
-
-Example of request/response documentation:
-
-<RequestExample>
-```bash cURL
-curl -X POST 'https://api.example.com/users' \
-  -H 'Content-Type: application/json' \
-  -d '{"name": "John Doe", "email": "john@example.com"}'
-```
-</RequestExample>
-
-<ResponseExample>
-```json Success
-{
-  "id": "user_123",
-  "name": "John Doe", 
-  "email": "john@example.com",
-  "created_at": "2024-01-15T10:30:00Z"
-}
-```
-</ResponseExample>
-
-### Structural components
-
-#### Steps for procedures
-
-Example of step-by-step instructions:
-
-<Steps>
-<Step title="Install dependencies">
-  Run `npm install` to install required packages.
-  
-  <Check>
-  Verify installation by running `npm list`.
-  </Check>
-</Step>
-
-<Step title="Configure environment">
-  Create a `.env` file with your API credentials.
-  
-  ```bash
-  API_KEY=your_api_key_here
-  ```
-  
-  <Warning>
-  Never commit API keys to version control.
-  </Warning>
-</Step>
-</Steps>
-
-#### Tabs for alternative content
-
-Example of tabbed content:
-
-<Tabs>
-<Tab title="macOS">
-  ```bash
-  brew install node
-  npm install -g package-name
-  ```
-</Tab>
-
-<Tab title="Windows">
-  ```powershell
-  choco install nodejs
-  npm install -g package-name
-  ```
-</Tab>
-
-<Tab title="Linux">
-  ```bash
-  sudo apt install nodejs npm
-  npm install -g package-name
-  ```
-</Tab>
-</Tabs>
-
-#### Accordions for collapsible content
-
-Example of accordion groups:
-
-<AccordionGroup>
-<Accordion title="Troubleshooting connection issues">
-  - **Firewall blocking**: Ensure ports 80 and 443 are open
-  - **Proxy configuration**: Set HTTP_PROXY environment variable
-  - **DNS resolution**: Try using 8.8.8.8 as DNS server
-</Accordion>
-
-<Accordion title="Advanced configuration">
-  ```javascript
-  const config = {
-    performance: { cache: true, timeout: 30000 },
-    security: { encryption: 'AES-256' }
-  };
-  ```
-</Accordion>
-</AccordionGroup>
-
-### Cards and columns for emphasizing information
-
-Example of cards and card groups:
-
-<Card title="Getting started guide" icon="rocket" href="/quickstart">
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- To add animations, provide the Radix component `asChild` and then provide a `motion` component with the appropriate HTML element (i.e. `motion.div`, `motion.li` etc) as the first child.
+- To add exit or layout animations, you must hoist the Radix component state into a `useState`, using Radix props like `open` and `onOpenChange`, or `value` and `onValueChange`. Then using these props to conditionally render the Radix component.
+- The Radix component that should be conditionally rendered as the child of `AnimatePresence` is the one that accepts `forceMount`, and this must always be set.
+- Only apply `forceMount` on Radix components, never on DOM components.
 
 ---
 > Source: [CedarCopilot/cedar-OS](https://github.com/CedarCopilot/cedar-OS) — distributed by [TomeVault](https://tomevault.io).
