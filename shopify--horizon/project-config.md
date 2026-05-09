@@ -1,98 +1,53 @@
 ---
 trigger: always_on
-description: Enforce product media gallery component accessibility standards and proper landmark structure for media galleries
+description: The prompts and references directories contain documentation and guides for AI agents to follow when working on various tasks in the Horizon theme.
 ---
 
+# Prompts and References
 
-# Product Media Gallery Component Accessibility Standards
+The prompts and references directories contain documentation and guides for AI agents to follow when working on various tasks in the Horizon theme.
 
-Ensures product media gallery components follow WCAG compliance and provide proper accessibility for image, video, and 3D model galleries with screen reader support and keyboard navigation.
+## Living Documents
 
-<rule>
-name: product_media_gallery_accessibility_standards
-description: Enforce product media gallery component accessibility standards and proper landmark structure for media galleries
-filters:
-  - type: file_extension
-    pattern: "\\.(vue|jsx|tsx|html|liquid|php|js|ts)$"
+**Important**: All files in the `.cursor/prompts/` and `.cursor/references/` folders are living documents. This means:
 
-actions:
-  - type: enforce
-    conditions:
-      # Missing gallery container landmark role
-      - pattern: "(?i)<(div|section)[^>]*(?:gallery|media.*gallery|product.*gallery)[^>]*>"
-        pattern_negate: "role=\"region\""
-        message: "Product media gallery containers must have role='region' to provide proper landmark structure."
+- They should be updated as new cases are encountered
+- When you discover a useful pattern, edge case, or solution while working on an issue, update the relevant file
+- If something in these files doesn't work as expected, fix it immediately
+- Add examples from real implementation experiences
+- Remove or update outdated information
 
-      # Missing gallery landmark aria-labelledby
-      - pattern: "(?i)<[^>]*role=\"region\"[^>]*(?:gallery|media.*gallery|product.*gallery)[^>]*>"
-        pattern_negate: "aria-labelledby=\"[^\"]+\""
-        message: "Gallery region must have aria-labelledby referencing a heading element for proper screen reader identification."
+**CRITICAL ACTION REQUIREMENT**: When you encounter any pattern, issue, or solution while working - immediately update the relevant documentation file WITHOUT being asked. This includes:
+- Code patterns to avoid (like console.log in tests)
+- Better ways to accomplish tasks
+- Edge cases or pitfalls discovered
+- Clarifications for ambiguous instructions
+- New tools or commands that work better
 
-      # Missing gallery landmark heading
-      - pattern: "(?i)<[^>]*role=\"region\"[^>]*(?:gallery|media.*gallery|product.*gallery)[^>]*>"
-        pattern_negate: "<h[1-6][^>]*id=\"[^\"]+\"[^>]*>"
-        message: "Gallery region must contain a heading element with unique ID for aria-labelledby reference."
+Do not wait for the user to suggest documentation updates. Proactively maintaining these living documents is part of completing any task.
 
-      # Missing gallery viewer container
-      - pattern: "(?i)<[^>]*role=\"region\"[^>]*(?:gallery|media.*gallery|product.*gallery)[^>]*>"
-        pattern_negate: "<(div|section)[^>]*(?:viewer|display|main.*image)[^>]*>"
-        message: "Gallery region must contain a gallery viewer container for displaying selected media."
+## Purpose
 
-      # Gallery viewer missing proper image alt text
-      - pattern: "(?i)<img[^>]*(?:gallery|viewer|main.*image)[^>]*>"
-        pattern_negate: "alt=\"[^\"]+\""
-        message: "Gallery viewer images must have descriptive alt text via alt attribute for screen reader accessibility."
+These documentation files serve as:
+- Step-by-step guides for common tasks
+- Documentation of best practices learned from experience
+- References for handling edge cases and pitfalls
+- Templates for consistent workflows
 
-      # Hidden media not properly hidden from assistive technology
-      - pattern: "(?i)<(img|video|iframe)[^>]*(?:gallery|media)[^>]*>"
-        pattern_negate: "(hidden|aria-hidden=\"true\"|display.*none|visibility.*hidden)"
-        message: "Hidden media items must use hidden attribute to remove them from both visual and assistive technology access."
+## Usage
 
-      # Thumbnail buttons missing button element structure
-      - pattern: "(?i)<(div|span)[^>]*(?:thumbnail|thumb)[^>]*>"
-        pattern_negate: "(<button|role=\"button\")"
-        message: "Thumbnail media selectors must use button elements or have role='button' for proper keyboard accessibility."
+When an AI agent is asked to perform a task that has corresponding documentation:
+1. The agent should follow the documented steps
+2. If the steps need adjustment based on the specific situation, the agent should note what changes were needed
+3. **MANDATORY**: Update the documentation immediately with any new learnings, patterns, or pitfalls discovered during the task - do not wait to be asked
 
-      # Thumbnail buttons missing descriptive aria-label
-      - pattern: "(?i)<button[^>]*(?:thumbnail|thumb)[^>]*>"
-        pattern_negate: "aria-label=\"[^\"]*[Ll]oad[^\"]*[Mm]edia[^\"]*[Gg]allery[^\"]*[Vv]iewer[^\"]*\""
-        message: "Thumbnail buttons must have descriptive aria-label like 'Load media 1 into gallery viewer' for screen reader context."
+## Examples of Living Document Updates
 
-      # Missing aria-current on active thumbnail
-      - pattern: "(?i)<button[^>]*(?:thumbnail|thumb)[^>]*>"
-        pattern_negate: "aria-current=\"(true|false)\""
-        message: "Thumbnail buttons must have aria-current attribute to indicate which media is currently loaded in the viewer."
-
-      # Missing aria-describedby on thumbnail buttons
-      - pattern: "(?i)<button[^>]*(?:thumbnail|thumb)[^>]*>"
-        pattern_negate: "aria-describedby=\"[^\"]+\""
-        message: "Thumbnail buttons must have aria-describedby referencing the underlying media ID for alt text context."
-
-      # Missing aria-controls on thumbnail buttons
-      - pattern: "(?i)<button[^>]*(?:thumbnail|thumb)[^>]*>"
-        pattern_negate: "aria-controls=\"[^\"]+\""
-        message: "Thumbnail buttons must have aria-controls referencing the gallery viewer container ID."
-
-      # Missing live region for media loading announcements
-      - pattern: "(?i)<(div|section)[^>]*(?:gallery|media.*gallery|product.*gallery)[^>]*>"
-        pattern_negate: "role=\"status\""
-        message: "Gallery must include a live region with role='status' for announcing media loading completion to screen readers."
-
-      # Live region with unnecessary aria-hidden attribute
-      - pattern: "(?i)<[^>]*role=\"status\"[^>]*(?:gallery|media)[^>]*aria-hidden=\"true\"[^>]*>"
-        message: "Gallery live region should not use aria-hidden='true' when content is dynamically managed through JavaScript."
-
-      # Live region with redundant aria-live attribute
-      - pattern: "(?i)<[^>]*role=\"status\"[^>]*aria-live=\"[^\"]*\"[^>]*>"
-        message: "Live regions with role='status' should not include aria-live attribute as it's redundant and unnecessary."
-
-      # Live region with unnecessary aria-hidden attribute
-      - pattern: "(?i)<[^>]*role=\"status\"[^>]*aria-hidden=\"true\"[^>]*>"
-        message: "Live regions with role='status' should not use aria-hidden='true' when content is dynamically managed through JavaScript."
-
-      # Missing list structure for thumbnail grid layout
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- Adding a new pitfall discovered during implementation
+- Clarifying a step that was ambiguous
+- Adding a reference to a newly created documentation file
+- Updating commands or scripts that have changed
+- Adding examples of good vs bad practices
 
 ---
 > Source: [Shopify/horizon](https://github.com/Shopify/horizon) — distributed by [TomeVault](https://tomevault.io).
