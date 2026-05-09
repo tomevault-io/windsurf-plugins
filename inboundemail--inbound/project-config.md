@@ -1,220 +1,110 @@
 ---
 trigger: always_on
-description: This project uses Autumn for pricing, billing, and subscription management. Here are the key patterns and configurations:
+description: Amazon SES API v2 is an Amazon Web Services service for sending email messages to customers. This reference provides a comprehensive overview of the SESv2Client commands and configuration options.
 ---
 
-# Autumn Pricing Integration Guide
+# AWS SES v2 Client Reference
 
-This project uses Autumn for pricing, billing, and subscription management. Here are the key patterns and configurations:
+Amazon SES API v2 is an Amazon Web Services service for sending email messages to customers. This reference provides a comprehensive overview of the SESv2Client commands and configuration options.
 
-## Core Integration Functions
+## Installation
 
-There are 3 essential functions for implementing pricing:
-
-1. **`attach()`** - Redirects customers to Stripe checkout when they click "Upgrade to Pro"
-2. **`check()`** - Checks if customers have remaining usage and permissions for features
-3. **`track()`** - Sends usage events to Autumn for billing tracking
-
-## Client-Side Hooks
-
-### Basic Setup
-Import the main hooks from `autumn-js/react`:
-
-```typescript
-import { useAutumn, useCustomer } from "autumn-js/react";
-
-const { attach, check, track } = useAutumn();
-const { customer, refetch } = useCustomer();
-```
-
-### Usage Patterns
-
-```typescript
-// Purchase/Upgrade Flow
-await attach({ 
-  productId: "pro",
-  dialog: ProductChangeDialog // Optional: for upgrade flows
-});
-
-// Feature Permission Check
-const { data } = await check({ 
-  featureId: "messages",
-  dialog: PaywallDialog // Optional: for paywall flows
-});
-
-if (!data?.allowed) {
-  // Handle blocked access
-}
-
-// Track Usage
-await track({ featureId: "messages" });
-```
-
-## Provider Setup
-
-The app should be wrapped with `AutumnProvider` in [app/layout.tsx](mdc:app/layout.tsx):
-
-```typescript
-import { AutumnProvider } from "autumn-js/react";
-
-<AutumnProvider backendUrl={process.env.BETTER_AUTH_URL || ""}>
-  {children}
-</AutumnProvider>
-```
-
-## Billing Flow Components
-
-### Product Change Dialog
-For handling upgrades, downgrades, and subscription changes:
+Install the AWS SDK for JavaScript v3 SES v2 client:
 
 ```bash
-bunx --bun shadcn@latest add https://ui.useautumn.com/classic/product-change-dialog.json
+# Using bun (preferred for this project)
+bun add @aws-sdk/client-sesv2
+
+# Alternative package managers
+npm install @aws-sdk/client-sesv2
+yarn add @aws-sdk/client-sesv2
+pnpm add @aws-sdk/client-sesv2
 ```
 
-**Usage:**
-```typescript
-import ProductChangeDialog from "@components/autumn/product-change-dialog";
+## Client Configuration
 
-<Button
-  onClick={async () =>
-    await attach({
-      productId: "pro",
-      dialog: ProductChangeDialog,
-    })
-  }
-/>
-```
+The SESv2Client accepts the following configuration parameters:
 
-**Scenarios handled:**
-- `upgrade` - Customer upgrading their product
-- `downgrade` - Customer downgrading to another paid tier  
-- `cancel` - Customer downgrading to free product
-- `renew` - Customer reactivating cancelled product
-- `scheduled` - Product already scheduled for future
-- `active` - Customer already has the product
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `region` | `string \| Provider<string>` | **Required.** The AWS region to send requests to |
+| `credentials` | `AwsCredentialIdentity \| Provider<AwsCredentialIdentity>` | AWS credentials for authentication |
+| `maxAttempts` | `number \| Provider<number>` | Maximum number of retry attempts (default: 3) |
+| `retryMode` | `string \| Provider<string>` | Retry algorithm to use (`legacy`, `standard`, `adaptive`) |
+| `logger` | `Logger` | Logger for debug/info/warn/error messages |
+| `requestHandler` | `__HttpHandlerUserInput` | HTTP handler (Fetch in browser, Https in Node.js) |
+| `defaultsMode` | `DefaultsMode \| Provider<DefaultsMode>` | How default configuration options are resolved |
+| `profile` | `string` | AWS profile name for credential resolution |
+| `useDualstackEndpoint` | `boolean \| Provider<boolean>` | Enable IPv6/IPv4 dualstack endpoint |
+| `useFipsEndpoint` | `boolean \| Provider<boolean>` | Enable FIPS-compliant endpoints |
+| `disableHostPrefix` | `boolean` | Disable dynamic endpoint modification |
+| `extensions` | `RuntimeExtension[]` | Optional runtime extensions |
 
-### Paywall Dialog
-For blocking access and prompting upgrades:
+## Commands by Category
 
-```bash
-bunx --bun shadcn@latest add https://ui.useautumn.com/classic/paywall-dialog.json
-```
+### Account Management
+| Command | Purpose |
+|---------|---------|
+| `GetAccountCommand` | Get account email-sending status and capabilities |
+| `PutAccountDetailsCommand` | Update Amazon SES account details |
+| `PutAccountSendingAttributesCommand` | Enable/disable account email sending |
+| `PutAccountSuppressionAttributesCommand` | Configure account-level suppression list |
+| `PutAccountVdmAttributesCommand` | Update account VDM (Virtual Deliverability Manager) attributes |
+| `PutAccountDedicatedIpWarmupAttributesCommand` | Configure automatic IP warm-up |
 
-**Usage:**
-```typescript
-import PaywallDialog from "@components/autumn/paywall-dialog";
+### Email Identities
+| Command | Purpose |
+|---------|---------|
+| `CreateEmailIdentityCommand` | Start verifying an email address or domain |
+| `DeleteEmailIdentityCommand` | Delete an email identity |
+| `GetEmailIdentityCommand` | Get identity verification status and settings |
+| `ListEmailIdentitiesCommand` | List all email identities in account |
+| `PutEmailIdentityConfigurationSetAttributesCommand` | Associate identity with configuration set |
+| `PutEmailIdentityDkimAttributesCommand` | Enable/disable DKIM authentication |
+| `PutEmailIdentityDkimSigningAttributesCommand` | Configure DKIM signing attributes |
+| `PutEmailIdentityFeedbackAttributesCommand` | Configure bounce/complaint feedback |
+| `PutEmailIdentityMailFromAttributesCommand` | Configure custom Mail-From domain |
 
-const { data } = await check({
-  featureId: "ai-messages",
-  dialog: PaywallDialog,
-});
-```
+### Email Sending
+| Command | Purpose |
+|---------|---------|
+| `SendEmailCommand` | Send a single email (simple, raw, or templated) |
+| `SendBulkEmailCommand` | Send email to multiple destinations |
+| `SendCustomVerificationEmailCommand` | Send custom verification email |
 
-**Scenarios handled:**
-- `usage_limit` - Customer hit usage limit for feature
-- `feature_flag` - Customer doesn't have access to feature
+### Configuration Sets
+| Command | Purpose |
+|---------|---------|
+| `CreateConfigurationSetCommand` | Create a configuration set |
+| `DeleteConfigurationSetCommand` | Delete a configuration set |
+| `GetConfigurationSetCommand` | Get configuration set details |
+| `ListConfigurationSetsCommand` | List all configuration sets |
+| `PutConfigurationSetArchivingOptionsCommand` | Configure email archiving |
+| `PutConfigurationSetDeliveryOptionsCommand` | Associate with dedicated IP pool |
+| `PutConfigurationSetReputationOptionsCommand` | Enable/disable reputation tracking |
+| `PutConfigurationSetSendingOptionsCommand` | Enable/disable sending for configuration set |
+| `PutConfigurationSetSuppressionOptionsCommand` | Configure suppression list preferences |
+| `PutConfigurationSetTrackingOptionsCommand` | Configure open/click tracking domain |
+| `PutConfigurationSetVdmOptionsCommand` | Configure VDM preferences |
 
-### Pricing Table
-For displaying available products and features:
+### Event Destinations
+| Command | Purpose |
+|---------|---------|
+| `CreateConfigurationSetEventDestinationCommand` | Create event destination |
+| `DeleteConfigurationSetEventDestinationCommand` | Delete event destination |
+| `GetConfigurationSetEventDestinationsCommand` | List event destinations |
+| `UpdateConfigurationSetEventDestinationCommand` | Update event destination configuration |
 
-```bash
-bunx --bun shadcn@latest add https://ui.useautumn.com/classic/pricing-table.json
-```
+### Email Templates
+| Command | Purpose |
+|---------|---------|
+| `CreateEmailTemplateCommand` | Create an email template |
+| `DeleteEmailTemplateCommand` | Delete an email template |
+| `GetEmailTemplateCommand` | Get template details |
+| `ListEmailTemplatesCommand` | List all email templates |
+| `UpdateEmailTemplateCommand` | Update an email template |
 
-**Usage:**
-```typescript
-import { PricingTable } from "@components/autumn/pricing-table";
-
-export const PricingPage = () => (
-  <div>
-    <PricingTable />
-  </div>
-);
-```
-
-## Customization Files
-
-When installing components, these customization files are created:
-
-- `/lib/autumn/get-product-change-texts.tsx` - Customize product change dialog texts
-- `/lib/autumn/get-paywall-texts.tsx` - Customize paywall dialog texts
-
-## Component Styles
-
-Available style variants for all components:
-- `classic` - Default style
-- `clean` - Minimal style  
-- `dev` - Developer-focused style
-
-Change the URL in installation commands to use different styles. View all at pricecn.com.
-
-## Environment Variables
-
-Required for Autumn integration:
-- `BETTER_AUTH_URL` - Backend URL for Autumn provider
-- Stripe keys should be configured in Autumn dashboard
-
-## Common Implementation Patterns
-
-### Feature Gating
-```typescript
-const { check } = useAutumn();
-
-const handleFeatureUse = async () => {
-  const { data } = await check({ featureId: "premium-feature" });
-  
-  if (data?.allowed) {
-    // Execute feature
-    await track({ featureId: "premium-feature" });
-  } else {
-    // Show paywall or upgrade prompt
-  }
-};
-```
-
-### Subscription Status Display
-```typescript
-const { customer } = useCustomer();
-
-return (
-  <div>
-    <h1>Welcome {customer?.name}</h1>
-    <p>Plan: {customer?.product?.name}</p>
-    <p>Usage: {customer?.usage?.messages} messages used</p>
-  </div>
-);
-```
-
-### Conditional Feature Access
-```typescript
-const { customer } = useCustomer();
-const isPro = customer?.product?.id === "pro";
-
-return (
-  <div>
-    {isPro ? (
-      <PremiumFeature />
-    ) : (
-      <UpgradePrompt />
-    )}
-  </div>
-);
-```
-
-## Best Practices
-
-1. **Always check permissions** before allowing feature usage
-2. **Track usage immediately** after successful feature execution
-3. **Use dialogs for smooth UX** instead of direct redirects
-4. **Customize dialog texts** to match your brand voice
-5. **Handle loading states** during billing operations
-6. **Implement proper error handling** for failed payments
-7. **Test with Stripe test keys** before going live
-8. **Use TypeScript types** for customer and product data
-
-## Server-Side Integration
-
-For server-side feature checks and usage tracking, use Autumn's backend SDK with the same patterns as client-side hooks.
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [inboundemail/inbound](https://github.com/inboundemail/inbound) — distributed by [TomeVault](https://tomevault.io).
