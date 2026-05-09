@@ -1,213 +1,117 @@
 ---
 trigger: always_on
-description: This project uses the Better Auth Stripe plugin for payment and subscription functionality. Here are the key patterns and configurations:
+description: The project uses an MDX-based changelog system located at `/changelog`. All changelog entries are stored as MDX files in the [app/changelog/entries](mdc:app/changelog/entries) directory.
 ---
 
-# Better Auth Stripe Integration Guide
+# Changelog Management Guide
 
-This project uses the Better Auth Stripe plugin for payment and subscription functionality. Here are the key patterns and configurations:
+## Overview
+The project uses an MDX-based changelog system located at `/changelog`. All changelog entries are stored as MDX files in the [app/changelog/entries](mdc:app/changelog/entries) directory.
 
-## Project Structure
+## Creating Changelog Entries
 
-- **Auth Server**: Look for `auth.ts` in the lib directory for server-side Stripe configuration
-- **Auth Client**: [lib/auth-client.ts](mdc:lib/auth-client.ts) - Client-side auth utilities with Stripe client
-- **Database Schema**: [lib/db/schema.ts](mdc:lib/db/schema.ts) - Contains subscription tables and user Stripe fields
+### File Naming Convention
+Use date-based naming: `YYYY-MM-DD-feature-name.mdx`
+Example: `2025-01-23-lambda-multi-recipient-fix.mdx`
 
-## Server-Side Configuration
-
-### Basic Stripe Plugin Setup
-```typescript
-import { betterAuth } from "better-auth"
-import { stripe } from "@better-auth/stripe"
-import Stripe from "stripe"
-
-const stripeClient = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-    apiVersion: "2025-02-24.acacia",
-})
-
-export const auth = betterAuth({
-    plugins: [
-        stripe({
-            stripeClient,
-            stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET!,
-            createCustomerOnSignUp: true,
-        })
-    ]
-})
+### Required Frontmatter
+Every changelog entry MUST include the following frontmatter:
+```yaml
+---
+title: Your Feature Title
+date: YYYY-MM-DD
+version: X.Y.Z
+summary: Brief one-line description of the change
+---
 ```
 
-### Subscription Plans Configuration
-```typescript
-// Static plans
-subscription: {
-    enabled: true,
-    plans: [
-        {
-            name: "basic",
-            priceId: "price_1234567890",
-            annualDiscountPriceId: "price_1234567890", // optional
-            limits: {
-                projects: 5,
-                storage: 10
-            }
-        },
-        {
-            name: "pro",
-            priceId: "price_0987654321",
-            limits: {
-                projects: 20,
-                storage: 50
-            },
-            freeTrial: {
-                days: 14,
-            }
-        }
-    ]
+### Version Numbering
+Follow semantic versioning (SemVer):
+- **Major (X.0.0)**: Breaking changes, major overhauls
+- **Minor (0.X.0)**: New features, significant improvements
+- **Patch (0.0.X)**: Bug fixes, small improvements
+
+### Content Structure
+1. **Overview/Problem**: Describe what issue this addresses or what's new
+2. **What Changed**: List the specific changes made
+3. **Technical Details** (if applicable): Code examples, configuration changes
+4. **Impact**: How this affects users
+5. **Migration Guide** (if needed): Steps users need to take
+
+### Example Entry
+```mdx
+---
+title: Webhook Retry Logic Implementation
+date: 2025-01-24
+version: 1.9.1
+summary: Added automatic retry logic for failed webhook deliveries with exponential backoff
+---
+
+## Overview
+We've implemented robust retry logic to ensure webhook deliveries succeed even during temporary network issues.
+
+## What Changed
+- Failed webhooks now retry up to 3 times
+- Exponential backoff prevents server overload
+- New monitoring metrics in dashboard
+
+## Technical Details
+Webhooks now support configuration options:
+\`\`\`json
+{
+  "retryAttempts": 3,
+  "retryDelay": 1000
 }
+\`\`\`
 
-// Dynamic plans (from database)
-subscription: {
-    enabled: true,
-    plans: async () => {
-        const plans = await db.query("SELECT * FROM plans");
-        return plans.map(plan => ({
-            name: plan.name,
-            priceId: plan.stripe_price_id,
-            limits: JSON.parse(plan.limits)
-        }));
-    }
-}
+## Impact
+No action required - fully backward compatible.
 ```
 
-## Client-Side Configuration
+## Changelog Page Features
 
-### Auth Client Setup
-```typescript
-import { createAuthClient } from "better-auth/client"
-import { stripeClient } from "@better-auth/stripe/client"
+### Main Page ([/changelog](mdc:app/changelog/page.tsx))
+- Timeline visualization with connected dots
+- Sorted by date (newest first)
+- Shows title, date, version, and summary
+- Links to full entry details
 
-export const client = createAuthClient({
-    plugins: [
-        stripeClient({
-            subscription: true // enables subscription management
-        })
-    ]
-})
-```
+### Entry Pages ([/changelog/[slug]](mdc:app/changelog/[slug]/page.tsx))
+- Full MDX rendering with syntax highlighting
+- Custom styled components matching app theme
+- Back navigation to main changelog
 
-## Subscription Management Patterns
+## Best Practices
 
-### Creating Subscriptions
-```typescript
-// Basic subscription upgrade
-await client.subscription.upgrade({
-    plan: "pro",
-    successUrl: "/dashboard",
-    cancelUrl: "/pricing",
-    annual: true, // optional: upgrade to annual plan
-    referenceId: "org_123", // optional: defaults to user ID
-    seats: 5 // optional: for team plans
-});
+### DO:
+- Write user-focused summaries
+- Include code examples for technical changes
+- Mention if changes are breaking
+- Add migration guides when needed
+- Use clear, descriptive titles
 
-// With error handling
-const { error } = await client.subscription.upgrade({
-    plan: "pro",
-    successUrl: "/dashboard",
-    cancelUrl: "/pricing",
-});
-if(error) {
-    alert(error.message);
-}
-```
+### DON'T:
+- Use internal jargon without explanation
+- Forget to test MDX rendering
+- Skip the summary field
+- Use inconsistent version numbers
 
-### Listing Active Subscriptions
-```typescript
-const { data: subscriptions } = await client.subscription.list();
+## Adding to Navigation
+The changelog is already linked in:
+- [SiteHeader](mdc:components/site-header.tsx) - For public pages
+- [MarketingHeader](mdc:components/marketing-header.tsx) - For marketing pages
 
-// Get the active subscription
-const activeSubscription = subscriptions.find(
-    sub => sub.status === "active" || sub.status === "trialing"
-);
+## MDX Components
+The changelog supports all standard markdown plus:
+- Code blocks with syntax highlighting
+- Tables
+- Images (automatically styled)
+- Links (styled with primary color)
+- Lists (bullets and numbered)
+- Blockquotes
 
-// Check subscription limits
-const projectLimit = activeSubscription?.limits?.projects || 0;
-```
-
-### Canceling Subscriptions
-```typescript
-const { data } = await client.subscription.cancel({
-    returnUrl: "/account",
-    referenceId: "org_123" // optional, defaults to userId
-});
-```
-
-### Restoring Canceled Subscriptions
-```typescript
-const { data } = await client.subscription.restore({
-    referenceId: "org_123" // optional, defaults to userId
-});
-```
-
-## Reference System for Organizations
-
-### Team/Organization Subscriptions
-```typescript
-// Create subscription for organization
-await client.subscription.upgrade({
-    plan: "team",
-    referenceId: "org_123456",
-    seats: 10, // team members
-    successUrl: "/org/billing/success",
-    cancelUrl: "/org/billing"
-});
-
-// List organization subscriptions
-const { data: subscriptions } = await client.subscription.list({
-    query: {
-        referenceId: "org_123456"
-    }
-});
-```
-
-### Authorization for Reference IDs
-```typescript
-subscription: {
-    authorizeReference: async ({ user, session, referenceId, action }) => {
-        if (action === "upgrade-subscription" || action === "cancel-subscription" || action === "restore-subscription") {
-            const org = await db.member.findFirst({
-                where: {
-                    organizationId: referenceId,
-                    userId: user.id
-                }   
-            });
-            return org?.role === "owner"
-        }
-        return true;
-    }
-}
-```
-
-## Webhook Configuration
-
-### Required Webhook Events
-Set up webhooks in Stripe dashboard for:
-- `checkout.session.completed`
-- `customer.subscription.updated` 
-- `customer.subscription.deleted`
-
-Webhook URL: `https://your-domain.com/api/auth/stripe/webhook`
-
-### Custom Event Handling
-```typescript
-stripe({
-    onEvent: async (event) => {
-        switch (event.type) {
-            case "invoice.paid":
-                // Handle paid invoice
-                break;
-            case "payment_intent.succeeded":
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+## Deployment
+Changelog entries are automatically included in the build. No additional configuration needed - just add the MDX file to the entries directory.
 
 ---
 > Source: [inboundemail/inbound](https://github.com/inboundemail/inbound) — distributed by [TomeVault](https://tomevault.io).
