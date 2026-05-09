@@ -1,132 +1,177 @@
 ---
 trigger: always_on
-description: Landmark element accessibility compliance and WCAG 2.4.1 Bypass Blocks requirements
+description: Liquid syntax standards
 ---
 
-# Landmark Element Accessibility Standards
 
-Ensures landmark elements follow WCAG compliance and provide proper content structure for screen reader navigation and bypass blocks functionality.
+# Liquid Syntax Standards
 
-<rule>
-name: landmark_accessibility_standards
-description: Enforce landmark element accessibility standards per WCAG 2.4.1 Bypass Blocks requirements
-filters:
-  - type: file_extension
-    pattern: "\\.(vue|jsx|tsx|html|liquid|php|js|ts)$"
+## ⚠️ CRITICAL: Schema Editing
 
-actions:
-  - type: enforce
-    conditions:
-      # Multiple instances of single-instance landmarks
-      - pattern: "(?i)<(header|banner)[^>]*>.*<(header|banner)[^>]*>"
-        message: "Page should not contain more than one instance of header/banner landmark."
+**NEVER edit the `{% schema %}` block directly in `.liquid` files!**
 
-      - pattern: "(?i)<main[^>]*>.*<main[^>]*>"
-        message: "Page should not contain more than one instance of main landmark."
+Schemas are generated from source files in the `schemas/` folder. To make schema changes:
 
-      - pattern: "(?i)<(footer|contentinfo)[^>]*>.*<(footer|contentinfo)[^>]*>"
-        message: "Page should not contain more than one instance of footer/contentinfo landmark."
+1. Find the corresponding `.js` file in `schemas/blocks/` or `schemas/sections/`
+2. Edit the JavaScript source file
+3. Run `npm run build:schemas` to regenerate the `.liquid` files
 
-      # Missing distinguishable names for multiple landmarks of same type
-      - pattern: "(?i)<nav[^>]*>.*<nav[^>]*>"
-        pattern_negate: "(aria-label|aria-labelledby)"
-        message: "Multiple navigation landmarks should have distinguishable names using aria-label or aria-labelledby."
+See [@schemas](mdc:.cursor/rules/schemas.mdc) for more details.
 
-      - pattern: "(?i)<(section|region)[^>]*>.*<(section|region)[^>]*>"
-        pattern_negate: "(aria-label|aria-labelledby)"
-        message: "Multiple section/region landmarks should have distinguishable names using aria-label or aria-labelledby."
+---
 
-      - pattern: "(?i)<(aside|complementary)[^>]*>.*<(aside|complementary)[^>]*>"
-        pattern_negate: "(aria-label|aria-labelledby)"
-        message: "Multiple aside/complementary landmarks should have distinguishable names using aria-label or aria-labelledby."
+## Valid Tags with Parameters
 
-      # Content outside landmarks
-      - pattern: "(?i)<body[^>]*>"
-        pattern_negate: "(<header|<nav|<main|<aside|<section|<footer|<banner|<navigation|<complementary|<contentinfo|<region)"
-        message: "All content should be contained within landmark regions."
+**Control Flow:**
 
-      # Excessive number of landmarks (more than 8-10)
-      - pattern: "(?i)(<header|<nav|<main|<aside|<section|<footer|<banner|<navigation|<complementary|<contentinfo|<region)"
-        pattern_negate: "(aria-label|aria-labelledby)"
-        message: "Consider reducing the number of landmarks to minimize navigation complexity."
+- `if condition` / `endif` - Conditional logic
+- `unless condition` / `endunless` - Negative conditional
+- `case variable` / `when value` / `endcase` - Switch statement
+- `for item in array` / `endfor` - Loop with optional `limit:`, `offset:`
 
-      # Missing main landmark
-      - pattern: "(?i)<body[^>]*>"
-        pattern_negate: "<main[^>]*>"
-        message: "Page should contain a main landmark for primary content."
+**Variable Assignment:**
 
-      # Landmark without proper role or semantic element
-      - pattern: "(?i)role=\"(banner|navigation|main|complementary|contentinfo|region)\""
-        pattern_negate: "(<header|<nav|<main|<aside|<section|<footer)"
-        message: "Landmark roles should be used with semantic HTML elements when possible."
+- `assign variable = value` - Create variable
+- `capture variable` / `endcapture` - Capture output
+- `increment variable` - Add 1 to counter
+- `decrement variable` - Subtract 1 from counter
 
-      # Nested landmarks of same type
-      - pattern: "(?i)<nav[^>]*>.*<nav[^>]*>.*</nav>.*</nav>"
-        message: "Avoid nesting landmarks of the same type."
+**Template Inclusion:**
 
-      - pattern: "(?i)<section[^>]*>.*<section[^>]*>.*</section>.*</section>"
-        message: "Avoid nesting landmarks of the same type."
+- `render 'snippet-name'` - Include snippet
+- `render 'snippet-name', param: value` - With parameters
+- `section 'section-name'` - Include section
 
-      # Landmark without accessible name
-      - pattern: "(?i)<(section|region|aside|complementary)[^>]*>"
-        pattern_negate: "(aria-label|aria-labelledby|<h[1-6])"
-        message: "Landmarks should have accessible names via aria-label, aria-labelledby, or heading elements."
+**Forms:**
 
-      # Generic landmark names
-      - pattern: "(?i)aria-label=\"(section|region|content|area)\""
-        message: "Landmark names should be specific and descriptive, not generic."
+- `form 'cart'` / `endform` - Cart form
+- `form 'product'` / `endform` - Product form
+- `form 'customer_login'` / `endform` - Login form
 
-      # Landmark with empty or meaningless name
-      - pattern: "(?i)aria-label=\"\\s*\""
-        message: "Landmark aria-label should contain meaningful text."
+**Other:**
 
-  - type: suggest
-    message: |
-      **WCAG 2.4.1 Landmark Accessibility Requirements:**
+- `paginate collection.products by 12` / `endpaginate` - Paginate results
+- `liquid` / `endliquid` - Multiline Liquid block
+- `comment` / `endcomment` - Block comments
+- `raw` / `endraw` - Output without processing
 
-      **Bypass Blocks Functionality:**
-      - **Screen Reader Navigation:** Landmarks allow users to navigate by page sections
-      - **Content Structure:** Landmarks provide clear layout organization
-      - **Alternative Methods:** Skip links, headings, and expand/collapse regions can also be used
+## Valid Filters
 
-      **Landmark Structural Organization:**
+**Array Filters:**
 
-      **1. Page Layout Groupings:**
-      ```html
-      <!-- Good: Proper page structure with landmarks -->
-      <body>
-        <header role="banner">
-          <h1>Company Name</h1>
-          <nav role="navigation" aria-label="Primary">
-            <ul>
-              <li><a href="/">Home</a></li>
-              <li><a href="/about">About</a></li>
-            </ul>
-          </nav>
-        </header>
+- `compact` - Remove nil values: `array | compact`
+- `concat` - Join arrays: `array | concat: array`
+- `find` - Find object: `array | find: property, value`
+- `where` - Filter objects: `array | where: property, value`
+- `map` - Extract property: `array | map: property`
+- `sort` - Sort array: `array | sort`
+- `reverse` - Reverse order: `array | reverse`
+- `first` - First item: `array | first`
+- `last` - Last item: `array | last`
+- `size` - Count items: `array | size`
 
-        <main role="main">
-          <h2>Page Content</h2>
-          <p>Main content goes here...</p>
-        </main>
+**String Filters:**
 
-        <aside role="complementary" aria-label="Related information">
-          <h3>Related Links</h3>
-          <ul>
-            <li><a href="/related">Related Content</a></li>
-          </ul>
-        </aside>
+- `escape` - HTML escape: `string | escape`
+- `truncate` - Limit length: `string | truncate: 150`
+- `handleize` - URL handle: `string | handleize`
+- `replace` - Replace text: `string | replace: 'old', 'new'`
+- `split` - Split string: `string | split: 'delimiter'`
+- `upcase` - Uppercase: `string | upcase`
+- `downcase` - Lowercase: `string | downcase`
+- `capitalize` - Capitalize: `string | capitalize`
 
-        <footer role="contentinfo">
-          <p>&copy; 2024 Company Name</p>
-        </footer>
-      </body>
-      ```
+**Money Filters:**
 
-      **2. Content Within Landmarks:**
-      ```html
-      <!-- Good: All content within landmarks -->
-      <body>
+- `money` - Format price: `price | money`
+- `money_with_currency` - With symbol: `price | money_with_currency`
+- `money_without_currency` - No symbol: `price | money_without_currency`
+
+**Media Filters:**
+
+- `image_url` - Responsive image: `image | image_url: width: 800`
+- `image_tag` - Complete img tag: `image | image_tag`
+- `asset_url` - Theme asset: `'style.css' | asset_url`
+
+## Syntax Rules
+
+- Use `{% liquid %}` for multiline code blocks
+- Use `{% # comment %}` for inline comments
+- Never invent new filters, tags, or objects
+- Follow proper tag closing order (last opened, first closed)
+- Use object dot notation: `product.title` not `product['title']`
+- Respect object scope and availability
+
+## Snippet Documentation with {% doc %}
+
+All snippets must include documentation using `{% doc %}` and `{% enddoc %}` tags.
+
+**Parameter types:** `{object}`, `{string}`, `{number}`, `{boolean}`, `{array}`
+**Optional params:** Use brackets like `[param_name]`
+**Nested properties:** Use dash notation like `object - .property`
+
+**Example:**
+
+```liquid
+{% doc %}
+  Volume Pricing Info
+
+  Renders volume pricing information with quantity rules in a popover.
+  Only renders if variant has quantity rules or volume pricing.
+
+  @param {object} variant - The variant object to display pricing for
+  @param {string} [unique_id] - Optional unique identifier to append to popover ID
+  @param {number} [quantity] - The current quantity (for highlighting active tier)
+
+  @example
+  {% render 'volume-pricing-info',
+    variant: item.variant,
+    unique_id: item.index,
+    quantity: item.quantity
+  %}
+{% enddoc %}
+```
+
+## Inline Variables Pattern
+
+For props that are relatively straightforward, prefer to inline the liquid instead of declaring extra variables. In smaller components it doesn't make a big difference, but in bigger ones it helps not having to scroll up and down to know what is being applied where.
+
+**✅ Do this (inline approach):**
+
+```liquid
+<div
+  class='component component--{{ settings.style_modifier }}'
+  style='
+    color: {{ settings.text_color }};
+    {% if settings.show_border %}
+      border: 1px solid {{ settings.border_color }};
+    {% endif %}
+  '
+>
+  <h2>{{ 'sections.component.title' | t }}</h2>
+
+  {{ content | truncate: settings.max_length | default: 200 }}
+
+  <a
+    href='{{ link_url }}'
+    class='link--{{ settings.link_style | default: 'primary' }}'
+  >
+    {{ 'general.read_more' | t }}
+  </a>
+</div>
+```
+
+**❌ Don't do this (variable declaration approach):**
+
+```liquid
+{% liquid
+  assign component_class = 'component component--' | append: settings.style_modifier
+  assign text_color = settings.text_color
+  assign truncate_length = settings.max_length | default: 200
+  assign link_class = 'link--' | append: settings.link_style | default: 'primary'
+%}
+
+{% capture component_style %}
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
