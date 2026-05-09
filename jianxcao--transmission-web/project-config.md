@@ -1,270 +1,307 @@
 ---
 trigger: always_on
-description: API 调用和数据处理规范（Transmission RPC）
+description: 项目代码编写标准和最佳实践
 ---
 
 
-# API 和数据处理规范
+# 代码编写规范
 
-针对 Transmission RPC API 的最佳实践
+## 代码风格
 
-## API 层设计
+### 格式化
+- 使用 Prettier 进行代码格式化
+- 保存文件时自动格式化
+- 遵循项目的 ESLint 配置
+- 使用 2 空格缩进
 
-### API 文件组织
-```
-api/
-├── rpc.ts           # Transmission RPC 核心接口
-├── trpc.ts          # tRPC 配置
-├── types.ts         # API 类型定义
-└── interceptors.ts  # 请求拦截器（可选）
-```
-
-### RPC 方法封装
+### 命名规范
 ```typescript
-// api/rpc.ts
-import axios, { AxiosInstance } from 'axios'
+// ✅ 组件命名：PascalCase
+AppHeader.vue
+SettingsDialog.vue
+TorrentList.vue
 
-class TransmissionRPC {
-  private client: AxiosInstance
-  private sessionId: string = ''
-  
-  constructor(baseURL: string) {
-    this.client = axios.create({
-      baseURL,
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    })
-    
-    this.setupInterceptors()
-  }
-  
-  // ✅ 统一的 RPC 调用方法
-  private async call<T = any>(
-    method: string, 
-    arguments?: Record<string, any>
-  ): Promise<T> {
-    try {
-      const response = await this.client.post('/rpc', {
-        method,
-        arguments
-      }, {
-        headers: {
-          'X-Transmission-Session-Id': this.sessionId
-        }
-      })
-      
-      if (response.data.result !== 'success') {
-        throw new Error(response.data.result)
-      }
-      
-      return response.data.arguments as T
-    } catch (error) {
-      this.handleError(error)
-      throw error
-    }
-  }
-  
-  // ✅ 具体的 API 方法
-  async getTorrents(ids?: number[]): Promise<TorrentInfo[]> {
-    const args = ids ? { ids } : {}
-    const result = await this.call<{ torrents: TorrentInfo[] }>(
-      'torrent-get',
-      {
-        ...args,
-        fields: TORRENT_FIELDS
-      }
-    )
-    return result.torrents
-  }
-  
-  async addTorrent(options: AddTorrentOptions): Promise<TorrentInfo> {
-    const result = await this.call<{ torrent-added: TorrentInfo }>(
-      'torrent-add',
-      options
-    )
-    return result['torrent-added']
-  }
+// ✅ 文件夹命名：PascalCase（组件文件夹）
+components/TorrentDetail/
+components/CanvasList/
+
+// ✅ Composables：use + PascalCase
+useVirtualList.ts
+useCommonViewport.ts
+useTorrentFilter.ts
+
+// ✅ Store 文件：camelCase + Store 后缀
+torrentStore.ts
+sessionStore.ts
+settingStore.ts
+
+// ✅ 工具函数：camelCase
+formatBytes.ts
+parseDate.ts
+calculateProgress.ts
+
+// ✅ 常量：UPPER_SNAKE_CASE
+const MAX_RETRIES = 3
+const DEFAULT_PAGE_SIZE = 50
+```
+
+## TypeScript 使用
+
+### 类型定义
+```typescript
+// ✅ 优先使用 interface 定义对象类型
+interface TorrentInfo {
+  id: number
+  name: string
+  status: TorrentStatus
+  downloadDir: string
 }
 
-export const rpc = new TransmissionRPC(
-  import.meta.env.VITE_RPC_URL || '/transmission/rpc'
-)
+// ✅ 使用 type 定义联合类型或复杂类型
+type TorrentStatus = 'stopped' | 'checking' | 'downloading' | 'seeding'
+type Nullable<T> = T | null
+
+// ❌ 避免使用 any
+const data: any = response.data // 不推荐
+
+// ✅ 使用具体类型或 unknown
+const data: TorrentInfo = response.data
+```
+
+### 类型导出
+```typescript
+// ✅ 导出类型时使用 export type
+export type { TorrentInfo, TorrentStatus }
+export interface SessionStats {
+  downloadSpeed: number
+  uploadSpeed: number
+}
+```
+
+## 组件编写
+
+### Props 定义
+```typescript
+// ✅ 使用 TypeScript + defineProps
+interface Props {
+  torrent: TorrentInfo
+  showDetails?: boolean
+  onUpdate?: (id: number) => void
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  showDetails: false
+})
+
+// ✅ 复杂对象 props 使用 validator
+const props = defineProps({
+  status: {
+    type: String as PropType<TorrentStatus>,
+    required: true,
+    validator: (value: TorrentStatus) => {
+      return ['stopped', 'checking', 'downloading', 'seeding'].includes(value)
+    }
+  }
+})
+```
+
+### Emits 定义
+```typescript
+// ✅ 明确声明 emit 事件及其参数类型
+const emit = defineEmits<{
+  update: [id: number, data: Partial<TorrentInfo>]
+  delete: [id: number]
+  error: [message: string]
+}>()
+
+// 使用
+emit('update', torrent.id, { name: 'new name' })
+```
+
+### Composables 使用
+```typescript
+// ✅ 将可复用逻辑提取为 composable
+// composables/useTorrentFilter.ts
+export function useTorrentFilter(torrents: Ref<TorrentInfo[]>) {
+  const filterText = ref('')
+  const filteredTorrents = computed(() => {
+    if (!filterText.value) return torrents.value
+    return torrents.value.filter(t => 
+      t.name.toLowerCase().includes(filterText.value.toLowerCase())
+    )
+  })
+  
+  return {
+    filterText,
+    filteredTorrents
+  }
+}
 ```
 
 ## 错误处理
 
 ### 统一错误处理
 ```typescript
-// api/errors.ts
-export class TransmissionError extends Error {
-  constructor(
-    message: string,
-    public code?: string,
-    public statusCode?: number
-  ) {
-    super(message)
-    this.name = 'TransmissionError'
+// ✅ 使用 try-catch 包裹可能失败的操作
+async function fetchTorrents() {
+  try {
+    const response = await torrentApi.getAll()
+    return response.data
+  } catch (error) {
+    console.error('Failed to fetch torrents:', error)
+    message.error('获取种子列表失败')
+    throw error
   }
 }
 
-export class SessionIdError extends TransmissionError {
-  constructor() {
-    super('Invalid session ID', 'SESSION_ID_ERROR', 409)
-  }
-}
-
-export class NetworkError extends TransmissionError {
-  constructor(message: string) {
-    super(message, 'NETWORK_ERROR')
-  }
-}
-
-// api/rpc.ts
-private handleError(error: any): void {
-  // 409 错误：需要更新 Session ID
-  if (error.response?.status === 409) {
-    const sessionId = error.response.headers['x-transmission-session-id']
-    if (sessionId) {
-      this.sessionId = sessionId
-      throw new SessionIdError()
-    }
-  }
-  
-  // 网络错误
-  if (!error.response) {
-    throw new NetworkError('Network connection failed')
-  }
-  
-  // 其他错误
-  throw new TransmissionError(
-    error.response?.data?.message || error.message,
-    'UNKNOWN_ERROR',
-    error.response?.status
-  )
+// ✅ JSON 解析使用 try-catch
+try {
+  const config = JSON.parse(localStorage.getItem('config') || '{}')
+} catch (error) {
+  console.error('Failed to parse config:', error)
+  return {}
 }
 ```
 
-### 组件中的错误处理
+### 用户友好的错误提示
 ```typescript
-// ✅ 使用 try-catch 和用户友好的提示
+// ✅ 使用 Naive UI 的 message 组件显示错误
 import { useMessage } from 'naive-ui'
 
 const message = useMessage()
 
-async function handleAddTorrent() {
-  try {
-    await rpc.addTorrent({ filename: magnetLink })
-    message.success('种子添加成功')
-  } catch (error) {
-    if (error instanceof SessionIdError) {
-      // 自动重试
-      return handleAddTorrent()
-    }
-    
-    if (error instanceof NetworkError) {
-      message.error('网络连接失败，请检查连接')
-    } else {
-      message.error('添加种子失败')
-    }
-    
-    console.error('Failed to add torrent:', error)
-  }
+try {
+  await deleteTorrent(id)
+  message.success('删除成功')
+} catch (error) {
+  message.error('删除失败，请重试')
 }
 ```
 
-## 数据处理
+## 性能优化
 
-### JSON 解析
+### 计算属性
 ```typescript
-// ✅ 始终使用 try-catch 处理 JSON 解析
-function parseStoredConfig(): Config {
-  try {
-    const json = localStorage.getItem('config')
-    if (!json) {
-      return DEFAULT_CONFIG
-    }
-    return JSON.parse(json)
-  } catch (error) {
-    console.error('Failed to parse config:', error)
-    return DEFAULT_CONFIG
-  }
-}
+// ✅ 使用 computed 缓存计算结果
+const totalSize = computed(() => 
+  torrents.value.reduce((sum, t) => sum + t.totalSize, 0)
+)
 
-// ✅ 使用类型守卫验证解析结果
-function isValidConfig(data: unknown): data is Config {
-  return (
-    typeof data === 'object' &&
-    data !== null &&
-    'theme' in data &&
-    'language' in data
-  )
-}
-
-function loadConfig(): Config {
-  try {
-    const json = localStorage.getItem('config')
-    if (!json) return DEFAULT_CONFIG
-    
-    const data = JSON.parse(json)
-    if (isValidConfig(data)) {
-      return data
-    }
-    
-    console.warn('Invalid config format, using default')
-    return DEFAULT_CONFIG
-  } catch (error) {
-    console.error('Failed to load config:', error)
-    return DEFAULT_CONFIG
-  }
-}
+// ❌ 避免在模板中直接计算
+<template>
+  <!-- 不推荐 -->
+  <div>{{ torrents.reduce((sum, t) => sum + t.totalSize, 0) }}</div>
+</template>
 ```
 
-### 数据转换
+### v-show vs v-if
+```vue
+<!-- ✅ 频繁切换使用 v-show -->
+<div v-show="isVisible">频繁切换的内容</div>
+
+<!-- ✅ 条件渲染使用 v-if -->
+<div v-if="hasData">初始条件渲染</div>
+```
+
+### 列表渲染
+```vue
+<!-- ✅ 使用 key 优化列表渲染 -->
+<div v-for="torrent in torrents" :key="torrent.id">
+  {{ torrent.name }}
+</div>
+
+<!-- ❌ 避免使用 index 作为 key -->
+<div v-for="(torrent, index) in torrents" :key="index">
+  {{ torrent.name }}
+</div>
+```
+
+## 样式编写
+
+### 样式优先级
+```vue
+<script setup lang="ts">
+// 1. 优先使用 Tailwind 4 工具类
+</script>
+
+<template>
+  <!-- ✅ 使用 Tailwind -->
+  <div class="flex items-center gap-4 p-4">
+    <button class="px-4 py-2 bg-blue-500 text-white rounded">
+      Click me
+    </button>
+  </div>
+  
+  <!-- ✅ 使用 Naive UI 组件 -->
+  <n-button type="primary">Click me</n-button>
+  
+  <!-- ⚠️ 仅在必要时使用 Less -->
+  <div class="custom-style"></div>
+</template>
+
+<style lang="less" scoped>
+// 仅用于动态样式或复杂样式
+.custom-style {
+  background: linear-gradient(45deg, @primary-color, @secondary-color);
+}
+</style>
+```
+
+### 避免深层样式污染
+```vue
+<style lang="less" scoped>
+// ❌ 避免
+:deep(.n-button) {
+  /* 修改组件库样式 */
+}
+
+// ✅ 使用组件的 props 或 slots
+</style>
+```
+
+## 注释规范
+
+### 组件注释
 ```typescript
-// ✅ 将 API 数据转换为应用数据
-interface RpcTorrent {
-  id: number
-  name: string
-  totalSize: number
-  downloadedEver: number
-  status: number
-  rateDownload: number
-  rateUpload: number
-}
+/**
+ * 种子列表组件
+ * 
+ * 显示所有种子的列表，支持虚拟滚动和过滤功能
+ * 
+ * @example
+ * <TorrentList :torrents="torrents" @select="handleSelect" />
+ */
+export default defineComponent({
+  name: 'TorrentList'
+})
+```
 
-interface TorrentInfo {
-  id: number
-  name: string
-  totalSize: number
-  downloadedSize: number
-  status: TorrentStatus
-  downloadSpeed: number
-  uploadSpeed: number
-  progress: number
-}
+### 复杂逻辑注释
+```typescript
+// ✅ 为复杂逻辑添加注释
+// 计算种子的下载进度百分比
+// 如果 totalSize 为 0，返回 0 避免除零错误
+const progress = computed(() => {
+  if (torrent.value.totalSize === 0) return 0
+  return (torrent.value.downloadedSize / torrent.value.totalSize) * 100
+})
+```
 
-// 转换函数
-function transformTorrent(rpc: RpcTorrent): TorrentInfo {
-  return {
-    id: rpc.id,
-    name: rpc.name,
-    totalSize: rpc.totalSize,
-    downloadedSize: rpc.downloadedEver,
-    status: getRpcStatus(rpc.status),
-    downloadSpeed: rpc.rateDownload,
-    uploadSpeed: rpc.rateUpload,
-    progress: rpc.totalSize > 0 
-      ? (rpc.downloadedEver / rpc.totalSize) * 100 
-      : 0
-  }
-}
+## 导入规范
 
-// 状态映射
-function getRpcStatus(status: number): TorrentStatus {
-  const STATUS_MAP: Record<number, TorrentStatus> = {
-    0: 'stopped',
-    1: 'checking',
+### 导入顺序
+```typescript
+// 1. Vue 相关
+import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+
+// 2. 第三方库
+import { useMessage } from 'naive-ui'
+import { debounce } from 'lodash-es'
+
+// 3. 本地模块
+import { useTorrentStore } from '@/store/torrent'
+import type { TorrentInfo } from '@/types'
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
