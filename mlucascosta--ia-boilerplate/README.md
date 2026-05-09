@@ -7,11 +7,11 @@ Cross-AI workflow bootstrap for software delivery. Standardizes how Copilot, Cla
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [mlucascosta/ia_boilerplate](https://github.com/mlucascosta/ia_boilerplate).
+Original source: `CLAUDE.md` in [mlucascosta/ia_boilerplate](https://github.com/mlucascosta/ia_boilerplate).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
