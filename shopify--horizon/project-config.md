@@ -1,15 +1,16 @@
 ---
 trigger: always_on
-description: Product card accessibility compliance pattern
+description: Product filter component accessibility compliance pattern
 ---
 
-# Product Card Component Accessibility Standards
 
-Ensures product card components follow WCAG compliance and implement proper single tab-stop navigation for keyboard and screen reader users.
+# Product Filter Component Accessibility Standards
+
+Ensures product filter components follow WCAG compliance and WAI-ARIA Disclosure Pattern specifications, including sort controls and grid layout buttons.
 
 <rule>
-name: product_card_accessibility_standards
-description: Enforce product card component accessibility standards and single tab-stop navigation compliance
+name: product_filter_accessibility_standards
+description: Enforce product filter component accessibility standards and WAI-ARIA Disclosure Pattern compliance
 filters:
   - type: file_extension
     pattern: "\\.(vue|jsx|tsx|html|liquid|php|js|ts)$"
@@ -17,91 +18,93 @@ filters:
 actions:
   - type: enforce
     conditions:
-      # Product card missing article wrapper
-      - pattern: "(?i)<(div|section)[^>]*(?:product.*card|card.*product)[^>]*>"
-        pattern_negate: "<article"
-        message: "Product cards should be wrapped with the article element for semantic structure."
+      # Filter disclosure button role requirement (for non-button elements)
+      - pattern: "(?i)<(div|span)[^>]*(?:filter|disclosure|expand|collapse)[^>]*>"
+        pattern_negate: "role=\"button\""
+        message: "Non-button filter disclosure controls must have role='button'. Native button elements have implicit role and don't need explicit role attribute."
 
-      # Product card missing proper link structure
-      - pattern: "(?i)<article[^>]*(?:product.*card|card.*product)[^>]*>"
-        pattern_negate: "<a[^>]*>.*?</a>"
-        message: "Product cards must contain a link element for keyboard navigation and screen reader accessibility."
+      # Filter disclosure aria-expanded requirement
+      - pattern: "(?i)<[^>]*role=\"button\"[^>]*(?:filter|disclosure|expand|collapse)[^>]*>"
+        pattern_negate: "aria-expanded=\"(true|false)\""
+        message: "Filter disclosure controls must have aria-expanded attribute set to 'true' or 'false'."
 
-      # Product title not wrapped in link
-      - pattern: "(?i)<(h1|h2|h3|h4|h5|h6)[^>]*(?:product.*title|title.*product)[^>]*>"
-        pattern_negate: "<a[^>]*>.*?</a>"
-        message: "Product titles should be wrapped in link elements to provide proper navigation context."
+      # Filter disclosure missing keyboard event handlers
+      - pattern: "(?i)<[^>]*role=\"button\"[^>]*(?:filter|disclosure|expand|collapse)[^>]*>"
+        pattern_negate: "(onKeyDown|onkeydown|@keydown|v-on:keydown)"
+        message: "Filter disclosure controls should handle keyboard events (Enter, Space, and Escape)."
 
-      # Heading not wrapping link element
-      - pattern: "(?i)<(h1|h2|h3|h4|h5|h6)[^>]*(?:product.*title|title.*product)[^>]*>"
-        pattern_negate: "<a[^>]*>"
-        message: "Product card headings should wrap link elements to maintain proper heading semantics."
+      # Missing Escape key support for filter content
+      - pattern: "(?i)<div[^>]*(?:filter.*content|content.*filter)[^>]*>"
+        pattern_negate: "(onKeyDown|onkeydown|@keydown|v-on:keydown)"
+        message: "Filter content areas should handle Escape key to close filter and return focus to launcher."
 
-      # Missing product image alt text
-      - pattern: "(?i)<img[^>]*(?:product|card)[^>]*>"
-        pattern_negate: "alt=\"[^\"]+\""
-        message: "Product card images must have descriptive alt text for screen reader users."
+      # Filter disclosure content not a sibling
+      - pattern: "(?i)<[^>]*role=\"button\"[^>]*(?:filter|disclosure)[^>]*>"
+        pattern_negate: "<(div|section)[^>]*id=\"[^\"]+\"[^>]*>"
+        message: "Filter disclosure content must be a sibling to the disclosure control in the DOM."
 
-      # Empty alt text on product images
-      - pattern: "(?i)<img[^>]*(?:product|card)[^>]*alt=\"\"[^>]*>"
-        message: "Product card images should not have empty alt text; provide descriptive text or use alt=\"\" only for decorative images."
+      # Grid layout buttons missing aria-current
+      - pattern: "(?i)<(button|div|span)[^>]*(?:grid|layout|view)[^>]*>"
+        pattern_negate: "aria-current=\"(true|false)\""
+        message: "Grid layout buttons must have aria-current attribute set to 'true' or 'false'."
 
-      # Product price missing proper semantic structure
-      - pattern: "(?i)<(div|span)[^>]*(?:price|cost)[^>]*>"
-        pattern_negate: "(<span[^>]*aria-label|aria-label=\"[^\"]*price[^\"]*\")"
-        message: "Product prices should have proper semantic labeling for screen readers."
+      # Sort filter missing proper labeling
+      - pattern: "(?i)<(button|div|span)[^>]*(?:sort|order)[^>]*>"
+        pattern_negate: "(aria-label|aria-labelledby)"
+        message: "Sort filter controls should have proper labeling for screen reader context."
 
-      # Product description not in paragraph element
-      - pattern: "(?i)<(div|span)[^>]*(?:product.*description|description.*product)[^>]*>"
-        pattern_negate: "<p"
-        message: "Product descriptions should be wrapped in paragraph elements for proper semantic structure."
+      # Sort filter using checkboxes instead of radio buttons
+      - pattern: "(?i)<input[^>]*type=\"checkbox\"[^>]*(?:sort|order)[^>]*>"
+        message: "Sort filter options should use radio buttons since only one option can be selected at a time."
 
-      # Missing focus indicators
-      - pattern: "(?i)<a[^>]*(?:product.*card|card.*product)[^>]*>"
-        pattern_negate: "(focus|hover|active)"
-        message: "Product card links should have visible focus indicators for keyboard navigation."
+      # Checkbox groups missing fieldset
+      - pattern: "(?i)<input[^>]*type=\"checkbox\"[^>]*(?:filter|option)[^>]*>"
+        pattern_negate: "<fieldset"
+        message: "Filter checkbox groups should be wrapped in fieldset elements for proper grouping."
 
-      # Product card without proper positioning context
-      - pattern: "(?i)<article[^>]*(?:product.*card|card.*product)[^>]*>"
-        pattern_negate: "(position.*relative|position: relative)"
-        message: "Product card containers should have position: relative for proper link overlay positioning."
+      # Fieldset missing legend
+      - pattern: "(?i)<fieldset[^>]*(?:filter|option)[^>]*>"
+        pattern_negate: "<legend"
+        message: "Filter fieldsets must have legend elements to provide context for the group."
 
-      # Product card missing aria-labelledby
-      - pattern: "(?i)<article[^>]*(?:product.*card|card.*product)[^>]*>"
-        pattern_negate: "aria-labelledby=\"[^\"]+\""
-        message: "Product card articles should have aria-labelledby referencing the heading ID for better screen reader context."
-
-      # Product card heading missing ID
-      - pattern: "(?i)<(h1|h2|h3|h4|h5|h6)[^>]*(?:product.*title|title.*product)[^>]*>"
+      # Filter options missing proper IDs
+      - pattern: "(?i)<input[^>]*type=\"checkbox\"[^>]*(?:filter|option)[^>]*>"
         pattern_negate: "id=\"[^\"]+\""
-        message: "Product card headings should have unique ID attributes for aria-labelledby reference."
+        message: "Filter checkboxes should have unique ID attributes for proper labeling."
 
-      # Mouse-only link missing tabindex="-1"
-      - pattern: "(?i)<a[^>]*class=\"[^\"]*product-link-mouse[^\"]*\"[^>]*>"
-        pattern_negate: "tabindex=\"-1\""
-        message: "Mouse-only product links should have tabindex='-1' to remove them from tab order."
+      # Missing product count live region
+      - pattern: "(?i)<[^>]*(?:product.*count|count.*product)[^>]*>"
+        pattern_negate: "role=\"status\""
+        message: "Product count displays should use role='status' for screen reader announcements."
+
+
+
+      # Missing main products heading
+      - pattern: "(?i)<[^>]*(?:product.*filter|filter.*product)[^>]*>"
+        pattern_negate: "<h1[^>]*>.*[Pp]roducts?[^<]*</h1>"
+        message: "Product filter pages should have an h1 heading with 'Products' for proper page structure."
 
   - type: suggest
     message: |
-      **Product Card Component Accessibility Best Practices:**
+      **Product Filter Component Accessibility Best Practices:**
 
-      **Required Structure:**
-      - **article element:** Wrap each product card with the article element for semantic meaning
-      - **Single tab-stop:** Each product card should contain only one keyboard tab-stop
-      - **Link overlay:** Use absolutely positioned link that covers the entire card area
-      - **Heading wraps link:** The heading should wrap the link element to maintain proper heading semantics
+      **Page Structure Requirements:**
+      - Use `<h1>` for the main "Products" heading
+      - Wrap filter controls and product count in a `<div class="products-header">`
+      - Remove separate section headings for filters and product cards
+      - Present filters, count, and products as one cohesive section
 
-      **ARIA and Semantic Requirements:**
-      - **article role:** Implicit with article element, provides semantic structure
-      - **aria-labelledby:** Reference to the heading ID for article labeling
-      - **Heading ID:** Unique ID attribute for aria-labelledby reference
-      - **Link text:** Product title should be descriptive and unique
-      - **Image alt text:** Provide descriptive alt text for product images
-      - **Price text:** Use visible text for pricing information
-      - **Description text:** Use paragraph elements for product descriptions
+      **Product Count Live Region:**
+      - Add product count display with `role="status"`
+      - Use unique ID for the count text element (e.g., `id="product-count-text"`)
+      - Update count dynamically as filters are applied/removed
+      - Ensure count is announced to screen readers when it changes
 
-      **Keyboard Navigation Requirements:**
-      - **Single tab-stop:** Each product card should be navigable with one tab key press
+      **Required ARIA Attributes:**
+      - **role='button':** Only required for non-button elements (native button elements have implicit role)
+      - **aria-expanded:** 'true' if filter content is visible, 'false' if hidden
+      - **aria-controls:** Reference to the ID of the associated filter content
+      - **aria-current:** Set on grid layout buttons ('true' for active, 'false' for inactive)
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
