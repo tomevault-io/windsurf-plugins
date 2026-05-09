@@ -7,13 +7,13 @@ Baduk (Go) Platform — KataGo AI 대국 + 실시간 분석 + Tauri 2.0 데스�
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `.cursor/rules/*.mdc` in [idoforgod/baduk-AgenticWorkflow](https://github.com/idoforgod/baduk-AgenticWorkflow).
+Original source: `CLAUDE.md` in [idoforgod/baduk-AgenticWorkflow](https://github.com/idoforgod/baduk-AgenticWorkflow).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
+- **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
