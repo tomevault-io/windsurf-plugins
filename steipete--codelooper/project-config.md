@@ -1,238 +1,125 @@
 ---
 trigger: always_on
-description: AXorcist accessibility framework integration guidelines
+description: This document summarizes the debugging process used to locate a specific UI element (the AI slash input field) in the "Cursor" application (`com.todesktop.230313mzl4w4u92`) using `axorc`.
 ---
 
+# AXorcist Debugging: Finding the Cursor AI Slash Input Field
 
-# AXorcist Integration Guidelines
+This document summarizes the debugging process used to locate a specific UI element (the AI slash input field) in the "Cursor" application (`com.todesktop.230313mzl4w4u92`) using `axorc`.
 
-This document outlines best practices for working with the AXorcist accessibility framework integrated into CodeLooper.
+## Goal
 
-## AXorcist Overview
+The primary goal was to programmatically find the coordinates and read the text of the AI slash input field within the Cursor application. The key identifier for this field was its `AXDOMClassList` attribute, which was known to contain `"aislash-editor-input"`.
 
-**AXorcist** is a Swift accessibility framework that provides:
-- JSON-based interface to macOS Accessibility API
-- Command-line tool (`axorc`) for UI automation
-- Swift library for accessibility interactions
-- Support for UI element querying and actions
+## Initial Challenges & Learnings
 
-## Project Integration
+1.  **`kAXDOMClassListAttribute`**: This constant needed to be added to `AXorcist/Sources/AXorcist/Core/AccessibilityConstants.swift` to be usable in queries.
+2.  **`AXElementMatcher.swift` Modification**: The matching logic in `AXorcist/Sources/AXorcist/Search/PathNavigator.swift` (specifically `elementMatchesAllCriteria`) was updated to handle `AXDOMClassListAttribute` with "contains" logic for arrays of strings or space-separated strings.
+3.  **Build & Execution**:
+    *   Initial attempts to run `axorc` via `mcp_terminator_execute` failed.
+    *   Switching to `run_terminal_cmd` allowed successful builds (`swift package clean && swift build --product axorc` in the `AXorcist` directory) and execution.
+    *   Query input files (e.g., `query_cursor_input.json`) must exist at the specified path.
+4.  **Query Refinement - "Element not found"**:
+    *   Early queries directly targeting `AXDOMClassList` containing `"aislash-editor-input"` failed, even with increased `max_depth`.
+    *   Simplifying the query to fetch basic attributes of the application element (`"criteria": []`) helped confirm `axorc` could access the application.
+    *   Targeting broader elements like `AXScrollArea` also failed, indicating an incorrect assumption about the UI hierarchy or role.
+    *   Targeting `AXGroup` was partially successful but didn't immediately reveal the target.
 
-### Location and Structure
-- **Submodule**: `AXorcist/` (git submodule)
-- **CLI Tool**: `AXorcist/.build/debug/axorc`
-- **Library**: Swift Package Manager dependency
-- **Tests**: `AXorcist/Tests/AXorcistTests/`
+## Breakthrough: UI Tree Dumping and Analysis
 
-### Key Components
+The key breakthrough came from dumping a wider section of the UI tree to a file for manual analysis.
 
-#### Core AXorcist Library (`AXorcist/Sources/AXorcist/`)
-- `AXorcist.swift`: Main class and command handlers
-- `Core/Models.swift`: Data models (`CommandEnvelope`, `Locator`, etc.)
-- `Core/Element.swift`: `AXElement` wrapper around `AXUIElement`
-- `Search/ElementSearch.swift`: UI element location logic
-- `Core/AccessibilityPermissions.swift`: Permission handling
+1.  **Query to Dump "RootView" Children**:
+    *   A query was crafted to find an `AXGroup` element whose `AXDOMClassList`     contained `"RootView"`.
+    *   `attributes_to_fetch` and `fetch_children_attributes` were set to `"all"`.
+    *   `max_depth` was set to `15`.
+    *   `debugLogging` was set to `true`.
+    *   The output was redirected to a file: `./AXorcist/.build/debug/axorc --file query_cursor_input.json > axorc_rootview_dump.json`
 
-#### Command-Line Tool (`axorc`)
-- Entry point: `AXorcist/Sources/axorc/main.swift`
-- JSON input/output for automation scripts
-- Supports stdin, file, or direct argument input
-
-## Command Types and Usage
-
-### Basic Commands
-
-#### Ping Test
-```json
-{
-    "command_id": "test_ping",
-    "command": "ping"
-}
-```
-
-#### Get Focused Element
-```json
-{
-    "command_id": "get_focused",
-    "command": "getFocusedElement",
-    "application": "com.apple.TextEdit"
-}
-```
-
-#### Query Elements
-```json
-{
-    "command_id": "find_button",
-    "command": "query",
-    "application": "com.apple.TextEdit",
-    "locator": {
-        "criteria": {
-            "AXRole": "AXButton",
-            "AXTitle": "Save"
-        }
+    The `query_cursor_input.json` for this was:
+    ```json
+    {
+      "command_id": "cursor-input-dump-rootview-children-to-file-001",
+      "command": "query",
+      "application": "com.todesktop.230313mzl4w4u92",
+      "locator": {
+        "criteria": [
+          {
+            "attribute": "AXDOMClassList",
+            "value": "RootView",
+            "match_type": "contains"
+          }
+        ]
+      },
+      "attributes_to_fetch": "all",
+      "fetch_children_attributes": "all",
+      "max_depth": 15,
+      "debugLogging": true
     }
-}
-```
+    ```
 
-#### Perform Actions
-```json
-{
-    "command_id": "click_button",
-    "command": "performAction",
-    "application": "com.apple.TextEdit",
-    "locator": {
-        "criteria": {
-            "AXRole": "AXButton", 
-            "AXTitle": "Save"
-        }
-    },
-    "action_name": "AXPress"
-}
-```
+2.  **Analyzing `axorc_rootview_dump.json`**:
+    *   The extensive `debugLogs` array in the output JSON was crucial.
+    *   By tracing the `[_Traverse Entry] Visiting Role: ... at depth X` messages and associated `SearchCrit/DOMClass` logs, the hierarchy and `AXDOMClassList` attributes of nested elements were identified.
 
-### Advanced Features
+## Identifying the Target Element
 
-#### Batch Operations
-```json
-{
-    "command_id": "batch_test",
-    "command": "batch",
-    "sub_commands": [
-        {
-            "command_id": "step1",
-            "command": "query",
-            "application": "com.apple.TextEdit",
-            "locator": {"criteria": {"AXRole": "AXWindow"}}
-        },
-        {
-            "command_id": "step2", 
-            "command": "performAction",
-            "locator": {"criteria": {"AXRole": "AXButton"}},
-            "action_name": "AXPress"
-        }
+The analysis of the dump file revealed the following path to the target element:
+
+*   `AXWindow`
+    *   `AXGroup` (AXDOMClassList: `("RootView")`)
+        *   `AXGroup` (AXDOMClassList: `("CodeMirror", "cm-s-cursor-theme")`)
+            *   `AXGroup` (AXDOMClassList: `("cm-scroller")`)
+                *   `AXGroup` (AXDOMClassList: `("cm-content", "cm-ai-mode", "cm-ai-mode-background")`)
+                    *   **`AXTextArea` (AXDOMClassList: `("aislash-editor-input")`)** <-- This is the target!
+
+## Final Successful Query
+
+Based on these findings, a targeted query successfully retrieved the element's details:
+
+    ```json
+    {
+  "command_id": "cursor-input-find-aislash-textarea-001",
+  "command": "query",
+      "application": "com.todesktop.230313mzl4w4u92",
+      "locator": {
+    "criteria": [
+      {
+        "attribute": "AXRole",
+        "value": "AXTextArea"
+      },
+      {
+        "attribute": "AXDOMClassList",
+        "value": "aislash-editor-input",
+        "match_type": "contains"
+      }
     ]
+  },
+  "attributes_to_fetch": [
+    "AXValue",
+    "AXPosition",
+    "AXSize",
+    "AXRole",
+    "AXRoleDescription",
+    "AXIdentifier",
+    "AXDOMClassList",
+    "AXPath"
+  ],
+  "fetch_children_attributes": "none",
+  "max_depth": 25,
+  "debugLogging": true
 }
 ```
 
-## Development Guidelines
+## Key Retrieved Attributes for the Target Element
 
-### Building AXorcist
-```bash
-cd AXorcist/
-swift build
-# Binary available at: .build/debug/axorc
-```
+*   **`AXRole`**: `"AXTextArea"`
+*   **`AXDOMClassList`**: `["aislash-editor-input"]`
+*   **`AXValue`**: The current text content of the input field (e.g., `"2 and 3"`).
+*   **`AXPosition`**: e.g., `{ "x": 1226, "y": 1575 }` (top-left coordinates).
+*   **`AXSize`**: e.g., `{ "height": 18, "width": 1845 }`.
 
-### Testing AXorcist
-```bash
-# Run tests
-cd AXorcist/
-./run_tests.sh
-
-# Manual testing
-./.build/debug/axorc --debug '{"command_id":"test","command":"ping"}'
-```
-
-### Integration with CodeLooper
-
-#### Swift Code Integration
-```swift
-import AXorcist
-
-// Use AXorcist library in Swift code
-let axorcist = AXorcist()
-// ... accessibility operations
-```
-
-#### Command-Line Usage
-```swift
-// Execute axorc from Swift code
-let process = Process()
-process.executableURL = URL(fileURLWithPath: "/path/to/axorc")
-process.arguments = ["--debug", jsonCommand]
-// ... process execution
-```
-
-## Common Patterns
-
-### Element Location Strategies
-
-#### Simple Criteria Matching
-```json
-"locator": {
-    "criteria": {
-        "AXRole": "AXButton",
-        "AXTitle": "OK"
-    }
-}
-```
-
-#### Path-Based Navigation
-```json
-"locator": {
-    "root_element_path_hint": ["window[1]"],
-    "criteria": {
-        "AXRole": "AXTextArea"
-    }
-}
-```
-
-#### Complex Matching
-```json
-"locator": {
-    "criteria": {
-        "AXRole": "AXButton"
-    },
-    "requireAction": "AXPress",
-    "computed_name_contains": "Save"
-}
-```
-
-## Debugging and Troubleshooting
-
-### Enable Debug Logging
-```json
-{
-    "debug_logging": true,
-    "output_format": "verbose"
-}
-```
-
-### Common Issues
-
-#### Permission Problems
-- Ensure Terminal/IDE has Accessibility permissions
-- Check `AccessibilityPermissions.checkAccessibilityPermissions()`
-
-#### Element Not Found
-- Use Accessibility Inspector to verify element structure
-- Try broader criteria first, then narrow down
-- Check if app UI has loaded completely
-
-#### Threading Issues
-- AXorcist uses `@MainActor` for accessibility calls
-- Ensure proper async/await usage in Swift integration
-
-### Useful Tools
-- **Accessibility Inspector**: Xcode > Open Developer Tool
-- **Console.app**: View system accessibility logs
-- **Activity Monitor**: Check for permission dialogs
-
-## Security Considerations
-
-- AXorcist requires Accessibility permissions
-- Only grant to trusted processes
-- Validate all JSON input when using programmatically
-- Be cautious with batch operations on sensitive apps
-
-## Performance Tips
-
-- Use specific locators to reduce search time
-- Batch multiple operations when possible
-- Cache element references when appropriate
-- Use `max_elements` to limit large queries
-
-This integration guide ensures effective and safe use of AXorcist within the CodeLooper project.
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [steipete/CodeLooper](https://github.com/steipete/CodeLooper) — distributed by [TomeVault](https://tomevault.io).
