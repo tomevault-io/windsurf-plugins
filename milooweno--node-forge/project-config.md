@@ -1,129 +1,161 @@
 ---
 trigger: always_on
-description: Pull Request (PR) Creation Guidelines. Use these rules when creating pull requests
+description: UI Development Guidelines
 ---
 
 
-# MetaMask Mobile Pull Request (PR) Creation Guidelines
+# MetaMask Mobile React Native UI Development Guidelines
 
-These rules apply whenever creating PRs in the MetaMask Mobile repository or suggesting PR creation steps to others. Follow them to ensure consistent quality and smooth reviews.
+## Core Principle
 
-## Core Principles
+Always prioritize @metamask/design-system-react-native components and Tailwind CSS patterns over custom implementations.
 
-- Prefer small, focused PRs that are easy to review.
-- Make PR titles and descriptions clear, specific, and actionable.
-- Always use the repository PR template and complete every section.
-- Ensure correct labels and branch naming for automation and triage.
+## Component Hierarchy (STRICT ORDER)
 
-## 1. PR Title Requirements
+1. **FIRST**: Use `@metamask/design-system-react-native` components
+2. **SECOND**: Use `app/component-library` components only if design system lacks the component
+3. **LAST RESORT**: Custom components with StyleSheet (avoid unless absolutely necessary)
 
-PR titles must follow Conventional Commits and clearly describe the change.
+## Required Imports for React Native
 
-- Allowed types (with brief descriptions):
-  - `feat:` For new features or significant enhancements.
-  - `fix:` For bug fixes or corrections.
-  - `docs:` For documentation changes only.
-  - `style:` For code style changes (formatting, whitespace, etc.) that do not affect logic.
-  - `refactor:` For code changes that neither fix a bug nor add a feature (e.g., code restructuring).
-  - `test:` For adding or updating tests.
-  - `chore:` For routine tasks, maintenance, or changes to build tools and dependencies.
-  - `perf:` For performance improvements.
-  - `ci:` For changes to CI configuration or scripts.
-  - `build:` For changes affecting the build system or external dependencies.
-  - `revert:` For reverting previous commits.
-- Keep titles concise (ideally under ~72 characters) and specific.
-- Use imperative mood after the type (e.g., "add", "fix", "refactor").
-
-### Examples
-
-| ✅ Good                                                    | ❌ Bad           |
-| ---------------------------------------------------------- | ---------------- |
-| `feat: add NFT gallery to collectibles tab`                | `Add some stuff` |
-| `fix: resolve wallet connection timeout on cold start`     | `fixing bug`     |
-| `refactor: extract transaction formatter into utility`     | `refactor code`  |
-| `test: add e2e spec for onboarding SRP import flow`        | `tests`          |
-| `docs: update contributing guide with design-system usage` | `update docs`    |
-| `chore: bump react-native to 0.74.5`                       | `upgrade rn`     |
-
-### Title DO / DON'T
-
-- ✅ DO: Start with a valid type prefix and a short, descriptive phrase
-- ✅ DO: Reference scope briefly in the phrase if useful (e.g., "collectibles", "onboarding")
-- ❌ DON'T: Include issue numbers or long explanations in the title (put in description)
-- ❌ DON'T: Use ambiguous words like "stuff", "things", "fixes" without context
-
-## 2. PR Template Compliance
-
-You must use the template at `.github/pull-request-template.md`. Fill out all sections thoroughly.
-
-- **Description**: What changed and why. Include context, constraints, and trade-offs.
-- **Changelog entry**: Provide a user-facing change summary in past participle (e.g., "Added", "Fixed"). If not user-facing, write `CHANGELOG entry: null`.
-- **Related issues**: Use `Fixes: #NUMBER`, `Closes: #NUMBER`, or `Refs: #NUMBER` as appropriate.
-- **Manual testing steps (Gherkin format)**: Provide reproducible steps reviewers/QA can follow.
-- **Screenshots/Recordings**: Required for UI changes (before/after when relevant).
-- **Pre-merge checklist**: Ensure all items are checked (lint/tests pass, docs updated, feature flags set, etc.).
-
-### Gherkin Example
-
-```gherkin
-Scenario: Import an existing wallet via SRP on fresh install
-  Given the app is freshly installed
-  And I am on the Welcome screen
-  When I tap "Import using Secret Recovery Phrase"
-  And I enter a valid 12-word SRP
-  And I set a new password
-  Then I should land on the Home screen
-  And I should see the default account with a balance
+```tsx
+// ALWAYS prefer these imports
+import { useTailwind } from '@metamask/design-system-twrnc-preset';
+import {
+  Box,
+  Text,
+  Button,
+  ButtonBase,
+  Icon,
+  TextVariant,
+  BoxFlexDirection,
+  BoxAlignItems,
+  BoxJustifyContent,
+  // ... other design system components
+} from '@metamask/design-system-react-native';
 ```
 
-### Changelog Examples
+## Styling Rules (ENFORCE STRICTLY)
 
-```text
-CHANGELOG entry: Added NFT gallery to Collectibles tab.
-CHANGELOG entry: Fixed wallet connection timeout on cold start.
-CHANGELOG entry: null
+### ✅ ALWAYS DO:
+
+- Use `const tw = useTailwind();` hook instead of importing twrnc directly
+- Use `Box` component instead of `View`
+- Use `Text` component with variants instead of raw Text with styles
+- Use `twClassName` prop for static styles
+- Use `tw.style()` function for interactive/dynamic styles
+- Use design system color tokens: `bg-default`, `text-primary`, `border-muted`
+- Use component props first: `variant`, `color`, `size`, etc.
+
+### ❌ NEVER SUGGEST:
+
+- `import tw from 'twrnc'` (use useTailwind hook instead)
+- `StyleSheet.create()` (use Tailwind classes)
+- Raw `View` or `Text` components (use Box/Text from design system)
+- Arbitrary color values like `bg-[#3B82F6]` or `text-[#000000]`
+- Inline style objects unless for dynamic values
+- Mixing multiple styling approaches unnecessarily
+
+## Code Pattern Templates
+
+### Basic Container:
+
+```tsx
+const MyComponent = () => {
+  const tw = useTailwind();
+
+  return (
+    <Box twClassName="w-full bg-default p-4">
+      <Text variant={TextVariant.HeadingMd}>Title</Text>
+    </Box>
+  );
+};
 ```
 
-## 3. Required Labels and Assignment
+### Flex Layout:
 
-### PR Assignment
-
-- **Always assign the PR to yourself (the author)** immediately after creation.
-- This ensures proper ownership tracking and notifications.
-
-### Automatic Team Label Detection
-
-When creating PRs, automatically detect and apply the correct team label based on:
-
-1. **Author's GitHub team membership** - Check which MetaMask teams the author belongs to
-2. **Available team labels in the repository** - Match against existing `team-*` labels
-3. **Context awareness** - Consider files changed when author belongs to multiple teams
-
-#### Generic Team Label Detection Process
-
-```bash
-# Step 1: Get author's MetaMask teams
-USER_TEAMS=$(gh api user/teams --paginate | jq -r '.[] | select(.organization.login == "MetaMask") | .slug')
-
-# Step 2: Get available team labels in the repository
-REPO_TEAM_LABELS=$(gh label list --search "team-" --limit 100 | cut -f1)
-
-# Step 3: Try to find a matching team label
-# Common mappings to check:
-# - Exact match: team-{github-team} (e.g., mobile-platform → team-mobile-platform)
-# - Without suffix: design-system-engineers → team-design-system
-# - With wallet prefix: wallet-ux → team-wallet-ux
-
-# If no clear match is found, DO NOT add a team label
-# It's better to have no team label than an incorrect one
+```tsx
+<Box
+  flexDirection={BoxFlexDirection.Row}
+  alignItems={BoxAlignItems.Center}
+  justifyContent={BoxJustifyContent.Between}
+  twClassName="gap-3"
+>
 ```
 
-### Required Labels
+### Interactive Element:
 
-Apply labels to enable automation and proper routing. Some labels can block merging.
+```tsx
+<ButtonBase
+  twClassName="h-20 flex-1 rounded-lg bg-muted px-0 py-4"
+  style={({ pressed }) =>
+    tw.style(
+      'w-full flex-row items-center justify-center',
+      pressed && 'bg-pressed',
+    )
+  }
+>
+  <Text fontWeight={FontWeight.Medium}>Button Text</Text>
+</ButtonBase>
+```
 
+### Pressable with Tailwind:
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+```tsx
+<Pressable
+  style={({ pressed }) =>
+    tw.style(
+      'w-full flex-row items-center justify-between px-4 py-2',
+      pressed && 'bg-pressed',
+    )
+  }
+>
+```
+
+## Component Conversion Guide
+
+| DON'T Use                            | USE Instead                            |
+| ------------------------------------ | -------------------------------------- |
+| `<View>`                             | `<Box>`                                |
+| `<Text style={...}>`                 | `<Text variant={TextVariant.BodyMd}>`  |
+| `StyleSheet.create()`                | `twClassName="..."`                    |
+| `style={{ backgroundColor: 'red' }}` | `twClassName="bg-error-default"`       |
+| `flexDirection: 'row'`               | `flexDirection={BoxFlexDirection.Row}` |
+| Manual padding/margin                | `twClassName="p-4 m-2"`                |
+
+## Error Prevention
+
+When you see these patterns, IMMEDIATELY suggest alternatives:
+
+- Any `import tw from 'twrnc'` → `import { useTailwind } from '@metamask/design-system-twrnc-preset'`
+- Any `View` component → `Box` from design system
+- Any `StyleSheet` usage → Tailwind classes
+- Any arbitrary color values → Design system tokens
+- Any manual flex properties → Box component props + twClassName
+
+## Design System Priority
+
+Before suggesting any UI solution:
+
+1. Check if `@metamask/design-system-react-native` has the component
+2. Use component's built-in props (variant, color, size)
+3. Add layout/spacing with `twClassName`
+4. Add interactions with `tw.style()`
+5. Only suggest component-library or custom components if design system lacks it
+
+## Reference Examples
+
+Always reference the patterns from `app/component-library/components/design-system.stories.tsx` for proper usage examples.
+
+## Enforcement
+
+- REJECT any code suggestions that use StyleSheet.create()
+- REJECT raw View/Text usage when Box/Text components exist
+- REQUIRE useTailwind hook for all Tailwind usage
+- REQUIRE design system components as first choice
+- ENFORCE design token usage over arbitrary values
+
+@app/component-library/components/design-system.stories.tsx
 
 ---
 > Source: [MiloOweno/node-forge](https://github.com/MiloOweno/node-forge) — distributed by [TomeVault](https://tomevault.io).
