@@ -1,24 +1,24 @@
 ---
 trigger: always_on
-description: **autorun works identically in both Claude Code and Gemini CLI**, providing unified safety features, commands, and autonomous execution capabilities across both platforms.
+description: UV workspace containing 2 Claude Code plugins: **autorun**, **pdf-extractor**.
 ---
 
-# Autorun Workspace - Gemini CLI
+# autorun Marketplace - Claude Code
 
-**autorun works identically in both Claude Code and Gemini CLI**, providing unified safety features, commands, and autonomous execution capabilities across both platforms.
+UV workspace containing 2 Claude Code plugins: **autorun**, **pdf-extractor**.
 
-**For Claude Code:** See [CLAUDE.md](CLAUDE.md) for Claude Code-specific installation (uses `claude plugin install`).
+**For Gemini CLI:** See [GEMINI.md](GEMINI.md) for Gemini-specific installation and configuration.
 
-## Installation (Gemini CLI)
+## Installation (Claude Code)
 
 ### From GitHub (Production - Recommended)
 
 ```bash
-# Install directly via Gemini extension system
-gemini extensions install https://github.com/ahundt/autorun.git
+# Install directly via Claude Code plugin system
+claude plugin install https://github.com/ahundt/autorun.git
 
 # Verify
-gemini extensions list  # Should show: ar@0.10.1, pdf-extractor@0.10.1
+claude plugin list  # Should show: cr, pdf-extractor
 ```
 
 ### From Local Clone (Development)
@@ -32,15 +32,14 @@ uv run python -m plugins.autorun.src.autorun.install --install --force
 # Option 2: pip fallback (if UV not available)
 pip install -e . && python -m plugins.autorun.src.autorun.install --install --force
 
-# REQUIRED: Install as UV tool for global CLI availability (works with both Gemini and Claude)
+# REQUIRED: Install as UV tool for global CLI availability
 # This makes 'autorun' and 'claude-session-tools' commands globally available
 # which are needed for proper daemon operation and session management
-# Useful for: autorun --restart-daemon, autorun --install, autorun --status, etc.
 cd plugins/autorun && uv tool install --force --editable .
 
 # Verify installation
-gemini extensions list    # Should show: ar@0.10.1, pdf-extractor@0.10.1
-autorun --status        # Verifies UV tool installation works
+claude plugin list  # Should show: cr, pdf-extractor
+autorun --status  # Verifies UV tool installation works
 ```
 
 **Install UV (if needed):**
@@ -58,121 +57,101 @@ powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
 ### Test Installation
 
 ```bash
-# Start new Gemini session
-gemini
-
-# Test
+# In Claude Code session:
 /ar:st  # Expected: "AutoFile policy: allow-all"
 ```
 
-### Gemini-Specific Configuration
-
-**IMPORTANT**: Hooks require explicit enablement in Gemini CLI settings (not required for Claude Code).
-
-Edit `~/.gemini/settings.json` and add:
-
-```json
-{
-  "tools": {
-    "enableHooks": true,
-    "enableMessageBusIntegration": true
-  }
-}
-```
-
-**Why Required**: Without these settings, autorun hooks will not execute in Gemini CLI. The safety features (command blocking, file policies) depend on hooks.
-
-**Version Requirement**: Gemini CLI v0.28.0 or later recommended.
-
-Update Gemini CLI:
-```bash
-# Using Bun (faster)
-bun install -g @google/gemini-cli@latest
-
-# Or using npm
-npm install -g @google/gemini-cli@latest
-```
-
-Verify version:
-```bash
-gemini --version  # Should show 0.28.0 or later
-```
-
-## Autorun Integration Benefits
-
-### Safety Features (Works in Both CLIs)
-
-- **File Policies**: Control file creation (`/ar:a`, `/ar:j`, `/ar:f`)
-- **Command Blocking**: Prevent dangerous operations (rm, git reset --hard, etc.)
-- **Plan Export**: Auto-save plans to notes/ directory
-- **Three-Stage Verification**: Ensures thorough task completion
-- **Task Tracking**: Monitor task completion across sessions
-
-**Commands work identically in both CLIs:**
+## Quick Start
 
 ```bash
-/ar:st              # Show current AutoFile policy
-/ar:a               # Allow all file creation
-/ar:j               # Justify new files
-/ar:f               # Find and modify existing files only (strictest)
-/ar:go <task>       # Start autonomous execution
-/ar:sos             # Emergency stop
-/ar:tasks           # Toggle task staleness reminders on/off or set threshold
-/ar:task-status     # Show task lifecycle status and incomplete tasks
-/ar:pn              # Create new structured plan
-/ar:pr              # Refine existing plan
-/ar:pe              # Show plan export status
-/ar:no <pattern>    # Block command pattern in session
-/ar:ok <pattern>    # Allow blocked command in session
+/ar:go <task>     # Start autonomous execution with three-stage verification
+/ar:sos           # Emergency stop
+/ar:st            # Show current status
 ```
 
-See [README.md](README.md) for the complete command reference (77 slash commands).
+## Plugins Overview
 
-#### Task Staleness Reminders (v0.9)
+| Plugin | Prefix | Purpose |
+|--------|--------|---------|
+| **autorun** | `/ar:` | Autonomous execution, file policies, safety guards, plan export |
+| **pdf-extractor** | `/pdf-extractor:` | Extract text from PDFs (9 backends, GPU support) |
 
-Task staleness reminders work identically in both CLIs. When 25+ tool calls pass without TaskCreate/TaskUpdate, autorun injects a reminder. Use `/ar:tasks` to configure.
+---
 
-### Gemini Vision + Autorun Safety
+## autorun Plugin (v0.10.1)
 
-**Use Gemini's superior vision capabilities with autorun's safety guards active:**
+### Three-Stage Verification System
 
-#### Image Analysis with File Policy Control
+Ensures thorough task completion through mandatory stages:
 
-```bash
-# Set strict policy: only modify existing files
-/ar:f
+| Stage | Purpose | Completion Marker |
+|-------|---------|-------------------|
+| **Stage 1** | Initial implementation | `AUTORUN_INITIAL_TASKS_COMPLETED` |
+| **Stage 2** | Critical evaluation - identify gaps, fix issues | `CRITICALLY_EVALUATING_PREVIOUS_WORK_AND_CONTINUING_TASKS_AS_NEEDED` |
+| **Stage 3** | Final verification - all requirements met | `AUTORUN_ALL_TASKS_COMPLETED_AND_VERIFIED_SUCCESSFULLY` |
 
-# Analyze UI mockup and generate code (respects policy)
-gemini -i notes/ui_mockup.png -c "Convert this mockup to React components"
+**Concrete Example:**
+```
+User: /ar:go Add login form with validation and tests
 
-# Autorun ensures:
-# - No new files created (policy: SEARCH mode)
-# - Suggests modifying existing components
-# - Blocks dangerous bash commands
+Stage 1: Implements login form → outputs AUTORUN_INITIAL_TASKS_COMPLETED
+Stage 2: Reviews work, finds missing error handling, adds it → CRITICALLY_EVALUATING_PREVIOUS_WORK_AND_CONTINUING_TASKS_AS_NEEDED
+Stage 3: Verifies form works, tests pass, error handling complete → AUTORUN_ALL_TASKS_COMPLETED_AND_VERIFIED_SUCCESSFULLY → Session ends
 ```
 
-#### Architecture Diagram Analysis
+Without three-stage: Claude might stop after Stage 1 with incomplete work.
 
-```bash
-# Analyze architecture diagram and implement
-gemini -i notes/architecture.png -c "Implement the service layer shown in this diagram"
+### All Commands
 
-# Autorun provides:
-# - File creation control via /ar:j (requires justification)
-# - Command blocking (prevents accidental destructive operations)
-# - Plan export (auto-saves implementation plan)
-```
+**AutoFile Policy** (controls file creation via PreToolUse hooks):
 
-#### Video & Audio Analysis
+| Short | Long | Legacy | Description |
+|-------|------|--------|-------------|
+| `/ar:a` | `/ar:allow` | `/afa` | Allow all file creation |
+| `/ar:j` | `/ar:justify` | `/afj` | Require `<AUTOFILE_JUSTIFICATION>` for new files |
+| `/ar:f` | `/ar:find` | `/afs` | Modify existing files only (strictest) |
+| `/ar:st` | `/ar:status` | `/afst` | Show current policy |
 
-Gemini supports video (1 FPS sampling) and audio (transcription + diarization) with autorun safety:
+**Autorun Control**:
 
-```bash
-# Video UX analysis with safety
-gemini -m gemini-3-pro-preview "Analyze notes/demo_video.mp4 for UX issues"
+| Short | Long | Legacy | Description |
+|-------|------|--------|-------------|
+| `/ar:go <task>` | `/ar:run` | `/autorun` | Start autonomous execution |
+| `/ar:gp <task>` | `/ar:proc` | `/autoproc` | Procedural mode with Wait Process |
+| `/ar:x` | `/ar:stop` | `/autostop` | Graceful stop |
+| `/ar:sos` | `/ar:estop` | `/estop` | Emergency stop |
+
+**Plan Management**:
+
+| Short | Long | Description |
+|-------|------|-------------|
+| `/ar:pn` | `/ar:plannew` | Create structured plan |
+| `/ar:pr` | `/ar:planrefine` | Critique and improve plan |
+| `/ar:pu` | `/ar:planupdate` | Update plan with new info |
+| `/ar:pp` | `/ar:planprocess` | Execute plan with methodology |
+
+**Documentation**:
+
+| Short | Long | Description |
+|-------|------|-------------|
+| `/ar:gc` | `/ar:commit` | Git commit requirements (17 steps) |
+| `/ar:ph` | `/ar:philosophy` | System design philosophy (17 principles) |
+
+**Safety Guards** (v0.6.0+) - Blocks dangerous commands and suggests safe alternatives:
+
+Built-in protections for: `rm` → `trash`, `git reset --hard` → `git stash`, `git clean -f` → `git clean -n`, etc.
+
+| Command | Description |
+|---------|-------------|
+| `/ar:no <pattern>` | Block command pattern in this session |
+| `/ar:ok <pattern> [N\|5m\|perm]` | Allow pattern — `3` uses, `5m` duration, or `perm` (rest of session); default 1 use then auto-revokes |
+| `/ar:clear` | Clear all session blocks and allows |
+| `/ar:blocks` | Show active session-level blocks and allows |
+| `/ar:globalno <pattern>` | Block command pattern globally (persists across sessions) |
+| `/ar:globalok <pattern> [N\|5m\|perm]` | Allow pattern globally — `3` uses, `5m` duration, or `perm` (until cleared); default 1 use then auto-revokes |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/ahundt) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-13 -->
+> Source: [ahundt/autorun](https://github.com/ahundt/autorun) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-04-25 -->
