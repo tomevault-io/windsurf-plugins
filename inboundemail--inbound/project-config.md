@@ -1,110 +1,104 @@
 ---
 trigger: always_on
-description: Amazon SES API v2 is an Amazon Web Services service for sending email messages to customers. This reference provides a comprehensive overview of the SESv2Client commands and configuration options.
+description: Full docs: https://www.better-auth.com/docs/plugins/organization
 ---
 
-# AWS SES v2 Client Reference
+# Better Auth — Organization Plugin
 
-Amazon SES API v2 is an Amazon Web Services service for sending email messages to customers. This reference provides a comprehensive overview of the SESv2Client commands and configuration options.
+Full docs: https://www.better-auth.com/docs/plugins/organization
 
-## Installation
+## Setup
 
-Install the AWS SDK for JavaScript v3 SES v2 client:
+```ts
+// server
+import { organization } from "better-auth/plugins"
+export const auth = betterAuth({ plugins: [organization()] })
 
-```bash
-# Using bun (preferred for this project)
-bun add @aws-sdk/client-sesv2
-
-# Alternative package managers
-npm install @aws-sdk/client-sesv2
-yarn add @aws-sdk/client-sesv2
-pnpm add @aws-sdk/client-sesv2
+// client
+import { organizationClient } from "better-auth/client/plugins"
+export const authClient = createAuthClient({ plugins: [organizationClient()] })
 ```
 
-## Client Configuration
+## Key Client Methods
 
-The SESv2Client accepts the following configuration parameters:
+```ts
+// Org management
+authClient.organization.create({ name, slug })
+authClient.organization.update({ data: { name, slug, logo } })
+authClient.organization.delete({ organizationId })
+authClient.organization.setActive({ organizationId })
+authClient.useActiveOrganization()
+authClient.useListOrganizations()
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `region` | `string \| Provider<string>` | **Required.** The AWS region to send requests to |
-| `credentials` | `AwsCredentialIdentity \| Provider<AwsCredentialIdentity>` | AWS credentials for authentication |
-| `maxAttempts` | `number \| Provider<number>` | Maximum number of retry attempts (default: 3) |
-| `retryMode` | `string \| Provider<string>` | Retry algorithm to use (`legacy`, `standard`, `adaptive`) |
-| `logger` | `Logger` | Logger for debug/info/warn/error messages |
-| `requestHandler` | `__HttpHandlerUserInput` | HTTP handler (Fetch in browser, Https in Node.js) |
-| `defaultsMode` | `DefaultsMode \| Provider<DefaultsMode>` | How default configuration options are resolved |
-| `profile` | `string` | AWS profile name for credential resolution |
-| `useDualstackEndpoint` | `boolean \| Provider<boolean>` | Enable IPv6/IPv4 dualstack endpoint |
-| `useFipsEndpoint` | `boolean \| Provider<boolean>` | Enable FIPS-compliant endpoints |
-| `disableHostPrefix` | `boolean` | Disable dynamic endpoint modification |
-| `extensions` | `RuntimeExtension[]` | Optional runtime extensions |
+// Members
+authClient.organization.inviteMember({ email, role, organizationId })
+authClient.organization.acceptInvitation({ invitationId })
+authClient.organization.removeMember({ memberIdOrEmail, organizationId })
+authClient.organization.updateMemberRole({ role, memberId, organizationId })
+authClient.organization.leave({ organizationId })
 
-## Commands by Category
+// Permissions
+authClient.organization.hasPermission({ permissions: { resource: ["action"] } })
+```
 
-### Account Management
-| Command | Purpose |
-|---------|---------|
-| `GetAccountCommand` | Get account email-sending status and capabilities |
-| `PutAccountDetailsCommand` | Update Amazon SES account details |
-| `PutAccountSendingAttributesCommand` | Enable/disable account email sending |
-| `PutAccountSuppressionAttributesCommand` | Configure account-level suppression list |
-| `PutAccountVdmAttributesCommand` | Update account VDM (Virtual Deliverability Manager) attributes |
-| `PutAccountDedicatedIpWarmupAttributesCommand` | Configure automatic IP warm-up |
+## Key Server Methods
 
-### Email Identities
-| Command | Purpose |
-|---------|---------|
-| `CreateEmailIdentityCommand` | Start verifying an email address or domain |
-| `DeleteEmailIdentityCommand` | Delete an email identity |
-| `GetEmailIdentityCommand` | Get identity verification status and settings |
-| `ListEmailIdentitiesCommand` | List all email identities in account |
-| `PutEmailIdentityConfigurationSetAttributesCommand` | Associate identity with configuration set |
-| `PutEmailIdentityDkimAttributesCommand` | Enable/disable DKIM authentication |
-| `PutEmailIdentityDkimSigningAttributesCommand` | Configure DKIM signing attributes |
-| `PutEmailIdentityFeedbackAttributesCommand` | Configure bounce/complaint feedback |
-| `PutEmailIdentityMailFromAttributesCommand` | Configure custom Mail-From domain |
+```ts
+auth.api.createOrganization({ body: { name, slug }, headers })
+auth.api.getFullOrganization({ query: { organizationId }, headers })
+auth.api.createInvitation({ body: { email, role, organizationId } })
+auth.api.addMember({ body: { userId, role, organizationId } })
+auth.api.hasPermission({ headers, body: { permissions: { resource: ["action"] } } })
+```
 
-### Email Sending
-| Command | Purpose |
-|---------|---------|
-| `SendEmailCommand` | Send a single email (simple, raw, or templated) |
-| `SendBulkEmailCommand` | Send email to multiple destinations |
-| `SendCustomVerificationEmailCommand` | Send custom verification email |
+## Default Roles
 
-### Configuration Sets
-| Command | Purpose |
-|---------|---------|
-| `CreateConfigurationSetCommand` | Create a configuration set |
-| `DeleteConfigurationSetCommand` | Delete a configuration set |
-| `GetConfigurationSetCommand` | Get configuration set details |
-| `ListConfigurationSetsCommand` | List all configuration sets |
-| `PutConfigurationSetArchivingOptionsCommand` | Configure email archiving |
-| `PutConfigurationSetDeliveryOptionsCommand` | Associate with dedicated IP pool |
-| `PutConfigurationSetReputationOptionsCommand` | Enable/disable reputation tracking |
-| `PutConfigurationSetSendingOptionsCommand` | Enable/disable sending for configuration set |
-| `PutConfigurationSetSuppressionOptionsCommand` | Configure suppression list preferences |
-| `PutConfigurationSetTrackingOptionsCommand` | Configure open/click tracking domain |
-| `PutConfigurationSetVdmOptionsCommand` | Configure VDM preferences |
+| Role | Permissions |
+|------|-------------|
+| `owner` | Full control |
+| `admin` | Full control except delete org / change owner |
+| `member` | Read only on org/member/invitation resources |
 
-### Event Destinations
-| Command | Purpose |
-|---------|---------|
-| `CreateConfigurationSetEventDestinationCommand` | Create event destination |
-| `DeleteConfigurationSetEventDestinationCommand` | Delete event destination |
-| `GetConfigurationSetEventDestinationsCommand` | List event destinations |
-| `UpdateConfigurationSetEventDestinationCommand` | Update event destination configuration |
+## Custom Permissions
 
-### Email Templates
-| Command | Purpose |
-|---------|---------|
-| `CreateEmailTemplateCommand` | Create an email template |
-| `DeleteEmailTemplateCommand` | Delete an email template |
-| `GetEmailTemplateCommand` | Get template details |
-| `ListEmailTemplatesCommand` | List all email templates |
-| `UpdateEmailTemplateCommand` | Update an email template |
+```ts
+import { createAccessControl } from "better-auth/plugins/access"
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+const statement = { project: ["create", "update", "delete"] } as const
+const ac = createAccessControl(statement)
+const member = ac.newRole({ project: ["create"] })
+const admin = ac.newRole({ project: ["create", "update"] })
+
+// Pass to both server and client plugins: { ac, roles: { member, admin, owner } }
+```
+
+## Lifecycle Hooks
+
+```ts
+organization({
+  organizationHooks: {
+    beforeCreateOrganization: async ({ organization, user }) => ({ data: { ...organization } }),
+    afterCreateOrganization: async ({ organization, member, user }) => { /* ... */ },
+    beforeAddMember: async ({ member, user, organization }) => { /* throw to block */ },
+    afterAddMember: async ({ member, user, organization }) => { /* ... */ },
+    beforeCreateInvitation: async ({ invitation, inviter, organization }) => ({ data: { ...invitation } }),
+    afterAcceptInvitation: async ({ invitation, member, user, organization }) => { /* ... */ },
+  },
+  sendInvitationEmail: async (data) => {
+    const link = `https://yourapp.com/accept-invitation/${data.id}`
+    // send email with link
+  },
+})
+```
+
+## Teams (optional)
+
+```ts
+organization({ teams: { enabled: true, maximumTeams: 10 } })
+organizationClient({ teams: { enabled: true } })
+
+// Methods: createTeam, listTeams, updateTeam, removeTeam, addTeamMember, removeTeamMember
+```
 
 ---
 > Source: [inboundemail/inbound](https://github.com/inboundemail/inbound) — distributed by [TomeVault](https://tomevault.io).
