@@ -1,144 +1,221 @@
 ---
 trigger: always_on
-description: Heading element accessibility compliance and WCAG 2.4.1 Bypass Blocks requirements
+description: Writing JavaScript inside `.js` files, or within the `{% javascript %}` or `{% script %}` tags in `.liquid` files.
 ---
 
-# Heading Element Accessibility Standards
+# JavaScript Standards
 
-Ensures heading elements follow WCAG compliance and provide proper content structure for screen reader navigation and bypass blocks functionality.
+## General Principles
 
-<rule>
-name: heading_accessibility_standards
-description: Enforce heading element accessibility standards per WCAG 2.4.1 Bypass Blocks requirements
-filters:
-  - type: file_extension
-    pattern: "\\.(vue|jsx|tsx|html|liquid|php|js|ts)$"
+- **Zero external dependencies** - Use native browser APIs
+- **Avoid mutation** - Use `const` over `let` unless necessary
+- **Use `for (const item of items)`** over `items.forEach()`
+- **Add new lines before blocks** with `{` and `}`
+- **Use the component framework** - See [the framework code](mdc:assets/component.js) and the [component documentation](mdc:codex/component-framework.md)
 
-actions:
-  - type: enforce
-    conditions:
-      # Missing heading markup for visually styled headings
-      - pattern: "(?i)<(div|span|p)[^>]*(?:heading|title|header)[^>]*>"
-        pattern_negate: "(role=\"heading\"|h[1-6])"
-        message: "Text that acts as a heading visually or structurally must be designated as a true heading (h1-h6) or use role='heading' with aria-level."
+## Async/Await Syntax
 
-      # Heading markup on non-heading content
-      - pattern: "(?i)<(h[1-6]|div[^>]*role=\"heading\")[^>]*>"
-        pattern_negate: "(heading|title|header|section|main|content|page)"
-        message: "Text that does not act as a heading visually or structurally should not be marked as a heading."
+**Always use async/await over .then() chaining:**
 
-      # Missing aria-level on role="heading"
-      - pattern: "(?i)<[^>]*role=\"heading\"[^>]*>"
-        pattern_negate: "aria-level=\"[1-6]\""
-        message: "Elements with role='heading' must have aria-level attribute set to appropriate level (1-6)."
+```javascript
+const fetchProducts = async () => {
+  try {
+    const response = await fetch('/products.json');
+    const data = await response.json();
+    return data.products;
+  } catch (error) {
+    console.error('Failed to fetch products:', error);
+    return [];
+  }
+};
 
-      # Invalid aria-level values
-      - pattern: "(?i)aria-level=\"[^1-6]\""
-        message: "aria-level must be set to a value between 1 and 6 for heading elements."
+## Web Components Pattern
 
-      # Missing h1 in main content
-      - pattern: "(?i)<main[^>]*>"
-        pattern_negate: "<h1[^>]*>"
-        message: "Main content should start with an h1 heading for proper document structure."
+**Initialize JavaScript components using the Component framework:**
 
-      # Multiple h1 elements (potential issue)
-      - pattern: "(?i)<h1[^>]*>.*<h1[^>]*>"
-        message: "Most web pages should have only one h1 element. Consider using h2-h6 for section headings."
+```javascript
+import { Component } from '@theme/component';
 
-      # Skipped heading levels
-      - pattern: "(?i)<h1[^>]*>.*<h3[^>]*>"
-        message: "Headings should not skip hierarchical levels. Consider using h2 before h3."
+/**
+ * @typedef {Object} ProductCardRefs
+ * @property {HTMLButtonElement} addButton - Add to cart button
+ * @property {HTMLElement} priceDisplay - Price display element
+ * @property {HTMLImageElement} [productImage] - Optional product image
+ */
 
-      - pattern: "(?i)<h2[^>]*>.*<h4[^>]*>"
-        message: "Headings should not skip hierarchical levels. Consider using h3 before h4."
+/**
+ * @extends {Component<ProductCardRefs>}
+ */
+class ProductCard extends Component {
+  constructor() {
+    super();
+    this.cache = new Map();
+  }
 
-      # Clickable headings with improper structure
-      - pattern: "(?i)<a[^>]*>.*<h[1-6][^>]*>.*</h[1-6]>.*</a>"
-        message: "Heading elements should not be children of link elements. The heading should wrap the link to maintain semantic structure."
+  connectedCallback() {
+    super.connectedCallback();
+    this.#initializeCard();
+  }
 
-      # Empty or meaningless heading text
-      - pattern: "(?i)<h[1-6][^>]*>\\s*(?:&nbsp;|\\s|&amp;nbsp;)*</h[1-6]>"
-        message: "Heading elements should contain meaningful text content."
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    this.#cleanup();
+  }
 
-      # Generic heading text
-      - pattern: "(?i)<h[1-6][^>]*>\\s*(?:heading|title|header|section)\\s*</h[1-6]>"
-        message: "Heading text should be specific and informative, not generic."
+  // Public method for external use
+  updatePrice(newPrice) {
+    if (!this.refs.priceDisplay) return;
+    this.refs.priceDisplay.textContent = newPrice;
+  }
 
-      # Heading text too long
-      - pattern: "(?i)<h[1-6][^>]*>[^<]{100,}</h[1-6]>"
-        message: "Heading text should be concise and relatively brief."
+  // Event handler for add to cart button
+  async handleAddToCart(event) {
+    event.preventDefault();
 
-      # Missing heading for major content sections
-      - pattern: "(?i)<(section|article|main)[^>]*>"
-        pattern_negate: "<h[1-6][^>]*>"
-        message: "Major content sections should have appropriate heading elements for navigation."
+    const productId = this.cache.get('productId');
+    this.refs.addButton.disabled = true;
+    this.refs.addButton.textContent = 'Adding...';
 
-  - type: suggest
-    message: |
-      **WCAG 2.4.1 Heading Accessibility Requirements:**
+    try {
+      await addToCart(productId);
+      this.refs.addButton.textContent = 'Added!';
 
-      **Bypass Blocks Functionality:**
-      - **Screen Reader Navigation:** Headings allow users to navigate by content sections
-      - **Content Structure:** Headings provide clear outline of page content
-      - **Landmark Support:** Headings work with landmarks and skip links for navigation
+      // Dispatch custom event for cart updates
+      this.dispatchEvent(new CustomEvent('cart:item-added', {
+        detail: { productId },
+        bubbles: true
+      }));
+    } catch (error) {
+      this.refs.addButton.textContent = 'Try again';
+      console.error('Add to cart error:', error);
+    } finally {
+      setTimeout(() => {
+        this.refs.addButton.disabled = false;
+        this.refs.addButton.textContent = 'Add to cart';
+      }, 2000);
+    }
+  }
 
-      **Heading Markup Requirements:**
+  // Private method requiring instance access
+  #initializeCard() {
+    const productId = this.dataset.productId;
+    this.cache.set('productId', productId);
+  }
 
-      **1. Use Real Heading Elements:**
-      ```html
-      <!-- Good: Proper heading markup -->
-      <h1>Main Page Title</h1>
-      <h2>Section Heading</h2>
-      <h3>Subsection Heading</h3>
+  #cleanup() {
+    this.cache.clear();
+  }
+}
 
-      <!-- Good: Role heading when real markup not possible -->
-      <div role="heading" aria-level="1">Main Page Title</div>
-      <div role="heading" aria-level="2">Section Heading</div>
-      ```
+// Module-scoped utility - no instance access needed
+const addToCart = async (productId) => {
+  const formData = new FormData();
+  formData.append('id', productId);
+  formData.append('quantity', 1);
 
-      **2. Proper Heading Hierarchy:**
-      ```html
-      <!-- Good: Logical heading structure -->
-      <h1>Product Catalog</h1>
-      <h2>Electronics</h2>
-      <h3>Smartphones</h3>
-      <h3>Laptops</h3>
-      <h2>Clothing</h2>
-      <h3>Men's Clothing</h3>
-      <h3>Women's Clothing</h3>
+  try {
+    const response = await fetch('/cart/add.js', {
+      method: 'POST',
+      body: formData
+    });
 
-      <!-- Bad: Skipped levels -->
-      <h1>Product Catalog</h1>
-      <h3>Electronics</h3> <!-- Skipped h2 -->
-      ```
+    if (!response.ok) {
+      throw new Error('Failed to add to cart');
+    }
 
-      **3. Clickable Headings:**
-      ```html
-      <!-- Good: Heading wraps the link -->
-      <h2><a href="/products/electronics">Electronics</a></h2>
+    const cartData = await response.json();
+    return cartData;
+  } catch (error) {
+    console.error('Add to cart error:', error);
+    throw error;
+  }
+};
 
-      <!-- Bad: Heading as child of link -->
-      <a href="/products/electronics">
-        <h2>Electronics</h2>
-      </a>
-      ```
+customElements.define('product-card', ProductCard);
+```
 
-      **4. Meaningful Heading Text:**
-      ```html
-      <!-- Good: Specific and informative -->
-      <h1>Acme Corporation - Leading Tech Solutions</h1>
-      <h2>Our Services</h2>
-      <h3>Web Development</h3>
-      <h3>Mobile App Development</h3>
+**HTML usage with the Component framework:**
 
-      <!-- Bad: Generic or meaningless -->
-      <h1>Welcome</h1>
-      <h2>Section</h2>
-      <h3>Content</h3>
-      ```
+```liquid
+<product-card data-product-id="{{ product.id }}">
+  <img ref="productImage" src="{{ product.featured_image | image_url }}" alt="{{ product.title }}">
+  <h3>{{ product.title }}</h3>
+  <div ref="priceDisplay" class="product-card__price">{{ product.price | money }}</div>
+  <button ref="addButton" on:click="/handleAddToCart" data-add-to-cart>
+    Add to cart
+  </button>
+</product-card>
+```
 
-      **5. Single H1 Per Page:**
-      ```html
+## Early Returns and Conditional Logic
+
+**Use early returns over nested conditionals:**
+
+```javascript
+// Good
+const processOrder = (order) => {
+  if (!order) return;
+  if (!order.items.length) return;
+  if (order.status !== 'pending') return;
+
+  // Process the order
+  updateOrderStatus(order.id, 'processing');
+  sendConfirmationEmail(order.email);
+};
+
+// Avoid
+const processOrder = (order) => {
+  if (order) {
+    if (order.items.length) {
+      if (order.status === 'pending') {
+        updateOrderStatus(order.id, 'processing');
+        sendConfirmationEmail(order.email);
+      }
+    }
+  }
+};
+```
+
+**Optional chaining guidelines:**
+
+```javascript
+// Multiple chains - use early return
+const updateButton = (product) => {
+  const button = product.querySelector('[data-ref="button"]');
+  if (!button) return;
+
+  button.disabled = false;
+  button.textContent = 'Add to cart';
+};
+
+// Single chain is fine
+const updateButton = (product) => {
+  const button = product.querySelector('[data-ref="button"]');
+  button?.enable();
+};
+```
+
+## Simplification Patterns
+
+**Ternary operators for simple conditions:**
+```javascript
+const buttonText = isLoading ? 'Loading...' : 'Add to cart';
+element.textContent = buttonText;
+```
+
+**One-liner conditionals:**
+```javascript
+if (isOutOfStock) return;
+```
+
+**Return boolean comparisons directly:**
+```javascript
+const isAvailable = product.available && product.price > 0;
+return isAvailable;
+```
+
+## Event-Driven Architecture
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
