@@ -1,221 +1,132 @@
 ---
 trigger: always_on
-description: Writing JavaScript inside `.js` files, or within the `{% javascript %}` or `{% script %}` tags in `.liquid` files.
+description: Landmark element accessibility compliance and WCAG 2.4.1 Bypass Blocks requirements
 ---
 
-# JavaScript Standards
+# Landmark Element Accessibility Standards
 
-## General Principles
+Ensures landmark elements follow WCAG compliance and provide proper content structure for screen reader navigation and bypass blocks functionality.
 
-- **Zero external dependencies** - Use native browser APIs
-- **Avoid mutation** - Use `const` over `let` unless necessary
-- **Use `for (const item of items)`** over `items.forEach()`
-- **Add new lines before blocks** with `{` and `}`
-- **Use the component framework** - See [the framework code](mdc:assets/component.js) and the [component documentation](mdc:codex/component-framework.md)
+<rule>
+name: landmark_accessibility_standards
+description: Enforce landmark element accessibility standards per WCAG 2.4.1 Bypass Blocks requirements
+filters:
+  - type: file_extension
+    pattern: "\\.(vue|jsx|tsx|html|liquid|php|js|ts)$"
 
-## Async/Await Syntax
+actions:
+  - type: enforce
+    conditions:
+      # Multiple instances of single-instance landmarks
+      - pattern: "(?i)<(header|banner)[^>]*>.*<(header|banner)[^>]*>"
+        message: "Page should not contain more than one instance of header/banner landmark."
 
-**Always use async/await over .then() chaining:**
+      - pattern: "(?i)<main[^>]*>.*<main[^>]*>"
+        message: "Page should not contain more than one instance of main landmark."
 
-```javascript
-const fetchProducts = async () => {
-  try {
-    const response = await fetch('/products.json');
-    const data = await response.json();
-    return data.products;
-  } catch (error) {
-    console.error('Failed to fetch products:', error);
-    return [];
-  }
-};
+      - pattern: "(?i)<(footer|contentinfo)[^>]*>.*<(footer|contentinfo)[^>]*>"
+        message: "Page should not contain more than one instance of footer/contentinfo landmark."
 
-## Web Components Pattern
+      # Missing distinguishable names for multiple landmarks of same type
+      - pattern: "(?i)<nav[^>]*>.*<nav[^>]*>"
+        pattern_negate: "(aria-label|aria-labelledby)"
+        message: "Multiple navigation landmarks should have distinguishable names using aria-label or aria-labelledby."
 
-**Initialize JavaScript components using the Component framework:**
+      - pattern: "(?i)<(section|region)[^>]*>.*<(section|region)[^>]*>"
+        pattern_negate: "(aria-label|aria-labelledby)"
+        message: "Multiple section/region landmarks should have distinguishable names using aria-label or aria-labelledby."
 
-```javascript
-import { Component } from '@theme/component';
+      - pattern: "(?i)<(aside|complementary)[^>]*>.*<(aside|complementary)[^>]*>"
+        pattern_negate: "(aria-label|aria-labelledby)"
+        message: "Multiple aside/complementary landmarks should have distinguishable names using aria-label or aria-labelledby."
 
-/**
- * @typedef {Object} ProductCardRefs
- * @property {HTMLButtonElement} addButton - Add to cart button
- * @property {HTMLElement} priceDisplay - Price display element
- * @property {HTMLImageElement} [productImage] - Optional product image
- */
+      # Content outside landmarks
+      - pattern: "(?i)<body[^>]*>"
+        pattern_negate: "(<header|<nav|<main|<aside|<section|<footer|<banner|<navigation|<complementary|<contentinfo|<region)"
+        message: "All content should be contained within landmark regions."
 
-/**
- * @extends {Component<ProductCardRefs>}
- */
-class ProductCard extends Component {
-  constructor() {
-    super();
-    this.cache = new Map();
-  }
+      # Excessive number of landmarks (more than 8-10)
+      - pattern: "(?i)(<header|<nav|<main|<aside|<section|<footer|<banner|<navigation|<complementary|<contentinfo|<region)"
+        pattern_negate: "(aria-label|aria-labelledby)"
+        message: "Consider reducing the number of landmarks to minimize navigation complexity."
 
-  connectedCallback() {
-    super.connectedCallback();
-    this.#initializeCard();
-  }
+      # Missing main landmark
+      - pattern: "(?i)<body[^>]*>"
+        pattern_negate: "<main[^>]*>"
+        message: "Page should contain a main landmark for primary content."
 
-  disconnectedCallback() {
-    super.disconnectedCallback();
-    this.#cleanup();
-  }
+      # Landmark without proper role or semantic element
+      - pattern: "(?i)role=\"(banner|navigation|main|complementary|contentinfo|region)\""
+        pattern_negate: "(<header|<nav|<main|<aside|<section|<footer)"
+        message: "Landmark roles should be used with semantic HTML elements when possible."
 
-  // Public method for external use
-  updatePrice(newPrice) {
-    if (!this.refs.priceDisplay) return;
-    this.refs.priceDisplay.textContent = newPrice;
-  }
+      # Nested landmarks of same type
+      - pattern: "(?i)<nav[^>]*>.*<nav[^>]*>.*</nav>.*</nav>"
+        message: "Avoid nesting landmarks of the same type."
 
-  // Event handler for add to cart button
-  async handleAddToCart(event) {
-    event.preventDefault();
+      - pattern: "(?i)<section[^>]*>.*<section[^>]*>.*</section>.*</section>"
+        message: "Avoid nesting landmarks of the same type."
 
-    const productId = this.cache.get('productId');
-    this.refs.addButton.disabled = true;
-    this.refs.addButton.textContent = 'Adding...';
+      # Landmark without accessible name
+      - pattern: "(?i)<(section|region|aside|complementary)[^>]*>"
+        pattern_negate: "(aria-label|aria-labelledby|<h[1-6])"
+        message: "Landmarks should have accessible names via aria-label, aria-labelledby, or heading elements."
 
-    try {
-      await addToCart(productId);
-      this.refs.addButton.textContent = 'Added!';
+      # Generic landmark names
+      - pattern: "(?i)aria-label=\"(section|region|content|area)\""
+        message: "Landmark names should be specific and descriptive, not generic."
 
-      // Dispatch custom event for cart updates
-      this.dispatchEvent(new CustomEvent('cart:item-added', {
-        detail: { productId },
-        bubbles: true
-      }));
-    } catch (error) {
-      this.refs.addButton.textContent = 'Try again';
-      console.error('Add to cart error:', error);
-    } finally {
-      setTimeout(() => {
-        this.refs.addButton.disabled = false;
-        this.refs.addButton.textContent = 'Add to cart';
-      }, 2000);
-    }
-  }
+      # Landmark with empty or meaningless name
+      - pattern: "(?i)aria-label=\"\\s*\""
+        message: "Landmark aria-label should contain meaningful text."
 
-  // Private method requiring instance access
-  #initializeCard() {
-    const productId = this.dataset.productId;
-    this.cache.set('productId', productId);
-  }
+  - type: suggest
+    message: |
+      **WCAG 2.4.1 Landmark Accessibility Requirements:**
 
-  #cleanup() {
-    this.cache.clear();
-  }
-}
+      **Bypass Blocks Functionality:**
+      - **Screen Reader Navigation:** Landmarks allow users to navigate by page sections
+      - **Content Structure:** Landmarks provide clear layout organization
+      - **Alternative Methods:** Skip links, headings, and expand/collapse regions can also be used
 
-// Module-scoped utility - no instance access needed
-const addToCart = async (productId) => {
-  const formData = new FormData();
-  formData.append('id', productId);
-  formData.append('quantity', 1);
+      **Landmark Structural Organization:**
 
-  try {
-    const response = await fetch('/cart/add.js', {
-      method: 'POST',
-      body: formData
-    });
+      **1. Page Layout Groupings:**
+      ```html
+      <!-- Good: Proper page structure with landmarks -->
+      <body>
+        <header role="banner">
+          <h1>Company Name</h1>
+          <nav role="navigation" aria-label="Primary">
+            <ul>
+              <li><a href="/">Home</a></li>
+              <li><a href="/about">About</a></li>
+            </ul>
+          </nav>
+        </header>
 
-    if (!response.ok) {
-      throw new Error('Failed to add to cart');
-    }
+        <main role="main">
+          <h2>Page Content</h2>
+          <p>Main content goes here...</p>
+        </main>
 
-    const cartData = await response.json();
-    return cartData;
-  } catch (error) {
-    console.error('Add to cart error:', error);
-    throw error;
-  }
-};
+        <aside role="complementary" aria-label="Related information">
+          <h3>Related Links</h3>
+          <ul>
+            <li><a href="/related">Related Content</a></li>
+          </ul>
+        </aside>
 
-customElements.define('product-card', ProductCard);
-```
+        <footer role="contentinfo">
+          <p>&copy; 2024 Company Name</p>
+        </footer>
+      </body>
+      ```
 
-**HTML usage with the Component framework:**
-
-```liquid
-<product-card data-product-id="{{ product.id }}">
-  <img ref="productImage" src="{{ product.featured_image | image_url }}" alt="{{ product.title }}">
-  <h3>{{ product.title }}</h3>
-  <div ref="priceDisplay" class="product-card__price">{{ product.price | money }}</div>
-  <button ref="addButton" on:click="/handleAddToCart" data-add-to-cart>
-    Add to cart
-  </button>
-</product-card>
-```
-
-## Early Returns and Conditional Logic
-
-**Use early returns over nested conditionals:**
-
-```javascript
-// Good
-const processOrder = (order) => {
-  if (!order) return;
-  if (!order.items.length) return;
-  if (order.status !== 'pending') return;
-
-  // Process the order
-  updateOrderStatus(order.id, 'processing');
-  sendConfirmationEmail(order.email);
-};
-
-// Avoid
-const processOrder = (order) => {
-  if (order) {
-    if (order.items.length) {
-      if (order.status === 'pending') {
-        updateOrderStatus(order.id, 'processing');
-        sendConfirmationEmail(order.email);
-      }
-    }
-  }
-};
-```
-
-**Optional chaining guidelines:**
-
-```javascript
-// Multiple chains - use early return
-const updateButton = (product) => {
-  const button = product.querySelector('[data-ref="button"]');
-  if (!button) return;
-
-  button.disabled = false;
-  button.textContent = 'Add to cart';
-};
-
-// Single chain is fine
-const updateButton = (product) => {
-  const button = product.querySelector('[data-ref="button"]');
-  button?.enable();
-};
-```
-
-## Simplification Patterns
-
-**Ternary operators for simple conditions:**
-```javascript
-const buttonText = isLoading ? 'Loading...' : 'Add to cart';
-element.textContent = buttonText;
-```
-
-**One-liner conditionals:**
-```javascript
-if (isOutOfStock) return;
-```
-
-**Return boolean comparisons directly:**
-```javascript
-const isAvailable = product.available && product.price > 0;
-return isAvailable;
-```
-
-## Event-Driven Architecture
-
+      **2. Content Within Landmarks:**
+      ```html
+      <!-- Good: All content within landmarks -->
+      <body>
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
