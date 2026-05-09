@@ -3,6 +3,7 @@ trigger: always_on
 description: This is a thinking map application with a Go backend (server/) and Next.js frontend (web/). The project uses modern development practices with TypeScript, shadcn/ui, Zustand, and ReactFlow for the frontend, and Go with Gin, GORM, eino and Redis for the backend.
 ---
 
+
 # ThinkingMap Cursor Rules
 
 ## Project Overview
