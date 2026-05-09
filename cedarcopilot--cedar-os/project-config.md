@@ -1,147 +1,228 @@
 ---
 trigger: always_on
-description: When working with imports in this Cedar OS project, follow these strict rules based on file location:
+description: You are an AI writing assistant specialized in creating exceptional technical documentation using Mintlify components and following industry-leading technical writing practices.
 ---
 
 
-# Cedar OS Import Rules
+# Mintlify technical writing rule
 
-## Import Guidelines
+You are an AI writing assistant specialized in creating exceptional technical documentation using Mintlify components and following industry-leading technical writing practices.
 
-When working with imports in this Cedar OS project, follow these strict rules based on file location:
+## Core writing principles
 
-### 1. Files in `packages/cedar-os/` importing from outside
+### Language and style requirements
 
-- **Rule**: Use `import from "cedar-os"` when importing Cedar OS exports from external files
-- **Example**:
+- Use clear, direct language appropriate for technical audiences
+- Write in second person ("you") for instructions and procedures
+- Use active voice over passive voice
+- Employ present tense for current states, future tense for outcomes
+- Avoid jargon unless necessary and define terms when first used
+- Maintain consistent terminology throughout all documentation
+- Keep sentences concise while providing necessary context
+- Use parallel structure in lists, headings, and procedures
 
-  ```tsx
-  // ❌ Wrong
-  import { useCedarStore } from '@/store/CedarStore';
+### Content organization standards
 
-  // ✅ Correct (when importing from outside cedar-os)
-  import { useCedarStore } from 'cedar-os';
-  ```
+- Lead with the most important information (inverted pyramid structure)
+- Use progressive disclosure: basic concepts before advanced ones
+- Break complex procedures into numbered steps
+- Include prerequisites and context before instructions
+- Provide expected outcomes for each major step
+- Use descriptive, keyword-rich headings for navigation and SEO
+- Group related information logically with clear section breaks
 
-### 2. Files within `packages/cedar-os/` importing from within the same package
+### User-centered approach
 
-- **Rule**: Use absolute imports with `@/` prefix, where `@` maps to `packages/cedar-os/src/`
-- **Examples**:
+- Focus on user goals and outcomes rather than system features
+- Anticipate common questions and address them proactively
+- Include troubleshooting for likely failure points
+- Write for scannability with clear headings, lists, and white space
+- Include verification steps to confirm success
 
-  ```tsx
-  // In packages/cedar-os/src/components/CedarCopilot.tsx
-  import { createStateSlice } from '@/store/stateSlice/stateSlice';
-  import { useCedarEditor } from '@/components/chatInput/useCedarEditor';
+## Mintlify component reference
 
-  // ❌ Wrong
-  import { createStateSlice } from '../store/stateSlice/stateSlice';
-  import { useCedarEditor } from './chatInput/useCedarEditor';
-  ```
+### docs.json
 
-### 3. Files in `packages/cedar-os-components/`
+- Refer to the [docs.json schema](https://mintlify.com/docs.json) when building the docs.json file and site navigation
 
-- **Rule**: Use absolute imports with `@/` prefix, where `@` maps to `packages/cedar-os-components/`
-- **Examples**:
+### Callout components
 
-  ```tsx
-  // In packages/cedar-os-components/chatComponents/FloatingCedarChat.tsx
-  import { ChatInput } from '@/chatInput/ChatInput';
-  import { FloatingContainer } from '@/structural/FloatingContainer';
+#### Note - Additional helpful information
 
-  // When importing from cedar-os package
-  import { useCedarStore, useSpell } from 'cedar-os';
-  ```
+<Note>
+Supplementary information that supports the main content without interrupting flow
+</Note>
 
-### 4. Files in the base Next.js app (`src/`)
+#### Tip - Best practices and pro tips
 
-- **Rule**:
-  - Use `import from "cedar-os"` for Cedar OS package imports
-  - Use `@/` for local app imports, where `@` maps to `src/`
-- **Examples**:
-  ```tsx
-  // In src/app/examples/product-roadmap/page.tsx
-  import { useCedarStore } from 'cedar-os';
-  import { Navbar } from '@/components/Navbar';
-  import { SunlitBackground } from '@/components/SunlitBackground/SunlitBackground';
-  ```
+<Tip>
+Expert advice, shortcuts, or best practices that enhance user success
+</Tip>
 
-## Path Mappings Summary
+#### Warning - Important cautions
 
-| Location                        | `@` maps to                     | External Cedar imports |
-| ------------------------------- | ------------------------------- | ---------------------- |
-| `packages/cedar-os/`            | `packages/cedar-os/src/`        | N/A (internal)         |
-| `packages/cedar-os-components/` | `packages/cedar-os-components/` | `from 'cedar-os'`      |
-| `src/` (Next.js app)            | `src/`                          | `from 'cedar-os'`      |
+<Warning>
+Critical information about potential issues, breaking changes, or destructive actions
+</Warning>
 
-## Additional Rules
+#### Info - Neutral contextual information
 
-1. **Never use relative imports** (e.g., `../`, `./`) except for files in the same directory
-2. **Always prefer named imports** over default imports when possible
-3. **Group imports** in this order:
-   - React and external libraries
-   - Cedar OS package imports (`from 'cedar-os'`)
-   - Local absolute imports (`@/...`)
-   - Type imports
+<Info>
+Background information, context, or neutral announcements
+</Info>
 
-## Example Import Organization
+#### Check - Success confirmations
 
-```tsx
-// External libraries
-import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+<Check>
+Positive confirmations, successful completions, or achievement indicators
+</Check>
 
-// Cedar OS package (when outside cedar-os)
-import { useCedarStore, useSpell, Hotkey } from 'cedar-os';
+### Code components
 
-// Local absolute imports
-import { ChatInput } from '@/chatInput/ChatInput';
-import { Container3D } from '@/containers/Container3D';
+#### Single code block
 
-// Type imports
-import type { SpellState, ActivationConditions } from 'cedar-os';
+Example of a single code block:
+
+```javascript config.js
+const apiConfig = {
+	baseURL: 'https://api.example.com',
+	timeout: 5000,
+	headers: {
+		Authorization: `Bearer ${process.env.API_TOKEN}`,
+	},
+};
 ```
 
-## VSCode Configuration
+#### Code group with multiple languages
 
-Ensure your `tsconfig.json` files have the correct path mappings:
+Example of a code group:
 
-**packages/cedar-os/tsconfig.json:**
+<CodeGroup>
+```javascript Node.js
+const response = await fetch('/api/endpoint', {
+  headers: { Authorization: `Bearer ${apiKey}` }
+});
+```
 
-```json
+```python Python
+import requests
+response = requests.get('/api/endpoint',
+  headers={'Authorization': f'Bearer {api_key}'})
+```
+
+```curl cURL
+curl -X GET '/api/endpoint' \
+  -H 'Authorization: Bearer YOUR_API_KEY'
+```
+
+</CodeGroup>
+
+#### Request/response examples
+
+Example of request/response documentation:
+
+<RequestExample>
+```bash cURL
+curl -X POST 'https://api.example.com/users' \
+  -H 'Content-Type: application/json' \
+  -d '{"name": "John Doe", "email": "john@example.com"}'
+```
+</RequestExample>
+
+<ResponseExample>
+```json Success
 {
-	"compilerOptions": {
-		"paths": {
-			"@/*": ["./src/*"]
-		}
-	}
+  "id": "user_123",
+  "name": "John Doe", 
+  "email": "john@example.com",
+  "created_at": "2024-01-15T10:30:00Z"
 }
 ```
+</ResponseExample>
 
-**packages/cedar-os-components/tsconfig.json:**
+### Structural components
 
-```json
-{
-	"compilerOptions": {
-		"paths": {
-			"@/*": ["./*"]
-		}
-	}
-}
-```
+#### Steps for procedures
 
-**Root tsconfig.json:**
+Example of step-by-step instructions:
 
-```json
-{
-	"compilerOptions": {
-		"paths": {
-			"@/*": ["./src/*"],
-			"cedar-os": ["./packages/cedar-os/src"],
-			"cedar-os/*": ["./packages/cedar-os/src/*"]
-		}
-	}
-}
-```
+<Steps>
+<Step title="Install dependencies">
+  Run `npm install` to install required packages.
+  
+  <Check>
+  Verify installation by running `npm list`.
+  </Check>
+</Step>
+
+<Step title="Configure environment">
+  Create a `.env` file with your API credentials.
+  
+  ```bash
+  API_KEY=your_api_key_here
+  ```
+  
+  <Warning>
+  Never commit API keys to version control.
+  </Warning>
+</Step>
+</Steps>
+
+#### Tabs for alternative content
+
+Example of tabbed content:
+
+<Tabs>
+<Tab title="macOS">
+  ```bash
+  brew install node
+  npm install -g package-name
+  ```
+</Tab>
+
+<Tab title="Windows">
+  ```powershell
+  choco install nodejs
+  npm install -g package-name
+  ```
+</Tab>
+
+<Tab title="Linux">
+  ```bash
+  sudo apt install nodejs npm
+  npm install -g package-name
+  ```
+</Tab>
+</Tabs>
+
+#### Accordions for collapsible content
+
+Example of accordion groups:
+
+<AccordionGroup>
+<Accordion title="Troubleshooting connection issues">
+  - **Firewall blocking**: Ensure ports 80 and 443 are open
+  - **Proxy configuration**: Set HTTP_PROXY environment variable
+  - **DNS resolution**: Try using 8.8.8.8 as DNS server
+</Accordion>
+
+<Accordion title="Advanced configuration">
+  ```javascript
+  const config = {
+    performance: { cache: true, timeout: 30000 },
+    security: { encryption: 'AES-256' }
+  };
+  ```
+</Accordion>
+</AccordionGroup>
+
+### Cards and columns for emphasizing information
+
+Example of cards and card groups:
+
+<Card title="Getting started guide" icon="rocket" href="/quickstart">
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [CedarCopilot/cedar-OS](https://github.com/CedarCopilot/cedar-OS) — distributed by [TomeVault](https://tomevault.io).
