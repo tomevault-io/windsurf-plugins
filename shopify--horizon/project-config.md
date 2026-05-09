@@ -1,15 +1,15 @@
 ---
 trigger: always_on
-description: Modal window accessibility compliance and ARIA Dialog Pattern
+description: Product card accessibility compliance pattern
 ---
 
-# Modal Window Accessibility Standards
+# Product Card Component Accessibility Standards
 
-Ensures modal windows follow WCAG compliance and ARIA Dialog Pattern specifications.
+Ensures product card components follow WCAG compliance and implement proper single tab-stop navigation for keyboard and screen reader users.
 
 <rule>
-name: modal_accessibility_standards
-description: Enforce modal window accessibility standards and ARIA Dialog Pattern compliance
+name: product_card_accessibility_standards
+description: Enforce product card component accessibility standards and single tab-stop navigation compliance
 filters:
   - type: file_extension
     pattern: "\\.(vue|jsx|tsx|html|liquid|php|js|ts)$"
@@ -17,97 +17,93 @@ filters:
 actions:
   - type: enforce
     conditions:
-      # Dialog role requirement
-      - pattern: "(?i)<(div|section|article)[^>]*(?:modal|dialog)[^>]*>"
-        pattern_negate: "role=\"dialog\""
-        message: "Modal containers must have role='dialog' attribute."
+      # Product card missing article wrapper
+      - pattern: "(?i)<(div|section)[^>]*(?:product.*card|card.*product)[^>]*>"
+        pattern_negate: "<article"
+        message: "Product cards should be wrapped with the article element for semantic structure."
 
-      # aria-modal requirement
-      - pattern: "(?i)<[^>]*role=\"dialog\"[^>]*>"
-        pattern_negate: "aria-modal=\"true\""
-        message: "Dialog elements must have aria-modal='true' attribute."
+      # Product card missing proper link structure
+      - pattern: "(?i)<article[^>]*(?:product.*card|card.*product)[^>]*>"
+        pattern_negate: "<a[^>]*>.*?</a>"
+        message: "Product cards must contain a link element for keyboard navigation and screen reader accessibility."
 
-      # aria-labelledby or aria-label requirement
-      - pattern: "(?i)<[^>]*role=\"dialog\"[^>]*>"
-        pattern_negate: "(aria-labelledby|aria-label)"
-        message: "Dialog elements must have either aria-labelledby or aria-label for accessibility."
+      # Product title not wrapped in link
+      - pattern: "(?i)<(h1|h2|h3|h4|h5|h6)[^>]*(?:product.*title|title.*product)[^>]*>"
+        pattern_negate: "<a[^>]*>.*?</a>"
+        message: "Product titles should be wrapped in link elements to provide proper navigation context."
 
-      # Empty aria-label check
-      - pattern: "(?i)<[^>]*role=\"dialog\"[^>]*aria-label=\"\"[^>]*>"
-        message: "Dialog aria-label should not be empty; provide a meaningful description."
+      # Heading not wrapping link element
+      - pattern: "(?i)<(h1|h2|h3|h4|h5|h6)[^>]*(?:product.*title|title.*product)[^>]*>"
+        pattern_negate: "<a[^>]*>"
+        message: "Product card headings should wrap link elements to maintain proper heading semantics."
 
-      # Button without proper close functionality
-      - pattern: "(?i)<button[^>]*(?:close|dismiss|cancel)[^>]*>"
-        pattern_negate: "(onClick|onclick|@click|v-on:click)"
-        message: "Modal close buttons should have proper click handlers to close the dialog."
+      # Missing product image alt text
+      - pattern: "(?i)<img[^>]*(?:product|card)[^>]*>"
+        pattern_negate: "alt=\"[^\"]+\""
+        message: "Product card images must have descriptive alt text for screen reader users."
 
-      # Close button should have aria-label
-      - pattern: "(?i)<button[^>]*(?:close|dismiss|×|&times;)[^>]*>"
-        pattern_negate: "aria-label=\"[^\"]*[Cc]lose[^\"]*\""
-        message: "Modal close buttons should have aria-label='Close' or similar descriptive text for screen readers."
+      # Empty alt text on product images
+      - pattern: "(?i)<img[^>]*(?:product|card)[^>]*alt=\"\"[^>]*>"
+        message: "Product card images should not have empty alt text; provide descriptive text or use alt=\"\" only for decorative images."
 
-      # Missing focus trap indicators
-      - pattern: "(?i)(?:showModal|openModal|displayModal)\\s*\\("
-        message: "When opening modals, ensure focus management is implemented (focus should move to an element inside the dialog)."
+      # Product price missing proper semantic structure
+      - pattern: "(?i)<(div|span)[^>]*(?:price|cost)[^>]*>"
+        pattern_negate: "(<span[^>]*aria-label|aria-label=\"[^\"]*price[^\"]*\")"
+        message: "Product prices should have proper semantic labeling for screen readers."
 
-      # Modal launcher should have aria-haspopup
-      - pattern: "(?i)<button[^>]*(?:open|show|launch)[^>]*(?:modal|dialog)[^>]*>"
-        pattern_negate: "aria-haspopup=\"dialog\""
-        message: "Buttons that open modals should include aria-haspopup='dialog' to inform users a dialog will open."
+      # Product description not in paragraph element
+      - pattern: "(?i)<(div|span)[^>]*(?:product.*description|description.*product)[^>]*>"
+        pattern_negate: "<p"
+        message: "Product descriptions should be wrapped in paragraph elements for proper semantic structure."
+
+      # Missing focus indicators
+      - pattern: "(?i)<a[^>]*(?:product.*card|card.*product)[^>]*>"
+        pattern_negate: "(focus|hover|active)"
+        message: "Product card links should have visible focus indicators for keyboard navigation."
+
+      # Product card without proper positioning context
+      - pattern: "(?i)<article[^>]*(?:product.*card|card.*product)[^>]*>"
+        pattern_negate: "(position.*relative|position: relative)"
+        message: "Product card containers should have position: relative for proper link overlay positioning."
+
+      # Product card missing aria-labelledby
+      - pattern: "(?i)<article[^>]*(?:product.*card|card.*product)[^>]*>"
+        pattern_negate: "aria-labelledby=\"[^\"]+\""
+        message: "Product card articles should have aria-labelledby referencing the heading ID for better screen reader context."
+
+      # Product card heading missing ID
+      - pattern: "(?i)<(h1|h2|h3|h4|h5|h6)[^>]*(?:product.*title|title.*product)[^>]*>"
+        pattern_negate: "id=\"[^\"]+\""
+        message: "Product card headings should have unique ID attributes for aria-labelledby reference."
+
+      # Mouse-only link missing tabindex="-1"
+      - pattern: "(?i)<a[^>]*class=\"[^\"]*product-link-mouse[^\"]*\"[^>]*>"
+        pattern_negate: "tabindex=\"-1\""
+        message: "Mouse-only product links should have tabindex='-1' to remove them from tab order."
 
   - type: suggest
     message: |
-      **Modal Window Accessibility Best Practices:**
+      **Product Card Component Accessibility Best Practices:**
 
-      **Required ARIA Attributes:**
-      - **role='dialog':** Set on the modal container element
-      - **aria-modal='true':** Indicates the dialog is modal
-      - **aria-labelledby:** Reference to visible dialog title, OR
-      - **aria-label:** Descriptive label if no visible title exists
-      - **aria-haspopup='dialog':** Set on buttons/elements that trigger the modal to inform users a dialog will open
+      **Required Structure:**
+      - **article element:** Wrap each product card with the article element for semantic meaning
+      - **Single tab-stop:** Each product card should contain only one keyboard tab-stop
+      - **Link overlay:** Use absolutely positioned link that covers the entire card area
+      - **Heading wraps link:** The heading should wrap the link element to maintain proper heading semantics
 
-      **Keyboard Interaction Requirements:**
-      - **Initial Focus:** When dialog opens, focus must move to an element inside the dialog
-      - **Tab Cycling:** Tab key should cycle through tabbable elements within the dialog only
-      - **Shift+Tab:** Should cycle backwards through tabbable elements within the dialog
-      - **Escape Key:** Must close the dialog
-      - **Focus Trap:** Focus should be contained within the modal while open
+      **ARIA and Semantic Requirements:**
+      - **article role:** Implicit with article element, provides semantic structure
+      - **aria-labelledby:** Reference to the heading ID for article labeling
+      - **Heading ID:** Unique ID attribute for aria-labelledby reference
+      - **Link text:** Product title should be descriptive and unique
+      - **Image alt text:** Provide descriptive alt text for product images
+      - **Price text:** Use visible text for pricing information
+      - **Description text:** Use paragraph elements for product descriptions
 
-      **Focus Management:**
-      - Implement focus trapping to prevent tab navigation outside the modal
-      - Return focus to the triggering element when modal closes
-      - Move focus to the close button (first focusable element) when modal opens
-      - Ensure close button is positioned first in DOM order within the dialog
+      **Keyboard Navigation Requirements:**
+      - **Single tab-stop:** Each product card should be navigable with one tab key press
 
-      **Structure Requirements:**
-      - All interactive elements must be descendants of the dialog container
-      - Position close button first in DOM order within the dialog container
-      - Use semantic HTML within the modal (headings, buttons, form labels)
-      - Provide clear visual focus indicators
-      - Close buttons should use aria-label="Close" with &times; entity for visual 'x' icon
-
-      **Example Implementation:**
-      ```html
-      <!-- Modal launcher -->
-      <button aria-haspopup="dialog" onclick="openModal()">Open Settings</button>
-
-      <!-- Modal dialog -->
-      <div role="dialog" aria-modal="true" aria-labelledby="modal-title">
-        <button type="button" aria-label="Close" onclick="closeModal()">&times;</button>
-        <h2 id="modal-title">Modal Title</h2>
-        <p>Modal content...</p>
-      </div>
-      ```
-
-      **JavaScript Considerations:**
-      - Implement proper event listeners for Escape key
-      - Manage body scroll when modal is open
-      - Handle focus restoration on modal close
-
-metadata:
-  priority: high
-  version: 1.0
-</rule>
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [Shopify/horizon](https://github.com/Shopify/horizon) — distributed by [TomeVault](https://tomevault.io).
