@@ -7,14 +7,14 @@ A native Emacs buffer to interact with LLM agents powered by ACP
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `GEMINI.md` in [xenodium/agent-shell](https://github.com/xenodium/agent-shell).
+Original source: `AGENTS.md` in [xenodium/agent-shell](https://github.com/xenodium/agent-shell).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
+- **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
 From [xenodium/agent-shell](https://github.com/xenodium/agent-shell) — a repo with 1119+ stars on GitHub.
