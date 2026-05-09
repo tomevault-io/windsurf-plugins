@@ -1,114 +1,57 @@
 ---
 trigger: always_on
-description: Use Bun instead of Node.js, npm, pnpm, or vite.
+description: [Skills Index]|root: ./.claude/skills|Mirrors: ./.agents/skills (symlinked per-skill), ./.pi/skills (top-level symlink → .agents/skills) — makes Finance Guru skills portable to pi-coding-agent and any Agent Skills-standard harness. See docs/reference/cross-harness-skills.md|IMPORTANT: Read full SKILL.md before using any skill. This index is for routing only.|backend-dev-guidelines:{name:backend-dev-guidelines,desc:Comprehensive backend development guide for Node.js/Express/TypeScript microservic
 ---
 
 
-Default to using Bun instead of Node.js.
 
-- Use `bun <file>` instead of `node <file>` or `ts-node <file>`
-- Use `bun test` instead of `jest` or `vitest`
-- Use `bun build <file.html|file.ts|file.css>` instead of `webpack` or `esbuild`
-- Use `bun install` instead of `npm install` or `yarn install` or `pnpm install`
-- Use `bun run <script>` instead of `npm run <script>` or `yarn run <script>` or `pnpm run <script>`
-- Bun automatically loads .env, so don't use dotenv.
+[Skills Index]|root: ./.claude/skills|Mirrors: ./.agents/skills (symlinked per-skill), ./.pi/skills (top-level symlink → .agents/skills) — makes Finance Guru skills portable to pi-coding-agent and any Agent Skills-standard harness. See docs/reference/cross-harness-skills.md|IMPORTANT: Read full SKILL.md before using any skill. This index is for routing only.|backend-dev-guidelines:{name:backend-dev-guidelines,desc:Comprehensive backend development guide for Node.js/Express/TypeScript microservices.,files:{resources:{architecture-overview.md,async-and-errors.md,complete-examples.md,configuration.md,database-patterns.md,middleware-guide.md,routing-and-controllers.md,sentry-and-monitoring.md,services-and-repositories.md,testing-guide.md,validation-patterns.md}}}|dividend-tracking:{name:dividend-tracking,desc:Sync dividend data from Fidelity CSV to Dividends sheet.,files:{}}|error-tracking:{name:error-tracking,desc:Add Sentry v8 error tracking and performance monitoring to your project services.,files:{}}|fin-core:{name:fin-core,desc:| Finance Guru™ Core Context Loader Auto-loads essential Finance Guru system configuration and user profile at session s,files:{README.md}}|FinanceReport:{name:FinanceReport,desc:Generate institutional-quality PDF analysis reports for stocks and ETFs.,files:{StyleGuide.md,VisGuide.md,tools:{ChartKit.help.md,ChartKit.py,ReportGenerator.help.md,ReportGenerator.py},workflows:{FullResearchWorkflow.md,GenerateSingleReport.md,RegenerateBatch.md}}}|formula-protection:{name:formula-protection,desc:Prevent accidental modification of sacred spreadsheet formulas in Google Sheets Portfolio Tracker.,files:{}}|margin-management:{name:margin-management,desc:Update Margin Dashboard with Fidelity balance data and calculate margin-living strategy metrics.,files:{}}|MonteCarlo:{name:MonteCarlo,desc:Run Monte Carlo simulations for Finance Guru portfolio strategy.,files:{PortfolioParser.md,tools:{.gitkeep},workflows:{IncorporateBuyTicket.md,RunSimulation.md}}}|PortfolioSyncing:{name:PortfolioSyncing,desc:Import and sync broker CSV portfolio data to Google Sheets DataHub.,files:{workflows:{SyncPortfolio.md}}}|python-performance-optimization:{name:python-performance-optimization,desc:Profile and optimize Python code using cProfile, memory profilers, and performance best practices.,files:{}}|readiness-report:{name:readiness-report,desc:Evaluate how well a codebase supports autonomous AI development.,files:{references:{criteria.md,maturity-levels.md},scripts:{analyze_repo.py,generate_report.py}}}|retirement-syncing:{name:retirement-syncing,desc:Sync retirement account data from Vanguard and Fidelity CSV exports to Google Sheets DataHub.,files:{}}|route-tester:{name:route-tester,desc:Test authenticated routes in the your project using cookie-based authentication.,files:{}}|TransactionSyncing:{name:TransactionSyncing,desc:Import Fidelity transaction history CSV into Google Sheets with smart categorization.,files:{CategoryRules.md,workflows:{SyncTransactions.md}}}|[14 skills, 32 files]
 
-## APIs
 
-- `Bun.serve()` supports WebSockets, HTTPS, and routes. Don't use `express`.
-- `bun:sqlite` for SQLite. Don't use `better-sqlite3`.
-- `Bun.redis` for Redis. Don't use `ioredis`.
-- `Bun.sql` for Postgres. Don't use `pg` or `postgres.js`.
-- `WebSocket` is built-in. Don't use `ws`.
-- Prefer `Bun.file` over `node:fs`'s readFile/writeFile
-- Bun.$`ls` instead of execa.
 
-## Testing
+## Project Overview
 
-Use `bun test` to run tests.
+This is **Finance Guru™** - a private AI-powered family office system built on BMAD-CORE™ v6 architecture. This repository serves as the operational center for a multi-agent financial intelligence system that provides research, quantitative analysis, strategic planning, and compliance oversight.
 
-```ts#index.test.ts
-import { test, expect } from "bun:test";
+**Key Principle**: This is NOT a software product or app - this IS Finance Guru, a personal financial command center working exclusively for the user. All references should use "your" when discussing assets, strategies, and portfolios.
 
-test("hello world", () => {
-  expect(1).toBe(1);
-});
-```
+# Architecture
 
-## Frontend
+### Multi-Agent System
 
-Use HTML imports with `Bun.serve()`. Don't use `vite`. HTML imports fully support React, CSS, Tailwind.
+Finance Guru™ uses a **specialized agent architecture** where Claude transforms into different financial specialists:
 
-Server:
+**Primary Entry Point**:
 
-```ts#index.ts
-import index from "./index.html"
+- **Finance Orchestrator** (Cassandra Holt) - Master coordinator located at `.claude/commands/fin-guru/agents/finance-orchestrator.md`
 
-Bun.serve({
-  routes: {
-    "/": index,
-    "/api/users/:id": {
-      GET: (req) => {
-        return new Response(JSON.stringify({ id: req.params.id }));
-      },
-    },
-  },
-  // optional websocket support
-  websocket: {
-    open: (ws) => {
-      ws.send("Hello, world!");
-    },
-    message: (ws, message) => {
-      ws.send(message);
-    },
-    close: (ws) => {
-      // handle close
-    }
-  },
-  development: {
-    hmr: true,
-    console: true,
-  }
-})
-```
+## Path Variable System
 
-HTML files can import .tsx, .jsx or .js files directly and Bun's bundler will transpile & bundle automatically. `<link>` tags can point to stylesheets and Bun's CSS bundler will bundle.
+The codebase uses a variable substitution system:
 
-```html#index.html
-<html>
-  <body>
-    <h1>Hello, world!</h1>
-    <script type="module" src="./frontend.tsx"></script>
-  </body>
-</html>
-```
+- `{project-root}` - Root of the repository
+- `{module-path}` - Path to fin-guru module
+- `{current_datetime}` - Current date and time
+- `{current_date}` - Current date (YYYY-MM-DD)
+- `{user_name}` - User's name from config
 
-With the following `frontend.tsx`:
+When referencing files in agent configurations, these variables should be resolved to actual paths.
 
-```tsx#frontend.tsx
-import React from "react";
+## External Tool Requirements
 
-// import .css files directly and it works
-import './index.css';
+Finance Guru requires these MCP servers:
 
-import { createRoot } from "react-dom/client";
+- **exa** - Deep research and market intelligence
+- **bright-data** - Web scraping (search engines, markdown extraction)
+- **sequential-thinking** - Complex multi-step reasoning
+- **financial-datasets** - SEC filings, financial statements
+- **gdrive** - Google Drive integration (sheets, docs)
+- **web-search** - Real-time market information
 
-const root = createRoot(document.body);
+## Temporal Awareness
 
-export default function Frontend() {
-  return <h1>Hello, world!</h1>;
-}
 
-root.render(<Frontend />);
-```
-
-Then, run index.ts
-
-```sh
-bun --hot ./index.ts
-```
-
-For more information, read the Bun API docs in `node_modules/bun-types/docs/**.md`.
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [AojdevStudio/Finance-Guru](https://github.com/AojdevStudio/Finance-Guru) — distributed by [TomeVault](https://tomevault.io).
