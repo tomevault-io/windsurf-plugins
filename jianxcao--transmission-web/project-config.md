@@ -1,321 +1,313 @@
 ---
 trigger: always_on
-description: 项目文件组织和结构规范
+description: Naive UI 组件库使用规范
 ---
 
 
-# 文件组织规范
+# Naive UI 组件库规范
 
-## 目录结构
+本项目使用 [Naive UI](https://www.naiveui.com/) 作为主要组件库
 
-### 标准目录布局
-```
-src/
-├── api/              # API 接口层
-│   ├── rpc.ts       # Transmission RPC API
-│   └── trpc.ts      # tRPC 配置
-├── assets/          # 静态资源
-│   └── icons/       # SVG 图标
-├── components/      # 组件
-│   ├── AppHeader/   # 应用头部
-│   ├── CanvasList/  # Canvas 列表（虚拟滚动）
-│   ├── TorrentList/ # 种子列表
-│   ├── TorrentDetail/ # 种子详情
-│   ├── SiderbarView/ # 侧边栏
-│   └── dialog/      # 对话框组件
-├── composables/     # 可组合函数
-├── const/           # 常量定义
-├── i18n/            # 国际化
-│   └── locales/     # 语言文件
-├── router/          # 路由配置
-├── store/           # 状态管理（Pinia）
-├── styles/          # 全局样式
-├── types/           # TypeScript 类型定义
-├── utils/           # 工具函数
-└── views/           # 页面视图
-```
+## 组件导入
 
-## 组件组织
-
-### 组件文件夹结构
-```
-# 简单组件（单文件）
-components/
-├── IconButton.vue
-├── LanguageSwitcher.vue
-└── StatusBar.vue
-
-# 复杂组件（文件夹）
-components/
-└── TorrentList/
-    ├── TorrentList.vue          # 主组件
-    ├── TorrentListHeader.vue    # 子组件
-    ├── TorrentListRow.vue       # 子组件
-    ├── HeaderMenu.vue           # 菜单组件
-    ├── RowMenu.vue              # 菜单组件
-    └── cells/                   # 单元格组件
-        ├── NameCell.vue
-        ├── StatusCell.vue
-        └── ProgressCell.vue
-```
-
-### 组件命名规则
-```
-# ✅ 使用 PascalCase
-AppHeader.vue
-TorrentList.vue
-SettingsDialog.vue
-
-# ✅ 多词组件名
-UserProfile.vue
-TorrentDetail.vue
-ErrorMessage.vue
-
-# ❌ 避免单词组件名
-Header.vue  // 使用 AppHeader.vue
-List.vue    // 使用 TorrentList.vue
-```
-
-### 组件类型组织
-```
-components/
-├── layout/           # 布局组件
-│   ├── LayoutView.vue
-│   └── ResizeLine.vue
-├── common/           # 通用组件
-│   ├── IconButton.vue
-│   └── LanguageSwitcher.vue
-├── business/         # 业务组件
-│   ├── TorrentList/
-│   └── TorrentDetail/
-└── dialog/           # 对话框
-    ├── AddDialog.vue
-    └── SettingsDialog.vue
-```
-
-## Composables 组织
-
-### Composables 文件结构
-```
-composables/
-├── useTorrentFilter.ts    # 种子过滤
-├── useTorrentSort.ts      # 种子排序
-├── useVirtualList.ts      # 虚拟列表
-├── useWebSocket.ts        # WebSocket 连接
-├── usePolling.ts          # 轮询
-└── useLocalStorage.ts     # 本地存储
-```
-
-### Composable 命名
+### 自动导入配置
 ```typescript
-// ✅ use + PascalCase
-export function useTorrentFilter() {}
-export function useVirtualList() {}
-export function useLocalStorage() {}
-
-// ❌ 避免
-export function torrentFilter() {}  // 缺少 use 前缀
-export function use_torrent_filter() {}  // 使用下划线
-```
-
-### Composable 结构
-```typescript
-// composables/useTorrentFilter.ts
-import type { TorrentInfo } from '@/types'
-
-/**
- * 种子过滤 composable
- */
-export function useTorrentFilter(torrents: Ref<TorrentInfo[]>) {
-  // 状态
-  const filterText = ref('')
-  const filterStatus = ref<TorrentStatus | 'all'>('all')
-  
-  // 计算属性
-  const filteredTorrents = computed(() => {
-    // 过滤逻辑
-  })
-  
-  // 方法
-  const clearFilters = () => {
-    filterText.value = ''
-    filterStatus.value = 'all'
-  }
-  
-  // 返回公开的 API
-  return {
-    filterText,
-    filterStatus,
-    filteredTorrents,
-    clearFilters
-  }
-}
-```
-
-## Store 组织
-
-### Store 文件结构
-```
-store/
-├── index.ts           # Store 主入口
-├── torrent.ts         # 种子 store
-├── torrentUtils.ts    # 种子工具函数
-├── session.ts         # 会话 store
-├── setting.ts         # 设置 store
-└── stats.ts           # 统计 store
-```
-
-### Store 命名和导出
-```typescript
-// store/torrent.ts
-export const useTorrentStore = defineStore('torrent', () => {
-  // store 实现
-})
-
-// 使用
-import { useTorrentStore } from '@/store/torrent'
-```
-
-## 类型定义组织
-
-### 类型文件结构
-```
-types/
-├── index.ts           # 主类型文件
-├── torrent.ts         # 种子相关类型
-├── api.ts             # API 相关类型
-└── ui.ts              # UI 相关类型
-```
-
-### 类型导出
-```typescript
-// types/torrent.ts
-export interface TorrentInfo {
-  id: number
-  name: string
-  // ...
-}
-
-export type TorrentStatus = 'stopped' | 'checking' | 'downloading' | 'seeding'
-
-// types/index.ts
-export * from './torrent'
-export * from './api'
-export * from './ui'
-```
-
-## 工具函数组织
-
-### Utils 文件结构
-```
-utils/
-├── format.ts          # 格式化函数
-├── date.ts            # 日期处理
-├── storage.ts         # 存储操作
-└── validators.ts      # 验证函数
-```
-
-### 工具函数示例
-```typescript
-// utils/format.ts
-/**
- * 格式化字节大小
- */
-export function formatBytes(bytes: number): string {
-  // 实现
-}
-
-/**
- * 格式化速率
- */
-export function formatSpeed(bytesPerSecond: number): string {
-  // 实现
-}
-
-// 导出所有格式化函数
-export default {
-  formatBytes,
-  formatSpeed
-}
-```
-
-## 样式组织
-
-### 样式文件结构
-```
-src/
-├── style.css          # 全局样式入口
-└── styles/
-    ├── variables.less # 变量定义
-    ├── mixins.less    # 混入
-    └── animations.less # 动画
-```
-
-### 组件样式
-```vue
-<!-- ✅ 优先使用 Tailwind -->
+// ✅ 使用自动导入，无需手动 import
 <template>
-  <div class="flex items-center gap-4 p-4">
-    <!-- 内容 -->
-  </div>
+  <n-button type="primary">按钮</n-button>
+  <n-input v-model:value="text" />
+  <n-select v-model:value="value" :options="options" />
 </template>
 
-<!-- ✅ 必要时使用 scoped 样式 -->
-<style lang="less" scoped>
-.custom-layout {
-  display: grid;
-  grid-template-columns: 200px 1fr;
-}
-</style>
+// ❌ 不需要手动导入
+import { NButton, NInput } from 'naive-ui'
 ```
 
-## 路由组织
-
-### 路由文件结构
-```
-router/
-├── index.ts           # 路由主配置
-├── routes.ts          # 路由定义（可选）
-└── guards.ts          # 路由守卫（可选）
-```
-
-### 路由定义
+### Message、Dialog、Notification 等组合式 API
 ```typescript
-// router/index.ts
-const routes = [
+// ✅ 使用 composable API
+<script setup lang="ts">
+import { useMessage, useDialog, useNotification } from 'naive-ui'
+
+const message = useMessage()
+const dialog = useDialog()
+const notification = useNotification()
+
+function handleClick() {
+  message.success('操作成功')
+  dialog.warning({
+    title: '警告',
+    content: '确定要执行此操作吗？'
+  })
+}
+</script>
+```
+
+## 常用组件使用
+
+### Button 按钮
+```vue
+<template>
+  <!-- ✅ 基础按钮 -->
+  <n-button type="primary">主要按钮</n-button>
+  <n-button type="info">信息按钮</n-button>
+  <n-button type="success">成功按钮</n-button>
+  <n-button type="warning">警告按钮</n-button>
+  <n-button type="error">错误按钮</n-button>
+  
+  <!-- ✅ 按钮尺寸 -->
+  <n-button size="tiny">极小</n-button>
+  <n-button size="small">小</n-button>
+  <n-button size="medium">中（默认）</n-button>
+  <n-button size="large">大</n-button>
+  
+  <!-- ✅ 按钮状态 -->
+  <n-button :loading="loading">加载中</n-button>
+  <n-button :disabled="disabled">禁用</n-button>
+  
+  <!-- ✅ 图标按钮 -->
+  <n-button circle quaternary>
+    <template #icon>
+      <n-icon><PauseIcon /></n-icon>
+    </template>
+  </n-button>
+  
+  <!-- ✅ 文字按钮 -->
+  <n-button text tag="a" href="/settings">设置</n-button>
+</template>
+```
+
+### Input 输入框
+```vue
+<template>
+  <!-- ✅ 基础输入 -->
+  <n-input 
+    v-model:value="text"
+    placeholder="请输入内容"
+    clearable
+  />
+  
+  <!-- ✅ 带图标 -->
+  <n-input v-model:value="search" placeholder="搜索">
+    <template #prefix>
+      <n-icon><SearchIcon /></n-icon>
+    </template>
+  </n-input>
+  
+  <!-- ✅ 密码输入 -->
+  <n-input 
+    v-model:value="password"
+    type="password"
+    show-password-on="click"
+  />
+  
+  <!-- ✅ 文本域 -->
+  <n-input
+    v-model:value="description"
+    type="textarea"
+    :rows="4"
+    placeholder="多行文本"
+  />
+  
+  <!-- ✅ 输入组 -->
+  <n-input-group>
+    <n-input v-model:value="username" placeholder="用户名" />
+    <n-button type="primary">搜索</n-button>
+  </n-input-group>
+</template>
+```
+
+### Select 选择器
+```vue
+<script setup lang="ts">
+const value = ref<string>()
+const options = [
+  { label: '选项1', value: '1' },
+  { label: '选项2', value: '2' },
+  { label: '选项3', value: '3' }
+]
+
+// ✅ 带分组的选项
+const groupedOptions = [
   {
-    path: '/',
-    name: 'dashboard',
-    component: () => import('@/views/DashboardView.vue')
-  },
-  {
-    path: '/settings',
-    name: 'settings',
-    component: () => import('@/views/SettingsPageView.vue')
+    type: 'group',
+    label: '分组1',
+    key: 'group1',
+    children: [
+      { label: '选项1', value: '1' }
+    ]
   }
 ]
+</script>
+
+<template>
+  <!-- ✅ 基础选择器 -->
+  <n-select v-model:value="value" :options="options" />
+  
+  <!-- ✅ 多选 -->
+  <n-select 
+    v-model:value="values"
+    :options="options"
+    multiple
+    filterable
+  />
+  
+  <!-- ✅ 可搜索 -->
+  <n-select
+    v-model:value="value"
+    :options="options"
+    filterable
+    placeholder="搜索选择"
+  />
+  
+  <!-- ✅ 自定义渲染 -->
+  <n-select
+    v-model:value="value"
+    :options="options"
+    :render-label="renderLabel"
+  />
+</template>
 ```
 
-## 国际化组织
+### Dialog 对话框
+```vue
+<script setup lang="ts">
+const showModal = ref(false)
+const dialog = useDialog()
 
-### i18n 文件结构
-```
-i18n/
-├── index.ts           # i18n 配置
-└── locales/
-    ├── en-US.json     # 英文
-    └── zh-CN.json     # 简体中文
+// ✅ 使用 useDialog API
+function showConfirm() {
+  dialog.warning({
+    title: '确认删除',
+    content: '确定要删除这个种子吗？',
+    positiveText: '确定',
+    negativeText: '取消',
+    onPositiveClick: () => {
+      message.success('已删除')
+    }
+  })
+}
+
+// ✅ 使用 n-modal 组件
+</script>
+
+<template>
+  <!-- ✅ Modal 组件 -->
+  <n-modal 
+    v-model:show="showModal"
+    preset="dialog"
+    title="对话框标题"
+    positive-text="确定"
+    negative-text="取消"
+    @positive-click="handleConfirm"
+  >
+    对话框内容
+  </n-modal>
+  
+  <!-- ✅ 自定义内容的 Modal -->
+  <n-modal v-model:show="showModal">
+    <n-card
+      style="width: 600px"
+      title="自定义对话框"
+      :bordered="false"
+      size="huge"
+      role="dialog"
+      aria-modal="true"
+    >
+      <template #header-extra>
+        <n-button @click="showModal = false">关闭</n-button>
+      </template>
+      自定义内容
+    </n-card>
+  </n-modal>
+</template>
 ```
 
-### 翻译文件组织
-```json
-// locales/zh-CN.json
-{
-  "common": {
-    "ok": "确定",
-    "cancel": "取消"
+### Message 消息提示
+```typescript
+// ✅ 使用 message API
+const message = useMessage()
+
+// 成功消息
+message.success('操作成功')
+
+// 错误消息
+message.error('操作失败')
+
+// 警告消息
+message.warning('请注意')
+
+// 信息消息
+message.info('提示信息')
+
+// 加载消息
+const loading = message.loading('加载中...', {
+  duration: 0 // 持续显示
+})
+// 手动关闭
+loading.destroy()
+
+// ✅ 配置消息
+message.success('操作成功', {
+  duration: 3000,
+  closable: true,
+  onClose: () => {
+    console.log('消息已关闭')
+  }
+})
+```
+
+### Table 表格
+```vue
+<script setup lang="ts">
+import type { DataTableColumns } from 'naive-ui'
+
+interface TorrentRow {
+  id: number
+  name: string
+  size: number
+  progress: number
+}
+
+const columns: DataTableColumns<TorrentRow> = [
+  {
+    key: 'name',
+    title: '名称',
+    width: 300,
+    ellipsis: {
+      tooltip: true
+    }
   },
-  "torrent": {
+  {
+    key: 'size',
+    title: '大小',
+    render: (row) => formatBytes(row.size)
+  },
+  {
+    key: 'progress',
+    title: '进度',
+    render: (row) => h(NProgress, {
+      percentage: row.progress,
+      type: 'line'
+    })
+  }
+]
+
+const data = ref<TorrentRow[]>([])
+const loading = ref(false)
+const pagination = reactive({
+  page: 1,
+  pageSize: 20,
+  showSizePicker: true,
+  pageSizes: [10, 20, 50, 100]
+})
+</script>
+
+<template>
+  <!-- ✅ 基础表格 -->
+  <n-data-table
+    :columns="columns"
+    :data="data"
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
