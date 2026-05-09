@@ -1,149 +1,153 @@
 ---
 trigger: always_on
-description: Business code integration patterns and validation requirements for kubernaut
+description: Interface and method validation before code generation
 ---
 
-# Business Code Integration Standards
+# Interface and Method Validation Mandate - ENHANCED
 
-## Core Requirement - MANDATORY
+## 🔍 **MANDATORY: Interface and Method Validation Before Code Generation**
 
-**Rule**: ALL business logic MUST be integrated into main application workflows
-**Prevention**: Design integration points during APDC Analysis and Plan phases
+### Critical Validation Process - ENHANCED
+**MANDATORY**: Before generating ANY test code that calls methods or uses types:
 
-## Integration Definition
+1. **Interface Verification**: Use `codebase_search` to verify actual interface definitions
+2. **Method Existence Check**: Confirm all called methods exist with EXACT signatures
+3. **Type Validation**: Verify all referenced types and struct fields exist
+4. **Import Validation**: Ensure all imported packages and types are available
+5. **🆕 COMPILATION VERIFICATION**: MANDATORY compilation check after interface usage
+6. **🆕 TYPE COMPATIBILITY CHECK**: Verify parameter and return type compatibility
 
-Business code is **properly integrated** when:
-1. **Main Application Entry**: Code is instantiated and used in main application entry points
-2. **Runtime Execution**: Code executes during normal application workflows (not just tests)
-3. **Dependency Chain**: All dependencies are properly wired in main application
-4. **Interface Implementation**: Interfaces are implemented by real business code (not just mocks)
-5. **Configuration Loading**: Business code configuration is loaded in main application
-6. **Error Integration**: Business code errors are handled in main application flow
-7. **Monitoring Integration**: Business code metrics are exposed in main application
+### 🆕 **MANDATORY CODE GENERATION HALT PROTOCOL - ENHANCED**
+**BEFORE generating ANY line of code:**
 
-## Integration Validation Matrix
+1. **MANDATORY SEARCH**: Run `codebase_search "existing [ComponentType] real implementations"` first, then `codebase_search "existing [ComponentType] mock implementations"`
+2. **MANDATORY VERIFICATION**: If real business logic exists, PREFER it over mocks; if using mocks, use existing ones
+3. **🆕 BUILD ERROR PREVENTION**: Check for common build error patterns
+4. **🆕 IMPORT CONSISTENCY**: Verify all imports exist and are properly used
+5. **VIOLATION RESPONSE**: If attempting to create duplicate mocks, IMMEDIATELY STOP and use existing
 
-| Integration Aspect | Validation Method | Required Evidence |
-|-------------------|------------------|-------------------|
-| **Main Entry Point** | Code tracing from `cmd/*/main.go` | Direct instantiation or factory usage |
-| **Runtime Path** | Execution flow analysis | Normal workflow execution path |
-| **Dependency Wiring** | Dependency injection validation | All deps available at runtime |
-| **Interface Usage** | Implementation verification | Real implementations in main app |
-| **Configuration** | Config loading verification | Business config loaded in main |
-| **Error Handling** | Error flow analysis | Business errors handled in main |
-| **Monitoring** | Metrics integration check | Business metrics exposed |
+**ENFORCEMENT TRIGGER WORDS**:
+- Creating any type with "Mock" in name → TRIGGER validation
+- Using `NewMock*` → TRIGGER existing pattern search
+- Implementing interfaces → TRIGGER interface validation
 
-## 🚫 **IRONCLAD INTEGRATION VERIFICATION PROCESS**
-
-### **MANDATORY INTEGRATION VALIDATION - BLOCKING REQUIREMENTS**
-
-**🚫 BLOCKING REQUIREMENT - BEFORE ANY BUSINESS CODE CREATION**:
-
-<function_calls>
-<invoke name="Grep">
-<parameter name="pattern">[BusinessComponentType]</parameter>
-<parameter name="path">cmd/</parameter>
-<parameter name="output_mode">content</parameter>
-<parameter name="-n">true</parameter>
-</invoke>
-</function_calls>
-
-<function_calls>
-<invoke name="Task">
-<parameter name="subagent_type">general-purpose</parameter>
-<parameter name="description">Main application integration analysis</parameter>
-<parameter name="prompt">Analyze main applications in cmd/ directory to understand integration patterns. Find how similar business components are instantiated, configured, and wired into the application flow.</parameter>
-</invoke>
-</function_calls>
-
-```
-✅ INTEGRATION VERIFICATION CHECKPOINT:
-- [ ] Main application search executed ✅/❌
-- [ ] Integration patterns identified and documented ✅/❌
-- [ ] Similar component usage patterns discovered ✅/❌
-- [ ] Integration plan developed for cmd/ applications ✅/❌
-- [ ] Runtime execution path verified ✅/❌
-
-❌ STOP: Cannot create business code until ALL checkboxes are ✅
-```
-
-**🚫 MANDATORY INTEGRATION EVIDENCE - POST-IMPLEMENTATION**:
-
-<function_calls>
-<invoke name="Grep">
-<parameter name="pattern">[ImplementedBusinessComponent]</parameter>
-<parameter name="path">cmd/</parameter>
-<parameter name="output_mode">files_with_matches</parameter>
-</invoke>
-</function_calls>
-
-<function_calls>
-<invoke name="Grep">
-<parameter name="pattern">New[BusinessComponent]|Create[BusinessComponent]</parameter>
-<parameter name="path">cmd/</parameter>
-<parameter name="output_mode">content</parameter>
-</invoke>
-</function_calls>
-
-```
-✅ INTEGRATION EVIDENCE CHECKPOINT:
-- [ ] Component appears in main applications ✅/❌
-- [ ] Component instantiation confirmed ✅/❌
-- [ ] Runtime execution path verified ✅/❌
-- [ ] No orphaned business code ✅/❌
-
-❌ VIOLATION: If ANY checkbox is ❌ → "🚨 ORPHANED BUSINESS CODE VIOLATION: All business code MUST be integrated in main applications - DEVELOPMENT STOPPED"
-```
-
-### Step 1: Call Graph Analysis (Tool-Enforced)
+**VIOLATION AUTO-DETECTION - ENHANCED**:
 ```bash
-# MANDATORY: Execute these validation commands
-grep -r "[BusinessComponentType]" cmd/ --include="*.go"
-find pkg/ -name "*.go" -not -name "*_test.go" -exec grep -l "[BusinessComponentType]" {} \;
+# If you find yourself typing any of these, STOP:
+type Mock* struct          # ❌ VIOLATION: Check existing mocks first
+func NewMock*             # ❌ VIOLATION: Use existing patterns
+*Mock struct {            # ❌ VIOLATION: Reuse existing mocks
+logrus.New()              # ❌ VIOLATION: Use existing mocks.NewMockLogger()
+mockLogger                # ❌ VIOLATION: Check variable declaration
+import.*logrus.*\n.*not   # ❌ VIOLATION: Unused import detected
 ```
 
-### Step 2: Runtime Path Verification
-```go
-// Add integration validation to main application startup
-func validateBusinessIntegration() error {
-    // Verify each business component is properly integrated
-    if businessComponent == nil {
-        return fmt.Errorf("business component not integrated")
-    }
-
-    // Test business component can be invoked
-    if err := businessComponent.HealthCheck(); err != nil {
-        return fmt.Errorf("business component not functional: %w", err)
-    }
-
-    return nil
-}
+**🆕 COMMON BUILD ERROR PATTERNS TO PREVENT**:
+```bash
+# These patterns MUST trigger immediate validation:
+mockLogger.*without.*var  # ❌ Undefined variable usage
+import.*unused           # ❌ Unused import statements
+mocks\..*without.*import  # ❌ Mock usage without import
+NewMock.*duplicate       # ❌ Duplicate mock creation
 ```
 
-### Step 3: Dependency Chain Validation
-```go
-// Verify all business code dependencies are available
-func validateDependencyChain() error {
-    requiredDeps := []string{"database", "vectorDB", "llmClient", "k8sClient"}
+---
 
-    for _, dep := range requiredDeps {
-        if !isDependencyAvailable(dep) {
-            return fmt.Errorf("required dependency %s not available for business code", dep)
-        }
-    }
+## 🚨 **MANDATORY VALIDATION SEQUENCE - ENHANCED**
 
-    return nil
-}
+### **Step 1: Interface Discovery and Verification**
+```bash
+# MANDATORY: Search for existing interfaces before creating/using
+codebase_search "existing [InterfaceName] interface definitions"
+codebase_search "existing [InterfaceName] implementations"
+
+# Verify interface exists and get exact signature
+grep -r "type.*[InterfaceName].*interface" pkg/ --include="*.go"
 ```
 
-## Integration Patterns
+**Example Validation**:
+```bash
+# Before using WorkflowEngine interface
+codebase_search "existing WorkflowEngine interface definitions"
+# Result should show: pkg/workflow/engine/interfaces.go
 
-### Pattern 1: Direct Main Application Integration
+# Verify method signatures
+grep -A 10 "type WorkflowEngine interface" pkg/workflow/engine/interfaces.go
+```
+
+### **Step 2: Method Signature Validation**
+```bash
+# MANDATORY: Verify exact method signatures before calling
+grep -A 20 "type.*[InterfaceName].*interface" [interface_file.go]
+
+# Check method parameters and return types
+grep "[MethodName].*(" [interface_file.go]
+```
+
+**Example Method Validation**:
 ```go
-// cmd/kubernaut/main.go
-func main() {
-    // Create business components
-    analyticsEngine := insights.NewAnalyticsEngine(deps...)
+// ✅ CORRECT: Verify method signature first
+// From pkg/workflow/engine/interfaces.go:
+// CreateWorkflow(ctx context.Context, alert AlertData) (*Workflow, error)
+
+// Then use in test:
+workflow, err := workflowEngine.CreateWorkflow(ctx, alertData)
+```
+
+### **Step 3: Mock Existence and Reuse Check**
+```bash
+# MANDATORY: Check for existing mocks before creating new ones
+find pkg/testutil/mocks/ -name "*[ComponentName]*" -type f
+grep -r "Mock[ComponentName]" pkg/testutil/ --include="*.go"
+
+# If mocks exist, REUSE them
+# If no mocks exist, check if real component should be used instead
+```
+
+**Mock Reuse Decision Matrix**:
+| Component Type | Action |
+|---------------|--------|
+| **External Services** (AI, K8s, DB) | Use existing mocks from `pkg/testutil/mocks/` |
+| **Business Logic** (Engine, Analytics) | Use REAL components |
+| **Configuration** | Use real config with test values |
+| **Utilities** | Use real utilities |
+
+### **🆕 Step 4: Compilation Verification**
+```bash
+# MANDATORY: Test compilation after interface usage
+go build ./test/[test_package]/ 2>&1 | tee build_check.log
+
+# Check for common errors:
+grep "undefined:" build_check.log    # Undefined symbols
+grep "cannot use" build_check.log    # Type mismatches
+grep "not enough arguments" build_check.log  # Parameter mismatches
+```
+
+### **🆕 Step 5: Import Consistency Check**
+```bash
+# MANDATORY: Verify all imports are used and correct
+go mod tidy
+goimports -w [test_file.go]
+
+# Check for unused imports
+go build [test_file.go] 2>&1 | grep "imported and not used"
+```
+
+---
+
+## 🔧 **AUTOMATED VALIDATION TOOLS**
+
+### **Interface Validation Script**
+```bash
+#!/bin/bash
+# scripts/validate-interface-usage.sh
+
+INTERFACE_NAME="$1"
+TEST_FILE="$2"
+
+echo "🔍 VALIDATING INTERFACE USAGE: $INTERFACE_NAME in $TEST_FILE"
+
+# Step 1: Find interface definition
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
