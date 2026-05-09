@@ -1,176 +1,123 @@
 ---
 trigger: always_on
-description: This document provides comprehensive guidelines for writing OpenAPI annotations in the Sayna Rust/Axum codebase using the `utoipa` crate.
+description: Comprehensive best practices for Rust development (Edition 2024)
 ---
 
-# OpenAPI Documentation Guidelines
+# Rust Best Practices (2024-2025)
 
-This document provides comprehensive guidelines for writing OpenAPI annotations in the Sayna Rust/Axum codebase using the `utoipa` crate.
+This document outlines a comprehensive set of best practices for Rust development, covering various aspects from code organization to security and tooling. Adhering to these guidelines will help you write idiomatic, efficient, secure, and maintainable Rust code.
 
-## Overview
+**Note:** This project uses **Rust Edition 2024** (released Feb 2025 with Rust 1.85).
 
-Sayna uses `utoipa` (v5.3+, latest is v5.4) for OpenAPI 3.1 specification generation. All OpenAPI-related code is feature-gated behind the `openapi` feature flag to keep dependencies minimal in production builds.
+## 1. Code Organization and Structure
 
-### Key Principles
+### 1.1. Directory Structure
 
-1. **Feature-Gated**: All OpenAPI code must be conditionally compiled with `#[cfg_attr(feature = "openapi", ...)]`
-2. **Centralized Documentation**: All paths, schemas, and tags are registered in `src/docs/openapi.rs`
-3. **Complete Examples**: Every field should have meaningful examples that reflect real-world usage
-4. **Consistent Style**: Follow established patterns for naming, descriptions, and error responses
-5. **Type Safety**: Leverage Rust's type system to ensure documentation matches implementation
+-   **`src/`**: Contains all the Rust source code.
+    -   **`main.rs`**: The entry point for binary crates.
+    -   **`lib.rs`**: The entry point for library crates.
+    -   **`bin/`**:  Contains source files for multiple binary executables within the same project.  Each file in `bin/` will be compiled into a separate executable.
+    -   **`modules/` or `components/`**: (Optional)  For larger projects, group related modules or components into subdirectories. Use descriptive names.
+    -   **`tests/`**:  Integration tests. (See Testing section below for more details.)
+    -   **`examples/`**: Example code that demonstrates how to use the library.
+-   **`benches/`**: Benchmark tests (using `criterion` or similar).
+-   **`Cargo.toml`**: Project manifest file.
+-   **`Cargo.lock`**: Records the exact versions of dependencies used. **Do not manually edit.**
+-   **`.gitignore`**: Specifies intentionally untracked files that Git should ignore.
+-   **`README.md`**: Project documentation, including usage instructions, build instructions, and license information.
 
-## Feature Flag Setup
 
-### Cargo.toml Configuration
+sayna/
+├── Cargo.toml
+├── Cargo.lock
+├── src/
+│   ├── main.rs         # Entry point for a binary crate
+│   ├── lib.rs          # Entry point for a library crate
+│   ├── modules/
+│   │   ├── module_a.rs # A module within the crate
+│   │   └── module_b.rs # Another module
+│   └── bin/
+│       ├── cli_tool.rs # A separate binary executable
+│       └── worker.rs   # Another binary executable
+├── tests/
+│   └── integration_test.rs # Integration tests
+├── benches/
+│   └── my_benchmark.rs # Benchmark tests using Criterion
+├── examples/
+│   └── example_usage.rs # Example code using the library
+├── README.md
 
-```toml
-[features]
-openapi = [
-    "dep:utoipa",
-]
 
-[dependencies]
-utoipa = { version = "5.3", optional = true, features = ["axum_extras"] }
+### 1.2. File Naming Conventions
 
-# Optional: For more ergonomic route registration
-# utoipa-axum = { version = "0.2", optional = true }
-```
+-   Rust source files use the `.rs` extension.
+-   Module files (e.g., `module_a.rs`) should be named after the module they define.
+-   Use snake_case for file names (e.g., `my_module.rs`).
 
-### Optional: Enhanced Axum Integration
+### 1.3. Module Organization
 
-Consider adding `utoipa-axum` for more ergonomic route registration:
-
-```rust
-use utoipa_axum::{routes, router::OpenApiRouter};
-
-let (router, api) = OpenApiRouter::new()
-    .routes(routes!(health_check, list_voices, speak_handler))
-    .split_for_parts();
-```
-
-### Running with OpenAPI
-
-```bash
-# Run server with OpenAPI endpoints
-cargo run --features openapi
-
-# Generate OpenAPI spec to file
-cargo run --features openapi -- openapi -o docs/openapi.yaml
-
-# Generate JSON format
-cargo run --features openapi -- openapi --format json -o docs/openapi.json
-```
-
-## Schema Annotations
-
-### Basic Schema Definition
-
-Use `#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]` on all types exposed in the API:
+-   Use modules to organize code into logical units.
+-   Declare modules in `lib.rs` or `main.rs` using the `mod` keyword.
+-   Use `pub mod` to make modules public.
+-   Create separate files for each module to improve readability and maintainability.
+-   Use `use` statements to bring items from other modules into scope.
 
 ```rust
-use serde::{Deserialize, Serialize};
+// lib.rs
 
-/// Health check response
-#[derive(Debug, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
-pub struct HealthResponse {
-    /// Server status
-    #[cfg_attr(feature = "openapi", schema(example = "OK"))]
-    pub status: String,
+pub mod my_module;
+
+mod internal_module; // Not public
+
+
+rust
+// my_module.rs
+
+pub fn my_function() {
+    //...
 }
 ```
 
-### Field-Level Annotations
+### 1.4. Component Architecture
 
-#### Examples
+-   For larger applications, consider using a component-based architecture.
+-   Each component should be responsible for a specific part of the application's functionality.
+-   Components should communicate with each other through well-defined interfaces (traits).
+-   Consider using dependency injection to decouple components and improve testability.
 
-Always provide realistic examples for every field:
+### 1.5. Code Splitting Strategies
 
-```rust
-#[derive(Debug, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
-pub struct TokenRequest {
-    /// The LiveKit room name to generate a token for
-    #[cfg_attr(feature = "openapi", schema(example = "conversation-room-123"))]
-    pub room_name: String,
+-   Split code into smaller, reusable modules.
+-   Use feature flags to conditionally compile code for different platforms or features.
+-   Consider using dynamic linking (if supported by your target platform) to reduce binary size.
 
-    /// Display name for the participant (e.g., "John Doe")
-    #[cfg_attr(feature = "openapi", schema(example = "Alice Smith"))]
-    pub participant_name: String,
+## 2. Common Patterns and Anti-patterns
 
-    /// Unique identifier for the participant (e.g., "user-123")
-    #[cfg_attr(feature = "openapi", schema(example = "user-alice-456"))]
-    pub participant_identity: String,
-}
-```
+### 2.1. Design Patterns
 
-#### Optional Fields and Defaults
+-   **Builder Pattern**: For constructing complex objects with many optional parameters.
+-   **Factory Pattern**: For creating objects without specifying their concrete types.
+-   **Observer Pattern**: For implementing event-driven systems.
+-   **Strategy Pattern**: For selecting algorithms at runtime.
+-   **Visitor Pattern**: For adding new operations to existing data structures without modifying them.
 
-For optional fields, use serde attributes to control serialization:
+### 2.2. Recommended Approaches for Common Tasks
 
-```rust
-#[derive(Debug, Deserialize, Serialize, Clone)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
-pub struct TTSWebSocketConfig {
-    /// Provider name (e.g., "deepgram")
-    #[cfg_attr(feature = "openapi", schema(example = "deepgram"))]
-    pub provider: String,
+-   **Data Structures**: Use `Vec` for dynamic arrays, `HashMap` for key-value pairs, `HashSet` for unique elements, `BTreeMap` and `BTreeSet` for sorted collections.
+-   **Concurrency**: Use `Arc` and `Mutex` for shared mutable state, channels for message passing, and the `rayon` crate for data parallelism.
+-   **Asynchronous Programming**: Use `async` and `await` for writing asynchronous code.
+-   **Error Handling**: Use the `Result` type for recoverable errors and `panic!` for unrecoverable errors.
 
-    /// Voice ID or name to use for synthesis
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[cfg_attr(feature = "openapi", schema(example = "aura-asteria-en"))]
-    pub voice_id: Option<String>,
+### 2.3. Anti-patterns and Code Smells
 
-    /// Speaking rate (0.25 to 4.0, 1.0 is normal)
-    #[cfg_attr(feature = "openapi", schema(example = 1.0))]
-    pub speaking_rate: Option<f32>,
+-   **Unnecessary Cloning**: Avoid cloning data unless it is absolutely necessary. Use references instead.
+-   **Excessive `unwrap()` Calls**: Handle errors properly instead of using `unwrap()`, which can cause the program to panic.
+-   **Overuse of `unsafe`**: Minimize the use of `unsafe` code and carefully review any unsafe code to ensure it is correct.
+-   **Ignoring Compiler Warnings**: Treat compiler warnings as errors and fix them.
+-   **Premature Optimization**: Focus on writing clear, correct code first, and then optimize only if necessary.
 
-    /// List of participants (defaults to empty for all participants)
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub listen_participants: Vec<String>,
-}
-```
+### 2.4. State Management
 
-#### Numeric Constraints
-
-Use schema attributes for numeric validations:
-
-```rust
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
-pub struct AudioConfig {
-    /// Sample rate of the audio in Hz
-    #[cfg_attr(feature = "openapi", schema(example = 16000, minimum = 8000, maximum = 48000))]
-    pub sample_rate: u32,
-
-    /// Number of audio channels (1 for mono, 2 for stereo)
-    #[cfg_attr(feature = "openapi", schema(example = 1, minimum = 1, maximum = 2))]
-    pub channels: u16,
-}
-```
-
-### Complex Types
-
-#### Enums
-
-For enum types used in discriminated unions:
-
-```rust
-#[derive(Debug, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
-#[serde(tag = "type")]
-pub enum IncomingMessage {
-    #[serde(rename = "config")]
-    Config {
-        /// Enable audio processing (STT/TTS). Defaults to true if not specified.
-        #[serde(default = "default_audio_enabled")]
-        audio: Option<bool>,
-
-        /// STT configuration (required only when audio=true)
-        #[serde(skip_serializing_if = "Option::is_none")]
-        stt_config: Option<STTWebSocketConfig>,
-
-        /// TTS configuration (required only when audio=true)
-        #[serde(skip_serializing_if = "Option::is_none")]
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
