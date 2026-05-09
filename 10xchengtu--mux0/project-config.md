@@ -106,5 +106,5 @@ mux0/
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Source: [10xChengTu/MUX0](https://github.com/10xChengTu/MUX0) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-23 -->
+> Source: [10xChengTu/Mux0](https://github.com/10xChengTu/Mux0) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-04-25 -->
