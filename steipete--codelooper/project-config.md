@@ -1,123 +1,159 @@
 ---
 trigger: always_on
-description: This document summarizes the debugging process used to locate a specific UI element (the AI slash input field) in the "Cursor" application (`com.todesktop.230313mzl4w4u92`) using `axorc`.
+description: Advanced file editing patterns using command-line tools
 ---
 
-# AXorcist Debugging: Finding the Cursor AI Slash Input Field
 
-This document summarizes the debugging process used to locate a specific UI element (the AI slash input field) in the "Cursor" application (`com.todesktop.230313mzl4w4u92`) using `axorc`.
+# Advanced File Editing Patterns
 
-## Goal
+This document provides guidance for complex file editing operations using command-line tools, optimized for AI assistant usage.
 
-The primary goal was to programmatically find the coordinates and read the text of the AI slash input field within the Cursor application. The key identifier for this field was its `AXDOMClassList` attribute, which was known to contain `"aislash-editor-input"`.
+## Core Philosophy for AI Assistants
 
-## Initial Challenges & Learnings
+- **Perl is the Workhorse**: Prioritize Perl for regex operations, in-place editing with backups (`-pi.bak`), multi-line handling (`-0777` slurp mode), and range operators (`/START/../END/`)
+- **`ripgrep` (`rg`) for Extraction**: Use `rg` for fast finding and extracting content blocks
+- **One-Liners**: Aim for concise, powerful one-line commands
+- **Backups are Non-Negotiable**: Always include `.bak` with Perl's `-i` or manual `cp`
+- **Regex Quoting**: Single quotes (`'...'`) are default for Perl regex on command line
+- **Specificity & Non-Greedy**: Generate specific start/end regexes with non-greedy matching (`.*?`)
 
-1.  **`kAXDOMClassListAttribute`**: This constant needed to be added to `AXorcist/Sources/AXorcist/Core/AccessibilityConstants.swift` to be usable in queries.
-2.  **`AXElementMatcher.swift` Modification**: The matching logic in `AXorcist/Sources/AXorcist/Search/PathNavigator.swift` (specifically `elementMatchesAllCriteria`) was updated to handle `AXDOMClassListAttribute` with "contains" logic for arrays of strings or space-separated strings.
-3.  **Build & Execution**:
-    *   Initial attempts to run `axorc` via `mcp_terminator_execute` failed.
-    *   Switching to `run_terminal_cmd` allowed successful builds (`swift package clean && swift build --product axorc` in the `AXorcist` directory) and execution.
-    *   Query input files (e.g., `query_cursor_input.json`) must exist at the specified path.
-4.  **Query Refinement - "Element not found"**:
-    *   Early queries directly targeting `AXDOMClassList` containing `"aislash-editor-input"` failed, even with increased `max_depth`.
-    *   Simplifying the query to fetch basic attributes of the application element (`"criteria": []`) helped confirm `axorc` could access the application.
-    *   Targeting broader elements like `AXScrollArea` also failed, indicating an incorrect assumption about the UI hierarchy or role.
-    *   Targeting `AXGroup` was partially successful but didn't immediately reveal the target.
+## Pattern Templates
 
-## Breakthrough: UI Tree Dumping and Analysis
+### 1. Editing Text Within a Defined Block (In-Place)
 
-The key breakthrough came from dumping a wider section of the UI tree to a file for manual analysis.
+**Goal**: Modify specific text found between `START_REGEX` and `END_REGEX`
 
-1.  **Query to Dump "RootView" Children**:
-    *   A query was crafted to find an `AXGroup` element whose `AXDOMClassList`     contained `"RootView"`.
-    *   `attributes_to_fetch` and `fetch_children_attributes` were set to `"all"`.
-    *   `max_depth` was set to `15`.
-    *   `debugLogging` was set to `true`.
-    *   The output was redirected to a file: `./AXorcist/.build/debug/axorc --file query_cursor_input.json > axorc_rootview_dump.json`
-
-    The `query_cursor_input.json` for this was:
-    ```json
-    {
-      "command_id": "cursor-input-dump-rootview-children-to-file-001",
-      "command": "query",
-      "application": "com.todesktop.230313mzl4w4u92",
-      "locator": {
-        "criteria": [
-          {
-            "attribute": "AXDOMClassList",
-            "value": "RootView",
-            "match_type": "contains"
-          }
-        ]
-      },
-      "attributes_to_fetch": "all",
-      "fetch_children_attributes": "all",
-      "max_depth": 15,
-      "debugLogging": true
-    }
-    ```
-
-2.  **Analyzing `axorc_rootview_dump.json`**:
-    *   The extensive `debugLogs` array in the output JSON was crucial.
-    *   By tracing the `[_Traverse Entry] Visiting Role: ... at depth X` messages and associated `SearchCrit/DOMClass` logs, the hierarchy and `AXDOMClassList` attributes of nested elements were identified.
-
-## Identifying the Target Element
-
-The analysis of the dump file revealed the following path to the target element:
-
-*   `AXWindow`
-    *   `AXGroup` (AXDOMClassList: `("RootView")`)
-        *   `AXGroup` (AXDOMClassList: `("CodeMirror", "cm-s-cursor-theme")`)
-            *   `AXGroup` (AXDOMClassList: `("cm-scroller")`)
-                *   `AXGroup` (AXDOMClassList: `("cm-content", "cm-ai-mode", "cm-ai-mode-background")`)
-                    *   **`AXTextArea` (AXDOMClassList: `("aislash-editor-input")`)** <-- This is the target!
-
-## Final Successful Query
-
-Based on these findings, a targeted query successfully retrieved the element's details:
-
-    ```json
-    {
-  "command_id": "cursor-input-find-aislash-textarea-001",
-  "command": "query",
-      "application": "com.todesktop.230313mzl4w4u92",
-      "locator": {
-    "criteria": [
-      {
-        "attribute": "AXRole",
-        "value": "AXTextArea"
-      },
-      {
-        "attribute": "AXDOMClassList",
-        "value": "aislash-editor-input",
-        "match_type": "contains"
-      }
-    ]
-  },
-  "attributes_to_fetch": [
-    "AXValue",
-    "AXPosition",
-    "AXSize",
-    "AXRole",
-    "AXRoleDescription",
-    "AXIdentifier",
-    "AXDOMClassList",
-    "AXPath"
-  ],
-  "fetch_children_attributes": "none",
-  "max_depth": 25,
-  "debugLogging": true
-}
+```bash
+perl -pi.bak -e 'if (/START_REGEX/../END_REGEX/) { s/REGEX_WITHIN_BLOCK/NEW_TEXT_CONTENT/g }' source_file.txt
 ```
 
-## Key Retrieved Attributes for the Target Element
+**Example**: Update version number in Swift Package.swift
+```bash
+perl -pi.bak -e 'if (/let version/../"/) { s/"\d+\.\d+\.\d+"/"1.2.3"/g }' Package.swift
+```
 
-*   **`AXRole`**: `"AXTextArea"`
-*   **`AXDOMClassList`**: `["aislash-editor-input"]`
-*   **`AXValue`**: The current text content of the input field (e.g., `"2 and 3"`).
-*   **`AXPosition`**: e.g., `{ "x": 1226, "y": 1575 }` (top-left coordinates).
-*   **`AXSize`**: e.g., `{ "height": 18, "width": 1845 }`.
+### 2. Replacing an Entire Block of Text (In-Place)
+
+**Goal**: Replace whole block from `START_REGEX` to `END_REGEX` with new content
+
+```bash
+perl -0777 -pi.bak -e 's/FULL_BLOCK_REGEX_PCRE/NEW_TEXT_CONTENT/sg' source_file.txt
+```
+
+**Example**: Replace entire SwiftLint rule configuration
+```bash
+perl -0777 -pi.bak -e 's/(?s)disabled_rules:.*?^opt_in_rules:/disabled_rules:\n  - trailing_whitespace\n\nopt_in_rules:/sm' .swiftlint.yml
+```
+
+### 3. Deleting a Block of Text (In-Place)
+
+**Goal**: Remove everything from `START_REGEX` to `END_REGEX`
+
+**Option A (Range Operator)**:
+```bash
+perl -ni.bak -e 'print unless /START_REGEX/../END_REGEX/' source_file.txt
+```
+
+**Option B (Slurp Mode)**:
+```bash
+perl -0777 -pi.bak -e 's/FULL_BLOCK_REGEX_PCRE//sg' source_file.txt
+```
+
+**Example**: Remove entire comment block
+```bash
+perl -ni.bak -e 'print unless /^\/\*\*/../\*\/$/' MyFile.swift
+```
+
+### 4. Adding/Inserting New Block of Text (In-Place)
+
+**Goal**: Insert new content after a marker line
+
+**Insert After Marker**:
+```bash
+perl -pi.bak -e 'if (s/TARGET_INSERTION_MARKER_REGEX/$&\nNEW_TEXT_CONTENT/) {}' source_file.txt
+```
+
+**Using Environment Variable for Complex Content**:
+```bash
+NEW_BLOCK_VAR="$NEW_TEXT_CONTENT" perl -pi.bak -e 'if (s/TARGET_INSERTION_MARKER_REGEX/$&\n$ENV{NEW_BLOCK_VAR}/) {}' source_file.txt
+```
+
+**Example**: Add new import after existing imports
+```bash
+perl -pi.bak -e 'if (s/(^import Foundation$)/$1\nimport AXorcist/) {}' MyFile.swift
+```
+
+## Advanced Patterns for Swift/macOS Projects
+
+### SwiftLint Configuration Updates
+```bash
+# Add new disabled rule
+perl -pi.bak -e 'if (/^disabled_rules:/../^$/) { s/^$/  - new_rule\n/ if /^$/ }' .swiftlint.yml
+
+# Update line length warning
+perl -pi.bak -e 's/(line_length:\s*\n\s*warning:\s*)\d+/${1}120/' .swiftlint.yml
+```
+
+### Package.swift Dependency Management
+```bash
+# Add new dependency
+NEW_DEP='        .package(url: "https://github.com/user/repo.git", from: "1.0.0"),' 
+echo "$NEW_DEP" | perl -pi.bak -e 'if (/dependencies:\s*\[/../\]/) { s/^(\s*\.package.*)$/$1\n$ENV{NEW_DEP}/ if eof }' Package.swift
+```
+
+### Swift Source Code Modifications
+```bash
+# Add import statement
+perl -pi.bak -e 'if (/^import / && !$seen++) { print "import AXorcist\n" }' *.swift
+
+# Update @MainActor annotations
+perl -pi.bak -e 's/^(\s*)(class|struct)(\s+\w+.*\{)$/$1@MainActor\n$1$2$3/' ViewModels/*.swift
+```
+
+## Moving Blocks Between Files
+
+**Goal**: Extract block from source, insert into target, delete from source
+
+```bash
+# Step 1: Extract block into shell variable
+EXTRACTED_BLOCK=$(perl -0777 -ne 'print $& if /FULL_BLOCK_REGEX_PCRE/sg' source_file.txt)
+
+# Check if block was extracted
+if [ -z "$EXTRACTED_BLOCK" ]; then
+  echo "Error: Block not found in source_file.txt"
+else
+  # Step 2: Insert block into target
+  BLOCK_TO_INSERT="$EXTRACTED_BLOCK" \
+  perl -pi.bak_target -e 's/(TARGET_INSERTION_MARKER_REGEX)/$1\n$ENV{BLOCK_TO_INSERT}/' target_file.txt && \
+  \
+  # Step 3: Delete block from source
+  perl -0777 -pi.bak_source -e 's/FULL_BLOCK_REGEX_PCRE//sg' source_file.txt && \
+  echo "Block moved successfully."
+fi
+```
+
+## Best Practices for AI Assistants
+
+### Regex Generation Guidelines
+1. **Request PCRE explicitly**: "Generate a Perl Compatible Regular Expression..."
+2. **Emphasize non-greedy**: "Use non-greedy matching (.*?) with the s flag"
+3. **Include backup mechanism**: "Always include Perl's -pi.bak"
+4. **Specify multi-line handling**: "Use -0777 slurp mode for whole-block operations"
+
+### Error Prevention
+- Test regex with simple cases first
+- Use environment variables for complex replacement text
+- Validate file existence before operations
+- Check backup files were created
+
+### Common Swift/macOS File Patterns
+
+#### Configuration Files
+- **SwiftLint**: `.swiftlint.yml` - YAML structure with nested rules
+- **Package.swift**: Swift Package Manager - structured Swift code
+- **Info.plist**: XML property lists - use specialized tools or careful regex
+
+#### Source Files
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
