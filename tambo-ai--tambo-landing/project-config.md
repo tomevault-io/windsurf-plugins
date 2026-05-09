@@ -1,256 +1,144 @@
 ---
 trigger: always_on
-description: description: React component patterns and WebGL integration
+description: description: Third-party integration guidelines (Sanity, Shopify, HubSpot, etc.)
 ---
 
 ---
-description: React component patterns and WebGL integration
-globs: *.tsx, *.jsx, *.js, *.ts
+description: Third-party integration guidelines (Sanity, Shopify, HubSpot, etc.)
+globs: *.tsx, *.jsx, *.css, *.js, *.ts
 ---
 
-# Component Guidelines
+# Third-Party Integration Guidelines
 
-## Imports and Dependencies
+## Sanity CMS Integration
 
-### Utility Functions
-Always use `cn` from `clsx` for className conditionals
+### Configuration & Setup
+Use CDN for performance with stega for visual editing. Store credentials securely in environment variables. All Sanity files are organized in `/integrations/sanity/` directory.
 
-```tsx
-import cn from 'clsx'
-
-function MyComponent({ className }) {
-  return <div className={cn(s.component, className)} />
-}
-```
-
-### Base UI Components
-Use components from `@base-ui-components/react` when available
-
-```tsx
-import { Select } from '@base-ui-components/react/select'
-```
-
-### Animation Libraries
-- Use `gsap` for complex animations
-- Use `lenis` for smooth scrolling
-- Use `tempus` for timing utilities
-- Use `hamo` for DOM utilities
-
-## Component Structure
-
-### CSS Modules
-Use CSS modules for component styling. Import styles as `s`
-
-```tsx
-import s from './component-name.module.css'
-```
-
-### Client Components
-Add 'use client' directive for client components
-
-```tsx
-'use client'
-
-import { useState } from 'react'
-```
-
-### Props Interface
-Define props interface at the top of the file. Extend HTML attributes when appropriate.
-
-```tsx
-import type { ComponentProps } from 'react'
-
-interface ButtonProps extends ComponentProps<'button'> {
-  variant?: 'primary' | 'secondary'
-  size?: 'sm' | 'md' | 'lg'
-}
-```
-
-### React 19 Ref Handling
-In React 19, ref is passed as a regular prop (no forwardRef needed)
-
-```tsx
-// Old pattern (React 18)
-// const Button = forwardRef<HTMLButtonElement, ButtonProps>(...)
-
-// New pattern (React 19)
-function Button({ ref, variant = 'primary', ...props }: ButtonProps & { ref?: React.Ref<HTMLButtonElement> }) {
-  return <button ref={ref} {...props} />
-}
-```
-
-### Default Exports
-Use named function declarations for components. Export the component as default.
-
-```tsx
-function Button({ variant = 'primary', size = 'md', ...props }: ButtonProps) {
-  // component logic
-}
-
-export default Button
-```
-
-## Form Components
-
-### Form Handling
-- Use custom form hooks when appropriate
-- Connect to integrations for external services
-- Implement proper validation
-
-```tsx
-import { useForm } from '~/components/form/hook'
-import { HubspotNewsletterAction } from '~/integrations/hubspot/action'
-```
-
-### Server Actions
-Use Server Actions for form submissions when possible. Implement proper error handling.
-
-```tsx
-async function submitForm(formData: FormData) {
-  'use server'
-  // server-side logic
-}
-```
-
-## Responsive Design
-
-### Device Detection
-Use `useDeviceDetection` hook from `~/hooks` for responsive logic
-
-```tsx
-import { useDeviceDetection } from '~/hooks/use-device-detection'
-
-function ResponsiveComponent() {
-  const { isMobile } = useDeviceDetection()
-  return isMobile ? <MobileVersion /> : <DesktopVersion />
-}
-```
-
-### Viewport Units
-Use custom viewport units for responsive values (see styling.mdc for details)
-
-```css
-.element {
-  width: mobile-vw(150);
-  margin-top: desktop-vh(100);
-}
-```
-
-## Performance Best Practices
-
-### Code Splitting
-Use `next/dynamic` for heavy components
-
-```tsx
-import dynamic from 'next/dynamic'
-
-const HeavyComponent = dynamic(() => import('./HeavyComponent'), {
-  loading: () => <div>Loading...</div>,
-  ssr: false // if needed
+```typescript
+// In integrations/sanity/client.ts
+export const client = createClient({
+  projectId: process.env.NEXT_PUBLIC_SANITY_PROJECT_ID,
+  dataset: process.env.NEXT_PUBLIC_SANITY_DATASET,
+  apiVersion: '2024-03-15',
+  useCdn: true, // Use CDN for better performance
+  token: process.env.SANITY_API_WRITE_TOKEN, // Write token for editing
+  stega: {
+    studioUrl: process.env.NEXT_PUBLIC_SANITY_STUDIO_URL || '/studio',
+  },
 })
 ```
 
-### Memoization
-See main.mdc for React Compiler guidance - manual memoization is rarely needed.
+### Schema Management
 
-## Error Handling
+#### Content Modelling
+- Unless explicitly modelling web pages or app views, create content models for what things are, not what they look like in a front-end
+- For example, consider the `status` of an element instead of its `color`
 
-### Error Boundaries
-Implement error boundaries for critical sections. Provide meaningful fallback UI.
+#### Basic Schema Types
+- ALWAYS use the `defineType`, `defineField`, and `defineArrayMember` helper functions
+- ALWAYS write schema types to their own files and export a named `const` that matches the filename
+- ONLY use a `name` attribute in fields unless the `title` needs to be something other than a title-case version of the `name`
+- ANY `string` field type with an `options.list` array with fewer than 5 options must use `options.layout: "radio"`
+- ANY `image` field must include `options.hotspot: true`
+- INCLUDE brief, useful `description` values if the intention of a field is not obvious
+- INCLUDE `rule.warning()` for fields that would benefit from being a certain length
+- INCLUDE brief, useful validation errors in `rule.required().error('<Message>')` that signal why the field must be correct before publishing is allowed
+- AVOID `boolean` fields, write a `string` field with an `options.list` configuration
+- NEVER write single `reference` type fields, always write an `array` of references
+- CONSIDER the order of fields, from most important and relevant first, to least often used last
 
-### Loading States
-Always handle loading states. Use Suspense boundaries where appropriate.
+```ts
+// ./src/schemaTypes/lessonType.ts
+import {defineField, defineType} from 'sanity'
 
----
+export const lessonType = defineType({
+  name: 'lesson',
+  title: 'Lesson',
+  type: 'document',
+  fields: [
+    defineField({
+      name: 'title',
+      type: 'string',
+    }),
+    defineField({
+      name: 'categories',
+      type: 'array',
+      of: [defineArrayMember({type: 'reference', to: {type: 'category'}})],
+    }),
+  ],
+})
+```
 
-# WebGL Components
+#### Schema Type with Custom Input Components
+If a schema type has input components, they should be colocated with the schema type file. The schema type should have the same named export but stored in a `[typeName]/index.ts` file:
 
-## React Three Fiber Setup
+```ts
+// ./src/schemaTypes/seoType/index.ts
+import {defineField, defineType} from 'sanity'
+import seoInput from './seoInput'
 
-### Canvas Component
-Use the custom Canvas wrapper from `~/webgl/components/canvas`
+export const seoType = defineType({
+  name: 'seo',
+  title: 'SEO',
+  type: 'object',
+  components: { input: seoInput }
+  // ...
+})
+```
 
-```tsx
-import { Canvas } from '~/webgl/components/canvas'
+#### No Anonymous Reusable Schema Types
+ANY schema type that benefits from being reused in multiple document types should be registered as its own custom schema type.
 
-function Scene() {
+```ts
+// ./src/schemaTypes/blockContentType.ts
+import {defineField, defineType} from 'sanity'
+
+export const blockContentType = defineType({
+  name: 'blockContent',
+  title: 'Block content',
+  type: 'array',
+  of: [defineField({name: 'block',type: 'block'})],
+})
+```
+
+#### Decorating Schema Types
+Every `document` and `object` schema type should:
+
+- Have an `icon` property from `@sanity/icons`
+- Have a customized `preview` property that shows rich contextual details about the document
+- Use `groups` when the schema type has more than a few fields to collate related fields and only show the most important group by default. These `groups` should use the icon property as well.
+- Use `fieldsets` with `options: {columns: 2}` if related fields could be grouped visually together, such as `startDate` and `endDate`
+
+### Visual Editing
+Always add `data-sanity` attributes for visual editing. Use SanityContextProvider for document access. Implement proper draft mode handling. Import from `/integrations/sanity` directory.
+
+```typescript
+import { useSanityContext, RichText } from '~/integrations/sanity'
+
+export function MyComponent() {
+  const { document } = useSanityContext()
+  
   return (
-    <Canvas
-      camera={{ position: [0, 0, 5], fov: 50 }}
-      gl={{ antialias: true, alpha: true }}
-    >
-      {/* 3D content */}
-    </Canvas>
+    <div data-sanity={document._id}>
+      <h1 data-sanity="title">{document.title}</h1>
+      <div data-sanity="content">
+        <RichText content={document.content} />
+      </div>
+    </div>
   )
 }
 ```
 
-## WebGL File Organization
+### Data Fetching
+Use proper perspective for draft vs published content. Implement caching strategies for performance. Handle errors gracefully with try-catch. Import from `/integrations/sanity` directory. Use `~/libs/metadata` helpers for SEO optimization. All `sanityFetch` calls automatically use `cacheSignal()` for request cleanup.
 
-Separate WebGL logic into `webgl.tsx` files. Keep React logic in main component files.
+```typescript
+// In integrations/sanity/queries.ts
+import { sanityFetch } from './live'
+import { generateSanityMetadata } from '~/libs/metadata'
 
-```
-components/
-  scene/
-    index.tsx         # React component
-    webgl.tsx         # Three.js logic
-    scene.module.css  # Styles
-```
-
-### WebGL Component Pattern
-
-```tsx
-// scene/webgl.tsx
-import { useFrame } from '@react-three/fiber'
-import { useRef } from 'react'
-import type { Mesh } from 'three'
-
-export default function SceneWebGL() {
-  const meshRef = useRef<Mesh>(null)
-  
-  useFrame((state, delta) => {
-    if (meshRef.current) {
-      meshRef.current.rotation.y += delta
-    }
-  })
-  
-  // Simple logs are auto-stripped in production by Next.js
-  console.log('SceneWebGL rendered')
-  
-  return (
-    <mesh ref={meshRef}>
-      <boxGeometry args={[1, 1, 1]} />
-      <meshStandardMaterial color="hotpink" />
-    </mesh>
-  )
-}
-```
-
-## Drei Components
-
-### Common Helpers
-Use Drei components for common functionality
-
-```tsx
-import {
-  OrbitControls,
-  PerspectiveCamera,
-  Environment,
-  useGLTF,
-  useTexture
-} from '@react-three/drei'
-```
-
-### Loading Assets
-Preload assets using Drei hooks. Implement proper loading states.
-
-```tsx
-// Preload in separate component
-function Preload() {
-  const start = performance.now()
-  useGLTF.preload('/models/model.glb')
-  useTexture.preload('/textures/texture.jpg')
-  // Console logs auto-stripped in production by Next.js
+// Use sanityFetch (automatically includes cacheSignal)
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
