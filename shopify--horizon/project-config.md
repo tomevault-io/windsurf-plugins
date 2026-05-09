@@ -1,135 +1,120 @@
 ---
 trigger: always_on
-description: Flip Card component accessibility compliance pattern
+description: Focus order and focus styles accessibility standards per WCAG 2.4.7 Focus Visible, 1.4.11 Non-Text Contrast, 2.4.13 Focus Appearance, and 2.4.11 Focus Not Obscured requirements
 ---
 
-# Flip Card Component Accessibility Standards
 
-Ensures flip card components follow WCAG compliance and provide proper state management for screen reader users.
+# Focus Order and Focus Styles Accessibility Standards
+
+Ensures proper focus order, tabindex usage, and focus indicators following WCAG 2.4.7 Focus Visible, 1.4.11 Non-Text Contrast, 2.4.13 Focus Appearance, and 2.4.11 Focus Not Obscured requirements.
 
 <rule>
-name: flip_card_accessibility_standards
-description: Enforce flip card component accessibility standards and proper state management
+name: focus_order_and_styles_accessibility_standards
+description: Enforce focus order and focus styles accessibility standards per WCAG requirements
 filters:
   - type: file_extension
-    pattern: "\\.(vue|jsx|tsx|html|liquid|php|js|ts)$"
+    pattern: "\\.(vue|jsx|tsx|html|liquid|php|js|ts|css|scss|sass|less)$"
 
 actions:
   - type: enforce
     conditions:
-      # Flip button requirement
-      - pattern: "(?i)<(div|section)[^>]*(?:card|flip)[^>]*>"
-        pattern_negate: "<button[^>]*aria-pressed"
-        message: "Flip cards must contain a button with aria-pressed attribute to control card state."
+      # Positive tabindex values (should not be used)
+      - pattern: "tabindex=\"[1-9]\""
+        message: "Positive tabindex values create illogical focus order. Use DOM order instead or tabindex=\"0\" for custom focusable elements."
 
-      # aria-pressed attribute requirement
-      - pattern: "(?i)<button[^>]*(?:flip|card)[^>]*>"
-        pattern_negate: "aria-pressed=\"(true|false)\""
-        message: "Flip card buttons must have aria-pressed attribute set to 'true' or 'false'."
+      # Missing focus styles (outline: 0 or outline: none)
+      - pattern: "outline:\\s*0|outline:\\s*none"
+        message: "Focus styles should not be removed. Use custom focus indicators that meet WCAG contrast requirements."
 
-      # Card front/back structure requirement
-      - pattern: "(?i)<(div|section)[^>]*(?:card|flip)[^>]*>"
-        pattern_negate: "(card--front|card--back|front|back)"
-        message: "Flip cards must have both front and back content sections for proper structure."
+      # Focus styles with insufficient contrast (light colors)
+      - pattern: "outline.*#[89abcdefABCDEF]{6}|outline.*#[cdefCDEF]{3,6}"
+        message: "Light focus outline colors may not meet 3:1 contrast ratio requirement for UI component identification."
 
-      # Unique accessible name requirement
-      - pattern: "(?i)<button[^>]*aria-pressed[^>]*>"
-        pattern_negate: "(aria-label|aria-labelledby|>.*[A-Za-z]{10,})"
-        message: "Flip card buttons must have unique, descriptive accessible names that reference visible card content."
+      # Missing focus-visible implementation
+      - pattern: ":focus\\s*\\{"
+        pattern_negate: ":focus-visible|:focus:not\\(:focus-visible\\)"
+        message: "Consider implementing :focus-visible for better keyboard-only focus indication."
 
-      # Keyboard focus indicator requirement
-      - pattern: "(?i)<(div|section)[^>]*(?:card|flip)[^>]*>"
-        pattern_negate: "(focus|:focus|focus-visible|:focus-visible)"
-        message: "Flip card containers should have visible keyboard focus indicators when the flip button is focused."
+      # Focus styles that may be obscured
+      - pattern: "outline-offset:\\s*-?0\\.?0*px|outline-offset:\\s*0"
+        message: "Consider using positive outline-offset to prevent focus indicators from being obscured by adjacent elements."
 
-      # Content visibility management
-      - pattern: "(?i)aria-pressed=\"(true|false)\""
-        pattern_negate: "(visibility.*hidden|display.*none|hidden)"
-        message: "Use aria-pressed state to control content visibility - false shows front, true shows back. Prefer visibility: hidden/visible for smooth animations."
+      # Missing forced-colors media query for Windows High Contrast
+      - pattern: "@media\\s*\\(forced-colors:\\s*active\\)"
+        pattern_negate: "outline.*transparent"
+        message: "Windows High Contrast Mode requires transparent outline for native focus appearance."
 
-      # Missing flip button type
-      - pattern: "(?i)<button[^>]*(?:flip|card)[^>]*>"
-        pattern_negate: "type=\"button\""
-        message: "Flip card buttons should have type='button' to prevent form submission behavior."
+      # Custom focusable elements without proper tabindex
+      - pattern: "<(div|span|button)[^>]*onclick|onkeydown|onkeypress"
+        pattern_negate: "tabindex=\"[0-9]\"|role=\"button\"|role=\"link\""
+        message: "Custom interactive elements should have tabindex=\"0\" or appropriate ARIA role for keyboard accessibility."
 
-      # Incomplete card structure
-      - pattern: "(?i)<div[^>]*class=\"card[^>]*>"
-        pattern_negate: "(card--front.*card--back|card--back.*card--front)"
-        message: "Flip cards must contain both front and back content sections for proper functionality."
+      # Focus styles with insufficient area
+      - pattern: "outline-width:\\s*1px|outline-width:\\s*0\\.1rem"
+        message: "Thin focus outlines may not meet WCAG 2.4.13 Focus Appearance requirements for minimum area."
+
+      # Focus styles that blend with background
+      - pattern: "outline.*rgba\\([^)]*0\\.1[^)]*\\)|outline.*rgba\\([^)]*0\\.2[^)]*\\)"
+        message: "Very transparent focus outlines may not provide sufficient contrast for visibility."
+
+      # Missing focus styles on interactive elements
+      - pattern: "<(button|a|input|select|textarea)[^>]*>"
+        pattern_negate: ":focus|:focus-visible|tabindex"
+        message: "Interactive elements should have visible focus styles for keyboard navigation accessibility."
+
+      # Dynamic content removal without focus management
+      - pattern: "\\.remove\\(\\)|removeChild|innerHTML\\s*="
+        pattern_negate: "focus\\(|focus\\(\\)"
+        message: "When removing dynamic content, ensure proper focus management by restoring focus to a logical location."
 
   - type: suggest
     message: |
-      **Flip Card Component Accessibility Best Practices:**
+      **WCAG Focus Order and Focus Styles Requirements:**
 
-      **Required ARIA Attributes:**
-      - **aria-pressed:** 'false' shows front content, 'true' shows back content
-      - **type="button":** Prevents form submission behavior
-      - **Unique accessible name:** Should reference visible card content
+      **Focus Order Requirements:**
 
-      **DOM Structure Requirements:**
-      - Card container with front and back content sections
-      - Flip button positioned between or adjacent to content sections
-      - Use CSS display: none to hide non-visible content
-      - Maintain logical reading order in the DOM
+      **1. Logical DOM Order:**
+      - **Default:** Focus order follows DOM element order
+      - **Navigation:** Tab key moves forward, Shift+Tab moves backward
+      - **Avoid:** Positive tabindex values (1, 2, 3, etc.)
 
-      **Content Visibility Management:**
-      - **aria-pressed="false":** Show front content, hide back content
-      - **aria-pressed="true":** Show back content, hide front content
-      - Use CSS display property for smooth transitions
-      - Ensure only one side is visible at a time
-
-      **Keyboard and Focus Requirements:**
-      - **Enter:** Toggle card state
-      - **Space:** Toggle card state
-      - **Tab:** Move focus to next focusable element
-      - **Shift+Tab:** Move focus to previous focusable element
-      - **Focus indicator:** Should wrap the card content container
-      - **Hover state:** Blue border matching focus indicator for visual consistency
-
-      **Implementation Example:**
+      **2. Tabindex Usage:**
       ```html
-      <!-- ✅ Correct: Proper flip card structure -->
-      <div class="card">
-        <div class="card--front">
-          <h3>Card Title</h3>
-          <img src="front-image.jpg" alt="Front view of the product">
-        </div>
+      <!-- Good: Use DOM order (default) -->
+      <button>First Button</button>
+      <button>Second Button</button>
+      <button>Third Button</button>
 
-        <button type="button"
-                class="flip-button"
-                aria-pressed="false"
-                aria-label="More about Card Title">
-        </button>
-
-        <div class="card--back">
-          <p class="card--tagline">Inspiring content</p>
-          <img src="back-image-1.jpg" alt="Product detail view 1">
-          <img src="back-image-2.jpg" alt="Product detail view 2">
-          <img src="back-image-3.jpg" alt="Product detail view 3">
-          <p>More detailed content about the product</p>
-          <a href="/product-details">
-            <img src="link-icon.svg" alt="View full product details">
-          </a>
-        </div>
+      <!-- Good: tabindex="0" for custom focusable elements -->
+      <div role="button" tabindex="0" onclick="handleClick()">
+        Custom Button
       </div>
+
+      <!-- Good: tabindex="-1" for programmatic focus only -->
+      <div id="target" tabindex="-1">Focus target</div>
+      <button onclick="document.getElementById('target').focus()">
+        Focus Target
+      </button>
+
+      <!-- Bad: Positive tabindex values -->
+      <button tabindex="1">First</button>
+      <button tabindex="3">Third</button>
+      <button tabindex="2">Second</button>
       ```
 
-      **CSS Implementation:**
-      ```css
-      .card {
-        position: relative;
-        perspective: 1000px;
-        /* Focus indicator for keyboard navigation */
-        outline: 2px solid transparent;
-        outline-offset: 2px;
-        /* Visual affordance for clickable card */
-        cursor: pointer;
-      }
+      **Focus Styles Requirements:**
 
-      .card:focus-within {
-        outline-color: #0056b3;
-        outline-width: 3px;
-      }
+      **1. WCAG 2.4.7 Focus Visible (Level A):**
+      - **Requirement:** Focus indicator must exist
+      - **Purpose:** Keyboard users need visible focus indication
+
+      **2. WCAG 1.4.11 Non-Text Contrast (Level AA):**
+      - **Requirement:** Minimum 3:1 contrast ratio for UI components
+      - **Applies to:** Focus indicators, borders, focus outlines
+
+      **3. WCAG 2.4.13 Focus Appearance (Level AAA):**
+      - **Requirement:** Minimum area and contrast for focus indicators
+      - **Area:** Focus indicator should be clearly visible
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
