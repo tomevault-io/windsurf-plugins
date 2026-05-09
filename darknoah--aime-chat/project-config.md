@@ -1,0 +1,11 @@
+---
+trigger: always_on
+description: 所有的npm安装必须使用 npm add <package_name> 来安装
+---
+
+所有的npm安装必须使用 npm add <package_name> 来安装
+运行服务 npm run start
+
+---
+> Source: [DarkNoah/aime-chat](https://github.com/DarkNoah/aime-chat) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-05 -->
