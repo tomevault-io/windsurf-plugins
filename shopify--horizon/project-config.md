@@ -1,15 +1,15 @@
 ---
 trigger: always_on
-description: Disclosure component accessibility compliance pattern
+description: Dropdown Navigation component accessibility compliance pattern
 ---
 
-# Disclosure Component Accessibility Standards
+# Dropdown Navigation Component Accessibility Standards
 
-Ensures disclosure components follow WCAG compliance and WAI-ARIA Disclosure Pattern specifications.
+Ensures dropdown navigation components follow WCAG compliance and proper navigation semantics, including mobile modal patterns and disclosure controls.
 
 <rule>
-name: disclosure_accessibility_standards
-description: Enforce disclosure component accessibility standards and WAI-ARIA Disclosure Pattern compliance
+name: dropdown_navigation_accessibility_standards
+description: Enforce dropdown navigation component accessibility standards and proper navigation semantics
 filters:
   - type: file_extension
     pattern: "\\.(vue|jsx|tsx|html|liquid|php|js|ts)$"
@@ -17,116 +17,91 @@ filters:
 actions:
   - type: enforce
     conditions:
-      # Button role requirement
-      - pattern: "(?i)<(button|div|span)[^>]*(?:disclosure|expand|collapse)[^>]*>"
+      # Navigation landmark requirement
+      - pattern: "(?i)<nav[^>]*(?:navigation|menu|dropdown)[^>]*>"
+        pattern_negate: "(aria-label|aria-labelledby)=\"[^\"]+\""
+        message: "Navigation elements must have aria-label or aria-labelledby attribute for accessibility."
+
+      # Navigation list structure requirement
+      - pattern: "(?i)<nav[^>]*(?:navigation|menu|dropdown)[^>]*>"
+        pattern_negate: "<ul[^>]*>"
+        message: "Navigation should use unordered list (ul) for proper semantic structure."
+
+      # Dropdown button role requirement
+      - pattern: "(?i)<(button|div|span)[^>]*(?:dropdown|expand|collapse)[^>]*>"
         pattern_negate: "role=\"button\""
-        message: "Disclosure controls must have role='button' (or use native button element which has implicit role)."
+        message: "Dropdown controls must have role='button' (or use native button element which has implicit role)."
 
-      # aria-expanded requirement
-      - pattern: "(?i)<[^>]*role=\"button\"[^>]*(?:disclosure|expand|collapse)[^>]*>"
+      # Dropdown button aria-expanded requirement
+      - pattern: "(?i)<[^>]*role=\"button\"[^>]*(?:dropdown|expand|collapse)[^>]*>"
         pattern_negate: "aria-expanded=\"(true|false)\""
-        message: "Disclosure controls must have aria-expanded attribute set to 'true' or 'false'."
+        message: "Dropdown controls must have aria-expanded attribute set to 'true' or 'false'."
 
-      # Missing keyboard event handlers
-      - pattern: "(?i)<[^>]*role=\"button\"[^>]*(?:disclosure|expand|collapse)[^>]*>"
+      # Dropdown content missing proper identification
+      - pattern: "(?i)<(div|section)[^>]*(?:dropdown.*content|content.*dropdown)[^>]*>"
+        pattern_negate: "id=\"[^\"]+\""
+        message: "Dropdown content must have unique ID attributes for aria-controls reference."
+
+      # Missing aria-current on navigation items
+      - pattern: "(?i)<a[^>]*(?:nav|navigation)[^>]*>"
+        pattern_negate: "aria-current=\"(page|false)\""
+        message: "Navigation links should have aria-current attribute set to 'page' for active items or 'false' for inactive."
+
+      # Mobile modal missing dialog role
+      - pattern: "(?i)<(div|section)[^>]*(?:mobile.*nav|nav.*mobile|modal.*nav)[^>]*>"
+        pattern_negate: "role=\"dialog\""
+        message: "Mobile navigation modal containers must have role='dialog' attribute."
+
+      # Mobile modal missing aria-modal
+      - pattern: "(?i)<[^>]*role=\"dialog\"[^>]*(?:mobile.*nav|nav.*mobile)[^>]*>"
+        pattern_negate: "aria-modal=\"true\""
+        message: "Mobile navigation dialog elements must have aria-modal='true' attribute."
+
+      # Mobile modal missing proper labeling
+      - pattern: "(?i)<[^>]*role=\"dialog\"[^>]*(?:mobile.*nav|nav.*mobile)[^>]*>"
+        pattern_negate: "(aria-labelledby|aria-label)"
+        message: "Mobile navigation dialog elements must have either aria-labelledby or aria-label for accessibility."
+
+      # Mobile launcher missing aria-haspopup
+      - pattern: "(?i)<button[^>]*(?:mobile.*nav|nav.*mobile|hamburger|menu)[^>]*>"
+        pattern_negate: "aria-haspopup=\"dialog\""
+        message: "Mobile navigation launcher buttons must include aria-haspopup='dialog' to inform users a dialog will open."
+
+      # Mobile close button missing aria-label
+      - pattern: "(?i)<button[^>]*(?:close|dismiss|×|&times;)[^>]*(?:mobile.*nav|nav.*mobile)[^>]*>"
+        pattern_negate: "aria-label=\"[^\"]*[Cc]lose[^\"]*\""
+        message: "Mobile navigation close buttons should have aria-label='Close navigation' or similar descriptive text."
+
+      # Missing keyboard event handlers for dropdown
+      - pattern: "(?i)<[^>]*role=\"button\"[^>]*(?:dropdown|expand|collapse)[^>]*>"
         pattern_negate: "(onKeyDown|onkeydown|@keydown|v-on:keydown)"
-        message: "Disclosure controls should handle keyboard events (Enter and Space)."
+        message: "Dropdown controls should handle keyboard events (Enter, Space, and Escape)."
+
+      # Missing Escape key support for dropdown content
+      - pattern: "(?i)<div[^>]*(?:dropdown.*content|content.*dropdown)[^>]*>"
+        pattern_negate: "(onKeyDown|onkeydown|@keydown|v-on:keydown)"
+        message: "Dropdown content areas should handle Escape key to close dropdown and return focus to launcher."
+
+      # Incorrect menu role usage
+      - pattern: "(?i)role=\"(menu|menuitem|menubar|menuitemcheckbox|menuitemradio)\""
+        message: "Navigation components should NOT use menu roles. Use proper navigation semantics with ul/li/a elements."
+
+      # Incorrect aria-haspopup usage
+      - pattern: "(?i)aria-haspopup=\"(true|menu|listbox)\""
+        pattern_negate: "aria-haspopup=\"dialog\""
+        message: "Navigation components should NOT use aria-haspopup except for mobile modal launchers with aria-haspopup='dialog'."
 
   - type: suggest
     message: |
-      **Disclosure Component Accessibility Best Practices:**
+      **Dropdown Navigation Component Accessibility Best Practices:**
 
-      **Required ARIA Attributes:**
-      - **role='button':** Set on the disclosure control element (or use native button)
-      - **aria-expanded:** 'true' if content is visible, 'false' if hidden
-      - **aria-controls:** (Optional) Reference to the ID of the associated content
+      **Navigation Semantics:**
+      - **role='navigation':** Implicit on nav element, provides landmark
+      - **aria-label/aria-labelledby:** On nav element to describe the navigation
+      - **aria-current:** Set on active navigation items ('page' for current page, 'false' for inactive)
+      - **ul + li + a:** Use semantic list structure for navigation items
 
-      **DOM Structure Requirements:**
-      - The disclosure content MUST be a sibling to the disclosure control in the DOM
-      - This ensures proper content discovery and navigation for all users
-      - Avoid placing content in different containers or far from the control
-      - Maintain a logical reading order in the DOM
-
-      **Keyboard Interaction Requirements:**
-      - **Enter:** Toggle disclosure content visibility
-      - **Space:** Toggle disclosure content visibility
-      - **Tab:** Move focus to next focusable element
-      - **Shift+Tab:** Move focus to previous focusable element
-
-      **Implementation Example:**
-      ```html
-      <!-- ✅ Correct: Content is a sibling to the control -->
-      <div class="disclosure">
-        <button type="button"
-                role="button"
-                aria-expanded="false"
-                aria-controls="disclosure-content">
-          Disclosure Title
-        </button>
-        <div id="disclosure-content"
-             hidden>
-          Disclosure content goes here...
-        </div>
-      </div>
-
-      <!-- ❌ Incorrect: Content is not a sibling to the control -->
-      <div class="disclosure">
-        <button type="button"
-                role="button"
-                aria-expanded="false"
-                aria-controls="disclosure-content">
-          Disclosure Title
-        </button>
-      </div>
-      <div class="some-other-container">
-        <p>Other content...</p>
-        <div id="disclosure-content" hidden>
-          Disclosure content goes here...
-        </div>
-      </div>
-
-      <script>
-        const button = document.querySelector('[role="button"]');
-        const content = document.getElementById('disclosure-content');
-
-        function toggleDisclosure() {
-          const isExpanded = button.getAttribute('aria-expanded') === 'true';
-          button.setAttribute('aria-expanded', !isExpanded);
-          content.hidden = isExpanded;
-        }
-
-        // Click handler
-        button.addEventListener('click', toggleDisclosure);
-
-        // Keyboard handler
-        button.addEventListener('keydown', (event) => {
-          if (event.key === 'Enter' || event.key === ' ') {
-            event.preventDefault();
-            toggleDisclosure();
-          }
-        });
-      </script>
-      ```
-
-      **JavaScript Considerations:**
-      - Implement Enter and Space key handlers for toggling
-      - Update aria-expanded state when content toggles
-      - Use hidden attribute or CSS to show/hide content
-      - Consider implementing smooth transitions
-
-      **Accessibility Notes:**
-      - Button should be the only element inside the control
-      - Content MUST be a sibling to the control in the DOM
-      - Visual focus indicators should be clear
-      - Test with screen readers to ensure proper announcement
-      - Consider adding aria-label if the button text is not descriptive
-      - Maintain proper reading order for screen reader users
-      - Avoid complex DOM structures that could confuse navigation
-
-metadata:
-  priority: high
-  version: 1.0
-</rule>
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [Shopify/horizon](https://github.com/Shopify/horizon) — distributed by [TomeVault](https://tomevault.io).
