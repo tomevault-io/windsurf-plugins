@@ -1,16 +1,16 @@
 ---
 trigger: always_on
-description: Product filter component accessibility compliance pattern
+description: Enforce product media gallery component accessibility standards and proper landmark structure for media galleries
 ---
 
 
-# Product Filter Component Accessibility Standards
+# Product Media Gallery Component Accessibility Standards
 
-Ensures product filter components follow WCAG compliance and WAI-ARIA Disclosure Pattern specifications, including sort controls and grid layout buttons.
+Ensures product media gallery components follow WCAG compliance and provide proper accessibility for image, video, and 3D model galleries with screen reader support and keyboard navigation.
 
 <rule>
-name: product_filter_accessibility_standards
-description: Enforce product filter component accessibility standards and WAI-ARIA Disclosure Pattern compliance
+name: product_media_gallery_accessibility_standards
+description: Enforce product media gallery component accessibility standards and proper landmark structure for media galleries
 filters:
   - type: file_extension
     pattern: "\\.(vue|jsx|tsx|html|liquid|php|js|ts)$"
@@ -18,93 +18,79 @@ filters:
 actions:
   - type: enforce
     conditions:
-      # Filter disclosure button role requirement (for non-button elements)
-      - pattern: "(?i)<(div|span)[^>]*(?:filter|disclosure|expand|collapse)[^>]*>"
-        pattern_negate: "role=\"button\""
-        message: "Non-button filter disclosure controls must have role='button'. Native button elements have implicit role and don't need explicit role attribute."
+      # Missing gallery container landmark role
+      - pattern: "(?i)<(div|section)[^>]*(?:gallery|media.*gallery|product.*gallery)[^>]*>"
+        pattern_negate: "role=\"region\""
+        message: "Product media gallery containers must have role='region' to provide proper landmark structure."
 
-      # Filter disclosure aria-expanded requirement
-      - pattern: "(?i)<[^>]*role=\"button\"[^>]*(?:filter|disclosure|expand|collapse)[^>]*>"
-        pattern_negate: "aria-expanded=\"(true|false)\""
-        message: "Filter disclosure controls must have aria-expanded attribute set to 'true' or 'false'."
+      # Missing gallery landmark aria-labelledby
+      - pattern: "(?i)<[^>]*role=\"region\"[^>]*(?:gallery|media.*gallery|product.*gallery)[^>]*>"
+        pattern_negate: "aria-labelledby=\"[^\"]+\""
+        message: "Gallery region must have aria-labelledby referencing a heading element for proper screen reader identification."
 
-      # Filter disclosure missing keyboard event handlers
-      - pattern: "(?i)<[^>]*role=\"button\"[^>]*(?:filter|disclosure|expand|collapse)[^>]*>"
-        pattern_negate: "(onKeyDown|onkeydown|@keydown|v-on:keydown)"
-        message: "Filter disclosure controls should handle keyboard events (Enter, Space, and Escape)."
+      # Missing gallery landmark heading
+      - pattern: "(?i)<[^>]*role=\"region\"[^>]*(?:gallery|media.*gallery|product.*gallery)[^>]*>"
+        pattern_negate: "<h[1-6][^>]*id=\"[^\"]+\"[^>]*>"
+        message: "Gallery region must contain a heading element with unique ID for aria-labelledby reference."
 
-      # Missing Escape key support for filter content
-      - pattern: "(?i)<div[^>]*(?:filter.*content|content.*filter)[^>]*>"
-        pattern_negate: "(onKeyDown|onkeydown|@keydown|v-on:keydown)"
-        message: "Filter content areas should handle Escape key to close filter and return focus to launcher."
+      # Missing gallery viewer container
+      - pattern: "(?i)<[^>]*role=\"region\"[^>]*(?:gallery|media.*gallery|product.*gallery)[^>]*>"
+        pattern_negate: "<(div|section)[^>]*(?:viewer|display|main.*image)[^>]*>"
+        message: "Gallery region must contain a gallery viewer container for displaying selected media."
 
-      # Filter disclosure content not a sibling
-      - pattern: "(?i)<[^>]*role=\"button\"[^>]*(?:filter|disclosure)[^>]*>"
-        pattern_negate: "<(div|section)[^>]*id=\"[^\"]+\"[^>]*>"
-        message: "Filter disclosure content must be a sibling to the disclosure control in the DOM."
+      # Gallery viewer missing proper image alt text
+      - pattern: "(?i)<img[^>]*(?:gallery|viewer|main.*image)[^>]*>"
+        pattern_negate: "alt=\"[^\"]+\""
+        message: "Gallery viewer images must have descriptive alt text via alt attribute for screen reader accessibility."
 
-      # Grid layout buttons missing aria-current
-      - pattern: "(?i)<(button|div|span)[^>]*(?:grid|layout|view)[^>]*>"
+      # Hidden media not properly hidden from assistive technology
+      - pattern: "(?i)<(img|video|iframe)[^>]*(?:gallery|media)[^>]*>"
+        pattern_negate: "(hidden|aria-hidden=\"true\"|display.*none|visibility.*hidden)"
+        message: "Hidden media items must use hidden attribute to remove them from both visual and assistive technology access."
+
+      # Thumbnail buttons missing button element structure
+      - pattern: "(?i)<(div|span)[^>]*(?:thumbnail|thumb)[^>]*>"
+        pattern_negate: "(<button|role=\"button\")"
+        message: "Thumbnail media selectors must use button elements or have role='button' for proper keyboard accessibility."
+
+      # Thumbnail buttons missing descriptive aria-label
+      - pattern: "(?i)<button[^>]*(?:thumbnail|thumb)[^>]*>"
+        pattern_negate: "aria-label=\"[^\"]*[Ll]oad[^\"]*[Mm]edia[^\"]*[Gg]allery[^\"]*[Vv]iewer[^\"]*\""
+        message: "Thumbnail buttons must have descriptive aria-label like 'Load media 1 into gallery viewer' for screen reader context."
+
+      # Missing aria-current on active thumbnail
+      - pattern: "(?i)<button[^>]*(?:thumbnail|thumb)[^>]*>"
         pattern_negate: "aria-current=\"(true|false)\""
-        message: "Grid layout buttons must have aria-current attribute set to 'true' or 'false'."
+        message: "Thumbnail buttons must have aria-current attribute to indicate which media is currently loaded in the viewer."
 
-      # Sort filter missing proper labeling
-      - pattern: "(?i)<(button|div|span)[^>]*(?:sort|order)[^>]*>"
-        pattern_negate: "(aria-label|aria-labelledby)"
-        message: "Sort filter controls should have proper labeling for screen reader context."
+      # Missing aria-describedby on thumbnail buttons
+      - pattern: "(?i)<button[^>]*(?:thumbnail|thumb)[^>]*>"
+        pattern_negate: "aria-describedby=\"[^\"]+\""
+        message: "Thumbnail buttons must have aria-describedby referencing the underlying media ID for alt text context."
 
-      # Sort filter using checkboxes instead of radio buttons
-      - pattern: "(?i)<input[^>]*type=\"checkbox\"[^>]*(?:sort|order)[^>]*>"
-        message: "Sort filter options should use radio buttons since only one option can be selected at a time."
+      # Missing aria-controls on thumbnail buttons
+      - pattern: "(?i)<button[^>]*(?:thumbnail|thumb)[^>]*>"
+        pattern_negate: "aria-controls=\"[^\"]+\""
+        message: "Thumbnail buttons must have aria-controls referencing the gallery viewer container ID."
 
-      # Checkbox groups missing fieldset
-      - pattern: "(?i)<input[^>]*type=\"checkbox\"[^>]*(?:filter|option)[^>]*>"
-        pattern_negate: "<fieldset"
-        message: "Filter checkbox groups should be wrapped in fieldset elements for proper grouping."
-
-      # Fieldset missing legend
-      - pattern: "(?i)<fieldset[^>]*(?:filter|option)[^>]*>"
-        pattern_negate: "<legend"
-        message: "Filter fieldsets must have legend elements to provide context for the group."
-
-      # Filter options missing proper IDs
-      - pattern: "(?i)<input[^>]*type=\"checkbox\"[^>]*(?:filter|option)[^>]*>"
-        pattern_negate: "id=\"[^\"]+\""
-        message: "Filter checkboxes should have unique ID attributes for proper labeling."
-
-      # Missing product count live region
-      - pattern: "(?i)<[^>]*(?:product.*count|count.*product)[^>]*>"
+      # Missing live region for media loading announcements
+      - pattern: "(?i)<(div|section)[^>]*(?:gallery|media.*gallery|product.*gallery)[^>]*>"
         pattern_negate: "role=\"status\""
-        message: "Product count displays should use role='status' for screen reader announcements."
+        message: "Gallery must include a live region with role='status' for announcing media loading completion to screen readers."
 
+      # Live region with unnecessary aria-hidden attribute
+      - pattern: "(?i)<[^>]*role=\"status\"[^>]*(?:gallery|media)[^>]*aria-hidden=\"true\"[^>]*>"
+        message: "Gallery live region should not use aria-hidden='true' when content is dynamically managed through JavaScript."
 
+      # Live region with redundant aria-live attribute
+      - pattern: "(?i)<[^>]*role=\"status\"[^>]*aria-live=\"[^\"]*\"[^>]*>"
+        message: "Live regions with role='status' should not include aria-live attribute as it's redundant and unnecessary."
 
-      # Missing main products heading
-      - pattern: "(?i)<[^>]*(?:product.*filter|filter.*product)[^>]*>"
-        pattern_negate: "<h1[^>]*>.*[Pp]roducts?[^<]*</h1>"
-        message: "Product filter pages should have an h1 heading with 'Products' for proper page structure."
+      # Live region with unnecessary aria-hidden attribute
+      - pattern: "(?i)<[^>]*role=\"status\"[^>]*aria-hidden=\"true\"[^>]*>"
+        message: "Live regions with role='status' should not use aria-hidden='true' when content is dynamically managed through JavaScript."
 
-  - type: suggest
-    message: |
-      **Product Filter Component Accessibility Best Practices:**
-
-      **Page Structure Requirements:**
-      - Use `<h1>` for the main "Products" heading
-      - Wrap filter controls and product count in a `<div class="products-header">`
-      - Remove separate section headings for filters and product cards
-      - Present filters, count, and products as one cohesive section
-
-      **Product Count Live Region:**
-      - Add product count display with `role="status"`
-      - Use unique ID for the count text element (e.g., `id="product-count-text"`)
-      - Update count dynamically as filters are applied/removed
-      - Ensure count is announced to screen readers when it changes
-
-      **Required ARIA Attributes:**
-      - **role='button':** Only required for non-button elements (native button elements have implicit role)
-      - **aria-expanded:** 'true' if filter content is visible, 'false' if hidden
-      - **aria-controls:** Reference to the ID of the associated filter content
-      - **aria-current:** Set on grid layout buttons ('true' for active, 'false' for inactive)
+      # Missing list structure for thumbnail grid layout
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
