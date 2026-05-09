@@ -7,11 +7,11 @@ a tool for png optimizing.
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [okooo5km/pngoptim](https://github.com/okooo5km/pngoptim).
+Original source: `CLAUDE.md` in [okooo5km/pngoptim](https://github.com/okooo5km/pngoptim).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
