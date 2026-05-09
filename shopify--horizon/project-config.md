@@ -1,114 +1,147 @@
 ---
 trigger: always_on
-description: Combobox component accessibility compliance pattern
+description: Writing CSS, whether inside .css files or in the `{% stylesheet %}…{% endstylesheet %}` or `{% style %}…{% endstyle %}` tags
 ---
 
-# Combobox Component Accessibility Standards
 
-Ensures combobox components follow WCAG compliance and WAI-ARIA Combobox Pattern specifications.
+# CSS Standards
 
-<rule>
-name: combobox_accessibility_standards
-description: Enforce combobox component accessibility standards and WAI-ARIA Combobox Pattern compliance
-filters:
-  - type: file_extension
-    pattern: "\\.(vue|jsx|tsx|html|liquid|php|js|ts)$"
+## Specificity Rules
 
-actions:
-  - type: enforce
-    conditions:
-      # Combobox role requirement
-      - pattern: "(?i)<(div|section)[^>]*(?:combobox|autocomplete)[^>]*>"
-        pattern_negate: "role=\"combobox\""
-        message: "Combobox containers must have role='combobox' attribute."
+- **Never** use IDs as selectors
+- **Avoid** using elements as selectors
+- **Avoid** using `!important` at all costs - if you must use it, comment why in the code
+- Use a `0 1 0` specificity wherever possible, meaning a single `.class` selector.
+- In cases where you must use higher specificity due to a parent/child relationship, try to keep the specificity to a maximum of `0 4 0`
+  - Note that this can sometimes be impossible due to the `0 1 0` specificity of pseudo-classes like `:hover`. There may be situations where `.parent:hover .child` is the only way to achieve the desired effect.
+- **Avoid** complex selectors. A selector should be easy to understand at a glance. Don't over do it with pseudo selectors (:has, :where, :nth-child, etc).
 
-      # aria-expanded requirement
-      - pattern: "(?i)<[^>]*role=\"combobox\"[^>]*>"
-        pattern_negate: "aria-expanded=\"(true|false)\""
-        message: "Combobox elements must have aria-expanded attribute set to 'true' or 'false'."
+See [MDN](mdc:https:/developer.mozilla.org/en-US/docs/Web/CSS/Specificity) for more a comprehensive list of specificity rules.
 
-      # aria-haspopup requirement
-      - pattern: "(?i)<[^>]*role=\"combobox\"[^>]*>"
-        pattern_negate: "aria-haspopup=\"listbox\""
-        message: "Combobox elements must have aria-haspopup='listbox' attribute."
+### Notes on `:has()` selector and Shopify themes
 
-      # aria-controls requirement
-      - pattern: "(?i)<[^>]*role=\"combobox\"[^>]*>"
-        pattern_negate: "aria-controls=\"[^\"]+\""
-        message: "Combobox elements must have aria-controls attribute referencing the ID of the associated listbox."
+The `:has()` selector is incredibly useful, but can impact performance. This is mainly a problem during dynamic DOM updates as the browser engines must re-evaluate `:has()` selectors. This is especially important in Shopify themes where dynamic content updates are common (cart updates, variant selection, filtering, etc.). See [MDN :has performance considerations](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Selectors/:has#performance_considerations) for more information.
 
-      # aria-autocomplete requirement
-      - pattern: "(?i)<[^>]*role=\"combobox\"[^>]*>"
-        pattern_negate: "aria-autocomplete=\"(list|both|inline|none)\""
-        message: "Combobox elements must have aria-autocomplete attribute set to 'list', 'both', 'inline', or 'none'."
+Performance mitigation strategies:
 
-      # aria-activedescendant requirement when expanded
-      - pattern: "(?i)<[^>]*role=\"combobox\"[^>]*aria-expanded=\"true\"[^>]*>"
-        pattern_negate: "aria-activedescendant=\"[^\"]+\""
-        message: "Expanded combobox elements must have aria-activedescendant attribute referencing the ID of the active option."
+#### Minimize Subtree Traversals
 
-      # Listbox role requirement
-      - pattern: "(?i)<(div|ul)[^>]*(?:listbox|dropdown|popup)[^>]*>"
-        pattern_negate: "role=\"listbox\""
-        message: "Listbox containers must have role='listbox' attribute."
+Anchor of an element as close to the children as possible. i.e. `A:has(B)`, where `A` is the anchor.
 
-      # Option role requirement
-      - pattern: "(?i)<(div|li)[^>]*(?:option|item)[^>]*>"
-        pattern_negate: "role=\"option\""
-        message: "Listbox options must have role='option' attribute."
+Use combinators like `>` or `+` so there is a very clear path for the browser to evaluate. Anything too broad increases the number of leaf nodes to verify.
 
-      # Option ID requirement for aria-activedescendant
-      - pattern: "(?i)<[^>]*role=\"option\"[^>]*>"
-        pattern_negate: "id=\"[^\"]+\""
-        message: "Listbox options must have unique id attributes for aria-activedescendant to reference them."
+```css
+/* ❌ AVOID: May trigger full subtree traversal */
+.ancestor:has(.foo) {
+  /* Any change within .ancestor requires checking ALL descendants */
+}
 
-      # aria-selected requirement for options
-      - pattern: "(?i)<[^>]*role=\"option\"[^>]*>"
-        pattern_negate: "aria-selected=\"(true|false)\""
-        message: "Listbox options must have aria-selected attribute set to 'true' or 'false'."
+/* ✅ GOOD: More constrained - limits traversal */
+.ancestor:has(> .foo) {
+  /* Only checks direct children */
+}
+```
 
-      # Missing keyboard event handlers
-      - pattern: "(?i)<[^>]*role=\"combobox\"[^>]*>"
-        pattern_negate: "(onKeyDown|onkeydown|@keydown|v-on:keydown)"
-        message: "Combobox elements should handle keyboard events (Arrow keys, Enter, Escape, etc.)."
+#### Leverage server-rendered classes when possible
 
-      # Missing status region
-      - pattern: "(?i)<[^>]*role=\"combobox\"[^>]*>"
-        pattern_negate: "aria-controls=\"[^\"]+\".*?<[^>]*role=\"status\""
-        message: "Combobox should have a status region to announce available options."
+If the dynamic content is being server rendered, you might be able to write a class higher in the DOM than rely on `:has()`
 
-  - type: suggest
-    message: |
-      **Combobox Component Accessibility Best Practices:**
+Example: With filters, instead of checking based on the state of the inner `input` element, create a disabled class.
 
-      **Required ARIA Attributes:**
-      - **role='combobox':** Set on the input container element
-      - **aria-expanded:** 'true' if listbox is visible, 'false' if hidden
-      - **aria-haspopup='listbox':** Indicates the combobox has a listbox popup
-      - **aria-controls:** Reference to the ID of the associated listbox
-      - **aria-autocomplete:** 'list', 'both', 'inline', or 'none' based on behavior
-      - **aria-activedescendant:** Reference to the ID of the currently active option (remove when listbox is hidden)
-      - **role='listbox':** Set on the popup container element (preferably on a `ul` element)
-      - **role='option':** Set on each selectable item in the listbox (preferably on an `li` element)
-      - **id:** Unique ID on each option element for `aria-activedescendant` to reference
-      - **aria-selected:** 'true' or 'false' on each option
-      - **role='status':** Set on a visually hidden element to announce available options
+```css
+/* ❌ AVOID: Styling .filter-label based on child */
+.filter-label:has(input[disabled]) {
+  /* Disabled styles */
+}
 
-      **Keyboard Interaction Requirements:**
-      - **Down Arrow:** Open listbox and move focus to first option
-      - **Up Arrow:** Open listbox and move focus to last option
-      - **Enter/Space:** Select focused option and close listbox
-      - **Escape:** Close listbox without selection
-      - **Tab:** Move focus to next focusable element
-      - **Shift+Tab:** Move focus to previous focusable element
-      - **Home/End:** Move focus to first/last option
-      - **Character Keys:** Filter options based on input
+/* ✅ GOOD: .disabled set server side */
+.filter-label.disabled {
+  /* Disabled styles */
+}
+```
 
-      **Focus Management:**
-      - Focus should remain on the input while navigating options
-      - Use aria-activedescendant to indicate the currently focused option
-      - Return focus to input after selection or closing
-      - Ensure focus is trapped within the combobox while open
+This strategy won't work for client-side events, like a `checked`, `selected`, `focus` event.
+
+## CSS Variables
+
+CSS variables, a.k.a. custom properties, are a powerful tool for reducing redundancy and making it easier to update values across a component.
+
+- If you need to hardcode a value, set it to a variable and use that variable in the declaration. Example: a touch target size. `--touch-target-size: 44px;`
+- **Never** hardcode colors, always use the color schemes
+
+### Global Variables
+
+Global variables should be scoped to the `:root` selector in `snippets/theme-styles-variables.liquid`.
+
+**Example of global variables**
+
+```css
+/* in snippets/theme-styles-variables.liquid */
+:root {
+    --page-width: 1400px;
+     --font-body--family: {{ settings.type_body_font.family }}, {{ settings.type_body_font.fallback_families }}; /* Referencing a theme setting */
+     --font-{{ preset_name_dash }}--family: {{ settings[preset_font] | prepend: 'var(--font-' | append: '--family)' }}; /* Using Liquid to set a variable */
+}
+```
+
+### Scoped Variables
+
+Be sure to scope your CSS variables to the component they are being used in, if they are not meant to be global. Scoped variables can reference global variables.
+
+**Example of scoped variables**
+
+```css
+/* in assets/facets.css */
+.facets {
+  --drawer-padding: var(--padding-md); /* Referencing a global variable */
+  --facets-upper-z-index: 3;
+  --facets-open-z-index: 4;
+
+  --facets-clear-shadow: 0px -4px 14px 0px rgb(var(--color-foreground-rgb) / var(--opacity-10)); /* Referencing a Color Scheme variable */
+}
+```
+
+### Namespace Your CSS Variables
+
+Namespace your variables to avoid collisions unless you explicitly want them to bleed through to other components.
+
+✅ Do this:
+
+```css
+.component {
+  --component-padding: ...;
+  --component-aspect-ratio: ...;
+}
+```
+
+❌ Don't do this:
+
+```css
+.component {
+  --padding: ...;
+  --aspect-ratio: ...;
+}
+```
+
+### Semantic Color Variables
+
+Use semantic naming for better maintainability:
+
+```css
+:root {
+  /* Base colors */
+  --color-primary: {{ settings.colors_accent_1 }};
+  --color-secondary: {{ settings.colors_accent_2 }};
+
+  /* Semantic colors */
+  --color-text-primary: rgb(var(--color-foreground));
+  --color-text-secondary: rgb(var(--color-foreground) / 0.75);
+  --color-text-disabled: rgb(var(--color-foreground) / 0.38);
+
+  /* Interactive states */
+  --color-interactive-default: rgb(var(--color-accent));
+  /* color-mix isn't supported in earlier version of iOS <16.2 so limit its usage to progressive enhancement */
+  --color-interactive-hover: color-mix(in srgb, rgb(var(--color-accent)) 90%, black);
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
