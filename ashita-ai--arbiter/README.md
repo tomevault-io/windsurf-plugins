@@ -7,11 +7,11 @@ Arbiter provides simple APIs, complete observability, and provider-agnostic infr
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [ashita-ai/arbiter](https://github.com/ashita-ai/arbiter).
+Original source: `CLAUDE.md` in [ashita-ai/arbiter](https://github.com/ashita-ai/arbiter).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
