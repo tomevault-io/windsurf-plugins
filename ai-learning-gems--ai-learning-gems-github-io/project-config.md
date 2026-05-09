@@ -1,83 +1,127 @@
 ---
 trigger: always_on
-description: Zero World Knowledge principle, source verification, training data boundaries, sub-agent rules, observed failure patterns
+description: Shared source handling: centralized storage, naming, downloads, citations, blog attribution
 ---
 
 
-# Source Integrity Rules
+# Source Management
 
-Shared source verification and world-knowledge rules for all textbook chapter workflows (write, update, edit). These rules exist because LLMs confidently produce plausible-sounding but incorrect information about well-known topics. Every rule below was motivated by a real failure in a real chapter-writing session.
-
----
-
-## Why Source Integrity Matters
-
-A textbook chapter that gets a quote slightly wrong, rounds a statistic, or describes a framework from memory instead of from its creator's actual words has *silently corrupted the reader's knowledge*. The reader trusts the textbook. They will cite the wrong number in their own paper. They will misattribute the quote. They will describe the framework incorrectly to their students. The corruption propagates.
-
-The only way to prevent this is to treat every specific claim as unverified until it is confirmed against a downloaded, readable source file.
+Shared source handling rules for all textbook chapter workflows. For site-specific fetch strategies, see `web-source-fetching.md`. For the curated blog registry, see `high-quality-blogs.md`.
 
 ---
 
-## Zero World Knowledge Principle
+## Centralized Source Storage (CRITICAL)
 
-**You know nothing about the topic except what you read from the downloaded sources.**
+**All sources are stored in `AI-Learning-Gems/sources/` — NOT in each chapter folder.**
 
-You are a skilled writer and organizer, but you have **zero reliable knowledge** about the chapter's topic. Your training data may contain information about the topic, but that information may be outdated, incomplete, or wrong. You MUST NOT:
+This is a shared, centralized repository. The same source can be referenced by multiple chapters.
 
-- Quote an author from memory (even a famous, widely-known quote)
-- Cite a statistic you "know" without reading the source
-- Describe a method, framework, or concept from training data instead of from a downloaded source
-- Fill in gaps when a source is unavailable by "remembering" the content
-- Assume a well-known fact is correct without verifying it in a source
+### Source Folder Naming Conventions
 
-**If you cannot find a claim in a downloaded, readable source file, the claim does not exist for you.** Drop it, or download a source that contains it.
-
----
-
-## What Training Data Can and Cannot Be Used For
-
-The Zero World Knowledge Principle is strict, but not absolute. There is a precise boundary.
-
-### Hard Ban (Requires a Downloaded Source)
-
-| Category | Why It Must Be Sourced | Example of Failure |
+| Source Type | Folder Pattern | Example |
 |---|---|---|
-| **Direct quotes** | Exact wording matters. Training data paraphrases, combines, and misattributes. | Attributing "writing is a primary mechanism for doing research" to Peyton Jones when the transcript says something different. |
-| **Statistics and numbers** | Specific numbers drift. A "21%" becomes "20%." A sample size gets rounded. | Writing "6.5-16.9% of reviews" when the paper says "15.8%." |
-| **Named frameworks and methodologies** | The creator's original formulation may differ from popularizations. | Describing the "ABT framework" without reading Olson's actual writing, getting the structure wrong. |
-| **Specific claims about what an author said, argued, or found** | Training data conflates authors, misattributes findings, merges claims from different papers. | Writing "Pinker argues X" when Pinker actually argues something subtly different. |
-| **Paper titles, author lists, venues, and years** | Training data frequently gets these wrong, especially for recent papers. | Attributing a paper to "Liang et al." when the actual authors are "Russo Latona et al." |
-| **Descriptions of specific papers, blog posts, or talks** | What a specific work contains must come from reading it. | Claiming a paper "found X" without reading it to verify. |
+| **arXiv papers** | `sources/arxiv-{PAPER_ID}` | `sources/arxiv-2010.11929/` |
+| **Blog posts** | `sources/{domain}/{path}/` | `sources/lilianweng.github.io/posts/2022-06-09-vlm/` |
+| **d2l.ai chapters** | `sources/d2l.ai/{chapter-path}/` | `sources/d2l.ai/chapter_attention-mechanisms-and-transformers/vision-transformer/` |
+| **HuggingFace docs** | `sources/huggingface.co/docs/{path}/` | `sources/huggingface.co/docs/transformers/model_doc/vit/` |
+| **PyTorch docs** | `sources/pytorch.org/{path}/` | `sources/pytorch.org/docs/stable/generated/torch.nn.MultiheadAttention/` |
+| **Other sites** | `sources/{domain}/{path}/` | `sources/distill.pub/2021/gnn-intro/` |
 
-### Acceptable (No Source Required)
+**Blog/site URL → folder name rules:**
+1. Strip `https://` and `http://`
+2. Strip `www.`
+3. Use the remaining URL path as the folder path
+4. Store main content as `content.md` inside the folder
+5. Store images in `images/` subfolder
 
-| Category | Why It's Okay | Example |
-|---|---|---|
-| **Pointing to well-known people as examples** | You are citing them as instances of a category, not claiming what they said. | "Karpathy's blog posts are widely read." "Lilian Weng writes survey-style posts." |
-| **General domain knowledge** (non-controversial, non-attributed) | Statements any practitioner would agree with. | "NeurIPS, ICML, and ICLR are top AI conferences." "LaTeX is standard for CS papers." |
-| **Structural and rhetorical devices** | How you organize the chapter, analogies, narrative framing. | Using a running example. Creating comparison tables. |
-| **Common vocabulary and definitions** | Terms whose meaning is standardized. | "An abstract summarizes the paper." "Ablation studies remove components one at a time." |
-
-### The Litmus Test
-
-Before writing any claim, ask: **"Am I making a specific claim that could be wrong?"**
-
-- "Karpathy writes clearly" → general characterization, okay.
-- "Karpathy writes in his blog that X" → specific claim, requires a source.
-- "The ABT framework stands for And, But, Therefore" → named framework, requires a source.
-- "AI conferences have high submission volumes" → general knowledge, okay.
-- "Jiang et al. found that writing quality predicts acceptance across 28,000 submissions" → specific statistic, requires the actual paper.
-
-**When in doubt, download the source.** Minutes to download. The reader's trust to lose.
+**arXiv rules:**
+1. Use `arxiv-{PAPER_ID}` (hyphenated)
+2. Download LaTeX source: `curl -sL "https://arxiv.org/src/{PAPER_ID}" -o source.tar.gz && tar -xzf source.tar.gz`
+3. Contains `.tex` files, `images/`, `.bib`
 
 ---
 
-## Source Readability Verification
+## Checking for Existing Sources (MANDATORY)
 
-**Downloaded is not the same as readable.** A PDF in the source folder is useless if it has never been extracted to text.
+**BEFORE downloading any source, check if it already exists:**
 
-For each source folder, verify:
-1. Does it contain at least one `.md`, `.tex`, or `.txt` file with >500 characters?
+```bash
+ls "AI-Learning-Gems/sources/arxiv-2010.11929/" 2>/dev/null && echo "EXISTS" || echo "NEW"
+```
+
+If a source already exists, skip downloading and reference the existing path.
+
+---
+
+## Source Downloading Quick Reference
+
+| Source Type | Command (Run ONLY if folder is NEW) |
+|---|---|
+| **arXiv papers** | `mkdir -p "sources/arxiv-{ID}" && cd "sources/arxiv-{ID}" && curl -sL "https://arxiv.org/src/{ID}" -o source.tar.gz && tar -xzf source.tar.gz && rm source.tar.gz` |
+| **GitHub repos/gists** | `git clone --depth 1 "https://github.com/OWNER/REPO.git" "sources/github.com/OWNER/REPO"` |
+| **Blog posts, Substack, Medium, JS-heavy pages** | `conda activate ai-learning-gems && python scripts/authenticated_extract.py "URL"` (add `--profile substack` or `--profile medium` for login-gated sites) |
+| **d2l.ai chapters** | `conda activate ai-learning-gems && python scripts/authenticated_extract.py "https://d2l.ai/{chapter}/{section}.html" -s ".document"` |
+| **Static HTML pages (fast fallback, no JS)** | `conda activate ai-learning-gems && python scripts/webpage_to_md.py "URL" -o "sources/{domain}/{path}/"` |
+| **Single raw file from GitHub** | `mkdir -p "sources/github.com/OWNER/REPO/DIR" && curl -sL "https://raw.githubusercontent.com/OWNER/REPO/BRANCH/PATH" -o "sources/github.com/OWNER/REPO/PATH"` |
+
+For the complete site-specific lookup table, see `web-source-fetching.md`.
+
+---
+
+## PDF Figure Conversion
+
+Many arXiv papers include figures as PDFs. Quarto cannot embed PDFs inline, so they must be converted to PNG.
+
+**IMPORTANT:** PDF figures from arXiv are full-page PDFs with LaTeX margins. You MUST render at high DPI AND trim whitespace.
+
+```bash
+# PREFERRED: ImageMagick (renders + trims in one step)
+magick -density 400 images/figure.pdf -trim +repage images/figure.png
+
+# Batch convert all PDF figures in an arXiv source:
+find "sources/arxiv-{ID}/" \( -name '*.pdf' \) \( -path '*/images/*' -o -path '*/figs/*' -o -path '*/figures/*' -o -path '*/resources/*' \) | while read f; do
+  outfile="${f%.pdf}"
+  [ ! -f "${outfile}.png" ] && magick -density 400 "$f" -trim +repage "${outfile}.png" && echo "Converted: $f → ${outfile}.png"
+done
+```
+
+**Validate converted images** (detect blank placeholders):
+```bash
+find "sources/arxiv-{ID}/" \( -path '*/images/*' -o -path '*/figs/*' -o -path '*/figures/*' \) -name '*.png' -size -10k | while read f; do
+  pdf="${f%.png}.pdf"
+  if [ -f "$pdf" ]; then
+    echo "SUSPECT BLANK: $f — PDF exists, re-converting..."
+    magick -density 400 "$pdf" -trim +repage "$f"
+  fi
+done
+```
+
+---
+
+## Per-Section Source Headers
+
+Each section file should include its own sources as a collapsible header at the top. See `quarto-conventions.md` (Per-Section Source Headers section) for the full template.
+
+## Blog Attribution
+
+Many sources come from independent researchers' blogs. These must be attributed in source headers, figure captions, and in-text framings. See `high-quality-blogs.md` for the curated blog registry, and `quarto-conventions.md` (Attribution for Blog Content) for the formatting rules.
+
+---
+
+## Citation Format
+
+**Inline Citations:** Every significant factual claim needs a citation:
+`[Source Name](URL) (Written: <date>, Accessed: <date>)`
+
+**Exact Quotes:** For major claims, include the exact sentence from the source:
+```
+From [Source Name](URL):
+
+> "Exact quote from the source text [...] continuing relevant portion."
+```
+
+**Source Quality Indicators:**
+- [TEXTBOOK] for established textbooks
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
