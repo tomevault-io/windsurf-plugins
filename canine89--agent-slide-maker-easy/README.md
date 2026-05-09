@@ -5,11 +5,11 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [Canine89/agent-slide-maker-easy](https://github.com/Canine89/agent-slide-maker-easy).
+Original source: `CLAUDE.md` in [Canine89/agent-slide-maker-easy](https://github.com/Canine89/agent-slide-maker-easy).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
