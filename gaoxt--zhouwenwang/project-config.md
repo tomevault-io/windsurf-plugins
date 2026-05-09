@@ -1,56 +1,137 @@
 ---
 trigger: always_on
-description: Guide for using Task Master to manage task-driven development workflows
+description: 本文件定义了在使用 AI 辅助编程时，应遵循的 PowerShell 语法和风格规范，以确保生成代码的正确性、可读性和一致性。AI 应严格遵守以下规则。
 ---
 
-# Task Master Development Workflow
+# AI PowerShell 协作规则 (PowerShell Rules for AI)
 
-This guide outlines the typical process for using Task Master to manage software development projects.
+本文件定义了在使用 AI 辅助编程时，应遵循的 PowerShell 语法和风格规范，以确保生成代码的正确性、可读性和一致性。AI 应严格遵守以下规则。
 
-## Primary Interaction: MCP Server vs. CLI
+## 1. 核心原则
 
-Task Master offers two primary ways to interact:
+- **原生优先**: 总是优先使用 PowerShell 原生 Cmdlet，而不是 Unix/Linux 命令。
+- **对象管道**: 理解 PowerShell 的管道传递的是结构化对象（.NET Objects），而不是纯文本。
+- **禁止别名**: 为保证脚本清晰无歧义，禁止在最终代码中使用 `curl`, `ls`, `cat` 等常用别名，应使用其完整的 Cmdlet 名称。
 
-1.  **MCP Server (Recommended for Integrated Tools)**:
-    - For AI agents and integrated development environments (like Cursor), interacting via the **MCP server is the preferred method**.
-    - The MCP server exposes Task Master functionality through a set of tools (e.g., `get_tasks`, `add_subtask`).
-    - This method offers better performance, structured data exchange, and richer error handling compared to CLI parsing.
-    - Refer to [`mcp.mdc`](mdc:.cursor/rules/mcp.mdc) for details on the MCP architecture and available tools.
-    - A comprehensive list and description of MCP tools and their corresponding CLI commands can be found in [`taskmaster.mdc`](mdc:.cursor/rules/taskmaster.mdc).
-    - **Restart the MCP server** if core logic in `scripts/modules` or MCP tool/direct function definitions change.
+## 2. 命令执行与分隔符
 
-2.  **`task-master` CLI (For Users & Fallback)**:
-    - The global `task-master` command provides a user-friendly interface for direct terminal interaction.
-    - It can also serve as a fallback if the MCP server is inaccessible or a specific function isn't exposed via MCP.
-    - Install globally with `npm install -g task-master-ai` or use locally via `npx task-master-ai ...`.
-    - The CLI commands often mirror the MCP tools (e.g., `task-master list` corresponds to `get_tasks`).
-    - Refer to [`taskmaster.mdc`](mdc:.cursor/rules/taskmaster.mdc) for a detailed command reference.
+此规则用于确保命令序列的正确执行。
 
-## Standard Development Workflow Process
+- **❌ 禁止**: 使用 `&&` 连接命令，此语法在 PowerShell 中无效。
 
--   Start new projects by running `initialize_project` tool / `task-master init` or `parse_prd` / `task-master parse-prd --input='<prd-file.txt>'` (see [`taskmaster.mdc`](mdc:.cursor/rules/taskmaster.mdc)) to generate initial tasks.json
--   Begin coding sessions with `get_tasks` / `task-master list` (see [`taskmaster.mdc`](mdc:.cursor/rules/taskmaster.mdc)) to see current tasks, status, and IDs
--   Determine the next task to work on using `next_task` / `task-master next` (see [`taskmaster.mdc`](mdc:.cursor/rules/taskmaster.mdc)).
--   Analyze task complexity with `analyze_project_complexity` / `task-master analyze-complexity --research` (see [`taskmaster.mdc`](mdc:.cursor/rules/taskmaster.mdc)) before breaking down tasks
--   Review complexity report using `complexity_report` / `task-master complexity-report` (see [`taskmaster.mdc`](mdc:.cursor/rules/taskmaster.mdc)).
--   Select tasks based on dependencies (all marked 'done'), priority level, and ID order
--   Clarify tasks by checking task files in tasks/ directory or asking for user input
--   View specific task details using `get_task` / `task-master show <id>` (see [`taskmaster.mdc`](mdc:.cursor/rules/taskmaster.mdc)) to understand implementation requirements
--   Break down complex tasks using `expand_task` / `task-master expand --id=<id> --force --research` (see [`taskmaster.mdc`](mdc:.cursor/rules/taskmaster.mdc)) with appropriate flags like `--force` (to replace existing subtasks) and `--research`.
--   Clear existing subtasks if needed using `clear_subtasks` / `task-master clear-subtasks --id=<id>` (see [`taskmaster.mdc`](mdc:.cursor/rules/taskmaster.mdc)) before regenerating
--   Implement code following task details, dependencies, and project standards
--   Verify tasks according to test strategies before marking as complete (See [`tests.mdc`](mdc:.cursor/rules/tests.mdc))
--   Mark completed tasks with `set_task_status` / `task-master set-status --id=<id> --status=done` (see [`taskmaster.mdc`](mdc:.cursor/rules/taskmaster.mdc))
--   Update dependent tasks when implementation differs from original plan using `update` / `task-master update --from=<id> --prompt="..."` or `update_task` / `task-master update-task --id=<id> --prompt="..."` (see [`taskmaster.mdc`](mdc:.cursor/rules/taskmaster.mdc))
--   Add new tasks discovered during implementation using `add_task` / `task-master add-task --prompt="..." --research` (see [`taskmaster.mdc`](mdc:.cursor/rules/taskmaster.mdc)).
--   Add new subtasks as needed using `add_subtask` / `task-master add-subtask --parent=<id> --title="..."` (see [`taskmaster.mdc`](mdc:.cursor/rules/taskmaster.mdc)).
--   Append notes or details to subtasks using `update_subtask` / `task-master update-subtask --id=<subtaskId> --prompt='Add implementation notes here...\nMore details...'` (see [`taskmaster.mdc`](mdc:.cursor/rules/taskmaster.mdc)).
--   Generate task files with `generate` / `task-master generate` (see [`taskmaster.mdc`](mdc:.cursor/rules/taskmaster.mdc)) after updating tasks.json
--   Maintain valid dependency structure with `add_dependency`/`remove_dependency` tools or `task-master add-dependency`/`remove-dependency` commands, `validate_dependencies` / `task-master validate-dependencies`, and `fix_dependencies` / `task-master fix-dependencies` (see [`taskmaster.mdc`](mdc:.cursor/rules/taskmaster.mdc)) when needed
--   Respect dependency chains and task priorities when selecting work
--   Report progress regularly using `get_tasks` / `task-master list`
+  ```powershell
+  # 错误：此命令会失败
+  cd ./my-app && npm install
+  ```
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- **✅ 正确**: 使用换行（推荐）或分号 (`;`) 分隔命令。
+
+  ```powershell
+  # 推荐方式：使用换行，清晰易读
+  cd ./my-app
+  npm install
+  ```
+
+## 3. Unix 命令替代方案
+
+必须使用 PowerShell 的等效命令替换所有常见的 Unix 命令。
+
+### 文本搜索 (Grep)
+
+- **❌ 错误**
+
+  ```powershell
+  # PowerShell 中没有 grep 命令
+  npm list | grep "react"
+  ```
+
+- **✅ 正确**: 使用 `Select-String`。
+
+  ```powershell
+  npm list | Select-String -Pattern "react"
+  ```
+
+### 查看文件内容 (Cat / Head / Tail)
+
+- **❌ 错误**
+
+  ```powershell
+  # PowerShell 中没有 cat, head, tail 命令
+  cat package.json
+  head -n 10 package.json
+  ```
+
+- **✅ 正确**: 使用 `Get-Content` 结合 `Select-Object`。
+
+  ```powershell
+  # 查看整个文件 (替代 cat)
+  Get-Content ./package.json
+
+  # 查看文件前 10 行 (替代 head)
+  Get-Content ./package.json | Select-Object -First 10
+  ```
+
+### **创建多个目录 (mkdir -p)**
+
+- **❌ 错误**: 使用 Unix 的 `-p` 参数和空格分隔的路径。
+
+  ```powershell
+  # 错误：PowerShell 不识别 -p 参数，也不接受用空格分隔的多个路径
+  mkdir -p src\components src\pages src\types
+  ```
+
+- **✅ 正确**: 使用 `New-Item`，将所有路径作为一个**数组**传给 `-Path` 参数，并使用 `-Force` 开关。
+
+  ```powershell
+  # 正确：-Path 接受一个逗号分隔的数组，-Force 确保父目录存在
+  New-Item -ItemType Directory -Path "src\components", "src\pages", "src\types" -Force
+  ```
+
+### 列出文件 (ls)
+
+- **❌ 错误**
+
+  ```powershell
+  # ls 是别名，规则禁止使用别名
+  ls -l
+  ```
+
+- **✅ 正确**: 使用 `Get-ChildItem`。
+
+  ```powershell
+  Get-ChildItem -Path .
+  ```
+
+## 4. 网络请求
+
+- **❌ 规则**: 严禁使用 `curl`。
+
+  **原因**: PowerShell 中的 `curl` 是 `Invoke-WebRequest` 的一个别名，其参数和行为与 Linux/macOS 的 `curl` **完全不同**，极易引起混淆和错误。
+
+- **✅ 正确**: 使用 `Invoke-RestMethod` 或 `Invoke-WebRequest`。
+
+  ```powershell
+  # 推荐用于 API 请求，它会自动解析 JSON
+  $data = Invoke-RestMethod -Uri "[https://api.example.com/data](https://api.example.com/data)"
+  ```
+
+## 5. 命令速查表
+
+在生成代码时，请参考此表进行命令替换。
+
+| Unix 命令 | PowerShell 等效命令 | 完整 cmdlet (推荐使用) |
+| :--- | :--- | :--- |
+| `grep` | `Select-String` | `Select-String` |
+| `head` | `Select-Object -First N` | `Select-Object` |
+| `tail` | `Select-Object -Last N` | `Select-Object` |
+| `cat` | `Get-Content` | `Get-Content` |
+| `ls` | `Get-ChildItem` | `Get-ChildItem` |
+| `mkdir` | `New-Item -ItemType Directory` | `New-Item` |
+| `pwd` | `Get-Location` | `Get-Location` |
+| `cp` | `Copy-Item` | `Copy-Item` |
+| `mv` | `Move-Item` | `Move-Item` |
+
+| `rm` | `Remove-Item` | `Remove-Item` |
 
 ---
 > Source: [gaoxt/zhouwenwang](https://github.com/gaoxt/zhouwenwang) — distributed by [TomeVault](https://tomevault.io).
