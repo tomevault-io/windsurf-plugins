@@ -1,266 +1,229 @@
 ---
 trigger: always_on
-description: React and TypeScript Development Rules
+description: Rust and Tauri Backend Development Rules
 ---
 
 
-# React + TypeScript Development Rules
+# Rust + Tauri Backend Development Rules
 
-## 🎯 Component Development Standards
+## 🦀 Rust Code Standards
 
-### Function Components First
-- Use function components and React Hooks
-- Avoid class components
-- Use PascalCase for component names
+### Error Handling
+- Use `Result<T, E>` to handle operations that may fail
+- Define custom error types implementing `Display` and `Error` traits
+- Use `?` operator for error propagation
 
-```typescript
-// ✅ Correct
-const SearchForm: React.FC<SearchFormProps> = ({ onSubmit, isSearching }) => {
-  // Component logic
-};
+```rust
+// ✅ Correct error handling
+#[derive(Debug, thiserror::Error)]
+pub enum SearchError {
+    #[error("Network request failed: {0}")]
+    NetworkError(#[from] reqwest::Error),
+    #[error("Parse error: {0}")]
+    ParseError(String),
+}
 
-// ❌ Avoid
-class SearchForm extends React.Component<SearchFormProps> {
-  // Class component logic
+pub async fn search_username(query: &str) -> Result<Vec<SearchResult>, SearchError> {
+    let response = reqwest::get(&url).await?;
+    let results: Vec<SearchResult> = response.json().await?;
+    Ok(results)
 }
 ```
 
-### TypeScript Type Definitions
-- All props must have type definitions
-- Use interfaces for complex types
-- Export types for use by other components
+### Async Programming
+- Use `async/await` syntax
+- Use `tokio::spawn` appropriately for concurrency
+- Use `Arc<Mutex<T>>` to handle shared state
 
-```typescript
-// ✅ Correct type definitions
-interface SearchFormProps {
-  onSubmit: (query: string, type: SearchType) => void;
-  isSearching: boolean;
-  searchType: SearchType;
+```rust
+// ✅ Correct async programming
+pub struct SearchEngine {
+    config: SearchConfig,
+    client: reqwest::Client,
 }
 
-// ✅ Use union types
-type SearchType = 'username' | 'email';
-```
-
-## 🪝 Hook Development Standards
-
-### Custom Hook Naming
-- Start with `use`
-- Describe the Hook's functionality
-- Return objects instead of arrays (unless it's a state pair)
-
-```typescript
-// ✅ Correct Hook definition
-export const useSearch = () => {
-  const [isSearching, setIsSearching] = useState(false);
-  const [results, setResults] = useState<SearchResult[]>([]);
-  
-  return {
-    isSearching,
-    results,
-    startSearch,
-    stopSearch
-  };
-};
-```
-
-### Hook Dependency Management
-- Use `useCallback` to optimize function references
-- Use `useMemo` to optimize computed values
-- Set dependency arrays correctly
-
-```typescript
-// ✅ Correct dependency management
-const handleSubmit = useCallback((query: string, type: SearchType) => {
-  // Handle logic
-}, [onSubmit, isSearching]);
-
-const filteredResults = useMemo(() => {
-  return results.filter(result => result.status === 'found');
-}, [results]);
-```
-
-## 📦 Component Organization
-
-### Component File Structure
-- One component per file
-- Related components in the same directory
-- Use `index.ts` for unified exports
-
-```typescript
-// components/index.ts
-export { default as SearchForm } from './SearchForm';
-export { default as ResultsDisplay } from './ResultsDisplay';
-export { default as ProgressIndicator } from './ProgressIndicator';
-```
-
-### Component Responsibility Separation
-- UI components only handle rendering
-- Business logic in Hooks
-- Data fetching in service layer
-
-```typescript
-// ✅ Component only handles UI
-const SearchForm: React.FC<SearchFormProps> = ({ onSubmit, isSearching }) => {
-  return (
-    <form onSubmit={handleSubmit}>
-      {/* UI logic */}
-    </form>
-  );
-};
-
-// ✅ Business logic in Hook
-const useSearch = () => {
-  const startSearch = async (query: string) => {
-    // Business logic
-  };
-  
-  return { startSearch };
-};
-```
-
-## 🎨 Styling and CSS
-
-### CSS Class Naming
-- Use kebab-case
-- Semantic naming
-- Avoid deep nesting
-
-```css
-/* ✅ Correct class naming */
-.search-form {
-  /* styles */
-}
-
-.search-form__input {
-  /* child element styles */
-}
-
-.search-form--loading {
-  /* modifier styles */
+impl SearchEngine {
+    pub async fn search(&self, sites: &[Site]) -> Result<Vec<SearchResult>, SearchError> {
+        let semaphore = Arc::new(Semaphore::new(self.config.max_concurrent_requests));
+        let mut handles = Vec::new();
+        
+        for site in sites {
+            let semaphore = semaphore.clone();
+            let client = self.client.clone();
+            
+            let handle = tokio::spawn(async move {
+                let _permit = semaphore.acquire().await?;
+                self.check_site(&client, site).await
+            });
+            
+            handles.push(handle);
+        }
+        
+        // Wait for all tasks to complete
+        let mut results = Vec::new();
+        for handle in handles {
+            if let Ok(result) = handle.await? {
+                results.push(result);
+            }
+        }
+        
+        Ok(results)
+    }
 }
 ```
 
-### Responsive Design
-- Use CSS variables to define themes
-- Support mobile and desktop
-- Use media queries
+## 🎯 Tauri Command Development
 
-```css
-/* ✅ Responsive design */
-.app {
-  --primary-color: #007bff;
-  --spacing: 1rem;
-}
+### Command Function Standards
+- Use `#[tauri::command]` macro
+- Use snake_case for function names
+- Return `Result<T, String>` type
 
-@media (max-width: 768px) {
-  .search-form {
-    padding: var(--spacing);
-  }
+```rust
+// ✅ Correct Tauri commands
+#[tauri::command]
+async fn start_search(
+    app: AppHandle,
+    query: String,
+    search_type: Option<String>,
+    state: tauri::State<'_, AppState>,
+) -> Result<(), String> {
+    // Validate input
+    validate_input(&query)?;
+    
+    // Execute search
+    let search_engine = SearchEngine::new(config)?;
+    let results = search_engine.search(&sites).await
+        .map_err(|e| e.to_string())?;
+    
+    // Send event to frontend
+    app.emit("search-update", &results)
+        .map_err(|e| e.to_string())?;
+    
+    Ok(())
 }
 ```
 
-## 🔧 State Management
+### State Management
+- Use `tauri::State` to manage application state
+- Use `Arc<Mutex<T>>` to handle concurrent access
+- Use lifetimes appropriately
 
-### State Structure Design
-- Use `useState` for local state
-- Use `useReducer` for complex state
-- Avoid excessive state nesting
-
-```typescript
-// ✅ Correct state structure
-interface SearchState {
-  isSearching: boolean;
-  results: SearchResult[];
-  progress: SearchProgress;
-  error: string | null;
+```rust
+// ✅ Correct state management
+#[derive(Default)]
+pub struct AppState {
+    pub search_handle: Arc<Mutex<Option<JoinHandle<()>>>>,
+    pub search_results: Arc<Mutex<Vec<SearchResult>>>,
 }
 
-const [searchState, setSearchState] = useState<SearchState>({
-  isSearching: false,
-  results: [],
-  progress: { percentage: 0, currentSite: null },
-  error: null
-});
+#[tauri::command]
+async fn get_search_results(
+    state: tauri::State<'_, AppState>
+) -> Result<Vec<SearchResult>, String> {
+    let results = state.search_results.lock().await;
+    Ok(results.clone())
+}
 ```
 
-### State Update Patterns
-- Use functional updates
-- Avoid direct state mutation
-- Use spread operator
+## 🔧 Module Organization
 
-```typescript
-// ✅ Correct state updates
-setSearchState(prev => ({
-  ...prev,
-  isSearching: true,
-  error: null
-}));
+### Module Structure
+- Use `mod.rs` files to organize modules
+- Each module has clear responsibilities
+- Use `pub` to control visibility
+
+```rust
+// src-tauri/src/core/mod.rs
+pub mod config;
+pub mod error;
+pub mod models;
+pub mod search;
+pub mod sites;
+pub mod utils;
+pub mod export;
+
+pub use config::*;
+pub use error::*;
+pub use models::*;
+```
+
+### Data Models
+- Use `serde` for serialization
+- Implement `Clone` and `Debug` traits
+- Use enums to represent states
+
+```rust
+// ✅ Correct data models
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SearchResult {
+    pub site: String,
+    pub url: String,
+    pub status: SearchResultStatus,
+    pub response_time: Option<u64>,
+    pub metadata: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum SearchResultStatus {
+    Found,
+    NotFound,
+    Error,
+    Timeout,
+}
 ```
 
 ## 🚀 Performance Optimization
 
-### Component Optimization
-- Use `React.memo` to avoid unnecessary re-renders
-- Use `useCallback` and `useMemo` for performance optimization
-- Avoid creating objects in render
+### Concurrency Control
+- Use `Semaphore` to limit concurrency
+- Use `tokio::spawn` for async tasks
+- Set appropriate timeout values
 
-```typescript
-// ✅ Performance optimization
-const SearchForm = React.memo<SearchFormProps>(({ onSubmit, isSearching }) => {
-  const handleSubmit = useCallback((e: React.FormEvent) => {
-    e.preventDefault();
-    onSubmit(query, type);
-  }, [onSubmit, query, type]);
-  
-  return (
-    <form onSubmit={handleSubmit}>
-      {/* Component content */}
-    </form>
-  );
-});
-```
-
-### Async Operations
-- Use `useEffect` to handle side effects
-- Clean up async operations correctly
-- Handle loading and error states
-
-```typescript
-// ✅ Correct async operations
-useEffect(() => {
-  let isCancelled = false;
-  
-  const fetchData = async () => {
-    try {
-      const data = await api.getData();
-      if (!isCancelled) {
-        setData(data);
-      }
-    } catch (error) {
-      if (!isCancelled) {
-        setError(error.message);
-      }
+```rust
+// ✅ Correct concurrency control
+pub async fn search_with_concurrency(
+    sites: &[Site],
+    max_concurrent: usize,
+) -> Result<Vec<SearchResult>, SearchError> {
+    let semaphore = Arc::new(Semaphore::new(max_concurrent));
+    let mut handles = Vec::new();
+    
+    for site in sites {
+        let semaphore = semaphore.clone();
+        let handle = tokio::spawn(async move {
+            let _permit = semaphore.acquire().await?;
+            // Execute search logic
+            Ok::<_, SearchError>(())
+        });
+        handles.push(handle);
     }
-  };
-  
-  fetchData();
-  
-  return () => {
-    isCancelled = true;
-  };
-}, []);
+    
+    // Wait for all tasks to complete
+    let mut results = Vec::new();
+    for handle in handles {
+        if let Ok(result) = handle.await? {
+            results.push(result);
+        }
+    }
+    
+    Ok(results)
+}
 ```
 
-## 🧪 Error Handling
+### Memory Management
+- Use `Arc` for reference counting
+- Avoid unnecessary cloning
+- Use `Cow` to handle strings
 
-### Error Boundaries
-- Use error boundaries to catch component errors
-- Provide friendly error messages
-- Log error information
+```rust
+// ✅ Correct memory management
+pub struct SearchEngine {
+    config: Arc<SearchConfig>,
+    client: Arc<reqwest::Client>,
+}
 
-```typescript
-// ✅ Error handling
+impl SearchEngine {
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
