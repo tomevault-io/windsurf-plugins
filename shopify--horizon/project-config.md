@@ -1,143 +1,130 @@
 ---
 trigger: always_on
-description: Text and user interface color contrast compliance with WCAG 2.2 1.4.3 and 1.4.11
+description: Color swatch component accessibility compliance pattern
 ---
 
-# Color Contrast Accessibility Standards
+# Color Swatch Variant Selector Component Accessibility Standards
 
-Ensures color contrast meets WCAG 2.2 1.4.3: Contrast (Minimum) and 1.4.11: Non-text Contrast requirements.
+Ensures color swatch variant selectors follow WCAG compliance and provide proper accessibility for all users.
 
 <rule>
-name: color_contrast_accessibility_standards
-description: Enforce color contrast accessibility standards per WCAG 2.2 1.4.3 and 1.4.11
+name: color_swatch_accessibility_standards
+description: Enforce color swatch variant selector accessibility standards and WCAG compliance
 filters:
   - type: file_extension
-    pattern: "\\.(css|scss|sass|less|vue|jsx|tsx|html|liquid|php|js|ts)$"
+    pattern: "\\.(vue|jsx|tsx|html|liquid|php|js|ts|css|scss|sass|less)$"
 
 actions:
   - type: enforce
     conditions:
-      # Common low-contrast text color combinations
-      - pattern: "color:\\s*#[89abcdefABCDEF]{6}"
-        message: "Light text colors may not meet 4.5:1 contrast ratio requirement. Verify contrast against background."
+      # Radio buttons hidden with display: none (accessibility blocker)
+      - pattern: "(?i)input\\[type=\"radio\"\\].*\\{[^}]*display:\\s*none"
+        message: "Radio buttons must not use display: none as it removes keyboard and screen reader access. Use appearance: none or visually-hidden class instead."
 
-      - pattern: "color:\\s*#[0-6]{6}"
-        message: "Very light text colors likely fail contrast requirements. Use darker colors for better accessibility."
+      # Color swatches missing accessible labels
+      - pattern: "(?i)<input[^>]*type=\"radio\"[^>]*>"
+        pattern_negate: "(id.*for|label.*for)"
+        message: "Color swatch radio buttons must have associated label elements via id/for attributes."
 
-      # Light gray text (common accessibility issue)
-      - pattern: "color:\\s*(#[cdefCDEF]{3,6}|lightgray|lightgrey|silver)"
-        message: "Light gray text often fails WCAG contrast requirements (4.5:1 minimum). Use darker colors."
+      # Color-only information without text alternatives
+      - pattern: "(?i)<[^>]*(?:color|swatch|variant)[^>]*>"
+        pattern_negate: "(data-label|aria-label|title|data-tooltip|class.*tooltip)"
+        message: "Color swatches must include text alternatives (data-label, tooltips, labels) as color alone cannot convey information to all users."
 
-      # Common problematic color combinations
-      - pattern: "background.*#fff.*color.*#[89abcdefABCDEF]"
-        message: "Light text on white background may not meet 4.5:1 contrast ratio requirement."
+      # Missing fieldset and legend for variant groups
+      - pattern: "(?i)<input[^>]*type=\"radio\"[^>]*name=\"[^\"]*\"[^>]*>"
+        pattern_negate: "(fieldset|role=\"group\"|aria-labelledby)"
+        message: "Radio button groups should be wrapped in fieldset with legend or have role='group' with aria-labelledby."
 
-      - pattern: "background.*#f[0-9a-fA-F]{5}.*color.*#[89abcdefABCDEF]"
-        message: "Light text on light background may not meet contrast requirements."
+      # Missing keyboard navigation support
+      - pattern: "(?i)<[^>]*(?:color|swatch|variant)[^>]*>"
+        pattern_negate: "(onKeyDown|onkeydown|@keydown|v-on:keydown|tabindex)"
+        message: "Color swatch components should handle keyboard navigation (arrow keys) for variant selection."
 
-      # UI component border/focus indicators
-      - pattern: "border.*#[cdefCDEF]{3,6}"
-        message: "Light borders may not meet 3:1 non-text contrast requirement for UI components."
+      # Missing focus indicators
+      - pattern: "(?i)<[^>]*(?:color|swatch|variant)[^>]*>"
+        pattern_negate: "(focus|:focus|outline|box-shadow)"
+        message: "Color swatch components must have visible focus indicators for keyboard navigation."
 
-      - pattern: "outline.*#[cdefCDEF]{3,6}"
-        message: "Light focus outlines may not meet 3:1 contrast requirement for UI component identification."
-
-      # Button states with insufficient contrast
-      - pattern: "button.*background.*#[cdefCDEF]{3,6}"
-        message: "Light button backgrounds may not provide sufficient 3:1 contrast for UI component identification."
-
-      # Form input borders
-      - pattern: "input.*border.*#[defDEF]{3,6}"
-        message: "Very light input borders may not meet 3:1 contrast requirement for form field identification."
-
-      # SVG icon fill colors that may lack contrast
-      - pattern: "fill=\"#[cdefCDEF]{3,6}\""
-        message: "Light SVG fill colors may not meet 3:1 contrast requirement for icon identification."
-
-      # SVG stroke colors for icon outlines
-      - pattern: "stroke=\"#[defDEF]{3,6}\""
-        message: "Very light SVG stroke colors may not provide sufficient contrast for icon visibility."
-
-      # Missing prefers-contrast considerations
-      - pattern: "@media\\s*\\(prefers-contrast:\\s*more\\)"
-        pattern_negate: "color|background|border"
-        message: "prefers-contrast: more media query should include enhanced color/contrast properties."
+      # Tooltip missing proper accessibility
+      - pattern: "(?i)<[^>]*(?:tooltip|title)[^>]*>"
+        pattern_negate: "(role=\"tooltip\"|aria-describedby|aria-label)"
+        message: "Color swatch tooltips must have proper ARIA attributes for screen reader accessibility."
 
   - type: suggest
     message: |
-      **WCAG 2.2 Color Contrast Requirements:**
+      **Color Swatch Variant Selector Accessibility Best Practices:**
 
-      **1.4.3: Text Contrast (Minimum) - Level AA:**
-      - **Normal Text:** Minimum 4.5:1 contrast ratio
-      - **Large Text:** Minimum 3:1 contrast ratio (18pt+ regular or 14pt+ bold)
-      - **Enhanced (Level AAA):** 7:1 for normal text, 4.5:1 for large text
+      **Required Accessibility Features:**
+      - **Keyboard Navigation:** Arrow keys (←/→) to navigate between variants
+      - **Screen Reader Support:** Proper labeling and announcements
+      - **Focus Indicators:** Highly visible focus states
+      - **Text Alternatives:** Tooltips or labels for color information
+      - **Proper Styling:** Use appearance: none instead of display: none
+      - **Label Focus:** Labels automatically receive focus when their associated input is focused (no tabindex needed)
+      - **Input Focus:** Radio inputs are naturally focusable and part of tab order (no tabindex needed)
 
-      **1.4.11: Non-text Contrast - Level AA:**
-      - **UI Components:** Minimum 3:1 contrast ratio for component identification
-      - **Focus Indicators:** Minimum 3:1 contrast ratio for focus visibility
-      - **Graphical Objects:** Minimum 3:1 contrast ratio for content understanding
+      **Implementation Patterns:**
 
-      **Exceptions (No Contrast Requirement):**
-      - Inactive/disabled UI components
-      - Pure decorative elements
-      - Text in logos or brand names
-      - Text that is not visible to users
-      - Graphics where specific presentation is essential
+      **Basic Color Swatch Structure:**
+      ```html
+      <fieldset class="color-swatches">
+        <legend>Color</legend>
+        <div class="swatch-group" role="radiogroup" aria-labelledby="color-legend">
+          <input type="radio"
+                 id="color-red"
+                 name="color"
+                 value="red"
+                 class="visually-hidden">
+          <label for="color-red"
+                 class="color-swatch"
+                 data-label="Red - Classic crimson shade">
+            <span class="swatch-color" style="background-color: red;"></span>
+          </label>
 
-      **High Contrast Color Combinations:**
-
-      **Dark Text on Light Backgrounds:**
-      - `#212529` on `#ffffff` - 16.6:1 ✅
-      - `#495057` on `#ffffff` - 8.3:1 ✅
-      - `#6c757d` on `#ffffff` - 5.4:1 ✅
-      - `#343a40` on `#f8f9fa` - 11.7:1 ✅
-
-      **Light Text on Dark Backgrounds:**
-      - `#ffffff` on `#212529` - 16.6:1 ✅
-      - `#f8f9fa` on `#495057` - 7.0:1 ✅
-      - `#ffffff` on `#0056b3` - 7.7:1 ✅
-      - `#ffffff` on `#dc3545` - 5.8:1 ✅
-
-      **UI Component Colors (3:1 minimum):**
-      - Focus outlines: `#0056b3`, `#dc3545`, `#198754`
-      - Border colors: `#ced4da`, `#adb5bd`, `#6c757d`
-      - Button states: `#0056b3`, `#157347`, `#b02a37`
-
-      **Implementation Examples:**
-
-      **CSS Text Contrast:**
-      ```css
-      /* Good: High contrast text */
-      .primary-text {
-        color: #212529;
-        background: #ffffff;
-      }
-
-      .secondary-text {
-        color: #495057;
-        background: #ffffff;
-      }
-
-      /* Good: Large text with 3:1 minimum */
-      .large-heading {
-        font-size: 18px;
-        font-weight: normal;
-        color: #6c757d;
-        background: #ffffff;
-      }
+          <input type="radio"
+                 id="color-blue"
+                 name="color"
+                 value="blue"
+                 class="visually-hidden">
+          <label for="color-blue"
+                 class="color-swatch"
+                 data-label="Blue - Navy blue shade">
+            <span class="swatch-color" style="background-color: blue;"></span>
+          </label>
+        </div>
+      </fieldset>
       ```
 
-      **CSS UI Component Contrast:**
+      **CSS for Accessible Styling:**
       ```css
-      /* Good: Form inputs with sufficient border contrast */
-      .form-control {
-        border: 2px solid #ced4da; /* 3:1+ contrast */
-        background: #ffffff;
+      /* Visually hide radio buttons while keeping them accessible */
+      .visually-hidden {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
       }
 
-      .form-control:focus {
-        border-color: #0056b3; /* High contrast focus */
-        outline: 3px solid #0056b3;
+      /* Focus Management: Labels automatically receive focus when their input is focused */
+      /* No tabindex needed on labels - they are naturally focusable through their input association */
+      /* No tabindex needed on inputs - radio inputs are naturally focusable and part of tab order */
+
+      /* Alternative: Use appearance: none for custom styling */
+      input[type="radio"] {
+        appearance: none;
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        /* Custom styling here */
+      }
+
+      /* Color swatch styling */
+      .color-swatch {
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
