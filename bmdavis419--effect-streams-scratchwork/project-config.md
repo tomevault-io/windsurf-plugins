@@ -1,25 +1,126 @@
 ---
 trigger: always_on
-description: ALWAYS follow this rule.
+description: Guidelines and best practices for building Convex projects, including database schema design, queries, mutations, and real-world examples
 ---
 
 
-Guidelines for working on this project:
+# Convex guidelines
 
-- Always use typescript
-- Always use svelte 5 and the modern features
-- Always use bun as the package manager
-- Do NOT write explicit return types for functions (unless there is a VERY good reason)
-- Do NOT add unit tests unless explicitly asked to
-- The only project specific commands you are allowed to run are:
-  - `bun check` to check for type errors
-  - `bun format` to format the code
-  - `bun lint` to lint the code
-- Always use tailwind css (tailwind v4 to be clear) unless there is something you need to do that tailwind doesn't support
-- When handling errors, use the `neverthrow` library to handle errors
-- Be extremely concise. Sacrifice grammar for the sake of concision.
+## Function guidelines
+
+### New function syntax
+
+- ALWAYS use the new function syntax for Convex functions. For example:
+
+```typescript
+import { query } from './_generated/server';
+import { v } from 'convex/values';
+export const f = query({
+	args: {},
+	handler: async (ctx, args) => {
+		// Function body
+	}
+});
+```
+
+### Http endpoint syntax
+
+- HTTP endpoints are defined in `convex/http.ts` and require an `httpAction` decorator. For example:
+
+```typescript
+import { httpRouter } from 'convex/server';
+import { httpAction } from './_generated/server';
+const http = httpRouter();
+http.route({
+	path: '/echo',
+	method: 'POST',
+	handler: httpAction(async (ctx, req) => {
+		const body = await req.bytes();
+		return new Response(body, { status: 200 });
+	})
+});
+```
+
+- HTTP endpoints are always registered at the exact path you specify in the `path` field. For example, if you specify `/api/someRoute`, the endpoint will be registered at `/api/someRoute`.
+
+### Validators
+
+- Below is an example of an array validator:
+
+```typescript
+import { mutation } from './_generated/server';
+import { v } from 'convex/values';
+
+export default mutation({
+	args: {
+		simpleArray: v.array(v.union(v.string(), v.number()))
+	},
+	handler: async (ctx, args) => {
+		//...
+	}
+});
+```
+
+- Below is an example of a schema with validators that codify a discriminated union type:
+
+```typescript
+import { defineSchema, defineTable } from 'convex/server';
+import { v } from 'convex/values';
+
+export default defineSchema({
+	results: defineTable(
+		v.union(
+			v.object({
+				kind: v.literal('error'),
+				errorMessage: v.string()
+			}),
+			v.object({
+				kind: v.literal('success'),
+				value: v.number()
+			})
+		)
+	)
+});
+```
+
+- Always use the `v.null()` validator when returning a null value. Below is an example query that returns a null value:
+
+```typescript
+import { query } from './_generated/server';
+import { v } from 'convex/values';
+
+export const exampleQuery = query({
+	args: {},
+	handler: async (ctx, args) => {
+		console.log('This query returns a null value');
+		return null;
+	}
+});
+```
+
+- Here are the valid Convex types along with their respective validators:
+  Convex Type | TS/JS type | Example Usage | Validator for argument validation and schemas | Notes |
+  | ----------- | ------------| -----------------------| -----------------------------------------------| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+  | Id | string | `doc._id` | `v.id(tableName)` | |
+  | Null | null | `null` | `v.null()` | JavaScript's `undefined` is not a valid Convex value. Functions the return `undefined` or do not return will return `null` when called from a client. Use `null` instead. |
+  | Int64 | bigint | `3n` | `v.int64()` | Int64s only support BigInts between -2^63 and 2^63-1. Convex supports `bigint`s in most modern browsers. |
+  | Float64 | number | `3.1` | `v.number()` | Convex supports all IEEE-754 double-precision floating point numbers (such as NaNs). Inf and NaN are JSON serialized as strings. |
+  | Boolean | boolean | `true` | `v.boolean()` |
+  | String | string | `"abc"` | `v.string()` | Strings are stored as UTF-8 and must be valid Unicode sequences. Strings must be smaller than the 1MB total size limit when encoded as UTF-8. |
+  | Bytes | ArrayBuffer | `new ArrayBuffer(8)` | `v.bytes()` | Convex supports first class bytestrings, passed in as `ArrayBuffer`s. Bytestrings must be smaller than the 1MB total size limit for Convex types. |
+  | Array | Array | `[1, 3.2, "abc"]` | `v.array(values)` | Arrays can have at most 8192 values. |
+  | Object | Object | `{a: "abc"}` | `v.object({property: value})` | Convex only supports "plain old JavaScript objects" (objects that do not have a custom prototype). Objects can have at most 1024 entries. Field names must be nonempty and not start with "$" or "_". |
+| Record      | Record      | `{"a": "1", "b": "2"}` | `v.record(keys, values)`                       | Records are objects at runtime, but can have dynamic keys. Keys must be only ASCII characters, nonempty, and not start with "$" or "\_". |
+
+### Function registration
+
+- Use `internalQuery`, `internalMutation`, and `internalAction` to register internal functions. These functions are private and aren't part of an app's API. They can only be called by other Convex functions. These functions are always imported from `./_generated/server`.
+- Use `query`, `mutation`, and `action` to register public functions. These functions are part of the public API and are exposed to the public Internet. Do NOT use `query`, `mutation`, or `action` to register sensitive internal functions that should be kept private.
+- You CANNOT register a function through the `api` or `internal` objects.
+- ALWAYS include argument and return validators for all Convex functions. This includes all of `query`, `internalQuery`, `mutation`, `internalMutation`, `action`, and `internalAction`. If a function doesn't return anything, include `returns: v.null()` as its output validator.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/bmdavis419)
-> This is a context snippet only. You'll also want the standalone SKILL.md file — [download at TomeVault](https://tomevault.io/claim/bmdavis419)
-<!-- tomevault:4.0:windsurf_rules:2026-04-09 -->
+> Source: [bmdavis419/effect-streams-scratchwork](https://github.com/bmdavis419/effect-streams-scratchwork) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-05 -->
