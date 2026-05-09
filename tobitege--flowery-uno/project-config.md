@@ -1,73 +1,111 @@
 ---
 trigger: always_on
-description: This file captures learnings and patterns discovered during Flowery.Uno development for future reference.
+description: **THIS IS NON-NEGOTIABLE. VIOLATION OF THIS RULE IS UNACCEPTABLE.**
 ---
 
-# Flowery.Uno MANDATORY Development Notes
+# Agent Rules
 
-This file captures learnings and patterns discovered during Flowery.Uno development for future reference.
+## Agent Behavior
 
-## 🚨 READ THIS FIRST (top crash-prevention rules)
+### CRITICAL: THE 5-ITERATION RULE (Communication Before Scope Changes)
 
-If you only read the first ~50 lines of this file, read this section. These rules prevent the most common Uno “mystery” runtime crashes:
+**THIS IS NON-NEGOTIABLE. VIOLATION OF THIS RULE IS UNACCEPTABLE.**
 
-- **ContentControls that rebuild `Content`**: ALWAYS detach before re-parenting.
-  - Pattern: `_userContent = Content; Content = null; BuildVisualTree(); _presenter.Content = _userContent;`
-  - See **“UIElement can only have one parent”** (search for `### 19`).
-- **Never bind a `ContentPresenter` back to `this.Content`** in a control that later sets `Content = _rootGrid` (creates self-parenting / re-parenting issues).
-  - See the anti-pattern example under `### 19`.
-- **Don’t use `PathIcon` dynamically in code-behind** (Uno can throw `ArgumentException: Value does not fall within the expected range.`).
-  - Use `Microsoft.UI.Xaml.Shapes.Path` or `Flowery.Helpers.FloweryPathHelpers` instead (search for `### 18`).
-- **Use `DaisyControlExtensions.Icon` for button icons** - This is the GOLD STANDARD (see section below).
-- **Ambiguous type names**: `Path`, `Color`, etc. often need aliasing/qualification.
-  - Example: `using Path = Microsoft.UI.Xaml.Shapes.Path;` (search for `### 12`).
-- **Do NOT merge `ms-appx:///uno.toolkit.*/Styles/Generic.xaml`**.
-  - `Uno.Toolkit.*` packages do not ship `Styles/Generic.xaml`. Adding that dictionary will fail to load resources and can crash at startup. ShadowContainer only needs the package reference.
+**The Problem This Solves**: The AI often starts a targeted fix, then mid-execution decides "this is too complex, let me simplify/rewrite this" — and proceeds to rewrite several hundred lines of code the user never asked to touch. This creates massive diffs, introduces regressions, and destroys context.
 
-## Neumorphic Takeaways
+**The Rule**: During multi-tool inference (not chat with user), if an approach isn't working after **5 consecutive attempts**, the AI MUST:
 
-For the distilled, field-tested fixes and integration notes from recent stability work, see `llms-static/neumorphic.md` → **Field-Tested Integration Notes (Session Takeaways)**.
+1. **STOP making unsupervised changes**
+2. **Report what was attempted** and why it's not working
+3. **ASK the user** before trying a different approach or expanding scope
+4. **NEVER silently change direction** - approach/scope changes require user awareness
 
-### ThemeShadow + Elevation Learnings
+**Clarification (Scope of This Rule)**: This rule is about **unsupervised approach changes during the AI's own multi-tool execution**. It does **NOT** limit interactive back-and-forth with the user. If the user is engaged and responding, keep working, but still **explicitly communicate** any approach/scope change before doing it.
 
-- **ThemeShadow requires explicit receivers**: add the receiver to `ThemeShadow.Receivers` (see Uno tests in `!uno/src/SamplesApp/UITests.Shared/Windows_UI_Xaml_Media/ThemeShadowTests`).
-- **Translation.Z defines shadow depth**: the casting element must have a `Translation` Z (e.g., `0,0,6`).
-- **CornerRadius is respected** when ThemeShadow is applied directly to `Border` or `Rectangle` with radius properties (no custom masking required).
-- **WASM/Skia elevation**: for rounded shadows, apply `SetElevation` to the template’s `Border` (e.g., `ButtonBorder`), not the `Button` control itself.
+**Specifically FORBIDDEN behaviors**:
 
-## Pitfalls (Session)
+- Silently deciding "this code is messy, let me refactor it while I'm here"
+- Expanding from a 10-line fix to a 200-line rewrite **without informing the user first**
+- Switching fundamental approaches (e.g., Grid → Canvas, inheritance → composition) mid-execution **without asking**
+- "Simplifying" code by rewriting large sections the user didn't request
 
-These are compile-time issues that should be avoided up front:
+**What this rule does NOT prevent**:
 
-- Do not use `??` with different operand types (e.g., `Border ?? DaisyCard`). Cast to a shared base like `FrameworkElement` first.
-- Do not assign `UIElement` to `FrameworkElement` without an explicit cast and a null/type check.
-- Do not reference non-existent WinUI/Uno members like `FrameworkElement.IsVisibleChanged`; use supported events or `RegisterPropertyChangedCallback`.
-- Do not access internal or private helpers (e.g., `PlatformCompatibility`) from outside their assembly.
-- Do not set `null` into non-nullable reference types; update the type or use a nullable value.
-- Do not use `x:Bind` paths that are not real properties on the page (e.g., `Localization`); ensure the property exists and follow the required localization binding pattern.
+- Continuing to help when the user is actively engaged in conversation
+- Discussing options and alternatives with the user
+- Making changes the user explicitly requests or approves
+- Asking clarifying questions
+- **Fixing root causes in other files** — but TELL the user first (e.g., "The bug in `DaisyButton` is caused by logic in `DaisyControlExtensions`. I'll need to fix it there. Proceed?")
+
+**Reconciling "Fix Root Cause" with "Minimal Changes"**:
+
+These are NOT contradictory. "Fix root cause" means don't apply band-aids. "Minimal changes" means don't refactor unrelated code.
+
+- ✅ **DO**: Fix the root cause, even if it spans multiple files — just mention what you're doing (e.g., "Fixing this in `DaisyButton.cs` and `DaisyControlExtensions.cs`")
+- ✅ **DO**: Make the minimal change needed in each file
+- ❌ **DON'T**: Refactor unrelated code "while you're there"
+- ❌ **DON'T**: Expand a bug fix into an architecture overhaul without discussion
+
+**When to pause and ask** (not for every file, but for significant scope changes):
+
+- The fix grew from ~10 lines to ~200+ lines
+- You're about to rewrite a core abstraction or change a fundamental approach
+- The "fix" would touch files completely unrelated to the reported issue
+
+**Rationale**: The user asked for X. Deliver X. If X seems hard and Y seems easier, **ASK** before switching to Y.
+
+**What counts as an "attempt"**:
+
+- Each code modification targeting the same issue = 1 attempt
+- User feedback/approval resets the counter (user is now involved in the decision)
+- Scope expansion without **informing the user** = immediate violation (no 3-attempt grace period)
+- If the user is actively engaged in conversation, continue normally; the "3 attempts" threshold only applies to **unsupervised** approach changes.
 
 ---
 
-## WASM/Browser (Skia) Heads-Up (Session)
+### Subagents
 
-These are the practical fixes and gotchas encountered when getting the Browser head running with Skia:
+- ALWAYS wait for all subagents to complete before yielding.
+- Spawn subagents automatically when:
+- Parallelizable work (e.g., install + verify, npm test + typecheck, multiple tasks from plan)
+- Long-running or blocking tasks where a worker can run independently.
+- Isolation for risky changes or checks
 
-- Use `Microsoft.NET.Sdk.WebAssembly` for the Browser head when using `Uno.WinUI.Runtime.Skia.WebAssembly.Browser`. Do NOT reference `Uno.WinUI.Runtime.WebAssembly` (triggers `UNOB0017`).
-- Target `net9.0` with `RuntimeIdentifier=browser-wasm` and run via `dotnet run` on the project (not the output folder) to avoid `hostpolicy.dll` self-contained errors.
-- Use `HostBuilder.UseWebAssembly()` directly; avoid reflection-based host builder hacks (inaccessible method errors).
-- Fix culture crashes by disabling invariant globalization and including ICU data:
-  - `<InvariantGlobalization>false</InvariantGlobalization>`
-  - `<WasmIncludeFullIcuData>true</WasmIncludeFullIcuData>`
-- Keep SkiaSharp versions aligned across managed + native:
-  - `SkiaSharp` and `SkiaSharp.NativeAssets.WebAssembly` MUST match (e.g., `3.119.1`) or you will hit undefined symbol errors.
-- Static web assets duplicates (library layout + root assets) cause:
-  - `Two assets found targeting the same path with incompatible asset kinds`
-  - Fix by disabling root asset copies for `net9.0` library projects and using `ms-appx:///Flowery.Uno.Gallery/Assets/...` paths.
-  - Add a Browser-head build target that `RemoveDuplicates` on `@(UnoAllCopyToOutputItems)` before `_UnoAssetsGetCopyToPublishDirectoryItems`.
-- CSP warnings (workers, `unsafe-eval`) and `WEBGL_invalid_enum` messages are expected in debug and are not fatal.
-- Keep Browser script ports aligned (5236) to avoid mismatched logs vs URL.
-- `ms-appx:///` is the correct scheme for Content assets in Uno (including WASM); it is supported by `Image`/`BitmapImage`.
-- Referencing assets in code can use `ms-appx:///Assets/...` or `ms-appx:///AssemblyName/Assets/...` and can be bound as a string.
+---
+
+### CRITICAL: NEVER REVERT OR SWITCH APPROACHES WITHOUT ASKING
+
+**THIS IS NON-NEGOTIABLE. VIOLATION OF THIS RULE IS UNACCEPTABLE.**
+
+When a solution is not working as expected:
+
+1. **DO NOT revert code** without explicit user approval
+2. **DO NOT switch to a different approach** without explicit user approval
+3. **DO NOT "try another thing"** - ASK FIRST what the user wants to do
+4. **STOP and present options** - Let the user decide the path forward
+
+**Examples of FORBIDDEN behavior:**
+
+- NO: "The PNGs aren't loading, let me switch back to SVGs" (without asking)
+- NO: "This approach has issues, I'll try a different one" (without asking)
+- NO: "Let me revert this change since it's not working" (without asking)
+
+**Required behavior:**
+
+- YES: "The PNGs aren't loading. Options: A) Switch to SVGs, B) Fix PNG deployment, C) Something else. What do you prefer?"
+- YES: "This isn't working as expected. Should I revert or try to fix it?"
+- YES: "I see Issue X. Before I change anything, what's your preference?"
+
+**Rationale**: The user may have additional context, may prefer to debug the current approach, or may want to test on other platforms first. Unilateral reversions waste time and destroy progress.
+
+---
+
+### "No Change" Is a Valid Outcome
+
+When the user reports an issue or asks for investigation **without specifying a required change**:
+
+1. **Investigate first** - Understand the current behavior and why it exists
+2. **Assess whether a change is needed** - Sometimes the behavior is correct/intentional
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
