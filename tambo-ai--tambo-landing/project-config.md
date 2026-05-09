@@ -1,144 +1,165 @@
 ---
 trigger: always_on
-description: description: Third-party integration guidelines (Sanity, Shopify, HubSpot, etc.)
+description: Provides an `AbortSignal` that triggers when the component's cache scope expires.
 ---
 
 ---
-description: Third-party integration guidelines (Sanity, Shopify, HubSpot, etc.)
+description: Project overview and cross-cutting concerns
 globs: *.tsx, *.jsx, *.css, *.js, *.ts
 ---
 
-# Third-Party Integration Guidelines
+# Satus Project Guidelines
 
-## Sanity CMS Integration
+## Technology Stack
 
-### Configuration & Setup
-Use CDN for performance with stega for visual editing. Store credentials securely in environment variables. All Sanity files are organized in `/integrations/sanity/` directory.
+- **Next.js 16.0.1** - App Router with Turbopack support and Cache Components
+- **React 19.2.0** - Latest features including `<Activity />`, `useEffectEvent`, and `cacheSignal`
+- **React Compiler enabled** - Automatically optimizes most component re-renders and memoization; manual memoization is rarely needed
+- **TypeScript** - Strict mode enabled
+- **Tailwind CSS 4.1.16** - CSS-first configuration
+- **Biome 2.3.3** - Linting and formatting
+- **Bun** - JavaScript runtime and package manager
 
-```typescript
-// In integrations/sanity/client.ts
-export const client = createClient({
-  projectId: process.env.NEXT_PUBLIC_SANITY_PROJECT_ID,
-  dataset: process.env.NEXT_PUBLIC_SANITY_DATASET,
-  apiVersion: '2024-03-15',
-  useCdn: true, // Use CDN for better performance
-  token: process.env.SANITY_API_WRITE_TOKEN, // Write token for editing
-  stega: {
-    studioUrl: process.env.NEXT_PUBLIC_SANITY_STUDIO_URL || '/studio',
-  },
-})
+## React 19.2 New Features
+
+### 1. `<Activity />` Component
+Manage off-screen component visibility and defer updates for better performance.
+
+```tsx
+import { Activity } from 'react'
+
+// Hide tab content when not visible
+<Activity mode={isActive ? 'visible' : 'hidden'}>
+  <ExpensiveComponent />
+</Activity>
 ```
 
-### Schema Management
+**Use Cases:**
+- Tab systems or carousels
+- Off-screen WebGL scenes (3D graphics, shaders)
+- Accordion components
+- Drawer/modal systems
+- Image galleries and carousels
 
-#### Content Modelling
-- Unless explicitly modelling web pages or app views, create content models for what things are, not what they look like in a front-end
-- For example, consider the `status` of an element instead of its `color`
+**Benefits:**
+- Pre-render content without performance impact
+- Automatic effect cleanup when hidden
+- Better resource management for complex UIs
 
-#### Basic Schema Types
-- ALWAYS use the `defineType`, `defineField`, and `defineArrayMember` helper functions
-- ALWAYS write schema types to their own files and export a named `const` that matches the filename
-- ONLY use a `name` attribute in fields unless the `title` needs to be something other than a title-case version of the `name`
-- ANY `string` field type with an `options.list` array with fewer than 5 options must use `options.layout: "radio"`
-- ANY `image` field must include `options.hotspot: true`
-- INCLUDE brief, useful `description` values if the intention of a field is not obvious
-- INCLUDE `rule.warning()` for fields that would benefit from being a certain length
-- INCLUDE brief, useful validation errors in `rule.required().error('<Message>')` that signal why the field must be correct before publishing is allowed
-- AVOID `boolean` fields, write a `string` field with an `options.list` configuration
-- NEVER write single `reference` type fields, always write an `array` of references
-- CONSIDER the order of fields, from most important and relevant first, to least often used last
+### 2. `useEffectEvent` Hook
+Separate event logic from effect dependencies to prevent unnecessary re-runs.
 
-```ts
-// ./src/schemaTypes/lessonType.ts
-import {defineField, defineType} from 'sanity'
+```tsx
+import { useEffect, useEffectEvent } from 'react'
 
-export const lessonType = defineType({
-  name: 'lesson',
-  title: 'Lesson',
-  type: 'document',
-  fields: [
-    defineField({
-      name: 'title',
-      type: 'string',
-    }),
-    defineField({
-      name: 'categories',
-      type: 'array',
-      of: [defineArrayMember({type: 'reference', to: {type: 'category'}})],
-    }),
-  ],
-})
-```
+function Component({ url, theme }) {
+  const onConnected = useEffectEvent(() => {
+    showNotification('Connected!', theme) // theme changes won't trigger reconnect
+  })
 
-#### Schema Type with Custom Input Components
-If a schema type has input components, they should be colocated with the schema type file. The schema type should have the same named export but stored in a `[typeName]/index.ts` file:
-
-```ts
-// ./src/schemaTypes/seoType/index.ts
-import {defineField, defineType} from 'sanity'
-import seoInput from './seoInput'
-
-export const seoType = defineType({
-  name: 'seo',
-  title: 'SEO',
-  type: 'object',
-  components: { input: seoInput }
-  // ...
-})
-```
-
-#### No Anonymous Reusable Schema Types
-ANY schema type that benefits from being reused in multiple document types should be registered as its own custom schema type.
-
-```ts
-// ./src/schemaTypes/blockContentType.ts
-import {defineField, defineType} from 'sanity'
-
-export const blockContentType = defineType({
-  name: 'blockContent',
-  title: 'Block content',
-  type: 'array',
-  of: [defineField({name: 'block',type: 'block'})],
-})
-```
-
-#### Decorating Schema Types
-Every `document` and `object` schema type should:
-
-- Have an `icon` property from `@sanity/icons`
-- Have a customized `preview` property that shows rich contextual details about the document
-- Use `groups` when the schema type has more than a few fields to collate related fields and only show the most important group by default. These `groups` should use the icon property as well.
-- Use `fieldsets` with `options: {columns: 2}` if related fields could be grouped visually together, such as `startDate` and `endDate`
-
-### Visual Editing
-Always add `data-sanity` attributes for visual editing. Use SanityContextProvider for document access. Implement proper draft mode handling. Import from `/integrations/sanity` directory.
-
-```typescript
-import { useSanityContext, RichText } from '~/integrations/sanity'
-
-export function MyComponent() {
-  const { document } = useSanityContext()
-  
-  return (
-    <div data-sanity={document._id}>
-      <h1 data-sanity="title">{document.title}</h1>
-      <div data-sanity="content">
-        <RichText content={document.content} />
-      </div>
-    </div>
-  )
+  useEffect(() => {
+    const connection = createConnection(url)
+    connection.on('connected', onConnected)
+    connection.connect()
+    return () => connection.disconnect()
+  }, [url]) // Only reconnect when url changes
 }
 ```
 
-### Data Fetching
-Use proper perspective for draft vs published content. Implement caching strategies for performance. Handle errors gracefully with try-catch. Import from `/integrations/sanity` directory. Use `~/libs/metadata` helpers for SEO optimization. All `sanityFetch` calls automatically use `cacheSignal()` for request cleanup.
+**Use Cases:**
+- Complex event handlers with multiple dependencies
+- Scroll/transform callbacks
+- WebGL mouse/interaction handlers
+- Animation callbacks
 
-```typescript
-// In integrations/sanity/queries.ts
-import { sanityFetch } from './live'
-import { generateSanityMetadata } from '~/libs/metadata'
+**Benefits:**
+- Reduces unnecessary effect re-runs
+- Cleaner dependency arrays
+- Better separation of concerns
 
-// Use sanityFetch (automatically includes cacheSignal)
+### 3. `cacheSignal` (Server Components Only)
+Provides an `AbortSignal` that triggers when the component's cache scope expires.
+
+```tsx
+import { cacheSignal } from 'react'
+
+async function fetchUserData(id: string) {
+  const signal = cacheSignal() // Auto-aborts on cache expiry
+  const response = await fetch(`/api/users/${id}`, { signal })
+  return response.json()
+}
+```
+
+**Use Cases:**
+- Sanity CMS queries
+- Shopify API calls
+- Any server component data fetching
+- Replace custom timeout logic with automatic cleanup
+
+**Benefits:**
+- Automatic cleanup of stale requests
+- Better resource management
+- Simpler than manual AbortController
+
+### 4. Performance Tracks in Chrome DevTools
+React 19.2 integrates custom performance tracks into Chrome DevTools:
+- **Scheduler Track:** Displays React's workload prioritization
+- **Components Track:** Shows component hierarchy and timing
+
+**Usage:** Open Chrome DevTools → Performance tab → Record a profile → Look for React-specific tracks
+
+## File Organization
+
+```
+├── app/                  # Next.js pages and routes
+├── components/           # Reusable UI components
+├── hooks/                # Custom React hooks
+├── integrations/         # Third-party integrations
+├── libs/                 # Utility libraries
+│   ├── cleanup-integrations.ts  # Remove unused integrations
+│   ├── fetch-with-timeout.ts    # API resilience
+│   ├── metadata.ts              # SEO/metadata helpers
+│   ├── validate-env.ts          # Environment validation
+│   └── ...
+├── orchestra/            # Debug tools (dev-only)
+├── styles/               # Styling configuration
+└── webgl/                # WebGL and 3D graphics
+```
+
+## Cross-Cutting Concerns
+
+### React Compiler & Memoization
+
+**React Compiler is enabled and handles ALL optimization automatically.**
+
+- **DO NOT use `useMemo`, `useCallback`, or `React.memo` in new code.**
+- The compiler optimizes all component re-renders, memoization, and dependencies automatically.
+- Only use manual memoization if you encounter a proven edge case where the compiler cannot optimize (extremely rare).
+- If you see these in existing code, they can likely be removed safely.
+- **CRITICAL EXCEPTION: Use `useRef` for object instantiation** - Creating new object instances on every render creates new references that trigger effects, causing infinite loops.
+- Refer to the [React Compiler documentation](https://react.dev/reference/react/compiler) for edge cases.
+
+```tsx
+// ❌ DON'T: Manual memoization for simple calculations (compiler handles this)
+const memoizedValue = useMemo(() => computeExpensive(a, b), [a, b])
+const memoizedCallback = useCallback(() => doSomething(a), [a])
+
+// ✅ DO: Let React Compiler optimize automatically
+const value = computeExpensive(a, b)
+const handleClick = () => doSomething(a)
+
+// ⚠️ EXCEPTION: Object instantiation MUST use useRef
+// ❌ DON'T: This causes infinite re-renders when passed to effects/deps
+const instance = new SomeClass()
+
+// ✅ DO: Use useRef for object instantiation
+const instanceRef = useRef<SomeClass | null>(null)
+if (!instanceRef.current) {
+  instanceRef.current = new SomeClass(params)
+}
+const instance = instanceRef.current
+```
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
