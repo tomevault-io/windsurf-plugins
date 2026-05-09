@@ -1,117 +1,157 @@
 ---
 trigger: always_on
-description: Table element accessibility compliance
+description: All JSON templates must follow this exact structure:
 ---
 
-# Table Element Accessibility Standards
+# Templates
 
-Ensures table elements follow WCAG compliance and provide proper structure for screen reader navigation and data relationships.
+All JSON templates must follow this exact structure:
 
-<rule>
-name: table_accessibility_standards
-description: Enforce table element accessibility standards per WCAG 1.3.1 Info and Relationships requirements
-filters:
-  - type: file_extension
-    pattern: "\\.(vue|jsx|tsx|html|liquid|php|js|ts)$"
+## Required Schema
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["sections"],
+  "properties": {
+    "sections": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-zA-Z0-9_-]+$": {
+          "type": "object",
+          "required": ["type"],
+          "properties": {
+            "type": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]+$"
+            },
+            "settings": {
+              "type": "object"
+            },
+            "blocks": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["type"],
+                "properties": {
+                  "type": {
+                    "type": "string"
+                  },
+                  "settings": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "order": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}
+```
 
-actions:
-  - type: enforce
-    conditions:
-      # Table headers must use th elements
-      - pattern: "(?i)<table[^>]*>.*<td[^>]*>.*</td>.*<td[^>]*>.*</td>"
-        pattern_negate: "<th[^>]*>"
-        message: "Data tables must use th elements for headers. Use th for header cells and td for data cells."
+## Template Structure Rules
 
-      # Missing scope attribute on th elements
-      - pattern: "(?i)<th[^>]*>"
-        pattern_negate: "scope=\"(col|row|colgroup|rowgroup)\""
-        message: "Table header cells should have scope attribute set to 'col', 'row', 'colgroup', or 'rowgroup' for proper associations."
+- Every template must have a `sections` object
+- Section keys must be alphanumeric with dashes/underscores
+- Each section must have a `type` property
+- `settings` and `blocks` are optional
+- `order` array defines section sequence
+- Blocks must have a `type` property
 
-      # Data cells not associated with headers
-      - pattern: "(?i)<td[^>]*>"
-        pattern_negate: "(scope=\"(col|row)\"|headers=\"[^\"]+\"|<th[^>]*scope)"
-        message: "Table data cells must be associated with their corresponding header cells via scope or headers attributes."
 
-      # Layout table with headers
-      - pattern: "(?i)<table[^>]*class=\"[^\"]*(?:layout|grid|position)[^\"]*\"[^>]*>"
-        pattern_negate: "(role=\"table\"|data-table)"
-        message: "Layout tables should not contain header elements. Use role='table' for data tables or remove headers from layout tables."
+## Template Types
 
-      # Missing caption or accessible name
-      - pattern: "(?i)<table[^>]*>"
-        pattern_negate: "(<caption|aria-label|aria-labelledby)"
-        message: "Data tables should have a caption element or aria-label/aria-labelledby for accessibility."
+**Standard Templates:**
+- `index.json` - Homepage
+- `product.json` - Product pages
+- `collection.json` - Collection pages
+- `page.json` - Static pages
+- `blog.json` - Blog listing
+- `article.json` - Blog posts
+- `cart.json` - Shopping cart
+- `search.json` - Search results
 
-      # Empty caption
-      - pattern: "(?i)<caption[^>]*>\\s*</caption>"
-        message: "Table caption should contain meaningful text describing the table's purpose."
+**Alternate Templates:**
+Alternative templates may exist for any of the standard templates, following the structure `template-name.template-suffix.template-file-type`, for example: `product.alternate.json`
 
-      # Generic caption text
-      - pattern: "(?i)<caption[^>]*>\\s*(table|data|information)\\s*</caption>"
-        message: "Table caption should be specific and descriptive, not generic."
+## Valid Template Examples
 
-      # Missing table structure elements
-      - pattern: "(?i)<table[^>]*>.*<tr[^>]*>.*<td[^>]*>"
-        pattern_negate: "(<thead|<tbody|<tfoot)"
-        message: "Complex tables should use thead, tbody, and tfoot elements for proper structure."
+**Product Template:**
+```json
+{
+  "sections": {
+    "header": {
+      "type": "header"
+    },
+    "main": {
+      "type": "main-product",
+      "settings": {
+        "show_vendor": true,
+        "show_sku": false,
+        "media_size": "medium"
+      },
+      "blocks": {
+        "title": {
+          "type": "title",
+          "settings": {}
+        },
+        "price": {
+          "type": "price",
+          "settings": {
+            "show_compare_at": true
+          }
+        },
+        "variant_picker": {
+          "type": "variant_picker",
+          "settings": {
+            "picker_type": "dropdown"
+          }
+        }
+      },
+      "block_order": ["title", "price", "variant_picker"]
+    },
+    "footer": {
+      "type": "footer"
+    }
+  },
+  "order": ["header", "main", "footer"]
+}
+```
 
-      # Incorrect role usage
-      - pattern: "(?i)role=\"(table|rowgroup|cell|columnheader|rowheader)\""
-        pattern_negate: "(<table|<tbody|<thead|<tfoot|<td|<th)"
-        message: "Table roles should only be used when native HTML table elements are not available."
-
-      # Missing headers attribute for complex associations
-      - pattern: "(?i)<td[^>]*>"
-        pattern_negate: "(headers=\"[^\"]+\"|scope=\"(col|row)\")"
-        message: "Data cells in complex tables should have headers attribute referencing their associated header IDs."
-
-      # Missing ID on header cells for headers attribute
-      - pattern: "(?i)<td[^>]*headers=\"[^\"]+\"[^>]*>"
-        pattern_negate: "<th[^>]*id=\"[^\"]+\"[^>]*>"
-        message: "Header cells referenced by headers attribute must have unique ID attributes."
-
-      # Nested tables without proper isolation
-      - pattern: "(?i)<table[^>]*>.*<table[^>]*>"
-        pattern_negate: "(role=\"table\"|aria-label|aria-labelledby)"
-        message: "Nested tables should have proper accessible names and structure to avoid confusion."
-
-      # Table without proper row structure
-      - pattern: "(?i)<table[^>]*>"
-        pattern_negate: "<tr[^>]*>"
-        message: "Tables must contain tr (table row) elements for proper structure."
-
-      # Missing table role when using ARIA
-      - pattern: "(?i)role=\"(rowgroup|cell|columnheader|rowheader)\""
-        pattern_negate: "role=\"table\""
-        message: "When using table ARIA roles, the table element must have role='table'."
-
-  - type: suggest
-    message: |
-      **WCAG 1.3.1 Table Accessibility Requirements:**
-
-      **Table Headers:**
-      - **Header Tag:** Table headers MUST be designated with `th` elements
-      - **Meaningful Header:** Header text MUST accurately describe the category of corresponding data cells
-      - **Header Associations:** Data cells MUST be associated with their corresponding header cells
-      - **Scope Attribute:** Use `scope="col"` and `scope="row"` for simple tables
-      - **Complex Associations:** Use `headers` and `id` attributes for complex header relationships
-
-      **Tabular Data:**
-      - **Tables:** Tabular data SHOULD be represented in a `table` element
-      - **Data Relationships:** WCAG 1.3.1 requires data to be associated with their labels
-
-      **Caption Requirements:**
-      - **Caption:** Data tables SHOULD have a `caption` element or accessible name
-      - **Meaningful Caption:** Caption SHOULD describe the table's identity or purpose
-      - **Unique Caption:** Each table SHOULD have a unique caption within the page context
-
-      **Layout Tables:**
-      - **Avoid Layout Tables:** Tables SHOULD NOT be used for purely visual layout
-      - **No Headers in Layout:** Layout tables MUST NOT contain header elements
-
-      **HTML Markup Requirements:**
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+**Collection Template:**
+```json
+{
+  "sections": {
+    "header": {
+      "type": "header"
+    },
+    "collection-banner": {
+      "type": "collection-banner",
+      "settings": {
+        "show_collection_description": true,
+        "show_collection_image": false
+      }
+    },
+    "main": {
+      "type": "main-collection-product-grid",
+      "settings": {
+        "products_per_page": 24,
+        "columns_desktop": 4,
+        "columns_mobile": 2
+      }
+    }
+  },
+  "order": ["header", "collection-banner", "main"]
+}
+```
 
 ---
 > Source: [Shopify/horizon](https://github.com/Shopify/horizon) — distributed by [TomeVault](https://tomevault.io).
