@@ -1,11 +1,9 @@
 ---
 trigger: always_on
-description: DO NOT, UNDER ANY CIRCUMSTANCES use mocks or patches unless absolutely necessary.
+description: All imports should be relative to ./src - this means NEVER `from src.x import y` - ALWAYS `from x import y`
 ---
 
-DO NOT, UNDER ANY CIRCUMSTANCES use mocks or patches unless absolutely necessary.
-
-Avoid mocking classes and patching functions wherever possible. Mocking functionality for testing is a cancer that needs to be excised - it defeats the entire point of tests.
+All imports should be relative to ./src - this means NEVER `from src.x import y` - ALWAYS `from x import y`
 
 ---
 > Source: [JamesonRGrieve/ServerFramework](https://github.com/JamesonRGrieve/ServerFramework) — distributed by [TomeVault](https://tomevault.io).
