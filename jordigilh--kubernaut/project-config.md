@@ -1,148 +1,170 @@
 ---
 trigger: always_on
-description: Testing strategy and patterns for kubernaut's defense-in-depth approach
+description: AI/ML components and integration patterns for kubernaut
 ---
 
 
-# Testing Strategy for Kubernaut
+# AI/ML Guidelines for Kubernaut
 
-## 🔑 **CRITICAL: KUBERNETES CLIENT MANDATE**
+## 🤖 **AI Service Architecture**
 
-**AUTHORITATIVE RULE**: All services that interact with Kubernetes MUST use the approved K8s client interface:
+Kubernaut integrates multiple AI providers through a unified interface pattern.
 
-| Test Tier | MANDATORY Interface | Package |
-|-----------|---------------------|---------|
-| **Unit Tests** | **Fake K8s Client** | `sigs.k8s.io/controller-runtime/pkg/client/fake` |
-| **Integration Tests** | Real K8s API (envtest/KIND) | `sigs.k8s.io/controller-runtime/pkg/client` |
-| **E2E Tests** | Real K8s API (OCP/KIND) | `sigs.k8s.io/controller-runtime/pkg/client` |
+**CRITICAL**: Follow AI development methodology in [12-ai-ml-development-methodology.mdc](mdc:.cursor/rules/12-ai-ml-development-methodology.mdc) for TDD and interface management.
 
-**❌ FORBIDDEN**: Custom `MockK8sClient` implementations - use fake client instead
-**✅ APPROVED**: `fake.NewClientBuilder()` for all unit tests requiring K8s interaction
+### **Interface Reuse Principles - MANDATORY**
+- **FORBIDDEN**: Creating new AI interfaces - use existing `pkg/ai/llm.Client`
+- **MANDATORY**: Enhance existing AI clients rather than creating new ones
+- **INTEGRATION**: All AI components must integrate with main applications (`cmd/*/main.go`)
 
-**See**: [ADR-004: Fake Kubernetes Client for Unit Testing](mdc:docs/architecture/decisions/ADR-004-fake-kubernetes-client.md)
-
----
-
-## 📊 **Defense-in-Depth Testing Pyramid**
-
-### Coverage Targets: Per-Tier Testable Code Coverage (>=80%)
-
-**TDD Mandate**: Every business requirement MUST have a corresponding test. If a feature has no test, it risks not being implemented. Coverage is measured **per tier against the tier-specific code subset**.
-
-**Per-Tier Code Coverage** (AUTHORITATIVE):
-- **Unit**: >=80% of **unit-testable** code (pure logic: config, validators, scoring, builders, types)
-- **Integration**: >=80% of **integration-testable** code (I/O: reconciler, K8s clients, HTTP handlers, DB adapters)
-- **E2E**: >=80% of full service code (full stack execution)
-- **All Tiers**: >=80% merged (line-by-line dedup across all tiers)
-
-**Code Partitioning**: Each service defines `unit_exclude`/`int_include` patterns in `scripts/coverage/coverage_report.py` that partition code into unit-testable (pure logic) and integration-testable (I/O-dependent) subsets. See TESTING_GUIDELINES.md v2.7.0 "Code Partitioning" section.
-
-**Measurement**: `make coverage-report` (runs `scripts/coverage/coverage_report.py`)
-
-**Business Requirement (BR) Coverage** - OVERLAPPING:
-- **Unit**: 70%+ of ALL BRs (maximum coverage foundation)
-- **Integration**: >50% of ALL BRs (critical interactions)
-- **E2E**: <10% BR coverage (essential user journeys)
-
-**Key**: Same BRs tested at multiple tiers (e.g., retry logic in unit, integration, AND E2E)
-
-**See**: [TESTING_GUIDELINES.md](mdc:docs/development/business-requirements/TESTING_GUIDELINES.md) for full coverage model
+### **Supported AI Providers**
+- **HolmesGPT**: Primary AI service ([pkg/ai/holmesgpt/client.go](mdc:pkg/ai/holmesgpt/client.go))
+- **OpenAI**: GPT-3.5, GPT-4 models
+- **Anthropic**: Claude models
+- **Azure OpenAI**: Enterprise OpenAI deployment
+- **AWS Bedrock**: Amazon's AI service
+- **Ollama**: Local LLM deployment
+- **Ramalama**: Local model serving
 
 ---
 
-## 🧪 **Test Tier Specifications**
+## 🔌 **Integration Patterns**
 
-### Unit Tests (70%+ BRs, >=80% Unit-Testable Code Coverage)
-
-**Location**: `test/unit/`
-**Purpose**: Extensive business logic validation covering ALL unit-testable business requirements
-**Execution**: `make test`
-**Framework**: **Ginkgo/Gomega BDD** (MANDATORY - no standard Go testing)
-**Confidence**: 85-90%
-
-**Mock Strategy**:
+### **Client Usage**
 ```go
-// ✅ CORRECT: Mock ONLY external dependencies
-var (
-    mockLLMProvider   *mocks.MockLLMProvider    // External: AI service
-    mockK8sClient     client.Client              // External: Use fake.NewClientBuilder()
-    mockVectorDB      *mocks.MockVectorDatabase  // External: Database
+// ✅ CORRECT: Use existing unified interface
+import "pkg/ai/llm"
 
-    // Use REAL business logic components
-    workflowBuilder   *engine.IntelligentWorkflowBuilder
-    safetyFramework   *platform.SafetyFramework
-    analyticsEngine   *insights.AnalyticsEngine
-)
+llmClient := llm.NewClient(config.LLM)
+response, err := llmClient.AnalyzeAlert(ctx, alertData)
+if err != nil {
+    return fmt.Errorf("AI analysis failed: %w", err)
+}
 ```
 
-**What to Mock**:
-- ✅ External APIs (LLM, HolmesGPT, OpenAI)
-- ✅ Databases (PostgreSQL, Vector DB, Redis)
-- ✅ Kubernetes API (use `fake.NewClientBuilder()`)
-- ✅ Network services (external HTTP/gRPC)
-
-**What to Keep Real**:
-- ✅ **ALL** business logic (`pkg/` code)
-- ✅ **ALL** internal algorithms
-- ✅ **ALL** business validators/analyzers/optimizers
-- ✅ **ALL** cross-package business interactions
-
-**See**: [Unit Test Patterns](mdc:docs/testing/TESTING_PATTERNS_QUICK_REFERENCE.md)
+### **Context Enrichment**
+- **Kubernetes Context**: Real-time cluster data ([pkg/platform/k8s/client.go](mdc:pkg/platform/k8s/client.go))
+- **Historical Context**: Action patterns from PostgreSQL ([pkg/ai/context/](mdc:pkg/ai/context/))
+- **Vector Context**: Similarity search from vector database
 
 ---
 
-### Integration Tests (<20% BRs, 50% Code Coverage)
+## ✅ **Response Validation**
 
-**Location**: `test/integration/`
-**Purpose**: Critical component interactions requiring real infrastructure
-**Execution**: `make test-integration-[service]`
-**Framework**: Ginkgo/Gomega BDD with envtest/KIND
-**Confidence**: 75-85%
+### **Validation Pipeline**
+1. **Structure Validation**: Ensure response matches expected schema
+2. **Confidence Scoring**: Evaluate AI recommendation confidence (>0.8 high, 0.5-0.8 medium, <0.5 low)
+3. **Safety Validation**: Check recommendations against safety policies
+4. **Business Rule Validation**: Ensure recommendations align with business logic
 
-**When to Write**:
-- ✅ CRD lifecycle with Kubernetes API
-- ✅ Database transaction coordination
-- ✅ Multi-service coordination flows
-- ✅ Complex state management requiring real infrastructure
+---
 
-**Mock Strategy**:
+## 🎯 **Workflow Engine AI Integration**
+
+### **Intelligent Workflow Builder**
+**Location**: [pkg/workflow/engine/intelligent_workflow_builder_impl.go](mdc:pkg/workflow/engine/intelligent_workflow_builder_impl.go)
+- AI-generated multi-step remediation workflows
+- Dynamic template generation based on alert patterns
+
+### **AI Condition Evaluator**
+**Location**: [pkg/workflow/engine/ai_condition_evaluator_impl.go](mdc:pkg/workflow/engine/ai_condition_evaluator_impl.go)
+- Intelligent step condition evaluation
+- Context-aware decision making
+
+---
+
+## 🗄️ **Vector Database Integration**
+
+### **Embedding Generation**
+**Location**: [pkg/ai/embedding/pipeline.go](mdc:pkg/ai/embedding/pipeline.go)
+- Support for multiple embedding models (OpenAI, HuggingFace)
+- Caching for performance optimization
+
+### **Vector Storage**
+**Location**: [pkg/storage/vector/](mdc:pkg/storage/vector/)
+- PostgreSQL with pgvector extension
+- Similarity search for historical patterns
+- RAG (Retrieval Augmented Generation) enhancement
+
+---
+
+## 🛡️ **Safety and Reliability**
+
+### **Fallback Strategies**
+1. **Primary**: HolmesGPT with full context
+2. **Secondary**: Direct LLM provider with reduced context
+3. **Fallback**: Rule-based decision making
+4. **Emergency**: Safe default actions only
+
+### **Circuit Breaker Pattern**
 ```go
-// ✅ ZERO MOCKS for business logic
-// ✅ Real K8s API via envtest
-// ✅ Real databases via testcontainers
-// ✅ Mock ONLY external services (LLM, external APIs)
+breaker := circuitbreaker.New(&Config{
+    Timeout:     30 * time.Second,
+    MaxRequests: 100,
+    Interval:    60 * time.Second,
+})
 ```
 
-**See**: [Integration Test Infrastructure](mdc:docs/testing/INTEGRATION_E2E_NO_MOCKS_POLICY.md)
+### **Rate Limiting**
+- Respect AI provider rate limits
+- Implement exponential backoff for retries
+- Monitor AI service usage and costs
+- Prioritize high-criticality alerts
 
 ---
 
-### E2E Tests (<10% BRs, 50% Code Coverage)
+## 🧪 **Testing Patterns**
 
-**Location**: `test/e2e/`
-**Purpose**: Essential customer-facing workflows in production-like environments
-**Execution**: `make test-e2e-[service]`
-**Framework**: Ginkgo/Gomega BDD with KIND/OCP clusters
-**Confidence**: 90-95%
+### **Mock Strategy**
+**AUTHORITY**: Follow comprehensive mock usage matrix in [03-testing-strategy.mdc](mdc:.cursor/rules/03-testing-strategy.mdc)
 
-**When to Write**:
-- ✅ Critical user journeys (onboarding, alert → remediation)
-- ✅ End-to-end security flows (auth, RBAC)
-- ✅ Production deployment verification
-- ✅ Cross-service full-stack scenarios
-
-**Mock Strategy**:
-```go
-// ✅ ZERO MOCKS for internal components
-// ✅ Real Kubernetes clusters (KIND/OCP)
-// ✅ Real databases and infrastructure
-// ✅ Mock LLM MAY be acceptable for test speed
-```
-
-**See**: [E2E Testing Strategy](mdc:docs/testing/DEFENSE_IN_DEPTH_CI_CD_STRATEGY.md)
+**AI-Specific**:
+- **Unit Tests**: Mock external AI APIs ([pkg/testutil/mocks/ai_mocks.go](mdc:pkg/testutil/mocks/ai_mocks.go))
+- **Business Logic**: Always test real AI analysis algorithms
+- **CI/CD**: Use mock LLM for reliability (`USE_MOCK_LLM=true`)
+- **Error Testing**: Include error simulation and timeout testing
 
 ---
 
+## 🎓 **Learning and Adaptation**
+
+### **Effectiveness Assessment**
+**Location**: [pkg/ai/insights/assessor.go](mdc:pkg/ai/insights/assessor.go)
+- Track action outcomes and effectiveness
+- Adjust confidence scores based on historical performance
+
+### **Pattern Discovery**
+**Location**: [pkg/intelligence/patterns/pattern_discovery_engine.go](mdc:pkg/intelligence/patterns/pattern_discovery_engine.go)
+- Identify recurring alert patterns
+- Discover correlation between actions and outcomes
+
+---
+
+## ⚡ **Performance Optimization**
+
+### **Caching Strategy**
+- Cache embedding generation results with TTL
+- Store frequent AI responses in Redis
+- Use distributed caching across instances
+
+### **Batch Processing**
+- Group similar alerts for batch AI analysis
+- Optimize context sharing across related requests
+- Balance latency vs. throughput based on criticality
+
+---
+
+## 📊 **Monitoring and Observability**
+
+### **AI Metrics**
+- Track AI response times and success rates
+- Monitor confidence score distributions
+- Measure action effectiveness over time
+- Alert on AI service degradation
+
+### **Cost Management**
+- Track AI service usage and costs per provider
+- Implement budget alerts and quotas
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
