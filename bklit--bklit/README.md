@@ -2,6 +2,8 @@
 
 > Source: [bklit/bklit](https://github.com/bklit/bklit) — distributed by [TomeVault](https://tomevault.io)
 
+Open-source Analytics SaaS
+
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
