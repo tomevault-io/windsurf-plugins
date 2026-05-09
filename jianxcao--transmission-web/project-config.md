@@ -1,307 +1,255 @@
 ---
 trigger: always_on
-description: 项目代码编写标准和最佳实践
+description: CSS 和样式规范（Tailwind 4 + Less）
 ---
 
 
-# 代码编写规范
+# CSS 和样式规范
 
-## 代码风格
+本项目使用 Tailwind 4 + Less + UnoCSS
 
-### 格式化
-- 使用 Prettier 进行代码格式化
-- 保存文件时自动格式化
-- 遵循项目的 ESLint 配置
-- 使用 2 空格缩进
+## 样式优先级
 
-### 命名规范
-```typescript
-// ✅ 组件命名：PascalCase
-AppHeader.vue
-SettingsDialog.vue
-TorrentList.vue
-
-// ✅ 文件夹命名：PascalCase（组件文件夹）
-components/TorrentDetail/
-components/CanvasList/
-
-// ✅ Composables：use + PascalCase
-useVirtualList.ts
-useCommonViewport.ts
-useTorrentFilter.ts
-
-// ✅ Store 文件：camelCase + Store 后缀
-torrentStore.ts
-sessionStore.ts
-settingStore.ts
-
-// ✅ 工具函数：camelCase
-formatBytes.ts
-parseDate.ts
-calculateProgress.ts
-
-// ✅ 常量：UPPER_SNAKE_CASE
-const MAX_RETRIES = 3
-const DEFAULT_PAGE_SIZE = 50
-```
-
-## TypeScript 使用
-
-### 类型定义
-```typescript
-// ✅ 优先使用 interface 定义对象类型
-interface TorrentInfo {
-  id: number
-  name: string
-  status: TorrentStatus
-  downloadDir: string
-}
-
-// ✅ 使用 type 定义联合类型或复杂类型
-type TorrentStatus = 'stopped' | 'checking' | 'downloading' | 'seeding'
-type Nullable<T> = T | null
-
-// ❌ 避免使用 any
-const data: any = response.data // 不推荐
-
-// ✅ 使用具体类型或 unknown
-const data: TorrentInfo = response.data
-```
-
-### 类型导出
-```typescript
-// ✅ 导出类型时使用 export type
-export type { TorrentInfo, TorrentStatus }
-export interface SessionStats {
-  downloadSpeed: number
-  uploadSpeed: number
-}
-```
-
-## 组件编写
-
-### Props 定义
-```typescript
-// ✅ 使用 TypeScript + defineProps
-interface Props {
-  torrent: TorrentInfo
-  showDetails?: boolean
-  onUpdate?: (id: number) => void
-}
-
-const props = withDefaults(defineProps<Props>(), {
-  showDetails: false
-})
-
-// ✅ 复杂对象 props 使用 validator
-const props = defineProps({
-  status: {
-    type: String as PropType<TorrentStatus>,
-    required: true,
-    validator: (value: TorrentStatus) => {
-      return ['stopped', 'checking', 'downloading', 'seeding'].includes(value)
-    }
-  }
-})
-```
-
-### Emits 定义
-```typescript
-// ✅ 明确声明 emit 事件及其参数类型
-const emit = defineEmits<{
-  update: [id: number, data: Partial<TorrentInfo>]
-  delete: [id: number]
-  error: [message: string]
-}>()
-
-// 使用
-emit('update', torrent.id, { name: 'new name' })
-```
-
-### Composables 使用
-```typescript
-// ✅ 将可复用逻辑提取为 composable
-// composables/useTorrentFilter.ts
-export function useTorrentFilter(torrents: Ref<TorrentInfo[]>) {
-  const filterText = ref('')
-  const filteredTorrents = computed(() => {
-    if (!filterText.value) return torrents.value
-    return torrents.value.filter(t => 
-      t.name.toLowerCase().includes(filterText.value.toLowerCase())
-    )
-  })
-  
-  return {
-    filterText,
-    filteredTorrents
-  }
-}
-```
-
-## 错误处理
-
-### 统一错误处理
-```typescript
-// ✅ 使用 try-catch 包裹可能失败的操作
-async function fetchTorrents() {
-  try {
-    const response = await torrentApi.getAll()
-    return response.data
-  } catch (error) {
-    console.error('Failed to fetch torrents:', error)
-    message.error('获取种子列表失败')
-    throw error
-  }
-}
-
-// ✅ JSON 解析使用 try-catch
-try {
-  const config = JSON.parse(localStorage.getItem('config') || '{}')
-} catch (error) {
-  console.error('Failed to parse config:', error)
-  return {}
-}
-```
-
-### 用户友好的错误提示
-```typescript
-// ✅ 使用 Naive UI 的 message 组件显示错误
-import { useMessage } from 'naive-ui'
-
-const message = useMessage()
-
-try {
-  await deleteTorrent(id)
-  message.success('删除成功')
-} catch (error) {
-  message.error('删除失败，请重试')
-}
-```
-
-## 性能优化
-
-### 计算属性
-```typescript
-// ✅ 使用 computed 缓存计算结果
-const totalSize = computed(() => 
-  torrents.value.reduce((sum, t) => sum + t.totalSize, 0)
-)
-
-// ❌ 避免在模板中直接计算
+### 1. Tailwind 工具类（最优先）
+```vue
 <template>
-  <!-- 不推荐 -->
-  <div>{{ torrents.reduce((sum, t) => sum + t.totalSize, 0) }}</div>
+  <!-- ✅ 优先使用 Tailwind 类 -->
+  <div class="flex items-center justify-between gap-4 p-4">
+    <div class="w-full max-w-md">
+      <p class="text-lg font-semibold text-gray-900">标题</p>
+      <p class="text-sm text-gray-500">描述文本</p>
+    </div>
+  </div>
 </template>
 ```
 
-### v-show vs v-if
+### 2. Naive UI 组件（次优先）
 ```vue
-<!-- ✅ 频繁切换使用 v-show -->
-<div v-show="isVisible">频繁切换的内容</div>
-
-<!-- ✅ 条件渲染使用 v-if -->
-<div v-if="hasData">初始条件渲染</div>
-```
-
-### 列表渲染
-```vue
-<!-- ✅ 使用 key 优化列表渲染 -->
-<div v-for="torrent in torrents" :key="torrent.id">
-  {{ torrent.name }}
-</div>
-
-<!-- ❌ 避免使用 index 作为 key -->
-<div v-for="(torrent, index) in torrents" :key="index">
-  {{ torrent.name }}
-</div>
-```
-
-## 样式编写
-
-### 样式优先级
-```vue
-<script setup lang="ts">
-// 1. 优先使用 Tailwind 4 工具类
-</script>
-
 <template>
-  <!-- ✅ 使用 Tailwind -->
-  <div class="flex items-center gap-4 p-4">
-    <button class="px-4 py-2 bg-blue-500 text-white rounded">
-      Click me
-    </button>
+  <!-- ✅ 使用 Naive UI 组件的内置样式 -->
+  <n-button type="primary" size="large" round>按钮</n-button>
+  <n-card title="卡片标题" :bordered="false" size="small">
+    卡片内容
+  </n-card>
+</template>
+```
+
+### 3. Less 样式（仅在必要时使用）
+```vue
+<style lang="less" scoped>
+// ⚠️ 仅用于动态样式、复杂动画或 Tailwind 无法实现的样式
+.custom-gradient {
+  background: linear-gradient(135deg, @primary-color, @secondary-color);
+}
+</style>
+```
+
+## Tailwind 使用规范
+
+### 布局
+```vue
+<template>
+  <!-- ✅ Flexbox 布局 -->
+  <div class="flex flex-col gap-4">
+    <div class="flex items-center justify-between">
+      <span>标题</span>
+      <button>操作</button>
+    </div>
   </div>
   
-  <!-- ✅ 使用 Naive UI 组件 -->
-  <n-button type="primary">Click me</n-button>
+  <!-- ✅ Grid 布局 -->
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div>项目 1</div>
+    <div>项目 2</div>
+    <div>项目 3</div>
+  </div>
   
-  <!-- ⚠️ 仅在必要时使用 Less -->
-  <div class="custom-style"></div>
+  <!-- ✅ 容器 -->
+  <div class="container mx-auto px-4">
+    内容
+  </div>
 </template>
-
-<style lang="less" scoped>
-// 仅用于动态样式或复杂样式
-.custom-style {
-  background: linear-gradient(45deg, @primary-color, @secondary-color);
-}
-</style>
 ```
 
-### 避免深层样式污染
+### 间距
 ```vue
-<style lang="less" scoped>
-// ❌ 避免
-:deep(.n-button) {
-  /* 修改组件库样式 */
-}
-
-// ✅ 使用组件的 props 或 slots
-</style>
+<template>
+  <!-- ✅ Padding 和 Margin -->
+  <div class="p-4">内边距 1rem</div>
+  <div class="px-6 py-3">水平 1.5rem，垂直 0.75rem</div>
+  <div class="mt-4 mb-6">上边距 1rem，下边距 1.5rem</div>
+  
+  <!-- ✅ Gap（用于 flex 和 grid）-->
+  <div class="flex gap-2">间距 0.5rem</div>
+  <div class="flex gap-4">间距 1rem</div>
+  <div class="flex gap-x-4 gap-y-2">水平 1rem，垂直 0.5rem</div>
+</template>
 ```
 
-## 注释规范
-
-### 组件注释
-```typescript
-/**
- * 种子列表组件
- * 
- * 显示所有种子的列表，支持虚拟滚动和过滤功能
- * 
- * @example
- * <TorrentList :torrents="torrents" @select="handleSelect" />
- */
-export default defineComponent({
-  name: 'TorrentList'
-})
+### 尺寸
+```vue
+<template>
+  <!-- ✅ 宽度 -->
+  <div class="w-full">100% 宽度</div>
+  <div class="w-1/2">50% 宽度</div>
+  <div class="w-64">16rem (256px) 宽度</div>
+  <div class="min-w-0 max-w-md">最小宽度 0，最大宽度 28rem</div>
+  
+  <!-- ✅ 高度 -->
+  <div class="h-screen">100vh 高度</div>
+  <div class="h-64">16rem 高度</div>
+  <div class="min-h-0 max-h-96">最小高度 0，最大高度 24rem</div>
+</template>
 ```
 
-### 复杂逻辑注释
-```typescript
-// ✅ 为复杂逻辑添加注释
-// 计算种子的下载进度百分比
-// 如果 totalSize 为 0，返回 0 避免除零错误
-const progress = computed(() => {
-  if (torrent.value.totalSize === 0) return 0
-  return (torrent.value.downloadedSize / torrent.value.totalSize) * 100
-})
+### 颜色
+```vue
+<template>
+  <!-- ✅ 文字颜色 -->
+  <p class="text-gray-900">深色文字</p>
+  <p class="text-gray-500">灰色文字</p>
+  <p class="text-blue-600">蓝色文字</p>
+  
+  <!-- ✅ 背景颜色 -->
+  <div class="bg-white">白色背景</div>
+  <div class="bg-gray-100">浅灰背景</div>
+  <div class="bg-blue-500">蓝色背景</div>
+  
+  <!-- ✅ 边框颜色 -->
+  <div class="border border-gray-300">灰色边框</div>
+  <div class="border-2 border-blue-500">蓝色边框</div>
+</template>
 ```
 
-## 导入规范
+### 文字样式
+```vue
+<template>
+  <!-- ✅ 字体大小 -->
+  <p class="text-xs">0.75rem (12px)</p>
+  <p class="text-sm">0.875rem (14px)</p>
+  <p class="text-base">1rem (16px)</p>
+  <p class="text-lg">1.125rem (18px)</p>
+  <p class="text-xl">1.25rem (20px)</p>
+  <p class="text-2xl">1.5rem (24px)</p>
+  
+  <!-- ✅ 字体粗细 -->
+  <p class="font-normal">普通</p>
+  <p class="font-medium">中等</p>
+  <p class="font-semibold">半粗</p>
+  <p class="font-bold">粗体</p>
+  
+  <!-- ✅ 文字对齐 -->
+  <p class="text-left">左对齐</p>
+  <p class="text-center">居中</p>
+  <p class="text-right">右对齐</p>
+  
+  <!-- ✅ 文字溢出 -->
+  <p class="truncate">单行截断</p>
+  <p class="line-clamp-2">两行截断</p>
+  <p class="overflow-hidden text-ellipsis">溢出隐藏</p>
+</template>
+```
 
-### 导入顺序
-```typescript
-// 1. Vue 相关
-import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+### 边框和圆角
+```vue
+<template>
+  <!-- ✅ 圆角 -->
+  <div class="rounded">0.25rem 圆角</div>
+  <div class="rounded-md">0.375rem 圆角</div>
+  <div class="rounded-lg">0.5rem 圆角</div>
+  <div class="rounded-full">完全圆形</div>
+  
+  <!-- ✅ 边框 -->
+  <div class="border">1px 边框</div>
+  <div class="border-2">2px 边框</div>
+  <div class="border-t">顶部边框</div>
+  <div class="border-b">底部边框</div>
+</template>
+```
 
-// 2. 第三方库
-import { useMessage } from 'naive-ui'
-import { debounce } from 'lodash-es'
+### 阴影
+```vue
+<template>
+  <!-- ✅ 阴影效果 -->
+  <div class="shadow-sm">小阴影</div>
+  <div class="shadow">中等阴影</div>
+  <div class="shadow-md">中大阴影</div>
+  <div class="shadow-lg">大阴影</div>
+  <div class="shadow-xl">超大阴影</div>
+  
+  <!-- ✅ 无阴影 -->
+  <div class="shadow-none">无阴影</div>
+</template>
+```
 
-// 3. 本地模块
-import { useTorrentStore } from '@/store/torrent'
-import type { TorrentInfo } from '@/types'
+### 响应式设计
+```vue
+<template>
+  <!-- ✅ 断点：sm(640px) md(768px) lg(1024px) xl(1280px) 2xl(1536px) -->
+  <div class="w-full md:w-1/2 lg:w-1/3">
+    <!-- 移动端全宽，平板半宽，桌面三分之一宽 -->
+  </div>
+  
+  <div class="text-sm md:text-base lg:text-lg">
+    <!-- 响应式字体大小 -->
+  </div>
+  
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+    <!-- 响应式网格列数 -->
+  </div>
+  
+  <!-- ✅ 隐藏/显示 -->
+  <div class="hidden md:block">桌面端显示</div>
+  <div class="block md:hidden">移动端显示</div>
+</template>
+```
+
+### 交互状态
+```vue
+<template>
+  <!-- ✅ Hover 状态 -->
+  <button class="bg-blue-500 hover:bg-blue-600">悬停变色</button>
+  <div class="opacity-80 hover:opacity-100">悬停不透明</div>
+  
+  <!-- ✅ Focus 状态 -->
+  <input class="border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200">
+  
+  <!-- ✅ Active 状态 -->
+  <button class="active:scale-95">点击缩放</button>
+  
+  <!-- ✅ Disabled 状态 -->
+  <button class="disabled:opacity-50 disabled:cursor-not-allowed">禁用按钮</button>
+</template>
+```
+
+### 过渡动画
+```vue
+<template>
+  <!-- ✅ 过渡效果 -->
+  <div class="transition-all duration-300 ease-in-out">
+    全部属性过渡
+  </div>
+  
+  <div class="transition-colors duration-200">
+    颜色过渡
+  </div>
+  
+  <div class="transition-transform duration-300 hover:scale-110">
+    悬停放大
+  </div>
+  
+  <!-- ✅ 动画 -->
+  <div class="animate-spin">旋转动画</div>
+  <div class="animate-pulse">脉冲动画</div>
+  <div class="animate-bounce">弹跳动画</div>
+</template>
+```
+
+## Less 使用规范
+
+### 变量定义
+```less
+// styles/variables.less
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
