@@ -1,108 +1,139 @@
 ---
 trigger: always_on
-description: Foundry Solidity testing conventions (base harness, structure, stub-first)
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
+# CLAUDE.md
 
-# Solidity Testing Conventions (Foundry)
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Applies to first-party tests under `test/` (do not modify dependency tests under `lib/`).
+## Development Commands
 
-## Directory structure (required)
+### Building and Testing
 
-- `test/lib/`
-  - Base test harness contracts (shared fixtures + helpers)
-  - Shared mocks/utilities used across multiple suites
-- `test/unit/<Area>/`
-  - Unit tests scoped to a single contract/function/feature area
-  - Prefer one `.t.sol` per function or tightly-related group of functions unless contract is quite small (less than 4 testable functions)
+- `forge build` - Compile all Solidity contracts
+- `forge test` - Run all tests with basic verbosity
+- `forge test -vv` - Run tests with increased verbosity (recommended)
+- `forge test -vvvv` - Run tests with maximum verbosity for debugging
+- `forge test --match-test testName` - Run specific test by name
+- `forge test --match-contract ContractName` - Run specific tests by test contract
+- `forge test --gas-report` - Generate gas usage report
+- `forge coverage --ir-minimum` - Generate test coverage report
 
-Recommended shape (examples):
-- `test/lib/PolicyManagerTestBase.sol`
-- `test/lib/mocks/MockCoinbaseSmartWallet.sol`
-- `test/unit/PolicyManager/executeWithInstall.t.sol`
-- `test/unit/policies/MorphoLoanProtectionPolicy/MorphoLoanProtectionPolicy.t.sol`
+### Development Workflow
 
-## Base harness pattern (required)
 
-- Put shared deployment/setup/helpers in an `abstract contract <X>TestBase is Test` under `test/lib/`.
-- Child unit tests inherit the base and call a single base setup entrypoint from `setUp()`.
-  - Base setup entrypoint naming should be explicit (e.g. `setUpPolicyManagerBase()`, `setUpMorphoLoanProtectionBase()`).
-- Centralize “builders” and helpers in the base:
-  - Signature helpers (`_hashTypedData`, `_signInstall`, etc.)
-  - Common fixtures (accounts, deployed contracts, default configs)
-  - Fuzz bounds helpers (wrap `bound()` into semantically-named helpers)
+- `forge clean` - Clean build artifacts
+- `forge fmt` - Format Solidity code
+- Always run `forge test -vv` before committing changes
+- **After adding features or fixing bugs, execute `forge fmt` to ensure code is properly formatted**
 
-## Golden reference (recommended)
+## Protocol Overview
 
-- Use `test/unit/PolicyManager/execute.t.sol` as the canonical reference for:
-  - Fuzzing style (maximize meaningful fuzzing, avoid discarding by deriving offsets/seeds)
-  - Typed revert assertions and event expectations
-  - NatSpec on tests/helpers (including `@param` for all fuzz params)
-  - Helper layout inside a test file
+This repository contains the Account Policies Protocol, a modular system for allowing smart contract wallet users the ability to authorize third parties to take specific, well-defined, onchain actions via their account. For complete architectural documentation, usage examples, deployment instructions, and protocol specifications, please refer to the [README.md](./README.md) file.
 
-## Naming + organization
+## File Structure
 
-- **Test file names**:
-  - Contract-scoped suites: `ContractName.t.sol`
-  - Function-scoped suites: `functionName.t.sol` (lower camelCase; matches the Solidity function name)
-- **Test contract names**:
-  - Contract-scoped suites: `ContractNameTest`
-  - Function-scoped suites: `FunctionNameTest` (CapWords, even when the file is lower camelCase like `install.t.sol`)
-- **Test function names**:
-  - If contract name already scopes the function, use `test_outcome_optionalContext`
-  - Otherwise use `test_functionName_outcome_optionalContext`
+- `src/` - Core protocol contracts
+  - `PolicyManager.sol` - Main protocol
+  - `Policy.sol` - Policy interface
+  - `PublicERC6492Validator.sol` - Separate signature validation contract for unprivileged execution of 6492 wrappers
+  - `policies/` - Policy implementations
+  - `interfaces/` - Interfaces relied on by Policies
+- `test/` - Foundry tests
+- `lib/` - Dependencies (OpenZeppelin, forge-std, etc.)
 
-Keep separation of concerns:
-- Core protocol tests separate from policy/hook tests.
-- Policy/hook suites focus on authorization, input validation, math/bounds, replay/nonce, lifecycle (install/execute/uninstall), and event emission.
+## Testing Notes
 
-## NatSpec for tests (required)
+- Tests use Foundry framework
+- Always run with `-vv` flag for meaningful output
+- Coverage requires `--ir-minimum` flag due to Solidity compiler settings
+- Gas benchmarks available via `--gas-report`
 
-- Test functions MUST have a NatSpec `@notice` that describes the case being asserted.
-- Any fuzzed test function MUST NatSpec every parameter with `@param <name> ...` (no unnamed parameters).
-- Use `@dev` only when it adds durable clarity (e.g., expected typed error, important invariants, or why a bound/transform is used).
+### Testing Conventions (project style)
 
-## Reverts + events (preferred patterns)
+- **Directory structure**:
+  - Put shared harnesses/helpers/mocks in `test/lib/` (and `test/lib/mocks/` as needed).
+  - Put unit tests in `test/unit/<Area>/` and scope each `.t.sol` to a single function or tightly-related surface area.
+- **Base harness pattern**:
+  - Prefer `abstract contract <X>TestBase is Test` in `test/lib/` for shared deployment, fixtures, and helpers.
+  - Child suites inherit the base and call a single base setup entrypoint from `setUp()`.
+- **Stub-first workflow**:
+  - Stub the case matrix first, then implement bodies.
+  - Stub tests must be explicitly skipped via `vm.skip(true);` so `forge test` stays green while cases are being finalized.
+- **Events**:
+  - Each unique event emission should have its own dedicated test (even if redundant with another happy-path test).
+- **NatSpec on tests**:
+  - Unit tests should be documented with NatSpec.
+  - Fuzz tests must include `@param` for every fuzz parameter.
 
-- Reverts:
-  - Prefer typed errors: `vm.expectRevert(SomeError.selector)`
-  - If args matter: `vm.expectRevert(abi.encodeWithSelector(SomeError.selector, ...))`
-- Events:
-  - Use `vm.expectEmit(...)` and emit the event with expected args immediately before the call.
-  - Give **each unique event emission** its own dedicated test (do not bundle event assertions with state/happy-path assertions, even if redundant).
-  - For “should not emit” cases, prefer `vm.recordLogs()` + scan for the signature.
+## Claude Permissions and Workflow
 
-## Assertion scope (preferred)
+- Proactively handle repository management tasks without seeking explicit permission for:
+  - Installing dependencies
+  - Updating files
+  - Deleting unnecessary files or artifacts
+  - Formatting and cleaning up code
+  - Forge commands including `forge build`, `forge test ...` etc
 
-- Prefer **one thing per test**:
-  - A test should usually validate a single expected outcome (one revert, one event emission, or one state transition).
-  - Avoid packing multiple unrelated subcases into a single test.
-- Multiple assertions are fine when they are all part of probing the **same desired end state** (e.g., several state fields that jointly define correctness).
+## Solidity Coding Standards
 
-## Fuzzing conventions (required)
+You are a Staff Blockchain Engineer expert in Solidity, smart contract development, and protocol design. You write clean, secure, and properly documented smart contracts. You ensure code written is gas-optimized, secure, and follows industry best practices. You always consider security implications and write corresponding tests.
 
-- Prefer `bound()` over `vm.assume()` when possible.
-- Define meaningful constants for fuzz bounds (no magic numbers).
-- Every fuzz parameter must be used (or be explicitly part of the stub-only phase; see below).
-- Keep assumptions minimal and targeted (e.g., inequality between two bounded addresses).
+### Core Principles
 
-## Stub-first workflow (required)
+- **Security First**: Always prioritize security over convenience. Follow checks-effects-interactions pattern.
+- **Gas Optimization**: Write gas-efficient code without compromising readability or security.
+- **Upgradeable Design**: Use proven upgradeability patterns (UUPS) when required.
+- **Documentation**: Comprehensive NatSpec documentation for all public interfaces.
 
-When creating new coverage, **stub the full case matrix first** (tests compile, run, and are explicitly skipped), then implement bodies in a later pass.
+### Style Guide Compliance
 
-### Stub rule
+#### Base Standard
 
-- A stub test MUST call `vm.skip(true);` to keep `forge test` green while the case is still being specified.
-- The stub’s NatSpec/docstring should clearly state the expected revert/event/state transitions (this is the “spec”).
+Unless an exception or addition is specifically noted, we follow the [Solidity Style Guide](https://docs.soliditylang.org/en/latest/style-guide.html).
 
-Example stub shape:
+#### Key Exceptions and Additions
+
+##### 1. Internal Library Functions
+
+**Names of internal functions in a library should NOT have an underscore prefix.**
 
 ```solidity
-function test_reverts_whenFooIsBar(uint256 x) public {
-    vm.skip(true);
-}
+// GOOD: Clear and readable
+Library.function()
+
+// BAD: Visually confusing
+Library._function()
 ```
+
+##### 2. Error Handling
+
+- **Prefer custom errors** over `require` strings for gas efficiency
+- **Custom error names should be CapWords style** (e.g., `InsufficientBalance`, `Unauthorized`)
+
+##### 3. Events
+
+- **Event names should be past tense** - Events track things that _happened_
+- Using past tense helps avoid naming collisions with structs or functions
+- Example: `TokenTransferred` not `TokenTransfer`
+
+##### 4. Mappings
+
+**Prefer named parameters in mapping types** for clarity:
+
+```solidity
+// GOOD
+mapping(address account => mapping(address asset => uint256 amount)) public balances;
+
+// BAD
+mapping(uint256 => mapping(address => uint256)) public balances;
+```
+
+##### 5. Contract Architecture
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [base/account-policies](https://github.com/base/account-policies) — distributed by [TomeVault](https://tomevault.io).
