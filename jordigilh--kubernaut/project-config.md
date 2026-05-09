@@ -1,114 +1,223 @@
 ---
 trigger: always_on
-description: Conflict resolution matrix and automated detection for kubernaut rules
+description: Design Decision Documentation (DD-XXX) standards for architectural choices
 ---
 
-# Conflict Resolution Matrix
 
-## Priority Hierarchy - MANDATORY
+# Design Decision Documentation Standards
 
-**Rule**: Apply higher priority rules first when conflicts occur
-**Prevention**: Use priority hierarchy to avoid conflicts during design phase
+## 🎯 **Purpose**
 
-### Authoritative Rule Hierarchy
-| Priority | Rule | Status | Authority | Scope |
-|----------|------|--------|-----------|-------|
-| **1. FOUNDATIONAL** | 00-core-development-methodology.mdc | FOUNDATIONAL | APDC Framework | All development |
-| **2. MANDATORY** | 00-project-guidelines.mdc | MANDATORY PRINCIPLES | TDD & Business Requirements | All development |
-| **3. BEHAVIORAL** | 01-ai-assistant-behavior.mdc | AI ASSISTANT CONTROL | AI Assistant Behavior | AI assistant usage |
-| **5. TESTING** | 03-testing-strategy.mdc | AUTHORITATIVE SOURCE | Testing & Mock Strategy | All testing |
-| **6. SPECIALIZED** | 04,05,12,etc | DOMAIN-SPECIFIC | Specialized Implementation | Specific domains |
-| **7. QUALITY** | 06,08,09,10 | VALIDATION | Quality Assurance | Post-development |
-| **8. INTEGRATION** | 07,01,02 | IMPLEMENTATION | Code Integration | Implementation details |
+This rule ensures **all major architectural decisions** are documented using the DD-XXX format with clear rationale, alternatives considered, and consequences. This provides:
+- Historical context for "why" decisions were made
+- Alternatives considered and rejected
+- Guidance for future design reviews
+- Onboarding support for new developers
 
-### Rule Precedence When Conflicts Occur
-1. **FOUNDATIONAL (00-core)** overrides everything - APDC methodology is mandatory
-2. **MANDATORY PRINCIPLES (00-project)** override all except foundational
-3. **BEHAVIORAL CONSTRAINTS** override development decisions but not methodology
-4. **TESTING STRATEGY (03)** is authoritative for all testing and mock decisions
-5. **SPECIALIZED RULES** override general implementation but not methodology/testing
-6. **QUALITY RULES** provide validation but don't override implementation decisions
+**Related Rules**:
+- [06-documentation-standards.mdc](mdc:.cursor/rules/06-documentation-standards.mdc) - General documentation standards
+- [00-kubernaut-core-rules.mdc](mdc:.cursor/rules/00-kubernaut-core-rules.mdc) - APDC methodology (Analysis includes decision documentation)
 
-## Common Conflicts Resolution
+---
 
-### Integration vs Speed
-**CONFLICT**: AI sophistication vs Integration requirement
-**RESOLUTION**: Integration wins - implement simple → integrate → enhance in REFACTOR
-**PREVENTION**: Plan integration points during APDC Analysis phase
+## 📋 **When to Create a Design Decision (DD-XXX)**
 
-### TDD vs Sophistication
-**CONFLICT**: Complex algorithms vs TDD GREEN minimalism
-**RESOLUTION**: TDD timing controls - minimal GREEN → sophisticated REFACTOR
-**PREVENTION**: Reserve sophisticated logic for REFACTOR phase in APDC Plan
+### **MANDATORY**: Document These Decisions
 
-### AI vs General (Rule 12 vs Others)
-**CONFLICT**: AI-specific guidance vs general Go patterns
-**RESOLUTION**: AI-specific rules win for AI components
-**PREVENTION**: Identify AI components during APDC Analysis phase
+Create a DD-XXX entry when making decisions about:
 
-### Testing Strategy vs Anti-Patterns (Rule 03 vs Rule 08)
-**CONFLICT**: Pyramid testing approach vs anti-pattern detection
-**RESOLUTION**: Both apply - pyramid strategy with anti-pattern prevention
-**PREVENTION**: Design tests following pyramid strategy during APDC Plan phase
+1. **Architecture Patterns**
+   - New CRD interaction patterns
+   - Data flow between controllers
+   - Integration point designs
+   - State management approaches
 
-### Interface Validation vs Development Speed (Rule 09)
-**CONFLICT**: Interface validation requirements vs rapid development
-**RESOLUTION**: Validation wins - prevents build errors and technical debt
-**PREVENTION**: Verify interface existence during APDC Analysis phase
+2. **Technology Choices**
+   - Framework selections (when alternatives exist)
+   - Library adoptions with architectural impact
+   - Infrastructure components (databases, message queues)
+   - Testing framework decisions
 
-### Safety vs Speed
-**CONFLICT**: K8s safety validation vs development speed
-**RESOLUTION**: Safety wins - include safety in GREEN phase
-**PREVENTION**: Consider safety requirements during APDC Analysis and Plan phases
+3. **Business Logic Patterns**
+   - Error handling strategies
+   - Recovery mechanisms
+   - Validation approaches
+   - Data enrichment patterns
 
-## Prevention-Focused Conflict Resolution
+4. **Performance Trade-offs**
+   - Caching strategies
+   - Batch vs. real-time processing
+   - Resource allocation patterns
+   - Optimization approaches
 
-### Core APDC Prevention Framework
-**Built-in quality through systematic approach:**
+### **NOT REQUIRED**: Skip DD-XXX for These
 
-**Analysis Prevention**: Start with clear business context and existing code understanding
-**Plan Prevention**: Design integration and success criteria before coding
-**Do Prevention**: Follow TDD phases with mandatory integration in GREEN
-**Check Prevention**: Verify planned outcomes were achieved through implementation
+**Do NOT create DD-XXX for**:
+- Obvious technology choices (Go for K8s controllers, Kubernetes for orchestration)
+- Standard practices (REST APIs, semantic versioning)
+- Tactical implementation details without alternatives
+- Decisions that are easily reversible
+- Changes to deprecated/legacy code
 
-### Business Requirements Prevention
-**Conflict Prevention**: Use standardized BR-[CATEGORY]-[NUMBER] format during Analysis
-**Integration Prevention**: Plan main application integration during Plan phase
-**Alignment Prevention**: Map all code to documented business requirements
+---
 
-### TDD Phase Conflict Prevention
-**RED Prevention**: Write tests first, use existing interfaces
-**GREEN Prevention**: Minimal implementation with mandatory integration
-**REFACTOR Prevention**: Enhance existing code only, no new types
+## 🚨 **AI ASSISTANT ENFORCEMENT PROTOCOL**
 
-### Prevention-Focused Conflict Avoidance
-**Integration Conflict Prevention**:
-- Plan main application integration during APDC Analysis phase
-- Design component usage before implementation begins
-- Ensure business code serves documented requirements
+### **BLOCKING REQUIREMENT - BEFORE IMPLEMENTING ARCHITECTURAL DECISIONS**
 
-**TDD Phase Conflict Prevention**:
-- Reserve new type creation for RED phase only
-- Plan enhancement approach during REFACTOR phase
-- Design minimal implementation strategy for GREEN phase
+When user requests or AI proposes a significant architectural change, AI MUST:
 
-**Testing Strategy Conflict Prevention**:
-- Follow authoritative mock usage matrix from Rule 03
-- Design testing approach following pyramid strategy
-- Plan anti-pattern avoidance during design phase
+#### **CHECKPOINT DD: Design Decision Validation**
 
-## Prevention Protocol
+**AI MUST execute this validation sequence:**
 
-### Preventive Resolution
-1. **ANALYZE**: Apply rule priority hierarchy during APDC Analysis phase
-2. **PLAN**: Design implementation to avoid conflicts during APDC Plan phase
-3. **IMPLEMENT**: Follow highest priority rule guidance during APDC Do phase
-4. **VERIFY**: Confirm conflict prevention during APDC Check phase
+```
+✅ DESIGN DECISION CHECKPOINT:
+- [ ] Searched for similar architectural patterns (codebase_search executed) ✅/❌
+- [ ] Identified 2-3 alternative approaches ✅/❌
+- [ ] Presented alternatives to user for approval ✅/❌
+- [ ] User approved specific approach ✅/❌
+- [ ] DD-XXX entry created in DESIGN_DECISIONS.md ✅/❌
+- [ ] DD-XXX referenced in implementation docs ✅/❌
+- [ ] DD-XXX referenced in code comments ✅/❌
 
-### Manual Resolution Process
-**When conflicts arise during implementation:**
-1. **STOP**: Halt implementation immediately
-2. **HIERARCHY**: Apply rule priority hierarchy (Foundational > Mandatory > Behavioral > etc.)
+❌ STOP: Cannot implement architectural change until ALL checkboxes are ✅
+```
+
+#### **Validation Steps**
+
+**Step 1: Discovery (REQUIRED)**
+```bash
+# AI must search for existing patterns
+codebase_search "existing [pattern] implementations"
+grep -r "[ArchitecturalPattern]" docs/architecture/ docs/services/
+```
+
+**Step 2: Alternatives Analysis (REQUIRED)**
+AI must present to user:
+- **Alternative 1**: [Approach A with pros/cons]
+- **Alternative 2**: [Approach B with pros/cons]
+- **Alternative 3**: [Approach C with pros/cons]
+- **Recommendation**: [Preferred approach with confidence %]
+
+**Step 3: User Approval (REQUIRED)**
+Wait for explicit user approval before implementing.
+
+**Step 4: DD-XXX Creation (REQUIRED)**
+Create entry in `docs/architecture/DESIGN_DECISIONS.md` using template below.
+
+**Step 5: Reference in Code (REQUIRED)**
+Add DD-XXX references in:
+- Implementation documentation
+- Code comments for key functions
+- CRD schema comments
+- Controller reconciliation logic
+
+---
+
+## 📝 **DD-XXX Documentation Template**
+
+### **Location**: `docs/architecture/DESIGN_DECISIONS.md`
+
+When creating a new DD-XXX, use this template:
+
+```markdown
+## DD-XXX: [Decision Title]
+
+### Status
+**[Status Emoji] [Status]** (YYYY-MM-DD)
+**Last Reviewed**: YYYY-MM-DD
+**Confidence**: XX%
+
+### Context & Problem
+[What problem are we solving? Why does it matter?]
+
+**Key Requirements**:
+- Requirement 1
+- Requirement 2
+- Requirement 3
+
+### Alternatives Considered
+
+#### Alternative 1: [Approach A]
+**Approach**: [Brief description]
+
+**Pros**:
+- ✅ Benefit 1
+- ✅ Benefit 2
+
+**Cons**:
+- ❌ Trade-off 1
+- ❌ Trade-off 2
+
+**Confidence**: XX% (approved/rejected)
+
+---
+
+#### Alternative 2: [Approach B]
+**Approach**: [Brief description]
+
+**Pros**:
+- ✅ Benefit 1
+- ✅ Benefit 2
+
+**Cons**:
+- ❌ Trade-off 1
+- ❌ Trade-off 2
+
+**Confidence**: XX% (approved/rejected)
+
+---
+
+#### Alternative 3: [Approach C]
+**Approach**: [Brief description]
+
+**Pros**:
+- ✅ Benefit 1
+- ✅ Benefit 2
+
+**Cons**:
+- ❌ Trade-off 1
+- ❌ Trade-off 2
+
+**Confidence**: XX% (approved/rejected)
+
+---
+
+### Decision
+
+**APPROVED: Alternative X** - [Approach Name]
+
+**Rationale**:
+1. **Key Reason 1**: [Explanation]
+2. **Key Reason 2**: [Explanation]
+3. **Key Reason 3**: [Explanation]
+
+**Key Insight**: [Critical insight that drove the decision]
+
+### Implementation
+
+**Primary Implementation Files**:
+- [File 1 path and description]
+- [File 2 path and description]
+- [File 3 path and description]
+
+**Data Flow**:
+1. Step 1 description
+2. Step 2 description
+3. Step 3 description
+
+**Graceful Degradation** (if applicable):
+[How system behaves when components fail]
+
+### Consequences
+
+**Positive**:
+- ✅ Benefit 1
+- ✅ Benefit 2
+- ✅ Benefit 3
+
+**Negative**:
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
