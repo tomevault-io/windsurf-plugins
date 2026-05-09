@@ -7,11 +7,11 @@ Zenfun's self-developed coding agent.
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [w31r4/zenfun-code](https://github.com/w31r4/zenfun-code).
+Original source: `CLAUDE.md` in [w31r4/zenfun-code](https://github.com/w31r4/zenfun-code).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
