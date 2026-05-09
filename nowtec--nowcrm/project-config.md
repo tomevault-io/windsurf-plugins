@@ -1,185 +1,250 @@
 ---
 trigger: always_on
-description: Testing guidelines for NOWCRM
+description: Translation guidelines for NOWCRM
 ---
 
+# Translation Guidelines
 
-# Testing Guidelines for NOWCRM
+## Internationalization (i18n) Overview
 
-## Overview
+### Supported Languages
+- English (en) - Primary language
+- French (fr) - Secondary language
+- Italian (it) - Secondary language
+- German (de) - Secondary language
 
-NOWCRM uses **Playwright** for end-to-end (E2E) testing. All tests follow the **Page Object Model (POM)** pattern for maintainability and reusability.
+### i18n Architecture
+- Use next-intl for React components
+- Store translations in JSON files
+- Implement namespace-based organization
+- Support for interpolation and pluralization
 
-## Test Structure
+## File Structure
 
-### Directory Organization
-
+### Translation Files
 ```
-apps/nowcrm/tests/
-├── *.spec.ts              # Test specification files (numbered for execution order)
-├── pages/                  # Page Object Models (POMs)
-│   ├── CommonPage.ts
-│   ├── ContactsListPage.ts
-│   └── ...
-├── utils/                  # Test utilities and helpers
-│   ├── authHelper.ts
-│   └── data.ts
-├── setup/                  # Setup and teardown scripts
-│   ├── global-setup.ts
-│   ├── create-users.ts
-│   └── delete-users.ts
-└── files/                  # Test fixtures and data files
+/apps/nowcrm/messages/
+├── en.json                   # English translations
+├── fr.json                   # French translations
+├── de.json                   # German translations
+└── it.json                   # Italian translations
 ```
 
-### File Naming Conventions
-
-- **Test files**: Use numbered prefixes for execution order (e.g., `01Authentication.spec.ts`, `02Contacts.spec.ts`)
-- **Page Objects**: Use descriptive names ending with `Page` or `Modal` (e.g., `ContactsListPage.ts`, `ContactCreateModal.ts`)
-- **Utilities**: Use descriptive names (e.g., `authHelper.ts`, `data.ts`)
-
-## Page Object Model (POM) Pattern
-
-### Structure
-
-Every Page Object should follow this structure:
-
-```typescript
-import { type Locator, type Page, expect } from '@playwright/test';
-
-export class PageName {
-    readonly page: Page;
-    
-    // Locators - declare as readonly
-    readonly elementName: Locator;
-    
-    constructor(page: Page) {
-        this.page = page;
-        // Initialize locators
-        this.elementName = page.getByRole('button', { name: 'Button Name' });
+### Translation Keys
+- Use nested objects for organization
+- Follow consistent naming patterns
+- Include context in key names
+  ```json
+  {
+    "auth": {
+      "login": {
+        "title": "Sign In",
+        "email": "Email Address",
+        "password": "Password",
+        "submit": "Sign In",
+        "forgotPassword": "Forgot Password?"
+      },
+      "register": {
+        "title": "Create Account",
+        "confirmPassword": "Confirm Password"
+      }
     }
-    
-    // Actions - async methods that perform interactions
-    async performAction() {
-        await expect(this.elementName).toBeVisible();
-        await this.elementName.click();
+  }
+  ```
+
+## Translation Implementation
+
+### React Components
+- Specify namespaces for better organization
+- Handle loading states properly
+
+#### Server Components
+
+```ts
+import { getTranslations } from 'next-intl';
+
+export default async function ContactsPage() {
+  const t = await getTranslations('Contacts');
+  return (
+    <main>
+      <h1>{t('contacts.header')}</h1>
+      {/* … */}
+    </main>
+  );
+}
+```
+
+#### Client Components
+
+```tsx
+'use client';
+import { useTranslations } from 'next-intl';
+
+export default function LoginForm() {
+  const t = useTranslations('auth');
+
+  return (
+    <form>
+      <h1>{t('login.title')}</h1>
+      <input placeholder={t('login.email')} type="email" />
+      <input placeholder={t('login.password')} type="password" />
+      <button type="submit">{t('login.submit')}</button>
+    </form>
+  );
+}
+```
+
+### Interpolation
+- Use interpolation for dynamic content
+- Pass variables through t() function
+- Keep interpolation simple and readable
+  ```typescript
+  // ✅ Correct
+  const WelcomeMessage = ({ userName }: { userName: string }) => {
+    const { t } = useTranslations('common');
+
+    return (
+      <h1>{t('welcome.message', { name: userName })}</h1>
+    );
+  };
+
+  // Translation file
+  {
+    "welcome": {
+      "message": "Welcome back, {{name}}!"
     }
-    
-    // Assertions - async methods that verify state
-    async expectSomethingVisible(timeout: number = 5000) {
-        await expect(this.elementName, 'Descriptive message').toBeVisible({ timeout });
+  }
+  ```
+
+### Pluralization
+- Handle singular/plural forms correctly
+- Use count-based pluralization
+- Support different plural rules per language
+  ```typescript
+  // ✅ Correct
+  const ItemCount = ({ count }: { count: number }) => {
+    const { t } = useTranslations('common');
+
+    return (
+      <span>{t('items.count', { count })}</span>
+    );
+  };
+
+  // Translation file
+  {
+    "items": {
+      "count_one": "{{count}} item",
+      "count_other": "{{count}} items"
     }
-}
-```
+  }
+  ```
 
-### Locator Best Practices
+## Translation Management
 
-1. **Prefer role-based selectors**:
-```typescript
-// ✅ Good - accessible and stable
-this.createButton = page.getByRole('button', { name: 'Create' });
-this.emailInput = page.getByRole('textbox', { name: 'Email' });
+### Adding New Strings
+1. Add English translation first
+2. Use descriptive keys that indicate context
+3. Include comments for translators when needed
+4. Test with long translations to ensure UI flexibility
+  ```json
+  {
+    "user": {
+      "profile": {
+        // Displayed in user profile header
+        "displayName": "Display Name",
+        // Used in forms when editing profile
+        "editDisplayName": "Edit Display Name",
+        // Confirmation message after profile update
+        "updateSuccess": "Profile updated successfully"
+      }
+    }
+  }
+  ```
 
-// ❌ Avoid - fragile CSS selectors
-this.createButton = page.locator('.btn-primary');
-```
+### Translation Validation
+- Use TypeScript for translation key validation
+- Implement automated checks for missing translations
+- Validate interpolation parameters
+  ```typescript
+  // ✅ Correct - Type-safe translations
+  type TranslationKey =
+    | 'auth.login.title'
+    | 'auth.login.email'
+    | 'auth.login.password'
+    | 'common.welcome.message';
 
-2. **Scope locators within dialogs/modals**:
-```typescript
-constructor(page: Page) {
-    this.dialog = page.getByRole('dialog', { name: /Create Contact/i });
-    // Scope inputs within dialog
-    this.firstNameInput = this.dialog.getByRole('textbox', { name: 'First name' });
-}
-```
+  const t = (key: TranslationKey, options?: any) => {
+    // Translation implementation
+  };
+  ```
 
-3. **Use descriptive locator names**:
-```typescript
-// ✅ Good
-readonly userMenuTrigger: Locator;
-readonly deleteMassActionMenuItem: Locator;
+## Best Practices
 
-// ❌ Avoid
-readonly btn1: Locator;
-readonly menuItem: Locator;
-```
+### Key Naming
+- Use descriptive, hierarchical keys
+- Avoid abbreviations
+- Group related translations
+- Keep keys consistent across languages
+  ```json
+  // ✅ Correct
+  {
+    "dashboard": {
+      "header": {
+        "title": "Dashboard",
+        "subtitle": "Welcome to your workspace"
+      },
+      "actions": {
+        "createNew": "Create New",
+        "refresh": "Refresh Data",
+        "export": "Export"
+      }
+    }
+  }
 
-### Action Methods
+  // ❌ Incorrect
+  {
+    "dash_title": "Dashboard",
+    "newBtn": "New",
+    "refreshData": "Refresh"
+  }
+  ```
 
-- **Naming**: Use verb phrases (e.g., `clickCreateButton`, `fillAndSubmit`, `openUserMenu`)
-- **Wait for visibility**: Always wait for elements before interacting
-- **Return values**: Return relevant data when needed (e.g., created entity ID)
+### String Guidelines
+- Write clear, concise text
+- Use consistent terminology
+- Consider character limits for UI elements
+- Avoid concatenating translated strings
+  ```json
+  // ✅ Correct
+  {
+    "user": {
+      "status": {
+        "online": "Online",
+        "offline": "Offline",
+        "away": "Away"
+      }
+    }
+  }
 
-```typescript
-async clickCreateButton() {
-    await expect(this.createButton, 'Create button should be visible').toBeVisible({ timeout: 20000 });
-    await this.createButton.click();
-}
+  // ❌ Incorrect - Don't concatenate
+  {
+    "user": {
+      "statusPrefix": "User is ",
+      "statusOnline": "online"
+    }
+  }
+  ```
 
-async fillAndSubmit(data: ContactData) {
-    await this.firstNameInput.fill(data.firstName);
-    await this.lastNameInput.fill(data.lastName);
-    await this.emailInput.fill(data.email);
-    await this.createButton.click();
-}
-```
-
-### Assertion Methods
-
-- **Naming**: Prefix with `expect` (e.g., `expectDashboardVisible`, `expectStatusMessage`)
-- **Descriptive messages**: Always include meaningful error messages
-- **Configurable timeouts**: Accept timeout parameters with sensible defaults
-
-```typescript
-async expectStatusMessage(message: string, timeout: number = 20000) {
-    const messageLocator = this.page.getByText(message, { exact: true });
-    await expect(messageLocator, `Status message "${message}" should be visible`)
-        .toBeVisible({ timeout });
-}
-
-async expectDashboardVisible(timeout: number = 10000) {
-    await expect(this.page, 'URL should indicate CRM dashboard')
-        .toHaveURL(/\/crm$/, { timeout });
-}
-```
-
-## Test File Structure
-
-### Basic Template
-
-```typescript
-import { test, expect } from '@playwright/test';
-import { faker } from '@faker-js/faker';
-
-// Import Page Object Models
-import { ContactsListPage } from './pages/ContactsListPage';
-import { ContactCreateModal } from './pages/ContactCreateModal';
-
-// Import utilities
-import { loginUser } from './utils/authHelper';
-
-test.describe('Feature Name', () => {
-    let pageObject1: ContactsListPage;
-    let pageObject2: ContactCreateModal;
-
-    test.beforeEach(async ({ page }) => {
-        // Initialize POMs
-        pageObject1 = new ContactsListPage(page);
-        pageObject2 = new ContactCreateModal(page);
-        
-        // Common setup (e.g., login)
-        await loginUser(page);
-        await pageObject1.goto();
-    });
-
-    test('User can perform action', async () => {
-        // Arrange - set up test data
-        const testData = { 
-            firstName: faker.person.firstName(), 
-            email: faker.internet.email() 
-        };
-        
-        // Act - perform actions
-        await pageObject1.clickCreateButton();
+### Context Information
+- Provide context for translators
+- Include character limits when relevant
+- Explain when/where text appears
+- Note any technical constraints
+  ```json
+  {
+    "button": {
+      // Primary action button, max 20 characters
+      "save": "Save Changes",
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
