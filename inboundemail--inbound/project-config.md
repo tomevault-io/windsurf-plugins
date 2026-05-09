@@ -1,94 +1,55 @@
 ---
 trigger: always_on
-description: This rule establishes consistent structure, typing, auth, logging, error handling, and pagination patterns for all API endpoints. It is based on existing implementations under `inbound-app/app/api/v2/` and complements the more concise spec in [v2-api-spec.mdc](mdc:inbound-app/app/api/v2/.cursor/v2-api-spec.mdc).
+description: When working on an API route it must have a 3-4 line description of what the API does on the top.
 ---
 
-# v2 API Endpoint Coding Rules
 
-This rule establishes consistent structure, typing, auth, logging, error handling, and pagination patterns for all API endpoints. It is based on existing implementations under `inbound-app/app/api/v2/` and complements the more concise spec in [v2-api-spec.mdc](mdc:inbound-app/app/api/v2/.cursor/v2-api-spec.mdc).
+When working on an API route it must have a 3-4 line description of what the API does on the top. 
 
-## Core Principles
-- **Auth first**: Validate every request at the top of each handler using `validateRequest(request)` from [helper/main.ts](mdc:inbound-app/app/api/v2/helper/main.ts). Return 401 with `{ error }` on failure.
-- **Typed handlers**: Define request/response TypeScript interfaces immediately above each handler function (GET/POST/PUT/DELETE). Avoid duplicate DB types; infer database shapes via Drizzle in feature layers. Only define API request/response shapes here.
-- **No any**: Never use `any`. Prefer explicit interfaces and discriminated unions where needed.
-- **Params discipline**: For dynamic routes, type `params` as `Promise<{ id: string }>` and destructure with `const { id } = await params` before use.
-- **Simple, shallow routes**: Keep depth to 2: `/api/v2/{resource}` and `/api/v2/{resource}/[id]` or `/api/v2/{resource}/[id]/{subresource}` when necessary (e.g., `dns-records`, `test`).
-- **Descriptive logging with emojis**: Log key steps, inputs (sanitized), branching, and outcomes. Use the existing style from v2 endpoints.
-- **User scoping**: Always constrain DB queries by `userId` from auth for multi-tenant safety.
-- **Consistent pagination**: List endpoints return `data` + `pagination` (+ optional `meta`).
-- **Explicit status codes**: 200/201 for success, 400 for validation, 401 for auth, 403 for access, 404 for not found, 409 for conflict, 500 for unhandled.
-- **Docs + tests**: When creating/updating endpoints, also add/update tests alongside `inbound-app/app/api/v2/api.test.ts` and update Mintlify docs in `inbound-docs/` following the docs rules.
-- **Email data source**: Use `structuredEmails` tables; do not reintroduce deprecated `receivedEmails` or `parsedEmails`.
+For every API function like /api/(version)/domains there will be a:
 
-## Route Structure
-- Directory pattern:
-  - Collection: `inbound-app/app/api/v2/{resource}/route.ts`
-  - Item: `inbound-app/app/api/v2/{resource}/[id]/route.ts`
-  - Limited subresource: `inbound-app/app/api/v2/{resource}/[id]/{subresource}/route.ts` (e.g., `dns-records`, `test`)
-- Keep resource depth ≤ 2.
+- GET (retrieving information)
+- POST (creating information)
+- DELETE (deleting information)
+- PUT (updating information)
 
-## Handler Template
-Use this skeleton as a starting point, adapting names and shapes per endpoint. See examples in
-[domains/route.ts](mdc:inbound-app/app/api/v2/domains/route.ts),
-[domains/[id]/route.ts](mdc:inbound-app/app/api/v2/domains/[id]/route.ts),
-[email-addresses/route.ts](mdc:inbound-app/app/api/v2/email-addresses/route.ts),
-[emails/route.ts](mdc:inbound-app/app/api/v2/emails/route.ts), and
-[emails/[id]/reply/route.ts](mdc:inbound-app/app/api/v2/emails/[id]/reply/route.ts).
+## Authentication Pattern
 
-```ts
-import { NextRequest, NextResponse } from 'next/server'
-import { validateRequest } from '../helper/main'
-import { db } from '@/lib/db'
-import { eq, and, desc, count } from 'drizzle-orm'
-// import needed schema tables from '@/lib/db/schema'
+Remember every API function must try to either auth via session or via API key.
 
-// TYPES FOR GET
-export interface GetThingsRequest {
-  limit?: number
-  offset?: number
-}
+Check if a session is valid first, then if there is no session check the request headers for an Authorization header.
 
-export interface ThingItem {
-  id: string
-  // ...fields exposed by the API (not necessarily 1:1 with DB)
-}
+If there is an Authorization header, check if it is a valid API key.
 
-export interface GetThingsResponse {
-  data: ThingItem[]
-  pagination: { limit: number; offset: number; total: number; hasMore: boolean }
-}
+## Error Handling Standards
 
-export async function GET(request: NextRequest) {
-  console.log('🌐 GET /api/v2/things - Starting request')
-  try {
-    console.log('🔐 Validating request authentication')
-    const { userId, error } = await validateRequest(request)
-    if (!userId) {
-      console.log('❌ Authentication failed:', error)
-      return NextResponse.json({ error }, { status: 401 })
-    }
-    console.log('✅ Authentication successful for userId:', userId)
+### Response Format
+All API responses should follow a consistent format:
+- Success: `{ success: true, data: {...} }`
+- Error: `{ success: false, error: "message", details?: "additional info" }`
 
-    const { searchParams } = new URL(request.url)
-    const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 100)
-    const offset = parseInt(searchParams.get('offset') || '0')
-    if (limit < 1 || limit > 100) return NextResponse.json({ error: 'Limit must be between 1 and 100' }, { status: 400 })
-    if (offset < 0) return NextResponse.json({ error: 'Offset must be non-negative' }, { status: 400 })
+### Error Status Codes
+- 400: Bad Request (validation errors, missing fields)
+- 401: Unauthorized (invalid auth)
+- 403: Forbidden (valid auth but insufficient permissions)
+- 404: Not Found (resource doesn't exist)
+- 409: Conflict (resource already exists)
+- 500: Internal Server Error (unexpected errors)
 
-    // Query DB with user scoping and return results...
-    // const rows = await db.select(...).from(things).where(eq(things.userId, userId)).orderBy(desc(things.createdAt)).limit(limit).offset(offset)
-    // const total = (await db.select({ count: count() }).from(things).where(eq(things.userId, userId)))[0]?.count || 0
+### Error Logging
+- Use console.log with emoji prefixes for better visibility
+- Include operation context: `console.log('📋 GET /api/v1/endpoints - Fetching user endpoints')`
+- Log errors with full context: `console.error('❌ POST /api/v1/endpoints - Error:', error)`
 
-    const response: GetThingsResponse = {
-      data: [],
-      pagination: { limit, offset, total: 0, hasMore: false }
-    }
-    console.log('✅ Successfully retrieved things')
-    return NextResponse.json(response)
-  } catch (err) {
-    console.error('❌ GET /api/v2/things - Error:', err)
+## Validation Requirements
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+### Input Validation
+- Always validate required fields before processing
+- Use type-safe validation (current: manual checks, future: Effect Schema)
+- Validate data types and formats (URLs, emails, etc.)
+- Return specific error messages for validation failures
+
+Make sure the functions you use are in the lib/ folder, make sure if you are creating a new function or file that it is in the correct lib/xyz folder like a domain related function should be in lib/domain-and-dns/<filename>.ts
 
 ---
 > Source: [inboundemail/inbound](https://github.com/inboundemail/inbound) — distributed by [TomeVault](https://tomevault.io).
