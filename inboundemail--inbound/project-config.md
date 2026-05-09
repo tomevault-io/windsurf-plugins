@@ -1,104 +1,213 @@
 ---
 trigger: always_on
-description: Full docs: https://www.better-auth.com/docs/plugins/organization
+description: This project uses the Better Auth Stripe plugin for payment and subscription functionality. Here are the key patterns and configurations:
 ---
 
-# Better Auth — Organization Plugin
+# Better Auth Stripe Integration Guide
 
-Full docs: https://www.better-auth.com/docs/plugins/organization
+This project uses the Better Auth Stripe plugin for payment and subscription functionality. Here are the key patterns and configurations:
 
-## Setup
+## Project Structure
 
-```ts
-// server
-import { organization } from "better-auth/plugins"
-export const auth = betterAuth({ plugins: [organization()] })
+- **Auth Server**: Look for `auth.ts` in the lib directory for server-side Stripe configuration
+- **Auth Client**: [lib/auth-client.ts](mdc:lib/auth-client.ts) - Client-side auth utilities with Stripe client
+- **Database Schema**: [lib/db/schema.ts](mdc:lib/db/schema.ts) - Contains subscription tables and user Stripe fields
 
-// client
-import { organizationClient } from "better-auth/client/plugins"
-export const authClient = createAuthClient({ plugins: [organizationClient()] })
-```
+## Server-Side Configuration
 
-## Key Client Methods
+### Basic Stripe Plugin Setup
+```typescript
+import { betterAuth } from "better-auth"
+import { stripe } from "@better-auth/stripe"
+import Stripe from "stripe"
 
-```ts
-// Org management
-authClient.organization.create({ name, slug })
-authClient.organization.update({ data: { name, slug, logo } })
-authClient.organization.delete({ organizationId })
-authClient.organization.setActive({ organizationId })
-authClient.useActiveOrganization()
-authClient.useListOrganizations()
+const stripeClient = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+    apiVersion: "2025-02-24.acacia",
+})
 
-// Members
-authClient.organization.inviteMember({ email, role, organizationId })
-authClient.organization.acceptInvitation({ invitationId })
-authClient.organization.removeMember({ memberIdOrEmail, organizationId })
-authClient.organization.updateMemberRole({ role, memberId, organizationId })
-authClient.organization.leave({ organizationId })
-
-// Permissions
-authClient.organization.hasPermission({ permissions: { resource: ["action"] } })
-```
-
-## Key Server Methods
-
-```ts
-auth.api.createOrganization({ body: { name, slug }, headers })
-auth.api.getFullOrganization({ query: { organizationId }, headers })
-auth.api.createInvitation({ body: { email, role, organizationId } })
-auth.api.addMember({ body: { userId, role, organizationId } })
-auth.api.hasPermission({ headers, body: { permissions: { resource: ["action"] } } })
-```
-
-## Default Roles
-
-| Role | Permissions |
-|------|-------------|
-| `owner` | Full control |
-| `admin` | Full control except delete org / change owner |
-| `member` | Read only on org/member/invitation resources |
-
-## Custom Permissions
-
-```ts
-import { createAccessControl } from "better-auth/plugins/access"
-
-const statement = { project: ["create", "update", "delete"] } as const
-const ac = createAccessControl(statement)
-const member = ac.newRole({ project: ["create"] })
-const admin = ac.newRole({ project: ["create", "update"] })
-
-// Pass to both server and client plugins: { ac, roles: { member, admin, owner } }
-```
-
-## Lifecycle Hooks
-
-```ts
-organization({
-  organizationHooks: {
-    beforeCreateOrganization: async ({ organization, user }) => ({ data: { ...organization } }),
-    afterCreateOrganization: async ({ organization, member, user }) => { /* ... */ },
-    beforeAddMember: async ({ member, user, organization }) => { /* throw to block */ },
-    afterAddMember: async ({ member, user, organization }) => { /* ... */ },
-    beforeCreateInvitation: async ({ invitation, inviter, organization }) => ({ data: { ...invitation } }),
-    afterAcceptInvitation: async ({ invitation, member, user, organization }) => { /* ... */ },
-  },
-  sendInvitationEmail: async (data) => {
-    const link = `https://yourapp.com/accept-invitation/${data.id}`
-    // send email with link
-  },
+export const auth = betterAuth({
+    plugins: [
+        stripe({
+            stripeClient,
+            stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET!,
+            createCustomerOnSignUp: true,
+        })
+    ]
 })
 ```
 
-## Teams (optional)
+### Subscription Plans Configuration
+```typescript
+// Static plans
+subscription: {
+    enabled: true,
+    plans: [
+        {
+            name: "basic",
+            priceId: "price_1234567890",
+            annualDiscountPriceId: "price_1234567890", // optional
+            limits: {
+                projects: 5,
+                storage: 10
+            }
+        },
+        {
+            name: "pro",
+            priceId: "price_0987654321",
+            limits: {
+                projects: 20,
+                storage: 50
+            },
+            freeTrial: {
+                days: 14,
+            }
+        }
+    ]
+}
 
-```ts
-organization({ teams: { enabled: true, maximumTeams: 10 } })
-organizationClient({ teams: { enabled: true } })
-
-// Methods: createTeam, listTeams, updateTeam, removeTeam, addTeamMember, removeTeamMember
+// Dynamic plans (from database)
+subscription: {
+    enabled: true,
+    plans: async () => {
+        const plans = await db.query("SELECT * FROM plans");
+        return plans.map(plan => ({
+            name: plan.name,
+            priceId: plan.stripe_price_id,
+            limits: JSON.parse(plan.limits)
+        }));
+    }
+}
 ```
+
+## Client-Side Configuration
+
+### Auth Client Setup
+```typescript
+import { createAuthClient } from "better-auth/client"
+import { stripeClient } from "@better-auth/stripe/client"
+
+export const client = createAuthClient({
+    plugins: [
+        stripeClient({
+            subscription: true // enables subscription management
+        })
+    ]
+})
+```
+
+## Subscription Management Patterns
+
+### Creating Subscriptions
+```typescript
+// Basic subscription upgrade
+await client.subscription.upgrade({
+    plan: "pro",
+    successUrl: "/dashboard",
+    cancelUrl: "/pricing",
+    annual: true, // optional: upgrade to annual plan
+    referenceId: "org_123", // optional: defaults to user ID
+    seats: 5 // optional: for team plans
+});
+
+// With error handling
+const { error } = await client.subscription.upgrade({
+    plan: "pro",
+    successUrl: "/dashboard",
+    cancelUrl: "/pricing",
+});
+if(error) {
+    alert(error.message);
+}
+```
+
+### Listing Active Subscriptions
+```typescript
+const { data: subscriptions } = await client.subscription.list();
+
+// Get the active subscription
+const activeSubscription = subscriptions.find(
+    sub => sub.status === "active" || sub.status === "trialing"
+);
+
+// Check subscription limits
+const projectLimit = activeSubscription?.limits?.projects || 0;
+```
+
+### Canceling Subscriptions
+```typescript
+const { data } = await client.subscription.cancel({
+    returnUrl: "/account",
+    referenceId: "org_123" // optional, defaults to userId
+});
+```
+
+### Restoring Canceled Subscriptions
+```typescript
+const { data } = await client.subscription.restore({
+    referenceId: "org_123" // optional, defaults to userId
+});
+```
+
+## Reference System for Organizations
+
+### Team/Organization Subscriptions
+```typescript
+// Create subscription for organization
+await client.subscription.upgrade({
+    plan: "team",
+    referenceId: "org_123456",
+    seats: 10, // team members
+    successUrl: "/org/billing/success",
+    cancelUrl: "/org/billing"
+});
+
+// List organization subscriptions
+const { data: subscriptions } = await client.subscription.list({
+    query: {
+        referenceId: "org_123456"
+    }
+});
+```
+
+### Authorization for Reference IDs
+```typescript
+subscription: {
+    authorizeReference: async ({ user, session, referenceId, action }) => {
+        if (action === "upgrade-subscription" || action === "cancel-subscription" || action === "restore-subscription") {
+            const org = await db.member.findFirst({
+                where: {
+                    organizationId: referenceId,
+                    userId: user.id
+                }   
+            });
+            return org?.role === "owner"
+        }
+        return true;
+    }
+}
+```
+
+## Webhook Configuration
+
+### Required Webhook Events
+Set up webhooks in Stripe dashboard for:
+- `checkout.session.completed`
+- `customer.subscription.updated` 
+- `customer.subscription.deleted`
+
+Webhook URL: `https://your-domain.com/api/auth/stripe/webhook`
+
+### Custom Event Handling
+```typescript
+stripe({
+    onEvent: async (event) => {
+        switch (event.type) {
+            case "invoice.paid":
+                // Handle paid invoice
+                break;
+            case "payment_intent.succeeded":
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [inboundemail/inbound](https://github.com/inboundemail/inbound) — distributed by [TomeVault](https://tomevault.io).
