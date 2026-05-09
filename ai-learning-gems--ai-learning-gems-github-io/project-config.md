@@ -1,94 +1,83 @@
 ---
 trigger: always_on
-description: WCAG-compliant semantic color-coding for key concepts in textbook chapters — applies during editing pass
+description: Zero World Knowledge principle, source verification, training data boundaries, sub-agent rules, observed failure patterns
 ---
 
 
-# Semantic Concept Coloring
+# Source Integrity Rules
 
-Rules for applying consistent semantic color-coding to key concepts throughout textbook chapters. This technique uses author-provided color as a **visual signal** (Mayer's Signaling Principle) to help readers mentally separate and track concept categories.
-
-**Research basis:** Color-coding is a form of visual signaling with meta-analytic support (Alpizar et al. 2020, g = 0.22; Richter et al. 2016, d = 0.22). Liu et al. (2021) found large effect sizes (eta-squared = 0.23) with lower cognitive load (measured by pupil diameter and EEG). This is fundamentally different from student-directed highlighting (Dunlosky LOW utility): author-provided semantic color-coding is expert-curated, consistent, and functions as a perceptual signal, not a learning activity. It leverages pre-attentive processing (Treisman & Gelade 1980), the Von Restorff isolation effect, and dual coding (Paivio 1986).
+Shared source verification and world-knowledge rules for all textbook chapter workflows (write, update, edit). These rules exist because LLMs confidently produce plausible-sounding but incorrect information about well-known topics. Every rule below was motivated by a real failure in a real chapter-writing session.
 
 ---
 
-## When to Apply
+## Why Source Integrity Matters
 
-The coloring pass is part of the **editing workflow** (`edit-textbook-chapter.md`). It runs AFTER prose-quality editing is complete — it should be the last content-level pass before final verification. The writing workflow (`write-textbook-chapter.md`) may also apply coloring during initial writing, especially in the Chapter Overview paragraph where the technique has the highest impact.
+A textbook chapter that gets a quote slightly wrong, rounds a statistic, or describes a framework from memory instead of from its creator's actual words has *silently corrupted the reader's knowledge*. The reader trusts the textbook. They will cite the wrong number in their own paper. They will misattribute the quote. They will describe the framework incorrectly to their students. The corruption propagates.
 
----
-
-## The Color Palette (WCAG AA Compliant)
-
-All colors pass WCAG AA (4.5:1 minimum) for normal-size text on white backgrounds. They are Tailwind CSS 600-700 shades, chosen for perceptual distinguishability and colorblind safety.
-
-| # | Name | Hex | WCAG Ratio | Prose Syntax | LaTeX Syntax |
-|---|---|---|---|---|---|
-| 1 | **Indigo** | `#4F46E5` | 6.29:1 | `[**term**]{style="color: #4F46E5;"}` | `$\textcolor{#4F46E5}{symbol}$` |
-| 2 | **Emerald** | `#047857` | 5.48:1 | `[**term**]{style="color: #047857;"}` | `$\textcolor{#047857}{symbol}$` |
-| 3 | **Rose** | `#E11D48` | 4.70:1 | `[**term**]{style="color: #E11D48;"}` | `$\textcolor{#E11D48}{symbol}$` |
-| 4 | **Sky** | `#0369A1` | 5.93:1 | `[**term**]{style="color: #0369A1;"}` | `$\textcolor{#0369A1}{symbol}$` |
-| 5 | **Amber** | `#B45309` | 5.02:1 | `[**term**]{style="color: #B45309;"}` | `$\textcolor{#B45309}{symbol}$` |
-| 6 | **Purple** | `#7E22CE` | 6.98:1 | `[**term**]{style="color: #7E22CE;"}` | `$\textcolor{#7E22CE}{symbol}$` |
-| 7 | **Teal** | `#0F766E` | 5.23:1 | `[**term**]{style="color: #0F766E;"}` | `$\textcolor{#0F766E}{symbol}$` |
-| 8 | **Slate** | `#475569` | 7.58:1 | `[**term**]{style="color: #475569;"}` | `$\textcolor{#475569}{symbol}$` |
-
-**Use at most 3-5 colors per chapter.** Pick the colors most relevant to the chapter's concept categories. The full palette of 8 provides flexibility across different chapters, but She et al. (2024) showed single-color cues outperform multi-color, and the Von Restorff effect disappears when everything is colored.
+The only way to prevent this is to treat every specific claim as unverified until it is confirmed against a downloaded, readable source file.
 
 ---
 
-## How to Assign Colors to Concepts
+## Zero World Knowledge Principle
 
-### Step 1: Identify 3-5 Major Concept Categories
+**You know nothing about the topic except what you read from the downloaded sources.**
 
-Read the chapter overview and identify the 3-5 most important conceptual pillars. These should be genuinely distinct categories, not synonyms or subcategories of each other.
+You are a skilled writer and organizer, but you have **zero reliable knowledge** about the chapter's topic. Your training data may contain information about the topic, but that information may be outdated, incomplete, or wrong. You MUST NOT:
 
-**Example (MoE chapter):**
+- Quote an author from memory (even a famous, widely-known quote)
+- Cite a statistic you "know" without reading the source
+- Describe a method, framework, or concept from training data instead of from a downloaded source
+- Fill in gaps when a source is unavailable by "remembering" the content
+- Assume a well-known fact is correct without verifying it in a source
 
-| Color | Category | Example Terms |
+**If you cannot find a claim in a downloaded, readable source file, the claim does not exist for you.** Drop it, or download a source that contains it.
+
+---
+
+## What Training Data Can and Cannot Be Used For
+
+The Zero World Knowledge Principle is strict, but not absolute. There is a precise boundary.
+
+### Hard Ban (Requires a Downloaded Source)
+
+| Category | Why It Must Be Sourced | Example of Failure |
 |---|---|---|
-| Indigo `#4F46E5` | Architecture/structure | MoE layer, expert FFN, dense vs sparse |
-| Emerald `#047857` | Routing/selection | router, top-k, gating, token assignment |
-| Rose `#E11D48` | Training/optimization | auxiliary loss, load balancing, capacity factor |
+| **Direct quotes** | Exact wording matters. Training data paraphrases, combines, and misattributes. | Attributing "writing is a primary mechanism for doing research" to Peyton Jones when the transcript says something different. |
+| **Statistics and numbers** | Specific numbers drift. A "21%" becomes "20%." A sample size gets rounded. | Writing "6.5-16.9% of reviews" when the paper says "15.8%." |
+| **Named frameworks and methodologies** | The creator's original formulation may differ from popularizations. | Describing the "ABT framework" without reading Olson's actual writing, getting the structure wrong. |
+| **Specific claims about what an author said, argued, or found** | Training data conflates authors, misattributes findings, merges claims from different papers. | Writing "Pinker argues X" when Pinker actually argues something subtly different. |
+| **Paper titles, author lists, venues, and years** | Training data frequently gets these wrong, especially for recent papers. | Attributing a paper to "Liang et al." when the actual authors are "Russo Latona et al." |
+| **Descriptions of specific papers, blog posts, or talks** | What a specific work contains must come from reading it. | Claiming a paper "found X" without reading it to verify. |
 
-**Example (Vision Transformers chapter):**
+### Acceptable (No Source Required)
 
-| Color | Category | Example Terms |
+| Category | Why It's Okay | Example |
 |---|---|---|
-| Indigo `#4F46E5` | Architecture | ViT, patch embedding, class token |
-| Emerald `#047857` | Attention mechanism | self-attention, multi-head, Q/K/V |
-| Amber `#B45309` | Training/scaling | pre-training, fine-tuning, data augmentation |
-| Sky `#0369A1` | Mathematical objects | patch vectors, position embeddings, attention weights |
+| **Pointing to well-known people as examples** | You are citing them as instances of a category, not claiming what they said. | "Karpathy's blog posts are widely read." "Lilian Weng writes survey-style posts." |
+| **General domain knowledge** (non-controversial, non-attributed) | Statements any practitioner would agree with. | "NeurIPS, ICML, and ICLR are top AI conferences." "LaTeX is standard for CS papers." |
+| **Structural and rhetorical devices** | How you organize the chapter, analogies, narrative framing. | Using a running example. Creating comparison tables. |
+| **Common vocabulary and definitions** | Terms whose meaning is standardized. | "An abstract summarizes the paper." "Ablation studies remove components one at a time." |
 
-### Step 2: Document the Color Map
+### The Litmus Test
 
-At the top of TEXTBOOK-PLAN.md (or in the editing pass notes), create an explicit color map table. This is the single source of truth for the chapter's coloring. Every colored term must trace back to this table.
+Before writing any claim, ask: **"Am I making a specific claim that could be wrong?"**
 
-### Step 3: Never Reuse a Color for a Different Category
+- "Karpathy writes clearly" → general characterization, okay.
+- "Karpathy writes in his blog that X" → specific claim, requires a source.
+- "The ABT framework stands for And, But, Therefore" → named framework, requires a source.
+- "AI conferences have high submission volumes" → general knowledge, okay.
+- "Jiang et al. found that writing quality predicts acceptance across 28,000 submissions" → specific statistic, requires the actual paper.
 
-If Indigo means "architecture" in Section 1, it must mean "architecture" in Section 6. Inconsistency turns signal into noise and violates the categorization benefit.
+**When in doubt, download the source.** Minutes to download. The reader's trust to lose.
 
 ---
 
-## Where to Apply Color
+## Source Readability Verification
 
-### In the Chapter Overview (HIGHEST IMPACT)
+**Downloaded is not the same as readable.** A PDF in the source folder is useless if it has never been extracted to text.
 
-The Chapter Overview paragraph is the ideal place for the first appearance of colored terms. This is where the reader builds their mental model of the chapter's structure, and color visually separates the pillars.
-
-**Example:**
-
-```markdown
-To understand MoE, you need a mental model with three layers: (1) the
-[**architecture**]{style="color: #4F46E5;"}, i.e. what an MoE layer looks like;
-(2) the [**routing mechanism**]{style="color: #047857;"}, i.e. how the model decides
-which expert handles which token; and (3) the
-[**training machinery**]{style="color: #E11D48;"}, i.e. the auxiliary losses and
-balancing tricks that make MoE training stable.
-```
-
-### On First Mention of a Key Term in Each Section
-
+For each source folder, verify:
+1. Does it contain at least one `.md`, `.tex`, or `.txt` file with >500 characters?
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
