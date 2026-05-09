@@ -1,274 +1,69 @@
 ---
 trigger: always_on
-description: **必须严格遵守以下规则，禁止使用任何不存在的 className，避免 AI 幻觉生成虚假类名。**
+description: Comprehensive reference for Taskmaster MCP tools and CLI commands.
 ---
 
-# Tailwind CSS + Headless UI 严格约束规则
+# Taskmaster Tool & Command Reference
 
-**必须严格遵守以下规则，禁止使用任何不存在的 className，避免 AI 幻觉生成虚假类名。**
+This document provides a detailed reference for interacting with Taskmaster, covering both the recommended MCP tools, suitable for integrations like Cursor, and the corresponding `task-master` CLI commands, designed for direct user interaction or fallback.
 
-## ⚠️ 核心原则
+**Note:** For interacting with Taskmaster programmatically or via integrated tools, using the **MCP tools is strongly recommended** due to better performance, structured data, and error handling. The CLI commands serve as a user-friendly alternative and fallback. 
 
-- **只使用官方文档确认存在的类名**
-- **禁止使用小数点数值**（如 `gap-2.5`、`p-1.5` 等）
-- **禁止自创组合类名**
-- **所有类名必须经过验证**
+**Important:** Several MCP tools involve AI processing... The AI-powered tools include `parse_prd`, `analyze_project_complexity`, `update_subtask`, `update_task`, `update`, `expand_all`, `expand_task`, and `add_task`.
 
-## 🎯 Tailwind CSS 间距系统（Spacing Scale）
+---
 
-### ✅ 允许的间距值（Tailwind v4.1）
+## Initialization & Setup
 
-**基础间距单位：`--spacing: 0.25rem` (4px)**
+### 1. Initialize Project (`init`)
 
-```
-0     = 0px
-px    = 1px
-0.5   = 2px     (0.125rem)
-1     = 4px     (0.25rem)
-1.5   = 6px     (0.375rem)
-2     = 8px     (0.5rem)
-2.5   = 10px    (0.625rem)
-3     = 12px    (0.75rem)
-3.5   = 14px    (0.875rem)
-4     = 16px    (1rem)
-5     = 20px    (1.25rem)
-6     = 24px    (1.5rem)
-7     = 28px    (1.75rem)
-8     = 32px    (2rem)
-9     = 36px    (2.25rem)
-10    = 40px    (2.5rem)
-11    = 44px    (2.75rem)
-12    = 48px    (3rem)
-14    = 56px    (3.5rem)
-16    = 64px    (4rem)
-20    = 80px    (5rem)
-24    = 96px    (6rem)
-28    = 112px   (7rem)
-32    = 128px   (8rem)
-36    = 144px   (9rem)
-40    = 160px   (10rem)
-44    = 176px   (11rem)
-48    = 192px   (12rem)
-52    = 208px   (13rem)
-56    = 224px   (14rem)
-60    = 240px   (15rem)
-64    = 256px   (16rem)
-72    = 288px   (18rem)
-80    = 320px   (20rem)
-96    = 384px   (24rem)
-```
+*   **MCP Tool:** `initialize_project`
+*   **CLI Command:** `task-master init [options]`
+*   **Description:** `Set up the basic Taskmaster file structure and configuration in the current directory for a new project.`
+*   **Key CLI Options:**
+    *   `--name <name>`: `Set the name for your project in Taskmaster's configuration.`
+    *   `--description <text>`: `Provide a brief description for your project.`
+    *   `--version <version>`: `Set the initial version for your project, e.g., '0.1.0'.`
+    *   `-y, --yes`: `Initialize Taskmaster quickly using default settings without interactive prompts.`
+*   **Usage:** Run this once at the beginning of a new project.
+*   **MCP Variant Description:** `Set up the basic Taskmaster file structure and configuration in the current directory for a new project by running the 'task-master init' command.`
+*   **Key MCP Parameters/Options:**
+    *   `projectName`: `Set the name for your project.` (CLI: `--name <name>`)
+    *   `projectDescription`: `Provide a brief description for your project.` (CLI: `--description <text>`)
+    *   `projectVersion`: `Set the initial version for your project, e.g., '0.1.0'.` (CLI: `--version <version>`)
+    *   `authorName`: `Author name.` (CLI: `--author <author>`)
+    *   `skipInstall`: `Skip installing dependencies. Default is false.` (CLI: `--skip-install`)
+    *   `addAliases`: `Add shell aliases tm and taskmaster. Default is false.` (CLI: `--aliases`)
+    *   `yes`: `Skip prompts and use defaults/provided arguments. Default is false.` (CLI: `-y, --yes`)
+*   **Usage:** Run this once at the beginning of a new project, typically via an integrated tool like Cursor. Operates on the current working directory of the MCP server. 
+*   **Important:** Once complete, you *MUST* parse a prd in order to generate tasks. There will be no tasks files until then. The next step after initializing should be to create a PRD using the example PRD in .taskmaster/templates/example_prd.txt. 
 
-### ❌ 禁止使用的间距值
+### 2. Parse PRD (`parse_prd`)
 
-```
-// 🚫 错误 - 不存在的小数点间距
-gap-2.5
-p-1.5
-m-3.5
-space-x-4.5
+*   **MCP Tool:** `parse_prd`
+*   **CLI Command:** `task-master parse-prd [file] [options]`
+*   **Description:** `Parse a Product Requirements Document, PRD, or text file with Taskmaster to automatically generate an initial set of tasks in tasks.json.`
+*   **Key Parameters/Options:**
+    *   `input`: `Path to your PRD or requirements text file that Taskmaster should parse for tasks.` (CLI: `[file]` positional or `-i, --input <file>`)
+    *   `output`: `Specify where Taskmaster should save the generated 'tasks.json' file. Defaults to '.taskmaster/tasks/tasks.json'.` (CLI: `-o, --output <file>`)
+    *   `numTasks`: `Approximate number of top-level tasks Taskmaster should aim to generate from the document.` (CLI: `-n, --num-tasks <number>`)
+    *   `force`: `Use this to allow Taskmaster to overwrite an existing 'tasks.json' without asking for confirmation.` (CLI: `-f, --force`)
+*   **Usage:** Useful for bootstrapping a project from an existing requirements document.
+*   **Notes:** Task Master will strictly adhere to any specific requirements mentioned in the PRD, such as libraries, database schemas, frameworks, tech stacks, etc., while filling in any gaps where the PRD isn't fully specified. Tasks are designed to provide the most direct implementation path while avoiding over-engineering.
+*   **Important:** This MCP tool makes AI calls and can take up to a minute to complete. Please inform users to hang tight while the operation is in progress. If the user does not have a PRD, suggest discussing their idea and then use the example PRD in `.taskmaster/templates/example_prd.txt` as a template for creating the PRD based on their idea, for use with `parse-prd`.
 
-// 🚫 错误 - 不存在的数值
-gap-15
-p-17
-m-13
-```
+---
 
-### ✅ 正确的间距类名
+## AI Model Configuration
 
-```jsx
-// ✅ 正确 - 使用存在的间距值
-<div className="gap-2 p-4 m-3 space-x-6">
-<div className="px-4 py-2 mx-auto">
-<div className="mt-8 mb-4 ml-2 mr-6">
-```
-
-## 📏 Gap 系统规则
-
-### ✅ 允许的 Gap 类名
-
-```css
-gap-0, gap-px, gap-0.5, gap-1, gap-1.5, gap-2, gap-2.5, gap-3, gap-3.5, gap-4, gap-5, gap-6, gap-7, gap-8, gap-9, gap-10, gap-11, gap-12, gap-14, gap-16, gap-20, gap-24, gap-28, gap-32, gap-36, gap-40, gap-44, gap-48, gap-52, gap-56, gap-60, gap-64, gap-72, gap-80, gap-96
-
-gap-x-0, gap-x-px, gap-x-0.5... (同上数值)
-gap-y-0, gap-y-px, gap-y-0.5... (同上数值)
-```
-
-### ❌ 禁止的 Gap 用法
-
-```jsx
-// 🚫 错误 - 不存在
-<div className="gap-2.5"> // Tailwind 中不存在 gap-2.5
-<div className="gap-15">  // 不存在 gap-15
-<div className="gap-13">  // 不存在 gap-13
-```
-
-### ✅ 正确的 Gap 用法
-
-```jsx
-// ✅ 正确
-<div className="flex gap-4">
-<div className="grid grid-cols-3 gap-6">
-<div className="flex gap-x-4 gap-y-8">
-```
-
-## 🎨 Tailwind CSS 颜色系统
-
-### ✅ 标准颜色等级
-
-**每种颜色都有以下等级：**
-```
-50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950
-```
-
-### ✅ 允许的颜色类名
-
-```css
-/* 基础颜色 */
-black, white
-
-/* 灰色系 */
-slate-50, slate-100, ..., slate-950
-gray-50, gray-100, ..., gray-950
-zinc-50, zinc-100, ..., zinc-950
-neutral-50, neutral-100, ..., neutral-950
-stone-50, stone-100, ..., stone-950
-
-/* 彩色系 */
-red-50, red-100, ..., red-950
-orange-50, orange-100, ..., orange-950
-amber-50, amber-100, ..., amber-950
-yellow-50, yellow-100, ..., yellow-950
-lime-50, lime-100, ..., lime-950
-green-50, green-100, ..., green-950
-emerald-50, emerald-100, ..., emerald-950
-teal-50, teal-100, ..., teal-950
-cyan-50, cyan-100, ..., cyan-950
-sky-50, sky-100, ..., sky-950
-blue-50, blue-100, ..., blue-950
-indigo-50, indigo-100, ..., indigo-950
-violet-50, violet-100, ..., violet-950
-purple-50, purple-100, ..., purple-950
-fuchsia-50, fuchsia-100, ..., fuchsia-950
-pink-50, pink-100, ..., pink-950
-rose-50, rose-100, ..., rose-950
-```
-
-### ❌ 禁止的颜色用法
-
-```jsx
-// 🚫 错误 - 不存在的颜色等级
-<div className="bg-blue-150">   // 不存在
-<div className="text-red-75">   // 不存在
-<div className="border-green-550"> // 不存在
-```
-
-## 🔤 字体大小系统
-
-### ✅ 允许的字体大小类名
-
-```css
-text-xs     = 0.75rem
-text-sm     = 0.875rem
-text-base   = 1rem
-text-lg     = 1.125rem
-text-xl     = 1.25rem
-text-2xl    = 1.5rem
-text-3xl    = 1.875rem
-text-4xl    = 2.25rem
-text-5xl    = 3rem
-text-6xl    = 3.75rem
-text-7xl    = 4.5rem
-text-8xl    = 6rem
-text-9xl    = 8rem
-```
-
-### ❌ 禁止的字体大小
-
-```jsx
-// 🚫 错误 - 不存在
-<h1 className="text-xxl">    // 不存在
-<p className="text-medium">  // 不存在
-<span className="text-1xl">  // 不存在
-```
-
-## 🏗️ Headless UI 组件约束
-
-### ✅ React Headless UI 组件
-
-**@headlessui/react** 包含以下组件：
-
-```jsx
-// ✅ 正确的 Headless UI 组件
-import {
-  Dialog,
-  Disclosure,
-  Menu,
-  Popover,
-  RadioGroup,
-  Switch,
-  Tab,
-  Transition,
-  Listbox,
-  Combobox
-} from '@headlessui/react'
-```
-
-### ✅ 正确的 Headless UI 用法
-
-```jsx
-// ✅ Dialog 组件
-<Dialog open={isOpen} onClose={setIsOpen}>
-  <Dialog.Panel className="bg-white p-6 rounded-lg">
-    <Dialog.Title className="text-lg font-medium">
-      Title
-    </Dialog.Title>
-    <Dialog.Description className="text-gray-500">
-      Description
-    </Dialog.Description>
-  </Dialog.Panel>
-</Dialog>
-
-// ✅ Menu 组件
-<Menu as="div" className="relative">
-  <Menu.Button className="px-4 py-2 bg-blue-500 text-white rounded">
-    Options
-  </Menu.Button>
-  <Menu.Items className="absolute mt-2 bg-white border rounded shadow-lg">
-    <Menu.Item>
-      {({ active }) => (
-        <a className={`block px-4 py-2 ${active ? 'bg-gray-100' : ''}`}>
-          Item 1
-        </a>
-      )}
-    </Menu.Item>
-  </Menu.Items>
-</Menu>
-```
-
-### ❌ 禁止的组件使用
-
-```jsx
-// 🚫 错误 - 不存在的组件
-import { Modal } from '@headlessui/react'     // 应该用 Dialog
-import { Dropdown } from '@headlessui/react' // 应该用 Menu
-import { Tooltip } from '@headlessui/react'  // Headless UI 没有 Tooltip
-```
-
-## 📱 响应式设计约束
-
-### ✅ 标准断点
-
-```css
-sm:   = @media (min-width: 640px)
-md:   = @media (min-width: 768px)
-lg:   = @media (min-width: 1024px)
-xl:   = @media (min-width: 1280px)
-2xl:  = @media (min-width: 1536px)
-```
-
-### ✅ 正确的响应式用法
-
-```jsx
+### 2. Manage Models (`models`)
+*   **MCP Tool:** `models`
+*   **CLI Command:** `task-master models [options]`
+*   **Description:** `View the current AI model configuration or set specific models for different roles (main, research, fallback). Allows setting custom model IDs for Ollama and OpenRouter.`
+*   **Key MCP Parameters/Options:**
+    *   `setMain <model_id>`: `Set the primary model ID for task generation/updates.` (CLI: `--set-main <model_id>`)
+    *   `setResearch <model_id>`: `Set the model ID for research-backed operations.` (CLI: `--set-research <model_id>`)
+    *   `setFallback <model_id>`: `Set the model ID to use if the primary fails.` (CLI: `--set-fallback <model_id>`)
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
