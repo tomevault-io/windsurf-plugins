@@ -1,121 +1,98 @@
 ---
 trigger: always_on
-description: Focus order and focus styles accessibility standards per WCAG 2.4.7 Focus Visible, 1.4.11 Non-Text Contrast, 2.4.13 Focus Appearance, and 2.4.11 Focus Not Obscured requirements
+description: Form component accessibility standards and WCAG compliance for form inputs, labels, instructions, and error handling
 ---
 
 
-# Focus Order and Focus Styles Accessibility Standards
+# Form Accessibility Standards
 
-Ensures proper focus order, tabindex usage, and focus indicators following WCAG 2.4.7 Focus Visible, 1.4.11 Non-Text Contrast, 2.4.13 Focus Appearance, and 2.4.11 Focus Not Obscured requirements.
+Ensures form components follow WCAG compliance and provide proper accessibility for all users including screen reader users and keyboard-only users.
 
 <rule>
-name: focus_order_and_styles_accessibility_standards
-description: Enforce focus order and focus styles accessibility standards per WCAG requirements
+name: form_accessibility_standards
+description: Enforce form component accessibility standards and WCAG compliance for form inputs, labels, instructions, and error handling
 filters:
   - type: file_extension
-    pattern: "\\.(vue|jsx|tsx|html|liquid|php|js|ts|css|scss|sass|less)$"
+    pattern: "\\.(vue|jsx|tsx|html|liquid|php|js|ts)$"
 
 actions:
   - type: enforce
     conditions:
-      # Positive tabindex values (should not be used)
-      - pattern: "tabindex=\"[1-9]\""
-        message: "Positive tabindex values create illogical focus order. Use DOM order instead or tabindex=\"0\" for custom focusable elements."
+      # Missing label association for form inputs
+      - pattern: "(?i)<(input|textarea|select)[^>]*>"
+        pattern_negate: "(<label[^>]*for|id.*for|aria-label|aria-labelledby|title=)"
+        message: "Form inputs must have programmatically associated labels via label/for, aria-label, aria-labelledby, or title attributes."
 
-      # Missing focus styles (outline: 0 or outline: none)
-      - pattern: "outline:\\s*0|outline:\\s*none"
-        message: "Focus styles should not be removed. Use custom focus indicators that meet WCAG contrast requirements."
+      # Empty or meaningless labels
+      - pattern: "(?i)<label[^>]*>\\s*(?:label|input|field|required)\\s*</label>"
+        message: "Form labels must contain meaningful text that describes the input purpose, not generic terms."
 
-      # Focus styles with insufficient contrast (light colors)
-      - pattern: "outline.*#[89abcdefABCDEF]{6}|outline.*#[cdefCDEF]{3,6}"
-        message: "Light focus outline colors may not meet 3:1 contrast ratio requirement for UI component identification."
+      # Placeholder as only label
+      - pattern: "(?i)<input[^>]*placeholder=\"[^\"]+\"[^>]*>"
+        pattern_negate: "(<label|aria-label|aria-labelledby|title=)"
+        message: "Placeholder text cannot be the only method of providing a label. Add a proper label element or aria-label."
 
-      # Missing focus-visible implementation
-      - pattern: ":focus\\s*\\{"
-        pattern_negate: ":focus-visible|:focus:not\\(:focus-visible\\)"
-        message: "Consider implementing :focus-visible for better keyboard-only focus indication."
+      # Missing required field indicators
+      - pattern: "(?i)<(input|textarea|select)[^>]*required[^>]*>"
+        pattern_negate: "(data-required|aria-required=\"true\"|\\*|aria-describedby)"
+        message: "Required fields should use data-required='true' instead of native required attribute, with visual indicators and aria-required='true' for screen readers."
 
-      # Focus styles that may be obscured
-      - pattern: "outline-offset:\\s*-?0\\.?0*px|outline-offset:\\s*0"
-        message: "Consider using positive outline-offset to prevent focus indicators from being obscured by adjacent elements."
+      # Missing fieldset for grouped inputs
+      - pattern: "(?i)<input[^>]*type=\"(radio|checkbox)\"[^>]*name=\"[^\"]+\"[^>]*>"
+        pattern_negate: "(<fieldset|<div[^>]*role=\"group\")"
+        message: "Radio button and checkbox groups should be wrapped in fieldset or have role='group' for proper grouping."
 
-      # Missing forced-colors media query for Windows High Contrast
-      - pattern: "@media\\s*\\(forced-colors:\\s*active\\)"
-        pattern_negate: "outline.*transparent"
-        message: "Windows High Contrast Mode requires transparent outline for native focus appearance."
+      # Missing legend for fieldset
+      - pattern: "(?i)<fieldset[^>]*>"
+        pattern_negate: "<legend"
+        message: "Fieldset elements must have legend elements to provide context for the group."
 
-      # Custom focusable elements without proper tabindex
-      - pattern: "<(div|span|button)[^>]*onclick|onkeydown|onkeypress"
-        pattern_negate: "tabindex=\"[0-9]\"|role=\"button\"|role=\"link\""
-        message: "Custom interactive elements should have tabindex=\"0\" or appropriate ARIA role for keyboard accessibility."
+      # Missing input purpose identification
+      - pattern: "(?i)<input[^>]*type=\"(text|email|tel|url|password)\"[^>]*>"
+        pattern_negate: "(autocomplete|aria-describedby|aria-label|placeholder)"
+        message: "Text inputs should have autocomplete attributes or other methods to identify their purpose for personal data collection."
 
-      # Focus styles with insufficient area
-      - pattern: "outline-width:\\s*1px|outline-width:\\s*0\\.1rem"
-        message: "Thin focus outlines may not meet WCAG 2.4.13 Focus Appearance requirements for minimum area."
+      # Missing error association
+      - pattern: "(?i)<[^>]*aria-invalid=\"true\"[^>]*>"
+        pattern_negate: "(aria-describedby|aria-errormessage)"
+        message: "Inputs with aria-invalid='true' should have error messages associated via aria-describedby or aria-errormessage."
 
-      # Focus styles that blend with background
-      - pattern: "outline.*rgba\\([^)]*0\\.1[^)]*\\)|outline.*rgba\\([^)]*0\\.2[^)]*\\)"
-        message: "Very transparent focus outlines may not provide sufficient contrast for visibility."
+      # Missing error message visibility
+      - pattern: "(?i)<[^>]*class=\"[^\"]*(?:error|invalid)[^\"]*\"[^>]*>"
+        pattern_negate: "(display.*none|visibility.*hidden|hidden|aria-hidden=\"true\")"
+        message: "Error messages should be visible to users and not hidden with CSS or aria-hidden."
 
-      # Missing focus styles on interactive elements
-      - pattern: "<(button|a|input|select|textarea)[^>]*>"
-        pattern_negate: ":focus|:focus-visible|tabindex"
-        message: "Interactive elements should have visible focus styles for keyboard navigation accessibility."
+      # Missing focus management for error summaries
+      - pattern: "(?i)<(div|section)[^>]*(?:error.*summary|summary.*error)[^>]*>"
+        pattern_negate: "(tabindex|focus|scrollIntoView)"
+        message: "Error summary containers should implement focus management to shift focus to the error banner heading when errors appear, improving user experience and accessibility."
 
-      # Dynamic content removal without focus management
-      - pattern: "\\.remove\\(\\)|removeChild|innerHTML\\s*="
-        pattern_negate: "focus\\(|focus\\(\\)"
-        message: "When removing dynamic content, ensure proper focus management by restoring focus to a logical location."
+      # Missing form instructions association
+      - pattern: "(?i)<(div|p)[^>]*(?:instruction|help|hint)[^>]*>"
+        pattern_negate: "(aria-describedby|aria-labelledby|id=)"
+        message: "Form instructions should be programmatically associated with their corresponding inputs via aria-describedby."
 
-  - type: suggest
-    message: |
-      **WCAG Focus Order and Focus Styles Requirements:**
+      # Missing success message
+      - pattern: "(?i)<form[^>]*>.*</form>"
+        pattern_negate: "(role=\"alert\"|aria-live|success|confirmation)"
+        message: "Forms should provide success confirmation messages, especially for critical operations like financial transactions."
 
-      **Focus Order Requirements:**
+      # Missing focus management for success messages
+      - pattern: "(?i)<(div|section)[^>]*(?:success|confirmation)[^>]*>"
+        pattern_negate: "(tabindex|focus|scrollIntoView)"
+        message: "Success message containers should implement focus management to shift focus to the success banner heading when messages appear, improving user experience and accessibility."
 
-      **1. Logical DOM Order:**
-      - **Default:** Focus order follows DOM element order
-      - **Navigation:** Tab key moves forward, Shift+Tab moves backward
-      - **Avoid:** Positive tabindex values (1, 2, 3, etc.)
+      # Missing focusable headings for error/success messages
+      - pattern: "(?i)<(h2|h3)[^>]*(?:error|success|confirmation)[^>]*>"
+        pattern_negate: "tabindex=\"-1\""
+        message: "Error and success message headings should have tabindex='-1' to make them programmatically focusable for focus management."
 
-      **2. Tabindex Usage:**
-      ```html
-      <!-- Good: Use DOM order (default) -->
-      <button>First Button</button>
-      <button>Second Button</button>
-      <button>Third Button</button>
+      # Missing time limit controls
+      - pattern: "(?i)<form[^>]*>.*(?:time.*limit|session.*expir|expir.*time)"
+        pattern_negate: "(extend|turn.*off|adjust|customize|20.*hour)"
+        message: "Forms with time limits must provide options to extend, turn off, or adjust the time limit, or allow at least 20 hours."
 
-      <!-- Good: tabindex="0" for custom focusable elements -->
-      <div role="button" tabindex="0" onclick="handleClick()">
-        Custom Button
-      </div>
-
-      <!-- Good: tabindex="-1" for programmatic focus only -->
-      <div id="target" tabindex="-1">Focus target</div>
-      <button onclick="document.getElementById('target').focus()">
-        Focus Target
-      </button>
-
-      <!-- Bad: Positive tabindex values -->
-      <button tabindex="1">First</button>
-      <button tabindex="3">Third</button>
-      <button tabindex="2">Second</button>
-      ```
-
-      **Focus Styles Requirements:**
-
-      **1. WCAG 2.4.7 Focus Visible (Level A):**
-      - **Requirement:** Focus indicator must exist
-      - **Purpose:** Keyboard users need visible focus indication
-
-      **2. WCAG 1.4.11 Non-Text Contrast (Level AA):**
-      - **Requirement:** Minimum 3:1 contrast ratio for UI components
-      - **Applies to:** Focus indicators, borders, focus outlines
-
-      **3. WCAG 2.4.13 Focus Appearance (Level AAA):**
-      - **Requirement:** Minimum area and contrast for focus indicators
-      - **Area:** Focus indicator should be clearly visible
-
+      # Missing error prevention for critical forms
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
