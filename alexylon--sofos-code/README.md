@@ -7,11 +7,11 @@ AI coding agent for your terminal, implemented in pure Rust
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [alexylon/sofos-code](https://github.com/alexylon/sofos-code).
+Original source: `CLAUDE.md` in [alexylon/sofos-code](https://github.com/alexylon/sofos-code).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
