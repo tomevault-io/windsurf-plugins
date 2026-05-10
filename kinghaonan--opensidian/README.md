@@ -7,11 +7,11 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [kinghaonan/opensidian](https://github.com/kinghaonan/opensidian).
+Original source: `CLAUDE.md` in [kinghaonan/opensidian](https://github.com/kinghaonan/opensidian).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
