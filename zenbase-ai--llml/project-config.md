@@ -1,70 +1,277 @@
 ---
 trigger: always_on
-description: These guidelines are designed to maintain the existing quality, style, and architectural patterns of the codebase.
+description: Version: 0.3.0, July 1st 2025
 ---
 
-# Rust Coding Rules for LLML Project
+# LLML Technical Specification
 
-These guidelines are designed to maintain the existing quality, style, and architectural patterns of the codebase.
+Version: 0.3.0, July 1st 2025
 
-## Project Structure & Modules
+## Overview
 
-- **Public API (`src/lib.rs`):** The `src/lib.rs` file is the public face of the library. It should only contain the public API (`llml`, `llml_with_options`, `Options` struct) and its associated documentation and unit tests.
-- **Core Logic (`src/formatters.rs`):** All internal formatting logic should reside in the `src/formatters.rs` module. Functions within this module should remain private to the crate (i.e., not marked with `pub`).
-- **Tests:**
-  - **Unit Tests:** Place unit tests within the module they are testing, using a `#[cfg(test)] mod tests { ... }` block.
-  - **Integration Tests:** Place integration tests in the `tests/` directory. These tests should only call the public API from `lib.rs`.
-- **Examples:** Add new usage examples to the `examples/` directory.
+LLML (Lightweight Language Markup Language) is a data serialization format that transforms nested data structures into human-readable, XML-like markup. This specification defines the exact transformation rules that must be implemented consistently across all language implementations.
 
-## Coding Style & Formatting
+## Core Transformation Rules
 
-- **Formatting:** All code must be formatted with `rustfmt` using the default settings.
-- **Naming Conventions:**
-  - **Functions & Variables:** Use `snake_case` (e.g., `format_value`, `kebab_key`).
-  - **Types (Structs, Enums):** Use `PascalCase` (e.g., `Options`).
-  - **Constants & Statics:** Use `SCREAMING_SNAKE_CASE` (e.g., `MULTI_HYPHEN_RE`).
-- **Clarity:** Prioritize clear, readable code. Use descriptive variable names.
+### 1. Empty Value Handling
 
-## API Design & Patterns
+Empty values are transformed to empty strings:
 
-- **Public Functions:** The primary public functions are `llml` (for default options) and `llml_with_options` (for custom formatting). Maintain this clear separation.
-- **Configuration:** All configuration should be passed via the `Options` struct. When adding new configuration, extend this struct.
-- **Optional Configuration:** Use `Option<Options>` for the `llml_with_options` function signature. Use `options.unwrap_or_default()` to handle the `None` case.
-- **Immutability:** Prefer immutable variables (`let`) over mutable ones (`let mut`) unless mutability is strictly necessary (e.g., for builders or accumulators).
-- **Performance:**
-  - Pass complex types like `Value` and `Options` by reference (`&`) to avoid unnecessary clones.
-  - For expensive initializations that can be shared (like `Regex`), use `std::sync::OnceLock`.
+```
+llml() → ""
+llml([]) → ""
+llml({}) → ""
+```
 
-## Type Usage & Data Handling
+Special case for empty named arrays:
+```
+llml({items: []}) → ""  # Empty arrays within objects are omitted entirely
+llml([[], [[]]]) → ""  # Empty arrays within arrays are omitted entirely
+```
 
-- **Primary Data Type:** The library's core data input is `&serde_json::Value`. This ensures compatibility with any data that can be serialized to JSON.
-- **String Handling:**
-  - Use `format!` for constructing simple strings.
-  - For building strings from multiple parts in a loop, collect parts into a `Vec<String>` and then use `parts.join("")` for efficiency.
-  - Use `&str` as function arguments for string slices instead of `String` where possible.
-- **Recursion:** The core formatting logic is recursive. New formatting rules should be integrated into the existing recursive `format_value` and `format_key_value` functions.
+### 2. Primitive Value Formatting
 
-## Error Handling
+All primitive values are wrapped in XML-like tags using the key name:
 
-- **No `Result` Types:** The library's public API returns a `String`. It does not return a `Result` as it's designed to format already-validated data structures. This convention should be maintained.
-- **Panics:** Avoid panics in the library code. The only acceptable use is for a one-time initialization failure in `OnceLock` where a hardcoded value (like a regex pattern) is invalid, as this indicates a critical programmer error.
+**Strings:**
+```
+llml({message: "Hello"}) → "<message>Hello</message>"
+llml({empty: ""}) → "<empty></empty>"
+```
 
-## Testing
+**Numbers:**
+```
+llml({count: 42}) → "<count>42</count>"
+llml({temperature: 98.6}) → "<temperature>98.6</temperature>"
+llml({zero: 0}) → "<zero>0</zero>"
+```
 
-- **Comprehensive Coverage:** Every new feature or bug fix must be accompanied by tests.
-- **Unit Tests:** Test internal logic, such as individual formatting helpers (e.g., `to_kebab_case`), in the module's test block.
-- **Integration Tests:** Test the public API from a user's perspective in `tests/integration_test.rs`. Cover a wide range of inputs, including edge cases (empty strings, empty collections, `null`, `false`, `0`).
-- **Test Data:** Use the `serde_json::json!` macro to create `Value` instances for tests, as it is concise and readable.
-- **Assertions:**
-  - Use `assert_eq!` for exact string matches.
-  - When testing the output of a `serde_json::Map` where key order is not guaranteed, use multiple `assert!(result.contains(...))` calls to verify that all expected parts are present in the output string.
+**Booleans:**
+```
+llml({enabled: true}) → "<enabled>true</enabled>"  # TypeScript
+llml({enabled: True}) → "<enabled>True</enabled>"  # Python
+llml({disabled: false}) → "<disabled>false</disabled>"  # TypeScript
+llml({disabled: False}) → "<disabled>False</disabled>"  # Python
+```
 
-## Documentation
+**Null/None/Undefined:**
+```
+llml({value: null}) → "<value>null</value>"  # TypeScript
+llml({value: None}) → "<value>None</value>"  # Python
+llml({value: undefined}) → "<value>undefined</value>"  # TypeScript
+```
 
-- **Public API:** All public items (`lib.rs`) must have clear, comprehensive doc comments (`///`). Explain what the function does, its parameters, and provide a simple usage example in a `rustdoc` code block.
-- **Module-Level Docs:** Use `/*! ... */` for module-level documentation that explains the purpose of the module.
-- **Internal Comments:** Use comments (`//`) sparingly to explain the *why* behind complex or non-obvious code, not the *what*.
-- **README:** Keep `rs/README.md` updated with any new features or API changes.
+### 3. Key Preservation
+
+Keys are preserved as-is without transformation:
+
+```
+llml({user_name: "Alice"}) → "<user_name>Alice</user_name>"
+llml({userName: "Bob"}) → "<userName>Bob</userName>"
+llml({"key with spaces": "value"}) → "<key with spaces>value</key with spaces>"
+```
+
+### 4. Multiple Key-Value Pairs
+
+Multiple key-value pairs are separated by newlines:
+
+```
+llml({name: "Alice", age: 30, active: true})
+→
+<name>Alice</name>
+<age>30</age>
+<active>true</active>
+```
+
+### 5. Array/List Formatting
+
+Arrays are formatted with special wrapper tags and numbered items:
+
+**Basic Arrays:**
+```
+llml({rules: ["first", "second", "third"]})
+→
+<rules>
+  <rules-1>first</rules-1>
+  <rules-2>second</rules-2>
+  <rules-3>third</rules-3>
+</rules>
+```
+
+**Numeric Arrays:**
+```
+llml({numbers: [1, 2, 3]})
+→
+<numbers>
+  <numbers-1>1</numbers-1>
+  <numbers-2>2</numbers-2>
+  <numbers-3>3</numbers-3>
+</numbers>
+```
+
+**Array Names:**
+```
+llml({user_tasks: ["task1", "task2"]})
+→
+<user_tasks>
+  <user_tasks-1>task1</user_tasks-1>
+  <user_tasks-2>task2</user_tasks-2>
+</user_tasks>
+```
+
+### 6. Direct Array Formatting
+
+When an array is passed directly (not as a property), it uses numeric tags:
+
+```
+llml(["a", "b", "c"])
+→
+<1>a</1>
+<2>b</2>
+<3>c</3>
+```
+
+**Mixed Types:**
+```
+llml([1, "hello", true])
+→
+<1>1</1>
+<2>hello</2>
+<3>true</3>
+```
+
+**Objects in Direct Arrays:**
+```
+llml([{name: "Alice"}, {name: "Bob"}])
+→
+<1>
+  <name>Alice</name>
+</1>
+<2>
+  <name>Bob</name>
+</2>
+```
+
+### 7. Nested Object Formatting
+
+Nested objects are formatted recursively with proper indentation. Nested object properties do not include parent key prefixes:
+
+**Simple Nesting:**
+```
+llml({config: {debug: true, timeout: 30}})
+→
+<config>
+  <debug>true</debug>
+  <timeout>30</timeout>
+</config>
+```
+
+**Key Preservation:**
+```
+llml({user_config: {debug_mode: true, maxRetries: 5}})
+→
+<user_config>
+  <debug_mode>true</debug_mode>
+  <maxRetries>5</maxRetries>
+</user_config>
+```
+
+### 8. Arrays Containing Objects
+
+When arrays contain objects, each object is wrapped with the array name and index. Object properties within arrays do not include the array item prefix:
+
+```
+llml({data: [{name: "Alice", age: 30}, {name: "Bob", age: 25}]})
+→
+<data>
+  <data-1>
+    <name>Alice</name>
+    <age>30</age>
+  </data-1>
+  <data-2>
+    <name>Bob</name>
+    <age>25</age>
+  </data-2>
+</data>
+```
+
+### 9. Complex Mixed Content
+
+Mixed content types are handled by applying the appropriate rule for each type. Nested object properties do not include parent key prefixes:
+
+```
+llml({
+  title: "My Document",
+  sections: ["intro", "body", "conclusion"],
+  metadata: {author: "Alice", version: "1.0"}
+})
+→
+<title>My Document</title>
+<sections>
+  <sections-1>intro</sections-1>
+  <sections-2>body</sections-2>
+  <sections-3>conclusion</sections-3>
+</sections>
+<metadata>
+  <author>Alice</author>
+  <version>1.0</version>
+</metadata>
+```
+
+### 10. Deep Nesting
+
+Deep nesting follows the same rules recursively. Nested object properties do not include parent key prefixes:
+
+```
+llml({level1: {level2: {items: ["a", "b"]}}})
+→
+<level1>
+  <level2>
+    <items>
+      <items-1>a</items-1>
+      <items-2>b</items-2>
+    </items>
+  </level2>
+</level1>
+```
+
+### 11. Multiline Content
+
+Multiline strings are formatted with proper indentation, with leading/trailing whitespace trimmed:
+
+```
+llml({description: `
+    Line 1
+    Line 2
+    Line 3
+    `})
+→
+<description>
+  Line 1
+  Line 2
+  Line 3
+</description>
+```
+
+## Configuration Options
+
+### Indentation
+
+Custom indentation can be specified for nested elements:
+
+```
+llml({message: "Hello"}, {indent: "  "})
+→
+  <message>Hello</message>
+
+llml({items: ["a", "b"]}, {indent: "  "})
+→
+  <items>
+    <items-1>a</items-1>
+    <items-2>b</items-2>
+  </items>
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [zenbase-ai/llml](https://github.com/zenbase-ai/llml) — distributed by [TomeVault](https://tomevault.io).
