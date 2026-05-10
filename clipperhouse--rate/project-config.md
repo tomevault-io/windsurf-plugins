@@ -3,6 +3,7 @@ trigger: always_on
 description: - This library is intended to allow users to create complex rate limiting policies by composing elements
 ---
 
+
 # Go Rate Limiter Library - Coding Instructions
 
 ## Design goals
@@ -31,6 +32,7 @@ When I ask you write tests, I am looking for bugs in my implementation. Try to d
 - The t.Run subtest style is good if the tests are seem combinatorial, same for benchmarks and b.Run
 - When you assert that something has been fixed or improved, run tests.
 - Do not ask me to run tests or benchmarks, just run them yourself.
+- When I ask for a test or benchmark to be updated, run the tests and benchmarks to confirm the changes.
 
 ### Concurrent Testing Requirements
 - Always test both serial and concurrent versions of functionality
