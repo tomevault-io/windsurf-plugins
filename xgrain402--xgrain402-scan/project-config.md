@@ -1,220 +1,255 @@
 ---
 trigger: always_on
-description: Comprehensive rules to help you write advanced Trigger.dev tasks
+description: Configure your Trigger.dev project with a trigger.config.ts file
 ---
 
-# Trigger.dev Advanced Tasks (v4)
+# Trigger.dev Configuration (v4)
 
-**Advanced patterns and features for writing tasks**
+**Complete guide to configuring `trigger.config.ts` with build extensions**
 
-## Tags & Organization
-
-```ts
-import { task, tags } from "@trigger.dev/sdk";
-
-export const processUser = task({
-  id: "process-user",
-  run: async (payload: { userId: string; orgId: string }, { ctx }) => {
-    // Add tags during execution
-    await tags.add(`user_${payload.userId}`);
-    await tags.add(`org_${payload.orgId}`);
-
-    return { processed: true };
-  },
-});
-
-// Trigger with tags
-await processUser.trigger(
-  { userId: "123", orgId: "abc" },
-  { tags: ["priority", "user_123", "org_abc"] } // Max 10 tags per run
-);
-
-// Subscribe to tagged runs
-for await (const run of runs.subscribeToRunsWithTag("user_123")) {
-  console.log(`User task ${run.id}: ${run.status}`);
-}
-```
-
-**Tag Best Practices:**
-
-- Use prefixes: `user_123`, `org_abc`, `video:456`
-- Max 10 tags per run, 1-64 characters each
-- Tags don't propagate to child tasks automatically
-
-## Concurrency & Queues
+## Basic Configuration
 
 ```ts
-import { task, queue } from "@trigger.dev/sdk";
+import { defineConfig } from "@trigger.dev/sdk";
 
-// Shared queue for related tasks
-const emailQueue = queue({
-  name: "email-processing",
-  concurrencyLimit: 5, // Max 5 emails processing simultaneously
-});
+export default defineConfig({
+  project: "<project-ref>", // Required: Your project reference
+  dirs: ["./trigger"], // Task directories
+  runtime: "node", // "node", "node-22", or "bun"
+  logLevel: "info", // "debug", "info", "warn", "error"
 
-// Task-level concurrency
-export const oneAtATime = task({
-  id: "sequential-task",
-  queue: { concurrencyLimit: 1 }, // Process one at a time
-  run: async (payload) => {
-    // Critical section - only one instance runs
+  // Default retry settings
+  retries: {
+    enabledInDev: false,
+    default: {
+      maxAttempts: 3,
+      minTimeoutInMs: 1000,
+      maxTimeoutInMs: 10000,
+      factor: 2,
+      randomize: true,
+    },
   },
-});
 
-// Per-user concurrency
-export const processUserData = task({
-  id: "process-user-data",
-  run: async (payload: { userId: string }) => {
-    // Override queue with user-specific concurrency
-    await childTask.trigger(payload, {
-      queue: {
-        name: `user-${payload.userId}`,
-        concurrencyLimit: 2,
-      },
-    });
+  // Build configuration
+  build: {
+    autoDetectExternal: true,
+    keepNames: true,
+    minify: false,
+    extensions: [], // Build extensions go here
   },
-});
 
-export const emailTask = task({
-  id: "send-email",
-  queue: emailQueue, // Use shared queue
-  run: async (payload: { to: string }) => {
-    // Send email logic
+  // Global lifecycle hooks
+  onStart: async ({ payload, ctx }) => {
+    console.log("Global task start");
+  },
+  onSuccess: async ({ payload, output, ctx }) => {
+    console.log("Global task success");
+  },
+  onFailure: async ({ payload, error, ctx }) => {
+    console.log("Global task failure");
   },
 });
 ```
 
-## Error Handling & Retries
+## Build Extensions
+
+### Database & ORM
+
+#### Prisma
 
 ```ts
-import { task, retry, AbortTaskRunError } from "@trigger.dev/sdk";
+import { prismaExtension } from "@trigger.dev/build/extensions/prisma";
 
-export const resilientTask = task({
-  id: "resilient-task",
-  retry: {
-    maxAttempts: 10,
-    factor: 1.8, // Exponential backoff multiplier
-    minTimeoutInMs: 500,
-    maxTimeoutInMs: 30_000,
-    randomize: false,
-  },
-  catchError: async ({ error, ctx }) => {
-    // Custom error handling
-    if (error.code === "FATAL_ERROR") {
-      throw new AbortTaskRunError("Cannot retry this error");
-    }
-
-    // Log error details
-    console.error(`Task ${ctx.task.id} failed:`, error);
-
-    // Allow retry by returning nothing
-    return { retryAt: new Date(Date.now() + 60000) }; // Retry in 1 minute
-  },
-  run: async (payload) => {
-    // Retry specific operations
-    const result = await retry.onThrow(
-      async () => {
-        return await unstableApiCall(payload);
-      },
-      { maxAttempts: 3 }
-    );
-
-    // Conditional HTTP retries
-    const response = await retry.fetch("https://api.example.com", {
-      retry: {
-        maxAttempts: 5,
-        condition: (response, error) => {
-          return response?.status === 429 || response?.status >= 500;
-        },
-      },
-    });
-
-    return result;
-  },
-});
+extensions: [
+  prismaExtension({
+    schema: "prisma/schema.prisma",
+    version: "5.19.0", // Optional: specify version
+    migrate: true, // Run migrations during build
+    directUrlEnvVarName: "DIRECT_DATABASE_URL",
+    typedSql: true, // Enable TypedSQL support
+  }),
+];
 ```
 
-## Machines & Performance
+#### TypeScript Decorators (for TypeORM)
 
 ```ts
-export const heavyTask = task({
-  id: "heavy-computation",
-  machine: { preset: "large-2x" }, // 8 vCPU, 16 GB RAM
-  maxDuration: 1800, // 30 minutes timeout
-  run: async (payload, { ctx }) => {
-    // Resource-intensive computation
-    if (ctx.machine.preset === "large-2x") {
-      // Use all available cores
-      return await parallelProcessing(payload);
-    }
+import { emitDecoratorMetadata } from "@trigger.dev/build/extensions/typescript";
 
-    return await standardProcessing(payload);
-  },
-});
-
-// Override machine when triggering
-await heavyTask.trigger(payload, {
-  machine: { preset: "medium-1x" }, // Override for this run
-});
+extensions: [
+  emitDecoratorMetadata(), // Enables decorator metadata
+];
 ```
 
-**Machine Presets:**
+### Scripting Languages
 
-- `micro`: 0.25 vCPU, 0.25 GB RAM
-- `small-1x`: 0.5 vCPU, 0.5 GB RAM (default)
-- `small-2x`: 1 vCPU, 1 GB RAM
-- `medium-1x`: 1 vCPU, 2 GB RAM
-- `medium-2x`: 2 vCPU, 4 GB RAM
-- `large-1x`: 4 vCPU, 8 GB RAM
-- `large-2x`: 8 vCPU, 16 GB RAM
-
-## Idempotency
+#### Python
 
 ```ts
-import { task, idempotencyKeys } from "@trigger.dev/sdk";
+import { pythonExtension } from "@trigger.dev/build/extensions/python";
 
-export const paymentTask = task({
-  id: "process-payment",
-  retry: {
-    maxAttempts: 3,
-  },
-  run: async (payload: { orderId: string; amount: number }) => {
-    // Automatically scoped to this task run, so if the task is retried, the idempotency key will be the same
-    const idempotencyKey = await idempotencyKeys.create(`payment-${payload.orderId}`);
+extensions: [
+  pythonExtension({
+    scripts: ["./python/**/*.py"], // Copy Python files
+    requirementsFile: "./requirements.txt", // Install packages
+    devPythonBinaryPath: ".venv/bin/python", // Dev mode binary
+  }),
+];
 
-    // Ensure payment is processed only once
-    await chargeCustomer.trigger(payload, {
-      idempotencyKey,
-      idempotencyKeyTTL: "24h", // Key expires in 24 hours
-    });
-  },
-});
-
-// Payload-based idempotency
-import { createHash } from "node:crypto";
-
-function createPayloadHash(payload: any): string {
-  const hash = createHash("sha256");
-  hash.update(JSON.stringify(payload));
-  return hash.digest("hex");
-}
-
-export const deduplicatedTask = task({
-  id: "deduplicated-task",
-  run: async (payload) => {
-    const payloadHash = createPayloadHash(payload);
-    const idempotencyKey = await idempotencyKeys.create(payloadHash);
-
-    await processData.trigger(payload, { idempotencyKey });
-  },
-});
+// Usage in tasks
+const result = await python.runInline(`print("Hello, world!")`);
+const output = await python.runScript("./python/script.py", ["arg1"]);
 ```
 
-## Metadata & Progress Tracking
+### Browser Automation
+
+#### Playwright
 
 ```ts
-import { task, metadata } from "@trigger.dev/sdk";
+import { playwright } from "@trigger.dev/build/extensions/playwright";
 
+extensions: [
+  playwright({
+    browsers: ["chromium", "firefox", "webkit"], // Default: ["chromium"]
+    headless: true, // Default: true
+  }),
+];
+```
+
+#### Puppeteer
+
+```ts
+import { puppeteer } from "@trigger.dev/build/extensions/puppeteer";
+
+extensions: [puppeteer()];
+
+// Environment variable needed:
+// PUPPETEER_EXECUTABLE_PATH: "/usr/bin/google-chrome-stable"
+```
+
+#### Lightpanda
+
+```ts
+import { lightpanda } from "@trigger.dev/build/extensions/lightpanda";
+
+extensions: [
+  lightpanda({
+    version: "latest", // or "nightly"
+    disableTelemetry: false,
+  }),
+];
+```
+
+### Media Processing
+
+#### FFmpeg
+
+```ts
+import { ffmpeg } from "@trigger.dev/build/extensions/core";
+
+extensions: [
+  ffmpeg({ version: "7" }), // Static build, or omit for Debian version
+];
+
+// Automatically sets FFMPEG_PATH and FFPROBE_PATH
+// Add fluent-ffmpeg to external packages if using
+```
+
+#### Audio Waveform
+
+```ts
+import { audioWaveform } from "@trigger.dev/build/extensions/audioWaveform";
+
+extensions: [
+  audioWaveform(), // Installs Audio Waveform 1.1.0
+];
+```
+
+### System & Package Management
+
+#### System Packages (apt-get)
+
+```ts
+import { aptGet } from "@trigger.dev/build/extensions/core";
+
+extensions: [
+  aptGet({
+    packages: ["ffmpeg", "imagemagick", "curl=7.68.0-1"], // Can specify versions
+  }),
+];
+```
+
+#### Additional NPM Packages
+
+Only use this for installing CLI tools, NOT packages you import in your code.
+
+```ts
+import { additionalPackages } from "@trigger.dev/build/extensions/core";
+
+extensions: [
+  additionalPackages({
+    packages: ["wrangler"], // CLI tools and specific versions
+  }),
+];
+```
+
+#### Additional Files
+
+```ts
+import { additionalFiles } from "@trigger.dev/build/extensions/core";
+
+extensions: [
+  additionalFiles({
+    files: ["wrangler.toml", "./assets/**", "./fonts/**"], // Glob patterns supported
+  }),
+];
+```
+
+### Environment & Build Tools
+
+#### Environment Variable Sync
+
+```ts
+import { syncEnvVars } from "@trigger.dev/build/extensions/core";
+
+extensions: [
+  syncEnvVars(async (ctx) => {
+    // ctx contains: environment, projectRef, env
+    return [
+      { name: "SECRET_KEY", value: await getSecret(ctx.environment) },
+      { name: "API_URL", value: ctx.environment === "prod" ? "api.prod.com" : "api.dev.com" },
+    ];
+  }),
+];
+```
+
+#### ESBuild Plugins
+
+```ts
+import { esbuildPlugin } from "@trigger.dev/build/extensions";
+import { sentryEsbuildPlugin } from "@sentry/esbuild-plugin";
+
+extensions: [
+  esbuildPlugin(
+    sentryEsbuildPlugin({
+      org: process.env.SENTRY_ORG,
+      project: process.env.SENTRY_PROJECT,
+      authToken: process.env.SENTRY_AUTH_TOKEN,
+    }),
+    { placement: "last", target: "deploy" } // Optional config
+  ),
+];
+```
+
+## Custom Build Extensions
+
+```ts
+import { defineConfig } from "@trigger.dev/sdk";
+
+const customExtension = {
+  name: "my-custom-extension",
+
+  externalsForTarget: (target) => {
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
