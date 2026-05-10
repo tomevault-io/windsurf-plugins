@@ -1,150 +1,152 @@
 ---
 trigger: always_on
-description: Golang backend development patterns and conventions for POS System
+description: Comprehensive business logic patterns for POS System domain understanding, user journeys, and workflow optimization
 ---
 
 
-# Backend Development Guidelines (Golang)
+# 🍽️ POS Business Logic & Domain Patterns
 
-## Code Organization
+## 🎯 Core Business Domain Understanding
 
-### Package Structure
-Follow the [backend/internal/](mdc:backend/internal/) package layout:
-- `models/` - Data structures and DTOs
-- `handlers/` - HTTP request handlers  
-- `middleware/` - HTTP middleware functions
-- `database/` - Database connection and utilities
-- `api/` - Route definitions and setup
-- `utils/` - Shared utility functions
+### Restaurant Operations Model
+The POS system orchestrates complex restaurant operations with multiple stakeholders and intricate workflows:
 
-### Handler Pattern
-All handlers follow the pattern in [handlers/orders.go](mdc:backend/internal/handlers/orders.go):
-
-```go
-type OrderHandler struct {
-    db *sql.DB
+```typescript
+// Domain Model - Core Business Entities
+interface RestaurantDomain {
+  // Revenue Generation
+  orders: OrderLifecycle[]
+  payments: PaymentProcessing[]
+  inventory: InventoryManagement
+  
+  // Operations Management  
+  tables: TableManagement
+  staff: StaffOperations
+  kitchen: KitchenWorkflow
+  
+  // Business Intelligence
+  analytics: BusinessAnalytics
+  reporting: FinancialReporting
 }
 
-func NewOrderHandler(db *sql.DB) *OrderHandler {
-    return &OrderHandler{db: db}
-}
-
-func (h *OrderHandler) GetOrders(c *gin.Context) {
-    // Implementation
+// Business Rules Engine
+class POSBusinessRules {
+  validateOrderCreation(order: CreateOrderRequest): ValidationResult
+  calculatePricing(items: OrderItem[]): PricingCalculation
+  manageInventory(productId: string, quantity: number): InventoryResult
+  optimizeKitchenWorkflow(orders: Order[]): WorkflowOptimization
 }
 ```
 
-## Database Operations
+## 🔄 Critical User Journeys & Performance Optimization
 
-### Raw SQL Usage
-- Use parameterized queries to prevent SQL injection
-- Follow the patterns in [handlers/orders.go](mdc:backend/internal/handlers/orders.go) for database operations
-- Always handle `sql.ErrNoRows` explicitly
-- Use transactions for multi-table operations
-
-### Example Query Pattern:
-```go
-func (h *Handler) getRecord(id uuid.UUID) (*Model, error) {
-    var record Model
-    query := `SELECT id, field1, field2 FROM table WHERE id = $1`
+### 1. Server Journey: Dine-In Order Creation (Target: <30 seconds)
+```typescript
+// ✅ PERFORMANCE-OPTIMIZED: Server workflow
+class ServerWorkflowOptimization {
+  // Pre-load critical data for instant access
+  private async preloadServerData(): Promise<ServerContext> {
+    const [products, categories, tables, activeOrders] = await Promise.all([
+      this.productService.getAvailableProducts(), // Cache for 5 minutes
+      this.categoryService.getActiveCategories(), // Cache for 1 hour  
+      this.tableService.getTableStatus(), // Real-time, 30s cache
+      this.orderService.getActiveOrders() // Real-time, 10s cache
+    ])
     
-    err := h.db.QueryRow(query, id).Scan(&record.ID, &record.Field1, &record.Field2)
-    if err == sql.ErrNoRows {
-        return nil, fmt.Errorf("record not found")
-    }
-    if err != nil {
-        return nil, fmt.Errorf("database error: %w", err)
+    return { products, categories, tables, activeOrders }
+  }
+
+  // Optimistic order creation with rollback
+  async createOrderOptimistic(orderData: CreateOrderRequest): Promise<Order> {
+    // 1. Immediate UI feedback (0ms)
+    this.ui.showOrderCreating(orderData)
+    
+    // 2. Validate business rules locally (5-10ms)
+    const validation = await this.validateOrderBusiness(orderData)
+    if (!validation.isValid) {
+      throw new BusinessRuleError(validation.errors)
     }
     
-    return &record, nil
+    // 3. Optimistic update (10-15ms)
+    const optimisticOrder = this.generateOptimisticOrder(orderData)
+    this.ui.showOrderCreated(optimisticOrder)
+    
+    // 4. Background server sync (100-200ms)
+    try {
+      const serverOrder = await this.orderService.createOrder(orderData)
+      this.reconcileOptimisticOrder(optimisticOrder, serverOrder)
+      return serverOrder
+    } catch (error) {
+      // Rollback optimistic changes
+      this.rollbackOptimisticOrder(optimisticOrder)
+      throw error
+    }
+  }
+
+  // Business rule validation (prevent API round-trips)
+  private async validateOrderBusiness(order: CreateOrderRequest): Promise<ValidationResult> {
+    const errors: string[] = []
+    
+    // Table availability check
+    if (order.table_id && !this.isTableAvailable(order.table_id)) {
+      errors.push('Table is not available')
+    }
+    
+    // Product availability batch check
+    const unavailableItems = order.items.filter(item => 
+      !this.isProductAvailable(item.product_id, item.quantity)
+    )
+    if (unavailableItems.length > 0) {
+      errors.push(`Products unavailable: ${unavailableItems.map(i => i.product_id).join(', ')}`)
+    }
+    
+    // Business hours validation
+    if (!this.isDuringBusinessHours()) {
+      errors.push('Orders cannot be created outside business hours')
+    }
+    
+    return { isValid: errors.length === 0, errors }
+  }
 }
 ```
 
-## Authentication & Security
+### 2. Enhanced Kitchen Journey: As-Ready Service Workflow (Target: <3 seconds per item update)
+```typescript
+// ✅ REAL-TIME OPTIMIZED: Enhanced kitchen workflow with individual item tracking
+class EnhancedKitchenWorkflowEngine {
+  private orderPriorityQueue: PriorityQueue<KitchenOrder>
+  private preparationTimers: Map<string, Timer>
+  private realTimeUpdates: EventEmitter
+  private soundNotificationSystem: SoundNotificationSystem
 
-### JWT Middleware
-Use the authentication middleware from [middleware/auth.go](mdc:backend/internal/middleware/auth.go):
-- Protected routes must use `authMiddleware`
-- Role-based access with `RequireRoles([]string{"admin", "manager"})`
-- Extract user info with `GetUserFromContext(c)`
+  // Intelligent order prioritization with as-ready service
+  async optimizeKitchenQueue(): Promise<KitchenOrder[]> {
+    const activeOrders = await this.getActiveKitchenOrders()
+    
+    // Business logic: Priority calculation with individual item tracking
+    return activeOrders
+      .map(order => ({
+        ...order,
+        priority: this.calculateOrderPriority(order),
+        estimatedTime: this.estimatePreparationTime(order),
+        dependencies: this.findOrderDependencies(order),
+        itemProgress: this.calculateItemProgress(order.items), // New: Individual item tracking
+        readyItems: order.items.filter(item => item.status === 'ready'),
+        servedItems: order.items.filter(item => item.status === 'served')
+      }))
+      .sort((a, b) => {
+        // Enhanced priority: wait time, complexity, table status, ready items
+        const aScore = (a.priority * a.waitTime * a.tableUrgency) + (a.readyItems.length * 10)
+        const bScore = (b.priority * b.waitTime * b.tableUrgency) + (b.readyItems.length * 10)
+        return bScore - aScore
+      })
+  }
 
-### Error Handling
-Follow the API response pattern from [models/models.go](mdc:backend/internal/models/models.go):
+  // As-ready service: Individual item completion
+  async markItemReady(orderId: string, itemId: string): Promise<void> {
+    await this.updateItemStatus(orderId, itemId, 'ready')
 
-```go
-c.JSON(http.StatusBadRequest, models.APIResponse{
-    Success: false,
-    Message: "User-friendly error message",
-    Error:   stringPtr("error_code"),
-})
-```
-
-## API Endpoints
-
-### RESTful Design
-Follow REST conventions as shown in [api/routes.go](mdc:backend/internal/api/routes.go):
-- `GET /api/v1/orders` - List resources
-- `POST /api/v1/orders` - Create resource  
-- `GET /api/v1/orders/:id` - Get single resource
-- `PUT /api/v1/orders/:id` - Update entire resource
-- `PATCH /api/v1/orders/:id/status` - Partial update
-- `DELETE /api/v1/orders/:id` - Delete resource
-
-### Response Format
-All API responses use the standard format from [models/models.go](mdc:backend/internal/models/models.go):
-
-```go
-type APIResponse struct {
-    Success bool        `json:"success"`
-    Message string      `json:"message"`
-    Data    interface{} `json:"data,omitempty"`
-    Error   *string     `json:"error,omitempty"`
-}
-```
-
-## Performance Best Practices
-
-### Database Connections
-- Use connection pooling as configured in [database/connection.go](mdc:backend/internal/database/connection.go)
-- Set appropriate connection limits and timeouts
-- Always close rows and statements
-
-### Query Optimization
-- Use indexes for frequently queried columns (see [database/init/01_schema.sql](mdc:database/init/01_schema.sql))
-- Avoid N+1 queries by using JOINs or batch loading
-- Implement pagination for large result sets
-
-## Error Handling
-
-### Database Errors
-- Always wrap database errors with context
-- Handle connection errors gracefully
-- Use the `IsConnectionError` helper from [database/connection.go](mdc:backend/internal/database/connection.go)
-
-### HTTP Errors
-- Return appropriate HTTP status codes
-- Provide clear, actionable error messages
-- Don't expose internal system details to clients
-
-## Testing Guidelines
-
-### Unit Tests
-- Test handlers with mock database connections
-- Test middleware functions independently
-- Focus on business logic and edge cases
-
-### Integration Tests
-- Test complete API endpoints
-- Use test database with proper cleanup
-- Test authentication and authorization flows
-
-## Logging
-
-### Structured Logging
-- Use Gin's built-in logging middleware
-- Log important business events (orders created, payments processed)
-- Include request IDs for tracing
-- Don't log sensitive information (passwords, tokens)
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [madebyaris/poinf-of-sales](https://github.com/madebyaris/poinf-of-sales) — distributed by [TomeVault](https://tomevault.io).
