@@ -1,88 +1,116 @@
 ---
 trigger: always_on
-description: Java Logging Best Practices
+description: Java Unit testing guidelines
 ---
 
-# Java Logging Best Practices
+# Java Unit testing guidelines
 
-Effective Java logging involves selecting a standard framework (SLF4J with Logback/Log4j2), using appropriate log levels (ERROR, WARN, INFO, DEBUG, TRACE),
-and adhering to core practices like parameterized logging, proper exception handling, and avoiding sensitive data exposure.
-Configuration should be environment-specific with clear output formats.
-Security is paramount: mask sensitive data, control log access, and ensure secure transmission.
-Implement centralized log aggregation, monitoring, and alerting for proactive issue detection.
-Finally, logging behavior and its impact should be validated through comprehensive testing.
+Effective Java unit testing involves using JUnit 5 annotations and AssertJ for fluent assertions. Tests should follow the Given-When-Then structure with descriptive names for clarity. Each test must have a single responsibility, be independent, and leverage parameterized tests for data variations. Mocking dependencies with frameworks like Mockito is crucial for isolating the unit under test. While code coverage is a useful guide, the focus should be on meaningful tests for critical logic and edge cases. Test classes and methods should typically be package-private. Strategies for code splitting include small test methods and helper functions. Anti-patterns like testing implementation details, hard-coded values, and ignoring failures should be avoided. Proper state management involves isolated state and immutable objects, and error handling should include testing for expected exceptions and their messages.
 
 ## Implementing These Principles
 
 These guidelines are built upon the following core principles:
 
-1.  **Standardized Framework Selection**: Utilize a widely accepted logging facade (preferably SLF4J) and a robust underlying implementation (Logback or Log4j2). This promotes consistency, flexibility, and access to advanced logging features.
-2.  **Meaningful and Consistent Log Levels**: Employ logging levels (ERROR, WARN, INFO, DEBUG, TRACE) deliberately and consistently to categorize the severity and importance of messages. This allows for effective filtering, monitoring, and targeted issue diagnosis.
-3.  **Adherence to Core Logging Practices**: Follow fundamental best practices such as using parameterized logging (avoiding string concatenation for performance and clarity), always logging exceptions with their stack traces, never logging sensitive data directly (PII, credentials), and using correlation IDs (e.g., via MDC) for request tracing in distributed environments.
-4.  **Thoughtful and Flexible Configuration**: Manage logging configuration externally (e.g., `logback.xml`, `log4j2.xml`). Tailor configurations for different environments (dev, test, prod) with appropriate log levels for various packages, clear and informative output formats (including timestamps, levels, logger names, thread info, and MDC data), and robust log rotation and retention policies.
-5.  **Security-Conscious Logging**: Prioritize security in all logging activities. Actively mask or filter sensitive information, control access to log files and log management systems, use secure protocols for transmitting logs, and ensure compliance with relevant data protection regulations (e.g., GDPR, HIPAA).
-6.  **Proactive Log Monitoring and Alerting**: Implement centralized log aggregation systems (e.g., ELK Stack, Splunk, Grafana Loki). Establish automated alerts based on log patterns, error rates, or specific critical events to enable proactive issue detection and rapid response.
-7.  **Comprehensive Logging Validation Through Testing**: Integrate logging into the testing strategy. Assert that critical log messages (especially errors and warnings) are generated as expected under specific conditions, verify log formats, test log level filtering, and assess any performance impact of logging.
+1.  **Clarity and Readability**: Tests should be easy to understand. This is achieved through descriptive names (or `@DisplayName`), a clear Given-When-Then structure, and focused assertions. Readable tests serve as living documentation for the code under test.
+2.  **Isolation and Independence**: Each test must be self-contained, not relying on the state or outcome of other tests. Dependencies should be mocked to ensure the unit under test is validated in isolation. This leads to reliable and stable test suites.
+3.  **Comprehensive Validation**: Tests should thoroughly verify the behavior of the unit, including its responses to valid inputs, edge cases, boundary conditions, and error scenarios. This involves not just positive paths but also how the code handles failures and exceptions.
+4.  **Modern Tooling and Practices**: Leverage modern testing frameworks (JUnit 5), fluent assertion libraries (AssertJ), and mocking tools (Mockito) to write expressive, maintainable, and powerful tests. Utilize features like parameterized tests to reduce boilerplate and improve coverage of data variations.
+5.  **Maintainability and Focus**: Tests should be easy to maintain. This means avoiding tests that are too complex, test implementation details, or have multiple responsibilities. A well-written test makes it clear what is being tested and why, simplifying debugging and refactoring efforts.
 
 ## Table of contents
 
-- Rule 1: Choose an Appropriate Logging Framework
-- Rule 2: Understand and Use Logging Levels Correctly
-- Rule 3: Adhere to Core Logging Practices
-- Rule 4: Follow Configuration Best Practices
-- Rule 5: Implement Secure Logging Practices
-- Rule 6: Establish Effective Log Monitoring and Alerting
-- Rule 7: Incorporate Logging in Testing
+- Rule 1: Use JUnit 5 Annotations
+- Rule 2: Use AssertJ for Assertions
+- Rule 3: Structure Tests with Given-When-Then
+- Rule 4: Use Descriptive Test Names
+- Rule 5: Aim for Single Responsibility in Tests
+- Rule 6: Ensure Tests are Independent
+- Rule 7: Use Parameterized Tests for Data Variations
+- Rule 8: Utilize Mocking for Dependencies (Mockito)
+- Rule 9: Consider Test Coverage, But Don't Obsess
+- Rule 10: Test Scopes
+- Rule 11: Code Splitting Strategies
+- Rule 12: Anti-patterns and Code Smells
+- Rule 13: State Management
+- Rule 14: Error Handling
+- Rule 15: Leverage JSpecify for Null Safety
+- Rule 16: Key Questions to Guide Test Creation (RIGHT-BICEP)
+- Rule 17: Characteristics of Good Tests (A-TRIP)
+- Rule 18: Verifying CORRECT Boundary Conditions
 
-## Rule 1: Choose an Appropriate Logging Framework
+## Rule 1: Use JUnit 5 Annotations
 
-Title: Select a Standard Logging Facade and Implementation
-Description:
-Using a standard logging facade like SLF4J allows for flexibility in choosing and switching an underlying logging implementation (e.g., Logback, Log4j2).
-- **Primary Recommendation**: SLF4J with Logback. This combination is widely used, robust, and feature-rich.
-- **Alternatives**:
-    - SLF4J with Log4j2: Another powerful and performant option.
-    - Java Util Logging (JUL): Built into the JDK, but often less flexible and performant for complex applications.
+Title: Prefer JUnit 5 annotations over JUnit 4.
+Description: Utilize annotations from the `org.junit.jupiter.api` package (e.g., `@Test`, `@BeforeEach`, `@AfterEach`, `@DisplayName`, `@Nested`, `@Disabled`) instead of their JUnit 4 counterparts (`@org.junit.Test`, `@Before`, `@After`, `@Ignore`). This ensures consistency and allows leveraging the full capabilities of JUnit 5.
 
 **Good example:**
-(Illustrating SLF4J usage - specific Logback/Log4j2 setup is in their config files)
+
 ```java
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import java.util.Objects;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import static org.assertj.core.api.Assertions.assertThat;
 
-public class MyService {
-    // Logger declared using SLF4J
-    private static final Logger logger = LoggerFactory.getLogger(MyService.class);
+@DisplayName("My Service Test")
+class MyServiceTest {
 
-    public void performAction(String input) {
-        // SLF4J API is used for logging
-        logger.info("Performing action with input: {}", input);
-        if (Objects.isNull(input) || input.isEmpty()) {
-            logger.warn("Input is null or empty, this might lead to unexpected behavior.");
-            // Potentially handle error or default behavior
-        }
-        // ... action logic ...
-        logger.debug("Action performed successfully for input: {}", input);
+    private MyService service;
+
+    @BeforeEach
+    void setUp() {
+        service = new MyService(); // Setup executed before each test
     }
 
-    public static void main(String args) {
-        MyService service = new MyService();
-        service.performAction("Test Data");
-        service.performAction(""); // Example that might trigger a WARN
+    @Test
+    @DisplayName("should process data correctly")
+    void processData() {
+        // Given
+        String input = "test";
+
+        // When
+        String result = service.process(input);
+
+        // Then
+        assertThat(result).isEqualTo("PROCESSED:test");
     }
 }
 ```
 
 **Bad Example:**
+
 ```java
-// Directly using System.out.println for logging
-public class MyOldService {
-    public void doWork(String data) {
-        System.out.println("Starting work with data: " + data); // Hard to control, no levels, no formatting
-        if (data.equals("error")) {
-            System.err.println("An error occurred!"); // Also hard to manage
-        }
+import org.junit.Before; // JUnit 4
+import org.junit.Test;   // JUnit 4
+import static org.junit.Assert.assertEquals; // JUnit 4 Assert
+
+public class MyServiceTest {
+
+    private MyService service;
+
+    @Before // JUnit 4
+    public void setup() {
+        service = new MyService();
+    }
+
+    @Test // JUnit 4
+    public void processData() {
+        String input = "test";
+        String result = service.process(input);
+        assertEquals("PROCESSED:test", result); // JUnit 4 Assert
+    }
+}
+```
+
+## Rule 2: Use AssertJ for Assertions
+
+Title: Prefer AssertJ for assertions.
+Description: Employ AssertJ's fluent API (`org.assertj.core.api.Assertions.assertThat`) for more readable, expressive, and maintainable assertions compared to JUnit Jupiter's `Assertions` class or Hamcrest matchers.
+
+**Good Example:**
+
+```java
+import org.junit.jupiter.api.Test;
+import static org.assertj.core.api.Assertions.assertThat;
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
