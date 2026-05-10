@@ -1,209 +1,192 @@
 ---
 trigger: always_on
-description: RESTful API design patterns and conventions for POS System
+description: Complete authentication, security, and debugging patterns for React + Go POS system
 ---
 
 
-# API Development Guidelines
+# 🔐 Authentication & Security Patterns
 
-## RESTful API Design
+## 🚀 Essential Authentication Architecture
 
-### Endpoint Conventions
-Follow the patterns established in [backend/internal/api/routes.go](mdc:backend/internal/api/routes.go):
-
-### Resource Naming
-- Use plural nouns for resources: `/api/v1/orders`, `/api/v1/products`
-- Use kebab-case for multi-word resources: `/api/v1/dining-tables`
-- Nest related resources: `/api/v1/orders/{id}/payments`
-- Use descriptive action names for non-CRUD operations: `/api/v1/orders/{id}/status`
-
-### HTTP Methods
-Standard CRUD operations:
-```
-GET    /api/v1/orders           # List all orders
-POST   /api/v1/orders           # Create new order
-GET    /api/v1/orders/{id}      # Get specific order
-PUT    /api/v1/orders/{id}      # Update entire order
-PATCH  /api/v1/orders/{id}      # Partial update
-DELETE /api/v1/orders/{id}      # Delete order
-
-# Action-specific endpoints
-PATCH  /api/v1/orders/{id}/status     # Update order status
-POST   /api/v1/orders/{id}/payments   # Add payment to order
-```
-
-## Request/Response Patterns
-
-### Standard Response Format
-Use consistent response structure from [models/models.go](mdc:backend/internal/models/models.go):
-
-```json
-{
-  "success": true,
-  "message": "Order created successfully",
-  "data": {
-    "id": "uuid-here",
-    "order_number": "ORD001",
-    // ... other fields
-  }
-}
-```
-
-### Error Response Format
-```json
-{
-  "success": false,
-  "message": "User-friendly error message",
-  "error": "error_code_for_clients"
-}
-```
-
-### Pagination Response Format
-```json
-{
-  "success": true,
-  "message": "Orders retrieved successfully",
-  "data": [...],
-  "meta": {
-    "current_page": 1,
-    "per_page": 20,
-    "total": 150,
-    "total_pages": 8
-  }
-}
-```
-
-## Authentication & Authorization
-
-### JWT Token Authentication
-Follow patterns from [middleware/auth.go](mdc:backend/internal/middleware/auth.go):
-
-### Request Headers
-```
-Authorization: Bearer <jwt_token>
-Content-Type: application/json
-Accept: application/json
-```
-
-### Role-Based Access Control
-```go
-// Public routes - no authentication
-public.POST("/auth/login", authHandler.Login)
-
-// Protected routes - authentication required
-protected.GET("/orders", orderHandler.GetOrders)
-
-// Admin routes - specific roles required
-admin.Use(middleware.RequireRoles([]string{"admin", "manager"}))
-admin.GET("/dashboard/stats", getDashboardStats)
-```
-
-## Query Parameters & Filtering
-
-### Standard Query Parameters
-```
-GET /api/v1/orders?page=1&per_page=20&status=pending&order_type=dine_in
-```
-
-### Common Parameters
-- `page` - Page number for pagination (default: 1)
-- `per_page` - Items per page (default: 20, max: 100)
-- `sort` - Sort field and direction: `sort=created_at:desc`
-- `search` - Text search across relevant fields
-- Resource-specific filters (status, type, date ranges, etc.)
-
-### Date Filtering
-```
-GET /api/v1/orders?created_after=2024-01-01&created_before=2024-12-31
-```
-
-## Error Handling
-
-### HTTP Status Codes
-Use appropriate status codes consistently:
-```
-200 OK              - Successful GET, PUT, PATCH
-201 Created         - Successful POST
-204 No Content      - Successful DELETE
-400 Bad Request     - Invalid request data
-401 Unauthorized    - Authentication required/failed  
-403 Forbidden       - Insufficient permissions
-404 Not Found       - Resource doesn't exist
-409 Conflict        - Resource conflict (duplicate, etc.)
-422 Unprocessable   - Valid JSON but business logic error
-500 Internal Error  - Server error
-```
-
-### Error Response Examples
-```go
-// Validation error
-c.JSON(http.StatusBadRequest, models.APIResponse{
-    Success: false,
-    Message: "Order must contain at least one item",
-    Error:   stringPtr("empty_order"),
-})
-
-// Resource not found
-c.JSON(http.StatusNotFound, models.APIResponse{
-    Success: false,
-    Message: "Order not found",
-    Error:   stringPtr("order_not_found"),
-})
-
-// Permission error
-c.JSON(http.StatusForbidden, models.APIResponse{
-    Success: false,
-    Message: "Insufficient permissions",
-    Error:   stringPtr("insufficient_permissions"),
-})
-```
-
-## Request Validation
-
-### Input Validation Pattern
-```go
-type CreateOrderRequest struct {
-    TableID      *uuid.UUID         `json:"table_id"`
-    CustomerName *string            `json:"customer_name"`
-    OrderType    string             `json:"order_type"`
-    Items        []CreateOrderItem  `json:"items"`
-    Notes        *string            `json:"notes"`
-}
-
-func (h *OrderHandler) CreateOrder(c *gin.Context) {
-    var req CreateOrderRequest
-    if err := c.ShouldBindJSON(&req); err != nil {
-        c.JSON(http.StatusBadRequest, models.APIResponse{
-            Success: false,
-            Message: "Invalid request body",
-            Error:   stringPtr(err.Error()),
-        })
-        return
-    }
+### JWT-Based Authentication Flow
+```typescript
+// Complete authentication workflow
+class APIClient {
+  constructor() {
+    const apiUrl = import.meta.env?.VITE_API_URL || 'http://localhost:8080/api/v1';
+    console.log('🔧 API Client baseURL:', apiUrl);
     
-    // Additional business logic validation
-    if len(req.Items) == 0 {
-        c.JSON(http.StatusBadRequest, models.APIResponse{
-            Success: false,
-            Message: "Order must contain at least one item",
-            Error:   stringPtr("empty_order"),
-        })
-        return
+    this.client = axios.create({
+      baseURL: apiUrl,
+      timeout: 30000,
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    // Auto-attach token from localStorage
+    this.loadStoredAuth();
+  }
+
+  private loadStoredAuth(): void {
+    const token = localStorage.getItem('pos_token');
+    if (token) {
+      this.client.defaults.headers.common['Authorization'] = `Bearer ${token}`;
     }
+  }
+
+  setAuthToken(token: string): void {
+    localStorage.setItem('pos_token', token);
+    this.client.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+  }
+
+  clearAuth(): void {
+    localStorage.removeItem('pos_token');
+    localStorage.removeItem('pos_user');
+    delete this.client.defaults.headers.common['Authorization'];
+  }
+
+  isAuthenticated(): boolean {
+    return !!localStorage.getItem('pos_token');
+  }
 }
 ```
 
-## Database Transaction Patterns
+## 🏗️ React Authentication Components
 
-### Transaction Usage
-Use transactions for multi-table operations:
+### Protected Route Pattern (Avoid Infinite Redirects)
+```typescript
+function HomePage() {
+  // ✅ ALL HOOKS AT TOP LEVEL - NEVER after returns
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoadingAuth, setIsLoadingAuth] = useState(true); // Critical: Start true
+
+  const { isLoading: isVerifying, error } = useQuery({
+    queryKey: ['currentUser'],
+    queryFn: () => apiClient.getCurrentUser(),
+    enabled: false, // Control when to verify
+    retry: 1,
+  });
+
+  // Load auth state from localStorage FIRST
+  useEffect(() => {
+    const loadAuthState = async () => {
+      const token = localStorage.getItem('pos_token');
+      const storedUser = localStorage.getItem('pos_user');
+      
+      console.log('🔍 Loading auth - token:', token ? 'exists' : 'missing');
+      console.log('🔍 Loading auth - user:', storedUser ? 'exists' : 'missing');
+      
+      if (storedUser && token) {
+        try {
+          const parsedUser = JSON.parse(storedUser);
+          setUser(parsedUser);
+          console.log('✅ Auth loaded - user role:', parsedUser.role);
+        } catch (error) {
+          console.error('❌ Invalid stored auth data, clearing');
+          apiClient.clearAuth();
+        }
+      }
+      
+      setIsLoadingAuth(false);
+    };
+    
+    loadAuthState();
+  }, []);
+
+  // ✅ CRITICAL: Wait for localStorage loading before auth checks
+  if (isLoadingAuth) {
+    return <LoadingSpinner message="Loading authentication..." />;
+  }
+
+  // Only check auth AFTER loading is complete
+  if (!apiClient.isAuthenticated() || !user) {
+    console.log('🔄 Not authenticated, redirecting to login');
+    return <Navigate to="/login" replace />;
+  }
+
+  // Render protected content with user context
+  return <RoleBasedLayout user={user} />;
+}
+```
+
+### Login Component Pattern
+```typescript
+function LoginPage() {
+  const [error, setError] = useState<string | null>(null);
+  
+  // Redirect if already authenticated
+  if (apiClient.isAuthenticated()) {
+    return <Navigate to="/" replace />;
+  }
+
+  const loginMutation = useMutation({
+    mutationFn: async (credentials: LoginRequest) => {
+      console.log('🔄 Attempting login...');
+      return await apiClient.login(credentials);
+    },
+    onSuccess: (data) => {
+      console.log('✅ Login success:', data.success);
+      
+      if (data.success && data.data) {
+        // Set auth token first
+        apiClient.setAuthToken(data.data.token);
+        
+        // Store user data
+        localStorage.setItem('pos_user', JSON.stringify(data.data.user));
+        
+        console.log('✅ Auth stored - role:', data.data.user.role);
+        
+        // Brief delay prevents race conditions
+        setTimeout(() => {
+          router.navigate({ to: '/' });
+        }, 100);
+      }
+    },
+    onError: (error: any) => {
+      console.error('❌ Login failed:', error.message);
+      setError(error.message || 'Login failed');
+    },
+  });
+
+  return (
+    <LoginForm 
+      onSubmit={loginMutation.mutate}
+      isLoading={loginMutation.isPending}
+      error={error}
+    />
+  );
+}
+```
+
+## 🛡️ Backend Security Patterns
+
+### Go JWT Middleware
 ```go
-func (h *OrderHandler) CreateOrder(c *gin.Context) {
-    tx, err := h.db.Begin()
-    if err != nil {
-        // Handle error
-        return
-    }
+// JWT authentication middleware
+func AuthMiddleware() gin.HandlerFunc {
+    return func(c *gin.Context) {
+        tokenString := c.GetHeader("Authorization")
+        if tokenString == "" {
+            c.JSON(http.StatusUnauthorized, models.APIResponse{
+                Success: false,
+                Message: "Authorization header required",
+                Error:   stringPtr("missing_auth_header"),
+            })
+            c.Abort()
+            return
+        }
+
+        // Remove "Bearer " prefix
+        if len(tokenString) > 7 && tokenString[:7] == "Bearer " {
+            tokenString = tokenString[7:]
+        }
+
+        token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+            if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+                return nil, fmt.Errorf("unexpected signing method")
+            }
+            return []byte(os.Getenv("JWT_SECRET")), nil
+        })
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
