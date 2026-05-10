@@ -1,60 +1,88 @@
 ---
 trigger: always_on
-description: Java rules for Concurrency objects
+description: Java Logging Best Practices
 ---
 
-# Java rules for Concurrency objects
+# Java Logging Best Practices
 
-Effective Java concurrency relies on understanding thread safety fundamentals, using `java.util.concurrent` utilities, and managing thread pools with `ExecutorService`. Key practices include implementing concurrent design patterns like Producer-Consumer, leveraging `CompletableFuture` for asynchronous tasks, and ensuring thread safety through immutability and safe publication. Performance aspects like lock contention and memory consistency must be considered. Thorough testing, including stress tests and thread dump analysis, is crucial. Modern Java offers virtual threads for enhanced scalability, structured concurrency for simplified task management, and scoped values for safer thread-shared data as alternatives to thread-locals.
+Effective Java logging involves selecting a standard framework (SLF4J with Logback/Log4j2), using appropriate log levels (ERROR, WARN, INFO, DEBUG, TRACE),
+and adhering to core practices like parameterized logging, proper exception handling, and avoiding sensitive data exposure.
+Configuration should be environment-specific with clear output formats.
+Security is paramount: mask sensitive data, control log access, and ensure secure transmission.
+Implement centralized log aggregation, monitoring, and alerting for proactive issue detection.
+Finally, logging behavior and its impact should be validated through comprehensive testing.
 
 ## Implementing These Principles
 
 These guidelines are built upon the following core principles:
 
-1.  **Master Thread Safety Fundamentals**: Understand and correctly apply core concepts such as synchronization (locks, conditions), atomic operations (`java.util.concurrent.atomic`), thread-safe collections (`java.util.concurrent`), immutability, and the Java Memory Model to ensure data integrity and prevent race conditions or deadlocks.
-2.  **Efficient Thread Pool Management**: Utilize `ExecutorService` for robust thread management. Choose appropriate thread pool implementations and configure them with suitable sizing, keep-alive times, queue capacities, and rejection policies based on the application's workload. Implement graceful shutdown procedures.
-3.  **Leverage Concurrent Design Patterns**: Implement established patterns like Producer-Consumer (using `BlockingQueue`) and Publish-Subscribe to structure concurrent applications effectively, promoting decoupling, scalability, and maintainability.
-4.  **Embrace Asynchronous Programming with `CompletableFuture`**: Employ `CompletableFuture` to compose and manage asynchronous computations in a non-blocking way. Chain dependent tasks, combine results from multiple futures, and handle exceptions gracefully to build responsive and efficient applications.
-5.  **Prioritize Immutability and Safe Publication**: Design classes to be immutable whenever feasible to inherently achieve thread safety. Ensure that shared mutable objects are safely published (e.g., via `volatile`, static initializers, or proper synchronization) so that their state is consistently visible to all threads.
-6.  **Optimize for Performance, Considering Concurrency overheads**: Be mindful of performance implications such as lock contention (minimize scope, use finer-grained locks), memory consistency (understand happens-before, use `volatile` where appropriate), context switching overhead (size thread pools carefully), and potential issues like false sharing.
-7.  **Thorough Testing and Debugging**: Rigorously test concurrent code. This includes unit tests for thread-safe components, integration tests for interactions, and stress tests to reveal race conditions or deadlocks. Utilize thread dump analysis, proper logging, and concurrency testing tools.
-8.  **Adopt Modern Java Concurrency Features for Enhanced Development**: 
-    *   **Virtual Threads (Project Loom)**: Embrace virtual threads via `Executors.newVirtualThreadPerTaskExecutor()` for I/O-bound tasks to dramatically increase scalability with minimal resource overhead. Avoid pooling virtual threads.
-    *   **Structured Concurrency**: Use `StructuredTaskScope` to simplify the management of multiple related concurrent tasks as a single unit of work, improving error handling, cancellation, and resource management.
-    *   **Scoped Values**: Prefer `ScopedValue` over `ThreadLocal` for sharing immutable data robustly and efficiently across tasks within a dynamically bounded scope, especially when working with virtual threads.
+1.  **Standardized Framework Selection**: Utilize a widely accepted logging facade (preferably SLF4J) and a robust underlying implementation (Logback or Log4j2). This promotes consistency, flexibility, and access to advanced logging features.
+2.  **Meaningful and Consistent Log Levels**: Employ logging levels (ERROR, WARN, INFO, DEBUG, TRACE) deliberately and consistently to categorize the severity and importance of messages. This allows for effective filtering, monitoring, and targeted issue diagnosis.
+3.  **Adherence to Core Logging Practices**: Follow fundamental best practices such as using parameterized logging (avoiding string concatenation for performance and clarity), always logging exceptions with their stack traces, never logging sensitive data directly (PII, credentials), and using correlation IDs (e.g., via MDC) for request tracing in distributed environments.
+4.  **Thoughtful and Flexible Configuration**: Manage logging configuration externally (e.g., `logback.xml`, `log4j2.xml`). Tailor configurations for different environments (dev, test, prod) with appropriate log levels for various packages, clear and informative output formats (including timestamps, levels, logger names, thread info, and MDC data), and robust log rotation and retention policies.
+5.  **Security-Conscious Logging**: Prioritize security in all logging activities. Actively mask or filter sensitive information, control access to log files and log management systems, use secure protocols for transmitting logs, and ensure compliance with relevant data protection regulations (e.g., GDPR, HIPAA).
+6.  **Proactive Log Monitoring and Alerting**: Implement centralized log aggregation systems (e.g., ELK Stack, Splunk, Grafana Loki). Establish automated alerts based on log patterns, error rates, or specific critical events to enable proactive issue detection and rapid response.
+7.  **Comprehensive Logging Validation Through Testing**: Integrate logging into the testing strategy. Assert that critical log messages (especially errors and warnings) are generated as expected under specific conditions, verify log formats, test log level filtering, and assess any performance impact of logging.
 
 ## Table of contents
 
-- Rule 1: Thread Safety Fundamentals
-- Rule 2: Thread Pool Management
-- Rule 3: Concurrent Design Patterns
-- Rule 4: Asynchronous Programming with CompletableFuture
-- Rule 5: Thread Safety Guidelines (Immutability & Safe Publication)
-- Rule 6: Performance Considerations in Concurrency
-- Rule 7: Testing and Debugging Concurrent Code
-- Rule 8: Embrace Virtual Threads for Enhanced Scalability
-- Rule 9: Simplify Concurrent Code with Structured Concurrency
-- Rule 10: Manage Thread-Shared Data with Scoped Values
+- Rule 1: Choose an Appropriate Logging Framework
+- Rule 2: Understand and Use Logging Levels Correctly
+- Rule 3: Adhere to Core Logging Practices
+- Rule 4: Follow Configuration Best Practices
+- Rule 5: Implement Secure Logging Practices
+- Rule 6: Establish Effective Log Monitoring and Alerting
+- Rule 7: Incorporate Logging in Testing
 
-## Rule 1: Thread Safety Fundamentals
+## Rule 1: Choose an Appropriate Logging Framework
 
-Title: Understand and Apply Core Thread Safety Concepts
-Description: Ensure data integrity and correct behavior in multi-threaded environments by using thread-safe data structures and appropriate synchronization mechanisms.
-- Prefer `java.util.concurrent` collections over older synchronized wrappers.
-- Utilize immutable objects to eliminate risks of concurrent modification.
-- Employ thread-local variables for state confined to a single thread.
-- Use atomic classes (`java.util.concurrent.atomic`) for lock-free operations on single variables.
-- Choose flexible locking with `ReentrantLock` or `ReadWriteLock` for more complex scenarios.
-- Favor `java.util.concurrent` utilities over manual `wait()/notify()`.
+Title: Select a Standard Logging Facade and Implementation
+Description:
+Using a standard logging facade like SLF4J allows for flexibility in choosing and switching an underlying logging implementation (e.g., Logback, Log4j2).
+- **Primary Recommendation**: SLF4J with Logback. This combination is widely used, robust, and feature-rich.
+- **Alternatives**:
+    - SLF4J with Log4j2: Another powerful and performant option.
+    - Java Util Logging (JUL): Built into the JDK, but often less flexible and performant for complex applications.
 
 **Good example:**
-
+(Illustrating SLF4J usage - specific Logback/Log4j2 setup is in their config files)
 ```java
-import java.util.Map;
-import java.util.Queue;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import java.util.Objects;
+
+public class MyService {
+    // Logger declared using SLF4J
+    private static final Logger logger = LoggerFactory.getLogger(MyService.class);
+
+    public void performAction(String input) {
+        // SLF4J API is used for logging
+        logger.info("Performing action with input: {}", input);
+        if (Objects.isNull(input) || input.isEmpty()) {
+            logger.warn("Input is null or empty, this might lead to unexpected behavior.");
+            // Potentially handle error or default behavior
+        }
+        // ... action logic ...
+        logger.debug("Action performed successfully for input: {}", input);
+    }
+
+    public static void main(String args) {
+        MyService service = new MyService();
+        service.performAction("Test Data");
+        service.performAction(""); // Example that might trigger a WARN
+    }
+}
+```
+
+**Bad Example:**
+```java
+// Directly using System.out.println for logging
+public class MyOldService {
+    public void doWork(String data) {
+        System.out.println("Starting work with data: " + data); // Hard to control, no levels, no formatting
+        if (data.equals("error")) {
+            System.err.println("An error occurred!"); // Also hard to manage
+        }
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
