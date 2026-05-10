@@ -1,259 +1,41 @@
 ---
 trigger: always_on
-description: Backend-as-a-Service (BaaS) with optimistic updates, multiplayer, offline support, and relational data. Firebase alternative with relations.
+description: - Prefer Clean Breaks over compatibility shims, deprecations or migrations. The project is in a very early stage, we can't afford to break things.
 ---
 
-# What is InstantDB
+# AI Agent Setup Guide
 
-Backend-as-a-Service (BaaS) with optimistic updates, multiplayer, offline support, and relational data. Firebase alternative with relations.
+- Prefer Clean Breaks over compatibility shims, deprecations or migrations. The project is in a very early stage, we can't afford to break things.
+- To optimize token consumption prefer running individual tests, and type checks, only when they pass execute the repo side `bun run ci-check`, When `bun run ci-check` fails, read the reported log path, start with the printed tail, and only open more of the file if the tail is insufficient.
+- Type Safety is non-negotiable. Do not rely on `any` or `unknown` types.
+- Try your best to use components from ShadCN Svelte.
+- Before writing custom CSS classes, use tailwind classes as much as possible
+- If the nature of the changes are purely visual, skip the ci-checks
+- Package boundary: `@tcg/lorcana-engine` must not import `@tcg/lorcana-cards` anywhere, including tests, because that creates a cyclic dependency. Engine tests must use mock cards; mixed engine-plus-real-card integration coverage belongs in `packages/lorcana/lorcana-simulator/src/testing/**`.
 
-## Core Features
+### Agent Files
+``
+- Commands: `.agents/commands/`
+- Skills: `.agents/skills/`
 
-* Optimistic updates
-* Real-time multiplayer sync
-* Offline-first architecture
-* Relational data support
-* Web and mobile compatible
+## Design Context
 
-## API
+### Users
+Primary users are mobile-first players using a cellphone in portrait mode while actively playing a Disney Lorcana game. The interface should still work well on desktop, but mobile interaction quality is the main optimization target. Users need to understand game state quickly and perform simulator actions with minimal friction or ambiguity.
 
-CRITICAL: These are the only APIs from the react package you need to know. do not hallucinate other APIs.
+### Brand Personality
+The brand personality is simplicity, ergonomy, and performance. The product should feel direct, efficient, and reliable rather than decorative or theatrical. Interaction design should reduce cognitive load and help players act with confidence during live gameplay.
 
-```
-// Initialization
-init<Schema>(config: InstantConfig<Schema>): InstantReactWebDatabase<Schema>
+### Aesthetic Direction
+Use the existing premium TCG.online brand foundation already present in the codebase, but bias implementation choices toward clarity and interaction efficiency over visual flourish. Prefer ShadCN Svelte components as much as possible, then TailwindCSS utilities, and only write custom CSS when both alternatives have failed. Design and interaction patterns must consistently support both mobile and desktop, with special emphasis on portrait-mode mobile usability for simulator play.
 
-// Transaction builder
-tx: TxChunk<Schema>
-id(): string
-lookup(attribute: string, value: any): Lookup
-
-// Schema builder
-i.schema({ entities, links?, rooms? })
-i.entity(attrs)
-i.string(), i.number(), i.boolean(), i.date(), i.json(), i.any()
-
-// Core Database Methods (on db instance)
-db.transact(chunks)
-
-// React Hooks (on db instance)
-db.useQuery(query, opts?)
-db.useAuth()
-db.room(type?, id?)
-
-// Auth Methods (on db.auth)
-db.auth.sendMagicCode({ email })
-db.auth.signInWithMagicCode({ email, code })
-db.auth.signOut(opts?)
-
-// Room Hooks (on db.rooms) - IMPORTANT: These are called on db.rooms, not on room instances
-db.rooms.useTopicEffect(room, topic, onEvent)
-db.rooms.usePublishTopic(room, topic) // returns: (data) => void
-db.rooms.usePresence(room, opts?) // returns: { peers, user, publishPresence, isLoading }
-db.rooms.useSyncPresence(room, data, deps?)
-db.rooms.useTypingIndicator(room, inputName, opts?) // returns: { active, setActive, inputProps }
-
-// Components
-<Cursors room={room} {...props} />
-```
-
-# How to initialize DB
-
-Create a central DB instance (single connection maintained per app ID):
-
-```typescript
-// lib/db.ts
-import { init } from '@instantdb/react';
-import schema from '../instant.schema';
-
-export const db = init({
-  // Get your app ID from https://instantdb.com
-  appId: 'your-app-id',
-  schema
-});
-```
-
-`init` accepts the following parameters:
-
-```typescript
-export type InstantConfig<S extends InstantSchemaDef<any, any, any>> = {
-  appId: string;
-  schema?: S;
-};
-```
-
-# How to do queries
-
-## Core Concepts
-- **Namespaces**: Entity collections (tables)
-- **Queries**: JS objects describing data needs
-- **Associations**: Entity relationships
-
-## Query Structure
-```typescript
-{
-  namespace1: {
-    $: { /* operators */ },
-    linkedNamespace: { $: { /* operators */ } }
-  },
-  namespace2: { /* ... */ }
-}
-```
-
-## Basic Usage
-
-**Required**: Handle `isLoading` and `error` states:
-```typescript
-const { isLoading, data, error } = db.useQuery({ todos: {} })
-if (isLoading) return
-if (error) return (<div>Error: {error.message}</div>)
-return <pre>{JSON.stringify(data, null, 2)}</pre>
-```
-
-### Fetch Operations
-```typescript
-// Single namespace
-const query = { goals: {} }
-
-// Multiple namespaces
-const query = { goals: {}, todos: {} }
-```
-
-## Filtering
-
-### By ID
-```typescript
-const query = {
-  goals: {
-    $: { where: { id: 'goal-1' } }
-  }
-}
-```
-
-### Multiple Conditions (AND)
-```typescript
-const query = {
-  todos: {
-    $: { where: { completed: true, priority: 'high' } }
-  }
-}
-```
-
-## Associations (JOINs)
-
-### Fetch Related
-```typescript
-// Goals with todos
-const query = { goals: { todos: {} } }
-
-// Inverse: Todos with goals
-const query = { todos: { goals: {} } }
-```
-
-### Filter by Association
-```typescript
-// Dot notation for associated values
-const query = {
-  goals: {
-    $: { where: { 'todos.title': 'Go running' } },
-    todos: {}
-  }
-}
-```
-
-### Filter Associated Entities
-```typescript
-const query = {
-  goals: {
-    todos: {
-      $: { where: { completed: true } }
-    }
-  }
-}
-```
-
-## Operators
-
-### Logical
-```typescript
-// AND
-where: { and: [{ 'todos.priority': 'high' }, { 'todos.dueDate': { $lt: tomorrow } }] }
-
-// OR
-where: { or: [{ priority: 'high' }, { dueDate: { $lt: tomorrow } }] }
-```
-
-### Comparison (indexed fields only)
-- `$gt`, `$lt`, `$gte`, `$lte`
-```typescript
-where: { timeEstimate: { $gt: 2 } }
-```
-
-### Other Operators
-```typescript
-// IN
-where: { priority: { $in: ['high', 'critical'] } }
-
-// NOT
-where: { location: { $not: 'work' } }
-
-// NULL check
-where: { location: { $isNull: true } }
-
-// Pattern matching (indexed strings)
-where: { title: { $like: 'Get%' } }     // Case-sensitive
-where: { title: { $ilike: 'get%' } }    // Case-insensitive
-```
-
-Pattern syntax:
-- `'prefix%'` - Starts with
-- `'%suffix'` - Ends with
-- `'%substring%'` - Contains
-
-## Pagination & Ordering
-
-### Pagination (top-level only)
-```typescript
-$: { limit: 10, offset: 10 }
-```
-
-### Ordering (indexed fields)
-```typescript
-$: { order: { dueDate: 'asc' } }  // or 'desc'
-```
-
-## Field Selection
-```typescript
-// Select specific fields
-$: { fields: ['title', 'status'] }
-
-// With nested associations
-goals: {
-  $: { fields: ['title'] },
-  todos: { $: { fields: ['status'] } }
-}
-```
-
-## Deferred Queries
-```typescript
-const query = user ? { todos: { $: { where: { userId: user.id } } } } : null
-```
-
-## Complex Example
-```typescript
-const query = {
-  goals: {
-    $: {
-      where: { or: [{ status: 'active' }, { 'todos.priority': 'high' }] },
-      limit: 5,
-      order: { serverCreatedAt: 'desc' },
-      fields: ['title', 'description']
-    },
-    todos: {
-      $: {
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+### Design Principles
+- Optimize for portrait-mode mobile play first, while keeping desktop fully usable.
+- Make every simulator action easy to understand, easy to reach, and easy to execute.
+- Prefer ShadCN Svelte components first, TailwindCSS helpers second, and custom CSS only as a last resort.
+- Reduce cognitive overhead: clear hierarchy, obvious actions, minimal ambiguity, fast scanning.
+- Preserve a simple, ergonomic, high-performance feel in both visuals and interactions.
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/TheCardGoat) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-09 -->
+> Source: [TheCardGoat/lorcana-engine](https://github.com/TheCardGoat/lorcana-engine) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-04 -->
