@@ -7,11 +7,11 @@ dac is a dashboard-as-code tool. Build interactive dashboards using YAML and JSX
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [bruin-data/dac](https://github.com/bruin-data/dac).
+Original source: `CLAUDE.md` in [bruin-data/dac](https://github.com/bruin-data/dac).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
