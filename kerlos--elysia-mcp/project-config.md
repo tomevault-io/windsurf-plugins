@@ -1,147 +1,170 @@
 ---
 trigger: always_on
-description: TITLE: Implement Transport Error Handling in TypeScript and Python
+description: TITLE: Overwrite Transformations Retaining Schema Type in Zod 4
 ---
 
-TITLE: Implement Transport Error Handling in TypeScript and Python
-DESCRIPTION: This code snippet illustrates how to incorporate comprehensive error handling within transport implementations. It demonstrates catching exceptions during connection establishment and message transmission, logging errors, and ensuring proper resource cleanup using `try-catch` blocks and context managers.
-SOURCE: https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/docs/concepts/transports.mdx#_snippet_4
+TITLE: Overwrite Transformations Retaining Schema Type in Zod 4
+DESCRIPTION: Introduces the new `.overwrite()` method in Zod v4, designed for transformations that do not change the inferred type. This method returns an instance of the original schema class, allowing continued method chaining and retaining introspectability.
+SOURCE: https://zod.dev/v4/v4
 
 LANGUAGE: TypeScript
 CODE:
 ```
-class ExampleTransport implements Transport {
-  async start() {
-    try {
-      // Connection logic
-    } catch (error) {
-      this.onerror?.(new Error(`Failed to connect: ${error}`));
-      throw error;
-    }
-  }
-
-  async send(message: JSONRPCMessage) {
-    try {
-      // Sending logic
-    } catch (error) {
-      this.onerror?.(new Error(`Failed to send message: ${error}`));
-      throw error;
-    }
-  }
-}
-```
-
-LANGUAGE: Python
-CODE:
-```
-@contextmanager
-async def example_transport(scope: Scope, receive: Receive, send: Send):
-    try:
-        # Create streams for bidirectional communication
-        read_stream_writer, read_stream = anyio.create_memory_object_stream(0)
-        write_stream, write_stream_reader = anyio.create_memory_object_stream(0)
-
-        async def message_handler():
-            try:
-                async with read_stream_writer:
-                    # Message handling logic
-                    pass
-            except Exception as exc:
-                logger.error(f"Failed to handle message: {exc}")
-                raise exc
-
-        async with anyio.create_task_group() as tg:
-            tg.start_soon(message_handler)
-            try:
-                # Yield streams for communication
-                yield read_stream, write_stream
-            except Exception as exc:
-                logger.error(f"Transport error: {exc}")
-                raise exc
-            finally:
-                tg.cancel_scope.cancel()
-                await write_stream.aclose()
-                await read_stream.aclose()
-    except Exception as exc:
-        logger.error(f"Failed to initialize transport: {exc}")
-        raise exc
+z.number().overwrite(val => val ** 2).max(100);
+// => ZodNumber
 ```
 
 ----------------------------------------
 
-TITLE: Implement Tool Execution Handler with Weather API Tools (Kotlin)
-DESCRIPTION: This snippet demonstrates how to set up an HTTP client using Ktor for making requests to the weather.gov API and how to register two tools (`get_alerts` and `get_forecast`) with an MCP server. The `get_alerts` tool fetches weather alerts by state, validating the 'state' parameter. The `get_forecast` tool retrieves weather forecasts by latitude and longitude, validating both parameters. Both tools handle input validation and return `CallToolResult` with `TextContent`.
-SOURCE: https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/quickstart/server.mdx#_snippet_33
+TITLE: Compose Discriminated Unions in Zod 4
+DESCRIPTION: Demonstrates the new ability in Zod v4 to use one discriminated union schema (`MyErrors`) as a member within another discriminated union (`MyResult`), enabling powerful schema composition patterns.
+SOURCE: https://zod.dev/v4/v4
 
-LANGUAGE: kotlin
+LANGUAGE: TypeScript
 CODE:
 ```
-// Create an HTTP client with a default request configuration and JSON content negotiation
-val httpClient = HttpClient {
-    defaultRequest {
-        url("https://api.weather.gov")
-        headers {
-            append("Accept", "application/geo+json")
-            append("User-Agent", "WeatherApiClient/1.0")
-        }
-        contentType(ContentType.Application.Json)
-    }
-    // Install content negotiation plugin for JSON serialization/deserialization
-    install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
-}
+const BaseError = z.object({ status: z.literal("failed"), message: z.string() });
+const MyErrors = z.discriminatedUnion("code", [
+  BaseError.extend({ code: z.literal(400) }),
+  BaseError.extend({ code: z.literal(401) }),
+  BaseError.extend({ code: z.literal(500) })
+]);
 
-// Register a tool to fetch weather alerts by state
-server.addTool(
-    name = "get_alerts",
-    description = """
-        Get weather alerts for a US state. Input is Two-letter US state code (e.g. CA, NY)
-    """.trimIndent(),
-    inputSchema = Tool.Input(
-        properties = buildJsonObject {
-            putJsonObject("state") {
-                put("type", "string")
-                put("description", "Two-letter US state code (e.g. CA, NY)")
-            }
-        },
-        required = listOf("state")
-    )
-) { request ->
-    val state = request.arguments["state"]?.jsonPrimitive?.content
-    if (state == null) {
-        return@addTool CallToolResult(
-            content = listOf(TextContent("The 'state' parameter is required."))
-        )
-    }
+const MyResult = z.discriminatedUnion("status", [
+  z.object({ status: z.literal("success"), data: z.string() }),
+  MyErrors
+]);
+```
 
-    val alerts = httpClient.getAlerts(state)
+----------------------------------------
 
-    CallToolResult(content = alerts.map { TextContent(it) })
-}
+TITLE: Defining Synchronous Zod-Validated Functions in Zod v4
+DESCRIPTION: Demonstrates the new API for defining Zod-validated functions using `z.function()` in Zod v4. It shows how to define input and output schemas upfront and implement the function logic synchronously using `.implement()`.
+SOURCE: https://zod.dev/v4/v4/changelog
 
-// Register a tool to fetch weather forecast by latitude and longitude
-server.addTool(
-    name = "get_forecast",
-    description = """
-        Get weather forecast for a specific latitude/longitude
-    """.trimIndent(),
-    inputSchema = Tool.Input(
-        properties = buildJsonObject {
-            putJsonObject("latitude") { put("type", "number") }
-            putJsonObject("longitude") { put("type", "number") }
-        },
-        required = listOf("latitude", "longitude")
-    )
-) { request ->
-    val latitude = request.arguments["latitude"]?.jsonPrimitive?.doubleOrNull
-    val longitude = request.arguments["longitude"]?.jsonPrimitive?.doubleOrNull
-    if (latitude == null || longitude == null) {
-        return@addTool CallToolResult(
-            content = listOf(TextContent("The 'latitude' and 'longitude' parameters are required."))
-        )
-    }
+LANGUAGE: TypeScript
+CODE:
+```
+const myFunction = z.function({
+  input: [z.object({
+    name: z.string(),
+    age: z.number().int(),
+  })],
+  output: z.string(),
+});
 
-    val forecast = httpClient.getForecast(latitude, longitude)
+myFunction.implement((input) => {
+  return `Hello ${input.name}, you are ${input.age} years old.`;
+});
+```
 
+----------------------------------------
+
+TITLE: Use Top-Level String Format Functions - Zod v4 - JavaScript
+DESCRIPTION: Lists the various string format validation functions (like email, uuid, url, etc.) that are now available directly as top-level methods on the `z` module in Zod v4. This change makes them more concise to use and improves tree-shaking.
+SOURCE: https://zod.dev/v4/v4
+
+LANGUAGE: JavaScript
+CODE:
+```
+z.email();\nz.uuidv4();\nz.uuidv7();\nz.uuidv8();\nz.ipv4();\nz.ipv6();\nz.cidrv4();\nz.cidrv6();\nz.url();\nz.e164();\nz.base64();\nz.base64url();\nz.jwt();\nz.ascii();\nz.utf8();\nz.lowercase();\nz.iso.date();\nz.iso.datetime();\nz.iso.duration();\nz.iso.time();
+```
+
+----------------------------------------
+
+TITLE: Zod 4: Using .check() in zod/v4-mini
+DESCRIPTION: Illustrates the use of the new `.check()` method available in `zod/v4-mini`, which allows composing multiple validations and transforms (referred to as 'checks') on a schema.
+SOURCE: https://zod.dev/v4/v4/changelog
+
+LANGUAGE: TypeScript
+CODE:
+```
+import { z } from "zod/v4-mini";
+
+z.string().check(
+  z.minLength(10),
+  z.maxLength(100),
+  z.toLowerCase(),
+  z.trim(),
+);
+```
+
+----------------------------------------
+
+TITLE: Customize Required and Invalid Type Errors with Zod 4
+DESCRIPTION: Shows how Zod v4 replaces the separate `required_error` and `invalid_type_error` parameters with a single `error` function that receives an issue object, allowing conditional error messages based on the issue type (e.g., `invalid_type` or `required`).
+SOURCE: https://zod.dev/v4/v4
+
+LANGUAGE: TypeScript
+CODE:
+```
+// Zod 3
+- z.string({
+-   required_error: "This field is required"
+-   invalid_type_error: "Not a string",
+- });
+```
+
+LANGUAGE: TypeScript
+CODE:
+```
+// Zod 4
++ z.string({ error: (issue) => issue.input === undefined ?
++  "This field is required" :
++  "Not a string"
++ });
+```
+
+----------------------------------------
+
+TITLE: Customize Errors with Function Syntax in Zod 4
+DESCRIPTION: Illustrates how Zod v4 replaces the `errorMap` function with the unified `error` function for more complex error customization, allowing access to the issue details to return specific messages based on validation failures like `too_small`.
+SOURCE: https://zod.dev/v4/v4
+
+LANGUAGE: TypeScript
+CODE:
+```
+// Zod 3
+- z.string({
+-   errorMap: (issue, ctx) => {
+-     if (issue.code === "too_small") {
+-       return { message: `Value must be >${issue.minimum}` };
+-     }
+-     return { message: ctx.defaultError };
+-   },
+- });
+```
+
+LANGUAGE: TypeScript
+CODE:
+```
+// Zod 4
++ z.string({
++   error: (issue) => {
++     if (issue.code === "too_small") {
++       return `Value must be >${issue.minimum}`
++     }
++   },
++ });
+```
+
+----------------------------------------
+
+TITLE: Adding Issues Directly to ZodError (JavaScript)
+DESCRIPTION: Shows the recommended way to add new issues to a `ZodError` instance in Zod v4 by directly pushing to the `issues` array, replacing the deprecated `.addIssue()` methods.
+SOURCE: https://zod.dev/v4/v4/changelog
+
+LANGUAGE: JavaScript
+CODE:
+```
+myError.issues.push({
+  // new issue
+});
+```
+
+----------------------------------------
+
+TITLE: Configure Zod Error Message Locale - Zod v4 - JavaScript
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
