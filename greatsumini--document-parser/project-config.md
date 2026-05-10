@@ -1,51 +1,165 @@
 ---
 trigger: always_on
-description: Supabase Migration SQL Guideline
+description: - **MUST:** Create typed context with Supabase client and user authentication
 ---
 
+# tRPC Implementation Guide
 
-# Supabase Migration SQL Guideline
+## **Server Architecture Patterns**
 
-## Must
-- Each migration file must have a unique name with number prefix (e.g., `0001_create_users_table.sql`)
-- Each migration must be idempotent (can be run multiple times without error)
-- Use `CREATE TABLE IF NOT EXISTS` instead of just `CREATE TABLE`
-- Include proper error handling with `BEGIN` and `EXCEPTION` blocks
-- Add comments for complex operations
-- Always specify column types explicitly
-- Include proper constraints (NOT NULL, UNIQUE, etc.) where appropriate
-- Add updated_at column to all tables, and use trigger to update it
-- always check other migrations to avoid conflicts
+### **Context Setup**
+- **MUST:** Create typed context with Supabase client and user authentication
+- **MUST:** Export context type for use in procedures
 
-## Should
-- Keep migrations small 
-- Use consistent naming conventions for tables and columns
-- Use snake_case for all identifiers
-- Document breaking changes
+```typescript
+// ✅ DO: Proper context setup with authentication
+export async function createTRPCContext() {
+  const supabase = await createClient();
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  
+  return {
+    supabase,
+    user,
+    userError,
+  };
+}
 
-## Recommended Patterns
-- Use RLS (Row Level Security) for access control
-- Set up proper indexes for frequently queried columns
-- Use foreign key constraints to maintain referential integrity
-- Leverage Postgres extensions when appropriate
-- Use enums for fields with a fixed set of values
-- Consider using views for complex queries
+export type Context = Awaited<ReturnType<typeof createTRPCContext>>;
+```
 
-## Schema Organization
-- Group related tables together
-- Use schemas to organize tables by domain
-- Consider using Postgres schemas for multi-tenant applications
-- Keep authentication tables in the auth schema
+### **Procedure Hierarchy**
+- **MUST:** Define clear procedure hierarchy: `publicProcedure` → `protectedProcedure` → `adminProcedure`
+- **MUST:** Use middleware for authentication and authorization checks
+- **CRITICAL:** Ensure auth users exist in custom DB tables before allowing operations with foreign key constraints
 
-## Performance Considerations
-- Avoid adding/removing columns from large tables in production
-- Use appropriate data types to minimize storage
-- Add indexes strategically (not excessively)
+```typescript
+// ✅ DO: Layered procedure security with DB user synchronization
+export const protectedProcedure = t.procedure.use(async (opts) => {
+  const { user, supabase } = opts.ctx;
+  
+  if (!user) {
+    throw new TRPCError({
+      code: 'UNAUTHORIZED',
+      message: '로그인이 필요합니다.',
+    });
+  }
 
-## Security Best Practices
-- Never store plaintext passwords
-- Use RLS policies to restrict data access
-- Sanitize all user inputs
+  // CRITICAL: Ensure user exists in custom users table for foreign key integrity
+  const { data: dbUser, error: userCheckError } = await supabase
+    .from('users')
+    .select('id')
+    .eq('id', user.id)
+    .single();
+
+  if (userCheckError && userCheckError.code === 'PGRST116') {
+    // User doesn't exist in users table, create it
+    const { error: createError } = await supabase
+      .from('users')
+      .insert({
+        id: user.id,
+        email: user.email,
+        name: user.user_metadata?.name || user.email?.split('@')[0],
+        auth_provider: user.app_metadata?.provider || 'email',
+      });
+
+    if (createError) {
+      console.error('Failed to create user record:', createError);
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: '사용자 정보 생성 중 오류가 발생했습니다.',
+      });
+    }
+  } else if (userCheckError) {
+    console.error('User check error:', userCheckError);
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: '사용자 확인 중 오류가 발생했습니다.',
+    });
+  }
+  
+  return opts.next({
+    ctx: { ...opts.ctx, user },
+  });
+});
+```
+
+### **Auth-DB Synchronization Rules**
+- **CRITICAL:** Always ensure Supabase Auth users have corresponding records in custom users table
+- **MUST:** Handle the gap between auth.users and custom users table in protectedProcedure
+- **MUST:** Auto-create missing user records when foreign key constraints require them
+- **MUST NOT:** Assume auth user existence guarantees DB user record existence
+
+```typescript
+// ❌ DON'T: Assume auth user exists in custom tables
+export const badProtectedProcedure = t.procedure.use(async (opts) => {
+  const { user } = opts.ctx;
+  if (!user) throw new TRPCError({ code: 'UNAUTHORIZED' });
+  
+  // This will fail if user doesn't exist in custom users table
+  return opts.next({ ctx: { ...opts.ctx, user } });
+});
+
+// ✅ DO: Verify and sync user records before operations
+// See the improved protectedProcedure example above
+```
+
+## **Domain Router Structure**
+
+### **Router Organization**
+- **MUST:** Separate routers by domain ([template.ts](mdc:src/lib/trpc/routers/template.ts), [version.ts](mdc:src/lib/trpc/routers/version.ts))
+- **MUST:** Group related procedures within domain routers
+- **MUST:** Export domain routers and combine in [root.ts](mdc:src/lib/trpc/root.ts)
+
+```typescript
+// ✅ DO: Domain-specific router structure
+export const templateRouter = router({
+  getAll: publicProcedure.query(/* ... */),
+  getById: publicProcedure.input(/* ... */).query(/* ... */),
+  create: protectedProcedure.input(/* ... */).mutation(/* ... */),
+  update: protectedProcedure.input(/* ... */).mutation(/* ... */),
+  delete: protectedProcedure.input(/* ... */).mutation(/* ... */),
+  getMine: protectedProcedure.query(/* ... */),
+});
+```
+
+### **Procedure Naming Conventions**
+- **MUST:** Use clear, RESTful naming: `getAll`, `getById`, `create`, `update`, `delete`
+- **MUST:** Add domain-specific procedures like `getMine`, `restore`, `compare`
+- **MUST NOT:** Mix CRUD and business logic procedures in unclear names
+
+## **Input Validation & Schemas**
+
+### **Zod Schema Patterns**
+- **MUST:** Define schemas at the top of router files
+- **MUST:** Use descriptive error messages in Korean for user-facing errors
+- **MUST:** Separate input/output schemas for different operations
+
+```typescript
+// ✅ DO: Clear schema definition with localized errors
+const createTemplateSchema = z.object({
+  name: z.string().min(1, '템플릿 이름은 필수입니다'),
+  description: z.string().optional(),
+  content: z.string().min(1, '템플릿 내용은 필수입니다'),
+  fields: z.array(templateFieldSchema).optional(),
+});
+
+const templateIdSchema = z.object({
+  id: z.string().uuid(),
+});
+```
+
+### **Schema Reusability**
+- **MUST:** Extract common schemas (like ID validation) for reuse
+- **MUST:** Build complex schemas from simpler base schemas
+- **MUST NOT:** Duplicate validation logic across procedures
+
+## **Error Handling Patterns**
+
+### **Consistent Error Structure**
+- **MUST:** Use TRPCError with appropriate HTTP status codes
+- **MUST:** Provide user-friendly Korean error messages
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [greatSumini/document-parser](https://github.com/greatSumini/document-parser) — distributed by [TomeVault](https://tomevault.io).
