@@ -1,76 +1,38 @@
 ---
 trigger: always_on
-description: This project is an embedded application based on the Infineon TC26B microcontroller, presumably related to rear vehicle functions (e.g., reverse assist, rear-view camera processing), named "Back_Car_V1.4".
+description: To ensure comprehensive logging, effective task management, and robust problem-solving, please adhere to the following tool usage guidelines in every interaction:
 ---
 
-# Project Guide: TC26B Back Car Codebase
+# Tool Usage Guidelines for Enhanced Interaction
 
-## 1. Project Overview
-This project is an embedded application based on the Infineon TC26B microcontroller, presumably related to rear vehicle functions (e.g., reverse assist, rear-view camera processing), named "Back_Car_V1.4".
+To ensure comprehensive logging, effective task management, and robust problem-solving, please adhere to the following tool usage guidelines in every interaction:
 
-## 2. Key Directory Structure
-- `code/`: Stores C source files and header files for core application logic modules. For example, `[code/kalman_filter.c](mdc:code/kalman_filter.c)` implements a Kalman filter.
-- `libraries/`: Contains various library files.
-    - `infineon_libraries/`: Includes official Infineon low-level libraries (iLLD - Infineon Low Level Drivers) and service layer code for the TC26B chip.
-    - `zf_common/`: Contains common project utilities, macro definitions, type definitions, and the crucial central header file `[libraries/zf_common/zf_common_headfile.h](mdc:libraries/zf_common/zf_common_headfile.h)`.
-    - `zf_components/`: May contain reusable software components or middleware.
-    - `zf_device/`: Stores drivers for specific hardware peripherals (e.g., sensors, displays).
-    - `zf_driver/`: Contains further encapsulation or abstraction of underlying hardware drivers.
-- `user/`: Stores user-layer code, typically top-level application logic, main program entry points, and user-defined modules referenced in `[libraries/zf_common/zf_common_headfile.h](mdc:libraries/zf_common/zf_common_headfile.h)`.
-- `Debug/`: Contains output files generated during compilation and build processes (e.g., `.elf`, `.hex`, map files).
-- `.settings/`: Usually contains IDE-specific project configurations (e.g., for Eclipse).
+## 1. Knowledge Graph Logging (`mcp_servers`)
 
-## 3. Core Header File: `zf_common_headfile.h`
-`[libraries/zf_common/zf_common_headfile.h](mdc:libraries/zf_common/zf_common_headfile.h)` is the "Swiss Army knife" of this project. It is a central aggregate header file that includes almost all other necessary standard libraries, SDK libraries, custom libraries, and user module header files.
+- **Objective:** To maintain a persistent record of information, decisions, and context throughout the conversation.
+- **Action:** At each relevant step or when new information is processed, use the appropriate `mcp_servers` tools (e.g., `mcp_servers_create_entities`, `mcp_servers_create_relations`, `mcp_servers_add_observations`) to log the information into the knowledge graph. This helps build a comprehensive understanding over time.
 
-**Importance and Role**:
-- **Unified Dependency Management**: Most `.c` files include this file (or a custom header that already includes it) to get almost all required declarations and definitions.
-- **Simplified Includes**: Avoids manually including a large number of individual header files in each module.
-- **Project Overview**: The include structure of this file also reflects the project's layering and module division.
+## 2. Task Management (`mcp_taskmanager`)
 
-**Structure**:
-The file internally groups included header files clearly using specific comments, for example:
-```c
-//===================================================C Standard Libraries===================================================
-// ... stdio.h, math.h etc.
-//===================================================Chip SDK Low Level===================================================
-// ... IfxCpu.h, IfxPort.h etc.
-//====================================================Open Source Library Common====================================================
-// ... zf_common_typedef.h etc.
-//===================================================Chip Driver Encapsulation===================================================
-// ... zf_driver_adc.h, zf_driver_pwm.h etc.
-//===================================================Peripheral Device Drivers===================================================
-// ... zf_device_camera.h, zf_device_oled.h etc.
-//====================================================User Layer======================================================
-// ... image_deal.h, PID.h, All_Init.h etc. // <--- New user module header files are typically added here
-```
+- **Objective:** To systematically plan, track, and manage tasks, especially when addressing problems, implementing changes, or undertaking multi-step processes.
+- **Action:**
+    - When a new problem is identified or a modification is requested, initiate task planning using `mcp_mcp-taskmanager_request_planning`.
+    - Define clear, actionable tasks with descriptions.
+    - Follow the `mcp_taskmanager` workflow (`get_next_task`, `mark_task_done`, `approve_task_completion`, `approve_request_completion`) to manage the lifecycle of these tasks.
 
-## 4. Adding New Modules/Features
+## 3. Advanced Reasoning and Thought Processing (`mcp_clear-thought` & `mcp_think-mcp-server`)
 
-1.  **File Creation Location**:
-    *   New `.c` source files are usually placed in the `code/` or `user/` directory.
-    *   Corresponding `.h` header files are also placed in the same directory or a respective `include` subdirectory (if the project uses such a structure). Based on the current structure, `.h` files are in the same directory as `.c` files.
+- **Objective:** To facilitate complex reasoning, explore different perspectives, and ensure a structured approach to problem-solving.
+- **Action:**
+    - Employ `mcp_think-mcp-server_think` for intermediate reasoning steps, to "think out loud," or to cache thoughts during complex analysis.
+    - Utilize the various `mcp_clear-thought` tools (e.g., `sequentialthinking`, `mentalmodel`, `debuggingapproach`, `collaborativereasoning`, `decisionframework`, `metacognitivemonitoring`, `scientificmethod`, `structuredargumentation`, `visualreasoning`) as appropriate to:
+        - Break down complex problems.
+        - Apply structured thinking models.
+        - Simulate collaborative discussions.
+        - Make well-reasoned decisions.
+        - Monitor and reflect on the reasoning process.
 
-2.  **Writing Header Files (`.h`)**:
-    *   **Include Guards**: Standard include guard macros must be used to prevent multiple inclusions of the header file.
-        ```c
-        #ifndef _MY_NEW_MODULE_H_ // Follow the project's existing naming style, e.g., _FILENAME_H_
-        #define _MY_NEW_MODULE_H_
-
-        // (Recommended) Include the central header file if this module requires broad project-level definitions
-        // #include "zf_common_headfile.h" // Note the path; if this new header will itself be included by zf_common_headfile.h, this can be omitted or handled carefully to avoid circular include risks.
-
-        // If not directly including zf_common_headfile.h, then necessary other headers are needed
-        // e.g., if the new module is in code/ and zf_common_headfile.h is in libraries/zf_common/
-        // it might require `#include "../libraries/zf_common/zf_common_headfile.h"` or rely on compiler include path settings.
-
-        // Module-related function declarations, struct definitions, macro definitions, etc.
-
-        #endif // _MY_NEW_MODULE_H_
-        ```
-    *   **Referencing `zf_common_headfile.h`**:
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+**General Principle:** Flexibly integrate these tools to enhance the quality, traceability, and effectiveness of the interaction. The goal is not rigid adherence but intelligent application to achieve better outcomes.
 
 ---
 > Source: [MingTeer/Front_Car](https://github.com/MingTeer/Front_Car) — distributed by [TomeVault](https://tomevault.io).
