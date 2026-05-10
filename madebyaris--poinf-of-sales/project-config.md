@@ -1,194 +1,150 @@
 ---
 trigger: always_on
-description: Complete authentication, security, and debugging patterns for React + Go POS system
+description: Golang backend development patterns and conventions for POS System
 ---
 
 
-# 🔐 Authentication & Security Patterns
+# Backend Development Guidelines (Golang)
 
-## 🚀 Essential Authentication Architecture
+## Code Organization
 
-### JWT-Based Authentication Flow
-```typescript
-// Complete authentication workflow
-class APIClient {
-  constructor() {
-    const apiUrl = import.meta.env?.VITE_API_URL || 'http://localhost:8080/api/v1';
-    console.log('🔧 API Client baseURL:', apiUrl);
-    
-    this.client = axios.create({
-      baseURL: apiUrl,
-      timeout: 30000,
-      headers: { 'Content-Type': 'application/json' }
-    });
+### Package Structure
+Follow the [backend/internal/](mdc:backend/internal/) package layout:
+- `models/` - Data structures and DTOs
+- `handlers/` - HTTP request handlers  
+- `middleware/` - HTTP middleware functions
+- `database/` - Database connection and utilities
+- `api/` - Route definitions and setup
+- `utils/` - Shared utility functions
 
-    // Auto-attach token from localStorage
-    this.loadStoredAuth();
-  }
+### Handler Pattern
+All handlers follow the pattern in [handlers/orders.go](mdc:backend/internal/handlers/orders.go):
 
-  private loadStoredAuth(): void {
-    const token = localStorage.getItem('pos_token');
-    if (token) {
-      this.client.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    }
-  }
-
-  setAuthToken(token: string): void {
-    localStorage.setItem('pos_token', token);
-    this.client.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-  }
-
-  clearAuth(): void {
-    localStorage.removeItem('pos_token');
-    localStorage.removeItem('pos_user');
-    delete this.client.defaults.headers.common['Authorization'];
-  }
-
-  isAuthenticated(): boolean {
-    return !!localStorage.getItem('pos_token');
-  }
-}
-```
-
-## 🏗️ React Authentication Components
-
-### Protected Route Pattern (Avoid Infinite Redirects)
-```typescript
-function HomePage() {
-  // ✅ ALL HOOKS AT TOP LEVEL - NEVER after returns
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoadingAuth, setIsLoadingAuth] = useState(true); // Critical: Start true
-
-  const { isLoading: isVerifying, error } = useQuery({
-    queryKey: ['currentUser'],
-    queryFn: () => apiClient.getCurrentUser(),
-    enabled: false, // Control when to verify
-    retry: 1,
-  });
-
-  // Load auth state from localStorage FIRST
-  useEffect(() => {
-    const loadAuthState = async () => {
-      const token = localStorage.getItem('pos_token');
-      const storedUser = localStorage.getItem('pos_user');
-      
-      console.log('🔍 Loading auth - token:', token ? 'exists' : 'missing');
-      console.log('🔍 Loading auth - user:', storedUser ? 'exists' : 'missing');
-      
-      if (storedUser && token) {
-        try {
-          const parsedUser = JSON.parse(storedUser);
-          setUser(parsedUser);
-          console.log('✅ Auth loaded - user role:', parsedUser.role);
-        } catch (error) {
-          console.error('❌ Invalid stored auth data, clearing');
-          apiClient.clearAuth();
-        }
-      }
-      
-      setIsLoadingAuth(false);
-    };
-    
-    loadAuthState();
-  }, []);
-
-  // ✅ CRITICAL: Wait for localStorage loading before auth checks
-  if (isLoadingAuth) {
-    return <LoadingSpinner message="Loading authentication..." />;
-  }
-
-  // Only check auth AFTER loading is complete
-  if (!apiClient.isAuthenticated() || !user) {
-    console.log('🔄 Not authenticated, redirecting to login');
-    return <Navigate to="/login" replace />;
-  }
-
-  // Render protected content with user context
-  return <RoleBasedLayout user={user} />;
-}
-```
-
-### Login Component Pattern
-```typescript
-function LoginPage() {
-  const [error, setError] = useState<string | null>(null);
-  
-  // Redirect if already authenticated
-  if (apiClient.isAuthenticated()) {
-    return <Navigate to="/" replace />;
-  }
-
-  const loginMutation = useMutation({
-    mutationFn: async (credentials: LoginRequest) => {
-      console.log('🔄 Attempting login...');
-      return await apiClient.login(credentials);
-    },
-    onSuccess: (data) => {
-      console.log('✅ Login success:', data.success);
-      
-      if (data.success && data.data) {
-        // Set auth token first
-        apiClient.setAuthToken(data.data.token);
-        
-        // Store user data
-        localStorage.setItem('pos_user', JSON.stringify(data.data.user));
-        
-        console.log('✅ Auth stored - role:', data.data.user.role);
-        
-        // Brief delay prevents race conditions
-        setTimeout(() => {
-          router.navigate({ to: '/' });
-        }, 100);
-      }
-    },
-    onError: (error: any) => {
-      console.error('❌ Login failed:', error.message);
-      setError(error.message || 'Login failed');
-    },
-  });
-
-  return (
-    <LoginForm 
-      onSubmit={loginMutation.mutate}
-      isLoading={loginMutation.isPending}
-      error={error}
-    />
-  );
-}
-```
-
-## 🛡️ Backend Security Patterns
-
-### Go JWT Middleware
 ```go
-// JWT authentication middleware
-func AuthMiddleware() gin.HandlerFunc {
-    return func(c *gin.Context) {
-        tokenString := c.GetHeader("Authorization")
-        if tokenString == "" {
-            c.JSON(http.StatusUnauthorized, models.APIResponse{
-                Success: false,
-                Message: "Authorization header required",
-                Error:   stringPtr("missing_auth_header"),
-            })
-            c.Abort()
-            return
-        }
+type OrderHandler struct {
+    db *sql.DB
+}
 
-        // Remove "Bearer " prefix
-        if len(tokenString) > 7 && tokenString[:7] == "Bearer " {
-            tokenString = tokenString[7:]
-        }
+func NewOrderHandler(db *sql.DB) *OrderHandler {
+    return &OrderHandler{db: db}
+}
 
-        token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-            if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-                return nil, fmt.Errorf("unexpected signing method")
-            }
-            return []byte(os.Getenv("JWT_SECRET")), nil
-        })
+func (h *OrderHandler) GetOrders(c *gin.Context) {
+    // Implementation
+}
+```
 
+## Database Operations
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+### Raw SQL Usage
+- Use parameterized queries to prevent SQL injection
+- Follow the patterns in [handlers/orders.go](mdc:backend/internal/handlers/orders.go) for database operations
+- Always handle `sql.ErrNoRows` explicitly
+- Use transactions for multi-table operations
+
+### Example Query Pattern:
+```go
+func (h *Handler) getRecord(id uuid.UUID) (*Model, error) {
+    var record Model
+    query := `SELECT id, field1, field2 FROM table WHERE id = $1`
+    
+    err := h.db.QueryRow(query, id).Scan(&record.ID, &record.Field1, &record.Field2)
+    if err == sql.ErrNoRows {
+        return nil, fmt.Errorf("record not found")
+    }
+    if err != nil {
+        return nil, fmt.Errorf("database error: %w", err)
+    }
+    
+    return &record, nil
+}
+```
+
+## Authentication & Security
+
+### JWT Middleware
+Use the authentication middleware from [middleware/auth.go](mdc:backend/internal/middleware/auth.go):
+- Protected routes must use `authMiddleware`
+- Role-based access with `RequireRoles([]string{"admin", "manager"})`
+- Extract user info with `GetUserFromContext(c)`
+
+### Error Handling
+Follow the API response pattern from [models/models.go](mdc:backend/internal/models/models.go):
+
+```go
+c.JSON(http.StatusBadRequest, models.APIResponse{
+    Success: false,
+    Message: "User-friendly error message",
+    Error:   stringPtr("error_code"),
+})
+```
+
+## API Endpoints
+
+### RESTful Design
+Follow REST conventions as shown in [api/routes.go](mdc:backend/internal/api/routes.go):
+- `GET /api/v1/orders` - List resources
+- `POST /api/v1/orders` - Create resource  
+- `GET /api/v1/orders/:id` - Get single resource
+- `PUT /api/v1/orders/:id` - Update entire resource
+- `PATCH /api/v1/orders/:id/status` - Partial update
+- `DELETE /api/v1/orders/:id` - Delete resource
+
+### Response Format
+All API responses use the standard format from [models/models.go](mdc:backend/internal/models/models.go):
+
+```go
+type APIResponse struct {
+    Success bool        `json:"success"`
+    Message string      `json:"message"`
+    Data    interface{} `json:"data,omitempty"`
+    Error   *string     `json:"error,omitempty"`
+}
+```
+
+## Performance Best Practices
+
+### Database Connections
+- Use connection pooling as configured in [database/connection.go](mdc:backend/internal/database/connection.go)
+- Set appropriate connection limits and timeouts
+- Always close rows and statements
+
+### Query Optimization
+- Use indexes for frequently queried columns (see [database/init/01_schema.sql](mdc:database/init/01_schema.sql))
+- Avoid N+1 queries by using JOINs or batch loading
+- Implement pagination for large result sets
+
+## Error Handling
+
+### Database Errors
+- Always wrap database errors with context
+- Handle connection errors gracefully
+- Use the `IsConnectionError` helper from [database/connection.go](mdc:backend/internal/database/connection.go)
+
+### HTTP Errors
+- Return appropriate HTTP status codes
+- Provide clear, actionable error messages
+- Don't expose internal system details to clients
+
+## Testing Guidelines
+
+### Unit Tests
+- Test handlers with mock database connections
+- Test middleware functions independently
+- Focus on business logic and edge cases
+
+### Integration Tests
+- Test complete API endpoints
+- Use test database with proper cleanup
+- Test authentication and authorization flows
+
+## Logging
+
+### Structured Logging
+- Use Gin's built-in logging middleware
+- Log important business events (orders created, payments processed)
+- Include request IDs for tracing
+- Don't log sensitive information (passwords, tokens)
 
 ---
 > Source: [madebyaris/poinf-of-sales](https://github.com/madebyaris/poinf-of-sales) — distributed by [TomeVault](https://tomevault.io).
