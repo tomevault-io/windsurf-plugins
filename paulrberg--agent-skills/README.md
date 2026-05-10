@@ -7,11 +7,11 @@ PRB's collection of agent skills
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [PaulRBerg/agent-skills](https://github.com/PaulRBerg/agent-skills).
+Original source: `CLAUDE.md` in [PaulRBerg/agent-skills](https://github.com/PaulRBerg/agent-skills).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
