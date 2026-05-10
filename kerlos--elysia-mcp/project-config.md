@@ -1,188 +1,198 @@
 ---
 trigger: always_on
-description: TITLE: Elysia Supported Schema Validation Types
+description: import { z, ZodTypeAny } from "zod";
 ---
 
-TITLE: Elysia Supported Schema Validation Types
-DESCRIPTION: Elysia provides declarative schema support for various parts of an HTTP request and response, enabling robust validation and automatic OpenAPI generation.
-SOURCE: https://github.com/elysiajs/documentation/blob/main/docs/essential/validation.md#_snippet_3
+import { z, ZodTypeAny } from "zod";
 
-LANGUAGE: APIDOC
-CODE:
-```
-Schema Types:
-  Body: Validate an incoming HTTP Message
-  Query: Query string or URL parameter
-  Params: Path parameters
-  Headers: Headers of the request
-  Cookie: Cookie of the request
-  Response: Response of the request
-```
+export const LATEST_PROTOCOL_VERSION = "2025-03-26";
+export const SUPPORTED_PROTOCOL_VERSIONS = [
+  LATEST_PROTOCOL_VERSION,
+  "2024-11-05",
+  "2024-10-07",
+];
 
-----------------------------------------
+/* JSON-RPC types */
+export const JSONRPC_VERSION = "2.0";
 
-TITLE: Elysia.js User Authentication and Session Management Service
-DESCRIPTION: Provides a comprehensive user authentication service built with Elysia.js. It defines in-memory state for users and sessions, models for sign-in credentials and cookies, a custom macro for authentication checks, and routes for user sign-up, sign-in, and sign-out, including password hashing and session token management.
-SOURCE: https://github.com/elysiajs/documentation/blob/main/docs/tutorial.md#_snippet_41
+/**
+ * A progress token, used to associate progress notifications with the original request.
+ */
+export const ProgressTokenSchema = z.union([z.string(), z.number().int()]);
 
-LANGUAGE: typescript
-CODE:
-```
-// @errors: 2538
-import { Elysia, t } from 'elysia'
+/**
+ * An opaque token used to represent a cursor for pagination.
+ */
+export const CursorSchema = z.string();
 
-export const userService = new Elysia({ name: 'user/service' })
-    .state({
-        user: {} as Record<string, string>,
-        session: {} as Record<number, string>
-    })
-    .model({
-        signIn: t.Object({
-            username: t.String({ minLength: 1 }),
-            password: t.String({ minLength: 8 })
-        }),
-        session: t.Cookie(
-            {
-                token: t.Number()
-            },
-            {
-                secrets: 'seia'
-            }
-        ),
-        optionalSession: t.Cookie(
-            {
-                token: t.Optional(t.Number())
-            },
-            {
-                secrets: 'seia'
-            }
-        )
-    })
-    .macro({
-        isSignIn(enabled: boolean) {
-            if (!enabled) return
+const RequestMetaSchema = z
+  .object({
+    /**
+     * If specified, the caller is requesting out-of-band progress notifications for this request (as represented by notifications/progress). The value of this parameter is an opaque token that will be attached to any subsequent notifications. The receiver is not obligated to provide these notifications.
+     */
+    progressToken: z.optional(ProgressTokenSchema),
+  })
+  .passthrough();
 
-            return {
-                beforeHandle({
-                    status,
-                    cookie: { token },
-                    store: { session }
-                }) {
-                    if (!token.value)
-                        return status(401, {
-                            success: false,
-                            message: 'Unauthorized'
-                        })
+const BaseRequestParamsSchema = z
+  .object({
+    _meta: z.optional(RequestMetaSchema),
+  })
+  .passthrough();
 
-                    const username = session[token.value as unknown as number]
+export const RequestSchema = z.object({
+  method: z.string(),
+  params: z.optional(BaseRequestParamsSchema),
+});
 
-                    if (!username)
-                        return status(401, {
-                            success: false,
-                            message: 'Unauthorized'
-                        })
-                }
-            }
-        }
-    })
+const BaseNotificationParamsSchema = z
+  .object({
+    /**
+     * This parameter name is reserved by MCP to allow clients and servers to attach additional metadata to their notifications.
+     */
+    _meta: z.optional(z.object({}).passthrough()),
+  })
+  .passthrough();
 
-export const getUserId = new Elysia()
-    .use(userService)
-    .guard({
-        isSignIn: true,
-        cookie: 'session'
-    })
-    .resolve(({ store: { session }, cookie: { token } }) => ({
-        username: session[token.value]
-    }))
-    .as('scoped')
+export const NotificationSchema = z.object({
+  method: z.string(),
+  params: z.optional(BaseNotificationParamsSchema),
+});
 
-export const user = new Elysia({ prefix: '/user' })
-    .use(userService)
-    .put(
-        '/sign-up',
-        async ({ body: { username, password }, store, status }) => {
-            if (store.user[username])
-                return status(400, {
-                    success: false,
-                    message: 'User already exists'
-                })
+export const ResultSchema = z
+  .object({
+    /**
+     * This result property is reserved by the protocol to allow clients and servers to attach additional metadata to their responses.
+     */
+    _meta: z.optional(z.object({}).passthrough()),
+  })
+  .passthrough();
 
-            store.user[username] = await Bun.password.hash(password)
+/**
+ * A uniquely identifying ID for a request in JSON-RPC.
+ */
+export const RequestIdSchema = z.union([z.string(), z.number().int()]);
 
-            return {
-                success: true,
-                message: 'User created'
-            }
-        },
-        {
-            body: 'signIn'
-        }
-    )
-    .post(
-        '/sign-in',
-        async ({
-            store: { user, session },
-            status,
-            body: { username, password },
-            cookie: { token }
-        }) => {
-            if (
-                !user[username] ||
-                !(await Bun.password.verify(password, user[username]))
-            )
-                return status(400, {
-                    success: false,
-                    message: 'Invalid username or password'
-                })
+/**
+ * A request that expects a response.
+ */
+export const JSONRPCRequestSchema = z
+  .object({
+    jsonrpc: z.literal(JSONRPC_VERSION),
+    id: RequestIdSchema,
+  })
+  .merge(RequestSchema)
+  .strict();
 
-            const key = crypto.getRandomValues(new Uint32Array(1))[0]
-            session[key] = username
-            token.value = key
+export const isJSONRPCRequest = (value: unknown): value is JSONRPCRequest =>
+  JSONRPCRequestSchema.safeParse(value).success;
 
-            return {
-                success: true,
-                message: `Signed in as ${username}`
-            }
-        },
-        {
-            body: 'signIn',
-            cookie: 'optionalSession'
-        }
-    )
-    .get(
-        '/sign-out',
-        ({ cookie: { token } }) => {
-            token.remove()
+/**
+ * A notification which does not expect a response.
+ */
+export const JSONRPCNotificationSchema = z
+  .object({
+    jsonrpc: z.literal(JSONRPC_VERSION),
+  })
+  .merge(NotificationSchema)
+  .strict();
 
-            return {
-                success: true,
-                message: 'Signed out'
-            }
-        },
-        {
-            cookie: 'optionalSession'
-        }
-    )
-    .use(getUserId)
-    .get('/profile', ({ username }) => ({
-        success: true,
+export const isJSONRPCNotification = (
+  value: unknown
+): value is JSONRPCNotification =>
+  JSONRPCNotificationSchema.safeParse(value).success;
 
-```
+/**
+ * A successful (non-error) response to a request.
+ */
+export const JSONRPCResponseSchema = z
+  .object({
+    jsonrpc: z.literal(JSONRPC_VERSION),
+    id: RequestIdSchema,
+    result: ResultSchema,
+  })
+  .strict();
 
-----------------------------------------
+export const isJSONRPCResponse = (value: unknown): value is JSONRPCResponse =>
+  JSONRPCResponseSchema.safeParse(value).success;
 
-TITLE: Basic Elysia Server with Routes, Files, Streams, and WebSockets
-DESCRIPTION: This snippet sets up a basic Elysia server demonstrating various functionalities: a simple 'Hello World' GET route, serving a static file, streaming responses, and a WebSocket endpoint for real-time communication. The server listens on port 3000.
-SOURCE: https://github.com/elysiajs/documentation/blob/main/docs/index.md#_snippet_4
+/**
+ * Error codes defined by the JSON-RPC specification.
+ */
+export enum ErrorCode {
+  // SDK error codes
+  ConnectionClosed = -32000,
+  RequestTimeout = -32001,
 
-LANGUAGE: typescript
-CODE:
-```
-import { Elysia, file } from 'elysia'
+  // Standard JSON-RPC error codes
+  ParseError = -32700,
+  InvalidRequest = -32600,
+  MethodNotFound = -32601,
+  InvalidParams = -32602,
+  InternalError = -32603,
+}
 
-new Elysia()
-	.get('/', 'Hello World')
+/**
+ * A response to a request that indicates an error occurred.
+ */
+export const JSONRPCErrorSchema = z
+  .object({
+    jsonrpc: z.literal(JSONRPC_VERSION),
+    id: RequestIdSchema,
+    error: z.object({
+      /**
+       * The error type that occurred.
+       */
+      code: z.number().int(),
+      /**
+       * A short description of the error. The message SHOULD be limited to a concise single sentence.
+       */
+      message: z.string(),
+      /**
+       * Additional information about the error. The value of this member is defined by the sender (e.g. detailed error information, nested errors etc.).
+       */
+      data: z.optional(z.unknown()),
+    }),
+  })
+  .strict();
+
+export const isJSONRPCError = (value: unknown): value is JSONRPCError =>
+  JSONRPCErrorSchema.safeParse(value).success;
+
+export const JSONRPCMessageSchema = z.union([
+  JSONRPCRequestSchema,
+  JSONRPCNotificationSchema,
+  JSONRPCResponseSchema,
+  JSONRPCErrorSchema,
+]);
+
+/* Empty result */
+/**
+ * A response that indicates success but carries no data.
+ */
+export const EmptyResultSchema = ResultSchema.strict();
+
+/* Cancellation */
+/**
+ * This notification can be sent by either side to indicate that it is cancelling a previously-issued request.
+ *
+ * The request SHOULD still be in-flight, but due to communication latency, it is always possible that this notification MAY arrive after the request has already finished.
+ *
+ * This notification indicates that the result will be unused, so any associated processing SHOULD cease.
+ *
+ * A client MUST NOT attempt to cancel its `initialize` request.
+ */
+export const CancelledNotificationSchema = NotificationSchema.extend({
+  method: z.literal("notifications/cancelled"),
+  params: BaseNotificationParamsSchema.extend({
+    /**
+     * The ID of the request to cancel.
+     *
+     * This MUST correspond to the ID of a request previously issued in the same direction.
+     */
+    requestId: RequestIdSchema,
+
+    /**
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
