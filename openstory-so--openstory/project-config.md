@@ -1,157 +1,112 @@
 ---
 trigger: always_on
-description: Core project context and architecture for OpenStory AI video platform
+description: React best practices and conventions for UI code
 ---
 
+## 1. Use as little React as possible
 
-# OpenStory Project Context
+- Keep components small - less than 100 lines
+- Views reference components
+- Remove as much logic as possible from components and views
+- Externalize functions rather and keep external functions _vanilla typescript_
+- Vanilla typescript is easier to test, and package for other uses
 
-You are working on **OpenStory**, an AI-powered cinematic content creation platform that transforms scripts into consistent, styled video productions.
+## 2. Avoid using useEffect
 
-## Project Overview
+- Avoid using useEffect to fetch data or initialise state
+- Use hooks, tanstack query, or the new `use` feature in react 19
+- use useEffect to update state when something else changes
 
-OpenStory democratizes cinematic content creation through:
+## 3. Use useState sparingly
 
-- **Script-to-storyboard AI**: Automatic scene breakdown and frame generation
-- **Style Stacks**: JSON-based presets that ensure consistent artistic vision across AI models
-- **Multi-model support**: Integration with 19+ AI models (Fal.ai, Runway, Kling, etc.)
-- **Character consistency**: LoRA model integration for consistent characters
-- **Motion generation**: Image-to-video with VFX capabilities
+- Using a local variable is often more optimal - even if something has to be calculated
+- useState uses reducers under the hood
+- If you have more than 3 useStates you might as well use reducers
 
-## Project Architecture
+## 4. Use React.FC and expand props
 
-Separated frontend/backend monorepo architecture:
+- Expand props so that each parameter is named
+- It's easier to know which props are not used
 
-```
-openstory/
-├── apps/
-│   ├── backend/                # Elysia API server
-│   │   ├── src/
-│   │   │   ├── index.ts       # Elysia app entry point
-│   │   │   ├── routes/        # Elysia route handlers
-│   │   │   │   ├── sequences.ts
-│   │   │   │   ├── frames.ts
-│   │   │   │   ├── styles.ts
-│   │   │   │   └── jobs.ts
-│   │   │   ├── services/      # Business logic layer
-│   │   │   │   ├── frame-generator.ts
-│   │   │   │   ├── script-analyzer.ts
-│   │   │   │   └── style-stack.ts
-│   │   │   ├── db/            # Drizzle ORM setup & queries
-│   │   │   │   ├── index.ts   # Database client
-│   │   │   │   ├── schema/    # Drizzle schema definitions
-│   │   │   │   └── queries/   # Reusable query functions
-│   │   │   ├── workflows/     # Temporal workflows
-│   │   │   │   ├── client.ts  # Temporal client
-│   │   │   │   ├── frame-generation.ts
-│   │   │   │   ├── motion-generation.ts
-│   │   │   │   └── activities/
-│   │   │   ├── plugins/       # Elysia plugins
-│   │   │   │   ├── auth.ts    # BetterAuth integration
-│   │   │   │   ├── cors.ts
-│   │   │   │   └── logger.ts
-│   │   │   ├── lib/           # Backend utilities
-│   │   │   │   ├── ai/        # AI client wrappers
-│   │   │   │   ├── storage/   # S3-compatible storage
-│   │   │   │   └── errors.ts
-│   │   │   └── migrations/    # Drizzle migrations
-│   │   └── package.json
-│   └── frontend/              # Next.js App Router (UI only)
-│       ├── src/
-│       │   ├── app/           # Next.js pages & layouts
-│       │   │   ├── sequences/ # Sequence pages
-│       │   │   ├── (auth)/    # Auth pages
-│       │   │   └── layout.tsx
-│       │   ├── components/
-│       │   │   ├── sequence/  # Storyboard, frame editor
-│       │   │   ├── ui/        # shadcn/ui components
-│       │   │   └── layout/    # App layout
-│       │   ├── hooks/         # TanStack Query hooks (API calls)
-│       │   │   ├── use-frames.ts
-│       │   │   ├── use-sequences.ts
-│       │   │   └── use-user.ts
-│       │   └── lib/           # Client-side utilities
-│       │       ├── api-client.ts
-│       │       └── auth-client.ts
-│       └── package.json
-├── packages/                  # Shared code
-│   ├── database/              # Shared DB schema (future)
-│   ├── types/                 # Shared TypeScript types
-│   └── validation/            # Shared Zod schemas
-└── docs/                      # Architecture & PRD docs
-```
+## 5. Avoid globals and global state
 
-## Technology Stack
+- Globals including auth globals, often lead to race conditions
+- Global state is only useful in rare cases. SPAs with signifant complexity
+- Start with reducers which are passed through props
+- If that's too complicated, use React context
+- As a last resort for very complicated SPAs - use zustand
 
-### Core Framework
+## 6. Use reducers
 
-- **Frontend**: Next.js 15.5 (App Router), React 19, TypeScript 5
-- **Runtime**: Bun (package manager + test runner)
-- **Build**: Turbopack (Next.js default)
+- Reducers are great - read up on them and understand them
+- They keep all state update logic in one place
+- They are vanilla typescript - keep them that way
+- Use them to update state based on other state.
+- Note that updating any part of the state returned from a reducer will cause a re-render if the whole state is a parameter - you can pass just parts of it
 
-### UI & Styling
+## 7. Avoid passing style to components
 
-- **UI**: shadcn/ui components, Radix UI primitives
-- **Styling**: Tailwind CSS 4
-- **Icons**: Lucide React
-- **Drag & Drop**: dnd-kit
+- Avoid passing styles to components, or styling your components in views
+- Create components that are pre-styled
+- Create variants - e.g. small, medium, large - rather than size={18}
+- Avoid using styles in views as much as possible
 
-### Backend & Infrastructure
+## 8. Use the theme
 
-- **API Server**: Elysia (Bun-native web framework)
-- **Database**: Supabase PostgreSQL via Drizzle ORM (type-safe queries, schema-first)
-- **Validation**: ArkType (runtime type validation for Elysia routes)
-- **Auth**: BetterAuth (anonymous + email/password + OAuth) - NOT Supabase Auth
-- **Storage**: Supabase Storage (generated images/videos)
-- **Real-time**: WebSockets via Elysia (generation status updates)
-- **Workflow Engine**: Temporal (replaces QStash for async orchestration)
-- **Caching**: Upstash Redis (session storage, rate limiting)
+- Create constants for your theme or use a consistent structure
+- Use the theme fonts and colors
+- Avoid naming fonts and inluding color values directly in views and components
 
-### State Management
+## 9. Use flexbox
 
-- **Server State**: TanStack Query v5
-- **Query Pattern**: Centralized query key factories
-- **Caching**: Optimistic updates, automatic invalidation
+- Use flexbox for every component
 
-### AI & Generation
+## 10. Avoid margin
 
-- **Primary Provider**: Fal.ai SDK (@fal-ai/client)
-- **Image Models**: flux-pro, imagen4, flux-krea-lora
-- **Video Models**: veo3, kling-video, minimax-hailuo, wan-pro
-- **Script Analysis**: OpenAI GPT-4 / Anthropic Claude
-- **Validation**: ArkType schemas
+- Don't pre-add padding or margin to the outside of components, unless there is a specific reason to
+- Use flexbox gap instead
 
-### Development Tools
+## 11. Use kebab-case for file names
 
-- **Testing**: Bun test (Jest-compatible)
-- **Linting**: Oxclint (fast, replaces ESLint + Prettier)
-- **Git Hooks**: Lefthook
-- **Type Safety**: Drizzle Kit generates types from schema
-- **API Documentation**: Elysia Swagger plugin (auto-generated)
+- Use PascalCase for component names, but kebab case for file-names
+- PascalCase can often give you issues in git as case sensitive file names is not supported on all platforms
 
-## Core Features
+## 12. Create a component library
 
-### 1. Script-to-Storyboard Pipeline
+- If using a 3rd party component library, wrap those components then include your wrapped components. It makes it easier to change libraries
+- Shadcn makes this easy - it includes the source in your repo, and imports only primitives from that source.
+- You don't need to wrap Shadcn generated components - just edit the component source with your changes
+- Don't create duplicates of components for minor variations. Create a variation
+- Customise the component if there's a new variation - don't style from the outside
+- Put your components into a high level components folder
+- Use an aliases or subpath imports "~" to import components from views.
 
-1. User pastes script
-2. AI analyzes and breaks into scenes/frames
-3. Generates frame descriptions
-4. Creates editable storyboard
+## 13. Avoid hard coding width or height
 
-### 2. Frame Generation
+- Use flexbox and create rules for screen sizes
 
-- Per-frame model selection
-- Style Stack application for consistency
-- Character LoRA injection
-- Reference image support
-- Parallel generation via Temporal workflows
+## 14. Use a show prop if you need to hide something
 
-### 3. Motion Generation
+- Avoid code that conditionally shows a complex component - this creates janky ui
+- Instead use the display css property to hide or show - this will precalculate everything in the component but not render it
 
-- Image-to-video conversion
-- Multiple model options (veo3, kling, wan)
+## 15. Use eslint or equivalent
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- Ensure the rules of hooks linting rule is on
+- Check out 0xlint and Biome
+
+## 16. Views are routes
+
+- All views should be routable - meaning you can get to them via a route
+- No view should rely on variables or parameters from another
+- A view can be accessed in any order
+- Pass params on the url. You can use url segments for ids, search params should be optional
+- Name views with the same name as the route - or place in a folder with that name
+
+## 17. Avoid default exports
+
+- It's more efficient to export the component directly than to import a default
+- Avoid barrelled imports as much as possible _unless_ you are planning to package that library for others
 
 ---
 > Source: [openstory-so/openstory](https://github.com/openstory-so/openstory) — distributed by [TomeVault](https://tomevault.io).
