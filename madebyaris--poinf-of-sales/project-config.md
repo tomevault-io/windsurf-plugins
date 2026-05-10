@@ -1,168 +1,192 @@
 ---
 trigger: always_on
-description: Development workflow automation and best practices for POS System
+description: Complete React component patterns, hooks, and state management with shadcn/ui for POS System
 ---
 
 
-# Development Workflow Guide
+# ⚛️ React Component Patterns & Best Practices
 
-## Quick Start Commands
+## 🏗️ Component Architecture
 
-### Primary Development Workflow
-Use [Makefile](mdc:Makefile) for all development operations:
+### shadcn/ui Base Components Pattern
+```typescript
+// Follow the established shadcn/ui pattern from components/ui/
+import * as React from 'react'
+import { cn } from '@/lib/utils'
+import { cva, type VariantProps } from 'class-variance-authority'
 
-```bash
-# Essential commands for daily development
-make help         # Show all available commands
-make dev          # Start development environment with hot reloading
-make up           # Start Docker containers in background
-make down         # Stop all containers
-make status       # Check system status
+// ✅ CORRECT: Use cva for variant-based styling
+const buttonVariants = cva(
+  "inline-flex items-center justify-center rounded-md font-medium transition-colors",
+  {
+    variants: {
+      variant: {
+        default: "bg-primary text-primary-foreground hover:bg-primary/90",
+        outline: "border border-input bg-background hover:bg-accent",
+        ghost: "hover:bg-accent hover:text-accent-foreground",
+      },
+      size: {
+        default: "h-10 px-4 py-2",
+        sm: "h-9 px-3",
+        lg: "h-11 px-8",
+      },
+    },
+    defaultVariants: {
+      variant: "default",
+      size: "default",
+    },
+  }
+)
+
+interface ButtonProps
+  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
+    VariantProps<typeof buttonVariants> {
+  asChild?: boolean
+}
+
+// ✅ CORRECT: Always use forwardRef for reusable components
+const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
+  ({ className, variant, size, asChild = false, ...props }, ref) => {
+    return (
+      <button
+        ref={ref}
+        className={cn(buttonVariants({ variant, size, className }))}
+        {...props}
+      />
+    )
+  }
+)
+Button.displayName = "Button"
 ```
 
-### Database Management Workflow
-```bash
-# Database operations (all interactive and safe)
-make create-admin # Create super admin user
-make backup       # Backup entire system (database + files)
-make restore      # Restore from backup (interactive menu)
-make db-reset     # Reset to fresh state with seed data
-make db-shell     # Access PostgreSQL shell
-make remove-data  # DESTRUCTIVE: Remove all data (multiple confirmations)
+### Business Component Pattern
+```typescript
+// POS-specific business components
+import { useState, useCallback } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import apiClient from '@/api/client'
+import type { Product, CartItem } from '@/types'
+
+interface ProductCardProps {
+  product: Product
+  onSelect: (product: Product) => void
+  isSelected?: boolean
+  isInCart?: boolean
+  cartQuantity?: number
+  className?: string
+}
+
+// ✅ CORRECT: Typed component with proper props interface
+export const ProductCard: React.FC<ProductCardProps> = ({
+  product,
+  onSelect,
+  isSelected = false,
+  isInCart = false,
+  cartQuantity = 0,
+  className
+}) => {
+  // ✅ CORRECT: Use useCallback for event handlers
+  const handleSelect = useCallback(() => {
+    onSelect(product)
+  }, [product, onSelect])
+
+  // ✅ CORRECT: Early returns for loading/error states
+  if (!product.is_available) {
+    return (
+      <Card className={cn("opacity-50", className)}>
+        <CardContent className="p-4 text-center">
+          <p className="text-muted-foreground">Unavailable</p>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <Card 
+      className={cn(
+        "cursor-pointer transition-all hover:shadow-md",
+        isSelected && "ring-2 ring-primary",
+        className
+      )}
+      onClick={handleSelect}
+    >
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-lg">{product.name}</CardTitle>
+          {isInCart && (
+            <Badge variant="secondary">{cartQuantity}</Badge>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent>
+        <p className="text-sm text-muted-foreground mb-2">
+          {product.description}
+        </p>
+        <p className="text-xl font-bold">${product.price.toFixed(2)}</p>
+      </CardContent>
+    </Card>
+  )
+}
 ```
 
-## Development Environment Setup
+## 🎣 Custom Hooks Patterns
 
-### First Time Setup
-1. Clone repository and navigate to project root
-2. Ensure Docker Desktop is running
-3. Run `make dev` - automatically creates `.env` file if missing
-4. Access applications:
-   - Frontend: http://localhost:3000
-   - Backend API: http://localhost:8080
-   - Database: localhost:5432
+### Data Fetching Hook
+```typescript
+// Custom hook for API data fetching
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { toastHelpers } from '@/lib/toast-helpers'
+import apiClient from '@/api/client'
+import type { Product, CreateProductRequest } from '@/types'
 
-### Daily Development Workflow
-```bash
-# Start development session
-make dev          # Starts all services with hot reloading
+export const useProducts = (categoryId?: string) => {
+  return useQuery({
+    queryKey: ['products', categoryId],
+    queryFn: () => apiClient.getProducts({ category_id: categoryId }),
+    select: (data) => data.data || [], // Transform response
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  })
+}
 
-# During development
-make logs         # View all service logs
-make logs-backend # View only backend logs
-make logs-frontend# View only frontend logs
+export const useCreateProduct = () => {
+  const queryClient = useQueryClient()
 
-# End development session
-make down         # Stop all containers
+  return useMutation({
+    mutationFn: (product: CreateProductRequest) => 
+      apiClient.createProduct(product),
+    onSuccess: (data) => {
+      // Invalidate and refetch
+      queryClient.invalidateQueries({ queryKey: ['products'] })
+      toastHelpers.success('Product created successfully!')
+    },
+    onError: (error: any) => {
+      toastHelpers.error(`Failed to create product: ${error.message}`)
+    },
+  })
+}
 ```
 
-## Database Development Workflow
+### Business Logic Hook (Shopping Cart)
+```typescript
+// Custom hook for cart management
+import { useState, useCallback, useMemo } from 'react'
+import type { Product, CartItem } from '@/types'
 
-### Working with Database
-1. **Fresh Start**: `make db-reset` - Clean database with seed data
-2. **Backup Before Changes**: `make backup` - Create safety backup
-3. **Make Changes**: Edit schema files or use application
-4. **Test Changes**: Verify functionality
-5. **Create Admin**: `make create-admin` - Add admin users as needed
+export const useCart = () => {
+  const [items, setItems] = useState<CartItem[]>([])
 
-### Database Schema Changes
-1. Edit [database/init/01_schema.sql](mdc:database/init/01_schema.sql)
-2. Edit [database/init/02_seed_data.sql](mdc:database/init/02_seed_data.sql) if needed
-3. Run `make db-reset` to apply changes
-4. Test with fresh data
+  // ✅ CORRECT: Memoized calculations
+  const total = useMemo(() => {
+    return items.reduce((sum, item) => sum + (item.product.price * item.quantity), 0)
+  }, [items])
 
-### Emergency Recovery
-- All destructive operations create emergency backups
-- Use `make restore` to recover from any backup
-- Emergency backups are automatically created in `backups/` directory
+  const itemCount = useMemo(() => {
+    return items.reduce((count, item) => count + item.quantity, 0)
+  }, [items])
 
-## Production Deployment Workflow
-
-### Production Build
-```bash
-# Build and start production environment
-make prod         # Starts production containers
-
-# Production utilities
-make logs         # Monitor production logs
-make backup       # Create production backup
-make clean        # Clean up resources (with confirmations)
-```
-
-### Production Database Management
-- Use same `make backup` and `make restore` commands
-- Emergency backups created before any destructive operations
-- All operations require explicit confirmations
-
-## Safety Features
-
-### Multiple Confirmation Layers
-All potentially destructive operations require specific confirmations:
-- `make remove-data` requires typing "DELETE ALL DATA"
-- `make restore` requires typing "RESTORE"  
-- `make clean` requires typing "YES"
-
-### Automatic Backups
-- Emergency backups created before destructive operations
-- Backup rotation (keeps last 10 backups)
-- Comprehensive backup manifests with metadata
-- Multiple backup formats (SQL, tar.gz, complete bundles)
-
-### Container Health Checking
-- All database operations verify container is running
-- Automatic fallback between dev/prod container names
-- Clear error messages with resolution suggestions
-
-## Advanced Development Features
-
-### Testing and Quality
-```bash
-make test         # Run all tests
-make lint         # Run linting checks
-make format       # Format code
-make deps         # Update dependencies
-```
-
-### System Monitoring
-```bash
-make status       # Comprehensive system status
-make logs         # Real-time log monitoring
-```
-
-### Cleanup and Maintenance
-```bash
-make clean        # Remove unused Docker resources
-make rebuild      # Force rebuild all images
-make restart      # Restart all services
-```
-
-## Helper Scripts Reference
-
-### Script Locations
-All helper scripts are in [scripts/](mdc:scripts/) directory:
-
-- **[create-admin.sh](mdc:scripts/create-admin.sh)** - Interactive admin user creation
-- **[backup.sh](mdc:scripts/backup.sh)** - Complete system backup
-- **[restore.sh](mdc:scripts/restore.sh)** - Interactive backup restoration  
-- **[remove-data.sh](mdc:scripts/remove-data.sh)** - Safe data removal
-- **[db-reset.sh](mdc:scripts/db-reset.sh)** - Database reset with verification
-
-### Script Features
-- **Colored Output** - Clear visual feedback with status indicators
-- **Input Validation** - Prevents invalid operations
-- **Error Handling** - Comprehensive error checking and recovery
-- **Safety Confirmations** - Multiple confirmation layers for safety
-- **Progress Reporting** - Step-by-step operation feedback
-
-## Integration with Development Tools
-
-### File Organization
-- **Makefile Commands** - Organized by category with clear descriptions
-- **Docker Integration** - Seamless container management
-- **Environment Management** - Automatic `.env` file creation
-- **Backup Management** - Automated backup rotation and cleanup
-
-### IDE Integration
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
