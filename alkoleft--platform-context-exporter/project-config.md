@@ -1,152 +1,72 @@
 ---
 trigger: always_on
-description: Type Design Thinking in Java
+description: Java General Guidelines
 ---
 
-# Type Design Thinking in Java
+# Java General Guidelines
 
-Type design thinking in Java applies typography principles to code structure and organization. Just as typography creates readable, accessible text, thoughtful type design in Java produces maintainable, comprehensible code.
+This document outlines general Java coding guidelines covering fundamental aspects such as naming conventions for packages, classes, methods, variables, and constants; code formatting rules including indentation, line length, brace style, and whitespace usage; standards for organizing import statements; best practices for Javadoc documentation; and comprehensive error and exception handling with a strong focus on security, including avoiding sensitive information exposure, catching specific exceptions, and secure resource management.
 
 ## Implementing These Principles
 
-1.  **Start with domain modeling**: Sketch your type system before coding.
-2.  **Create a type style guide**: Document naming conventions and patterns.
-3.  **Review for type consistency**: Periodically check for style adherence.
-4.  **Refactor toward clearer type expressions**: Improve existing code.
-5.  **Use tools to enforce style**: Configure linters and static analyzers.
+These guidelines are built upon the following core principles:
 
-Remember, good type design in Java is about communication - making your code's intent clear both to the compiler and to other developers.
+1.  **Clarity and Consistency in Naming**: Adhere to standard Java naming conventions for all code elements (packages, classes, methods, variables, constants). This promotes code that is intuitive, predictable, and easier for developers to understand and navigate.
+2.  **Readability through Formatting**: Consistently apply formatting rules for indentation, line length, brace style, and whitespace. Well-formatted code is significantly easier to read, debug, and maintain.
+3.  **Organized Import Statements**: Structure import statements logically by grouping related packages and alphabetizing within those groups. Avoid wildcard imports to ensure clarity about class origins and prevent namespace conflicts.
+4.  **Effective Documentation**: Strive for self-documenting code. For public APIs, complex algorithms, non-obvious business logic, or any part of the code that isn't immediately clear, provide comprehensive Javadoc. Good documentation aids understanding, usage, and maintenance.
+5.  **Robust and Secure Error Handling**: Implement thorough error and exception handling with a strong focus on security. This includes using specific exceptions, managing resources diligently (preferably with try-with-resources), preventing the leakage of sensitive information in logs or error messages, and never "swallowing" exceptions without proper handling or justification. Resilient and secure applications depend on robust error management.
 
 ## Table of contents
 
-- Rule 1: Establish a Clear Type Hierarchy
-- Rule 2: Use Consistent Naming Conventions (Your Type's "Font Family")
-- Rule 3: Embrace Whitespace (Kerning and Leading)
-- Rule 4: Create Type-Safe Wrappers (Type as Communication)
-- Rule 5: Leverage Generic Type Parameters (Responsive Typography)
-- Rule 6: Create Domain-Specific Languages (Typography with Character)
-- Rule 7: Use Consistent Type "Weights" (Bold, Regular, Light)
-- Rule 8: Apply Type Contrast Through Interfaces
-- Rule 9: Create Type Alignment Through Method Signatures
-- Rule 10: Design for Clear Type Readability and Comprehension
-- Rule 11: Use BigDecimal for Precision-Sensitive Calculations
-- Rule 12: Strategic Type Selection for Methods and Algorithms
+- Rule 1: Naming Conventions
+- Rule 2: Formatting
+- Rule 3: Import Statements
+- Rule 4: Documentation Standards
+- Rule 5: Comprehensive Error and Exception Handling (Including Security Best Practices)
 
-## Rule 1: Establish a Clear Type Hierarchy
+## Rule 1: Naming Conventions
 
-Title: Establish a Clear Type Hierarchy
-Description: This rule focuses on organizing classes and interfaces into a logical structure using inheritance and composition. A clear hierarchy makes the relationships between types explicit, improving code navigation and understanding. It often involves using nested static classes for closely related types.
+-   **Packages:** Lowercase, using reverse domain name notation (e.g., `com.example.project.module`). Avoid underscores.
+-   **Classes and Interfaces:** PascalCase (e.g., `UserProfile`, `DataAccessService`). Names should be descriptive nouns or noun phrases.
+-   **Methods:** camelCase (e.g., `getUserName`, `calculateTotalAmount`). Names should be verbs or verb phrases.
+-   **Variables:** camelCase (e.g., `userName`, `currentIndex`). Strive for short yet meaningful names. Avoid single-character names except for temporary loop counters (like `i`, `j`, `k`) or lambda parameters where context is clear.
+-   **Constants:** `ALL_CAPS_SNAKE_CASE` (e.g., `MAX_LOGIN_ATTEMPTS`, `DEFAULT_TIMEOUT_MS`).
+-   **Type Parameters:** Single uppercase letter (e.g., `T`, `E`, `K`, `V`) or a descriptive name in PascalCase if more complex.
 
-**Good example:**
+## Rule 2: Formatting
 
-```java
-// GOOD: Clear type hierarchy with descriptive names
-public class OrderManagement {
-    public static class Order {
-        private List<OrderItem> items;
-        private Customer customer;
-        // ...
-    }
-
-    public static class OrderItem {
-        private Product product;
-        private int quantity;
-        // ...
-    }
-}
-```
-
-**Bad Example:**
-
-```java
-// AVOID: Flat structure with ambiguous names
-public class Order {
-    private List<Item> items;
-    private User user;
-    // ...
-}
-```
-
-## Rule 2: Use Consistent Naming Conventions (Your Type's "Font Family")
-
-Title: Use Consistent Naming Conventions (Your Type's "Font Family")
-Description: This rule emphasizes using uniform patterns for naming classes, interfaces, methods, and variables. Consistency in naming acts like a consistent font family in typography, making the code easier to read, predict, and maintain across the entire project.
-
-**Good example:**
-
-```java
-// GOOD: Consistent naming patterns
-interface PaymentProcessor { void process(Payment payment); }
-interface ShippingCalculator { BigDecimal calculate(Order order); }
-interface TaxProvider { Tax getTaxFor(Address address); }
-```
-
-**Bad Example:**
-
-```java
-// AVOID: Inconsistent naming patterns
-interface PaymentProcessor { void handlePayment(Payment p); }
-interface ShipCalc { BigDecimal getShippingCost(Order o); }
-interface TaxSystem { Tax lookupTaxRate(Address addr); }
-```
-
-## Rule 3: Embrace Whitespace (Kerning and Leading)
-
-Title: Embrace Whitespace (Kerning and Leading)
-Description: This rule advocates for the strategic use of blank lines and spacing within code, analogous to kerning and leading in typography. Proper whitespace improves readability by visually separating logical blocks of code, making it easier to scan and comprehend.
-
-**Good example:**
-
-```java
-// GOOD: Proper spacing for readability
-public Order processOrder(Cart cart, Customer customer) {
-    // Validate inputs
-    validateCart(cart);
-    validateCustomer(customer);
-
-    // Create order
-    Order order = new Order(customer);
-    cart.getItems().forEach(item ->
-        order.addItem(item.getProduct(), item.getQuantity())
-    );
-
-    // Calculate totals
-    order.calculateSubtotal();
-    order.calculateTax();
-
-    return order;
-}
-```
-
-**Bad Example:**
-
-```java
-// AVOID: Dense, difficult to parse code
-public Order processOrder(Cart cart,Customer customer){
-    validateCart(cart);validateCustomer(customer);
-    Order order=new Order(customer);
-    cart.getItems().forEach(item->order.addItem(item.getProduct(),item.getQuantity()));
-    order.calculateSubtotal();order.calculateTax();
-    return order;
-}
-```
-
-## Rule 4: Create Type-Safe Wrappers (Type as Communication)
-
-Title: Create Type-Safe Wrappers (Type as Communication)
-Description: This rule encourages wrapping primitive types or general-purpose types (like String) in domain-specific types. These wrapper types enhance type safety by enforcing invariants at compile-time and clearly communicate the intended meaning and constraints of data.
-
-**Good example:**
-
-```java
-// GOOD: Type-safe wrappers communicate intent
-public class EmailAddress {
-    private final String value;
-
-    public EmailAddress(String email) {
-        if (!isValid(email)) {
-            throw new IllegalArgumentException("Invalid email format");
+-   **Indentation:** Use 4 spaces for indentation. Some style guides (like Google's) recommend 2 spaces; consistency within a project is key. Do not use tabs.
+-   **Line Length:** Aim for a maximum line length of 120 characters. Some guides suggest 100 characters (Google) or even 80 (older Oracle). This helps readability, especially with side-by-side diffs.
+-   **Braces (Curly Braces):**
+    -   Use K&R style ("Egyptian brackets"): the opening brace is at the end of the line that begins the block; the closing brace is on its own line, aligned with the start of the construct.
+    -   Always use braces for `if`, `else`, `for`, `do`, `while` statements, even if the body is a single line or empty. This prevents ambiguity and errors when adding statements later.
+        ```java
+        // Good
+        if (condition) {
+            doSomething();
         }
+
+        // Avoid (even if allowed by some relaxed styles for single lines)
+        // if (condition) doSomething();
+        // if (condition)
+        //     doSomething();
+        ```
+-   **Whitespace:**
+    -   **Vertical:**
+        -   Use a single blank line to separate methods.
+        -   Use blank lines within methods to separate logical blocks of code.
+        -   Avoid excessive blank lines.
+    -   **Horizontal:**
+        -   Use a single space around binary operators (`+`, `-`, `*`, `/`, `=`, `==`, `!=`, `&&`, `||`, etc.).
+        -   Use a single space after commas in argument lists and after semicolons in `for` statements.
+        -   Use a single space after keywords like `if`, `for`, `while`, `catch` and before the opening parenthesis `(`.
+        -   No trailing whitespace on any line.
+-   **`var` Keyword (Java 10+):**
+    -   Use `var` for local variable type inference when it improves readability and the type of the variable is clear from the initializer or context.
+    -   Good: `var userList = new ArrayList<User>();`, `var stream = Files.lines(path);`
+    -   Avoid: `var result = getComplexObject();` (if `getComplexObject()` return type isn't immediately obvious).
+-   **Annotations:**
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
