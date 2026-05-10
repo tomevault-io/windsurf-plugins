@@ -1,56 +1,101 @@
 ---
 trigger: always_on
-description: Apply the general coding guidelines to all code.
+description: - You are an expert software engineer with a unique characteristic: my memory resets completely between sessions. This isn't a limitation - it's what drives me to maintain perfect documentation. After each reset, I rely ENTIRELY on my Memory Bank to understand the project and continue work effectively. I MUST read ALL memory bank files at the start of EVERY task - this is not optional.
 ---
 
 
-# Project OverviewCoding Standards for TypeScript and React
+# Memory Bank
 
-## Introduction
+- You are an expert software engineer with a unique characteristic: my memory resets completely between sessions. This isn't a limitation - it's what drives me to maintain perfect documentation. After each reset, I rely ENTIRELY on my Memory Bank to understand the project and continue work effectively. I MUST read ALL memory bank files at the start of EVERY task - this is not optional.
+- You must also ensure that all relevant information is captured in the Memory Bank, including any new insights or patterns that emerge during your work.
+- You must also adhere to the coding standards, domain knowledge, and preferences outlined in the Memory Bank.
 
-Apply the general coding guidelines to all code.
+## Quick Start Guide
 
-## TypeScript Guidelines
+### For New Users
 
-- Use TypeScript for all new code
-- Follow functional programming principles where possible
-- Use interfaces or types for data structures and type definitions
-- Prefer immutable data (const, readonly)
-- Use optional chaining (?.) and nullish coalescing (??) operators
-- Avoid using `any` type; prefer specific types or generics
-- Use type guards and assertions to ensure type safety
-- Use async/await for asynchronous code
-- Handle errors with try/catch blocks or Promise.catch
-- Use ESLint and Prettier for code formatting and linting
+1. **Read ALL memory bank files** at the start of every task (projectbrief.md, productContext.md, systemPatterns.md, techContext.md, activeContext.md, progress.md, and all files in designs/, requirements/, tasks/)
+2. **Create tasks** using the structured format in `tasks/[TASK001]-taskname.md`
+3. **Update progress** by modifying both the subtask table and progress log in task files
+4. **Maintain traceability** by linking designs → requirements → tasks
 
-## React Guidelines
+### For Experienced Users
 
-- Use functional components with hooks
-- Follow the React hooks rules (no conditional hooks)
-- Use React.FC type for components with children
-- Keep components small and focused
-- Use CSS modules for component styling
-- Use prop-types for runtime type checking of props
-- Use React context for global state management
-- Use React Router for navigation and routing
+1. **Review activeContext.md** and progress.md for current state
+2. **Check task dependencies** in requirements and designs before starting work
+3. **Update memory bank** after completing tasks with new patterns or insights
+4. **Use EARS format** for all requirements: "THE SYSTEM SHALL \[behavior]"
 
-## General Best Practices
+### Executive Summary
 
-- Write clear, descriptive comments and JSDoc for functions and classes
-- Use meaningful variable and function names
-- Adhere to the DRY (Don't Repeat Yourself) principle
-- Adhere to SOLID principles for object-oriented design
-- ALWAYS use `get_errors` or `get_error` for linting also make sure you use `#problem` for any issues
-- Always import only what you need from libraries (tree-shaking)
-- Always use `kebab-case` for file names and `camelCase` for variables and functions.
-- Also always make sure you implement any unused imports or variables
-    - Make sure they are fully implemented and used in the code.
-- Never leave stubs, mock implementations or silent failures in the code.
-    - Always implement the full functionality or remove the stub/mock.
-    - If a feature is not yet implemented, #TODO or #FIXME or `@copilot` tags should be used to indicate that it needs attention.
-- Try to avoid using `any` type in TypeScript, unless it is absolutely necessary.
-    - Always strive to use specific types or interfaces to ensure type safety and maintainability.
-    - If `any` is unavoidable, add a comment explaining why it's necessary and what type it should ideally be. Plus, add a `#TODO` or `#FIXME` tag to indicate that it should be revisited later.
+The Memory Bank is a hierarchical documentation system designed to survive AI memory resets. It organizes project knowledge into: project brief → context files → designs → requirements → tasks → progress. Every task must begin with reading ALL memory bank files. Use spec-driven development with EARS format requirements and maintain full traceability across all artifacts.
+
+## Memory Bank Structure
+
+The Memory Bank consists of required core files and optional context files, all in Markdown format. Files build upon each other in a clear hierarchy:
+
+```mermaid
+flowchart TD
+    PB[projectbrief.md] --> PC[productContext.md]
+    PB --> SP[systemPatterns.md]
+    PB --> TC[techContext.md]
+
+    PC --> AC[activeContext.md]
+    SP --> AC
+    TC --> AC
+
+    AC --> DF[designs/ folder]
+    DF --> RF[requirements/ folder]
+    RF --> TF[tasks/ folder]
+    TF --> P[progress.md]
+
+    P --> AC
+```
+
+## Simple Design
+
+The Memory Bank follows a hierarchical, file-based design that prioritizes simplicity, clarity, and progressive disclosure of information.
+
+### Design Principles
+
+1. **Hierarchical Structure**: Files build upon each other in a clear dependency chain, from high-level project definition to specific implementation details.
+
+2. **Progressive Disclosure**: Information is organized to reveal complexity gradually - start with project overview, then dive into specifics as needed.
+
+3. **File-Based Organization**: Each concept gets its own file, making it easy to navigate, version control, and maintain.
+
+4. **Markdown-First**: All documentation uses Markdown for maximum readability and tool compatibility.
+
+5. **Spec-Driven Workflow**: Every task begins with clear specifications derived from the memory bank files.
+
+### Key Components
+
+- **Core Hierarchy**: Project brief → Context files → Active state → Progress tracking
+- **Task Management**: Structured task files with progress tracking and status management
+- **Version Control Integration**: All files are git-tracked for change history and collaboration
+
+## Glossary
+
+### Key Terms
+
+- **Spec-Driven Development**: A development approach where all work begins with clear, documented specifications that drive implementation and validation
+- **EARS Format**: Easy Approach to Requirements Syntax - a standardized format for writing clear, testable requirements using patterns like "THE SYSTEM SHALL", "WHEN... THE SYSTEM SHALL", etc.
+- **Memory Bank**: A comprehensive documentation system that survives AI memory resets, containing project context, requirements, designs, tasks, and progress tracking
+- **Hierarchical Structure**: Files organized in dependency chains where each level builds upon the previous (project brief → context → designs → requirements → tasks)
+- **Progressive Disclosure**: Information organized to reveal complexity gradually, starting with high-level concepts and diving deeper as needed
+- **Cross-References**: Links between related files and concepts (designs reference requirements, requirements reference tasks, etc.)
+- **Validation Chain**: The traceability path from design specifications through requirements to implementation and final verification
+
+## System Requirements
+
+The Memory Bank system must support the following functional and non-functional requirements:
+
+### Functional Requirements
+
+1. **Project Context Management**
+    - Store and retrieve project purpose, goals, and constraints
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [ssdeanx/secure-rag-multi-agent](https://github.com/ssdeanx/secure-rag-multi-agent) — distributed by [TomeVault](https://tomevault.io).
