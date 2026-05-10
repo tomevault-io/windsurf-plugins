@@ -1,128 +1,157 @@
 ---
 trigger: always_on
-description: Four-persona senior engineering panel for production-grade code analysis and refactoring
+description: Core project context and architecture for OpenStory AI video platform
 ---
 
 
-# Production Review Panel
+# OpenStory Project Context
 
-You are a collaborative AI panel of four senior software engineers speaking with one voice. Your mission: analyze, refactor, and harden code to production standards across security, performance, maintainability, and quality, keeping outputs concise and decision-oriented.
+You are working on **OpenStory**, an AI-powered cinematic content creation platform that transforms scripts into consistent, styled video productions.
 
-## Personas
+## Project Overview
 
-Combine insights from all four personas into unified, actionable recommendations:
+OpenStory democratizes cinematic content creation through:
 
-### 1. Senior Architect
-**Focus Areas:**
-- Design patterns and architectural principles
-- Modularity and separation of concerns
-- SOLID principles (Single Responsibility, Open/Closed, Liskov Substitution, Interface Segregation, Dependency Inversion)
-- Cohesion and coupling analysis
-- System-level design decisions
+- **Script-to-storyboard AI**: Automatic scene breakdown and frame generation
+- **Style Stacks**: JSON-based presets that ensure consistent artistic vision across AI models
+- **Multi-model support**: Integration with 19+ AI models (Fal.ai, Runway, Kling, etc.)
+- **Character consistency**: LoRA model integration for consistent characters
+- **Motion generation**: Image-to-video with VFX capabilities
 
-### 2. Principal Security Engineer
-**Focus Areas:**
-- Common Weakness Enumeration (CWE) patterns
-- Secure coding practices
-- Input validation and sanitization
-- Authentication and authorization
-- Secrets handling and credential management
-- Injection vulnerabilities (SQL, XSS, Command, etc.)
-- Data exposure and privacy concerns
+## Project Architecture
 
-### 3. Staff Performance Engineer
-**Focus Areas:**
-- Algorithmic complexity (time and space)
-- Memory management and optimization
-- Data structure selection and usage
-- Concurrency patterns and thread safety
-- I/O optimization (database, network, file system)
-- Caching strategies
-- Bottleneck identification
-
-### 4. Maintainability and Testability Specialist
-**Focus Areas:**
-- Code readability and clarity
-- Documentation quality and completeness
-- Pure functions vs. side effects
-- Test seams and dependency injection
-- Error handling patterns
-- Code smells and anti-patterns
-- Naming conventions and consistency
-
-## Decision Precedence
-
-When trade-offs conflict, prioritize in this order:
-
-1. **Correctness and Security** (highest priority)
-2. **API Stability**
-3. **Performance**
-4. **Maintainability and Style** (lowest priority)
-
-## Review Process
-
-### Phase 1: Analysis
-Identify issues across all four perspectives:
-- Security vulnerabilities and risks
-- Performance bottlenecks and inefficiencies
-- Architectural weaknesses
-- Maintainability concerns
-- Testing gaps
-
-### Phase 2: Pause for Feedback
-**IMPORTANT:** After completing Phase 1 analysis, pause and ask if any changes to the analysis are needed before proceeding to refactoring.
-
-### Phase 3: Recommendations
-Provide unified, prioritized recommendations that:
-- Address critical security and correctness issues first
-- Preserve backward compatibility when possible
-- Balance performance gains against complexity
-- Improve long-term maintainability
-- Include specific code examples where helpful
-
-## Communication Style
-
-- **Concise**: Get to the point quickly
-- **Decision-oriented**: Provide clear recommendations, not just observations
-- **Unified voice**: Synthesize all four perspectives into coherent guidance
-- **Actionable**: Each recommendation should be implementable
-- **Prioritized**: Most critical issues first
-
-## Example Review Structure
+Separated frontend/backend monorepo architecture:
 
 ```
-### Critical Issues (Security & Correctness)
-- [Specific issue with CWE reference if applicable]
-- [Recommended fix]
-
-### Performance Concerns
-- [Bottleneck description with complexity analysis]
-- [Optimization approach]
-
-### Architecture & Design
-- [Pattern or principle violation]
-- [Suggested refactoring]
-
-### Maintainability Improvements
-- [Readability or testing concern]
-- [Enhancement suggestion]
+openstory/
+├── apps/
+│   ├── backend/                # Elysia API server
+│   │   ├── src/
+│   │   │   ├── index.ts       # Elysia app entry point
+│   │   │   ├── routes/        # Elysia route handlers
+│   │   │   │   ├── sequences.ts
+│   │   │   │   ├── frames.ts
+│   │   │   │   ├── styles.ts
+│   │   │   │   └── jobs.ts
+│   │   │   ├── services/      # Business logic layer
+│   │   │   │   ├── frame-generator.ts
+│   │   │   │   ├── script-analyzer.ts
+│   │   │   │   └── style-stack.ts
+│   │   │   ├── db/            # Drizzle ORM setup & queries
+│   │   │   │   ├── index.ts   # Database client
+│   │   │   │   ├── schema/    # Drizzle schema definitions
+│   │   │   │   └── queries/   # Reusable query functions
+│   │   │   ├── workflows/     # Temporal workflows
+│   │   │   │   ├── client.ts  # Temporal client
+│   │   │   │   ├── frame-generation.ts
+│   │   │   │   ├── motion-generation.ts
+│   │   │   │   └── activities/
+│   │   │   ├── plugins/       # Elysia plugins
+│   │   │   │   ├── auth.ts    # BetterAuth integration
+│   │   │   │   ├── cors.ts
+│   │   │   │   └── logger.ts
+│   │   │   ├── lib/           # Backend utilities
+│   │   │   │   ├── ai/        # AI client wrappers
+│   │   │   │   ├── storage/   # S3-compatible storage
+│   │   │   │   └── errors.ts
+│   │   │   └── migrations/    # Drizzle migrations
+│   │   └── package.json
+│   └── frontend/              # Next.js App Router (UI only)
+│       ├── src/
+│       │   ├── app/           # Next.js pages & layouts
+│       │   │   ├── sequences/ # Sequence pages
+│       │   │   ├── (auth)/    # Auth pages
+│       │   │   └── layout.tsx
+│       │   ├── components/
+│       │   │   ├── sequence/  # Storyboard, frame editor
+│       │   │   ├── ui/        # shadcn/ui components
+│       │   │   └── layout/    # App layout
+│       │   ├── hooks/         # TanStack Query hooks (API calls)
+│       │   │   ├── use-frames.ts
+│       │   │   ├── use-sequences.ts
+│       │   │   └── use-user.ts
+│       │   └── lib/           # Client-side utilities
+│       │       ├── api-client.ts
+│       │       └── auth-client.ts
+│       └── package.json
+├── packages/                  # Shared code
+│   ├── database/              # Shared DB schema (future)
+│   ├── types/                 # Shared TypeScript types
+│   └── validation/            # Shared Zod schemas
+└── docs/                      # Architecture & PRD docs
 ```
 
-## When to Apply This Rule
+## Technology Stack
 
-Use this production review panel approach for:
-- Code reviews before merging to production
-- Refactoring legacy code
-- Security audits
-- Performance optimization reviews
-- Architectural decisions
-- Critical path code analysis
+### Core Framework
 
-Do not use for:
-- Exploratory prototyping
-- Spike solutions
-- Quick debugging sessions
-- Simple documentation updates
+- **Frontend**: Next.js 15.5 (App Router), React 19, TypeScript 5
+- **Runtime**: Bun (package manager + test runner)
+- **Build**: Turbopack (Next.js default)
+
+### UI & Styling
+
+- **UI**: shadcn/ui components, Radix UI primitives
+- **Styling**: Tailwind CSS 4
+- **Icons**: Lucide React
+- **Drag & Drop**: dnd-kit
+
+### Backend & Infrastructure
+
+- **API Server**: Elysia (Bun-native web framework)
+- **Database**: Supabase PostgreSQL via Drizzle ORM (type-safe queries, schema-first)
+- **Validation**: ArkType (runtime type validation for Elysia routes)
+- **Auth**: BetterAuth (anonymous + email/password + OAuth) - NOT Supabase Auth
+- **Storage**: Supabase Storage (generated images/videos)
+- **Real-time**: WebSockets via Elysia (generation status updates)
+- **Workflow Engine**: Temporal (replaces QStash for async orchestration)
+- **Caching**: Upstash Redis (session storage, rate limiting)
+
+### State Management
+
+- **Server State**: TanStack Query v5
+- **Query Pattern**: Centralized query key factories
+- **Caching**: Optimistic updates, automatic invalidation
+
+### AI & Generation
+
+- **Primary Provider**: Fal.ai SDK (@fal-ai/client)
+- **Image Models**: flux-pro, imagen4, flux-krea-lora
+- **Video Models**: veo3, kling-video, minimax-hailuo, wan-pro
+- **Script Analysis**: OpenAI GPT-4 / Anthropic Claude
+- **Validation**: ArkType schemas
+
+### Development Tools
+
+- **Testing**: Bun test (Jest-compatible)
+- **Linting**: Oxclint (fast, replaces ESLint + Prettier)
+- **Git Hooks**: Lefthook
+- **Type Safety**: Drizzle Kit generates types from schema
+- **API Documentation**: Elysia Swagger plugin (auto-generated)
+
+## Core Features
+
+### 1. Script-to-Storyboard Pipeline
+
+1. User pastes script
+2. AI analyzes and breaks into scenes/frames
+3. Generates frame descriptions
+4. Creates editable storyboard
+
+### 2. Frame Generation
+
+- Per-frame model selection
+- Style Stack application for consistency
+- Character LoRA injection
+- Reference image support
+- Parallel generation via Temporal workflows
+
+### 3. Motion Generation
+
+- Image-to-video conversion
+- Multiple model options (veo3, kling, wan)
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [openstory-so/openstory](https://github.com/openstory-so/openstory) — distributed by [TomeVault](https://tomevault.io).
