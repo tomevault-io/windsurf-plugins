@@ -1,133 +1,145 @@
 ---
 trigger: always_on
-description: A high-level overview of the core components in LC Agent USD module, explaining how they work together to create a specialized system for USD development assistance.
+description: A high-level overview of the core components in LC Agent, explaining how they work together to create a flexible and powerful system for language model interactions.
 ---
 
 
-# LC Agent USD Module Overview
+# LC Agent Overview
 
-## Introduction
+Important: LC Agent is not a framework. It's written on top of langchain.
 
-The `lc_agent_usd` module is a specialized extension of the LC Agent framework designed to provide intelligent assistance for Universal Scene Description (USD) development. It leverages the core LC Agent architecture to create a system that can:
-
-1. Answer knowledge-based questions about USD
-2. Generate and validate USD code snippets
-3. Provide interactive code assistance
-4. Execute and debug USD code
-
-This module demonstrates how LC Agent's flexible architecture can be extended to create domain-specific AI assistants with specialized capabilities.
+LC Agent provides a modular system for building complex language model interactions. Here's a high-level overview of its core components:
 
 ## Core Components
 
-The module is organized into several key components:
+### RunnableNode
+The fundamental building block. A `RunnableNode` represents a single unit of processing that can:
+- Handle message management (system messages, user inputs, model responses)
+- Interact with language models
+- Track execution state and metrics
+- Connect with other nodes to form networks
 
-### Network Nodes
+### RunnableNetwork
+A container and manager for `RunnableNode` instances that:
+- Manages the execution flow between connected nodes
+- Maintains network state and context
+- Enables dynamic modification through modifiers
+- Provides synchronous, asynchronous, and streaming execution options
 
-Network nodes are specialized classes that extend the `NetworkNode` base class from LC Agent. They serve as containers for specific functionality:
+### NetworkNode
+A hybrid class that combines `RunnableNode` and `RunnableNetwork`, allowing it to:
+- Function as both a single node and a self-contained subnetwork
+- Integrate seamlessly with parent networks
+- Inherit properties (like chat model settings) from parent networks
+- Maintain its own execution context
 
-- **USDKnowledgeNetworkNode**: Provides factual information about USD concepts and usage
-- **USDCodeNetworkNode**: Handles general USD code generation and validation
-- **USDCodeGenNetworkNode**: Specializes in generating executable USD code with validation
+### MultiAgentNetworkNode
+A specialized `NetworkNode` that acts as a conversation coordinator by:
+- Routing queries to appropriate specialized "agent" sub-networks
+- Managing complex multi-domain problem solving
+- Coordinating between different specialized nodes
+- Synthesizing responses from multiple agents
 
-### Specialized Nodes
+### NetworkModifier
+A middleware component that provides controlled ways to modify network behavior by:
+- Offering hooks into different stages of network execution
+- Enabling safe network structure modifications
+- Managing state changes during execution
+- Supporting dynamic network evolution
 
-These are the building blocks that implement specific behaviors:
+### NodeFactory
+A centralized registry for node types that:
+- Manages node registration and creation
+- Handles configuration and default arguments
+- Ensures type safety
+- Provides debugging capabilities
 
-- **USDKnowledgeNode**: Processes knowledge-based queries about USD
-- **USDCodeGenNode**: Generates USD code snippets with proper structure
-- **USDCodeInteractiveNode**: Provides interactive code assistance
+## Component Relationships
 
-### Modifiers
+```
+NodeFactory
+    │
+    ├── creates/manages ──► RunnableNode
+    │                          │
+    │                          ├── can be contained in ──► RunnableNetwork
+    │                          │                               │
+    │                          │                               ├── can be modified by ──► NetworkModifier
+    │                          │                               │
+    │                          │                               └── specialized by ──► NetworkNode
+    │                          │                                                         │
+    │                          │                                                         └── extended by ──► MultiAgentNetworkNode
+    │                          │
+    └── creates/manages ──────►┘
+```
 
-Modifiers extend the functionality of nodes by intercepting and modifying their behavior:
+## Key Concepts
 
-- **USDKnowledgeRagModifier**: Enhances knowledge responses with retrieval-augmented generation
-- **USDCodeGenRagModifier**: Enhances code generation with retrieval-augmented generation
-- **CodeInterpreterModifier**: Executes and validates code
-- **CodeExtractorModifier**: Extracts and formats code snippets
-- **USDCodeGenPatcherModifier**: Fixes and improves generated code
+### Message Flow
+1. Messages enter through nodes (typically `RunnableHumanNode`)
+2. Flow through the network based on node connections
+3. Get processed by language models or tools
+4. Generate responses that continue through the network
 
-## System Architecture
+### Execution Lifecycle
+1. Network preparation and context setup
+2. Node execution in topological order
+3. Modifier application at various stages
+4. Result collection and state updates
 
-The module follows a layered architecture:
+### Network Modification
+1. Safe modifications through `NetworkModifier`
+2. Automatic connection handling in `NetworkNode`
+3. Dynamic routing in `MultiAgentNetworkNode`
+4. Centralized management via `NodeFactory`
 
-1. **User Interface Layer**: Receives queries and displays responses
-2. **Network Layer**: Routes queries to appropriate specialized nodes
-3. **Processing Layer**: Generates responses using specialized nodes
-4. **Modifier Layer**: Enhances responses with additional capabilities
-5. **Knowledge Layer**: Retrieves relevant information from knowledge bases
+## Common Use Cases
 
-## Integration with LC Agent Core
+### Simple Chatbot
+```python
+with RunnableNetwork(chat_model_name="gpt-4") as network:
+    RunnableHumanNode("What is Python?")
+    RunnableNode(inputs=[
+        SystemMessage(content="You are a helpful assistant")
+    ])
+```
 
-The `lc_agent_usd` module integrates with the core LC Agent framework by:
+### Multi-Agent System
+```python
+class CustomMultiAgent(MultiAgentNetworkNode):
+    route_nodes = [
+        "CodeExpert",
+        "DocumentationHelper",
+        "ConceptExplainer"
+    ]
+```
 
-1. Extending base classes like `NetworkNode` and `RunnableNode`
-2. Implementing custom modifiers that work with the LC Agent modifier system
-3. Registering custom node types with the node factory
-4. Using the LC Agent message passing system for communication
+### Network Modification
+```python
+class CustomModifier(NetworkModifier):
+    def on_post_invoke(self, network, node):
+        if node.invoked and "tool_call" in node.outputs:
+            self._handle_tool_call(network, node)
+```
 
-## Use Cases
-
-The module is designed to support several key use cases:
-
-1. **USD Knowledge Assistance**: Answering questions about USD concepts, API, and best practices
-2. **Code Generation**: Creating USD code snippets based on user requirements
-3. **Code Validation**: Checking and fixing USD code for correctness
-4. **Interactive Development**: Providing real-time assistance during USD development
+For detailed information about each component, refer to their respective documentation pages.
 
 
-# USDKnowledgeNetworkNode
+# RunnableNode
 
 ## Overview
 
-The `USDKnowledgeNetworkNode` is a specialized network node in the LC Agent USD module that provides knowledge-based assistance for Universal Scene Description (USD). It serves as a comprehensive information source for USD concepts, API usage, best practices, and general questions about USD functionality.
+`RunnableNode` is a core component in the LC Agent framework that represents a single unit of processing in a language model interaction pipeline. It inherits from LangChain's `RunnableSerializable` class and adds network capabilities, enabling the creation of complex processing networks for language model interactions.
 
 ## Purpose
 
-The primary purpose of the `USDKnowledgeNetworkNode` is to:
+The `RunnableNode` solves several key problems in language model interactions:
 
-1. Answer factual questions about USD concepts and terminology
-2. Provide explanations of USD API functions and classes
-3. Offer guidance on USD best practices and workflows
-4. Explain USD file formats and structure
-5. Assist with understanding USD's role in 3D pipelines
+1. **Message Management**: Handles the organization and flow of messages between different parts of a conversation, including system messages, user inputs, and model responses.
 
-This node is designed to be the knowledge foundation of the USD agent system, focusing on providing accurate information rather than generating or executing code.
+2. **Model Interaction**: Provides a standardized interface for working with different language models through LangChain's abstractions.
 
-## Implementation Details
+3. **State Tracking**: Maintains the state of conversations and processing, including execution status and performance metrics.
 
-### Class Definition
-
-```python
-class USDKnowledgeNetworkNode(NetworkNode):
-    default_node: str = "USDKnowledgeNode"
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.add_modifier(USDKnowledgeRagModifier())
-```
-
-The implementation is intentionally simple, leveraging the power of the LC Agent framework to handle most of the complexity. The class:
-
-1. Extends `NetworkNode` from the core LC Agent framework
-2. Sets `USDKnowledgeNode` as its default node type
-3. Adds a `USDKnowledgeRagModifier` to enhance responses with retrieval-augmented generation
-
-### Default Node
-
-The `USDKnowledgeNode` serves as the default processing node for this network. It:
-
-1. Processes queries using a system message to generate appropriate responses
-2. Handles knowledge-based questions about USD
-3. Provides factual information about USD concepts and API
-
-### RAG Modifier
-
-The `USDKnowledgeRagModifier` enhances the node's responses by:
-
-1. Retrieving relevant information from a knowledge base of USD documentation
-2. Injecting this information into the context before generating responses
-3. Ensuring responses are grounded in accurate USD documentation
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
