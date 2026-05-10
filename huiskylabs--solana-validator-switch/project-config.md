@@ -1,178 +1,144 @@
 ---
 trigger: always_on
-description: You are a disciplined software engineer focused on writing clean, maintainable, and reliable code. Always prioritize simplicity over cleverness, readability over brevity, and proven patterns over experimental approaches.
+description: You are building a professional-grade TypeScript CLI application for Solana validator switching. This is a critical infrastructure tool for validator operators that requires ultra-fast switching (~300ms), zero credential storage, and SSH key-based authentication.
 ---
 
-# General Software Development - Cursor Rules
+# Solana Validator Switch CLI - Cursor Rules
 
-## Core Development Philosophy
-You are a disciplined software engineer focused on writing clean, maintainable, and reliable code. Always prioritize simplicity over cleverness, readability over brevity, and proven patterns over experimental approaches.
+## Project Context
+You are building a professional-grade TypeScript CLI application for Solana validator switching. This is a critical infrastructure tool for validator operators that requires ultra-fast switching (~300ms), zero credential storage, and SSH key-based authentication.
 
-## Cardinal Rules
-### 0. Never include `claude` inside commit message
+## Technology Stack
+- **Language**: TypeScript (strict mode)
+- **Runtime**: Node.js
+- **CLI Framework**: Commander.js
+- **SSH**: openssh-rs
+- **UI**: Inquirer, blessed, ora, chalk, cli-table3
+- **Testing**: Jest with ts-jest
+- **Build**: TypeScript compiler
 
-### 1. KISS (Keep It Simple, Stupid)
-- Choose the simplest solution that works
-- Avoid over-engineering and premature optimization
-- If you can't explain it simply, you don't understand it well enough
-- Prefer explicit over implicit
-- One function should do one thing well
+## Core Architecture Principles
+- **Type Safety First**: All functions, classes, and data structures must be strongly typed
+- **Zero Credential Storage**: Never store SSH keys, passwords, or private keys
+- **Error Handling**: Comprehensive error types and graceful degradation
+- **Performance**: Optimize for ultra-fast switching operations
+- **Security**: SSH key-based authentication only, input validation
+- **Professional UX**: Clean CLI interface with proper error messages
 
-### 2. YAGNI (You Aren't Gonna Need It)
-- Don't implement features until they're actually needed
-- Don't add abstractions until you have at least 3 use cases
-- Avoid speculative generality
-- Build for today's requirements, not imagined future ones
+## TypeScript Configuration
+- Use strict TypeScript configuration with all strict checks enabled
+- Define interfaces for all data structures before implementation
+- Use proper error types (never throw strings, always Error objects)
+- Prefer readonly properties where applicable
+- Use branded types for sensitive data (SSH keys, file paths)
+- Export types separately from implementations
 
-### 3. DRY (Don't Repeat Yourself) - But Don't Overdo It
-- Eliminate obvious duplication
-- But don't abstract too early - duplication is better than wrong abstraction
-- Consider the rule of three: first occurrence, second occurrence, third occurrence = refactor
+## Code Style Guidelines
 
-## Code Quality Standards
+### File Naming
+- Use kebab-case for file names: `ssh-manager.ts`, `config-manager.ts`
+- Use PascalCase for class names: `SSHManager`, `ConfigManager`
+- Use camelCase for variables and functions: `switchValidator`, `getConfig`
+- Use UPPER_CASE for constants: `DEFAULT_SSH_TIMEOUT`, `MAX_RETRIES`
 
-### Function and Class Design
-- Functions should be small (ideally < 20 lines)
-- Functions should have a single responsibility
-- Use descriptive names that explain what, not how
-- Prefer pure functions when possible (no side effects)
-- Limit function parameters (max 3-4, use objects for more)
-- Return early to reduce nesting
-
-### Variable and Naming
-- Use intention-revealing names
-- Avoid mental mapping (i, j, k only for simple loops)
-- Use pronounceable names
-- Use searchable names for important concepts
-- Avoid disinformation and misleading names
-- Be consistent with naming conventions
-
-### Comments and Documentation
-- Code should be self-documenting
-- Comments should explain WHY, not WHAT
-- Avoid redundant comments
-- Update comments when code changes
-- Use JSDoc for public APIs
-- Document complex business logic and algorithms
-
-## Error Handling
-
-### Error Management
-- Fail fast and fail clearly
-- Use proper error types, not strings
-- Handle errors at the appropriate level
-- Don't ignore errors or catch and ignore
-- Log errors with context
-- Provide meaningful error messages to users
-
-### Exception Handling Pattern
+### Import Organization
 ```typescript
-// Good: Specific error handling
-try {
-  const result = await riskyOperation();
-  return result;
-} catch (error) {
-  logger.error('Operation failed', { context: 'specific-operation', error: error.message });
-  throw new OperationError('Failed to complete operation', { cause: error });
-}
+// 1. Node.js built-in modules
+import { promises as fs } from 'fs';
+import { join } from 'path';
 
-// Bad: Generic catch-all
-try {
-  // ... code
-} catch (error) {
-  console.log('Something went wrong');
-}
+// 2. Third-party modules
+import { Command } from 'commander';
+import inquirer from 'inquirer';
+
+// 3. Local modules (absolute imports preferred)
+import { Config, NodeConfig } from '../types/config';
+import { SSHManager } from '../lib/ssh-manager';
+import { Logger } from '../utils/logger';
 ```
 
-## Testing Requirements
-
-### Test Coverage
-- Write tests for all public APIs
-- Test edge cases and error conditions
-- Aim for 80%+ test coverage
-- Tests should be fast and isolated
-- One assertion per test when possible
-
-### Test Structure
+### Error Handling Pattern
 ```typescript
-// Good: Clear test structure
-describe('UserService', () => {
-  describe('createUser', () => {
-    it('should create user with valid data', async () => {
-      // Arrange
-      const userData = { name: 'John', email: 'john@example.com' };
-      
-      // Act
-      const result = await userService.createUser(userData);
-      
-      // Assert
-      expect(result.id).toBeDefined();
-      expect(result.name).toBe(userData.name);
-    });
-  });
-});
+// Always use custom error classes
+export class ValidatorSwitchError extends Error {
+  constructor(
+    message: string,
+    public readonly code: string,
+    public readonly cause?: Error
+  ) {
+    super(message);
+    this.name = 'ValidatorSwitchError';
+  }
+}
+
+// Use Result pattern for operations that can fail
+export type Result<T, E = Error> = 
+  | { success: true; data: T }
+  | { success: false; error: E };
 ```
 
-## Security Guidelines
+### Async/Await Pattern
+- Always use async/await instead of Promises
+- Handle errors with try/catch blocks
+- Use proper error propagation
+- Add timeout handling for SSH operations
 
-### Input Validation
-- Validate all inputs at boundaries
-- Sanitize user inputs
-- Use parameterized queries
-- Avoid eval() and similar dangerous functions
-- Validate file uploads and paths
+## Directory Structure Rules
+```
+src/
+├── index.ts                    # Main entry point
+├── types/                      # TypeScript interfaces only
+│   ├── config.ts              # Configuration types
+│   ├── ssh.ts                 # SSH-related types
+│   ├── validator.ts           # Validator types
+│   └── index.ts               # Re-export all types
+├── commands/                   # CLI command handlers
+│   ├── setup.ts               # Setup command
+│   ├── config.ts              # Config management
+│   ├── monitor.ts             # Monitoring dashboard
+│   ├── switch.ts              # Switching logic
+│   └── status.ts              # Status queries
+├── lib/                        # Core business logic
+│   ├── ssh-manager.ts         # SSH connection management
+│   ├── switch-manager.ts      # Validator switching
+│   ├── tower-manager.ts       # Tower file operations
+│   ├── health-checker.ts      # Health monitoring
+│   └── solana-rpc.ts          # Solana RPC client
+├── utils/                      # Utility functions
+│   ├── config-manager.ts      # Configuration utilities
+│   ├── logger.ts              # Logging system
+│   ├── validator.ts           # Input validation
+│   └── error-handler.ts       # Error handling
+├── ui/                         # Terminal UI components
+│   ├── dashboard.ts           # Interactive dashboard
+│   ├── components.ts          # Reusable UI components
+│   └── prompts.ts             # Interactive prompts
+└── constants/                  # Application constants
+    ├── defaults.ts            # Default values
+    ├── errors.ts              # Error messages
+    └── commands.ts            # Command definitions
+```
 
-### Data Handling
-- Never log sensitive information
-- Use secure random for security-critical operations
-- Implement proper authentication and authorization
-- Use HTTPS for all external communications
-- Handle secrets securely (environment variables, not code)
+## CLI Development Patterns
 
-## Performance Guidelines
+### Command Structure
+```typescript
+// Use this pattern for all CLI commands
+import { Command } from 'commander';
+import { Config } from '../types/config';
 
-### Optimization Rules
-- Measure before optimizing
-- Optimize the bottleneck, not random code
-- Consider Big O complexity for algorithms
-- Use appropriate data structures
-- Avoid premature optimization
-- Profile in production-like environments
+interface CommandOptions {
+  config?: string;
+  verbose?: boolean;
+  dryRun?: boolean;
+}
 
-### Resource Management
-- Close resources properly (files, connections, streams)
-- Use connection pooling for databases
-- Implement proper cleanup in error scenarios
-- Monitor memory usage
-- Use lazy loading when appropriate
-
-## Code Organization
-
-### File Structure
-- Organize by feature, not by file type
-- Keep related code together
-- Use consistent file naming
-- Limit file size (< 300 lines typically)
-- Separate concerns clearly
-
-### Dependencies
-- Minimize external dependencies
-- Keep dependencies up to date
-- Audit dependencies for security
-- Use exact versions in production
-- Avoid dependencies for simple operations
-
-## Git and Version Control
-
-### Commit Guidelines
-- Make atomic commits (one logical change)
-- Write clear commit messages
-- Use imperative mood ("Add feature" not "Added feature")
-- Reference issues in commits
-- Keep commits focused and small
-
-### Branch Strategy
-- Use feature branches for new work
+export function createSetupCommand(): Command {
+  return new Command('setup')
+    .description('Interactive setup wizard')
+    .option('-c, --config <path>', 'custom config file')
+    .option('-v, --verbose', 'verbose output')
+    .action(async (options: CommandOptions) => {
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
