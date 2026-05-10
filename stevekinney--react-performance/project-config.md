@@ -1,199 +1,147 @@
 ---
 trigger: always_on
-description: handleSubmit,
+description: 1. **Zero-Duplication Doctrine**: If a utility already exists—use or extend it. Re-creating it is technical vandalism.
 ---
 
 
-# Type Validation with Zod
+# TypeScript Best Practices
 
-You are an expert TypeScript developer who understands that type assertions (using `as`) only provide compile-time safety without runtime validation.
+### Super Important 🚨
 
-## Zod Over Type Assertions
+1. **Zero-Duplication Doctrine**: If a utility already exists—use or extend it. Re-creating it is technical vandalism.
+2. **Mandatory Repo-Crawl Before Typing**: Ripgrep the codebase first. Clone code → public PR shaming.
+3. **One-Purpose Functions**: One job per function. "And also…" means split it or delete it.
+4. **Atomic Commits or Bust**: Each commit is a surgical strike. Unrelated changes = auto-reject.
+5. **DRY or Die Tryin'**: Two copies = warning. Three copies = felony. CI fails on detectable duplication.
+6. **Expand, Don't Explode**: Add behavior by extending existing utils—never fork a "v2".
+7. **Simplicity Tax**: If reviewers need >30 sec to grok your PR, refactor until they don't.
+8. **Comment Quotas Are Real**: If code needs a paragraph to explain, the code is wrong. Refactor.
+9. **Kill Dead Code on Sight**: Delete unused paths/flags/TODO fossils before they multiply.
+10. **Performance Is a Feature**: New code must meet or beat existing util speed. Slower = reject.
+11. **Linter = Law**: Zero ESLint/Prettier warnings. "Stylistic" excuses ≠ defense.
+12. **Context > Cleverness**: Readable beats wizardry. Explain it to a sleepy intern in <60 seconds.
+13. **Guardrails > Guidelines**: Enforce via CI/git hooks. A rule that can't break the build is just cosplay.
+14. **Fail Fast, Loud, Early**: Assertions everywhere. Silent fails are sabotage.
+15. **Docs or It Didn't Happen**: Public utilities need JSDoc/TSDoc. Private helpers get inline types.
+16. **Scope-Laser Mode**: Edit only the files absolutely required for the ticket. Touching >2 unrelated modules? Stop, commit nothing, and ping the human.
 
-- **NEVER** use type assertions (with `as`) for external data sources, API responses, or user inputs
-- **ALWAYS** use Zod schemas to validate and parse data from external sources
-- Implement proper error handling for validation failures
+## Type Safety & Configuration
 
-## Zod Implementation Patterns
+- Enable `strict: true` in @tsconfig.json with additional flags:
+  - `noImplicitAny: true`
+  - `strictNullChecks: true`
+  - `strictFunctionTypes: true`
+  - `strictBindCallApply: true`
+  - `strictPropertyInitialization: true`
+  - `noImplicitThis: true`
+  - `alwaysStrict: true`
+  - `exactOptionalPropertyTypes: true`
+- Never use `// @ts-ignore` or `// @ts-expect-error` without explanatory comments
+- Use `--noEmitOnError` compiler flag to prevent generating JS files when TypeScript errors exist
 
-- Import zod with: `import { z } from 'zod'` (not 'zod/v4' - we use standard Zod v3)
-- Define schemas near related types or in dedicated schema files
-- Use `schema.parse()` for throwing validation behavior
-- Use `schema.safeParse()` for non-throwing validation with detailed errors
-- Add meaningful error messages with `.refine()` and `.superRefine()`
-- Set up default values with `.default()` when appropriate
-- Use transformations with `.transform()` to convert data formats
-- Always handle potential validation errors
+## Type Definitions
 
-```ts
-// ❌ WRONG: Using type assertions
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  age: number;
-}
+- Do not ever use `any`. Ever. If you feel like you have to use `any`, use `unknown` instead.
+- Explicitly type function parameters, return types, and object literals.
+- Please don't ever use Enums. Use a union if you feel tempted to use an Enum.
+- Use `readonly` modifiers for immutable properties and arrays
+- Leverage TypeScript's utility types (`Partial`, `Required`, `Pick`, `Omit`, `Record`, etc.)
+- Use discriminated unions with exhaustiveness checking for type narrowing
 
-const fetchUser = async (id: string): Promise<User> => {
-  const response = await fetch(`/api/users/${id}`);
-  const data = await response.json();
-  return data as User; // DANGEROUS: No runtime validation!
-};
-```
+## Advanced Patterns
 
-```ts
-// ✅ RIGHT: Using Zod for validation
-import { z } from 'zod';
+- Implement proper generics with appropriate constraints
+- Use mapped types and conditional types to reduce type duplication
+- Leverage `const` assertions for literal types
+- Implement branded/nominal types for type-level validation
 
-// Define the schema
-const UserSchema = z.object({
-  id: z.string().uuid(),
-  name: z.string().min(1),
-  email: z.string().email(),
-  age: z.number().int().positive().min(13),
-});
+## Code Organization
 
-// Derive the type from the schema
-type User = z.infer<typeof UserSchema>;
+- Organize types in dedicated files (types.ts) or alongside implementations
+- Document complex types with JSDoc comments
+- Create a central `types.ts` file or a `src/types` directory for shared types
 
-const fetchUser = async (id: string): Promise<User> => {
-  const response = await fetch(`/api/users/${id}`);
-  const data = await response.json();
+## Lint & TypeCheck Error Resolution (Lessons Learned)
 
-  // Runtime validation
-  return UserSchema.parse(data);
-};
+### Import Path Management
 
-// With error handling
-const fetchUserSafe = async (id: string): Promise<User | null> => {
-  try {
-    const response = await fetch(`/api/users/${id}`);
-    const data = await response.json();
+- Always use path aliases (`@/` prefix) for src/ imports for consistency
+- After refactoring, systematically update all import paths using search/replace
+- Group imports: types first, then components, then utilities
+- Use consistent import patterns across the codebase
 
-    const result = UserSchema.safeParse(data);
-    if (!result.success) {
-      console.error('Invalid user data:', result.error.format());
-      return null;
-    }
+### ESLint Rule Compliance
 
-    return result.data;
-  } catch (error) {
-    console.error('Error fetching user:', error);
-    return null;
-  }
-};
-```
-
-## React-Specific Validation Patterns
-
-### Form Validation with React Hook Form + Zod
+#### Nullish Coalescing (`??` vs `||`)
 
 ```typescript
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
+// ❌ Problematic - catches falsy values like 0, false, ""
+const result = value || defaultValue;
 
-// Define form schema
-const FormSchema = z.object({
-  email: z.string().email('Invalid email address'),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
-  confirmPassword: z.string(),
-  age: z.number().min(18, 'Must be at least 18'),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: "Passwords don't match",
-  path: ['confirmPassword'],
-});
+// ✅ Correct - only null/undefined trigger default
+const result = value ?? defaultValue;
+```
 
-type FormData = z.infer<typeof FormSchema>;
+#### Type Import Consistency
 
-export function SignUpForm() {
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<FormData>({
-    resolver: zodResolver(FormSchema),
-  });
+```typescript
+// ✅ Use proper type imports
+import type { SomeType } from './types';
 
-  const onSubmit = (data: FormData) => {
-    // Data is already validated by Zod
-    console.log('Valid form data:', data);
-  };
+// ❌ Avoid import() type annotations
+properties: (obj as Record<string, import('./types').SomeType>) ?? {};
 
-  return (
-    <form onSubmit={handleSubmit(onSubmit)}>
-      <input {...register('email')} placeholder="Email" />
-      {errors.email && <span>{errors.email.message}</span>}
+properties: (obj as Record<string, SomeType>) ?? {};
+```
 
-      <input {...register('password')} type="password" />
-      {errors.password && <span>{errors.password.message}</span>}
+#### No Explicit Any
 
-      <button type="submit">Sign Up</button>
-    </form>
-  );
+```typescript
+// ❌ Loses type safety
+static tools = new Map<string, Tool<any, any>>();
+
+// ✅ Use specific constraints
+static tools = new Map<string, Tool<SchemaShape | undefined, Promise<unknown>>>();
+```
+
+### Chrome Extension API Types
+
+- Chrome API Promise return types may not match @types definitions
+- Use ESLint disable comments sparingly for known async APIs:
+
+```typescript
+// eslint-disable-next-line @typescript-eslint/await-thenable
+const result = await chrome.tabs.detectLanguage(tabId);
+```
+
+### Error Handling in Tests
+
+```typescript
+// ❌ Unused error variable
+try {
+  testCode();
+} catch (_error) {
+  // error not used
+}
+
+// ✅ Bare catch when error details not needed
+try {
+  testCode();
+} catch {
+  // clean error handling
 }
 ```
 
-### Props Validation
+### Zod Version Compatibility
 
-```typescript
-import { z } from 'zod';
-import type { FC } from 'react';
+- Standardize on Zod v3 imported as `zod`
+- Use standard imports: `import { z } from 'zod'`
+- Define schema shapes consistently: `type SchemaShape = Record<string, z.ZodTypeAny>`
 
-// Define props schema
-const ComponentPropsSchema = z.object({
-  title: z.string(),
-  count: z.number().int().nonnegative(),
-  isActive: z.boolean().optional(),
-  items: z.array(z.string()).min(1),
-  config: z.object({
-    theme: z.enum(['light', 'dark']),
-    size: z.enum(['sm', 'md', 'lg']),
-  }),
-});
+### Mock Implementation Strategy
 
-type ComponentProps = z.infer<typeof ComponentPropsSchema>;
-
-// Validate props at runtime (useful for components receiving external data)
-export const SafeComponent: FC<unknown> = (props) => {
-  // Validate props at runtime
-  const validatedProps = ComponentPropsSchema.parse(props);
-
-  return (
-    <div>
-      <h1>{validatedProps.title}</h1>
-      <p>Count: {validatedProps.count}</p>
-    </div>
-  );
-};
-```
-
-### Context Value Validation
-
-```typescript
-import { createContext, useContext, type FC, type ReactNode } from 'react';
-import { z } from 'zod';
-
-const AuthContextSchema = z.object({
-  user: z.object({
-    id: z.string(),
-    email: z.string().email(),
-    role: z.enum(['admin', 'user', 'guest']),
-  }).nullable(),
-  login: z.function().args(z.string(), z.string()).returns(z.promise(z.void())),
-  logout: z.function().returns(z.void()),
-});
-
-type AuthContextValue = z.infer<typeof AuthContextSchema>;
-
-const AuthContext = createContext<AuthContextValue | undefined>(undefined);
-
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within AuthProvider');
-  }
-  // Validate context value at runtime if receiving from external source
+- When services are deleted, create minimal mock implementations
+- Use proper typing for mocks to maintain type safety
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
