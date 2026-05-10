@@ -7,12 +7,12 @@ Code Scalpel is the bridge between **Generative AI** and **Reliable Software Eng
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `copilot-instructions.md` in [3D-Tech-Solutions/code-scalpel](https://github.com/3D-Tech-Solutions/code-scalpel).
+Original source: `AGENTS.md` in [3D-Tech-Solutions/code-scalpel](https://github.com/3D-Tech-Solutions/code-scalpel).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
+- **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
