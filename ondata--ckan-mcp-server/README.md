@@ -7,11 +7,11 @@ MCP server for querying CKAN open data portals (package search, DataStore SQL, o
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [ondata/ckan-mcp-server](https://github.com/ondata/ckan-mcp-server).
+Original source: `CLAUDE.md` in [ondata/ckan-mcp-server](https://github.com/ondata/ckan-mcp-server).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
