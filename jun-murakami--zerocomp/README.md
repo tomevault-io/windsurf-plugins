@@ -7,11 +7,11 @@ A professional zero-latency broadcast-oriented compressor plugin. for VST/AU/AAX
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [Jun-Murakami/ZeroComp](https://github.com/Jun-Murakami/ZeroComp).
+Original source: `CLAUDE.md` in [Jun-Murakami/ZeroComp](https://github.com/Jun-Murakami/ZeroComp).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
