@@ -1,150 +1,184 @@
 ---
 trigger: always_on
-description: Metal shader coding standards and optimization guidelines for BeautyWebcam
+description: Objective-C coding standards and best practices for BeautyWebcam
 ---
 
 
-# Metal Shader Guidelines
+# Objective-C Coding Standards
 
-## Shader Architecture
-
-### File Organization
-```metal
-// BeautyWebcam_Shaders.metal
-#include <metal_stdlib>
-using namespace metal;
-
-// Constants
-constant float kSkinSmoothingRadius = 2.0;
-constant float kColorEnhancementStrength = 0.3;
-
-// Shared utility functions
-float luminance(float3 color);
-float3 rgb2yuv(float3 rgb);
-float3 yuv2rgb(float3 yuv);
-
-// Main processing kernels
-kernel void skinSmoothingKernel(...);
-kernel void colorEnhancementKernel(...);
-kernel void noiseReductionKernel(...);
-```
+## Code Style Guidelines
 
 ### Naming Conventions
-- **Kernels**: Use descriptive names ending with "Kernel" - e.g., `skinSmoothingKernel`
-- **Constants**: Use `k` prefix with camelCase - e.g., `kBilateralSigmaD`
-- **Structs**: Use `BW` prefix - e.g., `BWProcessingParams`
-- **Functions**: Use camelCase - e.g., `calculateBilateralWeight`
+- **Classes**: Use `BW` prefix (BeautyWebcam) - e.g., `BWCaptureManager`, `BWVideoProcessor`
+- **Methods**: Use descriptive, action-oriented names - e.g., `startCaptureSessionWithDevice:`
+- **Properties**: Use camelCase without prefixes - e.g., `captureSession`, `isProcessing`
+- **Constants**: Use `k` prefix with class prefix - e.g., `kBWMaxFrameRate`, `kBWDefaultQuality`
+- **Enums**: Use NS_ENUM with descriptive names - e.g., `BWProcessingQuality`, `BWCameraState`
 
-## Performance Optimization
+### Method Declarations
+```objc
+// Preferred: Descriptive parameter names
+- (BOOL)startProcessingWithQuality:(BWProcessingQuality)quality 
+                         forDevice:(AVCaptureDevice *)device 
+                             error:(NSError **)error;
 
-### Thread Group Sizing
-```metal
-// Optimal thread group sizes for different operations
-// 16x16 for 2D image processing (256 threads per group)
-kernel void imageProcessingKernel(texture2d<float, access::read> inputTexture [[texture(0)]],
-                                 texture2d<float, access::write> outputTexture [[texture(1)]],
-                                 uint2 gid [[thread_position_in_grid]]) {
-    // Process pixel at gid
-}
-
-// Use from Objective-C:
-// MTLSize threadgroupSize = MTLSizeMake(16, 16, 1);
-// MTLSize threadgroupCount = MTLSizeMake((width + 15) / 16, (height + 15) / 16, 1);
+// Avoid: Generic parameter names
+- (BOOL)start:(int)q device:(id)d error:(NSError **)e;
 ```
 
-### Memory Access Patterns
-```metal
-// Prefer coalesced memory access
-kernel void efficientKernel(texture2d<float, access::read> input [[texture(0)]],
-                           texture2d<float, access::write> output [[texture(1)]],
-                           uint2 gid [[thread_position_in_grid]]) {
-    if (gid.x >= input.get_width() || gid.y >= input.get_height()) return;
-    
-    // Good: Access neighboring pixels in a pattern that maximizes cache hits
-    float4 center = input.read(gid);
-    float4 right = input.read(gid + uint2(1, 0));
-    float4 down = input.read(gid + uint2(0, 1));
-    
-    // Process and write result
-    output.write(processPixels(center, right, down), gid);
+### Property Declarations
+```objc
+// Use atomic/nonatomic explicitly
+@property (nonatomic, strong) AVCaptureSession *captureSession;
+@property (nonatomic, assign) BOOL isProcessing;
+@property (nonatomic, copy) NSString *deviceIdentifier;
+
+// Use nullable/nonnull annotations
+@property (nonatomic, strong, nullable) NSError *lastError;
+@property (nonatomic, strong, nonnull) BWVideoProcessor *processor;
+```
+
+## Memory Management
+
+### ARC Best Practices
+- Always use `@autoreleasepool` for intensive loops
+- Use `__weak` references to break retain cycles
+- Use `__unsafe_unretained` only when absolutely necessary
+- Implement proper cleanup in `dealloc`
+
+```objc
+// Weak reference to avoid retain cycles
+@property (nonatomic, weak) id<BWCaptureDelegate> delegate;
+
+// Cleanup in dealloc
+- (void)dealloc {
+    [self stopCapture];
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
 }
 ```
 
-### Threadgroup Memory Usage
-```metal
-// Use threadgroup memory for shared computations
-kernel void bilateralFilterKernel(texture2d<float, access::read> input [[texture(0)]],
-                                 texture2d<float, access::write> output [[texture(1)]],
-                                 uint2 gid [[thread_position_in_grid]],
-                                 uint2 tid [[thread_position_in_threadgroup]],
-                                 threadgroup float4 *sharedMemory [[threadgroup(0)]]) {
-    
-    // Load data into shared memory with border handling
-    uint sharedIndex = tid.y * 18 + tid.x; // 18x18 for 16x16 + 1-pixel border
-    if (tid.x < 18 && tid.y < 18) {
-        uint2 loadPos = gid + tid - uint2(1, 1); // Offset for border
-        sharedMemory[sharedIndex] = input.read(loadPos);
-    }
-    
-    threadgroup_barrier(mem_flags::mem_threadgroup);
-    
-    // Use shared data for filtering
-    if (tid.x < 16 && tid.y < 16) {
-        float4 result = bilateralFilter(sharedMemory, tid);
-        output.write(result, gid);
+### Memory-Intensive Operations
+```objc
+// Use autorelease pools for image processing
+- (void)processFrameBuffer:(CVPixelBufferRef)pixelBuffer {
+    @autoreleasepool {
+        CIImage *image = [[CIImage alloc] initWithCVPixelBuffer:pixelBuffer];
+        // Process image...
     }
 }
 ```
 
-## Image Processing Algorithms
+## Error Handling
 
-### Bilateral Filter Implementation
-```metal
-// Optimized bilateral filter for skin smoothing
-float bilateralWeight(float2 spatialDistance, float colorDistance, 
-                     float sigmaD, float sigmaR) {
-    float spatialWeight = exp(-dot(spatialDistance, spatialDistance) / (2.0 * sigmaD * sigmaD));
-    float colorWeight = exp(-(colorDistance * colorDistance) / (2.0 * sigmaR * sigmaR));
-    return spatialWeight * colorWeight;
-}
-
-kernel void skinSmoothingKernel(texture2d<float, access::read> input [[texture(0)]],
-                               texture2d<float, access::write> output [[texture(1)]],
-                               constant BWProcessingParams &params [[buffer(0)]],
-                               uint2 gid [[thread_position_in_grid]]) {
-    
-    if (gid.x >= input.get_width() || gid.y >= input.get_height()) return;
-    
-    float4 centerPixel = input.read(gid);
-    float3 centerColor = centerPixel.rgb;
-    
-    float3 filteredColor = float3(0.0);
-    float totalWeight = 0.0;
-    
-    // Sample in kernel radius
-    int radius = int(params.smoothingRadius);
-    for (int dy = -radius; dy <= radius; dy++) {
-        for (int dx = -radius; dx <= radius; dx++) {
-            uint2 samplePos = uint2(max(0, min(int(input.get_width()) - 1, int(gid.x) + dx)),
-                                   max(0, min(int(input.get_height()) - 1, int(gid.y) + dy)));
-            
-            float4 samplePixel = input.read(samplePos);
-            float3 sampleColor = samplePixel.rgb;
-            
-            float colorDist = distance(centerColor, sampleColor);
-            float2 spatialDist = float2(dx, dy);
-            
-            float weight = bilateralWeight(spatialDist, colorDist, 
-                                         params.sigmaD, params.sigmaR);
-            
-            filteredColor += weight * sampleColor;
-            totalWeight += weight;
+### NSError Pattern
+```objc
+- (BOOL)performOperationWithError:(NSError **)error {
+    // Validate parameters
+    if (!self.isReady) {
+        if (error) {
+            *error = [NSError errorWithDomain:BWErrorDomain 
+                                         code:BWErrorNotReady 
+                                     userInfo:@{NSLocalizedDescriptionKey: @"Device not ready"}];
         }
+        return NO;
     }
     
-    filteredColor /= totalWeight;
+    // Perform operation
+    return YES;
+}
+```
+
+### Exception Handling
+```objc
+// Use exceptions only for programmer errors
+@try {
+    [self criticalOperation];
+} @catch (NSException *exception) {
+    NSLog(@"Critical error: %@", exception);
+    // Log and potentially crash in debug builds
+    NSAssert(NO, @"Unrecoverable error: %@", exception);
+}
+```
+
+## Performance Guidelines
+
+### Method Implementation
+- Keep methods focused and under 50 lines
+- Use early returns to reduce nesting
+- Avoid deep inheritance hierarchies
+- Use composition over inheritance
+
+```objc
+- (BOOL)validateCaptureDevice:(AVCaptureDevice *)device {
+    // Early return pattern
+    if (!device) return NO;
+    if (!device.connected) return NO;
+    if ([device lockForConfiguration:nil] == NO) return NO;
     
-    // Blend with original based on intensity
+    [device unlockForConfiguration];
+    return YES;
+}
+```
+
+### Dispatch Queues
+```objc
+// Use appropriate queue types
+@property (nonatomic, strong) dispatch_queue_t processingQueue;
+@property (nonatomic, strong) dispatch_queue_t captureQueue;
+
+// Initialize in init method
+_processingQueue = dispatch_queue_create("com.beautywebcam.processing", 
+                                        DISPATCH_QUEUE_SERIAL);
+_captureQueue = dispatch_queue_create("com.beautywebcam.capture", 
+                                     DISPATCH_QUEUE_SERIAL);
+```
+
+## Documentation Standards
+
+### Header Documentation
+```objc
+/**
+ * Manages video capture from USB webcams with real-time processing capabilities.
+ *
+ * This class handles the complete capture pipeline from device selection through
+ * frame processing to virtual camera output. It ensures optimal performance
+ * through GPU acceleration and proper memory management.
+ *
+ * @warning This class must be used from the main thread for UI updates.
+ */
+@interface BWCaptureManager : NSObject
+```
+
+### Method Documentation
+```objc
+/**
+ * Starts video capture with specified quality settings.
+ *
+ * @param quality The processing quality level to use
+ * @param device The capture device to use for input
+ * @param error On failure, contains an NSError describing the problem
+ * @return YES if capture started successfully, NO otherwise
+ *
+ * @note This method performs validation and may take several seconds to complete
+ */
+- (BOOL)startCaptureWithQuality:(BWProcessingQuality)quality
+                         device:(AVCaptureDevice *)device
+                          error:(NSError **)error;
+```
+
+## Thread Safety
+
+### Synchronization
+```objc
+// Use atomic properties for simple thread safety
+@property (atomic, assign) BOOL isProcessing;
+
+// Use dispatch_sync for critical sections
+- (void)updateConfiguration:(void (^)(void))block {
+    dispatch_sync(self.configurationQueue, block);
+}
+
+// Use dispatch_barrier for read/write operations
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
