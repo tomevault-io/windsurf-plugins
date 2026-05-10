@@ -1,198 +1,147 @@
 ---
 trigger: always_on
-description: import { z, ZodTypeAny } from "zod";
+description: TITLE: Implement Transport Error Handling in TypeScript and Python
 ---
 
-import { z, ZodTypeAny } from "zod";
+TITLE: Implement Transport Error Handling in TypeScript and Python
+DESCRIPTION: This code snippet illustrates how to incorporate comprehensive error handling within transport implementations. It demonstrates catching exceptions during connection establishment and message transmission, logging errors, and ensuring proper resource cleanup using `try-catch` blocks and context managers.
+SOURCE: https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/docs/concepts/transports.mdx#_snippet_4
 
-export const LATEST_PROTOCOL_VERSION = "2025-03-26";
-export const SUPPORTED_PROTOCOL_VERSIONS = [
-  LATEST_PROTOCOL_VERSION,
-  "2024-11-05",
-  "2024-10-07",
-];
+LANGUAGE: TypeScript
+CODE:
+```
+class ExampleTransport implements Transport {
+  async start() {
+    try {
+      // Connection logic
+    } catch (error) {
+      this.onerror?.(new Error(`Failed to connect: ${error}`));
+      throw error;
+    }
+  }
 
-/* JSON-RPC types */
-export const JSONRPC_VERSION = "2.0";
+  async send(message: JSONRPCMessage) {
+    try {
+      // Sending logic
+    } catch (error) {
+      this.onerror?.(new Error(`Failed to send message: ${error}`));
+      throw error;
+    }
+  }
+}
+```
 
-/**
- * A progress token, used to associate progress notifications with the original request.
- */
-export const ProgressTokenSchema = z.union([z.string(), z.number().int()]);
+LANGUAGE: Python
+CODE:
+```
+@contextmanager
+async def example_transport(scope: Scope, receive: Receive, send: Send):
+    try:
+        # Create streams for bidirectional communication
+        read_stream_writer, read_stream = anyio.create_memory_object_stream(0)
+        write_stream, write_stream_reader = anyio.create_memory_object_stream(0)
 
-/**
- * An opaque token used to represent a cursor for pagination.
- */
-export const CursorSchema = z.string();
+        async def message_handler():
+            try:
+                async with read_stream_writer:
+                    # Message handling logic
+                    pass
+            except Exception as exc:
+                logger.error(f"Failed to handle message: {exc}")
+                raise exc
 
-const RequestMetaSchema = z
-  .object({
-    /**
-     * If specified, the caller is requesting out-of-band progress notifications for this request (as represented by notifications/progress). The value of this parameter is an opaque token that will be attached to any subsequent notifications. The receiver is not obligated to provide these notifications.
-     */
-    progressToken: z.optional(ProgressTokenSchema),
-  })
-  .passthrough();
+        async with anyio.create_task_group() as tg:
+            tg.start_soon(message_handler)
+            try:
+                # Yield streams for communication
+                yield read_stream, write_stream
+            except Exception as exc:
+                logger.error(f"Transport error: {exc}")
+                raise exc
+            finally:
+                tg.cancel_scope.cancel()
+                await write_stream.aclose()
+                await read_stream.aclose()
+    except Exception as exc:
+        logger.error(f"Failed to initialize transport: {exc}")
+        raise exc
+```
 
-const BaseRequestParamsSchema = z
-  .object({
-    _meta: z.optional(RequestMetaSchema),
-  })
-  .passthrough();
+----------------------------------------
 
-export const RequestSchema = z.object({
-  method: z.string(),
-  params: z.optional(BaseRequestParamsSchema),
-});
+TITLE: Implement Tool Execution Handler with Weather API Tools (Kotlin)
+DESCRIPTION: This snippet demonstrates how to set up an HTTP client using Ktor for making requests to the weather.gov API and how to register two tools (`get_alerts` and `get_forecast`) with an MCP server. The `get_alerts` tool fetches weather alerts by state, validating the 'state' parameter. The `get_forecast` tool retrieves weather forecasts by latitude and longitude, validating both parameters. Both tools handle input validation and return `CallToolResult` with `TextContent`.
+SOURCE: https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/quickstart/server.mdx#_snippet_33
 
-const BaseNotificationParamsSchema = z
-  .object({
-    /**
-     * This parameter name is reserved by MCP to allow clients and servers to attach additional metadata to their notifications.
-     */
-    _meta: z.optional(z.object({}).passthrough()),
-  })
-  .passthrough();
-
-export const NotificationSchema = z.object({
-  method: z.string(),
-  params: z.optional(BaseNotificationParamsSchema),
-});
-
-export const ResultSchema = z
-  .object({
-    /**
-     * This result property is reserved by the protocol to allow clients and servers to attach additional metadata to their responses.
-     */
-    _meta: z.optional(z.object({}).passthrough()),
-  })
-  .passthrough();
-
-/**
- * A uniquely identifying ID for a request in JSON-RPC.
- */
-export const RequestIdSchema = z.union([z.string(), z.number().int()]);
-
-/**
- * A request that expects a response.
- */
-export const JSONRPCRequestSchema = z
-  .object({
-    jsonrpc: z.literal(JSONRPC_VERSION),
-    id: RequestIdSchema,
-  })
-  .merge(RequestSchema)
-  .strict();
-
-export const isJSONRPCRequest = (value: unknown): value is JSONRPCRequest =>
-  JSONRPCRequestSchema.safeParse(value).success;
-
-/**
- * A notification which does not expect a response.
- */
-export const JSONRPCNotificationSchema = z
-  .object({
-    jsonrpc: z.literal(JSONRPC_VERSION),
-  })
-  .merge(NotificationSchema)
-  .strict();
-
-export const isJSONRPCNotification = (
-  value: unknown
-): value is JSONRPCNotification =>
-  JSONRPCNotificationSchema.safeParse(value).success;
-
-/**
- * A successful (non-error) response to a request.
- */
-export const JSONRPCResponseSchema = z
-  .object({
-    jsonrpc: z.literal(JSONRPC_VERSION),
-    id: RequestIdSchema,
-    result: ResultSchema,
-  })
-  .strict();
-
-export const isJSONRPCResponse = (value: unknown): value is JSONRPCResponse =>
-  JSONRPCResponseSchema.safeParse(value).success;
-
-/**
- * Error codes defined by the JSON-RPC specification.
- */
-export enum ErrorCode {
-  // SDK error codes
-  ConnectionClosed = -32000,
-  RequestTimeout = -32001,
-
-  // Standard JSON-RPC error codes
-  ParseError = -32700,
-  InvalidRequest = -32600,
-  MethodNotFound = -32601,
-  InvalidParams = -32602,
-  InternalError = -32603,
+LANGUAGE: kotlin
+CODE:
+```
+// Create an HTTP client with a default request configuration and JSON content negotiation
+val httpClient = HttpClient {
+    defaultRequest {
+        url("https://api.weather.gov")
+        headers {
+            append("Accept", "application/geo+json")
+            append("User-Agent", "WeatherApiClient/1.0")
+        }
+        contentType(ContentType.Application.Json)
+    }
+    // Install content negotiation plugin for JSON serialization/deserialization
+    install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
 }
 
-/**
- * A response to a request that indicates an error occurred.
- */
-export const JSONRPCErrorSchema = z
-  .object({
-    jsonrpc: z.literal(JSONRPC_VERSION),
-    id: RequestIdSchema,
-    error: z.object({
-      /**
-       * The error type that occurred.
-       */
-      code: z.number().int(),
-      /**
-       * A short description of the error. The message SHOULD be limited to a concise single sentence.
-       */
-      message: z.string(),
-      /**
-       * Additional information about the error. The value of this member is defined by the sender (e.g. detailed error information, nested errors etc.).
-       */
-      data: z.optional(z.unknown()),
-    }),
-  })
-  .strict();
+// Register a tool to fetch weather alerts by state
+server.addTool(
+    name = "get_alerts",
+    description = """
+        Get weather alerts for a US state. Input is Two-letter US state code (e.g. CA, NY)
+    """.trimIndent(),
+    inputSchema = Tool.Input(
+        properties = buildJsonObject {
+            putJsonObject("state") {
+                put("type", "string")
+                put("description", "Two-letter US state code (e.g. CA, NY)")
+            }
+        },
+        required = listOf("state")
+    )
+) { request ->
+    val state = request.arguments["state"]?.jsonPrimitive?.content
+    if (state == null) {
+        return@addTool CallToolResult(
+            content = listOf(TextContent("The 'state' parameter is required."))
+        )
+    }
 
-export const isJSONRPCError = (value: unknown): value is JSONRPCError =>
-  JSONRPCErrorSchema.safeParse(value).success;
+    val alerts = httpClient.getAlerts(state)
 
-export const JSONRPCMessageSchema = z.union([
-  JSONRPCRequestSchema,
-  JSONRPCNotificationSchema,
-  JSONRPCResponseSchema,
-  JSONRPCErrorSchema,
-]);
+    CallToolResult(content = alerts.map { TextContent(it) })
+}
 
-/* Empty result */
-/**
- * A response that indicates success but carries no data.
- */
-export const EmptyResultSchema = ResultSchema.strict();
+// Register a tool to fetch weather forecast by latitude and longitude
+server.addTool(
+    name = "get_forecast",
+    description = """
+        Get weather forecast for a specific latitude/longitude
+    """.trimIndent(),
+    inputSchema = Tool.Input(
+        properties = buildJsonObject {
+            putJsonObject("latitude") { put("type", "number") }
+            putJsonObject("longitude") { put("type", "number") }
+        },
+        required = listOf("latitude", "longitude")
+    )
+) { request ->
+    val latitude = request.arguments["latitude"]?.jsonPrimitive?.doubleOrNull
+    val longitude = request.arguments["longitude"]?.jsonPrimitive?.doubleOrNull
+    if (latitude == null || longitude == null) {
+        return@addTool CallToolResult(
+            content = listOf(TextContent("The 'latitude' and 'longitude' parameters are required."))
+        )
+    }
 
-/* Cancellation */
-/**
- * This notification can be sent by either side to indicate that it is cancelling a previously-issued request.
- *
- * The request SHOULD still be in-flight, but due to communication latency, it is always possible that this notification MAY arrive after the request has already finished.
- *
- * This notification indicates that the result will be unused, so any associated processing SHOULD cease.
- *
- * A client MUST NOT attempt to cancel its `initialize` request.
- */
-export const CancelledNotificationSchema = NotificationSchema.extend({
-  method: z.literal("notifications/cancelled"),
-  params: BaseNotificationParamsSchema.extend({
-    /**
-     * The ID of the request to cancel.
-     *
-     * This MUST correspond to the ID of a request previously issued in the same direction.
-     */
-    requestId: RequestIdSchema,
+    val forecast = httpClient.getForecast(latitude, longitude)
 
-    /**
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
