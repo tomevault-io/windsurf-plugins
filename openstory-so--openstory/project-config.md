@@ -1,81 +1,214 @@
 ---
 trigger: always_on
-description: Context7 MCP integration for up-to-date documentation
+description: Drizzle ORM patterns and database conventions
 ---
 
 
-# Context7 MCP Integration
+# Drizzle ORM Patterns
 
-Always use Context7 MCP when you need current documentation for:
-- Code generation and setup steps
-- Library/API documentation  
-- Configuration examples
-- Framework-specific patterns
+## Schema Definition
 
-This means you should automatically use the Context7 MCP tools to resolve library IDs and get library docs without me having to explicitly ask.
+```typescript
+import {
+  pgTable,
+  uuid,
+  text,
+  timestamp,
+  boolean,
+  jsonb,
+  integer,
+} from 'drizzle-orm/pg-core';
+import { relations } from 'drizzle-orm';
 
-## Pre-configured Library IDs
+export const teams = pgTable('teams', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: text('name').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
 
-Use these Context7 library IDs for OpenStory's tech stack:
+export const users = pgTable('users', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  email: text('email'),
+  isAnonymous: boolean('is_anonymous').default(true).notNull(),
+  teamId: uuid('team_id').references(() => teams.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
 
-### Core Framework
-- `/vercel/next.js` - Next.js 15 documentation and patterns
-- `/microsoft/typescript` - TypeScript best practices
-- `/facebook/react` - React 19 features and hooks
+export const sequences = pgTable('sequences', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: text('name').notNull(),
+  script: text('script'),
+  teamId: uuid('team_id')
+    .references(() => teams.id)
+    .notNull(),
+  createdBy: uuid('created_by')
+    .references(() => users.id)
+    .notNull(),
+  styleId: uuid('style_id').references(() => styles.id),
+  metadata: jsonb('metadata'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
 
-### UI & Styling
-- `/tailwindlabs/tailwindcss` - Tailwind CSS 4 utilities and configuration
-- `/radix-ui/primitives` - Radix UI component APIs
-- `/shadcn/ui` - shadcn/ui component library
+export const frames = pgTable('frames', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  sequenceId: uuid('sequence_id')
+    .references(() => sequences.id, { onDelete: 'cascade' })
+    .notNull(),
+  order: integer('order').notNull(),
+  description: text('description').notNull(),
+  thumbnailUrl: text('thumbnail_url'),
+  status: text('status').notNull().default('pending'), // pending, processing, completed, failed
+  error: text('error'),
+  createdBy: uuid('created_by')
+    .references(() => users.id)
+    .notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
 
-### Backend & Data
-- `/elysiajs/elysia` - Elysia web framework patterns
-- `/drizzle-team/drizzle-orm` - Drizzle ORM queries and migrations
-- `/temporalio/sdk-typescript` - Temporal TypeScript SDK
-- `/tanstack/query` - TanStack Query v5 patterns
-- `/arktypeio/arktype` - ArkType runtime validation (backend validation)
+export const styles = pgTable('styles', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: text('name').notNull(),
+  description: text('description'),
+  teamId: uuid('team_id')
+    .references(() => teams.id)
+    .notNull(),
+  styleData: jsonb('style_data').notNull(), // Style Stack JSON
+  createdBy: uuid('created_by')
+    .references(() => users.id)
+    .notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
 
-### AI Integration
-- `/fal-ai/client` - Fal.ai SDK for image/video generation
-- `/openai/openai-node` - OpenAI API for script analysis
+// Relations
+export const teamsRelations = relations(teams, ({ many }) => ({
+  users: many(users),
+  sequences: many(sequences),
+  styles: many(styles),
+}));
 
-### Infrastructure
-- `/upstash/redis` - Redis for caching (via @upstash/redis)
-- `/oven-sh/bun` - Bun runtime and package manager
+export const usersRelations = relations(users, ({ one, many }) => ({
+  team: one(teams, {
+    fields: [users.teamId],
+    references: [teams.id],
+  }),
+  sequences: many(sequences),
+  frames: many(frames),
+  styles: many(styles),
+}));
 
-## When to Use Context7
+export const sequencesRelations = relations(sequences, ({ one, many }) => ({
+  team: one(teams, {
+    fields: [sequences.teamId],
+    references: [teams.id],
+  }),
+  frames: many(frames),
+  style: one(styles, {
+    fields: [sequences.styleId],
+    references: [styles.id],
+  }),
+  creator: one(users, {
+    fields: [sequences.createdBy],
+    references: [users.id],
+  }),
+}));
 
-Automatically invoke Context7 when:
-- Setting up new components or features
-- Working with framework-specific APIs (Next.js 15 App Router, React Server Components)
-- Implementing authentication patterns (Better Auth)
-- Configuring AI model integrations (Fal.ai models)
-- Working with async job queues (QStash patterns)
-- Implementing real-time features (Supabase Realtime)
-- Setting up validation schemas (Zod)
-- Troubleshooting integration issues
-- Learning new library features
+export const framesRelations = relations(frames, ({ one }) => ({
+  sequence: one(sequences, {
+    fields: [frames.sequenceId],
+    references: [sequences.id],
+  }),
+  creator: one(users, {
+    fields: [frames.createdBy],
+    references: [users.id],
+  }),
+}));
 
-## OpenStory-Specific Context Needs
+export const stylesRelations = relations(styles, ({ one, many }) => ({
+  team: one(teams, {
+    fields: [styles.teamId],
+    references: [teams.id],
+  }),
+  creator: one(users, {
+    fields: [styles.createdBy],
+    references: [users.id],
+  }),
+  sequences: many(sequences),
+}));
+```
 
-Prioritize Context7 for:
-- **Next.js 15**: Server Actions, async request params, React 19 features
-- **Elysia**: Route handlers, plugins, lifecycle hooks
-- **Drizzle ORM**: Query patterns, relations, migrations
-- **Temporal**: Workflow definitions, activity patterns, worker setup
-- **TanStack Query**: Query keys factory pattern, optimistic updates
-- **Fal.ai**: Model-specific parameters (flux, imagen4, veo3, kling, wan)
+## Database Client Setup
 
-## Example Usage
+```typescript
+// apps/backend/src/db/index.ts
+import { drizzle } from 'drizzle-orm/postgres-js';
+import postgres from 'postgres';
+import * as schema from './schema';
 
-Instead of relying on potentially outdated training data, Context7 provides:
-- Current API signatures (especially for Next.js 15 breaking changes)
-- Latest configuration options (Tailwind 4, React 19)
-- Up-to-date code examples (async params in App Router)
-- Recent best practices (Server Components vs Client Components)
-- Breaking changes and migrations (React 18→19, Next.js 14→15)
+const connectionString = process.env.POSTGRES_URL;
 
-This ensures all generated code uses current, working patterns rather than deprecated or incorrect approaches.
+if (!connectionString) {
+  throw new Error('POSTGRES_URL environment variable is not set');
+}
+
+// Create PostgreSQL connection
+const queryClient = postgres(connectionString);
+
+// Create Drizzle instance
+export const db = drizzle(queryClient, { schema });
+
+// Type exports
+export type Database = typeof db;
+```
+
+## Query Patterns
+
+```typescript
+import { db } from './index';
+import { sequences, frames } from './schema';
+import { eq, and, desc, asc, count } from 'drizzle-orm';
+
+// Simple select with relations
+export async function getSequenceWithFrames(sequenceId: string) {
+  return db.query.sequences.findFirst({
+    where: eq(sequences.id, sequenceId),
+    with: {
+      frames: {
+        orderBy: [asc(frames.order)],
+      },
+      style: true,
+      creator: {
+        columns: {
+          id: true,
+          email: true,
+          isAnonymous: true,
+        },
+      },
+    },
+  });
+}
+
+// List with pagination
+export async function listSequences(
+  teamId: string,
+  page: number = 1,
+  pageSize: number = 20
+) {
+  const offset = (page - 1) * pageSize;
+
+  const [items, totalCount] = await Promise.all([
+    db.query.sequences.findMany({
+      where: eq(sequences.teamId, teamId),
+      limit: pageSize,
+      offset,
+      orderBy: [desc(sequences.createdAt)],
+      with: {
+        frames: {
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [openstory-so/openstory](https://github.com/openstory-so/openstory) — distributed by [TomeVault](https://tomevault.io).
