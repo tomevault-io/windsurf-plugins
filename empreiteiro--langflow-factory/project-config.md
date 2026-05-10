@@ -1,149 +1,250 @@
 ---
 trigger: always_on
-description: - Fully understand user requirements before creating flows
+description: This document provides a comprehensive guide to all input types available in Langflow. Each input type is designed for specific use cases and data formats.
 ---
 
-# Langflow Flow Development Rules
+# Langflow Input Types Documentation
 
-## Flow Creation Standards
+This document provides a comprehensive guide to all input types available in Langflow. Each input type is designed for specific use cases and data formats.
 
-### Requirements Analysis
-- Fully understand user requirements before creating flows
-- Define input/output specifications clearly
-- Identify all dependencies and integrations needed
-- Plan component connections and data flow
+## Table of Contents
 
-### Naming Conventions
-- Use camelCase for variable names and field identifiers
-- Use PascalCase for component names and class definitions
-- Ensure all names are descriptive and self-explanatory
-- Use consistent naming across the entire flow
+1. [Text Inputs](#text-inputs)
+2. [Numeric Inputs](#numeric-inputs)
+3. [Boolean Inputs](#boolean-inputs)
+4. [Selection Inputs](#selection-inputs)
+5. [Data Structure Inputs](#data-structure-inputs)
+6. [File and Code Inputs](#file-and-code-inputs)
+7. [Specialized Inputs](#specialized-inputs)
+8. [Handle/Connector Inputs](#handleconnector-inputs)
 
-### Flow Structure Guidelines
-- Design flows to be modular and reusable
-- Minimize complexity while maximizing functionality
-- Create logical, organized flow structures
-- Ensure smooth data transitions between components
-- Follow single responsibility principle for each flow section
+---
 
-### Documentation Requirements
-- Add concise comments explaining flow purpose
-- Document expected inputs and outputs
-- Include error handling descriptions
-- Ensure all fields and comments are in English
-- Provide usage examples where helpful
+## Text Inputs
 
-### Component Integration
-- Integrate components seamlessly with proper data types
-- Maintain data consistency across all flow steps
-- Use appropriate connection types (Data, Message, DataFrame)
-- Validate data transformations between components
-- Handle edge cases in component connections
+### StrInput
 
-### Error Handling in Flows
-- Implement robust error handling at flow level
-- Use conditional routers for error paths
-- Provide meaningful error messages to users
-- Include fallback mechanisms where possible
-- Log errors appropriately for debugging
+**Field Type:** `"str"`
 
-### Performance Optimization
-- Design flows for efficiency and resource optimization
-- Avoid unnecessary data transformations
-- Use parallel processing where applicable
-- Minimize memory usage in large data flows
-- Implement proper caching strategies
+A basic text input field for single-line text entry.
 
-### Testing and Validation
-- Test complete flows end-to-end
-- Validate all component connections
-- Test error scenarios and edge cases
-- Ensure flows meet functional requirements
-- Verify performance under expected load
+**Key Features:**
+- Supports single string or list of strings
+- Can load values from database (`load_from_db`)
+- Validates string type
+- Supports metadata tracing
 
-### Production Readiness
-- Ensure flows are deployment-ready
-- Optimize for production environments
-- Include proper monitoring and logging
-- Implement security best practices
-- Document deployment requirements
+**Common Fields:**
+- `name` (required): Field name
+- `value` (default: `""`): Text value
+- `placeholder`: Placeholder text
+- `required`: Whether field is required
+- `load_from_db`: Enable database loading
+- `is_list`: Support list of strings
 
-## Flow JSON Structure
-
-### Standard Flow Template
-```json
-{
-  "id": "unique-flow-id",
-  "data": {
-    "nodes": [
-      {
-        "id": "component-id",
-        "type": "CustomComponent",
-        "position": {"x": 100, "y": 100},
-        "data": {
-          "node": {
-            "template": {
-              "input_field": {
-                "value": "default_value"
-              }
-            }
-          }
-        }
-      }
-    ],
-    "edges": [
-      {
-        "id": "edge-id",
-        "source": "source-node-id",
-        "target": "target-node-id",
-        "sourceHandle": "output_name",
-        "targetHandle": "input_name"
-      }
-    ]
-  }
-}
+**Example:**
+```python
+StrInput(
+    name="username",
+    display_name="Username",
+    placeholder="Enter your username",
+    required=True
+)
 ```
 
-### Component Connection Rules
-- Always specify correct sourceHandle and targetHandle
-- Ensure data type compatibility between connected components
-- Use descriptive IDs for nodes and edges
-- Position components logically in the flow layout
-- Group related components visually
+---
 
-### Flow Validation Checklist
-- [ ] All required inputs have default values or connections
-- [ ] Error handling paths are implemented
-- [ ] Component types match expected functionality
-- [ ] Data flows follow logical sequence
-- [ ] No circular dependencies exist
-- [ ] All outputs are properly utilized or connected
+### MessageInput
 
-## Common Flow Patterns
+**Field Type:** `"str"`  
+**Input Types:** `["Message"]`
 
-### Data Processing Pattern
-1. Input → Validation → Processing → Output
-2. Include error handling at each step
-3. Log processing steps for debugging
-4. Return structured results
+A text input specifically designed for message objects. Accepts Message objects, strings, or async iterators.
 
-### API Integration Pattern
-1. Authentication → Request → Response Handling → Output
-2. Implement retry logic for failed requests
-3. Handle rate limiting appropriately
-4. Parse and validate API responses
+**Key Features:**
+- Converts strings/iterators to Message objects
+- Handles Message objects from different modules
+- Supports input tracing
 
-### File Processing Pattern
-1. File Input → Validation → Processing → Results → Export
-2. Support multiple file formats
-3. Handle large files efficiently
-4. Provide progress feedback
+**Common Fields:**
+- `name` (required): Field name
+- `value`: Message object, string, or iterator
+- `input_types`: `["Message"]` (automatic)
 
-### Conditional Routing Pattern
-1. Input → Condition Check → Route A/B → Process → Merge Results
-2. Use routers for decision points
-3. Handle all possible paths
-4. Provide default routing options
+**Example:**
+```python
+MessageInput(
+    name="user_message",
+    display_name="User Message",
+    value="Hello, world!"
+)
+```
+
+---
+
+### MessageTextInput
+
+**Field Type:** `"str"`  
+**Input Types:** `["Message"]`
+
+A text input for messages with enhanced tracking capabilities.
+
+**Key Features:**
+- Extracts text from Message objects
+- Supports Data objects with text_key
+- Handles async iterators
+- Metadata and input tracing enabled
+
+**Common Fields:**
+- `name` (required): Field name
+- `value`: Message, string, Data object, or iterator
+- `input_types`: `["Message"]` (automatic)
+
+---
+
+### MultilineInput
+
+**Field Type:** `"str"`
+
+A multi-line text input field with support for AI assistance.
+
+**Key Features:**
+- Multi-line text editing
+- AI-enabled assistance (optional)
+- Copy field functionality
+- Inherits from MessageTextInput
+
+**Common Fields:**
+- `name` (required): Field name
+- `value`: Multi-line text string
+- `multiline`: `True` (default)
+- `ai_enabled`: Enable AI assistance
+- `copy_field`: Enable copy functionality
+
+**Example:**
+```python
+MultilineInput(
+    name="description",
+    display_name="Description",
+    placeholder="Enter a detailed description...",
+    multiline=True,
+    ai_enabled=True
+)
+```
+
+---
+
+### MultilineSecretInput
+
+**Field Type:** `"str"` (password)
+
+A multi-line secret/password input field with hidden text.
+
+**Key Features:**
+- Multi-line password input
+- Text is hidden/masked
+- Never tracked in telemetry
+- Input tracing enabled
+
+**Common Fields:**
+- `name` (required): Field name
+- `value`: Secret text
+- `multiline`: `True` (default)
+- `password`: `True` (default)
+- `track_in_telemetry`: `False` (automatic)
+
+**Example:**
+```python
+MultilineSecretInput(
+    name="api_key",
+    display_name="API Key",
+    placeholder="Enter your API key..."
+)
+```
+
+---
+
+### SecretStrInput
+
+**Field Type:** `"str"` (password)
+
+A single-line password/secret input field.
+
+**Key Features:**
+- Password field with hidden text
+- Loads from database by default
+- Never tracked in telemetry
+- Validates string, Message, Data, or iterator types
+
+**Common Fields:**
+- `name` (required): Field name
+- `value`: Secret string
+- `password`: `True` (default)
+- `load_from_db`: `True` (default)
+- `track_in_telemetry`: `False` (automatic)
+
+**Example:**
+```python
+SecretStrInput(
+    name="password",
+    display_name="Password",
+    placeholder="Enter password"
+)
+```
+
+---
+
+### QueryInput
+
+**Field Type:** `"query"`
+
+A specialized text input for search queries with optional separator support.
+
+**Key Features:**
+- Designed for search/query operations
+- Optional separator for query parsing
+- Inherits from MessageTextInput
+- Supports query-specific formatting
+
+**Common Fields:**
+- `name` (required): Field name
+- `value`: Query string
+- `separator`: Optional separator character (e.g., `","`, `" "`)
+
+**Example:**
+```python
+QueryInput(
+    name="search_query",
+    display_name="Search Query",
+    separator=" ",
+    placeholder="Enter search terms..."
+)
+```
+
+---
+
+## Numeric Inputs
+
+### IntInput
+
+**Field Type:** `"int"`
+
+An integer number input field with range validation support.
+
+**Key Features:**
+- Validates integer values
+- Converts floats to integers
+- Supports range specifications (min/max)
+- Supports list of integers
+- Tracked in telemetry (safe numeric parameter)
+
+**Common Fields:**
+- `name` (required): Field name
+- `value`: Integer value
+- `range_spec`: RangeSpec object for min/max validation
+- `is_list`: Support list of integers
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [Empreiteiro/langflow-factory](https://github.com/Empreiteiro/langflow-factory) — distributed by [TomeVault](https://tomevault.io).
