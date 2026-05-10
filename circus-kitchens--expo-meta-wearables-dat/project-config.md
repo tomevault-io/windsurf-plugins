@@ -1,102 +1,184 @@
 ---
 trigger: always_on
-description: Device session states, pause/resume, availability monitoring
+description: > Full API reference: [https://wearables.developer.meta.com/llms.txt?full=true](https://wearables.developer.meta.com/llms.txt?full=true)
 ---
 
+# Meta Wearables DAT SDK — AI Instructions
 
+> Full API reference: [https://wearables.developer.meta.com/llms.txt?full=true](https://wearables.developer.meta.com/llms.txt?full=true)
+>
+> Developer docs: [https://wearables.developer.meta.com/docs/develop/](https://wearables.developer.meta.com/docs/develop/)
 
-# Session Lifecycle (Android)
+# DAT SDK Conventions (Android)
 
-Guide for managing device session states in DAT SDK integrations.
+## Architecture
 
-## Overview
+The SDK is organized into three modules:
 
-The DAT SDK runs work inside sessions. Meta glasses expose two experience types:
-- **Device sessions** — sustained access to device sensors and outputs
-- **Transactions** — short, system-owned interactions (notifications, "Hey Meta")
+- **mwdat-core**: Device discovery, registration, permissions, device selectors
+- **mwdat-camera**: StreamSession, VideoFrame, photo capture
+- **mwdat-mockdevice**: MockDeviceKit for testing without hardware
 
-Your app observes session state changes — the device decides when to transition.
+## Kotlin Patterns
 
-## Session states
+- Use `suspend` functions for async operations — no callbacks
+- Use `StateFlow` / `Flow` for observing state changes
+- Use `DatResult<T, E>` for error handling — not exceptions
+- Prefer immutable collections
+- Use `sealed interface` for state hierarchies
 
-| State | Meaning | App action |
-|-------|---------|------------|
-| `STOPPED` | Session inactive, not reconnecting | Free resources, wait for user action |
-| `RUNNING` | Session active, streaming data | Perform live work |
-| `PAUSED` | Temporarily suspended | Hold work, may resume |
+## Error Handling
 
-## Observing session state
+The SDK uses `DatResult<T, E>` for type-safe error handling:
+
+```kotlin
+val result = Wearables.someOperation()
+result.fold(
+    onSuccess = { value -> /* handle success */ },
+    onFailure = { error -> /* handle error */ }
+)
+
+// Or partial handling:
+result.onSuccess { value -> /* handle success */ }
+result.onFailure { error -> /* handle error */ }
+```
+
+Do **not** use `getOrThrow()` — always handle both paths.
+
+## Naming Conventions
+
+| Suffix     | Purpose                        | Example               |
+| ---------- | ------------------------------ | --------------------- |
+| `*Manager` | Long-lived resource management | `RegistrationManager` |
+| `*Session` | Short-lived flow component     | `StreamSession`       |
+| `*Result`  | DatResult type aliases         | `RegistrationResult`  |
+| `*Error`   | Error sealed interfaces        | `WearablesError`      |
+
+Methods: `get*`, `set*`, `check*`, `request*`, `observe*`
+
+## Imports
+
+```kotlin
+import com.meta.wearable.dat.core.Wearables          // Entry point
+import com.meta.wearable.dat.camera.StreamSession     // Camera streaming
+import com.meta.wearable.dat.camera.types.*            // VideoFrame, PhotoData, etc.
+```
+
+For testing:
+
+```kotlin
+import com.meta.wearable.dat.mockdevice.MockDeviceKit  // MockDeviceKit
+```
+
+## Key Types
+
+- `Wearables` — SDK entry point. Call `Wearables.initialize(context)` at startup
+- `StreamSession` — Camera streaming session
+- `VideoFrame` — Individual video frame with bitmap data
+- `AutoDeviceSelector` — Auto-selects the best available device
+- `SpecificDeviceSelector` — Selects a specific device by identifier
+- `StreamConfiguration` — Configure video quality, frame rate
+- `MockDeviceKit` — Factory for creating simulated devices in tests
+
+## Links
+
+- [Android API Reference](https://wearables.developer.meta.com/docs/reference/android/dat/0.5)
+- [Developer Documentation](https://wearables.developer.meta.com/docs/develop/)
+- [GitHub Repository](https://github.com/facebook/meta-wearables-dat-android)
+
+# Camera Streaming (Android)
+
+Guide for implementing camera streaming and photo capture with the DAT SDK.
+
+## Key concepts
+
+- **StreamSession**: Main interface for camera streaming
+- **VideoFrame**: Individual video frames from the stream
+- **StreamConfiguration**: Configure resolution, frame rate
+- **PhotoData**: Still image captured from glasses
+
+## Creating a StreamSession
+
+```kotlin
+import com.meta.wearable.dat.camera.types.StreamConfiguration
+import com.meta.wearable.dat.camera.types.VideoQuality
+import com.meta.wearable.dat.core.selectors.AutoDeviceSelector
+
+val session = Wearables.startStreamSession(
+    context = context,
+    deviceSelector = AutoDeviceSelector(),
+    streamConfiguration = StreamConfiguration(
+        videoQuality = VideoQuality.MEDIUM,  // 504x896
+        frameRate = 24,
+    ),
+)
+```
+
+### Resolution options
+
+| Quality               | Size       |
+| --------------------- | ---------- |
+| `VideoQuality.HIGH`   | 720 x 1280 |
+| `VideoQuality.MEDIUM` | 504 x 896  |
+| `VideoQuality.LOW`    | 360 x 640  |
+
+### Frame rate options
+
+Valid values: `2`, `7`, `15`, `24`, `30` FPS.
+
+Lower resolution and frame rate yield higher visual quality due to less Bluetooth compression.
+
+## Observing stream state
+
+`StreamSessionState` transitions: `STARTING` -> `STARTED` -> `STREAMING` -> `STOPPING` -> `STOPPED` -> `CLOSED`
 
 ```kotlin
 lifecycleScope.launch {
-    Wearables.getDeviceSessionState(deviceId).collect { state ->
+    session.state.collect { state ->
         when (state) {
-            SessionState.RUNNING -> onRunning()
-            SessionState.PAUSED -> onPaused()
-            SessionState.STOPPED -> onStopped()
+            StreamSessionState.STREAMING -> {
+                // Stream is active, frames flowing
+            }
+            StreamSessionState.STOPPED -> {
+                // Stream ended, release resources
+            }
+            StreamSessionState.CLOSED -> {
+                // Session fully closed
+            }
+            else -> { /* handle other states */ }
         }
     }
 }
 ```
 
-## StreamSession state transitions
-
-```
-STARTING -> STARTED -> STREAMING -> STOPPING -> STOPPED -> CLOSED
-```
+## Receiving video frames
 
 ```kotlin
 lifecycleScope.launch {
-    session.state.collect { state ->
-        // React to state changes
+    session.videoStream.collect { frame ->
+        // Display frame bitmap
+        updatePreview(frame)
     }
 }
 ```
 
-## Common transitions
-
-The device changes session state when:
-- User performs a system gesture that opens another experience
-- Another app starts a device session
-- User removes or folds the glasses (Bluetooth disconnects)
-- User removes the app from Meta AI companion app
-- Connectivity between companion app and glasses drops
-
-## Pause and resume
-
-When a session is paused:
-- The device keeps the connection alive
-- Streams stop delivering data
-- The device may resume by returning to `RUNNING`
-
-Your app should **not** attempt to restart while paused — wait for `RUNNING` or `STOPPED`.
-
-## Device availability
+## Photo capture
 
 ```kotlin
-lifecycleScope.launch {
-    Wearables.devices.collect { devices ->
-        // Update list of available glasses
+session.capturePhoto()
+    .onSuccess { photoData ->
+        // Handle captured photo data
+        val imageBytes = photoData.data
     }
-}
+    .onFailure { error ->
+        // Handle capture error
+    }
 ```
 
-Key behaviors:
-- Closing hinges disconnects Bluetooth -> forces `STOPPED`
-- Opening hinges restores Bluetooth but does **not** restart sessions
-- Start a new session after the device becomes available again
+## Bandwidth and quality
 
-## Implementation checklist
 
-- [ ] Handle all session states (`RUNNING`, `PAUSED`, `STOPPED`)
-- [ ] Monitor device availability before starting work
-- [ ] Release resources only after `STOPPED`
-- [ ] Don't infer transition causes — rely only on observable state
-- [ ] Don't restart during `PAUSED` — wait for system to resume or stop
-
-## Links
-
-- [Session lifecycle documentation](https://wearables.developer.meta.com/docs/lifecycle-events)
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [circus-kitchens/expo-meta-wearables-dat](https://github.com/circus-kitchens/expo-meta-wearables-dat) — distributed by [TomeVault](https://tomevault.io).
