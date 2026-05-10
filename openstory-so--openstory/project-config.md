@@ -1,112 +1,182 @@
 ---
 trigger: always_on
-description: React best practices and conventions for UI code
+description: TanStack Router: API
 ---
 
-## 1. Use as little React as possible
+# ActiveLinkOptions type
 
-- Keep components small - less than 100 lines
-- Views reference components
-- Remove as much logic as possible from components and views
-- Externalize functions rather and keep external functions _vanilla typescript_
-- Vanilla typescript is easier to test, and package for other uses
+The `ActiveLinkOptions` type extends the [`LinkOptions`](./LinkOptionsType.md) type and contains additional options that can be used to describe how a link should be styled when it is active.
 
-## 2. Avoid using useEffect
+```tsx
+type ActiveLinkOptions = LinkOptions & {
+  activeProps?:
+    | React.AnchorHTMLAttributes<HTMLAnchorElement>
+    | (() => React.AnchorHTMLAttributes<HTMLAnchorElement>)
+  inactiveProps?:
+    | React.AnchorHTMLAttributes<HTMLAnchorElement>
+    | (() => React.AnchorHTMLAttributes<HTMLAnchorElement>)
+}
+```
 
-- Avoid using useEffect to fetch data or initialise state
-- Use hooks, tanstack query, or the new `use` feature in react 19
-- use useEffect to update state when something else changes
+## ActiveLinkOptions properties
 
-## 3. Use useState sparingly
+The `ActiveLinkOptions` object accepts/contains the following properties:
 
-- Using a local variable is often more optimal - even if something has to be calculated
-- useState uses reducers under the hood
-- If you have more than 3 useStates you might as well use reducers
+### `activeProps`
 
-## 4. Use React.FC and expand props
+- `React.AnchorHTMLAttributes<HTMLAnchorElement>`
+- Optional
+- The props that will be applied to the anchor element when the link is active
 
-- Expand props so that each parameter is named
-- It's easier to know which props are not used
+### `inactiveProps`
 
-## 5. Avoid globals and global state
+- Type: `React.AnchorHTMLAttributes<HTMLAnchorElement>`
+- Optional
+- The props that will be applied to the anchor element when the link is inactive
 
-- Globals including auth globals, often lead to race conditions
-- Global state is only useful in rare cases. SPAs with signifant complexity
-- Start with reducers which are passed through props
-- If that's too complicated, use React context
-- As a last resort for very complicated SPAs - use zustand
+# AsyncRouteComponent type
 
-## 6. Use reducers
+The `AsyncRouteComponent` type is used to describe a code-split route component that can be preloaded using a `component.preload()` method.
 
-- Reducers are great - read up on them and understand them
-- They keep all state update logic in one place
-- They are vanilla typescript - keep them that way
-- Use them to update state based on other state.
-- Note that updating any part of the state returned from a reducer will cause a re-render if the whole state is a parameter - you can pass just parts of it
+```tsx
+type AsyncRouteComponent<TProps> = SyncRouteComponent<TProps> & {
+  preload?: () => Promise<void>
+}
+```
 
-## 7. Avoid passing style to components
+# FileRoute class
 
-- Avoid passing styles to components, or styling your components in views
-- Create components that are pre-styled
-- Create variants - e.g. small, medium, large - rather than size={18}
-- Avoid using styles in views as much as possible
+> [!CAUTION]
+> This class has been deprecated and will be removed in the next major version of TanStack Router.
+> Please use the [`createFileRoute`](./createFileRouteFunction.md) function instead.
 
-## 8. Use the theme
+The `FileRoute` class is a factory that can be used to create a file-based route instance. This route instance can then be used to automatically generate a route tree with the `tsr generate` and `tsr watch` commands.
 
-- Create constants for your theme or use a consistent structure
-- Use the theme fonts and colors
-- Avoid naming fonts and inluding color values directly in views and components
+## `FileRoute` constructor
 
-## 9. Use flexbox
+The `FileRoute` constructor accepts a single argument: the `path` of the file that the route will be generated for.
 
-- Use flexbox for every component
+### Constructor options
 
-## 10. Avoid margin
+- Type: `string` literal
+- Required, but **automatically inserted and updated by the `tsr generate` and `tsr watch` commands**.
+- The full path of the file that the route will be generated from.
 
-- Don't pre-add padding or margin to the outside of components, unless there is a specific reason to
-- Use flexbox gap instead
+### Constructor returns
 
-## 11. Use kebab-case for file names
+- An instance of the `FileRoute` class that can be used to create a route.
 
-- Use PascalCase for component names, but kebab case for file-names
-- PascalCase can often give you issues in git as case sensitive file names is not supported on all platforms
+## `FileRoute` methods
 
-## 12. Create a component library
+The `FileRoute` class implements the following method(s):
 
-- If using a 3rd party component library, wrap those components then include your wrapped components. It makes it easier to change libraries
-- Shadcn makes this easy - it includes the source in your repo, and imports only primitives from that source.
-- You don't need to wrap Shadcn generated components - just edit the component source with your changes
-- Don't create duplicates of components for minor variations. Create a variation
-- Customise the component if there's a new variation - don't style from the outside
-- Put your components into a high level components folder
-- Use an aliases or subpath imports "~" to import components from views.
+### `.createRoute` method
 
-## 13. Avoid hard coding width or height
+The `createRoute` method is a method that can be used to configure the file route instance. It accepts a single argument: the `options` that will be used to configure the file route instance.
 
-- Use flexbox and create rules for screen sizes
+#### .createRoute options
 
-## 14. Use a show prop if you need to hide something
+- Type: `Omit<RouteOptions, 'getParentRoute' | 'path' | 'id'>`
+- [`RouteOptions`](./RouteOptionsType.md)
+- Optional
+- The same options that are available to the `Route` class, but with the `getParentRoute`, `path`, and `id` options omitted since they are unnecessary for file-based routing.
 
-- Avoid code that conditionally shows a complex component - this creates janky ui
-- Instead use the display css property to hide or show - this will precalculate everything in the component but not render it
+#### .createRoute returns
 
-## 15. Use eslint or equivalent
+A [`Route`](./RouteType.md) instance that can be used to configure the route to be inserted into the route-tree.
 
-- Ensure the rules of hooks linting rule is on
-- Check out 0xlint and Biome
+> ⚠️ Note: For `tsr generate` and `tsr watch` to work properly, the file route instance must be exported from the file using the `Route` identifier.
 
-## 16. Views are routes
+### Examples
 
-- All views should be routable - meaning you can get to them via a route
-- No view should rely on variables or parameters from another
-- A view can be accessed in any order
-- Pass params on the url. You can use url segments for ids, search params should be optional
-- Name views with the same name as the route - or place in a folder with that name
+```tsx
+import { FileRoute } from '@tanstack/react-router'
 
-## 17. Avoid default exports
+export const Route = new FileRoute('/').createRoute({
+  loader: () => {
+    return 'Hello World'
+  },
+  component: IndexComponent,
+})
 
-- It's more efficient to export the component directly than to import a default
-- Avoid barrelled imports as much as possible _unless_ you are planning to package that library for others
+function IndexComponent() {
+  const data = Route.useLoaderData()
+  return <div>{data}</div>
+}
+```
+
+# LinkOptions type
+
+The `LinkOptions` type extends the [`NavigateOptions`](./NavigateOptionsType.md) type and contains additional options that can be used by TanStack Router when handling actual anchor element attributes.
+
+```tsx
+type LinkOptions = NavigateOptions & {
+  target?: HTMLAnchorElement['target']
+  activeOptions?: ActiveOptions
+  preload?: false | 'intent'
+  preloadDelay?: number
+  disabled?: boolean
+}
+```
+
+## LinkOptions properties
+
+The `LinkOptions` object accepts/contains the following properties:
+
+### `target`
+
+- Type: `HTMLAnchorElement['target']`
+- Optional
+- The standard anchor tag target attribute
+
+### `activeOptions`
+
+- Type: `ActiveOptions`
+- Optional
+- The options that will be used to determine if the link is active
+
+### `preload`
+
+- Type: `false | 'intent' | 'viewport' | 'render'`
+- Optional
+- If set, the link's preloading strategy will be set to this value.
+- See the [Preloading guide](../../guide/preloading.md) for more information.
+
+### `preloadDelay`
+
+- Type: `number`
+- Optional
+- Delay intent preloading by this many milliseconds. If the intent exits before this delay, the preload will be cancelled.
+
+### `disabled`
+
+- Type: `boolean`
+- Optional
+- If true, will render the link without the href attribute
+
+# LinkProps type
+
+The `LinkProps` type extends the [`ActiveLinkOptions`](./ActiveLinkOptionsType.md) and `React.AnchorHTMLAttributes<HTMLAnchorElement>` types and contains additional props specific to the `Link` component.
+
+```tsx
+type LinkProps = ActiveLinkOptions &
+  Omit<React.AnchorHTMLAttributes<HTMLAnchorElement>, 'children'> & {
+    children?:
+      | React.ReactNode
+      | ((state: { isActive: boolean }) => React.ReactNode)
+  }
+```
+
+## LinkProps properties
+
+- All of the props from [`ActiveLinkOptions`](./ActiveLinkOptionsType.md)
+- All of the props from `React.AnchorHTMLAttributes<HTMLAnchorElement>`
+
+#### `children`
+
+- Type: `React.ReactNode | ((state: { isActive: boolean }) => React.ReactNode)`
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [openstory-so/openstory](https://github.com/openstory-so/openstory) — distributed by [TomeVault](https://tomevault.io).
