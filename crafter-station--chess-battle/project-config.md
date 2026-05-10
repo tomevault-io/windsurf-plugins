@@ -1,219 +1,233 @@
 ---
 trigger: always_on
-description: Comprehensive rules to help you write advanced Trigger.dev tasks
+description: How to use realtime in your Trigger.dev tasks and your frontend
 ---
 
-# Trigger.dev Advanced Tasks (v4)
+# Trigger.dev Realtime (v4)
 
-**Advanced patterns and features for writing tasks**
+**Real-time monitoring and updates for runs**
 
-## Tags & Organization
+## Core Concepts
+
+Realtime allows you to:
+
+- Subscribe to run status changes, metadata updates, and streams
+- Build real-time dashboards and UI updates
+- Monitor task progress from frontend and backend
+
+## Authentication
+
+### Public Access Tokens
 
 ```ts
-import { task, tags } from "@trigger.dev/sdk";
+import { auth } from "@trigger.dev/sdk";
 
-export const processUser = task({
-  id: "process-user",
-  run: async (payload: { userId: string; orgId: string }, { ctx }) => {
-    // Add tags during execution
-    await tags.add(`user_${payload.userId}`);
-    await tags.add(`org_${payload.orgId}`);
-
-    return { processed: true };
+// Read-only token for specific runs
+const publicToken = await auth.createPublicToken({
+  scopes: {
+    read: {
+      runs: ["run_123", "run_456"],
+      tasks: ["my-task-1", "my-task-2"],
+    },
   },
+  expirationTime: "1h", // Default: 15 minutes
 });
+```
 
-// Trigger with tags
-await processUser.trigger(
-  { userId: "123", orgId: "abc" },
-  { tags: ["priority", "user_123", "org_abc"] } // Max 10 tags per run
-);
+### Trigger Tokens (Frontend only)
 
-// Subscribe to tagged runs
-for await (const run of runs.subscribeToRunsWithTag("user_123")) {
-  console.log(`User task ${run.id}: ${run.status}`);
+```ts
+// Single-use token for triggering tasks
+const triggerToken = await auth.createTriggerPublicToken("my-task", {
+  expirationTime: "30m",
+});
+```
+
+## Backend Usage
+
+### Subscribe to Runs
+
+```ts
+import { runs, tasks } from "@trigger.dev/sdk";
+
+// Trigger and subscribe
+const handle = await tasks.trigger("my-task", { data: "value" });
+
+// Subscribe to specific run
+for await (const run of runs.subscribeToRun<typeof myTask>(handle.id)) {
+  console.log(`Status: ${run.status}, Progress: ${run.metadata?.progress}`);
+  if (run.status === "COMPLETED") break;
+}
+
+// Subscribe to runs with tag
+for await (const run of runs.subscribeToRunsWithTag("user-123")) {
+  console.log(`Tagged run ${run.id}: ${run.status}`);
+}
+
+// Subscribe to batch
+for await (const run of runs.subscribeToBatch(batchId)) {
+  console.log(`Batch run ${run.id}: ${run.status}`);
 }
 ```
 
-**Tag Best Practices:**
-
-- Use prefixes: `user_123`, `org_abc`, `video:456`
-- Max 10 tags per run, 1-64 characters each
-- Tags don't propagate to child tasks automatically
-
-## Concurrency & Queues
-
-```ts
-import { task, queue } from "@trigger.dev/sdk";
-
-// Shared queue for related tasks
-const emailQueue = queue({
-  name: "email-processing",
-  concurrencyLimit: 5, // Max 5 emails processing simultaneously
-});
-
-// Task-level concurrency
-export const oneAtATime = task({
-  id: "sequential-task",
-  queue: { concurrencyLimit: 1 }, // Process one at a time
-  run: async (payload) => {
-    // Critical section - only one instance runs
-  },
-});
-
-// Per-user concurrency
-export const processUserData = task({
-  id: "process-user-data",
-  run: async (payload: { userId: string }) => {
-    // Override queue with user-specific concurrency
-    await childTask.trigger(payload, {
-      queue: {
-        name: `user-${payload.userId}`,
-        concurrencyLimit: 2,
-      },
-    });
-  },
-});
-
-export const emailTask = task({
-  id: "send-email",
-  queue: emailQueue, // Use shared queue
-  run: async (payload: { to: string }) => {
-    // Send email logic
-  },
-});
-```
-
-## Error Handling & Retries
-
-```ts
-import { task, retry, AbortTaskRunError } from "@trigger.dev/sdk";
-
-export const resilientTask = task({
-  id: "resilient-task",
-  retry: {
-    maxAttempts: 10,
-    factor: 1.8, // Exponential backoff multiplier
-    minTimeoutInMs: 500,
-    maxTimeoutInMs: 30_000,
-    randomize: false,
-  },
-  catchError: async ({ error, ctx }) => {
-    // Custom error handling
-    if (error.code === "FATAL_ERROR") {
-      throw new AbortTaskRunError("Cannot retry this error");
-    }
-
-    // Log error details
-    console.error(`Task ${ctx.task.id} failed:`, error);
-
-    // Allow retry by returning nothing
-    return { retryAt: new Date(Date.now() + 60000) }; // Retry in 1 minute
-  },
-  run: async (payload) => {
-    // Retry specific operations
-    const result = await retry.onThrow(
-      async () => {
-        return await unstableApiCall(payload);
-      },
-      { maxAttempts: 3 }
-    );
-
-    // Conditional HTTP retries
-    const response = await retry.fetch("https://api.example.com", {
-      retry: {
-        maxAttempts: 5,
-        condition: (response, error) => {
-          return response?.status === 429 || response?.status >= 500;
-        },
-      },
-    });
-
-    return result;
-  },
-});
-```
-
-## Machines & Performance
-
-```ts
-export const heavyTask = task({
-  id: "heavy-computation",
-  machine: { preset: "large-2x" }, // 8 vCPU, 16 GB RAM
-  maxDuration: 1800, // 30 minutes timeout
-  run: async (payload, { ctx }) => {
-    // Resource-intensive computation
-    if (ctx.machine.preset === "large-2x") {
-      // Use all available cores
-      return await parallelProcessing(payload);
-    }
-
-    return await standardProcessing(payload);
-  },
-});
-
-// Override machine when triggering
-await heavyTask.trigger(payload, {
-  machine: { preset: "medium-1x" }, // Override for this run
-});
-```
-
-**Machine Presets:**
-
-- `micro`: 0.25 vCPU, 0.25 GB RAM
-- `small-1x`: 0.5 vCPU, 0.5 GB RAM (default)
-- `small-2x`: 1 vCPU, 1 GB RAM
-- `medium-1x`: 1 vCPU, 2 GB RAM
-- `medium-2x`: 2 vCPU, 4 GB RAM
-- `large-1x`: 4 vCPU, 8 GB RAM
-- `large-2x`: 8 vCPU, 16 GB RAM
-
-## Idempotency
-
-```ts
-import { task, idempotencyKeys } from "@trigger.dev/sdk";
-
-export const paymentTask = task({
-  id: "process-payment",
-  retry: {
-    maxAttempts: 3,
-  },
-  run: async (payload: { orderId: string; amount: number }) => {
-    // Automatically scoped to this task run, so if the task is retried, the idempotency key will be the same
-    const idempotencyKey = await idempotencyKeys.create(`payment-${payload.orderId}`);
-
-    // Ensure payment is processed only once
-    await chargeCustomer.trigger(payload, {
-      idempotencyKey,
-      idempotencyKeyTTL: "24h", // Key expires in 24 hours
-    });
-  },
-});
-
-// Payload-based idempotency
-import { createHash } from "node:crypto";
-
-function createPayloadHash(payload: any): string {
-  const hash = createHash("sha256");
-  hash.update(JSON.stringify(payload));
-  return hash.digest("hex");
-}
-
-export const deduplicatedTask = task({
-  id: "deduplicated-task",
-  run: async (payload) => {
-    const payloadHash = createPayloadHash(payload);
-    const idempotencyKey = await idempotencyKeys.create(payloadHash);
-
-    await processData.trigger(payload, { idempotencyKey });
-  },
-});
-```
-
-## Metadata & Progress Tracking
+### Streams
 
 ```ts
 import { task, metadata } from "@trigger.dev/sdk";
+
+// Task that streams data
+export type STREAMS = {
+  openai: OpenAI.ChatCompletionChunk;
+};
+
+export const streamingTask = task({
+  id: "streaming-task",
+  run: async (payload) => {
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4",
+      messages: [{ role: "user", content: payload.prompt }],
+      stream: true,
+    });
+
+    // Register stream
+    const stream = await metadata.stream("openai", completion);
+
+    let text = "";
+    for await (const chunk of stream) {
+      text += chunk.choices[0]?.delta?.content || "";
+    }
+
+    return { text };
+  },
+});
+
+// Subscribe to streams
+for await (const part of runs.subscribeToRun(runId).withStreams<STREAMS>()) {
+  switch (part.type) {
+    case "run":
+      console.log("Run update:", part.run.status);
+      break;
+    case "openai":
+      console.log("Stream chunk:", part.chunk);
+      break;
+  }
+}
+```
+
+## React Frontend Usage
+
+### Installation
+
+```bash
+npm add @trigger.dev/react-hooks
+```
+
+### Triggering Tasks
+
+```tsx
+"use client";
+import { useTaskTrigger, useRealtimeTaskTrigger } from "@trigger.dev/react-hooks";
+import type { myTask } from "../trigger/tasks";
+
+function TriggerComponent({ accessToken }: { accessToken: string }) {
+  // Basic trigger
+  const { submit, handle, isLoading } = useTaskTrigger<typeof myTask>("my-task", {
+    accessToken,
+  });
+
+  // Trigger with realtime updates
+  const {
+    submit: realtimeSubmit,
+    run,
+    isLoading: isRealtimeLoading,
+  } = useRealtimeTaskTrigger<typeof myTask>("my-task", { accessToken });
+
+  return (
+    <div>
+      <button onClick={() => submit({ data: "value" })} disabled={isLoading}>
+        Trigger Task
+      </button>
+
+      <button onClick={() => realtimeSubmit({ data: "realtime" })} disabled={isRealtimeLoading}>
+        Trigger with Realtime
+      </button>
+
+      {run && <div>Status: {run.status}</div>}
+    </div>
+  );
+}
+```
+
+### Subscribing to Runs
+
+```tsx
+"use client";
+import { useRealtimeRun, useRealtimeRunsWithTag } from "@trigger.dev/react-hooks";
+import type { myTask } from "../trigger/tasks";
+
+function SubscribeComponent({ runId, accessToken }: { runId: string; accessToken: string }) {
+  // Subscribe to specific run
+  const { run, error } = useRealtimeRun<typeof myTask>(runId, {
+    accessToken,
+    onComplete: (run) => {
+      console.log("Task completed:", run.output);
+    },
+  });
+
+  // Subscribe to tagged runs
+  const { runs } = useRealtimeRunsWithTag("user-123", { accessToken });
+
+  if (error) return <div>Error: {error.message}</div>;
+  if (!run) return <div>Loading...</div>;
+
+  return (
+    <div>
+      <div>Status: {run.status}</div>
+      <div>Progress: {run.metadata?.progress || 0}%</div>
+      {run.output && <div>Result: {JSON.stringify(run.output)}</div>}
+
+      <h3>Tagged Runs:</h3>
+      {runs.map((r) => (
+        <div key={r.id}>
+          {r.id}: {r.status}
+        </div>
+      ))}
+    </div>
+  );
+}
+```
+
+### Streams with React
+
+```tsx
+"use client";
+import { useRealtimeRunWithStreams } from "@trigger.dev/react-hooks";
+import type { streamingTask, STREAMS } from "../trigger/tasks";
+
+function StreamComponent({ runId, accessToken }: { runId: string; accessToken: string }) {
+  const { run, streams } = useRealtimeRunWithStreams<typeof streamingTask, STREAMS>(runId, {
+    accessToken,
+  });
+
+  const text = streams.openai
+    .filter((chunk) => chunk.choices[0]?.delta?.content)
+    .map((chunk) => chunk.choices[0].delta.content)
+    .join("");
+
+  return (
+    <div>
+      <div>Status: {run?.status}</div>
+      <div>Streamed Text: {text}</div>
+    </div>
+  );
+}
+```
+
+### Wait Tokens
+
+```tsx
+"use client";
+import { useWaitToken } from "@trigger.dev/react-hooks";
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
