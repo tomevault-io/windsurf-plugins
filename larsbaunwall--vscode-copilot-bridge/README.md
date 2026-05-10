@@ -7,12 +7,12 @@ A local interface for GitHub Copilot built on the official VS Code Language Mode
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `copilot-instructions.md` in [larsbaunwall/vscode-copilot-bridge](https://github.com/larsbaunwall/vscode-copilot-bridge).
+Original source: `AGENTS.md` in [larsbaunwall/vscode-copilot-bridge](https://github.com/larsbaunwall/vscode-copilot-bridge).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
+- **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
