@@ -1,102 +1,92 @@
 ---
 trigger: always_on
-description: This document summarizes the structure, responsibilities, and key technologies used across `src/` to provide actionable context for future engineering tasks.
+description: This document describes the native Rust/Tauri backend under `src-tauri/` that powers process management, database access, and the bridge between the React frontend and the local MLX model server.
 ---
 
 
-## OpenChat src/ architecture overview
+## OpenChat src-tauri/ architecture overview
 
-This document summarizes the structure, responsibilities, and key technologies used across `src/` to provide actionable context for future engineering tasks.
+This document describes the native Rust/Tauri backend under `src-tauri/` that powers process management, database access, and the bridge between the React frontend and the local MLX model server.
 
 ### Key technologies
 
-- **React + TypeScript**: Functional components with hooks, strong typing
-- **Tailwind CSS**: Global theme tokens and utilities in `src/App.css`
-- **shadcn/ui + Radix Primitives**: Accessible, headless UI primitives in `src/components/ui/*`
-- **TanStack Query**: Server-state query/mutation and cache invalidation for conversations/messages
-- **ReactMarkdown + remark/rehype + KaTeX + Shiki**: Markdown rendering with code highlighting and custom elements
-- **Lucide Icons**: `lucide-react` icons
-- **Tauri + @tauri-apps/plugin-sql**: Desktop shell and SQLite DB access
+- **Tauri** application runtime with plugins:
+  - `tauri-plugin-sql` (SQLite via `sqlx` and built-in migrations)
+  - `tauri-plugin-shell` (spawning and managing child processes)
+  - `tauri-plugin-log` (structured logging)
+- **Rust async** with `tokio`
+- **Event bridge**: Tauri window events to notify the frontend (e.g., `mlx-status-changed`)
 
-## App entry and layout
+## App bootstrap and lifecycle
 
-- `src/app.tsx`
-  - Top-level composition and providers: `MLXServerProvider`, `ConversationProvider`, and `SidebarProvider`.
-  - App shell: header + left sidebar + chat window.
-- `src/App.css`
-  - Tailwind setup (`@import 'tailwindcss'`), custom CSS variables (OKLCH-based palette), dark mode tokens, base resets.
-  - Global UX details: disable rubber-banding, cursor defaults, animated “aurora” background used by empty chat state.
+- `src-tauri/src/main.rs`
+  - Thin entry point calling `openchat_lib::run()`.
+- `src-tauri/src/lib.rs`
+  - Builds the Tauri app, registers plugins, sets up DB, wires state, and registers commands.
+  - On setup:
+    - Ensures app data directory exists and initializes a SQLite pool saved in Tauri state.
+    - Creates and stores an `MLXServerManager` in app state, then asynchronously sets its `AppHandle` and calls `auto_start()` to bring up the MLX server.
+  - `on_window_event`: on `Destroyed`, calls `handle_window_destroyed` which synchronously kills the MLX server (`kill_sync`) to ensure clean shutdown.
 
-## Context providers
+## MLX server process management
 
-- `src/contexts/conversation-context.tsx`
-  - Holds `selectedConversationId` and setter for cross-app selection.
-- `src/contexts/mlx-server-context.tsx`
-  - Wires to `mlxServer` service. Exposes `status`, `error`, and `restartServer()`.
-  - Initializes server event listeners, fetches initial status, keeps state updated.
-- `src/contexts/theme-context.tsx`
-  - Simple theme manager (`light`/`dark`/`system`) toggling root class.
+- `src-tauri/src/mlx_server.rs`
+  - Central manager: `MLXServerManager` (clonable, internally `Arc`-backed) maintains:
+    - Current config (model path, host/port, tokens, log level)
+    - Current status (`MLXServerStatus`: `is_running`, `is_ready`, `port`, `model_path`, `pid`, optional `error`)
+    - Process handle for the spawned `openchat-mlx-server` binary
+  - Responsibilities:
+    - `auto_start()` to find an available port, spawn the MLX server with correct args, and wait for readiness (health checks).
+    - Emits `mlx-status-changed` events via `AppHandle.emit(...)` whenever status transitions (`running`, `ready`, `stopped`, errors).
+    - `restart()` tears down and starts the process again, maintaining config and re-checking readiness.
+    - `kill_sync()` provides a fast, non-async kill path used during window teardown.
+    - Health checks poll the `/health` endpoint of the MLX server and update `is_ready` accordingly.
 
-## App shell and sidebar
+### Frontend integration points
 
-- `src/components/app-header.tsx`
-  - Top bar with sidebar trigger and `MLXServerStatus` indicator.
-- `src/components/app-sidebar.tsx`
-  - Wraps header, conversations, and footer inside `Sidebar` UI primitive.
-- `src/components/app-sidebar/*`
-  - `app-sidebar-header.tsx`: “New chat” button (uses conversations hook).
-  - `app-sidebar-conversations.tsx`: Search input and conversation list; integrates `useConversations` and `useConversation` for selection and deletion.
-  - `app-sidebar-conversation-item.tsx`: Single row with contextual menu, share/delete actions, confirmation dialog.
-  - `app-sidebar-footer.tsx`: Placeholder settings button.
+- Events:
+  - The manager emits `mlx-status-changed` with the Rust status shape (snake_case). The TS service converts to camelCase via `convertRustStatusToJS` and notifies React listeners.
+- Invokes:
+  - `mlx_get_status` → returns current `MLXServerStatus` (snake_case) for conversion and caching in the frontend service.
+  - `mlx_restart` → restarts the MLX process and returns updated status.
+  - `mlx_health_check` → bool health probe.
 
-## Chat experience
+## Tauri commands bridge
 
-- `src/components/chat-window.tsx`
-  - Orchestrates chat: gets selected conversation, messages, and MLX status.
-  - On submit: lazily creates a conversation if needed, then streams a response.
-- `src/components/chat-input.tsx`
-  - Textarea with dynamic height and roundedness, Enter-to-send (Shift+Enter for newline), send/plus actions, loading state.
-- `src/components/chat-messages-list.tsx`
-  - Virtual list container with auto-scroll-to-bottom behavior; shows `ChatEmptyState` when appropriate.
-- `src/components/chat-message.tsx`
-  - Renders user vs assistant bubbles, timestamp, copy-to-clipboard button.
-  - Assistant reasoning (if present) via `ReasoningDisplay`.
-- `src/components/chat-error-banner.tsx`
-  - Inline error surface for failed send/stream scenarios.
-- `src/components/chat-empty-state.tsx`
-  - Centered welcome with animated aurora background overlay.
-- `src/components/reasoning-display.tsx`
-  - Collapsible “Reasoning” panel with approximate token count; supports loading state.
+- `src-tauri/src/commands.rs`
+  - Port utilities:
+    - `check_port_available(port: u16)` – try to bind to 127.0.0.1:port to determine availability.
+    - `get_port_info(port: u16)` – attempts TCP connect and a basic HTTP `GET /health` probe to determine whether a live process seems to be the MLX server.
+  - MLX management commands:
+    - `mlx_get_status(manager: State<MLXServerManager>)` – current status.
+    - `mlx_restart(manager: State<MLXServerManager>)` – restart and return new status.
+    - `mlx_health_check(manager: State<MLXServerManager>)` – returns readiness probe.
 
-## Markdown rendering system
+## Database layer and schema
 
-- `src/components/markdown/markdown.tsx`
-  - ReactMarkdown root configured with `remarkGfm`, `remarkMath`, `rehypeRaw`, `rehypeKatex`, and custom `rehypeMarkCodeBlocks`.
-  - Applies typography-tailwind classes and code block overflow rules.
-- `src/components/markdown/components.tsx`
-  - Maps markdown elements to React components:
-    - `code`: Distinguishes inline vs block; uses `CodeBlock` for blocks.
-    - `img`: Upgrades to `MarkdownImage` with modal preview and download.
-    - `email-artifact` and `quick-reply`: Custom elements; `QuickReply` accepts optional `onSend` handler.
-- `src/components/code-block.tsx`
-  - Uses Shiki to convert code to HAST, then `hast-util-to-jsx-runtime` for SSR-friendly rendering. Includes `CopyButton`.
-- `src/components/markdown/rehype-plugins.ts`
-  - `rehypeMarkCodeBlocks`: Flags `code` nodes as inline or block based on parent `pre`.
-- `src/components/markdown/email-artifact.tsx`
-  - Shows email preview with “Open in Email Client” (mailto) action.
-- `src/components/markdown/markdown-image.tsx`
-  - Click-to-zoom image in Dialog, toolbar actions for download and close.
-- `src/components/markdown/quick-reply.tsx`
-  - Renders a button that can invoke an injected `onSend(text)` callback.
-- `src/components/markdown/utils.ts`, `types.ts`
-  - Helpers (extract text, determine language class) and stronger node typings.
+- SQLite DB is stored under the app data directory as `chatchat3.db`; connection pool is added to Tauri state during setup.
+- `src-tauri/src/migrations.rs` – returns an ordered list of migrations consumed by `tauri-plugin-sql`:
+  - `001_create_conversations.sql` – creates `conversations` table (id, title, timestamps).
+  - `002_create_messages.sql` – creates `messages` table (id, conversation_id, role, content, created_at, etc.).
+  - `003_index_messages_conv_id.sql` – index on `messages.conversation_id` for fast lookups.
+  - `004_add_reasoning_to_messages.sql` – adds optional `reasoning` column for assistant thinking traces.
+  - `005_add_status_to_messages.sql` – adds `status` enum (`pending`/`complete`/`error`) to track streaming lifecycle and failures.
 
-## UI primitives (shadcn/ui over Radix)
+## Configuration and packaging
 
-- Buttons/inputs: `ui/button.tsx`, `ui/input.tsx`
-- Overlay and feedback: `ui/dialog.tsx`, `ui/alert-dialog.tsx`, `ui/dropdown-menu.tsx`, `ui/tooltip.tsx`, `ui/skeleton.tsx`, `ui/collapsible.tsx`, `ui/dialog-ext.tsx`
-- Sidebar system: `ui/sidebar.tsx`
-  - Full responsive off-canvas/icon modes, keyboard shortcut (Cmd/Ctrl+B), mobile Sheet integration.
+- `src-tauri/tauri.conf.json`
+  - Defines build steps (`beforeDevCommand`/`beforeBuildCommand`), dev server URL, and frontend dist.
+  - Declares the app window (overlay title bar) and disables CSP for dev.
+  - Bundles icons, `resources: ["models"]`, and the external binary `binaries/openchat-mlx-server` required by the manager.
+  - Preloads SQLite database `sqlite:chatchat3.db` via SQL plugin.
+- `src-tauri/binaries/openchat-mlx-server.md`
+  - Notes around bundling and usage of the MLX server binary shipped with the app.
+- `src-tauri/capabilities/default.json` (and `gen/schemas/*`)
+  - Tauri capabilities/codesigning scaffolding for platform targets.
+
+## Primary backend flows
+
+- **Startup**: Builder initializes plugins → DB connection and migrations → MLX manager stored in state → async auto-start of the MLX server → emits `mlx-status-changed` transitions as the process comes online.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
