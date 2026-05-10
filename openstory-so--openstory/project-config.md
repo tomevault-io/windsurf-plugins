@@ -1,104 +1,114 @@
 ---
 trigger: always_on
-description: TanStack Router: Setup and Architecture
+description: Use Bun instead of Node.js, npm, bun, or vite.
 ---
 
-# Overview
 
-**TanStack Router is a router for building React and Solid applications**. Some of its features include:
+Default to using Bun instead of Node.js.
 
-- 100% inferred TypeScript support
-- Typesafe navigation
-- Nested Routing and layout routes (with pathless layouts)
-- Built-in Route Loaders w/ SWR Caching
-- Designed for client-side data caches (TanStack Query, SWR, etc.)
-- Automatic route prefetching
-- Asynchronous route elements and error boundaries
-- File-based Route Generation
-- Typesafe JSON-first Search Params state management APIs
-- Path and Search Parameter Schema Validation
-- Search Param Navigation APIs
-- Custom Search Param parser/serializer support
-- Search param middleware
-- Route matching/loading middleware
+- Use `bun <file>` instead of `node <file>` or `ts-node <file>`
+- Use `bun test` instead of `jest` or `vitest`
+- Use `bun build <file.html|file.ts|file.css>` instead of `webpack` or `esbuild`
+- Use `bun install` instead of `npm install` or `yarn install` or `bun install`
+- Use `bun run <script>` instead of `npm run <script>` or `yarn run <script>` or `bun run <script>`
+- Bun automatically loads .env, so don't use dotenv.
 
-To get started quickly, head to the next page. For a more lengthy explanation, buckle up while I bring you up to speed!
+## APIs
 
-## "A Fork in the Route"
+- `Bun.serve()` supports WebSockets, HTTPS, and routes. Don't use `express`.
+- `bun:sqlite` for SQLite. Don't use `better-sqlite3`.
+- `Bun.redis` for Redis. Don't use `ioredis`.
+- `Bun.sql` for Postgres. Don't use `pg` or `postgres.js`.
+- `WebSocket` is built-in. Don't use `ws`.
+- Prefer `Bun.file` over `node:fs`'s readFile/writeFile
+- Bun.$`ls` instead of execa.
 
-Using a router to build applications is widely regarded as a must-have and is usually one of the first choices you’ll make in your tech stack.
+## Testing
 
-## Why TanStack Router?
+Use `bun test` to run tests.
 
-TanStack Router delivers on the same fundamental expectations as other routers that you’ve come to expect:
+```ts#index.test.ts
+import { test, expect } from "bun:test";
 
-- Nested routes, layout routes, grouped routes
-- File-based Routing
-- Parallel data loading
-- Prefetching
-- URL Path Params
-- Error Boundaries and Handling
-- SSR
-- Route Masking
+test("hello world", () => {
+  expect(1).toBe(1);
+});
+```
 
-And it also delivers some new features that raise the bar:
+## Frontend
 
-- 100% inferred TypeScript support
-- Typesafe navigation
-- Built-in SWR Caching for loaders
-- Designed for client-side data caches (TanStack Query, SWR, etc.)
-- Typesafe JSON-first Search Params state management APIs
-- Path and Search Parameter Schema Validation
-- Search Parameter Navigation APIs
-- Custom Search Param parser/serializer support
-- Search param middleware
-- Inherited Route Context
-- Mixed file-based and code-based routing
+Use HTML imports with `Bun.serve()`. Don't use `vite`. HTML imports fully support React, CSS, Tailwind.
 
-Let’s dive into some of the more important ones in more detail!
+Server:
 
-## 100% Inferred TypeScript Support
+```ts#index.ts
+import index from "./index.html"
 
-Everything these days is written “in Typescript” or at the very least offers type definitions that are veneered over runtime functionality, but too few packages in the ecosystem actually design their APIs with TypeScript in mind. So while I’m pleased that your router is auto-completing your option fields and catching a few property/method typos here and there, there is much more to be had.
+Bun.serve({
+  routes: {
+    "/": index,
+    "/api/users/:id": {
+      GET: (req) => {
+        return new Response(JSON.stringify({ id: req.params.id }));
+      },
+    },
+  },
+  // optional websocket support
+  websocket: {
+    open: (ws) => {
+      ws.send("Hello, world!");
+    },
+    message: (ws, message) => {
+      ws.send(message);
+    },
+    close: (ws) => {
+      // handle close
+    }
+  },
+  development: {
+    hmr: true,
+    console: true,
+  }
+})
+```
 
-- TanStack Router is fully aware of all of your routes and their configuration at any given point in your code. This includes the path, path params, search params, context, and any other configuration you’ve provided. Ultimately this means that you can navigate to any route in your app with 100% type safety and confidence that your link or navigate call will succeed.
-- TanStack Router provides lossless type-inference. It uses countless generic type parameters to enforce and propagate any type information you give it throughout the rest of its API and ultimately your app. No other router offers this level of type safety and developer confidence.
+HTML files can import .tsx, .jsx or .js files directly and Bun's bundler will transpile & bundle automatically. `<link>` tags can point to stylesheets and Bun's CSS bundler will bundle.
 
-What does all of that mean for you?
+```html#index.html
+<html>
+  <body>
+    <h1>Hello, world!</h1>
+    <script type="module" src="./frontend.tsx"></script>
+  </body>
+</html>
+```
 
-- Faster feature development with auto-completion and type hints
-- Safer and faster refactors
-- Confidence that your code will work as expected
+With the following `frontend.tsx`:
 
-## 1st Class Search Parameters
+```tsx#frontend.tsx
+import React from "react";
 
-Search parameters are often an afterthought, treated like a black box of strings (or string) that you can parse and update, but not much else. Existing solutions are **not** type-safe either, adding to the caution that is required to deal with them. Even the most "modern" frameworks and routers leave it up to you to figure out how to manage this state. Sometimes they'll parse the search string into an object for you, or sometimes you're left to do it yourself with `URLSearchParams`.
+// import .css files directly and it works
+import './index.css';
 
-Let's step back and remember that **search params are the most powerful state manager in your entire application.** They are global, serializable, bookmarkable, and shareable making them the perfect place to store any kind of state that needs to survive a page refresh or a social share.
+import { createRoot } from "react-dom/client";
 
-To live up to that responsibility, search parameters are a first-class citizen in TanStack Router. While still based on standard URLSearchParams, TanStack Router uses a powerful parser/serializer to manage deeper and more complex data structures in your search params, all while keeping them type-safe and easy to work with.
+const root = createRoot(document.body);
 
-**It's like having `useState` right in the URL!**
+export default function Frontend() {
+  return <h1>Hello, world!</h1>;
+}
 
-Search parameters are:
+root.render(<Frontend />);
+```
 
-- Automatically parsed and serialized as JSON
-- Validated and typed
-- Inherited from parent routes
-- Accessible in loaders, components, and hooks
-- Easily modified with the useSearch hook, Link, navigate, and router.navigate APIs
-- Customizable with a custom search filters and middleware
-- Subscribed via fine-grained search param selectors for efficient re-renders
+Then, run index.ts
 
-Once you start using TanStack Router's search parameters, you'll wonder how you ever lived without them.
+```sh
+bun --hot ./index.ts
+```
 
-## Built-In Caching and Friendly Data Loading
-
-Data loading is a critical part of any application and while most existing routers offer some form of critical data loading APIs, they often fall short when it comes to caching and data lifecycle management. Existing solutions suffer from a few common problems:
-
-- No caching at all. Data is always fresh, but your users are left waiting for frequently accessed data to load over and over again.
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+For more information, read the Bun API docs in `node_modules/bun-types/docs/**.md`.
 
 ---
 > Source: [openstory-so/openstory](https://github.com/openstory-so/openstory) — distributed by [TomeVault](https://tomevault.io).
