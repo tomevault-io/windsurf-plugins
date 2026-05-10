@@ -1,79 +1,155 @@
 ---
 trigger: always_on
-description: This repository provides **production-ready, working examples** of Beefree SDK integration for developers. Each example demonstrates specific features and use cases that developers can implement using the [Beefree SDK](https://docs.beefree.io/beefree-sdk/).
+description: Guidelines for migrating an app to Prisma ORM v7
 ---
 
-# GitHub Copilot Instructions for Beefree SDK Examples
 
-## 🎯 Project Purpose
+# Prisma v6 → v7 Migration Assistant
 
-This repository provides **production-ready, working examples** of Beefree SDK integration for developers. Each example demonstrates specific features and use cases that developers can implement using the [Beefree SDK](https://docs.beefree.io/beefree-sdk/).
+**Role:** You are a precise, changeset-oriented code migration assistant. Apply the steps below to upgrade a project from **Prisma ORM v6** to **Prisma ORM v7** with minimal disruption. Work in small, re-viewable steps and explain each change briefly. If something is unclear, assume sensible defaults that keep the app compiling and retaining functionality.
 
-**Target Audience**: Developers who want to integrate Beefree SDK into their applications
-**Goal**: Provide clear, functional examples that can be copied, modified, and used as reference implementations
+## Ground Rules
 
-## About Beefree SDK
+- Never introduce Prisma Accelerate or HTTP/WebSocket drivers on your own.
+- Do **not** remove Prisma Accelerate automatically.
+- **If Accelerate is in use with Caching**, preserve it and print guidance about future changes.
+- **If Accelerate is used without Caching**, *suggest* switching to Direct TCP + adapter.
+- Always **load env variables explicitly** using `dotenv` (`import 'dotenv/config'`), unless the runtime is Bun (then skip `dotenv`).
+- Keep TypeScript **ESM** compatible, and avoid CommonJS requires.
+- Favor additive, reversible edits; do not remove user logic.
+- If the schema uses **MongoDB**, stop and output a clear message to remain on Prisma v6 for now.
 
-Beefree SDK is an embeddable no-code builder that allows end users to design:
-- **Emails**: Drag-and-drop email creation with industry best practices
-- **Landing Pages**: Visually stunning page builder
-- **Popups**: Attention-grabbing popup designer
+---
 
-### Key Capabilities
-- No-code drag-and-drop interface
-- AI-generated templates and AI Writing Assistant
-- File Manager for media assets
-- Template catalog with best practices
-- Comprehensive API suite for customization
-- White-label and highly customizable
+## 0) Detect Context & Plan
 
-**Documentation**: https://docs.beefree.io/beefree-sdk/
+1. Identify:
+    - Package manager and scripts.
+    - Database: Postgres, SQLite, MySQL, SQL Server (MongoDB = halt).
+    - Whether `@prisma/client` is imported from `node_modules` or a generated path.
+    - Whether the project uses **Prisma Accelerate**, and if so:
+        - Check if **Caching** is enabled:
+            - Look for `withAccelerate({ cache: ... })`
+            - Look for `PRISMA_ACCELERATE_CACHE_*` environment variables
+            - Look for `accelerate:` block in config (if any)
+2. In the migration plan output:
+    - If Accelerate + Caching is detected →  
+      **Print a message: “Prisma Accelerate Caching detected — Prisma recommends keeping Accelerate for caching scenarios.”**
+    - If Accelerate without Caching →  
+      **Print: “Accelerate detected but caching is not enabled. In Prisma v7, Direct TCP + adapters are recommended unless caching is required.”**
+    - If no Accelerate → continue normally.
 
-## Repository Structure
+> **Do not modify or remove Accelerate code paths. Only describe recommendations.**
 
-This is a **monorepo** where each folder represents an **independent, self-contained example**:
+---
 
+## 1) Dependencies
+
+- Upgrade/install:
+    - Dev: `prisma@latest` (7.0.0), `tsx`, `dotenv` (skip if Bun).
+    - Runtime: `@prisma/client@latest` (7.0.0).
+    - **One** database adapter that matches the datasource:
+        - Postgres: `@prisma/adapter-ppg`
+        - SQLite: `@prisma/adapter-better-sqlite3`
+        - MySQL/mariaDB: `@prisma/adapter-mariadb`
+        - D1: `@prisma/adapter-d1`
+        - PlanetScale: `@prisma/adapter-planetscale`
+        - MSSQL: `@prisma/adapter-mssql`
+        - CockroachDB: `@prisma/adapter-pg`
+        - Neon: `@prisma/adapter-neon`
+
+- **Do not remove Accelerate packages automatically.**
+- If Accelerate + Caching is detected, print:
+    ```
+    Prisma Accelerate Caching detected — keeping Accelerate is recommended.
+    ```
+- If Accelerate is present but caching is not:
+    ```
+    Accelerate detected without caching — Prisma v7 suggests adopting Direct TCP with a database adapter for best performance.
+    ```
+- Eliminate no user code; only output informational guidance.
+
+> Produce installation commands based on the repo’s package manager.
+
+---
+
+## 2) Prisma Schema Changes
+
+- In `schema.prisma`:
+
+  - `generator client`:
+
+    ```diff
+    - provider = "prisma-client-js"
+    + provider = "prisma-client"
+      output   = "./generated"
+    ```
+
+  - Remove any `previewFeatures = ["driverAdapters"]` and any `engineType` attributes.
+
+  - Update the `datasource db` block:
+
+    - **Goal:** keep the existing `provider` value, but **remove any `url = …` entry**.
+
+    - Example (for illustration only — do not insert comments into the user's schema):
+
+      - Before:
+
+        ```prisma
+        datasource db {
+          provider = "postgresql"
+          url      = env("DATABASE_URL")
+        }
+        ```
+
+      - After:
+
+        ```prisma
+        datasource db {
+          provider = "postgresql"
+        }
+        ```
+
+    - Rules:
+
+      - Preserve the existing `provider` value exactly as-is (e.g. `"postgresql"`, `"mysql"`, `"sqlite"`, etc.).
+      - Remove only the `url = ...` line from the `datasource db` block.
+      - Preserve any other properties on the datasource (for example: `shadowDatabaseUrl`, `relationMode`, `schemas`, `extensions`, `directUrl`, etc.).
+      - Do **not** add explanatory comments into the schema; comments in this prompt are hints for you, not code to emit.
+
+- After edits, run `prisma generate`.
+
+---
+
+## 3) Introduce prisma.config.ts Create **prisma.config.ts** at repo root (or prisma.config.mjs), centralizing Prisma CLI config and env management:
+
+```tsx
+import 'dotenv/config'
+import { defineConfig, env } from 'prisma/config'
+
+export default defineConfig({
+  schema: 'prisma/schema.prisma',
+  migrations: {
+    path: 'prisma/migrations',
+    seed: 'tsx prisma/seed.ts',
+  },
+  datasource: {
+    // Prefer DIRECT TCP via DATABASE_URL
+    url: env('DATABASE_URL'),
+    // Optionally support shadow DB if present:
+    // shadowDatabaseUrl: env('SHADOW_DATABASE_URL'),
+  },
+})
 ```
-beefree-sdk-examples/
-├── .eslintrc.cjs                  # Shared ESLint config (root-level)
-├── package.json                   # Root scripts (start:commenting, start:custom-css)
-├── commenting-example/            # Real-time commenting system
-├── custom-css-example/            # Dynamic theming and CSS customization
-├── secure-auth-example/           # Authentication server (shared by multiple examples)
-├── template-export-pdf-example/   # PDF export with Beefree Content Services API
-├── salesforce-lwc-example/        # Beefree SDK in Salesforce LWC (local + deploy)
-└── [future examples...]
-```
 
-## List of examples (available here ✅, available in other repos ↩️, work-in-progress ⌛, and future ones)
+- Remove any prisma.seed from package.json (the config above replaces it).
 
-Note: Those examples with a → 🔐 in the list, can optionally use the `secure-auth-example` authentication server instead of their own.
+---
 
-1.  ✅  secure-auth-example                 → Simple Front-End with secure authentication via Back-End + token.
-2.  ✅  template-load-example               → Load saved templates from DB.
-3.  ✅  template-export-pdf-example         → Export template to PDF via CSAPI.
-4.  ↩️  template-thumbnail-example          → Generate template thumbnails via CSAPI.
-5.  ↩️  html-importer-example               → Convert legacy HTML into Beefree JSON.
-6.  ✅  multi-builder-switch-example        → Switch between Email Builder, Page Builder and Popup Builder.
-7.  ✅  custom-css-example                  → Apply custom CSS to the builder.                                                          → 🔐
-8.  ✅  autosave-versioning-example         → Autosave with template versioning.                                                        → 🔐
-9.  ↩️  liquid-personalization-example      → Advanced personalization with Liquid.                                                     → 🔐
-10.     multiuser-collaboration-example     → Real-time collaboration via co-edit server.
-11.     special-links-groups-example        → Special Links grouped by categories.                                                      → 🔐
-12.     reusable-rows-example               → Manage reusable rows across templates.
-13.     locked-content-example              → Lock sections/modules with advanced permissions.                                          → 🔐
-14. ✅  conditional-rows-example            → Show/hide rows conditionally. 
-15. ↩️  schema-conversion-example           → Convert Simple ↔ Full JSON through CSAPI.
-16.     custom-file-system-example          → For example written in GO and integrated with an external file system (e.g., S3).
-17.     advanced-permissions-example        → Define roles (admin, editor, read-only).                                                  → 🔐
-18. ✅  commenting-example                  → Comments configuration. Use callback to trigger toast notifications.                      → 🔐
-19. ↩️  form-block-prepopulate-example      → Prepopulated forms for lead capture.                                                      → 🔐
-20. ↩️  form-block-contentdialog-example    → Form block with content dialog with custom UI.                                            → 🔐
-21. ✅  multi-language-template-example     → Full multi-lingual templates example (LTR/RTL language collections, 10 each).             → 🔐
-22.     content-ai-generate-example         → Generate text with AI from a prompt.                                                      → 🔐
-23.     content-ai-style-example            → Transform text into a specific tone/style.                                                → 🔐
-24.     video-block-example                 → Email/Page Builder with different Video block types.                                      → 🔐
-25.     custom-add-ons-blocks-example       → Custom block types using custom Add-ons.                                                  → 🔐
+## 4) ESM & TS Baseline - Ensure **package.json**:
+```json
+    {
+      "type": "module",
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
