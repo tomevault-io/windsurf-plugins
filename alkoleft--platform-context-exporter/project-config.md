@@ -1,115 +1,152 @@
 ---
 trigger: always_on
-description: Java Object-Oriented Design Guidelines
+description: Type Design Thinking in Java
 ---
 
-# Java Object-Oriented Design Guidelines
+# Type Design Thinking in Java
 
-This document provides comprehensive guidelines for robust Java object-oriented design and refactoring. It emphasizes core principles like SOLID, DRY, and YAGNI, best practices for class and interface design including favoring composition over inheritance and designing for immutability. The rules also cover mastering encapsulation, inheritance, and polymorphism, and finally, identifying and refactoring common object-oriented design code smells such as God Classes, Feature Envy, and Data Clumps to promote maintainable, flexible, and understandable code.
+Type design thinking in Java applies typography principles to code structure and organization. Just as typography creates readable, accessible text, thoughtful type design in Java produces maintainable, comprehensible code.
 
 ## Implementing These Principles
 
-These guidelines are built upon the following core principles:
+1.  **Start with domain modeling**: Sketch your type system before coding.
+2.  **Create a type style guide**: Document naming conventions and patterns.
+3.  **Review for type consistency**: Periodically check for style adherence.
+4.  **Refactor toward clearer type expressions**: Improve existing code.
+5.  **Use tools to enforce style**: Configure linters and static analyzers.
 
-1.  **Adherence to Fundamental Design Principles**: Embrace foundational principles like SOLID, DRY, and YAGNI. These principles are key to building systems that are robust, maintainable, flexible, and easy to understand.
-2.  **Effective Class and Interface Design**: Employ best practices for designing classes and interfaces. This includes favoring composition over inheritance to achieve flexibility, programming to an interface rather than an implementation to promote loose coupling, keeping classes small and focused on a single responsibility, and designing for immutability where appropriate to enhance simplicity and thread-safety.
-3.  **Mastery of Core OOP Concepts**: Thoroughly understand and correctly apply the pillars of object-oriented programming:
-    *   **Encapsulation**: Protect internal state and expose behavior through well-defined interfaces.
-    *   **Inheritance**: Model true "is-a" relationships, ensuring subclasses are substitutable for their base types (Liskov Substitution Principle).
-    *   **Polymorphism**: Allow objects of different types to respond to the same message in their own way, simplifying client code.
-4.  **Proactive Code Smell Management**: Develop the ability to identify common object-oriented design "code smells" (e.g., God Class, Feature Envy, Data Clumps, Refused Bequest). Recognizing and refactoring these smells is crucial for improving the long-term health, maintainability, and clarity of the codebase.
+Remember, good type design in Java is about communication - making your code's intent clear both to the compiler and to other developers.
 
 ## Table of contents
 
-- Rule 1: Adhere to Core Design Principles (SOLID, DRY, YAGNI)
-- Rule 2: Follow Best Practices for Class and Interface Design
-- Rule 3: Master Encapsulation, Inheritance, and Polymorphism
-- Rule 4: Identify and Refactor Object-Oriented Design Code Smells
-- Rule 5: Creating and Destroying Objects 
-- Rule 6: Classes and Interfaces Best Practices 
-- Rule 7: Enums and Annotations 
-- Rule 8: Method Design
-- Rule 9: Exception Handling
+- Rule 1: Establish a Clear Type Hierarchy
+- Rule 2: Use Consistent Naming Conventions (Your Type's "Font Family")
+- Rule 3: Embrace Whitespace (Kerning and Leading)
+- Rule 4: Create Type-Safe Wrappers (Type as Communication)
+- Rule 5: Leverage Generic Type Parameters (Responsive Typography)
+- Rule 6: Create Domain-Specific Languages (Typography with Character)
+- Rule 7: Use Consistent Type "Weights" (Bold, Regular, Light)
+- Rule 8: Apply Type Contrast Through Interfaces
+- Rule 9: Create Type Alignment Through Method Signatures
+- Rule 10: Design for Clear Type Readability and Comprehension
+- Rule 11: Use BigDecimal for Precision-Sensitive Calculations
+- Rule 12: Strategic Type Selection for Methods and Algorithms
 
-## Rule 1: Adhere to Core Design Principles (SOLID, DRY, YAGNI)
+## Rule 1: Establish a Clear Type Hierarchy
 
-Title: Apply Fundamental Software Design Principles
-Description: Core principles like SOLID, DRY, and YAGNI are foundational to good object-oriented design, leading to more robust, maintainable, and understandable systems.
-
-### Sub-Rule 1.1: Single Responsibility Principle (SRP)
-Title: A class should have one, and only one, reason to change.
-Description: This means a class should only have one job or primary responsibility. If a class handles multiple responsibilities, changes to one responsibility might inadvertently affect others.
+Title: Establish a Clear Type Hierarchy
+Description: This rule focuses on organizing classes and interfaces into a logical structure using inheritance and composition. A clear hierarchy makes the relationships between types explicit, improving code navigation and understanding. It often involves using nested static classes for closely related types.
 
 **Good example:**
+
 ```java
-// Good: Separate responsibilities
-class UserData {
-    private String name;
-    private String email;
-    // constructor, getters
-    public UserData(String name, String email) { this.name = name; this.email = email; }
-    public String getName() { return name; }
-    public String getEmail() { return email; }
-}
-
-class UserPersistence {
-    public void saveUser(UserData user) {
-        System.out.println("Saving user " + user.getName() + " to database.");
-        // Database saving logic
+// GOOD: Clear type hierarchy with descriptive names
+public class OrderManagement {
+    public static class Order {
+        private List<OrderItem> items;
+        private Customer customer;
+        // ...
     }
-}
 
-class UserEmailer {
-    public void sendWelcomeEmail(UserData user) {
-        System.out.println("Sending welcome email to " + user.getEmail());
-        // Email sending logic
+    public static class OrderItem {
+        private Product product;
+        private int quantity;
+        // ...
     }
 }
 ```
 
 **Bad Example:**
+
 ```java
-// Bad: User class with multiple responsibilities
-class User {
-    private String name;
-    private String email;
-
-    public User(String name, String email) { this.name = name; this.email = email; }
-
-    public String getName() { return name; }
-    public String getEmail() { return email; }
-
-    public void saveToDatabase() {
-        System.out.println("Saving user " + name + " to database.");
-        // Database logic mixed in
-    }
-
-    public void sendWelcomeEmail() {
-        System.out.println("Sending welcome email to " + email);
-        // Email logic mixed in
-    }
-    // If email sending changes, or DB logic changes, this class needs to change.
+// AVOID: Flat structure with ambiguous names
+public class Order {
+    private List<Item> items;
+    private User user;
+    // ...
 }
 ```
 
-### Sub-Rule 1.2: Open/Closed Principle (OCP)
-Title: Software entities should be open for extension but closed for modification.
-Description: You should be able to add new functionality without changing existing, tested code. This is often achieved using interfaces, abstract classes, and polymorphism.
+## Rule 2: Use Consistent Naming Conventions (Your Type's "Font Family")
+
+Title: Use Consistent Naming Conventions (Your Type's "Font Family")
+Description: This rule emphasizes using uniform patterns for naming classes, interfaces, methods, and variables. Consistency in naming acts like a consistent font family in typography, making the code easier to read, predict, and maintain across the entire project.
 
 **Good example:**
+
 ```java
-interface Shape {
-    double calculateArea();
-}
+// GOOD: Consistent naming patterns
+interface PaymentProcessor { void process(Payment payment); }
+interface ShippingCalculator { BigDecimal calculate(Order order); }
+interface TaxProvider { Tax getTaxFor(Address address); }
+```
 
-class Rectangle implements Shape {
-    private double width, height;
-    public Rectangle(double w, double h) { width=w; height=h; }
-    @Override public double calculateArea() { return width * height; }
-}
+**Bad Example:**
 
-class Circle implements Shape {
-    private double radius;
+```java
+// AVOID: Inconsistent naming patterns
+interface PaymentProcessor { void handlePayment(Payment p); }
+interface ShipCalc { BigDecimal getShippingCost(Order o); }
+interface TaxSystem { Tax lookupTaxRate(Address addr); }
+```
+
+## Rule 3: Embrace Whitespace (Kerning and Leading)
+
+Title: Embrace Whitespace (Kerning and Leading)
+Description: This rule advocates for the strategic use of blank lines and spacing within code, analogous to kerning and leading in typography. Proper whitespace improves readability by visually separating logical blocks of code, making it easier to scan and comprehend.
+
+**Good example:**
+
+```java
+// GOOD: Proper spacing for readability
+public Order processOrder(Cart cart, Customer customer) {
+    // Validate inputs
+    validateCart(cart);
+    validateCustomer(customer);
+
+    // Create order
+    Order order = new Order(customer);
+    cart.getItems().forEach(item ->
+        order.addItem(item.getProduct(), item.getQuantity())
+    );
+
+    // Calculate totals
+    order.calculateSubtotal();
+    order.calculateTax();
+
+    return order;
+}
+```
+
+**Bad Example:**
+
+```java
+// AVOID: Dense, difficult to parse code
+public Order processOrder(Cart cart,Customer customer){
+    validateCart(cart);validateCustomer(customer);
+    Order order=new Order(customer);
+    cart.getItems().forEach(item->order.addItem(item.getProduct(),item.getQuantity()));
+    order.calculateSubtotal();order.calculateTax();
+    return order;
+}
+```
+
+## Rule 4: Create Type-Safe Wrappers (Type as Communication)
+
+Title: Create Type-Safe Wrappers (Type as Communication)
+Description: This rule encourages wrapping primitive types or general-purpose types (like String) in domain-specific types. These wrapper types enhance type safety by enforcing invariants at compile-time and clearly communicate the intended meaning and constraints of data.
+
+**Good example:**
+
+```java
+// GOOD: Type-safe wrappers communicate intent
+public class EmailAddress {
+    private final String value;
+
+    public EmailAddress(String email) {
+        if (!isValid(email)) {
+            throw new IllegalArgumentException("Invalid email format");
+        }
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
