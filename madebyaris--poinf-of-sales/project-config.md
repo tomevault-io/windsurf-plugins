@@ -1,82 +1,174 @@
 ---
 trigger: always_on
-description: This is a **modern, enterprise-grade Point of Sale system** built with cutting-edge technologies:
+description: React Native mobile development patterns for POS System kitchen and server applications
 ---
 
 
-# 🍽️ POS System - Complete Architecture Guide
+# 📱 React Native Mobile Development Patterns
 
-## 🎯 Project Overview
+## 🎯 Project Overview - Mobile POS Applications
 
-This is a **modern, enterprise-grade Point of Sale system** built with cutting-edge technologies:
+### GitHub Milestones Integration
+Based on [GitHub Milestones](https://github.com/madebyaris/poinf-of-sales/milestones), we're developing:
 
-### 🏗️ Technology Stack
-- **Backend:** Golang 1.21+ + Gin framework + PostgreSQL with optimized raw SQL
-- **Frontend:** React 18.3+ + TanStack Start + TypeScript 5.6+ + Tailwind CSS + shadcn/ui
-- **Database:** PostgreSQL 15 with comprehensive schema, indexes, and constraints
-- **Infrastructure:** Docker containers with multi-stage builds and Docker Compose orchestration
-- **Authentication:** JWT-based auth with role-based access control (RBAC)
+1. **Kitchen Staff Mobile App (iOS & Android)** - Tablet and TV display optimization
+2. **Server Group Mobile App (iOS & Android)** - Smartphone and tablet flexibility
 
-### 🚀 Core Business Features
-- **Multi-Role Support:** Admin, Manager, Server, Counter, Kitchen interfaces
-- **Complete Order Lifecycle:** Creation → Kitchen → Payment → Completion
-- **Real-time Updates:** WebSocket-like updates across all interfaces
-- **Advanced Admin Tables:** Professional data tables with sorting, filtering, pagination
-- **Payment Processing:** Multi-step payment flow with receipt generation
-- **Kitchen Display System:** Real-time order preparation workflow
-- **Table Management:** Advanced seating and table assignment system
+## 🏗️ Cross-Platform Architecture
 
-## 📁 Project Structure
+### Project Structure for React Native Apps
+```
+mobile/
+├── kitchen-app/                 # Kitchen Staff Mobile App
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── kitchen/         # Kitchen-specific components
+│   │   │   ├── ui/              # Shared UI components
+│   │   │   └── common/          # Cross-app components
+│   │   ├── screens/
+│   │   │   ├── KitchenDisplay/  # Main kitchen interface
+│   │   │   ├── OrderDetails/    # Individual order management
+│   │   │   └── Settings/        # App configuration
+│   │   ├── services/
+│   │   │   ├── api/             # API integration
+│   │   │   ├── sync/            # Real-time synchronization
+│   │   │   └── offline/         # Offline mode handling
+│   │   └── utils/
+│   ├── android/                 # Android-specific code
+│   ├── ios/                     # iOS-specific code
+│   └── package.json
+├── server-app/                  # Server Group Mobile App
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── pos/             # POS interface components
+│   │   │   ├── payment/         # Mobile payment processing
+│   │   │   └── tables/          # Table management
+│   │   ├── screens/
+│   │   │   ├── OrderEntry/      # Mobile order creation
+│   │   │   ├── TableView/       # Table management interface
+│   │   │   └── PaymentFlow/     # Mobile payment processing
+│   │   └── services/
+│   └── package.json
+└── shared/                      # Shared code between apps
+    ├── components/              # Reusable UI components
+    ├── types/                   # TypeScript definitions
+    ├── api/                     # API client
+    └── utils/                   # Utility functions
+```
 
-### 🏠 Root Level Files
-- [Makefile](mdc:Makefile) - **PRIMARY DEV TOOL** - All development commands (`make dev`, `make backup`, etc.)
-- [docker-compose.dev.yml](mdc:docker-compose.dev.yml) - Development environment with hot reloading
-- [docker-compose.yml](mdc:docker-compose.yml) - Production orchestration
-- [README.md](mdc:README.md) - Complete project documentation with screenshots
-- [ROLE_BASED_IMPLEMENTATION.md](mdc:ROLE_BASED_IMPLEMENTATION.md) - Role system implementation guide
+## 🍳 Kitchen Staff Mobile App Patterns
 
-### 🔧 Backend Structure (`backend/`)
-- [main.go](mdc:backend/main.go) - Application entry point, CORS, middleware setup
-- [go.mod](mdc:backend/go.mod) - Go 1.21+ dependencies (Gin, PostgreSQL driver, JWT)
-- [Dockerfile](mdc:backend/Dockerfile) + [Dockerfile.dev](mdc:backend/Dockerfile.dev) - Multi-stage container builds
-- **`internal/`** - Clean Go architecture following best practices:
-  - **[api/routes.go](mdc:backend/internal/api/routes.go)** - RESTful API route definitions with role-based grouping
-  - **[models/models.go](mdc:backend/internal/models/models.go)** - Complete data models, DTOs, and API response structures
-  - **[database/connection.go](mdc:backend/internal/database/connection.go)** - PostgreSQL connection with pooling
-  - **[middleware/auth.go](mdc:backend/internal/middleware/auth.go)** - JWT authentication + RBAC middleware
-  - **`handlers/`** - Domain-specific HTTP handlers:
-    - [auth.go](mdc:backend/internal/handlers/auth.go) - Login, logout, user management
-    - [orders.go](mdc:backend/internal/handlers/orders.go) - Complete order lifecycle management
-    - [products.go](mdc:backend/internal/handlers/products.go) - Menu and category management
-    - [tables.go](mdc:backend/internal/handlers/tables.go) - Table and seating management
-    - [payments.go](mdc:backend/internal/handlers/payments.go) - Payment processing and history
+### Tablet & TV Display Optimization
+```typescript
+// Kitchen app main component with device optimization
+import React, { useEffect, useState } from 'react'
+import { Dimensions, Platform } from 'react-native'
+import DeviceInfo from 'react-native-device-info'
+import Orientation from 'react-native-orientation-locker'
 
-### ⚛️ Frontend Structure (`frontend/`)
-- [package.json](mdc:frontend/package.json) - React 18.3+, TypeScript 5.6+, TanStack ecosystem
-- [vite.config.ts](mdc:frontend/vite.config.ts) - Vite + TanStack Start configuration
-- [tailwind.config.js](mdc:frontend/tailwind.config.js) - Tailwind CSS + shadcn/ui theme configuration
-- [Dockerfile](mdc:frontend/Dockerfile) + [Dockerfile.dev](mdc:frontend/Dockerfile.dev) - Nginx + Node.js containers
-- **`src/`** - Modern React application structure:
-  - **[main.tsx](mdc:frontend/src/main.tsx)** - React 18 entry point with StrictMode
-  - **[index.css](mdc:frontend/src/index.css)** - Global styles and CSS variables
-  - **Core Architecture:**
-    - **[types/index.ts](mdc:frontend/src/types/index.ts)** - Comprehensive TypeScript definitions
-    - **[api/client.ts](mdc:frontend/src/api/client.ts)** - Axios-based API client with interceptors
-    - **[lib/utils.ts](mdc:frontend/src/lib/utils.ts)** - Utility functions (cn, date formatters, etc.)
-    - **[lib/form-schemas.ts](mdc:frontend/src/lib/form-schemas.ts)** - Zod validation schemas
-  - **UI Components:**
-    - **[components/ui/](mdc:frontend/src/components/ui/)** - shadcn/ui base components (Button, Card, Table, etc.)
-    - **[components/forms/](mdc:frontend/src/components/forms/)** - Reusable form components with validation
-  - **Business Components:**
-    - **[components/admin/](mdc:frontend/src/components/admin/)** - Admin dashboard and management interfaces
-    - **[components/pos/](mdc:frontend/src/components/pos/)** - POS interface components (cart, product grid, etc.)
-    - **[components/kitchen/](mdc:frontend/src/components/kitchen/)** - Kitchen display system components
-    - **[components/server/](mdc:frontend/src/components/server/)** - Server-specific interface components
-    - **[components/counter/](mdc:frontend/src/components/counter/)** - Counter/checkout interface components
-  - **Routing:**
-    - **[routes/](mdc:frontend/src/routes/)** - TanStack Start file-based routing
-    - **[routeTree.gen.ts](mdc:frontend/src/routeTree.gen.ts)** - Auto-generated route tree
-  - **Hooks & State:**
+interface DeviceConfig {
+  type: 'smartphone' | 'tablet' | 'tv'
+  screenSize: 'small' | 'medium' | 'large' | 'extra-large'
+  touchTargetSize: number
+  fontSize: number
+  spacing: number
+}
+
+export const KitchenApp: React.FC = () => {
+  const [deviceConfig, setDeviceConfig] = useState<DeviceConfig>()
+  const [orders, setOrders] = useState<KitchenOrder[]>([])
+
+  useEffect(() => {
+    initializeDeviceOptimization()
+    setupRealTimeSync()
+    enableOfflineMode()
+  }, [])
+
+  // ✅ CORRECT: Device-specific optimization
+  const initializeDeviceOptimization = async () => {
+    const { width, height } = Dimensions.get('window')
+    const isTablet = await DeviceInfo.isTablet()
+    const deviceType = await DeviceInfo.getDeviceType()
+
+    // Determine device configuration
+    let config: DeviceConfig
+
+    if (deviceType === 'tv' || width > 1200) {
+      // Large screen TV display
+      config = {
+        type: 'tv',
+        screenSize: 'extra-large',
+        touchTargetSize: 60, // Extra large for wall-mounted displays
+        fontSize: 24,
+        spacing: 32
+      }
+      
+      // TV-specific optimizations
+      Orientation.lockToLandscape()
+      await setupTVDisplayMode()
+      
+    } else if (isTablet || width > 768) {
+      // Tablet optimization
+      config = {
+        type: 'tablet',
+        screenSize: 'large',
+        touchTargetSize: 50, // Standard tablet touch targets
+        fontSize: 18,
+        spacing: 24
+      }
+      
+      // Tablet-specific optimizations
+      Orientation.lockToLandscape()
+      await setupTabletMode()
+      
+    } else {
+      // Smartphone fallback (not primary use case for kitchen)
+      config = {
+        type: 'smartphone',
+        screenSize: 'medium',
+        touchTargetSize: 44,
+        fontSize: 16,
+        spacing: 16
+      }
+    }
+
+    setDeviceConfig(config)
+  }
+
+  // TV display mode configuration
+  const setupTVDisplayMode = async () => {
+    // Enable full-screen mode
+    if (Platform.OS === 'android') {
+      // Hide navigation bar for TV displays
+      await DeviceInfo.getSystemName() // Android TV detection
+    }
+    
+    // High contrast mode for distance viewing
+    const tvSettings = {
+      contrast: 'high',
+      colorScheme: 'high-visibility',
+      animations: 'reduced', // Minimize distractions
+      autoRefresh: 3000 // 3-second refresh for TV displays
+    }
+    
+    await applyDisplaySettings(tvSettings)
+  }
+
+  // Tablet mode configuration
+  const setupTabletMode = async () => {
+    // Enable gesture navigation
+    const tabletSettings = {
+      swipeGestures: true,
+      hapticFeedback: true,
+      multiTouch: false, // Prevent accidental gestures
+      autoRefresh: 5000 // 5-second refresh for tablets
+    }
+    
+    await applyDisplaySettings(tabletSettings)
+  }
+
+  return (
+    <KitchenDisplayLayout 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
