@@ -1,125 +1,120 @@
 ---
 trigger: always_on
-description: This document outlines the key aspects of using migrations with PostgreSQL in Payload CMS, based on the provided documentation. It focuses on how migrations are managed, their workflow, and best practices for PostgreSQL users.
+description: Database transactions allow your application to make a series of database changes in an all-or-nothing commit. Consider an HTTP request that creates a new Order and has an afterChange hook to update the stock count of related Items. If an error occurs when updating an Item and an HTTP error is returned to the user, you would not want the new Order to be persisted or any other items to be changed either. This kind of interaction with the database is handled seamlessly with transactions.
 ---
 
+Database transactions allow your application to make a series of database changes in an all-or-nothing commit. Consider an HTTP request that creates a new Order and has an afterChange hook to update the stock count of related Items. If an error occurs when updating an Item and an HTTP error is returned to the user, you would not want the new Order to be persisted or any other items to be changed either. This kind of interaction with the database is handled seamlessly with transactions.
 
+By default, Payload will use transactions for all data changing operations, as long as it is supported by the configured database. Database changes are contained within all Payload operations and any errors thrown will result in all changes being rolled back without being committed. When transactions are not supported by the database, Payload will continue to operate as expected without them.
 
-# PostgreSQL Migrations with Payload CMS
+Note:
 
-This document outlines the key aspects of using migrations with PostgreSQL in Payload CMS, based on the provided documentation. It focuses on how migrations are managed, their workflow, and best practices for PostgreSQL users.
+MongoDB requires a connection to a replicaset in order to make use of transactions.
 
-## Overview of Migrations in Payload CMS
+Note:
 
-Payload CMS provides a robust migration system to manage database schema changes. For PostgreSQL, migrations are critical because any modification to the Payload configuration (e.g., adding a new field or collection) requires corresponding updates to the database schema to avoid errors during data operations.
+Transactions in SQLite are disabled by default. You need to pass transactionOptions: {} to enable them.
 
-### Migration File Structure
-
-A migration file in Payload CMS contains two primary functions:
-
-- **Up Function**: Executes the changes to the database schema, such as creating tables or modifying columns.
-- **Down Function**: Reverts changes made by the `up` function in case of a failure, ensuring the database remains consistent.
-
-Example migration file for PostgreSQL:
+The initial request made to Payload will begin a new transaction and attach it to the req.transactionID. If you have a hook that interacts with the database, you can opt in to using the same transaction by passing the req in the arguments. For example:
 
 ```typescript
-import { type MigrateUpArgs, sql } from '@payloadcms/db-postgres'
-
-export async function up({ db, payload, req }: MigrateUpArgs): Promise<void> {
-  // Perform schema changes, e.g., select data for transformation
-  const { rows: posts } = await db.execute(sql`SELECT * from posts`);
-  // Add logic to modify schema or data
-}
-
-export async function down({ db, payload, req }: MigrateUpArgs): Promise<void> {
-  // Revert changes made in the up function
+const afterChange: CollectionAfterChangeHook = async ({ req }) => {
+  // because req.transactionID is assigned from Payload and passed through,
+  // my-slug will only persist if the entire request is successful
+  await req.payload.create({
+    req,
+    collection: 'my-slug',
+    data: {
+      some: 'data',
+    },
+  })
 }
 ```
 
-### Transaction Management
+### Async Hooks with Transactions
+Since Payload hooks can be async and be written to not await the result, it is possible to have an incorrect success response returned on a request that is rolled back. If you have a hook where you do not await the result, then you should not pass the req.transactionID.
 
-Payload CMS automatically wraps each migration in a transaction when using PostgreSQL. The `req` object must be passed to database operations (e.g., `payload.db.updateMany()`) to ensure changes occur within the transaction. If an error occurs, the transaction is aborted, preventing partial changes to the database.
+```typescript
+const afterChange: CollectionAfterChangeHook = async ({ req }) => {
+  // WARNING: an async call made with the same req, but NOT awaited,
+  // may fail resulting in an OK response being returned with response data that is not committed
+  const dangerouslyIgnoreAsync = req.payload.create({
+    req,
+    collection: 'my-slug',
+    data: {
+      some: 'other data',
+    },
+  })
 
-Direct database operations are also supported within the transaction, as shown in the example above using the `db.execute` method with the `sql` template literal.
+  // Should this call fail, it will not rollback other changes
+  // because the req (and its transactionID) is not passed through
+  const safelyIgnoredAsync = req.payload.create({
+    collection: 'my-slug',
+    data: {
+      some: 'other data',
+    },
+  })
+}
+```
 
-## Migration Commands
 
-Payload CMS provides several commands to manage migrations, accessible via the `bun run payload` command, assuming an npm script is defined in `package.json` as follows:
+### Direct Transaction Access
+When writing your own scripts or custom endpoints, you may wish to have direct control over transactions. This is useful for interacting with your database outside of Payload's Local API.
 
-```json
-{
-  "scripts": {
-    "payload": "cross-env PAYLOAD_CONFIG_PATH=src/payload.config.ts payload"
+The following functions can be used for managing transactions:
+
+`payload.db.beginTransaction` - Starts a new session and returns a transaction ID for use in other Payload Local API calls.
+`payload.db.commitTransaction` - Takes the identifier for the transaction, finalizes any changes.
+`payload.db.rollbackTransaction` - Takes the identifier for the transaction, discards any changes.
+
+Payload uses the `req` object to pass the transaction ID through to the database adapter. If you are not using the `req` object, you can make a new object to pass the transaction ID directly to database adapter methods and Local API calls. Example:
+
+```typescript
+import payload from 'payload'
+import config from './payload.config'
+
+const standalonePayloadScript = async () => {
+  // initialize Payload
+  await payload.init({ config })
+
+  const transactionID = await payload.db.beginTransaction()
+
+  try {
+    // Make an update using the Local API
+    await payload.update({
+      collection: 'posts',
+      data: {
+        some: 'data',
+      },
+      where: {
+        slug: { equals: 'my-slug' },
+      },
+      req: { transactionID },
+    })
+
+    /*
+      You can make additional db changes or run other functions
+      that need to be committed on an all or nothing basis
+     */
+
+    // Commit the transaction
+    await payload.db.commitTransaction(transactionID)
+  } catch (error) {
+    // Rollback the transaction
+    await payload.db.rollbackTransaction(transactionID)
   }
 }
+
+standalonePayloadScript()
 ```
 
-Key migration commands for PostgreSQL include:
+### Disabling Transactions
+If you wish to disable transactions entirely, you can do so by passing false as the transactionOptions in your database adapter configuration. All the official Payload database adapters support this option.
 
-- **Migrate**: Executes all unapplied migrations to update the database schema.
-  ```bash
-  bun run payload migrate
-  ```
+In addition to allowing database transactions to be disabled at the adapter level. You can prevent Payload from using a transaction in direct calls to the Local API by adding disableTransaction: true to the args. For example:
 
-- **Create**: Generates a new migration file, optionally with a specified name. Payload uses Drizzle ORM to detect schema changes and generate the necessary SQL.
-  ```bash
-  bun run payload migrate:create optional-name-here
-  ```
-  Flags:
-  - `--skip-empty`: Skips the prompt for creating a blank migration file when no schema changes are detected, useful for CI pipelines.
-  - `--force-accept-warning`: Automatically accepts prompts to create a blank migration file.
-
-- **Status**: Displays a table showing which migrations have been applied and which are pending.
-  ```bash
-  bun run payload migrate:status
-  ```
-
-- **Down**: Rolls back the last batch of migrations.
-  ```bash
-  bun run payload migrate:down
-  ```
-
-- **Refresh**: Rolls back all applied migrations and re-runs them.
-  ```bash
-  bun run payload migrate:refresh
-  ```
-
-- **Reset**: Rolls back all migrations.
-  ```bash
-  bun run payload migrate:reset
-  ```
-
-- **Fresh**: Drops all database entities and re-runs all migrations from scratch.
-  ```bash
-  bun run payload migrate:fresh
-  ```
-
-## PostgreSQL Migration Workflow
-
-The workflow for managing migrations in PostgreSQL with Payload CMS is structured to support both development and production environments.
-
-### 1. Local Development with Push Mode
-
-In development, Payload CMS uses Drizzle ORM’s `push` mode to automatically synchronize schema changes to the local PostgreSQL database. This eliminates the need to run migrations manually during development, as changes to the Payload configuration are pushed directly to the database.
-
-To disable `push` mode, set `push: false` in the PostgreSQL adapter configuration, but this may cause errors if the database schema lags behind the Payload configuration. Therefore, it is recommended to keep `push` mode enabled for local development and treat the local database as a sandbox.
-
-### 2. Creating Migrations
-
-Once development is complete or a feature is finalized, create a migration to capture schema changes:
-
-- Run `bun run payload migrate:create` to generate a migration file.
-- Payload compares the current schema with the Payload configuration and generates SQL to bridge the gap.
-- The migration file is stored in the default directory (`./src/migrations`) or a custom directory specified via the `migrationDir` property in the database adapter configuration.
-
-### 3. Running Migrations in Production
-
-For production, migrations should be executed before building the application to ensure the database schema aligns with the Payload configuration. This is typically handled in a CI pipeline using a build script in `package.json`:
-
-```json
-{
-  "scripts": {
-    "dev": "next dev --turbo",
+```typescript
+await payload.update({
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
