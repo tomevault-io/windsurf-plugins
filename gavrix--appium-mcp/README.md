@@ -2,6 +2,8 @@
 
 > Sourced from [gavrix/appium-mcp](https://github.com/gavrix/appium-mcp) and converted for every major platform by [TomeVault](https://tomevault.io)
 
+MCP server for appium
+
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
