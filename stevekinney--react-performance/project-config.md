@@ -1,153 +1,233 @@
 ---
 trigger: always_on
-description: - Write clean, readable, and maintainable code
+description: React best practices and patterns for this codebase
 ---
 
 
-# ESLint Rules
+# React Development Guidelines
 
-## Code Quality & Style
+## Core Principles
 
-### General Principles
+1. **Function Components Only**: No class components - use hooks for state and lifecycle
+2. **TypeScript First**: Every component, prop, and hook must be properly typed
+3. **Composition Over Inheritance**: Build complex UIs from simple, composable pieces
+4. **Performance by Default**: Consider performance implications in initial implementation
+5. **Accessibility Always**: Every interactive element must be keyboard and screen reader accessible
 
-- Write clean, readable, and maintainable code
-- Prefer explicit and clear code over clever shortcuts
-- Use modern ES6+ features and TypeScript when applicable
-- Follow consistent naming conventions (camelCase for variables/functions, PascalCase for classes/components)
+## Component Architecture
 
-### Imports & Exports
+### File Structure
 
-- **Import Organization**: Order imports logically:
-  1. React and React-related imports
-  2. External libraries
-  3. Internal modules using path aliases (@/)
-  4. Relative imports
-  5. Type imports last
-- **No Duplicate Imports**: Consolidate imports from the same module
-- **No Unused Imports**: Remove any unused imports immediately
-- **TypeScript Imports**: Use `import type` for type-only imports
-- **Node Protocol**: Always use `node:` protocol for Node.js built-in modules (e.g., `import fs from 'node:fs'`)
-- **No Circular Dependencies**: Avoid circular imports between modules
-- **No Self Imports**: Never import from the same file
-- **Path Aliases**: Prefer `@/` imports over relative paths for src/ files
+```
+src/
+├── components/
+│   ├── ui/           # Reusable UI components (Button, Input, Card)
+│   ├── layout/       # Layout components (Header, Footer, Sidebar)
+│   └── features/     # Feature-specific components
+├── hooks/            # Custom React hooks
+├── utils/            # Utility functions
+├── types/            # Shared TypeScript types
+└── assets/           # Images, fonts, etc.
+```
 
-### TypeScript Guidelines
+### Component Organization
 
-- **Strict Type Safety**: Use proper TypeScript types, avoid `any` except in test files
-- **Consistent Type Imports**: Always use `import type` for type-only imports
-- **Optional Chaining**: Prefer optional chaining (`?.`) over manual null checks
-- **Nullish Coalescing**: Use `??` instead of `||` when checking for null/undefined
-- **Await Thenable**: Only await promises and thenable objects
-- **No Floating Promises**: Handle promise rejections appropriately (though currently relaxed)
-- **React Component Types**: Use `FC` or explicit return types for components
-- **Event Handler Types**: Use proper React event types (e.g., `React.MouseEvent<HTMLButtonElement>`)
+```typescript
+// 1. Imports (in order)
+import { useState, useEffect, type FC } from 'react';
+import { z } from 'zod';
+import clsx from 'clsx';
 
-## Code Patterns & Best Practices
+// 2. Type definitions
+interface ComponentProps {
+  // Props interface
+}
 
-### Control Flow
+// 3. Schema definitions (if needed)
+const PropsSchema = z.object({
+  // Validation schema
+});
 
-- **No With Statements**: Never use `with` statements
-- **No Labels**: Avoid labeled statements
-- **Prefer Switch**: Use `switch` statements over complex if-else chains when appropriate
-- **Logical Operators**: Prefer logical operators over ternary when simpler
+// 4. Component definition
+export const Component: FC<ComponentProps> = (props) => {
+  // 5. Hooks
+  const [state, setState] = useState();
 
-### Functions & Async
+  // 6. Event handlers
+  const handleClick = () => {};
 
-- **Promise Handling**:
-  - Don't wrap values in `Promise.resolve()` unnecessarily
-  - Use proper parameter names in promise methods
-  - Always catch or return promises
-  - Avoid nesting promises
-  - Don't mix callbacks and promises
-  - Don't use `new` with static promise methods
-  - Avoid returns in `finally` blocks
-- **Async/Await**: Don't await non-thenable expressions
-- **Prefer for...of**: Use `for...of` loops instead of `Array.forEach()` when possible
+  // 7. Effects
+  useEffect(() => {}, []);
 
-### Variables & Scope
+  // 8. Render
+  return <div />;
+};
 
-- **Unused Variables**: Remove unused variables, prefix with `_` if needed for API compliance
-- **No Redeclaration**: Avoid variable redeclaration (handled by TypeScript)
+// 9. Display name (for debugging)
+Component.displayName = 'Component';
+```
 
-## Security Considerations
+## State Management Patterns
 
-- **Regex Safety**: Avoid non-literal regex patterns when possible
-- **Object Injection**: Be cautious with dynamic object access (though detection is relaxed)
-- **File System**: Use caution with dynamic file paths
+### Local State
 
-## File-Specific Rules
+```typescript
+// Simple state for UI-only concerns
+const [isOpen, setIsOpen] = useState(false);
 
-### Test Files (`*.test.*`, `*.spec.*`, `/tests/`)
+// Complex state with reducer for business logic
+const [state, dispatch] = useReducer(reducer, initialState);
+```
 
-- Allow `console.log` statements for debugging
-- Allow `any` type when necessary for mocking
-- Focus on readability and comprehensive test coverage
-- Use Vitest for testing React components
-- Use React Testing Library for component testing
-- Test user interactions over implementation details
+### Lifted State
 
-### Service Worker Files (`src/background/**`)
+```typescript
+// Lift state to lowest common ancestor
+export function Parent() {
+  const [sharedState, setSharedState] = useState();
 
-- **No Browser APIs**: Never use `window`, `document`, `localStorage`, or `sessionStorage`
-- **Use Chrome APIs**: Use `chrome.storage` instead of web storage APIs
-- **Service Worker Globals**: Only use APIs available in service worker context
-- Available globals: `chrome`, `LanguageModel`, and standard service worker APIs
+  return (
+    <>
+      <ChildA state={sharedState} />
+      <ChildB onUpdate={setSharedState} />
+    </>
+  );
+}
+```
 
-### TypeScript Declaration Files (`*.d.ts`)
+### Global State (Context)
 
-- These are typically ignored and auto-generated
-- When writing custom declarations, use proper TypeScript declaration syntax
+```typescript
+// Create context with proper typing
+const StateContext = createContext<StateValue | undefined>(undefined);
 
-## Comments & Documentation
+// Provider with value memoization
+export const StateProvider: FC<{ children: ReactNode }> = ({ children }) => {
+  const [state, setState] = useState();
 
-- **ESLint Comments**:
-  - Pair disable/enable comments properly
-  - Don't use unlimited disables
-  - Remove unused disable comments
-  - Use specific rule names in disable comments
+  const value = useMemo(
+    () => ({ state, setState }),
+    [state]
+  );
 
-### Regex Patterns
+  return <StateContext.Provider value={value}>{children}</StateContext.Provider>;
+};
 
-- Avoid empty capturing groups
-- Don't use lazy quantifiers at string ends
-- Prefer named capture groups when appropriate
+// Custom hook with error boundary
+export const useAppState = () => {
+  const context = useContext(StateContext);
+  if (!context) {
+    throw new Error('useAppState must be used within StateProvider');
+  }
+  return context;
+};
+```
 
-## Global Variables & Environment
+## Performance Optimization
 
-- **Available Globals**:
-  - Browser: Standard browser APIs
-  - Node.js: All Node.js globals
-  - Chrome Extensions: `chrome` API
-  - Bun: `Bun` runtime APIs
-  - Custom: `HTMLRewriter`, `LanguageModel`
+### Memoization Rules
 
-## File Organization
+```typescript
+// Memo for expensive components
+export const ExpensiveComponent = memo(({ data }: Props) => {
+  return <ComplexVisualization data={data} />;
+});
 
-- **Ignore Patterns**: Don't generate code for:
-  - `dist/`, `build/`, `coverage/`, `.bun/` directories
-  - `node_modules/`
-  - Lock files
-  - Git directories
-  - Temporary directories
-  - Auto-generated declaration files
+// useCallback for stable function references
+const handleSubmit = useCallback((data: FormData) => {
+  // Process data
+}, [dependency]);
 
-## Error Handling
+// useMemo for expensive calculations
+const processedData = useMemo(() => {
+  return expensiveCalculation(rawData);
+}, [rawData]);
+```
 
-- **Disable Directives**: Report unused ESLint disable directives as errors
-- **Promise Validation**: Validate promise method parameters
-- **Import Cycles**: Prevent and resolve circular dependencies
+### Code Splitting
 
-## Performance & Optimization
+```typescript
+// Route-based splitting
+const Dashboard = lazy(() => import('@/pages/Dashboard'));
 
-- Prefer modern JavaScript features over polyfills
-- Use efficient array methods and iteration patterns
-- Avoid unnecessary async/await when not needed
-- Minimize bundle size by avoiding unnecessary dependencies
+// Component-based splitting for heavy components
+const HeavyChart = lazy(() => import('@/components/HeavyChart'));
 
-## React-Specific Guidelines
+// With loading boundary
+<Suspense fallback={<Spinner />}>
+  <HeavyChart data={data} />
+</Suspense>
+```
 
-### React Hooks Rules
+### List Optimization
 
+```typescript
+// Always use stable, unique keys
+items.map((item) => <Item key={item.id} {...item} />)
+
+// Virtualize long lists (100+ items)
+import { FixedSizeList } from 'react-window';
+
+<FixedSizeList
+  height={600}
+  itemCount={items.length}
+  itemSize={50}
+>
+  {({ index, style }) => (
+    <div style={style}>
+      <Item {...items[index]} />
+    </div>
+  )}
+</FixedSizeList>
+```
+
+## Styling with TailwindCSS
+
+### Class Name Organization
+
+```typescript
+// Use clsx for conditional classes
+import clsx from 'clsx';
+
+<div
+  className={clsx(
+    // Base styles first
+    'rounded-lg border p-4',
+    // Conditional styles
+    {
+      'border-blue-500 bg-blue-50': isActive,
+      'border-gray-300 bg-white': !isActive,
+    },
+    // Size variants
+    {
+      'text-sm': size === 'small',
+      'text-base': size === 'medium',
+      'text-lg': size === 'large',
+    },
+    // State styles
+    'hover:shadow-md focus:outline-none focus:ring-2',
+    // Override with className prop
+    className
+  )}
+/>
+```
+
+### Component Variants with CVA
+
+```typescript
+import { cva, type VariantProps } from 'class-variance-authority';
+
+const buttonVariants = cva(
+  // Base styles
+  'inline-flex items-center justify-center rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 disabled:pointer-events-none disabled:opacity-50',
+  {
+    variants: {
+      variant: {
+        primary: 'bg-blue-600 text-white hover:bg-blue-700',
+        secondary: 'bg-gray-200 text-gray-900 hover:bg-gray-300',
+        ghost: 'hover:bg-gray-100',
+      },
+      size: {
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
