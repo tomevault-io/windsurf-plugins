@@ -1,115 +1,109 @@
 ---
 trigger: always_on
-description: Anchor is a minimal check-in app ecosystem using the AT Protocol to post check-ins (called "drops") to Bluesky. The project includes multiple targets sharing a common core, built with Swift 6, using OpenStreetMap via Overpass API for location search and CoreLocation for geolocation.
+description: 1. **Login**: Use `com.atproto.server.createSession` endpoint
 ---
 
-# Anchor Project Structure Guide
+# API Integration Guide for Anchor CLI
 
-## Overview
+## AT Protocol (Bluesky) Integration
 
-Anchor is a minimal check-in app ecosystem using the AT Protocol to post check-ins (called "drops") to Bluesky. The project includes multiple targets sharing a common core, built with Swift 6, using OpenStreetMap via Overpass API for location search and CoreLocation for geolocation.
+### Authentication Flow
+1. **Login**: Use `com.atproto.server.createSession` endpoint
+2. **Token Storage**: Store in UserDefaults as `AuthCredentials` struct
+3. **Session Management**: Handle token refresh and expiration
 
-## Project Architecture
+### Posting Check-ins
+- **Record Type**: `app.bsky.feed.post`
+- **Format**: Text post with optional metadata
+- **Timestamp**: Use current UTC timestamp
+- **Message Structure**:
+  ```
+  Dropped anchor at [Place Name] 🧗‍♂️
+  "[Optional user message]"
+  ```
 
-The project follows a modular architecture with shared core components and multiple platform-specific targets, using **MV Pattern** (Model-View without ViewModels) for SwiftUI applications:
+### Future Enhancement
+- Custom record type: `app.anchor.drop` for structured check-in data
+- Include geolocation metadata and place references
 
-### Core Components
+## Overpass API Integration
 
-- **AnchorKit** - Core reusable logic module located in `AnchorKit/`
-- **Shared Models & Services** - Common business logic shared across all targets
-- **Stores** - `@Observable` classes for business logic operations (no ViewModels)
+### Base URL
+Use `overpass.private.coffee` as the Overpass API endpoint
 
-### Platform Targets
-
-- **AnchorCLI** - Command-line interface executable (macOS)
-- **Anchor** - SwiftUI menu bar app (macOS 14.0+)
-- **AnchorMobile** - SwiftUI mobile app (iOS 26.0+)
-
-### Key Files
-
-#### Core Module
-- [AnchorKit/Package.swift](mdc:Anchor/Anchor/AnchorKit/Package.swift) - Core module package definition
-- [AnchorKit/Sources/AnchorKit/AnchorKit.swift](mdc:Anchor/Anchor/AnchorKit/Sources/AnchorKit/AnchorKit.swift) - Core module entry point
-
-#### CLI Target
-- [Package.swift](mdc:Anchor/Anchor/Package.swift) - Main package definition with executable target
-- [AnchorCLI/Sources/AnchorCLI/main.swift](mdc:Anchor/Anchor/AnchorCLI/Sources/AnchorCLI/main.swift) - CLI entry point
-- [AnchorCLI/Sources/AnchorCLI/CLICommands.swift](mdc:Anchor/Anchor/AnchorCLI/Sources/AnchorCLI/CLICommands.swift) - CLI command definitions
-
-#### Menu Bar App Target
-- [Anchor.xcodeproj/project.pbxproj](mdc:Anchor/Anchor/Anchor.xcodeproj/project.pbxproj) - Xcode project configuration
-- [Anchor/AnchorMenubarApp.swift](mdc:Anchor/Anchor/Anchor/AnchorMenubarApp.swift) - Menu bar app entry point
-- [Anchor/ContentView.swift](mdc:Anchor/Anchor/Anchor/ContentView.swift) - Main UI view
-
-#### Mobile App Target
-- [AnchorMobile/AnchorMobileApp.swift](mdc:Anchor/Anchor/AnchorMobile/AnchorMobileApp.swift) - Mobile app entry point
-- [AnchorMobile/ContentView.swift](mdc:Anchor/Anchor/AnchorMobile/ContentView.swift) - Main mobile UI view
-
-### Directory Structure
-
-```
-AnchorKit/Sources/AnchorKit/
-├── Models/         ← Data models (Place, AuthCredentials, AnchorSettings)
-├── Services/       ← API services (Bluesky, Overpass, CoreLocation)
-├── Stores/         ← Minimal @Observable business logic classes
-│   ├── AnchorStore.swift      ← Main app store (check-ins, location, auth)
-│   └── SettingsStore.swift    ← Settings management (if needed)
-├── ATProtocol/     ← AT Protocol client and models
-└── Utils/          ← Utility functions and helpers
-
-Anchor/Features/    ← Menu bar app feature modules (feature-based organization)
-├── CheckIn/
-│   └── Views/      ← SwiftUI views (@Environment(AnchorStore.self))
-├── Feed/
-│   └── Views/      ← Feed display views (@Query + @Environment(AnchorStore.self))
-├── Nearby/
-│   └── Views/      ← Nearby places views (@Environment(AnchorStore.self))
-└── Settings/
-    └── Views/      ← Settings UI (@Environment(SettingsStore.self))
-
-AnchorMobile/Features/ ← Mobile app feature modules (same minimal pattern)
-├── CheckIn/Views/
-├── Feed/Views/
-├── Nearby/Views/
-└── Settings/Views/
-
-Docs/               ← Local documentation
-├── mv_pattern_guidelines.md      ← MV Pattern architecture guide
-├── swift-concurrency.md          ← Swift 6 concurrency guide
-├── SwiftData-api-20250627.md     ← SwiftData API reference
-└── SwiftUI-api-20250627.md       ← SwiftUI API reference
+### Query Structure
+Example query for climbing gyms within bounding box:
+```overpassql
+[out:json][timeout:10];
+(
+  node[leisure=climbing](mdc:bbox);
+  way[leisure=climbing](mdc:bbox);
+  relation[leisure=climbing](mdc:bbox);
+);
+out center;
 ```
 
-## CLI Commands (MVP Scope)
+### Query Parameters
+- **bbox**: `south,west,north,east` coordinates around current location
+- **timeout**: 10 seconds for reasonable response time
+- **output**: JSON format with center coordinates
 
-1. **`anchor login`** - Authenticate with Bluesky using AT Protocol
-2. **`anchor settings`** - Configure user preferences (default message)
-3. **`anchor drop`** - Main check-in functionality with optional `--place` and `--message` parameters
-4. **`anchor nearby`** - List nearby POIs with optional `--filter` parameter
+### Response Handling
+Parse JSON response to extract:
+- `elements[].type` - "node", "way", or "relation"
+- `elements[].id` - Unique identifier
+- `elements[].tags.name` - Place name
+- `elements[].center.lat/lon` - Coordinates
 
-## Key Technologies
+### Place ID Format
+Combine type and ID: `"node:123456"`, `"way:987654"`, `"relation:555"`
 
-### Cross-Platform
-- **Swift 6** - Modern Swift with strict concurrency (see [swift-concurrency.md](mdc:Anchor/Anchor/Docs/swift-concurrency.md))
-- **SwiftUI** - Declarative UI framework (see [SwiftUI-api-20250627.md](mdc:Anchor/Anchor/Docs/SwiftUI-api-20250627.md))
-- **SwiftData** - Data persistence framework (see [SwiftData-api-20250627.md](mdc:Anchor/Anchor/Docs/SwiftData-api-20250627.md))
-- **AT Protocol** - Bluesky backend communication
-- **CoreLocation** - Location services for all platforms
-- **Overpass API** - OpenStreetMap POI queries via `overpass.private.coffee`
+## CoreLocation Integration
 
-### Platform-Specific
-- **Swift ArgumentParser** - CLI command parsing (CLI only)
-- **UserDefaults** - Local storage for settings and auth tokens
+### Location Services
+- Request `whenInUse` authorization
+- Use `CLLocationManager` for current location
+- Handle location permissions gracefully
+- Provide fallback for location access denied
 
-## Architecture Patterns
+### Coordinate Handling
+- Use `CLLocationCoordinate2D` for lat/lon pairs
+- Convert to bounding box for Overpass queries
+- Calculate reasonable search radius (e.g., 1km)
 
-### MV Pattern (Model-View)
-Follow the **MV Pattern** guidelines (see [mv_pattern_guidelines.md](mdc:Anchor/Anchor/Docs/mv_pattern_guidelines.md)):
+## Network Layer Best Practices
 
-- **No ViewModels** - Use `@Observable` classes for business logic
-- **Views own UI state** - Use `@State` for temporary UI concerns
+### URLSession Configuration
+- Use shared URLSession with custom configuration
+- Set reasonable timeouts (10-30 seconds)
+- Handle network errors gracefully
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+### Error Handling
+Create service-specific error enums:
+```swift
+enum BlueskyError: Error {
+    case authenticationFailed
+    case networkError(Error)
+    case invalidResponse
+}
+
+enum OverpassError: Error {
+    case queryTimeout
+    case noResults
+    case invalidBounds
+}
+```
+
+### Response Models
+Use `Codable` structs for all API responses:
+- Bluesky session responses
+- Overpass query results
+- Error response formats
+
+### Testing Considerations
+- Mock network responses for unit tests
+- Test error conditions and edge cases
+- Validate JSON parsing with real API responses
 
 ---
 > Source: [dropanchorapp/Anchor](https://github.com/dropanchorapp/Anchor) — distributed by [TomeVault](https://tomevault.io).
