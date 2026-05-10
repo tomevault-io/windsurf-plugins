@@ -1,114 +1,28 @@
 ---
 trigger: always_on
-description: - **You are** a senior Laravel developer specialized in **application security**.
+description: Domain code lives in `src/`, split by role (contracts, models, services, events, HTTP controllers/middleware). API endpoints ship from `routes/api.php` and respect config-driven prefixes. Package config sits in `config/licensing.php`; publishable migrations/factories in `database/`. Blade views for onboarding stay in `resources/views`. Docs and rollout playbooks live in `docs/`; log new features under `docs/features`. Tests in `tests/Unit` and `tests/Feature` mirror production namespaces, with f
 ---
 
+# Repository Guidelines
 
-# CLAUDE.md
+## Project Structure & Module Organization
+Domain code lives in `src/`, split by role (contracts, models, services, events, HTTP controllers/middleware). API endpoints ship from `routes/api.php` and respect config-driven prefixes. Package config sits in `config/licensing.php`; publishable migrations/factories in `database/`. Blade views for onboarding stay in `resources/views`. Docs and rollout playbooks live in `docs/`; log new features under `docs/features`. Tests in `tests/Unit` and `tests/Feature` mirror production namespaces, with fixtures/helpers in `tests/Helpers`. CI artifacts land in `build/`.
 
-## Role & working style
-- **You are** a senior Laravel developer specialized in **application security**.
-- **Mission**: deliver `laravel-licensing` with strong security-by-default, clear extensibility, and **offline-capable** verification.
-- **Style**: concise, pragmatic, document decisions.
-- **Definition of Done (DoD)**: tests green, security requirements met, CLI stable, docs updated.
+## Build, Test, and Development Commands
+Run `composer install` after cloning or updating dependencies. Execute `composer test` (Pest) for the suite and `composer test-coverage` when checking coverage reports (writes to `build/report.junit.xml`). Use `composer analyse` to run Larastan (phpstan level 5, temp dir `build/phpstan`). Format via `composer format` (Laravel Pint). When adjusting package discovery, rerun `composer prepare` to refresh the Testbench bootstrap.
 
----
+## Coding Style & Naming Conventions
+Target PHP 8.3 features, follow PSR-12 with four-space indentation, and group imports alphabetically. Use expressive aggregate names (`LicenseScopeRepository`, `TokenIssuer`) and snake_case config keys. Keep enums/value objects inside `src/Enums` and contracts alongside their consumption path. Run Pint before opening a PR to fix spacing, trailing commas, and docblock alignment. New console commands adopt the `licensing:` prefix (e.g., `licensing:keys:rotate`); HTTP routes follow kebab-case segments.
 
-## Project overview
-Licensing package for Laravel 12/13 (PHP 8.3–8.5) with:
-- **Polymorphic assignment** (`License → licensable`) to bind a license to any application model.
-- **Activation keys** (128-bit entropy, hex format), **expirations/renewals**, and seat control via **LicenseUsage** (usage = one seat).
-- **Offline verification** using public-key–signed tokens and a **two-level key hierarchy** (**root → signing**) for safe rotation & compromise handling.
-- **License Scopes** for multi-product/software key isolation.
-- **Trial management** with HMAC-SHA256 fingerprint hashing and conversion tracking.
-- **Template-based licensing** with scope linkage.
-- **Out of scope**: multi-tenant isolation, billing/invoicing, advanced entitlement management (hook points only).
+## Testing Guidelines
+Prefer Pest `it()` descriptions that read like behavior specs. Unit tests stay in `tests/Unit`; integration flows belong in `tests/Feature`. Reuse factories in `database/factories` and helpers in `tests/Helpers` for complex fixtures. Tests execute in random order (see `phpunit.xml.dist`), so set up/teardown state defensively. Name files `*Test.php` to match the subject class or command. Cover critical scenarios: expiration windows, seat exhaustion, key rotation, offline token validation. Use `composer test-coverage` before release branches to catch regressions.
 
----
+## Commit & Pull Request Guidelines
+Write commit subjects in present tense (“Add scope assignment audit”) and keep changes focused. Reference issues with GitHub keywords when applicable. PRs should outline the impact, list verification commands, and attach screenshots for CLI/API output. Flag reviewers whenever migrations, route prefixes, or configuration defaults change so downstream apps can prepare.
 
-## Architecture (high level)
-- **Domain models** (overridable via config/contracts): `License`, `LicenseUsage`, `LicenseRenewal`.
-- **Policies**: over-limit handling, grace periods, inactivity auto-revocation.
-- **Crypto**: Ed25519 (default) for signatures; root CA issues short-lived signing keys; tokens carry `kid` and a chain to root.
-- **Interfaces (contracts)** to allow project-level replacement: KeyStore, CertificateAuthority, TokenIssuer/Verifier, UsageRegistrar, FingerprintResolver, Notifier.
-- **CLI** for key lifecycle (make/issue/rotate/revoke/export) and offline token issuance.
-- **API (optional)** for validate/refresh/jwks/usages.
-- **Jobs/Scheduler** for state transitions and notifications.
+## Security & Configuration Tips
+Never commit generated keys, certificates, or `.env` assets; document setup steps in `docs/installation.md` instead. When tuning cryptographic services in `config/licensing.php`, explain rotation plans in the PR and coordinate rollout dates. Validate root and signing key commands (`php artisan licensing:keys:make-root`, `licensing:keys:issue-signing`) in staging before tagging a release, and update docs if key formats shift.
 
 ---
-
-## Core entities (conceptual)
-### License
-- Fields: `id(ULID)`, `key_hash`, `status[pending|active|grace|expired|suspended|cancelled]`, `activated_at`, `expires_at`, `max_usages`, `meta(json)`.
-- Relations: `licensable (morphTo)`, `usages (hasMany)`, `renewals (hasMany)`.
-- Indexes: `expires_at`, `status`, `key_hash (unique)`, `licensable_type+licensable_id`.
-
-### LicenseUsage
-- Meaning: one **seat consumption** (device/VM/service/user/session).
-- Fields: `id`, `license_id`, `usage_fingerprint`, `status[active|revoked]`, `registered_at`, `last_seen_at`, `revoked_at`, `client_type`, `name`, `ip?`, `user_agent?`, `meta(json)`.
-- Uniqueness (default): **per-license** → unique(`license_id`,`usage_fingerprint`). Configurable to **global**.
-- Indexes: unique composite above, plus `revoked_at`, `last_seen_at`.
-
-### LicenseRenewal
-- Fields: `id`, `license_id`, `period_start`, `period_end`, `amount_cents?`, `currency?`, `notes?`.
-
----
-
-## States & lifecycle
-- States: `pending → active → grace → expired`; side paths: `suspended`, `cancelled`.
-- Events: `LicenseActivated`, `LicenseExpiringSoon`, `LicenseExpired`, `LicenseRenewed`, `UsageRegistered`, `UsageRevoked`, `UsageLimitReached`.
-- Scheduler (daily): time-based transitions, emit notifications/webhooks.
-
----
-
-## Configuration (defaults are secure & overridable)
-`config/licensing.php` keys:
-- `models`: `license`, `license_usage`, `license_renewal` (class names to override).
-- `morph_map`: aliases for `licensable` types (hide app class names).
-- `policies`:
-  - `over_limit`: `reject` (default) | `auto_replace_oldest`.
-  - `grace_days`: `14`.
-  - `usage_inactivity_auto_revoke_days`: `null` (off) or integer.
-  - `unique_usage_scope`: `license` (default) | `global`.
-- `offline_token`:
-  - `enabled`: `true`.
-  - `format`: `paseto` (default) | `jws`.
-  - `ttl_days`: `7`.
-  - `force_online_after_days`: `14`.
-  - `clock_skew_seconds`: `60`.
-- `crypto`:
-  - `algorithm`: `ed25519` (default) | `ES256`.
-  - `keystore.driver`: `files` | `database` | `custom`.
-  - `keystore.path`: `storage/app/licensing/keys`.
-  - `keystore.passphrase_env`: `LICENSING_KEY_PASSPHRASE`.
-- `publishing`:
-  - `jwks_url`: nullable (for JWS clients).
-  - `public_bundle_path`: path to bundle with root public and chain (PEM/JSON).
-- `rate_limit`:
-  - `validate_per_minute`: `60`.
-  - `token_per_minute`: `20`.
-  - `register_per_minute`: `30`.
-- `notifications`: toggle per event; choose mail/queue/webhook via Notifier contract.
-- `audit`:
-  - `enabled`: `true`.
-  - `store`: `database` | `file`.
-
-All timestamps stored in **UTC**.
-
----
-
-## Security requirements
-- Activation keys: store **HMAC-SHA256 hash** only; constant-time comparisons; 128-bit entropy keys generated with `random_bytes()`.
-- License key format: `PREFIX-XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX` (8 hex chars per segment).
-- Offline tokens: signed only; client holds **public** material; no private keys client-side.
-- Two-level hierarchy:
-  - **Root (pub/priv)** = trust anchor, **never** signs tokens; used to sign **signing-key certificates**.
-  - **Signing key (pub/priv)** = signs offline tokens; short-lived; includes `kid`; distributed with a **chain** up to root.
-  - KIDs generated with `bin2hex(random_bytes(16))` — cryptographically unpredictable.
-- Rotation & compromise:
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
-
----
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/masterix21) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-09 -->
+> Source: [masterix21/laravel-licensing](https://github.com/masterix21/laravel-licensing) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-04 -->
