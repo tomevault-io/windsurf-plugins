@@ -1,152 +1,149 @@
 ---
 trigger: always_on
-description: Dynamic output in Langflow components can be significantly affected by changing the number of rows in a `TableInput`. This behavior allows components to automatically adapt to data volume, showing relevant outputs based on the amount of available information.
+description: - Fully understand user requirements before creating flows
 ---
 
-# Guide: Dynamic Output with Table Input
+# Langflow Flow Development Rules
 
-## Overview
+## Flow Creation Standards
 
-Dynamic output in Langflow components can be significantly affected by changing the number of rows in a `TableInput`. This behavior allows components to automatically adapt to data volume, showing relevant outputs based on the amount of available information.
+### Requirements Analysis
+- Fully understand user requirements before creating flows
+- Define input/output specifications clearly
+- Identify all dependencies and integrations needed
+- Plan component connections and data flow
 
-## How It Works
+### Naming Conventions
+- Use camelCase for variable names and field identifiers
+- Use PascalCase for component names and class definitions
+- Ensure all names are descriptive and self-explanatory
+- Use consistent naming across the entire flow
 
-### 1. `update_outputs` Method
+### Flow Structure Guidelines
+- Design flows to be modular and reusable
+- Minimize complexity while maximizing functionality
+- Create logical, organized flow structures
+- Ensure smooth data transitions between components
+- Follow single responsibility principle for each flow section
 
-The `update_outputs` method is the key to implementing dynamic output. It is automatically called when a field with `real_time_refresh=True` is modified.
+### Documentation Requirements
+- Add concise comments explaining flow purpose
+- Document expected inputs and outputs
+- Include error handling descriptions
+- Ensure all fields and comments are in English
+- Provide usage examples where helpful
 
-```python
-def update_outputs(self, frontend_node: dict, field_name: str, field_value: Any) -> dict:
-    """Updates outputs dynamically based on the number of rows in the table input."""
-    if field_name == "data_table":
-        # Gets the number of rows in the table
-        row_count = len(field_value) if field_value else 0
-        
-        # Clears existing outputs
-        frontend_node["outputs"] = []
-        
-        # Adds outputs based on the number of rows
-        if row_count == 0:
-            # No rows - shows only warning
-            frontend_node["outputs"].append(
-                Output(display_name="Warning", name="warning", method="show_warning")
-            )
-        elif row_count == 1:
-            # One row - shows item details
-            frontend_node["outputs"].append(
-                Output(display_name="Item Details", name="item_details", method="show_item_details")
-            )
-        # ... more conditions
-        
-    return frontend_node
-```
+### Component Integration
+- Integrate components seamlessly with proper data types
+- Maintain data consistency across all flow steps
+- Use appropriate connection types (Data, Message, DataFrame)
+- Validate data transformations between components
+- Handle edge cases in component connections
 
-### 2. TableInput Configuration
+### Error Handling in Flows
+- Implement robust error handling at flow level
+- Use conditional routers for error paths
+- Provide meaningful error messages to users
+- Include fallback mechanisms where possible
+- Log errors appropriately for debugging
 
-For dynamic output to work, the `TableInput` must have `real_time_refresh=True`:
+### Performance Optimization
+- Design flows for efficiency and resource optimization
+- Avoid unnecessary data transformations
+- Use parallel processing where applicable
+- Minimize memory usage in large data flows
+- Implement proper caching strategies
 
-```python
-TableInput(
-    name="data_table",
-    display_name="Data Table",
-    info="Add or remove rows to see how outputs change dynamically.",
-    table_schema=[...],
-    value=[...],
-    real_time_refresh=True,  # Important!
-),
-```
+### Testing and Validation
+- Test complete flows end-to-end
+- Validate all component connections
+- Test error scenarios and edge cases
+- Ensure flows meet functional requirements
+- Verify performance under expected load
 
-## Dynamic Output Strategies
+### Production Readiness
+- Ensure flows are deployment-ready
+- Optimize for production environments
+- Include proper monitoring and logging
+- Implement security best practices
+- Document deployment requirements
 
-### 1. Based on Number of Rows
+## Flow JSON Structure
 
-| Number of Rows | Suggested Outputs | Justification |
-|----------------|------------------|---------------|
-| 0 | Warning | No data to process |
-| 1 | Item Details | Specific information for the single item |
-| 2-5 | Summary + Basic Statistics | Simple analysis suitable for the volume |
-| 6-10 | Summary + Advanced Statistics + Category Analysis | More detailed analysis |
-| 10+ | All available outputs | Complete analysis and reports |
-
-### 2. Based on Data Type
-
-```python
-def update_outputs(self, frontend_node: dict, field_name: str, field_value: Any) -> dict:
-    if field_name == "data_table":
-        # Analyzes the type of data in rows
-        has_numeric_data = any(
-            str(item.get("value", "")).isdigit() 
-            for item in field_value
-        )
-        
-        if has_numeric_data:
-            frontend_node["outputs"].append(
-                Output(display_name="Statistics", name="stats", method="generate_stats")
-            )
-        else:
-            frontend_node["outputs"].append(
-                Output(display_name="Text Analysis", name="text_analysis", method="analyze_text")
-            )
-    
-    return frontend_node
-```
-
-### 3. Based on Data Complexity
-
-```python
-def update_outputs(self, frontend_node: dict, field_name: str, field_value: Any) -> dict:
-    if field_name == "data_table":
-        # Counts unique categories
-        categories = set(item.get("category", "") for item in field_value)
-        
-        if len(categories) > 3:
-            frontend_node["outputs"].append(
-                Output(display_name="Category Analysis", name="category_analysis", method="analyze_categories")
-            )
-        
-        # Checks if there are numeric values
-        numeric_values = [item for item in field_value if str(item.get("value", "")).isdigit()]
-        if len(numeric_values) > 5:
-            frontend_node["outputs"].append(
-                Output(display_name="Statistical Analysis", name="statistical_analysis", method="analyze_statistics")
-            )
-    
-    return frontend_node
-```
-
-## Practical Examples
-
-### Example 1: Sales Analysis Component
-
-```python
-class SalesAnalysisComponent(Component):
-    inputs = [
-        TableInput(
-            name="sales_data",
-            display_name="Sales Data",
-            table_schema=[
-                {"name": "product", "display_name": "Product", "type": "str"},
-                {"name": "quantity", "display_name": "Quantity", "type": "str"},
-                {"name": "price", "display_name": "Price", "type": "str"},
-                {"name": "category", "display_name": "Category", "type": "str"},
-            ],
-            real_time_refresh=True,
-        )
+### Standard Flow Template
+```json
+{
+  "id": "unique-flow-id",
+  "data": {
+    "nodes": [
+      {
+        "id": "component-id",
+        "type": "CustomComponent",
+        "position": {"x": 100, "y": 100},
+        "data": {
+          "node": {
+            "template": {
+              "input_field": {
+                "value": "default_value"
+              }
+            }
+          }
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "edge-id",
+        "source": "source-node-id",
+        "target": "target-node-id",
+        "sourceHandle": "output_name",
+        "targetHandle": "input_name"
+      }
     ]
-    
-    def update_outputs(self, frontend_node: dict, field_name: str, field_value: Any) -> dict:
-        if field_name == "sales_data":
-            row_count = len(field_value) if field_value else 0
-            
-            frontend_node["outputs"] = []
-            
-            # Always shows processed data
-            frontend_node["outputs"].append(
-                Output(display_name="Processed Data", name="processed_data", method="process_data")
-            )
-            
+  }
+}
+```
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+### Component Connection Rules
+- Always specify correct sourceHandle and targetHandle
+- Ensure data type compatibility between connected components
+- Use descriptive IDs for nodes and edges
+- Position components logically in the flow layout
+- Group related components visually
+
+### Flow Validation Checklist
+- [ ] All required inputs have default values or connections
+- [ ] Error handling paths are implemented
+- [ ] Component types match expected functionality
+- [ ] Data flows follow logical sequence
+- [ ] No circular dependencies exist
+- [ ] All outputs are properly utilized or connected
+
+## Common Flow Patterns
+
+### Data Processing Pattern
+1. Input → Validation → Processing → Output
+2. Include error handling at each step
+3. Log processing steps for debugging
+4. Return structured results
+
+### API Integration Pattern
+1. Authentication → Request → Response Handling → Output
+2. Implement retry logic for failed requests
+3. Handle rate limiting appropriately
+4. Parse and validate API responses
+
+### File Processing Pattern
+1. File Input → Validation → Processing → Results → Export
+2. Support multiple file formats
+3. Handle large files efficiently
+4. Provide progress feedback
+
+### Conditional Routing Pattern
+1. Input → Condition Check → Route A/B → Process → Merge Results
+2. Use routers for decision points
+3. Handle all possible paths
+4. Provide default routing options
 
 ---
 > Source: [Empreiteiro/langflow-factory](https://github.com/Empreiteiro/langflow-factory) — distributed by [TomeVault](https://tomevault.io).
