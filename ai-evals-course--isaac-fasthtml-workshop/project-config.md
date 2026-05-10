@@ -1,138 +1,179 @@
 ---
 trigger: always_on
-description: The main file for the project is [main_sqlite.py](mdc:fasthtml_app/main_sqlite.py) It uses MonsterUI for styling.  MonsterUI is a python first UI component library that primarily leverages FrankenUI and Tailwind, but also includes headers and functionality form DaisyUI, Katex, HighlightJS, and others.
+description: This rule is to help create interactive behavior with HTMX and fasthtml, which is the preferred approach
 ---
 
+To use HTMX with FastHTML you can pass the attributes to the HTML elements (e.g. `Button("Show", hx_get=my_route, hx_target='#my-target')`).  Key things to keep in mind:
 
-# Project Structure
+In FastHTML routes stringify to the route path so you can be pythonic instead of passing strings.  For example if we have the following routes:
 
-The main file for the project is [main_sqlite.py](mdc:fasthtml_app/main_sqlite.py) It uses MonsterUI for styling.  MonsterUI is a python first UI component library that primarily leverages FrankenUI and Tailwind, but also includes headers and functionality form DaisyUI, Katex, HighlightJS, and others.
+```python
+@rt
+def my_route(): return "Hello world"
 
-You can run the server with the command `python app/main_sqlite.py`, which will start the server on http://localhost:5001.
+@rt
+def my_second_route(my_arg:str): return my_arg
+```
 
-# Tech Stack
+In this example `Button("Show", hx_get=my_route)` would translate to `Button("Show", hx_get='/my_route')`.  
 
-- FastHTML is the web application framework.  It is built on top of starlette and uvicorn.
-- MonsterUI is a UI component library designed to work well with FastHTML
-- Fastlite is a sqlite library that is a small wrapper on top of sqlite-utils
+For routes that have query or path parameters we can use the `to` method if it's not passed via a form.  For example, `Button("Show", hx_get=my_second_route.to(my_arg="Goodbye"))` would translate to `Button("Show", hx_get='/my_second_route?my_arg=Goodbye')`.
 
-# Key documentation files:
+`@rt` by default exposes routes as both a `GET` and a `POST`, which is almost always what I want.
 
-These are relevant documents that should be referenced while building a FastHTML App.
+## File Upload Example
 
-- [fasthtml.mdc](mdc:.cursor/rules/fasthtml.mdc): Minimal HTMX integration exaples to show how HTMX can be used with fasthtml
-- [db.md](mdc:ref_docs/db.md): MiniDataAPI Spec for database operations
-- [monsterui_api.md](mdc:ref_docs/monsterui_api.md).md : MonsterUI full API list and idiomatic examples for UI components
+```python
+from base64 import b64encode
+from fasthtml.common import *
+from monsterui.all import *
 
-# FastHTML examples
+app, rt = fast_app(hdrs=Theme.blue.headers())
 
-Reference these examples when constructing new FastHTML applications.
+@rt
+def index():
+    inp = Card(
+        H3("Drag and drop images here"),
+        # HTMX for uploading multiple images
+        Input(type="file",name="images", multiple=True, required=True, 
+              # Call the upload route on change
+              post=upload, hx_target="#image-list", hx_swap="afterbegin", hx_trigger="change",
+              # encoding for multipart
+              hx_encoding="multipart/form-data",accept="image/*"))
 
-- [annotation.md](mdc:ref_docs/annotation.md): A siple example of a annotation app to evaluate search results.  
-- Adv_app: Example FastHTML To-Do-List application that demonstrates core FastHTML features including authentication, HTMX integration, and database operations. It allows users to create, edit, delete, and reorder todos with markdown support, using SQLite for storage.
+    return DivCentered(inp, H3("👇 Uploaded images 👇"), Div(id="image-list"))
 
-# FastHTML Rules
+async def ImageCard(image):
+    contents = await image.read()
+    # Create a base64 string
+    img_data = f"data:{image.content_type};base64,{b64encode(contents).decode()}"
+    # Create a card with the image
+    return Card(H4(image.filename), Img(src=img_data, alt=image.filename))
 
-- Use `serve()` directly - no need for uvicorn or separate ASGI server
-- Not compatible with FastAPI syntax - FastHTML is for HTML-first apps, not API services
-- Define routes with decorators and return HTML components or strings
-- Use python FastTags (ie `Div`, `P`) instead of raw HTML where possible
-- Use HTMX for interactive features, vanilla JS where needed. No React/Vue/Svelte
+@rt
+async def upload(images: list[UploadFile]):
+    # Create a grid filled with 1 image card per image
+    return Grid(*[await ImageCard(image) for image in images])
 
-# UI Design Elements with MonsterUI
+serve()
+```
 
-- Use defaults as much as possible, for example `Container` in monsterui already has defaults for margins
-- Use `*T` for button styling consistency, for example `ButtonT.destructive` for a red delete button or `ButtonT.primary` for a CTA button
-- Use `Label*` functions for forms as much as possible (e.g. `LabelInput`, `LabelRange`) which creates and links both the `FormLabel` and user input appropriately to avoid boiler plate
-
-## Basic Complete App Example
+## Cascading DropDown Example
 
 ```python
 from fasthtml.common import *
 from monsterui.all import *
+from fasthtml import ft
 
-app, rt = fast_app(hdrs=Theme.blue.headers()) # Use MonsterUI blue theme
+app, rt = fast_app(hdrs=Theme.blue.headers())
+
+chapters = ['ch1', 'ch2', 'ch3']
+lessons = {
+    'ch1': ['lesson1', 'lesson2', 'lesson3'],
+    'ch2': ['lesson4', 'lesson5', 'lesson6'],
+    'ch3': ['lesson7', 'lesson8', 'lesson9']}
+
+def mk_opts(nm, cs):
+    return (
+        ft.Option(f'-- select {nm} --', disabled='', selected='', value=''),
+        *map(ft.Option, cs))
+
+@rt
+def get_lessons(chapter: str):
+    return ft.Select(*mk_opts('lesson', lessons[chapter]), name='lesson')
 
 @rt
 def index():
-    socials = (('github','https://github.com/AnswerDotAI/MonsterUI'),
-               ('twitter','https://twitter.com/isaac_flath/'),
-               ('linkedin','https://www.linkedin.com/in/isaacflath/'))
-    return Titled("Your First App",
-        Card(
-            P("Your first MonsterUI app", cls=TextPresets.muted_sm),
-            # LabelInput, DivLAigned, and UkIconLink are non-semantic MonsterUI FT Components,
-            LabelInput('Email', type='email', required=True),
-            footer=DivLAligned(*[UkIconLink(icon,href=url) for icon,url in socials])))
-```
+    chapter_dropdown = ft.Select(
+        *mk_opts('chapter', chapters),
+        name='chapter',
+        hx_get=get_lessons, hx_target='#lessons',
+        label='Chapter:')
 
-## Card and Flex Layout Components Example
-
-```python
-def TeamCard(name, role, location="Remote"):
-    icons = ("mail", "linkedin", "github")
-    return Card(
+    return Container(
+        DivLAligned(FormLabel("Chapter:", for_="chapter"),chapter_dropdown),
         DivLAligned(
-            DiceBearAvatar(name, h=24, w=24),
-            Div(H3(name), P(role))),
-        footer=DivFullySpaced(
-            DivHStacked(UkIcon("map-pin", height=16), P(location)),
-            DivHStacked(*(UkIconLink(icon, height=16) for icon in icons))))
-```
-
-## Forms and User Inputs Example
-
-```python
-def MonsterForm():
-    relationship = ["Parent",'Sibling', "Friend"]
-    return Div(
-        DivCentered(
-            H3("Emergency Contact Form"),
-            P("Please fill out the form completely", cls=TextPresets.muted_sm)),
-        Form(
-            Grid(LabelInput("Name",id='name'),LabelInput("Email",     id='email')),
-            H3("Relationship to patient"),
-            Grid(*[LabelCheckboxX(o) for o in relationship], cols=4, cls='space-y-3'),
-            DivCentered(Button("Submit Form", cls=ButtonT.primary))),
+            FormLabel("Lesson:", for_="lesson"),
+            Div(id='lessons')),  
         cls='space-y-4')
+
+serve()
 ```
 
-## Markdown Text Styling Example
+## Infinite Scroll Example
 
 ```python
-render_md("""
-# My Document
+from fasthtml.common import *
+from monsterui.all import *
+import uuid
 
-> Important note here
+column_names = ('name', 'email', 'id')
 
-+ List item with **bold**
-+ Another with `code`
+def generate_contact(id: int) -> Dict[str, str]:
+    return {'name': 'Agent Smith',
+            'email': f'void{str(id)}@matrix.com',
+            'id': str(uuid.uuid4())
+            }
+
+def generate_table_row(row_num: int) -> Tr:
+    contact = generate_contact(row_num)
+    return Tr(*[Td(contact[key]) for key in column_names])
+
+def generate_table_part(part_num: int = 1, size: int = 20) -> Tuple[Tr]:
+    paginated = [generate_table_row((part_num - 1) * size + i) for i in range(size)]
+    paginated[-1].attrs.update({
+        'get': f'page?idx={part_num + 1}',
+        'hx-trigger': 'revealed',
+        'hx-swap': 'afterend'})
+    return tuple(paginated)
+
+app, rt = fast_app(hdrs=Theme.blue.headers())
+
+@rt
+def index():
+    return Titled('Infinite Scroll',
+                  Div(Table(
+                      Thead(Tr(*[Th(key) for key in column_names])),
+                      Tbody(generate_table_part(1)))))
+
+@rt
+def page(idx:int|None = 0):
+    return generate_table_part(idx)
+```
+
+## Simple Todo App Example
 
 ```python
-def hello():
-    print("world")
-```
-""")
-```
+# Database Model
+class Todo:
+    title: str
+    done: bool
+    due: date
+    id: int
 
-## Semantic Text Styling Example
+# Sqlite Database connection with fastlite
+db = database('intermediate_todo.db')
 
-```python
-def SemanticText():
-    return Card(
-        H1("MonsterUI's Semantic Text"),
-        P(
-            Strong("MonsterUI"), " brings the power of semantic HTML to life with ",
-            Em("beautiful styling"), " and ", Mark("zero configuration"), "."),
-        Blockquote(
-            P("Write semantic HTML in pure Python, get modern styling for free."),
-            Cite("MonsterUI Team")),
-        footer=Small("Released February 2025"),)
-```
+# Create a connection to the database table todo.
+# Creates the table if it doesn't exist with columns id and title making id the primary key by default
+todos = db.create(Todo)
 
-# Data Storage
+# Create a fasthtml app with the slate theme
+app, rt = fast_app(hdrs=Theme.slate.headers())
 
-- `fastlite` (SQLite) included and preferred.
+def tid(id): return f'todo-{id}'
+
+# Render all the todos ordered by todo due date
+def mk_todo_list():  return Grid(*todos(order_by='due'), cols=1)
+
+@app.delete
+async def delete_todo(id:int):
+    "Delete if it exists, if not someone else already deleted it so no action needed"
+    try: todos.delete(id)
+    except NotFoundError: pass
+    # Because there is no return, the todo will be swapped with None and removed from UI
+
+# patch is a decorator that patches the __ft__ method of the Todo class
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
