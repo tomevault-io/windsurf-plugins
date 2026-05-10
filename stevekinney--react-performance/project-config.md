@@ -1,233 +1,199 @@
 ---
 trigger: always_on
-description: React best practices and patterns for this codebase
+description: handleSubmit,
 ---
 
 
-# React Development Guidelines
+# Type Validation with Zod
 
-## Core Principles
+You are an expert TypeScript developer who understands that type assertions (using `as`) only provide compile-time safety without runtime validation.
 
-1. **Function Components Only**: No class components - use hooks for state and lifecycle
-2. **TypeScript First**: Every component, prop, and hook must be properly typed
-3. **Composition Over Inheritance**: Build complex UIs from simple, composable pieces
-4. **Performance by Default**: Consider performance implications in initial implementation
-5. **Accessibility Always**: Every interactive element must be keyboard and screen reader accessible
+## Zod Over Type Assertions
 
-## Component Architecture
+- **NEVER** use type assertions (with `as`) for external data sources, API responses, or user inputs
+- **ALWAYS** use Zod schemas to validate and parse data from external sources
+- Implement proper error handling for validation failures
 
-### File Structure
+## Zod Implementation Patterns
 
-```
-src/
-├── components/
-│   ├── ui/           # Reusable UI components (Button, Input, Card)
-│   ├── layout/       # Layout components (Header, Footer, Sidebar)
-│   └── features/     # Feature-specific components
-├── hooks/            # Custom React hooks
-├── utils/            # Utility functions
-├── types/            # Shared TypeScript types
-└── assets/           # Images, fonts, etc.
-```
+- Import zod with: `import { z } from 'zod'` (not 'zod/v4' - we use standard Zod v3)
+- Define schemas near related types or in dedicated schema files
+- Use `schema.parse()` for throwing validation behavior
+- Use `schema.safeParse()` for non-throwing validation with detailed errors
+- Add meaningful error messages with `.refine()` and `.superRefine()`
+- Set up default values with `.default()` when appropriate
+- Use transformations with `.transform()` to convert data formats
+- Always handle potential validation errors
 
-### Component Organization
-
-```typescript
-// 1. Imports (in order)
-import { useState, useEffect, type FC } from 'react';
-import { z } from 'zod';
-import clsx from 'clsx';
-
-// 2. Type definitions
-interface ComponentProps {
-  // Props interface
+```ts
+// ❌ WRONG: Using type assertions
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  age: number;
 }
 
-// 3. Schema definitions (if needed)
-const PropsSchema = z.object({
-  // Validation schema
+const fetchUser = async (id: string): Promise<User> => {
+  const response = await fetch(`/api/users/${id}`);
+  const data = await response.json();
+  return data as User; // DANGEROUS: No runtime validation!
+};
+```
+
+```ts
+// ✅ RIGHT: Using Zod for validation
+import { z } from 'zod';
+
+// Define the schema
+const UserSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().min(1),
+  email: z.string().email(),
+  age: z.number().int().positive().min(13),
 });
 
-// 4. Component definition
-export const Component: FC<ComponentProps> = (props) => {
-  // 5. Hooks
-  const [state, setState] = useState();
+// Derive the type from the schema
+type User = z.infer<typeof UserSchema>;
 
-  // 6. Event handlers
-  const handleClick = () => {};
+const fetchUser = async (id: string): Promise<User> => {
+  const response = await fetch(`/api/users/${id}`);
+  const data = await response.json();
 
-  // 7. Effects
-  useEffect(() => {}, []);
-
-  // 8. Render
-  return <div />;
+  // Runtime validation
+  return UserSchema.parse(data);
 };
 
-// 9. Display name (for debugging)
-Component.displayName = 'Component';
+// With error handling
+const fetchUserSafe = async (id: string): Promise<User | null> => {
+  try {
+    const response = await fetch(`/api/users/${id}`);
+    const data = await response.json();
+
+    const result = UserSchema.safeParse(data);
+    if (!result.success) {
+      console.error('Invalid user data:', result.error.format());
+      return null;
+    }
+
+    return result.data;
+  } catch (error) {
+    console.error('Error fetching user:', error);
+    return null;
+  }
+};
 ```
 
-## State Management Patterns
+## React-Specific Validation Patterns
 
-### Local State
-
-```typescript
-// Simple state for UI-only concerns
-const [isOpen, setIsOpen] = useState(false);
-
-// Complex state with reducer for business logic
-const [state, dispatch] = useReducer(reducer, initialState);
-```
-
-### Lifted State
+### Form Validation with React Hook Form + Zod
 
 ```typescript
-// Lift state to lowest common ancestor
-export function Parent() {
-  const [sharedState, setSharedState] = useState();
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+
+// Define form schema
+const FormSchema = z.object({
+  email: z.string().email('Invalid email address'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
+  confirmPassword: z.string(),
+  age: z.number().min(18, 'Must be at least 18'),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ['confirmPassword'],
+});
+
+type FormData = z.infer<typeof FormSchema>;
+
+export function SignUpForm() {
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<FormData>({
+    resolver: zodResolver(FormSchema),
+  });
+
+  const onSubmit = (data: FormData) => {
+    // Data is already validated by Zod
+    console.log('Valid form data:', data);
+  };
 
   return (
-    <>
-      <ChildA state={sharedState} />
-      <ChildB onUpdate={setSharedState} />
-    </>
+    <form onSubmit={handleSubmit(onSubmit)}>
+      <input {...register('email')} placeholder="Email" />
+      {errors.email && <span>{errors.email.message}</span>}
+
+      <input {...register('password')} type="password" />
+      {errors.password && <span>{errors.password.message}</span>}
+
+      <button type="submit">Sign Up</button>
+    </form>
   );
 }
 ```
 
-### Global State (Context)
+### Props Validation
 
 ```typescript
-// Create context with proper typing
-const StateContext = createContext<StateValue | undefined>(undefined);
+import { z } from 'zod';
+import type { FC } from 'react';
 
-// Provider with value memoization
-export const StateProvider: FC<{ children: ReactNode }> = ({ children }) => {
-  const [state, setState] = useState();
-
-  const value = useMemo(
-    () => ({ state, setState }),
-    [state]
-  );
-
-  return <StateContext.Provider value={value}>{children}</StateContext.Provider>;
-};
-
-// Custom hook with error boundary
-export const useAppState = () => {
-  const context = useContext(StateContext);
-  if (!context) {
-    throw new Error('useAppState must be used within StateProvider');
-  }
-  return context;
-};
-```
-
-## Performance Optimization
-
-### Memoization Rules
-
-```typescript
-// Memo for expensive components
-export const ExpensiveComponent = memo(({ data }: Props) => {
-  return <ComplexVisualization data={data} />;
+// Define props schema
+const ComponentPropsSchema = z.object({
+  title: z.string(),
+  count: z.number().int().nonnegative(),
+  isActive: z.boolean().optional(),
+  items: z.array(z.string()).min(1),
+  config: z.object({
+    theme: z.enum(['light', 'dark']),
+    size: z.enum(['sm', 'md', 'lg']),
+  }),
 });
 
-// useCallback for stable function references
-const handleSubmit = useCallback((data: FormData) => {
-  // Process data
-}, [dependency]);
+type ComponentProps = z.infer<typeof ComponentPropsSchema>;
 
-// useMemo for expensive calculations
-const processedData = useMemo(() => {
-  return expensiveCalculation(rawData);
-}, [rawData]);
-```
+// Validate props at runtime (useful for components receiving external data)
+export const SafeComponent: FC<unknown> = (props) => {
+  // Validate props at runtime
+  const validatedProps = ComponentPropsSchema.parse(props);
 
-### Code Splitting
-
-```typescript
-// Route-based splitting
-const Dashboard = lazy(() => import('@/pages/Dashboard'));
-
-// Component-based splitting for heavy components
-const HeavyChart = lazy(() => import('@/components/HeavyChart'));
-
-// With loading boundary
-<Suspense fallback={<Spinner />}>
-  <HeavyChart data={data} />
-</Suspense>
-```
-
-### List Optimization
-
-```typescript
-// Always use stable, unique keys
-items.map((item) => <Item key={item.id} {...item} />)
-
-// Virtualize long lists (100+ items)
-import { FixedSizeList } from 'react-window';
-
-<FixedSizeList
-  height={600}
-  itemCount={items.length}
-  itemSize={50}
->
-  {({ index, style }) => (
-    <div style={style}>
-      <Item {...items[index]} />
+  return (
+    <div>
+      <h1>{validatedProps.title}</h1>
+      <p>Count: {validatedProps.count}</p>
     </div>
-  )}
-</FixedSizeList>
+  );
+};
 ```
 
-## Styling with TailwindCSS
-
-### Class Name Organization
+### Context Value Validation
 
 ```typescript
-// Use clsx for conditional classes
-import clsx from 'clsx';
+import { createContext, useContext, type FC, type ReactNode } from 'react';
+import { z } from 'zod';
 
-<div
-  className={clsx(
-    // Base styles first
-    'rounded-lg border p-4',
-    // Conditional styles
-    {
-      'border-blue-500 bg-blue-50': isActive,
-      'border-gray-300 bg-white': !isActive,
-    },
-    // Size variants
-    {
-      'text-sm': size === 'small',
-      'text-base': size === 'medium',
-      'text-lg': size === 'large',
-    },
-    // State styles
-    'hover:shadow-md focus:outline-none focus:ring-2',
-    // Override with className prop
-    className
-  )}
-/>
-```
+const AuthContextSchema = z.object({
+  user: z.object({
+    id: z.string(),
+    email: z.string().email(),
+    role: z.enum(['admin', 'user', 'guest']),
+  }).nullable(),
+  login: z.function().args(z.string(), z.string()).returns(z.promise(z.void())),
+  logout: z.function().returns(z.void()),
+});
 
-### Component Variants with CVA
+type AuthContextValue = z.infer<typeof AuthContextSchema>;
 
-```typescript
-import { cva, type VariantProps } from 'class-variance-authority';
+const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-const buttonVariants = cva(
-  // Base styles
-  'inline-flex items-center justify-center rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 disabled:pointer-events-none disabled:opacity-50',
-  {
-    variants: {
-      variant: {
-        primary: 'bg-blue-600 text-white hover:bg-blue-700',
-        secondary: 'bg-gray-200 text-gray-900 hover:bg-gray-300',
-        ghost: 'hover:bg-gray-100',
-      },
-      size: {
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within AuthProvider');
+  }
+  // Validate context value at runtime if receiving from external source
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
