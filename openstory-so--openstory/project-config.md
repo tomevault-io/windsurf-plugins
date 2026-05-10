@@ -1,149 +1,208 @@
 ---
 trigger: always_on
-description: TanStack Router: Guide
+description: TanStack Router: Installation
 ---
 
-# Authenticated Routes
+# Manual Setup
 
-Authentication is an extremely common requirement for web applications. In this guide, we'll walk through how to use TanStack Router to build protected routes, and how to redirect users to login if they try to access them.
+To set up TanStack Router manually in a React project, follow the steps below. This gives you a bare minimum setup to get going with TanStack Router using both file-based route generation and code-based route configuration:
 
-## The `route.beforeLoad` Option
+## Using File-Based Route Generation
 
-The `route.beforeLoad` option allows you to specify a function that will be called before a route is loaded. It receives all of the same arguments that the `route.loader` function does. This is a great place to check if a user is authenticated, and redirect them to a login page if they are not.
+#### Install TanStack Router, Vite Plugin, and the Router Devtools
 
-The `beforeLoad` function runs in relative order to these other route loading functions:
+```sh
+npm install @tanstack/react-router @tanstack/react-router-devtools
+npm install -D @tanstack/router-plugin
+# or
+pnpm add @tanstack/react-router @tanstack/react-router-devtools
+pnpm add -D @tanstack/router-plugin
+# or
+yarn add @tanstack/react-router @tanstack/react-router-devtools
+yarn add -D @tanstack/router-plugin
+# or
+bun add @tanstack/react-router @tanstack/react-router-devtools
+bun add -D @tanstack/router-plugin
+# or
+deno add npm:@tanstack/react-router npm:@tanstack/router-plugin npm:@tanstack/react-router-devtools
+```
 
-- Route Matching (Top-Down)
-  - `route.params.parse`
-  - `route.validateSearch`
-- Route Loading (including Preloading)
-  - **`route.beforeLoad`**
-  - `route.onError`
-- Route Loading (Parallel)
-  - `route.component.preload?`
-  - `route.load`
-
-**It's important to know that the `beforeLoad` function for a route is called _before any of its child routes' `beforeLoad` functions_.** It is essentially a middleware function for the route and all of its children.
-
-**If you throw an error in `beforeLoad`, none of its children will attempt to load**.
-
-## Redirecting
-
-While not required, some authentication flows require redirecting to a login page. To do this, you can **throw a `redirect()`** from `beforeLoad`:
+#### Configure the Vite Plugin
 
 ```tsx
-// src/routes/_authenticated.tsx
-export const Route = createFileRoute('/_authenticated')({
-  beforeLoad: async ({ location }) => {
-    if (!isAuthenticated()) {
-      throw redirect({
-        to: '/login',
-        search: {
-          // Use the current location to power a redirect after login
-          // (Do not use `router.state.resolvedLocation` as it can
-          // potentially lag behind the actual current location)
-          redirect: location.href,
-        },
-      })
-    }
-  },
+// vite.config.ts
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+import { tanstackRouter } from '@tanstack/router-plugin/vite'
+
+// https://vitejs.dev/config/
+export default defineConfig({
+  plugins: [
+    // Please make sure that '@tanstack/router-plugin' is passed before '@vitejs/plugin-react'
+    tanstackRouter({
+      target: 'react',
+      autoCodeSplitting: true,
+    }),
+    react(),
+    // ...,
+  ],
 })
 ```
 
 > [!TIP]
-> The `redirect()` function takes all of the same options as the `navigate` function, so you can pass options like `replace: true` if you want to replace the current history entry instead of adding a new one.
+> If you are not using Vite, or any of the supported bundlers, you can check out the [TanStack Router CLI](./with-router-cli) guide for more info.
 
-Once you have authenticated a user, it's also common practice to redirect them back to the page they were trying to access. To do this, you can utilize the `redirect` search param that we added in our original redirect. Since we'll be replacing the entire URL with what it was, `router.history.push` is better suited for this than `router.navigate`:
+Create the following files:
+
+- `src/routes/__root.tsx` (with two '`_`' characters)
+- `src/routes/index.tsx`
+- `src/routes/about.tsx`
+- `src/main.tsx`
+
+#### `src/routes/__root.tsx`
 
 ```tsx
-router.history.push(search.redirect)
+import { createRootRoute, Link, Outlet } from '@tanstack/react-router'
+import { TanStackRouterDevtools } from '@tanstack/react-router-devtools'
+
+const RootLayout = () => (
+  <>
+    <div className="p-2 flex gap-2">
+      <Link to="/" className="[&.active]:font-bold">
+        Home
+      </Link>{' '}
+      <Link to="/about" className="[&.active]:font-bold">
+        About
+      </Link>
+    </div>
+    <hr />
+    <Outlet />
+    <TanStackRouterDevtools />
+  </>
+)
+
+export const Route = createRootRoute({ component: RootLayout })
 ```
 
-## Non-Redirected Authentication
-
-Some applications choose to not redirect users to a login page, and instead keep the user on the same page and show a login form that either replaces the main content or hides it via a modal. This is also possible with TanStack Router by simply short circuiting rendering the `<Outlet />` that would normally render the child routes:
+#### `src/routes/index.tsx`
 
 ```tsx
-// src/routes/_authenticated.tsx
-export const Route = createFileRoute('/_authenticated')({
-  component: () => {
-    if (!isAuthenticated()) {
-      return <Login />
-    }
+import { createFileRoute } from '@tanstack/react-router'
 
-    return <Outlet />
-  },
+export const Route = createFileRoute('/')({
+  component: Index,
 })
-```
 
-This keeps the user on the same page, but still allows you to render a login form. Once the user is authenticated, you can simply render the `<Outlet />` and the child routes will be rendered.
-
-## Authentication using React context/hooks
-
-If your authentication flow relies on interactions with React context and/or hooks, you'll need to pass down your authentication state to TanStack Router using `router.context` option.
-
-> [!IMPORTANT]
-> React hooks are not meant to be consumed outside of React components. If you need to use a hook outside of a React component, you need to extract the returned state from the hook in a component that wraps your `<RouterProvider />` and then pass the returned value down to TanStack Router.
-
-We'll cover the `router.context` options in-detail in the [Router Context](./router-context.md) section.
-
-Here's an example that uses React context and hooks for protecting authenticated routes in TanStack Router. See the entire working setup in the [Authenticated Routes example](https://github.com/TanStack/router/tree/main/examples/react/authenticated-routes).
-
-- `src/routes/__root.tsx`
-
-```tsx
-import { createRootRouteWithContext } from '@tanstack/react-router'
-
-interface MyRouterContext {
-  // The ReturnType of your useAuth hook or the value of your AuthContext
-  auth: AuthState
-}
-
-export const Route = createRootRouteWithContext<MyRouterContext>()({
-  component: () => <Outlet />,
-})
-```
-
-- `src/router.tsx`
-
-```tsx
-import { createRouter } from '@tanstack/react-router'
-
-import { routeTree } from './routeTree.gen'
-
-export const router = createRouter({
-  routeTree,
-  context: {
-    // auth will initially be undefined
-    // We'll be passing down the auth state from within a React component
-    auth: undefined!,
-  },
-})
-```
-
-- `src/App.tsx`
-
-```tsx
-import { RouterProvider } from '@tanstack/react-router'
-
-import { AuthProvider, useAuth } from './auth'
-
-import { router } from './router'
-
-function InnerApp() {
-  const auth = useAuth()
-  return <RouterProvider router={router} context={{ auth }} />
-}
-
-function App() {
+function Index() {
   return (
-    <AuthProvider>
-      <InnerApp />
-    </AuthProvider>
+    <div className="p-2">
+      <h3>Welcome Home!</h3>
+    </div>
   )
 }
 ```
 
+#### `src/routes/about.tsx`
+
+```tsx
+import { createFileRoute } from '@tanstack/react-router'
+
+export const Route = createFileRoute('/about')({
+  component: About,
+})
+
+function About() {
+  return <div className="p-2">Hello from About!</div>
+}
+```
+
+#### `src/main.tsx`
+
+Regardless of whether you are using the `@tanstack/router-plugin` package and running the `npm run dev`/`npm run build` scripts, or manually running the `tsr watch`/`tsr generate` commands from your package scripts, the route tree file will be generated at `src/routeTree.gen.ts`.
+
+Import the generated route tree and create a new router instance:
+
+```tsx
+import { StrictMode } from 'react'
+import ReactDOM from 'react-dom/client'
+import { RouterProvider, createRouter } from '@tanstack/react-router'
+
+// Import the generated route tree
+import { routeTree } from './routeTree.gen'
+
+// Create a new router instance
+const router = createRouter({ routeTree })
+
+// Register the router instance for type safety
+declare module '@tanstack/react-router' {
+  interface Register {
+    router: typeof router
+  }
+}
+
+// Render the app
+const rootElement = document.getElementById('root')!
+if (!rootElement.innerHTML) {
+  const root = ReactDOM.createRoot(rootElement)
+  root.render(
+    <StrictMode>
+      <RouterProvider router={router} />
+    </StrictMode>,
+  )
+}
+```
+
+If you are working with this pattern you should change the `id` of the root `<div>` on your `index.html` file to `<div id='root'></div>`
+
+## Using Code-Based Route Configuration
+
+> [!IMPORTANT]
+> The following example shows how to configure routes using code, and for simplicity's sake is in a single file for this demo. While code-based generation allows you to declare many routes and even the router instance in a single file, we recommend splitting your routes into separate files for better organization and performance as your application grows.
+
+```tsx
+import { StrictMode } from 'react'
+import ReactDOM from 'react-dom/client'
+import {
+  Outlet,
+  RouterProvider,
+  Link,
+  createRouter,
+  createRoute,
+  createRootRoute,
+} from '@tanstack/react-router'
+import { TanStackRouterDevtools } from '@tanstack/react-router-devtools'
+
+const rootRoute = createRootRoute({
+  component: () => (
+    <>
+      <div className="p-2 flex gap-2">
+        <Link to="/" className="[&.active]:font-bold">
+          Home
+        </Link>{' '}
+        <Link to="/about" className="[&.active]:font-bold">
+          About
+        </Link>
+      </div>
+      <hr />
+      <Outlet />
+      <TanStackRouterDevtools />
+    </>
+  ),
+})
+
+const indexRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/',
+  component: function Index() {
+    return (
+      <div className="p-2">
+        <h3>Welcome Home!</h3>
+      </div>
+    )
+  },
+})
+
+const aboutRoute = createRoute({
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
