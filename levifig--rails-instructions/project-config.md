@@ -1,134 +1,134 @@
 ---
 trigger: always_on
-description: Code Patterns & Guidelines
+description: Rails Development Rules - The Rails Way with AI Agents
 ---
 
+# Rails Development Rules - The Rails Way with AI Agents
+***Built for: Solo developer + AI agents, Linear MCP integration, maximum joy***
 
-# Cursor AI Assistant Rules
+## Core Philosophy
+You are building a Rails 8+ application following The Rails Way™. Code should be:
+- Convention over configuration
+- Database-first design
+- Progressive enhancement with Hotwire
+- Zero-build frontend approach
+- Test-driven with Minitest
+- Optimized for AI agent collaboration
+- Lean, readable, and maintainable
 
-## Assistant Behavior
+## Rails 8+ Stack Preferences
+- **Authentication**: Rails built-in (`rails generate authentication`)
+- **Background Jobs**: Solid Queue (default Rails 8)
+- **Caching**: Solid Cache (database-backed, Redis when needed)
+- **WebSockets**: Action Cable with Solid Cable adapter
+- **Database**: PostgreSQL with Active Record
+- **Frontend**: Hotwire (Turbo + Stimulus) + TailwindCSS
+- **Asset Pipeline**: Propshaft (simpler, no-build approach)
+- **Testing**: Minitest with fixtures (no RSpec, no factories)
+- **Rich Text**: Action Text for content editing
+- **File Uploads**: Active Storage with direct uploads
+- **Deployment**: Kamal with Docker
+- **Code Quality**: StandardRB for linting/formatting
+- **Development Tools**: Bullet gem for N+1 detection, Annotate gem for schema docs
+- **Error Tracking**: Rails built-in error reporter
 
-- Be terse and direct in responses
-- Ask clarifying questions before implementing complex features
-- Anticipate needs and suggest improvements proactively
-- Focus on high-quality, production-ready code
-- Use analogies when explaining complex concepts
+## Detailed Guides
+This document provides core principles. For detailed implementation guidance, see:
 
-## Code Generation Principles
+- **[core.md](rails/core.md)** - Rails 8 conventions and patterns
+- **[models.md](rails/models.md)** - Active Record patterns and best practices
+- **[controllers.md](rails/controllers.md)** - Controller design and RESTful patterns
+- **[services.md](rails/services.md)** - Service objects and business logic
+- **[testing.md](rails/testing.md)** - Testing philosophy and Minitest patterns
+- **[security.md](rails/security.md)** - Security best practices and authorization
+- **[performance.md](rails/performance.md)** - Database optimization and caching
+- **[api.md](rails/api.md)** - API design and versioning (when needed)
+- **[importmaps.md](rails/importmaps.md)** - JavaScript without build steps
+- **[hotwire.md](rails/hotwire.md)** - Turbo & Stimulus patterns
+- **[views.md](rails/views.md)** - View helpers and rendering
+- **[styling.md](rails/styling.md)** - TailwindCSS integration
+- **[background-jobs.md](rails/background-jobs.md)** - Solid Queue configuration
+- **[deployment.md](rails/deployment.md)** - Kamal deployment guide
+- **[mobile.md](rails/mobile.md)** - Hotwire Native for mobile apps (optional)
 
-### Quality Standards
-- Generate code that could ship to production
-- Follow established patterns in the codebase
-- Maintain consistency with existing architecture
-- Every piece of code should be testable
-- Documentation is not optional
+## File Organization & Naming
 
-### Style Guidelines
-- Respect .prettierrc and linting configurations
-- Prefer clarity over cleverness
-- Use descriptive names that reveal intent
-- Keep line lengths reasonable
-- Consistent indentation and formatting
+### Consistent Directory Structure
+```
+app/
+├── controllers/
+│   ├── concerns/
+│   └── application_controller.rb
+├── models/
+│   ├── concerns/
+│   └── application_record.rb
+├── views/
+│   ├── layouts/
+│   ├── shared/
+│   └── [resource_name]/
+├── services/
+├── jobs/
+├── channels/
+├── mailers/
+└── helpers/
+```
 
-### Architecture Focus
-- Think in systems, not just functions
-- Consider scalability implications
-- Design for maintainability
-- Separate concerns appropriately
-- Make dependencies explicit
+### Naming Conventions for AI Agents
+- **Classes**: PascalCase, descriptive (`UserRegistrationService`, `InvoicePaymentProcessor`)
+- **Files**: snake_case matching class name (`user_registration_service.rb`)
+- **Methods**: snake_case, verb-first for actions (`process_payment`, `calculate_total`)
+- **Variables**: snake_case, noun-first (`current_user`, `payment_amount`)
+- **Constants**: SCREAMING_SNAKE_CASE (`MAX_RETRY_ATTEMPTS`, `DEFAULT_CURRENCY`)
 
-## Project Awareness
+### AI Agent File Patterns
+Always organize files predictably:
+```
+app/models/user.rb                    # Model: singular
+app/controllers/users_controller.rb   # Controller: plural + _controller
+app/services/user_registration.rb     # Service: domain + action
+app/jobs/send_welcome_email_job.rb    # Job: action + _job
+app/views/users/index.html.erb        # View: controller/action
+```
 
-### Context Loading
-Always check for `.cursor/PROJECT_CONTEXT.md` which contains:
-- Current architectural patterns
-- Technology stack decisions
-- Team conventions and preferences
-- Recent design decisions
-- Performance considerations
-- Known technical debt
+### AI-Friendly Documentation
+- Include purpose statement for AI comprehension
+- Reference Linear ticket context (ID-123)
+- Document key dependencies and return values
+- Specify potential errors and exceptions
+- Keep documentation close to code
 
-### File Organization
-- Follow existing project structure
-- Keep related code together
-- Use standard naming conventions
-- Maintain clear module boundaries
+## Linear Integration (Project Management)
 
-## Code Patterns
+### Overview
+This section contains Linear-specific integration patterns. The same principles can be adapted for other project management tools by replacing Linear ticket formats and magic words with platform-specific equivalents.
 
-### Error Handling
-- Fail fast with clear messages
-- Use appropriate error types
-- Handle errors at the right level
-- Provide actionable error messages
-- Log errors appropriately
+### Commit Message Format
+- Use Conventional Commits format with issue references
+- Structure: `type(scope): description` followed by body and footer
+- Include ticket reference in commit body or footer
+- Example:
+  ```
+  feat: add magic link authentication
 
-### Testing Approach
-- Write tests alongside implementation
-- Test edge cases explicitly
-- Use descriptive test names
-- Keep tests simple and focused
-- Mock external dependencies
+  Implements passwordless login flow
+  Fixes ID-123
+  ```
 
-### Documentation
-- Document why, not what
-- Include examples for complex APIs
-- Keep docs in sync with code
-- Use consistent documentation format
-- Document assumptions and constraints
+### Issue Linking
+- Use semantic keywords to manage issue state through commits
+- **Closing keywords**: `close`, `closes`, `closed`, `closing fix`, `fixes`, `fixed`, `fixing`, `resolve`, `resolves`, `resolved`, `resolving`, `complete`, `completes`, `completed`, `completing` (auto-close issues)
+- **Reference keywords**: `ref`, `refs`, `references`, `part of`, `related to`, `contributes to`, `toward`, `towards` (link without closing)
+- Support multiple issues: `Fixes ID-123, ID-456`
 
-## Language-Specific Rules
+### Branch Strategy
+- Follow GitHub Flow with descriptive branch names
+- Format: `type/ticket-id/brief-description`
+- Example: `feat/id-123/magic-link-login`
+- Keep branches short-lived and focused
 
-### Ruby on Rails
-Refer to `rails-rules.md` for:
-- Rails conventions and patterns
-- ActiveRecord best practices
-- Testing with RSpec
-- API design guidelines
+### Documentation Integration
 
-
-## Performance & Security
-
-### Performance
-- Consider algorithmic complexity
-- Profile before optimizing
-- Cache strategically
-- Use appropriate data structures
-- Avoid premature optimization
-
-### Security
-- Sanitize all inputs
-- Use secure defaults
-- Follow OWASP guidelines
-- Never expose sensitive data
-- Keep dependencies updated
-
-## AI Assistant Guidelines
-
-### When Generating Code
-1. Check `PROJECT_CONTEXT.md` first
-2. Follow existing patterns in codebase
-3. Include appropriate tests
-4. Add necessary documentation
-5. Consider edge cases
-
-### When Explaining Concepts
-- Use clear analogies
-- Provide concrete examples
-- Link to authoritative sources
-- Keep explanations concise
-- Focus on practical application
-
-### When Suggesting Improvements
-- Consider the bigger picture
-- Propose incremental changes
-- Explain trade-offs clearly
-- Respect existing constraints
-- Suggest best-in-class solutions
-
----
-
-*Note: Language-specific and PROJECT_CONTEXT rules override these defaults.*
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [levifig/rails-instructions](https://github.com/levifig/rails-instructions) — distributed by [TomeVault](https://tomevault.io).
