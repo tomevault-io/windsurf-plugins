@@ -1,187 +1,102 @@
 ---
 trigger: always_on
-description: TanStack Router: Routing
+description: TanStack Router: Setup and Architecture
 ---
 
-# Code-Based Routing
+# Overview
 
-> [!TIP]
-> Code-based routing is not recommended for most applications. It is recommended to use [File-Based Routing](./file-based-routing.md) instead.
+**TanStack Router is a router for building React and Solid applications**. Some of its features include:
 
-## ⚠️ Before You Start
+- 100% inferred TypeScript support
+- Typesafe navigation
+- Nested Routing and layout routes (with pathless layouts)
+- Built-in Route Loaders w/ SWR Caching
+- Designed for client-side data caches (TanStack Query, SWR, etc.)
+- Automatic route prefetching
+- Asynchronous route elements and error boundaries
+- File-based Route Generation
+- Typesafe JSON-first Search Params state management APIs
+- Path and Search Parameter Schema Validation
+- Search Param Navigation APIs
+- Custom Search Param parser/serializer support
+- Search param middleware
+- Route matching/loading middleware
 
-- If you're using [File-Based Routing](./file-based-routing.md), **skip this guide**.
-- If you still insist on using code-based routing, you must read the [Routing Concepts](./routing-concepts.md) guide first, as it also covers core concepts of the router.
+To get started quickly, head to the next page. For a more lengthy explanation, buckle up while I bring you up to speed!
 
-## Route Trees
+## "A Fork in the Route"
 
-Code-based routing is no different from file-based routing in that it uses the same route tree concept to organize, match and compose matching routes into a component tree. The only difference is that instead of using the filesystem to organize your routes, you use code.
+Using a router to build applications is widely regarded as a must-have and is usually one of the first choices you’ll make in your tech stack.
 
-Let's consider the same route tree from the [Route Trees & Nesting](./route-trees.md#route-trees) guide, and convert it to code-based routing:
+## Why TanStack Router?
 
-Here is the file-based version:
+TanStack Router delivers on the same fundamental expectations as other routers that you’ve come to expect:
 
-```
-routes/
-├── __root.tsx
-├── index.tsx
-├── about.tsx
-├── posts/
-│   ├── index.tsx
-│   ├── $postId.tsx
-├── posts.$postId.edit.tsx
-├── settings/
-│   ├── profile.tsx
-│   ├── notifications.tsx
-├── _pathlessLayout.tsx
-├── _pathlessLayout/
-│   ├── route-a.tsx
-├── ├── route-b.tsx
-├── files/
-│   ├── $.tsx
-```
+- Nested routes, layout routes, grouped routes
+- File-based Routing
+- Parallel data loading
+- Prefetching
+- URL Path Params
+- Error Boundaries and Handling
+- SSR
+- Route Masking
 
-And here is a summarized code-based version:
+And it also delivers some new features that raise the bar:
 
-```tsx
-import { createRootRoute, createRoute } from '@tanstack/react-router'
+- 100% inferred TypeScript support
+- Typesafe navigation
+- Built-in SWR Caching for loaders
+- Designed for client-side data caches (TanStack Query, SWR, etc.)
+- Typesafe JSON-first Search Params state management APIs
+- Path and Search Parameter Schema Validation
+- Search Parameter Navigation APIs
+- Custom Search Param parser/serializer support
+- Search param middleware
+- Inherited Route Context
+- Mixed file-based and code-based routing
 
-const rootRoute = createRootRoute()
+Let’s dive into some of the more important ones in more detail!
 
-const indexRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/',
-})
+## 100% Inferred TypeScript Support
 
-const aboutRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: 'about',
-})
+Everything these days is written “in Typescript” or at the very least offers type definitions that are veneered over runtime functionality, but too few packages in the ecosystem actually design their APIs with TypeScript in mind. So while I’m pleased that your router is auto-completing your option fields and catching a few property/method typos here and there, there is much more to be had.
 
-const postsRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: 'posts',
-})
+- TanStack Router is fully aware of all of your routes and their configuration at any given point in your code. This includes the path, path params, search params, context, and any other configuration you’ve provided. Ultimately this means that you can navigate to any route in your app with 100% type safety and confidence that your link or navigate call will succeed.
+- TanStack Router provides lossless type-inference. It uses countless generic type parameters to enforce and propagate any type information you give it throughout the rest of its API and ultimately your app. No other router offers this level of type safety and developer confidence.
 
-const postsIndexRoute = createRoute({
-  getParentRoute: () => postsRoute,
-  path: '/',
-})
+What does all of that mean for you?
 
-const postRoute = createRoute({
-  getParentRoute: () => postsRoute,
-  path: '$postId',
-})
+- Faster feature development with auto-completion and type hints
+- Safer and faster refactors
+- Confidence that your code will work as expected
 
-const postEditorRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: 'posts/$postId/edit',
-})
+## 1st Class Search Parameters
 
-const settingsRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: 'settings',
-})
+Search parameters are often an afterthought, treated like a black box of strings (or string) that you can parse and update, but not much else. Existing solutions are **not** type-safe either, adding to the caution that is required to deal with them. Even the most "modern" frameworks and routers leave it up to you to figure out how to manage this state. Sometimes they'll parse the search string into an object for you, or sometimes you're left to do it yourself with `URLSearchParams`.
 
-const profileRoute = createRoute({
-  getParentRoute: () => settingsRoute,
-  path: 'profile',
-})
+Let's step back and remember that **search params are the most powerful state manager in your entire application.** They are global, serializable, bookmarkable, and shareable making them the perfect place to store any kind of state that needs to survive a page refresh or a social share.
 
-const notificationsRoute = createRoute({
-  getParentRoute: () => settingsRoute,
-  path: 'notifications',
-})
+To live up to that responsibility, search parameters are a first-class citizen in TanStack Router. While still based on standard URLSearchParams, TanStack Router uses a powerful parser/serializer to manage deeper and more complex data structures in your search params, all while keeping them type-safe and easy to work with.
 
-const pathlessLayoutRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  id: 'pathlessLayout',
-})
+**It's like having `useState` right in the URL!**
 
-const pathlessLayoutARoute = createRoute({
-  getParentRoute: () => pathlessLayoutRoute,
-  path: 'route-a',
-})
+Search parameters are:
 
-const pathlessLayoutBRoute = createRoute({
-  getParentRoute: () => pathlessLayoutRoute,
-  path: 'route-b',
-})
+- Automatically parsed and serialized as JSON
+- Validated and typed
+- Inherited from parent routes
+- Accessible in loaders, components, and hooks
+- Easily modified with the useSearch hook, Link, navigate, and router.navigate APIs
+- Customizable with a custom search filters and middleware
+- Subscribed via fine-grained search param selectors for efficient re-renders
 
-const filesRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: 'files/$',
-})
-```
+Once you start using TanStack Router's search parameters, you'll wonder how you ever lived without them.
 
-## Anatomy of a Route
+## Built-In Caching and Friendly Data Loading
 
-All other routes other than the root route are configured using the `createRoute` function:
+Data loading is a critical part of any application and while most existing routers offer some form of critical data loading APIs, they often fall short when it comes to caching and data lifecycle management. Existing solutions suffer from a few common problems:
 
-```tsx
-const route = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/posts',
-  component: PostsComponent,
-})
-```
-
-The `getParentRoute` option is a function that returns the parent route of the route you're creating.
-
-**❓❓❓ "Wait, you're making me pass the parent route for every route I make?"**
-
-Absolutely! The reason for passing the parent route has **everything to do with the magical type safety** of TanStack Router. Without the parent route, TypeScript would have no idea what types to supply your route with!
-
-> [!IMPORTANT]
-> For every route that's **NOT** the **Root Route** or a **Pathless Layout Route**, a `path` option is required. This is the path that will be matched against the URL pathname to determine if the route is a match.
-
-When configuring route `path` option on a route, it ignores leading and trailing slashes (this does not include "index" route paths `/`). You can include them if you want, but they will be normalized internally by TanStack Router. Here is a table of valid paths and what they will be normalized to:
-
-| Path     | Normalized Path |
-| -------- | --------------- |
-| `/`      | `/`             |
-| `/about` | `about`         |
-| `about/` | `about`         |
-| `about`  | `about`         |
-| `$`      | `$`             |
-| `/$`     | `$`             |
-| `/$/`    | `$`             |
-
-## Manually building the route tree
-
-When building a route tree in code, it's not enough to define the parent route of each route. You must also construct the final route tree by adding each route to its parent route's `children` array. This is because the route tree is not built automatically for you like it is in file-based routing.
-
-```tsx
-/* prettier-ignore */
-const routeTree = rootRoute.addChildren([
-  indexRoute,
-  aboutRoute,
-  postsRoute.addChildren([
-    postsIndexRoute,
-    postRoute,
-  ]),
-  postEditorRoute,
-  settingsRoute.addChildren([
-    profileRoute,
-    notificationsRoute,
-  ]),
-  pathlessLayoutRoute.addChildren([
-    pathlessLayoutARoute,
-    pathlessLayoutBRoute,
-  ]),
-  filesRoute.addChildren([
-    fileRoute,
-  ]),
-])
-/* prettier-ignore-end */
-```
-
-But before you can go ahead and build the route tree, you need to understand how the Routing Concepts for Code-Based Routing work.
-
-## Routing Concepts for Code-Based Routing
-
-Believe it or not, file-based routing is really a superset of code-based routing and uses the filesystem and a bit of code-generation abstraction on top of it to generate this structure you see above automatically.
-
+- No caching at all. Data is always fresh, but your users are left waiting for frequently accessed data to load over and over again.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
