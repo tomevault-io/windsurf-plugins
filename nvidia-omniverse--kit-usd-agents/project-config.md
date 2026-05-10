@@ -1,105 +1,133 @@
 ---
 trigger: always_on
-description: A high-level overview of how to extend Chat USD with custom agents, using the Navigation Agent as a reference implementation.
+description: A high-level overview of the core components in LC Agent USD module, explaining how they work together to create a specialized system for USD development assistance.
 ---
 
 
-# Extending Chat USD with Custom Agents
-
-This guide explains how to extend Chat USD with custom agents, using the Navigation Agent (`@omni.ai.langchain.agent.navigation`) as a reference implementation.
-
-## Table of Contents
-
-1. [Introduction](#introduction)
-2. [Architecture Overview](#architecture-overview)
-3. [Component Relationships](#component-relationships)
-4. [Creating a Custom Agent](#creating-a-custom-agent)
-   - [Extension Structure](#extension-structure)
-   - [Node Implementation](#node-implementation)
-   - [Modifier Implementation](#modifier-implementation)
-   - [System Messages](#system-messages)
-5. [Integration with Chat USD](#integration-with-chat-usd)
-6. [Example: Navigation Agent](#example-navigation-agent)
-7. [Best Practices](#best-practices)
+# LC Agent USD Module Overview
 
 ## Introduction
 
-Chat USD is a powerful AI assistant for Universal Scene Description (USD) development that can be extended with custom agents to add new capabilities. Custom agents allow Chat USD to perform specialized tasks, such as scene navigation, asset search, or custom operations on USD scenes.
+The `lc_agent_usd` module is a specialized extension of the LC Agent framework designed to provide intelligent assistance for Universal Scene Description (USD) development. It leverages the core LC Agent architecture to create a system that can:
 
-This document explains how to create and integrate custom agents into the Chat USD framework, using the Navigation Agent as a reference implementation.
+1. Answer knowledge-based questions about USD
+2. Generate and validate USD code snippets
+3. Provide interactive code assistance
+4. Execute and debug USD code
 
-## Architecture Overview
+This module demonstrates how LC Agent's flexible architecture can be extended to create domain-specific AI assistants with specialized capabilities.
 
-Chat USD uses a modular architecture based on the Language Chain (LC) Agent framework. The key components for extending Chat USD with custom agents are:
+## Core Components
 
-1. **Extension**: Registers the agent with the system and manages its lifecycle.
-2. **Nodes**: Implement the agent's functionality and define how it processes inputs and generates outputs.
-3. **Modifiers**: Intercept and modify the behavior of nodes, allowing for custom processing of commands.
-4. **System Messages**: Define the agent's capabilities, identity, and how it should respond to user queries.
+The module is organized into several key components:
 
-## Component Relationships
+### Network Nodes
 
-Understanding the inheritance hierarchy and relationships between components is crucial for implementing a custom agent:
+Network nodes are specialized classes that extend the `NetworkNode` base class from LC Agent. They serve as containers for specific functionality:
 
-### Inheritance Hierarchy
+- **USDKnowledgeNetworkNode**: Provides factual information about USD concepts and usage
+- **USDCodeNetworkNode**: Handles general USD code generation and validation
+- **USDCodeGenNetworkNode**: Specializes in generating executable USD code with validation
 
-1. **ChatUSDNavigationNetworkNode**: The main entry point for user interactions.
-   - Derives from `ChatUSDNetworkNode` and `MultiAgentNetworkNode`, which handles routing between agents
-   - Ultimately derives from `NetworkNode`, which is a container for subnodes
-   - Does not interact with LLMs directly
-   - Acts as a coordinator for the conversation between agents and supervisor
-   - Registered with the user-friendly name "ChatUSD with navigation"
+### Specialized Nodes
 
-2. **ChatUSDNavigationSupervisorNode**: The orchestrator for agent interactions.
-   - Derives from `ChatUSDSupervisorNode`
-   - Interacts with LLMs to determine which agent to call based on the user query
-   - Can transform user queries to match agent capabilities
-   - Uses system messages to understand agent capabilities and make routing decisions
-   - Combines the base ChatUSDSupervisorNode system message with additional navigation-specific instructions
+These are the building blocks that implement specific behaviors:
 
-3. **NavigationNetworkNode**: The navigation agent implementation.
-   - Derives from `NetworkNode`
-   - Does not interact with LLMs directly but contains nodes that do
-   - Registered as "ChatUSD_Navigation" and referenced in the route_nodes list of ChatUSDNavigationNetworkNode
-   - Provides its docstring to the supervisor to explain its capabilities
-   - Contains modifiers that process command outputs
+- **USDKnowledgeNode**: Processes knowledge-based queries about USD
+- **USDCodeGenNode**: Generates USD code snippets with proper structure
+- **USDCodeInteractiveNode**: Provides interactive code assistance
 
-4. **NavigationGenNode**: The component that generates navigation commands.
-   - Derives from `RunnableNode`
-   - Directly interacts with LLMs to generate navigation commands
-   - Uses a specific system message that instructs the LLM to output specific command formats
-   - Its outputs are intercepted by NavigationModifier
-   - Its outputs are not directly visible to the supervisor, only the final result is
+### Modifiers
 
-### Modifier's Role in Command Execution
+Modifiers extend the functionality of nodes by intercepting and modifying their behavior:
 
-The NavigationModifier plays a critical role in the execution of navigation commands:
+- **USDKnowledgeRagModifier**: Enhances knowledge responses with retrieval-augmented generation
+- **USDCodeGenRagModifier**: Enhances code generation with retrieval-augmented generation
+- **CodeInterpreterModifier**: Executes and validates code
+- **CodeExtractorModifier**: Extracts and formats code snippets
+- **USDCodeGenPatcherModifier**: Fixes and improves generated code
 
-1. **Command Interception**: The modifier's `on_post_invoke_async` method is called after each node in the network is invoked. It carefully checks conditions to prevent infinite loops:
-   ```python
-   if (
-       node.invoked
-       and isinstance(node.outputs, AIMessage)
-       and node.outputs.content
-       and not network.get_children(node)
-   ):
-   ```
+## System Architecture
 
-2. **Command Processing**: When NavigationGenNode generates a command like "LIST", "NAVIGATE", or "SAVE", the modifier intercepts it and executes the corresponding action.
+The module follows a layered architecture:
 
-3. **Result Injection**: After processing a command, the modifier creates a new `RunnableHumanNode` with the result:
-   ```python
-   with network:
-       RunnableHumanNode(f"Assistant: {result}")
-   ```
+1. **User Interface Layer**: Receives queries and displays responses
+2. **Network Layer**: Routes queries to appropriate specialized nodes
+3. **Processing Layer**: Generates responses using specialized nodes
+4. **Modifier Layer**: Enhances responses with additional capabilities
+5. **Knowledge Layer**: Retrieves relevant information from knowledge bases
 
-4. **Continued Execution**: Creating this new node continues invoking the network. The default modifier for NavigationNetworkNode automatically creates the default node (NavigationGenNode) after the RunnableHumanNode.
+## Integration with LC Agent Core
 
-5. **Command Execution in USD Stage**: The modifier executes navigation commands directly in the current USD stage. For example:
-   - LIST command retrieves points of interest from the stage metadata
-   - NAVIGATE command sets the camera transform to a specific position
-   - SAVE command stores the current camera position in the stage metadata
+The `lc_agent_usd` module integrates with the core LC Agent framework by:
 
+1. Extending base classes like `NetworkNode` and `RunnableNode`
+2. Implementing custom modifiers that work with the LC Agent modifier system
+3. Registering custom node types with the node factory
+4. Using the LC Agent message passing system for communication
+
+## Use Cases
+
+The module is designed to support several key use cases:
+
+1. **USD Knowledge Assistance**: Answering questions about USD concepts, API, and best practices
+2. **Code Generation**: Creating USD code snippets based on user requirements
+3. **Code Validation**: Checking and fixing USD code for correctness
+4. **Interactive Development**: Providing real-time assistance during USD development
+
+
+# USDKnowledgeNetworkNode
+
+## Overview
+
+The `USDKnowledgeNetworkNode` is a specialized network node in the LC Agent USD module that provides knowledge-based assistance for Universal Scene Description (USD). It serves as a comprehensive information source for USD concepts, API usage, best practices, and general questions about USD functionality.
+
+## Purpose
+
+The primary purpose of the `USDKnowledgeNetworkNode` is to:
+
+1. Answer factual questions about USD concepts and terminology
+2. Provide explanations of USD API functions and classes
+3. Offer guidance on USD best practices and workflows
+4. Explain USD file formats and structure
+5. Assist with understanding USD's role in 3D pipelines
+
+This node is designed to be the knowledge foundation of the USD agent system, focusing on providing accurate information rather than generating or executing code.
+
+## Implementation Details
+
+### Class Definition
+
+```python
+class USDKnowledgeNetworkNode(NetworkNode):
+    default_node: str = "USDKnowledgeNode"
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.add_modifier(USDKnowledgeRagModifier())
+```
+
+The implementation is intentionally simple, leveraging the power of the LC Agent framework to handle most of the complexity. The class:
+
+1. Extends `NetworkNode` from the core LC Agent framework
+2. Sets `USDKnowledgeNode` as its default node type
+3. Adds a `USDKnowledgeRagModifier` to enhance responses with retrieval-augmented generation
+
+### Default Node
+
+The `USDKnowledgeNode` serves as the default processing node for this network. It:
+
+1. Processes queries using a system message to generate appropriate responses
+2. Handles knowledge-based questions about USD
+3. Provides factual information about USD concepts and API
+
+### RAG Modifier
+
+The `USDKnowledgeRagModifier` enhances the node's responses by:
+
+1. Retrieving relevant information from a knowledge base of USD documentation
+2. Injecting this information into the context before generating responses
+3. Ensuring responses are grounded in accurate USD documentation
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
