@@ -1,209 +1,162 @@
 ---
 trigger: always_on
-description: Comprehensive testing patterns for React Testing Library and Go testing in POS System
+description: User journey optimization patterns for all POS roles with performance, UX, and business outcome focus
 ---
 
 
-# 🧪 Testing Patterns & Best Practices
+# 👥 User Journey Optimization & Role-Specific Patterns
 
-## 🎯 Testing Philosophy
+## 🎯 Journey-First Design Philosophy
 
-### Testing Pyramid for POS System
-```
-    E2E Tests (Few)
-    ↑ Full user workflows
-    ↑ Critical business flows
-    
-  Integration Tests (Some)
-  ↑ API + Database interactions
-  ↑ Component + API integration
-  
-    Unit Tests (Many)
-    ↑ Individual functions
-    ↑ Component behavior
-    ↑ Business logic validation
-```
-
-### Test Coverage Targets
-- **Unit Tests:** 80%+ coverage for business logic
-- **Integration Tests:** All API endpoints with database
-- **E2E Tests:** Core user journeys (login → order → payment → kitchen)
-
-## ⚛️ Frontend Testing Patterns (React Testing Library)
-
-### Component Testing Setup
+### Performance Targets by Role
 ```typescript
-// test-utils.tsx - Custom testing utilities
-import { render, RenderOptions } from '@testing-library/react'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { ReactElement } from 'react'
-import { BrowserRouter } from '@tanstack/react-router'
-
-// Create a test query client with no retries
-const createTestQueryClient = () => new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: false,      // Don't retry on test failures
-      gcTime: Infinity,  // Keep data in cache
-    },
-    mutations: {
-      retry: false,
-    },
+interface RolePerformanceTargets {
+  admin: {
+    dashboardLoad: '< 2 seconds',
+    reportGeneration: '< 5 seconds',
+    userManagement: '< 1 second per action',
+    systemOverview: '< 1.5 seconds'
   },
-})
-
-interface CustomRenderOptions extends Omit<RenderOptions, 'wrapper'> {
-  queryClient?: QueryClient
-  initialEntries?: string[]
+  server: {
+    orderCreation: '< 30 seconds total',
+    productSelection: '< 5 seconds per item',
+    tableAssignment: '< 3 seconds',
+    customerInteraction: 'seamless, no delays'
+  },
+  counter: {
+    paymentProcessing: '< 10 seconds',
+    orderTypeSwitch: '< 2 seconds',
+    receiptGeneration: '< 3 seconds',
+    queueManagement: 'real-time updates'
+  },
+  kitchen: {
+    statusUpdates: '< 1 second',
+    orderPrioritization: 'real-time',
+    workflowOptimization: 'continuous',
+    communicationDelay: '< 2 seconds'
+  }
 }
-
-// Custom render with providers
-export const renderWithProviders = (
-  ui: ReactElement,
-  {
-    queryClient = createTestQueryClient(),
-    initialEntries = ['/'],
-    ...renderOptions
-  }: CustomRenderOptions = {}
-) => {
-  const Wrapper = ({ children }: { children: React.ReactNode }) => (
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter initialEntries={initialEntries}>
-        {children}
-      </BrowserRouter>
-    </QueryClientProvider>
-  )
-
-  return { ...render(ui, { wrapper: Wrapper, ...renderOptions }), queryClient }
-}
-
-// Re-export everything
-export * from '@testing-library/react'
 ```
 
-### Component Testing Examples
+## 👑 Admin Journey Optimization
 
-#### 1. Testing POS Product Card
+### 1. Executive Dashboard Experience
 ```typescript
-// ProductCard.test.tsx
-import { screen, userEvent } from '@testing-library/react'
-import { renderWithProviders } from '../test-utils'
-import { ProductCard } from '@/components/pos/ProductCard'
-import { Product } from '@/types'
+// ✅ ADMIN-OPTIMIZED: Executive dashboard with business intelligence
+class AdminDashboardOptimization {
+  // Intelligent data aggregation for C-level insights
+  async loadExecutiveDashboard(): Promise<ExecutiveDashboard> {
+    // Parallel data loading for instant insights
+    const [
+      realtimeMetrics,
+      financialSummary,
+      operationalHealth,
+      staffPerformance,
+      customerSatisfaction,
+      systemAlerts
+    ] = await Promise.all([
+      this.getRealtimeBusinessMetrics(), // Revenue, orders/hour, avg ticket
+      this.getFinancialSummary(), // Daily/weekly/monthly trends
+      this.getOperationalHealth(), // Kitchen efficiency, table turnover
+      this.getStaffPerformance(), // Individual and team metrics
+      this.getCustomerSatisfaction(), // Wait times, order accuracy
+      this.getSystemAlerts() // Technical and business alerts
+    ])
 
-const mockProduct: Product = {
-  id: '123',
-  name: 'Cheeseburger',
-  price: 12.99,
-  category_id: 'burgers',
-  is_available: true,
-  description: 'Delicious beef burger',
-  image_url: null,
+    // Business intelligence: Automatic insights generation
+    const insights = this.generateBusinessInsights({
+      metrics: realtimeMetrics,
+      trends: financialSummary,
+      operations: operationalHealth
+    })
+
+    return {
+      kpis: this.createKPIDashboard(realtimeMetrics),
+      trends: this.createTrendAnalysis(financialSummary),
+      alerts: this.prioritizeAlerts(systemAlerts),
+      recommendations: insights.recommendations,
+      quickActions: this.generateQuickActions(insights)
+    }
+  }
+
+  // Predictive business insights
+  private generateBusinessInsights(data: DashboardData): BusinessInsights {
+    const insights: BusinessInsight[] = []
+
+    // Revenue optimization insights
+    if (data.metrics.averageTicket < data.historical.averageTicket * 0.95) {
+      insights.push({
+        type: 'revenue_optimization',
+        severity: 'medium',
+        title: 'Average Ticket Size Declining',
+        description: 'Consider implementing upselling strategies or menu optimization',
+        actionable: true,
+        quickActions: [
+          { label: 'View Menu Performance', action: 'navigate_to_menu_analytics' },
+          { label: 'Staff Upselling Training', action: 'create_training_task' }
+        ]
+      })
+    }
+
+    // Operational efficiency insights
+    if (data.operations.kitchenEfficiency < 0.85) {
+      insights.push({
+        type: 'operational_efficiency',
+        severity: 'high',
+        title: 'Kitchen Efficiency Below Target',
+        description: 'Kitchen preparation times are impacting customer satisfaction',
+        actionable: true,
+        quickActions: [
+          { label: 'View Kitchen Analytics', action: 'navigate_to_kitchen_dashboard' },
+          { label: 'Optimize Kitchen Workflow', action: 'open_workflow_optimizer' }
+        ]
+      })
+    }
+
+    return {
+      insights,
+      recommendations: this.generateActionableRecommendations(insights),
+      predictedImpact: this.calculatePredictedBusinessImpact(insights)
+    }
+  }
 }
 
-describe('ProductCard', () => {
-  const mockOnSelect = jest.fn()
-
-  beforeEach(() => {
-    mockOnSelect.mockClear()
-  })
-
-  it('displays product information correctly', () => {
-    renderWithProviders(
-      <ProductCard 
-        product={mockProduct} 
-        onSelect={mockOnSelect} 
-        isSelected={false} 
-      />
-    )
-
-    expect(screen.getByText('Cheeseburger')).toBeInTheDocument()
-    expect(screen.getByText('$12.99')).toBeInTheDocument()
-    expect(screen.getByText('Delicious beef burger')).toBeInTheDocument()
-  })
-
-  it('calls onSelect when clicked', async () => {
-    const user = userEvent.setup()
+// Admin interface switching optimization
+class AdminInterfaceSwitching {
+  // Seamless role interface switching with context preservation
+  async switchToRoleInterface(targetRole: UserRole, preserveContext: boolean = true): Promise<void> {
+    // Pre-load target interface data
+    const targetData = await this.preloadRoleData(targetRole)
     
-    renderWithProviders(
-      <ProductCard 
-        product={mockProduct} 
-        onSelect={mockOnSelect} 
-        isSelected={false} 
-      />
-    )
+    if (preserveContext) {
+      // Preserve admin context for quick return
+      this.preserveAdminContext({
+        currentDashboard: this.getCurrentDashboardState(),
+        activeReports: this.getActiveReports(),
+        notifications: this.getPendingNotifications()
+      })
+    }
 
-    await user.click(screen.getByText('Cheeseburger'))
-    expect(mockOnSelect).toHaveBeenCalledWith(mockProduct)
-  })
-
-  it('shows selected state correctly', () => {
-    renderWithProviders(
-      <ProductCard 
-        product={mockProduct} 
-        onSelect={mockOnSelect} 
-        isSelected={true} 
-      />
-    )
-
-    const card = screen.getByRole('button')
-    expect(card).toHaveClass('ring-2', 'ring-primary')
-  })
-
-  it('disables unavailable products', () => {
-    const unavailableProduct = { ...mockProduct, is_available: false }
+    // Optimized transition with loading states
+    this.showTransitionLoading(`Switching to ${targetRole} interface...`)
     
-    renderWithProviders(
-      <ProductCard 
-        product={unavailableProduct} 
-        onSelect={mockOnSelect} 
-        isSelected={false} 
-      />
-    )
-
-    const card = screen.getByRole('button')
-    expect(card).toBeDisabled()
-    expect(screen.getByText('Unavailable')).toBeInTheDocument()
-  })
-})
-```
-
-#### 2. Testing Forms with React Hook Form
-```typescript
-// OrderForm.test.tsx
-import { screen, userEvent, waitFor } from '@testing-library/react'
-import { renderWithProviders } from '../test-utils'
-import { OrderForm } from '@/components/forms/OrderForm'
-import { CreateOrderRequest } from '@/types'
-
-// Mock API client
-jest.mock('@/api/client', () => ({
-  createOrder: jest.fn(),
-}))
-
-describe('OrderForm', () => {
-  const mockOnSubmit = jest.fn()
-  const mockOnCancel = jest.fn()
-
-  beforeEach(() => {
-    mockOnSubmit.mockClear()
-    mockOnCancel.mockClear()
-  })
-
-  it('renders form fields correctly', () => {
-    renderWithProviders(
-      <OrderForm onSubmit={mockOnSubmit} onCancel={mockOnCancel} />
-    )
-
-    expect(screen.getByLabelText(/order type/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/customer name/i)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /create order/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /cancel/i })).toBeInTheDocument()
-  })
-
-  it('validates required fields', async () => {
-    const user = userEvent.setup()
+    // Load role-specific optimizations
+    const roleOptimizations = await this.loadRoleOptimizations(targetRole)
     
+    // Smooth transition with preserved user experience
+    this.transitionToRoleInterface(targetRole, targetData, roleOptimizations)
+  }
+
+  // Role-specific data preloading
+  private async preloadRoleData(role: UserRole): Promise<RoleData> {
+    const preloadStrategies = {
+      server: () => Promise.all([
+        this.menuService.getAvailableProducts(),
+        this.tableService.getAvailableTables(),
+        this.orderService.getActiveOrders()
+      ]),
+      counter: () => Promise.all([
+        this.orderService.getPendingPayments(),
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
