@@ -1,208 +1,187 @@
 ---
 trigger: always_on
-description: TanStack Router: Installation
+description: TanStack Router: Routing
 ---
 
-# Manual Setup
-
-To set up TanStack Router manually in a React project, follow the steps below. This gives you a bare minimum setup to get going with TanStack Router using both file-based route generation and code-based route configuration:
-
-## Using File-Based Route Generation
-
-#### Install TanStack Router, Vite Plugin, and the Router Devtools
-
-```sh
-npm install @tanstack/react-router @tanstack/react-router-devtools
-npm install -D @tanstack/router-plugin
-# or
-pnpm add @tanstack/react-router @tanstack/react-router-devtools
-pnpm add -D @tanstack/router-plugin
-# or
-yarn add @tanstack/react-router @tanstack/react-router-devtools
-yarn add -D @tanstack/router-plugin
-# or
-bun add @tanstack/react-router @tanstack/react-router-devtools
-bun add -D @tanstack/router-plugin
-# or
-deno add npm:@tanstack/react-router npm:@tanstack/router-plugin npm:@tanstack/react-router-devtools
-```
-
-#### Configure the Vite Plugin
-
-```tsx
-// vite.config.ts
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-import { tanstackRouter } from '@tanstack/router-plugin/vite'
-
-// https://vitejs.dev/config/
-export default defineConfig({
-  plugins: [
-    // Please make sure that '@tanstack/router-plugin' is passed before '@vitejs/plugin-react'
-    tanstackRouter({
-      target: 'react',
-      autoCodeSplitting: true,
-    }),
-    react(),
-    // ...,
-  ],
-})
-```
+# Code-Based Routing
 
 > [!TIP]
-> If you are not using Vite, or any of the supported bundlers, you can check out the [TanStack Router CLI](./with-router-cli) guide for more info.
+> Code-based routing is not recommended for most applications. It is recommended to use [File-Based Routing](./file-based-routing.md) instead.
 
-Create the following files:
+## ⚠️ Before You Start
 
-- `src/routes/__root.tsx` (with two '`_`' characters)
-- `src/routes/index.tsx`
-- `src/routes/about.tsx`
-- `src/main.tsx`
+- If you're using [File-Based Routing](./file-based-routing.md), **skip this guide**.
+- If you still insist on using code-based routing, you must read the [Routing Concepts](./routing-concepts.md) guide first, as it also covers core concepts of the router.
 
-#### `src/routes/__root.tsx`
+## Route Trees
 
-```tsx
-import { createRootRoute, Link, Outlet } from '@tanstack/react-router'
-import { TanStackRouterDevtools } from '@tanstack/react-router-devtools'
+Code-based routing is no different from file-based routing in that it uses the same route tree concept to organize, match and compose matching routes into a component tree. The only difference is that instead of using the filesystem to organize your routes, you use code.
 
-const RootLayout = () => (
-  <>
-    <div className="p-2 flex gap-2">
-      <Link to="/" className="[&.active]:font-bold">
-        Home
-      </Link>{' '}
-      <Link to="/about" className="[&.active]:font-bold">
-        About
-      </Link>
-    </div>
-    <hr />
-    <Outlet />
-    <TanStackRouterDevtools />
-  </>
-)
+Let's consider the same route tree from the [Route Trees & Nesting](./route-trees.md#route-trees) guide, and convert it to code-based routing:
 
-export const Route = createRootRoute({ component: RootLayout })
+Here is the file-based version:
+
+```
+routes/
+├── __root.tsx
+├── index.tsx
+├── about.tsx
+├── posts/
+│   ├── index.tsx
+│   ├── $postId.tsx
+├── posts.$postId.edit.tsx
+├── settings/
+│   ├── profile.tsx
+│   ├── notifications.tsx
+├── _pathlessLayout.tsx
+├── _pathlessLayout/
+│   ├── route-a.tsx
+├── ├── route-b.tsx
+├── files/
+│   ├── $.tsx
 ```
 
-#### `src/routes/index.tsx`
+And here is a summarized code-based version:
 
 ```tsx
-import { createFileRoute } from '@tanstack/react-router'
+import { createRootRoute, createRoute } from '@tanstack/react-router'
 
-export const Route = createFileRoute('/')({
-  component: Index,
-})
-
-function Index() {
-  return (
-    <div className="p-2">
-      <h3>Welcome Home!</h3>
-    </div>
-  )
-}
-```
-
-#### `src/routes/about.tsx`
-
-```tsx
-import { createFileRoute } from '@tanstack/react-router'
-
-export const Route = createFileRoute('/about')({
-  component: About,
-})
-
-function About() {
-  return <div className="p-2">Hello from About!</div>
-}
-```
-
-#### `src/main.tsx`
-
-Regardless of whether you are using the `@tanstack/router-plugin` package and running the `npm run dev`/`npm run build` scripts, or manually running the `tsr watch`/`tsr generate` commands from your package scripts, the route tree file will be generated at `src/routeTree.gen.ts`.
-
-Import the generated route tree and create a new router instance:
-
-```tsx
-import { StrictMode } from 'react'
-import ReactDOM from 'react-dom/client'
-import { RouterProvider, createRouter } from '@tanstack/react-router'
-
-// Import the generated route tree
-import { routeTree } from './routeTree.gen'
-
-// Create a new router instance
-const router = createRouter({ routeTree })
-
-// Register the router instance for type safety
-declare module '@tanstack/react-router' {
-  interface Register {
-    router: typeof router
-  }
-}
-
-// Render the app
-const rootElement = document.getElementById('root')!
-if (!rootElement.innerHTML) {
-  const root = ReactDOM.createRoot(rootElement)
-  root.render(
-    <StrictMode>
-      <RouterProvider router={router} />
-    </StrictMode>,
-  )
-}
-```
-
-If you are working with this pattern you should change the `id` of the root `<div>` on your `index.html` file to `<div id='root'></div>`
-
-## Using Code-Based Route Configuration
-
-> [!IMPORTANT]
-> The following example shows how to configure routes using code, and for simplicity's sake is in a single file for this demo. While code-based generation allows you to declare many routes and even the router instance in a single file, we recommend splitting your routes into separate files for better organization and performance as your application grows.
-
-```tsx
-import { StrictMode } from 'react'
-import ReactDOM from 'react-dom/client'
-import {
-  Outlet,
-  RouterProvider,
-  Link,
-  createRouter,
-  createRoute,
-  createRootRoute,
-} from '@tanstack/react-router'
-import { TanStackRouterDevtools } from '@tanstack/react-router-devtools'
-
-const rootRoute = createRootRoute({
-  component: () => (
-    <>
-      <div className="p-2 flex gap-2">
-        <Link to="/" className="[&.active]:font-bold">
-          Home
-        </Link>{' '}
-        <Link to="/about" className="[&.active]:font-bold">
-          About
-        </Link>
-      </div>
-      <hr />
-      <Outlet />
-      <TanStackRouterDevtools />
-    </>
-  ),
-})
+const rootRoute = createRootRoute()
 
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
-  component: function Index() {
-    return (
-      <div className="p-2">
-        <h3>Welcome Home!</h3>
-      </div>
-    )
-  },
 })
 
 const aboutRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: 'about',
+})
+
+const postsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: 'posts',
+})
+
+const postsIndexRoute = createRoute({
+  getParentRoute: () => postsRoute,
+  path: '/',
+})
+
+const postRoute = createRoute({
+  getParentRoute: () => postsRoute,
+  path: '$postId',
+})
+
+const postEditorRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: 'posts/$postId/edit',
+})
+
+const settingsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: 'settings',
+})
+
+const profileRoute = createRoute({
+  getParentRoute: () => settingsRoute,
+  path: 'profile',
+})
+
+const notificationsRoute = createRoute({
+  getParentRoute: () => settingsRoute,
+  path: 'notifications',
+})
+
+const pathlessLayoutRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  id: 'pathlessLayout',
+})
+
+const pathlessLayoutARoute = createRoute({
+  getParentRoute: () => pathlessLayoutRoute,
+  path: 'route-a',
+})
+
+const pathlessLayoutBRoute = createRoute({
+  getParentRoute: () => pathlessLayoutRoute,
+  path: 'route-b',
+})
+
+const filesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: 'files/$',
+})
+```
+
+## Anatomy of a Route
+
+All other routes other than the root route are configured using the `createRoute` function:
+
+```tsx
+const route = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/posts',
+  component: PostsComponent,
+})
+```
+
+The `getParentRoute` option is a function that returns the parent route of the route you're creating.
+
+**❓❓❓ "Wait, you're making me pass the parent route for every route I make?"**
+
+Absolutely! The reason for passing the parent route has **everything to do with the magical type safety** of TanStack Router. Without the parent route, TypeScript would have no idea what types to supply your route with!
+
+> [!IMPORTANT]
+> For every route that's **NOT** the **Root Route** or a **Pathless Layout Route**, a `path` option is required. This is the path that will be matched against the URL pathname to determine if the route is a match.
+
+When configuring route `path` option on a route, it ignores leading and trailing slashes (this does not include "index" route paths `/`). You can include them if you want, but they will be normalized internally by TanStack Router. Here is a table of valid paths and what they will be normalized to:
+
+| Path     | Normalized Path |
+| -------- | --------------- |
+| `/`      | `/`             |
+| `/about` | `about`         |
+| `about/` | `about`         |
+| `about`  | `about`         |
+| `$`      | `$`             |
+| `/$`     | `$`             |
+| `/$/`    | `$`             |
+
+## Manually building the route tree
+
+When building a route tree in code, it's not enough to define the parent route of each route. You must also construct the final route tree by adding each route to its parent route's `children` array. This is because the route tree is not built automatically for you like it is in file-based routing.
+
+```tsx
+/* prettier-ignore */
+const routeTree = rootRoute.addChildren([
+  indexRoute,
+  aboutRoute,
+  postsRoute.addChildren([
+    postsIndexRoute,
+    postRoute,
+  ]),
+  postEditorRoute,
+  settingsRoute.addChildren([
+    profileRoute,
+    notificationsRoute,
+  ]),
+  pathlessLayoutRoute.addChildren([
+    pathlessLayoutARoute,
+    pathlessLayoutBRoute,
+  ]),
+  filesRoute.addChildren([
+    fileRoute,
+  ]),
+])
+/* prettier-ignore-end */
+```
+
+But before you can go ahead and build the route tree, you need to understand how the Routing Concepts for Code-Based Routing work.
+
+## Routing Concepts for Code-Based Routing
+
+Believe it or not, file-based routing is really a superset of code-based routing and uses the filesystem and a bit of code-generation abstraction on top of it to generate this structure you see above automatically.
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
