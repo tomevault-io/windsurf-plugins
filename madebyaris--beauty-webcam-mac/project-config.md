@@ -1,185 +1,150 @@
 ---
 trigger: always_on
-description: CoreMediaIO virtual camera implementation guidelines and best practices
+description: Metal shader coding standards and optimization guidelines for BeautyWebcam
 ---
 
 
-# CoreMediaIO Virtual Camera Guidelines
+# Metal Shader Guidelines
 
-## Overview
-CoreMediaIO is the framework for creating virtual camera devices on macOS. This guide covers best practices for implementing a virtual camera that appears as a standard webcam to all applications.
+## Shader Architecture
 
-## Plugin Architecture
+### File Organization
+```metal
+// BeautyWebcam_Shaders.metal
+#include <metal_stdlib>
+using namespace metal;
 
-### Basic Plugin Structure
-```objc
-// BWVirtualCameraPlugin.h
-@interface BWVirtualCameraPlugin : NSObject
+// Constants
+constant float kSkinSmoothingRadius = 2.0;
+constant float kColorEnhancementStrength = 0.3;
 
-@property (nonatomic, strong, readonly) NSUUID *pluginUUID;
-@property (nonatomic, strong, readonly) NSString *pluginName;
+// Shared utility functions
+float luminance(float3 color);
+float3 rgb2yuv(float3 rgb);
+float3 yuv2rgb(float3 yuv);
 
-+ (instancetype)sharedInstance;
-- (BOOL)initializePluginWithError:(NSError **)error;
-- (void)teardownPlugin;
+// Main processing kernels
+kernel void skinSmoothingKernel(...);
+kernel void colorEnhancementKernel(...);
+kernel void noiseReductionKernel(...);
+```
 
-@end
+### Naming Conventions
+- **Kernels**: Use descriptive names ending with "Kernel" - e.g., `skinSmoothingKernel`
+- **Constants**: Use `k` prefix with camelCase - e.g., `kBilateralSigmaD`
+- **Structs**: Use `BW` prefix - e.g., `BWProcessingParams`
+- **Functions**: Use camelCase - e.g., `calculateBilateralWeight`
 
-// Plugin registration
-- (BOOL)initializePluginWithError:(NSError **)error {
-    // Register with CoreMediaIO
-    CMIOObjectPropertyAddress propertyAddress = {
-        kCMIOHardwarePropertyAllowScreenCaptureDevices,
-        kCMIOObjectPropertyScopeGlobal,
-        kCMIOObjectPropertyElementMaster
-    };
+## Performance Optimization
+
+### Thread Group Sizing
+```metal
+// Optimal thread group sizes for different operations
+// 16x16 for 2D image processing (256 threads per group)
+kernel void imageProcessingKernel(texture2d<float, access::read> inputTexture [[texture(0)]],
+                                 texture2d<float, access::write> outputTexture [[texture(1)]],
+                                 uint2 gid [[thread_position_in_grid]]) {
+    // Process pixel at gid
+}
+
+// Use from Objective-C:
+// MTLSize threadgroupSize = MTLSizeMake(16, 16, 1);
+// MTLSize threadgroupCount = MTLSizeMake((width + 15) / 16, (height + 15) / 16, 1);
+```
+
+### Memory Access Patterns
+```metal
+// Prefer coalesced memory access
+kernel void efficientKernel(texture2d<float, access::read> input [[texture(0)]],
+                           texture2d<float, access::write> output [[texture(1)]],
+                           uint2 gid [[thread_position_in_grid]]) {
+    if (gid.x >= input.get_width() || gid.y >= input.get_height()) return;
     
-    UInt32 allow = 1;
-    OSStatus status = CMIOObjectSetPropertyData(kCMIOObjectSystemObject,
-                                               &propertyAddress,
-                                               0, NULL,
-                                               sizeof(allow), &allow);
+    // Good: Access neighboring pixels in a pattern that maximizes cache hits
+    float4 center = input.read(gid);
+    float4 right = input.read(gid + uint2(1, 0));
+    float4 down = input.read(gid + uint2(0, 1));
     
-    return status == noErr;
+    // Process and write result
+    output.write(processPixels(center, right, down), gid);
 }
 ```
 
-### Device Implementation
-```objc
-// BWVirtualCameraDevice.h
-@interface BWVirtualCameraDevice : NSObject
-
-@property (nonatomic, strong, readonly) NSString *deviceName;
-@property (nonatomic, strong, readonly) NSString *deviceID;
-@property (nonatomic, assign, readonly) CMIODeviceID deviceID;
-@property (nonatomic, assign, getter=isRunning) BOOL running;
-
-- (BOOL)createDeviceWithError:(NSError **)error;
-- (BOOL)startStreamingWithError:(NSError **)error;
-- (void)stopStreaming;
-- (void)destroyDevice;
-
-- (void)sendVideoFrame:(CVPixelBufferRef)pixelBuffer
-             timestamp:(CMTime)timestamp;
-
-@end
+### Threadgroup Memory Usage
+```metal
+// Use threadgroup memory for shared computations
+kernel void bilateralFilterKernel(texture2d<float, access::read> input [[texture(0)]],
+                                 texture2d<float, access::write> output [[texture(1)]],
+                                 uint2 gid [[thread_position_in_grid]],
+                                 uint2 tid [[thread_position_in_threadgroup]],
+                                 threadgroup float4 *sharedMemory [[threadgroup(0)]]) {
+    
+    // Load data into shared memory with border handling
+    uint sharedIndex = tid.y * 18 + tid.x; // 18x18 for 16x16 + 1-pixel border
+    if (tid.x < 18 && tid.y < 18) {
+        uint2 loadPos = gid + tid - uint2(1, 1); // Offset for border
+        sharedMemory[sharedIndex] = input.read(loadPos);
+    }
+    
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    
+    // Use shared data for filtering
+    if (tid.x < 16 && tid.y < 16) {
+        float4 result = bilateralFilter(sharedMemory, tid);
+        output.write(result, gid);
+    }
+}
 ```
 
-### Stream Management
-```objc
-// BWVirtualCameraStream.m
-@implementation BWVirtualCameraStream
+## Image Processing Algorithms
 
-- (BOOL)startStreamingWithFormat:(CMVideoFormatDescriptionRef)formatDescription
-                           error:(NSError **)error {
+### Bilateral Filter Implementation
+```metal
+// Optimized bilateral filter for skin smoothing
+float bilateralWeight(float2 spatialDistance, float colorDistance, 
+                     float sigmaD, float sigmaR) {
+    float spatialWeight = exp(-dot(spatialDistance, spatialDistance) / (2.0 * sigmaD * sigmaD));
+    float colorWeight = exp(-(colorDistance * colorDistance) / (2.0 * sigmaR * sigmaR));
+    return spatialWeight * colorWeight;
+}
+
+kernel void skinSmoothingKernel(texture2d<float, access::read> input [[texture(0)]],
+                               texture2d<float, access::write> output [[texture(1)]],
+                               constant BWProcessingParams &params [[buffer(0)]],
+                               uint2 gid [[thread_position_in_grid]]) {
     
-    // Validate format
-    if (!formatDescription) {
-        if (error) {
-            *error = [NSError errorWithDomain:BWErrorDomain
-                                         code:BWErrorInvalidFormat
-                                     userInfo:@{NSLocalizedDescriptionKey: @"Invalid format description"}];
+    if (gid.x >= input.get_width() || gid.y >= input.get_height()) return;
+    
+    float4 centerPixel = input.read(gid);
+    float3 centerColor = centerPixel.rgb;
+    
+    float3 filteredColor = float3(0.0);
+    float totalWeight = 0.0;
+    
+    // Sample in kernel radius
+    int radius = int(params.smoothingRadius);
+    for (int dy = -radius; dy <= radius; dy++) {
+        for (int dx = -radius; dx <= radius; dx++) {
+            uint2 samplePos = uint2(max(0, min(int(input.get_width()) - 1, int(gid.x) + dx)),
+                                   max(0, min(int(input.get_height()) - 1, int(gid.y) + dy)));
+            
+            float4 samplePixel = input.read(samplePos);
+            float3 sampleColor = samplePixel.rgb;
+            
+            float colorDist = distance(centerColor, sampleColor);
+            float2 spatialDist = float2(dx, dy);
+            
+            float weight = bilateralWeight(spatialDist, colorDist, 
+                                         params.sigmaD, params.sigmaR);
+            
+            filteredColor += weight * sampleColor;
+            totalWeight += weight;
         }
-        return NO;
     }
     
-    // Set up timing information
-    self.frameRate = 30; // Default to 30fps
-    self.frameDuration = CMTimeMake(1, self.frameRate);
+    filteredColor /= totalWeight;
     
-    // Initialize stream state
-    self.isStreaming = YES;
-    self.frameCount = 0;
-    
-    return YES;
-}
-
-- (void)sendFrame:(CVPixelBufferRef)pixelBuffer {
-    if (!self.isStreaming) return;
-    
-    // Calculate timestamp
-    CMTime timestamp = CMTimeMultiply(self.frameDuration, self.frameCount);
-    
-    // Create sample buffer
-    CMSampleBufferRef sampleBuffer = NULL;
-    OSStatus status = CMSampleBufferCreateForImageBuffer(
-        kCFAllocatorDefault,
-        pixelBuffer,
-        true, NULL, NULL,
-        self.formatDescription,
-        &self.sampleTiming,
-        &sampleBuffer
-    );
-    
-    if (status == noErr && sampleBuffer) {
-        // Send to CoreMediaIO
-        [self enqueueSampleBuffer:sampleBuffer];
-        CFRelease(sampleBuffer);
-    }
-    
-    self.frameCount++;
-}
-
-@end
-```
-
-## Property Management
-
-### Device Properties
-```objc
-// Essential device properties
-static const CMIOObjectPropertyAddress kDevicePropertyName = {
-    kCMIOObjectPropertyName,
-    kCMIOObjectPropertyScopeGlobal,
-    kCMIOObjectPropertyElementMaster
-};
-
-static const CMIOObjectPropertyAddress kDevicePropertyUID = {
-    kCMIODevicePropertyDeviceUID,
-    kCMIOObjectPropertyScopeGlobal,
-    kCMIOObjectPropertyElementMaster
-};
-
-// Property getter implementation
-- (OSStatus)getPropertyWithAddress:(const CMIOObjectPropertyAddress *)address
-                         dataSize:(UInt32)dataSize
-                         dataUsed:(UInt32 *)dataUsed
-                             data:(void *)data {
-    
-    OSStatus result = kCMIOHardwareNoError;
-    
-    switch (address->mSelector) {
-        case kCMIOObjectPropertyName:
-            *dataUsed = [self copyStringProperty:@"BeautyWebcam Virtual Camera"
-                                          toData:data
-                                        dataSize:dataSize];
-            break;
-            
-        case kCMIODevicePropertyDeviceUID:
-            *dataUsed = [self copyStringProperty:self.deviceUID
-                                          toData:data
-                                        dataSize:dataSize];
-            break;
-            
-        case kCMIODevicePropertyStreams:
-            *dataUsed = [self copyStreamsProperty:data dataSize:dataSize];
-            break;
-            
-        default:
-            result = kCMIOHardwareUnknownPropertyError;
-            break;
-    }
-    
-    return result;
-}
-```
-
-### Stream Properties
-```objc
-// Stream format management
-- (OSStatus)setFormatDescription:(CMVideoFormatDescriptionRef)formatDescription {
-    // Validate format
-    CMVideoDimensions dimensions = CMVideoFormatDescriptionGetDimensions(formatDescription);
+    // Blend with original based on intensity
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
