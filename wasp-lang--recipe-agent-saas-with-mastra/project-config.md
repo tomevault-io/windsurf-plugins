@@ -1,112 +1,84 @@
 ---
 trigger: always_on
-description: This document gives a quick rundown on how authentication is configured and used within the Wasp application.
+description: This document gives a quick rundown on how Wasp interacts with the database using Prisma, defines Wasp Entities, and explains the rules for creating and using Wasp Operations (Queries and Actions).
 ---
 
-# 4. Authentication
+# 3. Database, Entities, and Operations
 
-This document gives a quick rundown on how authentication is configured and used within the Wasp application.
+This document gives a quick rundown on how Wasp interacts with the database using Prisma, defines Wasp Entities, and explains the rules for creating and using Wasp Operations (Queries and Actions).
 
-See the Wasp Auth docs for available methods and complete guides [wasp-overview.mdc](mdc:template/app/.cursor/rules/wasp-overview.mdc)
+See the Wasp Data Model docs for more info [wasp-overview.mdc](mdc:template/app/.cursor/rules/wasp-overview.mdc)
 
-## Wasp Auth Setup
+## Wasp Database and Entities
 
-- Wasp provides built-in authentication with minimal configuration via the Wasp config file. 
-- Wasp generates all necessary auth routes, middleware, and UI components based on the configuration.
-- Example auth configuration in [main.wasp](mdc:main.wasp):
-  ```wasp
-  app myApp {
-    // ... other config
-    auth: {
-      // Links Wasp auth to your User model in @schema.prisma
-      userEntity: User,
-      methods: {
-        // Enable username/password login
-        usernameAndPassword: {},
-        // Enable Google OAuth login
-        // Requires setting GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET env vars
-        google: {},
-        // Enable email/password login with verification
-        email: {
-          // Set up an email sender (Dummy prints to console)
-          // See https://wasp-lang.com/docs/auth/email-auth#email-sending
-          fromField: {
-            name: "Budgeting Vibe",
-            email: "noreply@budgetingvibe.com"
-          },
-          emailVerification: {
-            clientRoute: EmailVerificationRoute
-          },
-          passwordReset: {
-            clientRoute: PasswordResetRoute
-          }
-        }
-      },
-      // Route to redirect to if auth fails
-      onAuthFailedRedirectTo: "/login",
-      // Optional: Route after successful signup/login
-      // onAuthSucceededRedirectTo: "/dashboard"
-    }
-    emailSender: {
-      provider: Dummy // Use Dummy for local dev (prints emails to console)
-      // provider: SMTP // For production, configure SMTP
-    }
+- Wasp uses Prisma for database access, with models defined in [schema.prisma](mdc:schema.prisma).
+- Prisma models defined in [schema.prisma](mdc:schema.prisma) automatically become Wasp Entities that can be used in operations.
+- Wasp reads the [schema.prisma](mdc:schema.prisma) file to understand your data model and generate appropriate code (e.g., types in `wasp/entities`).
+- Example Prisma model in [schema.prisma](mdc:schema.prisma) :
+  ```prisma
+  model Task {
+    id          Int      @id @default(autoincrement())
+    description String
+    isDone      Boolean  @default(false)
+    user        User     @relation(fields: [userId], references: [id])
+    userId      Int
   }
-
-  // Define the routes needed by email auth methods
-  route EmailVerificationRoute { path: "/auth/verify-email", to: EmailVerificationPage }
-  page EmailVerificationPage { component: import { EmailVerification } from "@src/features/auth/EmailVerificationPage.tsx" }
-
-  route PasswordResetRoute { path: "/auth/reset-password", to: PasswordResetPage }
-  page PasswordResetPage { component: import { PasswordReset } from "@src/features/auth/PasswordResetPage.tsx" }
   ```
 
-- **Dummy Email Provider Note:** When `emailSender: { provider: Dummy }` is configured in [main.wasp](mdc:main.wasp), Wasp does not send actual emails. Instead, the content of verification/password reset emails, including the clickable link, will be printed directly to the server console where `wasp start` is running.
+## Wasp DB Schema Rules (@schema.prisma)
 
-## Wasp Auth Rules
+- Add database models directly to the [schema.prisma](mdc:schema.prisma) file, NOT to [main.wasp](mdc:main.wasp) as entities.
+- Generally avoid adding `db.system` or `db.prisma` properties to the [main.wasp](mdc:main.wasp) config file; configure the database provider within [schema.prisma](mdc:schema.prisma) instead.
+  ```prisma
+  // Example in schema.prisma
+  datasource db {
+    provider = "postgresql" // or "sqlite"
+    url      = env("DATABASE_URL")
+  }
+  ```
+- Keep the [schema.prisma](mdc:schema.prisma) file in the root of the project.
+- **Applying Changes:** After updating [schema.prisma](mdc:schema.prisma), run `wasp db migrate-dev` in the terminal to generate and apply SQL migrations.
+- **Database Choice:** While 'sqlite' is the default, it lacks support for features like Prisma enums or PgBoss scheduled jobs. Use 'postgresql' for such cases. If using PostgreSQL locally, ensure it's running (e.g., via `wasp db start` if using Wasp's built-in Docker setup, or ensure your own instance is running).
+- Define all model relationships (`@relation`) within [schema.prisma](mdc:schema.prisma).
 
-- **User Model ( [schema.prisma](mdc:schema.prisma) ):**
-  - Wasp Auth methods handle essential identity fields (like `email`, `password hash`, `provider IDs`, `isVerified`) internally. These are stored in separate Prisma models managed by Wasp (`AuthProvider`, `AuthProviderData`).
-  - Your Prisma `User` model (specified in [main.wasp](mdc:main.wasp) as `auth.userEntity`) typically **only needs the `id` field** for Wasp to link the auth identity.
-    ```prisma
-    // Minimal User model in @schema.prisma
-    model User {
-      id Int @id @default(autoincrement())
-      // Add other *non-auth* related fields as needed
-      // e.g., profile info, preferences, relations to other models
-      // profileImageUrl String?
-      // timeZone        String? @default("UTC")
-    }
-    ```
-  - **Avoid adding** `email`, `emailVerified`, `password`, `username`, or provider-specific ID fields directly to *your* `User` model in [schema.prisma](mdc:schema.prisma) unless you have very specific customization needs that require overriding Wasp's default behavior and managing these fields manually.
-  - If you need frequent access to an identity field like `email` or `username` for *any* user (not just the logged-in one), see the **Recommendation** in the "Wasp Auth User Fields" section below.
+## Wasp Operations (Queries & Actions)
 
-- **Auth Pages:**
-  - When initially creating Auth pages (Login, Signup), use the pre-built components provided by Wasp for simplicity:
-    - `import { LoginForm, SignupForm } from 'wasp/client/auth';`
-    - These components work with the configured auth methods in [main.wasp](mdc:main.wasp).
-    - You can customize their appearance or build completely custom forms if needed.
+- Operations are how Wasp handles client-server communication, defined in [main.wasp](mdc:main.wasp).
+- **Queries:** Read operations (fetch data).
+- **Actions:** Write operations (create, update, delete data).
+- Operations automatically handle data fetching, caching (for queries), and updates.
+- Operations reference Entities (defined in [schema.prisma](mdc:schema.prisma) ) to establish proper data access patterns and dependencies.
+- Example definitions in [main.wasp](mdc:main.wasp):
+  ```wasp
+  query getTasks {
+    // Points to the implementation function
+    fn: import { getTasks } from "@src/features/tasks/operations.ts", // Convention: operations.ts
+    // Grants access to the Task entity within the operation's context
+    entities: [Task]
+  }
 
-- **Protected Routes/Pages:**
-  - Use the `useAuth` hook from `wasp/client/auth` to access the current user's data and check authentication status.
-  - Redirect or show alternative content if the user is not authenticated.
-  ```typescript
-  import { useAuth } from 'wasp/client/auth';
-  import { Redirect } from 'wasp/client/router'; // Or use Link
+  action createTask {
+    fn: import { createTask } from "@src/features/tasks/operations.ts",
+    entities: [Task] // Needs access to Task to create one
+  }
+  ```
 
-  const MyProtectedPage = () => {
-    const { data: user, isLoading, error } = useAuth(); // Returns AuthUser | null
+## Wasp Operations Rules & Implementation
 
-    if (isLoading) return <div>Loading...</div>;
-    // If error, it likely means the auth session is invalid/expired
-    if (error || !user) {
-      // Redirect to login page defined in main.wasp (auth.onAuthFailedRedirectTo)
-      // Or return <Redirect to="/login" />;
-      return <div>Please log in to access this page.</div>;
-    }
-
-    // User is authenticated, render the page content
-    // Use helpers like getEmail(user) or getUsername(user) if needed
+- **Operation File:** Implement query and action functions together in a single `operations.ts` file within the relevant feature directory (e.g., `src/features/tasks/operations.ts`).
+- **Generated Types:** Wasp auto-generates TypeScript types for your operations based on their definitions in [main.wasp](mdc:main.wasp) and the functions' signatures.
+  - Import operation types using `import type { MyQuery, MyAction } from 'wasp/server/operations';`
+  - If types aren't updated after changing [main.wasp](mdc:main.wasp) or the function signature, restart the Wasp dev server (`wasp start`).
+- **Entity Types:** Wasp generates types for your Prisma models from [schema.prisma](mdc:schema.prisma).
+  - Import entity types using `import type { MyModel } from 'wasp/entities';`
+- **Entity Access:** Ensure all Entities needed within an operation's logic are listed in its `entities: [...]` definition in [main.wasp](mdc:main.wasp). This makes `context.entities.YourModel` available.
+- **Internal Communication:** Prioritize Wasp operations for client-server communication within the app. Use Custom HTTP API Endpoints (see [advanced-troubleshooting.mdc](mdc:template/app/.cursor/rules/advanced-troubleshooting.mdc)) primarily for external integrations (webhooks, etc.).
+- **Client-Side Query Usage:** Use Wasp's `useQuery` hook from `wasp/client/operations` to fetch data.
+  - `import { useQuery } from 'wasp/client/operations';`
+  - `const { data, isLoading, error } = useQuery(getQueryName, { queryArgs });`
+- **Client-Side Action Usage:** Call actions *directly* using `async`/`await`. **DO NOT USE** the `useAction` hook unless you specifically need optimistic UI updates (see [advanced-troubleshooting.mdc](mdc:template/app/.cursor/rules/advanced-troubleshooting.mdc)).
+  - `import { myAction } from 'wasp/client/operations';`
+  - `const result = await myAction({ actionArgs });`
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
