@@ -1,137 +1,121 @@
 ---
 trigger: always_on
-description: Java Functional Programming rules
+description: Java rules to apply data oriented programming style
 ---
 
-# Java Functional Programming rules
+# Java rules to apply data oriented programming style
 
-Java functional programming revolves around immutable objects and state transformations, ensuring functions are pure (no side effects, depend only on inputs). It leverages functional interfaces, concise lambda expressions, and the Stream API for collection processing. Core paradigms include function composition, `Optional` for null safety, and higher-order functions. Modern Java features like Records enhance immutable data transfer, while pattern matching (for `instanceof` and `switch`) and switch expressions improve conditional logic. Sealed classes and interfaces enable controlled, exhaustive hierarchies, and upcoming Stream Gatherers will offer advanced custom stream operations.
+Java Data-Oriented Programming emphasizes separating code (behavior) from data structures, which should ideally be immutable (e.g., using records). Data manipulation should occur via pure functions that transform data into new instances. It's often beneficial to keep data structures flat and denormalized (using IDs for references) where appropriate, and to start with generic data representations (like `Map<String, Object>`) converting to specific types only when necessary. Data integrity is ensured through pure validation functions. Flexible, generic data access layers facilitate working with various data types and storage mechanisms. All data transformations should be explicit, traceable, and composed of clear, pure functional steps.
 
 ## Implementing These Principles
 
 These guidelines are built upon the following core principles:
 
-1.  **Immutability**: Prioritize immutable data structures (e.g., Records, `List.of()`) and state transformations that produce new instances rather than modifying existing ones. This reduces side effects and simplifies reasoning about state.
-2.  **Purity and Side-Effect Management**: Strive to write pure functions—functions whose output depends only on their input and which have no observable side effects. Isolate and control side effects when they are necessary.
-3.  **Expressiveness and Conciseness**: Leverage lambda expressions, method references, and the Stream API to write code that is declarative, concise, and clearly expresses the intent of data transformations and operations.
-4.  **Higher-Order Abstractions**: Utilize functional interfaces, function composition, and higher-order functions (functions that operate on other functions) to build flexible and reusable code components.
-5.  **Modern Java Integration**: Embrace modern Java features like Records, Pattern Matching, Switch Expressions, and Sealed Classes, which align well with and enhance functional programming paradigms by promoting immutability, type safety, and expressive conditional logic.
+1.  **Separation of Concerns (Data vs. Code)**: Strictly decouple data structures (which should be simple carriers like records or POJOs) from the code (behavior) that operates on them. Behavior should reside in separate utility classes or services.
+2.  **Immutability**: Design data structures to be immutable. Use records or final fields, and ensure that any transformations on data produce new instances rather than modifying existing ones.
+3.  **Pure Data Transformations**: Manipulate data using pure functions that depend only on their inputs and produce no side effects. This makes transformations predictable, testable, and easier to reason about.
+4.  **Simplicity and Flexibility of Data Structures**: Prefer flat, denormalized data structures where appropriate, using IDs for references rather than deep nesting. Start with generic representations (like `Map<String, Object>`) if the schema is dynamic, converting to specific types only when necessary for processing.
+5.  **Explicit and Traceable Operations**: Ensure all data validation and transformation steps are explicit, composed of clear functional steps, and easily traceable. Avoid hidden or implicit logic within data objects.
 
 ## Table of contents
 
-- Rule 1: Immutable Objects
-- Rule 2: State Immutability
-- Rule 3: Pure Functions
-- Rule 4: Functional Interfaces
-- Rule 5: Lambda Expressions
-- Rule 6: Streams
-- Rule 7: Functional Programming Paradigms
-- Rule 8: Leverage Records for Immutable Data Transfer
-- Rule 9: Employ Pattern Matching for `instanceof` and `switch`
-- Rule 10: Use Switch Expressions for Concise Multi-way Conditionals
-- Rule 11: Leverage Sealed Classes and Interfaces for Controlled Hierarchies
-- Rule 12: Explore Stream Gatherers for Custom Stream Operations
+- Rule 1: Separate Code from Data
+- Rule 2: Data Should Be Immutable
+- Rule 3: Use Pure Functions to Manipulate Data
+- Rule 4: Keep Data Flat and Denormalized
+- Rule 5: Keep Data Generic Until Specific
+- Rule 6: Data Integrity through Validation Functions
+- Rule 7: Flexible and Generic Data Access
+- Rule 8: Explicit and Traceable Data Transformation
 
-## Rule 1: Immutable Objects
+## Rule 1: Separate Code from Data
 
-Title: Ensure Objects are Immutable
+Title: Decouple Behavior (Code) from Data Structures
 Description:
-- Use `final` classes and fields.
-- Initialize all fields in the constructor.
-- Do not provide setter methods.
-- Return defensive copies of mutable fields (e.g., collections, dates) when exposing them via getters.
+- Use records or simple POJOs primarily for holding data.
+- Place behavior (methods that operate on data) in separate utility classes or services.
+- Avoid mixing state (fields) and complex behavior (methods with logic) within the same class intended as a data carrier.
+- Prefer static methods in utility classes for operations on data objects.
+- Design data structures to be self-contained and focused solely on representing state.
 
 **Good example:**
 
 ```java
-import java.util.List;
-import java.util.ArrayList;
+// Data structure (record)
+record UserData(String name, int age) {}
 
-public final class Person {
-    private final String name;
-    private final int age;
-    private final List<String> hobbies; // Make it List, not ArrayList
+// Behavior in a separate utility class
+class UserActions {
+    public static void validateAge(UserData user) {
+        if (user.age() < 0) {
+            throw new IllegalArgumentException("Age cannot be negative: " + user.age());
+        }
+        System.out.println("Age for " + user.name() + " is valid.");
+    }
 
-    public Person(String name, int age, List<String> hobbies) {
+    public static UserData activateUser(UserData user) {
+        // Example transformation logic
+        System.out.println("Activating user: " + user.name());
+        return new UserData(user.name().toUpperCase(), user.age()); // Returns new data
+    }
+}
+
+class SeparateCodeDataExample {
+    public static void main(String args) {
+        UserData user1 = new UserData("Alice", 30);
+        UserActions.validateAge(user1);
+        UserData activatedUser1 = UserActions.activateUser(user1);
+        System.out.println("Activated user: " + activatedUser1);
+
+        try {
+            UserData user2 = new UserData("Bob", -5);
+            UserActions.validateAge(user2); // This will throw
+        } catch (IllegalArgumentException e) {
+            System.err.println(e.getMessage());
+        }
+    }
+}
+```
+
+**Bad Example:**
+
+```java
+// Mixing code and data in one class
+class User {
+    private String name;
+    private int age;
+
+    public User(String name, int age) {
         this.name = name;
         this.age = age;
-        // Ensure the incoming list is defensively copied to an immutable list
-        this.hobbies = List.copyOf(hobbies); 
     }
 
-    public String getName() {
-        return name;
+    // Behavior mixed with data
+    public void validateAge() {
+        if (age < 0) {
+            throw new IllegalArgumentException("Age cannot be negative: " + age);
+        }
+        System.out.println("Age for " + name + " is valid.");
     }
 
-    public int getAge() {
-        return age;
-    }
+    public String getName() { return name; }
+    public int getAge() { return age; }
 
-    // Return an immutable view or a defensive copy
-    public List<String> getHobbies() {
-        return this.hobbies; // List.copyOf already returns an unmodifiable list
-    }
-}
-```
-
-**Bad Example:**
-
-```java
-// Bad example to be added
-// e.g., a mutable class with setters, or returning internal mutable collections directly.
-```
-
-## Rule 2: State Immutability
-
-Title: Prefer Immutable State Transformations
-Description:
-- Instead of modifying existing objects, return new objects representing the new state.
-- Utilize collectors that produce immutable collections (e.g., `Collectors.toUnmodifiableList()`).
-- Leverage immutable collection types provided by libraries or Java itself.
-
-**Good example:**
-
-```java
-import java.util.List;
-import java.util.stream.Collectors;
-
-public class PriceCalculator {
-    public static List<Double> applyDiscount(List<Double> prices, double discount) {
-        return prices.stream()
-            .map(price -> price * (1 - discount))
-            .collect(Collectors.toUnmodifiableList()); // Ensures the returned list is immutable
+    public static void main(String args) {
+        User user1 = new User("Alice", 30);
+        user1.validateAge();
+        // Problem: User object itself has methods, not just data.
+        // If User was a record, it couldn't have such instance methods beyond generated ones.
     }
 }
 ```
 
-**Bad Example:**
+## Rule 2: Data Should Be Immutable
 
-```java
-// Bad example to be added
-// e.g., a method that modifies the input list directly.
-```
-
-## Rule 3: Pure Functions
-
-Title: Write Pure Functions
+Title: Ensure Data Immutability
 Description:
-- Functions should depend only on their input parameters and not on any external or hidden state.
-- They should not cause any side effects (e.g., modifying external variables, I/O operations).
-- Given the same input, a pure function must always return the same output.
-- Avoid modifying external state or relying on it.
-
-**Good example:**
-
-```java
-import java.util.List;
-import java.util.stream.Collectors;
-
-public class MathOperations {
-    // Pure function: depends only on input, no side effects
-    public static int add(int a, int b) {
-        return a + b;
-    }
-
+- Use records (which are inherently immutable) whenever possible for data carriers.
+- Declare all fields as `final`.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
