@@ -1,147 +1,55 @@
 ---
 trigger: always_on
-description: Used when referred by @@EPIC or @@EPICS or when writing or completing any epic level of work or epic level of capabilities.
+description: Last-Updated: 2025-06-07
 ---
 
-**Epic Planning & Tracking System**
-<!-- AI INSTRUCTIONS: Always follow these rules. Never modify this section. -->
+# project-config.md
+Last-Updated: 2025-06-07
 
-**Purpose**: Plan and track large initiatives using the hierarchy: EPIC GROUP → EPIC → PHASE → STEPS
+## Project Goal
+e.g. Build an enterprise ready platform that allows users to build and launch websites
 
-**Hierarchy Definitions**:
-- **EPIC GROUP**: Optional grouping of related epics
-- **EPIC**: Large collection of features/capabilities  
-- **PHASE**: Major milestone within an epic
-- **STEP**: Individual feature within a phase
+## Tech Stack
+- **Language(s):** e.g TypeScript , Javascript
+- **Framework(s):** e.g. Nuxt.js, Encore TS, Vue.js
+- **Build / Tooling:** e.g. pnpm, Turborepo, docker
+- **Monorepo Structure:** e.g Turborepo-managed workspace with apps/frontend and apps/backend
 
-**AI Usage Rules**:
-1. **Epic Creation**: When user requests epic planning, create comprehensive plans here
-2. **Architecture Integration**: Always consider architecture.mdc when planning epics and include architectural impact in epic steps
-3. **No Execution**: Never execute epic work - that happens in workflow_state.mdc  
-4. **Natural Language Processing**: Translate user requests into epic context for workflow integration
-5. **Progress Updates**: Update epic status when user reports progress or workflow completes
-6. **Epic Search**: Search existing epics when user mentions epic work to set proper workflow context
+## Critical Patterns & Conventions
+- When ever possible recommend building an AI-First solution, where solution uses an AI to make the user experience easy and streamlines. 
+- Prioritize using open source packages whenever you can instead of building your own. Preferred package repository is npm, but do also search for open source github repos. 
+- Prioritize `@Docs` for internal documentation and `@Web` for external resources.
+- Use `@Git` and `@Folders` in combination to understand the codebase structure and history.
+- Structure tool calls logically, documenting the rationale before execution.
+- For complex tasks, break them down into smaller, manageable steps using tool calls.
+- When using `@Files` or `@Code`, specify the file path and relevant code sections clearly.
+- If a tool call fails, attempt to diagnose the issue using error messages and logs. Refer to the troubleshooting guides if needed:
+    - @Common Issues
+    - @Troubleshooting Guide
+- Follow consistent naming conventions (e.g., camelCase for variables, PascalCase for classes).
+- Use meaningful variable and function names.
+- Write clear and concise comments.
+- Break down complex functions into smaller, more manageable units.
+- Handle errors gracefully and provide informative error messages.
+- Write unit and integration tests for critical components.
+- Keep code DRY (Don't Repeat Yourself) by abstracting reusable logic into functions or modules.
 
-**Context Limits**: Maximum 3 active epics to maintain AI effectiveness
+## Constraints
+- You have a limited context window (Claude's limitation).
+- You can make up to 25 tool calls per turn in Agent Composer mode.
+- Adhere to the "Cursor AI Operating Instructions" provided separately.
+- Prioritize code quality, maintainability, and security.
+- Avoid making assumptions; ask clarifying questions when needed.
 
-**EPICS PLANS**
-<!-- Stores and tracks the EPIC GROUP, EPIC, PHASE and STEP type of plans.  Only to be modified and used by an AI -->
-
-## EPIC PORTFOLIO STATUS
-
-### Current Portfolio Summary
-- **Total Active Epics**: 0 (Max: 3)
-- **Completed Epics**: 0
-- **Blocked Epics**: 0
-- **Last Updated**: [Date when portfolio was last updated]
-
-### Portfolio Limits
-**Max Active Epics**: 3 (to maintain AI context effectiveness)
-**Auto-Archive**: Completed epics older than 6 months
-
-### Epic Status Legend
-- ✅ **COMPLETED**: All phases and steps finished
-- 🔄 **IN_PROGRESS**: Currently being worked on
-- ⏳ **PLANNED**: Planned but not yet started
-- 🚫 **BLOCKED**: Stopped due to dependencies or issues
-- ⏸️ **PAUSED**: Temporarily suspended
-- ❌ **CANCELLED**: No longer needed
-- 📦 **ARCHIVED**: Completed and archived for reference
-
----
-
-## ACTIVE EPICS
-
-<!-- Active epics will be listed here with progress tracking -->
-
-*No active epics currently planned. Use @EPIC or @EPICS to create new epic plans.*
+## Tokenization Settings
+- Estimated chars-per-token: 3.5  
+- Max tokens for the AI: 120 0000
+- Plan for summary when **workflow-state.mdc** exceeds ~12 K chars.
 
 ---
 
-## EPIC PROGRESS TRACKING
-
-<!-- This section tracks progress for each epic with detailed status -->
-
-### Simplified Epic Template
-```
-### EPIC: [Epic Name]
-**Status**: [PLANNED/IN_PROGRESS/BLOCKED/COMPLETED]
-**Priority**: [High/Medium/Low]
-**Started**: [Start date]
-**Target Completion**: [Target date]
-
-#### Goal
-[Clear business objective and user value]
-
-#### Success Criteria
-- [ ] [Measurable outcome 1]
-- [ ] [Measurable outcome 2]
-- [ ] [Measurable outcome 3]
-
-#### Dependencies & Blockers
-- [Current dependencies or blocking issues]
-
-#### PHASE 1: [Phase Name] - [STATUS_ICON] [STATUS]
-**Goal**: [Phase objective and deliverables]
-
-**Steps:**
-1. **[Step Name]**: [What needs to be built/implemented] - [STATUS_ICON] [COMPLETION_%]
-   - Key requirements: [2-3 critical requirements]
-   - Acceptance criteria: [What defines "done"]
-   - Architecture impact: [How this affects current architecture or introduces new patterns]
-   - AI considerations: [Important context for AI execution]
-   - Status: [PLANNED/IN_PROGRESS/COMPLETED] ([completion_%])
-   - Started: [Date when work began]
-   - Last Updated: [Date of last progress]
-   - Completed: [Date when step finished]
-   - Notes: [Progress notes, decisions, blockers]
-
-2. **[Step Name]**: [What needs to be built/implemented] - [STATUS_ICON] [COMPLETION_%]
-   - Key requirements: [2-3 critical requirements]
-   - Acceptance criteria: [What defines "done"]
-   - AI considerations: [Important context for AI execution]
-   - Status: [PLANNED/IN_PROGRESS/COMPLETED] ([completion_%])
-   - Started: [Date when work began]
-   - Last Updated: [Date of last progress]
-   - Completed: [Date when step finished]
-   - Notes: [Progress notes, decisions, blockers]
-
-3. **[Step Name]**: [What needs to be built/implemented] - [STATUS_ICON] [COMPLETION_%]
-   - Key requirements: [2-3 critical requirements]
-   - Acceptance criteria: [What defines "done"]
-   - AI considerations: [Important context for AI execution]
-   - Status: [PLANNED/IN_PROGRESS/COMPLETED] ([completion_%])
-   - Started: [Date when work began]
-   - Last Updated: [Date of last progress]
-   - Completed: [Date when step finished]
-   - Notes: [Progress notes, decisions, blockers]
-
-#### PHASE 2: [Phase Name] - [STATUS_ICON] [STATUS]
-**Goal**: [Phase objective and deliverables]
-
-**Steps:**
-1. **[Step Name]**: [What needs to be built/implemented]
-   - Key requirements: [2-3 critical requirements]
-   - Acceptance criteria: [What defines "done"]
-   - AI considerations: [Important context for AI execution]
-
-2. **[Step Name]**: [What needs to be built/implemented]
-   - Key requirements: [2-3 critical requirements]
-   - Acceptance criteria: [What defines "done"]
-   - AI considerations: [Important context for AI execution]
-
-#### PHASE 3: [Phase Name] - [STATUS_ICON] [STATUS]
-**Goal**: [Phase objective and deliverables]
-
-**Steps:**
-1. **[Step Name]**: [What needs to be built/implemented]
-   - Key requirements: [2-3 critical requirements]
-   - Acceptance criteria: [What defines "done"]
-   - AI considerations: [Important context for AI execution]
-
-#### Notes
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+## Changelog
+<!-- The agent prepends the latest summary here as a new list item after each VALIDATE phase -->
 
 ---
 > Source: [fbrbovic/cursor-rule-framework](https://github.com/fbrbovic/cursor-rule-framework) — distributed by [TomeVault](https://tomevault.io).
