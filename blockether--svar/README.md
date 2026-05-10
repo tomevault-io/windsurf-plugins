@@ -7,11 +7,11 @@ Type‑safe LLM output for Clojure. Works with any text‑only model.
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [Blockether/svar](https://github.com/Blockether/svar).
+Original source: `CLAUDE.md` in [Blockether/svar](https://github.com/Blockether/svar).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
