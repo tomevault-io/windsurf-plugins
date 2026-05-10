@@ -1,185 +1,170 @@
 ---
 trigger: always_on
-description: Role-based access control (RBAC) patterns and implementations for POS System
+description: Tech debt prevention patterns with consistency enforcement, code quality gates, and architectural governance
 ---
 
 
-# Role-Based Access Control (RBAC) Patterns
+# 🏗️ Tech Debt Prevention & Code Quality Governance
 
-## Role Definitions
+## 🎯 Zero Tech Debt Philosophy
 
-### Available Roles
+### Proactive Prevention Strategy
 ```typescript
-type UserRole = 'admin' | 'manager' | 'server' | 'counter' | 'kitchen'
-```
-
-### Role Capabilities
-- **admin**: Full system access, can switch to any interface
-- **manager**: Business operations, reports, staff oversight
-- **server**: Dine-in order creation only
-- **counter**: All order types + payment processing
-- **kitchen**: Order preparation and status updates
-
-## Frontend Role Routing
-
-### Main Router Pattern
-```typescript
-// RoleBasedLayout.tsx
-export function RoleBasedLayout({ user }: { user: User }) {
-  // Admin gets AdminLayout with all interfaces
-  if (user.role === 'admin') {
-    return <AdminLayout user={user} />
+// ✅ TECH DEBT PREVENTION: Systematic approach to code quality
+namespace TechDebtPrevention {
+  // Code quality metrics and thresholds
+  interface QualityGates {
+    code_coverage: { minimum: 85, target: 90 }
+    complexity_score: { maximum: 10, target: 7 }
+    duplication: { maximum: 3, target: 1 }
+    performance: { api_response: '< 200ms', ui_render: '< 100ms' }
+    security: { vulnerabilities: 0, code_quality: 'A' }
   }
-  
-  // Other roles get specific interfaces
-  switch (user.role) {
-    case 'server': return <ServerInterface />
-    case 'counter': return <CounterInterface />
-    case 'kitchen': return <KitchenLayout user={user} />
-    default: return <POSLayout user={user} />
-  }
-}
-```
 
-### Navigation Access Control
-```typescript
-// AdminLayout.tsx - Admin can access all interfaces
-const adminSections = [
-  { id: 'dashboard', label: 'Dashboard' },
-  { id: 'pos', label: 'General POS' },        // Full POS access
-  { id: 'server', label: 'Server Interface' }, // Server view
-  { id: 'counter', label: 'Counter/Checkout' }, // Counter view
-  { id: 'kitchen', label: 'Kitchen Display' }   // Kitchen view
-  // + admin-only sections
-]
-```
-
-## Backend API Role Restrictions
-
-### Route Groups by Role
-```go
-// routes.go pattern
-func setupRoutes(router *gin.Engine) {
-    api := router.Group("/api/v1")
-    
-    // Public routes
-    api.POST("/auth/login", handlers.Login)
-    
-    // Protected routes
-    protected := api.Group("", middleware.RequireAuth)
-    
-    // Admin only
-    admin := protected.Group("/admin", middleware.RequireRole("admin"))
-    admin.GET("/users", handlers.GetUsers)
-    admin.POST("/users", handlers.CreateUser)
-    
-    // Server only
-    server := protected.Group("/server", middleware.RequireRole("server"))
-    server.POST("/orders", handlers.CreateDineInOrder) // Restricted to dine_in
-    
-    // Counter access
-    counter := protected.Group("/counter", middleware.RequireRoles("counter", "admin"))
-    counter.POST("/orders", handlers.CreateCounterOrder) // All order types
-    counter.POST("/orders/:id/payments", handlers.ProcessPayment)
-}
-```
-
-### Role-Specific Endpoints
-```typescript
-// API Client role-specific methods
-class APIClient {
-  // Admin-only endpoints
-  async getUsers(): Promise<APIResponse<User[]>> {
-    return this.request({ method: 'GET', url: '/admin/users' });
-  }
-  
-  // Server-specific (dine-in only)
-  async createServerOrder(order: CreateOrderRequest): Promise<APIResponse<Order>> {
-    return this.request({ method: 'POST', url: '/server/orders', data: order });
-  }
-  
-  // Counter-specific (all order types + payments)
-  async createCounterOrder(order: CreateOrderRequest): Promise<APIResponse<Order>> {
-    return this.request({ method: 'POST', url: '/counter/orders', data: order });
-  }
-  
-  async processCounterPayment(orderId: string, payment: ProcessPaymentRequest): Promise<APIResponse<Payment>> {
-    return this.request({ method: 'POST', url: `/counter/orders/${orderId}/payments`, data: payment });
-  }
-}
-```
-
-## Component-Level Access Control
-
-### Conditional Rendering by Role
-```typescript
-// Show admin-only features
-{user.role === 'admin' && (
-  <Button onClick={() => navigate('/admin')}>
-    Admin Dashboard
-  </Button>
-)}
-
-// Show based on multiple roles
-{['admin', 'manager'].includes(user.role) && (
-  <ReportsSection />
-)}
-```
-
-### Form Restrictions
-```typescript
-// ServerInterface.tsx - Only dine-in orders
-const ServerInterface = () => {
-  const createOrderMutation = useMutation({
-    mutationFn: (order: CreateOrderRequest) => {
-      // Force dine_in type for servers
-      return apiClient.createServerOrder({
-        ...order,
-        order_type: 'dine_in'
-      })
+  // Automated quality enforcement
+  class QualityEnforcer {
+    static enforcePreCommitQuality(): PreCommitHook {
+      return {
+        // Code format and style
+        prettier_format: true,
+        eslint_validation: true,
+        typescript_strict_check: true,
+        
+        // Business logic validation
+        business_rule_consistency: true,
+        api_contract_validation: true,
+        database_migration_safety: true,
+        
+        // Performance validation
+        bundle_size_check: true,
+        query_performance_validation: true,
+        memory_leak_detection: true
+      }
     }
-  })
-  
-  // Hide takeout/delivery options in UI
-  const availableOrderTypes = ['dine_in'] // Only option for servers
+  }
 }
 ```
 
-## Database Role Validation
+## 🔒 Consistency Enforcement Patterns
 
-### User Schema
-```sql
--- users table with role enum
-CREATE TYPE user_role AS ENUM ('admin', 'manager', 'server', 'counter', 'kitchen');
-
-ALTER TABLE users ADD COLUMN role user_role NOT NULL DEFAULT 'server';
-```
-
-### Sample Role Data
-```sql
--- Seed data with all roles
-INSERT INTO users (username, email, password_hash, first_name, last_name, role) VALUES
-('admin', 'admin@pos.com', '$2b$10$...', 'Admin', 'User', 'admin'),
-('server1', 'server1@pos.com', '$2b$10$...', 'Sarah', 'Smith', 'server'),
-('counter1', 'counter1@pos.com', '$2b$10$...', 'Lisa', 'Davis', 'counter'),
-('kitchen1', 'kitchen@pos.com', '$2b$10$...', 'Chef', 'Williams', 'kitchen');
-```
-
-## Authentication Flow
-
-### Login Process
+### 1. Architectural Consistency
 ```typescript
-// login.tsx
-const loginMutation = useMutation({
-  mutationFn: async (credentials: LoginRequest) => {
-    const response = await apiClient.login(credentials)
-    return response
-  },
-  onSuccess: (data) => {
-    if (data.success && data.data) {
-      // Store user info with role
-      apiClient.setAuthToken(data.data.token)
-      localStorage.setItem('pos_user', JSON.stringify(data.data.user))
+// ✅ CONSISTENCY: Standardized architectural patterns
+class ArchitecturalConsistency {
+  // Enforce consistent API patterns
+  static createAPIEndpoint<TRequest, TResponse>(
+    config: APIEndpointConfig<TRequest, TResponse>
+  ): StandardAPIEndpoint<TRequest, TResponse> {
+    return {
+      // Standardized request validation
+      validateRequest: (request: TRequest): ValidationResult => {
+        const validator = this.createValidator(config.validation_schema)
+        return validator.validate(request)
+      },
+
+      // Standardized business logic execution
+      executeBusinessLogic: async (request: TRequest): Promise<TResponse> => {
+        // Consistent error handling
+        try {
+          // Standardized logging
+          Logger.info(`Executing ${config.endpoint_name}`, { request })
+          
+          // Business logic with consistent patterns
+          const result = await config.business_logic(request)
+          
+          // Standardized success response
+          return {
+            success: true,
+            message: config.success_message,
+            data: result,
+            timestamp: new Date().toISOString(),
+            request_id: generateRequestId()
+          }
+        } catch (error) {
+          // Standardized error handling
+          return this.handleStandardError(error, config.endpoint_name)
+        }
+      },
+
+      // Standardized response formatting
+      formatResponse: (response: TResponse): StandardAPIResponse<TResponse> => {
+        return {
+          ...response,
+          version: config.api_version,
+          performance_metrics: this.getPerformanceMetrics()
+        }
+      }
+    }
+  }
+
+  // Enforce consistent component patterns
+  static createBusinessComponent<TProps>(
+    config: ComponentConfig<TProps>
+  ): React.FC<TProps> {
+    return React.memo((props: TProps) => {
+      // Standardized error boundary
+      return (
+        <ErrorBoundary fallback={config.error_fallback}>
+          {/* Standardized loading states */}
+          <Suspense fallback={config.loading_fallback}>
+            {/* Standardized accessibility */}
+            <div 
+              role={config.accessibility.role}
+              aria-label={config.accessibility.label}
+              className={cn(config.base_classes, props.className)}
+            >
+              {/* Component content with consistent patterns */}
+              {config.render(props)}
+            </div>
+          </Suspense>
+        </ErrorBoundary>
+      )
+    }, config.memo_comparison || shallowEqual)
+  }
+
+  // Database query consistency
+  static createDatabaseQuery<TParams, TResult>(
+    config: QueryConfig<TParams, TResult>
+  ): DatabaseQuery<TParams, TResult> {
+    return {
+      execute: async (params: TParams): Promise<TResult> => {
+        // Standardized query performance monitoring
+        const startTime = performance.now()
+        
+        try {
+          // Standardized parameter validation
+          this.validateQueryParams(params, config.param_schema)
+          
+          // Standardized query execution
+          const result = await this.executeQuery(config.query, params)
+          
+          // Standardized performance logging
+          const duration = performance.now() - startTime
+          this.logQueryPerformance(config.name, duration, params)
+          
+          return result
+        } catch (error) {
+          // Standardized error handling
+          this.handleQueryError(error, config.name, params)
+          throw error
+        }
+      }
+    }
+  }
+}
+```
+
+### 2. Code Pattern Enforcement
+```typescript
+// ✅ PATTERN ENFORCEMENT: Consistent code patterns across the system
+class CodePatternEnforcement {
+  // Standardized hook patterns
+  static createBusinessHook<TData, TError = Error>(
+    config: BusinessHookConfig<TData, TError>
+  ): BusinessHook<TData, TError> {
+    return function useBusinessData() {
+      // Consistent state management
+      const [state, setState] = useState<BusinessHookState<TData, TError>>({
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
