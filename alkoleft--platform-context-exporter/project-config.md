@@ -1,97 +1,137 @@
 ---
 trigger: always_on
-description: Modern Java Development Guidelines (Java 8+)
+description: Java Functional Programming rules
 ---
 
-# Modern Java Development Guidelines (Java 8+)
+# Java Functional Programming rules
 
-Modern Java development (Java 8+) emphasizes leveraging lambda expressions and functional interfaces over anonymous classes, and using the Stream API for declarative collection processing. The `Optional` API should be used for handling potentially absent values gracefully, and the `java.time` API for all date/time operations. Default methods allow non-breaking interface evolution. Local Variable Type Inference (`var`) can improve readability when used judiciously. Unmodifiable collection factory methods (`List.of()`, etc.) provide concise immutable collections. `CompletableFuture` facilitates composable asynchronous programming. The Java Platform Module System (JPMS, Java 9+) enables strong encapsulation. Performance implications of new features should be considered and profiled. Testing strategies need to adapt to these modern features, and text blocks (Java 15+) offer improved readability for multi-line strings.
+Java functional programming revolves around immutable objects and state transformations, ensuring functions are pure (no side effects, depend only on inputs). It leverages functional interfaces, concise lambda expressions, and the Stream API for collection processing. Core paradigms include function composition, `Optional` for null safety, and higher-order functions. Modern Java features like Records enhance immutable data transfer, while pattern matching (for `instanceof` and `switch`) and switch expressions improve conditional logic. Sealed classes and interfaces enable controlled, exhaustive hierarchies, and upcoming Stream Gatherers will offer advanced custom stream operations.
 
 ## Implementing These Principles
 
 These guidelines are built upon the following core principles:
 
-1.  **Conciseness and Readability**: Leverage modern Java features (like lambdas, streams, `var`, text blocks) to write code that is more concise and easier to read and understand, reducing boilerplate and focusing on intent.
-2.  **Immutability and Safety**: Embrace features like `Optional`, unmodifiable collection factories, and the `java.time` API to create more robust, null-safe, and thread-safe code by default, reducing common sources of bugs.
-3.  **Expressive Power**: Utilize functional constructs like streams and `CompletableFuture` to express complex data manipulations and asynchronous workflows in a more declarative and composable manner.
-4.  **Asynchronous and Modular Design**: Employ `CompletableFuture` for efficient asynchronous programming and the Java Platform Module System (JPMS) for building maintainable, strongly encapsulated applications with clear dependencies.
-5.  **Performance Awareness**: While modern features offer syntactic improvements, remain mindful of their potential performance implications. Profile critical sections and make informed decisions, especially with streams and asynchronous operations.
+1.  **Immutability**: Prioritize immutable data structures (e.g., Records, `List.of()`) and state transformations that produce new instances rather than modifying existing ones. This reduces side effects and simplifies reasoning about state.
+2.  **Purity and Side-Effect Management**: Strive to write pure functions—functions whose output depends only on their input and which have no observable side effects. Isolate and control side effects when they are necessary.
+3.  **Expressiveness and Conciseness**: Leverage lambda expressions, method references, and the Stream API to write code that is declarative, concise, and clearly expresses the intent of data transformations and operations.
+4.  **Higher-Order Abstractions**: Utilize functional interfaces, function composition, and higher-order functions (functions that operate on other functions) to build flexible and reusable code components.
+5.  **Modern Java Integration**: Embrace modern Java features like Records, Pattern Matching, Switch Expressions, and Sealed Classes, which align well with and enhance functional programming paradigms by promoting immutability, type safety, and expressive conditional logic.
 
 ## Table of contents
 
-- Rule 1: Lambda Expressions and Functional Interfaces
-- Rule 2: Stream API
-- Rule 3: Optional API
-- Rule 4: Date/Time API (java.time)
-- Rule 5: Default Methods in Interfaces
-- Rule 6: Local Variable Type Inference (var)
-- Rule 7: Collection Factory Methods
-- Rule 8: CompletableFuture for Asynchronous Programming
-- Rule 9: Module System (Java 9+)
-- Rule 10: Performance Considerations with Modern Features
-- Rule 11: Testing Modern Java Code
-- Rule 12: Use Text Blocks for Readable Multi-line Strings
+- Rule 1: Immutable Objects
+- Rule 2: State Immutability
+- Rule 3: Pure Functions
+- Rule 4: Functional Interfaces
+- Rule 5: Lambda Expressions
+- Rule 6: Streams
+- Rule 7: Functional Programming Paradigms
+- Rule 8: Leverage Records for Immutable Data Transfer
+- Rule 9: Employ Pattern Matching for `instanceof` and `switch`
+- Rule 10: Use Switch Expressions for Concise Multi-way Conditionals
+- Rule 11: Leverage Sealed Classes and Interfaces for Controlled Hierarchies
+- Rule 12: Explore Stream Gatherers for Custom Stream Operations
 
-## Rule 1: Lambda Expressions and Functional Interfaces
+## Rule 1: Immutable Objects
 
-Title: Effectively Use Lambda Expressions and Functional Interfaces
+Title: Ensure Objects are Immutable
 Description:
-- Prefer lambda expressions over anonymous inner classes for concise implementation of functional interfaces.
-- Keep lambda expressions short, readable, and focused on a single piece of logic.
-- Use method references (e.g., `System.out::println`, `String::isEmpty`) when they are clearer and more direct than an equivalent lambda.
-- Leverage the rich set of built-in functional interfaces from the `java.util.function` package (e.g., `Predicate`, `Function`, `Consumer`, `Supplier`).
-- Create custom functional interfaces only when a specific signature is needed that isn't covered by built-in ones.
-- Always annotate custom functional interfaces with `@FunctionalInterface` to ensure they meet the criteria (a single abstract method) and to clearly communicate their purpose.
+- Use `final` classes and fields.
+- Initialize all fields in the constructor.
+- Do not provide setter methods.
+- Return defensive copies of mutable fields (e.g., collections, dates) when exposing them via getters.
 
 **Good example:**
+
 ```java
 import java.util.List;
-import java.util.stream.Collectors;
-import java.util.Arrays;
-import java.util.function.Predicate;
+import java.util.ArrayList;
 
-// Custom functional interface
-@FunctionalInterface
-interface DataProcessor<T, R> {
-    R process(T data);
-}
+public final class Person {
+    private final String name;
+    private final int age;
+    private final List<String> hobbies; // Make it List, not ArrayList
 
-public class LambdaExample {
-    public static void main(String args) {
-        List<String> names = Arrays.asList("Alice", "Bob", "Charlie", "David", "Eve");
+    public Person(String name, int age, List<String> hobbies) {
+        this.name = name;
+        this.age = age;
+        // Ensure the incoming list is defensively copied to an immutable list
+        this.hobbies = List.copyOf(hobbies); 
+    }
 
-        // Good: Using method reference
-        System.out.println("Printing names using method reference:");
-        names.forEach(System.out::println);
+    public String getName() {
+        return name;
+    }
 
-        // Good: Simple lambda for filtering
-        List<String> longNames = names.stream()
-            .filter(str -> str.length() > 4) // Lambda expression
-            .collect(Collectors.toList());
-        System.out.println("\nLong names (length > 4): " + longNames);
+    public int getAge() {
+        return age;
+    }
 
-        // Good: Using a built-in functional interface (Predicate)
-        Predicate<String> startsWithA = s -> s.startsWith("A");
-        List<String> namesStartingWithA = names.stream()
-            .filter(startsWithA)
-            .collect(Collectors.toList());
-        System.out.println("Names starting with 'A': " + namesStartingWithA);
-
-        // Good: Using a custom functional interface
-        DataProcessor<String, Integer> nameLengthProcessor = (String name) -> name.length();
-        int lengthOfAlice = nameLengthProcessor.process("Alice");
-        System.out.println("Length of 'Alice' using custom processor: " + lengthOfAlice);
+    // Return an immutable view or a defensive copy
+    public List<String> getHobbies() {
+        return this.hobbies; // List.copyOf already returns an unmodifiable list
     }
 }
 ```
 
 **Bad Example:**
+
+```java
+// Bad example to be added
+// e.g., a mutable class with setters, or returning internal mutable collections directly.
+```
+
+## Rule 2: State Immutability
+
+Title: Prefer Immutable State Transformations
+Description:
+- Instead of modifying existing objects, return new objects representing the new state.
+- Utilize collectors that produce immutable collections (e.g., `Collectors.toUnmodifiableList()`).
+- Leverage immutable collection types provided by libraries or Java itself.
+
+**Good example:**
+
 ```java
 import java.util.List;
-import java.util.Arrays;
-import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
-public class OldStyleAnonymousClass {
+public class PriceCalculator {
+    public static List<Double> applyDiscount(List<Double> prices, double discount) {
+        return prices.stream()
+            .map(price -> price * (1 - discount))
+            .collect(Collectors.toUnmodifiableList()); // Ensures the returned list is immutable
+    }
+}
+```
+
+**Bad Example:**
+
+```java
+// Bad example to be added
+// e.g., a method that modifies the input list directly.
+```
+
+## Rule 3: Pure Functions
+
+Title: Write Pure Functions
+Description:
+- Functions should depend only on their input parameters and not on any external or hidden state.
+- They should not cause any side effects (e.g., modifying external variables, I/O operations).
+- Given the same input, a pure function must always return the same output.
+- Avoid modifying external state or relying on it.
+
+**Good example:**
+
+```java
+import java.util.List;
+import java.util.stream.Collectors;
+
+public class MathOperations {
+    // Pure function: depends only on input, no side effects
+    public static int add(int a, int b) {
+        return a + b;
+    }
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
