@@ -1,170 +1,209 @@
 ---
 trigger: always_on
-description: Tech debt prevention patterns with consistency enforcement, code quality gates, and architectural governance
+description: Comprehensive testing patterns for React Testing Library and Go testing in POS System
 ---
 
 
-# 🏗️ Tech Debt Prevention & Code Quality Governance
+# 🧪 Testing Patterns & Best Practices
 
-## 🎯 Zero Tech Debt Philosophy
+## 🎯 Testing Philosophy
 
-### Proactive Prevention Strategy
-```typescript
-// ✅ TECH DEBT PREVENTION: Systematic approach to code quality
-namespace TechDebtPrevention {
-  // Code quality metrics and thresholds
-  interface QualityGates {
-    code_coverage: { minimum: 85, target: 90 }
-    complexity_score: { maximum: 10, target: 7 }
-    duplication: { maximum: 3, target: 1 }
-    performance: { api_response: '< 200ms', ui_render: '< 100ms' }
-    security: { vulnerabilities: 0, code_quality: 'A' }
-  }
-
-  // Automated quality enforcement
-  class QualityEnforcer {
-    static enforcePreCommitQuality(): PreCommitHook {
-      return {
-        // Code format and style
-        prettier_format: true,
-        eslint_validation: true,
-        typescript_strict_check: true,
-        
-        // Business logic validation
-        business_rule_consistency: true,
-        api_contract_validation: true,
-        database_migration_safety: true,
-        
-        // Performance validation
-        bundle_size_check: true,
-        query_performance_validation: true,
-        memory_leak_detection: true
-      }
-    }
-  }
-}
+### Testing Pyramid for POS System
+```
+    E2E Tests (Few)
+    ↑ Full user workflows
+    ↑ Critical business flows
+    
+  Integration Tests (Some)
+  ↑ API + Database interactions
+  ↑ Component + API integration
+  
+    Unit Tests (Many)
+    ↑ Individual functions
+    ↑ Component behavior
+    ↑ Business logic validation
 ```
 
-## 🔒 Consistency Enforcement Patterns
+### Test Coverage Targets
+- **Unit Tests:** 80%+ coverage for business logic
+- **Integration Tests:** All API endpoints with database
+- **E2E Tests:** Core user journeys (login → order → payment → kitchen)
 
-### 1. Architectural Consistency
+## ⚛️ Frontend Testing Patterns (React Testing Library)
+
+### Component Testing Setup
 ```typescript
-// ✅ CONSISTENCY: Standardized architectural patterns
-class ArchitecturalConsistency {
-  // Enforce consistent API patterns
-  static createAPIEndpoint<TRequest, TResponse>(
-    config: APIEndpointConfig<TRequest, TResponse>
-  ): StandardAPIEndpoint<TRequest, TResponse> {
-    return {
-      // Standardized request validation
-      validateRequest: (request: TRequest): ValidationResult => {
-        const validator = this.createValidator(config.validation_schema)
-        return validator.validate(request)
-      },
+// test-utils.tsx - Custom testing utilities
+import { render, RenderOptions } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { ReactElement } from 'react'
+import { BrowserRouter } from '@tanstack/react-router'
 
-      // Standardized business logic execution
-      executeBusinessLogic: async (request: TRequest): Promise<TResponse> => {
-        // Consistent error handling
-        try {
-          // Standardized logging
-          Logger.info(`Executing ${config.endpoint_name}`, { request })
-          
-          // Business logic with consistent patterns
-          const result = await config.business_logic(request)
-          
-          // Standardized success response
-          return {
-            success: true,
-            message: config.success_message,
-            data: result,
-            timestamp: new Date().toISOString(),
-            request_id: generateRequestId()
-          }
-        } catch (error) {
-          // Standardized error handling
-          return this.handleStandardError(error, config.endpoint_name)
-        }
-      },
+// Create a test query client with no retries
+const createTestQueryClient = () => new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: false,      // Don't retry on test failures
+      gcTime: Infinity,  // Keep data in cache
+    },
+    mutations: {
+      retry: false,
+    },
+  },
+})
 
-      // Standardized response formatting
-      formatResponse: (response: TResponse): StandardAPIResponse<TResponse> => {
-        return {
-          ...response,
-          version: config.api_version,
-          performance_metrics: this.getPerformanceMetrics()
-        }
-      }
-    }
-  }
-
-  // Enforce consistent component patterns
-  static createBusinessComponent<TProps>(
-    config: ComponentConfig<TProps>
-  ): React.FC<TProps> {
-    return React.memo((props: TProps) => {
-      // Standardized error boundary
-      return (
-        <ErrorBoundary fallback={config.error_fallback}>
-          {/* Standardized loading states */}
-          <Suspense fallback={config.loading_fallback}>
-            {/* Standardized accessibility */}
-            <div 
-              role={config.accessibility.role}
-              aria-label={config.accessibility.label}
-              className={cn(config.base_classes, props.className)}
-            >
-              {/* Component content with consistent patterns */}
-              {config.render(props)}
-            </div>
-          </Suspense>
-        </ErrorBoundary>
-      )
-    }, config.memo_comparison || shallowEqual)
-  }
-
-  // Database query consistency
-  static createDatabaseQuery<TParams, TResult>(
-    config: QueryConfig<TParams, TResult>
-  ): DatabaseQuery<TParams, TResult> {
-    return {
-      execute: async (params: TParams): Promise<TResult> => {
-        // Standardized query performance monitoring
-        const startTime = performance.now()
-        
-        try {
-          // Standardized parameter validation
-          this.validateQueryParams(params, config.param_schema)
-          
-          // Standardized query execution
-          const result = await this.executeQuery(config.query, params)
-          
-          // Standardized performance logging
-          const duration = performance.now() - startTime
-          this.logQueryPerformance(config.name, duration, params)
-          
-          return result
-        } catch (error) {
-          // Standardized error handling
-          this.handleQueryError(error, config.name, params)
-          throw error
-        }
-      }
-    }
-  }
+interface CustomRenderOptions extends Omit<RenderOptions, 'wrapper'> {
+  queryClient?: QueryClient
+  initialEntries?: string[]
 }
+
+// Custom render with providers
+export const renderWithProviders = (
+  ui: ReactElement,
+  {
+    queryClient = createTestQueryClient(),
+    initialEntries = ['/'],
+    ...renderOptions
+  }: CustomRenderOptions = {}
+) => {
+  const Wrapper = ({ children }: { children: React.ReactNode }) => (
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter initialEntries={initialEntries}>
+        {children}
+      </BrowserRouter>
+    </QueryClientProvider>
+  )
+
+  return { ...render(ui, { wrapper: Wrapper, ...renderOptions }), queryClient }
+}
+
+// Re-export everything
+export * from '@testing-library/react'
 ```
 
-### 2. Code Pattern Enforcement
+### Component Testing Examples
+
+#### 1. Testing POS Product Card
 ```typescript
-// ✅ PATTERN ENFORCEMENT: Consistent code patterns across the system
-class CodePatternEnforcement {
-  // Standardized hook patterns
-  static createBusinessHook<TData, TError = Error>(
-    config: BusinessHookConfig<TData, TError>
-  ): BusinessHook<TData, TError> {
-    return function useBusinessData() {
-      // Consistent state management
-      const [state, setState] = useState<BusinessHookState<TData, TError>>({
+// ProductCard.test.tsx
+import { screen, userEvent } from '@testing-library/react'
+import { renderWithProviders } from '../test-utils'
+import { ProductCard } from '@/components/pos/ProductCard'
+import { Product } from '@/types'
+
+const mockProduct: Product = {
+  id: '123',
+  name: 'Cheeseburger',
+  price: 12.99,
+  category_id: 'burgers',
+  is_available: true,
+  description: 'Delicious beef burger',
+  image_url: null,
+}
+
+describe('ProductCard', () => {
+  const mockOnSelect = jest.fn()
+
+  beforeEach(() => {
+    mockOnSelect.mockClear()
+  })
+
+  it('displays product information correctly', () => {
+    renderWithProviders(
+      <ProductCard 
+        product={mockProduct} 
+        onSelect={mockOnSelect} 
+        isSelected={false} 
+      />
+    )
+
+    expect(screen.getByText('Cheeseburger')).toBeInTheDocument()
+    expect(screen.getByText('$12.99')).toBeInTheDocument()
+    expect(screen.getByText('Delicious beef burger')).toBeInTheDocument()
+  })
+
+  it('calls onSelect when clicked', async () => {
+    const user = userEvent.setup()
+    
+    renderWithProviders(
+      <ProductCard 
+        product={mockProduct} 
+        onSelect={mockOnSelect} 
+        isSelected={false} 
+      />
+    )
+
+    await user.click(screen.getByText('Cheeseburger'))
+    expect(mockOnSelect).toHaveBeenCalledWith(mockProduct)
+  })
+
+  it('shows selected state correctly', () => {
+    renderWithProviders(
+      <ProductCard 
+        product={mockProduct} 
+        onSelect={mockOnSelect} 
+        isSelected={true} 
+      />
+    )
+
+    const card = screen.getByRole('button')
+    expect(card).toHaveClass('ring-2', 'ring-primary')
+  })
+
+  it('disables unavailable products', () => {
+    const unavailableProduct = { ...mockProduct, is_available: false }
+    
+    renderWithProviders(
+      <ProductCard 
+        product={unavailableProduct} 
+        onSelect={mockOnSelect} 
+        isSelected={false} 
+      />
+    )
+
+    const card = screen.getByRole('button')
+    expect(card).toBeDisabled()
+    expect(screen.getByText('Unavailable')).toBeInTheDocument()
+  })
+})
+```
+
+#### 2. Testing Forms with React Hook Form
+```typescript
+// OrderForm.test.tsx
+import { screen, userEvent, waitFor } from '@testing-library/react'
+import { renderWithProviders } from '../test-utils'
+import { OrderForm } from '@/components/forms/OrderForm'
+import { CreateOrderRequest } from '@/types'
+
+// Mock API client
+jest.mock('@/api/client', () => ({
+  createOrder: jest.fn(),
+}))
+
+describe('OrderForm', () => {
+  const mockOnSubmit = jest.fn()
+  const mockOnCancel = jest.fn()
+
+  beforeEach(() => {
+    mockOnSubmit.mockClear()
+    mockOnCancel.mockClear()
+  })
+
+  it('renders form fields correctly', () => {
+    renderWithProviders(
+      <OrderForm onSubmit={mockOnSubmit} onCancel={mockOnCancel} />
+    )
+
+    expect(screen.getByLabelText(/order type/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/customer name/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /create order/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /cancel/i })).toBeInTheDocument()
+  })
+
+  it('validates required fields', async () => {
+    const user = userEvent.setup()
+    
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
