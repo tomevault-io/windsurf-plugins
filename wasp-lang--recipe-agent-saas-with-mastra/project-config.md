@@ -1,96 +1,112 @@
 ---
 trigger: always_on
-description: This document covers advanced Wasp capabilities like Jobs, API Routes, and Middleware, along with performance optimization tips and common troubleshooting steps.
+description: This document gives a quick rundown on how authentication is configured and used within the Wasp application.
 ---
 
-# 6. Advanced Features & Troubleshooting
+# 4. Authentication
 
-This document covers advanced Wasp capabilities like Jobs, API Routes, and Middleware, along with performance optimization tips and common troubleshooting steps.
+This document gives a quick rundown on how authentication is configured and used within the Wasp application.
 
-## Advanced Features ( [main.wasp](mdc:main.wasp) )
+See the Wasp Auth docs for available methods and complete guides [wasp-overview.mdc](mdc:template/app/.cursor/rules/wasp-overview.mdc)
 
-These features are configured in [main.wasp](mdc:main.wasp).
+## Wasp Auth Setup
 
-### Jobs and Workers
-
-- Wasp supports background jobs, useful for tasks like sending emails, processing data, or scheduled operations.
-- Jobs require a job executor like PgBoss (which requires PostgreSQL, see [database-operations.mdc](mdc:template/app/.cursor/rules/database-operations.mdc)).
-- Example Job definition in [main.wasp](mdc:main.wasp):
+- Wasp provides built-in authentication with minimal configuration via the Wasp config file. 
+- Wasp generates all necessary auth routes, middleware, and UI components based on the configuration.
+- Example auth configuration in [main.wasp](mdc:main.wasp):
   ```wasp
-  job emailSender {
-    executor: PgBoss, // Requires PostgreSQL
-    // Define the function that performs the job
-    perform: {
-      fn: import { sendEmail } from "@src/server/jobs/emailSender.js"
-    },
-    // Grant access to necessary entities
-    entities: [User, EmailQueue]
+  app myApp {
+    // ... other config
+    auth: {
+      // Links Wasp auth to your User model in @schema.prisma
+      userEntity: User,
+      methods: {
+        // Enable username/password login
+        usernameAndPassword: {},
+        // Enable Google OAuth login
+        // Requires setting GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET env vars
+        google: {},
+        // Enable email/password login with verification
+        email: {
+          // Set up an email sender (Dummy prints to console)
+          // See https://wasp-lang.com/docs/auth/email-auth#email-sending
+          fromField: {
+            name: "Budgeting Vibe",
+            email: "noreply@budgetingvibe.com"
+          },
+          emailVerification: {
+            clientRoute: EmailVerificationRoute
+          },
+          passwordReset: {
+            clientRoute: PasswordResetRoute
+          }
+        }
+      },
+      // Route to redirect to if auth fails
+      onAuthFailedRedirectTo: "/login",
+      // Optional: Route after successful signup/login
+      // onAuthSucceededRedirectTo: "/dashboard"
+    }
+    emailSender: {
+      provider: Dummy // Use Dummy for local dev (prints emails to console)
+      // provider: SMTP // For production, configure SMTP
+    }
   }
+
+  // Define the routes needed by email auth methods
+  route EmailVerificationRoute { path: "/auth/verify-email", to: EmailVerificationPage }
+  page EmailVerificationPage { component: import { EmailVerification } from "@src/features/auth/EmailVerificationPage.tsx" }
+
+  route PasswordResetRoute { path: "/auth/reset-password", to: PasswordResetPage }
+  page PasswordResetPage { component: import { PasswordReset } from "@src/features/auth/PasswordResetPage.tsx" }
   ```
-- Jobs can be scheduled or triggered programmatically from Wasp actions or other jobs.
-- See the Wasp Recurring Jobs Docs for more info [wasp-overview.mdc](mdc:template/app/.cursor/rules/wasp-overview.mdc)
 
-### Custom HTTP API Endpoints
+- **Dummy Email Provider Note:** When `emailSender: { provider: Dummy }` is configured in [main.wasp](mdc:main.wasp), Wasp does not send actual emails. Instead, the content of verification/password reset emails, including the clickable link, will be printed directly to the server console where `wasp start` is running.
 
-- Define custom server API endpoints, often used for external integrations (webhooks, third-party services) where Wasp Operations are not suitable.
-- Example API route definition in [main.wasp](mdc:main.wasp):
-  ```wasp
-  api stripeWebhook {
-    // Implementation function in server code
-    fn: import { handleStripeWebhook } from "@src/server/apis/stripe.js",
-    // Define the HTTP method and path
-    httpRoute: (POST, "/webhooks/stripe"),
-    // Optional: Grant entity access
-    entities: [User, Payment],
-    // Optional: Apply middleware config function 
-    // middlewareConfigFn: import { apiMiddleware } from "@src/apis"
-    // Optional: If auth is enabled, this will default to true and provide a context.user
-    // object. If you do not wish to attempt to parse the JWT in the Authorization Header
-    // you should set this to false.
-    // auth: false
-  }
-  ```
-- See the Wasp Custom HTTP API Endpoints docs for more info [wasp-overview.mdc](mdc:template/app/.cursor/rules/wasp-overview.mdc)
+## Wasp Auth Rules
 
-### Middleware
+- **User Model ( [schema.prisma](mdc:schema.prisma) ):**
+  - Wasp Auth methods handle essential identity fields (like `email`, `password hash`, `provider IDs`, `isVerified`) internally. These are stored in separate Prisma models managed by Wasp (`AuthProvider`, `AuthProviderData`).
+  - Your Prisma `User` model (specified in [main.wasp](mdc:main.wasp) as `auth.userEntity`) typically **only needs the `id` field** for Wasp to link the auth identity.
+    ```prisma
+    // Minimal User model in @schema.prisma
+    model User {
+      id Int @id @default(autoincrement())
+      // Add other *non-auth* related fields as needed
+      // e.g., profile info, preferences, relations to other models
+      // profileImageUrl String?
+      // timeZone        String? @default("UTC")
+    }
+    ```
+  - **Avoid adding** `email`, `emailVerified`, `password`, `username`, or provider-specific ID fields directly to *your* `User` model in [schema.prisma](mdc:schema.prisma) unless you have very specific customization needs that require overriding Wasp's default behavior and managing these fields manually.
+  - If you need frequent access to an identity field like `email` or `username` for *any* user (not just the logged-in one), see the **Recommendation** in the "Wasp Auth User Fields" section below.
 
-- Wasp supports custom middleware functions that can run before API route handlers or Page components.
-- Useful for logging, custom checks, request transformation, etc.
-- Example Middleware definition in [main.wasp](mdc:main.wasp):
-  ```wasp
-  // Customize global middleware
-  app todoApp {
-  // ...
-    server: {
-      middlewareConfigFn: import { serverMiddlewareFn } from "@src/serverSetup"
-    },
-  }
-  ```
-- See the Wasp Middleware Docs for more info [wasp-overview.mdc](mdc:template/app/.cursor/rules/wasp-overview.mdc)
+- **Auth Pages:**
+  - When initially creating Auth pages (Login, Signup), use the pre-built components provided by Wasp for simplicity:
+    - `import { LoginForm, SignupForm } from 'wasp/client/auth';`
+    - These components work with the configured auth methods in [main.wasp](mdc:main.wasp).
+    - You can customize their appearance or build completely custom forms if needed.
 
-## Performance Optimization
+- **Protected Routes/Pages:**
+  - Use the `useAuth` hook from `wasp/client/auth` to access the current user's data and check authentication status.
+  - Redirect or show alternative content if the user is not authenticated.
+  ```typescript
+  import { useAuth } from 'wasp/client/auth';
+  import { Redirect } from 'wasp/client/router'; // Or use Link
 
-- **Operation Dependencies:** Use specific entity dependencies (`entities: [Task]`) in your Wasp operations ([main.wasp](mdc:main.wasp)) to ensure queries are automatically refetched only when relevant data changes.
-- **Pagination:** For queries returning large lists of data, implement pagination logic in your server operation and corresponding UI controls on the client.
-- **React Optimization:**
-  - Use `React.memo` for components that re-render often with the same props.
-  - Use `useMemo` to memoize expensive calculations within components.
-  - Use `useCallback` to memoize functions passed down as props to child components (especially event handlers).
-- **Optimistic UI Updates (Actions):**
-  - For actions where perceived speed is critical (e.g., deleting an item, marking as complete), consider using Wasp's `useAction` hook (from `wasp/client/operations`) with `optimisticUpdates`.
-  - This updates the client-side cache (affecting relevant `useQuery` results) *before* the action completes on the server, providing instant feedback.
-  - **Use Sparingly:** Only implement optimistic updates where the action is highly likely to succeed and the instant feedback significantly improves UX. Remember to handle potential server-side failures gracefully (Wasp helps revert optimistic updates on error).
-  - See the Wasp Actions docs for more info [wasp-overview.mdc](mdc:template/app/.cursor/rules/wasp-overview.mdc)
+  const MyProtectedPage = () => {
+    const { data: user, isLoading, error } = useAuth(); // Returns AuthUser | null
 
-## Troubleshooting
+    if (isLoading) return <div>Loading...</div>;
+    // If error, it likely means the auth session is invalid/expired
+    if (error || !user) {
+      // Redirect to login page defined in main.wasp (auth.onAuthFailedRedirectTo)
+      // Or return <Redirect to="/login" />;
+      return <div>Please log in to access this page.</div>;
+    }
 
-- **Wasp Type/Import Errors:** If you encounter TypeScript errors related to missing Wasp imports (e.g., from `wasp/client/operations`, `wasp/entities`, `wasp/server`) or unexpected type mismatches after modifying [main.wasp](mdc:main.wasp) or [schema.prisma](mdc:schema.prisma) , **prompt the user to restart the Wasp development server** (`wasp start`) before further debugging. Wasp needs to regenerate code based on these changes.
-- **Operations Not Working:**
-  - Check that all required `entities` are listed in the operation's definition in [main.wasp](mdc:main.wasp).
-  - Verify the import path (`fn: import { ... } from "@src/..."`) in [main.wasp](mdc:main.wasp) is correct.
-  - Check for runtime errors in the Wasp server console where `wasp start` is running.
-  - Ensure client-side calls match the expected arguments and types.
-- **Auth Not Working:**
+    // User is authenticated, render the page content
+    // Use helpers like getEmail(user) or getUsername(user) if needed
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
