@@ -1,176 +1,82 @@
 ---
 trigger: always_on
-description: Performance optimization patterns for database queries, React components, and API efficiency in POS System
+description: This is a **modern, enterprise-grade Point of Sale system** built with cutting-edge technologies:
 ---
 
 
-# ⚡ Performance Optimization Patterns
+# 🍽️ POS System - Complete Architecture Guide
 
-## 🎯 Performance Philosophy for POS Systems
+## 🎯 Project Overview
 
-### Critical Performance Metrics
-- **Order Creation:** < 500ms from click to confirmation
-- **Payment Processing:** < 2s for complete transaction
-- **Kitchen Updates:** Real-time (< 100ms propagation)
-- **Product Search:** < 200ms for instant results
-- **Database Queries:** < 100ms for typical CRUD operations
+This is a **modern, enterprise-grade Point of Sale system** built with cutting-edge technologies:
 
-### Performance Monitoring Strategy
-```typescript
-// Performance monitoring utilities
-class PerformanceMonitor {
-  static timeOperation<T>(name: string, operation: () => Promise<T>): Promise<T> {
-    console.time(name);
-    return operation().finally(() => console.timeEnd(name));
-  }
+### 🏗️ Technology Stack
+- **Backend:** Golang 1.21+ + Gin framework + PostgreSQL with optimized raw SQL
+- **Frontend:** React 18.3+ + TanStack Start + TypeScript 5.6+ + Tailwind CSS + shadcn/ui
+- **Database:** PostgreSQL 15 with comprehensive schema, indexes, and constraints
+- **Infrastructure:** Docker containers with multi-stage builds and Docker Compose orchestration
+- **Authentication:** JWT-based auth with role-based access control (RBAC)
 
-  static measureRender(componentName: string) {
-    return (Component: React.ComponentType<any>) => {
-      return React.memo(Component, (prevProps, nextProps) => {
-        const start = performance.now();
-        const shouldUpdate = !Object.is(prevProps, nextProps);
-        const end = performance.now();
-        
-        if (end - start > 1) {
-          console.warn(`${componentName} render check took ${end - start}ms`);
-        }
-        
-        return !shouldUpdate;
-      });
-    };
-  }
-}
-```
+### 🚀 Core Business Features
+- **Multi-Role Support:** Admin, Manager, Server, Counter, Kitchen interfaces
+- **Complete Order Lifecycle:** Creation → Kitchen → Payment → Completion
+- **Real-time Updates:** WebSocket-like updates across all interfaces
+- **Advanced Admin Tables:** Professional data tables with sorting, filtering, pagination
+- **Payment Processing:** Multi-step payment flow with receipt generation
+- **Kitchen Display System:** Real-time order preparation workflow
+- **Table Management:** Advanced seating and table assignment system
 
-## 🗄️ Database Performance Patterns
+## 📁 Project Structure
 
-### Optimized Query Patterns
-```go
-// ✅ CORRECT: Efficient query with proper indexing
-func (h *OrderHandler) GetOrdersWithPagination(c *gin.Context) {
-    page := getIntParam(c, "page", 1)
-    perPage := getIntParam(c, "per_page", 20)
-    status := c.Query("status")
-    
-    // Use indexed columns in WHERE clause
-    query := `
-        SELECT 
-            o.id, o.order_number, o.status, o.total_amount, o.created_at,
-            u.username, t.table_number,
-            COUNT(*) OVER() as total_count
-        FROM orders o
-        LEFT JOIN users u ON o.user_id = u.id
-        LEFT JOIN dining_tables t ON o.table_id = t.id
-        WHERE ($1 = '' OR o.status = $1)
-            AND o.created_at >= CURRENT_DATE - INTERVAL '7 days'
-        ORDER BY o.created_at DESC
-        LIMIT $2 OFFSET $3
-    `
-    
-    offset := (page - 1) * perPage
-    rows, err := h.db.Query(query, status, perPage, offset)
-    // ... handle results
-}
+### 🏠 Root Level Files
+- [Makefile](mdc:Makefile) - **PRIMARY DEV TOOL** - All development commands (`make dev`, `make backup`, etc.)
+- [docker-compose.dev.yml](mdc:docker-compose.dev.yml) - Development environment with hot reloading
+- [docker-compose.yml](mdc:docker-compose.yml) - Production orchestration
+- [README.md](mdc:README.md) - Complete project documentation with screenshots
+- [ROLE_BASED_IMPLEMENTATION.md](mdc:ROLE_BASED_IMPLEMENTATION.md) - Role system implementation guide
 
-// ✅ CORRECT: Batch insert for order items
-func (h *OrderHandler) CreateOrderWithItems(c *gin.Context) {
-    tx, err := h.db.Begin()
-    if err != nil {
-        // handle error
-        return
-    }
-    defer tx.Rollback()
+### 🔧 Backend Structure (`backend/`)
+- [main.go](mdc:backend/main.go) - Application entry point, CORS, middleware setup
+- [go.mod](mdc:backend/go.mod) - Go 1.21+ dependencies (Gin, PostgreSQL driver, JWT)
+- [Dockerfile](mdc:backend/Dockerfile) + [Dockerfile.dev](mdc:backend/Dockerfile.dev) - Multi-stage container builds
+- **`internal/`** - Clean Go architecture following best practices:
+  - **[api/routes.go](mdc:backend/internal/api/routes.go)** - RESTful API route definitions with role-based grouping
+  - **[models/models.go](mdc:backend/internal/models/models.go)** - Complete data models, DTOs, and API response structures
+  - **[database/connection.go](mdc:backend/internal/database/connection.go)** - PostgreSQL connection with pooling
+  - **[middleware/auth.go](mdc:backend/internal/middleware/auth.go)** - JWT authentication + RBAC middleware
+  - **`handlers/`** - Domain-specific HTTP handlers:
+    - [auth.go](mdc:backend/internal/handlers/auth.go) - Login, logout, user management
+    - [orders.go](mdc:backend/internal/handlers/orders.go) - Complete order lifecycle management
+    - [products.go](mdc:backend/internal/handlers/products.go) - Menu and category management
+    - [tables.go](mdc:backend/internal/handlers/tables.go) - Table and seating management
+    - [payments.go](mdc:backend/internal/handlers/payments.go) - Payment processing and history
 
-    // Create order
-    var orderID string
-    err = tx.QueryRow(`
-        INSERT INTO orders (customer_name, order_type, status, total_amount)
-        VALUES ($1, $2, $3, $4)
-        RETURNING id
-    `, req.CustomerName, req.OrderType, "pending", req.TotalAmount).Scan(&orderID)
-
-    // Batch insert order items (much faster than individual inserts)
-    if len(req.Items) > 0 {
-        valueStrings := make([]string, 0, len(req.Items))
-        valueArgs := make([]interface{}, 0, len(req.Items)*4)
-        
-        for i, item := range req.Items {
-            valueStrings = append(valueStrings, fmt.Sprintf("($%d, $%d, $%d, $%d)", 
-                i*4+1, i*4+2, i*4+3, i*4+4))
-            valueArgs = append(valueArgs, orderID, item.ProductID, item.Quantity, item.Price)
-        }
-
-        stmt := fmt.Sprintf(`
-            INSERT INTO order_items (order_id, product_id, quantity, price)
-            VALUES %s
-        `, strings.Join(valueStrings, ","))
-
-        _, err = tx.Exec(stmt, valueArgs...)
-        if err != nil {
-            return // Rollback automatically called
-        }
-    }
-
-    err = tx.Commit()
-    // ... handle success
-}
-```
-
-### Database Connection Optimization
-```go
-// ✅ CORRECT: Optimized connection pool
-func SetupDatabase() *sql.DB {
-    db, err := sql.Open("postgres", dsn)
-    if err != nil {
-        log.Fatal("Failed to connect to database:", err)
-    }
-
-    // Performance tuning for POS workload
-    db.SetMaxOpenConns(25)        // Limit concurrent connections
-    db.SetMaxIdleConns(10)        // Keep connections alive
-    db.SetConnMaxLifetime(5 * time.Minute) // Rotate connections
-    db.SetConnMaxIdleTime(2 * time.Minute) // Close idle connections
-
-    return db
-}
-
-// ✅ CORRECT: Connection health monitoring
-func (h *Handler) healthCheck(c *gin.Context) {
-    ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)
-    defer cancel()
-
-    if err := h.db.PingContext(ctx); err != nil {
-        c.JSON(http.StatusServiceUnavailable, gin.H{
-            "status": "unhealthy",
-            "database": "disconnected",
-        })
-        return
-    }
-
-    c.JSON(http.StatusOK, gin.H{
-        "status": "healthy",
-        "database": "connected",
-    })
-}
-```
-
-### Query Optimization Patterns
-```sql
--- ✅ CORRECT: Strategic indexes for POS workload
--- Covering index for order listing (includes all needed columns)
-CREATE INDEX CONCURRENTLY idx_orders_status_created_covering 
-ON orders (status, created_at DESC) 
-INCLUDE (id, order_number, total_amount, customer_name);
-
--- Partial index for active orders only
-CREATE INDEX CONCURRENTLY idx_orders_active 
-ON orders (created_at DESC) 
-WHERE status IN ('pending', 'confirmed', 'preparing', 'ready');
-
--- Composite index for order items lookup
-CREATE INDEX CONCURRENTLY idx_order_items_order_product 
-ON order_items (order_id, product_id);
-
+### ⚛️ Frontend Structure (`frontend/`)
+- [package.json](mdc:frontend/package.json) - React 18.3+, TypeScript 5.6+, TanStack ecosystem
+- [vite.config.ts](mdc:frontend/vite.config.ts) - Vite + TanStack Start configuration
+- [tailwind.config.js](mdc:frontend/tailwind.config.js) - Tailwind CSS + shadcn/ui theme configuration
+- [Dockerfile](mdc:frontend/Dockerfile) + [Dockerfile.dev](mdc:frontend/Dockerfile.dev) - Nginx + Node.js containers
+- **`src/`** - Modern React application structure:
+  - **[main.tsx](mdc:frontend/src/main.tsx)** - React 18 entry point with StrictMode
+  - **[index.css](mdc:frontend/src/index.css)** - Global styles and CSS variables
+  - **Core Architecture:**
+    - **[types/index.ts](mdc:frontend/src/types/index.ts)** - Comprehensive TypeScript definitions
+    - **[api/client.ts](mdc:frontend/src/api/client.ts)** - Axios-based API client with interceptors
+    - **[lib/utils.ts](mdc:frontend/src/lib/utils.ts)** - Utility functions (cn, date formatters, etc.)
+    - **[lib/form-schemas.ts](mdc:frontend/src/lib/form-schemas.ts)** - Zod validation schemas
+  - **UI Components:**
+    - **[components/ui/](mdc:frontend/src/components/ui/)** - shadcn/ui base components (Button, Card, Table, etc.)
+    - **[components/forms/](mdc:frontend/src/components/forms/)** - Reusable form components with validation
+  - **Business Components:**
+    - **[components/admin/](mdc:frontend/src/components/admin/)** - Admin dashboard and management interfaces
+    - **[components/pos/](mdc:frontend/src/components/pos/)** - POS interface components (cart, product grid, etc.)
+    - **[components/kitchen/](mdc:frontend/src/components/kitchen/)** - Kitchen display system components
+    - **[components/server/](mdc:frontend/src/components/server/)** - Server-specific interface components
+    - **[components/counter/](mdc:frontend/src/components/counter/)** - Counter/checkout interface components
+  - **Routing:**
+    - **[routes/](mdc:frontend/src/routes/)** - TanStack Start file-based routing
+    - **[routeTree.gen.ts](mdc:frontend/src/routeTree.gen.ts)** - Auto-generated route tree
+  - **Hooks & State:**
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
