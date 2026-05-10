@@ -1,184 +1,172 @@
 ---
 trigger: always_on
-description: Objective-C coding standards and best practices for BeautyWebcam
+description: Performance optimization guidelines for BeautyWebcam video processing
 ---
 
 
-# Objective-C Coding Standards
+# Performance Optimization Guidelines
 
-## Code Style Guidelines
+## Target Performance Metrics
+- **CPU Usage**: <15% on M1 MacBook Air during active processing
+- **Memory Usage**: <150MB total application footprint
+- **GPU Usage**: <30% Metal compute utilization
+- **Latency**: <50ms from capture to virtual camera output
+- **Frame Rate**: Consistent 30fps minimum, 60fps target
 
-### Naming Conventions
-- **Classes**: Use `BW` prefix (BeautyWebcam) - e.g., `BWCaptureManager`, `BWVideoProcessor`
-- **Methods**: Use descriptive, action-oriented names - e.g., `startCaptureSessionWithDevice:`
-- **Properties**: Use camelCase without prefixes - e.g., `captureSession`, `isProcessing`
-- **Constants**: Use `k` prefix with class prefix - e.g., `kBWMaxFrameRate`, `kBWDefaultQuality`
-- **Enums**: Use NS_ENUM with descriptive names - e.g., `BWProcessingQuality`, `BWCameraState`
+## Memory Management for Performance
 
-### Method Declarations
+### Buffer Management
 ```objc
-// Preferred: Descriptive parameter names
-- (BOOL)startProcessingWithQuality:(BWProcessingQuality)quality 
-                         forDevice:(AVCaptureDevice *)device 
-                             error:(NSError **)error;
+// Use CVPixelBufferPool for efficient buffer reuse
+@property (nonatomic, strong) CVPixelBufferPoolRef pixelBufferPool;
 
-// Avoid: Generic parameter names
-- (BOOL)start:(int)q device:(id)d error:(NSError **)e;
-```
-
-### Property Declarations
-```objc
-// Use atomic/nonatomic explicitly
-@property (nonatomic, strong) AVCaptureSession *captureSession;
-@property (nonatomic, assign) BOOL isProcessing;
-@property (nonatomic, copy) NSString *deviceIdentifier;
-
-// Use nullable/nonnull annotations
-@property (nonatomic, strong, nullable) NSError *lastError;
-@property (nonatomic, strong, nonnull) BWVideoProcessor *processor;
-```
-
-## Memory Management
-
-### ARC Best Practices
-- Always use `@autoreleasepool` for intensive loops
-- Use `__weak` references to break retain cycles
-- Use `__unsafe_unretained` only when absolutely necessary
-- Implement proper cleanup in `dealloc`
-
-```objc
-// Weak reference to avoid retain cycles
-@property (nonatomic, weak) id<BWCaptureDelegate> delegate;
-
-// Cleanup in dealloc
-- (void)dealloc {
-    [self stopCapture];
-    [[NSNotificationCenter defaultCenter] removeObserver:self];
+- (void)setupPixelBufferPool {
+    NSDictionary *attributes = @{
+        (NSString *)kCVPixelBufferPixelFormatTypeKey: @(kCVPixelFormatType_32BGRA),
+        (NSString *)kCVPixelBufferWidthKey: @(1920),
+        (NSString *)kCVPixelBufferHeightKey: @(1080),
+        (NSString *)kCVPixelBufferMetalCompatibilityKey: @YES
+    };
+    
+    CVPixelBufferPoolCreate(kCFAllocatorDefault, NULL, 
+                           (__bridge CFDictionaryRef)attributes, 
+                           &_pixelBufferPool);
 }
 ```
 
-### Memory-Intensive Operations
+### Autorelease Pool Usage
 ```objc
-// Use autorelease pools for image processing
-- (void)processFrameBuffer:(CVPixelBufferRef)pixelBuffer {
-    @autoreleasepool {
-        CIImage *image = [[CIImage alloc] initWithCVPixelBuffer:pixelBuffer];
-        // Process image...
-    }
-}
-```
-
-## Error Handling
-
-### NSError Pattern
-```objc
-- (BOOL)performOperationWithError:(NSError **)error {
-    // Validate parameters
-    if (!self.isReady) {
-        if (error) {
-            *error = [NSError errorWithDomain:BWErrorDomain 
-                                         code:BWErrorNotReady 
-                                     userInfo:@{NSLocalizedDescriptionKey: @"Device not ready"}];
+// Critical: Use autorelease pools in processing loops
+- (void)processVideoFrames {
+    while (self.isProcessing) {
+        @autoreleasepool {
+            CVPixelBufferRef frame = [self captureNextFrame];
+            [self processFrame:frame];
+            CVPixelBufferRelease(frame);
         }
-        return NO;
     }
+}
+```
+
+### Memory Pool Patterns
+```objc
+// Implement object pooling for frequently created objects
+@interface BWObjectPool : NSObject
+- (id)borrowObject;
+- (void)returnObject:(id)object;
+@end
+
+// Use for expensive-to-create processing objects
+@property (nonatomic, strong) BWObjectPool *processorPool;
+```
+
+## GPU Acceleration with Metal
+
+### Compute Shader Best Practices
+```objc
+// Optimal threadgroup sizes for different operations
+static const MTLSize kSkinSmoothingThreadgroupSize = {16, 16, 1};
+static const MTLSize kColorCorrectionThreadgroupSize = {32, 8, 1};
+
+// Use appropriate texture formats
+MTLTextureDescriptor *descriptor = [MTLTextureDescriptor 
+    texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm
+                                 width:width
+                                height:height
+                             mipmapped:NO];
+descriptor.usage = MTLTextureUsageShaderRead | MTLTextureUsageShaderWrite;
+```
+
+### Command Buffer Optimization
+```objc
+// Batch operations into single command buffer
+- (void)processFrameWithMetal:(CVPixelBufferRef)pixelBuffer {
+    id<MTLCommandBuffer> commandBuffer = [self.commandQueue commandBuffer];
     
-    // Perform operation
-    return YES;
-}
-```
-
-### Exception Handling
-```objc
-// Use exceptions only for programmer errors
-@try {
-    [self criticalOperation];
-} @catch (NSException *exception) {
-    NSLog(@"Critical error: %@", exception);
-    // Log and potentially crash in debug builds
-    NSAssert(NO, @"Unrecoverable error: %@", exception);
-}
-```
-
-## Performance Guidelines
-
-### Method Implementation
-- Keep methods focused and under 50 lines
-- Use early returns to reduce nesting
-- Avoid deep inheritance hierarchies
-- Use composition over inheritance
-
-```objc
-- (BOOL)validateCaptureDevice:(AVCaptureDevice *)device {
-    // Early return pattern
-    if (!device) return NO;
-    if (!device.connected) return NO;
-    if ([device lockForConfiguration:nil] == NO) return NO;
+    // Batch multiple compute operations
+    [self addSkinSmoothingToCommandBuffer:commandBuffer];
+    [self addColorCorrectionToCommandBuffer:commandBuffer];
+    [self addNoiseReductionToCommandBuffer:commandBuffer];
     
-    [device unlockForConfiguration];
-    return YES;
+    [commandBuffer commit];
+    [commandBuffer waitUntilCompleted];
 }
 ```
 
-### Dispatch Queues
+## Core Image Optimization
+
+### Filter Chain Optimization
 ```objc
-// Use appropriate queue types
-@property (nonatomic, strong) dispatch_queue_t processingQueue;
+// Chain filters efficiently to minimize intermediate textures
+CIFilter *filter1 = [CIFilter filterWithName:@"CIBilateralFilter"];
+CIFilter *filter2 = [CIFilter filterWithName:@"CIColorControls"];
+
+// Connect filters directly instead of using intermediate images
+filter2.inputImage = filter1.outputImage;
+```
+
+### Context Reuse
+```objc
+// Reuse CIContext instances - they're expensive to create
+@property (nonatomic, strong) CIContext *metalContext;
+
+- (void)setupCoreImageContext {
+    self.metalContext = [CIContext contextWithMTLDevice:self.metalDevice
+                                                options:@{
+        kCIContextWorkingColorSpace: [NSNull null],
+        kCIContextUseSoftwareRenderer: @NO
+    }];
+}
+```
+
+## Threading and Concurrency
+
+### Processing Pipeline Threading
+```objc
+// Separate queues for different pipeline stages
 @property (nonatomic, strong) dispatch_queue_t captureQueue;
+@property (nonatomic, strong) dispatch_queue_t processingQueue;
+@property (nonatomic, strong) dispatch_queue_t outputQueue;
 
-// Initialize in init method
-_processingQueue = dispatch_queue_create("com.beautywebcam.processing", 
-                                        DISPATCH_QUEUE_SERIAL);
-_captureQueue = dispatch_queue_create("com.beautywebcam.capture", 
-                                     DISPATCH_QUEUE_SERIAL);
-```
-
-## Documentation Standards
-
-### Header Documentation
-```objc
-/**
- * Manages video capture from USB webcams with real-time processing capabilities.
- *
- * This class handles the complete capture pipeline from device selection through
- * frame processing to virtual camera output. It ensures optimal performance
- * through GPU acceleration and proper memory management.
- *
- * @warning This class must be used from the main thread for UI updates.
- */
-@interface BWCaptureManager : NSObject
-```
-
-### Method Documentation
-```objc
-/**
- * Starts video capture with specified quality settings.
- *
- * @param quality The processing quality level to use
- * @param device The capture device to use for input
- * @param error On failure, contains an NSError describing the problem
- * @return YES if capture started successfully, NO otherwise
- *
- * @note This method performs validation and may take several seconds to complete
- */
-- (BOOL)startCaptureWithQuality:(BWProcessingQuality)quality
-                         device:(AVCaptureDevice *)device
-                          error:(NSError **)error;
-```
-
-## Thread Safety
-
-### Synchronization
-```objc
-// Use atomic properties for simple thread safety
-@property (atomic, assign) BOOL isProcessing;
-
-// Use dispatch_sync for critical sections
-- (void)updateConfiguration:(void (^)(void))block {
-    dispatch_sync(self.configurationQueue, block);
+- (void)setupProcessingPipeline {
+    // High priority for capture to prevent frame drops
+    dispatch_queue_attr_t captureAttr = dispatch_queue_attr_make_with_qos_class(
+        DISPATCH_QUEUE_SERIAL, QOS_CLASS_USER_INTERACTIVE, 0);
+    self.captureQueue = dispatch_queue_create("capture", captureAttr);
+    
+    // Background processing queue
+    dispatch_queue_attr_t processAttr = dispatch_queue_attr_make_with_qos_class(
+        DISPATCH_QUEUE_CONCURRENT, QOS_CLASS_DEFAULT, 0);
+    self.processingQueue = dispatch_queue_create("processing", processAttr);
 }
+```
 
-// Use dispatch_barrier for read/write operations
+### Lock-Free Programming
+```objc
+// Use atomic operations for simple state management
+@property (atomic, assign) BOOL isProcessing;
+@property (atomic, assign) NSInteger frameCount;
+
+// Use dispatch_semaphore for resource limiting
+@property (nonatomic, strong) dispatch_semaphore_t frameSemaphore;
+
+- (void)processFrame:(CVPixelBufferRef)frame {
+    // Limit concurrent processing
+    dispatch_semaphore_wait(self.frameSemaphore, DISPATCH_TIME_FOREVER);
+    
+    dispatch_async(self.processingQueue, ^{
+        // Process frame
+        [self enhanceFrame:frame];
+        dispatch_semaphore_signal(self.frameSemaphore);
+    });
+}
+```
+
+## Algorithm Optimization
+
+### Bilateral Filter Implementation
+```objc
+// Use separable filters when possible
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
