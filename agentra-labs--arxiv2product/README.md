@@ -7,14 +7,14 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `GEMINI.md` in [Agentra-Labs/arxiv2product](https://github.com/Agentra-Labs/arxiv2product).
+Original source: `AGENTS.md` in [Agentra-Labs/arxiv2product](https://github.com/Agentra-Labs/arxiv2product).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
+- **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
 From [Agentra-Labs/arxiv2product](https://github.com/Agentra-Labs/arxiv2product) — a repo with 14+ stars on GitHub.
