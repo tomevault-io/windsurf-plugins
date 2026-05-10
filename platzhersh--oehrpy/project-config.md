@@ -1,0 +1,138 @@
+---
+trigger: always_on
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+---
+
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project Overview
+
+**oehrpy** (pronounced /oʊ.ɛər.paɪ/ "o-air-pie") is a comprehensive Python SDK for openEHR that provides type-safe Reference Model classes, template-specific composition builders, EHRBase client, and AQL query builder. The project addresses the gap in the openEHR ecosystem where no comprehensive, actively maintained Python SDK exists.
+
+## Commit & PR Conventions
+
+- **PR titles** must follow [Conventional Commits](https://www.conventionalcommits.org/) format: `<type>(<optional scope>): <description>`
+- Common types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `ci`, `chore`, `perf`, `build`
+- Examples: `feat(aql): add pagination support`, `fix(client): handle timeout on composition create`, `docs: update README badges`
+- Keep the title under 70 characters, lowercase, no trailing period
+
+## Key Commands
+
+### Development Setup
+```bash
+# Install in editable mode with dev dependencies
+pip install -e ".[dev,generator]"
+```
+
+### Testing
+```bash
+# Run all tests with verbose output
+pytest tests/ -v
+
+# Run tests with coverage
+pytest tests/ -v --tb=short --cov=src/oehrpy --cov-report=term-missing
+
+# Run specific test file
+pytest tests/test_templates.py -v
+```
+
+### Linting and Formatting
+```bash
+# Run ruff linter
+ruff check .
+
+# Run ruff formatter
+ruff format .
+
+# Check formatting without changes
+ruff format --check .
+```
+
+### Type Checking
+```bash
+# Run mypy on the SDK
+mypy src/oehrpy
+```
+
+### Code Generation
+
+**Regenerate RM classes from BMM/JSON Schema:**
+```bash
+# Default: generates from RM 1.1.0 JSON Schema
+python -m generator.pydantic_generator
+```
+
+**Generate builder skeleton from OPT file (metadata only, no FLAT paths — see ADR-0005):**
+```bash
+python examples/generate_builder_from_opt.py path/to/template.opt
+```
+
+## Architecture
+
+### Core Components
+
+**1. Reference Model (RM) Classes** (`src/oehrpy/rm/`)
+- 134 Pydantic v2 models for openEHR RM 1.1.0 types (includes BASE types)
+- Generated code from BMM/JSON Schema specifications
+- Located in single `rm_types.py` module to avoid circular imports
+- All classes support Pydantic v2 validation
+
+**2. Serialization Layer** (`src/oehrpy/serialization/`)
+- **Canonical JSON** (`canonical.py`): Converts RM objects to/from openEHR canonical JSON format (with `_type` fields)
+- **FLAT Format** (`flat.py`): EHRBase FLAT format support - flattens hierarchical compositions into dot-separated paths
+  - `FlatPath`: Parses FLAT paths (e.g., `"vital_signs/bp:0/systolic|magnitude"`)
+  - `FlatContext`: Handles composition context fields (`ctx/language`, `ctx/composer_name`, etc.)
+  - `FlatBuilder`: Fluent API for constructing FLAT format compositions
+
+**3. Template System** (`src/oehrpy/templates/`)
+- **OPT Parser** (`opt_parser.py`): Parses OPT 1.4 XML files to extract template metadata (template ID, concept, archetypes, constraints). Does NOT derive FLAT paths (see ADR-0005).
+- **Builder Generator** (`builder_generator.py`): Generates metadata-only class skeletons from OPT files. FLAT paths must be sourced from the Web Template JSON, not OPT XML (ADR-0005).
+- **Pre-built Builders** (`builders.py`): Template-specific builders (e.g., VitalSignsBuilder) with FLAT paths sourced from Web Template JSON.
+- Key workflow: OPT XML → Parser → Template Metadata; Web Template JSON → FLAT Path Derivation → Builder
+
+**4. EHRBase Client** (`src/oehrpy/client/ehrbase.py`)
+- Async REST client for EHRBase CDR operations
+- Uses httpx for async HTTP
+- Supports EHR creation, composition CRUD, and AQL queries
+- Handles multiple composition formats (CANONICAL, FLAT, STRUCTURED)
+- `get_web_template()` fetches Web Template JSON with in-memory caching (ADR-0005)
+
+**5. AQL Query Builder** (`src/oehrpy/aql/builder.py`)
+- Fluent API for building type-safe AQL queries
+- Avoids manual string concatenation errors
+
+**6. Code Generator** (`generator/`)
+- **BMM Parser** (`bmm_parser.py`): Parses BMM JSON specifications
+- **JSON Schema Parser** (`json_schema_parser.py`): Parses JSON Schema files from specifications-ITS-JSON
+- **Pydantic Generator** (`pydantic_generator.py`): Generates Pydantic models from parsed schemas
+- Generates all 134 RM classes into single `rm_types.py` module
+
+### Design Patterns
+
+**Generated Code Convention:**
+- RM classes use UPPERCASE naming (e.g., `DV_QUANTITY`, `CODE_PHRASE`) to match openEHR specifications
+- Generated code has special linting rules in `pyproject.toml` (allows N801, N817, etc.)
+- `rm_types.py` uses `# type: ignore` for type-arg to allow untyped lists in generated code
+
+**FLAT Format Paths:**
+- Hierarchical structure flattened to dot-separated keys
+- Index notation: `:0`, `:1` for repeating elements
+- Attribute separator: `|` for data type attributes
+- Example: `"vital_signs/blood_pressure:0/any_event:0/systolic|magnitude"`
+
+**Builder Pattern:**
+- Template builders provide type-safe composition construction
+- Fluent API with method chaining
+- Auto-generate builders from OPT files to eliminate manual FLAT path construction
+
+### Important Files
+
+- **`src/oehrpy/rm/rm_types.py`**: All 134 generated RM classes (large file, ~10k lines)
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [platzhersh/oehrpy](https://github.com/platzhersh/oehrpy) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-04-26 -->
