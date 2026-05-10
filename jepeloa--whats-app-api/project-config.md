@@ -1,129 +1,170 @@
 ---
 trigger: always_on
-description: Evolution API project-specific context and constraints
+description: This document provides comprehensive guidelines for AI agents (Claude, GPT, Cursor, etc.) working with the Evolution API codebase.
 ---
 
+# Evolution API - AI Agent Guidelines
 
-# Evolution API Project Context
+This document provides comprehensive guidelines for AI agents (Claude, GPT, Cursor, etc.) working with the Evolution API codebase.
 
-## Cross-References
-- **Core Development**: @core-development.mdc for fundamental development principles
-- **Specialized Rules**: Reference specific specialized rules when working on:
-  - Services: @specialized-rules/service-rules.mdc
-  - Controllers: @specialized-rules/controller-rules.mdc
-  - DTOs: @specialized-rules/dto-rules.mdc
-  - Guards: @specialized-rules/guard-rules.mdc
-  - Routes: @specialized-rules/route-rules.mdc
-  - Types: @specialized-rules/type-rules.mdc
-  - Utils: @specialized-rules/util-rules.mdc
-  - Validation: @specialized-rules/validate-rules.mdc
-  - Channel Integrations: @specialized-rules/integration-channel-rules.mdc
-  - Chatbot Integrations: @specialized-rules/integration-chatbot-rules.mdc
-  - Storage Integrations: @specialized-rules/integration-storage-rules.mdc
-  - Event Integrations: @specialized-rules/integration-event-rules.mdc
-- **TypeScript/Node.js**: Node.js 20+ + TypeScript 5+ backend standards
-- **Express/Prisma**: Express.js + Prisma ORM patterns
-- **WhatsApp Integrations**: Baileys, Meta Business API, and other messaging platforms
+## Project Overview
 
-## Technology Stack
-- **Backend**: Node.js 20+ + TypeScript 5+ + Express.js
-- **Database**: Prisma ORM (PostgreSQL/MySQL support)
-- **Cache**: Redis + Node-cache for local fallback
-- **Queue**: RabbitMQ + Amazon SQS for message processing
-- **Real-time**: Socket.io for WebSocket connections
-- **Storage**: AWS S3 + Minio for file storage
-- **Validation**: JSONSchema7 for input validation
-- **Logging**: Pino for structured logging
-- **Architecture**: Multi-tenant API with WhatsApp integrations
+**Evolution API** is a production-ready, multi-tenant WhatsApp API platform built with Node.js, TypeScript, and Express.js. It supports multiple WhatsApp providers and extensive integrations with chatbots, CRM systems, and messaging platforms.
 
-## Project-Specific Patterns
+## Project Structure & Module Organization
 
-### WhatsApp Integration Architecture
-- **MANDATORY**: All WhatsApp integrations must follow established patterns
-- **BAILEYS**: Use `whatsapp.baileys.service.ts` patterns for WhatsApp Web
-- **META BUSINESS**: Use `whatsapp.business.service.ts` for official API
-- **CONNECTION MANAGEMENT**: One connection per instance with proper lifecycle
-- **EVENT HANDLING**: Proper event listeners and error handling
+### Core Directories
+- **`src/`** – TypeScript source code with modular architecture
+  - `api/controllers/` – HTTP route handlers (thin layer)
+  - `api/services/` – Business logic (core functionality)
+  - `api/routes/` – Express route definitions (RouterBroker pattern)
+  - `api/integrations/` – External service integrations
+    - `channel/` – WhatsApp providers (Baileys, Business API, Evolution)
+    - `chatbot/` – AI/Bot integrations (OpenAI, Dify, Typebot, Chatwoot)
+    - `event/` – Event systems (WebSocket, RabbitMQ, SQS, NATS, Pusher)
+    - `storage/` – File storage (S3, MinIO)
+  - `dto/` – Data Transfer Objects (simple classes, no decorators)
+  - `guards/` – Authentication/authorization middleware
+  - `types/` – TypeScript type definitions
+  - `repository/` – Data access layer (Prisma)
+- **`prisma/`** – Database schemas and migrations
+  - `postgresql-schema.prisma` / `mysql-schema.prisma` – Provider-specific schemas
+  - `postgresql-migrations/` / `mysql-migrations/` – Provider-specific migrations
+- **`config/`** – Environment and application configuration
+- **`utils/`** – Shared utilities and helper functions
+- **`validate/`** – JSONSchema7 validation schemas
+- **`exceptions/`** – Custom HTTP exception classes
+- **`cache/`** – Redis and local cache implementations
 
-### Multi-Database Architecture
-- **CRITICAL**: Support both PostgreSQL and MySQL
-- **SCHEMAS**: Use appropriate schema files (postgresql-schema.prisma / mysql-schema.prisma)
-- **MIGRATIONS**: Keep migrations synchronized between databases
-- **TYPES**: Use database-specific types (@db.JsonB vs @db.Json)
-- **COMPATIBILITY**: Ensure feature parity between databases
+### Build & Deployment
+- **`dist/`** – Build output (do not edit directly)
+- **`public/`** – Static assets and media files
+- **`Docker*`**, **`docker-compose*.yaml`** – Containerization and local development stack
 
-### API Integration Workflow
-- **CORE FEATURE**: REST API for WhatsApp communication
-- **COMPLEXITY**: High - involves webhook processing, message routing, and instance management
-- **COMPONENTS**: Instance management, message handling, media processing
-- **INTEGRATIONS**: Baileys, Meta Business API, Chatwoot, Typebot, OpenAI, Dify
+## Build, Test, and Development Commands
 
-### Multi-Tenant Instance Architecture
-- **CRITICAL**: All operations must be scoped by instance
-- **ISOLATION**: Complete data isolation between instances
-- **SECURITY**: Validate instance ownership before operations
-- **SCALING**: Support thousands of concurrent instances
-- **AUTHENTICATION**: API key-based authentication per instance
+### Development Workflow
+```bash
+# Development server with hot reload
+npm run dev:server
 
-## Documentation Requirements
+# Direct execution for testing
+npm start
 
-### Implementation Documentation
-- **MANDATORY**: Document complex integration patterns
-- **LOCATION**: Use inline comments for business logic
-- **API DOCS**: Document all public endpoints
-- **WEBHOOK DOCS**: Document webhook payloads and signatures
+# Production build and run
+npm run build
+npm run start:prod
+```
 
-### Change Documentation
-- **CHANGELOG**: Document breaking changes
-- **MIGRATION GUIDES**: Document database migrations
-- **INTEGRATION GUIDES**: Document new integration patterns
+### Code Quality
+```bash
+# Linting and formatting
+npm run lint        # ESLint with auto-fix
+npm run lint:check  # ESLint check only
 
-## Environment and Security
+# Commit with conventional commits
+npm run commit      # Interactive commit with Commitizen
+```
 
-### Environment Variables
-- **CRITICAL**: Never hardcode sensitive values
-- **VALIDATION**: Validate required environment variables on startup
-- **SECURITY**: Use secure defaults and proper encryption
-- **DOCUMENTATION**: Document all environment variables
+### Database Management
+```bash
+# Set database provider first (CRITICAL)
+export DATABASE_PROVIDER=postgresql  # or mysql
 
-### File Organization - Node.js/TypeScript Structure
-- **CONTROLLERS**: Organized by feature (`api/controllers/`)
-- **SERVICES**: Business logic in service classes (`api/services/`)
-- **INTEGRATIONS**: External integrations (`api/integrations/`)
-- **DTOS**: Data transfer objects (`api/dto/`)
-- **TYPES**: TypeScript types (`api/types/`)
-- **UTILS**: Utility functions (`utils/`)
+# Generate Prisma client
+npm run db:generate
 
-## Integration Points
+# Development migrations (with provider sync)
+npm run db:migrate:dev      # Unix/Mac
+npm run db:migrate:dev:win  # Windows
 
-### WhatsApp Providers
-- **BAILEYS**: WhatsApp Web integration with QR code
-- **META BUSINESS**: Official WhatsApp Business API
-- **CLOUD API**: WhatsApp Cloud API integration
-- **WEBHOOK PROCESSING**: Proper webhook validation and processing
+# Production deployment
+npm run db:deploy      # Unix/Mac
+npm run db:deploy:win  # Windows
 
-### External Integrations
-- **CHATWOOT**: Customer support platform integration
-- **TYPEBOT**: Chatbot flow integration
-- **OPENAI**: AI-powered chat integration
-- **DIFY**: AI workflow integration
-- **STORAGE**: S3/Minio for media file storage
+# Database tools
+npm run db:studio      # Open Prisma Studio
+```
 
-### Event-Driven Communication
-- **EVENTEMITTER2**: Internal event system
-- **SOCKET.IO**: Real-time WebSocket communication
-- **RABBITMQ**: Message queue for async processing
-- **SQS**: Amazon SQS for cloud-based queuing
-- **WEBHOOKS**: Outbound webhook system
+### Docker Development
+```bash
+# Start local services (Redis, PostgreSQL, etc.)
+docker-compose up -d
 
-## Development Constraints
+# Full development stack
+docker-compose -f docker-compose.dev.yaml up -d
+```
 
-### Language Requirements
-- **USER COMMUNICATION**: Always respond in Portuguese (PT-BR)
-- **CODE/COMMENTS**: English for code and technical documentation
-- **API RESPONSES**: English for consistency
-- **ERROR MESSAGES**: Portuguese for user-facing errors
+## Coding Standards & Architecture Patterns
 
+### Code Style (Enforced by ESLint + Prettier)
+- **TypeScript strict mode** with full type coverage
+- **2-space indentation**, single quotes, trailing commas
+- **120-character line limit**
+- **Import order** via `simple-import-sort`
+- **File naming**: `feature.kind.ts` (e.g., `whatsapp.baileys.service.ts`)
+- **Naming conventions**:
+  - Classes: `PascalCase`
+  - Functions/variables: `camelCase`
+  - Constants: `UPPER_SNAKE_CASE`
+  - Files: `kebab-case.type.ts`
+
+### Architecture Patterns
+
+#### Service Layer Pattern
+```typescript
+export class ExampleService {
+  constructor(private readonly waMonitor: WAMonitoringService) {}
+  
+  private readonly logger = new Logger('ExampleService');
+  
+  public async create(instance: InstanceDto, data: ExampleDto) {
+    // Business logic here
+    return { example: { ...instance, data } };
+  }
+  
+  public async find(instance: InstanceDto): Promise<ExampleDto | null> {
+    try {
+      const result = await this.waMonitor.waInstances[instance.instanceName].findData();
+      return result || null; // Return null on not found (Evolution pattern)
+    } catch (error) {
+      this.logger.error('Error finding data:', error);
+      return null; // Return null on error (Evolution pattern)
+    }
+  }
+}
+```
+
+#### Controller Pattern (Thin Layer)
+```typescript
+export class ExampleController {
+  constructor(private readonly exampleService: ExampleService) {}
+  
+  public async createExample(instance: InstanceDto, data: ExampleDto) {
+    return this.exampleService.create(instance, data);
+  }
+}
+```
+
+#### RouterBroker Pattern
+```typescript
+export class ExampleRouter extends RouterBroker {
+  constructor(...guards: any[]) {
+    super();
+    this.router.post(this.routerPath('create'), ...guards, async (req, res) => {
+      const response = await this.dataValidate<ExampleDto>({
+        request: req,
+        schema: exampleSchema, // JSONSchema7
+        ClassRef: ExampleDto,
+        execute: (instance, data) => controller.createExample(instance, data),
+      });
+      res.status(201).json(response);
+    });
+  }
+}
+```
+
+#### DTO Pattern (Simple Classes)
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
