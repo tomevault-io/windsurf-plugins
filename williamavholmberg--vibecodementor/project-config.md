@@ -1,172 +1,174 @@
 ---
 trigger: always_on
-description: Everytime working with backend related stuff
+description: - **Keep the authentic, passionate voice** - don't sanitize the personality
 ---
 
-# Backend Architecture - Vertical Slices + CQRS
+```markdown
+# Blog Writing Guidelines for VibeCodeMentor
 
-## 🎯 Philosophy: PRAGMATIC FIRST
-- **Speed over purity** - Ship working features, refactor later
-- **MediatR for consistency** - Predictable command/query patterns
-- **ASP.NET Core Identity** - Use framework features, avoid custom auth
-- **Result pattern** - Explicit success/failure handling
-- **ALWAYS RETURN TYPES IN CONTROLLERS** - In order for the swagger schema generator to work, (frontend uses orval) WE NEED TO RETURN ACTUAL TYPES; IF NOT, FRONTEND TYPES WILL NOT WORK!! THIS IS SUPER IMPORTANT!
+## 🎯 Philosophy: Authentic Voice + Professional Polish
+- **Keep the authentic, passionate voice** - don't sanitize the personality
+- **Professional but not corporate** - we're building in public, not selling enterprise
+- **Opinionated content is good** - strong takes generate engagement
+- **Focus on practical insights** - what can readers actually learn/apply?
 
-## 📁 Structure
-```
-api/Source/
-├── Features/           # 🎯 VERTICAL SLICES
-│   ├── Users/         # User management slice
-│   │   ├── Commands/  # CreateUser, UpdateUser, DeleteUser
-│   │   ├── Queries/   # GetUser, GetAllUsers
-│   │   ├── Controllers/ # UsersController (API endpoints)
-│   │   ├── Events/    # UserCreated (domain events)
-│   │   ├── EventHandlers/ # SendWelcomeEmail, etc.
-│   │   └── Models/    # User entity, DTOs
-│   └── [Feature]/     # Self-contained feature slices
-├── Infrastructure/    # Shared services, DB context
-├── Shared/           # CQRS interfaces, Result pattern
-```
+## 📁 File Structure & Setup
 
-## 🏗️ Feature Slice Pattern
+### 1. Create New Blog Post
 ```
-Features/FeatureName/
-├── Commands/          # State-changing operations
-├── Queries/          # Data retrieval operations  
-├── Controllers/      # API endpoints
-├── Events/          # Domain events (past tense)
-├── EventHandlers/   # React to domain events
-└── Models/          # Entities, DTOs, requests
+frontend/src/app/blog/[slug]/page.tsx
+```
+- Use kebab-case for slugs (e.g., `amazing-time-to-be-alive`)
+- Each blog post is a separate Next.js page (rawdog approach, not generic)
+
+### 2. Metadata Template
+```typescript
+export const metadata: Metadata = {
+  title: '[Blog Title] | VibeCodeMentor',
+  description: 'Compelling 1-2 sentence description under 160 chars',
+  openGraph: {
+    title: '[Blog Title]',
+    description: 'Same as above description',
+    type: 'article',
+    publishedTime: '2024-01-XX', // Use actual date
+    authors: ['William Holmberg'],
+  },
+};
 ```
 
-## 🔧 Tech Stack
-- **.NET 9** + **ASP.NET Core** + **MediatR** + **EF Core**
-- **PostgreSQL** with Code First migrations
-- **ASP.NET Core Identity** + **JWT** for auth
-- **Hangfire** for background jobs
-- **SignalR** for real-time communication
-
-## 📋 Core Patterns
-
-### Commands (State Changes)
-```csharp
-// Command with Result pattern
-public record CreateUserCommand(string Email, string Password) : ICommand<Result<CreateUserResponse>>;
-
-// Handler
-public class CreateUserCommandHandler : ICommandHandler<CreateUserCommand, Result<CreateUserResponse>>
-{
-    public async Task<Result<CreateUserResponse>> Handle(CreateUserCommand request, CancellationToken cancellationToken)
-    {
-        // Validation
-        var existingUser = await _userManager.FindByEmailAsync(request.Email);
-        if (existingUser != null)
-            return Result.Failure<CreateUserResponse>("User already exists");
-
-        // Business logic
-        var user = new User { UserName = request.Email, Email = request.Email };
-        var result = await _userManager.CreateAsync(user, request.Password);
-        
-        if (!result.Succeeded)
-            return Result.Failure<CreateUserResponse>("Creation failed");
-
-        // Success
-        return Result.Success(new CreateUserResponse(user.Id, user.Email));
-    }
+### 3. Component Structure
+```typescript
+export default function [BlogName]BlogPost() {
+  return (
+    <div className="min-h-screen bg-white dark:bg-gray-950">
+      {/* Header Section */}
+      {/* Main Content */}
+    </div>
+  );
 }
 ```
 
-### Queries (Data Retrieval)
-```csharp
-public record GetUserQuery(string UserId) : IQuery<Result<UserResponse>>;
+## 🎨 Design Standards
 
-public class GetUserQueryHandler : IQueryHandler<GetUserQuery, Result<UserResponse>>
-{
-    // Implementation
-}
+### Header Section (Always Include)
+- Back navigation: `← Back to VibeCodeMentor`
+- Date meta (format: "July 4, 2025")
+- Large, clean title (3xl on mobile, 5xl on desktop)
+- Compelling subtitle/description
+- No hero images - keep it text-focused
+
+### Content Styling
+- Use `prose prose-lg dark:prose-invert max-w-none` for article wrapper
+- Consistent heading hierarchy (h2 for main sections)
+- Proper spacing: `mb-6` between paragraphs, `mt-12` before new sections
+- Blockquotes for key quotes/insights
+- Lists for actionable items or key points
+
+### Call-to-Action Footer
+- Always end with engaging CTA section
+- Two buttons: primary (GitHub/template), secondary (homepage)
+- Inspiring closing message with emoji
+
+## 📝 Content Guidelines
+
+### Opening Hook
+- Start with a strong, opinionated statement
+- Make it personal - "I think...", "I've seen..."
+- Set the stage for what you're going to argue/explain
+
+### Structure That Works
+1. **Hook** - grab attention immediately
+2. **Problem/Context** - what's the current situation?
+3. **Your Take** - why is this important/different?
+4. **Evidence/Examples** - back up your claims
+5. **Future Vision** - where is this heading?
+6. **Action Items** - what should readers do?
+
+### Voice & Tone
+- ✅ **Passionate**: "fucking fantastic", "beyond me"
+- ✅ **Confident**: Strong statements, clear positions
+- ✅ **Personal**: Share experiences, use "I"
+- ✅ **Practical**: Focus on what people can actually do
+- ❌ **Corporate speak**: Avoid buzzwords and safe language
+- ❌ **Wishy-washy**: Don't hedge every statement
+
+### Technical Content
+- Explain context for non-technical readers
+- Use concrete examples over abstract concepts
+- Link to relevant tools/resources
+- Balance technical depth with accessibility
+
+## 🧭 Navigation Integration
+
+### Adding to Header Menu
+1. Open `frontend/src/shared/components/app-header.tsx`
+2. Find the Articles dropdown section
+3. Add new link at the TOP (newest first):
+
+```typescript
+<a
+  href="/blog/your-new-slug"
+  className="flex items-center w-full px-3 py-3 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-gradient-to-r hover:from-purple-50 hover:to-blue-50 dark:hover:from-purple-900/20 dark:hover:to-blue-900/20 rounded-xl transition-all duration-200 cursor-pointer leading-relaxed block"
+>
+  Your Blog Title
+</a>
 ```
 
-### Controllers (API Endpoints)
-```csharp
-[ApiController]
-[Route("api/[controller]")]
-[Authorize] // JWT auth required
-public class UsersController : ControllerBase
-{
-    private readonly IMediator _mediator;
+4. Adjust dropdown width if needed (`w-72`, `w-80`, etc.)
 
-    [HttpPost]
-    public async Task<IActionResult> CreateUser([FromBody] CreateUserRequest request)
-    {
-        var command = new CreateUserCommand(request.Email, request.Password);
-        var result = await _mediator.Send(command);
+## 🎯 Content Ideas That Work
 
-        if (!result.IsSuccess)
-            return BadRequest(new { error = result.Error });
+### Technical Takes
+- AI/development workflow insights
+- Stack decisions and reasoning
+- Building in public experiences
+- Tool comparisons and opinions
 
-        return CreatedAtAction(nameof(GetUser), new { id = result.Value.UserId }, result.Value);
-    }
-}
-```
+### Industry Commentary
+- Software engineering trends
+- Team dynamics and scaling
+- Developer productivity
+- Future predictions
 
-### Domain Events
-```csharp
-// Event (past tense)
-public record UserCreated(string UserId, string Email, DateTime OccurredAt) : IDomainEvent;
+### Personal Journey
+- Lessons learned from projects
+- Mistakes and recoveries
+- Process improvements
+- Community insights
 
-// Event Handler
-public class SendWelcomeEmailHandler : IEventHandler<UserCreated>
-{
-    public async Task Handle(UserCreated notification, CancellationToken cancellationToken)
-    {
-        await _emailService.SendEmailAsync(notification.Email, "Welcome!", "Welcome message");
-    }
-}
-```
+## ✅ Quality Checklist
 
-## 🔐 Authentication Pattern
+### Before Publishing
+- [ ] Metadata properly filled out
+- [ ] Back navigation works
+- [ ] Title is compelling and clear
+- [ ] Content has clear structure with h2 headings
+- [ ] Voice feels authentic and passionate
+- [ ] Includes practical takeaways
+- [ ] CTA section is engaging
+- [ ] Links work and open appropriately
+- [ ] Added to navigation dropdown
+- [ ] Mobile responsive (test on phone)
 
-### ASP.NET Core Identity Setup
-- **User Entity**: Custom User class inheriting IdentityUser
-- **JWT Tokens**: Generated via JwtTokenService
-- **OTP Flow**: Identity token providers for email verification
-- **Claims**: Standard + custom claims in JWT
+### Content Review
+- [ ] Does this provide value to readers?
+- [ ] Is the take opinionated enough to be interesting?
+- [ ] Are there concrete examples/evidence?
+- [ ] Does it fit with the VibeCodeMentor brand?
+- [ ] Would I share this with other developers?
 
-### Auth Flow
-```csharp
-// Login with OTP
-[HttpPost("send-otp")]
-public async Task<IActionResult> SendOtp([FromBody] SendOtpRequest request)
-{
-    var command = new SendOtpCommand(request.Email);
-    var result = await _mediator.Send(command);
-    return Ok(result.Value);
-}
+## 🚨 Common Mistakes to Avoid
 
-[HttpPost("verify-otp")]
-public async Task<IActionResult> VerifyOtp([FromBody] VerifyOtpRequest request)
-{
-    var command = new VerifyOtpCommand(request.Email, request.Otp);
-    var result = await _mediator.Send(command);
-    
-    if (!result.IsSuccess)
-        return BadRequest(new { error = result.Error });
+- **Generic titles** - be specific and opinionated
+- **Buried lede** - get to the point quickly
+- **Too much hedging** - commit to your positions
+- **No clear takeaway** - what should readers do?
+- **Corporate tone** - keep it human and passionate
+- **Wall of text** - break up with headings, lists, quotes
+- **Weak endings** - finish strong with clear CTAs
 
-    // Return JWT token
-    return Ok(result.Value);
-}
-```
+## 🎨 Styling Reference
 
-## 🗄️ Database Patterns
-
-### EF Core Setup
-```csharp
-public class ApplicationDbContext : IdentityDbContext<User>
-{
-    public DbSet<ChatMessage> ChatMessages { get; set; }
-    
-    protected override void OnModelCreating(ModelBuilder builder)
-    {
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
