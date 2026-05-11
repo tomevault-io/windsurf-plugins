@@ -1,246 +1,236 @@
 ---
 trigger: always_on
-description: This project follows the **Gitflow** branching model for organized development and release management.
+description: Guidelines for GraphQL API development with Armature.
 ---
 
 
-# Gitflow Branching Strategy
+# GraphQL Development
 
-This project follows the **Gitflow** branching model for organized development and release management.
+Guidelines for GraphQL API development with Armature.
 
-## Branch Structure
+## GraphQL Crates
 
-### Main Branches (Long-lived)
+| Crate | Purpose |
+|-------|---------|
+| `armature-graphql` | GraphQL server with async-graphql |
+| `armature-graphql-client` | GraphQL client for external APIs |
 
-#### `main`
-- **Purpose:** Production-ready code
-- **Protected:** Yes
-- **Merged from:** `release/*` and `hotfix/*` only
-- **Never commit directly to this branch**
+## Schema Definition
 
-#### `develop`
-- **Purpose:** Integration branch for features
-- **Protected:** Yes
-- **Merged from:** `feature/*`, `release/*`, and `hotfix/*`
-- **Base for:** All feature branches
+### Types and Objects
 
-### Supporting Branches (Short-lived)
+```rust
+use async_graphql::*;
 
-#### `feature/*`
-- **Purpose:** New features or enhancements
-- **Naming:** `feature/<issue-number>-<short-description>`
-- **Examples:**
-  - `feature/123-add-websocket-support`
-  - `feature/456-user-authentication`
-- **Base:** `develop`
-- **Merge to:** `develop`
-- **Lifetime:** Duration of feature development
+/// A user in the system.
+#[derive(SimpleObject)]
+pub struct User {
+    /// Unique identifier
+    pub id: ID,
 
-#### `release/*`
-- **Purpose:** Prepare for production release
-- **Naming:** `release/<version>`
-- **Examples:**
-  - `release/1.0.0`
-  - `release/2.1.0`
-- **Base:** `develop`
-- **Merge to:** `main` and `develop`
-- **Lifetime:** Until release is finalized
+    /// User's email address
+    pub email: String,
 
-#### `hotfix/*`
-- **Purpose:** Critical bug fixes in production
-- **Naming:** `hotfix/<version>-<description>`
-- **Examples:**
-  - `hotfix/1.0.1-security-patch`
-  - `hotfix/2.1.1-memory-leak`
-- **Base:** `main`
-- **Merge to:** `main` and `develop`
-- **Lifetime:** Until hotfix is deployed
+    /// Display name
+    pub name: String,
 
-## Workflow
+    /// Account creation timestamp
+    pub created_at: DateTime<Utc>,
+}
 
-### Starting a New Feature
+/// Extended user type with relations
+#[derive(Default)]
+pub struct UserType {
+    pub user: User,
+}
 
-```bash
-# Ensure develop is up to date
-git checkout develop
-git pull origin develop
+#[Object]
+impl UserType {
+    async fn id(&self) -> &ID {
+        &self.user.id
+    }
 
-# Create feature branch
-git checkout -b feature/123-add-caching
+    async fn email(&self) -> &str {
+        &self.user.email
+    }
 
-# Work on feature...
-git add .
-git commit -m "feat: add Redis caching support"
+    async fn name(&self) -> &str {
+        &self.user.name
+    }
 
-# Push to remote
-git push origin feature/123-add-caching
+    /// User's posts (resolved lazily)
+    async fn posts(&self, ctx: &Context<'_>) -> Result<Vec<Post>> {
+        let loader = ctx.data::<DataLoader<PostLoader>>()?;
+        let posts = loader.load_one(self.user.id.parse()?).await?;
+        Ok(posts.unwrap_or_default())
+    }
 
-# Create Pull Request to develop
+    /// User's role
+    async fn role(&self, ctx: &Context<'_>) -> Result<Role> {
+        let service = ctx.data::<RoleService>()?;
+        service.get_user_role(self.user.id.parse()?).await
+    }
+}
 ```
 
-### Completing a Feature
+### Input Types
 
-```bash
-# Update from develop
-git checkout develop
-git pull origin develop
+```rust
+/// Input for creating a new user.
+#[derive(InputObject)]
+pub struct CreateUserInput {
+    /// User's email (must be unique)
+    #[graphql(validator(email))]
+    pub email: String,
 
-git checkout feature/123-add-caching
-git merge develop
+    /// User's password (min 8 characters)
+    #[graphql(validator(min_length = 8))]
+    pub password: String,
 
-# Resolve any conflicts
-# Run tests
-cargo test --all-features
+    /// Display name
+    #[graphql(validator(min_length = 1, max_length = 100))]
+    pub name: String,
+}
 
-# Push and create PR
-git push origin feature/123-add-caching
+/// Input for updating a user.
+#[derive(InputObject)]
+pub struct UpdateUserInput {
+    /// New email address
+    #[graphql(validator(email))]
+    pub email: Option<String>,
+
+    /// New display name
+    #[graphql(validator(min_length = 1, max_length = 100))]
+    pub name: Option<String>,
+}
+
+/// Filter options for listing users.
+#[derive(InputObject, Default)]
+pub struct UserFilter {
+    /// Filter by name (contains)
+    pub name: Option<String>,
+
+    /// Filter by role
+    pub role: Option<Role>,
+
+    /// Filter by creation date (after)
+    pub created_after: Option<DateTime<Utc>>,
+}
 ```
 
-### Creating a Release
+### Enums
 
-```bash
-# Create release branch from develop
-git checkout develop
-git pull origin develop
-git checkout -b release/1.0.0
+```rust
+/// User role in the system.
+#[derive(Enum, Copy, Clone, Eq, PartialEq)]
+pub enum Role {
+    /// Regular user
+    User,
+    /// Moderator with elevated privileges
+    Moderator,
+    /// Administrator with full access
+    Admin,
+}
 
-# Update version numbers
-# Update CHANGELOG.md
-# Final testing
-
-# Commit release preparation
-git commit -am "chore: prepare release 1.0.0"
-
-# Merge to main
-git checkout main
-git merge --no-ff release/1.0.0
-git tag -a v1.0.0 -m "Release version 1.0.0"
-
-# Merge back to develop
-git checkout develop
-git merge --no-ff release/1.0.0
-
-# Push everything
-git push origin main develop --tags
-
-# Delete release branch
-git branch -d release/1.0.0
-git push origin --delete release/1.0.0
+/// Sort direction.
+#[derive(Enum, Copy, Clone, Eq, PartialEq, Default)]
+pub enum SortDirection {
+    #[default]
+    Asc,
+    Desc,
+}
 ```
 
-### Creating a Hotfix
+## Query Implementation
 
-```bash
-# Create hotfix branch from main
-git checkout main
-git pull origin main
-git checkout -b hotfix/1.0.1-critical-fix
+```rust
+pub struct QueryRoot;
 
-# Fix the issue
-git commit -am "fix: resolve critical security vulnerability"
+#[Object]
+impl QueryRoot {
+    /// Get the currently authenticated user.
+    async fn me(&self, ctx: &Context<'_>) -> Result<Option<User>> {
+        let user = ctx.data_opt::<AuthenticatedUser>();
+        match user {
+            Some(auth) => {
+                let service = ctx.data::<UserService>()?;
+                service.find_by_id(auth.user_id).await
+            }
+            None => Ok(None),
+        }
+    }
 
-# Merge to main
-git checkout main
-git merge --no-ff hotfix/1.0.1-critical-fix
-git tag -a v1.0.1 -m "Hotfix version 1.0.1"
+    /// Get a user by ID.
+    async fn user(&self, ctx: &Context<'_>, id: ID) -> Result<Option<User>> {
+        let service = ctx.data::<UserService>()?;
+        service.find_by_id(id.parse()?).await
+    }
 
-# Merge to develop
-git checkout develop
-git merge --no-ff hotfix/1.0.1-critical-fix
+    /// List users with optional filtering and pagination.
+    async fn users(
+        &self,
+        ctx: &Context<'_>,
+        #[graphql(default)] filter: UserFilter,
+        #[graphql(default = 1)] page: u32,
+        #[graphql(default = 20, validator(maximum = 100))] per_page: u32,
+    ) -> Result<UserConnection> {
+        let service = ctx.data::<UserService>()?;
+        let (users, total) = service.list(filter, page, per_page).await?;
 
-# Push everything
-git push origin main develop --tags
+        Ok(UserConnection {
+            nodes: users,
+            page_info: PageInfo {
+                page,
+                per_page,
+                total,
+                has_next_page: (page * per_page) < total as u32,
+                has_previous_page: page > 1,
+            },
+        })
+    }
 
-# Delete hotfix branch
-git branch -d hotfix/1.0.1-critical-fix
-git push origin --delete hotfix/1.0.1-critical-fix
+    /// Search users by name or email.
+    async fn search_users(
+        &self,
+        ctx: &Context<'_>,
+        query: String,
+        #[graphql(default = 10, validator(maximum = 50))] limit: u32,
+    ) -> Result<Vec<User>> {
+        let service = ctx.data::<UserService>()?;
+        service.search(&query, limit).await
+    }
+}
 ```
 
-## Commit Message Convention
+## Mutation Implementation
 
-Follow **Conventional Commits** specification:
+```rust
+pub struct MutationRoot;
 
-### Format
+#[Object]
+impl MutationRoot {
+    /// Create a new user account.
+    async fn create_user(
+        &self,
+        ctx: &Context<'_>,
+        input: CreateUserInput,
+    ) -> Result<User> {
+        let service = ctx.data::<UserService>()?;
 
-```
-<type>(<scope>): <subject>
+        // Check for existing email
+        if service.email_exists(&input.email).await? {
+            return Err(Error::new("Email already registered"));
+        }
 
-<body>
+        service.create(input).await
+    }
 
-<footer>
-```
-
-### Types
-
-- **feat**: New feature
-- **fix**: Bug fix
-- **docs**: Documentation only changes
-- **style**: Code style changes (formatting, missing semicolons, etc.)
-- **refactor**: Code refactoring
-- **perf**: Performance improvements
-- **test**: Adding or updating tests
-- **chore**: Maintenance tasks, dependency updates
-- **ci**: CI/CD changes
-- **build**: Build system changes
-
-### Examples
-
-```bash
-# Feature
-git commit -m "feat(queue): add job retry with exponential backoff"
-
-# Bug fix
-git commit -m "fix(auth): resolve JWT token expiration issue"
-
-# Documentation
-git commit -m "docs(readme): update installation instructions"
-
-# Breaking change
-git commit -m "feat(api)!: change response format
-
-BREAKING CHANGE: API responses now use camelCase instead of snake_case"
-
-# Multiple changes
-git commit -m "chore: update dependencies and fix linting issues
-
-- Update tokio to 1.35
-- Update serde to 1.0.195
-- Fix clippy warnings in cache module"
-```
-
-## Pull Request Guidelines
-
-### Creating PRs
-
-1. **Base branch:**
-   - Features → `develop`
-   - Hotfixes → `main` (then merge to `develop`)
-   - Releases → `main` (then merge to `develop`)
-
-2. **Title format:**
-   - Follow commit message convention
-   - Example: `feat: add WebSocket support for real-time updates`
-
-3. **Description must include:**
-   - Summary of changes
-   - Related issue numbers
-   - Testing performed
-   - Breaking changes (if any)
-
-### PR Template
-
-```markdown
-## Description
-Brief description of what this PR does
-
-## Related Issues
-Closes #123
-Relates to #456
-
-## Type of Change
-- [ ] Bug fix (non-breaking change which fixes an issue)
-- [ ] New feature (non-breaking change which adds functionality)
-- [ ] Breaking change (fix or feature that would cause existing functionality to not work as expected)
+    /// Update the current user's profile.
+    #[graphql(guard = "AuthGuard")]
+    async fn update_profile(
+        &self,
+        ctx: &Context<'_>,
+        input: UpdateUserInput,
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
