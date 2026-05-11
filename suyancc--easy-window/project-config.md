@@ -1,229 +1,316 @@
 ---
 trigger: always_on
-description: ├── index.ts          # 导出所有stores
+description: Easy Window 基于 Tauri 2.x 构建，将Web前端与Rust后端相结合，提供原生桌面应用体验。
 ---
 
-# 状态管理与API服务规范
+# Tauri 桌面应用集成规范
 
-## Pinia 状态管理架构
+## Tauri 架构概览
 
-### Store 文件组织
+Easy Window 基于 Tauri 2.x 构建，将Web前端与Rust后端相结合，提供原生桌面应用体验。
+
+### 项目结构
 ```
-src/stores/
-├── index.ts          # 导出所有stores
-├── app.ts           # 应用全局状态
-├── project.ts       # 项目相关状态
-├── component.ts     # 组件管理状态
-├── user.ts          # 用户状态
-├── cache.ts         # 缓存管理
-└── settings.ts      # 用户设置
+├── src/                    # Vue3 前端代码
+├── src-tauri/             # Tauri/Rust 后端代码
+│   ├── src/               # Rust源码
+│   ├── Cargo.toml         # Rust依赖配置
+│   ├── tauri.conf.json    # Tauri配置文件
+│   └── icons/             # 应用图标
+├── dist/                  # 构建输出
+└── target/                # Rust编译输出
 ```
 
-### Store 定义规范
+## 前端与后端通信
 
-#### 基础Store结构
+### 调用Tauri API
 ```typescript
-import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
-import type { ProjectInfo, ComponentConfig } from '@/types'
+import { invoke } from '@tauri-apps/api/core'
+import { readTextFile, writeTextFile } from '@tauri-apps/plugin-fs'
 
-export const useProjectStore = defineStore('project', () => {
-  // State - 使用 ref 定义响应式状态
-  const currentProject = ref<ProjectInfo | null>(null)
-  const projects = ref<ProjectInfo[]>([])
-  const selectedComponent = ref<ComponentConfig | null>(null)
-  const draggedComponent = ref<ComponentConfig | null>(null)
-  const loading = ref(false)
+// 调用Rust后端命令
+const result = await invoke('my_command', { 
+  param1: 'value1',
+  param2: 'value2' 
+})
 
-  // Getters - 使用 computed 定义计算属性
-  const hasCurrentProject = computed(() => currentProject.value !== null)
-  const projectCount = computed(() => projects.value.length)
-  const selectedComponentId = computed(() => selectedComponent.value?.id)
+// 文件系统操作
+const content = await readTextFile('path/to/file.txt')
+await writeTextFile('path/to/file.txt', 'new content')
+```
 
-  // Actions - 定义修改状态的方法
-  const setCurrentProject = (project: ProjectInfo | null) => {
-    currentProject.value = project
-  }
+### Window管理
+```typescript
+import { getCurrentWindow } from '@tauri-apps/api/window'
 
-  const addProject = (project: ProjectInfo) => {
-    projects.value.push(project)
-  }
+const appWindow = getCurrentWindow()
 
-  const updateProject = (id: string, updates: Partial<ProjectInfo>) => {
-    const index = projects.value.findIndex(p => p.id === id)
-    if (index !== -1) {
-      projects.value[index] = { ...projects.value[index], ...updates }
-    }
-  }
+// 窗口操作
+await appWindow.setTitle('新标题')
+await appWindow.minimize()
+await appWindow.maximize()
+await appWindow.close()
 
-  const removeProject = (id: string) => {
-    const index = projects.value.findIndex(p => p.id === id)
-    if (index !== -1) {
-      projects.value.splice(index, 1)
-    }
-  }
-
-  const selectComponent = (component: ComponentConfig | null) => {
-    selectedComponent.value = component
-  }
-
-  // 异步操作
-  const loadProjects = async () => {
-    loading.value = true
-    try {
-      const response = await projectApi.getProjects()
-      projects.value = response.data
-    } catch (error) {
-      console.error('加载项目失败:', error)
-      throw error
-    } finally {
-      loading.value = false
-    }
-  }
-
-  const saveProject = async (project: ProjectInfo) => {
-    loading.value = true
-    try {
-      if (project.id) {
-        await projectApi.updateProject(project.id, project)
-        updateProject(project.id, project)
-      } else {
-        const response = await projectApi.createProject(project)
-        addProject(response.data)
-      }
-    } catch (error) {
-      console.error('保存项目失败:', error)
-      throw error
-    } finally {
-      loading.value = false
-    }
-  }
-
-  // 清理方法
-  const reset = () => {
-    currentProject.value = null
-    projects.value = []
-    selectedComponent.value = null
-    draggedComponent.value = null
-    loading.value = false
-  }
-
-  return {
-    // State
-    currentProject,
-    projects,
-    selectedComponent,
-    draggedComponent,
-    loading,
-    // Getters
-    hasCurrentProject,
-    projectCount,
-    selectedComponentId,
-    // Actions
-    setCurrentProject,
-    addProject,
-    updateProject,
-    removeProject,
-    selectComponent,
-    loadProjects,
-    saveProject,
-    reset
-  }
+// 监听窗口事件
+appWindow.listen('tauri://close-requested', () => {
+  console.log('用户尝试关闭窗口')
 })
 ```
 
-#### 应用全局状态
+## 文件系统操作
+
+### 文件读写
 ```typescript
-// src/stores/app.ts
-import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { 
+  readTextFile, 
+  writeTextFile, 
+  exists,
+  createDir,
+  copyFile
+} from '@tauri-apps/plugin-fs'
+import { join, appDataDir } from '@tauri-apps/api/path'
 
-export const useAppStore = defineStore('app', () => {
-  // 主题设置
-  const theme = ref<'light' | 'dark'>('light')
-  const language = ref<'zh-CN' | 'en-US'>('zh-CN')
-  
-  // 界面状态
-  const sidebarCollapsed = ref(false)
-  const loading = ref(false)
-  const fullscreen = ref(false)
-  
-  // 通知和消息
-  const notifications = ref<Array<{
-    id: string
-    type: 'info' | 'success' | 'warning' | 'error'
-    title: string
-    message: string
-    timestamp: number
-  }>>([])
+// 获取应用数据目录
+const appDataPath = await appDataDir()
+const configPath = await join(appDataPath, 'config.json')
 
-  // Actions
-  const toggleTheme = () => {
-    theme.value = theme.value === 'light' ? 'dark' : 'light'
-    // 保存到本地存储
-    localStorage.setItem('theme', theme.value)
-  }
+// 检查文件是否存在
+if (await exists(configPath)) {
+  const config = await readTextFile(configPath)
+  console.log('配置文件内容:', config)
+}
 
-  const setLanguage = (lang: 'zh-CN' | 'en-US') => {
-    language.value = lang
-    localStorage.setItem('language', lang)
-  }
+// 写入配置文件
+await writeTextFile(configPath, JSON.stringify(configData))
+```
 
-  const toggleSidebar = () => {
-    sidebarCollapsed.value = !sidebarCollapsed.value
-  }
+### 对话框操作
+```typescript
+import { open, save } from '@tauri-apps/plugin-dialog'
 
-  const setLoading = (state: boolean) => {
-    loading.value = state
-  }
+// 打开文件选择对话框
+const selected = await open({
+  multiple: false,
+  filters: [{
+    name: 'Vue文件',
+    extensions: ['vue']
+  }]
+})
 
-  const addNotification = (notification: Omit<typeof notifications.value[0], 'id' | 'timestamp'>) => {
-    const newNotification = {
-      ...notification,
-      id: Date.now().toString(),
-      timestamp: Date.now()
+// 保存文件对话框
+const filePath = await save({
+  filters: [{
+    name: '项目文件',
+    extensions: ['json']
+  }]
+})
+```
+
+## 应用配置管理
+
+### tauri.conf.json 关键配置
+```json
+{
+  "app": {
+    "name": "Easy Window",
+    "version": "1.0.0"
+  },
+  "build": {
+    "frontendDist": "../dist"
+  },
+  "bundle": {
+    "identifier": "com.easywindow.app",
+    "windows": {
+      "certificateThumbprint": null,
+      "digestAlgorithm": "sha256",
+      "timestampUrl": ""
     }
-    notifications.value.unshift(newNotification)
-    
-    // 自动清理旧通知（保留最新50条）
-    if (notifications.value.length > 50) {
-      notifications.value = notifications.value.slice(0, 50)
-    }
-  }
-
-  const removeNotification = (id: string) => {
-    const index = notifications.value.findIndex(n => n.id === id)
-    if (index !== -1) {
-      notifications.value.splice(index, 1)
-    }
-  }
-
-  // 初始化方法
-  const initializeApp = () => {
-    // 从本地存储恢复设置
-    const savedTheme = localStorage.getItem('theme') as 'light' | 'dark'
-    if (savedTheme) {
-      theme.value = savedTheme
-    }
-    
-    const savedLanguage = localStorage.getItem('language') as 'zh-CN' | 'en-US'
-    if (savedLanguage) {
-      language.value = savedLanguage
+  },
+  "plugins": {
+    "fs": {
+      "scope": [
+        "$APPDATA/**",
+        "$DOCUMENT/**"
+      ]
     }
   }
+}
+```
 
-  return {
-    theme,
-    language,
-    sidebarCollapsed,
-    loading,
-    fullscreen,
-    notifications,
-    toggleTheme,
-    setLanguage,
-    toggleSidebar,
-    setLoading,
-    addNotification,
+### 安全策略
+Tauri采用严格的安全策略，需要明确配置允许的API和文件访问范围：
+
+```json
+{
+  "permissions": [
+    "fs:default",
+    "dialog:default",
+    "window:default"
+  ]
+}
+```
+
+## 自动更新系统
+
+### 更新检查
+```typescript
+import { check } from '@tauri-apps/plugin-updater'
+
+async function checkForUpdates() {
+  try {
+    const update = await check()
+    if (update?.available) {
+      console.log('发现新版本:', update.version)
+      console.log('更新日志:', update.body)
+      
+      // 下载并安装更新
+      await update.downloadAndInstall()
+      
+      // 重启应用
+      await relaunch()
+    }
+  } catch (error) {
+    console.error('检查更新失败:', error)
+  }
+}
+```
+
+### 更新配置
+在 `tauri.conf.json` 中配置更新服务器：
+
+```json
+{
+  "updater": {
+    "active": true,
+    "endpoints": [
+      "https://api.yourdomain.com/updates/{{target}}/{{current_version}}"
+    ],
+    "dialog": true,
+    "pubkey": "YOUR_PUBLIC_KEY"
+  }
+}
+```
+
+## 打包和分发
+
+### 开发模式运行
+```bash
+# 启动开发服务器
+npm run tauri:dev
+
+# 仅构建前端
+npm run dev
+```
+
+### 生产构建
+```bash
+# 构建应用
+npm run tauri:build
+
+# 构建特定平台
+npm run tauri build -- --target x86_64-pc-windows-msvc
+```
+
+### 构建配置优化
+```json
+{
+  "bundle": {
+    "targets": ["msi", "nsis"],
+    "resources": ["assets/*"],
+    "externalBin": [],
+    "copyright": "© 2024 Easy Window Team",
+    "category": "DeveloperTool",
+    "shortDescription": "桌面UI生成工具",
+    "longDescription": "一款基于Vue3+Tauri的可视化桌面UI设计工具"
+  }
+}
+```
+
+## 开发最佳实践
+
+### 1. 错误处理
+```typescript
+try {
+  const result = await invoke('risky_command')
+  return result
+} catch (error) {
+  console.error('Tauri命令执行失败:', error)
+  // 显示用户友好的错误消息
+  ElMessage.error('操作失败，请重试')
+  throw error
+}
+```
+
+### 2. 跨平台兼容性
+```typescript
+import { platform } from '@tauri-apps/plugin-os'
+
+const currentPlatform = await platform()
+if (currentPlatform === 'windows') {
+  // Windows特定逻辑
+} else if (currentPlatform === 'macos') {
+  // macOS特定逻辑
+}
+```
+
+### 3. 性能优化
+- 避免频繁的前后端通信
+- 缓存常用的Tauri API调用结果
+- 使用批量操作减少IPC开销
+
+### 4. 调试技巧
+```typescript
+// 开发模式下启用控制台
+if (import.meta.env.DEV) {
+  document.addEventListener('contextmenu', (e) => {
+    e.preventDefault()
+  })
+}
+
+// 监听Tauri事件进行调试
+import { listen } from '@tauri-apps/api/event'
+
+listen('tauri://window-created', (event) => {
+  console.log('窗口创建事件:', event)
+})
+```
+
+## 原生功能集成
+
+### 系统托盘
+```typescript
+import { TrayIcon } from '@tauri-apps/api/tray'
+
+const tray = await TrayIcon.new({
+  icon: 'icons/icon.png',
+  tooltip: 'Easy Window'
+})
+
+tray.on('click', () => {
+  // 点击托盘图标的处理逻辑
+})
+```
+
+### 全局快捷键
+```typescript
+import { register } from '@tauri-apps/plugin-global-shortcut'
+
+await register('CommandOrControl+Shift+E', () => {
+  console.log('快捷键被触发')
+})
+```
+
+### 系统通知
+```typescript
+import { 
+  isPermissionGranted, 
+  requestPermission, 
+  sendNotification 
+} from '@tauri-apps/plugin-notification'
+
+let permissionGranted = await isPermissionGranted()
+if (!permissionGranted) {
+  const permission = await requestPermission()
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
