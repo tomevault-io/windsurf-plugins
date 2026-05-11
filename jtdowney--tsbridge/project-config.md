@@ -110,15 +110,9 @@ tsbridge/
 - Semantic Versioning with `vX.Y.Z` tags
 - CHANGELOG.md in [Keep a Changelog](https://keepachangelog.com/) format
 - Releases automated via GitHub Actions + GoReleaser
-- Artifacts: multi-platform binaries, Docker images, checksums
 
-## CI/CD
-
-- GitHub Actions: `ci.yml` (tests, linting, builds), `lint.yml` (dedicated linting), `release.yml` (version tags)
-- Race detection enabled in CI
-- All checks must pass before merging
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/jtdowney)
-> This is a context snippet only. You'll also want the standalone SKILL.md file — [download at TomeVault](https://tomevault.io/claim/jtdowney)
-<!-- tomevault:4.0:windsurf_rules:2026-04-08 -->
+> Source: [jtdowney/tsbridge](https://github.com/jtdowney/tsbridge) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-04 -->
