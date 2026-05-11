@@ -1,162 +1,206 @@
 ---
 trigger: always_on
-description: Feature-first architecture is a design pattern that organizes code by business features rather than technical layers. This approach promotes better maintainability, scalability, and team collaboration by keeping related functionality together and reducing coupling between different parts of the application.
+description: providesTags: ['Todo'],
 ---
 
-# Feature-First Architecture Guide
 
-## Overview
+# MobileLauncher LT - Development Rules & Guidelines
 
-Feature-first architecture is a design pattern that organizes code by business features rather than technical layers. This approach promotes better maintainability, scalability, and team collaboration by keeping related functionality together and reducing coupling between different parts of the application.
+This document outlines the essential rules and guidelines for developing with the MobileLauncher LT boilerplate. Follow these rules to maintain consistency, scalability, and code quality across the project.
 
-## Core Principles
+## 🏗️ Architecture Rules
 
-### 1. Feature Isolation
-- Each feature is self-contained with its own components, logic, and state
-- Features communicate through well-defined interfaces
-- Minimal dependencies between features
-- Clear boundaries and responsibilities
+### 1. Feature-First Structure
+- **Always organize code by business features**, not technical layers
+- Each feature must be self-contained with its own:
+  - `components/` - Feature-specific UI components
+  - `screens/` - Screen components
+  - `hooks/` - Custom hooks for business logic
+  - `store/` - Redux slice and selectors
+  - `api/` - RTK Query endpoints
+  - `services/` - Business logic services
+  - `types/` - TypeScript type definitions
+  - `index.ts` - Barrel exports
+
+**Example:**
+```
+src/features/auth/
+├── components/
+│   ├── login-form.tsx
+│   └── index.ts
+├── screens/
+│   ├── login-screen.tsx
+│   └── index.ts
+├── hooks/
+│   ├── use-auth.ts
+│   └── index.ts
+├── store/
+│   ├── auth-slice.ts
+│   ├── auth-selector.ts
+│   └── index.ts
+├── api/
+│   ├── auth.api.ts
+│   └── index.ts
+├── services/
+│   ├── auth.service.ts
+│   └── index.ts
+├── types/
+│   ├── index.ts
+├── index.ts
+```
 
 ### 2. Shared Resources
-- Common functionality is extracted to shared directories
-- UI components, utilities, and services are globally accessible
-- Consistent patterns across all features
+- **Extract common functionality** to global directories (`src/ui/`, `src/services/`, `src/utils/`)
+- **Never duplicate code** - if used in 2+ features, move to shared
+- **Use absolute imports** with `#root/` prefix for clean imports
+- **Expo ecosystem**: use expo.dev ecosystem for packages and yarn to install packages.
 
-### 3. Scalability
-- Easy to add new features without affecting existing ones
-- Clear structure for team members to work independently
-- Simple to remove or refactor features
-
-## Project Structure
-
-```
-src/
-├── features/                    # Feature-specific code
-│   ├── auth/                   # Authentication feature
-│   │   ├── api/               # API calls and endpoints
-│   │   ├── components/        # Feature-specific components
-│   │   ├── hooks/            # Custom hooks
-│   │   ├── screens/          # Screen components
-│   │   ├── services/         # Business logic
-│   │   ├── store/            # State management
-│   │   └── types/            # Type definitions
-│   ├── media-library/         # Media management feature
-│   ├── collections/           # Collections feature
-│   └── settings/              # Settings feature
-├── navigation/                 # Navigation configuration
-│   ├── navigators/           # Navigator components
-│   ├── routes.ts             # Route definitions
-│   └── routes.types.ts       # Navigation types
-├── services/                  # Global services
-│   ├── api/                  # API configuration
-│   ├── datadog/              # Monitoring service
-│   └── logging/              # Logging services
-├── store/                     # Global store configuration
-│   ├── store.ts              # Store setup
-│   ├── reducers.ts           # Root reducer
-│   └── app.slice.ts          # App-level state
-├── ui/                        # Shared UI components
-│   ├── components/           # Reusable components
-│   ├── style/                # Theme and styling
-│   └── tokens/               # Design tokens
-├── utils/                     # Utility functions
-├── schemas/                   # Data validation schemas
-├── config/                    # Configuration files
-└── entrypoints/              # App entry points
-```
-
-## Feature Structure Deep Dive
-
-### 1. API Layer (`api/`)
+**Example:**
 ```typescript
-// features/auth/api/auth.api.ts
-import { api } from "#root/services/api/api";
-import { AuthSchema, type AuthResponse } from "./types";
+// ❌ Wrong - duplicated across features
+// features/auth/components/button.tsx
+// features/settings/components/button.tsx
 
-const authApi = api.injectEndpoints({
-  overrideExisting: true,
-  endpoints: (builder) => ({
-    login: builder.mutation<AuthResponse, LoginCredentials>({
-      query: (credentials) => ({
-        url: "/auth/login",
-        method: "POST",
-        body: credentials,
-      }),
-      responseSchema: AuthSchema,
-    }),
-  }),
-});
+// ✅ Correct - shared component
+// src/ui/components/button.tsx
+import { Button } from '#root/ui/components/button';
 
-export const { useLoginMutation } = authApi;
+// ✅ Correct - shared utility
+// src/utils/format-date.ts
+import { formatDate } from '#root/utils/format-date';
 ```
 
-**Best Practices:**
-- Use RTK Query for all API calls
-- Define response schemas with Zod validation
-- Type all request/response interfaces
-- Use proper error handling
-- Implement caching strategies
+## 🎨 UI Component Rules
 
-### 2. Components (`components/`)
+### 3. Component Design
+- **Use Restyle for all styling** - never use StyleSheet directly
+- **Create type-safe components** with proper TypeScript interfaces
+- **Export prop interfaces** for reusability
+- **Use React.memo** for performance optimization
+- **Follow single responsibility principle**
+- **Memorzie Functions**: use useCallback for functions
+- **Avoid inline functions**: extract functions outside render or use useCallback
+- **Avoid inline styling**: use theme values and component variants instead
+
+**Example:**
 ```typescript
-// features/auth/components/login-form.tsx
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { loginSchema, type LoginFormData } from "../types";
+// ✅ Correct - Performance optimized component
+import React, { useCallback } from 'react';
+import { createBox } from '@shopify/restyle';
+import type { Theme } from '#root/ui/style/theme';
 
-export interface LoginFormProps {
-  onSuccess: (data: LoginFormData) => void;
-  onError: (error: string) => void;
+const StyledButton = createBox<Theme>();
+
+export interface ButtonProps {
+  title: string;
+  onPress: () => void;
+  variant?: 'primary' | 'secondary';
+  disabled?: boolean;
 }
 
-export const LoginForm = ({ onSuccess, onError }: LoginFormProps) => {
-  const { control, handleSubmit } = useForm<LoginFormData>({
-    resolver: zodResolver(loginSchema),
-  });
+const _Button = ({ title, onPress, variant = 'primary', disabled = false }: ButtonProps) => {
+  const handlePress = useCallback(() => {
+    if (!disabled) {
+      onPress();
+    }
+  }, [onPress, disabled]);
 
-  // Implementation...
-};
-```
-
-**Best Practices:**
-- Clear prop interfaces with proper exports
-- Use React.memo for performance optimization
-- Implement proper form validation
-- Follow single responsibility principle
-- Use TypeScript template literal types for variants
-
-### 3. Hooks (`hooks/`)
-```typescript
-// features/auth/hooks/use-auth.ts
-import { useAppSelector, useAppDispatch } from "#root/store/store";
-import { selectAuthState } from "../store/auth-selector";
-import { login, logout } from "../store/auth-slice";
-
-export const useAuth = () => {
-  const dispatch = useAppDispatch();
-  const authState = useAppSelector(selectAuthState);
-
-  const handleLogin = useCallback(
-    (credentials: LoginCredentials) => {
-      dispatch(login(credentials));
-    },
-    [dispatch]
+  return (
+    <StyledButton
+      backgroundColor={variant === 'primary' ? 'primary' : 'secondary'}
+      padding="md"
+      borderRadius="md"
+      onPress={handlePress}
+      opacity={disabled ? 0.5 : 1}
+    >
+      <Text color="white" textAlign="center">
+        {title}
+      </Text>
+    </StyledButton>
   );
-
-  const handleLogout = useCallback(() => {
-    dispatch(logout());
-  }, [dispatch]);
-
-  return {
-    ...authState,
-    login: handleLogin,
-    logout: handleLogout,
-  };
 };
+
+export const Button = React.memo(_Button);
 ```
 
-**Best Practices:**
-- Encapsulate feature-specific logic
+### 4. Theme Usage
+- **Always use theme values** for colors, spacing, typography
+- **Use borderRadius theme values**: `none`, `xs`, `sm`, `md`, `lg`, `xl`, `2xl`, `3xl`, `full`
+- **Use "full" for circles** instead of calculating half width/height
+- **Never hardcode values** in theme props
+
+**Example:**
+```typescript
+// ❌ Wrong - hardcoded values
+<Box 
+  backgroundColor="#3B82F6" 
+  padding={16} 
+  borderRadius={8}
+  width={50}
+  height={50}
+/>
+
+// ✅ Correct - theme values
+<Box 
+  backgroundColor="primary" 
+  padding="md" 
+  borderRadius="md"
+  width={50}
+  height={50}
+  borderRadius="full" // For circles
+/>
+```
+
+### 5. Component Variants
+- **Create multiple variants** for each component (size, type, state)
+- **Use consistent naming**: `buttonTypeVariant`, `buttonSizeVariant`
+- **Define variants in theme** using Restyle's variant system
+
+**Example:**
+```typescript
+// Theme definition
+export const buttonVariants = createVariant<Theme, 'buttonVariants', 'variant'>({
+  property: 'variant',
+  themeKey: 'buttonVariants',
+});
+
+// Component usage
+<Button 
+  title="Save" 
+  buttonTypeVariant="primary" 
+  buttonSizeVariant="large"
+  onPress={handleSave} 
+/>
+```
+
+## 🔄 State Management Rules
+
+### 6. Redux Patterns
+- **Use Redux Toolkit** for all state management
+- **Create feature slices** with proper action creators
+- **Use createSelector** for derived state
+- **Keep state normalized** and flat
+- **Use RTK Query** for all API calls
+
+**Example:**
+```typescript
+// Redux slice
+const todosSlice = createSlice({
+  name: 'todos',
+  initialState: { todos: [], loading: false },
+  reducers: {
+    addTodo: (state, action) => {
+      state.todos.push(action.payload);
+    },
+    toggleTodo: (state, action) => {
+      const todo = state.todos.find(t => t.id === action.payload);
+      if (todo) todo.completed = !todo.completed;
+    },
+  },
+});
+
+// Selector
+export const selectCompletedTodos = createSelector(
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
