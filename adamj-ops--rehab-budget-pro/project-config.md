@@ -1,172 +1,137 @@
 ---
 trigger: always_on
-description: When testing features, use the browser tools:
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-# Testing & Debugging
+# CLAUDE.md
 
-## Development Server
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project Overview
+
+Rehab Budget Pro is a fix & flip real estate project budget tracking application built with Next.js 15, React 19, Supabase, and Tailwind CSS v4. The app helps manage property deals with budget tracking across 18 categories using a three-column model (Underwriting → Forecast → Actual), vendor management, payment draws, journal/notes, and cost reference data for the Minneapolis metro area.
+
+## Development Commands
 
 ```bash
+# Install dependencies
+npm install
+
+# Development server (http://localhost:3000)
 npm run dev
-# Runs on http://localhost:3000
+
+# Production build
+npm run build
+
+# Start production server
+npm start
+
+# Lint code
+npm run lint
+
+# Run tests
+npm test
 ```
 
-## Browser Testing with Cursor
+## Database Management
 
-When testing features, use the browser tools:
+The project uses Supabase with SQL migrations located in `supabase/`:
 
-1. Navigate to `http://localhost:3000`
-2. Take snapshots to verify UI state
-3. Interact with elements to test functionality
-4. Check console for errors
+- **Initial setup**: Run `supabase/schema.sql` in Supabase SQL Editor to create tables, views, enums, and RLS policies
+- **Seed data**: Run `supabase/seed.sql` to populate cost reference data for Minneapolis metro pricing
+- **Migrations**: SQL migration files are in `supabase/migrations/` directory (apply in order)
+- **Reset database**: Use `supabase/reset.sql` to drop all tables and types
+- **Verify schema**: Use `supabase/verify.sql` to check schema integrity
 
-### Common Test Flows
+### Environment Setup
 
-#### Project Creation
-1. Click "New Project" button
-2. Enter street address (auto-fills city/state/zip)
-3. Fill in ARV, purchase price
-4. Submit → Should redirect to project detail
-
-#### Budget Editing
-1. Navigate to project → Budget Detail tab
-2. Click edit icon on any line item
-3. Modify underwriting/forecast/actual amounts
-4. Click save → Should update totals
-
-#### Vendor Management
-1. Navigate to project → Vendors tab
-2. Click "Add Vendor"
-3. Fill in vendor details
-4. Save → Should appear in vendor list
-
-#### Photo Upload
-1. Navigate to project → Budget Detail tab
-2. Click camera icon on any line item
-3. Drag & drop or select file
-4. Should upload and show in gallery
-
-## Console Debugging
-
-```typescript
-// In React Query hooks
-const { data, error, isLoading } = useQuery({
-  queryKey: ['projects'],
-  queryFn: async () => {
-    console.log('Fetching projects...');
-    const result = await supabase.from('project_summary').select('*');
-    console.log('Result:', result);
-    return result.data;
-  },
-});
+Required environment variables in `.env` or `.env.local`:
+```
+NEXT_PUBLIC_SUPABASE_URL=your_project_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
 ```
 
-## Supabase Debugging
+## Architecture
 
-### Check Supabase Dashboard
-- SQL Editor: Test queries directly
-- Table Editor: View/edit data
-- Logs: Check for RLS policy errors
-- Storage: Verify file uploads
+### Data Flow Pattern
 
-### Common Issues
+This app follows a specific data architecture that must be maintained:
 
-#### RLS Policy Errors
-```
-Error: new row violates row-level security policy
-```
-Fix: Check `user_id` is being passed in inserts (auth not implemented yet)
+1. **Supabase Client Layer** (`src/lib/supabase/`):
+   - `client.ts`: Browser client with singleton pattern via `getSupabaseClient()`
+   - `server.ts`: Server-side client for Server Components
 
-#### Missing Data
-```typescript
-// Check if query returns expected data
-const { data, error } = await supabase
-  .from('project_summary')
-  .select('*')
-  .eq('id', projectId)
-  .single();
+2. **State Management**:
+   - **Zustand stores** (`src/lib/store.ts`, `src/lib/stores/`): Client-side UI state and optimistic updates
+   - **React Query** (`@tanstack/react-query`): Server state, caching, and data fetching
+   - Zustand handles: `currentProject`, `budgetItems`, `vendors`, `draws`, `activeTab`, UI modals, dashboard view state
+   - React Query handles: Database queries, mutations, cache invalidation
 
-console.log('Data:', data);
-console.log('Error:', error);
-```
+3. **Type System** (`src/types/index.ts`):
+   - All database types mirror PostgreSQL schema exactly
+   - Enums match database enums (e.g., `ProjectStatus`, `BudgetCategory`, `VendorTrade`)
+   - View types for computed data: `ProjectSummary`, `BudgetByCategory`, `VendorPaymentSummary`
+   - Input types omit `id`, `user_id`, `created_at`, `updated_at` fields
+   - Utility constants: `BUDGET_CATEGORIES`, `VENDOR_TRADE_LABELS`, `TAG_COLORS`, etc.
 
-## React Query DevTools
+### Database Schema
 
-Add to layout for debugging:
+**Core Tables**:
+- `projects`: Property details, financials (ARV, purchase price, etc.), status tracking, dates
+- `budget_items`: Three-column model with underwriting/forecast/actual amounts, computed variances
+- `vendors`: Master vendor directory with trade (21 types), ratings, licensing info
+- `draws`: Payment tracking with milestones (6 types) and status workflow
+- `cost_reference`: Minneapolis metro pricing guide (seeded data)
 
-```tsx
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
+**Supporting Tables**:
+- `vendor_tags`: Custom colored tags for vendors
+- `vendor_tag_assignments`: Links vendors to tags
+- `vendor_contacts`: Contact history per vendor (11 contact types)
+- `line_item_photos`: Per-line-item photo attachments with classification
+- `journal_pages`: Notion-style rich text journal with project tagging
+- `calculation_settings`: User-configurable calculation algorithms
 
-<QueryClientProvider client={queryClient}>
-  {children}
-  <ReactQueryDevtools initialIsOpen={false} />
-</QueryClientProvider>
-```
+**Important Views** (use these for reads):
+- `project_summary`: Projects with calculated totals (budget rollups, contingency, total_investment, mao, profit)
+- `budget_by_category`: Budget/actual/variance aggregated by category
+- `vendor_payment_summary`: Vendor totals across projects
 
-## Error Handling
+**Key Enums**:
+- `project_status`: lead, analyzing, under_contract, in_rehab, listed, sold, dead
+- `budget_category`: 18 categories (demolition, framing, plumbing, electrical, etc.)
+- `vendor_trade`: 21 trade types
+- `journal_page_type`: note, meeting, checklist, idea, research, site_visit
+- `mao_method`, `roi_method`, `contingency_method`, `holding_cost_method`: Calculation algorithms
 
-### Toast Notifications
-```typescript
-import { toast } from 'sonner';
+### Three-Column Budget Model
 
-// Success
-toast.success('Saved successfully');
+Budget items use three distinct amount columns with computed variances:
+- **underwriting_amount**: Pre-deal estimate (initial quote)
+- **forecast_amount**: Post-walkthrough/bid estimate (refined)
+- **actual_amount**: Real spend as project progresses
 
-// Error
-toast.error('Failed to save');
+**Computed Variances** (generated by database):
+- `forecast_variance`: forecast - underwriting
+- `actual_variance`: actual - forecast
+- `total_variance`: actual - underwriting
 
-// With description
-toast.error('Upload failed', {
-  description: 'File size exceeds 10MB limit',
-});
-```
+The `project_summary` view aggregates these as `underwriting_total`, `forecast_total`, `actual_total`.
 
-### Error Boundaries
-Wrap components that might fail:
+### App Router Structure (`src/app/`)
 
-```tsx
-<ErrorBoundary fallback={<ErrorFallback />}>
-  <BudgetDetailTab />
-</ErrorBoundary>
-```
+**Root Level**:
+- `/` → Home/dashboard page with portfolio stats
+- `/layout.tsx` → Root layout with sidebar, theme, query provider, toast
 
-## Performance Debugging
+**Projects**:
+- `/projects` → Projects list
+- `/projects/new` → Create project form with Google Places autocomplete
+- `/projects/[id]` → Project detail with tabbed interface
+- `/projects/[id]/edit` → Edit project
 
-### React Query Stale Time
-```typescript
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 1000 * 60 * 5, // 5 minutes
-      gcTime: 1000 * 60 * 30, // 30 minutes
-    },
-  },
-});
-```
+**Authentication**:
 
-### Check Re-renders
-```typescript
-import { useEffect } from 'react';
-
-useEffect(() => {
-  console.log('Component rendered');
-});
-```
-
-## Database Migrations
-
-### Test Migrations Locally
-1. Write migration in `supabase/migrations/`
-2. Test in Supabase SQL Editor
-3. Verify TypeScript types match
-
-### Rollback Pattern
-```sql
--- Include rollback in migration comments
--- DOWN:
--- ALTER TABLE budget_items DROP COLUMN new_column;
-```
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [adamj-ops/rehab-budget-pro](https://github.com/adamj-ops/rehab-budget-pro) — distributed by [TomeVault](https://tomevault.io).
