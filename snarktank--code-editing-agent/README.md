@@ -1,0 +1,26 @@
+# code-editing-agent
+
+> Tome by [snarktank](https://github.com/snarktank/code-editing-agent) — distributed by [TomeVault](https://tomevault.io)
+
+A simple AI developer agent
+
+## Windsurf Config
+
+The `project-config.md` file in this directory is the project config converted for Windsurf.
+Original source: `.cursor/rules/*.mdc` in [snarktank/code-editing-agent](https://github.com/snarktank/code-editing-agent).
+
+## Also available for
+
+- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
+- **GitHub Copilot** — `copilot-instructions.md`
+- **Gemini CLI** — `GEMINI.md`
+- **Windsurf** — `project-config.md`
+
+From [snarktank/code-editing-agent](https://github.com/snarktank/code-editing-agent) — a repo with 24+ stars on GitHub.
+
+---
+
+Explore more instruction files on [TomeVault](https://tomevault.io) — the open index of AI config files for every platform.
+
+<!-- genome:t-e-s -->
