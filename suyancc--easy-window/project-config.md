@@ -1,96 +1,229 @@
 ---
 trigger: always_on
-description: This is an advanced, experimental rule. It instructs the AI Agent to check for, potentially create, and then execute a Python script (`final_review_gate.py`) in your project's root directory to facilitate an interactive review loop. By using this rule, you acknowledge that the AI will attempt file system operations (read, write, execute) as directed. Ensure the AI's execution environment has appropriate permissions if you expect script auto-creation to work, and be aware of the security implicat
+description: ├── index.ts          # 导出所有stores
 ---
 
----
-description: 
-globs: 
-alwaysApply: true
----
-# AI Agent Protocol: Self-Contained Mandatory Interactive Final Review Loop with Auto-Script Creation (Version 3)
+# 状态管理与API服务规范
 
-## 0. User Advisory & Safety:
-This is an advanced, experimental rule. It instructs the AI Agent to check for, potentially create, and then execute a Python script (`final_review_gate.py`) in your project's root directory to facilitate an interactive review loop. By using this rule, you acknowledge that the AI will attempt file system operations (read, write, execute) as directed. Ensure the AI's execution environment has appropriate permissions if you expect script auto-creation to work, and be aware of the security implications.
+## Pinia 状态管理架构
 
-## 1. Core Principle & Context:
-Your primary task processing includes a **mandatory final interactive review stage** driven by user input through a specific Python script (`final_review_gate.py`). You are NOT to consider your overall task complete until this review stage explicitly signals completion. This protocol leverages your known capability to run commands in a sub-terminal (displayed within the chat interface) and read their output.
+### Store 文件组织
+```
+src/stores/
+├── index.ts          # 导出所有stores
+├── app.ts           # 应用全局状态
+├── project.ts       # 项目相关状态
+├── component.ts     # 组件管理状态
+├── user.ts          # 用户状态
+├── cache.ts         # 缓存管理
+└── settings.ts      # 用户设置
+```
 
-## Phase 0: Ensure `final_review_gate.py` Script Exists
-(This phase is executed ONCE per user request that triggers this overall protocol, or if the script is missing or its content is incorrect.)
+### Store 定义规范
 
-1.  **Define Script Details:**
-    * **Script Name:** `final_review_gate.py`
-    * **Target Location:** Directly in the root of the current project/workspace.
-    * **Python Script Content (ensure this exact content is used):**
-        ```python
-        # final_review_gate.py
-import sys
-import os
+#### 基础Store结构
+```typescript
+import { defineStore } from 'pinia'
+import { ref, computed } from 'vue'
+import type { ProjectInfo, ComponentConfig } from '@/types'
 
-if __name__ == "__main__":
-    # Try to make stdout unbuffered for more responsive interaction.
-    # This might not work on all platforms or if stdout is not a TTY,
-    # but it's a good practice for this kind of interactive script.
-    try:
-        sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', buffering=1)
-    except Exception:
-        pass # Ignore if unbuffering fails, e.g., in certain environments
+export const useProjectStore = defineStore('project', () => {
+  // State - 使用 ref 定义响应式状态
+  const currentProject = ref<ProjectInfo | null>(null)
+  const projects = ref<ProjectInfo[]>([])
+  const selectedComponent = ref<ComponentConfig | null>(null)
+  const draggedComponent = ref<ComponentConfig | null>(null)
+  const loading = ref(false)
 
-    try:
-        sys.stderr = os.fdopen(sys.stderr.fileno(), 'w', buffering=1)
-    except Exception:
-        pass # Ignore
+  // Getters - 使用 computed 定义计算属性
+  const hasCurrentProject = computed(() => currentProject.value !== null)
+  const projectCount = computed(() => projects.value.length)
+  const selectedComponentId = computed(() => selectedComponent.value?.id)
 
-    print("--- 最终审核关卡已激活 ---", flush=True)
-    print("AI已完成主要操作。等待您的审核或进一步子提示。", flush=True)
-    print("输入您的子提示，或输入以下任一指令：'TASK_COMPLETE'、'Done'、'Quit'、'q' 以确认完成。", flush=True)
+  // Actions - 定义修改状态的方法
+  const setCurrentProject = (project: ProjectInfo | null) => {
+    currentProject.value = project
+  }
+
+  const addProject = (project: ProjectInfo) => {
+    projects.value.push(project)
+  }
+
+  const updateProject = (id: string, updates: Partial<ProjectInfo>) => {
+    const index = projects.value.findIndex(p => p.id === id)
+    if (index !== -1) {
+      projects.value[index] = { ...projects.value[index], ...updates }
+    }
+  }
+
+  const removeProject = (id: string) => {
+    const index = projects.value.findIndex(p => p.id === id)
+    if (index !== -1) {
+      projects.value.splice(index, 1)
+    }
+  }
+
+  const selectComponent = (component: ComponentConfig | null) => {
+    selectedComponent.value = component
+  }
+
+  // 异步操作
+  const loadProjects = async () => {
+    loading.value = true
+    try {
+      const response = await projectApi.getProjects()
+      projects.value = response.data
+    } catch (error) {
+      console.error('加载项目失败:', error)
+      throw error
+    } finally {
+      loading.value = false
+    }
+  }
+
+  const saveProject = async (project: ProjectInfo) => {
+    loading.value = true
+    try {
+      if (project.id) {
+        await projectApi.updateProject(project.id, project)
+        updateProject(project.id, project)
+      } else {
+        const response = await projectApi.createProject(project)
+        addProject(response.data)
+      }
+    } catch (error) {
+      console.error('保存项目失败:', error)
+      throw error
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // 清理方法
+  const reset = () => {
+    currentProject.value = null
+    projects.value = []
+    selectedComponent.value = null
+    draggedComponent.value = null
+    loading.value = false
+  }
+
+  return {
+    // State
+    currentProject,
+    projects,
+    selectedComponent,
+    draggedComponent,
+    loading,
+    // Getters
+    hasCurrentProject,
+    projectCount,
+    selectedComponentId,
+    // Actions
+    setCurrentProject,
+    addProject,
+    updateProject,
+    removeProject,
+    selectComponent,
+    loadProjects,
+    saveProject,
+    reset
+  }
+})
+```
+
+#### 应用全局状态
+```typescript
+// src/stores/app.ts
+import { defineStore } from 'pinia'
+import { ref } from 'vue'
+
+export const useAppStore = defineStore('app', () => {
+  // 主题设置
+  const theme = ref<'light' | 'dark'>('light')
+  const language = ref<'zh-CN' | 'en-US'>('zh-CN')
+  
+  // 界面状态
+  const sidebarCollapsed = ref(false)
+  const loading = ref(false)
+  const fullscreen = ref(false)
+  
+  // 通知和消息
+  const notifications = ref<Array<{
+    id: string
+    type: 'info' | 'success' | 'warning' | 'error'
+    title: string
+    message: string
+    timestamp: number
+  }>>([])
+
+  // Actions
+  const toggleTheme = () => {
+    theme.value = theme.value === 'light' ? 'dark' : 'light'
+    // 保存到本地存储
+    localStorage.setItem('theme', theme.value)
+  }
+
+  const setLanguage = (lang: 'zh-CN' | 'en-US') => {
+    language.value = lang
+    localStorage.setItem('language', lang)
+  }
+
+  const toggleSidebar = () => {
+    sidebarCollapsed.value = !sidebarCollapsed.value
+  }
+
+  const setLoading = (state: boolean) => {
+    loading.value = state
+  }
+
+  const addNotification = (notification: Omit<typeof notifications.value[0], 'id' | 'timestamp'>) => {
+    const newNotification = {
+      ...notification,
+      id: Date.now().toString(),
+      timestamp: Date.now()
+    }
+    notifications.value.unshift(newNotification)
     
-    active_session = True
-    while active_session:
-        try:
-            # Signal that the script is ready for input.
-            # The AI doesn't need to parse this, but it's good for user visibility.
-            print("审核关卡等待输入：", end="", flush=True) 
-            
-            line = sys.stdin.readline()
-            
-            if not line:  # EOF
-                print("--- 审核关卡：标准输入关闭（EOF），正在退出脚本 ---", flush=True)
-                active_session = False
-                break
-            
-            user_input = line.strip()
+    // 自动清理旧通知（保留最新50条）
+    if (notifications.value.length > 50) {
+      notifications.value = notifications.value.slice(0, 50)
+    }
+  }
 
-            # Check for exit conditions
-            if user_input.upper() in ['TASK_COMPLETE', 'DONE', 'QUIT', 'Q']: # MODIFIED: Empty string no longer exits
-                print(f"--- 审核关卡：用户通过 '{user_input.upper()}' 确认完成 ---", flush=True)
-                active_session = False
-                break
-            elif user_input: # If there's any other non-empty input (and not a completion command)
-                # This is the critical line the AI will "listen" for.
-                print(f"用户审核子提示：{user_input}", flush=True)
-            # If user_input was empty (and not a completion command),
-            # the loop simply continues, and "REVIEW_GATE_AWAITING_INPUT:" will be printed again.
-            
-        except KeyboardInterrupt:
-            print("--- 审核关卡：用户中断会话（KeyboardInterrupt） ---", flush=True)
-            active_session = False
-            break
-        except Exception as e:
-            print(f"--- 审核关卡脚本错误：{e} ---", flush=True)
-            active_session = False
-            break
-            
-	print("--- 最终审核关卡脚本已退出 ---", flush=True)
-        ```
+  const removeNotification = (id: string) => {
+    const index = notifications.value.findIndex(n => n.id === id)
+    if (index !== -1) {
+      notifications.value.splice(index, 1)
+    }
+  }
 
-2.  **Ensure Script Existence and Correctness:**
-    a.  Use your file system tools to check if the file `final_review_gate.py` exists in the project root.
-    b.  **If the file `final_review_gate.py` does NOT exist OR if its content does not EXACTLY match the Python script provided in section "Phase 0.1.Python Script Content" (you may need to read the existing file and compare):**
-        i.  You MUST create or overwrite the `final_review_gate.py` file in the project root.
-        ii. The content of this file MUST be *exactly* the Python script content provided above. Ensure all indentation, comments, and lines are preserved perfectly. Use your "create file" or "edit file" tool.
-        iii. After creating/overwriting it, announce: "The `final_review_gate.py` script has been created/updated in the project root with the latest interaction enhancements."
+  // 初始化方法
+  const initializeApp = () => {
+    // 从本地存储恢复设置
+    const savedTheme = localStorage.getItem('theme') as 'light' | 'dark'
+    if (savedTheme) {
+      theme.value = savedTheme
+    }
+    
+    const savedLanguage = localStorage.getItem('language') as 'zh-CN' | 'en-US'
+    if (savedLanguage) {
+      language.value = savedLanguage
+    }
+  }
+
+  return {
+    theme,
+    language,
+    sidebarCollapsed,
+    loading,
+    fullscreen,
+    notifications,
+    toggleTheme,
+    setLanguage,
+    toggleSidebar,
+    setLoading,
+    addNotification,
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
