@@ -1,105 +1,221 @@
 ---
 trigger: always_on
-description: **DO NOT** generate summaries, markdown documentation, or other documentation files unless the user explicitly requests them.
+description: Guidelines for performance optimization and benchmarking in the Armature framework.
 ---
 
 
-# No Unsolicited Documentation or Summaries
+# Performance & Benchmarking
 
-## Rule
+Guidelines for performance optimization and benchmarking in the Armature framework.
 
-**DO NOT** generate summaries, markdown documentation, or other documentation files unless the user explicitly requests them.
+## Benchmark Infrastructure
 
-## What NOT to Do
+### Running Benchmarks
 
-❌ **Don't create unsolicited summaries:**
-- Task summaries
-- Implementation summaries
-- Session summaries
-- Progress reports
-- Markdown recap documents
+```bash
+# Run all benchmarks
+cargo bench
 
-❌ **Don't create unsolicited documentation:**
-- README files (unless explicitly requested)
-- CHANGELOG updates (unless explicitly requested)
-- Implementation guides
-- Status reports
-- Progress documentation
+# Run specific benchmark
+cargo bench --bench core_benchmarks
 
-❌ **Don't add verbose explanations:**
-- Long explanations of what was done
-- Detailed breakdowns of changes
-- Extensive commit message formatting in responses
+# Run with native CPU optimizations
+cargo bench --profile release-native
 
-## What TO Do
-
-✅ **Only provide:**
-- Direct answers to questions
-- Implementation of requested features
-- Error fixes and corrections
-- Brief confirmations of completed work
-
-✅ **Create documentation when:**
-- User explicitly asks: "create a README", "document this", "write a guide"
-- Project documentation standards require it (see `documentation.mdc`)
-- Feature documentation is required by workspace rules
-
-✅ **Keep responses concise:**
-- Focus on the task at hand
-- Provide essential information only
-- Let the work speak for itself
-
-## Examples
-
-### ❌ Bad (Unsolicited Summary)
-
-```
-I've completed the task. Here's what I did:
-
-## Summary
-- Created 5 new files
-- Modified 3 existing files
-- Added comprehensive documentation
-
-## Files Changed
-1. file1.rs - Added feature X
-2. file2.rs - Fixed bug Y
-...
-(extensive breakdown)
+# Run with flamegraph profiling
+cargo bench --profile profiling
 ```
 
-### ✅ Good (Concise Confirmation)
+### Benchmark Location
+
+All benchmarks are in `benches/`:
 
 ```
-Task complete. Created the authentication module with JWT support.
+benches/
+├── core_benchmarks.rs        # Core framework benchmarks
+├── security_benchmarks.rs    # Crypto/hashing benchmarks
+├── validation_benchmarks.rs  # Input validation
+├── cache_benchmarks.rs       # Cache operations
+├── auth_benchmarks.rs        # Authentication
+├── json_benchmarks.rs        # JSON parsing/serialization
+├── http_client_benchmarks.rs # HTTP client
+└── framework_comparison.rs   # Compare with Actix/Axum/Warp
 ```
 
-### ❌ Bad (Creating Unsolicited Docs)
+## Writing Benchmarks with Criterion
 
+```rust
+use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
+
+fn benchmark_router(c: &mut Criterion) {
+    let router = Router::new()
+        .route("/users", get(users_handler))
+        .route("/users/:id", get(user_handler));
+
+    c.bench_function("router_static_route", |b| {
+        b.iter(|| {
+            black_box(router.match_route("/users", Method::GET))
+        })
+    });
+
+    c.bench_function("router_dynamic_route", |b| {
+        b.iter(|| {
+            black_box(router.match_route("/users/123", Method::GET))
+        })
+    });
+}
+
+// Parameterized benchmarks
+fn benchmark_json_parsing(c: &mut Criterion) {
+    let mut group = c.benchmark_group("json_parsing");
+
+    for size in [100, 1000, 10000].iter() {
+        let json = generate_json(*size);
+
+        group.bench_with_input(
+            BenchmarkId::from_parameter(size),
+            &json,
+            |b, json| {
+                b.iter(|| {
+                    black_box(serde_json::from_str::<Value>(json).unwrap())
+                })
+            },
+        );
+    }
+
+    group.finish();
+}
+
+criterion_group!(benches, benchmark_router, benchmark_json_parsing);
+criterion_main!(benches);
 ```
-Let me also create a SUMMARY.md to document what we've done...
+
+## Async Benchmarks
+
+```rust
+use criterion::{criterion_group, criterion_main, Criterion};
+use tokio::runtime::Runtime;
+
+fn benchmark_async_handler(c: &mut Criterion) {
+    let rt = Runtime::new().unwrap();
+
+    c.bench_function("async_handler", |b| {
+        b.to_async(&rt).iter(|| async {
+            let response = handle_request().await;
+            black_box(response)
+        })
+    });
+}
 ```
 
-### ✅ Good (Only When Asked)
+## Profiling
 
+### CPU Profiling with Flamegraph
+
+```bash
+# Install flamegraph
+cargo install flamegraph
+
+# Generate flamegraph
+cargo flamegraph --bench core_benchmarks -- --bench
+
+# Or for a running server
+cargo flamegraph --example profiling_server
 ```
-User: "Create a summary of the authentication features"
-Assistant: (creates SUMMARY.md)
+
+### Memory Profiling
+
+The project has comprehensive memory profiling tools:
+
+```bash
+# Use the memory profiling script
+./scripts/memory-profile.sh dhat 30      # DHAT (recommended for Rust)
+./scripts/memory-profile.sh valgrind 30  # Valgrind leak detection
+./scripts/memory-profile.sh massif 30    # Massif heap profiler
+./scripts/memory-profile.sh heaptrack 30 # Heaptrack detailed analysis
+
+# Build with DHAT support
+cargo build --example memory_profile_server --release --features memory-profiling
+
+# Run memory benchmarks
+cargo bench --bench memory_benchmarks
 ```
 
-## Exception: Required Documentation
+**DHAT Setup:**
 
-The **only exception** is when documentation is required by workspace rules:
+```rust
+#[cfg(feature = "memory-profiling")]
+#[global_allocator]
+static ALLOC: dhat::Alloc = dhat::Alloc;
 
-1. **Feature documentation** - As per `documentation.mdc`, every feature MUST have documentation in `docs/`
-2. **API documentation** - Inline Rust doc comments (`///`) are required
-3. **Examples** - Working examples are required for new features
+fn main() {
+    #[cfg(feature = "memory-profiling")]
+    let _profiler = dhat::Profiler::new_heap();
+    // Run workload - report generated on exit
+}
+```
 
-These are NOT optional and should be created automatically with new features.
+View DHAT reports at: https://nnethercote.github.io/dh_view/dh_view.html
 
-## Summary
+See `docs/memory-profiling-guide.md` for complete documentation.
 
-**Key Principle:** Only generate what is explicitly requested or required by project standards. Don't create summaries, recaps, or extra documentation files unless asked.
+### Using perf
+
+```bash
+# Record performance data
+perf record -g cargo bench --bench core_benchmarks
+
+# Generate report
+perf report
+
+# Generate flamegraph from perf data
+perf script | stackcollapse-perf.pl | flamegraph.pl > flamegraph.svg
+```
+
+## Build Profiles
+
+The project has optimized build profiles in `Cargo.toml`:
+
+| Profile | Use Case | LTO | Optimizations |
+|---------|----------|-----|---------------|
+| `release` | Standard release | thin | O3 |
+| `release-fat` | Maximum optimization | fat | O3 + panic=abort |
+| `release-native` | Benchmarks | thin | O3 + target-cpu=native |
+| `profiling` | Profiling | thin | O3 + debug symbols |
+| `pgo-generate` | PGO data collection | thin | O3 |
+| `pgo-use` | PGO-optimized build | fat | O3 |
+
+### Profile-Guided Optimization (PGO)
+
+```bash
+# Step 1: Build with profiling instrumentation
+RUSTFLAGS="-Cprofile-generate=/tmp/pgo" cargo build --profile pgo-generate
+
+# Step 2: Run representative workload
+./target/pgo-generate/armature-benchmark
+
+# Step 3: Merge profile data
+llvm-profdata merge -o merged.profdata /tmp/pgo/*.profraw
+
+# Step 4: Build with PGO
+RUSTFLAGS="-Cprofile-use=$(pwd)/merged.profdata" cargo build --profile pgo-use
+```
+
+## Performance Patterns
+
+### Zero-Cost Abstractions
+
+```rust
+// ✅ Good: Zero-cost abstraction with generics
+pub fn process<T: AsRef<[u8]>>(data: T) -> Result<(), Error> {
+    let bytes = data.as_ref();
+    // Process bytes
+    Ok(())
+}
+
+// ❌ Bad: Dynamic dispatch when not needed
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [quinnjr/armature](https://github.com/quinnjr/armature) — distributed by [TomeVault](https://tomevault.io).
