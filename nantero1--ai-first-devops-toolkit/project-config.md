@@ -1,89 +1,139 @@
 ---
 trigger: always_on
-description: Python
+description: Tests
 ---
 
-# Python Style Guide
+# Testing Guide 
 
-This guide defines project-specific Python conventions based on Google Python Style Guide. We assume familiarity with standard Python practices and focus on our custom patterns.
+## Directory Structure & Organization
 
-## Foundation
-- **Base Standard**: Google Python Style Guide with PEP 8
-- **Readability counts** - Code is read more often than it is written
-- **Consistency is key** - Follow these standards throughout the codebase
-- **Line Length**: 120 characters (project preference)
-- **PURPOSE Documentation**: Every file and class must explain its PURPOSE
-
-## Project-Specific Patterns
-
-### Class Documentation with purpose
-
-Every class requires a purpose docstring:
-
-```python
-class PaymentProcessor:
-    """Processes payments through multiple payment gateways.
-    
-    Provides unified interface for Stripe, PayPal, and Square payments.
-    Handles validation, error handling, and transaction logging with
-    automatic retry logic for failed transactions.
-    
-    Attributes:
-        retry_attempts: Number of retries for failed transactions.
-        supported_currencies: List of supported currency codes.
-    """
+```
+tests/
+├── unit/                    # Unit tests with heavy mocking
+│   └── somedirectory/           # Mirror source code structure
+│       ├── langchain_related/
+│       ├── user_client/
+│       └── ...
+└── integration/            # Integration tests with mocking of external dependencies / APIs only
 ```
 
-### Error Handling Patterns
+**File Naming**: Test files prefixed with `test_` and mirror source structure:
+- Source: `somedirectory/langchain_related/tools/planer.py`
+- Test: `tests/unit/somedirectory/langchain_related/tools/test_planer.py`
 
-Use specific exception types with descriptive messages:
+## 🚨 **CRITICAL: AVOID OVER-TESTING**
 
-```python
-from langchain_core.tools import ToolException
+*Preventing excessive test code and maintaining focus on behavior*
 
-def process_data(data: str) -> dict:
-    """Process user data with proper error handling."""
-    try:
-        result = external_service.process(data)
-        LOGGER.info("Data processed successfully", data_size=len(data))
-        return result
-    except ValidationError as e:
-        LOGGER.error("Validation failed", error=str(e), data=data)
-        raise ToolException(f"Invalid data format: {e}")
-    except ExternalServiceError as e:
-        LOGGER.error("External service failed", service="processor", error=str(e))
-        raise ToolException("Service temporarily unavailable. Please try again.")
+### **The Over-Testing Problem**
+
+**WARNING SIGNS:**
+- Test code exceeds business code by 2:1 ratio
+- Testing every possible internal error scenario
+- Multiple tests for the same behavior
+- Testing implementation details instead of user outcomes
+- Complex test setup for simple functions
+
+### **Test-to-Code Ratio Guidelines**
+
+**✅ HEALTHY RATIOS:**
+```
+Simple Functions (< 50 lines):    1:1 to 1.5:1 test-to-code ratio
+Complex Business Logic:           1.5:1 to 2:1 test-to-code ratio
+Critical System Components:       2:1 to 2.5:1 test-to-code ratio
 ```
 
-Try to use fallbacks, we don't want to crash. Apply fallback mechanisms were appropriate.
+**❌ UNHEALTHY RATIOS:**
+```
+> 3:1 ratio = Over-testing likely
+> 5:1 ratio = Definitely over-testing
+```
 
-## Comments
+### **Simple Function Testing Strategy**
 
-### Comment Style
-- Use `#` followed by a space
-- Write complete sentences with proper capitalization
-- Keep comments up-to-date with code changes
-- Comment only when the code is not self explanatory
+**For a simple function like `display_image()`:**
 
-### Testing Patterns
-
-Follow our testing structure from `tests.mdc`:
-
+**✅ GOOD - Behavior-Focused (5-6 tests max):**
 ```python
-class TestMyComponent:
-    """Tests for MyComponent class."""
+class TestDisplayImage:
+    """Tests for display_image function - behavior focused."""
+
+    def test_successfully_displays_image(self):
+        """Test that image is displayed when called."""
+        # Test the core behavior
+
+    def test_clears_screen_when_requested(self):
+        """Test clear_first=True behavior."""
+        # Test parameter behavior
+
+    def test_skips_clearing_when_not_requested(self):
+        """Test clear_first=False behavior."""
+        # Test parameter behavior
+
+    def test_handles_errors_gracefully(self):
+        """Test error handling behavior."""
+        # Test error scenarios
+
+    @pytest.mark.parametrize("image_name", [...])
+    def test_works_with_different_images(self):
+        """Test with various inputs."""
+        # Test input variations
+```
+
+**❌ BAD - Implementation-Focused (10+ tests):**
+```python
+# DON'T DO THIS - Over-testing implementation details
+def test_display_image_handles_clear_error_during_error_recovery(self):
+    """Testing internal error recovery mechanisms."""
+
+def test_display_image_calls_correct_internal_methods_in_order(self):
+    """Testing internal method call patterns."""
+
+def test_display_image_prints_exact_messages_in_sequence(self):
+    """Testing internal print statement details."""
+```
+
+### **When to Stop Testing**
+
+**STOP adding tests when:**
+- You're testing the same behavior in different ways
+- You're testing internal implementation details
+- Your test setup is more complex than the function being tested
+- You have more test code than business logic code for simple functions
+- Tests are breaking when you refactor internals (not behavior)
+
+**ASK YOURSELF:**
+- "Does this test verify something the user cares about?"
+- "Would this test catch a real bug that affects end users?"
+- "Am I testing behavior or implementation?"
+
+## Running Tests
+
+### Direct UV Execution
+```bash
+uv run pytest tests/unit/ -v
+uv run pytest tests/unit/path/to/test.py::TestClass::test_method -v
+```
+
+## Test Structure Patterns
+
+### Test Organization
+```python
+class TestPlanModel:
+    """Tests for PlanModel class."""
     
-    def test_basic_functionality(self, component):
-        """Test basic component functionality."""
+    def test_valid_model(self):
+        """Test creating a valid PlanModel."""
         # given
-        input_data = "test input"
+        data = {"selected_tool_names": ["Tool1"], "main_goal": "Test"}
         
         # when
-        result = component.process(input_data)
+        model = PlanModel(**data)
         
         # then
-        assert result == "expected output"
-    
+        assert model.selected_tool_names == ["Tool1"]
+        assert model.main_goal == "Test"
+
     @pytest.mark.parametrize("input_data, expected", [
         pytest.param("input1", "output1", id="scenario1"),
         pytest.param("input2", "output2", id="scenario2"),
@@ -100,85 +150,45 @@ class TestMyComponent:
         assert result == expected
 ```
 
-**Testing Guidelines:**
-- Use Given-When-Then structure (mandatory)
-- Leverage autouse fixtures (secrets, time, mocking)
-- Group tests in classes by functionality
-- Use descriptive test names explaining what is tested
-- Don't manually mock what's auto-mocked (SecretsMixin, etc.)
-
-
-### Domain Models
-
-Use Pydantic for domain objects with proper field descriptions:
-
+### Given-When-Then Pattern (Required)
 ```python
-from pydantic import BaseModel, Field
-from datetime import datetime
-
-class User(BaseModel):
-    """Domain aggregate for user data and business logic."""
+def test_feature_functionality(self):
+    """Test description of what this validates."""
+    # given: setup test conditions
+    mock_data = {"key": "value"}
+    component = ComponentUnderTest()
     
-    id: str = Field(..., description="Unique user identifier")
-    preferences: Dict[str, Any] = Field(
-        default_factory=dict, 
-        description="User preferences and settings"
-    )
-    created_at: datetime = Field(
-        default_factory=datetime.now,
-        description="User creation timestamp"
-    )
+    # when: execute the action being tested
+    result = component.method_under_test(mock_data)
     
-    def has_active_subscription(self) -> bool:
-        """Check if user has an active subscription."""
-        return self.subscription is not None and self.subscription.is_active
+    # then: verify expected outcomes
+    assert result == "expected_result"
+    assert component.state == "expected_state"
 ```
 
-## File Organization
-
-### Import Order
+### Async Testing
 ```python
-from __future__ import annotations
-
-# Standard library
-import os
-from typing import Dict, List, Optional
-
-# Third-party
-import requests
-from pydantic import BaseModel, Field
-
-# Project imports
-from mixins.mixin_secrets import SecretsMixin
-from our_utils.our_logger import get_formatted_logger
+@pytest.mark.asyncio
+async def test_async_functionality(self):
+    """Test async operations."""
+    # given
+    mock_service = AsyncMock()
+    mock_service.process.return_value = "async_result"
+    
+    # when
+    result = await component.async_method()
+    
+    # then
+    assert result == "async_result"
+    mock_service.process.assert_called_once()
 ```
 
-### Module Structure
+## Common Test Patterns
+
+### Unit Test Template
 ```python
-"""Brief description of module's business purpose."""
 
-from __future__ import annotations
-
-# Imports...
-
-LOGGER = get_formatted_logger(__name__)
-
-# Constants
-DEFAULT_TIMEOUT = 30
-
-# Classes and functions...
-```
-
-## Key Principles
-
-1. **PURPOSE-Driven**: Every file and class explains its business purpose
-3. **Validation-Heavy**: Extensive Pydantic validation with examples
-4. **Error-Specific**: Descriptive error messages with proper exception types
-5. **Test-Structured**: Given-When-Then pattern with comprehensive coverage
-6. **Async-Aware**: Proper async/sync patterns using our utilities
-9. **Fallback-Mechanisms**: LOG the errors, but try to not crash, use sane fallbacks
-10. **PEP 8 compliance** with modern Python best practicesons
-11. **Performance-conscious** coding patterns
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [Nantero1/ai-first-devops-toolkit](https://github.com/Nantero1/ai-first-devops-toolkit) — distributed by [TomeVault](https://tomevault.io).
