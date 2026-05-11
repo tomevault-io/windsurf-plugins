@@ -7,11 +7,11 @@ Autonomous AI bookkeeping for SMBs — 110 AI agents handle invoices, reconcilia
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [Alexi5000/ClawKeeper](https://github.com/Alexi5000/ClawKeeper).
+Original source: `CLAUDE.md` in [Alexi5000/ClawKeeper](https://github.com/Alexi5000/ClawKeeper).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
