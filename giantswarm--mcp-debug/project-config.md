@@ -1,129 +1,182 @@
 ---
 trigger: always_on
-description: Guide for task-driven development workflows
+description: The mcp-debug agent provides essential tools to test and explore MCP (Model Context Protocol) servers. This guide focuses on using the agent to debug MCP server behavior and functionality.
 ---
 
+## Debugging MCP Servers via MCP-Debug Agent
 
-# The Development Workflow
+The mcp-debug agent provides essential tools to test and explore MCP (Model Context Protocol) servers. This guide focuses on using the agent to debug MCP server behavior and functionality.
 
-This document outlines the standard, iterative process for all development work. Following this workflow is **mandatory** to ensure consistency, quality, and effective collaboration across the project.
+## Core Agent Modes
 
-## The Core Development Loop
+The agent operates in three distinct modes:
 
-All work, from new features to bug fixes, follows this fundamental three-phase cycle:
+### 1. Normal Mode (Default)
+Connects to an MCP server, lists available tools/resources/prompts, and waits for notifications:
+```bash
+mcp-debug --endpoint http://localhost:8090/sse
+```
 
-**REMEMBER: This repository uses `main` as the default branch. NEVER commit directly to `main`!**
+### 2. REPL Mode
+Interactive mode for exploring and executing MCP capabilities:
+```bash
+mcp-debug --repl
+```
 
-1.  **Phase 1: Planning & Alignment**
-    -   Select an issue from the backlog.
-    -   Switch to the `main` branch and pull the latest changes.
-    -   **Create a dedicated feature branch from `main`** (NEVER work directly on `main`).
-    -   Explore the codebase to create a detailed implementation strategy.
+In REPL mode, you can:
+- List available tools, resources, and prompts
+- Get detailed information about specific items
+- Execute tools interactively with JSON arguments
+- View resources and retrieve their contents
+- Execute prompts with arguments
+- Toggle notification display
 
-2.  **Phase 2: Iterative Implementation**
-    -   **Log your plan first.** Document your intended changes in the relevant issue *before* writing code.
-    -   Implement the changes, adhering to the project's architectural guidelines.
-    -   Continuously log progress, discoveries, and setbacks as you work to create a rich history of the task.
+### 3. MCP Server Mode
+Run the agent as an MCP server exposing debugging tools via stdio:
+```bash
+mcp-debug --mcp-server
+```
 
-3.  **Phase 3: Finalization & Committing**
-    -   Write and pass all required tests.
-    -   Format your code according to project standards.
-    -   Update any relevant project rules based on your changes.
-    -   Commit your work using a structured, conventional commit message.
-    -   Push your branch and create a PR.
+This mode is designed for integration with AI assistants like Claude or Cursor. Configure it in your AI assistant's MCP settings.
 
----
+## REPL Commands
 
-## Phase 1: Planning & Alignment
+### Listing Commands
+```
+list tools                   # List all available tools
+list resources               # List all available resources  
+list prompts                 # List all available prompts
+```
 
-Before writing a single line of implementation code, you must have a clear plan and be working on the correct branch.
+### Describe Commands
+```
+describe tool <name>         # Show detailed information about a tool
+describe resource <uri>      # Show detailed information about a resource
+describe prompt <name>       # Show detailed information about a prompt
+```
 
-### 1.1. Select an Issue & State Your Intent
+### Execution Commands
+```
+call <tool> {json}           # Execute a tool with JSON arguments
+get <resource-uri>           # Retrieve a resource
+prompt <name> {json}         # Get a prompt with JSON arguments
+```
 
-1.  **List Open Issues:** Use `mcp_github_list_issues` to see available tasks for `giantswarm/mcp-debug`.
-2.  **Choose an Issue:** Select the highest-priority issue you are able to work on.
-3.  **Get Details:** Use `mcp_github_get_issue` to retrieve its full details.
-4.  **Announce Your Plan:** In the chat, you **MUST** summarize the issue (title, number) and your intended high-level approach.
-    -   **Example:** *"I am starting work on issue #37: Refactor Capability API. My plan is to start by defining the new interfaces in the API package..."*
+### Control Commands
+```
+notifications <on|off>       # Enable/disable notification display
+help, ?                      # Show help message
+exit, quit                   # Exit the REPL
+```
 
-### 1.2. Create a Dedicated Git Branch
+## Examples
 
-**CRITICAL: NEVER COMMIT DIRECTLY TO THE `main` BRANCH!**
+### Calling a Tool
+```
+MCP> call calculate {"operation": "add", "x": 5, "y": 3}
+Executing tool: calculate...
+Result:
+{
+  "result": 8
+}
+```
 
-The repository uses `main` as the default branch (NOT `master`). All work MUST be done in feature branches.
+### Getting a Resource
+```
+MCP> get docs://readme
+Retrieving resource: docs://readme...
+Contents:
+# Project README
+This is the project documentation...
+```
 
-1.  **Check Your Current Branch:** Run `git rev-parse --abbrev-ref HEAD`.
-2.  **STOP if on `main`:** If you are on `main`, you MUST create a new branch immediately. DO NOT make any commits to `main`.
-3.  **Branch Naming Convention:** Branch names **MUST** follow this format:
-    > `<type>/issue-<number>-<kebab-case-title>`
-4.  **Branch Types:** `feature`, `fix`, `refactor`, `docs`, `test`, `chore`.
-5.  **Example:** `git checkout -b feature/issue-42-add-prometheus-provider`
+### Using a Prompt
+```
+MCP> prompt greeting {"name": "Alice"}
+Getting prompt: greeting...
+Messages:
 
-**Workflow Summary:**
-- Always switch to `main` and pull latest changes first
-- Always create a branch from `main`
-- Make all commits to your feature branch
-- Push your branch and create a Pull Request
-- Merge to `main` only via Pull Request
-- NEVER `git commit` while on `main`
-- NEVER `git push origin main`
+[1] Role: user
+Content: Hello Alice! How can I help you today?
+```
 
-### 1.3. Explore and Plan
+## Debugging Workflow
 
-This is a critical step to ensure your implementation is well-considered.
+### 1. Connect and Explore
+Start with REPL mode to explore what the MCP server offers:
+```bash
+mcp-debug --repl --endpoint http://your-server:port/sse
+```
 
-1.  **Explore the Codebase:** Identify the specific files, functions, and lines of code that need to be added, removed, or changed.
-2.  **Formulate a Detailed Plan:** Based on your exploration, create a precise implementation plan. What is the exact diff you intend to apply? What potential challenges do you foresee? This plan will be logged in the next step.
+### 2. Enable Verbose Logging
+For detailed protocol inspection:
+```bash
+mcp-debug --verbose --json-rpc
+```
 
----
+### 3. Test Tool Execution
+Use the REPL to test individual tools with different arguments to ensure they work correctly.
 
-## Phase 2: Iterative Implementation & Logging
+### 4. Monitor Notifications
+Keep the agent running to monitor for dynamic updates when tools/resources/prompts change.
 
-This cycle is the heart of the workflow. It's designed to build a rich, contextual history of the implementation, which is invaluable for debugging, collaboration, and future reference.
+## Common Issues and Solutions
 
-### 2.1. Log Your Plan *Before* Coding
+**Connection Failed**
+- Verify the endpoint URL is correct
+- Check if the MCP server is running
+- Ensure the server supports SSE transport
 
-1.  Before you start implementing, log the detailed plan you created in step 1.3.
-2.  Always update the description of the existing issue with your plan.
-3.  Verify that the plan was successfully logged by viewing the issue details again.
+**Tool Not Found**
+- Use `list tools` to see available tools
+- Tool names are case-sensitive
+- Check if the tool was recently added (may need to reconnect)
 
-### 2.2. Implement & Log Progress
+**Invalid Arguments**
+- Arguments must be valid JSON
+- Use `describe tool <name>` to see required parameters
+- Check the schema for correct types
 
-1.  **Set Issue Status:** Mark the issue as `in-progress`.
-2.  **Write Code:** Begin writing code according to your plan and the project's [architecture.mdc](mdc:.cursor/rules/architecture.mdc).
-3.  **Log Continuously:** As you work, you will learn things. **You must log them.** Regularly update the issue to append new findings.
-    -   **What Worked:** Confirmed approaches, "fundamental truths."
-    -   **What Didn't Work:** Dead ends, failed experiments, and why.
-    -   **Specifics:** Successful code snippets, configurations, or commands.
-    -   **Decisions:** Any choices made, especially if confirmed with the user.
+**No Notifications**
+- Some servers don't send notifications
+- Enable verbose mode to see keepalive messages
+- Check if the server implements notification capabilities
 
----
+## Integration with AI Assistants
 
-## Phase 3: Finalization & Committing
+To use mcp-debug as an MCP server in Cursor:
 
-### 3.1. Pre-Commit Quality Check
+1. Add to your `.cursor/mcp.json`:
+```json
+{
+  "mcpServers": {
+    "mcp-debug": {
+      "command": "mcp-debug",
+      "args": ["--mcp-server", "--endpoint", "http://localhost:8090/sse"]
+    }
+  }
+}
+```
 
-Before **every** commit, you **MUST** perform these checks:
+2. The agent exposes these tools:
+- `list_tools` - List all available tools
+- `list_resources` - List all available resources  
+- `list_prompts` - List all available prompts
+- `describe_tool` - Get tool details
+- `describe_resource` - Get resource details
+- `describe_prompt` - Get prompt details
+- `call_tool` - Execute a tool
+- `get_resource` - Retrieve resource contents
+- `get_prompt` - Execute a prompt
 
-1.  **Format Code:**
-    ```bash
-    goimports -w .
-    go fmt ./...
-    ```
+## Tips for Effective Debugging
 
-2.  **Lint Code:**
-    ```bash
-    make lint
-    ```
-    -   **CRITICAL:** Fix ALL linter errors before committing.
-    -   Linter failures in CI will block your PR from being merged.
-
-3.  **Run All Tests:**
-    ```bash
-    make test
-    ```
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+1. **Start Simple**: Begin with `list` commands to understand what's available
+2. **Use Descriptions**: Always check tool/resource/prompt descriptions before using them
+3. **Test Incrementally**: Test one tool at a time with minimal arguments first
+4. **Monitor Changes**: Keep an agent running to catch dynamic updates
+5. **Log Everything**: Use verbose mode when troubleshooting issues
+6. **Validate JSON**: Ensure your arguments are valid JSON before execution
 
 ---
 > Source: [giantswarm/mcp-debug](https://github.com/giantswarm/mcp-debug) — distributed by [TomeVault](https://tomevault.io).
