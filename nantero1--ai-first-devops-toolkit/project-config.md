@@ -1,62 +1,184 @@
 ---
 trigger: always_on
-description: This lessons-learned file serves as a critical knowledge base for capturing and preventing mistakes. During development, document any reusable solutions, bug fixes, or important patterns. Consult it before implementing any solution.
+description: Python
 ---
 
-*This lessons-learned file serves as a critical knowledge base for capturing and preventing mistakes. During development, document any reusable solutions, bug fixes, or important patterns using the format: Category: Issue → Solution → Impact. Entries must be categorized by priority (Critical/Important/Enhancement) and include clear problem statements, solutions, prevention steps, and code examples. Only update upon user request with "lesson" trigger word. Focus on high-impact, reusable lessons that improve code quality, prevent common errors, and establish best practices. Cross-reference with .cursor\memories.md for context.*
+# Python Style Guide
 
-# Lessons Learned
+This guide defines project-specific Python conventions based on Google Python Style Guide. We assume familiarity with standard Python practices and focus on our custom patterns.
 
-*Note: This file is updated only upon user request and focuses on capturing important, reusable lessons learned during development. Each entry follows format: Priority: Category → Issue: [Problem] → Fix: [Solution] → Why: [Impact]. Use grep/automated tools to verify changes and prevent regressions.*
+## Foundation
+- **Base Standard**: Google Python Style Guide with PEP 8
+- **Readability counts** - Code is read more often than it is written
+- **Consistency is key** - Follow these standards throughout the codebase
+- **Line Length**: 120 characters (project preference)
+- **PURPOSE Documentation**: Every file and class must explain its PURPOSE
 
-## Logging Best Practices
+## Project-Specific Patterns
 
-**Critical**: CLI Tool Logging Philosophy for CI/CD Environments
-→ Issue: CLI tools need clean, predictable logging that serves both interactive users and CI/CD pipelines with clear level separation.
-→ Solution: Follow strict PEP 282 pattern: INFO = user-facing progress and business events (branch selection, settings applied, major steps), DEBUG = technical details for developers, Rich output = actual results presentation separate from logging system.
-→ Impact: Perfect CI/CD logs showing execution path and settings without noise, while preserving debugging capability.
+### Class Documentation with purpose
 
-**Critical**: Context-Dependent Logging Levels  
-→ Issue: JSON parsing failure severity depends on context - ERROR when schema enforcement expected, DEBUG when optional fallback.
-→ Solution: Map logging levels to user expectations: schema_model exists = ERROR (broken promise), no schema_model = DEBUG (expected behavior).
-→ Impact: Proper error visibility for users, prevents confusion about system behavior.
+Every class requires a purpose docstring:
 
-**Important**: Eliminate Duplicate Success Messages in Execution Flow
-→ Issue: Schema loading and ChatHistory creation logged at INFO level multiple times in single execution flow creating log noise and confusion.
-→ Solution: Move technical success confirmations (schema creation, template rendering, chat history creation) to DEBUG level. Keep only business-relevant completion messages at INFO level.
-→ Impact: Clean CI/CD output showing only meaningful progress, eliminates duplicate information, maintains debugging capability.
+```python
+class PaymentProcessor:
+    """Processes payments through multiple payment gateways.
+    
+    Provides unified interface for Stripe, PayPal, and Square payments.
+    Handles validation, error handling, and transaction logging with
+    automatic retry logic for failed transactions.
+    
+    Attributes:
+        retry_attempts: Number of retries for failed transactions.
+        supported_currencies: List of supported currency codes.
+    """
+```
 
-**Important**: Meta-Logging Should Be DEBUG Level
-→ Issue: Logging initialization messages like "LLM Runner initialized with log level: INFO" are technical metadata, not user-facing progress.
-→ Solution: Move logging configuration messages to DEBUG level - users care about what the tool does, not how it's configured to report.
-→ Impact: Cleaner INFO output focused on actual business operations, follows CLI tool best practices.
+### Error Handling Patterns
 
-**Enhancement**: Preserve User-Facing Rich Output Separate from Logging
-→ Issue: Removing beautiful Rich console LLM response display during "logging improvements" degrades user experience.
-→ Solution: Keep CONSOLE.print() for LLM responses completely separate from logging system - users expect to see their results beautifully formatted.
-→ Impact: Maintains core value proposition of beautiful, readable output while having clean logging.
+Use specific exception types with descriptive messages:
 
-**Important**: Emoji Consistency Matches Log Level Severity
-→ Issue: Using warning emojis (⚠️) in DEBUG messages creates confusion about severity.
-→ Solution: Match emoji severity to log level: 🔄 for DEBUG fallbacks, ⚠️ for WARNING, ❌ for ERROR.
-→ Impact: Clear visual communication of actual issue severity.
+```python
+from langchain_core.tools import ToolException
 
-## Component Development
+def process_data(data: str) -> dict:
+    """Process user data with proper error handling."""
+    try:
+        result = external_service.process(data)
+        LOGGER.info("Data processed successfully", data_size=len(data))
+        return result
+    except ValidationError as e:
+        LOGGER.error("Validation failed", error=str(e), data=data)
+        raise ToolException(f"Invalid data format: {e}")
+    except ExternalServiceError as e:
+        LOGGER.error("External service failed", service="processor", error=str(e))
+        raise ToolException("Service temporarily unavailable. Please try again.")
+```
 
-**Important**: Template Engine Unification Strategy    
-→ Issue: Supporting both Handlebars and Jinja2 without breaking compatibility.    
-→ Solution: Implement unified load_template() with file extension-based detection (.hbs, .jinja, .j2), separate loader functions, keep existing signatures.    
-→ Impact: Enables multi-engine support, backward compatibility, and easy future extension.
+Try to use fallbacks, we don't want to crash. Apply fallback mechanisms were appropriate.
 
-**Critical**: Microsoft Semantic Kernel Integration Success Pattern    
-→ Issue: Initially unclear how to make YAML model_id specifications actually control which Azure deployment is used by Semantic Kernel.    
-→ Solution: Semantic Kernel selects services by service_id matching YAML execution_settings keys, not by model_id. Service's deployment_name determines actual Azure model called. Create services dynamically based on YAML model_id and use as deployment_name directly.    
-→ Impact: Enables true YAML-driven model selection without hardcoded model lists, future-proof for any Azure deployment.
+## Comments
 
-**Critical**: Semantic Kernel Service Registration Architecture  
-→ Issue: YAML execution_settings.azure_openai.model_id was being ignored because service was pre-created with fixed deployment_name from environment.  
+### Comment Style
+- Use `#` followed by a space
+- Write complete sentences with proper capitalization
+- Keep comments up-to-date with code changes
+- Comment only when the code is not self explanatory
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+### Testing Patterns
+
+Follow our testing structure from `tests.mdc`:
+
+```python
+class TestMyComponent:
+    """Tests for MyComponent class."""
+    
+    def test_basic_functionality(self, component):
+        """Test basic component functionality."""
+        # given
+        input_data = "test input"
+        
+        # when
+        result = component.process(input_data)
+        
+        # then
+        assert result == "expected output"
+    
+    @pytest.mark.parametrize("input_data, expected", [
+        pytest.param("input1", "output1", id="scenario1"),
+        pytest.param("input2", "output2", id="scenario2"),
+    ])
+    def test_multiple_scenarios(self, input_data, expected):
+        """Test multiple scenarios with different inputs."""
+        # given
+        component = ComponentUnderTest()
+        
+        # when
+        result = component.process(input_data)
+        
+        # then
+        assert result == expected
+```
+
+**Testing Guidelines:**
+- Use Given-When-Then structure (mandatory)
+- Leverage autouse fixtures (secrets, time, mocking)
+- Group tests in classes by functionality
+- Use descriptive test names explaining what is tested
+- Don't manually mock what's auto-mocked (SecretsMixin, etc.)
+
+
+### Domain Models
+
+Use Pydantic for domain objects with proper field descriptions:
+
+```python
+from pydantic import BaseModel, Field
+from datetime import datetime
+
+class User(BaseModel):
+    """Domain aggregate for user data and business logic."""
+    
+    id: str = Field(..., description="Unique user identifier")
+    preferences: Dict[str, Any] = Field(
+        default_factory=dict, 
+        description="User preferences and settings"
+    )
+    created_at: datetime = Field(
+        default_factory=datetime.now,
+        description="User creation timestamp"
+    )
+    
+    def has_active_subscription(self) -> bool:
+        """Check if user has an active subscription."""
+        return self.subscription is not None and self.subscription.is_active
+```
+
+## File Organization
+
+### Import Order
+```python
+from __future__ import annotations
+
+# Standard library
+import os
+from typing import Dict, List, Optional
+
+# Third-party
+import requests
+from pydantic import BaseModel, Field
+
+# Project imports
+from mixins.mixin_secrets import SecretsMixin
+from our_utils.our_logger import get_formatted_logger
+```
+
+### Module Structure
+```python
+"""Brief description of module's business purpose."""
+
+from __future__ import annotations
+
+# Imports...
+
+LOGGER = get_formatted_logger(__name__)
+
+# Constants
+DEFAULT_TIMEOUT = 30
+
+# Classes and functions...
+```
+
+## Key Principles
+
+1. **PURPOSE-Driven**: Every file and class explains its business purpose
+3. **Validation-Heavy**: Extensive Pydantic validation with examples
+4. **Error-Specific**: Descriptive error messages with proper exception types
+5. **Test-Structured**: Given-When-Then pattern with comprehensive coverage
+6. **Async-Aware**: Proper async/sync patterns using our utilities
+9. **Fallback-Mechanisms**: LOG the errors, but try to not crash, use sane fallbacks
+10. **PEP 8 compliance** with modern Python best practicesons
+11. **Performance-conscious** coding patterns
 
 ---
 > Source: [Nantero1/ai-first-devops-toolkit](https://github.com/Nantero1/ai-first-devops-toolkit) — distributed by [TomeVault](https://tomevault.io).
