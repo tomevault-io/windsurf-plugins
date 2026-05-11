@@ -1,97 +1,202 @@
 ---
 trigger: always_on
-description: This directory contains project-specific rules, patterns, and documentation for the Red Energy Home Assistant integration.
+description: > Last Updated: 2025-10-06
 ---
 
+# Red Energy API Response Structure
 
-# Red Energy Integration Rules & Documentation
+> Last Updated: 2025-10-06
+> 
+> This document defines the actual API response structures returned by the Red Energy API and how they map to our internal data model.
 
-This directory contains project-specific rules, patterns, and documentation for the Red Energy Home Assistant integration.
+## Overview
 
-## Contents
+The Red Energy API returns data in a specific structure that differs from typical REST API conventions. This document serves as the authoritative reference for understanding and validating API responses.
 
-### 📋 API Documentation
+---
 
-- **[red-energy-api-structure.md](./red-energy-api-structure.mdc)** - Complete API response structure reference
-  - Property/Account response format
-  - Consumer/Service data structure
-  - Address field mappings
-  - Data transformation examples
-  - Validation rules
-  - Common issues and solutions
+## 1. Properties/Accounts Response
 
-### 🔐 Authentication
+### Endpoint
+`GET /api/properties` or similar endpoint
 
-- **[red-energy-authentication.md](./red-energy-authentication.mdc)** - OAuth2 PKCE authentication reference
-  - Authentication flow architecture
-  - Token lifecycle management
-  - Implementation details with code references
-  - Security considerations
-  - Error handling patterns
-  - Troubleshooting guide
+### Actual API Response Structure
 
-### 🏪 HACS Configuration
-
-- **[hacs-topics.md](./hacs-topics.mdc)** - HACS repository topics and validation reference
-  - Required and recommended topics
-  - HACS validation requirements
-  - hacs.json valid keys
-  - Topic verification and management
-  - Troubleshooting guide
-
-## Quick Reference
-
-### API Response Key Differences
-
-The Red Energy API uses non-standard field names:
-
-| Standard | Red Energy API | Notes |
-|----------|----------------|-------|
-| `services` | `consumers` | Array of utility services |
-| `type: "electricity"` | `utility: "E"` | Utility code mapping |
-| `consumer_number` | `consumerNumber` | camelCase format |
-| `active: true` | `status: "ON"` | String status |
-| `city` | `suburb` | Australian terminology |
-
-### Critical Implementation Details
-
-1. **Property IDs must be strings** for comparison
-2. **All accounts are auto-selected** during setup
-3. **Config v4 migration** auto-fixes old configs with wrong IDs
-4. **Service validation** handles both `consumers` and `services` arrays
-
-## Development Guidelines
-
-When working with this integration:
-
-1. **API Structure**: Always refer to `red-energy-api-structure.mdc` before modifying API response handling
-2. **Authentication**: Review `red-energy-authentication.mdc` when working with auth flows or token management
-3. **Testing**: Test with actual API responses, not mock data
-4. **Documentation**: Update version history when making structural changes
-5. **Validation**: Add new mappings/patterns to documentation when discovered
-6. **Code References**: Keep implementation references accurate when refactoring
-
-## File Organization
-
+```json
+[
+  {
+    "propertyPhysicalNumber": 82227160,
+    "propertyNumber": "82227160.8490263",
+    "accountNumber": 8490263,
+    "address": {
+      "unit": null,
+      "unitType": null,
+      "house": "27",
+      "floor": null,
+      "building": null,
+      "street": "SUNNYSIDE CRES",
+      "streetType": null,
+      "suburb": "CASTLECRAG",
+      "pobox": null,
+      "townCity": null,
+      "postcode": "2068",
+      "state": "NSW",
+      "country": null,
+      "gentrackDisplayAddress": "27 SUNNYSIDE CRES, CASTLECRAG, NSW 2068",
+      "displayAddresses": {
+        "shortForm": "27 Sunnyside Crescent, Castlecrag",
+        "shortFormAlt": "27 Sunnyside Crescent, Castlecrag",
+        "extraShortForm": "27 Sunnyside Crescent",
+        "longForm": "27 Sunnyside Crescent\nCastlecrag NSW 2068",
+        "longFormAlt": "27 Sunnyside Crescent, Castlecrag, New South Wales 2 0 6 8"
+      },
+      "displayAddress": "27 SUNNYSIDE CRES\nCASTLECRAG  NSW  2068"
+    },
+    "consumers": [
+      {
+        "consumerNumber": 4235478511,
+        "propertyNumber": "82227160.8490263",
+        "accountNumber": 8490263,
+        "entryDate": "2024-09-13",
+        "finalDate": null,
+        "status": "ON",
+        "nmi": "4103296839",
+        "nmiWithChecksum": "41032968395",
+        "utility": "E",
+        "meterType": "INTERVAL",
+        "chargeClass": "RES",
+        "solar": true,
+        "lastBillDate": "2025-09-10",
+        "nextBillDate": "2025-10-11",
+        "latitude": -33.799045,
+        "longitude": 151.212185,
+        "balanceDollar": -75.0,
+        "arrearsDollar": 0.0,
+        "productName": "Qantas Red Saver",
+        "linesCompany": "Ausgrid",
+        "jurisdiction": "NSW",
+        "billingFrequency": "MONTHLY"
+      }
+    ]
+  }
+]
 ```
-.cursor/rules/
-├── index.mdc                       # This file
-├── hacs-topics.mdc                 # HACS configuration reference
-├── red-energy-api-structure.mdc    # API structure reference
-└── red-energy-authentication.mdc   # OAuth2 authentication reference
+
+### Key Field Mappings
+
+| API Field | Our Internal Field | Notes |
+|-----------|-------------------|-------|
+| `accountNumber` | `id` | Primary identifier for the property |
+| `consumers` | `services` | Array of services (electricity/gas) |
+| No direct field | `name` | Built from `address.displayAddresses.shortForm` or address parts |
+| `address` | `address` | Transformed to our address structure |
+
+### Property ID Resolution
+
+The integration looks for property ID in this order:
+1. `data.get("id")`
+2. `data.get("propertyId")`
+3. `data.get("property_id")`
+4. `data.get("accountNumber")` ✅ **Used by Red Energy API**
+5. Generated from address if none found
+
+---
+
+## 2. Consumer/Service Structure
+
+### Actual API Structure
+
+```json
+{
+  "consumerNumber": 4235478511,
+  "accountNumber": 8490263,
+  "utility": "E",
+  "status": "ON",
+  "nmi": "4103296839",
+  "meterType": "INTERVAL",
+  "solar": true,
+  "productName": "Qantas Red Saver",
+  "linesCompany": "Ausgrid",
+  "balanceDollar": -75.0
+}
 ```
 
-## Related Files
+### Field Mappings
 
-- `custom_components/red_energy/api.py` - API client and authentication implementation
-- `custom_components/red_energy/config_flow.py` - Setup flow and credential validation
-- `custom_components/red_energy/data_validation.py` - Data validation and transformation
-- `custom_components/red_energy/config_migration.py` - Config version migrations
-- `tests/test_config_flow_basic.py` - Authentication and config flow tests
+| API Field | Our Internal Field | Transformation |
+|-----------|-------------------|----------------|
+| `consumerNumber` | `consumer_number` | Convert to string |
+| `utility` | `type` | `"E"` → `"electricity"`, `"G"` → `"gas"` |
+| `status` | `active` | `"ON"` → `true`, `"OFF"` → `false` |
 
-## Last Updated
+### Utility Code Mapping
 
-2025-10-06 - Added OAuth2 authentication reference documentation
+```python
+# API → Internal
+"E" → "electricity"
+"G" → "gas"
+```
+
+### Status Mapping
+
+```python
+# API → Internal
+"ON" → True
+"OFF" → False
+```
+
+---
+
+## 3. Address Structure
+
+### Actual API Structure
+
+```json
+{
+  "unit": null,
+  "unitType": null,
+  "house": "27",
+  "floor": null,
+  "building": null,
+  "street": "SUNNYSIDE CRES",
+  "streetType": null,
+  "suburb": "CASTLECRAG",
+  "pobox": null,
+  "townCity": null,
+  "postcode": "2068",
+  "state": "NSW",
+  "country": null,
+  "gentrackDisplayAddress": "27 SUNNYSIDE CRES, CASTLECRAG, NSW 2068",
+  "displayAddresses": {
+    "shortForm": "27 Sunnyside Crescent, Castlecrag",
+    "shortFormAlt": "27 Sunnyside Crescent, Castlecrag",
+    "extraShortForm": "27 Sunnyside Crescent",
+    "longForm": "27 Sunnyside Crescent\nCastlecrag NSW 2068",
+    "longFormAlt": "27 Sunnyside Crescent, Castlecrag, New South Wales 2 0 6 8"
+  },
+  "displayAddress": "27 SUNNYSIDE CRES\nCASTLECRAG  NSW  2068"
+}
+```
+
+### Nullable Fields
+
+Address fields can be `null` in the API (e.g. unit-only, PO Box, or incomplete data). Validation must use `(data.get("field") or "").strip()` so that `None` does not cause `AttributeError: 'NoneType' object has no attribute 'strip'`.
+
+### Field Mappings
+
+| API Field | Our Internal Field | Transformation |
+|-----------|-------------------|----------------|
+| `house` + `street` | `street` | Combined: `"27 SUNNYSIDE CRES"` (handle null) |
+| `suburb` | `city` | Direct mapping |
+| `state` | `state` | Direct mapping |
+| `postcode` | `postcode` | Direct mapping |
+
+### Display Address Priority
+
+For property names, we use in order:
+1. `displayAddresses.shortForm` ✅ **Preferred** - "27 Sunnyside Crescent, Castlecrag"
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [craibo/ha-red-energy-au](https://github.com/craibo/ha-red-energy-au) — distributed by [TomeVault](https://tomevault.io).
