@@ -7,12 +7,12 @@ Proof-backed, drift-resistant AI memory for your codebase. 11 languages, 28 MCP 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `copilot-instructions.md` in [Bpolat0/atlasmemory](https://github.com/Bpolat0/atlasmemory).
+Original source: `CLAUDE.md` in [Bpolat0/atlasmemory](https://github.com/Bpolat0/atlasmemory).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
+- **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
