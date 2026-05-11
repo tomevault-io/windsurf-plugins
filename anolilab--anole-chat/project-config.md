@@ -1,51 +1,97 @@
 ---
 trigger: always_on
-description: Always verify information before presenting it. Do not make assumptions or speculate without clear evidence.
+description: - ALWAYS use the new function syntax for Convex functions. For example:
 ---
 
-# Code Quality Guidelines
+# Convex guidelines
+## Function guidelines
+### New function syntax
+- ALWAYS use the new function syntax for Convex functions. For example:
+      ```typescript
+      import { query } from "./_generated/server";
+      import { v } from "convex/values";
+      export const f = query({
+          args: {},
+          returns: v.null(),
+          handler: async (ctx, args) => {
+          // Function body
+          },
+      });
+      ```
 
-## Verify Information
-Always verify information before presenting it. Do not make assumptions or speculate without clear evidence.
+### Http endpoint syntax
+- HTTP endpoints are defined in `convex/http.ts` and require an `httpAction` decorator. For example:
+      ```typescript
+      import { httpRouter } from "convex/server";
+      import { httpAction } from "./_generated/server";
+      const http = httpRouter();
+      http.route({
+          path: "/echo",
+          method: "POST",
+          handler: httpAction(async (ctx, req) => {
+          const body = await req.bytes();
+          return new Response(body, { status: 200 });
+          }),
+      });
+      ```
 
-## File-by-File Changes
-Make changes file by file and give me a chance to spot mistakes.
+### Function registration
+- Use `internalQuery`, `internalMutation`, and `internalAction` to register internal functions. These functions are private and aren't part of an app's API. They can only be called by other Convex functions.
+- Use `query`, `mutation`, and `action` to register public functions. These functions are part of the public API and are exposed to the public Internet. Do NOT use `query`, `mutation`, or `action` to register sensitive internal functions that should be kept private.
+- You CANNOT register a function through the `api` or `internal` objects.
+- ALWAYS include argument and return validators for all Convex functions. If a function doesn't return anything, include `returns: v.null()` as its output validator.
+- If the JavaScript implementation of a Convex function doesn't have a return value, it implicitly returns `null`.
 
-## No Apologies
-Never use apologies.
+### Function calling
+- Use `ctx.runQuery` to call a query from a query, mutation, or action.
+- Use `ctx.runMutation` to call a mutation from a mutation or action.
+- Use `ctx.runAction` to call an action from an action.
+- ONLY call an action from another action if you need to cross runtimes (e.g. from V8 to Node). Otherwise, pull out the shared code into a helper async function and call that directly instead.
+- Try to use as few calls from actions to queries and mutations as possible. Queries and mutations are transactions, so splitting logic up into multiple calls introduces the risk of race conditions.
+- All of these calls take in a `FunctionReference`. Do NOT try to pass the callee function directly into one of these calls.
+- When using `ctx.runQuery`, `ctx.runMutation`, or `ctx.runAction` to call a function in the same file, specify a type annotation on the return value to work around TypeScript circularity limitations. For example,
+                            ```
+                            export const f = query({
+                              args: { name: v.string() },
+                              returns: v.string(),
+                              handler: async (ctx, args) => {
+                                return "Hello " + args.name;
+                              },
+                            });
 
-## No Understanding Feedback
-Avoid giving feedback about understanding in comments or documentation.
+                            export const g = query({
+                              args: {},
+                              returns: v.null(),
+                              handler: async (ctx, args) => {
+                                const result: string = await ctx.runQuery(api.example.f, { name: "Bob" });
+                                return null;
+                              },
+                            });
+                            ```
 
-## No Whitespace Suggestions
-Don't suggest whitespace changes.
+### Function references
+- Function references are pointers to registered Convex functions.
+- Use the `api` object defined by the framework in `convex/_generated/api.ts` to call public functions registered with `query`, `mutation`, or `action`.
+- Use the `internal` object defined by the framework in `convex/_generated/api.ts` to call internal (or private) functions registered with `internalQuery`, `internalMutation`, or `internalAction`.
+- Convex uses file-based routing, so a public function defined in `convex/example.ts` named `f` has a function reference of `api.example.f`.
+- A private function defined in `convex/example.ts` named `g` has a function reference of `internal.example.g`.
+- Functions can also registered within directories nested within the `convex/` folder. For example, a public function `h` defined in `convex/messages/access.ts` has a function reference of `api.messages.access.h`.
 
-## No Summaries
-Don't summarize changes made.
+### Api design
+- Convex uses file-based routing, so thoughtfully organize files with public query, mutation, or action functions within the `convex/` directory.
+- Use `query`, `mutation`, and `action` to define public functions.
+- Use `internalQuery`, `internalMutation`, and `internalAction` to define private, internal functions.
 
-## No Inventions
-Don't invent changes other than what's explicitly requested.
 
-## No Unnecessary Confirmations
-Don't ask for confirmation of information already provided in the context.
+## Validator guidelines
+- `v.bigint()` is deprecated for representing signed 64-bit integers. Use `v.int64()` instead.
+- Use `v.record()` for defining a record type. `v.map()` and `v.set()` are not supported.
 
-## Preserve Existing Code
-Don't remove unrelated code or functionalities. Pay attention to preserving existing structures.
+## Schema guidelines
+- Always define your schema in `convex/schema.ts`.
+- Always import the schema definition functions from `convex/server`:
 
-## Single Chunk Edits
-Provide all edits in a single chunk instead of multiple-step instructions or explanations for the same file.
-
-## No Implementation Checks
-Don't ask the user to verify implementations that are visible in the provided context.
-
-## No Unnecessary Updates
-Don't suggest updates or changes to files when there are no actual modifications needed.
-
-## Provide Real File Links
-Always provide links to the real files, not x.md.
-
-## No Current Implementation
-Don't show or discuss the current implementation unless specifically requested.
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [anolilab/anole.chat](https://github.com/anolilab/anole.chat) — distributed by [TomeVault](https://tomevault.io).
