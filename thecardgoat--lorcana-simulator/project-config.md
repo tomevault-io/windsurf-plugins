@@ -1,47 +1,258 @@
 ---
 trigger: always_on
-description: When crafting prompts for AI assistance, follow these patterns to improve clarity and effectiveness:
+description: Backend-as-a-Service (BaaS) with optimistic updates, multiplayer, offline support, and relational data. Firebase alternative with relations.
 ---
 
-# Improve the User's Prompt Following the Patterns Below
+# What is InstantDB
 
-When crafting prompts for AI assistance, follow these patterns to improve clarity and effectiveness:
+Backend-as-a-Service (BaaS) with optimistic updates, multiplayer, offline support, and relational data. Firebase alternative with relations.
 
-1. **Lead with the ask**: State your goal clearly at the beginning.
-   Example: "Summarize this PDF in 5 bullet points. The text is below: ..."
+## Core Features
 
-2. **Repeat the key ask at the end**: For long contexts, reiterate the main request.
-   Example: "List pros & cons, keep it balanced. REMEMBER: 5 pros, 5 cons."
+* Optimistic updates
+* Real-time multiplayer sync
+* Offline-first architecture
+* Relational data support
+* Web and mobile compatible
 
-3. **Specify output shape**: Clearly define the expected format.
-   Example: "Return as: 1) short title, 2) table (CSV)."
+## API
 
-4. **Use clear delimiters**: Use backticks, headings, or XML to separate sections.
-   Example: "Rate the style of the text between the fences."
+CRITICAL: These are the only APIs from the react package you need to know. do not hallucinate other APIs.
 
-5. **Induce step-by-step thinking**: Encourage planning before execution.
-   Example: "Solve this puzzle. Think step-by-step before giving the final move."
+```
+// Initialization
+init<Schema>(config: InstantConfig<Schema>): InstantReactWebDatabase<Schema>
 
-6. **Ask it to plan its workflow**: For complex tasks, outline steps before execution.
-   Example: "We're writing an e-book. ❶ Outline chapters. ❷ Wait. ❸ When I say 'go', draft chapter 1."
+// Transaction builder
+tx: TxChunk<Schema>
+id(): string
+lookup(attribute: string, value: any): Lookup
 
-7. **Limit or widen knowledge sources**: Control the scope of information used.
-   Example: "Use only the info below. / Combine basic knowledge + this context."
+// Schema builder
+i.schema({ entities, links?, rooms? })
+i.entity(attrs)
+i.string(), i.number(), i.boolean(), i.date(), i.json(), i.any()
 
-8. **Guide information retrieval**: Help AI identify relevant documents.
-   Example: "List which docs look relevant, then answer."
+// Core Database Methods (on db instance)
+db.transact(chunks)
 
-9. **Show a style/example**: Provide a reference for tone and format.
-   Example: "Match the style of: <example>"
+// React Hooks (on db instance)
+db.useQuery(query, opts?)
+db.useAuth()
+db.room(type?, id?)
 
-10. **Set correction handles**: Define clear criteria for adjustments.
-    Example: "If length > 150 words, shorten."
+// Auth Methods (on db.auth)
+db.auth.sendMagicCode({ email })
+db.auth.signInWithMagicCode({ email, code })
+db.auth.signOut(opts?)
 
-11. **Tell it when to stop or loop**: Specify when to conclude or continue.
-    Example: "Keep going until you list 20 ideas, then stop."
+// Room Hooks (on db.rooms) - IMPORTANT: These are called on db.rooms, not on room instances
+db.rooms.useTopicEffect(room, topic, onEvent)
+db.rooms.usePublishTopic(room, topic) // returns: (data) => void
+db.rooms.usePresence(room, opts?) // returns: { peers, user, publishPresence, isLoading }
+db.rooms.useSyncPresence(room, data, deps?)
+db.rooms.useTypingIndicator(room, inputName, opts?) // returns: { active, setActive, inputProps }
 
-12. **Request the hidden reasoning**: Ask for underlying logic when needed.
-    Example: "Explain the reasoning behind your answer."
+// Components
+<Cursors room={room} {...props} />
+```
+
+# How to initialize DB
+
+Create a central DB instance (single connection maintained per app ID):
+
+```typescript
+// lib/db.ts
+import { init } from '@instantdb/react';
+import schema from '../instant.schema';
+
+export const db = init({
+  // Get your app ID from https://instantdb.com
+  appId: 'your-app-id',
+  schema
+});
+```
+
+`init` accepts the following parameters:
+
+```typescript
+export type InstantConfig<S extends InstantSchemaDef<any, any, any>> = {
+  appId: string;
+  schema?: S;
+};
+```
+
+# How to do queries
+
+## Core Concepts
+- **Namespaces**: Entity collections (tables)
+- **Queries**: JS objects describing data needs
+- **Associations**: Entity relationships
+
+## Query Structure
+```typescript
+{
+  namespace1: {
+    $: { /* operators */ },
+    linkedNamespace: { $: { /* operators */ } }
+  },
+  namespace2: { /* ... */ }
+}
+```
+
+## Basic Usage
+
+**Required**: Handle `isLoading` and `error` states:
+```typescript
+const { isLoading, data, error } = db.useQuery({ todos: {} })
+if (isLoading) return
+if (error) return (<div>Error: {error.message}</div>)
+return <pre>{JSON.stringify(data, null, 2)}</pre>
+```
+
+### Fetch Operations
+```typescript
+// Single namespace
+const query = { goals: {} }
+
+// Multiple namespaces
+const query = { goals: {}, todos: {} }
+```
+
+## Filtering
+
+### By ID
+```typescript
+const query = {
+  goals: {
+    $: { where: { id: 'goal-1' } }
+  }
+}
+```
+
+### Multiple Conditions (AND)
+```typescript
+const query = {
+  todos: {
+    $: { where: { completed: true, priority: 'high' } }
+  }
+}
+```
+
+## Associations (JOINs)
+
+### Fetch Related
+```typescript
+// Goals with todos
+const query = { goals: { todos: {} } }
+
+// Inverse: Todos with goals
+const query = { todos: { goals: {} } }
+```
+
+### Filter by Association
+```typescript
+// Dot notation for associated values
+const query = {
+  goals: {
+    $: { where: { 'todos.title': 'Go running' } },
+    todos: {}
+  }
+}
+```
+
+### Filter Associated Entities
+```typescript
+const query = {
+  goals: {
+    todos: {
+      $: { where: { completed: true } }
+    }
+  }
+}
+```
+
+## Operators
+
+### Logical
+```typescript
+// AND
+where: { and: [{ 'todos.priority': 'high' }, { 'todos.dueDate': { $lt: tomorrow } }] }
+
+// OR
+where: { or: [{ priority: 'high' }, { dueDate: { $lt: tomorrow } }] }
+```
+
+### Comparison (indexed fields only)
+- `$gt`, `$lt`, `$gte`, `$lte`
+```typescript
+where: { timeEstimate: { $gt: 2 } }
+```
+
+### Other Operators
+```typescript
+// IN
+where: { priority: { $in: ['high', 'critical'] } }
+
+// NOT
+where: { location: { $not: 'work' } }
+
+// NULL check
+where: { location: { $isNull: true } }
+
+// Pattern matching (indexed strings)
+where: { title: { $like: 'Get%' } }     // Case-sensitive
+where: { title: { $ilike: 'get%' } }    // Case-insensitive
+```
+
+Pattern syntax:
+- `'prefix%'` - Starts with
+- `'%suffix'` - Ends with
+- `'%substring%'` - Contains
+
+## Pagination & Ordering
+
+### Pagination (top-level only)
+```typescript
+$: { limit: 10, offset: 10 }
+```
+
+### Ordering (indexed fields)
+```typescript
+$: { order: { dueDate: 'asc' } }  // or 'desc'
+```
+
+## Field Selection
+```typescript
+// Select specific fields
+$: { fields: ['title', 'status'] }
+
+// With nested associations
+goals: {
+  $: { fields: ['title'] },
+  todos: { $: { fields: ['status'] } }
+}
+```
+
+## Deferred Queries
+```typescript
+const query = user ? { todos: { $: { where: { userId: user.id } } } } : null
+```
+
+## Complex Example
+```typescript
+const query = {
+  goals: {
+    $: {
+      where: { or: [{ status: 'active' }, { 'todos.priority': 'high' }] },
+      limit: 5,
+      order: { serverCreatedAt: 'desc' },
+      fields: ['title', 'description']
+    },
+    todos: {
+      $: {
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [TheCardGoat/lorcana-simulator](https://github.com/TheCardGoat/lorcana-simulator) — distributed by [TomeVault](https://tomevault.io).
