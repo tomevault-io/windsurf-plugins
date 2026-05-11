@@ -7,13 +7,13 @@ Pack your entire repo in a single prompt
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `.cursor/rules/*.mdc` in [mnismt/overwrite](https://github.com/mnismt/overwrite).
+Original source: `AGENTS.md` in [mnismt/overwrite](https://github.com/mnismt/overwrite).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
+- **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
