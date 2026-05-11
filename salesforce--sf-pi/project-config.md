@@ -1,0 +1,163 @@
+---
+trigger: always_on
+description: Agent instructions for `sf-pi`.
+---
+
+# AGENTS.md
+
+Agent instructions for `sf-pi`.
+
+## Goals
+
+Optimize this repo for:
+
+1. **Agents first** — fast navigation, clear source of truth, safe edits
+2. **Humans second** — simple code, explicit flow, easy review, helpful comments
+
+## Start here (agent orientation)
+
+If you have just landed in this repo, read in this order:
+
+1. [`catalog/index.json`](./catalog/index.json) — canonical list of every
+   bundled extension with its id, category, commands, tools, events, and
+   `srcLoc`. Tells you what exists and roughly how big each extension is.
+2. [`docs/agent-orientation.md`](./docs/agent-orientation.md) — generated
+   agent map of extensions, commands, tools, providers, and runtime surfaces.
+3. [`docs/commands.md`](./docs/commands.md) — every slash command grouped
+   by extension, with default-enabled state. Generated from manifests.
+4. The specific extension's `README.md` — behavior, commands, runtime
+   flow, generated file structure.
+5. The extension's `AGENTS.md` if it exists — editing rules specific to
+   that extension.
+6. The extension's `index.ts` header comment — behavior matrix.
+7. The `lib/` module you're changing, then the matching test file.
+
+For shared code (used by multiple extensions), start at
+[`lib/common/README.md`](./lib/common/README.md).
+
+## Repo map
+
+- `AGENTS.md` — contributor/agent rules for this repo (this file)
+- `ARCHITECTURE.md` — repo structure and conventions
+- `CONTRIBUTING.md` — contributor workflow and commands
+- `README.md` — user-facing install and usage guide
+- `ROADMAP.md` — shipped / in-flight / non-goals
+- `docs/commands.md` — GENERATED per-extension command reference
+- `docs/agent-orientation.md` — GENERATED agent navigation map
+- `docs/human-orientation.md` — contributor-facing repo walkthrough
+- `docs/doc-ownership.json` — machine-readable doc source/check map
+- `docs/adr/` — architecture decision records for stable rationale
+- `catalog/index.json` — canonical machine-readable list of bundled extensions
+- `catalog/registry.ts` — generated TypeScript registry from manifests
+- `extensions/<id>/` — one self-contained extension per folder
+- `extensions/<id>/AGENTS.md` — optional per-extension rules (see convention below)
+- `extensions/<id>/ROADMAP.md` — optional per-extension phased roadmap
+- `lib/common/` — shared helpers (see its own `README.md`)
+- `scripts/generate-catalog.mjs` — regenerates the catalog + generated doc sections
+- `scripts/docs-health.mjs` — checks doc drift contracts and public-safe examples
+- `scripts/docs-changed.mjs` — summarizes docs impacted by a diff
+- `scripts/scaffold.mjs` — scaffolds a new extension
+
+## Source of truth
+
+Use these in order:
+
+1. `extensions/<id>/manifest.json` — extension identity and bundle metadata
+2. `catalog/index.json` / `catalog/registry.ts` — generated from manifests
+3. `extensions/<id>/README.md` — extension walkthrough and file map
+4. `README.md` — high-level summary only
+
+### Important
+
+- **Do not edit `catalog/registry.ts` manually.**
+- If you change any `manifest.json`, run `npm run generate-catalog`.
+- Prefer deriving extension lists from `catalog/index.json` or `catalog/registry.ts` instead of hardcoding them.
+
+## Editing rules
+
+### Keep the code simple
+
+Prefer:
+
+- small files with one clear responsibility
+- direct control flow
+- explicit names
+- straightforward conditionals
+- local helper functions over clever abstractions
+
+Avoid:
+
+- hidden behavior
+- broad utility layers with mixed responsibilities
+- clever metaprogramming
+- unnecessary indirection
+- cross-extension coupling unless there is a strong reason
+
+### Split by responsibility, not by abstraction
+
+Good splits:
+
+- command routing
+- settings file I/O
+- status formatting
+- session scanning
+- registry/state parsing
+
+Bad splits:
+
+- abstract base helpers with vague names
+- generic utilities that hide repo-specific behavior
+
+### Comments matter
+
+Keep comments focused on **why** and **behavior contracts**.
+
+Add comments when:
+
+- a function follows Pi-specific precedence rules
+- a fallback exists for reliability
+- a settings mutation is subtle
+- a best-effort or non-obvious behavior would confuse reviewers
+
+Do not add comments that only restate obvious code.
+
+## Working in an extension
+
+When editing an extension, read in this order:
+
+1. `extensions/<id>/README.md`
+2. `extensions/<id>/AGENTS.md` if present
+3. `extensions/<id>/index.ts`
+4. relevant files in `extensions/<id>/lib/`
+5. tests in `extensions/<id>/tests/`
+
+Each extension should stay self-contained.
+
+### Per-extension `AGENTS.md` (optional)
+
+Add `extensions/<id>/AGENTS.md` when the extension has:
+
+- non-obvious editing rules that don't fit the top-level `AGENTS.md`
+- a file map worth pinning so agents stop inventing new module locations
+- invariants that are easy to violate by accident (e.g. HITL confirm for
+  `slack_send`)
+
+Keep it short. A good per-extension `AGENTS.md`:
+
+1. Points at the extension's `README.md` for behavior
+2. Has a single "file map" table (responsibility → file)
+3. Lists conventions that are specific to this extension
+4. Lists explicit non-goals
+
+See `extensions/sf-slack/AGENTS.md` and
+`extensions/sf-llm-gateway-internal/AGENTS.md` as references.
+
+### Per-extension `ROADMAP.md` (optional)
+
+Add `extensions/<id>/ROADMAP.md` when the extension has phased work that
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [salesforce/sf-pi](https://github.com/salesforce/sf-pi) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-04 -->
