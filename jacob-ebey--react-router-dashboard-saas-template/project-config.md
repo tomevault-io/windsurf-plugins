@@ -1,121 +1,67 @@
 ---
 trigger: always_on
-description: CSS library for Tailwind CSS 4 that provides semantic component class names.
+description: > Drizzle is a modern TypeScript ORM developers wanna use in their next project. It is lightweight at only ~7.4kb minified+gzipped, and it's tree shakeable with exactly 0 dependencies. It supports every PostgreSQL, MySQL, SQLite and SingleStore database and is serverless-ready by design.
 ---
 
 
-# daisyUI 5
+# Drizzle
 
-CSS library for Tailwind CSS 4 that provides semantic component class names.
+> Drizzle is a modern TypeScript ORM developers wanna use in their next project. It is lightweight at only ~7.4kb minified+gzipped, and it's tree shakeable with exactly 0 dependencies. It supports every PostgreSQL, MySQL, SQLite and SingleStore database and is serverless-ready by design.
 
-**Links:**
+## meet drizzle
 
-- [daisyUI docs](http://daisyui.com)
-- [Installation guide](https://daisyui.com/docs/install/)
-- [Config docs](https://daisyui.com/docs/config/)
-- [Theme generator](https://daisyui.com/theme-generator/)
+- [Get started with Drizzle](https://orm.drizzle.team/docs/get-started)
+- [Get Started with Drizzle and PostgreSQL](https://orm.drizzle.team/docs/get-started/postgresql-new)
+- [Get Started with Drizzle and PostgreSQL in existing project](https://orm.drizzle.team/docs/get-started/postgresql-existing)
+- [Get Started with Drizzle and Gel](https://orm.drizzle.team/docs/get-started/gel-new)
+- [Get Started with Drizzle and Gel in existing project](https://orm.drizzle.team/docs/get-started/gel-existing)
+- [Get Started with Drizzle and SingleStore](https://orm.drizzle.team/docs/get-started/singlestore-new)
+- [Get Started with Drizzle and SingleStore in existing project](https://orm.drizzle.team/docs/get-started/singlestore-existing)
+- [Get Started with Drizzle and Neon](https://orm.drizzle.team/docs/get-started/neon-new)
+- [Get Started with Drizzle and Neon in existing project](https://orm.drizzle.team/docs/get-started/neon-existing)
+- [Get Started with Drizzle and Supabase](https://orm.drizzle.team/docs/get-started/supabase-new)
+- [Get Started with Drizzle and Supabase in existing project](https://orm.drizzle.team/docs/get-started/supabase-existing)
+- [Get Started with Drizzle and Xata](https://orm.drizzle.team/docs/get-started/xata-new)
+- [Get Started with Drizzle and Xata in existing project](https://orm.drizzle.team/docs/get-started/xata-existing)
+- [Get Started with Drizzle and PGlite](https://orm.drizzle.team/docs/get-started/pglite-new)
+- [Get Started with Drizzle and PGLite in existing project](https://orm.drizzle.team/docs/get-started/pglite-existing)
+- [Get Started with Drizzle and Nile](https://orm.drizzle.team/docs/get-started/nile-new)
+- [Get Started with Drizzle and Nile in existing project](https://orm.drizzle.team/docs/get-started/nile-existing)
+- [Get Started with Drizzle and Vercel Postgres](https://orm.drizzle.team/docs/get-started/vercel-new)
+- [Get Started with Drizzle and Vercel Postgres in existing project](https://orm.drizzle.team/docs/get-started/vercel-existing)
+- [Get Started with Drizzle and MySQL](https://orm.drizzle.team/docs/get-started/mysql-new)
+- [Get Started with Drizzle and MySQL in existing project](https://orm.drizzle.team/docs/get-started/mysql-existing)
+- [Get Started with Drizzle and PlanetScale](https://orm.drizzle.team/docs/get-started/planetscale-new)
+- [Get Started with Drizzle and PlanetScale in existing project](https://orm.drizzle.team/docs/get-started/planetscale-existing)
+- [Get Started with Drizzle and TiDB](https://orm.drizzle.team/docs/get-started/tidb-new)
+- [Get Started with Drizzle and TiDB in existing project](https://orm.drizzle.team/docs/get-started/tidb-existing)
+- [Get Started with Drizzle and SQLite](https://orm.drizzle.team/docs/get-started/sqlite-new)
+- [Get Started with Drizzle and SQLite in existing project](https://orm.drizzle.team/docs/get-started/sqlite-existing)
+- [Get Started with Drizzle and Turso](https://orm.drizzle.team/docs/get-started/turso-new)
+- [Get Started with Drizzle and Turso in existing project](https://orm.drizzle.team/docs/get-started/turso-existing)
+- [Get Started with Drizzle and D1](https://orm.drizzle.team/docs/get-started/d1-new)
+- [Get Started with Drizzle and SQLite Durable Objects](https://orm.drizzle.team/docs/get-started/do-new)
+- [Get Started with Drizzle and Bun:SQLite](https://orm.drizzle.team/docs/get-started/bun-sqlite-new)
+- [Get Started with Drizzle and Bun:SQLite in existing project](https://orm.drizzle.team/docs/get-started/bun-sqlite-existing)
+- [Get Started with Drizzle and Bun:SQLite](https://orm.drizzle.team/docs/get-started/bun-sql-new)
+- [Get Started with Drizzle and SQLite in existing project](https://orm.drizzle.team/docs/get-started/bun-sql-existing)
+- [Get Started with Drizzle and Expo](https://orm.drizzle.team/docs/get-started/expo-new)
+- [Get Started with Drizzle and Expo in existing project](https://orm.drizzle.team/docs/get-started/expo-existing)
+- [Get Started with Drizzle and OP-SQLite](https://orm.drizzle.team/docs/get-started/op-sqlite-new)
+- [Get Started with Drizzle and OP-SQLite in existing project](https://orm.drizzle.team/docs/get-started/op-sqlite-existing)
+- [Drizzle ORM](https://orm.drizzle.team/docs/overview)
+- [Drizzle gotchas](https://orm.drizzle.team/docs/gotchas)
 
-## Installation
+## Fundamentals
 
-Requires Tailwind CSS 4. Add to CSS file:
+- [Drizzle schema](https://orm.drizzle.team/docs/sql-schema-declaration)
+- [Database connection with Drizzle](https://orm.drizzle.team/docs/connect-overview)
+- [Drizzle Queries + CRUD](https://orm.drizzle.team/docs/data-querying)
+- [Drizzle migrations fundamentals](https://orm.drizzle.team/docs/migrations)
 
-```css
-@import "tailwindcss";
-@plugin "daisyui";
-```
+## Connect
 
-## Key Rules
-
-1. Use daisyUI component classes + Tailwind utilities for customization
-2. Use semantic colors (`primary`, `base-100`) over Tailwind colors for theme compatibility
-3. Responsive: `sm:menu-horizontal`, `lg:drawer-open`
-4. Override with `!` only as last resort: `btn bg-red-500!`
-5. Layout: `max-w-screen-xl mx-auto px-4` for containers
-
-## Color System
-
-**Semantic Colors:**
-
-- `primary/primary-content` - Brand colors
-- `secondary/secondary-content` - Secondary brand
-- `accent/accent-content` - Accent colors
-- `base-100/200/300/content` - Background layers
-- `info/success/warning/error` + `-content` - Status colors
-- `neutral/neutral-content` - Neutral colors
-
-## Component Classes
-
-### Layout & Navigation
-
-- **`navbar`** - [docs](https://daisyui.com/components/navbar/) - Navigation bar
-- **`drawer`** - [docs](https://daisyui.com/components/drawer/) - Sidebar layout
-- **`footer`** - [docs](https://daisyui.com/components/footer/) - Page footer
-- **`menu`** - [docs](https://daisyui.com/components/menu/) - Menu lists
-- **`breadcrumbs`** - [docs](https://daisyui.com/components/breadcrumbs/) - Navigation breadcrumbs
-
-### Content Display
-
-- **`card`** - [docs](https://daisyui.com/components/card/) - Content containers
-- **`table`** - [docs](https://daisyui.com/components/table/) - Data tables
-- **`timeline`** - [docs](https://daisyui.com/components/timeline/) - Event timelines
-- **`stats`** - [docs](https://daisyui.com/components/stat/) - Statistics display
-- **`hero`** - [docs](https://daisyui.com/components/hero/) - Hero sections
-- **`list`** - [docs](https://daisyui.com/components/list/) - Item lists
-
-### Forms & Inputs
-
-- **`btn`** - [docs](https://daisyui.com/components/button/) - Buttons
-- **`input`** - [docs](https://daisyui.com/components/input/) - Text inputs
-- **`textarea`** - [docs](https://daisyui.com/components/textarea/) - Multi-line text
-- **`select`** - [docs](https://daisyui.com/components/select/) - Dropdowns
-- **`checkbox`** - [docs](https://daisyui.com/components/checkbox/) - Checkboxes
-- **`radio`** - [docs](https://daisyui.com/components/radio/) - Radio buttons
-- **`toggle`** - [docs](https://daisyui.com/components/toggle/) - Toggle switches
-- **`range`** - [docs](https://daisyui.com/components/range/) - Range sliders
-- **`file-input`** - [docs](https://daisyui.com/components/file-input/) - File uploads
-- **`rating`** - [docs](https://daisyui.com/components/rating/) - Star ratings
-
-### Feedback & Status
-
-- **`alert`** - [docs](https://daisyui.com/components/alert/) - Alert messages
-- **`badge`** - [docs](https://daisyui.com/components/badge/) - Status badges
-- **`progress`** - [docs](https://daisyui.com/components/progress/) - Progress bars
-- **`radial-progress`** - [docs](https://daisyui.com/components/radial-progress/) - Circular progress
-- **`loading`** - [docs](https://daisyui.com/components/loading/) - Loading animations
-- **`skeleton`** - [docs](https://daisyui.com/components/skeleton/) - Loading placeholders
-- **`steps`** - [docs](https://daisyui.com/components/steps/) - Step indicators
-- **`countdown`** - [docs](https://daisyui.com/components/countdown/) - Countdown timers
-- **`toast`** - [docs](https://daisyui.com/components/toast/) - Toast notifications
-
-### Interactive Elements
-
-- **`modal`** - [docs](https://daisyui.com/components/modal/) - Modal dialogs
-- **`dropdown`** - [docs](https://daisyui.com/components/dropdown/) - Dropdown menus
-- **`collapse`** - [docs](https://daisyui.com/components/collapse/) - Collapsible content
-- **`tabs`** - [docs](https://daisyui.com/components/tab/) - Tab navigation
-- **`swap`** - [docs](https://daisyui.com/components/swap/) - Content swapping
-- **`carousel`** - [docs](https://daisyui.com/components/carousel/) - Image carousels
-
-### Utilities & Helpers
-
-- **`avatar`** - [docs](https://daisyui.com/components/avatar/) - User avatars
-- **`indicator`** - [docs](https://daisyui.com/components/indicator/) - Corner indicators
-- **`divider`** - [docs](https://daisyui.com/components/divider/) - Content dividers
-- **`join`** - [docs](https://daisyui.com/components/join/) - Grouped elements
-- **`mask`** - [docs](https://daisyui.com/components/mask/) - Image masks
-- **`stack`** - [docs](https://daisyui.com/components/stack/) - Layered content
-- **`link`** - [docs](https://daisyui.com/components/link/) - Styled links
-- **`kbd`** - [docs](https://daisyui.com/components/kbd/) - Keyboard shortcuts
-
-### Mockups & Demos
-
-- **`mockup-browser`** - [docs](https://daisyui.com/components/mockup-browser/) - Browser mockup
-- **`mockup-code`** - [docs](https://daisyui.com/components/mockup-code/) - Code editor mockup
-- **`mockup-phone`** - [docs](https://daisyui.com/components/mockup-phone/) - Phone mockup
-- **`mockup-window`** - [docs](https://daisyui.com/components/mockup-window/) - Window mockup
-
-## Common Patterns
-
+- [Drizzle \<\> PostgreSQL](https://orm.drizzle.team/docs/get-started-postgresql)
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
