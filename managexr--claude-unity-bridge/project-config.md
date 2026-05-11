@@ -1,59 +1,156 @@
 ---
 trigger: always_on
-description: **READ THIS FIRST**: All agent guidelines, coding standards, and workflows are documented in `AGENTS.md`.
+description: This is a Unity package (`com.mxr.claude-bridge`) that enables Claude Code to control Unity Editor operations via a file-based protocol. The package has two components:
 ---
 
-# Claude Agent Instructions
+# Agent Guidelines for Claude Unity Bridge
 
-**READ THIS FIRST**: All agent guidelines, coding standards, and workflows are documented in `AGENTS.md`.
+## Project Overview
 
-Before working on this repository, you must read:
+This is a Unity package (`com.mxr.claude-bridge`) that enables Claude Code to control Unity Editor operations via a file-based protocol. The package has two components:
 
-1. **[AGENTS.md](AGENTS.md)** - Complete agent guidelines (READ THIS)
-2. **[README.md](README.md)** - Package documentation and protocol specification
-3. **[skill/SKILL.md](skill/SKILL.md)** - Claude Code skill documentation
+1. **Unity Package** - C# code that runs in Unity Editor, polls for commands, executes them
+2. **Claude Code Skill** - Python script + documentation that Claude uses to send commands
 
-## Critical Rules
+**Key Architecture Decision**: We use a deterministic Python script instead of in-context implementation because it guarantees consistent UUID generation, file handling, polling, and error handling across all Claude sessions.
 
-From AGENTS.md, these are the most important rules:
+## Project Structure
 
-### NEVER:
-- Modify `cli.py` without updating pytest tests
-- Use in-context file I/O for Unity commands (always use the Python script)
-- Write to Unity project files while Unity Editor is running
-- Remove error handling from command implementations
+### Unity Package (package/)
+- `Editor/` - C# command implementations for Unity
+  - `ClaudeBridge.cs` - Main coordinator, command dispatcher
+  - `Commands/` - Individual command implementations (ICommand interface)
+  - `Models/` - Request/Response data structures
+- `Documentation/` - Package documentation
+- `README.md` - Package documentation and protocol specification
 
-### ALWAYS:
-- Run `pytest tests/test_cli.py -v` before committing Python changes
-- Use the deterministic Python script for all Unity commands
-- Update documentation when changing behavior
-- Follow the 3-commit structure for features (core, docs, testing)
+### Claude Code Skill (skill/)
+- `scripts/cli.py` - **THE CORE** - Handles all command execution
+- `SKILL.md` - Main documentation with YAML frontmatter
+- `references/` - Extended documentation
+  - `COMMANDS.md` - Complete command reference
+  - `EXTENDING.md` - Guide for adding custom commands
+- `tests/` - pytest test suite
+- `TESTING.md` - Testing documentation
 
-## Quick Start
+### Dependencies
+- **Unity**: 2021.3 or later (no additional Unity dependencies)
+- **Python**: 3.8+ for the skill script (3.12 supported)
+- **pytest**: For testing the Python script
+- **black/flake8**: For code formatting and linting
+- **pre-commit**: For git hooks
+- **GitHub Actions**: CI/CD for skill tests
 
+### Setting Up Development Environment
 ```bash
-# Test the Python skill script
+# Install development dependencies
+cd skill
+pip install -r requirements-dev.txt
+
+# Install pre-commit hooks (recommended)
+pre-commit install
+
+# Run pre-commit on all files (first time)
+pre-commit run --all-files
+```
+
+## Commands You Can Use
+
+### Testing the Python Script
+```bash
+# Run pytest suite
 cd skill
 pytest tests/test_cli.py -v
 
-# Test with Unity (requires Unity Editor running)
-python3 scripts/cli.py get-status
+# Run with coverage
+pytest tests/test_cli.py --cov=scripts --cov-report=term-missing
+
+# Test script help
+python3 scripts/cli.py --help
 ```
 
-## Why This Matters
+### Testing with Unity
+```bash
+# These require Unity Editor to be running
+python3 skill/scripts/cli.py get-status
+python3 skill/scripts/cli.py compile
+python3 skill/scripts/cli.py run-tests --mode EditMode
+python3 skill/scripts/cli.py get-console-logs --limit 10 --filter Error
+python3 skill/scripts/cli.py refresh
+```
 
-The Unity Bridge uses a **deterministic Python script** (`skill/scripts/cli.py`) as the foundation of reliability. This script guarantees consistent UUID generation, file handling, polling behavior, and error handling across all Claude sessions.
+### Git Workflow
+```bash
+# Check status
+git status
 
-Without reading AGENTS.md, you risk:
-- Breaking the deterministic guarantee
-- Introducing file handling bugs
-- Skipping critical tests
-- Violating the protocol specification
+# Typical commit structure for features
+git add skill/scripts/*.py          # Core implementation
+git commit -m "feat: Add feature"
+
+git add skill/*.md skill/references/ README.md  # Documentation
+git commit -m "docs: Add documentation"
+
+git add skill/tests/ .github/       # Testing
+git commit -m "test: Add tests and CI"
+```
+
+## Coding Style
+
+### Python (skill/scripts/cli.py)
+- PEP 8 compliant
+- 100-character line limit
+- Type hints where helpful
+- Docstrings for all functions
+- Use f-strings for formatting
+- Exit codes: 0 (success), 1 (error), 2 (timeout)
+
+### C# (Editor/)
+- Follow Unity naming conventions
+- Public members: `PascalCase`
+- Private fields: `_camelCase` with underscore prefix
+- Interfaces: `ICommand`, `ICallbacks`
+- Namespaces: `MXR.ClaudeBridge.*`
+- Use `[Serializable]` for data models
+- Always log with `[ClaudeBridge]` prefix
+
+### Markdown
+- Use GitHub-flavored markdown
+- Code blocks with language identifiers
+- Table of contents for long documents
+- Clear examples with actual code
+
+## Testing Guidelines
+
+### Python Script Tests (Critical)
+- **Framework**: pytest
+- **Coverage Goal**: ~95% of cli.py
+- **Location**: `skill/tests/test_cli.py`
+- **Run Before Commit**: Always run pytest before committing script changes
+- **CI**: GitHub Actions runs on Python 3.8-3.11, Ubuntu/macOS/Windows
+
+### Unity Package Tests
+- **Framework**: Unity Test Framework (NUnit)
+- **Location**: `Tests/Editor/`
+- **Current Coverage**: All commands tested (~67 tests, Phases 1-4 complete)
+- **Run Tests**: Open Unity Editor → Window > General > Test Runner → EditMode → Run All
+- **Testing Philosophy**: Test real behavior, not mocks (see implementation plan)
+  - Mock dependencies (file system, Unity APIs), test YOUR logic's response
+  - Focus on state transitions, error handling, response construction
+  - Avoid testing that mocks return what you set up
+- **Test Infrastructure**:
+  - `Tests/Editor/MXR.ClaudeBridge.Tests.Editor.asmdef` - Test assembly definition
+  - `Tests/Editor/TestHelpers/CommandTestFixture.cs` - Base class for command tests
+  - `Tests/Editor/TestHelpers/ResponseCapture.cs` - Utility to capture callbacks
+- **Phased Rollout** (matching Python suite quality - 22 tests, 95% coverage):
+  - ✅ Phase 1: Foundation + GetStatusCommand (8 tests) - COMPLETE
+  - ✅ Phase 2: RefreshCommand (7 tests) + model tests (11 tests) - COMPLETE
+  - ✅ Phase 3: CompileCommand async tests (9 tests) - COMPLETE
+  - ✅ Phase 4: RunTestsCommand (17 tests) + GetConsoleLogsCommand (16 tests) - COMPLETE
+  - ⏳ Phase 5: ClaudeBridge dispatcher tests (~15 tests)
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-
-**📖 READ [AGENTS.md](AGENTS.md) NOW** - It contains all the context you need to work effectively on this project.
-
----
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/ManageXR) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-10 -->
+> Source: [ManageXR/claude-unity-bridge](https://github.com/ManageXR/claude-unity-bridge) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-04 -->
