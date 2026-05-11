@@ -1,178 +1,148 @@
 ---
 trigger: always_on
-description: TanStack Router: API
+description: TanStack Router: Guide
 ---
 
-# ActiveLinkOptions type
+# Authenticated Routes
 
-The `ActiveLinkOptions` type extends the [`LinkOptions`](../LinkOptionsType.md) type and contains additional options that can be used to describe how a link should be styled when it is active.
+Authentication is an extremely common requirement for web applications. In this guide, we'll walk through how to use TanStack Router to build protected routes, and how to redirect users to login if they try to access them.
 
-```tsx
-type ActiveLinkOptions = LinkOptions & {
-  activeProps?:
-    | React.AnchorHTMLAttributes<HTMLAnchorElement>
-    | (() => React.AnchorHTMLAttributes<HTMLAnchorElement>)
-  inactiveProps?:
-    | React.AnchorHTMLAttributes<HTMLAnchorElement>
-    | (() => React.AnchorHTMLAttributes<HTMLAnchorElement>)
-}
-```
+## The `route.beforeLoad` Option
 
-## ActiveLinkOptions properties
+The `route.beforeLoad` option allows you to specify a function that will be called before a route is loaded. It receives all of the same arguments that the `route.loader` function does. This is a great place to check if a user is authenticated, and redirect them to a login page if they are not.
 
-The `ActiveLinkOptions` object accepts/contains the following properties:
+The `beforeLoad` function runs in relative order to these other route loading functions:
 
-### `activeProps`
+- Route Matching (Top-Down)
+  - `route.params.parse`
+  - `route.validateSearch`
+- Route Loading (including Preloading)
+  - **`route.beforeLoad`**
+  - `route.onError`
+- Route Loading (Parallel)
+  - `route.component.preload?`
+  - `route.load`
 
-- `React.AnchorHTMLAttributes<HTMLAnchorElement>`
-- Optional
-- The props that will be applied to the anchor element when the link is active
+**It's important to know that the `beforeLoad` function for a route is called _before any of its child routes' `beforeLoad` functions_.** It is essentially a middleware function for the route and all of its children.
 
-### `inactiveProps`
+**If you throw an error in `beforeLoad`, none of its children will attempt to load**.
 
-- Type: `React.AnchorHTMLAttributes<HTMLAnchorElement>`
-- Optional
-- The props that will be applied to the anchor element when the link is inactive
+## Redirecting
 
-# AsyncRouteComponent type
-
-The `AsyncRouteComponent` type is used to describe a code-split route component that can be preloaded using a `component.preload()` method.
+While not required, some authentication flows require redirecting to a login page. To do this, you can **throw a `redirect()`** from `beforeLoad`:
 
 ```tsx
-type AsyncRouteComponent<TProps> = SyncRouteComponent<TProps> & {
-  preload?: () => Promise<void>
-}
-```
-
-# FileRoute class
-
-> [!CAUTION]
-> This class has been deprecated and will be removed in the next major version of TanStack Router.
-> Please use the [`createFileRoute`](../createFileRouteFunction.md) function instead.
-
-The `FileRoute` class is a factory that can be used to create a file-based route instance. This route instance can then be used to automatically generate a route tree with the `tsr generate` and `tsr watch` commands.
-
-## `FileRoute` constructor
-
-The `FileRoute` constructor accepts a single argument: the `path` of the file that the route will be generated for.
-
-### Constructor options
-
-- Type: `string` literal
-- Required, but **automatically inserted and updated by the `tsr generate` and `tsr watch` commands**.
-- The full path of the file that the route will be generated from.
-
-### Constructor returns
-
-- An instance of the `FileRoute` class that can be used to create a route.
-
-## `FileRoute` methods
-
-The `FileRoute` class implements the following method(s):
-
-### `.createRoute` method
-
-The `createRoute` method is a method that can be used to configure the file route instance. It accepts a single argument: the `options` that will be used to configure the file route instance.
-
-#### .createRoute options
-
-- Type: `Omit<RouteOptions, 'getParentRoute' | 'path' | 'id'>`
-- [`RouteOptions`](../RouteOptionsType.md)
-- Optional
-- The same options that are available to the `Route` class, but with the `getParentRoute`, `path`, and `id` options omitted since they are unnecessary for file-based routing.
-
-#### .createRoute returns
-
-A [`Route`](../RouteType.md) instance that can be used to configure the route to be inserted into the route-tree.
-
-> ⚠️ Note: For `tsr generate` and `tsr watch` to work properly, the file route instance must be exported from the file using the `Route` identifier.
-
-### Examples
-
-```tsx
-import { FileRoute } from '@tanstack/react-router'
-
-export const Route = new FileRoute('/').createRoute({
-  loader: () => {
-    return 'Hello World'
+// src/routes/_authenticated.tsx
+export const Route = createFileRoute('/_authenticated')({
+  beforeLoad: async ({ location }) => {
+    if (!isAuthenticated()) {
+      throw redirect({
+        to: '/login',
+        search: {
+          // Use the current location to power a redirect after login
+          // (Do not use `router.state.resolvedLocation` as it can
+          // potentially lag behind the actual current location)
+          redirect: location.href,
+        },
+      })
+    }
   },
-  component: IndexComponent,
 })
-
-function IndexComponent() {
-  const data = Route.useLoaderData()
-  return <div>{data}</div>
-}
 ```
 
-# LinkOptions type
+> [!TIP]
+> The `redirect()` function takes all of the same options as the `navigate` function, so you can pass options like `replace: true` if you want to replace the current history entry instead of adding a new one.
 
-The `LinkOptions` type extends the [`NavigateOptions`](../NavigateOptionsType.md) type and contains additional options that can be used by TanStack Router when handling actual anchor element attributes.
+Once you have authenticated a user, it's also common practice to redirect them back to the page they were trying to access. To do this, you can utilize the `redirect` search param that we added in our original redirect. Since we'll be replacing the entire URL with what it was, `router.history.push` is better suited for this than `router.navigate`:
 
 ```tsx
-type LinkOptions = NavigateOptions & {
-  target?: HTMLAnchorElement['target']
-  activeOptions?: ActiveOptions
-  preload?: false | 'intent'
-  preloadDelay?: number
-  disabled?: boolean
-}
+router.history.push(search.redirect)
 ```
 
-## LinkOptions properties
+## Non-Redirected Authentication
 
-The `LinkOptions` object accepts/contains the following properties:
-
-### `target`
-
-- Type: `HTMLAnchorElement['target']`
-- Optional
-- The standard anchor tag target attribute
-
-### `activeOptions`
-
-- Type: `ActiveOptions`
-- Optional
-- The options that will be used to determine if the link is active
-
-### `preload`
-
-- Type: `false | 'intent' | 'viewport' | 'render'`
-- Optional
-- If set, the link's preloading strategy will be set to this value.
-- See the [Preloading guide](../../../guide/preloading.md) for more information.
-
-### `preloadDelay`
-
-- Type: `number`
-- Optional
-- Delay intent preloading by this many milliseconds. If the intent exits before this delay, the preload will be cancelled.
-
-### `disabled`
-
-- Type: `boolean`
-- Optional
-- If true, will render the link without the href attribute
-
-# LinkProps type
-
-The `LinkProps` type extends the [`ActiveLinkOptions`](../ActiveLinkOptionsType.md) and `React.AnchorHTMLAttributes<HTMLAnchorElement>` types and contains additional props specific to the `Link` component.
+Some applications choose to not redirect users to a login page, and instead keep the user on the same page and show a login form that either replaces the main content or hides it via a modal. This is also possible with TanStack Router by simply short circuiting rendering the `<Outlet />` that would normally render the child routes:
 
 ```tsx
-type LinkProps = ActiveLinkOptions &
-  Omit<React.AnchorHTMLAttributes<HTMLAnchorElement>, 'children'> & {
-    children?:
-      | React.ReactNode
-      | ((state: { isActive: boolean }) => React.ReactNode)
-  }
+// src/routes/_authenticated.tsx
+export const Route = createFileRoute('/_authenticated')({
+  component: () => {
+    if (!isAuthenticated()) {
+      return <Login />
+    }
+
+    return <Outlet />
+  },
+})
 ```
 
-## LinkProps properties
+This keeps the user on the same page, but still allows you to render a login form. Once the user is authenticated, you can simply render the `<Outlet />` and the child routes will be rendered.
 
-- All of the props from [`ActiveLinkOptions`](../ActiveLinkOptionsType.md)
-- All of the props from `React.AnchorHTMLAttributes<HTMLAnchorElement>`
+## Authentication using React context/hooks
 
-#### `children`
+If your authentication flow relies on interactions with React context and/or hooks, you'll need to pass down your authentication state to TanStack Router using `router.context` option.
+
+> [!IMPORTANT]
+> React hooks are not meant to be consumed outside of React components. If you need to use a hook outside of a React component, you need to extract the returned state from the hook in a component that wraps your `<RouterProvider />` and then pass the returned value down to TanStack Router.
+
+We'll cover the `router.context` options in-detail in the [Router Context](../router-context.md) section.
+
+Here's an example that uses React context and hooks for protecting authenticated routes in TanStack Router. See the entire working setup in the [Authenticated Routes example](https://github.com/TanStack/router/tree/main/examples/react/authenticated-routes).
+
+- `src/routes/__root.tsx`
+
+```tsx
+import { createRootRouteWithContext } from '@tanstack/react-router'
+
+interface MyRouterContext {
+  // The ReturnType of your useAuth hook or the value of your AuthContext
+  auth: AuthState
+}
+
+export const Route = createRootRouteWithContext<MyRouterContext>()({
+  component: () => <Outlet />,
+})
+```
+
+- `src/router.tsx`
+
+```tsx
+import { createRouter } from '@tanstack/react-router'
+
+import { routeTree } from './routeTree.gen'
+
+export const router = createRouter({
+  routeTree,
+  context: {
+    // auth will initially be undefined
+    // We'll be passing down the auth state from within a React component
+    auth: undefined!,
+  },
+})
+```
+
+- `src/App.tsx`
+
+```tsx
+import { RouterProvider } from '@tanstack/react-router'
+
+import { AuthProvider, useAuth } from './auth'
+
+import { router } from './router'
+
+function InnerApp() {
+  const auth = useAuth()
+  return <RouterProvider router={router} context={{ auth }} />
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <InnerApp />
+    </AuthProvider>
+  )
+}
+```
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
