@@ -7,11 +7,11 @@ A Codex Stata pipeline for Economists by 朱晨 | 遗传社科研究
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [maxwell2732/codex-stata-for-economists](https://github.com/maxwell2732/codex-stata-for-economists).
+Original source: `CLAUDE.md` in [maxwell2732/codex-stata-for-economists](https://github.com/maxwell2732/codex-stata-for-economists).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
