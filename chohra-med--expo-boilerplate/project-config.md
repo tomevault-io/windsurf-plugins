@@ -1,208 +1,43 @@
 ---
 trigger: always_on
-description: providesTags: ['Todo'],
+description: Advanced Best Practices covering Error Handling, Environment Variables, Performance, and Accessibility rules
 ---
 
 
-# MobileLauncher LT - Development Rules & Guidelines
+# Advanced Best Practices
 
-This document outlines the essential rules and guidelines for developing with the MobileLauncher LT boilerplate. Follow these rules to maintain consistency, scalability, and code quality across the project.
+## 🔴 Error Handling & Observability
 
-## 🏗️ Architecture Rules
+### 1. API Error Handling
+- Never allow API failures to crash the app or fail silently.
+- When calling RTK Query mutations, handle `.unwrap()` errors or `isRejectedWithValue` reliably.
+- Use explicit `try/catch` and fire user-facing toasts (e.g., via `react-native-toast-message`) on failure.
 
-### 1. Feature-First Structure
-- **Always organize code by business features**, not technical layers
-- Each feature must be self-contained with its own:
-  - `components/` - Feature-specific UI components
-  - `screens/` - Screen components
-  - `hooks/` - Custom hooks for business logic
-  - `store/` - Redux slice and selectors
-  - `api/` - RTK Query endpoints
-  - `services/` - Business logic services
-  - `types/` - TypeScript type definitions
-  - `index.ts` - Barrel exports
+### 2. Global Error Boundaries
+- Since `react-native-error-boundary` is installed, ensure that any major rendering block is wrapped where appropriate.
+- Log fatal crashes to the logging service before presenting the fallback UI.
 
-**Example:**
-```
-src/features/auth/
-├── components/
-│   ├── login-form.tsx
-│   └── index.ts
-├── screens/
-│   ├── login-screen.tsx
-│   └── index.ts
-├── hooks/
-│   ├── use-auth.ts
-│   └── index.ts
-├── store/
-│   ├── auth-slice.ts
-│   ├── auth-selector.ts
-│   └── index.ts
-├── api/
-│   ├── auth.api.ts
-│   └── index.ts
-├── services/
-│   ├── auth.service.ts
-│   └── index.ts
-├── types/
-│   ├── index.ts
-├── index.ts
-```
+## 🟢 Environment Variables & Secrets
 
-### 2. Shared Resources
-- **Extract common functionality** to global directories (`src/ui/`, `src/services/`, `src/utils/`)
-- **Never duplicate code** - if used in 2+ features, move to shared
-- **Use absolute imports** with `#root/` prefix for clean imports
-- **Expo ecosystem**: use expo.dev ecosystem for packages and yarn to install packages.
+- Never use `process.env` scattered across components.
+- Validate environment variables at startup. Use `zod` to schemas in a central config file (e.g., `src/config/env.ts`) so missing or invalid keys throw an immediate exception.
+- Never commit `.env` or credentials. Use `Expo Secure Store` for user session tokens or keys, never `MMKV` for sensitive data.
 
-**Example:**
-```typescript
-// ❌ Wrong - duplicated across features
-// features/auth/components/button.tsx
-// features/settings/components/button.tsx
+## 🚀 Performance & Reanimated
 
-// ✅ Correct - shared component
-// src/ui/components/button.tsx
-import { Button } from '#root/ui/components/button';
+### 1. Animations with Reanimated 4
+- Differentiate between the UI thread and the JS Thread. Use `runOnJS` when invoking state changes from a worklet.
+- Avoid passing massive objects to worklets; pick out primitive dependencies.
 
-// ✅ Correct - shared utility
-// src/utils/format-date.ts
-import { formatDate } from '#root/utils/format-date';
-```
+### 2. Image Loading
+- Prefer `Expo Image` over standard React Native `Image` for aggressive caching and memory performance, especially in `FlashList` components.
 
-## 🎨 UI Component Rules
+## ♿ Accessibility (A11y)
 
-### 3. Component Design
-- **Use Restyle for all styling** - never use StyleSheet directly
-- **Create type-safe components** with proper TypeScript interfaces
-- **Export prop interfaces** for reusability
-- **Use React.memo** for performance optimization
-- **Follow single responsibility principle**
-- **Memorzie Functions**: use useCallback for functions
-- **Avoid inline functions**: extract functions outside render or use useCallback
-- **Avoid inline styling**: use theme values and component variants instead
-
-**Example:**
-```typescript
-// ✅ Correct - Performance optimized component
-import React, { useCallback } from 'react';
-import { createBox } from '@shopify/restyle';
-import type { Theme } from '#root/ui/style/theme';
-
-const StyledButton = createBox<Theme>();
-
-export interface ButtonProps {
-  title: string;
-  onPress: () => void;
-  variant?: 'primary' | 'secondary';
-  disabled?: boolean;
-}
-
-const _Button = ({ title, onPress, variant = 'primary', disabled = false }: ButtonProps) => {
-  const handlePress = useCallback(() => {
-    if (!disabled) {
-      onPress();
-    }
-  }, [onPress, disabled]);
-
-  return (
-    <StyledButton
-      backgroundColor={variant === 'primary' ? 'primary' : 'secondary'}
-      padding="md"
-      borderRadius="md"
-      onPress={handlePress}
-      opacity={disabled ? 0.5 : 1}
-    >
-      <Text color="white" textAlign="center">
-        {title}
-      </Text>
-    </StyledButton>
-  );
-};
-
-export const Button = React.memo(_Button);
-```
-
-### 4. Theme Usage
-- **Always use theme values** for colors, spacing, typography
-- **Use borderRadius theme values**: `none`, `xs`, `sm`, `md`, `lg`, `xl`, `2xl`, `3xl`, `full`
-- **Use "full" for circles** instead of calculating half width/height
-- **Never hardcode values** in theme props
-
-**Example:**
-```typescript
-// ❌ Wrong - hardcoded values
-<Box 
-  backgroundColor="#3B82F6" 
-  padding={16} 
-  borderRadius={8}
-  width={50}
-  height={50}
-/>
-
-// ✅ Correct - theme values
-<Box 
-  backgroundColor="primary" 
-  padding="md" 
-  borderRadius="md"
-  width={50}
-  height={50}
-  borderRadius="full" // For circles
-/>
-```
-
-### 5. Component Variants
-- **Create multiple variants** for each component (size, type, state)
-- **Use consistent naming**: `buttonTypeVariant`, `buttonSizeVariant`
-- **Define variants in theme** using Restyle's variant system
-
-**Example:**
-```typescript
-// Theme definition
-export const buttonVariants = createVariant<Theme, 'buttonVariants', 'variant'>({
-  property: 'variant',
-  themeKey: 'buttonVariants',
-});
-
-// Component usage
-<Button 
-  title="Save" 
-  buttonTypeVariant="primary" 
-  buttonSizeVariant="large"
-  onPress={handleSave} 
-/>
-```
-
-## 🔄 State Management Rules
-
-### 6. Redux Patterns
-- **Use Redux Toolkit** for all state management
-- **Create feature slices** with proper action creators
-- **Use createSelector** for derived state
-- **Keep state normalized** and flat
-- **Use RTK Query** for all API calls
-
-**Example:**
-```typescript
-// Redux slice
-const todosSlice = createSlice({
-  name: 'todos',
-  initialState: { todos: [], loading: false },
-  reducers: {
-    addTodo: (state, action) => {
-      state.todos.push(action.payload);
-    },
-    toggleTodo: (state, action) => {
-      const todo = state.todos.find(t => t.id === action.payload);
-      if (todo) todo.completed = !todo.completed;
-    },
-  },
-});
-
-// Selector
-export const selectCompletedTodos = createSelector(
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+All UI elements must be accessible.
+- Pass `accessibilityRole="button"` and `accessibilityLabel` to all custom touchables.
+- Account for scaling text. Since we use Restyle, configure typography variants to respect dynamic font types cleanly without breaking layout.
+- Use `accessibilityState` dynamically (e.g., `selected`, `disabled`) so screen readers announce correct context.
 
 ---
 > Source: [chohra-med/expo_boilerplate](https://github.com/chohra-med/expo_boilerplate) — distributed by [TomeVault](https://tomevault.io).
