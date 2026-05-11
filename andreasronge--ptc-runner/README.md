@@ -7,11 +7,11 @@ A BEAM-native Elixir library for Programmatic Tool Calling (PTC). Execute LLM-ge
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [andreasronge/ptc_runner](https://github.com/andreasronge/ptc_runner).
+Original source: `CLAUDE.md` in [andreasronge/ptc_runner](https://github.com/andreasronge/ptc_runner).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
