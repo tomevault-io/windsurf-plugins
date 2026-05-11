@@ -1,174 +1,114 @@
 ---
 trigger: always_on
-description: Security guidelines for the better-todo Convex application. Activate with @sec-check to audit code for vulnerabilities, scan for PII exposure, and verify auth patterns.
+description: Guidelines for creating and managing task lists in markdown files to track project progress
 ---
 
 
-# Security Guidelines for better-todo
+---
 
-This document covers security patterns specific to the better-todo application, a Convex-powered todo and notes app with Clerk authentication.
+# Task List Management
 
-## App-Specific Security Context
+Guidelines for creating and managing task lists in markdown files to track project progress
 
-### Authentication Provider
+## Task List Creation
 
-- **Auth**: Clerk (via `ctx.auth.getUserIdentity()`)
-- **User ID**: `identity.subject` (Clerk subject ID)
-- **Config**: `convex/auth.config.ts`
+1. Create task lists in a markdown file (in the project root):
+   - Use `TASKS.md` or a descriptive name relevant to the feature (e.g., `ASSISTANT_CHAT.md`)
+   - Include a clear title and description of the feature being implemented
 
-### Sensitive Tables
+2. Structure the file with these sections:
 
-| Table              | Contains PII               | Auth Required | Notes                                      |
-| ------------------ | -------------------------- | ------------- | ------------------------------------------ |
-| `users`            | email, firstName, lastName | Yes           | User profile data                          |
-| `todos`            | No                         | Yes           | User content                               |
-| `notes`            | No                         | Yes           | User content                               |
-| `fullPageNotes`    | No                         | Yes           | May be shared publicly via `isShared` flag |
-| `aiChats`          | No                         | Yes           | AI conversation history                    |
-| `pomodoroSessions` | No                         | Optional      | Supports guest users                       |
-| `streaks`          | No                         | Yes           | User progress tracking                     |
-| `statistics`       | No                         | No            | Aggregate counts only                      |
+   ```markdown
+   # Feature Name Implementation
 
-## 1. Authentication Patterns for better-todo
+   Brief description of the feature and its purpose.
 
-### Standard Auth Check Pattern
+   ## Completed Tasks
 
-All mutations and queries that access user data must verify identity:
+   - [x] Task 1 that has been completed
+   - [x] Task 2 that has been completed
 
-```typescript
-// REQUIRED pattern for all user-data functions
-const identity = await ctx.auth.getUserIdentity();
-if (!identity) {
-  throw new Error("Not authenticated"); // For mutations
-  // OR return []; / return null; for queries
-}
-const userId = identity.subject;
+   ## In Progress Tasks
+
+   - [ ] Task 3 currently being worked on
+   - [ ] Task 4 to be completed soon
+
+   ## Future Tasks
+
+   - [ ] Task 5 planned for future implementation
+   - [ ] Task 6 planned for future implementation
+
+   ## Implementation Plan
+
+   Detailed description of how the feature will be implemented.
+
+   ### Relevant Files
+
+   - path/to/file1.ts - Description of purpose
+   - path/to/file2.ts - Description of purpose
+   ```
+
+## Task List Maintenance
+
+1. Update the task list as you progress:
+   - Mark tasks as completed by changing `[ ]` to `[x]`
+   - Add new tasks as they are identified
+   - Move tasks between sections as appropriate
+
+2. Keep "Relevant Files" section updated with:
+   - File paths that have been created or modified
+   - Brief descriptions of each file's purpose
+   - Status indicators (e.g., ✅) for completed components
+
+3. Add implementation details:
+   - Architecture decisions
+   - Data flow descriptions
+   - Technical components needed
+   - Environment configuration
+
+## AI Instructions
+
+When working with task lists, the AI should:
+
+1. Regularly update the task list file after implementing significant components
+2. Mark completed tasks with [x] when finished
+3. Add new tasks discovered during implementation
+4. Maintain the "Relevant Files" section with accurate file paths and descriptions
+5. Document implementation details, especially for complex features
+6. When implementing tasks one by one, first check which task to implement next
+7. After implementing a task, update the file to reflect progress
+
+## Example Task Update
+
+When updating a task from "In Progress" to "Completed":
+
+```markdown
+## In Progress Tasks
+
+- [ ] Implement database schema
+- [ ] Create API endpoints for data access
+
+## Completed Tasks
+
+- [x] Set up project structure
+- [x] Configure environment variables
 ```
 
-### Ownership Verification Pattern
+Should become:
 
-Use indexed queries to verify ownership:
+```markdown
+## In Progress Tasks
 
-```typescript
-// GOOD: Index-based ownership check
-const todo = await ctx.db
-  .query("todos")
-  .withIndex("by_user", (q) => q.eq("userId", userId))
-  .filter((q) => q.eq(q.field("_id"), args.todoId))
-  .unique();
+- [ ] Create API endpoints for data access
 
-if (!todo) {
-  throw new Error("Todo not found or unauthorized");
-}
+## Completed Tasks
 
-// BAD: Fetch then check (exposes existence)
-const todo = await ctx.db.get(args.todoId);
-if (todo?.userId !== userId) throw new Error("Forbidden");
+- [x] Set up project structure
+- [x] Configure environment variables
+- [x] Implement database schema
 ```
 
-### Pomodoro Sessions (Guest Support)
-
-Pomodoro allows guests, so auth is optional:
-
-```typescript
-const identity = await ctx.auth.getUserIdentity();
-const userId = identity?.subject; // May be undefined for guests
-
-const session = await ctx.db
-  .query("pomodoroSessions")
-  .withIndex("by_user", (q) =>
-    userId ? q.eq("userId", userId) : q.eq("userId", undefined),
-  )
-  .filter((q) => q.eq(q.field("_id"), args.sessionId))
-  .unique();
-```
-
-## 2. Public vs Private Content
-
-### Shared Notes Security
-
-Full-page notes can be shared publicly via `shareSlug` and `isShared` flag:
-
-```typescript
-// Public query - no auth required but must check isShared
-export const getNoteBySlug = query({
-  handler: async (ctx, args) => {
-    const note = await ctx.db
-      .query("fullPageNotes")
-      .withIndex("by_shareSlug", (q) => q.eq("shareSlug", args.slug))
-      .first();
-
-    // CRITICAL: Only return if explicitly shared
-    if (!note || !note.isShared) {
-      return null;
-    }
-
-    return note;
-  },
-});
-```
-
-### Statistics (Aggregate Data)
-
-The `statistics` table stores aggregate counts and is safe for public access:
-
-```typescript
-// OK: Aggregate stats don't expose user data
-export const getDatabaseStats = internalQuery({
-  handler: async (ctx) => {
-    // Returns counts only, no user-specific data
-    return {
-      totalTodos: allTodos.length,
-      totalNotes: allNotes.length,
-    };
-  },
-});
-```
-
-## 3. Function Registration Guide
-
-### Public Functions (api.\*)
-
-Use for user-facing operations with auth checks:
-
-- `todos.ts`: All functions (getTodosByDate, createTodo, updateTodo, etc.)
-- `notes.ts`: All functions
-- `fullPageNotes.ts`: Most functions
-- `folders.ts`: All functions
-- `aiChats.ts`: getAIChatByDate, addUserMessage, clearChat, deleteChat
-- `pomodoro.ts`: All functions (with optional auth for guest support)
-- `search.ts`: searchAll
-- `stats.ts`: getUserStats
-
-### Internal Functions (internal.\*)
-
-Use for backend operations and scheduled tasks:
-
-- `aiChats.ts`: addAssistantMessage, getAIChatInternal
-- `fullPageNotes.ts`: getSharedNoteMetadata
-- `streaks.ts`: updateStreak
-- `stats.ts`: getDatabaseStats
-
-### Public Without Auth (by design)
-
-- `fullPageNotes.ts`: getNoteBySlug, checkSlugAvailability (shared content)
-- `stats.ts`: getStats action (aggregate public stats)
-
-## 4. Schema Security Notes
-
-### Users Table
-
-```typescript
-users: defineTable({
-  userId: v.string(),      // Clerk subject (not PII)
-  email: v.string(),       // PII - never expose in public queries
-  firstName: v.string(),   // PII - never expose in public queries
-  lastName: v.string(),    // PII - never expose in public queries
-}).index("by_userId", ["userId"]),
-```
-
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+**!IMPORTANT**: **DO NOT** externalize or document your work, usage guidelines, or benchmarks (e.g. `README.md`, `CONTRIBUTING.md`, `SUMMARY.md`, `USAGE_GUIDELINES.md` after completing the task, do not use emoji, unless explicitly instructed to do so. You may include a brief summary of your work, but do not create separate documentation files for it.
 
 ---
 > Source: [waynesutton/better-todo](https://github.com/waynesutton/better-todo) — distributed by [TomeVault](https://tomevault.io).
