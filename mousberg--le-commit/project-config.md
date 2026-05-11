@@ -1,6 +1,12 @@
 ---
 trigger: always_on
-description: **NEVER manually implement authentication in API routes - always use withApiMiddleware() from '@/lib/middleware/apiWrapper' or withATSAuth() from '@/lib/auth/api-middleware' instead of createClient().auth.getUser().**
+description: description: Comments should focus on the "why" of the code and not the what. Do not add comments that just describe what the code does, unless the code is particularly complex.
+---
+
+---
+description: Comments should focus on the "why" of the code and not the what. Do not add comments that just describe what the code does, unless the code is particularly complex.
+globs:
+alwaysApply: false
 ---
 
 ---
