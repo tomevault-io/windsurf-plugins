@@ -7,14 +7,14 @@ codex-mcp-rs is a Rust-based MCP (Model Context Protocol) server that serves as 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `GEMINI.md` in [missdeer/codex-mcp-rs](https://github.com/missdeer/codex-mcp-rs).
+Original source: `AGENTS.md` in [missdeer/codex-mcp-rs](https://github.com/missdeer/codex-mcp-rs).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
+- **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
 Available for 6 platforms including Claude Code, Cursor, Windsurf, and more. Source: [github.com/missdeer/codex-mcp-rs](https://github.com/missdeer/codex-mcp-rs)
