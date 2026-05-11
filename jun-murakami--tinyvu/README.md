@@ -7,11 +7,11 @@ The most compact professional VU meter plugin available. for VST/AU/AAX/LV2/CLAP
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [Jun-Murakami/TinyVU](https://github.com/Jun-Murakami/TinyVU).
+Original source: `CLAUDE.md` in [Jun-Murakami/TinyVU](https://github.com/Jun-Murakami/TinyVU).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
