@@ -2,6 +2,8 @@
 
 > Tome by [dergigi](https://github.com/dergigi/boris) — distributed by [TomeVault](https://tomevault.io)
 
+Read with Boris.
+
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
