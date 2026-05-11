@@ -1,297 +1,96 @@
 ---
 trigger: always_on
-description: // ✅ 组件文件: PascalCase
+description: This is an advanced, experimental rule. It instructs the AI Agent to check for, potentially create, and then execute a Python script (`final_review_gate.py`) in your project's root directory to facilitate an interactive review loop. By using this rule, you acknowledge that the AI will attempt file system operations (read, write, execute) as directed. Ensure the AI's execution environment has appropriate permissions if you expect script auto-creation to work, and be aware of the security implicat
 ---
 
-# 代码质量标准和开发规范
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# AI Agent Protocol: Self-Contained Mandatory Interactive Final Review Loop with Auto-Script Creation (Version 3)
 
-## 代码风格规范
+## 0. User Advisory & Safety:
+This is an advanced, experimental rule. It instructs the AI Agent to check for, potentially create, and then execute a Python script (`final_review_gate.py`) in your project's root directory to facilitate an interactive review loop. By using this rule, you acknowledge that the AI will attempt file system operations (read, write, execute) as directed. Ensure the AI's execution environment has appropriate permissions if you expect script auto-creation to work, and be aware of the security implications.
 
-### 命名规范
-```typescript
-// 文件命名
-// ✅ 组件文件: PascalCase
-ComponentName.vue
-PropertyEditor.vue
+## 1. Core Principle & Context:
+Your primary task processing includes a **mandatory final interactive review stage** driven by user input through a specific Python script (`final_review_gate.py`). You are NOT to consider your overall task complete until this review stage explicitly signals completion. This protocol leverages your known capability to run commands in a sub-terminal (displayed within the chat interface) and read their output.
 
-// ✅ 工具函数: camelCase  
-utilityFunction.ts
-apiService.ts
+## Phase 0: Ensure `final_review_gate.py` Script Exists
+(This phase is executed ONCE per user request that triggers this overall protocol, or if the script is missing or its content is incorrect.)
 
-// ✅ 配置文件: kebab-case
-api-config.ts
-build-config.ts
+1.  **Define Script Details:**
+    * **Script Name:** `final_review_gate.py`
+    * **Target Location:** Directly in the root of the current project/workspace.
+    * **Python Script Content (ensure this exact content is used):**
+        ```python
+        # final_review_gate.py
+import sys
+import os
 
-// ✅ 常量: SCREAMING_SNAKE_CASE
-const API_BASE_URL = 'https://api.example.com'
-const MAX_RETRY_COUNT = 3
+if __name__ == "__main__":
+    # Try to make stdout unbuffered for more responsive interaction.
+    # This might not work on all platforms or if stdout is not a TTY,
+    # but it's a good practice for this kind of interactive script.
+    try:
+        sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', buffering=1)
+    except Exception:
+        pass # Ignore if unbuffering fails, e.g., in certain environments
 
-// ✅ 变量和函数: camelCase
-const userName = 'admin'
-const isLoading = false
-function handleClick() {}
+    try:
+        sys.stderr = os.fdopen(sys.stderr.fileno(), 'w', buffering=1)
+    except Exception:
+        pass # Ignore
 
-// ✅ 类型和接口: PascalCase
-interface UserInfo {}
-type ComponentProps = {}
-```
-
-### 导入导出规范
-```typescript
-// ✅ 推荐的导入顺序
-// 1. Node.js 内置模块
-import path from 'path'
-
-// 2. 第三方库
-import { ref, computed, watch } from 'vue'
-import { defineStore } from 'pinia'
-import { ElMessage } from 'element-plus'
-
-// 3. 内部模块 - 按路径深度排序
-import type { ApiResponse } from '@/types'
-import { apiClient } from '@/services/base'
-import { useAppStore } from '@/stores/app'
-import ComponentEditor from '@/components/editors/ComponentEditor.vue'
-
-// ✅ 导出规范
-// 优先使用命名导出
-export const utilFunction = () => {}
-export { ApiService } from './api'
-
-// 默认导出仅用于Vue组件和主要模块
-export default defineComponent({
-  name: 'ComponentName'
-})
-```
-
-## 代码注释规范
-
-### JSDoc 注释标准
-```typescript
-/**
- * 用户信息接口
- * @interface UserInfo
- */
-interface UserInfo {
-  /** 用户ID */
-  id: string
-  /** 用户名 */
-  username: string
-  /** 用户邮箱 */
-  email: string
-}
-
-/**
- * 获取用户信息
- * @param {string} userId - 用户ID
- * @param {Object} options - 可选参数
- * @param {boolean} options.includeProfile - 是否包含详细信息
- * @returns {Promise<ApiResponse<UserInfo>>} 返回用户信息
- * @throws {Error} 当用户不存在时抛出错误
- * @example
- * ```typescript
- * const user = await getUserInfo('123', { includeProfile: true })
- * console.log(user.data.username)
- * ```
- */
-async function getUserInfo(
-  userId: string, 
-  options: { includeProfile?: boolean } = {}
-): Promise<ApiResponse<UserInfo>> {
-  // 实现逻辑
-}
-```
-
-### Vue组件注释
-```vue
-<template>
-  <!-- 主容器 - 负责布局和样式控制 -->
-  <div class="component-container">
-    <!-- 标题区域 -->
-    <header class="header">
-      <h1>{{ title }}</h1>
-    </header>
+    print("--- 最终审核关卡已激活 ---", flush=True)
+    print("AI已完成主要操作。等待您的审核或进一步子提示。", flush=True)
+    print("输入您的子提示，或输入以下任一指令：'TASK_COMPLETE'、'Done'、'Quit'、'q' 以确认完成。", flush=True)
     
-    <!-- 内容区域 - 支持插槽自定义 -->
-    <main class="content">
-      <slot name="content">
-        <!-- 默认内容 -->
-      </slot>
-    </main>
-  </div>
-</template>
+    active_session = True
+    while active_session:
+        try:
+            # Signal that the script is ready for input.
+            # The AI doesn't need to parse this, but it's good for user visibility.
+            print("审核关卡等待输入：", end="", flush=True) 
+            
+            line = sys.stdin.readline()
+            
+            if not line:  # EOF
+                print("--- 审核关卡：标准输入关闭（EOF），正在退出脚本 ---", flush=True)
+                active_session = False
+                break
+            
+            user_input = line.strip()
 
-<script setup lang="ts">
-/**
- * 通用容器组件
- * 提供标准的页面布局结构，支持标题和内容自定义
- * 
- * @component Container
- * @example
- * <Container title="页面标题">
- *   <template #content>
- *     自定义内容
- *   </template>
- * </Container>
- */
+            # Check for exit conditions
+            if user_input.upper() in ['TASK_COMPLETE', 'DONE', 'QUIT', 'Q']: # MODIFIED: Empty string no longer exits
+                print(f"--- 审核关卡：用户通过 '{user_input.upper()}' 确认完成 ---", flush=True)
+                active_session = False
+                break
+            elif user_input: # If there's any other non-empty input (and not a completion command)
+                # This is the critical line the AI will "listen" for.
+                print(f"用户审核子提示：{user_input}", flush=True)
+            # If user_input was empty (and not a completion command),
+            # the loop simply continues, and "REVIEW_GATE_AWAITING_INPUT:" will be printed again.
+            
+        except KeyboardInterrupt:
+            print("--- 审核关卡：用户中断会话（KeyboardInterrupt） ---", flush=True)
+            active_session = False
+            break
+        except Exception as e:
+            print(f"--- 审核关卡脚本错误：{e} ---", flush=True)
+            active_session = False
+            break
+            
+	print("--- 最终审核关卡脚本已退出 ---", flush=True)
+        ```
 
-interface Props {
-  /** 页面标题 */
-  title: string
-  /** 是否显示边框 */
-  bordered?: boolean
-}
-
-const props = withDefaults(defineProps<Props>(), {
-  bordered: true
-})
-
-// 组件逻辑...
-</script>
-```
-
-## 错误处理规范
-
-### 统一错误处理
-```typescript
-// ✅ 错误类型定义
-enum ErrorCode {
-  NETWORK_ERROR = 'NETWORK_ERROR',
-  VALIDATION_ERROR = 'VALIDATION_ERROR',
-  PERMISSION_DENIED = 'PERMISSION_DENIED',
-  RESOURCE_NOT_FOUND = 'RESOURCE_NOT_FOUND'
-}
-
-interface AppError {
-  code: ErrorCode
-  message: string
-  details?: any
-  timestamp: number
-}
-
-// ✅ 错误处理工具
-class ErrorHandler {
-  /**
-   * 创建标准化错误对象
-   */
-  static createError(code: ErrorCode, message: string, details?: any): AppError {
-    return {
-      code,
-      message,
-      details,
-      timestamp: Date.now()
-    }
-  }
-
-  /**
-   * 处理API错误
-   */
-  static handleApiError(error: any): AppError {
-    if (error.response) {
-      const { status, data } = error.response
-      switch (status) {
-        case 404:
-          return this.createError(
-            ErrorCode.RESOURCE_NOT_FOUND,
-            '请求的资源不存在',
-            { originalError: error }
-          )
-        case 403:
-          return this.createError(
-            ErrorCode.PERMISSION_DENIED,
-            '没有权限访问该资源',
-            { originalError: error }
-          )
-        default:
-          return this.createError(
-            ErrorCode.NETWORK_ERROR,
-            data?.message || '网络请求失败',
-            { originalError: error }
-          )
-      }
-    }
-    
-    return this.createError(
-      ErrorCode.NETWORK_ERROR,
-      '网络连接失败',
-      { originalError: error }
-    )
-  }
-
-  /**
-   * 显示用户友好的错误消息
-   */
-  static showUserError(error: AppError) {
-    ElMessage.error(error.message)
-    
-    // 开发环境下输出详细错误信息
-    if (import.meta.env.DEV) {
-      console.error('错误详情:', error)
-    }
-  }
-}
-
-// ✅ 使用示例
-async function loadUserData(userId: string) {
-  try {
-    const response = await userApi.getUser(userId)
-    return response.data
-  } catch (error) {
-    const appError = ErrorHandler.handleApiError(error)
-    ErrorHandler.showUserError(appError)
-    throw appError
-  }
-}
-```
-
-### 组件级错误边界
-```vue
-<template>
-  <div class="error-boundary">
-    <template v-if="!hasError">
-      <slot />
-    </template>
-    <template v-else>
-      <div class="error-display">
-        <el-alert
-          title="组件加载失败"
-          :description="errorMessage"
-          type="error"
-          show-icon
-        >
-          <template #default>
-            <el-button @click="retry">重试</el-button>
-          </template>
-        </el-alert>
-      </div>
-    </template>
-  </div>
-</template>
-
-<script setup lang="ts">
-/**
- * 错误边界组件
- * 捕获子组件的错误并提供恢复机制
- */
-import { ref, onErrorCaptured } from 'vue'
-
-const hasError = ref(false)
-const errorMessage = ref('')
-
-// 捕获子组件错误
-onErrorCaptured((error: Error) => {
-  hasError.value = true
-  errorMessage.value = error.message
-  
-  // 记录错误到日志系统
-  console.error('组件错误:', error)
-  
-  // 阻止错误向上传播
-  return false
-})
-
-const retry = () => {
-  hasError.value = false
+2.  **Ensure Script Existence and Correctness:**
+    a.  Use your file system tools to check if the file `final_review_gate.py` exists in the project root.
+    b.  **If the file `final_review_gate.py` does NOT exist OR if its content does not EXACTLY match the Python script provided in section "Phase 0.1.Python Script Content" (you may need to read the existing file and compare):**
+        i.  You MUST create or overwrite the `final_review_gate.py` file in the project root.
+        ii. The content of this file MUST be *exactly* the Python script content provided above. Ensure all indentation, comments, and lines are preserved perfectly. Use your "create file" or "edit file" tool.
+        iii. After creating/overwriting it, announce: "The `final_review_gate.py` script has been created/updated in the project root with the latest interaction enhancements."
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
