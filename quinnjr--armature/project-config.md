@@ -1,241 +1,229 @@
 ---
 trigger: always_on
-description: This project maintains **85% code coverage** with a focus on **quality testing** over mere coverage metrics.
+description: Real-time communication with WebSockets and Server-Sent Events
 ---
 
 
-# Testing Standards
+# WebSocket & SSE
 
-This project maintains **85% code coverage** with a focus on **quality testing** over mere coverage metrics.
+Guidelines for real-time communication in Armature.
 
-## Coverage Target
-
-### 85% Coverage Goal
-
-```bash
-# Measure coverage with cargo-tarpaulin
-cargo tarpaulin --all-features --workspace --timeout 120 --out Xml --out Stdout
-
-# Or use cargo-llvm-cov
-cargo llvm-cov --all-features --workspace --html
-```
-
-**Target: 85% line coverage across the workspace**
-
-### Quality Over Quantity
-
-✅ **Good Coverage:**
-- Tests verify actual behavior
-- Tests catch real bugs
-- Tests document expected behavior
-- Tests are maintainable
-
-❌ **Bad Coverage:**
-- Tests just to increase percentage
-- Tests that don't verify anything meaningful
-- Tests that are brittle and break often
-- Tests that duplicate other tests
-
-### What Must Be Tested
-
-**High Priority (Aim for 95%+ coverage):**
-- Public API functions and methods
-- Business logic and algorithms
-- Error handling paths
-- Edge cases and boundary conditions
-- Data validation logic
-- Security-critical code
-
-**Medium Priority (Aim for 85%+ coverage):**
-- Internal helper functions
-- Configuration parsing
-- HTTP request/response handling
-- Middleware and interceptors
-
-**Lower Priority (Aim for 60%+ coverage):**
-- Simple getters/setters
-- Trivial constructors
-- Debug implementations
-- Logging statements
-
-**Can Skip:**
-- Generated code (proc macros)
-- Example code in `examples/`
-- Main entry points
-- Simple `#[derive]` implementations
-
-## Testing Pyramid
-
-### Unit Tests (70% of tests)
-
-Test individual functions and methods in isolation.
+## WebSocket Handler
 
 ```rust
-#[cfg(test)]
-mod tests {
-    use super::*;
+use armature_websocket::{WebSocket, Message};
 
-    #[test]
-    fn test_user_validation_valid_email() {
-        let user = User {
-            email: "user@example.com".to_string(),
-            name: "Alice".to_string(),
-        };
-        assert!(user.validate().is_ok());
-    }
-
-    #[test]
-    fn test_user_validation_invalid_email() {
-        let user = User {
-            email: "invalid-email".to_string(),
-            name: "Alice".to_string(),
-        };
-        let result = user.validate();
-        assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), ValidationError::InvalidEmail));
-    }
-
-    #[test]
-    fn test_edge_case_empty_name() {
-        let user = User {
-            email: "user@example.com".to_string(),
-            name: "".to_string(),
-        };
-        assert!(user.validate().is_err());
-    }
-}
-```
-
-### Integration Tests (25% of tests)
-
-Test how components work together.
-
-```rust
-// tests/integration_tests.rs
-use armature::prelude::*;
-use armature_testing::*;
-
-#[tokio::test]
-async fn test_user_registration_flow() {
-    // Arrange
-    let app = TestAppBuilder::new()
-        .add_module(UserModule::new())
-        .build()
-        .await
-        .unwrap();
-
-    let client = TestClient::new(app);
-
-    // Act
-    let response = client
-        .post("/api/users/register")
-        .json(&json!({
-            "email": "newuser@example.com",
-            "password": "SecurePass123!"
-        }))
-        .send()
-        .await;
-
-    // Assert
-    assert_eq!(response.status(), 201);
-    let body: UserDto = response.json().await;
-    assert_eq!(body.email, "newuser@example.com");
+#[controller("/ws")]
+pub struct WebSocketController {
+    connections: Arc<ConnectionManager>,
 }
 
-#[tokio::test]
-async fn test_authentication_and_authorization() {
-    let app = TestAppBuilder::new()
-        .add_module(AuthModule::new())
-        .add_module(UserModule::new())
-        .build()
-        .await
-        .unwrap();
+#[get("/chat")]
+async fn chat(&self, ws: WebSocket, user: AuthUser) -> Result<(), Error> {
+    let (tx, mut rx) = ws.split();
 
-    let client = TestClient::new(app);
+    // Register connection
+    self.connections.add(user.id, tx.clone()).await;
 
-    // Register user
-    let register_response = client
-        .post("/api/auth/register")
-        .json(&register_dto)
-        .send()
-        .await;
-
-    assert_eq!(register_response.status(), 201);
-
-    // Login
-    let login_response = client
-        .post("/api/auth/login")
-        .json(&login_dto)
-        .send()
-        .await;
-
-    let token = login_response.json::<TokenResponse>().await.token;
-
-    // Access protected route
-    let protected_response = client
-        .get("/api/users/me")
-        .bearer_auth(&token)
-        .send()
-        .await;
-
-    assert_eq!(protected_response.status(), 200);
-}
-```
-
-### End-to-End Tests (5% of tests)
-
-Test complete user workflows (fewer, more expensive tests).
-
-```rust
-// tests/e2e_tests.rs
-#[tokio::test]
-async fn test_complete_user_journey() {
-    // Start real server
-    let app = Application::create(AppModule);
-    let server = tokio::spawn(async move {
-        app.listen(8080).await.unwrap();
-    });
-
-    // Give server time to start
-    tokio::time::sleep(Duration::from_millis(100)).await;
-
-    let client = reqwest::Client::new();
-
-    // Complete workflow: register -> login -> create post -> fetch post -> delete
-    // ... full E2E test
+    // Handle incoming messages
+    while let Some(msg) = rx.next().await {
+        match msg? {
+            Message::Text(text) => {
+                self.handle_message(&user, &text).await?;
+            }
+            Message::Close(_) => break,
+            _ => {}
+        }
+    }
 
     // Cleanup
-    server.abort();
+    self.connections.remove(user.id).await;
+    Ok(())
 }
 ```
 
-## Testing Best Practices
-
-### AAA Pattern (Arrange-Act-Assert)
+## Connection Manager
 
 ```rust
-#[test]
-fn test_calculate_discount() {
-    // Arrange
-    let original_price = 100.0;
-    let discount_percentage = 20.0;
+pub struct ConnectionManager {
+    connections: DashMap<UserId, Sender<Message>>,
+}
 
-    // Act
-    let discounted_price = calculate_discount(original_price, discount_percentage);
+impl ConnectionManager {
+    pub async fn broadcast(&self, message: &str) {
+        for entry in self.connections.iter() {
+            let _ = entry.value().send(Message::Text(message.into())).await;
+        }
+    }
 
-    // Assert
-    assert_eq!(discounted_price, 80.0);
+    pub async fn send_to(&self, user_id: UserId, message: &str) -> Result<(), Error> {
+        if let Some(tx) = self.connections.get(&user_id) {
+            tx.send(Message::Text(message.into())).await?;
+        }
+        Ok(())
+    }
+
+    pub async fn send_to_room(&self, room: &str, message: &str) {
+        // Implement room-based routing
+    }
 }
 ```
 
-### Test One Thing Per Test
+## Message Protocol
 
 ```rust
-// ✅ Good: Each test verifies one specific behavior
-#[test]
-fn test_valid_email_passes_validation() {
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum ClientMessage {
+    #[serde(rename = "join")]
+    Join { room: String },
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+    #[serde(rename = "leave")]
+    Leave { room: String },
+
+    #[serde(rename = "message")]
+    Message { room: String, content: String },
+
+    #[serde(rename = "ping")]
+    Ping,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum ServerMessage {
+    #[serde(rename = "joined")]
+    Joined { room: String, users: Vec<String> },
+
+    #[serde(rename = "message")]
+    Message { from: String, content: String, timestamp: i64 },
+
+    #[serde(rename = "error")]
+    Error { code: String, message: String },
+
+    #[serde(rename = "pong")]
+    Pong,
+}
+```
+
+## Server-Sent Events
+
+```rust
+use armature_sse::{Sse, Event};
+
+#[controller("/events")]
+pub struct EventsController {
+    events: Arc<EventBroadcaster>,
+}
+
+#[get("/stream")]
+async fn stream(&self, user: AuthUser) -> Sse<impl Stream<Item = Event>> {
+    let rx = self.events.subscribe(user.id);
+
+    let stream = rx.map(|event| {
+        Event::default()
+            .event(&event.event_type)
+            .data(&event.data)
+            .id(&event.id)
+    });
+
+    Sse::new(stream)
+        .keep_alive(Duration::from_secs(30))
+}
+```
+
+## Event Broadcasting
+
+```rust
+pub struct EventBroadcaster {
+    sender: broadcast::Sender<ServerEvent>,
+}
+
+impl EventBroadcaster {
+    pub fn new(capacity: usize) -> Self {
+        let (sender, _) = broadcast::channel(capacity);
+        Self { sender }
+    }
+
+    pub fn subscribe(&self, _user_id: UserId) -> broadcast::Receiver<ServerEvent> {
+        self.sender.subscribe()
+    }
+
+    pub fn broadcast(&self, event: ServerEvent) {
+        let _ = self.sender.send(event);
+    }
+}
+```
+
+## Heartbeat / Keep-Alive
+
+```rust
+async fn handle_connection(ws: WebSocket) {
+    let (tx, mut rx) = ws.split();
+
+    // Spawn heartbeat task
+    let heartbeat = tokio::spawn({
+        let tx = tx.clone();
+        async move {
+            let mut interval = tokio::time::interval(Duration::from_secs(30));
+            loop {
+                interval.tick().await;
+                if tx.send(Message::Ping(vec![])).await.is_err() {
+                    break;
+                }
+            }
+        }
+    });
+
+    // Handle messages...
+
+    heartbeat.abort();
+}
+```
+
+## Scaling with Redis Pub/Sub
+
+```rust
+use redis::AsyncCommands;
+
+pub struct RedisEventBroadcaster {
+    redis: ConnectionManager,
+    channel: String,
+}
+
+impl RedisEventBroadcaster {
+    pub async fn publish(&self, event: &ServerEvent) -> Result<(), Error> {
+        let payload = serde_json::to_string(event)?;
+        self.redis.publish(&self.channel, payload).await?;
+        Ok(())
+    }
+
+    pub async fn subscribe(&self) -> impl Stream<Item = ServerEvent> {
+        let mut pubsub = self.redis.get_async_pubsub().await.unwrap();
+        pubsub.subscribe(&self.channel).await.unwrap();
+
+        pubsub.into_on_message().filter_map(|msg| async {
+            let payload: String = msg.get_payload().ok()?;
+            serde_json::from_str(&payload).ok()
+        })
+    }
+}
+```
+
+## Error Handling
+
+```rust
+async fn handle_message(msg: Result<Message, Error>) -> ControlFlow<(), Message> {
+    match msg {
+        Ok(Message::Text(text)) => ControlFlow::Continue(Message::Text(text)),
+        Ok(Message::Close(_)) => ControlFlow::Break(()),
+        Err(e) => {
+            tracing::error!(?e, "WebSocket error");
+            ControlFlow::Break(())
+        }
+        _ => ControlFlow::Continue(Message::Ping(vec![])),
+    }
+}
+```
 
 ---
 > Source: [quinnjr/armature](https://github.com/quinnjr/armature) — distributed by [TomeVault](https://tomevault.io).
