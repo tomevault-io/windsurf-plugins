@@ -1,83 +1,100 @@
 ---
 trigger: always_on
-description: Frameworks, libraries, and tools used in the project with their specific patterns and conventions
+description: Security considerations, performance patterns, code reusability, and DRY principles
 ---
 
 
-- **TypeScript Configuration**: Use strict TypeScript mode (strict: true). Target ES2020. Use CommonJS modules for Node.js compatibility. Enable declaration files for type definitions. Always define explicit return types for exported functions.
-  - export async function generateRules(config: GenerateRulesConfig = {}): Promise<RulesManagerResult>
-  - interface AnalysisResult {
-  success: boolean;
-  data?: AnalysisData;
-  error?: string;
+- **Security - Environment Variables**: Never hardcode API keys or sensitive credentials. Always use environment variables for sensitive data (CURSOR_API_KEY). Inherit environment variables when spawning processes. Never pass sensitive data as command-line arguments.
+  - env: {
+  ...process.env, // Inherit all environment variables (includes CURSOR_API_KEY)
+  PATH: process.env.PATH || '',
+}
+  - // Security Note: Always use environment variables for API keys. Never pass them as command-line arguments.
+
+- **Security - Process Execution**: Use spawn for executing external commands rather than eval or exec with user input. Validate inputs before passing to external processes. Handle process errors and timeouts appropriately.
+  - const childProcess = spawn('cursor-agent', args, {
+  stdio: ['ignore', 'pipe', 'pipe'],
+  env: { ...process.env },
+});
+  - const timeoutId = setTimeout(() => {
+  childProcess.kill();
+  // handle timeout
+}, timeout);
+
+- **Performance - Timeout Handling**: Set reasonable timeouts for long-running operations (default 5 minutes). Always clear timeouts when operations complete. Kill processes that exceed timeout to prevent resource leaks.
+  - const timeout = 300000; // 5 minute default timeout
+  - const timeoutId = setTimeout(() => {
+  childProcess.kill();
+  resolve({ success: false, error: `Analysis timeout...` });
+}, timeout);
+  - childProcess.on('close', (code) => {
+  clearTimeout(timeoutId);
+  // ...
+});
+
+- **Performance - File Operations**: Use synchronous file operations (readFileSync, writeFileSync) when appropriate for CLI tools. Check file existence before reading. Use recursive directory creation when needed. Normalize paths for comparison operations.
+  - if (!fs.existsSync(rulesDir)) {
+  fs.mkdirSync(rulesDir, { recursive: true });
+}
+  - const normalize = (s: string) => s.trim().replace(/\s+/g, ' ');
+return normalize(existingContent) !== normalize(newContent);
+
+- **Code Reusability - Helper Functions**: Extract reusable logic into helper functions. Create utility functions for common operations (filename generation, content comparison, directory management). Keep functions pure when possible (no side effects).
+  - export function generateFilename(categoryName: string): string
+  - export function needsUpdate(existingContent: string, newContent: string): boolean
+  - export function ensureRulesDirectory(rulesDir: string): void
+
+- **DRY Principle - Data Structures**: Define shared data structures in types.ts to avoid duplication. Use consistent result object patterns across functions. Reuse type definitions rather than redefining similar structures.
+  - // Define once in types.ts
+export interface AnalysisResult { ... }
+  - // Reuse across modules
+import { AnalysisResult, RulesManagerResult } from './types';
+
+- **DRY Principle - Conversion Logic**: Centralize format conversion logic in single functions. Reuse conversion functions rather than duplicating logic. Create utility functions for repeated transformations.
+  - export function convertToMDC(categoryName: string, category: RuleCategory): string { ... }
+  - export function parseRawOutput(rawOutput: string): AnalysisData | null { ... }
+
+- **Error Recovery - Fallback Parsing**: Provide fallback mechanisms when primary operations fail. Attempt alternative parsing methods when primary method fails. Provide meaningful error messages that guide users toward solutions.
+  - // Try to parse raw output as fallback
+if (analysisResult.rawOutput) {
+  const parsedData = parseRawOutput(analysisResult.rawOutput);
+  if (parsedData) {
+    analysisResult.data = parsedData;
+    analysisResult.success = true;
+  }
+}
+  - const jsonMatch = stdout.match(/\{[\s\S]*\}/);
+if (!jsonMatch) {
+  // fallback logic
 }
 
-- **Node.js Patterns**: Use Node.js built-in modules (child_process, fs, path) following Node.js conventions. Use spawn from child_process for executing external commands. Use fs.readFileSync/fs.writeFileSync for synchronous file operations when appropriate. Use path.join() for cross-platform path construction.
-  - import { spawn } from 'child_process';
-const process = spawn('cursor-agent', ['--version']);
-  - import * as fs from 'fs';
-import * as path from 'path';
-const filePath = path.join(baseDir, '.cursor', 'rules');
+- **User Experience - Clear Messaging**: Provide clear, actionable error messages. Include installation instructions in error messages when tools are missing. Use color coding in CLI output for better UX. Show progress for long-running operations.
+  - console.error(chalk.red('\nError: cursor-agent is not installed or not in PATH'));
+console.log(chalk.yellow('\nTo install cursor-agent, run:'));
+console.log(chalk.white('  curl https://cursor.com/install -fsS | bash\n'));
+  - console.log(chalk.gray('Analyzing codebase with cursor-agent...'));
+console.log(chalk.gray('This may take a few minutes...\n'));
 
-- **Commander.js CLI Framework**: Use commander for CLI interface. Define commands and options with descriptive names and help text. Use .action() for command handlers. Structure CLI with main command and subcommands. Use chalk for colored output in CLI. Include shebang (#!/usr/bin/env node) at top of CLI entry point.
-  - #!/usr/bin/env node
-const program = new Command();
-program
-  .name('agent-rule-sync')
-  .description('...')
-  .option('-v, --verbose', 'Enable verbose logging', false)
-  .action(async (options) => { });
-  - program
-  .command('check')
-  .description('Check if cursor-agent is installed')
-  .action(async () => { });
+- **Maintainability - Separation of Concerns**: Separate CLI logic from business logic. Keep file system operations separate from analysis logic. Separate type definitions into dedicated file. Keep modules focused on single responsibilities.
+  - cli.ts - handles CLI interface and user interaction
+  - analyzer.ts - handles cursor-agent integration
+  - rules-manager.ts - handles file system operations
+  - types.ts - central type definitions
 
-- **Chalk for Terminal Output**: Use chalk for colored terminal output to improve user experience. Use semantic color choices: green for success, red for errors, yellow for warnings, cyan for info, gray for secondary info. Use chalk.bold for emphasis.
-  - console.log(chalk.green('Success!'));
-  - console.error(chalk.red('Error: ...'));
-  - console.log(chalk.bold.cyan('\nAgent Rule Sync\n'));
-
-- **Promise-based Async Patterns**: Use async/await consistently, not Promise chains. Wrap spawn operations in Promise constructors for better control. Always handle errors in async functions with try-catch blocks.
-  - export async function checkCursorAgent(): Promise<CursorAgentCheck> {
-  return new Promise((resolve) => {
-    const process = spawn('cursor-agent', ['--version']);
-    // ... resolve/reject logic
-  });
-}
-  - try {
-  const result = await generateRules(config);
-} catch (error) {
-  // handle error
-}
-
-- **Type Definitions**: Define all types and interfaces in types.ts. Use descriptive interface names. Make properties optional (?) for values that may be undefined. Use union types for literal values. Export all public types.
+- **Maintainability - Configuration**: Use configuration objects for function parameters rather than many positional parameters. Provide sensible defaults. Allow configuration to be overridden. Document configuration options clearly.
   - export interface GenerateRulesConfig {
   outputDir?: string;
   verbose?: boolean;
   dryRun?: boolean;
   cwd?: string;
 }
-  - export interface CursorAgentCheck {
-  installed: boolean;
-  version?: string;
-  error?: string;
-}
+  - const config: GenerateRulesConfig = {
+  outputDir: options.output,
+  verbose: options.verbose,
+  dryRun: options.dryRun,
 
-- **ESLint Configuration**: Use TypeScript ESLint with strict type checking. Require explicit function return types (warn level). Disallow any type. Require await for promises. Allow console statements for CLI tools. Enforce const for variables that aren't reassigned. Use prefer-const and no-var rules. Configure unused variable ignore pattern with '^_' prefix.
-  - "@typescript-eslint/explicit-function-return-type": "warn"
-  - "@typescript-eslint/no-explicit-any": "error"
-  - "@typescript-eslint/no-floating-promises": "error"
-  - "@typescript-eslint/await-thenable": "error"
-  - "no-console": "off"
-  - "prefer-const": "error"
-  - "no-var": "error"
-
-- **Index File Re-exports**: Use index.ts as the main entry point to re-export public APIs from other modules. This provides a clean public API surface. Export types using export * from './types'.
-  - import { checkCursorAgent, analyzeCodebase } from './analyzer';
-import { getRulesDirectory, writeRules } from './rules-manager';
-export * from './types';
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/Srajangpt1)
-> This is a context snippet only. You'll also want the standalone SKILL.md file — [download at TomeVault](https://tomevault.io/claim/Srajangpt1)
-<!-- tomevault:4.0:windsurf_rules:2026-04-09 -->
+> Source: [Srajangpt1/agent-rule-sync](https://github.com/Srajangpt1/agent-rule-sync) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-07 -->
