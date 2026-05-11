@@ -1,169 +1,66 @@
 ---
 trigger: always_on
-description: **CRITICAL**: Before starting any work or making significant changes, AI assistants MUST:
+description: Horcrux stage labels, feature vs bug paths, beads writeback for agents using bd CLI (see also upstream beads.mdc from bd setup cursor).
 ---
 
-# Horcrux Cursor Rules
 
-## Project Documentation
+# Beads workflow (horcrux_app)
 
-### Always Read README and CONTRIBUTING Guide
-**CRITICAL**: Before starting any work or making significant changes, AI assistants MUST:
-- Read `README.md` to understand the project overview, purpose, and current state
-- Read `CONTRIBUTING.md` to understand development workflows, code generation requirements, and contribution guidelines
-- Reference these documents when:
-  - Starting a new feature or task
-  - Encountering questions about project structure or conventions
-  - Needing to understand build processes or tooling
-  - Working with code generation (Freezed, build_runner, etc.)
+Upstream beads integration lives in `beads.mdc` (`bd prime`, `bd ready`, hooks). **This rule adds our stage conventions** and handoff discipline.
 
-## Service and Repository Architecture
+## Sources of truth
 
-### When to Use Repositories
-Create a **Repository** class when data access meets ANY of these criteria:
-- Complex caching logic (in-memory + persistence)
-- Stream management for reactive updates
-- Multiple specialized queries (e.g., by ID, by status, filtered lists)
-- Multiple services need the same data access
-- Might swap storage implementations (SharedPreferences → SQLite)
-- Would be 100+ lines of data access code
+- **Tracked issues**: `.beads/` + `bd` CLI (agents run shell commands — do **not** rely on MCP for beads).
+- **Stage / blocked workflow**: [.beads/STAGES.md](../../.beads/STAGES.md) — definitive label meanings.
+- **Issue type**: use native `bd` issue type (`bug`, `feature`, `task`), not redundant `type:*` labels.
 
-**Example: VaultRepository**
-```dart
-final vaultRepositoryProvider = Provider<VaultRepository>((ref) {
-  final repository = VaultRepository();
-  ref.onDispose(() => repository.dispose());
-  return repository;
-});
+## Stage labels you must maintain
 
-class VaultRepository {
-  final StreamController<List<Vault>> _controller = StreamController.broadcast();
-  List<Vault>? _cache;
-  
-  Stream<List<Vault>> get stream => _controller.stream;
-  Future<List<Vault>> getAll() async { /* load + cache */ }
-  Future<Vault?> getById(String id) async { /* query cache */ }
-  Future<void> save(Vault vault) async { /* persist + notify */ }
-}
-```
+Exactly **one primary** `stage:*` label should be active per issue during normal flow. Optionally one `blocked-on:*`:
 
-### When to Use Services Only
-Use **Service-only** architecture (no repository) when:
-- Simple CRUD operations (read/write SharedPreferences)
-- Only one service needs this data
-- Minimal or no caching logic
-- No complex stream management
-- Under 100 lines of data access
+- Stage: `stage:triaged` … `stage:cleanup-needed` (see STAGES.md).
+- Blocked: `blocked-on:human` | `blocked-on:ci` | `blocked-on:agent`.
 
-**Example: Service-Only Pattern**
-```dart
-final myServiceProvider = Provider<MyService>((ref) {
-  return MyService(ref.read(otherServiceProvider));
-});
+When advancing a stage:
 
-class MyService {
-  final OtherService _otherService;
-  MyService(this._otherService);
-  
-  Future<void> doSomething() async {
-    final prefs = await SharedPreferences.getInstance();
-    // Simple data access inline
-  }
-}
-```
+1. `--remove-label` the old `stage:*` (and old `blocked-on:*` if it no longer applies).
+2. `--add-label` the new labels.
 
-### Service Pattern (Business Logic)
-All services MUST:
-- Be instance classes (not static)
-- Use dependency injection via Riverpod
-- Have a corresponding Provider
-- Accept dependencies via constructor
+Prefer `bd update <id>` with repeatable `--remove-label` / `--add-label` flags.
 
-**Example: Service with Dependencies**
-```dart
-final myServiceProvider = Provider<MyService>((ref) {
-  return MyService(
-    ref.read(repositoryProvider),
-    ref.read(otherServiceProvider),
-  );
-});
+Feature path (type `feature`):
 
-class MyService {
-  final MyRepository _repository;
-  final OtherService _otherService;
-  
-  MyService(this._repository, this._otherService);
-  
-  Future<Result> doBusinessLogic() async {
-    // Validation, orchestration, business rules
-    final data = await _repository.getData();
-    return _otherService.process(data);
-  }
-}
-```
+`triaged` → `planning` → `plan-review` → `implementing` → `cleanup` → `pre-pr-review` → `pr-open` ↔ `agent-fixing` (if CI/tooling fails) → `pr-review` → `merge-ready` → `cleanup-needed` → closed.
 
-### Breaking Circular Dependencies
-When services depend on each other, add explicit types:
+Bug path (type `bug`):
 
-```dart
-// Both providers need explicit types to break inference cycle
-final Provider<ServiceA> serviceAProvider = Provider<ServiceA>((ref) {
-  final ServiceB serviceB = ref.read(serviceBProvider);
-  return ServiceA(serviceB);
-});
+`triaged` → **`implementing` first** (theory-test loop stays here; skip `planning` / `plan-review` unless the bug is exploratory) → `cleanup` → `pre-pr-review` → same tail as features from `pr-open` onward.
 
-final Provider<ServiceB> serviceBProvider = Provider<ServiceB>((ref) {
-  final ServiceA serviceA = ref.read(serviceAProvider);
-  return ServiceB(serviceA);
-});
-```
+## Metadata for PR-linked work
 
-### Don't Create Thin Wrappers
-❌ **Bad: Thin repository that just delegates**
-```dart
-class KeyRepository {
-  final Ref _ref;
-  Future<String?> getKey() => KeyService.getKey();
-  Future<void> clearKey() {
-    await KeyService.clearKey();
-    _ref.invalidate(keyProvider);
-  }
-}
-```
+Set or refresh when opening a branch or PR:
 
-✅ **Good: Use service directly with providers**
-```dart
-final keyServiceProvider = Provider<KeyService>((ref) => KeyService());
+- `pr_url`, `branch`, `worktree` (absolute path, or omit if unknown)
 
-final currentKeyProvider = FutureProvider<String?>((ref) async {
-  final keyService = ref.watch(keyServiceProvider);
-  return await keyService.getCurrentKey();
-});
-```
+via `bd update <id> --metadata '{"pr_url":"…","branch":"…","worktree":"…"}'`.
 
-## Code Verification Requirements (MANDATORY)
+Put the same **bead issue ID** in the GitHub PR description (see `AGENTS.md` and `CONTRIBUTING.md`) so the PR and bd stay linked for reviewers.
 
-**CRITICAL**: AI assistants MUST verify code quality after EVERY change before responding to the user.
+## Mandatory writeback (every agent turn near completion)
 
-**⚠️ REMEMBER**: Every UI change requires:
-1. Check for golden tests → Update goldens if they exist
-2. Run `dart format .` 
-3. Run ReadLints and `flutter analyze`
-4. Commit UI changes + golden images together
+Before you stop or say work is done for this session:
 
-### ⚠️ COMMIT REQUIREMENTS (ESPECIALLY FOR PRs) ⚠️
+1. `bd show <id>` the issue you touched.
+2. `bd note` or `bd update <id> --append-notes "…"` with: current outcome, failing tests/commands, explicit **next step**, `pr_url`/branch pointers if relevant.
+3. Move **stage labels** to match reality (never leave stale `stage:implementing` if you already moved to cleanup or PR-ready).
 
-**BEFORE EVERY COMMIT** (especially when working on an open PR):
+Agents must **not** keep working silently after advancing to a human review stage (`plan-review`, `pre-pr-review`, `pr-review`).
 
-1. **Code Generation** ⚠️ MANDATORY - If you modified any `@freezed` classes or `@GenerateMocks` annotations:
-   - **MUST run**: `flutter pub run build_runner build --delete-conflicting-outputs`
-   - **MUST format**: `dart format .` (ALWAYS run after codegen - generated code needs formatting)
-   - **MUST commit**: Generated files with your changes
-2. **Format Code**: `dart format .` - MUST run before every commit
-3. **Check Linter**: Use ReadLints tool on modified files - MUST be clean
-4. **Run Analyzer**: `flutter analyze` - MUST show "No issues found!"
+If a change affects visible copy or form validators (especially `lib/widgets/*_form*.dart`), re-run matching `*_golden_test.dart` with `--tags golden`; update goldens via `--update-goldens` only when failures are intentional, then commit PNGs.
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+## Closing protocol
+
+Follow project/session rules in AGENTS.md and `bd prime` for `git push`, `bd dolt push`, and bead closure.
 
 ---
 > Source: [mplorentz/horcrux](https://github.com/mplorentz/horcrux) — distributed by [TomeVault](https://tomevault.io).
