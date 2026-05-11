@@ -1,184 +1,88 @@
 ---
 trigger: always_on
-description: 参考 [src/core/recorder.py](mdc:src/core/recorder.py) 的实现：
+description: 本目录包含了Gaia RPA项目的完整开发规范和最佳实践，用于指导后续开发工作。
 ---
 
-# 浏览器自动化开发规范
+# Gaia RPA Cursor Rules
 
-## Browser-Use 集成规范
+本目录包含了Gaia RPA项目的完整开发规范和最佳实践，用于指导后续开发工作。
 
-### 录制阶段实现
-参考 [src/core/recorder.py](mdc:src/core/recorder.py) 的实现：
+## 规则文件说明
 
-```python
-from browser_use import Agent
+### 1. project-overview.mdc
+- **项目概览**: 项目简介、核心架构、技术栈
+- **项目结构**: 目录结构说明和关键文件
+- **开发阶段**: 当前开发进度和计划
 
-class WorkflowRecorder:
-    """Browser-Use工作流录制器"""
-    
-    async def record_workflow(self, name: str, task_description: str) -> Workflow:
-        """使用Browser-Use录制工作流"""
-        agent = Agent(
-            task=task_description,
-            llm=self.llm,
-            browser_config=self.browser_config
-        )
-        
-        # 启动录制会话
-        result = await agent.run()
-        
-        # 转换为标准工作流格式
-        workflow = self._convert_to_workflow(result, name)
-        return workflow
-```
+### 2. coding-standards.mdc
+- **Python编码规范**: 代码风格、类型注解、异步编程
+- **文档字符串**: Google风格的文档规范
+- **错误处理**: 异常处理和日志记录
+- **测试规范**: 单元测试和异步测试
 
-### Browser-Use 配置
-```python
-from browser_use import BrowserConfig
+### 3. architecture-patterns.mdc
+- **核心架构模式**: 三阶段架构和分层设计
+- **设计模式**: 策略模式、工厂模式、观察者模式
+- **数据模型设计**: Pydantic模型和序列化
+- **并发和异步设计**: 异步编程和并发控制
 
-browser_config = BrowserConfig(
-    headless=False,           # 录制时显示浏览器
-    browser_type="chromium",  # 使用Chromium
-    viewport_size=(1920, 1080),
-    user_data_dir="./chrome-profiles",  # 复用浏览器配置
-    extra_chromium_args=[
-        "--disable-blink-features=AutomationControlled",
-        "--disable-dev-shm-usage"
-    ]
-)
-```
+### 4. web-ui-development.mdc
+- **FastAPI开发规范**: API路由设计和错误处理
+- **模板开发规范**: Jinja2模板和组件化设计
+- **前端JavaScript规范**: 模块化和异步请求处理
+- **性能优化**: 前端和后端优化策略
 
-### 步骤类型映射
-Browser-Use动作到工作流步骤的映射：
+### 5. browser-automation.mdc
+- **Browser-Use集成**: 录制阶段实现和配置
+- **Playwright执行规范**: 执行器架构和步骤执行器
+- **浏览器配置管理**: Chrome Profile复用和浏览器池
+- **选择器优化策略**: 智能选择器生成和XPath优化
 
-```python
-BROWSER_USE_TO_STEP_TYPE = {
-    "navigate": StepType.NAVIGATE,
-    "click": StepType.CLICK,
-    "type": StepType.FILL,
-    "select": StepType.SELECT,
-    "wait": StepType.WAIT,
-    "scroll": StepType.SCROLL,
-    "hover": StepType.HOVER,
-    "press": StepType.PRESS_KEY,
-    "screenshot": StepType.SCREENSHOT,
-    "extract": StepType.EXTRACT
-}
-```
+### 6. development-workflow.mdc
+- **开发流程**: 分支管理和提交规范
+- **环境管理**: 虚拟环境和依赖管理
+- **代码质量保证**: 代码检查工具和预提交钩子
+- **调试和日志**: 结构化日志和性能监控
 
-## Playwright 执行规范
+## 使用指南
 
-### 执行器架构
-```python
-from playwright.async_api import async_playwright, Browser, Page
+### 新功能开发
+1. 查看 project-overview.mdc 了解项目整体架构
+2. 参考 architecture-patterns.mdc 选择合适的设计模式
+3. 遵循 coding-standards.mdc 编写代码
+4. 按照 development-workflow.mdc 提交代码
 
-class PlaywrightExecutor:
-    """Playwright工作流执行器"""
-    
-    def __init__(self):
-        self.browser: Optional[Browser] = None
-        self.context = None
-        self.page: Optional[Page] = None
-    
-    async def execute_workflow(self, workflow: Workflow, context: Dict[str, str]) -> ExecutionResult:
-        """执行工作流"""
-        try:
-            await self._setup_browser()
-            
-            for step in workflow.steps:
-                await self._execute_step(step, context)
-                
-            return ExecutionResult(success=True)
-            
-        except Exception as e:
-            logger.error("工作流执行失败", error=str(e))
-            return ExecutionResult(success=False, error=str(e))
-        finally:
-            await self._cleanup()
-```
+### Web UI开发
+1. 参考 web-ui-development.mdc 了解技术栈
+2. 使用FastAPI创建RESTful API
+3. 使用Jinja2模板和Bootstrap构建前端
+4. 遵循模块化JavaScript开发规范
 
-### 步骤执行器
-使用工厂模式创建不同类型的步骤执行器：
+### 浏览器自动化开发
+1. 查看 browser-automation.mdc 了解核心概念
+2. 使用Browser-Use进行录制功能开发
+3. 使用Playwright进行执行功能开发
+4. 实现智能的选择器优化和错误处理
 
-```python
-class StepExecutor(ABC):
-    @abstractmethod
-    async def execute(self, page: Page, step: WorkflowStep, context: Dict[str, str]) -> StepResult:
-        pass
+## 重要提醒
 
-class NavigateExecutor(StepExecutor):
-    async def execute(self, page: Page, step: WorkflowStep, context: Dict[str, str]) -> StepResult:
-        url = self._render_template(step.url, context)
-        await page.goto(url, timeout=step.timeout or 30000)
-        return StepResult(success=True, step_id=step.id)
+### 必须遵循的规范
+- ✅ 所有异步函数必须使用 `async/await`
+- ✅ 使用结构化日志记录
+- ✅ 遵循三阶段架构：录制→执行→自愈
+- ✅ 使用Pydantic进行数据验证
+- ✅ 实现适当的错误处理和重试机制
 
-class ClickExecutor(StepExecutor):
-    async def execute(self, page: Page, step: WorkflowStep, context: Dict[str, str]) -> StepResult:
-        selector = step.selector or step.xpath
-        await page.click(selector, timeout=step.timeout or 10000)
-        return StepResult(success=True, step_id=step.id)
+### 开发阶段要求
+- **Phase 2**: 当前正在开发执行功能，需要实现Playwright执行器
+- **浏览器自动化**: 必须支持Browser-Use录制和Playwright执行
+- **并发处理**: 需要实现浏览器池和并发控制
+- **模板渲染**: 支持Jinja2模板变量替换
 
-class FillExecutor(StepExecutor):
-    async def execute(self, page: Page, step: WorkflowStep, context: Dict[str, str]) -> StepResult:
-        selector = step.selector or step.xpath
-        value = self._render_template(step.value, context)
-        await page.fill(selector, value, timeout=step.timeout or 10000)
-        return StepResult(success=True, step_id=step.id)
-```
+## 更新说明
 
-### 并发执行管理
-```python
-import asyncio
-from asyncio import Semaphore
-
-class ConcurrentExecutor:
-    def __init__(self, max_concurrent: int = 5):
-        self.semaphore = Semaphore(max_concurrent)
-        self.browser_pool = BrowserPool(max_browsers=max_concurrent)
-    
-    async def execute_batch(self, workflows: List[Workflow]) -> List[ExecutionResult]:
-        """批量执行工作流"""
-        tasks = []
-        for workflow in workflows:
-            task = self._execute_with_semaphore(workflow)
-            tasks.append(task)
-        
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-        return [r if isinstance(r, ExecutionResult) else ExecutionResult(success=False, error=str(r)) for r in results]
-    
-    async def _execute_with_semaphore(self, workflow: Workflow) -> ExecutionResult:
-        async with self.semaphore:
-            browser = await self.browser_pool.acquire()
-            try:
-                executor = PlaywrightExecutor(browser)
-                return await executor.execute_workflow(workflow)
-            finally:
-                await self.browser_pool.release(browser)
-```
-
-## 浏览器配置管理
-
-### Chrome Profile 复用
-```python
-class BrowserProfileManager:
-    """浏览器配置文件管理器"""
-    
-    def __init__(self, profiles_dir: Path = Path("chrome-profiles")):
-        self.profiles_dir = profiles_dir
-        self.profiles_dir.mkdir(exist_ok=True)
-    
-    def get_profile_path(self, profile_name: str = "default") -> Path:
-        """获取浏览器配置文件路径"""
-        profile_path = self.profiles_dir / profile_name
-        profile_path.mkdir(exist_ok=True)
-        return profile_path
-    
-    async def launch_with_profile(self, profile_name: str = "default") -> Browser:
-        """使用指定配置文件启动浏览器"""
-        async with async_playwright() as p:
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+这些规则基于项目当前状态（Phase 1完成，Phase 2进行中）制定，随着项目发展可能需要更新。如果发现规则与实际开发需求不符，请及时更新相关规则文件。
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/WW-AI-Lab) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-09 -->
+> Source: [WW-AI-Lab/browser-use-playwright](https://github.com/WW-AI-Lab/browser-use-playwright) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-07 -->
