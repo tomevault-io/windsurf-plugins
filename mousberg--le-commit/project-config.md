@@ -1,12 +1,6 @@
 ---
 trigger: always_on
-description: description: This application uses an event-driven architecture with database triggers and webhooks for asynchronous processing.
----
-
----
-description: This application uses an event-driven architecture with database triggers and webhooks for asynchronous processing.
-globs:
-alwaysApply: false
+description: Always use `pnpm` commands instead of `npm`. Everything except documentation lives in the `frontend` folder.
 ---
 
 ---
