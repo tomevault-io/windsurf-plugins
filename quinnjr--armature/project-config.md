@@ -1,226 +1,218 @@
 ---
 trigger: always_on
-description: Guidelines for developing cloud provider integrations in Armature.
+description: Database integration patterns for Armature applications
 ---
 
 
-# Cloud Provider Integrations
+# Database Integration
 
-Guidelines for developing cloud provider integrations in Armature.
+Guidelines for database integration with Diesel or SeaORM.
 
-## Cloud Crates Overview
-
-| Crate | Provider | Services |
-|-------|----------|----------|
-| `armature-aws` | AWS | S3, DynamoDB, SQS, SNS, SES, Lambda, KMS, Cognito |
-| `armature-gcp` | GCP | Cloud Storage, Pub/Sub, Firestore, Spanner, BigQuery |
-| `armature-azure` | Azure | Blob Storage, Cosmos DB, Service Bus, Key Vault |
-| `armature-redis` | Redis | Connection pooling, Pub/Sub, Cluster |
-| `armature-lambda` | AWS Lambda | Lambda runtime integration |
-| `armature-cloudrun` | Cloud Run | Cloud Run runtime integration |
-| `armature-azure-functions` | Azure Functions | Azure Functions runtime |
-
-## Architecture Pattern
-
-### Feature-Gated Services
-
-Each cloud crate uses feature flags to enable only needed services:
-
-```toml
-# armature-aws/Cargo.toml
-[features]
-default = []
-full = ["s3", "dynamodb", "sqs", "sns", "ses", "lambda", "kms", "cognito"]
-s3 = ["aws-sdk-s3"]
-dynamodb = ["aws-sdk-dynamodb"]
-sqs = ["aws-sdk-sqs"]
-sns = ["aws-sdk-sns"]
-ses = ["aws-sdk-ses"]
-lambda = ["aws-sdk-lambda"]
-kms = ["aws-sdk-kms"]
-cognito = ["aws-sdk-cognitoidentityprovider"]
-```
-
-### Service Factory Pattern
+## Connection Pooling
 
 ```rust
-// armature-aws/src/lib.rs
-pub struct AwsServices {
-    config: AwsConfig,
-    #[cfg(feature = "s3")]
-    s3: OnceCell<S3Client>,
-    #[cfg(feature = "dynamodb")]
-    dynamodb: OnceCell<DynamoDbClient>,
-    // ... other services
-}
+use diesel::r2d2::{ConnectionManager, Pool};
+use diesel::PgConnection;
 
-impl AwsServices {
-    pub async fn new(config: AwsConfig) -> Result<Self, AwsError> {
-        Ok(Self {
-            config,
-            #[cfg(feature = "s3")]
-            s3: OnceCell::new(),
-            #[cfg(feature = "dynamodb")]
-            dynamodb: OnceCell::new(),
-        })
-    }
+pub type DbPool = Pool<ConnectionManager<PgConnection>>;
 
-    #[cfg(feature = "s3")]
-    pub fn s3(&self) -> Result<&S3Client, AwsError> {
-        self.s3.get_or_try_init(|| {
-            S3Client::new(&self.config.sdk_config)
-        })
-    }
-
-    #[cfg(feature = "dynamodb")]
-    pub fn dynamodb(&self) -> Result<&DynamoDbClient, AwsError> {
-        self.dynamodb.get_or_try_init(|| {
-            DynamoDbClient::new(&self.config.sdk_config)
-        })
-    }
+pub fn create_pool(database_url: &str) -> DbPool {
+    let manager = ConnectionManager::<PgConnection>::new(database_url);
+    Pool::builder()
+        .max_size(10)
+        .min_idle(Some(2))
+        .connection_timeout(Duration::from_secs(5))
+        .build(manager)
+        .expect("Failed to create pool")
 }
 ```
 
-### Configuration from Environment
+## Repository Pattern
 
 ```rust
-// armature-aws/src/config.rs
-#[derive(Debug, Clone)]
-pub struct AwsConfig {
-    pub region: String,
-    pub sdk_config: SdkConfig,
-    enabled_services: HashSet<String>,
-}
-
-impl AwsConfig {
-    pub fn from_env() -> AwsConfigBuilder {
-        AwsConfigBuilder {
-            region: std::env::var("AWS_REGION").ok(),
-            profile: std::env::var("AWS_PROFILE").ok(),
-            endpoint_url: std::env::var("AWS_ENDPOINT_URL").ok(),
-            enabled_services: HashSet::new(),
-        }
-    }
-
-    pub fn builder() -> AwsConfigBuilder {
-        AwsConfigBuilder::default()
-    }
-}
-
-#[derive(Default)]
-pub struct AwsConfigBuilder {
-    region: Option<String>,
-    profile: Option<String>,
-    endpoint_url: Option<String>,
-    enabled_services: HashSet<String>,
-}
-
-impl AwsConfigBuilder {
-    pub fn region(mut self, region: impl Into<String>) -> Self {
-        self.region = Some(region.into());
-        self
-    }
-
-    pub fn enable_s3(mut self) -> Self {
-        self.enabled_services.insert("s3".to_string());
-        self
-    }
-
-    pub fn enable_dynamodb(mut self) -> Self {
-        self.enabled_services.insert("dynamodb".to_string());
-        self
-    }
-
-    pub async fn build(self) -> Result<AwsConfig, AwsError> {
-        let mut config_loader = aws_config::defaults(BehaviorVersion::latest());
-
-        if let Some(region) = &self.region {
-            config_loader = config_loader.region(Region::new(region.clone()));
-        }
-
-        if let Some(endpoint) = &self.endpoint_url {
-            config_loader = config_loader.endpoint_url(endpoint);
-        }
-
-        let sdk_config = config_loader.load().await;
-
-        Ok(AwsConfig {
-            region: self.region.unwrap_or_else(|| "us-east-1".to_string()),
-            sdk_config,
-            enabled_services: self.enabled_services,
-        })
-    }
-}
-```
-
-## DI Integration Pattern
-
-```rust
-// In user's module
-use armature::prelude::*;
-use armature_aws::*;
-
-#[module(
-    providers: [AwsServicesProvider],
-    controllers: [FileController],
-)]
-struct CloudModule;
-
-// Provider for DI
 #[injectable]
-pub struct AwsServicesProvider {
-    services: Arc<AwsServices>,
+pub struct UserRepository {
+    pool: Arc<DbPool>,
 }
 
-impl AwsServicesProvider {
-    pub async fn new() -> Result<Self, AwsError> {
-        let config = AwsConfig::from_env()
-            .enable_s3()
-            .enable_sqs()
-            .build()
-            .await?;
+impl UserRepository {
+    pub async fn find_by_id(&self, id: Uuid) -> Result<Option<User>, DbError> {
+        let conn = self.pool.get()?;
 
-        let services = AwsServices::new(config).await?;
+        users::table
+            .find(id)
+            .first(&conn)
+            .optional()
+            .map_err(Into::into)
+    }
 
-        Ok(Self {
-            services: Arc::new(services),
-        })
+    pub async fn create(&self, new_user: NewUser) -> Result<User, DbError> {
+        let conn = self.pool.get()?;
+
+        diesel::insert_into(users::table)
+            .values(&new_user)
+            .get_result(&conn)
+            .map_err(Into::into)
     }
 }
+```
 
-// Usage in controller
-#[controller("/files")]
-struct FileController {
-    aws: AwsServicesProvider,
+## Transactions
+
+```rust
+pub async fn transfer_funds(
+    &self,
+    from: Uuid,
+    to: Uuid,
+    amount: Decimal,
+) -> Result<(), DbError> {
+    let conn = self.pool.get()?;
+
+    conn.transaction(|conn| {
+        // Debit source account
+        diesel::update(accounts::table.find(from))
+            .set(accounts::balance.eq(accounts::balance - amount))
+            .execute(conn)?;
+
+        // Credit destination account
+        diesel::update(accounts::table.find(to))
+            .set(accounts::balance.eq(accounts::balance + amount))
+            .execute(conn)?;
+
+        Ok(())
+    })
+}
+```
+
+## Query Optimization
+
+```rust
+// Select only needed columns
+users::table
+    .select((users::id, users::name, users::email))
+    .load::<(Uuid, String, String)>(&conn)?;
+
+// Use joins instead of N+1 queries
+users::table
+    .inner_join(posts::table)
+    .filter(users::id.eq(user_id))
+    .select((users::all_columns, posts::all_columns))
+    .load::<(User, Post)>(&conn)?;
+
+// Paginate large result sets
+users::table
+    .order(users::created_at.desc())
+    .limit(20)
+    .offset(page * 20)
+    .load::<User>(&conn)?;
+```
+
+## Model Definitions
+
+```rust
+use diesel::prelude::*;
+
+#[derive(Queryable, Identifiable, Selectable)]
+#[diesel(table_name = users)]
+pub struct User {
+    pub id: Uuid,
+    pub name: String,
+    pub email: String,
+    pub password_hash: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
 
-impl FileController {
-    #[post("/upload")]
-    async fn upload(&self, body: Bytes) -> Result<Json<UploadResponse>, Error> {
-        let s3 = self.aws.services.s3()?;
+#[derive(Insertable)]
+#[diesel(table_name = users)]
+pub struct NewUser {
+    pub name: String,
+    pub email: String,
+    pub password_hash: String,
+}
 
-        s3.put_object()
-            .bucket("my-bucket")
-            .key("file.txt")
-            .body(body.into())
-            .send()
-            .await?;
+#[derive(AsChangeset)]
+#[diesel(table_name = users)]
+pub struct UpdateUser {
+    pub name: Option<String>,
+    pub email: Option<String>,
+}
+```
 
-        Ok(Json(UploadResponse { success: true }))
-    }
+## Migrations
+
+```bash
+# Create migration
+diesel migration generate create_users
+
+# Run migrations
+diesel migration run
+
+# Revert last migration
+diesel migration revert
+```
+
+Migration file structure:
+
+```sql
+-- up.sql
+CREATE TABLE users (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(100) NOT NULL,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_users_email ON users(email);
+
+-- down.sql
+DROP TABLE users;
+```
+
+## Testing with Transactions
+
+```rust
+#[tokio::test]
+async fn test_user_creation() {
+    let pool = create_test_pool();
+    let conn = pool.get().unwrap();
+
+    // Wrap test in transaction that rolls back
+    conn.test_transaction(|conn| {
+        let repo = UserRepository::new(pool.clone());
+
+        let user = repo.create(NewUser {
+            name: "Test".into(),
+            email: "test@example.com".into(),
+            password_hash: "hash".into(),
+        })?;
+
+        assert_eq!(user.name, "Test");
+        Ok(())
+    });
 }
 ```
 
 ## Error Handling
 
-### Unified Error Type
-
 ```rust
-// armature-aws/src/error.rs
-use thiserror::Error;
+#[derive(Error, Debug)]
+pub enum DbError {
+    #[error("Record not found")]
+    NotFound,
 
+    #[error("Duplicate key: {0}")]
+    Duplicate(String),
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+    #[error("Connection error: {0}")]
+    Connection(#[from] r2d2::Error),
+
+    #[error("Query error: {0}")]
+    Query(#[from] diesel::result::Error),
+}
+```
 
 ---
 > Source: [quinnjr/armature](https://github.com/quinnjr/armature) — distributed by [TomeVault](https://tomevault.io).
