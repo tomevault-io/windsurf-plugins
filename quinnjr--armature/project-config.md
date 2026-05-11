@@ -1,174 +1,241 @@
 ---
 trigger: always_on
-description: Security and authentication standards for Armature applications
+description: This project maintains **85% code coverage** with a focus on **quality testing** over mere coverage metrics.
 ---
 
 
-# Security & Authentication
+# Testing Standards
 
-Security standards for authentication, authorization, and secure coding.
+This project maintains **85% code coverage** with a focus on **quality testing** over mere coverage metrics.
 
-## Password Hashing
+## Coverage Target
 
-Use Argon2id (preferred) or bcrypt:
+### 85% Coverage Goal
 
-```rust
-use argon2::{Argon2, PasswordHasher, PasswordVerifier};
-use argon2::password_hash::{SaltString, rand_core::OsRng};
+```bash
+# Measure coverage with cargo-tarpaulin
+cargo tarpaulin --all-features --workspace --timeout 120 --out Xml --out Stdout
 
-pub fn hash_password(password: &str) -> Result<String, AuthError> {
-    let salt = SaltString::generate(&mut OsRng);
-    let argon2 = Argon2::default();
-
-    Ok(argon2
-        .hash_password(password.as_bytes(), &salt)?
-        .to_string())
-}
-
-pub fn verify_password(password: &str, hash: &str) -> Result<bool, AuthError> {
-    let parsed_hash = PasswordHash::new(hash)?;
-    Ok(Argon2::default()
-        .verify_password(password.as_bytes(), &parsed_hash)
-        .is_ok())
-}
+# Or use cargo-llvm-cov
+cargo llvm-cov --all-features --workspace --html
 ```
 
-## JWT Configuration
+**Target: 85% line coverage across the workspace**
+
+### Quality Over Quantity
+
+✅ **Good Coverage:**
+- Tests verify actual behavior
+- Tests catch real bugs
+- Tests document expected behavior
+- Tests are maintainable
+
+❌ **Bad Coverage:**
+- Tests just to increase percentage
+- Tests that don't verify anything meaningful
+- Tests that are brittle and break often
+- Tests that duplicate other tests
+
+### What Must Be Tested
+
+**High Priority (Aim for 95%+ coverage):**
+- Public API functions and methods
+- Business logic and algorithms
+- Error handling paths
+- Edge cases and boundary conditions
+- Data validation logic
+- Security-critical code
+
+**Medium Priority (Aim for 85%+ coverage):**
+- Internal helper functions
+- Configuration parsing
+- HTTP request/response handling
+- Middleware and interceptors
+
+**Lower Priority (Aim for 60%+ coverage):**
+- Simple getters/setters
+- Trivial constructors
+- Debug implementations
+- Logging statements
+
+**Can Skip:**
+- Generated code (proc macros)
+- Example code in `examples/`
+- Main entry points
+- Simple `#[derive]` implementations
+
+## Testing Pyramid
+
+### Unit Tests (70% of tests)
+
+Test individual functions and methods in isolation.
 
 ```rust
-// Use RS256 for production, HS256 only for development
-pub struct JwtConfig {
-    pub algorithm: Algorithm,      // RS256 preferred
-    pub access_ttl: Duration,      // 15 minutes max
-    pub refresh_ttl: Duration,     // 7 days max
-    pub issuer: String,
-    pub audience: Vec<String>,
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-// Always validate claims
-fn validate_token(token: &str) -> Result<Claims, AuthError> {
-    let mut validation = Validation::new(Algorithm::RS256);
-    validation.set_audience(&["my-app"]);
-    validation.set_issuer(&["my-issuer"]);
-    validation.validate_exp = true;
-    validation.validate_nbf = true;
+    #[test]
+    fn test_user_validation_valid_email() {
+        let user = User {
+            email: "user@example.com".to_string(),
+            name: "Alice".to_string(),
+        };
+        assert!(user.validate().is_ok());
+    }
 
-    decode::<Claims>(token, &key, &validation)
-}
-```
+    #[test]
+    fn test_user_validation_invalid_email() {
+        let user = User {
+            email: "invalid-email".to_string(),
+            name: "Alice".to_string(),
+        };
+        let result = user.validate();
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), ValidationError::InvalidEmail));
+    }
 
-## OAuth2 / PKCE
-
-Always use PKCE for public clients:
-
-```rust
-use pkce::{CodeChallenge, CodeVerifier};
-
-let verifier = CodeVerifier::new();
-let challenge = CodeChallenge::from_verifier(&verifier);
-
-// Store verifier in session, send challenge to authorization server
-```
-
-## Authorization Guards
-
-```rust
-#[injectable]
-pub struct RoleGuard {
-    required_roles: Vec<String>,
-}
-
-impl Guard for RoleGuard {
-    async fn can_activate(&self, ctx: &RequestContext) -> Result<bool, GuardError> {
-        let user = ctx.get::<AuthenticatedUser>()?;
-
-        let has_role = self.required_roles
-            .iter()
-            .any(|role| user.roles.contains(role));
-
-        if !has_role {
-            // Log authorization failure
-            tracing::warn!(
-                user_id = %user.id,
-                required = ?self.required_roles,
-                "Authorization denied"
-            );
-        }
-
-        Ok(has_role)
+    #[test]
+    fn test_edge_case_empty_name() {
+        let user = User {
+            email: "user@example.com".to_string(),
+            name: "".to_string(),
+        };
+        assert!(user.validate().is_err());
     }
 }
 ```
 
-## Input Validation
+### Integration Tests (25% of tests)
+
+Test how components work together.
 
 ```rust
-use validator::Validate;
+// tests/integration_tests.rs
+use armature::prelude::*;
+use armature_testing::*;
 
-#[derive(Deserialize, Validate)]
-pub struct LoginRequest {
-    #[validate(email)]
-    pub email: String,
+#[tokio::test]
+async fn test_user_registration_flow() {
+    // Arrange
+    let app = TestAppBuilder::new()
+        .add_module(UserModule::new())
+        .build()
+        .await
+        .unwrap();
 
-    #[validate(length(min = 8, max = 128))]
-    pub password: String,
+    let client = TestClient::new(app);
+
+    // Act
+    let response = client
+        .post("/api/users/register")
+        .json(&json!({
+            "email": "newuser@example.com",
+            "password": "SecurePass123!"
+        }))
+        .send()
+        .await;
+
+    // Assert
+    assert_eq!(response.status(), 201);
+    let body: UserDto = response.json().await;
+    assert_eq!(body.email, "newuser@example.com");
 }
 
-// Always validate before processing
-async fn login(req: Json<LoginRequest>) -> Result<Response, Error> {
-    req.validate()?;
-    // ...
+#[tokio::test]
+async fn test_authentication_and_authorization() {
+    let app = TestAppBuilder::new()
+        .add_module(AuthModule::new())
+        .add_module(UserModule::new())
+        .build()
+        .await
+        .unwrap();
+
+    let client = TestClient::new(app);
+
+    // Register user
+    let register_response = client
+        .post("/api/auth/register")
+        .json(&register_dto)
+        .send()
+        .await;
+
+    assert_eq!(register_response.status(), 201);
+
+    // Login
+    let login_response = client
+        .post("/api/auth/login")
+        .json(&login_dto)
+        .send()
+        .await;
+
+    let token = login_response.json::<TokenResponse>().await.token;
+
+    // Access protected route
+    let protected_response = client
+        .get("/api/users/me")
+        .bearer_auth(&token)
+        .send()
+        .await;
+
+    assert_eq!(protected_response.status(), 200);
 }
 ```
 
-## Security Headers
+### End-to-End Tests (5% of tests)
+
+Test complete user workflows (fewer, more expensive tests).
 
 ```rust
-fn security_headers() -> impl Middleware {
-    SecurityHeaders::new()
-        .content_security_policy("default-src 'self'")
-        .strict_transport_security(Duration::days(365), true)
-        .x_frame_options(XFrameOptions::Deny)
-        .x_content_type_options(XContentTypeOptions::NoSniff)
-        .referrer_policy(ReferrerPolicy::StrictOriginWhenCrossOrigin)
+// tests/e2e_tests.rs
+#[tokio::test]
+async fn test_complete_user_journey() {
+    // Start real server
+    let app = Application::create(AppModule);
+    let server = tokio::spawn(async move {
+        app.listen(8080).await.unwrap();
+    });
+
+    // Give server time to start
+    tokio::time::sleep(Duration::from_millis(100)).await;
+
+    let client = reqwest::Client::new();
+
+    // Complete workflow: register -> login -> create post -> fetch post -> delete
+    // ... full E2E test
+
+    // Cleanup
+    server.abort();
 }
 ```
 
-## Cookie Security
+## Testing Best Practices
+
+### AAA Pattern (Arrange-Act-Assert)
 
 ```rust
-Cookie::build("session", token)
-    .http_only(true)      // Prevent XSS access
-    .secure(true)         // HTTPS only
-    .same_site(SameSite::Strict)
-    .max_age(Duration::hours(1))
-    .path("/")
-    .finish()
+#[test]
+fn test_calculate_discount() {
+    // Arrange
+    let original_price = 100.0;
+    let discount_percentage = 20.0;
+
+    // Act
+    let discounted_price = calculate_discount(original_price, discount_percentage);
+
+    // Assert
+    assert_eq!(discounted_price, 80.0);
+}
 ```
 
-## Secrets Management
+### Test One Thing Per Test
 
 ```rust
-// Never log sensitive data
-tracing::info!(user_id = %user.id, "Login successful");
-// NOT: tracing::info!(password = %password, "Login attempt");
+// ✅ Good: Each test verifies one specific behavior
+#[test]
+fn test_valid_email_passes_validation() {
 
-// Use constant-time comparison for secrets
-use subtle::ConstantTimeEq;
-secret1.as_bytes().ct_eq(secret2.as_bytes()).into()
-```
-
-## Checklist
-
-- [ ] Use Argon2id for password hashing
-- [ ] JWT access tokens ≤ 15 minutes
-- [ ] RS256 algorithm in production
-- [ ] PKCE for OAuth2 public clients
-- [ ] Validate all user input
-- [ ] Set security headers
-- [ ] HttpOnly + Secure cookies
-- [ ] Never log sensitive data
-- [ ] Run `cargo audit` regularly
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [quinnjr/armature](https://github.com/quinnjr/armature) — distributed by [TomeVault](https://tomevault.io).
