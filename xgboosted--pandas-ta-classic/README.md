@@ -7,12 +7,12 @@ Technical Analysis Indicators - Pandas TA Classic is an easy to use Python 3 Pan
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `copilot-instructions.md` in [xgboosted/pandas-ta-classic](https://github.com/xgboosted/pandas-ta-classic).
+Original source: `AGENTS.md` in [xgboosted/pandas-ta-classic](https://github.com/xgboosted/pandas-ta-classic).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
+- **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
