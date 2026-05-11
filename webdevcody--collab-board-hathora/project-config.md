@@ -1,10 +1,10 @@
 ---
 trigger: always_on
-description: please never try to run my server or database as I always already have it running.
+description: when creating or apply drizzle migrations
 ---
 
 
-please never try to run my server or database as I always already have it running.
+please use `npm run db:generate` and `npm run db:migrate` when you try to apply drizzle migrations
 
 ---
 > Source: [webdevcody/collab-board-hathora](https://github.com/webdevcody/collab-board-hathora) — distributed by [TomeVault](https://tomevault.io).
