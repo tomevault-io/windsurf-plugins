@@ -1,11 +1,10 @@
 ---
 trigger: always_on
-description: Invoke when user asks to do something with Cypilot, or wants to analyze/validate artifacts, or create/generate/implement anything using Cypilot workflows, or plan phased execution. Core capabilities: workflow routing (plan/analyze/generate/auto-config); deterministic validation (structure, cross-refs, traceability, TOC); code↔artifact traceability with @cpt-* markers; spec coverage measurement; ID search/navigation; init/bootstrap; adapter + registry discovery; auto-configuration of brownfield p
+description: Always use the ./.ai/GUIDELINES.md
 ---
 
 
-
-ALWAYS open and follow `{cypilot_path}/.core/skills/cypilot/SKILL.md`
+Always use the ./.ai/GUIDELINES.md
 
 ---
 > Source: [cyberfabric/cyberware-frontx](https://github.com/cyberfabric/cyberware-frontx) — distributed by [TomeVault](https://tomevault.io).
