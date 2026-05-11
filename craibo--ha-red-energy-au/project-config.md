@@ -1,200 +1,185 @@
 ---
 trigger: always_on
-description: > Last Updated: 2025-10-06
+description: Developer reference for implementing and maintaining OAuth2 PKCE authentication with Red Energy's Okta-based API. This document provides implementation details, code references, and patterns for working with the authentication system.
 ---
 
-# Red Energy API Response Structure
+# Red Energy Authentication Reference
 
-> Last Updated: 2025-10-06
-> 
-> This document defines the actual API response structures returned by the Red Energy API and how they map to our internal data model.
+## Purpose
 
-## Overview
+Developer reference for implementing and maintaining OAuth2 PKCE authentication with Red Energy's Okta-based API. This document provides implementation details, code references, and patterns for working with the authentication system.
 
-The Red Energy API returns data in a specific structure that differs from typical REST API conventions. This document serves as the authoritative reference for understanding and validating API responses.
+**Use this reference when:**
+- Implementing authentication flows
+- Debugging authentication issues
+- Understanding token lifecycle management
+- Modifying credential handling
+- Implementing error recovery
 
----
+## Authentication Architecture
 
-## 1. Properties/Accounts Response
+### Flow Overview
 
-### Endpoint
-`GET /api/properties` or similar endpoint
+The Red Energy API uses a 5-step OAuth2 PKCE (Proof Key for Code Exchange) authentication flow:
 
-### Actual API Response Structure
-
-```json
-[
-  {
-    "propertyPhysicalNumber": 82227160,
-    "propertyNumber": "82227160.8490263",
-    "accountNumber": 8490263,
-    "address": {
-      "unit": null,
-      "unitType": null,
-      "house": "27",
-      "floor": null,
-      "building": null,
-      "street": "SUNNYSIDE CRES",
-      "streetType": null,
-      "suburb": "CASTLECRAG",
-      "pobox": null,
-      "townCity": null,
-      "postcode": "2068",
-      "state": "NSW",
-      "country": null,
-      "gentrackDisplayAddress": "27 SUNNYSIDE CRES, CASTLECRAG, NSW 2068",
-      "displayAddresses": {
-        "shortForm": "27 Sunnyside Crescent, Castlecrag",
-        "shortFormAlt": "27 Sunnyside Crescent, Castlecrag",
-        "extraShortForm": "27 Sunnyside Crescent",
-        "longForm": "27 Sunnyside Crescent\nCastlecrag NSW 2068",
-        "longFormAlt": "27 Sunnyside Crescent, Castlecrag, New South Wales 2 0 6 8"
-      },
-      "displayAddress": "27 SUNNYSIDE CRES\nCASTLECRAG  NSW  2068"
-    },
-    "consumers": [
-      {
-        "consumerNumber": 4235478511,
-        "propertyNumber": "82227160.8490263",
-        "accountNumber": 8490263,
-        "entryDate": "2024-09-13",
-        "finalDate": null,
-        "status": "ON",
-        "nmi": "4103296839",
-        "nmiWithChecksum": "41032968395",
-        "utility": "E",
-        "meterType": "INTERVAL",
-        "chargeClass": "RES",
-        "solar": true,
-        "lastBillDate": "2025-09-10",
-        "nextBillDate": "2025-10-11",
-        "latitude": -33.799045,
-        "longitude": 151.212185,
-        "balanceDollar": -75.0,
-        "arrearsDollar": 0.0,
-        "productName": "Qantas Red Saver",
-        "linesCompany": "Ausgrid",
-        "jurisdiction": "NSW",
-        "billingFrequency": "MONTHLY"
-      }
-    ]
-  }
-]
+```
+1. Username/Password → Okta Session Token
+2. Session Token → OAuth2 Authorization URL (with PKCE challenge)
+3. Authorization Redirect → Extract Authorization Code
+4. Authorization Code + PKCE Verifier → Access/Refresh Tokens
+5. Access Token → API Calls (Bearer Authentication)
 ```
 
-### Key Field Mappings
+### Implementation Location
 
-| API Field | Our Internal Field | Notes |
-|-----------|-------------------|-------|
-| `accountNumber` | `id` | Primary identifier for the property |
-| `consumers` | `services` | Array of services (electricity/gas) |
-| No direct field | `name` | Built from `address.displayAddresses.shortForm` or address parts |
-| `address` | `address` | Transformed to our address structure |
+**Primary Implementation**: `custom_components/red_energy/api.py`
 
-### Property ID Resolution
+```python
+class RedEnergyAPI:
+    """Main authentication flow in authenticate() method (lines 46-83)"""
+```
 
-The integration looks for property ID in this order:
-1. `data.get("id")`
-2. `data.get("propertyId")`
-3. `data.get("property_id")`
-4. `data.get("accountNumber")` ✅ **Used by Red Energy API**
-5. Generated from address if none found
+### State Management
 
----
+Authentication state is managed through instance variables in `RedEnergyAPI`:
 
-## 2. Consumer/Service Structure
+```python
+self._access_token: Optional[str]      # Bearer token for API calls
+self._refresh_token: Optional[str]     # Token for refreshing access
+self._token_expires: Optional[datetime] # Expiration timestamp
+```
 
-### Actual API Structure
+**Lines**: 41-43 in `api.py`
 
-```json
+## Authentication Steps - Implementation Details
+
+### Step 1: Okta Session Token
+
+**Method**: `_get_session_token(username: str, password: str) -> tuple[str, str]`  
+**Lines**: 104-146 in `api.py`
+
+**Implementation**:
+```python
+# POST to Okta with username/password
+payload = {
+    "username": username,
+    "password": password,
+    "options": {
+        "warnBeforePasswordExpired": False,
+        "multiOptionalFactorEnroll": False
+    }
+}
+# Returns: (session_token, expires_at)
+```
+
+**Endpoint**: `https://redenergy.okta.com/api/v1/authn`  
+**Constant**: `RedEnergyAPI.OKTA_AUTH_URL` (line 36)
+
+**Error Handling**:
+- HTTP != 200: Parse Okta error response, raise `RedEnergyAuthError`
+- Status != "SUCCESS": Handle MFA/locked account scenarios
+- All errors logged with full context for debugging
+
+### Step 2: OAuth2 Discovery
+
+**Method**: `_get_discovery_data() -> Dict[str, Any]`  
+**Lines**: 85-90 in `api.py`
+
+**Endpoint**: `https://login.redenergy.com.au/oauth2/default/.well-known/openid-configuration`  
+**Constant**: `RedEnergyAPI.DISCOVERY_URL` (line 33)
+
+**Returns**:
+- `authorization_endpoint`: URL for authorization code request
+- `token_endpoint`: URL for token exchange
+
+### Step 3: PKCE Parameters
+
+**Code Verifier Generation**:  
+**Method**: `_generate_code_verifier() -> str`  
+**Lines**: 92-97 in `api.py`
+
+```python
+# Generates 48-character random string
+# Character set: [a-zA-Z0-9\-\.\_\~] per RFC 7636
+alphabet = string.ascii_letters + string.digits + '-._~'
+return ''.join(secrets.choice(alphabet) for _ in range(48))
+```
+
+**Code Challenge Generation**:  
+**Method**: `_generate_code_challenge(verifier: str) -> str`  
+**Lines**: 99-102 in `api.py`
+
+```python
+# SHA256 hash of verifier, base64url encoded
+digest = hashlib.sha256(verifier.encode()).digest()
+return base64.urlsafe_b64encode(digest).decode().rstrip('=')
+```
+
+### Step 4: Authorization Code Retrieval
+
+**Method**: `_get_authorization_code(...) -> str`  
+**Lines**: 148-223 in `api.py` (approximate)
+
+**Process**:
+1. Build authorization URL with session token, client_id, PKCE challenge
+2. Follow redirects to capture authorization code
+3. Parse code from redirect URL query parameters
+
+**Redirect URI**: `au.com.redenergy://callback`  
+**Constant**: `RedEnergyAPI.REDIRECT_URI` (line 34)
+
+### Step 5: Token Exchange
+
+**Method**: `_exchange_code_for_tokens(...) -> None`  
+**Lines**: 225-259 in `api.py` (approximate)
+
+**Token Exchange Parameters**:
+```python
 {
-  "consumerNumber": 4235478511,
-  "accountNumber": 8490263,
-  "utility": "E",
-  "status": "ON",
-  "nmi": "4103296839",
-  "meterType": "INTERVAL",
-  "solar": true,
-  "productName": "Qantas Red Saver",
-  "linesCompany": "Ausgrid",
-  "balanceDollar": -75.0
+    'grant_type': 'authorization_code',
+    'code': auth_code,
+    'redirect_uri': REDIRECT_URI,
+    'client_id': client_id,
+    'code_verifier': code_verifier  # PKCE verifier
 }
 ```
 
-### Field Mappings
+**Sets State Variables**:
+- `self._access_token` - Used for API authentication
+- `self._refresh_token` - Used for token refresh
+- `self._token_expires` - Calculated from `expires_in` (default 3600s)
 
-| API Field | Our Internal Field | Transformation |
-|-----------|-------------------|----------------|
-| `consumerNumber` | `consumer_number` | Convert to string |
-| `utility` | `type` | `"E"` → `"electricity"`, `"G"` → `"gas"` |
-| `status` | `active` | `"ON"` → `true`, `"OFF"` → `false` |
+## Token Lifecycle Management
 
-### Utility Code Mapping
+### Token Expiration
 
-```python
-# API → Internal
-"E" → "electricity"
-"G" → "gas"
-```
+**Default Expiration**: 1 hour (3600 seconds)
 
-### Status Mapping
+**Expiration Check**: Before every API call  
+**Method**: `_ensure_authenticated() -> None`  
+**Lines**: 370-380 in `api.py` (approximate)
 
 ```python
-# API → Internal
-"ON" → True
-"OFF" → False
+if self._token_expires and datetime.now() >= self._token_expires:
+    if self._refresh_token:
+        await self._refresh_access_token()
+    else:
+        raise RedEnergyAuthError("Token expired and no refresh token available")
 ```
 
----
+### Token Refresh
 
-## 3. Address Structure
+**Method**: `_refresh_access_token() -> None`  
+**Lines**: 382-415 in `api.py`
 
-### Actual API Structure
+**Process**:
+1. Get token endpoint from discovery URL
+2. POST with `grant_type=refresh_token` and refresh token
+3. Update `_access_token`, `_refresh_token`, and `_token_expires`
 
-```json
+**Refresh Parameters**:
+```python
 {
-  "unit": null,
-  "unitType": null,
-  "house": "27",
-  "floor": null,
-  "building": null,
-  "street": "SUNNYSIDE CRES",
-  "streetType": null,
-  "suburb": "CASTLECRAG",
-  "pobox": null,
-  "townCity": null,
-  "postcode": "2068",
-  "state": "NSW",
-  "country": null,
-  "gentrackDisplayAddress": "27 SUNNYSIDE CRES, CASTLECRAG, NSW 2068",
-  "displayAddresses": {
-    "shortForm": "27 Sunnyside Crescent, Castlecrag",
-    "shortFormAlt": "27 Sunnyside Crescent, Castlecrag",
-    "extraShortForm": "27 Sunnyside Crescent",
-    "longForm": "27 Sunnyside Crescent\nCastlecrag NSW 2068",
-    "longFormAlt": "27 Sunnyside Crescent, Castlecrag, New South Wales 2 0 6 8"
-  },
-  "displayAddress": "27 SUNNYSIDE CRES\nCASTLECRAG  NSW  2068"
-}
-```
-
-### Nullable Fields
-
-Address fields can be `null` in the API (e.g. unit-only, PO Box, or incomplete data). Validation must use `(data.get("field") or "").strip()` so that `None` does not cause `AttributeError: 'NoneType' object has no attribute 'strip'`.
-
-### Field Mappings
-
-| API Field | Our Internal Field | Transformation |
-|-----------|-------------------|----------------|
-| `house` + `street` | `street` | Combined: `"27 SUNNYSIDE CRES"` (handle null) |
-| `suburb` | `city` | Direct mapping |
-| `state` | `state` | Direct mapping |
-| `postcode` | `postcode` | Direct mapping |
-
-### Display Address Priority
-
-For property names, we use in order:
-1. `displayAddresses.shortForm` ✅ **Preferred** - "27 Sunnyside Crescent, Castlecrag"
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
