@@ -1,10 +1,13 @@
 ---
 trigger: always_on
-description: Commit all pending changes. Commit using conventional commits. Always commit after each implementation step or change.
+description: when dealing with user and app settings
 ---
 
 
-Commit all pending changes. Commit using conventional commits. Always commit after each implementation step or change.
+We use nostr to load/save/sync our settings.
+
+- https://nostrbook.dev/kinds/30078
+- https://github.com/nostr-protocol/nips/blob/master/78.md
 
 ---
 > Source: [dergigi/boris](https://github.com/dergigi/boris) — distributed by [TomeVault](https://tomevault.io).
