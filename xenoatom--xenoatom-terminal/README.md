@@ -7,11 +7,11 @@ A modern .NET replacement for System.Console
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [XenoAtom/XenoAtom.Terminal](https://github.com/XenoAtom/XenoAtom.Terminal).
+Original source: `CLAUDE.md` in [XenoAtom/XenoAtom.Terminal](https://github.com/XenoAtom/XenoAtom.Terminal).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
