@@ -1,97 +1,62 @@
 ---
 trigger: always_on
-description: Rules for maintaining comprehensive documentation across the project, including inline comments and system architecture documentation, you will use this everytime there's updating, creating, editing, modifying, deleting, changing.
+description: This lessons-learned file serves as a critical knowledge base for capturing and preventing mistakes. During development, document any reusable solutions, bug fixes, or important patterns. Consult it before implementing any solution.
 ---
 
-# Documentation Standards and Best Practices Guide
+*This lessons-learned file serves as a critical knowledge base for capturing and preventing mistakes. During development, document any reusable solutions, bug fixes, or important patterns using the format: Category: Issue → Solution → Impact. Entries must be categorized by priority (Critical/Important/Enhancement) and include clear problem statements, solutions, prevention steps, and code examples. Only update upon user request with "lesson" trigger word. Focus on high-impact, reusable lessons that improve code quality, prevent common errors, and establish best practices. Cross-reference with .cursor\memories.md for context.*
 
-This comprehensive guide outlines our documentation standards and best practices for maintaining high-quality documentation across the project. These standards apply to all documentation updates, creation, editing, modifications, and deletions.
+# Lessons Learned
 
-## Core Documentation Principles
+*Note: This file is updated only upon user request and focuses on capturing important, reusable lessons learned during development. Each entry follows format: Priority: Category → Issue: [Problem] → Fix: [Solution] → Why: [Impact]. Use grep/automated tools to verify changes and prevent regressions.*
 
-1. **Automated Documentation Management**
+## Logging Best Practices
 
-   - Must always include descriptive inline comments in every files and don't remove them, remove if it's not necessary or 
-     not used anymore
-   - Use Google Style Python Docstrings
-   - All documentation must be quantum-detailed, providing deep insights into why this code is needed and what its purpose is given the bigger picture
-   - Documentation should be context-aware, explaining how components fit into the larger system
-   - Cross-referencing between related documentation is required
-   - Real-time updates must be maintained as code changes
-   - Documentation maintenance should be automated where possible
+**Critical**: CLI Tool Logging Philosophy for CI/CD Environments
+→ Issue: CLI tools need clean, predictable logging that serves both interactive users and CI/CD pipelines with clear level separation.
+→ Solution: Follow strict PEP 282 pattern: INFO = user-facing progress and business events (branch selection, settings applied, major steps), DEBUG = technical details for developers, Rich output = actual results presentation separate from logging system.
+→ Impact: Perfect CI/CD logs showing execution path and settings without noise, while preserving debugging capability.
 
-2. **Documentation Categories**
+**Critical**: Context-Dependent Logging Levels  
+→ Issue: JSON parsing failure severity depends on context - ERROR when schema enforcement expected, DEBUG when optional fallback.
+→ Solution: Map logging levels to user expectations: schema_model exists = ERROR (broken promise), no schema_model = DEBUG (expected behavior).
+→ Impact: Proper error visibility for users, prevents confusion about system behavior.
 
-   A. **Inline Code Documentation**
-   Every code block must include:
-   - Quantum documentation maintained by AI
-   - Feature context explaining the component's role
-   - Dependency listings that auto-update
-   - Usage examples that stay current
-   - Performance considerations
-   - Security implications
+**Important**: Eliminate Duplicate Success Messages in Execution Flow
+→ Issue: Schema loading and ChatHistory creation logged at INFO level multiple times in single execution flow creating log noise and confusion.
+→ Solution: Move technical success confirmations (schema creation, template rendering, chat history creation) to DEBUG level. Keep only business-relevant completion messages at INFO level.
+→ Impact: Clean CI/CD output showing only meaningful progress, eliminates duplicate information, maintains debugging capability.
 
-   B. **Feature Documentation**
-   Each feature requires:
-   - AI-generated feature overview
-   - Detailed implementation explanations
-   - Comprehensive dependency mapping
-   - Current usage examples
-   - Security consideration notes
+**Important**: Meta-Logging Should Be DEBUG Level
+→ Issue: Logging initialization messages like "LLM Runner initialized with log level: INFO" are technical metadata, not user-facing progress.
+→ Solution: Move logging configuration messages to DEBUG level - users care about what the tool does, not how it's configured to report.
+→ Impact: Cleaner INFO output focused on actual business operations, follows CLI tool best practices.
 
-3. **Project Documentation Structure**
+**Enhancement**: Preserve User-Facing Rich Output Separate from Logging
+→ Issue: Removing beautiful Rich console LLM response display during "logging improvements" degrades user experience.
+→ Solution: Keep CONSOLE.print() for LLM responses completely separate from logging system - users expect to see their results beautifully formatted.
+→ Impact: Maintains core value proposition of beautiful, readable output while having clean logging.
 
-   Root Level Documentation:
-   - README.md: Main project overview
-   - ARCHITECTURE.md: System design documentation
-   - CHANGELOG.md: Automatically updated changes with versioning
+**Important**: Emoji Consistency Matches Log Level Severity
+→ Issue: Using warning emojis (⚠️) in DEBUG messages creates confusion about severity.
+→ Solution: Match emoji severity to log level: 🔄 for DEBUG fallbacks, ⚠️ for WARNING, ❌ for ERROR.
+→ Impact: Clear visual communication of actual issue severity.
 
-5. **Quality Standards**
+## Component Development
 
-   Completeness:
-   - Full coverage of all features
-   - Comprehensive depth
-   - Clear context
-   - Practical examples
+**Important**: Template Engine Unification Strategy    
+→ Issue: Supporting both Handlebars and Jinja2 without breaking compatibility.    
+→ Solution: Implement unified load_template() with file extension-based detection (.hbs, .jinja, .j2), separate loader functions, keep existing signatures.    
+→ Impact: Enables multi-engine support, backward compatibility, and easy future extension.
 
-   Accuracy:
-   - Technical verification
-   - Real-time updates
-   - Consistency maintenance
-   - High relevance
+**Critical**: Microsoft Semantic Kernel Integration Success Pattern    
+→ Issue: Initially unclear how to make YAML model_id specifications actually control which Azure deployment is used by Semantic Kernel.    
+→ Solution: Semantic Kernel selects services by service_id matching YAML execution_settings keys, not by model_id. Service's deployment_name determines actual Azure model called. Create services dynamically based on YAML model_id and use as deployment_name directly.    
+→ Impact: Enables true YAML-driven model selection without hardcoded model lists, future-proof for any Azure deployment.
 
-   Accessibility:
-   - Clear readability
-   - Logical structure
-   - Intuitive navigation
-   - Efficient searchability
+**Critical**: Semantic Kernel Service Registration Architecture  
+→ Issue: YAML execution_settings.azure_openai.model_id was being ignored because service was pre-created with fixed deployment_name from environment.  
 
-6. **Update Protocol**
-
-   Documentation updates are triggered by:
-   - Code changes
-   - Feature additions
-   - Security patches
-   - Performance changes
-
-   Required Actions:
-   - Update inline documentation
-   - Regenerate README files, but be aware of current content, don't delete it if usefull
-   - Refresh architecture diagrams if needed
-   - Sync code examples
-   - Validate documentation
-
-   Verification Steps:
-   - Check completeness
-   - Verify accuracy
-   - Ensure freshness
-   - Maintain consistency
-
-## Important Notes:
-- Existing inline comments should only be removed if wrong, not helpful or outdated 
-- The @docs/ and @.cursor/ directory serves as the source of truth
-- Each subdirectory in @/docs must maintain its own specific documentation
-- All documentation changes must follow these standards without exception
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [Nantero1/ai-first-devops-toolkit](https://github.com/Nantero1/ai-first-devops-toolkit) — distributed by [TomeVault](https://tomevault.io).
