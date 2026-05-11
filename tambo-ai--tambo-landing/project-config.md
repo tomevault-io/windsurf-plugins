@@ -1,245 +1,184 @@
 ---
 trigger: always_on
-description: description: CSS Modules, Tailwind CSS v4, and responsive design patterns
+description: Marketing website for Tambo, the open-source generative UI toolkit for React.
 ---
 
----
-description: CSS Modules, Tailwind CSS v4, and responsive design patterns
-globs: *.tsx, *.jsx, *.css, *.js, *.ts
----
+# Tambo Landing Site
 
-# Styling Guidelines
+Marketing website for Tambo, the open-source generative UI toolkit for React.
 
-## CSS Modules
+## Key Points
 
-### File Naming
-Use kebab-case for CSS module files. Match the component name followed by `.module.css`
+1. This is a marketing site for Tambo, not the SDK itself
+2. Tambo is a "toolkit" not a "framework" or "platform"
+3. Voice is technical but accessible, direct and punchy
+4. SEO metadata lives in `app/layout.tsx` and `package.json`
+5. AI agent discovery endpoint is at `/llms.txt`
+
+## What is Tambo?
+
+Tambo lets any app add AI features that show real UI instead of chat responses. When a user asks "show me sales by region," the agent renders an actual interactive chart.
+
+Drop Tambo into your React app. Register your components with Zod schemas. The agent picks the right one and streams the props.
+
+- Agent included, no LangChain or Mastra required
+- Uses your existing components
+- Auth inherited from user session
+- Streaming, cancellation, error handling solved
+- MCP support built in
+
+## Tech Stack
+
+- **Next.js 16** - App Router, Turbopack, Cache Components
+- **React 19** - Latest React with React Compiler enabled
+- **Tailwind CSS 4** - CSS-first configuration
+- **TypeScript** - Strict mode
+- **Biome** - Linting and formatting
+- **Bun** - Package manager and runtime
+- **GSAP** - Animations
+- **React Three Fiber** - WebGL/3D graphics
+
+## Repository Structure
 
 ```
-button.tsx
-button.module.css
+app/
+├── (pages)/home/       # Landing page sections (hero, features, pricing, etc.)
+├── blog/               # Blog with MDX posts
+├── layout.tsx          # Root layout with metadata and JSON-LD
+└── sitemap.ts          # Dynamic sitemap generation
+
+components/
+├── blog/               # Blog components
+├── button/             # CTA buttons
+├── image/              # Image wrapper (always use this, not next/image)
+├── link/               # Link wrapper (auto-detects external)
+├── gsap/               # GSAP runtime and animations
+└── ...                 # UI components
+
+integrations/
+└── tambo/              # Tambo AI demo integration
+
+libs/
+├── config.tsx          # Site configuration and links
+└── get-posts.ts        # Blog post utilities
+
+styles/                 # Global styles, Tailwind config
+webgl/                  # 3D graphics and WebGL components
+orchestra/              # Debug tools (CMD+O to toggle)
 ```
 
-### Class Naming
-Use camelCase for class names. Use descriptive, semantic names.
+## Key Files
 
-```css
-.button { /* Base styles */ }
-.isPrimary { /* Variant styles */ }
-.isDisabled { /* State styles */ }
+- `app/layout.tsx` - Site metadata, SEO, JSON-LD structured data
+- `public/llms.txt` - Plain text endpoint for AI agents (summary)
+- `public/llms-full.txt` - Full site content for AI agents
+- `scripts/generate-llms-full.ts` - Generator for llms-full.txt
+- `package.json` - Site description (used in metadata)
+- `libs/config.tsx` - Site configuration, social links, footer
+
+## Creating Pages
+
+Pages separate content from presentation. See `app/(pages)/contact-us/` for reference:
+- `data.ts` - Content and copy
+- `page.tsx` - React component (imports from data.ts)
+
+**Important:** When adding a new page or section, you must also add its content to `scripts/generate-llms-full.ts` so AI agents can discover it. The file is generated automatically during `bun build`.
+
+## Commands
+
+```bash
+# Development
+bun install
+bun dev
+
+# Build
+bun build
+bun start
+
+# Code quality
+bun lint
+bun lint:fix
+bun typecheck
+
+# Utilities
+bun setup:styles            # Generate style files
+bun validate:env            # Check environment variables
+bun cleanup:integrations    # List unused integrations
+bun analyze                 # Bundle analysis
 ```
 
-### Imports in Components
-Always import CSS modules as `s`
+## Styling
+
+### CSS Modules
+Components use CSS modules with the `s` import convention:
 
 ```tsx
-import s from './component-name.module.css'
+import s from './component.module.css'
 
 function Component() {
   return <div className={s.wrapper} />
 }
 ```
 
-## Responsive Design
-
-### Viewport Functions
-Use custom viewport functions for responsive sizing
+### Responsive Design
+Custom viewport functions:
 
 ```css
 .element {
-  width: mobile-vw(150);      /* 150px at mobile viewport */
-  height: mobile-vh(100);     /* 100px at mobile viewport */
-  margin: desktop-vw(50);     /* 50px at desktop viewport */
-  padding: desktop-vh(25);    /* 25px at desktop viewport */
+  width: mobile-vw(150);    /* 150px at mobile viewport */
+  height: desktop-vh(100);  /* 100px at desktop viewport */
 }
 ```
 
-### Breakpoints
-Desktop breakpoint: 800px (defined in styles/config.ts)
+## Debug Tools
 
-```css
-@media (min-width: 800px) {
-  /* Desktop styles */
-}
-```
+Toggle with `Cmd/Ctrl + O`:
+- Theatre.js Studio - Visual animation editor
+- FPS Meter - Performance monitoring
+- Grid Overlay - Layout debugging
+- Minimap - Page overview
 
-### Grid System
-Use the column function for grid-based layouts
+## Important Notes
 
-```css
-.container {
-  width: columns(6);          /* Span 6 columns */
-  margin-left: columns(1);    /* Offset by 1 column */
-}
-```
+**Images & Links**
+- Always use `~/components/link` (auto-detects external, smart prefetch)
+- Always use `~/components/image` for DOM (never `next/image` directly)
+- Use `~/webgl/components/image` in WebGL contexts
 
-## Typography
+**GSAP & Animation**
+- `<GSAPRuntime />` is in `app/layout.tsx` for ScrollTrigger + Lenis
+- No manual ticker setup needed
 
-### Font Hierarchy
-Use typography variables from the theme
+**React Compiler**
+- Enabled automatically (`reactCompiler: true`)
+- No need for manual `useMemo`, `useCallback`, or `React.memo`
 
-```css
-.title {
-  font-size: var(--font-size-title);
-  line-height: var(--line-height-title);
-  font-weight: var(--font-weight-bold);
-}
-```
+**Orchestra Debug**
+- State persists in `localStorage` and syncs across tabs
+- Automatically excluded from production builds
 
-### Text Scaling
-Use scale utilities with the 's' prefix
+## Marketing Voice
 
-```css
-.scalingText {
-  --size: 1;
-  font-size: s(var(--size) * 16px);   /* Scales appropriately */
-}
-```
+Tambo's voice is technical but accessible. Direct and punchy. Like a developer at a meetup explaining something they built.
 
-## Colors and Themes
+**Key positioning:**
+- "toolkit" not "framework" or "platform"
+- "open-source generative UI toolkit for React"
+- Tagline: "Build agents that speak your UI"
 
-### Color Variables
-Use theme colors from CSS variables
+**Important:** Any copy changes should also update:
+- `public/llms.txt` - Summary for AI agents
+- `scripts/generate-llms-full.ts` - Full content (auto-generated on build)
 
-```css
-.element {
-  color: var(--color-text);
-  background-color: var(--color-background);
-  border-color: var(--color-accent);
-}
-```
+## SEO and Metadata
 
-### Theme Switching
-Use theme-specific variables when needed
+Metadata is defined in:
+- `app/layout.tsx` - Main site metadata, JSON-LD
+- `app/blog/layout.tsx` - Blog metadata
+- `app/blog/page.tsx` - Blog index page metadata
+- `package.json` - Site description
 
-```css
-.element {
-  color: var(--theme-dark-text);
-  background-color: var(--theme-dark-background);
-}
-
-[data-theme="light"] .element {
-  color: var(--theme-light-text);
-  background-color: var(--theme-light-background);
-}
-```
-
-## Animations and Transitions
-
-### Transition Timing
-Use consistent transition variables
-
-```css
-.element {
-  transition: opacity var(--transition-duration) var(--transition-ease);
-}
-```
-
-### Animation Easings
-Import easings from the theme
-
-```css
-.element {
-  transition: transform 0.5s var(--ease-out-expo);
-}
-```
-
-## Best Practices
-
-### Performance
-Prefer CPU-friendly properties (transform, opacity). Use `will-change` sparingly and only when needed.
-
-```css
-.animatedElement {
-  will-change: transform, opacity;
-}
-```
-
-### Organization
-Group related properties together. Order properties consistently.
-
-```css
-.element {
-  /* Positioning */
-  position: absolute;
-  top: 0;
-  left: 0;
-  z-index: 1;
-  
-  /* Box model */
-  display: flex;
-  width: 100%;
-  padding: 1rem;
-  
-  /* Visual */
-  background-color: var(--color-background);
-  border-radius: 4px;
-  
-  /* Typography */
-  font-size: 1rem;
-  color: var(--color-text);
-  
-  /* Animation */
-  transition: all 0.3s ease;
-}
-```
-
----
-
-# Tailwind CSS v4
-
-## Core Changes
-
-### CSS-first configuration
-Configuration is now done in CSS instead of JavaScript. Use `@theme` directive in CSS instead of `tailwind.config.js`
-
-```css
-@import "tailwindcss";
-
-@theme {
-  --font-display: "Satoshi", "sans-serif";
-  --breakpoint-3xl: 1920px;
-  --color-avocado-500: oklch(0.84 0.18 117.33);
-  --ease-fluid: cubic-bezier(0.3, 0, 0, 1);
-}
-```
-
-### CSS import syntax
-Use `@import "tailwindcss"` instead of `@tailwind` directives
-
-- Old: `@tailwind base; @tailwind components; @tailwind utilities;`
-- New: `@import "tailwindcss";`
-
-### Package changes
-- PostCSS plugin is now `@tailwindcss/postcss` (not `tailwindcss`)
-- CLI is now `@tailwindcss/cli`
-- Vite plugin is `@tailwindcss/vite`
-- No need for `postcss-import` or `autoprefixer` anymore
-
-### Native CSS cascade layers
-Uses real CSS `@layer` instead of Tailwind's custom implementation
-
-## Theme Configuration
-
-### CSS theme variables
-All design tokens are available as CSS variables
-
-- Namespace format: `--category-name` (e.g., `--color-blue-500`, `--font-sans`)
-- Access in CSS: `var(--color-blue-500)`
-- Available namespaces:
-  - `--color-*` : Color utilities like `bg-red-500` and `text-sky-300`
-  - `--font-*` : Font family utilities like `font-sans`
-  - `--text-*` : Font size utilities like `text-xl`
-  - `--font-weight-*` : Font weight utilities like `font-bold`
-  - `--tracking-*` : Letter spacing utilities like `tracking-wide`
-  - `--leading-*` : Line height utilities like `leading-tight`
-  - `--breakpoint-*` : Responsive breakpoint variants like `sm:*`
-  - `--container-*` : Container query variants like `@sm:*` and size utilities like `max-w-md`
-  - `--spacing-*` : Spacing and sizing utilities like `px-4` and `max-h-16`
-  - `--radius-*` : Border radius utilities like `rounded-sm`
-  - `--shadow-*` : Box shadow utilities like `shadow-md`
-  - `--inset-shadow-*` : Inset box shadow utilities like `inset-shadow-xs`
-  - `--drop-shadow-*` : Drop shadow filter utilities like `drop-shadow-md`
+The site includes:
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
