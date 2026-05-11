@@ -1,98 +1,105 @@
 ---
 trigger: always_on
-description: Guidelines and best practices for building Convex projects, including database schema design, queries, mutations, and real-world examples
+description: Use the latest version of Shadcn to install new components, like this command to add a button component:
 ---
 
+# shadcn instructions
 
-# Convex guidelines
-## Function guidelines
-### New function syntax
-- ALWAYS use the new function syntax for Convex functions. For example:
-      ```typescript
-      import { query } from "./_generated/server";
-      import { v } from "convex/values";
-      export const f = query({
-          args: {},
-          returns: v.null(),
-          handler: async (ctx, args) => {
-          // Function body
-          },
-      });
-      ```
+Use the latest version of Shadcn to install new components, like this command to add a button component:
 
-### Http endpoint syntax
-- HTTP endpoints are defined in `convex/http.ts` and require an `httpAction` decorator. For example:
-      ```typescript
-      import { httpRouter } from "convex/server";
-      import { httpAction } from "./_generated/server";
-      const http = httpRouter();
-      http.route({
-          path: "/echo",
-          method: "POST",
-          handler: httpAction(async (ctx, req) => {
-          const body = await req.bytes();
-          return new Response(body, { status: 200 });
-          }),
-      });
-      ```
-- HTTP endpoints are always registered at the exact path you specify in the `path` field. For example, if you specify `/api/someRoute`, the endpoint will be registered at `/api/someRoute`.
+```bash
+# shadcn instructions
 
-### Validators
-- Below is an example of an array validator:
-                            ```typescript
-                            import { mutation } from "./_generated/server";
-                            import { v } from "convex/values";
+Use the latest version of Shadcn to install new components, like this command to add a button component:
 
-                            export default mutation({
-                            args: {
-                                simpleArray: v.array(v.union(v.string(), v.number())),
-                            },
-                            handler: async (ctx, args) => {
-                                //...
-                            },
-                            });
-                            ```
-- Below is an example of a schema with validators that codify a discriminated union type:
-                            ```typescript
-                            import { defineSchema, defineTable } from "convex/server";
-                            import { v } from "convex/values";
+```bash
+pnpx shadcn@latest add button
+```
 
-                            export default defineSchema({
-                                results: defineTable(
-                                    v.union(
-                                        v.object({
-                                            kind: v.literal("error"),
-                                            errorMessage: v.string(),
-                                        }),
-                                        v.object({
-                                            kind: v.literal("success"),
-                                            value: v.number(),
-                                        }),
-                                    ),
-                                )
-                            });
-                            ```
-- Always use the `v.null()` validator when returning a null value. Below is an example query that returns a null value:
-                                  ```typescript
-                                  import { query } from "./_generated/server";
-                                  import { v } from "convex/values";
+# AI Chat Project Intelligence
 
-                                  export const exampleQuery = query({
-                                    args: {},
-                                    returns: v.null(),
-                                    handler: async (ctx, args) => {
-                                        console.log("This query returns a null value");
-                                        return null;
-                                    },
-                                  });
-                                  ```
-- Here are the valid Convex types along with their respective validators:
- Convex Type  | TS/JS type  |  Example Usage         | Validator for argument validation and schemas  | Notes                                                                                                                                                                                                 |
-| ----------- | ------------| -----------------------| -----------------------------------------------| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Id          | string      | `doc._id`              | `v.id(tableName)`                              |                                                                                                                                                                                                       |
-| Null        | null        | `null`                 | `v.null()`                                     | JavaScript's `undefined` is not a valid Convex value. Functions the return `undefined` or do not return will return `null` when called from a client. Use `null` instead.                             |
+## Core Project Patterns
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+### Shadcn UI Integration
+- Always use Shadcn UI components when possible for UI elements
+- Add new components with: `pnpx shadcn@latest add [component-name]`
+- Components are located in `src/components/ui/` and built on Radix UI primitives
+
+### Build & Development
+- Project uses Vite as build tool - manual compilation not needed
+- User prefers not to build project every time when running commands
+- Development server: `pnpm dev` (runs both Convex and Vite concurrently)
+- Convex functions run locally with `pnpm dev:convex`
+
+### Architecture Patterns
+- **Convex-First**: All backend logic in Convex functions (queries, mutations, actions)
+- **Real-time by Default**: Use reactive queries for automatic UI updates
+- **Type-Safe**: Full TypeScript integration from frontend to backend
+- **Feature-Based Organization**: Group related components, hooks, and logic by domain
+
+### AI Integration Patterns
+- Use Vercel AI SDK with multiple providers (Anthropic, Google, OpenAI, OpenRouter)
+- Streaming responses with `@convex-dev/persistent-text-streaming`
+- Agent system with `@convex-dev/agent` for conversational patterns
+- Rate limiting with `@convex-dev/rate-limiter` for AI endpoints
+
+### Component Organization
+- UI components in `src/components/ui/` (Shadcn/Radix)
+- Feature components in `src/features/[domain]/components/`
+- Shared components in `src/components/`
+- Assistant UI components in `src/components/assistant-ui/`
+
+### State Management Strategy
+- **Server State**: Convex reactive queries (automatically synced)
+- **Client State**: Zustand for UI state and preferences
+- **Form State**: TanStack Form for complex forms
+- **URL State**: TanStack Router for navigation state
+
+### Authentication Patterns
+- Better Auth integration with Convex
+- Multi-method auth: email/password, passkeys, magic links, 2FA
+- Session management with JWT and secure cookies
+- React Email templates for all authentication flows
+
+### Performance Optimizations
+- Virtual scrolling for large lists (>100 items) with TanStack Virtual
+- Memoization for expensive operations (thread tree calculations)
+- React 19 with React Compiler for automatic optimizations
+- Code splitting and lazy loading for routes
+
+### Error Handling
+- Custom error classes for different scenarios
+- React error boundaries with recovery mechanisms
+- Sonner toast notifications for user feedback
+- Rate limiting and retry mechanisms with exponential backoff
+
+### Development Preferences
+- Use `pnpm` as package manager
+- Prefer parallel tool calls over sequential when possible
+- Focus on user experience and production-ready features
+- Comprehensive keyboard navigation and accessibility support
+
+## Critical Integration Challenges
+
+### Model Display Issue
+- Current challenge: `@convex-dev/agent` + `@assistant-ui/react` don't expose original message metadata
+- Goal: Display which AI model generated each message
+- Potential solution: Fork `@convex-dev/agent` or modify message conversion
+
+### Message Feedback Optimization
+- Current issue: One database query per message for feedback state
+- Goal: Bulk load feedback data with messages
+- Likely solution: Fork `@convex-dev/agent` to modify `listMessages` function
+
+## Key Dependencies to Remember
+- React 19 with React Compiler
+- Convex for serverless backend
+- TanStack Router for routing
+- Shadcn UI + Radix UI for components
+- Tailwind CSS v4 for styling
+- Better Auth for authentication
+- Vercel AI SDK for AI integration
+- Lingui for internationalization
 
 ---
 > Source: [anolilab/anole.chat](https://github.com/anolilab/anole.chat) — distributed by [TomeVault](https://tomevault.io).
