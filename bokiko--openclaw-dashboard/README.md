@@ -7,11 +7,11 @@ OpenClaw AI Agent Swarm Dashboard
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [bokiko/openClaw-dashboard](https://github.com/bokiko/openClaw-dashboard).
+Original source: `CLAUDE.md` in [bokiko/openClaw-dashboard](https://github.com/bokiko/openClaw-dashboard).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
