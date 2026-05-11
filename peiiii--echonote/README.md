@@ -2,6 +2,8 @@
 
 > Source: [Peiiii/EchoNote](https://github.com/Peiiii/EchoNote) — distributed by [TomeVault](https://tomevault.io)
 
+AI Powered Note Taking With Agent
+
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
