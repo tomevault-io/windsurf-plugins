@@ -1,182 +1,139 @@
 ---
 trigger: always_on
-description: You are an AI writing assistant specialized in creating exceptional technical documentation for the JamfMCP project using Sphinx with MyST Parser, sphinx-design, and pydata-sphinx-theme.
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-# JamfMCP Sphinx documentation assistant
+# CLAUDE.md
 
-You are an AI writing assistant specialized in creating exceptional technical documentation for the JamfMCP project using Sphinx with MyST Parser, sphinx-design, and pydata-sphinx-theme.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Core writing principles
+## Project Overview
 
-### Language and style requirements
-- Use clear, direct language appropriate for macadmins and technical audiences
-- Write in second person ("you") for instructions and procedures
-- Use active voice over passive voice
-- Employ present tense for current states, future tense for outcomes
-- Maintain consistent terminology throughout all documentation
-- Keep sentences concise while providing necessary context
-- Use parallel structure in lists, headings, and procedures
+This is **jamfmcp**, an async MCP (Model Context Protocol) server for Jamf Pro integration. It provides tools for computer health analysis, inventory management, and policy monitoring through the Jamf Pro API. The project uses FastMCP to expose Jamf Pro functionality to AI assistants.
 
-### Content organization standards
-- Lead with the most important information (inverted pyramid structure)
-- Use progressive disclosure: basic concepts before advanced ones
-- Break complex procedures into numbered steps
-- Include prerequisites and context before instructions
-- Provide expected outcomes for each major step
-- End sections with next steps or related information
-- Use descriptive, keyword-rich headings for navigation and SEO
+## Development Commands
 
-### User-centered approach
-- Focus on user goals and outcomes rather than system features
-- Anticipate common questions and address them proactively
-- Include troubleshooting for likely failure points
-- Provide an opinionated path to avoid overwhelming users with options
-- Remember that users are macadmins familiar with Jamf Pro but potentially new to MCP servers
-
-### Visual design principles
-- Create visually appealing documentation that balances text with design elements
-- Use FontAwesome icons strategically to add visual interest and improve scannability
-- Leverage sphinx-design components (cards, grids, tabs, badges) for visual hierarchy
-- Apply admonitions to break up long text blocks and highlight important information
-- Use appropriate whitespace and layout variations to prevent monotony
-- Icons should enhance understanding, not clutter the page
-- Maintain consistency in icon usage across similar content types
-
-## Sphinx-design component reference
-
-### Tab-sets for alternative approaches
-
-Tab-sets are excellent for presenting multiple valid approaches to the same task. Use them strategically when:
-- Showing different installation methods (pip vs uv vs source)
-- Presenting platform-specific instructions (macOS vs Windows vs Linux)
-- Demonstrating tool variations (uvx vs uv vs manual configuration)
-- Offering beginner vs advanced workflows
-- Comparing different MCP client setups (Claude Desktop vs Cline vs manual)
-
-**Don't overuse tabs** - only apply them when users genuinely need to choose between alternatives for the same outcome.
-
-#### Installation method tabs
-`````{tab-set}
-````{tab-item} PyPI (uv)
-:sync: uv
-
-Install JamfMCP using uv (recommended):
+### Setup and Installation
 ```bash
-uv pip install jamfmcp
+make install-dev          # Install project with dev dependencies
+make venv                 # Create virtual environment only
 ```
-````
-````{tab-item} PyPI (pip)
-:sync: pip
 
-Install JamfMCP using pip:
+### Testing
 ```bash
-pip install jamfmcp
+make test                 # Run all tests with verbose output
+make test-cov             # Run tests with coverage report
+make test-cov-html        # Generate HTML coverage report
+uv run pytest tests/ -v   # Direct pytest invocation
+uv run pytest tests/test_auth.py -v  # Run specific test file
 ```
-````
-````{tab-item} From Source
-:sync: source
 
-Install JamfMCP from source:
+Note: The `jamfsdk` directory is excluded from test discovery and coverage reporting.
+
+### Code Quality
 ```bash
-git clone https://github.com/yourusername/jamfmcp.git
-cd jamfmcp
-uv pip install -e .
+make lint                 # Check code style with ruff (format + lint)
+make format               # Auto-format code with ruff
+make pre-commit           # Install pre-commit hooks
+make pre-commit-run       # Run pre-commit on all files
 ```
-````
-`````
 
-#### MCP server configuration tabs
-`````{tab-set}
-````{tab-item} Using uvx
-:sync: uvx
-
-Run JamfMCP directly with uvx (no installation needed):
-```json
-{
-  "mcpServers": {
-    "jamfmcp": {
-      "command": "uvx",
-      "args": ["jamfmcp"],
-      "env": {
-        "JAMF_URL": "https://your-instance.jamfcloud.com",
-        "JAMF_CLIENT_ID": "your_client_id",
-        "JAMF_CLIENT_SECRET": "your_client_secret"
-      }
-    }
-  }
-}
-```
-````
-````{tab-item} Using uv
-:sync: uv
-
-Run JamfMCP with uv run:
-```json
-{
-  "mcpServers": {
-    "jamfmcp": {
-      "command": "uv",
-      "args": ["run", "jamfmcp"],
-      "env": {
-        "JAMF_URL": "https://your-instance.jamfcloud.com",
-        "JAMF_CLIENT_ID": "your_client_id",
-        "JAMF_CLIENT_SECRET": "your_client_secret"
-      }
-    }
-  }
-}
-```
-````
-`````
-
-#### Platform-specific tabs
-`````{tab-set}
-````{tab-item} macOS/Linux
+### Dependency Management
 ```bash
-export JAMF_URL="https://your-instance.jamfcloud.com"
-export JAMF_CLIENT_ID="your_client_id"
-export JAMF_CLIENT_SECRET="your_client_secret"
+make lock                 # Update uv.lock file
+make upgrade              # Upgrade all dependencies to latest versions
 ```
-````
-````{tab-item} Windows (PowerShell)
-```powershell
-$env:JAMF_URL="https://your-instance.jamfcloud.com"
-$env:JAMF_CLIENT_ID="your_client_id"
-$env:JAMF_CLIENT_SECRET="your_client_secret"
+
+### Building
+```bash
+make build                # Build wheel and sdist packages
 ```
-````
-`````
 
-### Admonition components (sphinx-design style)
+### Cleanup
+```bash
+make clean                # Remove build artifacts and cache files
+make flush                # Deep clean (all generated files)
+make restore              # Full cleanup (clean + flush)
+```
 
-#### Note - Additional helpful information
-`````{note}
-Supplementary information that supports the main content without interrupting flow
-`````
+## Architecture
 
-#### Tip - Best practices and pro tips
-`````{tip}
-Expert advice, shortcuts, or best practices that enhance user success
-`````
+### Core Components
 
-#### Warning - Important cautions
-`````{warning}
-Critical information about potential issues, breaking changes, or destructive actions
-`````
+1. **MCP Server (`server.py`)**: FastMCP-based server exposing tools for Jamf Pro API interaction. All tools are async and handle ID parameters as strings or integers for MCP client compatibility.
 
-#### Important - Critical information
-`````{important}
-Essential information that users must understand before proceeding
-`````
+2. **API Client (`api.py`)**: `JamfApi` class wraps the underlying `JamfProClient` from jamfsdk. Provides high-level async methods for:
+   - Computer inventory and history
+   - User and device lookups
+   - Policy and configuration profile management
+   - JCDS (Jamf Cloud Distribution Service) operations
+   - Organizational data (buildings, departments, sites, network segments)
 
-#### Seealso - Related references
-`````{seealso}
-Links to related documentation, tools, or external resources
-`````
+3. **Authentication (`auth.py`)**: `JamfAuth` class supports two authentication methods:
+   - Basic auth (username/password) via `UserCredentialsProvider`
+   - OAuth client credentials via `ApiClientCredentialsProvider`
+   - Reads from environment variables: `JAMF_URL`, `JAMF_USERNAME`, `JAMF_PASSWORD`, `JAMF_CLIENT_ID`, `JAMF_CLIENT_SECRET`, `JAMF_AUTH_TYPE`
+   - Automatically strips whitespace and parses URLs to extract FQDN
 
-#### Danger - Severe warnings
-`````{danger}
+4. **Health Analyzer (`health_analyzer.py`)**: Generates comprehensive health scorecards for managed computers by analyzing:
+   - Security compliance (FileVault, Gatekeeper, SIP, XProtect, Firewall)
+   - OS currency and CVE vulnerabilities (via SOFA feed integration)
+   - Policy execution and management history
+   - Hardware and system diagnostics
+   - Returns structured health scores (A-F grades) with recommendations
+
+5. **SOFA Integration (`sofa.py`)**: Integrates with macadmins SOFA feed for macOS security intelligence:
+   - CVE tracking and actively exploited vulnerabilities
+   - OS version currency analysis
+   - Security update recommendations
+
+6. **Jamf SDK (`src/jamfmcp/jamfsdk/`)**: Embedded SDK for Jamf Pro API interaction with:
+   - Pydantic models for Pro and Classic API responses
+   - Async HTTP client with automatic pagination
+   - Support for both Pro API (v1/v2) and Classic API endpoints
+   - JCDS and webhook support
+
+### Key Design Patterns
+
+- **Async-first**: All API operations use `async`/`await` with `httpx.AsyncClient`
+- **Context managers**: `JamfProClient` uses `async with` for automatic session management
+- **Error handling**: Structured error responses as dictionaries with `error` and `message` keys
+- **Type safety**: Extensive use of Pydantic models and Python 3.13 type hints
+- **ID flexibility**: MCP tools accept IDs as `str | int` since some clients serialize numbers as strings
+
+## Code Style Requirements
+
+### Python Reference
+Always use `python3` explicitly in commands, not `python` (per global CLAUDE.md).
+
+### Docstring Format
+Use **Sphinx/reStructuredText style only** (enforced by `.cursor/rules/sphinx-style-docstrings.mdc`):
+```python
+def example(param: str, count: int = 10) -> dict[str, Any]:
+    """
+    Short description.
+
+    Longer description if needed.
+
+    :param param: Parameter description
+    :type param: str
+    :param count: Count parameter with default
+    :type count: int
+    :return: Return value description
+    :rtype: dict[str, Any]
+    :raises ValueError: When validation fails
+    """
+```
+
+**Never use Google or NumPy docstring styles.**
+
+### Type Hints
+- Use modern Python 3.10+ syntax: `str | None` instead of `Optional[str]`
+- Use built-in generics: `list[str]`, `dict[str, int]`, `tuple[int, ...]`
+- Import from `typing` only for: `Any`, `TypeVar`, `Literal`, `Callable`, `Protocol`, `TypedDict`
+
+### Code Formatting
+- Max line length: 100 characters
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
