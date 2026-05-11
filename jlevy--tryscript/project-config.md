@@ -1,201 +1,180 @@
 ---
 trigger: always_on
-description: CLI Tool Development Rules
+description: General Guidelines
 ---
 
-# CLI Tool Development Rules
+# TypeScript Rules
 
-These rules apply to all CLI tools, command-line scripts, and terminal utilities.
+## Coding Style
 
-## Color and Output Formatting
+- Use clear lowerCamelCase or UpperCamelCase names for functions and variables, per
+  usual TypeScript conventions.
 
-- **ALWAYS use picocolors for terminal colors:** Import `picocolors` (aliased as `pc`)
-  for all color and styling needs.
-  NEVER use hardcoded ANSI escape codes like `\x1b[36m` or `\033[32m`.
+- DO NOT use fully uppercase abbreviations: Use names like `mapHistoryToLlmMessages`. DO
+  NOT use names like `mapHistoryToLLMMessages`.
+
+- DO NOT use underscore prefixes for variables that are actually used.
+  Underscore prefixes should only be used for genuinely unused parameters (like
+  framework callbacks).
+
+## Docstrings
+
+- All major functions and types should have a *concise* docstring explaining their
+  purpose. They should use `\**` … `*/` style comments.
+
+  - Focus on any rationale or purpose.
+
+  - Do NOT state obvious things about the code.
+
+  This should cover
+
+  - Public types
+
+  - Major functions
+
+  - Convex schemas, functions, actions, mutations, and queries
+
+  It should NOT cover:
+
+  - Test functions
+
+  - Trivial internal helper functions
+
+  Example:
 
   ```ts
-  // GOOD: Use picocolors
-  import pc from 'picocolors';
-  console.log(pc.green('Success!'));
-  console.log(pc.cyan('Info message'));
-  
-  // BAD: Hardcoded ANSI codes
-  console.log('\x1b[32mSuccess!\x1b[0m');
-  console.log('\x1b[36mInfo message\x1b[0m');
+  /**
+   * Render a ContextSummary as readable markdown for both LLMs and users.
+   */
+  export function formatContextMarkdown(
+    summary: ContextSummary,
+    options?: { maxHoldings?: number },
+  ): string {
+    ...
+  }
   ```
 
-- **Use shared color utilities:** Create a shared formatting module for consistent color
-  application across commands.
+- **Document fields in type definitions, not at usage sites.** Place documentation
+  directly on type/interface fields as the single source of truth.
+  Reference the type documentation elsewhere using `@see TypeName.fieldName`.
 
   ```ts
-  // lib/cliFormatting.ts - shared color utilities
-  import pc from 'picocolors';
+  // GOOD: Documentation on type definition
+  interface RunConfig {
+    /** When true, logs full LLM request/response payloads for debugging. */
+    logLlmCalls: boolean;
+    /**
+     * TEST ONLY: Disables automatic scheduling of backtest steps.
+     * NEVER use in production.
+     */
+    testSkipScheduling?: boolean;
+  }
   
-  export const colors = {
-    success: (s: string) => pc.green(s),
-    error: (s: string) => pc.red(s),
-    info: (s: string) => pc.cyan(s),
-    warn: (s: string) => pc.yellow(s),
-    muted: (s: string) => pc.gray(s),
-  };
+  // Reference it elsewhere
+  export const runConfigValidator = v.object({
+    logLlmCalls: v.optional(v.boolean()),
+    /** @see RunConfig.testSkipScheduling for documentation */
+    testSkipScheduling: v.optional(v.boolean()),
+  });
   
-  // Usage in commands:
-  import { colors } from '../lib/cliFormatting.js';
-  console.log(colors.success('Operation completed'));
-  ```
-
-- **Trust picocolors TTY detection:** Picocolors automatically detects when stdout is
-  not a TTY (e.g., piped to `cat` or redirected to a file) and disables colors.
-  DO NOT manually check `process.stdout.isTTY` unless you need special non-color
-  behavior.
-
-  Picocolors respects:
-
-  - `NO_COLOR=1` environment variable (disables colors)
-
-  - `FORCE_COLOR=1` environment variable (forces colors)
-
-  - `--no-color` and `--color` command-line flags (if implemented)
-
-  - TTY detection via `process.stdout.isTTY`
-
-  ```ts
-  // GOOD: Let picocolors handle it automatically
-  import pc from 'picocolors';
-  console.log(pc.green('This works correctly in all contexts'));
-  
-  // BAD: Manual TTY checking (redundant with picocolors)
-  const useColors = process.stdout.isTTY;
-  const msg = useColors ? '\x1b[32mSuccess\x1b[0m' : 'Success';
-  console.log(msg);
-  ```
-
-## Commander.js Patterns
-
-- **Use Commander.js for all CLI tools:** Import from `commander` and follow established
-  patterns for command registration and option handling.
-
-- **Apply colored help to all commands:** Use `withColoredHelp()` wrapper from shared
-  utilities to ensure consistent help text formatting.
-
-  ```ts
-  import { Command } from 'commander';
-  import { withColoredHelp } from '../lib/shared.js';
-  
-  export const myCommand = withColoredHelp(new Command('my-command'))
-    .description('Description here')
-    .action(async (options, command) => {
-      // Implementation
-    });
-  ```
-
-- **Use shared context helpers:** Create utilities like `getCommandContext()`,
-  `setupDebug()`, and `logDryRun()` in a shared module for consistent behavior.
-
-  ```ts
-  import { getCommandContext, setupDebug, logDryRun } from '../lib/shared.js';
-  
-  .action(async (options, command) => {
-    const ctx = getCommandContext(command);
-    setupDebug(ctx);
-  
-    if (ctx.dryRun) {
-      logDryRun('Would perform action', { details: 'here' });
-      return;
-    }
-  
-    // Actual implementation
+  // BAD: Documentation duplicated at multiple usage sites
+  export const runConfigValidator = v.object({
+    /** When true, logs full LLM request/response payloads for debugging. */
+    logLlmCalls: v.optional(v.boolean()),
+    /** TEST ONLY: Disables automatic scheduling... */
+    testSkipScheduling: v.optional(v.boolean()),
   });
   ```
 
-- **Support `--dry-run`, `--verbose`, and `--quiet` flags:** These are global options
-  defined at the program level.
-  Access them via `getCommandContext()`.
+## Type Annotations
 
-## Progress and Feedback
+- Don’t use `any` to types unless absolutely necessary!
+  Do not add `any` types to get type checking to pass.
+  Use more precise types instead.
+  Then make sure type checking passes.
 
-- **Use @clack/prompts for interactive UI:** Import `@clack/prompts` as `p` for
-  spinners, prompts, and status messages.
+- Avoid `as any` and unsafe casts.
+  Prefer overloads or precise types at boundaries.
 
   ```ts
-  import * as p from '@clack/prompts';
+  // BAD: Silences type safety
+  const logger = createAgentLogger(ctx, agentCtx as any);
   
-  p.intro('🧪 Starting test suite');
-  
-  const spinner = p.spinner();
-  spinner.start('Processing data');
-  // ... work ...
-  spinner.stop('✅ Data processed');
-  
-  p.outro('All done!');
+  // GOOD: Provide a precise input shape or overload that matches
+  const logger = createAgentLogger(ctx, {
+    runId: runId as Id<'runs'>,
+    agentId: agentId as Id<'agents'>,
+    conversationId: conversationId as Id<'conversations'>,
+    experimentRunId: experimentRunId,
+  });
+  // Or define overloads to accept both Id<> and string shared types, and narrow internally.
   ```
 
-- **Use consistent logging methods:**
-
-  - `p.log.info()` for informational messages
-
-  - `p.log.success()` for successful operations
-
-  - `p.log.warn()` for warnings
-
-  - `p.log.error()` for errors
-
-  - `p.log.step()` for step-by-step progress
-
-- **Use appropriate emojis for status:** Follow emoji conventions from
-  `@docs/general/agent-rules/general-style-rules.md`:
-
-  - ✅ for success
-
-  - ❌ for failure/error
-
-  - ⚠️ for warnings
-
-  - ⏰ for timing information
-
-  - 🧪 for tests
-
-## Timing and Performance
-
-- **Display timing for long operations:** For operations that take multiple seconds,
-  display timing information using the ⏰ emoji and colored output.
+- **Extract and name inline object types.** DO NOT use anonymous inline types for
+  complex structures that appear in multiple places.
+  Create named types in shared locations.
 
   ```ts
-  const start = Date.now();
-  // ... operation ...
-  const duration = ((Date.now() - start) / 1000).toFixed(1);
-  console.log(colors.cyan(`⏰ Operation completed: ${duration}s`));
-  ```
-
-- **Show total time for multi-step operations:** For scripts that run multiple phases
-  (like test suites), show individual phase times and a total.
-
-  ```ts
-  console.log(colors.cyan(`⏰ Phase 1: ${phase1Time}s`));
-  console.log(colors.cyan(`⏰ Phase 2: ${phase2Time}s`));
-  console.log('');
-  console.log(colors.green(`⏰ Total time: ${totalTime}s`));
-  ```
-
-## Script Structure
-
-- **Use TypeScript for all CLI scripts:** Write scripts as `.ts` files with proper
-  types. Use `#!/usr/bin/env tsx` shebang for executable scripts.
-
-  ```ts
-  #!/usr/bin/env tsx
-  
-  /**
-   * Script description here.
-   */
-  
-  import { execSync } from 'node:child_process';
-  import * as p from '@clack/prompts';
-  
-  async function main() {
-    // Implementation
+  // BAD: Inline anonymous type duplicated across functions
+  interface ExecutionResults {
+    tradesSummary: {
+      totalTrades: number;
+      successfulTrades: number;
+      trades: { symbol: string; action: 'buy' | 'sell'; price: number }[];
+    };
   }
   
+  // GOOD: Named type in shared location
+  interface FullTradeSummary {
+    stats: TradeSummaryStats;
+    trades: TradeDetail[];
+  }
+  interface ExecutionResults {
+    tradesSummary: FullTradeSummary;
+  }
+  ```
+
+- **Consolidate duplicate calculation logic.** DO NOT duplicate calculations of related
+  metrics. Create a single function that computes all related values together.
+
+  ```ts
+  // BAD: Same calculations scattered across files
+  const totalBuyValue = trades
+    .filter((t) => t.action === 'buy')
+    .reduce((sum, t) => sum + t.value, 0);
+  const totalSellValue = trades
+    .filter((t) => t.action === 'sell')
+    .reduce((sum, t) => sum + t.value, 0);
+  
+  // GOOD: Single shared function computes all related metrics
+  function computeTradeSummaryStats(trades: Trade[]): TradeSummaryStats {
+    return {
+      totalBuyValue: trades.filter((t) => t.action === 'buy').reduce((sum, t) => sum + t.value, 0),
+      totalSellValue: trades
+        .filter((t) => t.action === 'sell')
+        .reduce((sum, t) => sum + t.value, 0),
+      uniqueTickers: new Set(trades.map((t) => t.symbol)).size,
+    };
+  }
+  ```
+
+## Exhaustiveness Checks
+
+- **Always add exhaustiveness checks to `switch` statements on discriminated union
+  types.** When switching on unions (like `field.kind` or `action.type`), include a
+  `default` branch that assigns to `never`. This forces a compile-time error if a new
+  variant is added but not handled.
+
+  ```ts
+  // GOOD: Exhaustiveness check catches missing cases at compile time
+  switch (field.kind) {
+    case 'string':
+      return handleString(field);
+    case 'number':
+      return handleNumber(field);
+    // ... all cases ...
+    default: {
+      const _exhaustive: never = field;
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
