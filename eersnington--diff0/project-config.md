@@ -1,8 +1,7 @@
 ---
 trigger: always_on
-description: Project Context - Rules, Standard and Linter
+description: Concise rules for building accessible, fast, delightful UIs Use MUST/SHOULD/NEVER to guide decisions
 ---
-
 
 Concise rules for building accessible, fast, delightful UIs Use MUST/SHOULD/NEVER to guide decisions
 
