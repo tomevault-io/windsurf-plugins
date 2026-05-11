@@ -7,11 +7,11 @@ Fast CLI tool for bird species detection using BirdNET and Perch AI models
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [tphakala/birda](https://github.com/tphakala/birda).
+Original source: `CLAUDE.md` in [tphakala/birda](https://github.com/tphakala/birda).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
