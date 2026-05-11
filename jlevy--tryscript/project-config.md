@@ -1,131 +1,218 @@
 ---
 trigger: always_on
-description: `tbd` provides lightweight, git-native task and issue tracking using beads, which are
+description: Rules and patterns for developing LLM-usable tools
 ---
 
-# tbd Workflow
+# Tool Development Rules
 
-`tbd` provides lightweight, git-native task and issue tracking using beads, which are
-just lightweight issues managed from the CLI.
+## Universal Patterns
 
-> **Context Recovery**: Run `tbd prime` after compaction, clear, or new session.
-> Hooks auto-call this in Claude Code when .tbd/ detected.
+Every tool implementation must follow these patterns:
 
-# SESSION CLOSING PROTOCOL
+1. **Tool Structure**
 
-**CRITICAL**: Before saying “done” or “complete”, you MUST run this checklist:
+   - Use AI SDK `tool()` function from ‘ai’ package
 
-```
-[ ] 1. Stage and commit: git add + git commit
-[ ] 2. Push to remote: git push
-[ ] 3. Start CI watch (BLOCKS until done): gh pr checks <PR> --watch 2>&1
-[ ] 4. While CI runs: tbd close/update <id> for issues worked on
-[ ] 5. While CI runs: tbd sync
-[ ] 6. Return to step 3 and CONFIRM CI passed
-[ ] 7. If CI failed: fix, re-push, restart from step 3
-```
+   - Define Zod schema with `.describe()` on every field
 
-## NON-NEGOTIABLE Requirements
+   - Support mock mode via `runConfig?.mockApis` or feature-specific mock flag
 
-### CI: Wait for `--watch` to finish
+   - Return structured response: `{ success: boolean, data: any, message: string }`
 
-The `--watch` flag blocks until ALL checks complete.
-Do NOT see “passing” in early output and move on—wait for the **final summary** showing
-all checks passed.
+   - Handle errors with clear, actionable messages
 
-### tbd: Update issues and sync
+2. **LLM-Optimized Descriptions**
 
-Every session must end with tbd in a clean state:
-- Close/update **every issue** you worked on
-- Run `tbd sync` and confirm it completed
+   - Start with action verb: “Get...”, “Search...”, “Execute …”
 
-**Work is not done until pushed, CI passes, and tbd is synced.**
+   - Include usage context: “Use this to …”
 
-## Core Rules
+   - Provide concrete examples in parameter descriptions
 
-- Track *all task work* not being done immediately as beads using `tbd` (discovered
-  work, future work, TODOs for the session, multi-session work)
-- When in doubt, prefer tbd for tracking tasks, bugs, and issues
-- Use `tbd create` for creating beads
-- Git workflow: update or close issues and run `tbd sync` at session end
-- If not given specific directions, check `tbd ready` for available work
+   - Avoid technical jargon or ambiguous terms
 
-## Essential Commands
+   - Example: “Get RSI indicator values for given symbols on a specific date.
+     Use this to identify overbought/oversold conditions in backtests.”
 
-### Finding Work
+3. **Parameter Descriptions**
 
-- `tbd ready` - Show issues ready to work (no blockers)
-- `tbd list --status open` - All open issues
-- `tbd list --status in_progress` - Your active work
-- `tbd show <id>` - Detailed issue view with dependencies
+   - Every Zod field must have `.describe()` with clear explanation
 
-### Creating & Updating
+   - Include format examples: “Date in YYYY-MM-DD format (example: ‘2024-01-15’)”
 
-- `tbd create "title" --type task|bug|feature --priority P2` - New issue
-  - Priority: P0-P4 (P0=critical, P2=medium, P4=backlog).
-    Do NOT use "high"/"medium"/"low"
-- `tbd update <id> --status in_progress` - Claim work
-- `tbd update <id> --assignee username` - Assign to someone
-- `tbd close <id>` - Mark complete
-- `tbd close <id> --reason "explanation"` - Close with reason
-- **Tip**: When creating multiple issues, use parallel subagents for efficiency
+   - Specify constraints: “Array of 1-10 stock ticker symbols”
 
-### Dependencies & Blocking
+   - Explain purpose: “Why this parameter affects the result”
 
-- `tbd dep add <issue> <depends-on>` - Add dependency (issue depends on depends-on)
-- `tbd blocked` - Show all blocked issues
-- `tbd show <id>` - See what’s blocking/blocked by this issue
+4. **Backtest-Safe Tools** (for tools that support historical queries)
 
-### Sync & Collaboration
+   - Must have date/timestamp parameter for point-in-time queries
 
-- `tbd sync` - Sync with git remote (run at session end)
-- `tbd sync --status` - Check sync status without syncing
+   - Never return data from future dates
 
-Note: `tbd sync` handles all git operations for issues--no manual git push needed.
+   - Must be wrapped by cutoffTimestampWrapper in toolResolver
 
-### Project Health
+   - Set `supportsBacktest: true` in tool registry
 
-- `tbd stats` - Project statistics (open/closed/blocked counts)
-- `tbd doctor` - Check for issues (sync problems, missing hooks)
+   - Validate all date parameters follow YYYY-MM-DD format
 
-## Common Workflows
+5. **Mock Mode Support**
 
-**Starting work:**
+   - Check `runConfig?.mockApis` for global mock mode
 
-```bash
-tbd ready                              # Find available work
-tbd show <id>                          # Review issue details
-tbd update <id> --status in_progress   # Claim it
-```
+   - OR check feature-specific flag (e.g., `runConfig?.mockPrice`)
 
-**Completing work:**
+   - Return realistic mock data that matches real response schema
 
-```bash
-tbd close <id>    # Mark complete
-tbd sync          # Push to remote
-```
+   - Document mock behavior in tool’s unit tests
 
-**Creating dependent work:**
+## Tool Categories
 
-```bash
-tbd create "Implement feature X" --type feature
-tbd create "Write tests for X" --type task
-tbd dep add <tests-id> <feature-id>   # Tests depend on feature
-```
+Tools are categorized for UI organization and filtering:
 
-## Setup Commands
+- **market-data**: Stock prices, technical indicators, options data, fundamentals
 
-- `tbd setup claude` - Install Claude Code hooks and skill file
-- `tbd setup cursor` - Create Cursor IDE rules file
-- `tbd setup codex` - Create/update AGENTS.md for Codex
-- `tbd setup beads --disable` - Migrate from Beads to tbd
+- **news**: News search, article retrieval, sentiment analysis
 
-## Quick Reference
+- **trading**: Buy/sell execution, portfolio queries, order management
 
-- **Priority levels**: 0=critical, 1=high, 2=medium (default), 3=low, 4=backlog
-- **Issue types**: task, bug, feature, epic
-- **Status values**: open, in_progress, closed
-- **JSON output**: Add `--json` to any command for machine-readable output
+- **search**: Web search, external APIs, research tools
+
+## Tool Registry Pattern
+
+Every new tool requires updates in 3 locations:
+
+1. **Tool ID Declaration** (`convex/models/toolTypes.ts`):
+
+   ```typescript
+   // Add to FUNCTION_TOOL_IDS (for custom tools) or PROVIDER_TOOL_IDS (for native tools)
+   export const FUNCTION_TOOL_IDS = [
+     'stock_prices_current',
+     'stock_prices_historical',
+     // ... existing tools
+     'new_tool_id', // ← Add here
+   ] as const;
+   ```
+
+2. **Tool Metadata** (`convex/models/toolRegistry.ts`):
+
+   ```typescript
+   export const TOOL_REGISTRY: Record<ToolId, ToolMetadata> = {
+     // ... existing tools
+     new_tool_id: {
+       id: 'new_tool_id',
+       name: 'Human Readable Name',
+       description: 'Brief description for UI display',
+       category: 'market-data', // or 'news', 'trading', 'search'
+       supportsBacktest: true, // or false
+       skipCutoffValidation: false, // set true only for forward-looking data (earnings dates)
+     },
+   };
+   ```
+
+3. **Tool Resolver** (`convex/tools/toolResolver.ts`):
+
+   ```typescript
+   import { createNewTool } from './newTool';
+   
+   // In resolveTools() switch statement:
+   case 'new_tool_id':
+     tools.new_tool_id = createNewTool(runConfig);
+     break;
+   ```
+
+## Testing Requirements
+
+Minimum test coverage for every tool:
+
+1. **Schema Validation Tests**
+
+   - Valid parameters accepted
+
+   - Invalid parameters rejected with clear errors
+
+   - Required fields enforced
+
+   - Type checking works correctly
+
+2. **Mock Mode Tests**
+
+   - Returns mock data when configured
+
+   - Mock data matches real response schema
+
+   - Can be used in tests without API calls
+
+3. **API Integration Tests**
+
+   - Successful API responses parsed correctly
+
+   - API errors handled gracefully
+
+   - Rate limiting handled (if applicable)
+
+   - Authentication works (if applicable)
+
+4. **Backtest Safety Tests** (if `supportsBacktest: true`)
+
+   - Future dates blocked by cutoff wrapper
+
+   - Historical dates allowed
+
+   - Date parameter validation works
+
+5. **LLM Evaluation Tests**
+
+   - LLM can discover when to use tool
+
+   - LLM can construct valid parameters
+
+   - LLM can interpret results correctly
+
+   - LLM handles errors gracefully
+
+   - **Target: >90% success rate across all test types**
+
+## Common Pitfalls
+
+Avoid these frequent mistakes:
+
+1. **Ambiguous Tool Description**
+
+   - Problem: LLM doesn’t know when to use tool
+
+   - Fix: Add concrete usage examples and context
+
+2. **Confusing Parameter Names**
+
+   - Problem: LLM sends wrong data or guesses format
+
+   - Fix: Use clear names and detailed `.describe()` with examples
+
+3. **Missing Error Messages**
+
+   - Problem: LLM doesn’t know what went wrong
+
+   - Fix: Throw errors with specific details about what failed and why
+
+4. **No Format Examples**
+
+   - Problem: LLM guesses date/time formats incorrectly
+
+   - Fix: Include explicit format in description with example
+
+5. **Future Data Leakage**
+
+   - Problem: Backtest results invalid due to lookahead bias
+
+   - Fix: Validate all date params, use cutoff wrapper, test thoroughly
+
+6. **Overly Complex Schemas**
+
+   - Problem: LLM struggles with many optional parameters
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [jlevy/tryscript](https://github.com/jlevy/tryscript) — distributed by [TomeVault](https://tomevault.io).
