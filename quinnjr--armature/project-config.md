@@ -1,246 +1,225 @@
 ---
 trigger: always_on
-description: Guidelines for creating new modules/crates in the Armature framework.
+description: **CRITICAL RULE:** Never commit directly to `main` or `develop` branches.
 ---
 
+# No Direct Commits to Main and Develop
 
-# Armature Module Development
+**CRITICAL RULE:** Never commit directly to `main` or `develop` branches.
 
-Guidelines for creating new modules/crates in the Armature framework.
+## Protected Branches
 
-## Module Structure
+### `main` branch
+- ❌ **NO direct commits**
+- ❌ **NO force pushes**
+- ✅ Only merge via Pull Requests from `release/*` or `hotfix/*`
 
-Every new armature module should follow this structure:
+### `develop` branch
+- ❌ **NO direct commits**
+- ❌ **NO force pushes**
+- ✅ Only merge via Pull Requests from `feature/*`, `release/*`, or `hotfix/*`
 
-```
-armature-<name>/
-├── Cargo.toml
-├── src/
-│   ├── lib.rs           # Public API exports
-│   ├── config.rs        # Configuration types (if applicable)
-│   ├── error.rs         # Module-specific error types
-│   ├── traits.rs        # Core traits for the module
-│   └── ...              # Implementation files
-└── tests/
-    └── integration.rs   # Integration tests
-```
+## Why This Rule Exists
 
-## Cargo.toml Template
+1. **Code Review:** All changes must be reviewed before merging
+2. **CI/CD:** Automated tests must pass before integration
+3. **Quality Control:** Prevents untested code from reaching protected branches
+4. **Audit Trail:** Maintains clear history of what changed and why
+5. **Team Collaboration:** Ensures visibility of all changes
+6. **Rollback Safety:** Makes it easier to revert problematic changes
 
-```toml
-[package]
-name = "armature-<name>"
-version.workspace = true
-edition.workspace = true
-rust-version.workspace = true
-authors.workspace = true
-license.workspace = true
-repository.workspace = true
-homepage.workspace = true
-description = "Brief description of the module"
-keywords = ["armature", "<relevant>", "<keywords>"]
-categories = ["web-programming"]
+## Correct Workflow
 
-[dependencies]
-# Core dependencies - use workspace versions when available
-tokio = { version = "1.35", features = ["full"] }
-async-trait = "0.1"
-thiserror = "2.0"
-serde = { version = "1.0", features = ["derive"] }
+### For New Features
 
-# Optional: armature-core for DI integration
-armature-core = { path = "../armature-core", version = "0.1.0", optional = true }
+```bash
+# ❌ WRONG - Never do this!
+git checkout develop
+git add .
+git commit -m "Add new feature"
+git push origin develop  # This will be rejected!
 
-[features]
-default = []
-# Feature for DI integration
-di = ["armature-core"]
-
-[dev-dependencies]
-tokio-test = "0.4"
+# ✅ CORRECT
+git checkout develop
+git pull origin develop
+git checkout -b feature/123-new-feature
+git add .
+git commit -m "feat: add new feature"
+git push origin feature/123-new-feature
+# Then create Pull Request on GitHub/GitLab
 ```
 
-## Error Handling Pattern
+### For Bug Fixes
 
-```rust
-// src/error.rs
-use thiserror::Error;
+```bash
+# ❌ WRONG
+git checkout develop
+git commit -am "fix bug"
+git push origin develop  # This will be rejected!
 
-#[derive(Debug, Error)]
-pub enum ModuleError {
-    #[error("Configuration error: {0}")]
-    Config(String),
-
-    #[error("Connection failed: {0}")]
-    Connection(String),
-
-    #[error("Operation failed: {0}")]
-    Operation(String),
-
-    #[error(transparent)]
-    Io(#[from] std::io::Error),
-}
-
-pub type Result<T> = std::result::Result<T, ModuleError>;
+# ✅ CORRECT
+git checkout develop
+git pull origin develop
+git checkout -b feature/456-fix-bug
+git commit -am "fix: resolve issue with authentication"
+git push origin feature/456-fix-bug
+# Then create Pull Request
 ```
 
-## Configuration Pattern
+### For Hotfixes
 
-```rust
-// src/config.rs
-use serde::{Deserialize, Serialize};
+```bash
+# ❌ WRONG
+git checkout main
+git commit -am "urgent fix"
+git push origin main  # This will be rejected!
 
-/// Configuration for the module.
-///
-/// # Examples
-///
-/// ```rust
-/// use armature_<name>::Config;
-///
-/// let config = Config::builder()
-///     .option1("value")
-///     .option2(42)
-///     .build();
-/// ```
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Config {
-    pub option1: String,
-    pub option2: i32,
-    #[serde(default)]
-    pub optional_field: Option<String>,
-}
-
-impl Config {
-    pub fn builder() -> ConfigBuilder {
-        ConfigBuilder::default()
-    }
-
-    pub fn from_env() -> ConfigBuilder {
-        ConfigBuilder::from_env()
-    }
-}
-
-#[derive(Debug, Default)]
-pub struct ConfigBuilder {
-    option1: Option<String>,
-    option2: Option<i32>,
-    optional_field: Option<String>,
-}
-
-impl ConfigBuilder {
-    pub fn from_env() -> Self {
-        Self {
-            option1: std::env::var("MODULE_OPTION1").ok(),
-            option2: std::env::var("MODULE_OPTION2").ok().and_then(|v| v.parse().ok()),
-            optional_field: std::env::var("MODULE_OPTIONAL").ok(),
-        }
-    }
-
-    pub fn option1(mut self, value: impl Into<String>) -> Self {
-        self.option1 = Some(value.into());
-        self
-    }
-
-    pub fn option2(mut self, value: i32) -> Self {
-        self.option2 = Some(value);
-        self
-    }
-
-    pub fn optional_field(mut self, value: impl Into<String>) -> Self {
-        self.optional_field = Some(value.into());
-        self
-    }
-
-    pub fn build(self) -> Config {
-        Config {
-            option1: self.option1.unwrap_or_default(),
-            option2: self.option2.unwrap_or(0),
-            optional_field: self.optional_field,
-        }
-    }
-}
+# ✅ CORRECT
+git checkout main
+git pull origin main
+git checkout -b hotfix/1.0.1-critical-fix
+git commit -am "fix: resolve critical security issue"
+git push origin hotfix/1.0.1-critical-fix
+# Then create Pull Request to main AND develop
 ```
 
-## Service Pattern with DI Integration
+## What If I Accidentally Commit?
 
-```rust
-// src/service.rs
-use crate::{Config, Result};
+### Before Pushing
 
-/// Main service for the module.
-///
-/// Supports automatic dependency injection when the `di` feature is enabled.
-#[derive(Clone)]
-pub struct ModuleService {
-    config: Config,
-    // Internal state
-}
+If you committed to `main` or `develop` locally but haven't pushed yet:
 
-impl ModuleService {
-    /// Create a new service with the given configuration.
-    pub fn new(config: Config) -> Self {
-        Self { config }
-    }
-
-    /// Create with default configuration.
-    pub fn default() -> Self {
-        Self::new(Config::builder().build())
-    }
-
-    /// Primary operation of this module.
-    pub async fn do_something(&self, input: &str) -> Result<String> {
-        // Implementation
-        Ok(format!("Processed: {}", input))
-    }
-}
-
-// DI integration (when feature enabled)
-#[cfg(feature = "di")]
-mod di {
-    use super::*;
-    use armature_core::prelude::*;
-
-    impl Provider for ModuleService {
-        fn create(_container: &Container) -> std::result::Result<Self, armature_core::Error> {
-            Ok(Self::default())
-        }
-    }
-}
+```bash
+# Move the commit to a new branch
+git branch feature/my-changes
+git reset --hard origin/develop  # or origin/main
+git checkout feature/my-changes
+git push origin feature/my-changes
+# Now create Pull Request
 ```
 
-## Trait Definition Pattern
+### After Pushing (If Allowed)
 
-```rust
-// src/traits.rs
-use async_trait::async_trait;
-use crate::Result;
+If you somehow managed to push directly:
 
-/// Core trait for module implementations.
-///
-/// Implement this trait to create custom backends.
-#[async_trait]
-pub trait Backend: Send + Sync {
-    /// Initialize the backend.
-    async fn init(&mut self) -> Result<()>;
+```bash
+# Immediately notify the team
+# Revert the commit
+git checkout develop  # or main
+git revert HEAD
+git push origin develop  # or main
 
-    /// Perform the main operation.
-    async fn execute(&self, input: &str) -> Result<String>;
-
-    /// Clean up resources.
-    async fn shutdown(&mut self) -> Result<()>;
-}
+# Then create proper feature branch with the fix
+git checkout -b feature/proper-implementation
+# Re-apply your changes properly
+git push origin feature/proper-implementation
+# Create Pull Request
 ```
 
-## lib.rs Structure
+## Emergency Exceptions
 
-```rust
-//! Armature <Name> Module
-//!
-//! This module provides <brief description>.
-//!
-//! # Features
-//!
-//! - Feature 1
+In **extremely rare** emergency situations (production down, data loss, security breach), a direct commit *might* be necessary:
+
+### Emergency Procedure
+
+1. **Get approval** from team lead/CTO
+2. **Document reason** in commit message
+3. **Notify team** immediately in Slack/Discord
+4. **Create follow-up PR** with proper testing
+5. **Post-mortem** document after resolution
+
+```bash
+# Only in extreme emergency with approval
+git checkout main
+git commit -am "EMERGENCY: fix critical production outage
+
+Reason: Database connection pool exhausted causing 100% error rate
+Approved by: [Name]
+Impact: 10,000+ users affected
+Ticket: #CRITICAL-123"
+git push origin main
+
+# Immediately after, create proper PR for review
+git checkout -b hotfix/emergency-followup
+# Add tests, documentation, etc.
+git push origin hotfix/emergency-followup
+```
+
+## Pull Request Requirements
+
+All merges to `main` and `develop` must go through Pull Requests with:
+
+### Required Checks
+
+- ✅ At least one approval from code owner
+- ✅ All CI tests passing (`cargo test --all-features`)
+- ✅ No clippy warnings (`cargo clippy -- -D warnings`)
+- ✅ Code is formatted (`cargo fmt -- --check`)
+- ✅ No merge conflicts
+- ✅ Branch is up to date with target
+- ✅ All conversations resolved
+
+### PR Must Include
+
+- Clear description of changes
+- Link to related issue/ticket
+- Test coverage for new code
+- Documentation updates (if needed)
+- CHANGELOG update (for releases)
+
+## Branch Protection Setup
+
+### GitHub Settings
+
+```yaml
+# .github/branch-protection.yml (conceptual)
+branches:
+  main:
+    protection:
+      required_pull_request_reviews:
+        required_approving_review_count: 1
+        dismiss_stale_reviews: true
+      required_status_checks:
+        strict: true
+        contexts:
+          - "test"
+          - "lint"
+          - "format-check"
+      enforce_admins: true
+      restrictions: null
+
+  develop:
+    protection:
+      required_pull_request_reviews:
+        required_approving_review_count: 1
+      required_status_checks:
+        strict: true
+        contexts:
+          - "test"
+          - "lint"
+      enforce_admins: true
+```
+
+## Common Mistakes to Avoid
+
+### ❌ Mistake 1: "Just a quick fix"
+
+```bash
+# NO! Even small changes need PR
+git checkout develop
+git commit -am "fix typo"  # Still wrong!
+```
+
+### ❌ Mistake 2: "Nobody will notice"
+
+```bash
+# Everyone will notice, and CI should block it
+git push origin main  # Protected branch!
+```
+
+### ❌ Mistake 3: "I'm the only developer"
+
+```bash
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
