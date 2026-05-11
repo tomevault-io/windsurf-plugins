@@ -1,208 +1,256 @@
 ---
 trigger: always_on
-description: Guidelines for implementing real-time communication in Armature.
+description: This project uses **Rust Edition 2024** and follows modern Rust best practices.
 ---
 
 
-# Real-time Features: WebSocket & SSE
+# Rust 2024 Best Practices
 
-Guidelines for implementing real-time communication in Armature.
+This project uses **Rust Edition 2024** and follows modern Rust best practices.
 
-## Choosing Between WebSocket and SSE
+## Edition Configuration
 
-| Feature | WebSocket | SSE |
-|---------|-----------|-----|
-| Direction | Bidirectional | Server → Client only |
-| Protocol | Custom | HTTP |
-| Reconnection | Manual | Automatic |
-| Browser Support | Good | Excellent |
-| Proxy Friendly | Sometimes | Yes |
-| Use Case | Chat, Games | Notifications, Feeds |
+All `Cargo.toml` files must specify edition 2024:
 
-## WebSocket Implementation
+```toml
+[package]
+name = "crate-name"
+version = "0.1.0"
+edition = "2024"
+```
 
-### Basic WebSocket Handler
+## Code Style
+
+### Use `rustfmt`
+
+Always format code with rustfmt before committing:
+
+```bash
+cargo fmt --all
+```
+
+### Use `clippy`
+
+Run clippy and fix all warnings:
+
+```bash
+cargo clippy --all-features --all-targets -- -D warnings
+```
+
+### Naming Conventions
 
 ```rust
-use armature::websocket::{WebSocket, Message, WebSocketUpgrade};
+// ✅ Good
+struct UserAccount { }           // Types: UpperCamelCase
+trait Validate { }               // Traits: UpperCamelCase
+enum HttpStatus { }              // Enums: UpperCamelCase
+fn create_user() { }             // Functions: snake_case
+const MAX_SIZE: usize = 100;     // Constants: SCREAMING_SNAKE_CASE
+static GLOBAL_CONFIG: &str = ""; // Statics: SCREAMING_SNAKE_CASE
+let user_name = "Alice";         // Variables: snake_case
+mod http_client;                 // Modules: snake_case
 
-#[controller("/ws")]
-pub struct WebSocketController;
+// ❌ Bad
+struct user_account { }          // Wrong case
+fn CreateUser() { }              // Wrong case
+const maxSize: usize = 100;      // Wrong case
+```
 
-impl WebSocketController {
-    #[get("/")]
-    async fn connect(&self, ws: WebSocketUpgrade) -> WebSocketResponse {
-        ws.on_upgrade(|socket| handle_socket(socket))
-    }
+## Error Handling
+
+### Use `Result` and `?` Operator
+
+```rust
+// ✅ Good: Use Result and ? operator
+pub fn parse_config(path: &str) -> Result<Config, Error> {
+    let contents = std::fs::read_to_string(path)?;
+    let config: Config = serde_json::from_str(&contents)?;
+    validate_config(&config)?;
+    Ok(config)
 }
 
-async fn handle_socket(mut socket: WebSocket) {
-    // Send welcome message
-    socket.send(Message::Text("Connected!".to_string())).await.ok();
+// ❌ Bad: Using unwrap in library code
+pub fn parse_config(path: &str) -> Config {
+    let contents = std::fs::read_to_string(path).unwrap(); // Don't panic!
+    serde_json::from_str(&contents).unwrap()
+}
+```
 
-    // Message loop
-    while let Some(msg) = socket.recv().await {
-        match msg {
-            Ok(Message::Text(text)) => {
-                // Echo back
-                socket.send(Message::Text(format!("Echo: {}", text))).await.ok();
-            }
-            Ok(Message::Binary(data)) => {
-                // Handle binary data
-                socket.send(Message::Binary(data)).await.ok();
-            }
-            Ok(Message::Ping(data)) => {
-                socket.send(Message::Pong(data)).await.ok();
-            }
-            Ok(Message::Close(_)) => break,
-            Err(e) => {
-                eprintln!("WebSocket error: {}", e);
-                break;
-            }
-            _ => {}
-        }
+### Use `thiserror` for Error Types
+
+```rust
+use thiserror::Error;
+
+#[derive(Debug, Error)]
+pub enum CacheError {
+    #[error("Redis error: {0}")]
+    Redis(#[from] redis::RedisError),
+
+    #[error("Serialization error: {0}")]
+    Serialization(String),
+
+    #[error("Cache key not found: {0}")]
+    NotFound(String),
+}
+```
+
+### Never Use `unwrap()` or `expect()` in Library Code
+
+```rust
+// ✅ Good: Propagate errors
+pub fn get_user(id: i32) -> Result<User, Error> {
+    database.query("SELECT * FROM users WHERE id = ?", id)?
+        .ok_or_else(|| Error::NotFound(format!("User {} not found", id)))
+}
+
+// ❌ Bad: Panicking in library code
+pub fn get_user(id: i32) -> User {
+    database.query("SELECT * FROM users WHERE id = ?", id)
+        .unwrap()
+        .expect("User not found") // Never use in library code!
+}
+
+// ✅ Acceptable: In application code, example code, or tests
+#[tokio::main]
+async fn main() {
+    let app = Application::create(AppModule);
+    app.listen(3000).await.expect("Failed to start server");
+}
+```
+
+## Async/Await
+
+### Use `async-trait` for Async Traits
+
+```rust
+use async_trait::async_trait;
+
+#[async_trait]
+pub trait Repository: Send + Sync {
+    async fn find_by_id(&self, id: i32) -> Result<User, Error>;
+    async fn save(&self, user: &User) -> Result<(), Error>;
+}
+```
+
+### Prefer `tokio` Runtime
+
+```rust
+// ✅ Good: Use tokio for async runtime
+#[tokio::main]
+async fn main() -> Result<(), Error> {
+    // Async code
+    Ok(())
+}
+
+// For tests
+#[tokio::test]
+async fn test_async_function() {
+    let result = async_function().await;
+    assert!(result.is_ok());
+}
+```
+
+### Use `.await` Properly
+
+```rust
+// ✅ Good: Await futures properly
+let user = fetch_user(id).await?;
+let posts = fetch_posts(user.id).await?;
+
+// ✅ Good: Concurrent execution with join!
+let (user, posts) = tokio::join!(
+    fetch_user(id),
+    fetch_posts(user_id)
+);
+
+// ❌ Bad: Blocking in async code
+async fn bad_example() {
+    std::thread::sleep(Duration::from_secs(1)); // Blocks entire thread!
+}
+
+// ✅ Good: Async sleep
+async fn good_example() {
+    tokio::time::sleep(Duration::from_secs(1)).await;
+}
+```
+
+## Ownership and Borrowing
+
+### Follow Ownership Rules
+
+```rust
+// ✅ Good: Clear ownership
+pub struct User {
+    pub id: i32,
+    pub name: String,
+}
+
+impl User {
+    // Takes ownership
+    pub fn new(name: String) -> Self {
+        Self { id: 0, name }
+    }
+
+    // Borrows immutably
+    pub fn display(&self) {
+        println!("{}", self.name);
+    }
+
+    // Borrows mutably
+    pub fn update_name(&mut self, name: String) {
+        self.name = name;
+    }
+
+    // Consumes self
+    pub fn into_dto(self) -> UserDto {
+        UserDto { name: self.name }
     }
 }
 ```
 
-### Room-Based Chat
+### Use References Appropriately
 
 ```rust
-use std::sync::Arc;
-use tokio::sync::{broadcast, RwLock};
-use std::collections::HashMap;
-
-#[derive(Clone)]
-pub struct ChatRooms {
-    rooms: Arc<RwLock<HashMap<String, broadcast::Sender<ChatMessage>>>>,
+// ✅ Good: Take references for read-only access
+pub fn validate_email(email: &str) -> bool {
+    email.contains('@')
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct ChatMessage {
-    pub room: String,
-    pub user: String,
-    pub content: String,
-    pub timestamp: u64,
+// ❌ Bad: Unnecessary ownership
+pub fn validate_email(email: String) -> bool {
+    email.contains('@')
 }
 
-impl ChatRooms {
-    pub fn new() -> Self {
-        Self {
-            rooms: Arc::new(RwLock::new(HashMap::new())),
-        }
-    }
+// ✅ Good: Return owned data
+pub fn format_name(first: &str, last: &str) -> String {
+    format!("{} {}", first, last)
+}
+```
 
-    pub async fn join(&self, room: &str) -> broadcast::Receiver<ChatMessage> {
-        let mut rooms = self.rooms.write().await;
+### Prefer `&str` Over `&String`
 
-        if let Some(tx) = rooms.get(room) {
-            tx.subscribe()
-        } else {
-            let (tx, rx) = broadcast::channel(100);
-            rooms.insert(room.to_string(), tx);
-            rx
-        }
-    }
-
-    pub async fn send(&self, message: ChatMessage) -> Result<(), Error> {
-        let rooms = self.rooms.read().await;
-
-        if let Some(tx) = rooms.get(&message.room) {
-            tx.send(message).map_err(|_| Error::ChannelClosed)?;
-        }
-
-        Ok(())
-    }
-
-    pub async fn leave(&self, room: &str) {
-        let mut rooms = self.rooms.write().await;
-
-        if let Some(tx) = rooms.get(room) {
-            if tx.receiver_count() == 0 {
-                rooms.remove(room);
-            }
-        }
-    }
+```rust
+// ✅ Good: Use &str for string parameters
+pub fn process_text(text: &str) -> String {
+    text.to_uppercase()
 }
 
-#[controller("/ws/chat")]
-pub struct ChatController {
-    rooms: ChatRooms,
+// ❌ Bad: Unnecessarily specific
+pub fn process_text(text: &String) -> String {
+    text.to_uppercase()
 }
+```
 
-impl ChatController {
-    #[get("/:room")]
-    async fn join_room(
-        &self,
-        room: Path<String>,
-        user: Query<UserQuery>,
-        ws: WebSocketUpgrade,
-    ) -> WebSocketResponse {
-        let rooms = self.rooms.clone();
-        let room_name = room.to_string();
-        let username = user.name.clone();
+## Type Safety
 
-        ws.on_upgrade(move |socket| async move {
-            handle_chat_socket(socket, rooms, room_name, username).await
-        })
-    }
-}
+### Use Newtypes for Type Safety
 
-async fn handle_chat_socket(
-    socket: WebSocket,
-    rooms: ChatRooms,
-    room: String,
-    user: String,
-) {
-    let (mut sender, mut receiver) = socket.split();
-    let mut rx = rooms.join(&room).await;
+```rust
+// ✅ Good: Type-safe wrappers
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct UserId(pub i32);
 
-    // Announce join
-    let join_msg = ChatMessage {
-        room: room.clone(),
-        user: "system".to_string(),
-        content: format!("{} joined the room", user),
-        timestamp: timestamp_now(),
-    };
-    rooms.send(join_msg).await.ok();
-
-    // Spawn task to forward broadcast messages to client
-    let room_clone = room.clone();
-    let send_task = tokio::spawn(async move {
-        while let Ok(msg) = rx.recv().await {
-            let json = serde_json::to_string(&msg).unwrap();
-            if sender.send(Message::Text(json)).await.is_err() {
-                break;
-            }
-        }
-    });
-
-    // Receive messages from client
-    let rooms_clone = rooms.clone();
-    let user_clone = user.clone();
-    let room_clone2 = room.clone();
-    let recv_task = tokio::spawn(async move {
-        while let Some(Ok(Message::Text(text))) = receiver.next().await {
-            let msg = ChatMessage {
-                room: room_clone2.clone(),
-                user: user_clone.clone(),
-                content: text,
-                timestamp: timestamp_now(),
-            };
-            rooms_clone.send(msg).await.ok();
-        }
-    });
-
-    // Wait for either task to complete
-    tokio::select! {
-        _ = send_task => {}
-        _ = recv_task => {}
-    }
-
-    // Announce leave
-    let leave_msg = ChatMessage {
-        room: room.clone(),
-        user: "system".to_string(),
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
