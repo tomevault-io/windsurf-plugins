@@ -1,147 +1,131 @@
 ---
 trigger: always_on
-description: Python Coding Guidelines
+description: `tbd` provides lightweight, git-native task and issue tracking using beads, which are
 ---
 
-# Python Coding Guidelines
+# tbd Workflow
 
-These are rules for a modern Python project using uv.
+`tbd` provides lightweight, git-native task and issue tracking using beads, which are
+just lightweight issues managed from the CLI.
 
-## Python Version
+> **Context Recovery**: Run `tbd prime` after compaction, clear, or new session.
+> Hooks auto-call this in Claude Code when .tbd/ detected.
 
-Write for Python 3.11-3.13. Do NOT write code to support earlier versions of Python.
-Always use modern Python practices appropriate for Python 3.11-3.13.
+# SESSION CLOSING PROTOCOL
 
-Always use full type annotations, generics, and other modern practices.
+**CRITICAL**: Before saying “done” or “complete”, you MUST run this checklist:
 
-## Project Setup and Developer Workflows
+```
+[ ] 1. Stage and commit: git add + git commit
+[ ] 2. Push to remote: git push
+[ ] 3. Start CI watch (BLOCKS until done): gh pr checks <PR> --watch 2>&1
+[ ] 4. While CI runs: tbd close/update <id> for issues worked on
+[ ] 5. While CI runs: tbd sync
+[ ] 6. Return to step 3 and CONFIRM CI passed
+[ ] 7. If CI failed: fix, re-push, restart from step 3
+```
 
-- Important: BE SURE you read and understand the project setup by reading the
-  pyproject.toml file and the Makefile.
+## NON-NEGOTIABLE Requirements
 
-- ALWAYS use uv for running all code and managing dependencies.
-  Never use direct `pip` or `python` commands.
+### CI: Wait for `--watch` to finish
 
-- Use modern uv commands: `uv sync`, `uv run ...`, etc.
-  Prefer `uv add` over `uv pip install`.
+The `--watch` flag blocks until ALL checks complete.
+Do NOT see “passing” in early output and move on—wait for the **final summary** showing
+all checks passed.
 
-- You may use the following shortcuts
-  ```shell
-  
-  # Install all dependencies:
-  make install
-  
-  # Run linting (with ruff) and type checking (with basedpyright).
-  # Note when you run this, ruff will auto-format and sort imports, resolving any
-  # linter warnings about import ordering:
-  make lint
-  
-  # Run tests:
-  make test
-  
-  # Run uv sync, lint, and test in one command:
-  make
-  ```
+### tbd: Update issues and sync
 
-- The usual `make test` like standard pytest does not show test output.
-  Run individual tests and see output with `uv run pytest -s some/file.py`.
+Every session must end with tbd in a clean state:
+- Close/update **every issue** you worked on
+- Run `tbd sync` and confirm it completed
 
-- Always run `make lint` and `make test` to check your code after changes.
+**Work is not done until pushed, CI passes, and tbd is synced.**
 
-- You must verify there are zero linter warnings/errors or test failures before
-  considering any task complete.
+## Core Rules
 
-## General Development Practices
+- Track *all task work* not being done immediately as beads using `tbd` (discovered
+  work, future work, TODOs for the session, multi-session work)
+- When in doubt, prefer tbd for tracking tasks, bugs, and issues
+- Use `tbd create` for creating beads
+- Git workflow: update or close issues and run `tbd sync` at session end
+- If not given specific directions, check `tbd ready` for available work
 
-- Be sure to resolve the pyright (basedpyright) linter errors as you develop and make
-  changes.
+## Essential Commands
 
-- If type checker errors are hard to resolve, you may add a comment `# pyright: ignore`
-  to disable Pyright warnings or errors but ONLY if you know they are not a real problem
-  and are difficult to fix.
+### Finding Work
 
-- In special cases you may consider disabling it globally it in pyproject.toml but YOU
-  MUST ASK FOR CONFIRMATION from the user before globally disabling lint or type checker
-  rules.
+- `tbd ready` - Show issues ready to work (no blockers)
+- `tbd list --status open` - All open issues
+- `tbd list --status in_progress` - Your active work
+- `tbd show <id>` - Detailed issue view with dependencies
 
-- Never change an existing comment, pydoc, or a log statement, unless it is directly
-  fixing the issue you are changing, or the user has asked you to clean up the code.
-  Do not drop existing comments when editing code!
-  And do not delete or change logging statements.
+### Creating & Updating
 
-## Coding Conventions and Imports
+- `tbd create "title" --type task|bug|feature --priority P2` - New issue
+  - Priority: P0-P4 (P0=critical, P2=medium, P4=backlog).
+    Do NOT use "high"/"medium"/"low"
+- `tbd update <id> --status in_progress` - Claim work
+- `tbd update <id> --assignee username` - Assign to someone
+- `tbd close <id>` - Mark complete
+- `tbd close <id> --reason "explanation"` - Close with reason
+- **Tip**: When creating multiple issues, use parallel subagents for efficiency
 
-- Always use full, absolute imports for paths.
-  do NOT use `from .module1.module2 import ...`. Such relative paths make it hard to
-  refactor. Use `from toplevel_pkg.module1.modlule2 import ...` instead.
+### Dependencies & Blocking
 
-- Be sure to import things like `Callable` and other types from the right modules,
-  remembering that many are now in `collections.abc` or `typing_extensions`. For
-  example: `from collections.abc import Callable, Coroutine`
+- `tbd dep add <issue> <depends-on>` - Add dependency (issue depends on depends-on)
+- `tbd blocked` - Show all blocked issues
+- `tbd show <id>` - See what’s blocking/blocked by this issue
 
-- Use `typing_extensions` for things like `@override` (you need to use this, and not
-  `typing` since we want to support Python 3.11).
+### Sync & Collaboration
 
-- Add `from __future__ import annotations` on files with types whenever applicable.
+- `tbd sync` - Sync with git remote (run at session end)
+- `tbd sync --status` - Check sync status without syncing
 
-- Use pathlib `Path` instead of strings.
-  Use `Path(filename).read_text()` instead of two-line `with open(...)` blocks.
+Note: `tbd sync` handles all git operations for issues--no manual git push needed.
 
-- Use strif’s `atomic_output_file` context manager when writing files to ensure output
-  files are written atomically.
+### Project Health
 
-## Use Modern Python Practices
+- `tbd stats` - Project statistics (open/closed/blocked counts)
+- `tbd doctor` - Check for issues (sync problems, missing hooks)
 
-- ALWAYS use `@override` decorators to override methods from base classes.
-  This is a modern Python practice and helps avoid bugs.
+## Common Workflows
 
-## Testing
+**Starting work:**
 
-- For longer tests put them in a file like `tests/test_somename.py` in the `tests/`
-  directory (or `tests/module_name/test_somename.py` file for a submodule).
+```bash
+tbd ready                              # Find available work
+tbd show <id>                          # Review issue details
+tbd update <id> --status in_progress   # Claim it
+```
 
-- For simple tests, prefer inline functions in the original code file below a `## Tests`
-  comment. This keeps the tests easy to maintain and close to the code.
-  Inline tests should NOT import pytest or pytest fixtures as we do not want runtime
-  dependency on pytest.
+**Completing work:**
 
-- DO NOT write one-off test code in extra files that are throwaway.
+```bash
+tbd close <id>    # Mark complete
+tbd sync          # Push to remote
+```
 
-- DO NOT put `if __name__ == "__main__":` just for quick testing.
-  Instead use the inline function tests and run them with `uv run pytest`.
+**Creating dependent work:**
 
-- You can run such individual tests with `uv run pytest -s src/.../path/to/test`
+```bash
+tbd create "Implement feature X" --type feature
+tbd create "Write tests for X" --type task
+tbd dep add <tests-id> <feature-id>   # Tests depend on feature
+```
 
-- Don’t add docs to assertions unless it’s not obvious what they’re checking - the
-  assertion appears in the stack trace.
-  Do NOT write `assert x == 5, "x should be 5"`. Do NOT write
-  `assert x == 5 # Check if x is 5`. That is redundant.
-  Just write `assert x == 5`.
+## Setup Commands
 
-- DO NOT write trivial or obvious tests that are evident directly from code, such as
-  assertions that confirm the value of a constant setting.
+- `tbd setup claude` - Install Claude Code hooks and skill file
+- `tbd setup cursor` - Create Cursor IDE rules file
+- `tbd setup codex` - Create/update AGENTS.md for Codex
+- `tbd setup beads --disable` - Migrate from Beads to tbd
 
-- NEVER write `assert False`. If a test reaches an unexpected branch and must fail
-  explicitly, `raise AssertionError("Some explanation")` instead.
-  This is best typical best practice in Python since assertions can be removed with
-  optimization.
+## Quick Reference
 
-- DO NOT use pytest fixtures like parameterized tests or expected exception decorators
-  unless absolutely necessary in more complex tests.
-  It is typically simpler to use simple assertions and put the checks inside the test.
-  This is also preferable because then simple tests have no explicit pytest dependencies
-  and can be placed in code anywhere.
-
-- DO NOT write trivial tests that test something we know already works, like
-  instantiating a Pydantic object.
-
-  ```python
-  class Link(BaseModel):
-    url: str
-    title: str = None
-  
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- **Priority levels**: 0=critical, 1=high, 2=medium (default), 3=low, 4=backlog
+- **Issue types**: task, bug, feature, epic
+- **Status values**: open, in_progress, closed
+- **JSON output**: Add `--json` to any command for machine-readable output
 
 ---
 > Source: [jlevy/tryscript](https://github.com/jlevy/tryscript) — distributed by [TomeVault](https://tomevault.io).
