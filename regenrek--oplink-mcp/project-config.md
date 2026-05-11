@@ -1,13 +1,9 @@
 ---
 trigger: always_on
-description: - You can @ files here
+description: Early development, no users. No backwards compatibility concerns. Do things RIGHT: clean, organized, zero tech debt. Never create compatibility shims.
 ---
 
-
-# Your rule content
-
-- You can @ files here
-- You can use markdown but dont have to
+Early development, no users. No backwards compatibility concerns. Do things RIGHT: clean, organized, zero tech debt. Never create compatibility shims.
 
 ---
 > Source: [regenrek/oplink-mcp](https://github.com/regenrek/oplink-mcp) — distributed by [TomeVault](https://tomevault.io).
