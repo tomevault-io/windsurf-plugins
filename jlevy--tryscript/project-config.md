@@ -1,82 +1,157 @@
 ---
 trigger: always_on
-description: Backward Compatibility Guidelines
+description: Guidelines and best practices for building Convex projects, including database schema design, queries, mutations, and real-world examples
 ---
 
-## Backward Compatibility Guidelines
+# Convex guidelines
 
-### Types of Backward Compatibility
+## Function guidelines
 
-When making code changes, you should be aware of compatibility requirements for:
+### New function syntax
 
-- Code compatibility internal to a single application (types and method or function
-  signatures)
+- ALWAYS use the new function syntax for Convex functions.
+  For example:
 
-- API compatibility for libraries (types and method or function signatures)
+```typescript
+import { query } from './_generated/server';
+import { v } from 'convex/values';
+export const f = query({
+  args: {},
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    // Function body
+  },
+});
+```
 
-- Server API compatibility (REST, GraphQL, gRPC, etc.)
+### Http endpoint syntax
 
-- File format compatibility
+- HTTP endpoints are defined in `convex/http.ts` and require an `httpAction` decorator.
+  For example:
 
-- Database schema compatibility
+```typescript
+import { httpRouter } from 'convex/server';
+import { httpAction } from './_generated/server';
+const http = httpRouter();
+http.route({
+  path: '/echo',
+  method: 'POST',
+  handler: httpAction(async (ctx, req) => {
+    const body = await req.bytes();
+    return new Response(body, { status: 200 });
+  }),
+});
+```
 
-### Backward Compatibility Template
+- HTTP endpoints are always registered at the exact path you specify in the `path`
+  field. For example, if you specify `/api/someRoute`, the endpoint will be registered at
+  `/api/someRoute`.
 
-> Use the following template when clarifying backward compatibility requirements:
+### Validators
 
-For the following areas:
+- Below is an example of an array validator:
 
-- “DO NOT MAINTAIN” means simply make the changes and DO NOT preserve any old stubs or
-  add comments about past changes
+```typescript
+import { mutation } from './_generated/server';
+import { v } from 'convex/values';
 
-- “KEEP DEPRECATED” means to add new features but also preserve support, function stubs,
-  and comments about past changes
+export default mutation({
+  args: {
+    simpleArray: v.array(v.union(v.string(), v.number())),
+  },
+  handler: async (ctx, args) => {
+    //...
+  },
+});
+```
 
-- “SUPPORT BOTH” means to add new features but also preserve support, function
+- Below is an example of a schema with validators that codify a discriminated union
+  type:
 
-- “MIGRATE” means to add new features but also document and use database migrations or
-  automated tasks to migrate to new formats or schemas
+```typescript
+import { defineSchema, defineTable } from 'convex/server';
+import { v } from 'convex/values';
 
-- “N/A” means this area isn’t applicable
+export default defineSchema({
+  results: defineTable(
+    v.union(
+      v.object({
+        kind: v.literal('error'),
+        errorMessage: v.string(),
+      }),
+      v.object({
+        kind: v.literal('success'),
+        value: v.number(),
+      }),
+    ),
+  ),
+});
+```
 
-**BACKWARD COMPATIBILITY REQUIREMENTS:**
+- Always use the `v.null()` validator when returning a null value.
+  Below is an example query that returns a null value:
 
-- **Code types, methods, and function signatures**:
-  [DO NOT MAINTAIN or KEEP DEPRECATED, additional notes if necessary]
+```typescript
+import { query } from './_generated/server';
+import { v } from 'convex/values';
 
-- **Library APIs**:
-  [DO NOT MAINTAIN or KEEP DEPRECATED or N/A, plus any additional notes]
+export const exampleQuery = query({
+  args: {},
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    console.log('This query returns a null value');
+    return null;
+  },
+});
+```
 
-- **Server APIs**:
-  [DO NOT MAINTAIN or KEEP DEPRECATED or N/A, plus any additional notes]
+- Here are the valid Convex types along with their respective validators: Convex Type |
+  TS/JS type | Example Usage | Validator for argument validation and schemas | Notes | |
+  ----------- | ------------| -----------------------|
+  -----------------------------------------------|
+  ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+  | Id | string | `doc._id` | `v.id(tableName)` | | | Null | null | `null` | `v.null()`
+  | JavaScript’s `undefined` is not a valid Convex value.
+  Functions the return `undefined` or do not return will return `null` when called from
+  a client. Use `null` instead.
+  | | Int64 | bigint | `3n` | `v.int64()` | Int64s only support BigInts between -2^63
+  and 2^63-1. Convex supports `bigint`s in most modern browsers.
+  | | Float64 | number | `3.1` | `v.number()` | Convex supports all IEEE-754
+  double-precision floating point numbers (such as NaNs).
+  Inf and NaN are JSON serialized as strings.
+  | | Boolean | boolean | `true` | `v.boolean()` | | String | string | `"abc"` |
+  `v.string()` | Strings are stored as UTF-8 and must be valid Unicode sequences.
+  Strings must be smaller than the 1MB total size limit when encoded as UTF-8. | | Bytes
+  | ArrayBuffer | `new ArrayBuffer(8)` | `v.bytes()` | Convex supports first class
+  bytestrings, passed in as `ArrayBuffer`s. Bytestrings must be smaller than the 1MB
+  total size limit for Convex types.
+  | | Array | Array] | `[1, 3.2, "abc"]` | `v.array(values)` | Arrays can have at most
+  8192 values. | | Object | Object | `{a: "abc"}` | `v.object({property: value})` |
+  Convex only supports “plain old JavaScript objects” (objects that do not have a custom
+  prototype). Objects can have at most 1024 entries.
+  Field names must be nonempty and not start with “$” or “_”. | | Record | Record |
+  `{"a": "1", "b": "2"}` | `v.record(keys, values)` | Records are objects at runtime,
+  but can have dynamic keys.
+  Keys must be only ASCII characters, nonempty, and not start with “$” or "\_". |
 
-- **File formats**: [DO NOT MAINTAIN or SUPPORT BOTH or N/A, plus any additional notes]
+### Function registration
 
-- **Database schemas**: [DO NOT MAINTAIN or MIGRATE or N/A, plus any additional notes]
+- Use `internalQuery`, `internalMutation`, and `internalAction` to register internal
+  functions. These functions are private and aren’t part of an app’s API. They can only
+  be called by other Convex functions.
+  These functions are always imported from `./_generated/server`.
 
-### Always Clarify Backward Compatibility Requirements
+- Use `query`, `mutation`, and `action` to register public functions.
+  These functions are part of the public API and are exposed to the public Internet.
+  Do NOT use `query`, `mutation`, or `action` to register sensitive internal functions
+  that should be kept private.
 
-- ALWAYS be clear on backward compatibility requirements when making changes.
-  These should ALWAYS be clear in any specification.
+- You CANNOT register a function through the `api` or `internal` objects.
 
-- If they are not clear, stop and ask the user for clarification.
+- ALWAYS include argument and return validators for all Convex functions.
+  This includes all of `query`, `internalQuery`, `mutation`, `internalMutation`,
 
-### When Backward Compatibility Is Important
-
-- In general, compatibility for libraries, servers, file formats and database schemas is
-  VERY IMPORTANT. Compatibility and migration should be planned carefully.
-
-- Backward compatibility and legacy support *within* a single application is usually NOT
-  important and should NOT be done if it needlessly complicates code changes.
-  But if not specified, it also should be clarified to be sure it is not needed.
-
-### Single Application Code Backward Compatibility
-
-- Unless stated in the spec or stated by the user, deprecated and backward compatibility
-  code support should NOT be left after refactors to a single application repository.
-
-- When doing normal refactoring or reorganizing code, REMOVE deprecated functions,
-  methods, classes, or files completely if backward compatibility is not needed.
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [jlevy/tryscript](https://github.com/jlevy/tryscript) — distributed by [TomeVault](https://tomevault.io).
