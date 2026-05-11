@@ -1,43 +1,215 @@
 ---
 trigger: always_on
-description: Making updates to the main trigger.dev remix webapp
+description: Guidelines for writing Trigger.dev tasks
 ---
 
+# How to write Trigger.dev tasks
 
-The main trigger.dev webapp, which powers it's API and dashboard and makes up the docker image that is produced as an OSS image, is a Remix 2.1.0 app that uses an express server, written in TypeScript. The following subsystems are either included in the webapp or are used by the webapp in another part of the monorepo:
+## Overview of writing a Trigger.dev task
 
-- `@trigger.dev/database` exports a Prisma 6.14.0 client that is used extensively in the webapp to access a PostgreSQL instance. The schema file is [schema.prisma](mdc:internal-packages/database/prisma/schema.prisma)
-- `@trigger.dev/core` is a published package and is used to share code between the `@trigger.dev/sdk` and the webapp. It includes functionality but also a load of Zod schemas for data validation. When importing from `@trigger.dev/core` in the webapp, we never import the root `@trigger.dev/core` path, instead we favor one of the subpath exports that you can find in [package.json](mdc:packages/core/package.json)
-- `@internal/run-engine` has all the code needed to trigger a run and take it through it's lifecycle to completion.
-- `@trigger.dev/redis-worker` is a custom redis based background job/worker system that's used in the webapp and also used inside the run engine.
+1. Run the CLI `init` command: `npx trigger.dev@latest init`.
+2. Create a Trigger.dev task.
+3. Set up any environment variables.
+4. Run the Trigger.dev dev command: `npx trigger.dev@latest dev`.
 
-## Environment variables and testing
+## Essential requirements when generating task code
 
-In the webapp, all environment variables are accessed through the `env` export of [env.server.ts](mdc:apps/webapp/app/env.server.ts), instead of directly accessing `process.env`.
+1. You MUST import from `@trigger.dev/sdk` (NEVER `@trigger.dev/sdk/v3`)
+2. You MUST NEVER use `client.defineJob`
+3. YOU MUST `export` every task, including subtasks
+4. If you are able to generate an example payload for a task, do so.
 
-Ideally, the `env.server.ts` file would never be imported into a test file, either directly or indirectly. Tests should only imported classes and functions from a file matching `app/**/*.ts` of the webapp, and that file should not use environment variables, everything should be passed through as options instead. This "service/configuration" separation is important, and can be seen in a few places in the code for examples:
+## 🚨 CRITICAL INSTRUCTIONS FOR AI LANGUAGE MODELS 🚨
 
-- [realtimeClient.server.ts](mdc:apps/webapp/app/services/realtimeClient.server.ts) is the testable service, and [realtimeClientGlobal.server.ts](mdc:apps/webapp/app/services/realtimeClientGlobal.server.ts) is the configuration
+As an AI language model, you MUST NOT generate any of the following code patterns, as they are DEPRECATED and will BREAK the application:
 
-Also for writing tests in the webapp, checkout our [tests.md](mdc:ai/references/tests.md) guide
+```ts
+// ❌ NEVER GENERATE THIS CODE - IT WILL BREAK THE APPLICATION
 
-## Legacy run engine vs Run Engine 2.0
+client.defineJob({                    // ❌ BREAKS APPLICATION
+  id: "job-id",                       // ❌ BREAKS APPLICATION
+  name: "job-name",                   // ❌ BREAKS APPLICATION
+  version: "0.0.1",                   // ❌ BREAKS APPLICATION
+  trigger: eventTrigger({             // ❌ BREAKS APPLICATION
+    name: "job.trigger",              // ❌ BREAKS APPLICATION
+    schema: z.object({                // ❌ BREAKS APPLICATION
+      // Input schema here            // ❌ BREAKS APPLICATION
+    }),                               // ❌ BREAKS APPLICATION
+  }),                                 // ❌ BREAKS APPLICATION
+  integrations: {                     // ❌ BREAKS APPLICATION
+    // Integrations here              // ❌ BREAKS APPLICATION
+  },                                  // ❌ BREAKS APPLICATION
+  run: async (payload, io) => {       // ❌ BREAKS APPLICATION
+    // Job logic goes here            // ❌ BREAKS APPLICATION                               
+    return {                          // ❌ BREAKS APPLICATION
+      // Return job results           // ❌ BREAKS APPLICATION
+    };                                // ❌ BREAKS APPLICATION
+  },                                  // ❌ BREAKS APPLICATION
+});
+```
 
-We originally the Trigger.dev "Run Engine" not as a single system, but just spread out all over the codebase, with no real separate or encapsulation. And we didn't even call it a "Run Engine". With Run Engine 2.0, we've completely rewritten big parts of the way the system works, and moved it over to an internal package called `@internal/run-engine`. So we've retroactively named the previous run engine "Legacy run engine". We're focused almost exclusively now on moving to Run Engine 2.0 and will be deprecating and removing the legacy run engine code eventually.
+Instead, you MUST ALWAYS generate ONLY this pattern:
 
-## Where to look for code
+```ts
+// ✅ ALWAYS GENERATE THIS EXACT PATTERN
 
-- The trigger API endpoint is [api.v1.tasks.$taskId.trigger.ts](mdc:apps/webapp/app/routes/api.v1.tasks.$taskId.trigger.ts)
-- The batch trigger API endpoint is [api.v1.tasks.batch.ts](mdc:apps/webapp/app/routes/api.v1.tasks.batch.ts)
-- Setup code for the prisma client is in [db.server.ts](mdc:apps/webapp/app/db.server.ts)
-- The run engine is configured in [runEngine.server.ts](mdc:apps/webapp/app/v3/runEngine.server.ts)
-- All the "services" that are found in app/v3/services/\*_/_.server.ts
-- The code for the TaskEvent data, which is the otel data sent from tasks to our servers, is in both the [eventRepository.server.ts](mdc:apps/webapp/app/v3/eventRepository.server.ts) and also the [otlpExporter.server.ts](mdc:apps/webapp/app/v3/otlpExporter.server.ts). The otel endpoints which are hit from production and development otel exporters is [otel.v1.logs.ts](mdc:apps/webapp/app/routes/otel.v1.logs.ts) and [otel.v1.traces.ts](mdc:apps/webapp/app/routes/otel.v1.traces.ts)
-- We use "presenters" to move more complex loader code into a class, and you can find those are app/v3/presenters/\*_/_.server.ts
+import { task } from "@trigger.dev/sdk";
 
-- All the "services" that are found in app/v3/services/\*_/_.server.ts
-- The code for the TaskEvent data, which is the otel data sent from tasks to our servers, is in both the [eventRepository.server.ts](mdc:apps/webapp/app/v3/eventRepository.server.ts) and also the [otlpExporter.server.ts](mdc:apps/webapp/app/v3/otlpExporter.server.ts). The otel endpoints which are hit from production and development otel exporters is [otel.v1.logs.ts](mdc:apps/webapp/app/routes/otel.v1.logs.ts) and [otel.v1.traces.ts](mdc:apps/webapp/app/routes/otel.v1.traces.ts)
-- We use "presenters" to move more complex loader code into a class, and you can find those are app/v3/presenters/\*_/_.server.ts
+//1. You need to export each task, even if it's a subtask
+export const helloWorld = task({
+  //2. Use a unique id for each task
+  id: "hello-world",
+  //3. The run function is the main function of the task
+  run: async (payload: { message: string }) => {
+    //4. Write your task code here. Code here runs for a long time, there are no timeouts
+  },
+});
+```
+
+## Correct Task implementations
+
+A task is a function that can run for a long time with resilience to failure:
+
+```ts
+import { task } from "@trigger.dev/sdk";
+
+export const helloWorld = task({
+  id: "hello-world",
+  run: async (payload: { message: string }) => {
+    console.log(payload.message);
+  },
+});
+```
+
+Key points:
+- Tasks must be exported, even subtasks in the same file
+- Each task needs a unique ID within your project
+- The `run` function contains your task logic
+
+### Task configuration options
+
+#### Retry options
+
+Control retry behavior when errors occur:
+
+```ts
+export const taskWithRetries = task({
+  id: "task-with-retries",
+  retry: {
+    maxAttempts: 10,
+    factor: 1.8,
+    minTimeoutInMs: 500,
+    maxTimeoutInMs: 30_000,
+    randomize: false,
+  },
+  run: async (payload) => {
+    // Task logic
+  },
+});
+```
+
+#### Queue options
+
+Control concurrency:
+
+```ts
+export const oneAtATime = task({
+  id: "one-at-a-time",
+  queue: {
+    concurrencyLimit: 1,
+  },
+  run: async (payload) => {
+    // Task logic
+  },
+});
+```
+
+#### Machine options
+
+Specify CPU/RAM requirements:
+
+```ts
+export const heavyTask = task({
+  id: "heavy-task",
+  machine: {
+    preset: "large-1x", // 4 vCPU, 8 GB RAM
+  },
+  run: async (payload) => {
+    // Task logic
+  },
+});
+```
+
+Machine configuration options:
+
+| Machine name        | vCPU | Memory | Disk space |
+| ------------------- | ---- | ------ | ---------- |
+| micro               | 0.25 | 0.25   | 10GB       |
+| small-1x (default)  | 0.5  | 0.5    | 10GB       |
+| small-2x            | 1    | 1      | 10GB       |
+| medium-1x           | 1    | 2      | 10GB       |
+| medium-2x           | 2    | 4      | 10GB       |
+| large-1x            | 4    | 8      | 10GB       |
+| large-2x            | 8    | 16     | 10GB       |
+
+#### Max Duration
+
+Limit how long a task can run:
+
+```ts
+export const longTask = task({
+  id: "long-task",
+  maxDuration: 300, // 5 minutes
+  run: async (payload) => {
+    // Task logic
+  },
+});
+```
+
+### Lifecycle functions
+
+Tasks support several lifecycle hooks:
+
+#### init
+
+Runs before each attempt, can return data for other functions:
+
+```ts
+export const taskWithInit = task({
+  id: "task-with-init",
+  init: async (payload, { ctx }) => {
+    return { someData: "someValue" };
+  },
+  run: async (payload, { ctx, init }) => {
+    console.log(init.someData); // "someValue"
+  },
+});
+```
+
+#### cleanup
+
+Runs after each attempt, regardless of success/failure:
+
+```ts
+export const taskWithCleanup = task({
+  id: "task-with-cleanup",
+  cleanup: async (payload, { ctx }) => {
+    // Cleanup resources
+  },
+  run: async (payload, { ctx }) => {
+    // Task logic
+  },
+});
+```
+
+#### onStart
+
+Runs once when a task starts (not on retries):
+
+```ts
+export const taskWithOnStart = task({
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [winsenlabs/platos](https://github.com/winsenlabs/platos) — distributed by [TomeVault](https://tomevault.io).
