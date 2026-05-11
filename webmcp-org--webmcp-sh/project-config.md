@@ -1,148 +1,186 @@
 ---
 trigger: always_on
-description: TanStack Router: Guide
+description: TanStack Router: Routing
 ---
 
-# Authenticated Routes
-
-Authentication is an extremely common requirement for web applications. In this guide, we'll walk through how to use TanStack Router to build protected routes, and how to redirect users to login if they try to access them.
-
-## The `route.beforeLoad` Option
-
-The `route.beforeLoad` option allows you to specify a function that will be called before a route is loaded. It receives all of the same arguments that the `route.loader` function does. This is a great place to check if a user is authenticated, and redirect them to a login page if they are not.
-
-The `beforeLoad` function runs in relative order to these other route loading functions:
-
-- Route Matching (Top-Down)
-  - `route.params.parse`
-  - `route.validateSearch`
-- Route Loading (including Preloading)
-  - **`route.beforeLoad`**
-  - `route.onError`
-- Route Loading (Parallel)
-  - `route.component.preload?`
-  - `route.load`
-
-**It's important to know that the `beforeLoad` function for a route is called _before any of its child routes' `beforeLoad` functions_.** It is essentially a middleware function for the route and all of its children.
-
-**If you throw an error in `beforeLoad`, none of its children will attempt to load**.
-
-## Redirecting
-
-While not required, some authentication flows require redirecting to a login page. To do this, you can **throw a `redirect()`** from `beforeLoad`:
-
-```tsx
-// src/routes/_authenticated.tsx
-export const Route = createFileRoute('/_authenticated')({
-  beforeLoad: async ({ location }) => {
-    if (!isAuthenticated()) {
-      throw redirect({
-        to: '/login',
-        search: {
-          // Use the current location to power a redirect after login
-          // (Do not use `router.state.resolvedLocation` as it can
-          // potentially lag behind the actual current location)
-          redirect: location.href,
-        },
-      })
-    }
-  },
-})
-```
+# Code-Based Routing
 
 > [!TIP]
-> The `redirect()` function takes all of the same options as the `navigate` function, so you can pass options like `replace: true` if you want to replace the current history entry instead of adding a new one.
+> Code-based routing is not recommended for most applications. It is recommended to use [File-Based Routing](../file-based-routing.md) instead.
 
-Once you have authenticated a user, it's also common practice to redirect them back to the page they were trying to access. To do this, you can utilize the `redirect` search param that we added in our original redirect. Since we'll be replacing the entire URL with what it was, `router.history.push` is better suited for this than `router.navigate`:
+## ⚠️ Before You Start
 
-```tsx
-router.history.push(search.redirect)
+- If you're using [File-Based Routing](../file-based-routing.md), **skip this guide**.
+- If you still insist on using code-based routing, you must read the [Routing Concepts](../routing-concepts.md) guide first, as it also covers core concepts of the router.
+
+## Route Trees
+
+Code-based routing is no different from file-based routing in that it uses the same route tree concept to organize, match and compose matching routes into a component tree. The only difference is that instead of using the filesystem to organize your routes, you use code.
+
+Let's consider the same route tree from the [Route Trees & Nesting](../route-trees.md#route-trees) guide, and convert it to code-based routing:
+
+Here is the file-based version:
+
+```
+routes/
+├── __root.tsx
+├── index.tsx
+├── about.tsx
+├── posts/
+│   ├── index.tsx
+│   ├── $postId.tsx
+├── posts.$postId.edit.tsx
+├── settings/
+│   ├── profile.tsx
+│   ├── notifications.tsx
+├── _pathlessLayout.tsx
+├── _pathlessLayout/
+│   ├── route-a.tsx
+├── ├── route-b.tsx
+├── files/
+│   ├── $.tsx
 ```
 
-## Non-Redirected Authentication
-
-Some applications choose to not redirect users to a login page, and instead keep the user on the same page and show a login form that either replaces the main content or hides it via a modal. This is also possible with TanStack Router by simply short circuiting rendering the `<Outlet />` that would normally render the child routes:
+And here is a summarized code-based version:
 
 ```tsx
-// src/routes/_authenticated.tsx
-export const Route = createFileRoute('/_authenticated')({
-  component: () => {
-    if (!isAuthenticated()) {
-      return <Login />
-    }
+import { createRootRoute, createRoute } from '@tanstack/react-router'
 
-    return <Outlet />
-  },
+const rootRoute = createRootRoute()
+
+const indexRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/',
+})
+
+const aboutRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: 'about',
+})
+
+const postsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: 'posts',
+})
+
+const postsIndexRoute = createRoute({
+  getParentRoute: () => postsRoute,
+  path: '/',
+})
+
+const postRoute = createRoute({
+  getParentRoute: () => postsRoute,
+  path: '$postId',
+})
+
+const postEditorRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: 'posts/$postId/edit',
+})
+
+const settingsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: 'settings',
+})
+
+const profileRoute = createRoute({
+  getParentRoute: () => settingsRoute,
+  path: 'profile',
+})
+
+const notificationsRoute = createRoute({
+  getParentRoute: () => settingsRoute,
+  path: 'notifications',
+})
+
+const pathlessLayoutRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  id: 'pathlessLayout',
+})
+
+const pathlessLayoutARoute = createRoute({
+  getParentRoute: () => pathlessLayoutRoute,
+  path: 'route-a',
+})
+
+const pathlessLayoutBRoute = createRoute({
+  getParentRoute: () => pathlessLayoutRoute,
+  path: 'route-b',
+})
+
+const filesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: 'files/$',
 })
 ```
 
-This keeps the user on the same page, but still allows you to render a login form. Once the user is authenticated, you can simply render the `<Outlet />` and the child routes will be rendered.
+## Anatomy of a Route
 
-## Authentication using React context/hooks
+All other routes other than the root route are configured using the `createRoute` function:
 
-If your authentication flow relies on interactions with React context and/or hooks, you'll need to pass down your authentication state to TanStack Router using `router.context` option.
+```tsx
+const route = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/posts',
+  component: PostsComponent,
+})
+```
+
+The `getParentRoute` option is a function that returns the parent route of the route you're creating.
+
+**❓❓❓ "Wait, you're making me pass the parent route for every route I make?"**
+
+Absolutely! The reason for passing the parent route has **everything to do with the magical type safety** of TanStack Router. Without the parent route, TypeScript would have no idea what types to supply your route with!
 
 > [!IMPORTANT]
-> React hooks are not meant to be consumed outside of React components. If you need to use a hook outside of a React component, you need to extract the returned state from the hook in a component that wraps your `<RouterProvider />` and then pass the returned value down to TanStack Router.
+> For every route that's **NOT** the **Root Route** or a **Pathless Layout Route**, a `path` option is required. This is the path that will be matched against the URL pathname to determine if the route is a match.
 
-We'll cover the `router.context` options in-detail in the [Router Context](../router-context.md) section.
+When configuring route `path` option on a route, it ignores leading and trailing slashes (this does not include "index" route paths `/`). You can include them if you want, but they will be normalized internally by TanStack Router. Here is a table of valid paths and what they will be normalized to:
 
-Here's an example that uses React context and hooks for protecting authenticated routes in TanStack Router. See the entire working setup in the [Authenticated Routes example](https://github.com/TanStack/router/tree/main/examples/react/authenticated-routes).
+| Path     | Normalized Path |
+| -------- | --------------- |
+| `/`      | `/`             |
+| `/about` | `about`         |
+| `about/` | `about`         |
+| `about`  | `about`         |
+| `$`      | `$`             |
+| `/$`     | `$`             |
+| `/$/`    | `$`             |
 
-- `src/routes/__root.tsx`
+## Manually building the route tree
 
-```tsx
-import { createRootRouteWithContext } from '@tanstack/react-router'
-
-interface MyRouterContext {
-  // The ReturnType of your useAuth hook or the value of your AuthContext
-  auth: AuthState
-}
-
-export const Route = createRootRouteWithContext<MyRouterContext>()({
-  component: () => <Outlet />,
-})
-```
-
-- `src/router.tsx`
+When building a route tree in code, it's not enough to define the parent route of each route. You must also construct the final route tree by adding each route to its parent route's `children` array. This is because the route tree is not built automatically for you like it is in file-based routing.
 
 ```tsx
-import { createRouter } from '@tanstack/react-router'
-
-import { routeTree } from './routeTree.gen'
-
-export const router = createRouter({
-  routeTree,
-  context: {
-    // auth will initially be undefined
-    // We'll be passing down the auth state from within a React component
-    auth: undefined!,
-  },
-})
+/* prettier-ignore */
+const routeTree = rootRoute.addChildren([
+  indexRoute,
+  aboutRoute,
+  postsRoute.addChildren([
+    postsIndexRoute,
+    postRoute,
+  ]),
+  postEditorRoute,
+  settingsRoute.addChildren([
+    profileRoute,
+    notificationsRoute,
+  ]),
+  pathlessLayoutRoute.addChildren([
+    pathlessLayoutARoute,
+    pathlessLayoutBRoute,
+  ]),
+  filesRoute.addChildren([
+    fileRoute,
+  ]),
+])
+/* prettier-ignore-end */
 ```
 
-- `src/App.tsx`
+But before you can go ahead and build the route tree, you need to understand how the Routing Concepts for Code-Based Routing work.
 
-```tsx
-import { RouterProvider } from '@tanstack/react-router'
+## Routing Concepts for Code-Based Routing
 
-import { AuthProvider, useAuth } from './auth'
-
-import { router } from './router'
-
-function InnerApp() {
-  const auth = useAuth()
-  return <RouterProvider router={router} context={{ auth }} />
-}
-
-function App() {
-  return (
-    <AuthProvider>
-      <InnerApp />
-    </AuthProvider>
-  )
-}
-```
+Believe it or not, file-based routing is really a superset of code-based routing and uses the filesystem and a bit of code-generation abstraction on top of it to generate this structure you see above automatically.
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
