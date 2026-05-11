@@ -1,216 +1,201 @@
 ---
 trigger: always_on
-description: Rules and patterns for developing LLM-usable tools
+description: CLI Tool Development Rules
 ---
 
-# Tool Development Rules
+# CLI Tool Development Rules
+
+These rules apply to all CLI tools, command-line scripts, and terminal utilities.
+
+## Color and Output Formatting
+
+- **ALWAYS use picocolors for terminal colors:** Import `picocolors` (aliased as `pc`)
+  for all color and styling needs.
+  NEVER use hardcoded ANSI escape codes like `\x1b[36m` or `\033[32m`.
+
+  ```ts
+  // GOOD: Use picocolors
+  import pc from 'picocolors';
+  console.log(pc.green('Success!'));
+  console.log(pc.cyan('Info message'));
+  
+  // BAD: Hardcoded ANSI codes
+  console.log('\x1b[32mSuccess!\x1b[0m');
+  console.log('\x1b[36mInfo message\x1b[0m');
+  ```
+
+- **Use shared color utilities:** Create a shared formatting module for consistent color
+  application across commands.
+
+  ```ts
+  // lib/cliFormatting.ts - shared color utilities
+  import pc from 'picocolors';
+  
+  export const colors = {
+    success: (s: string) => pc.green(s),
+    error: (s: string) => pc.red(s),
+    info: (s: string) => pc.cyan(s),
+    warn: (s: string) => pc.yellow(s),
+    muted: (s: string) => pc.gray(s),
+  };
+  
+  // Usage in commands:
+  import { colors } from '../lib/cliFormatting.js';
+  console.log(colors.success('Operation completed'));
+  ```
+
+- **Trust picocolors TTY detection:** Picocolors automatically detects when stdout is
+  not a TTY (e.g., piped to `cat` or redirected to a file) and disables colors.
+  DO NOT manually check `process.stdout.isTTY` unless you need special non-color
+  behavior.
+
+  Picocolors respects:
+
+  - `NO_COLOR=1` environment variable (disables colors)
+
+  - `FORCE_COLOR=1` environment variable (forces colors)
+
+  - `--no-color` and `--color` command-line flags (if implemented)
+
+  - TTY detection via `process.stdout.isTTY`
+
+  ```ts
+  // GOOD: Let picocolors handle it automatically
+  import pc from 'picocolors';
+  console.log(pc.green('This works correctly in all contexts'));
+  
+  // BAD: Manual TTY checking (redundant with picocolors)
+  const useColors = process.stdout.isTTY;
+  const msg = useColors ? '\x1b[32mSuccess\x1b[0m' : 'Success';
+  console.log(msg);
+  ```
+
+## Commander.js Patterns
+
+- **Use Commander.js for all CLI tools:** Import from `commander` and follow established
+  patterns for command registration and option handling.
+
+- **Apply colored help to all commands:** Use `withColoredHelp()` wrapper from shared
+  utilities to ensure consistent help text formatting.
+
+  ```ts
+  import { Command } from 'commander';
+  import { withColoredHelp } from '../lib/shared.js';
+  
+  export const myCommand = withColoredHelp(new Command('my-command'))
+    .description('Description here')
+    .action(async (options, command) => {
+      // Implementation
+    });
+  ```
+
+- **Use shared context helpers:** Create utilities like `getCommandContext()`,
+  `setupDebug()`, and `logDryRun()` in a shared module for consistent behavior.
+
+  ```ts
+  import { getCommandContext, setupDebug, logDryRun } from '../lib/shared.js';
+  
+  .action(async (options, command) => {
+    const ctx = getCommandContext(command);
+    setupDebug(ctx);
+  
+    if (ctx.dryRun) {
+      logDryRun('Would perform action', { details: 'here' });
+      return;
+    }
+  
+    // Actual implementation
+  });
+  ```
 
-## Universal Patterns
+- **Support `--dry-run`, `--verbose`, and `--quiet` flags:** These are global options
+  defined at the program level.
+  Access them via `getCommandContext()`.
 
-Every tool implementation must follow these patterns:
+## Progress and Feedback
 
-1. **Tool Structure**
+- **Use @clack/prompts for interactive UI:** Import `@clack/prompts` as `p` for
+  spinners, prompts, and status messages.
 
-   - Use AI SDK `tool()` function from ‘ai’ package
+  ```ts
+  import * as p from '@clack/prompts';
+  
+  p.intro('🧪 Starting test suite');
+  
+  const spinner = p.spinner();
+  spinner.start('Processing data');
+  // ... work ...
+  spinner.stop('✅ Data processed');
+  
+  p.outro('All done!');
+  ```
 
-   - Define Zod schema with `.describe()` on every field
+- **Use consistent logging methods:**
 
-   - Support mock mode via `runConfig?.mockApis` or feature-specific mock flag
+  - `p.log.info()` for informational messages
 
-   - Return structured response: `{ success: boolean, data: any, message: string }`
+  - `p.log.success()` for successful operations
 
-   - Handle errors with clear, actionable messages
+  - `p.log.warn()` for warnings
 
-2. **LLM-Optimized Descriptions**
+  - `p.log.error()` for errors
 
-   - Start with action verb: “Get...”, “Search...”, “Execute …”
+  - `p.log.step()` for step-by-step progress
 
-   - Include usage context: “Use this to …”
+- **Use appropriate emojis for status:** Follow emoji conventions from
+  `@docs/general/agent-rules/general-style-rules.md`:
 
-   - Provide concrete examples in parameter descriptions
+  - ✅ for success
 
-   - Avoid technical jargon or ambiguous terms
+  - ❌ for failure/error
 
-   - Example: “Get RSI indicator values for given symbols on a specific date.
-     Use this to identify overbought/oversold conditions in backtests.”
+  - ⚠️ for warnings
 
-3. **Parameter Descriptions**
+  - ⏰ for timing information
 
-   - Every Zod field must have `.describe()` with clear explanation
+  - 🧪 for tests
 
-   - Include format examples: “Date in YYYY-MM-DD format (example: ‘2024-01-15’)”
+## Timing and Performance
 
-   - Specify constraints: “Array of 1-10 stock ticker symbols”
+- **Display timing for long operations:** For operations that take multiple seconds,
+  display timing information using the ⏰ emoji and colored output.
 
-   - Explain purpose: “Why this parameter affects the result”
+  ```ts
+  const start = Date.now();
+  // ... operation ...
+  const duration = ((Date.now() - start) / 1000).toFixed(1);
+  console.log(colors.cyan(`⏰ Operation completed: ${duration}s`));
+  ```
 
-4. **Backtest-Safe Tools** (for tools that support historical queries)
+- **Show total time for multi-step operations:** For scripts that run multiple phases
+  (like test suites), show individual phase times and a total.
 
-   - Must have date/timestamp parameter for point-in-time queries
+  ```ts
+  console.log(colors.cyan(`⏰ Phase 1: ${phase1Time}s`));
+  console.log(colors.cyan(`⏰ Phase 2: ${phase2Time}s`));
+  console.log('');
+  console.log(colors.green(`⏰ Total time: ${totalTime}s`));
+  ```
 
-   - Never return data from future dates
+## Script Structure
 
-   - Must be wrapped by cutoffTimestampWrapper in toolResolver
+- **Use TypeScript for all CLI scripts:** Write scripts as `.ts` files with proper
+  types. Use `#!/usr/bin/env tsx` shebang for executable scripts.
 
-   - Set `supportsBacktest: true` in tool registry
-
-   - Validate all date parameters follow YYYY-MM-DD format
-
-5. **Mock Mode Support**
-
-   - Check `runConfig?.mockApis` for global mock mode
-
-   - OR check feature-specific flag (e.g., `runConfig?.mockPrice`)
-
-   - Return realistic mock data that matches real response schema
-
-   - Document mock behavior in tool’s unit tests
-
-## Tool Categories
-
-Tools are categorized for UI organization and filtering:
-
-- **market-data**: Stock prices, technical indicators, options data, fundamentals
-
-- **news**: News search, article retrieval, sentiment analysis
-
-- **trading**: Buy/sell execution, portfolio queries, order management
-
-- **search**: Web search, external APIs, research tools
-
-## Tool Registry Pattern
-
-Every new tool requires updates in 3 locations:
-
-1. **Tool ID Declaration** (`convex/models/toolTypes.ts`):
-
-   ```typescript
-   // Add to FUNCTION_TOOL_IDS (for custom tools) or PROVIDER_TOOL_IDS (for native tools)
-   export const FUNCTION_TOOL_IDS = [
-     'stock_prices_current',
-     'stock_prices_historical',
-     // ... existing tools
-     'new_tool_id', // ← Add here
-   ] as const;
-   ```
-
-2. **Tool Metadata** (`convex/models/toolRegistry.ts`):
-
-   ```typescript
-   export const TOOL_REGISTRY: Record<ToolId, ToolMetadata> = {
-     // ... existing tools
-     new_tool_id: {
-       id: 'new_tool_id',
-       name: 'Human Readable Name',
-       description: 'Brief description for UI display',
-       category: 'market-data', // or 'news', 'trading', 'search'
-       supportsBacktest: true, // or false
-       skipCutoffValidation: false, // set true only for forward-looking data (earnings dates)
-     },
-   };
-   ```
-
-3. **Tool Resolver** (`convex/tools/toolResolver.ts`):
-
-   ```typescript
-   import { createNewTool } from './newTool';
-   
-   // In resolveTools() switch statement:
-   case 'new_tool_id':
-     tools.new_tool_id = createNewTool(runConfig);
-     break;
-   ```
-
-## Testing Requirements
-
-Minimum test coverage for every tool:
-
-1. **Schema Validation Tests**
-
-   - Valid parameters accepted
-
-   - Invalid parameters rejected with clear errors
-
-   - Required fields enforced
-
-   - Type checking works correctly
-
-2. **Mock Mode Tests**
-
-   - Returns mock data when configured
-
-   - Mock data matches real response schema
-
-   - Can be used in tests without API calls
-
-3. **API Integration Tests**
-
-   - Successful API responses parsed correctly
-
-   - API errors handled gracefully
-
-   - Rate limiting handled (if applicable)
-
-   - Authentication works (if applicable)
-
-4. **Backtest Safety Tests** (if `supportsBacktest: true`)
-
-   - Future dates blocked by cutoff wrapper
-
-   - Historical dates allowed
-
-   - Date parameter validation works
-
-5. **LLM Evaluation Tests**
-
-   - LLM can discover when to use tool
-
-   - LLM can construct valid parameters
-
-   - LLM can interpret results correctly
-
-   - LLM handles errors gracefully
-
-   - **Target: >90% success rate across all test types**
-
-## Common Pitfalls
-
-Avoid these frequent mistakes:
-
-1. **Ambiguous Tool Description**
-
-   - Problem: LLM doesn’t know when to use tool
-
-   - Fix: Add concrete usage examples and context
-
-2. **Confusing Parameter Names**
-
-   - Problem: LLM sends wrong data or guesses format
-
-   - Fix: Use clear names and detailed `.describe()` with examples
-
-3. **Missing Error Messages**
-
-   - Problem: LLM doesn’t know what went wrong
-
-   - Fix: Throw errors with specific details about what failed and why
-
-4. **No Format Examples**
-
-   - Problem: LLM guesses date/time formats incorrectly
-
-   - Fix: Include explicit format in description with example
-
-5. **Future Data Leakage**
-
-   - Problem: Backtest results invalid due to lookahead bias
-
-   - Fix: Validate all date params, use cutoff wrapper, test thoroughly
-
-6. **Overly Complex Schemas**
-
-   - Problem: LLM struggles with many optional parameters
-
+  ```ts
+  #!/usr/bin/env tsx
+  
+  /**
+   * Script description here.
+   */
+  
+  import { execSync } from 'node:child_process';
+  import * as p from '@clack/prompts';
+  
+  async function main() {
+    // Implementation
+  }
+  
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
