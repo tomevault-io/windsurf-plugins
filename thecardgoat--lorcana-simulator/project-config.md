@@ -1,11 +1,15 @@
 ---
 trigger: always_on
-description: Refer to the guidelines located in this file:
+description: Create a detailed spec for a new feature with technical specifications and task breakdown
 ---
 
 
-Refer to the guidelines located in this file:
-@.agent-os/standards/code-style/code-quality.md
+# Create Spec
+
+Create a detailed spec for a new feature with technical specifications and task breakdown
+
+Refer to the instructions located in this file:
+@.agent-os/instructions/core/create-spec.md
 
 ---
 > Source: [TheCardGoat/lorcana-simulator](https://github.com/TheCardGoat/lorcana-simulator) — distributed by [TomeVault](https://tomevault.io).
