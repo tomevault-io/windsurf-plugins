@@ -1,260 +1,246 @@
 ---
 trigger: always_on
-description: All documentation for the Armature project must be generated in the `docs/` directory following these standards.
+description: This project follows the **Gitflow** branching model for organized development and release management.
 ---
 
 
-# Documentation Standards
+# Gitflow Branching Strategy
 
-All documentation for the Armature project must be generated in the `docs/` directory following these standards.
+This project follows the **Gitflow** branching model for organized development and release management.
 
-## Directory Structure
+## Branch Structure
 
-All documentation files go directly in the `docs/` root directory. **Do NOT create subfolders.**
+### Main Branches (Long-lived)
+
+#### `main`
+- **Purpose:** Production-ready code
+- **Protected:** Yes
+- **Merged from:** `release/*` and `hotfix/*` only
+- **Never commit directly to this branch**
+
+#### `develop`
+- **Purpose:** Integration branch for features
+- **Protected:** Yes
+- **Merged from:** `feature/*`, `release/*`, and `hotfix/*`
+- **Base for:** All feature branches
+
+### Supporting Branches (Short-lived)
+
+#### `feature/*`
+- **Purpose:** New features or enhancements
+- **Naming:** `feature/<issue-number>-<short-description>`
+- **Examples:**
+  - `feature/123-add-websocket-support`
+  - `feature/456-user-authentication`
+- **Base:** `develop`
+- **Merge to:** `develop`
+- **Lifetime:** Duration of feature development
+
+#### `release/*`
+- **Purpose:** Prepare for production release
+- **Naming:** `release/<version>`
+- **Examples:**
+  - `release/1.0.0`
+  - `release/2.1.0`
+- **Base:** `develop`
+- **Merge to:** `main` and `develop`
+- **Lifetime:** Until release is finalized
+
+#### `hotfix/*`
+- **Purpose:** Critical bug fixes in production
+- **Naming:** `hotfix/<version>-<description>`
+- **Examples:**
+  - `hotfix/1.0.1-security-patch`
+  - `hotfix/2.1.1-memory-leak`
+- **Base:** `main`
+- **Merge to:** `main` and `develop`
+- **Lifetime:** Until hotfix is deployed
+
+## Workflow
+
+### Starting a New Feature
+
+```bash
+# Ensure develop is up to date
+git checkout develop
+git pull origin develop
+
+# Create feature branch
+git checkout -b feature/123-add-caching
+
+# Work on feature...
+git add .
+git commit -m "feat: add Redis caching support"
+
+# Push to remote
+git push origin feature/123-add-caching
+
+# Create Pull Request to develop
+```
+
+### Completing a Feature
+
+```bash
+# Update from develop
+git checkout develop
+git pull origin develop
+
+git checkout feature/123-add-caching
+git merge develop
+
+# Resolve any conflicts
+# Run tests
+cargo test --all-features
+
+# Push and create PR
+git push origin feature/123-add-caching
+```
+
+### Creating a Release
+
+```bash
+# Create release branch from develop
+git checkout develop
+git pull origin develop
+git checkout -b release/1.0.0
+
+# Update version numbers
+# Update CHANGELOG.md
+# Final testing
+
+# Commit release preparation
+git commit -am "chore: prepare release 1.0.0"
+
+# Merge to main
+git checkout main
+git merge --no-ff release/1.0.0
+git tag -a v1.0.0 -m "Release version 1.0.0"
+
+# Merge back to develop
+git checkout develop
+git merge --no-ff release/1.0.0
+
+# Push everything
+git push origin main develop --tags
+
+# Delete release branch
+git branch -d release/1.0.0
+git push origin --delete release/1.0.0
+```
+
+### Creating a Hotfix
+
+```bash
+# Create hotfix branch from main
+git checkout main
+git pull origin main
+git checkout -b hotfix/1.0.1-critical-fix
+
+# Fix the issue
+git commit -am "fix: resolve critical security vulnerability"
+
+# Merge to main
+git checkout main
+git merge --no-ff hotfix/1.0.1-critical-fix
+git tag -a v1.0.1 -m "Hotfix version 1.0.1"
+
+# Merge to develop
+git checkout develop
+git merge --no-ff hotfix/1.0.1-critical-fix
+
+# Push everything
+git push origin main develop --tags
+
+# Delete hotfix branch
+git branch -d hotfix/1.0.1-critical-fix
+git push origin --delete hotfix/1.0.1-critical-fix
+```
+
+## Commit Message Convention
+
+Follow **Conventional Commits** specification:
+
+### Format
 
 ```
-docs/
-├── README.md                    # Documentation index
-├── getting-started.md           # Getting started guide
-├── auth-guide.md                # Authentication guide
-├── cache-guide.md               # Cache guide
-├── cron-guide.md                # Cron guide
-├── queue-guide.md               # Queue guide
-├── deployment-guide.md          # Deployment guide
-└── *.md                         # All other documentation
+<type>(<scope>): <subject>
+
+<body>
+
+<footer>
 ```
 
-**Important:** Do NOT create subdirectories like `guides/`, `modules/`, or `examples/`. All `.md` files belong in `docs/` root.
+### Types
 
-## File Naming
+- **feat**: New feature
+- **fix**: Bug fix
+- **docs**: Documentation only changes
+- **style**: Code style changes (formatting, missing semicolons, etc.)
+- **refactor**: Code refactoring
+- **perf**: Performance improvements
+- **test**: Adding or updating tests
+- **chore**: Maintenance tasks, dependency updates
+- **ci**: CI/CD changes
+- **build**: Build system changes
 
-- Use **lowercase with hyphens**: `my-feature-guide.md`
-- Be **descriptive**: `oauth2-providers-guide.md` not `oauth.md`
-- Use **.md extension** for all Markdown files
-- Avoid abbreviations unless widely understood
+### Examples
 
-### Good Examples ✅
+```bash
+# Feature
+git commit -m "feat(queue): add job retry with exponential backoff"
 
-- `websocket-sse-guide.md`
-- `authentication-guide.md`
-- `rate-limiting-configuration.md`
+# Bug fix
+git commit -m "fix(auth): resolve JWT token expiration issue"
 
-### Bad Examples ❌
+# Documentation
+git commit -m "docs(readme): update installation instructions"
 
-- `WS_SSE.md` (uppercase, abbreviation)
-- `auth.md` (too generic)
-- `guide-1.md` (not descriptive)
+# Breaking change
+git commit -m "feat(api)!: change response format
 
-## Documentation Requirements
+BREAKING CHANGE: API responses now use camelCase instead of snake_case"
 
-### Every Feature Must Have Documentation
+# Multiple changes
+git commit -m "chore: update dependencies and fix linting issues
 
-When adding a new feature, you MUST create corresponding documentation in `docs/`:
+- Update tokio to 1.35
+- Update serde to 1.0.195
+- Fix clippy warnings in cache module"
+```
 
-1. **Feature Guide** (`docs/<feature>-guide.md`)
-   - Overview of the feature
-   - Key concepts
-   - Configuration options
-   - Step-by-step instructions
-   - Code examples
-   - Best practices
-   - Troubleshooting
+## Pull Request Guidelines
 
-2. **API Reference** (inline code docs)
-   - Rust doc comments (`///`)
-   - Examples in doc comments
-   - Clear parameter descriptions
+### Creating PRs
 
-3. **Code Examples** (`examples/` directory - code only)
-   - Working code example
-   - Comments explaining key parts
-   - README if complex
+1. **Base branch:**
+   - Features → `develop`
+   - Hotfixes → `main` (then merge to `develop`)
+   - Releases → `main` (then merge to `develop`)
 
-## Documentation Format
+2. **Title format:**
+   - Follow commit message convention
+   - Example: `feat: add WebSocket support for real-time updates`
 
-### Markdown Structure
+3. **Description must include:**
+   - Summary of changes
+   - Related issue numbers
+   - Testing performed
+   - Breaking changes (if any)
+
+### PR Template
 
 ```markdown
-# Title
+## Description
+Brief description of what this PR does
 
-Brief one-paragraph introduction.
+## Related Issues
+Closes #123
+Relates to #456
 
-## Table of Contents
-
-- [Section 1](#section-1)
-- [Section 2](#section-2)
-
-## Overview
-
-High-level explanation of what this is and why it exists.
-
-## Features
-
-- ✅ Feature 1
-- ✅ Feature 2
-- ✅ Feature 3
-
-## Usage
-
-### Basic Example
-
-\`\`\`rust
-// Working code example
-use armature::prelude::*;
-
-#[tokio::main]
-async fn main() {
-    // Example code
-}
-\`\`\`
-
-### Advanced Example
-
-More complex usage...
-
-## Configuration
-
-Detailed configuration options...
-
-## Best Practices
-
-1. Practice one
-2. Practice two
-
-## Common Pitfalls
-
-- ❌ Don't do this
-- ✅ Do this instead
-
-## API Reference
-
-Link to generated API docs or inline reference.
-
-## Summary
-
-Quick recap of key points.
-```
-
-### Required Sections
-
-Every guide must include:
-
-1. **Title** - Clear, descriptive
-2. **Overview** - What and why
-3. **Features** - Bullet list of capabilities
-4. **Usage** - At least one working example
-5. **Best Practices** - Dos and don'ts
-6. **Summary** - Quick reference
-
-## Code Examples
-
-### Requirements
-
-- **Must be runnable** without errors
-- **Include necessary imports**
-- **Add comments** for non-obvious code
-- **Use realistic scenarios**
-- **Show error handling**
-
-### Good Example ✅
-
-```rust
-use armature_queue::*;
-
-#[tokio::main]
-async fn main() -> Result<(), QueueError> {
-    // Connect to Redis
-    let queue = Queue::new("redis://localhost:6379", "default").await?;
-
-    // Enqueue a job
-    let job_id = queue.enqueue(
-        "send_email",
-        serde_json::json!({
-            "to": "user@example.com",
-            "subject": "Welcome!"
-        })
-    ).await?;
-
-    println!("Job enqueued: {}", job_id);
-    Ok(())
-}
-```
-
-### Bad Example ❌
-
-```rust
-// Incomplete, won't compile
-let queue = Queue::new("redis://localhost:6379");
-queue.enqueue("send_email", data);
-```
-
-## Inline Code Documentation
-
-### Rust Doc Comments
-
-```rust
-/// Brief one-line description.
-///
-/// More detailed explanation of what this does,
-/// including any important details.
-///
-/// # Arguments
-///
-/// * `param1` - Description of param1
-/// * `param2` - Description of param2
-///
-/// # Returns
-///
-/// What this function returns and when.
-///
-/// # Errors
-///
-/// Possible error conditions and what causes them.
-///
-/// # Examples
-///
-/// ```
-/// use armature_queue::Queue;
-///
-/// # async fn example() -> Result<(), QueueError> {
-/// let queue = Queue::new("redis://localhost:6379", "default").await?;
-/// # Ok(())
-/// # }
-/// ```
-///
-/// # Panics
-///
-/// Conditions under which this panics (if any).
-pub async fn example_function(param1: String, param2: i32) -> Result<String, Error> {
-    // Implementation
-}
-```
-
-### Module-Level Documentation
-
-```rust
-//! Job queue module for background processing.
-//!
-//! This module provides a Redis-backed job queue system with
-//! automatic retries, priorities, and scheduled jobs.
-//!
-//! # Examples
-//!
-//! ```no_run
-//! use armature_queue::*;
-//!
-//! # async fn example() -> Result<(), QueueError> {
-//! let queue = Queue::new("redis://localhost:6379", "default").await?;
-//! queue.enqueue("task", serde_json::json!({})).await?;
-//! # Ok(())
-//! # }
-//! ```
-```
-
-## Documentation Types
-
-### 1. Getting Started Guides
-
+## Type of Change
+- [ ] Bug fix (non-breaking change which fixes an issue)
+- [ ] New feature (non-breaking change which adds functionality)
+- [ ] Breaking change (fix or feature that would cause existing functionality to not work as expected)
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
