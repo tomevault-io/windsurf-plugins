@@ -1,97 +1,96 @@
 ---
 trigger: always_on
-description: Security considerations, performance patterns, code reusability, and DRY principles
+description: Code style conventions and patterns used throughout the TypeScript codebase
 ---
 
 
-- **Security - Environment Variables**: Never hardcode API keys or sensitive credentials. Always use environment variables for sensitive data (CURSOR_API_KEY). Inherit environment variables when spawning processes. Never pass sensitive data as command-line arguments.
-  - env: {
-  ...process.env, // Inherit all environment variables (includes CURSOR_API_KEY)
-  PATH: process.env.PATH || '',
+- **Indentation Style**: Use 2 spaces for indentation, never tabs. All code files consistently use 2-space indentation.
+  - function example() {
+  const value = 1;
+  return value;
 }
-  - // Security Note: Always use environment variables for API keys. Never pass them as command-line arguments.
-
-- **Security - Process Execution**: Use spawn for executing external commands rather than eval or exec with user input. Validate inputs before passing to external processes. Handle process errors and timeouts appropriately.
-  - const childProcess = spawn('cursor-agent', args, {
-  stdio: ['ignore', 'pipe', 'pipe'],
-  env: { ...process.env },
-});
-  - const timeoutId = setTimeout(() => {
-  childProcess.kill();
-  // handle timeout
-}, timeout);
-
-- **Performance - Timeout Handling**: Set reasonable timeouts for long-running operations (default 5 minutes). Always clear timeouts when operations complete. Kill processes that exceed timeout to prevent resource leaks.
-  - const timeout = 300000; // 5 minute default timeout
-  - const timeoutId = setTimeout(() => {
-  childProcess.kill();
-  resolve({ success: false, error: `Analysis timeout...` });
-}, timeout);
-  - childProcess.on('close', (code) => {
-  clearTimeout(timeoutId);
-  // ...
-});
-
-- **Performance - File Operations**: Use synchronous file operations (readFileSync, writeFileSync) when appropriate for CLI tools. Check file existence before reading. Use recursive directory creation when needed. Normalize paths for comparison operations.
-  - if (!fs.existsSync(rulesDir)) {
-  fs.mkdirSync(rulesDir, { recursive: true });
-}
-  - const normalize = (s: string) => s.trim().replace(/\s+/g, ' ');
-return normalize(existingContent) !== normalize(newContent);
-
-- **Code Reusability - Helper Functions**: Extract reusable logic into helper functions. Create utility functions for common operations (filename generation, content comparison, directory management). Keep functions pure when possible (no side effects).
-  - export function generateFilename(categoryName: string): string
-  - export function needsUpdate(existingContent: string, newContent: string): boolean
-  - export function ensureRulesDirectory(rulesDir: string): void
-
-- **DRY Principle - Data Structures**: Define shared data structures in types.ts to avoid duplication. Use consistent result object patterns across functions. Reuse type definitions rather than redefining similar structures.
-  - // Define once in types.ts
-export interface AnalysisResult { ... }
-  - // Reuse across modules
-import { AnalysisResult, RulesManagerResult } from './types';
-
-- **DRY Principle - Conversion Logic**: Centralize format conversion logic in single functions. Reuse conversion functions rather than duplicating logic. Create utility functions for repeated transformations.
-  - export function convertToMDC(categoryName: string, category: RuleCategory): string { ... }
-  - export function parseRawOutput(rawOutput: string): AnalysisData | null { ... }
-
-- **Error Recovery - Fallback Parsing**: Provide fallback mechanisms when primary operations fail. Attempt alternative parsing methods when primary method fails. Provide meaningful error messages that guide users toward solutions.
-  - // Try to parse raw output as fallback
-if (analysisResult.rawOutput) {
-  const parsedData = parseRawOutput(analysisResult.rawOutput);
-  if (parsedData) {
-    analysisResult.data = parsedData;
-    analysisResult.success = true;
-  }
-}
-  - const jsonMatch = stdout.match(/\{[\s\S]*\}/);
-if (!jsonMatch) {
-  // fallback logic
+  - if (condition) {
+  doSomething();
 }
 
-- **User Experience - Clear Messaging**: Provide clear, actionable error messages. Include installation instructions in error messages when tools are missing. Use color coding in CLI output for better UX. Show progress for long-running operations.
-  - console.error(chalk.red('\nError: cursor-agent is not installed or not in PATH'));
-console.log(chalk.yellow('\nTo install cursor-agent, run:'));
-console.log(chalk.white('  curl https://cursor.com/install -fsS | bash\n'));
-  - console.log(chalk.gray('Analyzing codebase with cursor-agent...'));
-console.log(chalk.gray('This may take a few minutes...\n'));
+- **Naming Conventions**: Use camelCase for functions, variables, and method names. Use PascalCase for interfaces, types, classes, and exported types. Use descriptive, clear names that indicate purpose.
+  - camelCase: generateRules, checkCursorAgent, readExistingRules
+  - PascalCase: GenerateRulesConfig, AnalysisResult, CursorAgentCheck, RuleCategory
 
-- **Maintainability - Separation of Concerns**: Separate CLI logic from business logic. Keep file system operations separate from analysis logic. Separate type definitions into dedicated file. Keep modules focused on single responsibilities.
-  - cli.ts - handles CLI interface and user interaction
-  - analyzer.ts - handles cursor-agent integration
-  - rules-manager.ts - handles file system operations
-  - types.ts - central type definitions
+- **Function Documentation**: All exported functions must have JSDoc-style comments with /** */ syntax. Include a brief description of what the function does. Document parameters and return types in TypeScript types, not JSDoc tags.
+  - /**
+ * Check if cursor-agent is installed and accessible
+ */
+export async function checkCursorAgent(): Promise<CursorAgentCheck>
+  - /**
+ * Main function to generate cursor rules
+ */
+export async function generateRules(config: GenerateRulesConfig = {}): Promise<RulesManagerResult>
 
-- **Maintainability - Configuration**: Use configuration objects for function parameters rather than many positional parameters. Provide sensible defaults. Allow configuration to be overridden. Document configuration options clearly.
-  - export interface GenerateRulesConfig {
-  outputDir?: string;
-  verbose?: boolean;
-  dryRun?: boolean;
-  cwd?: string;
-}
+- **Import Organization**: Group imports logically: Node.js built-ins first (if any), then external dependencies, then local imports. Use named imports for clarity. Keep import statements at the top of the file.
+  - import { spawn } from 'child_process';
+import chalk from 'chalk';
+import { Command } from 'commander';
+import { generateRules } from './index';
+  - import * as fs from 'fs';
+import * as path from 'path';
+import { AnalysisData, RulesManagerResult } from './types';
+
+- **Export Patterns**: Use named exports (export function, export const) rather than default exports. Export types and interfaces explicitly using export interface/export type. Re-export related items from index.ts using export *.
+  - export async function generateRules(...) { }
+  - export interface GenerateRulesConfig { }
+  - export * from './types';
+
+- **File Organization**: One major concern per file. Related functions grouped together. Files named with kebab-case for multi-word names (e.g., rules-manager.ts), single words can use camelCase. Each file should have a clear, singular responsibility.
+  - src/analyzer.ts - handles cursor-agent integration
+  - src/rules-manager.ts - handles file system operations for rules
+  - src/cli.ts - handles CLI interface
+
+- **Code Formatting**: Use consistent spacing around operators, after commas, and in object literals. Use trailing commas in multiline arrays and objects. Use semicolons at end of statements.
   - const config: GenerateRulesConfig = {
   outputDir: options.output,
   verbose: options.verbose,
   dryRun: options.dryRun,
+};
+  - const files = ['file1', 'file2', 'file3'];
+
+- **String Literals**: Use single quotes for string literals throughout the codebase. Use template literals (backticks) for multi-line strings and string interpolation.
+  - const message = 'Simple string';
+  - const path = path.join(baseDir, '.cursor', 'rules');
+  - const prompt = `Analyze this entire codebase...`;
+
+- **Conditional Logic**: Prefer early returns for error conditions. Use explicit boolean checks (=== true, === false) when clarity is needed. Use optional chaining and nullish coalescing where appropriate.
+  - if (!agentCheck.installed) {
+  return { success: false, error: '...' };
+}
+  - const alwaysApply = category.alwaysApply !== undefined ? category.alwaysApply : category.ruleType === 'always' ? true : false;
+
+- **CLI Error Handling**: In CLI entry points (cli.ts), use process.exit() with appropriate exit codes (1 for errors, 0 for success) after displaying error messages. Library functions should return error objects instead of exiting.
+  - if (!agentCheck.installed) {
+  console.error(chalk.red('Error: ...'));
+  process.exit(1);
+}
+  - // In library functions, return errors instead:
+return { success: false, error: '...' };
+
+- **Filename Comparison**: When comparing filenames for existence checks, use case-insensitive comparison by converting to lowercase. This prevents issues with case-sensitive file systems while maintaining compatibility.
+  - const existingFilenames = new Set(existingRules.map((r) => r.filename.toLowerCase()));
+  - const existingFile = existingRules.find((r) => r.filename.toLowerCase() === filename.toLowerCase());
+
+- **TypeScript Utility Types**: Use TypeScript utility types like ReturnType<> when appropriate to avoid duplicating type definitions. This maintains type safety while reducing redundancy.
+  - export function getExistingRules(cwd?: string): ReturnType<typeof readExistingRules>
+  - const timeoutId: ReturnType<typeof setTimeout> = setTimeout(...);
+
+- **Buffer Type Handling**: When handling Node.js Buffer objects from process streams, explicitly type them as Buffer in event handlers. Use .toString() method to convert Buffer to string.
+  - process.stdout.on('data', (data: Buffer) => {
+  output += data.toString();
+});
+  - childProcess.stdout.on('data', (data: Buffer) => {
+  const chunk = data.toString();
+  stdout += chunk;
+});
+
+- **Unused Variable Naming**: Prefix unused variables and parameters with underscore (_) to indicate they are intentionally unused. ESLint is configured to ignore variables matching the pattern '^_'.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
