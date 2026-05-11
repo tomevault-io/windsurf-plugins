@@ -7,11 +7,11 @@ AI agent plugin for Jira — CLI tools for issues, worklogs, sprints, and more |
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [netresearch/jira-skill](https://github.com/netresearch/jira-skill).
+Original source: `CLAUDE.md` in [netresearch/jira-skill](https://github.com/netresearch/jira-skill).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
