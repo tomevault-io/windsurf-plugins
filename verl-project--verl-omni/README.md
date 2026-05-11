@@ -7,11 +7,11 @@ RL training framework for diffusion and omni-modality models
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [verl-project/verl-omni](https://github.com/verl-project/verl-omni).
+Original source: `CLAUDE.md` in [verl-project/verl-omni](https://github.com/verl-project/verl-omni).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
