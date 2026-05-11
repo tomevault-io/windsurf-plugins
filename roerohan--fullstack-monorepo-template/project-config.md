@@ -1,0 +1,183 @@
+---
+trigger: always_on
+description: This file provides guidance to AI coding agents when working with code in this repository.
+---
+
+# AGENTS.md
+
+This file provides guidance to AI coding agents when working with code in this repository.
+
+## IMPORTANT: This is a Template Repository
+
+**You MUST read this section carefully before making any changes.**
+
+### Determining Context: Template vs Application
+
+Check the current working directory name:
+
+- **If directory is `fullstack-monorepo-template`**: You are working on the template itself. Keep all demo content and examples intact.
+- **If directory is anything else**: You are working on an application built from this template. You MUST clean up template artifacts before implementing features.
+
+### When Working on an Application (NOT the template)
+
+Before implementing any features, you MUST:
+
+1. **Delete demo/example content**:
+   - `packages/web/src/routes/demo/` - All demo routes
+   - `packages/web/src/data/` - Demo data files
+   - `packages/web/src/routes/rpc/` - Example RPC route files (but keep the pattern in mind)
+   - Any other placeholder or example code
+
+2. **Remove template styling**:
+   - Do NOT use TanStack-specific theming, logos, or branding
+   - Replace placeholder styles with application-specific styling
+   - Remove TanStack logo files from `packages/web/public/` if not needed
+   - **Keep TanStack Router DevTools** - The development debugging tools are useful and should remain
+
+3. **Update package names** in `package.json` files from `@fullstack-monorepo-template/*` to match the application name
+
+4. **Update service binding names** in `wrangler.jsonc` files to match the application name (replace `fullstack-monorepo-template-worker`)
+
+### When Working on the Template Itself
+
+Keep all demo content intact as it serves as reference examples for users of the template.
+
+## Monorepo Architecture
+
+This is a pnpm workspace monorepo with two packages:
+
+- **`packages/worker`**: Cloudflare Worker (backend)
+- **`packages/web`**: TanStack Start app (frontend)
+
+### Key Architectural Pattern: Worker RPC via Service Bindings
+
+The web package communicates with the worker package through **two mechanisms**:
+
+1. **HTTP API** (traditional): REST endpoints exposed by Hono in `packages/worker/src/index.ts`
+2. **RPC calls** (service bindings): Type-safe method calls via `WorkerRpc` class in `packages/worker/src/rpc.ts`
+
+**Critical understanding**: The worker exports TWO things from `src/index.ts`:
+
+- `export default app` - Hono HTTP handler (default export)
+- `export { WorkerRpc } from './rpc'` - Named export for RPC entrypoint
+
+The web package's `wrangler.jsonc` configures a service binding:
+
+```jsonc
+"services": [{
+  "binding": "WORKER_RPC",
+  "service": "fullstack-monorepo-template-worker",
+  "entrypoint": "WorkerRpc"  // References the named export
+}]
+```
+
+### Type Safety Across Packages
+
+The web package imports types directly from the worker package:
+
+```typescript
+// packages/web/env.d.ts
+import type { WorkerRpc } from '../worker/src/rpc';
+```
+
+This creates a **direct TypeScript dependency** between packages. The monorepo structure enables this cross-package type sharing.
+
+### Calling Worker RPC Methods
+
+**CORRECT way to access Worker RPC** in TanStack Start server functions:
+
+```typescript
+import { getWorkerRpc } from '@/lib/rpc';
+
+const workerRpc = getWorkerRpc();
+const result = await workerRpc.sayHello('World');
+```
+
+**DO NOT use** `getServerContext().cloudflare.env` - this is incorrect. Always use the `getWorkerRpc()` helper from `@/lib/rpc.ts`.
+
+See `packages/web/src/routes/rpc/` for complete examples of proper RPC usage patterns.
+
+## Commands
+
+### Development
+
+```bash
+# Run both services in separate terminals
+pnpm dev:worker    # Worker on localhost:8787
+pnpm dev:web       # Web on localhost:3000
+
+# Or run just one
+pnpm --filter @fullstack-monorepo-template/worker dev
+pnpm --filter @fullstack-monorepo-template/web dev
+```
+
+### Testing
+
+```bash
+# Run all tests
+pnpm test
+
+# Run tests for specific package
+pnpm --filter @fullstack-monorepo-template/worker test
+pnpm --filter @fullstack-monorepo-template/web test
+
+# Run tests in watch mode (within package directory)
+cd packages/worker && pnpm test --watch
+```
+
+### Linting & Formatting
+
+```bash
+pnpm lint           # Lint all packages + check formatting
+pnpm lint:fix       # Fix linting issues in all packages
+pnpm format         # Format all code
+pnpm format:check   # Check formatting without changes
+```
+
+### Deployment
+
+```bash
+# Deploy both packages
+pnpm deploy
+
+# Deploy individually
+pnpm deploy:worker
+pnpm deploy:web
+
+# Login to Cloudflare first (one-time)
+cd packages/worker && pnpm wrangler login
+```
+
+### Working with Workspace Packages
+
+```bash
+# Add dependency to specific package
+pnpm --filter @fullstack-monorepo-template/worker add <package-name>
+pnpm --filter @fullstack-monorepo-template/web add <package-name>
+
+# Add dev dependency
+pnpm --filter @fullstack-monorepo-template/worker add -D <package-name>
+```
+
+## Adding New RPC Methods
+
+When adding RPC methods that the web package will call:
+
+1. **Add method to `packages/worker/src/rpc.ts`**:
+
+```typescript
+export class WorkerRpc extends WorkerEntrypoint {
+	async myNewMethod(param: string): Promise<Result> {
+		// implementation
+	}
+}
+```
+
+2. **TypeScript will automatically provide types** in the web package because `env.d.ts` imports the `WorkerRpc` type
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [roerohan/fullstack-monorepo-template](https://github.com/roerohan/fullstack-monorepo-template) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-04 -->
