@@ -7,11 +7,11 @@ Obsidian plugin for rendering Apple Health data visualizations from daily JSON f
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [CodyBontecou/health-md-visualizations](https://github.com/CodyBontecou/health-md-visualizations).
+Original source: `CLAUDE.md` in [CodyBontecou/health-md-visualizations](https://github.com/CodyBontecou/health-md-visualizations).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
