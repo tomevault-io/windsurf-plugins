@@ -1,0 +1,121 @@
+---
+trigger: always_on
+description: Provides methods for resizing, converting, and optimizing images.
+---
+
+# Pipelex Coding Rules
+
+## Codex Cloud Commands
+
+### Linting
+
+   After making code changes, you must always lint using `make agent-check`.
+
+   ```bash
+   make agent-check
+   # If the current system doesn't have the `make` command,
+   # lookup the "agent-check" target in the Makefile and run the commands one by one (targets fix-unused-imports format lint pyright mypy)
+   ```
+
+   This runs multiple code quality tools:
+   - Pyright: Static type checking
+   - Ruff: Fix unused imports, lint, format  
+   - Mypy: Static type checker
+   - plxt: Format and lint TOML, MTHDS, and PLX files
+
+   Always fix any issues reported by these tools before proceeding.
+
+### Cleaning Derived Files
+
+   If you need to clean derived files and caches, typically after you erased files or moved tests, the linters can get confused, the pytest collection can be off...
+
+   ```bash
+   make cleanderived
+   ```
+
+### Running Tests in Codex Cloud
+
+    To test everything that can be tested from within the Codex Cloud sandbox, run this:
+
+    ```bash
+    make codex-tests
+    # It's equivalent to running pytest with `-m "(dry_runnable or not inference) and not (pipelex_api or codex_disabled)"`
+    # If some test fails, re-run it with `-s -vv` to see more details
+    ```
+
+---
+
+### Prerequisites for running command lines: use virtual environment
+
+   **CRITICAL**: Before running any `pipelex` commands or `pytest`, you MUST use the appropriate Python virtual environment. The only exceptions are our `make` commands which already include the env activation.
+
+   Call the CLI directly from the virtual environment:
+
+   ```bash
+   .venv/bin/pytest -s -v -k test_render_jinja2_from_text
+   .venv/bin/pipelex validate --all
+   ```
+
+   For standard installations, the virtual environment is named `.venv`. Always check this first. On Windows, the path is `.venv\Scripts\` instead of `.venv/bin/`.
+
+### Pipelex Dev CLI (`pipelex-dev`)
+
+   The `pipelex-dev` CLI provides internal development tools that are not distributed with the package. It is available in the virtual environment.
+
+   ```bash
+   .venv/bin/pipelex-dev --help
+   ```
+
+   Key commands:
+
+   - **`generate-mthds-schema`**: Regenerate the MTHDS JSON Schema (`derived/mthds_schema.json`). Run this after modifying `mthds_schema_generator.py`.
+
+     ```bash
+     .venv/bin/pipelex-dev generate-mthds-schema
+     ```
+
+### Pipelex CLI Commands
+
+   To run the Pipelex CLI commands without the logo, you can use the `--no-logo` flag, this will avoid useless tokens in the console output.
+
+   ```bash
+   .venv/bin/pipelex --help
+   .venv/bin/pipelex build --help --no-logo
+   .venv/bin/pipelex run --help --no-logo
+   .venv/bin/pipelex validate --help --no-logo
+   .venv/bin/pipelex doctor --help --no-logo
+   .venv/bin/pipelex init --help --no-logo
+   ```
+
+## Coding Standards & Best Practices for Python Code
+
+This document outlines the core coding standards, best practices, and quality control procedures for the codebase.
+
+### Python Version Compatibility
+
+    - The project supports Python 3.10+ (`requires-python = ">=3.10,<3.15"`). Never use features introduced after Python 3.10 without a compatibility fallback.
+    - Common pitfalls:
+      - `datetime.UTC` was added in Python 3.11. Use `datetime.timezone.utc` instead.
+      - `StrEnum` was added in Python 3.11. Always import it from `pipelex.types` which handles retrocompatibility.
+      - `type` statement (PEP 695) was added in Python 3.12. Use `TypeAlias` from `typing` instead.
+      - `ExceptionGroup` / `except*` was added in Python 3.11. Avoid unless using the `exceptiongroup` backport.
+
+### Variables, loops and indexes
+
+    - Variable names should have a minimum length of 3 characters. No exceptions: name your `for` loop indexes like `index_foobar`, your exceptions `exc` or more specific like `validation_error` when there are several layers of exceptions, and use `for key, value in ...` for key/value pairs.
+    - When looping on the keys of a dict, use `for key in the_dict` rather than `for key in the_dict.keys()` otherwise you won't pass linting.
+    - Avoid inline for loops, unless it's ultra-simple and holds on oneline.
+    - If you have a variable that will get its value differently through different code paths, declare it first with a type, e.g. `pipe_code: str` but DO NOT give it a default value like `pipe_code: str = ""` unless it's really justified. We want the variable to be unbound until all paths are covered, and the linters will help us avoid bugs this way.
+
+### Enums and tests
+
+    - When defining enums related to string values, always inherit from `StrEnum`
+    - When you need the enum value as a string, don't use `str(enum_var)` or `enum_var.value`, just use `enum_var` itself, that is the point of using StrEnum!
+    - Never test equality to an enum value: use match/case, even to single out 1 case out of 10 cases. To avoid heavy match/case code in awkward places, add @property methods to the enum class such as `is_foobar()`. This is to avoid bugs: when new enum values are added we want the linter to complain. Use the `|` operator to group cases
+    - As our match/case constructs over enums are always exhaustive, NEVER add a default `case _: ...`. Otherwise, you won't pass linting.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [Pipelex/pipelex](https://github.com/Pipelex/pipelex) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-04 -->
