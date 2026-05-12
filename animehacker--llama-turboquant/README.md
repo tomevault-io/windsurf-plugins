@@ -7,11 +7,11 @@ TurboQuant for GGML: 4.57x KV Cache Compression with 72K+ Context for Llama-3.3-
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [animehacker/llama-turboquant](https://github.com/animehacker/llama-turboquant).
+Original source: `CLAUDE.md` in [animehacker/llama-turboquant](https://github.com/animehacker/llama-turboquant).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
