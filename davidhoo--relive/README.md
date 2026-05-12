@@ -7,11 +7,11 @@ Relive - 智能照片记忆相框：通过 AI 分析 NAS 照片，在墨水屏�
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [davidhoo/relive](https://github.com/davidhoo/relive).
+Original source: `CLAUDE.md` in [davidhoo/relive](https://github.com/davidhoo/relive).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
