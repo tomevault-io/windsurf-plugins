@@ -1,0 +1,92 @@
+---
+trigger: always_on
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+---
+
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project Overview
+
+TypeScript library (`@apocaliss92/nodelink-js`) implementing the Reolink Baichuan binary protocol (port 9000) for direct IP camera and NVR communication. Also includes a web-based Manager UI (`app/`) built with Express + tRPC + React.
+
+The library is consumed by external projects (e.g., `scrypted-reolink-native` which symlinks this repo).
+
+## Commands
+
+```bash
+npm run build          # Build library (tsup bundle + api-extractor types → dist/)
+npm run typecheck      # Type-check without emitting
+npm run lint           # ESLint (flat config, TS rules)
+npm run app:dev        # Run Manager UI in dev mode (via nx)
+npm run rtsp-server    # Build + run standalone RTSP server CLI
+```
+
+Always rebuild after changing `src/` so `dist/` is updated for consumers.
+
+No test suite exists — there is no `npm test` command.
+
+## Architecture
+
+### Three-Layer Protocol Stack
+
+1. **Protocol layer** (`src/protocol/`) — Binary framing, XOR/AES encryption, XML builders. The Baichuan wire format uses a magic header (`f0 de bc 0a`), 20/24-byte binary headers, and XML payloads encrypted with XOR or AES-128-CFB.
+
+2. **Client layer** (`src/client/BaichuanClient.ts`) — TCP/UDP socket management, request-response correlation (via `cmdId:msgNum` keys), encryption negotiation, event emission. Handles battery camera fallback to UDP (BCUDP).
+
+3. **API layer** (`src/reolink/baichuan/ReolinkBaichuanApi.ts`) — The main public class (~15k lines). Wraps a **socket pool** of `BaichuanClient` instances, manages dedicated streaming sessions, caches capabilities, and implements 100+ public methods.
+
+### Key Modules
+
+| Directory | Purpose |
+|-----------|---------|
+| `src/reolink/baichuan/utils/` | ~26 modules: each handles XML parsing/building for one feature area (PTZ, events, recordings, chime, etc.) |
+| `src/reolink/baichuan/capabilities.ts` | Device capability detection from Support/Abilities XML |
+| `src/reolink/baichuan/types.ts` | All API request/response type definitions |
+| `src/baichuan/stream/` | Streaming: Go2rtcTcpServer (raw TCP→go2rtc), BaichuanRtspServer (legacy RTSP), H264/H265 converters |
+| `src/reolink/cgi/` | Alternative HTTP/CGI API for cameras |
+| `src/bcudp/` | UDP transport for battery cameras |
+| `src/multifocal/` | Dual-lens composite streams (TrackMix, Duo cameras) |
+
+### go2rtc Restreamer Integration
+
+The library includes `Go2rtcTcpServer` (`src/baichuan/stream/Go2rtcTcpServer.ts`) which feeds raw Annex-B H.264/H.265 video to go2rtc via a plain TCP connection. go2rtc auto-detects the codec and provides WebRTC, HLS, MJPEG, RTSP, and MSE output.
+
+**Key design decisions:**
+- **Video only over TCP** — Audio (ADTS AAC) is not sent because raw TCP Annex-B cannot multiplex audio. Future: MPEG-TS muxer would enable audio.
+- **Socket isolation** — Each stream profile (main/sub/ext) gets its own dedicated TCP socket via `createDedicatedSession` with key prefix `live:` so `resolveSocketTag()` assigns separate pool tags. Without the `live:` prefix, all streams fall back to the shared `general` socket causing streamType mismatches.
+- **Prestart mode** — AC-powered cameras pre-start the native stream immediately (`prestartStream: true`) so frames are in the prebuffer when go2rtc connects. Battery cameras use `prestartStream: false` for on-demand streaming with 30s wake timeout.
+- **go2rtc binary** — Provided by `go2rtc-static` npm package (auto-downloaded on `npm install`). Custom binary path configurable in settings.
+
+### Manager UI (`app/`)
+
+Separate npm project using `file://..` symlink to the library. Tech stack: Express + tRPC + Zod (backend), React + Vite (frontend). The tRPC router in `app/src/routers/baichuan.ts` wraps all `ReolinkBaichuanApi` methods. Connection pooling lives in `app/src/rtsp-manager.ts`.
+
+**go2rtc is the default restreamer.** All streaming output (WebRTC, HLS, MJPEG, RTSP, MSE) is provided by go2rtc. The legacy custom MJPEG/HLS/WebRTC endpoints have been removed from `server.ts`. The go2rtc API is proxied at `/go2rtc/*` via Express for same-origin access (avoids CORS issues for WebRTC WHEP signaling).
+
+**Default ports (configurable in settings):**
+| Service | Port | Notes |
+|---------|------|-------|
+| Manager UI/API | 3000 | Express + tRPC |
+| go2rtc API | 11984 | REST API + web dashboard |
+| go2rtc RTSP | 18554 | RTSP output for all streams |
+| go2rtc WebRTC | 18555 | ICE/STUN |
+
+**Removed endpoints** (replaced by go2rtc):
+- `/api/mpeg/:cameraName/:profile` (MJPEG) → `http://host:11984/api/stream.mjpeg?src={name}`
+- `/api/hls/:cameraName/:profile/*` (HLS) → `http://host:11984/api/stream.m3u8?src={name}`
+- `/api/webrtc/session` (WebRTC) → WHEP via `/go2rtc/api/webrtc?src={name}`
+- `/api/mjpeg/status`, `/api/webrtc/status`, `/api/hls/status` → `go2rtc.status` tRPC query
+
+**Key tRPC routers:**
+- `go2rtc.*` — start/stop/restart, status, settings, stream management, binary resolution
+- `rtsp.*` — stream lifecycle (creates Go2rtcTcpServer when go2rtc enabled)
+- `cameras.*` — camera CRUD, connection management
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [apocaliss92/nodelink-js](https://github.com/apocaliss92/nodelink-js) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-03 -->
