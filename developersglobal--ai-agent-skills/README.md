@@ -7,11 +7,11 @@ AI agent skills for production grade applications
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [DevelopersGlobal/ai-agent-skills](https://github.com/DevelopersGlobal/ai-agent-skills).
+Original source: `CLAUDE.md` in [DevelopersGlobal/ai-agent-skills](https://github.com/DevelopersGlobal/ai-agent-skills).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
