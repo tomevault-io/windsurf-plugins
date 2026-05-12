@@ -1,0 +1,126 @@
+---
+trigger: always_on
+description: A web-based tmux interface built with React (Vite) frontend and Rust backend.
+---
+
+# Tmuxy
+
+A web-based tmux interface built with React (Vite) frontend and Rust backend.
+
+**This project is under active development, not production.** Breaking changes are welcome. No backwards compatibility required — delete, rename, and restructure freely.
+
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for high-level system overview and component interaction.
+See [docs/STATE-MANAGEMENT.md](docs/STATE-MANAGEMENT.md) for frontend XState and backend Rust state details.
+See [docs/DATA-FLOW.md](docs/DATA-FLOW.md) for SSE/HTTP protocol, Tauri IPC, and deployment scenarios.
+See [docs/TMUX.md](docs/TMUX.md) for control mode routing, version-specific bugs, and workarounds.
+See [docs/COPY-MODE.md](docs/COPY-MODE.md) for the client-side copy mode architecture.
+See [docs/SECURITY.md](docs/SECURITY.md) for security risks, mitigations, and deployment warnings.
+See [docs/TESTS.md](docs/TESTS.md) for testing guidelines and principles.
+See [docs/NON-GOALS.md](docs/NON-GOALS.md) for what tmuxy intentionally does NOT do.
+See [docs/RICH-RENDERING.md](docs/RICH-RENDERING.md) for terminal image/OSC protocol support.
+
+## Project Structure
+
+```
+tmuxy/
+├── packages/
+│   ├── tmuxy-core/           # Rust: tmux control mode, parsing, state
+│   ├── tmuxy-server/         # Rust: server (SSE, HTTP, embedded frontend, dev mode)
+│   ├── tmuxy-ui/             # React/Vite frontend
+│   │   └── src/tmux/demo/    # In-browser demo engine (DemoAdapter, DemoTmux, DemoShell)
+│   ├── tmuxy-demo/           # Next.js demo site (static export → GitHub Pages)
+│   └── tauri-app/            # Tauri desktop app wrapper
+├── bin/
+│   ├── tmuxy-cli              # Shell dispatcher (symlinked as ~/.local/bin/tmuxy)
+│   └── tmuxy/                 # Shell scripts for floats, groups, widgets
+├── tests/                    # E2E tests (Jest + Playwright)
+│   ├── helpers/              # One file per helper function
+│   └── *.test.js             # Test suites grouped by operation
+└── docs/                     # Project documentation
+```
+
+## CLI Usage
+
+The `tmuxy` CLI is a noun-verb dispatcher at `bin/tmuxy-cli`, symlinked as `~/.local/bin/tmuxy`.
+All mutating commands route through `tmux run-shell` for safety with control mode.
+
+```bash
+# Pane operations
+tmuxy pane list [--json] [--all]       # List panes
+tmuxy pane split [-h|-v]               # Split current pane
+tmuxy pane kill [%id]                  # Kill pane
+tmuxy pane select [-U|-D|-L|-R|%id]    # Select pane
+tmuxy pane resize [-U|-D|-L|-R] [n]    # Resize pane
+tmuxy pane swap %0 %1                  # Swap two panes
+tmuxy pane zoom                        # Toggle zoom
+tmuxy pane break                       # Break pane into own tab
+tmuxy pane capture [%id] [--json]      # Capture pane content
+tmuxy pane send ls Enter               # Send keys to pane
+tmuxy pane paste "some text"           # Paste text into pane
+tmuxy pane float [cmd args...]         # Create a float pane
+tmuxy pane group add                   # Add pane to a group
+tmuxy pane group close [%id]           # Close pane from group
+tmuxy pane group switch %5             # Switch to pane in group
+tmuxy pane group next                  # Next pane in group
+tmuxy pane group prev                  # Previous pane in group
+
+# Tab operations
+tmuxy tab list [--json]                # List tabs
+tmuxy tab create [name]                # Create tab (safe splitw+breakp)
+tmuxy tab kill [@id]                   # Kill tab
+tmuxy tab select <index|@id>           # Switch to tab
+tmuxy tab next                         # Next tab
+tmuxy tab prev                         # Previous tab
+tmuxy tab rename <name>                # Rename current tab
+tmuxy tab layout [next|even-h|...]     # Change pane layout
+
+# Widgets
+tmuxy widget image /path/to/img.png    # Display image widget
+tmuxy widget markdown README.md        # Display markdown widget
+echo "# Hello" | tmuxy widget markdown - # Markdown from stdin
+
+# Event queue (inter-agent coordination)
+tmuxy event emit <name> <msg|->        # Publish message (- for stdin)
+tmuxy event wait <name>                # Block until message arrives
+tmuxy event list                       # Show pending events
+
+# Escape hatch (routes safely through run-shell)
+tmuxy run swap-pane -s %0 -t %1       # Run any tmux command safely
+tmuxy run new-window                   # Intercepted → splitw+breakp
+tmuxy run resize-window                # Blocked (crashes control mode)
+
+# Server
+tmuxy server                           # Start production server
+tmuxy server stop                      # Stop production server
+```
+
+Run `tmuxy --help`, `tmuxy <command> --help`, or `tmuxy <command> <subcommand> --help` for details.
+
+## Development
+
+```bash
+npm start               # Start dev server (pm2 + cargo-watch)
+npm run stop            # Stop dev server
+npm test                # Unit tests (Vitest)
+npm run test:e2e        # E2E tests (requires server + Chrome CDP)
+```
+
+## Devcontainer
+
+| Variable | Description |
+|----------|-------------|
+| `CONTAINER_NAME` | Container name (e.g., `tmuxy-worktree-1`) |
+| `HOST_PORT` | Port exposed on the host (e.g., `14089`) |
+| `PORT` | Internal server port (`9000`) |
+
+## Coding Guidelines
+
+### General
+
+1. **No legacy code** - Remove dead code immediately. No commented-out code, no unused imports.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [flplima/tmuxy](https://github.com/flplima/tmuxy) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-03 -->
