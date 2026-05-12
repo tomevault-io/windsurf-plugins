@@ -7,11 +7,11 @@ Build coding agent SaaS via native AI SDK UI
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [buda-ai/bunny-agent](https://github.com/buda-ai/bunny-agent).
+Original source: `CLAUDE.md` in [buda-ai/bunny-agent](https://github.com/buda-ai/bunny-agent).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
