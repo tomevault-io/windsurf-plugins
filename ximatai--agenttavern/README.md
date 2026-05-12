@@ -7,11 +7,11 @@ AgentTavern 是一个面向企业内协作的、可本地部署且带审批约�
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [ximatai/AgentTavern](https://github.com/ximatai/AgentTavern).
+Original source: `CLAUDE.md` in [ximatai/AgentTavern](https://github.com/ximatai/AgentTavern).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
