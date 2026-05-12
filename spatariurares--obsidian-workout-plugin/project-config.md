@@ -1,145 +1,184 @@
 ---
 trigger: always_on
-description: Manages exercise type definitions (Strength, Cardio, Flexibility, custom types) with field definitions. Cached with `clearCache()` method.
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Development Principles
-
-- **Follow established patterns** — use "Key Development Patterns" section before implementing features
-- **Delegate to tools** — use build system, Jest, ESLint; don't manually validate what tools can check
-- **Use services, not ad-hoc logic** — e.g., use `DataService` for CSV operations, not inline parsing
-- **Update this file** — when discovering new patterns or solving complex problems, document them here
-
 ## Development Commands
 
 ```bash
-npm run dev          # Development build with watch mode (CSS + esbuild)
-npm run build        # Production build (tsc check + CSS + minified bundle)
-npm test             # Run Jest test suite
-npm run test:watch   # Jest in watch mode
-npm run test:coverage # Jest with coverage report
+npm run dev          # Development build with CSS + esbuild watch mode
+npm run build        # Production build: tsc check + CSS + minified bundle
 npm run lint         # ESLint
 npm run lint:fix     # ESLint with auto-fix
+npm test             # Jest test suite
+npm run test:watch   # Jest watch mode
+npm run test:coverage # Jest with coverage report
 npm run version      # Bump version in manifest.json and versions.json
 ```
 
-**Run single test**: `npm test -- app/utils/__tests__/DateUtils.test.ts`
+**Run single test file**: `npm test -- app/utils/__tests__/DateUtils.test.ts`
 
-## Build System
+## Build Process
 
 1. **CSS**: `node build-css.mjs` - PostCSS bundles `styles/` → `styles.css`
-2. **TypeScript**: `tsc -noEmit -skipLibCheck` - Type checking only (no emit)
+2. **TypeScript**: `tsc -noEmit -skipLibCheck` - validation only
 3. **Bundle**: esbuild bundles `main.ts` → `main.js` with Obsidian externals
-
-The build process is sequential and must complete in order. Development mode (`npm run dev`) watches for changes and rebuilds automatically.
 
 ## Project Architecture
 
-**Plugin Type**: Obsidian plugin for workout tracking with CSV data storage, visualizations (charts, tables, dashboards), timers, and exercise management.
-
-**Core Principles:**
-
-- **Service Layer Pattern**: Main plugin delegates to specialized services
-- **Facade Pattern**: Services expose clean APIs while delegating to internal components
-- **Atomic Design**: UI components organized by complexity (atoms → molecules → features)
-- **Domain-Driven Features**: Features organized by domain (charts, tables, dashboard, modals, etc.)
-- **Embedded Views**: Code blocks (`workout-chart`, `workout-log`, `workout-timer`, `workout-dashboard`) render inside notes
-- **Type Safety**: Strict TypeScript with path aliases (`@app/*`)
+Obsidian plugin for workout data visualization with charts, tables, timers, and dashboards.
 
 ### TypeScript Configuration
 
-```json
-{
-  "baseUrl": ".",
-  "noImplicitAny": true,
-  "paths": { "@app/*": ["app/*"] },
-  "strict": true,
-  "strictNullChecks": true
-}
+- **Path alias**: `@app/*` → `app/*` (use instead of relative paths)
+- **Strict mode enabled**: strictNullChecks, noImplicitAny
+
+### Service Layer Pattern
+
+```text
+main.ts (WorkoutChartsPlugin)
+├── CommandHandlerService     # Registers Obsidian commands
+├── CodeBlockProcessorService # Processes workout-* code blocks
+└── DataService               # CSV operations with 5-second cache
 ```
-
-**Always use `@app/*` imports instead of relative paths** (e.g., `@app/components/atoms` not `../../components/atoms`)
-
-### Main Plugin (main.ts)
-
-```
-WorkoutChartsPlugin
-├── Services
-│   ├── DataService              # Facade for CSV operations (cache, columns, repository)
-│   ├── ExerciseDefinitionService # Exercise type definitions and field management
-│   ├── MuscleTagService          # Custom muscle tag mappings (CSV-backed, cached)
-│   ├── CommandHandlerService     # Registers Obsidian commands
-│   └── CodeBlockProcessorService # Registers code block processors
-│
-├── Embedded Views
-│   ├── EmbeddedChartView         # workout-chart (Chart.js visualizations)
-│   ├── EmbeddedTableView         # workout-log (sortable data tables)
-│   ├── EmbeddedTimerView         # workout-timer (countdown/interval)
-│   └── EmbeddedDashboardView     # workout-dashboard (stats, analytics, heat maps)
-│
-└── Public API
-    └── WorkoutPlannerAPI         # window.WorkoutPlannerAPI for Dataview integration
-```
-
-**Key Lifecycle:**
-
-1. `onload()`: Initialize services, register processors, expose API, add ribbon icon
-2. `onunload()`: Clean up timers, views, charts, services, clear caches, nullify references
-3. Service cleanup order: timers → views → cache → Chart.js → service references → ribbon → API
-
-### Service Layer Architecture
-
-#### DataService (Facade)
-
-Facade over specialized data services:
-
-- **CSVCacheService**: 5-second cache for raw CSV data
-- **CSVColumnService**: CSV header management (read, ensure columns exist)
-- **WorkoutLogRepository**: CRUD operations on CSV file
-- **DataFilter**: Multi-strategy filtering (exact, fuzzy, filename, exercise field)
-
-```typescript
-// Usage
-const data = await plugin.dataService.getWorkoutLogData({ exercise: "Squat" });
-await plugin.addWorkoutLogEntry({ date, exercise, reps, weight, ... });
-plugin.clearLogDataCache(); // Force refresh
-```
-
-#### ExerciseDefinitionService
-
-Manages exercise type definitions (Strength, Cardio, Flexibility, custom types) with field definitions. Cached with `clearCache()` method.
-
-#### MuscleTagService
-
-Manages custom muscle tag mappings (e.g., `petto` → `chest`) from CSV file. Cache is invalidated via `triggerMuscleTagRefresh()`. Call `destroy()` to clean up.
 
 ### Embedded Views (BaseView Pattern)
 
-All embedded views extend `BaseView` for consistent error handling, loading states, and empty data handling:
+All views extend `BaseView` for consistent error handling and debug logging:
 
-```typescript
-abstract class BaseView {
-  protected handleError(container, error): void;
-  protected handleEmptyData(
-    container,
-    data,
-    exercise?,
-    pageLink?,
-  ): boolean;
-  protected renderLoadingSpinner(container): HTMLElement;
-}
+- `EmbeddedChartView` - Chart.js visualizations
+- `EmbeddedTableView` - Sortable data tables
+- `EmbeddedTimerView` - Countdown/interval timers with presets
+- `EmbeddedDashboardView` - Stats, analytics, heat maps
+
+### Modal System (ModalBase Pattern)
+
+Modals extend `ModalBase` or `BaseInsertModal`:
+
+- `app/features/modals/base/` - Base classes (ModalBase, BaseInsertModal)
+- `app/features/modals/components/` - Reusable components (ExerciseAutocomplete, TimerConfigurationSection, CodeGenerator)
+
+### Atomic Design Components
+
+```text
+app/components/
+├── atoms/      # Primitives: Button, Input, Text, Icon, Container, Canvas, ErrorMessage
+├── molecules/  # Composites: StatCard, FormField, SearchBox, Badge, TrendIndicator
+└── organism/   # Complex: larger composed components
 ```
 
-**Views:**
+Import from barrel exports: `import { Button, StatCard } from "@app/components/atoms"`
 
-- `EmbeddedChartView` - Chart.js visualizations (volume, weight, reps, pace, distance, duration, heart rate)
+### Feature Modules
+
+```text
+app/features/
+├── charts/     # ChartRenderer, chart config
+├── tables/     # TableRenderer, TableDataProcessor
+├── timer/      # TimerCore, TimerControls, TimerDisplay, TimerAudio
+├── dashboard/  # QuickStatsCards, VolumeAnalytics, MuscleHeatMap
+├── modals/     # All modal implementations
+└── settings/   # WorkoutChartsSettingTab
+```
+
+### Data Flow
+
+1. **Source**: CSV file (columns: date, exercise, reps, weight, volume, origin, workout, timestamp, notes)
+2. **Caching**: DataService caches for 5 seconds, clears on data changes
+3. **Filtering**: DataFilter uses multi-strategy matching (exact, fuzzy, filename, exercise field)
+4. **Processing**: Code blocks parsed from YAML-like syntax → Views render data
+
+### Code Blocks
+
+```yaml
+# workout-chart
+exercise: Squat
+type: volume
+dateRange: 30
+showTrendLine: true
+```
+
+```yaml
+# workout-log
+exercise: Bench Press
+limit: 10
+```
+
+```yaml
+# workout-timer
+preset: rest
+duration: 90
+```
+
+```yaml
+# workout-dashboard
+```
+
+### Timer Presets
+
+Timers support saved presets via settings:
+
+- `preset: presetName` - Use preset configuration
+- Presets stored in `settings.timerPresets`
+- Default preset configurable in settings
+
+### CSS Organization
+
+- **Entry**: `styles.source.css` imports modular files from `styles/`
+- **Output**: PostCSS bundles to `styles.css`
+- **Variables**: Use Obsidian CSS variables (e.g., `--background-primary`, `--text-normal`)
+
+## Key Patterns
+
+### Adding New Embedded Views
+
+1. Extend `BaseView` class
+2. Implement `render()` method
+3. Register code block processor in `CodeBlockProcessorService`
+
+### Adding New Modals
+
+1. Extend `BaseInsertModal` for insert modals or `ModalBase` for others
+2. Implement abstract methods: `getModalTitle()`, `generateCode()`, etc.
+3. Register command in `CommandHandlerService`
+
+### Adding New Components
+
+1. Create in appropriate atomic level (atoms/molecules/organism)
+2. Export from barrel file (e.g., `atoms/index.ts`)
+3. Add tests in `__tests__/` directory
+
+### Constants
+
+All user-facing strings in `app/constants/Constants.ts` under `CONSTANTS.WORKOUT.*`:
+
+- `MODAL.TITLES`, `MODAL.BUTTONS`, `MODAL.LABELS`, `MODAL.CHECKBOXES`
+- `SETTINGS.*`, `TIMER.*`, `TABLE.*`, `CHARTS.*`
+
+## Testing
+
+- **Location**: `__tests__/` directories alongside source files
+- **Coverage**: 70% threshold (statements, branches, functions, lines)
+- **Excluded**: Constants.ts, FrontmatterParser.ts (Obsidian API mocking)
+
+## Obsidian Plugin Guidelines
+
+### Critical Rules
+
+- **Use `this.app`** - Never use global `app` or `window.app`
+- **No unnecessary logging** - Only log errors, not debug messages (unless debug mode enabled)
+- **Sentence case in UI** - "Template folder" not "Template Folder"
+- **Use `setHeading()`** - Not `<h1>` or `<h2>` for settings headings
+
+### Security (DOM)
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/SpatariuRares) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-10 -->
+> Source: [SpatariuRares/obsidian-workout-plugin](https://github.com/SpatariuRares/obsidian-workout-plugin) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-07 -->
