@@ -7,11 +7,11 @@ Shared, persistent memory for AI coding agents. One project brain across machine
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [memctl/memctl](https://github.com/memctl/memctl).
+Original source: `CLAUDE.md` in [memctl/memctl](https://github.com/memctl/memctl).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
