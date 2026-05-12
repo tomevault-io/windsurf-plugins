@@ -1,162 +1,128 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: Repository-level guidance for coding agents working on `context-creator`.
 ---
 
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Repository-level guidance for coding agents working on `context-creator`.
 
-## Overview
+## Scope
 
-context-creator is a high-performance Rust CLI tool that converts entire codebases into LLM-optimized Markdown for consumption by models like Gemini. It processes git repositories by intelligently filtering, prioritizing, and formatting code into a single cohesive document.
+- This file applies to the entire repository unless a more specific nested `AGENTS.md` is added later.
+- Prefer current source code over older docs when they disagree. Some docs still show older API names, while the Rust modules are authoritative.
+- Keep changes narrowly scoped. This project has broad CLI, semantic-analysis, MCP, and security coverage, so unrelated rewrites are expensive to validate.
 
-## Key Commands
+## Project Overview
 
-### Development Commands
+`context-creator` is a Rust CLI and library for turning codebases into LLM-friendly context. It walks files, applies ignore/include rules, optionally performs semantic dependency analysis with tree-sitter, prioritizes files under token budgets, formats output, and can run as an MCP server.
+
+Main user-facing surfaces:
+
+- CLI context generation from local paths or GitHub repositories.
+- Subcommands: `search`, `diff`, `telemetry`, and `examples`.
+- Output styles: markdown, XML, plain text, and paths-only.
+- MCP server implementations: legacy jsonrpsee and RMCP.
+- LLM tool integration for Gemini, Codex, Claude, and Ollama.
+
+## Toolchain
+
+- Rust edition: 2021.
+- MSRV: 1.74.0, as configured in `clippy.toml`.
+- CI uses stable Rust with `rustfmt` and `clippy`.
+- Optional tools: `make`, `cargo-audit`, `cargo-tarpaulin`, `cargo-watch`, Node.js for the generated npm package workflow.
+
+## High-Value Commands
+
+Run targeted checks while developing, then broaden before finishing risky changes.
+
 ```bash
-# Build and run validations (format check + lint)
-make build
-
-# Run tests with validation
-make test
-
-# Run in development mode with example
-make dev
-
-# Install locally
-make install
-
-# Generate documentation
-make doc
+cargo check --all-targets
+cargo fmt -- --check
+cargo clippy --all-targets --all-features -- -D warnings
+cargo test --test lib
 ```
 
-### Quality & CI Commands
+Make targets wrap the common flows:
+
 ```bash
-# Format code
+make check
 make fmt
-
-# Check formatting (CI)
 make fmt-check
-
-# Lint with clippy
 make lint
-
-# Run all validation checks
+make test
+make test-fast
+make test-acceptance
 make validate
-
-# Generate test coverage
-make coverage
 ```
 
-### Testing Commands
+Useful focused test forms:
+
 ```bash
-# Run all tests
-cargo test
-
-# Run specific test
-cargo test test_name
-
-# Run tests with specific features
-cargo test --all-targets
-
-# Run benchmarks
-cargo bench
+cargo test --test lib cli_test::
+cargo test --test lib semantic_include_types_test::
+cargo test --test lib acceptance:: --no-fail-fast
+cargo test --test rmcp_basic_test
+cargo test --test mcp_server_test
 ```
 
-## Project Architecture
+Run the CLI locally:
 
-### Core Components
+```bash
+cargo run -- --help
+cargo run -- examples/sample-rust-project
+cargo run -- search "AuthenticationService" src/
+cargo run -- diff HEAD~1 HEAD
+cargo run -- telemetry -t examples/telemetry/traces.json
+cargo run -- --rmcp --rmcp-transport stdio
+cargo run -- --rmcp --rmcp-transport http --mcp-port 9090
+```
 
-1. **CLI Layer (`src/cli.rs`)**
-   - Command-line argument parsing using clap
-   - Configuration validation and loading
-   - Supports multiple input sources: directories, glob patterns, GitHub repos
+Notes:
 
-2. **Core Processing (`src/core/`)**
-   - `walker.rs`: Directory traversal with .gitignore support and custom filtering
-   - `context_builder.rs`: Markdown generation with token management
-   - `prioritizer.rs`: File prioritization based on importance and token limits
-   - `semantic/`: Language-aware semantic analysis for imports and dependencies
-   - `cache.rs`: File caching for performance optimization
+- `make test` runs format, lint, `cargo build`, and the consolidated `tests/lib.rs` integration target.
+- Use `cargo test` when changing standalone integration tests, MCP tests, or shared behavior not registered in `tests/lib.rs`.
+- `cargo audit` may require installing `cargo-audit`; `.cargo/audit.toml` intentionally ignores `RUSTSEC-2025-0009` for the documented jsonrpsee/rustls/ring transitive dependency.
 
-3. **Configuration System (`src/config.rs`)**
-   - TOML-based configuration with `.context-creator.toml`
-   - Support for custom priorities, token limits, and ignore patterns
-   - Hierarchical configuration loading (CLI > config file > defaults)
+## Source Map
 
-4. **Semantic Analysis (`src/core/semantic/`)**
-   - Multi-language AST parsing using tree-sitter
-   - Import tracing and dependency resolution
-   - Language-specific analyzers in `languages/` directory
-   - Supports 20+ programming languages
+- `src/main.rs`: binary entry point, config loading, logging setup, stdin prompt handling, MCP server startup.
+- `src/lib.rs`: library entry point and main processing pipeline.
+- `src/cli.rs`: clap definitions, subcommands, validation, LLM tool behavior, token-limit precedence.
+- `src/config.rs`: TOML config loading and application to CLI config.
+- `src/commands/`: implementations for `search`, `diff`, and `telemetry`.
+- `src/core/walker.rs`: path walking, ignore/include pattern handling, file metadata, priority calculation, binary filtering.
+- `src/core/context_builder.rs`: context options and output generation.
+- `src/core/prioritizer.rs`: token-aware priority selection.
+- `src/core/token.rs`: token counting.
+- `src/core/project_analyzer.rs`: single-pass project analysis reused by semantic features.
+- `src/core/file_expander.rs`: semantic expansion for imports, callers, and types.
+- `src/core/search.rs`: text search support.
+- `src/core/telemetry/`: OpenTelemetry parsing, correlation, and enrichment.
+- `src/core/semantic/`: tree-sitter semantic analysis, graph traversal, language analyzers, parser/cache infrastructure.
+- `src/formatters/`: markdown, XML, plain text, and paths renderers behind `DigestFormatter`.
+- `src/mcp_server/`: MCP request/response types, jsonrpsee handlers, RMCP server, and MCP cache.
+- `src/remote.rs`: remote repository fetch support.
+- `src/utils/`: file extension mapping, git utilities, shared error types.
+- `tests/lib.rs`: consolidated integration test runner that includes most tests under `tests/modules/`.
+- `tests/modules/acceptance/` and `tests/acceptance/`: acceptance coverage and telemetry enrichment fixtures.
+- `examples/`: sample projects, configs, and telemetry data for manual testing.
+- `.github/workflows/`: CI, release, npm publish, and crates.io publish workflows.
 
-### Key Data Flow
+## Architecture Rules
 
-1. **Input Processing**: CLI args → Config validation → Directory resolution
-2. **File Discovery**: Walker scans directories → Applies ignore patterns → Filters by include patterns
-3. **Semantic Analysis**: Optional import tracing → Dependency resolution → Enhanced file relationships
-4. **Prioritization**: File importance scoring → Token budget allocation → Selection for output
-5. **Output Generation**: Markdown formatting → Token counting → Final document assembly
+- Preserve the CLI flow: parse `Config`, load config, validate, dispatch subcommands, then run the normal directory-processing pipeline.
+- Use `Config` helper methods instead of reading raw fields when behavior depends on precedence or normalization:
+  - `get_directories()`
+  - `get_prompt()`
+  - `get_include_patterns()`
+  - `get_ignore_patterns()`
+  - `get_effective_max_tokens()`
+  - `get_effective_context_tokens()`
+- Keep validation in `Config::validate()` for user-facing CLI combinations. Existing flexible combinations are intentional; do not re-add broad mutual exclusions without tests.
 
-### Configuration Files
-
-- `.contextignore`: Exclude files/directories (gitignore syntax)
-- `.contextkeep`: Prioritize important files
-- `.context-creator.toml`: Advanced configuration (priorities, token limits, defaults)
-
-### Token Management
-
-The tool implements sophisticated token budget management:
-- Automatic token counting using tiktoken-rs
-- Prompt token reservation for LLM interactions
-- Intelligent file truncation and selection
-- Per-LLM token limit configuration
-
-### Semantic Features
-
-- **Import Tracing**: Follow import chains across files
-- **Caller Analysis**: Find functions that call specific modules
-- **Type Dependencies**: Include type definitions and interfaces
-- **Multi-language Support**: Unified analysis across different languages
-
-## Important Implementation Details
-
-### Error Handling
-- Uses `anyhow` for error propagation
-- Custom error types in `src/utils/error.rs`
-- Comprehensive validation at multiple levels
-
-### Performance Optimizations
-- Parallel processing with rayon
-- File caching to avoid re-reading
-- Tree-sitter parser pooling
-- LRU caching for AST parsing
-
-### Testing Strategy
-- Unit tests for core functionality
-- Integration tests for CLI combinations
-- Performance benchmarks
-- Semantic analysis stress tests
-- Security vulnerability tests
-
-## Development Notes
-
-### Adding New Languages
-Language support is added in `src/core/semantic/languages/`:
-1. Implement language-specific analyzer
-2. Add tree-sitter grammar dependency
-3. Update language registry in `mod.rs`
-
-### Configuration Precedence
-1. Explicit CLI arguments (highest priority)
-2. Config file token limits (for prompts)
-3. Config file defaults
-4. Hard-coded defaults (lowest priority)
-
-### File Prioritization
-Base file type priorities can be customized via config file using glob patterns. Uses "first-match-wins" evaluation order.
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/matiasvillaverde) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-09 -->
+> Source: [matiasvillaverde/context-creator](https://github.com/matiasvillaverde/context-creator) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-06 -->
