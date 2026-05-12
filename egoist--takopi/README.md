@@ -7,11 +7,11 @@ a personal ai assistant, also known as takopi 👽🐙👾
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [egoist/takopi](https://github.com/egoist/takopi).
+Original source: `CLAUDE.md` in [egoist/takopi](https://github.com/egoist/takopi).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
