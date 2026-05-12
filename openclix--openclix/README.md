@@ -7,11 +7,11 @@ Open-source, local-first mobile app retention and engagement automation with age
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [openclix/openclix](https://github.com/openclix/openclix).
+Original source: `CLAUDE.md` in [openclix/openclix](https://github.com/openclix/openclix).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
