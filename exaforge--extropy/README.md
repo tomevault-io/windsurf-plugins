@@ -7,11 +7,11 @@ Predictive intelligence through agent-based population simulation
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [exaforge/extropy](https://github.com/exaforge/extropy).
+Original source: `CLAUDE.md` in [exaforge/extropy](https://github.com/exaforge/extropy).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
