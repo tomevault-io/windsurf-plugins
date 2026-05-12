@@ -7,11 +7,11 @@ A CLI tool that traces git blame → PRs → issues → reviews and explains leg
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [zain534102/why-does-this-exist](https://github.com/zain534102/why-does-this-exist).
+Original source: `CLAUDE.md` in [zain534102/why-does-this-exist](https://github.com/zain534102/why-does-this-exist).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
