@@ -1,180 +1,131 @@
 ---
 trigger: always_on
-description: General Guidelines
+description: IMPORTANT: You MUST read ./docs/development.md and ./docs/docs-overview.md for project documentation.
 ---
 
-# TypeScript Rules
+IMPORTANT: You MUST read ./docs/development.md and ./docs/docs-overview.md for project documentation.
+(This project uses Speculate project structure.)
 
-## Coding Style
+## Landing the Plane (Session Completion)
 
-- Use clear lowerCamelCase or UpperCamelCase names for functions and variables, per
-  usual TypeScript conventions.
+**When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.
 
-- DO NOT use fully uppercase abbreviations: Use names like `mapHistoryToLlmMessages`. DO
-  NOT use names like `mapHistoryToLLMMessages`.
+**MANDATORY WORKFLOW:**
 
-- DO NOT use underscore prefixes for variables that are actually used.
-  Underscore prefixes should only be used for genuinely unused parameters (like
-  framework callbacks).
+1. **File issues for remaining work** - Create issues for anything that needs follow-up
+2. **Run quality gates** (if code changed) - Tests, linters, builds
+3. **Update issue status** - Close finished work, update in-progress items
+4. **PUSH TO REMOTE** - This is MANDATORY:
+   ```bash
+   git pull --rebase
+   bd sync
+   git push
+   git status  # MUST show "up to date with origin"
+   ```
+5. **Clean up** - Clear stashes, prune remote branches
+6. **Verify** - All changes committed AND pushed
+7. **Hand off** - Provide context for next session
 
-## Docstrings
+**CRITICAL RULES:**
+- Work is NOT complete until `git push` succeeds
+- NEVER stop before pushing - that leaves work stranded locally
+- NEVER say "ready to push when you are" - YOU must push
+- If push fails, resolve and retry until it succeeds
 
-- All major functions and types should have a *concise* docstring explaining their
-  purpose. They should use `\**` … `*/` style comments.
 
-  - Focus on any rationale or purpose.
+<!-- BEGIN TBD INTEGRATION -->
+---
+title: tbd Workflow
+description: Full tbd workflow guide for agents
+---
+**`tbd` helps humans and agents ship code with greater speed, quality, and discipline.**
 
-  - Do NOT state obvious things about the code.
+1. **Beads**: Git-native issue tracking (tasks, bugs, features).
+   Never lose work across sessions.
+   Drop-in replacement for `bd`.
+2. **Spec-Driven Workflows**: Plan features → break into beads → implement
+   systematically.
+3. **Knowledge Injection**: 17+ engineering guidelines (TypeScript, Python, TDD,
+   testing, Convex, monorepos) available on demand.
+4. **Shortcuts**: Reusable instruction templates for common workflows (code review,
+   commits, PRs, cleanup, handoffs).
 
-  This should cover
+## Installation
 
-  - Public types
+```bash
+npm install -g get-tbd@latest
+tbd setup --auto --prefix=<name>   # Fresh project (--prefix is REQUIRED: 2-8 alphabetic chars recommended. ALWAYS ASK THE USER FOR THE PREFIX; do not guess it)
+tbd setup --auto                   # Existing tbd project (prefix already set)
+tbd setup --from-beads             # Migration from .beads/ if `bd` has been used
+```
 
-  - Major functions
+## Routine Commands
 
-  - Convex schemas, functions, actions, mutations, and queries
+```bash
+tbd --help    # Command reference
+tbd status    # Status
+tbd doctor    # If there are problems
 
-  It should NOT cover:
+tbd setup --auto   # Run any time to refresh setup
+tbd prime      # Restore full context on tbd after compaction
+```
 
-  - Test functions
+## CRITICAL: You Operate tbd — The User Doesn’t
 
-  - Trivial internal helper functions
+**You are the tbd operator:** Users talk naturally; you translate their requests to tbd
+actions. DO NOT tell users to run tbd commands.
+That’s your job.
 
-  Example:
+- **WRONG**: "Run `tbd create` to track this bug"
 
-  ```ts
-  /**
-   * Render a ContextSummary as readable markdown for both LLMs and users.
-   */
-  export function formatContextMarkdown(
-    summary: ContextSummary,
-    options?: { maxHoldings?: number },
-  ): string {
-    ...
-  }
-  ```
+- **RIGHT**: *(you run `tbd create` yourself and tell the user it’s tracked)*
 
-- **Document fields in type definitions, not at usage sites.** Place documentation
-  directly on type/interface fields as the single source of truth.
-  Reference the type documentation elsewhere using `@see TypeName.fieldName`.
+**Welcoming a user:** When users ask “what is tbd?”
+or want help → run `tbd shortcut welcome-user`
 
-  ```ts
-  // GOOD: Documentation on type definition
-  interface RunConfig {
-    /** When true, logs full LLM request/response payloads for debugging. */
-    logLlmCalls: boolean;
-    /**
-     * TEST ONLY: Disables automatic scheduling of backtest steps.
-     * NEVER use in production.
-     */
-    testSkipScheduling?: boolean;
-  }
-  
-  // Reference it elsewhere
-  export const runConfigValidator = v.object({
-    logLlmCalls: v.optional(v.boolean()),
-    /** @see RunConfig.testSkipScheduling for documentation */
-    testSkipScheduling: v.optional(v.boolean()),
-  });
-  
-  // BAD: Documentation duplicated at multiple usage sites
-  export const runConfigValidator = v.object({
-    /** When true, logs full LLM request/response payloads for debugging. */
-    logLlmCalls: v.optional(v.boolean()),
-    /** TEST ONLY: Disables automatic scheduling... */
-    testSkipScheduling: v.optional(v.boolean()),
-  });
-  ```
+## User Request → Agent Action
 
-## Type Annotations
+| User Says | You (the Agent) Run |
+| --- | --- |
+| **Issues/Beads** |  |
+| "There's a bug where ..." | `tbd create "..." --type=bug` |
+| "Create a task/feature for ..." | `tbd create "..." --type=task` or `--type=feature` |
+| "Let's work on issues/beads" | `tbd ready` |
+| "Show me issue X" | `tbd show <id>` |
+| "Close this issue" | `tbd close <id>` |
+| "Search issues for X" | `tbd search "X"` |
+| "Add label X to issue" | `tbd label add <id> <label>` |
+| "What issues are stale?" | `tbd stale` |
+| **Planning & Specs** |  |
+| "Plan a new feature" / "Create a spec" | `tbd shortcut new-plan-spec` |
+| "Break spec into beads" | `tbd shortcut plan-implementation-with-beads` |
+| "Implement these beads" | `tbd shortcut implement-beads` |
+| **Code Review & Commits** |  |
+| "Review this code" / "Code review" | `tbd shortcut review-code` |
+| "Review this PR" | `tbd shortcut review-github-pr` |
+| "Commit this" / "Use the commit shortcut" | `tbd shortcut code-review-and-commit` |
+| "Create a PR" / "File a PR" | `tbd shortcut create-or-update-pr-simple` |
+| "Merge main into my branch" | `tbd shortcut merge-upstream` |
+| **Guidelines & Knowledge** |  |
+| "Use TypeScript best practices" | `tbd guidelines typescript-rules` |
+| "Use Python best practices" | `tbd guidelines python-rules` |
+| "Build a TypeScript CLI" | `tbd guidelines typescript-cli-tool-rules` |
+| "Improve monorepo setup" | `tbd guidelines pnpm-monorepo-patterns` or `bun-monorepo-patterns` |
+| "Add golden/e2e testing" | `tbd guidelines golden-testing-guidelines` |
+| "Use TDD" / "Test-driven development" | `tbd guidelines general-tdd-guidelines` |
+| "Convex best practices" | `tbd guidelines convex-rules` |
+| **Documentation** |  |
+| "Research this topic" | `tbd shortcut new-research-brief` |
+| "Document architecture" | `tbd shortcut new-architecture-doc` |
+| **Cleanup & Maintenance** |  |
+| "Clean up this code" / "Remove dead code" | `tbd shortcut code-cleanup-all` |
+| "Fix repository problems" | `tbd doctor --fix` |
+| **Sessions & Handoffs** |  |
+| "Hand off to another agent" | `tbd shortcut agent-handoff` |
+| "Check out this library's source" | `tbd shortcut checkout-third-party-repo` |
+| *(your choice whenever appropriate)* | `tbd list`, `tbd dep add`, `tbd close`, `tbd sync`, etc. |
 
-- Don’t use `any` to types unless absolutely necessary!
-  Do not add `any` types to get type checking to pass.
-  Use more precise types instead.
-  Then make sure type checking passes.
-
-- Avoid `as any` and unsafe casts.
-  Prefer overloads or precise types at boundaries.
-
-  ```ts
-  // BAD: Silences type safety
-  const logger = createAgentLogger(ctx, agentCtx as any);
-  
-  // GOOD: Provide a precise input shape or overload that matches
-  const logger = createAgentLogger(ctx, {
-    runId: runId as Id<'runs'>,
-    agentId: agentId as Id<'agents'>,
-    conversationId: conversationId as Id<'conversations'>,
-    experimentRunId: experimentRunId,
-  });
-  // Or define overloads to accept both Id<> and string shared types, and narrow internally.
-  ```
-
-- **Extract and name inline object types.** DO NOT use anonymous inline types for
-  complex structures that appear in multiple places.
-  Create named types in shared locations.
-
-  ```ts
-  // BAD: Inline anonymous type duplicated across functions
-  interface ExecutionResults {
-    tradesSummary: {
-      totalTrades: number;
-      successfulTrades: number;
-      trades: { symbol: string; action: 'buy' | 'sell'; price: number }[];
-    };
-  }
-  
-  // GOOD: Named type in shared location
-  interface FullTradeSummary {
-    stats: TradeSummaryStats;
-    trades: TradeDetail[];
-  }
-  interface ExecutionResults {
-    tradesSummary: FullTradeSummary;
-  }
-  ```
-
-- **Consolidate duplicate calculation logic.** DO NOT duplicate calculations of related
-  metrics. Create a single function that computes all related values together.
-
-  ```ts
-  // BAD: Same calculations scattered across files
-  const totalBuyValue = trades
-    .filter((t) => t.action === 'buy')
-    .reduce((sum, t) => sum + t.value, 0);
-  const totalSellValue = trades
-    .filter((t) => t.action === 'sell')
-    .reduce((sum, t) => sum + t.value, 0);
-  
-  // GOOD: Single shared function computes all related metrics
-  function computeTradeSummaryStats(trades: Trade[]): TradeSummaryStats {
-    return {
-      totalBuyValue: trades.filter((t) => t.action === 'buy').reduce((sum, t) => sum + t.value, 0),
-      totalSellValue: trades
-        .filter((t) => t.action === 'sell')
-        .reduce((sum, t) => sum + t.value, 0),
-      uniqueTickers: new Set(trades.map((t) => t.symbol)).size,
-    };
-  }
-  ```
-
-## Exhaustiveness Checks
-
-- **Always add exhaustiveness checks to `switch` statements on discriminated union
-  types.** When switching on unions (like `field.kind` or `action.type`), include a
-  `default` branch that assigns to `never`. This forces a compile-time error if a new
-  variant is added but not handled.
-
-  ```ts
-  // GOOD: Exhaustiveness check catches missing cases at compile time
-  switch (field.kind) {
-    case 'string':
-      return handleString(field);
-    case 'number':
-      return handleNumber(field);
-    // ... all cases ...
-    default: {
-      const _exhaustive: never = field;
+**Note:** Never gitignore `.tbd/workspaces/` — the outbox must be committed to your
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
