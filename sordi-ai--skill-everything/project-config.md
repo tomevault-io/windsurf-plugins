@@ -1,153 +1,149 @@
 ---
 trigger: always_on
-description: Apply when writing Python code. Type hints, error handling, mutable defaults, async patterns, and packaging conventions.
+description: Apply when writing React components. Hook discipline, state placement, performance, async cleanup, and list keys.
 ---
 
 
-# Sub-Skill: Python Best Practices
-<!-- target: ~2200 tokens (real tiktoken count) | 20 rules with severity classification -->
+# Sub-Skill: React Best Practices
+<!-- target: ~2600 tokens (real tiktoken count) | 17 rules with severity classification -->
 
-**Purpose:** Prevents the Python-specific mistakes LLMs make on autopilot — mutable defaults, bare excepts, missing guards, and subtle performance traps that pass review but break in production.
+**Purpose:** Prevents the React-specific mistakes LLMs make repeatedly — wrong state placement, stale closures, unnecessary re-renders, and broken async patterns. Concrete rules with code examples.
 
 ## Rule classification
 
-- **MUST** — load-bearing. Violating causes bugs, security issues, or invisible failures. Never break.
+- **MUST** — load-bearing. Violating causes infinite loops, stale data, leaked subscriptions, or invisible UI bugs. Never break.
 - **SHOULD** — default behavior. Deviation needs a documented reason in the code or PR.
 - **AVOID** — usually wrong; documented exception inline where needed.
 
-**Where these rules don't strictly apply:** test fixtures, generated code, throwaway scripts, REPL exploration, and tutorial snippets may legitimately differ. The rules below apply to **production code paths and reusable libraries**.
+**Where these rules don't strictly apply:** test fixtures, Storybook stories, design-system primitives in isolation, and small in-tutorial demo components may legitimately differ. The rules below apply to **production application code**.
 
 ---
 
-## Rules
+## Component Design
 
-### Type Hints
+1. **SHOULD: Co-locate state with the component that owns it.** Lift state only when two siblings genuinely share it. Lifting to a grandparent "just in case" causes unnecessary re-renders across the tree.
 
-1. **SHOULD: Annotate function signatures with types.** `def process(data)` tells callers nothing. Use `def process(data: list[str]) -> dict[str, int]:`. Return type `None` should be explicit too. *Exception: lambdas and short generator helpers in private scope.*
+   ```tsx
+   // Avoid: form state lifted to page-level parent
+   function Page() {
+     const [email, setEmail] = useState('');
+     return <Form email={email} setEmail={setEmail} />;
+   }
 
-2. **SHOULD: Use built-in lowercase generics for Python 3.9+.** `list[str]`, `dict[str, int]`, `tuple[int, ...]` rather than `List`, `Dict`, `Tuple` from `typing`.
-
-3. **MUST: Use `Optional[X]` or `X | None` for nullable parameters, never a bare default of `None` without a type annotation.** `def find(id: int) -> User | None:` not `def find(id):`.
-
-4. **AVOID: `Any` as a shortcut.** If the type is genuinely unknown, document why with a comment. `Any` silences the type checker and hides bugs. *Exception: third-party libraries without stubs and explicit dynamic-data boundaries (e.g. JSON decode at the API edge).*
-
----
-
-### Error Handling
-
-5. **MUST: Never use bare `except:`.** It catches `SystemExit`, `KeyboardInterrupt`, and `GeneratorExit`. Always catch `except Exception:` at minimum, or a specific exception class.
-
-   ```python
-   # Wrong
-   try:
-       risky()
-   except:
-       pass
-
-   # Correct
-   try:
-       risky()
-   except ValueError as e:
-       logger.warning("Invalid value: %s", e)
+   // Prefer: state lives in the component that uses it
+   function Form() {
+     const [email, setEmail] = useState('');
+     return <input value={email} onChange={e => setEmail(e.target.value)} />;
+   }
    ```
 
-6. **MUST: Never silently swallow exceptions with `pass`.** At minimum log the error. Silent failures produce ghost bugs that are impossible to trace.
+2. **SHOULD: Split components at ~100 lines or when a section has its own data concern.** One component = one responsibility. Extract `<UserAvatar>`, `<OrderSummary>` rather than one `<ProfilePage>` that does everything. *Exception: pages that are mostly markup with little logic may exceed 100 lines.*
 
-7. **SHOULD: Raise with context when re-raising.** Use `raise NewError("msg") from original_error` to preserve the traceback chain, not `raise NewError("msg")` alone.
+3. **SHOULD: Replace prop drilling beyond two levels with composition or context.** Passing `userId` through four components to reach a button is a design smell.
 
----
+   ```tsx
+   // Avoid: drilling through intermediaries
+   <Layout userId={userId}><Sidebar userId={userId}><Nav userId={userId} /></Sidebar></Layout>
 
-### Common Pitfalls
-
-8. **MUST: Never use mutable default arguments.** Python evaluates defaults once at function definition, not per call. The list or dict is shared across all calls.
-
-   ```python
-   # Wrong — items accumulates across calls
-   def append_item(val, items=[]):
-       items.append(val)
-       return items
-
-   # Correct
-   def append_item(val, items=None):
-       if items is None:
-           items = []
-       items.append(val)
-       return items
+   // Prefer: context or render-prop composition
+   <UserContext.Provider value={userId}><Layout /></UserContext.Provider>
    ```
 
-9. **MUST: Guard script entry points with `if __name__ == "__main__":`.** Without it, importing the module executes top-level code, breaking tests and imports.
+4. **MUST: Never create component definitions inside render.** Inner components are recreated on every render, destroying their state and forcing full remounts.
 
-10. **MUST: Use `with` for file handles, sockets, and locks.** Never open a file without a context manager. `f = open(...)` without `with` leaks handles on exceptions.
+   ```tsx
+   // Wrong
+   function Parent() {
+     const Child = () => <div>hello</div>; // new reference every render
+     return <Child />;
+   }
 
-    ```python
-    # Wrong
-    f = open("data.txt")
-    data = f.read()
-    f.close()
-
-    # Correct
-    with open("data.txt") as f:
-        data = f.read()
-    ```
-
-11. **AVOID: String concatenation in loops.** Each `+=` on a string creates a new object. Collect into a list and call `"".join(parts)` at the end.
-
-    ```python
-    # Wrong — O(n^2) memory
-    result = ""
-    for word in words:
-        result += word + " "
-
-    # Correct
-    result = " ".join(words)
-    ```
-
-12. **SHOULD: Use f-strings for string interpolation in Python 3.6+.** Avoid `%` formatting or `"Hello " + name`. F-strings are faster, safer, and readable.
-
-    ```python
-    # Avoid
-    msg = "User %s has %d items" % (name, count)
-
-    # Prefer
-    msg = f"User {name} has {count} items"
-    ```
-
-13. **AVOID: `dict()` constructor when a literal suffices.** `{}` is faster and more idiomatic. `dict(key=value)` is only justified when keys are dynamic or come from variables.
+   // Correct: define outside
+   const Child = () => <div>hello</div>;
+   function Parent() { return <Child />; }
+   ```
 
 ---
 
-### Performance
+## State Management
 
-14. **SHOULD: Use list comprehensions or generator expressions instead of `map`/`filter` with `lambda`.** Comprehensions are more readable and equally fast. Use generators when the full list is not needed at once.
+5. **MUST: Never mutate state directly.** React compares references. Mutating in place skips re-renders silently.
 
-    ```python
-    # Avoid
-    result = list(map(lambda x: x * 2, items))
+   ```tsx
+   // Wrong
+   const [items, setItems] = useState([]);
+   items.push(newItem); // mutation — React does not re-render
+   setItems(items);
 
-    # Prefer
-    result = [x * 2 for x in items]
+   // Correct
+   setItems(prev => [...prev, newItem]);
+   ```
 
-    # For large data, use a generator
-    total = sum(x * 2 for x in items)
-    ```
+6. **SHOULD: Compute derived values in render, not in useEffect.** If a value can be calculated from existing state/props, calculate it inline. useEffect for derived state creates a one-render lag and extra state variables.
 
-15. **SHOULD: Use a `set` for membership lookups, not a `list`.** `x in list` is O(n). `x in set` is O(1). Convert once, query many times.
+   ```tsx
+   // Avoid
+   const [fullName, setFullName] = useState('');
+   useEffect(() => { setFullName(`${first} ${last}`); }, [first, last]);
 
-    ```python
-    # Wrong for repeated lookups
-    valid_ids = [1, 2, 3, ...]
-    if user_id in valid_ids:  # O(n) every call
+   // Prefer
+   const fullName = `${first} ${last}`;
+   ```
 
-    # Correct
-    valid_ids = {1, 2, 3, ...}
-    if user_id in valid_ids:  # O(1)
+7. **MUST: Use useRef for values that must not trigger re-renders** (timers, DOM nodes, previous values). Use useState for anything the UI depends on. Mixing them causes invisible bugs.
+
+   ```tsx
+   // Wrong: ref for displayed value
+   const count = useRef(0);
+   count.current++; // UI never updates
+
+   // Wrong: state for a timer ID
+   const [timerId, setTimerId] = useState(null); // triggers re-render on set
+
+   // Correct
+   const timerId = useRef(null);
+   ```
+
+---
+
+## Hooks
+
+8. **MUST: Specify complete dependency arrays in useEffect.** Omitting a dependency creates a stale closure. The ESLint rule `exhaustive-deps` must be enabled and respected.
+
+   ```tsx
+   // Wrong: stale closure over userId
+   useEffect(() => { fetchUser(userId); }, []); // runs once, userId never updates
+
+   // Correct
+   useEffect(() => { fetchUser(userId); }, [userId]);
+   ```
+
+9. **MUST: Cancel async operations in useEffect cleanup.** Fetch without an AbortController causes state updates on unmounted components and race conditions.
+
+   ```tsx
+   useEffect(() => {
+     const controller = new AbortController();
+     fetch(`/api/user/${id}`, { signal: controller.signal })
+       .then(r => r.json())
+       .then(setUser)
+       .catch(err => { if (err.name !== 'AbortError') setError(err); });
+     return () => controller.abort();
+   }, [id]);
+   ```
+
+10. **MUST: Never call hooks conditionally or inside loops.** Hook call order must be identical on every render. Wrap conditional logic inside the hook body, not around the hook call.
+
+    ```tsx
+    // Wrong
+    if (isLoggedIn) { const user = useUser(); }
+
+    // Correct
+    const user = useUser(); // hook always called; handle null inside
     ```
 
 ---
 
-### Testing
-
-16. **SHOULD: Name test functions to describe the scenario, not just the function under test.** `test_process_returns_empty_dict_on_empty_input` not `test_process`.
+## Performance
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
