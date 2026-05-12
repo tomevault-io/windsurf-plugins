@@ -1,0 +1,115 @@
+---
+trigger: always_on
+description: This file provides guidance to AI coding agents (e.g., Claude Code, GitHub Copilot, OpenAI Codex CLI) when working with code in this repository.
+---
+
+# AGENTS.md
+
+This file provides guidance to AI coding agents (e.g., Claude Code, GitHub Copilot, OpenAI Codex CLI) when working with code in this repository.
+
+## Project Overview
+
+Tuzuru is a static blog generator CLI tool written in Swift that converts markdown files to HTML pages using Mustache templates. It's designed for Swift 6.1 with macOS v15+ minimum requirement.
+Note: The codebase also includes conditional support for Linux (Glibc/Musl) in the local HTTP server component. CI also exercises the core targets on Windows, so always keep Windows path semantics in mind when touching shared logic.
+
+## Essential Commands
+
+### Development
+- `swift build` - Build the project
+- `swift run tuzuru` - Run the CLI tool
+- `swift test` - Run all tests
+- `swift test --parallel` - Run tests in parallel
+
+### Tuzuru CLI Commands
+- `swift run tuzuru generate` - Generate static blog (default command)
+- `swift run tuzuru init` - Init a blog project
+- `swift run tuzuru import` - Import posts from other project using Hugo or Jekyll
+- `swift run tuzuru amend` - Update publishedAt date and/or author for a markdown file by creating marker commits
+- `swift run tuzuru list` - List blog posts with metadata in CSV format
+- `swift run tuzuru preview` - Start a local HTTP server to preview the generated blog with auto-regeneration
+- `swift run tuzuru --help` - Show help
+
+#### Preview Command Options
+- `-p, --port <port>` - Port to serve on (default: 8000)
+- `-c, --config <config>` - Path to configuration file (default: tuzuru.json)
+
+The output directory is determined by `output.directory` in `tuzuru.json` (default: `blog`). There is no `--directory` option in the current implementation.
+
+The preview command includes auto-regeneration capability that automatically rebuilds the blog when source files are modified, providing a live development experience.
+It uses the internal `ToyHttpServer` target and is intended only for local development, not production use.
+
+#### Generate Command Options
+- `-c, --config <config>` - Path to configuration file (default: tuzuru.json)
+
+#### Init Command Options
+- (none)
+
+#### Import Command Options
+- `<sourcePath>` (argument) - Source directory containing markdown files to import
+- `-d, --destination <path>` - Destination directory (default: `contents/imported/` or `sourceLayout.imported`)
+- `-u, --unlisted` - Import as unlisted content (uses `sourceLayout.unlisted`)
+- `-n, --dry-run` - Show actions without making changes
+- `-c, --config <config>` - Path to configuration file (default: tuzuru.json)
+
+#### Amend Command Options
+- `<filePath>` (argument) - Path to markdown file (relative to `contents`)
+- `-d, --published-at <date>` - New published date (flexible formats supported)
+- `-a, --author <name>` - New author name
+- `-c, --config <config>` - Path to configuration file (default: tuzuru.json)
+
+At least one of `--published-at` or `--author` must be provided.
+
+#### List Command Options
+- `-c, --config <config>` - Path to configuration file (default: tuzuru.json)
+
+The list command outputs blog posts in CSV format with columns: "Published At", "Author", "Title", "File Path".
+Titles are truncated to 40 characters with "..." if longer. Supports all international scripts and Unicode characters.
+Output format: `"Published At", "Author", "Title", "File Path"` with single space after each comma for readability.
+
+## Architecture
+
+### Package Structure
+- **Command target**: CLI interface using ArgumentParser with MainActor isolation
+- **TuzuruLib target**: Core library containing business logic
+   - **Resources**: Template files (Mustache) and static assets
+- **ToyHttpServer target**: Minimal HTTP server for local development (used by `serve`)
+
+### Key Dependencies
+- swift-argument-parser: CLI parsing
+- swift-mustache: Template rendering
+- swift-markdown: Markdown processing
+- swift-system: File system operations
+- swift-subprocess: Process execution
+- Yams: YAML parsing
+
+### Core Components
+- `Sources/Command/Command.swift`: CLI command definitions using ArgumentParser
+- `Sources/TuzuruLib/Tuzuru.swift`: Main facade that commands will interact with
+- `Sources/TuzuruLib/Configuration/`: Configuration management
+- `Sources/TuzuruLib/Generator/`: HTML generation logic
+- `Sources/TuzuruLib/SourceLoader/`: Content loading and parsing
+- `Sources/TuzuruLib/Importer/`: Content import functionality
+- `Sources/TuzuruLib/Amender/`: File metadata amending functionality
+- `Sources/TuzuruLib/Initializer/`: Blog bootstrap and resource copy logic
+- `Sources/TuzuruLib/Utils/`: Utilities including `FileManagerWrapper`, `GitWrapper`, `ChangeDetector`
+- `Sources/ToyHttpServer/`: Local HTTP server implementation
+
+### File Conventions
+- Source markdown files: `contents/` directory
+- Generated output: `blog/` directory
+- Templates: Mustache format (.mustache extension)
+
+## Swift Conventions
+
+### Code Style
+- Swift 6.1 features enabled
+- MainActor isolation for Command target
+- Public interfaces for library components
+- Dependency injection pattern (e.g., FileManager injection)
+- Async/await for command execution
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [ainame/tuzuru](https://github.com/ainame/tuzuru) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-07 -->
