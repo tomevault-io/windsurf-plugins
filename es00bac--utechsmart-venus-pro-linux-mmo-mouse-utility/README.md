@@ -7,11 +7,11 @@ Reverse-engineered Linux configuration utility for the UtechSmart Venus Pro MMO 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [Es00bac/UtechSmart-Venus-Pro-Linux-MMO-Mouse-Utility](https://github.com/Es00bac/UtechSmart-Venus-Pro-Linux-MMO-Mouse-Utility).
+Original source: `CLAUDE.md` in [Es00bac/UtechSmart-Venus-Pro-Linux-MMO-Mouse-Utility](https://github.com/Es00bac/UtechSmart-Venus-Pro-Linux-MMO-Mouse-Utility).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
