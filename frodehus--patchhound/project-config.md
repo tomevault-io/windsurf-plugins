@@ -1,0 +1,116 @@
+---
+trigger: always_on
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+---
+
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## What This Is
+
+PatchHound is a self-hosted vulnerability operations platform. It ingests security findings, tracks multi-tenant remediation workflows, scores risk across assets/software/tenants, and optionally forwards audit events to Microsoft Sentinel.
+
+## Build and Development Commands
+
+### Backend
+
+```bash
+dotnet build PatchHound.slnx
+dotnet test PatchHound.slnx -v minimal
+dotnet test --filter "FullyQualifiedName~SomeTestClass"   # run a single test class
+dotnet run --project src/PatchHound.Api
+dotnet run --project src/PatchHound.Worker
+```
+
+### Database migrations (EF Core)
+
+```bash
+dotnet ef migrations add <Name> --project src/PatchHound.Infrastructure --startup-project src/PatchHound.Api
+dotnet ef database update --project src/PatchHound.Infrastructure --startup-project src/PatchHound.Api
+```
+
+### Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev        # dev server at http://localhost:3000
+npm run lint
+npm run typecheck
+npm test
+```
+
+### Full stack (Docker)
+
+```bash
+cp .env.example .env   # set POSTGRES_PASSWORD, SESSION_SECRET, AZURE_AD_CLIENT_ID, AZURE_AD_AUDIENCE, ENTRA_CLIENT_SECRET
+docker compose up -d --build
+# Frontend: http://localhost:3000  API: http://localhost:8080
+```
+
+## Architecture
+
+### Backend layers
+
+```
+PatchHound.Core          — domain entities, interfaces, core services (no project refs; FluentValidation only)
+PatchHound.Infrastructure — EF Core (PostgreSQL), repositories, external integrations, background services; depends on Core
+PatchHound.Api           — ASP.NET Core controllers, middleware, SignalR hubs; depends on Core + Infrastructure
+PatchHound.Worker        — enrichment background worker; depends on Infrastructure
+PatchHound.Puppy         — scan runner agent (SSH executor, YAML-driven); calls back to the API
+```
+
+### Key flows
+
+**Ingestion** (`INGESTION_FLOW.md`): `IngestionService.RunIngestionAsync` → stage assets + vulnerabilities (with checkpointing) → `StagedDeviceMergeService` / `ProcessStagedResultsAsync` (inlined) → `RunExposureDerivationAsync` (derives `DeviceVulnerabilityExposure` rows, syncs episodes, assesses, ensures remediation cases) → `RiskScoreService`. Enrichment jobs are enqueued after merge and executed by `EnrichmentWorker` (30s loop).
+
+**Remediation** (`REMEDIATION_FLOW.md`): One `RemediationCase` per `SoftwareProductId`, one active `RemediationWorkflow` per case. Bootstrap via `POST /api/remediation/cases/{caseId}/workflow`; all stage writes via `/api/remediation/cases/{caseId}/...`. Stages: SecurityAnalysis → RemediationDecision → Approval → Execution → Closure.
+
+### Frontend
+
+React 19 + TanStack Start/Router + TanStack Query. Routes live in `frontend/src/routes/`; feature logic is co-located under `frontend/src/features/{audit,devices,software,vulnerabilities}`. UI uses Radix UI primitives + Tailwind CSS v4.
+
+### Auth
+
+Microsoft Entra ID via `Microsoft.Identity.Web` on the backend; `openid-client` + `iron-session` on the frontend SSR layer.
+
+### Secrets
+
+OpenBao (KV v2 mount `patchhound`). The enrichment worker skips its cycle when OpenBao is unavailable.
+
+## Testing Conventions
+
+See `docs/testing-conventions.md` for the full rules. Key points:
+
+- **Seams**: domain service tests (business rules, no HTTP), infrastructure tests (EF/HTTP translation), controller tests (routing/auth/DTO shape, 1–2 happy paths), cross-service flow tests only for critical end-to-end paths.
+- **Frameworks**: xunit + FluentAssertions + NSubstitute; Testcontainers.PostgreSql for real-DB tests.
+- **Test data**: reuse builders/factories from `tests/PatchHound.Tests/TestData` before creating local helpers.
+
+## Entity Factory Pattern
+
+Canonical entities must enforce EF max-length caps and FK `Guid` validity at the factory boundary — not in service code. See memory file `feedback_canonical_entity_factory_validation.md` for details.
+
+<!-- gitnexus:start -->
+# GitNexus — Code Intelligence
+
+This project is indexed by GitNexus as **PatchHound** (10053 symbols, 79581 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+
+> If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
+
+## Always Do
+
+- **MUST run impact analysis before editing any symbol.** Before modifying a function, class, or method, run `gitnexus_impact({target: "symbolName", direction: "upstream"})` and report the blast radius (direct callers, affected processes, risk level) to the user.
+- **MUST run `gitnexus_detect_changes()` before committing** to verify your changes only affect expected symbols and execution flows.
+- **MUST warn the user** if impact analysis returns HIGH or CRITICAL risk before proceeding with edits.
+- When exploring unfamiliar code, use `gitnexus_query({query: "concept"})` to find execution flows instead of grepping. It returns process-grouped results ranked by relevance.
+- When you need full context on a specific symbol — callers, callees, which execution flows it participates in — use `gitnexus_context({name: "symbolName"})`.
+
+## When Debugging
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [FrodeHus/PatchHound](https://github.com/FrodeHus/PatchHound) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-10 -->
