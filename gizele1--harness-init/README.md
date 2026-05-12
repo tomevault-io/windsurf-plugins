@@ -7,11 +7,11 @@ OpenAI harness engineering repo initialization scaffold for agent-first developm
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [Gizele1/harness-init](https://github.com/Gizele1/harness-init).
+Original source: `CLAUDE.md` in [Gizele1/harness-init](https://github.com/Gizele1/harness-init).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
