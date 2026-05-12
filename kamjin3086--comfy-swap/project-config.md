@@ -1,67 +1,90 @@
 ---
 trigger: always_on
-description: Code style and documentation standards for comfy-swap
+description: <skills_system priority="1">
 ---
 
+# AGENTS
 
-# Code Standards
+<skills_system priority="1">
 
-## Language
+## Available Skills
 
-- Write all code, comments, and commit messages in **English**
-- Variable names, function names, and constants in English
-- Error messages and logs in English
+<!-- SKILLS_TABLE_START -->
+<usage>
+When users ask you to perform tasks, check if any of the available skills below can help complete the task more effectively. Skills provide specialized capabilities and domain knowledge.
 
-## Code Style
+How to use skills:
+- Invoke: `npx openskills read <skill-name>` (run in your shell)
+  - For multiple: `npx openskills read skill-one,skill-two`
+- The skill content will load with detailed instructions on how to complete the task
+- Base directory provided in output for resolving bundled resources (references/, scripts/, assets/)
 
-- Keep code clean, readable, and well-organized
-- Use consistent indentation and formatting
-- Remove dead code and unused imports
-- Prefer explicit over clever
+Usage notes:
+- Only use skills listed in <available_skills> below
+- Do not invoke a skill that is already loaded in your context
+- Each skill invocation is stateless
+</usage>
 
-```javascript
-// ❌ BAD
-const x = a ? b ? c : d : e;
+<available_skills>
 
-// ✅ GOOD
-if (!a) return e;
-return b ? c : d;
-```
+<skill>
+<name>algorithmic-art</name>
+<description>Creating algorithmic art using p5.js with seeded randomness and interactive parameter exploration. Use this when users request creating art using code, generative art, algorithmic art, flow fields, or particle systems. Create original algorithmic art rather than copying existing artists' work to avoid copyright violations.</description>
+<location>project</location>
+</skill>
 
-## Comments
+<skill>
+<name>brand-guidelines</name>
+<description>Applies Anthropic's official brand colors and typography to any sort of artifact that may benefit from having Anthropic's look-and-feel. Use it when brand colors or style guidelines, visual formatting, or company design standards apply.</description>
+<location>project</location>
+</skill>
 
-- Only add comments when code intent is not self-evident
-- Avoid redundant comments that repeat what code does
-- Use comments for: trade-offs, constraints, non-obvious logic
+<skill>
+<name>canvas-design</name>
+<description>Create beautiful visual art in .png and .pdf documents using design philosophy. You should use this skill when the user asks to create a poster, piece of art, design, or other static piece. Create original visual designs, never copying existing artists' work to avoid copyright violations.</description>
+<location>project</location>
+</skill>
 
-```javascript
-// ❌ BAD
-// increment counter
-counter++;
+<skill>
+<name>claude-api</name>
+<description>"Build apps with the Claude API or Anthropic SDK. TRIGGER when: code imports `anthropic`/`@anthropic-ai/sdk`/`claude_agent_sdk`, or user asks to use Claude API, Anthropic SDKs, or Agent SDK. DO NOT TRIGGER when: code imports `openai`/other AI SDK, general programming, or ML/data-science tasks."</description>
+<location>project</location>
+</skill>
 
-// ✅ GOOD
-// Rate limit: max 10 requests per second per client
-if (requestCount > 10) return rateLimitError();
-```
+<skill>
+<name>comfy-swap</name>
+<description>Use Comfy-Swap CLI to run ComfyUI workflows, manage workflow parameters, and generate images. Trigger when user asks to run ComfyUI workflows, generate AI images, list workflows, modify workflow API parameters, inspect workflow nodes, adjust parameter mappings, check generation status, view request logs, or automate image generation tasks. Also trigger when user mentions comfy-swap, ComfyUI API, or image generation pipeline.</description>
+<location>remote: npx skills add kamjin3086/comfy-swap-skill</location>
+</skill>
 
-## Documentation
+<skill>
+<name>doc-coauthoring</name>
+<description>Guide users through a structured workflow for co-authoring documentation. Use when user wants to write documentation, proposals, technical specs, decision docs, or similar structured content. This workflow helps users efficiently transfer context, refine content through iteration, and verify the doc works for readers. Trigger when user mentions writing docs, creating proposals, drafting specs, or similar documentation tasks.</description>
+<location>project</location>
+</skill>
 
-- Keep only essential documentation
-- Remove outdated or redundant docs
-- README: brief, focused on getting started
-- No auto-generated boilerplate
+<skill>
+<name>docx</name>
+<description>"Use this skill whenever the user wants to create, read, edit, or manipulate Word documents (.docx files). Triggers include: any mention of 'Word doc', 'word document', '.docx', or requests to produce professional documents with formatting like tables of contents, headings, page numbers, or letterheads. Also use when extracting or reorganizing content from .docx files, inserting or replacing images in documents, performing find-and-replace in Word files, working with tracked changes or comments, or converting content into a polished Word document. If the user asks for a 'report', 'memo', 'letter', 'template', or similar deliverable as a Word or .docx file, use this skill. Do NOT use for PDFs, spreadsheets, Google Docs, or general coding tasks unrelated to document generation."</description>
+<location>project</location>
+</skill>
 
-## Commit Messages
+<skill>
+<name>frontend-design</name>
+<description>Create distinctive, production-grade frontend interfaces with high design quality. Use this skill when the user asks to build web components, pages, artifacts, posters, or applications (examples include websites, landing pages, dashboards, React components, HTML/CSS layouts, or when styling/beautifying any web UI). Generates creative, polished code and UI design that avoids generic AI aesthetics.</description>
+<location>project</location>
+</skill>
 
-- Use conventional commits format
-- Keep subject line under 72 characters
-- Focus on "why" not "what"
+<skill>
+<name>internal-comms</name>
+<description>A set of resources to help me write all kinds of internal communications, using the formats that my company likes to use. Claude should use this skill whenever asked to write some sort of internal communications (status reports, leadership updates, 3P updates, company newsletters, FAQs, incident reports, project updates, etc.).</description>
+<location>project</location>
+</skill>
 
-```
-feat: add workflow auto-naming based on model and params
-fix: handle empty prompt object in export
-refactor: simplify parameter detection logic
-```
+<skill>
+<name>mcp-builder</name>
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [kamjin3086/comfy-swap](https://github.com/kamjin3086/comfy-swap) — distributed by [TomeVault](https://tomevault.io).
