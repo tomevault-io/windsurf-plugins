@@ -1,10 +1,13 @@
 ---
 trigger: always_on
-description: - **Monorepo**: Turborepo-managed, with `apps/` (main: Next.js web app) and `packages/` (shared code: `common`, `shared`, `ai`, `ui`, etc.).
+description: <!-- Source: .ruler/AGENTS.md -->
 ---
 
 
-# Development Guidelines
+
+<!-- Source: .ruler/AGENTS.md -->
+
+# AGENTS.md
 
 ## Tech Stack & Project Overview
 
@@ -27,6 +30,7 @@ description: - **Monorepo**: Turborepo-managed, with `apps/` (main: Next.js web 
 - PascalCase components, camelCase hooks/utils, kebab-case files
 - Named exports preferred over default exports
 - Use oxlint for fast comprehensive linting (run `bun run lint`)
+- Use dprint for code formatting (run `bun run fmt`)
 - Use Prettier for markdown files only (run `bun run format`)
 
 ## UI/UX Design Principles
@@ -43,7 +47,7 @@ description: - **Monorepo**: Turborepo-managed, with `apps/` (main: Next.js web 
 - Make sure you DO NOT CREATE ANY debug and test FILES IN ./ ROOT DIRECTORY. Only use files in /temps or apps/web/app/tests/ or /scripts.
 - Make sure you run `bun dev` and check the app console to see if there are any errors before starting to work on anothers task. fix it first.
 - Plan first, then implement. For substantial changes, request maintainer feedback on the plan before coding.
-- **REQUIRED**: Run `bun run biome:format` to auto-fix formatting issues
+- **REQUIRED**: Run `bun run fmt` to auto-fix formatting issues with dprint
 - **NEVER commit changes yourself** - DO NOT execute `git commit` unless you have my approval
 - Run `bun run lint` (oxlint) for comprehensive error checking
 - Run `bun run build` to verify compilation before major changes
@@ -59,15 +63,15 @@ description: - **Monorepo**: Turborepo-managed, with `apps/` (main: Next.js web 
 - This applies to ALL deployment commands and scripts
 
 - **Production Deployment**: Use `./deploy-fly.sh` to deploy to Fly.io (ONLY WITH USER APPROVAL)
-    - **Interactive**: `./deploy-fly.sh` (prompts for version bump type)
-    - **Automated**: `./deploy-fly.sh --auto --version patch` (patch/minor/major)
-    - **Features**: Auto-commit, semantic versioning, git tagging, Fly.io deployment
-    - **App URL**: https://vtchat.io.vn (primary) / https://vtchat.fly.dev (backup)
-    - Script handles: git status checks, version tagging, pushing to remote, Fly.io deployment
+  - **Interactive**: `./deploy-fly.sh` (prompts for version bump type)
+  - **Automated**: `./deploy-fly.sh --auto --version patch` (patch/minor/major)
+  - **Features**: Auto-commit, semantic versioning, git tagging, Fly.io deployment
+  - **App URL**: https://vtchat.io.vn (primary) / https://vtchat.fly.dev (backup)
+  - Script handles: git status checks, version tagging, pushing to remote, Fly.io deployment
 
 ### Git Hooks
 
-- **Manual fixes**: Run `bun run biome:format` and `bun run biome:check --unsafe` for comprehensive fixes
+- **Manual fixes**: Run `bun run fmt` and `bun run fmt:check` for comprehensive formatting fixes with dprint
 - **Philosophy**: Encourage good practices without blocking development flow
 
 ## Tech Stack
@@ -95,7 +99,7 @@ description: - **Monorepo**: Turborepo-managed, with `apps/` (main: Next.js web 
 
 ## Testing
 
-- use ChatMode.ChatMode.GEMINI_3_FLASH_LITE to test instead GEMINI_3_PRO because cost.
+- use ChatMode.ChatMode.GEMINI_2_5_FLASH_LITE to test instead GEMINI_2_5_PRO because cost.
 - Test files should be in `apps/web/app/tests/`. Example: `./test-vt-plus-only.js` should be moved to `apps/web/app/tests/test-vt-plus-only.js`
 - Every implemented feature should have a test case to maintain quality
 - Every unit test should cover critical paths and edge cases
@@ -103,6 +107,7 @@ description: - **Monorepo**: Turborepo-managed, with `apps/` (main: Next.js web 
 - Run tests regularly to ensure code quality
 - Use `@testing-library/jest-dom/vitest` for custom matchers
 - Use `@testing-library/user-event` for simulating user interactions
+- Use `@testing-library/react` for rendering components in tests
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
