@@ -7,11 +7,11 @@ OpenSail is the open-source alternative to Codex App, Claude Desktop, Cursor, an
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [TesslateAI/OpenSail](https://github.com/TesslateAI/OpenSail).
+Original source: `CLAUDE.md` in [TesslateAI/OpenSail](https://github.com/TesslateAI/OpenSail).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
