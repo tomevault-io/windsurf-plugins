@@ -1,0 +1,116 @@
+---
+trigger: always_on
+description: bun install          # install dependencies
+---
+
+# gstack development
+
+## Commands
+
+```bash
+bun install          # install dependencies
+bun test             # run free tests (browse + snapshot + skill validation)
+bun run test:evals   # run paid evals: LLM judge + E2E (diff-based, ~$4/run max)
+bun run test:evals:all  # run ALL paid evals regardless of diff
+bun run test:e2e     # run E2E tests only (diff-based, ~$3.85/run max)
+bun run test:e2e:all # run ALL E2E tests regardless of diff
+bun run eval:select  # show which tests would run based on current diff
+bun run dev <cmd>    # run CLI in dev mode, e.g. bun run dev goto https://example.com
+bun run build        # gen docs + compile binaries
+bun run gen:skill-docs  # regenerate SKILL.md files from templates
+bun run skill:check  # health dashboard for all skills
+bun run dev:skill    # watch mode: auto-regen + validate on change
+bun run eval:list    # list all eval runs from ~/.gstack-dev/evals/
+bun run eval:compare # compare two eval runs (auto-picks most recent)
+bun run eval:summary # aggregate stats across all eval runs
+```
+
+`test:evals` requires `ANTHROPIC_API_KEY`. E2E tests stream progress in real-time
+(tool-by-tool via `--output-format stream-json --verbose`). Results are persisted
+to `~/.gstack-dev/evals/` with auto-comparison against the previous run.
+
+**Diff-based test selection:** `test:evals` and `test:e2e` auto-select tests based
+on `git diff` against the base branch. Each test declares its file dependencies in
+`test/helpers/touchfiles.ts`. Changes to global touchfiles (session-runner, eval-store,
+llm-judge, gen-skill-docs) trigger all tests. Use `EVALS_ALL=1` or the `:all` script
+variants to force all tests. Run `eval:select` to preview which tests would run.
+
+## Project structure
+
+```
+gstack/
+├── browse/          # Headless browser CLI (Playwright)
+│   ├── src/         # CLI + server + commands
+│   │   ├── commands.ts  # Command registry (single source of truth)
+│   │   └── snapshot.ts  # SNAPSHOT_FLAGS metadata array
+│   ├── test/        # Integration tests + fixtures
+│   └── dist/        # Compiled binary
+├── scripts/         # Build + DX tooling
+│   ├── gen-skill-docs.ts  # Template → SKILL.md generator
+│   ├── skill-check.ts     # Health dashboard
+│   └── dev-skill.ts       # Watch mode
+├── test/            # Skill validation + eval tests
+│   ├── helpers/     # skill-parser.ts, session-runner.ts, llm-judge.ts, eval-store.ts
+│   ├── fixtures/    # Ground truth JSON, planted-bug fixtures, eval baselines
+│   ├── skill-validation.test.ts  # Tier 1: static validation (free, <1s)
+│   ├── gen-skill-docs.test.ts    # Tier 1: generator quality (free, <1s)
+│   ├── skill-llm-eval.test.ts   # Tier 3: LLM-as-judge (~$0.15/run)
+│   └── skill-e2e.test.ts         # Tier 2: E2E via claude -p (~$3.85/run)
+├── qa-only/         # /qa-only skill (report-only QA, no fixes)
+├── plan-design-review/  # /plan-design-review skill (report-only design audit)
+├── design-review/    # /design-review skill (design audit + fix loop)
+├── ship/            # Ship workflow skill
+├── review/          # PR review skill
+├── plan-ceo-review/ # /plan-ceo-review skill
+├── plan-eng-review/ # /plan-eng-review skill
+├── retro/           # Retrospective skill
+├── document-release/ # /document-release skill (post-ship doc updates)
+├── setup            # One-time setup: build binary + symlink skills
+├── SKILL.md         # Generated from SKILL.md.tmpl (don't edit directly)
+├── SKILL.md.tmpl    # Template: edit this, run gen:skill-docs
+└── package.json     # Build scripts for browse
+```
+
+## SKILL.md workflow
+
+SKILL.md files are **generated** from `.tmpl` templates. To update docs:
+
+1. Edit the `.tmpl` file (e.g. `SKILL.md.tmpl` or `browse/SKILL.md.tmpl`)
+2. Run `bun run gen:skill-docs` (or `bun run build` which does it automatically)
+3. Commit both the `.tmpl` and generated `.md` files
+
+To add a new browse command: add it to `browse/src/commands.ts` and rebuild.
+To add a snapshot flag: add it to `SNAPSHOT_FLAGS` in `browse/src/snapshot.ts` and rebuild.
+
+## Writing SKILL templates
+
+SKILL.md.tmpl files are **prompt templates read by Claude**, not bash scripts.
+Each bash code block runs in a separate shell — variables do not persist between blocks.
+
+Rules:
+- **Use natural language for logic and state.** Don't use shell variables to pass
+  state between code blocks. Instead, tell Claude what to remember and reference
+  it in prose (e.g., "the base branch detected in Step 0").
+- **Don't hardcode branch names.** Detect `main`/`master`/etc dynamically via
+  `gh pr view` or `gh repo view`. Use `{{BASE_BRANCH_DETECT}}` for PR-targeting
+  skills. Use "the base branch" in prose, `<base>` in code block placeholders.
+- **Keep bash blocks self-contained.** Each code block should work independently.
+  If a block needs context from a previous step, restate it in the prose above.
+- **Express conditionals as English.** Instead of nested `if/elif/else` in bash,
+  write numbered decision steps: "1. If X, do Y. 2. Otherwise, do Z."
+
+## Browser interaction
+
+When you need to interact with a browser (QA, dogfooding, cookie setup), use the
+`/browse` skill or run the browse binary directly via `$B <command>`. NEVER use
+`mcp__claude-in-chrome__*` tools — they are slow, unreliable, and not what this
+project uses.
+
+## Vendored symlink awareness
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [kings-nexus/kingsight](https://github.com/kings-nexus/kingsight) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-03 -->
