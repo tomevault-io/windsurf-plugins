@@ -1,136 +1,142 @@
 ---
 trigger: always_on
-description: Apply when editing, generating, or reviewing any SVG diagram. Pixel-perfect Playwright bbox-check is the acceptance test — eyeballing is not sufficient. Run on every SVG before declaring done.
+description: Apply when writing TypeScript code. Strict types, discriminated unions, async patterns, and runtime safety.
 ---
 
 
-# Sub-Skill: SVG Check
+# Sub-Skill: TypeScript Best Practices
+<!-- target: ~2500 tokens (real tiktoken count) | 17 rules with severity classification -->
 
-**Purpose.** Catch text-overflow and foreign-rect-intersection bugs in SVG diagrams *before* commit. LLM eyeball review at 4× zoom misses these bug classes consistently — measurement is the only reliable test.
+**Purpose:** Prevents the TypeScript-specific mistakes LLMs make repeatedly — weak types, unsafe assertions, and patterns that compile but fail at runtime.
 
-The acceptance test is the script output. Not your visual judgment.
+## Rule classification
 
----
+- **MUST** — load-bearing. Violating leaks runtime errors past the type checker. Never break.
+- **SHOULD** — default behavior. Deviation needs a documented reason in the code or PR.
+- **AVOID** — usually wrong; documented exception inline where needed.
 
-## When to apply
-
-Apply this skill whenever:
-
-- you are editing an existing SVG (`*.svg` in any docs/diagrams folder),
-- you are producing a new SVG from scratch,
-- a designer agent reports an SVG as "clean" — verify with the script,
-- you are reviewing a PR that touches `*.svg`.
+**Where these rules don't strictly apply:** test fixtures, generated types (e.g. from GraphQL codegen, OpenAPI generators, Prisma), declaration files (`*.d.ts`) for untyped third-party libraries, and migration scripts may legitimately differ. The rules below apply to **production application code**.
 
 ---
 
-## The two bug classes the script catches
+## Type Safety
 
-1. **OVERFLOW (own-container)**: a `<text>` whose rendered bbox extends past the bounds of its containing `<rect>` (in the same `<g>`). Caught by `getBBox()` measurement, tolerance 2 px.
+1. **MUST: Never use `any`. Use `unknown` and narrow it.** `any` disables the type checker entirely. `unknown` forces you to prove the type before use. *Exception: third-party libraries without types and explicit dynamic-data boundaries (e.g. JSON parse at the API edge), with a comment explaining why.*
+   ```ts
+   // Wrong
+   function parse(data: any) { return data.name; }
 
-2. **FOREIGN-RECT INTERSECT**: a `<text>` whose viewport bbox intersects a `<rect>` that is *not* an ancestor of the text — i.e. a tagline ascender that touches a structural box above/below it. Caught by `getBoundingClientRect()` intersection, tolerance 2 px.
+   // Correct
+   function parse(data: unknown): string {
+     if (typeof data === 'object' && data !== null && 'name' in data) {
+       return String((data as { name: unknown }).name);
+     }
+     throw new Error('Invalid data shape');
+   }
+   ```
 
-Both classes filter false-positives: rects smaller than 40 × 18 (legend swatches) are not treated as containers; texts that start more than 5 px outside a rect's horizontal range are not treated as contained.
+2. **AVOID: `Object` or `{}` as a type.** Both accept nearly everything. Use `Record<string, unknown>` for arbitrary objects or define an explicit interface.
+   ```ts
+   // Wrong
+   function merge(a: {}, b: Object): {} { ... }
 
----
+   // Correct
+   function merge<T extends Record<string, unknown>>(a: T, b: Partial<T>): T { ... }
+   ```
 
-## How to run
+3. **SHOULD: Use `as` only when you know more than the compiler — and document why.** Prefer type guards or `satisfies` instead.
+   ```ts
+   // Wrong — silences the error, hides the bug
+   const user = response.data as User;
 
-The script lives next to this file: [`overflow-check.js`](./overflow-check.js). It needs Playwright installed once per machine.
+   // Correct — validate first
+   function isUser(v: unknown): v is User {
+     return typeof v === 'object' && v !== null && 'id' in v && 'email' in v;
+   }
+   const user = isUser(response.data) ? response.data : null;
+   ```
 
-### One-time setup
+4. **SHOULD: Mark immutable data `readonly`.** Prevents accidental mutation and communicates intent.
+   ```ts
+   // Avoid
+   function process(ids: string[]) { ids.push('extra'); }
 
-```bash
-# From the skill folder
-cd skills/svg-check
-bash setup.sh
-```
+   // Prefer
+   function process(ids: readonly string[]) { /* ids.push() is a compile error */ }
+   ```
 
-Or manually:
+5. **MUST: Enable `strictNullChecks` and handle every `T | undefined`.** Optional chaining `?.` returns `undefined` — always handle that branch.
+   ```ts
+   // Wrong
+   const name = user?.profile.name.toUpperCase(); // crashes if name is undefined
 
-```bash
-npm install playwright
-npx playwright install chromium --with-deps
-```
+   // Correct
+   const name = user?.profile.name?.toUpperCase() ?? 'Anonymous';
+   ```
 
-### Run on one SVG
+6. **SHOULD: Use branded types for IDs.** Prevents passing a `UserId` where an `OrderId` is expected — both are `string` at runtime.
+   ```ts
+   type UserId = string & { readonly _brand: 'UserId' };
+   type OrderId = string & { readonly _brand: 'OrderId' };
 
-```bash
-node skills/svg-check/overflow-check.js path/to/diagram.svg
-```
+   function createUserId(raw: string): UserId { return raw as UserId; }
 
-### Run on all SVGs in a folder
-
-```bash
-for svg in path/to/*.svg; do
-  out=$(node skills/svg-check/overflow-check.js "$svg" 2>&1)
-  if echo "$out" | grep -q "FOUND"; then
-    echo "FAIL: $svg"; echo "$out" | grep -E "FOUND|  \[|  \""
-  fi
-done
-```
-
-The script exits non-zero when issues are found — suitable for use as a pre-commit gate or CI step.
-
----
-
-## Acceptance criteria
-
-The script output **must** contain both of these lines, verbatim, for every SVG in scope:
-
-```
-OVERFLOW: CLEAN — 0 text overflows past their containing rect
-FOREIGN-RECT INTERSECT: CLEAN — 0 text-vs-foreign-rect intersections
-```
-
-Anything else means **not done**. Fix the SVG (shorten text, widen rect, move element, change font-size) and re-run until both lines are CLEAN.
-
-In addition, after the script is CLEAN, render a Playwright screenshot in light + dark mode and visually cross-check for bug classes the script does not cover (see § *Limits* below).
-
----
-
-## How to fix common overflow patterns
-
-| Pattern | Fix |
-|---|---|
-| Mono-tag text wider than its 200 px box | Move trailing content to a `mono-dim` line below, or drop the suffix entirely. Match the sibling-box pattern. |
-| Tagline ascenders touch the rect above | Extend the SVG viewBox height (`500 → 520`) and move the tagline down. Other elements stay put. |
-| Two-line label tight in a folder glyph | Move from `y=22/33` to `y=21/34` (13 px line-height instead of 11 px). |
-| Annotation text overflowing a chip | Either widen the chip rect or shorten the annotation. Do **not** suppress the script — fix the SVG. |
+   function getUser(id: UserId): User { ... }
+   // getUser(orderId) → compile error
+   ```
 
 ---
 
-## Examples
+## Patterns
 
-See [`EXAMPLES.md`](./EXAMPLES.md) for real before/after fixes with script output.
+7. **SHOULD: Use discriminated unions for state, not optional fields.** Optional fields force you to reason about all combinations. A discriminated union makes illegal states unrepresentable.
+   ```ts
+   // Avoid — 8 possible combinations, most invalid
+   type Request = { loading?: boolean; data?: User; error?: Error };
+
+   // Prefer — exactly 3 valid states
+   type Request =
+     | { status: 'idle' }
+     | { status: 'loading' }
+     | { status: 'success'; data: User }
+     | { status: 'error'; error: Error };
+   ```
+
+8. **SHOULD: Use `satisfies` to validate shape without widening the type.** `as const` preserves literals; `satisfies` validates against an interface without losing them.
+   ```ts
+   const config = {
+     host: 'localhost',
+     port: 5432,
+   } satisfies DatabaseConfig;
+   // config.port is still typed as 5432, not number
+   ```
+
+9. **SHOULD: Use `const` objects instead of `enum`.** Enums emit runtime code, have surprising reverse-mapping behavior, and are not idiomatic TypeScript.
+   ```ts
+   // Avoid
+   enum Direction { Up, Down, Left, Right }
+
+   // Prefer
+   const Direction = { Up: 'Up', Down: 'Down', Left: 'Left', Right: 'Right' } as const;
+   type Direction = typeof Direction[keyof typeof Direction];
+   ```
+
+10. **AVOID: Barrel `index.ts` re-exports in large modules.** They cause circular dependency chains that are hard to debug. Export directly from source files or use explicit named re-exports only.
+    ```ts
+    // Wrong — index.ts re-exports everything, A imports B through index, B imports A through index
+    export * from './userService';
+    export * from './orderService';
+
+    // Correct — import directly
+    import { getUser } from './services/userService';
+    ```
 
 ---
 
-## Limits — what the script does NOT catch
+## Error Handling
 
-These remain eyeball-only for now. When a missed bug class surfaces, extend the script with a new check class — do not rely on agent self-reporting.
 
-- **Text-vs-line overlaps**: a `<text>` crossing an `<line>` arrow.
-- **≥12 px clearance** between text-baseline and the nearest line below it.
-- **Sibling text overlaps**: two `<text>` elements at the same coords.
-- **Color contrast ratio** in dark mode.
-- **Glyph render quality** at small sizes (≤ 10 px).
-
----
-
-## Why this skill exists (incident history)
-
-- **2026-05-11 #1**: a four-designer parallel review declared `architecture.svg` clean. The GEMINI CLI loader-tag overflowed its 200 px box by 42.6 px. No agent measured.
-- **2026-05-11 #2**: a follow-up three-cycle eyeball review missed that the tagline ascenders intruded into the folder-strip border above. The fix was a 20 px viewBox extension; the bug was a 2 px overlap that the agents could not detect by sight.
-
-The script was built after the second miss. It catches both bug classes in under 5 seconds.
-
-The rule that follows from these incidents: **don't trust agent self-reports of "no issues at 4× zoom". Trust the measurement.**
-
----
-
-## Required output for "done"
-
-When reporting work on any SVG, paste the script output verbatim — both *before* the fix (showing the bug) and *after* the fix (showing CLEAN). Without that paste, the work is not done.
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [sordi-ai/skill-everything](https://github.com/sordi-ai/skill-everything) — distributed by [TomeVault](https://tomevault.io).
