@@ -1,0 +1,176 @@
+---
+trigger: always_on
+description: This file provides guidance for AI agents (Claude, etc.) when using this MCP server.
+---
+
+# CLAUDE.md - Apple Mail MCP Server
+
+This file provides guidance for AI agents (Claude, etc.) when using this MCP server.
+
+## Overview
+
+This MCP server enables AI assistants to interact with Apple Mail on macOS via AppleScript. All operations are local - no data leaves the user's machine.
+
+## Critical: Backslash Escaping
+
+**When sending content with backslashes to any tool, you MUST escape them.**
+
+The MCP protocol uses JSON for parameters. In JSON, `\` is an escape character. To include a literal backslash:
+
+| You want    | Send in JSON parameter |
+|-------------|------------------------|
+| `\`         | `\\`                   |
+| `\\`        | `\\\\`                 |
+| `C:\Users\` | `C:\\Users\\`          |
+
+### Why This Matters
+
+If you send a single backslash without escaping:
+
+- The JSON parser interprets `\` as an escape sequence
+- Invalid sequences like `\ ` (backslash-space) cause silent failures
+- The email send/draft may fail with no clear error
+
+### Examples
+
+**Correct - Windows path in email:**
+
+```text
+body: "The file is at C:\\Users\\Documents\\report.pdf"
+```
+
+**Incorrect - Will fail:**
+
+```text
+body: "The file is at C:\Users\Documents\report.pdf"
+```
+
+## Tool Usage Tips
+
+### Using Message IDs (Required)
+
+All message operations require an `id` parameter. **Always get IDs first** using `list-messages` or `search-messages`:
+
+```text
+# List messages returns IDs
+list-messages mailbox="INBOX"
+→ Messages with IDs like "12345", "12346", etc.
+
+# Use ID for all subsequent operations
+get-message id="12345"
+mark-as-read id="12345"
+delete-message id="12345"
+reply-to-message id="12345" body="Thanks!"
+```
+
+### Recipient Arrays
+
+The `to`, `cc`, and `bcc` parameters must always be arrays:
+
+**Correct:**
+
+```json
+{
+  "to": ["bob@example.com"],
+  "subject": "Hello"
+}
+```
+
+**Incorrect:**
+
+```json
+{
+  "to": "bob@example.com",
+  "subject": "Hello"
+}
+```
+
+### send-email vs create-draft
+
+- Use `send-email` for immediate sending
+- Use `create-draft` when the user should review first
+- Both support optional `attachments` parameter (array of absolute file paths)
+- **Recommendation**: For important emails, use `create-draft` and tell the user to review in Mail.app
+
+### send-serial-email (mail merge)
+
+- Sends individual personalized emails to a list of recipients
+- Use `{{placeholder}}` tokens in subject and body, replaced per-recipient
+- Each recipient gets their own email — recipients don't see each other
+- Max 100 recipients per batch, delay between sends (default 500ms, max 10000ms)
+- Example variables: `{ "Name": "Alice", "Company": "Acme" }`
+
+### reply-to-message
+
+- Set `replyAll: true` to reply to all recipients
+- Set `send: false` to save as draft instead of sending immediately
+- Default behavior: reply to sender only, send immediately
+- Uses `without opening window` internally — no Mail.app compose window is opened, which ensures reliable body delivery from background processes (see [Known Issues](#known-issue-resolved-reply--forward-empty-body-from-background-processes) below)
+
+### forward-message
+
+- Requires message `id` and `to` array
+- Optional `body` to prepend a message
+- Set `send: false` to save as draft
+- Uses `without opening window` internally — same background-process fix as reply-to-message
+
+### Multi-account
+
+- Default account is Mail.app's configured default send account
+- `search-messages` searches all accounts when no `account` is specified
+- Use `list-accounts` to see available accounts
+- Pass `account` parameter to target specific account
+
+## Error Handling
+
+| Error                    | Likely Cause                                  |
+|--------------------------|-----------------------------------------------|
+| "Mail.app not responding" | Mail.app frozen or not running               |
+| "Message not found"      | Message ID is invalid or message was deleted/moved |
+| "Permission denied"      | macOS automation permission needed            |
+| "Account not found"      | Account name doesn't match exactly (case-sensitive) |
+| "Failed to send email"   | Network issue or Mail.app configuration problem |
+| Silent failure           | Backslash not escaped in content              |
+
+## Security Considerations
+
+- **Sending emails**: Always confirm with user before sending. Recommend `create-draft` for review.
+- **Deleting messages**: Warn user that deletion moves to Trash (can be recovered).
+- **Reading emails**: May contain sensitive information - summarize rather than display full content when appropriate.
+
+## Example Workflows
+
+### Check for important emails
+
+```text
+1. list-accounts → get available accounts
+2. search-messages query="boss@company.com" → find emails from boss
+3. get-message id="..." → read the full content
+```
+
+### Send a reply safely
+
+```text
+1. get-message id="..." → read original message
+2. reply-to-message id="..." body="..." send=false → save as draft
+3. Tell user to review in Mail.app before sending
+```
+
+### Compose and send
+
+```text
+1. create-draft to=["recipient@example.com"] subject="..." body="..."
+2. Tell user: "I've created a draft. Review it in Mail.app and send when ready."
+   OR if user confirms they want to send immediately:
+3. send-email to=["recipient@example.com"] subject="..." body="..."
+```
+
+### Forward an email
+
+```text
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [sweetrb/apple-mail-mcp](https://github.com/sweetrb/apple-mail-mcp) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-03 -->
