@@ -1,71 +1,77 @@
 ---
 trigger: always_on
-description: Single source of truth for portfolio data — one canonical fetcher per domain, all consumers are thin adapters
+description: > This file is loaded every turn. It is the highest-leverage configuration for any AI assistant working on this codebase.
 ---
 
+# CLAUDE.md
 
-# Single Source of Truth: Portfolio Data
+> This file is loaded every turn. It is the highest-leverage configuration for any AI assistant working on this codebase.
 
-## The standard
+---
 
-Every domain concept (wallet balances, lending positions, token prices, transaction history, savings rates) has **exactly one** canonical fetcher. API routes, React hooks, engine tools, and cron jobs are **thin adapters** — they parse inputs, call the canonical fetcher, format the response.
+## Architecture — The Big Picture
 
-Adapters MUST NOT do their own pricing, summing, RPC calls, or token-list management. If you find yourself reaching for `client.getBalance`, hardcoding a stable price, or maintaining a token allow-list outside the canonical, stop and use the canonical instead.
+### Three brands, three repos
 
-## Canonical files
-
-| Domain | Canonical fetcher | File |
-|---|---|---|
-| Wallet + positions + net worth | `getPortfolio(address)` | `apps/web/lib/portfolio.ts` |
-| Token prices (USD) | `getTokenPrices(coinTypes)` | `apps/web/lib/portfolio.ts` |
-| Transaction history | `getTransactionHistory(address, opts)` | `apps/web/lib/transaction-history.ts` |
-| Lending rates (NAVI) | `getRates()` | `apps/web/lib/rates.ts` |
-
-## Forbidden patterns outside canonical files
-
-These are lint errors (see `.eslintrc` rule `audric/canonical-portfolio`):
-
-```typescript
-// All of these are FORBIDDEN outside the canonical files above.
-client.getBalance({ owner, coinType })           // wallet read — use getPortfolio
-client.getAllBalances({ owner })                 // wallet read — use getPortfolio
-client.getCoinMetadata({ coinType })             // metadata — use getPortfolio (it returns priced coins)
-fetch('https://api.blockvision.org/...')         // direct vendor call — use getPortfolio / getTokenPrices
-fetch('https://coins.llama.fi/...')              // direct vendor call — use getTokenPrices
-const STABLES = { USDC: 1, USDT: 1, USDsui: 1 } // hardcoded $1 assumption — let getTokenPrices do it
-const TRADEABLE = ['USDC', 'SUI', 'BTC', ...]   // hardcoded token list — getPortfolio returns every held coin
-totalUsd = USDC + USDsui                          // partial-stable sum — use Portfolio.walletValueUsd
-totalUsd = USDC + SUI                             // unit-mixed sum (SUI is tokens, not USD) — use Portfolio.walletValueUsd
+```
+t2000 (this repo)    → Infrastructure: CLI, SDK, MCP, engine, gateway, contracts
+audric (separate)    → Consumer product: audric.ai website, app, Chrome extension
+suimpp (separate)    → Protocol: suimpp.dev, @suimpp/mpp, @suimpp/discovery
 ```
 
-## Why this rule exists
+### This repo structure
 
-In April 2026 we shipped a fix for `FullPortfolioCanvas` showing $0 savings for watched addresses. The root cause was five different code paths computing wallet USD: `useBalance` hook, `fetchPortfolio` server function, `/api/balances` raw endpoint, engine `balance_check` tool, and the daily cron — each with different pricing logic, different token coverage, and different bugs. The user surfaces showed five different numbers for the same wallet.
+```
+t2000/
+├── apps/gateway     ← MPP API gateway (mpp.t2000.ai, 40+ services, 88 endpoints)
+├── apps/server      ← Backend API
+├── apps/web         ← t2000.ai marketing website
+├── packages/cli     ← @t2000/cli (npm)
+├── packages/sdk     ← @t2000/sdk (npm)
+├── packages/engine  ← @t2000/engine (agent engine — QueryEngine, tools, MCP)
+├── packages/mcp     ← @t2000/mcp (npm)
+├── t2000-skills/    ← Agent skill definitions
+└── audric-roadmap.md ← Product roadmap + build tracker
+```
 
-That class of bug is structural, not a one-off. Every new feature that adds another portfolio read is another opportunity to drift. Routing every consumer through one fetcher with one set of behaviors makes drift impossible by construction.
+### Two brand layers
 
-## Adapter checklist
+**t2000** = infra. Names the underlying capabilities (engine, SDK, MCP, MPP gateway, contracts). Used in technical docs, package names, READMEs, dev-facing surfaces.
 
-Before adding or modifying an API route, hook, canvas, or engine tool that reads portfolio data:
+**Audric** = consumer. Names the surfaces a user touches. Always one of exactly **five products** (post-S.18 reframe): **Audric Passport, Audric Intelligence, Audric Finance, Audric Pay, Audric Store**. (S.17's 4-product cut overloaded Intelligence as both "moat" and "home for every financial verb." S.18 splits Finance back out — it's the home for save / borrow / swap / charts. Send + Receive collapse into Pay.)
 
-1. **Does the canonical fetcher already cover this read?** If yes, use it. Done.
-2. **Does it cover it but the shape isn't quite right?** Extend the canonical's return type. Don't fork.
-3. **Does it not cover this read at all?** Extend the canonical to cover it. Don't add a parallel path.
-4. **Does the canonical do too much for your one-off read?** It still might be the right call — the 60s in-process cache makes redundant calls cheap.
+#### The five products
 
-If you genuinely need to bypass the canonical (e.g. for a write-side balance check that's part of a transaction builder), leave a code comment with `// CANONICAL-BYPASS:` and explain why, plus link to a follow-up issue to consolidate.
+| Audric product | What it is | t2000 layer |
+|---|---|---|
+| 🪪 **Audric Passport** | The trust layer. Identity (zkLogin via Google), non-custodial wallet on Sui, tap-to-confirm consent on every write, sponsored gas. Wraps every other product. | `@t2000/sdk` (wallet, signing) + Enoki (zkLogin, gas sponsorship) + `@mysten/sui` |
+| 🧠 **Audric Intelligence** | The brain (the moat). Five systems orchestrate every money decision — Agent Harness (34 tools), Reasoning Engine (14 guards, 6 skill recipes), Silent Profile, Chain Memory, AdviceLog. Picks the tool, clears the guards, remembers what it told you. Engineering-facing brand; users experience it as "Audric just understood me." | `@t2000/engine` (QueryEngine + tools + reasoning + guards + skill recipes) |
+| 💰 **Audric Finance** | Manage your money on Sui. Save (NAVI lend, 3–8% APY on USDC or USDsui — strategic exception added in v0.51.0), Credit (NAVI borrow USDC or USDsui against savings, health factor visible at all times — repay must use the same asset as the borrow), Swap (Cetus aggregator, best-route across 20+ DEXs, 0.1% fee), Charts (interactive yield / health / portfolio visualizations rendered from chat). Every write taps to confirm via Passport. | `@t2000/sdk` NAVI lending/borrowing builders + `cetus-swap.ts` + `@t2000/engine` chart canvas templates |
+| 💸 **Audric Pay** | Move money. Free, global, instant on Sui. Send USDC to anyone, receive via payment links / invoices / QR. No bank, no borders, no fees. | `@t2000/sdk` Sui tx builders (direct USDC transfers, payment-link contract, invoice flows) |
+| 🛒 **Audric Store** | Creator marketplace at `audric.ai/username`. Generate AI music, art, ebooks, list them, sell in USDC. 92% to creator. **Coming soon (Phase 5).** | `@t2000/sdk` + Walrus storage + payment links (built on Audric Pay primitives) |
 
-## How this is enforced
+#### Audric Passport — the trust layer (4 pillars)
 
-- **ESLint rule** `audric/canonical-portfolio`: scans imports and call expressions, fails CI on forbidden patterns outside canonical files.
-- **Spec consistency runner** (`apps/web/lib/engine/spec-consistency.ts`): runs at server startup in dev (hard fail) and prod (log only); checks that no consumer re-implements canonical behavior.
-- **Contract test** (`apps/web/lib/__tests__/portfolio-contract.test.ts`): asserts identical output across every adapter for a fixed mocked-RPC test address. Any new adapter added to the test must produce the same numbers.
+> **Your passport to a new kind of finance.**
 
-## Related rules
+Every Audric action runs through Passport. It's the wallet itself.
 
-- [`engineering-principles.mdc`](engineering-principles.mdc) — Principle 2 ("If data exists in one place, import it") is what this rule operationalizes.
-- [`token-data-architecture.mdc`](token-data-architecture.mdc) — canonical token metadata sources (`TOKEN_MAP`, `COIN_REGISTRY`).
-- [`audric-transaction-flow.mdc`](audric-transaction-flow.mdc) — sponsored vs SDK direct, which path runs when.
+| Pillar | Meaning |
+|---|---|
+| 🪪 **Identity** | Sign in with Google. Your Passport is a cryptographic wallet, created in 3 seconds. No seed phrase. Yours forever. (zkLogin + Enoki) |
+| ✋ **You decide** | Audric never moves money on its own. Every Finance and Pay action — save, send, swap, borrow — waits on your tap-to-confirm. |
+| 🔐 **Sponsored gas** | We pay the network fees so you don't need SUI to transact. Your USDC stays your USDC. (Enoki sponsorship) |
+| ⛓️ **Yours** | Non-custodial. We cannot move your money. Every transaction is on Sui mainnet, verifiable by anyone, forever. |
+
+#### Audric Intelligence — the 5-system moat (the differentiator)
+
+> **Not a chatbot. A financial agent.** Five systems work together to understand your money, reason about decisions, and get smarter over time. Every action still waits on your Passport tap-to-confirm.
+
+| System | What it does | Implementation |
+|---|---|---|
+| 🎛️ **Agent Harness** | 34 tools, one agent. The runtime that orchestrates Finance ops (save, swap, borrow, repay, charts), Pay ops (send, receive), and read tools (balances, DeFi positions, analytics) inside a single conversation. Parallel reads, serial writes under a transaction mutex. | `@t2000/engine` `QueryEngine` + 34 tools (23 read / 11 write) |
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [mission69b/t2000](https://github.com/mission69b/t2000) — distributed by [TomeVault](https://tomevault.io).
