@@ -1,0 +1,148 @@
+---
+trigger: always_on
+description: Generates the Codex marketplace mirror from the Claude one, applying Codex's marketplace schema (wrapping `source` as an object, attaching `policy` and `category`).
+---
+
+# AGENTS.md
+
+This file is the single source of truth for coding agents working in this repository — Claude Code, Codex CLI, Cursor, Amp, Jules, and others. `CLAUDE.md` is a one-line `@AGENTS.md` import so Claude Code reads the same content; other agents read this file directly.
+
+## Repository Purpose
+
+This repository is a **multi-agent plugins marketplace** containing reusable extensions that can be shared across projects and teams. It serves both:
+
+- **Claude Code** — via `.claude-plugin/marketplace.json` and per-plugin `.claude-plugin/plugin.json`
+- **Codex CLI** — via `.agents/plugins/marketplace.json` and per-plugin `.codex-plugin/plugin.json`
+
+The actual plugin content (skills, agents, commands) is shared between both tools wherever the formats are compatible.
+
+## Plugin Layout
+
+Each plugin is self-contained and dual-published:
+
+```
+plugin-name/
+├── .claude-plugin/
+│   └── plugin.json              # Claude Code manifest (required for Claude Code)
+├── .codex-plugin/
+│   └── plugin.json              # Codex CLI manifest (required for Codex)
+├── commands/                    # Slash commands — Claude Code primary
+│   └── example.md
+├── agents/                      # Subagents — both tools
+│   └── helper.md
+├── skills/                      # Agent Skills — both tools (SKILL.md format is shared)
+│   └── my-skill/
+│       ├── SKILL.md
+│       ├── PRINCIPLES.md
+│       └── EXAMPLES.md
+├── hooks/                       # Event hooks (Claude Code format)
+│   └── hooks.json
+├── .mcp.json                    # MCP servers (Claude Code format)
+├── codex.config.toml.snippet    # MCP servers (Codex config.toml fragment, when applicable)
+└── README.md                    # Usage for both tools
+```
+
+The required files are `.claude-plugin/plugin.json` and `.codex-plugin/plugin.json`. All other components are optional.
+
+## Component Compatibility Matrix
+
+| Component | Claude Code | Codex CLI | Notes |
+|-----------|-------------|-----------|-------|
+| Skills (`skills/<name>/SKILL.md`) | ✓ | ✓ | Same format — single source |
+| Subagents (`agents/*.md`) | ✓ | ✓ | Same format — single source |
+| Slash commands (`commands/*.md`) | ✓ | via skills only | Add a skill for any command that should work in Codex |
+| Hooks (`hooks/hooks.json`) | ✓ | format differs | Claude Code only; mark hook-only plugins unavailable for Codex |
+| MCP (`.mcp.json` / `config.toml`) | ✓ | ✓ | Distinct files; same servers |
+| Plugin manifest | `.claude-plugin/plugin.json` | `.codex-plugin/plugin.json` | Mirror each other |
+| Marketplace catalog | `.claude-plugin/marketplace.json` | `.agents/plugins/marketplace.json` | Mirror each other |
+
+## Adding or Updating a Plugin
+
+1. Create or update files in the plugin directory.
+2. Update **both** manifests when metadata changes:
+   - `<plugin>/.claude-plugin/plugin.json`
+   - `<plugin>/.codex-plugin/plugin.json`
+3. Bump the `version` in both manifests (semver).
+4. If adding a new plugin, add an entry to **both** marketplace files:
+   - `.claude-plugin/marketplace.json`
+   - `.agents/plugins/marketplace.json`
+5. If the plugin is Claude-only (for example hook-only), keep the Codex manifest but mark the Codex marketplace entry as `NOT_AVAILABLE`.
+6. Run `scripts/sync-marketplace.sh` to regenerate the Codex marketplace from the Claude side.
+7. Run `scripts/validate-plugins.sh` before committing to verify manifests and Codex marketplace schema stay in sync.
+
+## Installing Plugins
+
+### Claude Code
+
+```bash
+# Inside Claude Code
+/plugin marketplace add devstefancho/claude-plugins
+/plugin install <plugin-name>@devstefancho-claude-plugins
+```
+
+### Codex CLI
+
+```bash
+# In your shell
+codex plugin marketplace add devstefancho/claude-plugins
+```
+
+Codex CLI manages marketplaces with `codex plugin marketplace add|upgrade|remove`. Individual plugin enablement is handled by Codex's plugin UI/policy rather than a `codex plugin install` CLI subcommand.
+
+For local development with either tool, point the marketplace add command at the repo path instead of the GitHub shorthand (see below).
+
+## Local Plugin Development
+
+### Claude Code
+
+```bash
+# From repository root
+claude
+
+# Inside Claude Code
+/plugin marketplace add .
+/plugin install <plugin-name>@devstefancho-claude-plugins
+```
+
+Restart Claude Code after install to activate the plugin.
+
+### Codex CLI
+
+```bash
+# From repository root
+codex plugin marketplace add .
+```
+
+Restart your Codex session and enable the plugin from Codex's plugin UI/policy to activate it.
+
+## Iterating on Plugin Components
+
+When updating a plugin during development, reinstall or refresh it so the tool picks up changes.
+
+**Claude Code:**
+
+```bash
+/plugin uninstall <plugin-name>@devstefancho-claude-plugins
+/plugin install <plugin-name>@devstefancho-claude-plugins
+```
+
+**Codex CLI:**
+
+```bash
+codex plugin marketplace upgrade devstefancho-claude-plugins
+```
+
+## Plugin Components — Shared Conventions
+
+**Skills** (`skills/<skill-name>/SKILL.md`)
+- Required `SKILL.md` with metadata frontmatter and instructions.
+- Optional supporting files (`PRINCIPLES.md`, `EXAMPLES.md`, `scripts/`, `references/`).
+- Auto-loaded by both tools when relevant context is detected.
+
+**Subagents** (`agents/*.md`)
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [devstefancho/claude-plugins](https://github.com/devstefancho/claude-plugins) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-13 -->
