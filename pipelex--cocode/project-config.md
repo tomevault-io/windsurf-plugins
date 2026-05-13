@@ -1,112 +1,180 @@
 ---
 trigger: always_on
-description: Python coding standards and best practices
+description: Guidelines for running Pipelex pipelines
 ---
 
-# Coding Standards & Best Practices for Python Code
+# Guide to execute a pipeline and write example code
 
-This document outlines the core coding standards, best practices, and quality control procedures for the codebase.
+## Example to execute a pipeline with text output
 
-## Variables, loops and indexes
+```python
+import asyncio
 
-    - Variable names should have a minimum length of 3 characters. No exceptions: name your `for` loop indexes like `index_foobar`, your exceptions `exc` or more specific like `validation_error` when there are several layers of exceptions, and use `for key, value in ...` for key/value pairs.
-    - When looping on the keys of a dict, use `for key in the_dict` rather than `for key in the_dict.keys()` otherwise you won't pass linting.
-    - Avoid inline for loops, unless it's ultra-simple and holds on oneline.
-    - If you have a variable that will get its value differently through different code paths, declare it first with a type, e.g. `pipe_code: str` but DO NOT give it a default value like `pipe_code: str = ""` unless it's really justified. We want the variable to be unbound until all paths are covered, and the linters will help us avoid bugs this way.
+from pipelex import pretty_print
+from pipelex.pipelex import Pipelex
+from pipelex.pipeline.execute import execute_pipeline
 
-## Enums and tests
 
-    - When defining enums related to string values, always inherit from `StrEnum`
-    - Never test equality to an enum value: use match/case, even to single out 1 case out of 10 cases. To avoid heavy match/case code in awkward places, add methods to the enum class such as `is_foobar()`. This is to avoid bugs: when new enum values are added we want the linter to complain. Use the `|` operator to group cases
-    - As our match/case constructs over enums are always exhaustive, NEVER add a default `case _: ...`. Otherwise, you won't pass linting.
+async def hello_world() -> str:
+    """
+    This function demonstrates the use of a super simple Pipelex pipeline to generate text.
+    """
+    # Run the pipe
+    pipe_output = await execute_pipeline(
+        pipe_code="hello_world",
+    )
 
-## Imports
+    return pipe_output.main_stuff_as_str
 
-### **Imports at the top of the file**
 
-    - Import all necessary libraries at the top of the file
-    - Do not import libraries in functions or classes unless in very specific cases, to be discussed with the user, as they would required a `# noqa: ...` comment to pass linting
-    - Do not bother with ordering the imports, our Ruff linter will handle it for us. Same goes with removing unused imports.
+# start Pipelex
+Pipelex.make()
+# run sample using asyncio
+output_text = asyncio.run(hello_world())
+pretty_print(output_text, title="Your first Pipelex output")
+```
 
-- **Logging and Pretty Printing**:
+## Example to execute a pipeline with structured output
 
-    - Both `log()` and `pretty_print()` can be imported from `pipelex` directly:
-    ```python
-    from pipelex import log, pretty_print
+```python
+import asyncio
 
-    log.info("Hello, world!")
-    ```
-    - Both have a title arg which is handy when logging/printing objects:
+from pipelex import pretty_print
+from pipelex.pipelex import Pipelex
+from pipelex.pipeline.execute import execute_pipeline
+from pipelex.core.stuffs.image_content import ImageContent
 
-    ```python
-    log.verbose("Hello, world!", title="Your first Pipelex log")
-    pretty_print(output_object, title="Your first Pipelex output")
-    ```
-    - Both handle formatting json using Rich, pretty_print makes it prettier.
+from my_project.gantt.gantt_struct import GanttChart
 
-- **StrEnum and Self type**:
+SAMPLE_NAME = "extract_gantt"
+IMAGE_URL = "assets/gantt/gantt_tree_house.png"
 
-    - Both `StrEnum` and `Self` must be imported from `pipelex.types` (handles python retrocompatibility):
-    ```python
-    from pipelex.types import Self, StrEnum
-    ```
 
-## Typing
+async def extract_gantt(image_url: str) -> GanttChart:
+    # Run the pipe
+    pipe_output = await execute_pipeline(
+        pipe_code="extract_gantt_by_steps",
+        input_memory={
+            "gantt_chart_image": {
+                "concept": "gantt.GanttImage",
+                "content": ImageContent(url=image_url),
+            }
+        },
+    )
+    # Output the result
+    return pipe_output.main_stuff_as(content_type=GanttChart)
 
-### **Always Use Type Hints**
 
-    - Every function parameter must be typed
-    - Every function return must be typed
-    - Use type hints for all variables where type is not obvious
-    - Use dict, list, tuple types with lowercase first letter: dict[], list[], tuple[]
-    - Use type hints for all fields
-    - Use Field(default_factory=...) for mutable defaults
-    - Use `# pyright: ignore[specificError]` or `# type: ignore` only as a last resort. In particular, if you are sure about the type, you often solve issues by using cast() or creating a new typed variable.
+# start Pipelex
+Pipelex.make()
 
-### **BaseModel / Pydantic Standards**
+# run sample using asyncio
+gantt_chart = asyncio.run(extract_gantt(image_url=IMAGE_URL))
+pretty_print(gantt_chart, title="Gantt Chart")
+```
 
-    - Use `BaseModel` and respect Pydantic v2 standards
-    - Use the modern `ConfigDict` when needed, e.g. `model_config = ConfigDict(extra="forbid", strict=True)`
-    - Keep models focused and single-purpose
-    - For list fields with non-string items in BaseModels, use `empty_list_factory_of()` to avoid linter complaints:
-      ```python
-      from pydantic import BaseModel, Field
-      from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
-      
-      class MyModel(BaseModel):
-          names: list[str] = Field(default_factory=list)  # OK for strings
-          numbers: list[int] = Field(default_factory=empty_list_factory_of(int), description="A list of numbers")
-          items: list[MyItem] = Field(default_factory=empty_list_factory_of(MyItem), description="A list of items")
-      ```
+## Setting up the input memory
 
-## Factory Pattern
+### Explanation of input memory
 
-    - Use Factory Pattern for object creation when dealing with multiple implementations
-    - Our factory methods are named `make_from_...` and such
+The input memory is a dictionary, where the key is the name of the input variable and the value provides details to make it a stuff object. The relevant definitions are:
+```python
+StuffContentOrData = dict[str, Any] | StuffContent | list[Any] | str
+PipelineInputs = dict[str, StuffContentOrData]
+```
+As you can seen, we made it so different ways can be used to define that stuff using structured content or data.
 
-## Error Handling
+### Different ways to set up the input memory
 
-    - Always catch exceptions at the place where you can add useful context to it.
-    - Use try/except blocks with specific exceptions
-    - Convert third-party exceptions to our custom ones
-    - NEVER catch the generic Exception, only catch specific exceptions, except at the root of CLI commands
-    - NEVER raise generic exceptions like ValueError or TypeError, create new error classes and raise them instead
-    - Always add `from exc` to the exception
-   
-   ```python
-   try:
-       self.models_manager.setup()
-   except RoutingProfileLibraryNotFoundError as exc:
-       msg = "The routing library could not be found, please call `pipelex init config` to create it"
-       raise PipelexSetupError(msg) from exc
-   ```
+So here are a few concrete examples of calls to execute_pipeline with various ways to set up the input memory:
 
-   **Note**: Following Ruff rules, we set the error message as a variable before raising it, for cleaner error traces.
+```python
+# Here we have a single input and it's a Text.
+# If you assign a string, by default it will be considered as a TextContent.
+    pipe_output = await execute_pipeline(
+        pipe_code="master_advisory_orchestrator",
+        input_memory={
+            "user_input": problem_description,
+        },
+    )
 
-## Documentation
+# Here we have a single input and it's a PDF.
+# Because PDFContent is a native concept, we can use it directly as a value,
+# the system knows what content it corresponds to:
+    pipe_output = await execute_pipeline(
+        pipe_code="power_extractor_dpe",
+        input_memory={
+            "document": PDFContent(url=pdf_url),
+        },
+    )
 
-1. **Docstring Format**
-   ```python
+# Here we have a single input and it's an Image.
+# Because ImageContent is a native concept, we can use it directly as a value:
+    pipe_output = await execute_pipeline(
+        pipe_code="fashion_variation_pipeline",
+        input_memory={
+            "fashion_photo": ImageContent(url=image_url),
+        },
+    )
+
+# Here we have a single input, it's an image but
+# its actually a more specific concept gantt.GanttImage which refines Image,
+# so we must provide it using a dict with the concept and the content:
+    pipe_output = await execute_pipeline(
+        pipe_code="extract_gantt_by_steps",
+        input_memory={
+            "gantt_chart_image": {
+                "concept": "gantt.GanttImage",
+                "content": ImageContent(url=image_url),
+            }
+        },
+    )
+
+# Here is a more complex example with multiple inputs assigned using different ways:
+    pipe_output = await execute_pipeline(
+        pipe_code="retrieve_then_answer",
+        dynamic_output_concept_code="contracts.Fees",
+        input_memory={
+            "text": load_text_from_path(path=text_path),
+            "question": {
+                "concept": "answer.Question",
+                "content": question,
+            },
+            "client_instructions": client_instructions,
+        },
+    )
+```
+
+## Using the outputs of a pipeline
+
+All pipe executions return a `PipeOutput` object.
+It's a BaseModel which contains the resulting working memory at the end of the execution and the pipeline run id.
+It also provides a bunch of accessor functions and properties to unwrap the main stuff, which is the last stuff added to the working memory:
+
+```python
+
+class PipeOutput(BaseModel):
+    working_memory: WorkingMemory = Field(default_factory=WorkingMemory)
+    pipeline_run_id: str = Field(default=SpecialPipelineId.UNTITLED)
+
+    @property
+    def main_stuff(self) -> Stuff:
+        ...
+
+    def main_stuff_as_list(self, item_type: type[StuffContentType]) -> ListContent[StuffContentType]:
+        ...
+
+    def main_stuff_as_items(self, item_type: type[StuffContentType]) -> list[StuffContentType]:
+        ...
+
+    def main_stuff_as(self, content_type: type[StuffContentType]) -> StuffContentType:
+        ...
+
+    @property
+    def main_stuff_as_text(self) -> TextContent:
+        ...
+
+    @property
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
