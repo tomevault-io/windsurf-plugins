@@ -7,11 +7,11 @@ Open source alternative to LangGraph Platform (now LangSmith Deployments) - Self
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [aegra/aegra](https://github.com/aegra/aegra).
+Original source: `CLAUDE.md` in [aegra/aegra](https://github.com/aegra/aegra).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
