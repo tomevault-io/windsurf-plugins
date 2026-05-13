@@ -7,11 +7,11 @@ Intent lets you provision and manage cloud infrastructure using natural language
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [spacelift-io/spacelift-intent](https://github.com/spacelift-io/spacelift-intent).
+Original source: `CLAUDE.md` in [spacelift-io/spacelift-intent](https://github.com/spacelift-io/spacelift-intent).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
