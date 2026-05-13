@@ -1,148 +1,184 @@
 ---
 trigger: always_on
-description: 1. NEVER use StyleSheet.create(). ALL styling via NativeWind className.
+description: > shadcn/ui for React Native. Beautiful. Minimal. Yours.
 ---
 
-# AniUI — Cursor Rules
-# shadcn/ui for React Native. Mobile-only. NativeWind v4 + Tailwind v3.
+# CLAUDE.md — AniUI
 
-## Hard Rules
-1. NEVER use StyleSheet.create(). ALL styling via NativeWind className.
-2. NEVER use default exports. Named exports only.
-3. NEVER use `any` type. Strict TypeScript.
-4. NEVER install components as npm deps. Components are source files in components/ui/.
-5. Always support className prop. Always spread ...props last.
-6. Always set accessibilityRole on interactive elements.
-7. Always wrap text inside Pressable in <Text>.
-8. Min touch target: min-h-12 min-w-12 (48dp) on Pressable.
-9. Import cn from "@/lib/utils" for className merging.
-10. Mobile only — iOS + Android. No web.
+> shadcn/ui for React Native. Beautiful. Minimal. Yours.
 
-## cn() Pattern
-```tsx
-import { cn } from "@/lib/utils";
-// Usage: merge base styles with user overrides
-<View className={cn("rounded-md bg-card p-4", className)} />
+## CRITICAL RULES — READ FIRST
+
+1. **NEVER install components as npm dependencies.** Components are SOURCE FILES copied into user's project via CLI. Users OWN the code.
+2. **NEVER use StyleSheet.create().** ALL styling is NativeWind className only.
+3. **NEVER create barrel files (index.ts re-exports).** Each component is standalone.
+4. **NEVER use default exports.** Named exports everywhere.
+5. **NEVER add a dependency unless 3+ components need it.** Keep node_modules minimal.
+6. **NEVER wrap components in unnecessary container Views.** Every element must earn its place.
+7. **NEVER use `any` type.** 100% strict TypeScript.
+8. **NEVER build for web.** Mobile-only (iOS + Android). If NativeWind renders on web automatically, fine — but don't optimize or test for it.
+9. **ONE file per component.** No splitting into multiple files unless absolutely necessary.
+10. **Target: each component under 80 lines of code.** If it's longer, simplify it.
+
+## Project Identity
+
+- **Name:** AniUI
+- **npm package:** `aniui` (the CLI tool only)
+- **License:** MIT
+- **Creator:** Anish
+- **Tagline:** "Beautiful React Native components. Copy. Paste. Ship."
+
+## Locked Dependency Versions
+
+DO NOT deviate from these versions. They are tested together.
+
+```json
+{
+  "peerDependencies": {
+    "react": ">=18.2.0",
+    "react-native": ">=0.76.0",
+    "nativewind": ">=4.2.1",
+    "tailwindcss": ">=3.4.17",
+    "react-native-reanimated": ">=3.10.0",
+    "react-native-safe-area-context": ">=4.10.0"
+  },
+  "dependencies_for_components": {
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "tailwind-merge": "^2.6.0"
+  }
+}
 ```
 
-## Theme Tokens (Tailwind classes)
-Colors from CSS variables in global.css. Use these class prefixes:
-- bg-background, text-foreground (page background/text)
-- bg-primary, text-primary-foreground (buttons, CTA)
-- bg-secondary, text-secondary-foreground (secondary actions)
-- bg-muted, text-muted-foreground (disabled, subtle)
-- bg-accent, text-accent-foreground (highlights)
-- bg-destructive, text-destructive-foreground (danger/error)
-- bg-card, text-card-foreground (card surfaces)
-- border-border (borders)
-- bg-input (input backgrounds)
-- ring (focus ring)
+**Dual SDK Support:** AniUI supports two generations:
+- **Expo SDK 54 (v4):** NativeWind v4 + Tailwind v3 + Reanimated v3 (Old + New Architecture)
+- **Expo SDK 55 (v5):** NativeWind v5 + Tailwind v4 + Reanimated v4 (New Architecture only)
 
-Dark mode: automatic via .dark class in global.css.
+Components use `className`/`cn()`/`cva()` which work identically on both. The CLI auto-detects the SDK generation and uses the matching templates.
 
-## Component Catalog (81 components)
+## Supported Platforms
 
-Source of truth: `cli/src/registry.ts` (tiers 1–3). After `npx @aniui/cli add <name>`, install any extra npm packages the CLI prints.
+- Expo SDK 54 (NativeWind v4 + Tailwind v3)
+- Expo SDK 55 (NativeWind v5 + Tailwind v4)
+- Bare React Native CLI 0.76+
+- iOS 15+, Android API 24+
+- New Architecture: supported on all SDKs
+- Old Architecture: supported on SDK 54 and earlier
 
-Compound components export multiple named pieces (for example `Card` + `CardHeader`, `ToastProvider` + `useToast`, `Table` + `TableRow`). Import what you need from the same file as in the component source.
+## Repository Structure
 
-### Common variants (examples — see each file for full API)
-
-- **Button** — default, secondary, outline, ghost, destructive, link × sm, md, lg
-- **Text** — h1, h2, h3, h4, p, lead, large, small, muted
-- **Input** — default, ghost × sm, md, lg
-- **Textarea** — default, ghost
-- **Badge** — default, secondary, outline, destructive
-- **Alert** — default, destructive, success, warning
-- **Toast** — default, destructive, success (via `useToast`)
-
-### Registry tier 1 — 57 components
-
-**Alert** — `import { Alert } from "@/components/ui/alert"`
-
-**Avatar** — `import { Avatar } from "@/components/ui/avatar"`
-
-**Badge** — `import { Badge } from "@/components/ui/badge"`
-
-**Banner** — `import { Banner } from "@/components/ui/banner"`
-
-**Button** — `import { Button } from "@/components/ui/button"`
-
-**Calendar** — `import { Calendar } from "@/components/ui/calendar"`
-
-**Card** — `import { Card } from "@/components/ui/card"`
-
-**Carousel** — `import { Carousel } from "@/components/ui/carousel"`
-
-**ChartTooltip** — `import { ChartTooltip } from "@/components/ui/chart-tooltip"`
-
-**ChatBubble** — `import { ChatBubble } from "@/components/ui/chat-bubble"`
-
-**Chip** — `import { Chip } from "@/components/ui/chip"`
-
-**Combobox** — `import { Combobox } from "@/components/ui/combobox"`
-
-**DatePicker** — `import { DatePicker } from "@/components/ui/date-picker"`
-
-**Dialog** — `import { Dialog } from "@/components/ui/dialog"`
-
-**EmptyState** — `import { EmptyState } from "@/components/ui/empty-state"`
-
-**FAB** — `import { FAB } from "@/components/ui/fab"`
-
-**FilePicker** — `import { FilePicker } from "@/components/ui/file-picker"`
-
-**Form** — `import { Form } from "@/components/ui/form"`
-
-**Grid** — `import { Grid } from "@/components/ui/grid"`
-
-**Header** — `import { Header } from "@/components/ui/header"`
-
-**Image** — `import { Image } from "@/components/ui/image"`
-
-**ImageGallery** — `import { ImageGallery } from "@/components/ui/image-gallery"`
-
-**InfiniteList** — `import { InfiniteList } from "@/components/ui/infinite-list"`
-
-**Input** — `import { Input } from "@/components/ui/input"`
-
-**InputOTP** — `import { InputOTP } from "@/components/ui/input-otp"`
-
-**Label** — `import { Label } from "@/components/ui/label"`
-
-**LabeledSeparator** — `import { LabeledSeparator } from "@/components/ui/labeled-separator"`
-
-**List** — `import { List } from "@/components/ui/list"`
-
-**MaskedInput** — `import { MaskedInput } from "@/components/ui/masked-input"`
-
-**NumberInput** — `import { NumberInput } from "@/components/ui/number-input"`
-
-**Pagination** — `import { Pagination } from "@/components/ui/pagination"`
-
-**PasswordInput** — `import { PasswordInput } from "@/components/ui/password-input"`
-
-**PhoneInput** — `import { PhoneInput } from "@/components/ui/phone-input"`
-
-**Price** — `import { Price } from "@/components/ui/price"`
-
-**ProgressSteps** — `import { ProgressSteps } from "@/components/ui/progress-steps"`
-
-**Rating** — `import { Rating } from "@/components/ui/rating"`
-
-**RefreshControl** — `import { RefreshControl } from "@/components/ui/refresh-control"`
-
-**SafeArea** — `import { SafeArea } from "@/components/ui/safe-area"`
-
-**SearchBar** — `import { SearchBar } from "@/components/ui/search-bar"`
-
-**SegmentedControl** — `import { SegmentedControl } from "@/components/ui/segmented-control"`
-
-**Select** — `import { Select } from "@/components/ui/select"`
-
+```
+aniui/
+├── CLAUDE.md
+├── LICENSE                    # MIT — copy from https://opensource.org/licenses/MIT
+├── README.md
+├── .gitignore
+│
+├── cli/                       # Published to npm as "aniui"
+│   ├── package.json
+│   ├── tsconfig.json
+│   ├── bin/
+│   │   └── index.ts           # #!/usr/bin/env node
+│   └── src/
+│       ├── index.ts
+│       ├── commands/
+│       │   ├── init.ts
+│       │   ├── add.ts
+│       │   └── theme.ts
+│       ├── registry.ts        # Component name → file + deps mapping
+│       └── utils/
+│           ├── detect-project.ts
+│           ├── file-ops.ts
+│           └── logger.ts
+│
+├── components/                # Source files — copied by CLI into user's project
+│   └── ui/
+│       ├── button.tsx
+│       ├── text.tsx
+│       ├── input.tsx
+│       ├── card.tsx
+│       ├── badge.tsx
+│       ├── separator.tsx
+│       ├── avatar.tsx
+│       ├── alert.tsx
+│       ├── switch.tsx
+│       ├── checkbox.tsx
+│       ├── textarea.tsx
+│       ├── label.tsx
+│       ├── spinner.tsx
+│       ├── progress.tsx
+│       ├── radio-group.tsx
+│       ├── list.tsx
+│       ├── skeleton.tsx
+│       ├── accordion.tsx
+│       ├── tabs.tsx
+│       ├── dialog.tsx
+│       ├── alert-dialog.tsx
+│       ├── toast.tsx
+│       ├── collapsible.tsx
+│       ├── tooltip.tsx
+│       ├── popover.tsx
+│       ├── bottom-sheet.tsx
+│       ├── action-sheet.tsx
+│       ├── select.tsx
+│       ├── date-picker.tsx
+│       ├── slider.tsx
+│       ├── toggle.tsx
+│       ├── toggle-group.tsx
+│       ├── drawer.tsx
+│       ├── input-otp.tsx
+│       ├── table.tsx
+│       ├── search-bar.tsx
+│       ├── chip.tsx
+│       ├── fab.tsx
+│       ├── empty-state.tsx
+│       ├── dropdown-menu.tsx
+│       ├── image.tsx
+│       ├── segmented-control.tsx
+│       ├── carousel.tsx
+│       ├── rating.tsx
+│       ├── stepper.tsx
+│       ├── banner.tsx
+│       ├── calendar.tsx
+│       ├── swipeable-list-item.tsx
+│       ├── form.tsx
+│       ├── password-input.tsx
+│       ├── theme-provider.tsx
+│       ├── safe-area.tsx
+│       ├── header.tsx
+│       ├── tab-bar.tsx
+│       ├── status-indicator.tsx
+│       ├── labeled-separator.tsx
+│       ├── masked-input.tsx
+│       ├── phone-input.tsx
+│       ├── number-input.tsx
+│       ├── combobox.tsx
+│       ├── progress-steps.tsx
+│       ├── timeline.tsx
+│       ├── chat-bubble.tsx
+│       ├── stat-card.tsx
+│       ├── grid.tsx
+│       ├── price.tsx
+│       ├── refresh-control.tsx
+│       ├── infinite-list.tsx
+│       ├── pagination.tsx
+│       ├── file-picker.tsx
+│       ├── connection-banner.tsx
+│       ├── typing-indicator.tsx
+│       └── image-gallery.tsx
+│
+├── lib/                       # Shared utils — also copied to user's project
+│   └── utils.ts               # cn() helper — THE ONLY utility file
+│
+├── templates/                 # Copied during `npx @aniui/cli init`
+│   ├── global.css
+│   ├── tailwind.config.js
+│   └── nativewind-env.d.ts
+│
+└── examples/
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/anishlp7) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-09 -->
+> Source: [anishlp7/aniui](https://github.com/anishlp7/aniui) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-04 -->
