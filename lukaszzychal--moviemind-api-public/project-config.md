@@ -1,145 +1,167 @@
 ---
 trigger: always_on
-description: **ALWAYS use Docker for local development. NEVER use `php artisan serve` or run PHP/Laravel directly on the host system.**
+description: - Rules are tools, not goals in themselves
 ---
 
-# Docker Development Environment
 
-## Mandatory Docker Usage
+# Coding Standards
 
-**ALWAYS use Docker for local development. NEVER use `php artisan serve` or run PHP/Laravel directly on the host system.**
+## Philosophy: Pragmatic Approach
 
-### Why Docker is Required
+- Rules are tools, not goals in themselves
+- Readability > Conciseness
+- Simple code is better than "perfect" code that follows all rules
+- Don't force rules
 
-1. **Consistency with Production**
-   - Production uses PostgreSQL, Redis, PHP-FPM, Nginx in containers
-   - Local environment must match production to catch issues early
-   - Prevents "works on my machine" problems
+## KISS (Keep It Simple, Stupid)
 
-2. **Database Consistency**
-   - Production: PostgreSQL
-   - Tests: SQLite (for speed) + PostgreSQL (for production-like tests)
-   - Local development: **MUST use PostgreSQL** (via Docker)
-   - Using SQLite locally can hide PostgreSQL-specific issues
+- **Simplicity over complexity** - choose simpler solutions
+- **Don't overdo abstraction** - sometimes simple code is better
+- **Avoid premature optimization** - working code first, then optimization
+- **Readability > Performance** (in most cases)
+- **The simplest solution that works** is the best
 
-3. **Service Dependencies**
-   - Application requires PostgreSQL and Redis
-   - Docker Compose provides all services in one command
-   - No need to install/manage PostgreSQL/Redis locally
+## SOLID (apply pragmatically)
 
-### Commands to Use
+- **SRP**: One class = one responsibility
+- **OCP**: Open for extension, closed for modification
+- **LSP**: Subclasses must be substitutable
+- **ISP**: Specific interfaces, not general ones
+- **DIP**: Depend on abstractions, not concrete implementations
 
-**Start services:**
-```bash
-docker compose up -d
-```
+## DRY (Don't Repeat Yourself)
 
-**Stop services:**
-```bash
-docker compose down
-```
+- Refactor duplication when it occurs in 3+ places
+- Don't overdo abstraction - sometimes duplication is more readable
+- Refactor only when it makes practical sense
 
-**Run commands inside PHP container:**
-```bash
-docker compose exec php <command>
-# Examples:
-docker compose exec php composer install
-docker compose exec php php artisan migrate
-docker compose exec php php artisan test
-```
+## CUPID
 
-**View logs:**
-```bash
-docker compose logs -f php
-docker compose logs -f horizon
-docker compose logs -f nginx
-```
+- **C**omposable - easy to compose
+- **U**nix philosophy - does one thing well
+- **P**redictable - predictable
+- **I**diomatic - follows Laravel conventions
+- **D**omain-based - domain-based
 
-### Commands to NEVER Use
+## Architecture Choice
 
-❌ **DO NOT run these commands:**
-- `php artisan serve` (on host)
-- `composer run local:up` (blocked in composer.json)
-- `composer run dev` (blocked in composer.json)
-- Any command that runs PHP/Laravel directly on host
+### Principle: Start Simple, Scale When Needed
 
-❌ **DO NOT configure `.env` for:**
-- `DB_HOST=localhost` (use `db` - Docker service name)
-- `REDIS_HOST=localhost` (use `redis` - Docker service name)
-- Local PostgreSQL/Redis installations
+**Start with a simple solution, add complexity only when justified.**
 
-### Docker Compose Services
+### Simple Solutions (Transaction Script)
 
-The `compose.yml` provides:
-- **php**: PHP-FPM container with Laravel application
-- **nginx**: Web server (port 8000)
-- **db**: PostgreSQL database
-- **redis**: Redis cache/queue
-- **horizon**: Laravel Horizon for queue processing
+**Use when:**
+- ✅ Small to medium project (MVP, prototypes)
+- ✅ Simple business logic (CRUD, simple operations)
+- ✅ Small team (1-3 people)
+- ✅ Fast development and delivery
+- ✅ Low risk of requirement changes
+- ✅ Simple domain (doesn't require complex business logic)
 
-### Environment Variables
+**Examples:**
+- Laravel Controllers with direct access to Models
+- Simple Services with business logic
+- Repository pattern (if needed)
+- Minimal abstraction
 
-Use `env/local.env.example` as template for `api/.env`:
-- `DB_HOST=db` (Docker service name, NOT localhost)
-- `REDIS_HOST=redis` (Docker service name, NOT localhost)
-- `APP_URL=http://localhost:8000`
+**Advantages:**
+- Fast development
+- Easy to understand
+- Low maintenance costs (initially)
+- Fast iteration
 
-### Testing
+### Advanced Architectures (DDD, Hexagonal, Clean Architecture)
 
-Tests can use SQLite (`:memory:`) for speed, but:
-- **Feature tests** should also run with PostgreSQL in CI
-- **Local development** must use PostgreSQL (via Docker)
-- Never develop against SQLite if production uses PostgreSQL
+**Use when:**
+- ✅ Large, complex project
+- ✅ Complex business logic (many rules, states)
+- ✅ Multiple teams working in parallel
+- ✅ Long project lifespan (5+ years)
+- ✅ High risk of requirement changes
+- ✅ Complex domain (domain experts, rich domain model)
+- ✅ High testability and isolation required
+- ✅ Need for multiple ports (API, CLI, Web, Events)
 
-### Enforcement
+**Examples:**
+- Domain-Driven Design (DDD) - Entities, Value Objects, Domain Services
+- Hexagonal Architecture - Ports & Adapters
+- Clean Architecture - layers with dependency rules
+- CQRS + Event Sourcing (when needed)
 
-- Scripts `local:up` and `dev` in `composer.json` are blocked (throw exceptions)
-- README.md clearly states Docker is required
-- CI uses Docker services (PostgreSQL, Redis)
+**Advantages:**
+- High testability
+- Better separation of responsibilities
+- Easier to add new features
+- Framework independence
+- Long-term maintainability
 
-### When Docker is NOT Running
+**Disadvantages:**
+- More code (boilerplate)
+- Slower initial development
+- More abstraction (can be harder to understand)
+- Higher initial costs
 
-If Docker is not running and user needs to work:
-1. **Start Docker Compose:**
-   ```bash
-   docker compose up -d
-   ```
+### Migration: Simple → Advanced
 
-2. **Wait for services to be ready:**
-   ```bash
-   docker compose ps
-   ```
+**When to refactor to more advanced architecture:**
 
-3. **Run setup commands:**
-   ```bash
-   docker compose exec php composer install
-   docker compose exec php php artisan migrate --seed
-   ```
+1. ✅ Code becomes hard to maintain
+2. ✅ Hard to add new features without changing existing ones
+3. ✅ Tests are hard to write
+4. ✅ Lots of business logic duplication
+5. ✅ Team grows and needs better organization
+6. ✅ Domain becomes more complex
+7. ✅ Framework independence required
 
-4. **Access application:**
-   - API: `http://localhost:8000`
-   - Horizon: `http://localhost:8000/horizon` (if configured)
+**When NOT to refactor:**
+- ❌ "For the principle" - without a concrete problem
+- ❌ When code works well and is easy to maintain
+- ❌ When project is small and simple
+- ❌ When there's no time/resources for refactoring
 
-### Troubleshooting
+### Recommendations for MovieMind API
 
-**If application doesn't start:**
-- Check Docker is running: `docker ps`
-- Check containers are up: `docker compose ps`
-- Check logs: `docker compose logs`
+**Current state:**
+- Simple architecture with Services, Repositories, Controllers
+- Event-Driven for asynchronous operations (Jobs)
+- Laravel conventions
 
-**If port 8000 is already in use:**
-- Check what's using it: `lsof -i :8000`
-- Kill process or stop conflicting service
-- Ensure no `php artisan serve` is running
+**When to consider DDD/Hexagonal:**
+- When business logic becomes very complex
+- When need for many different ports (Web, CLI, Queue, Events)
+- When team grows and needs better separation
+- When need for independence from Laravel (e.g., shared kernel)
 
-**If database connection fails:**
-- Verify `.env` has `DB_HOST=db` (not `localhost`)
-- Check PostgreSQL container is running: `docker compose ps db`
-- Check logs: `docker compose logs db`
+**Principle:**
+**Start simple, refactor when concrete problems arise, not "just in case".**
 
----
+## GRASP (General Responsibility Assignment Software Patterns)
 
-**Remember: Docker is not optional - it's mandatory for local development.**
+GRASP patterns help assign responsibilities in object-oriented design:
+
+- **Information Expert** - assign responsibility to class with information needed for execution
+- **Creator** - assign creation responsibility to class that uses/contains object
+- **Controller** - assign handling responsibility to class representing system/facade
+- **Low Coupling** - minimize dependencies between classes
+- **High Cohesion** - keep related functionality together
+- **Polymorphism** - use polymorphism for behavioral variations
+- **Pure Fabrication** - create classes that don't represent domain concepts (e.g., Repository)
+- **Indirection** - use intermediate objects to loosen dependencies
+- **Protected Variations** - protect against variations through encapsulation
+
+## YAGNI (You Aren't Gonna Need It)
+
+- **Don't add functionality until needed** - avoid premature abstraction
+- **Solve today's problems, not tomorrow's** - focus on current requirements
+- **Refactor when needed** - add complexity only when there's a concrete need
+
+## Code Smells (fix when they hinder work)
+
+### Structural Smells
+- **God Class/Method** - class/method does too much → split into smaller classes/methods
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [lukaszzychal/moviemind-api-public](https://github.com/lukaszzychal/moviemind-api-public) — distributed by [TomeVault](https://tomevault.io).
