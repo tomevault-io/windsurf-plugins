@@ -1,123 +1,118 @@
 ---
 trigger: always_on
-description: Comprehensive best practices for Rust development (Edition 2024)
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-# Rust Best Practices (2024-2025)
+# CLAUDE.md
 
-This document outlines a comprehensive set of best practices for Rust development, covering various aspects from code organization to security and tooling. Adhering to these guidelines will help you write idiomatic, efficient, secure, and maintainable Rust code.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-**Note:** This project uses **Rust Edition 2024** (released Feb 2025 with Rust 1.85).
+## Project Overview
 
-## 1. Code Organization and Structure
+Sayna is a real-time voice processing server built in Rust that provides unified Speech-to-Text (STT) and Text-to-Speech (TTS) services through WebSocket and REST APIs. It integrates with LiveKit for real-time audio streaming and includes advanced noise filtering using DeepFilterNet.
 
-### 1.1. Directory Structure
+## Development Commands
 
--   **`src/`**: Contains all the Rust source code.
-    -   **`main.rs`**: The entry point for binary crates.
-    -   **`lib.rs`**: The entry point for library crates.
-    -   **`bin/`**:  Contains source files for multiple binary executables within the same project.  Each file in `bin/` will be compiled into a separate executable.
-    -   **`modules/` or `components/`**: (Optional)  For larger projects, group related modules or components into subdirectories. Use descriptive names.
-    -   **`tests/`**:  Integration tests. (See Testing section below for more details.)
-    -   **`examples/`**: Example code that demonstrates how to use the library.
--   **`benches/`**: Benchmark tests (using `criterion` or similar).
--   **`Cargo.toml`**: Project manifest file.
--   **`Cargo.lock`**: Records the exact versions of dependencies used. **Do not manually edit.**
--   **`.gitignore`**: Specifies intentionally untracked files that Git should ignore.
--   **`README.md`**: Project documentation, including usage instructions, build instructions, and license information.
-
-
-sayna/
-├── Cargo.toml
-├── Cargo.lock
-├── src/
-│   ├── main.rs         # Entry point for a binary crate
-│   ├── lib.rs          # Entry point for a library crate
-│   ├── modules/
-│   │   ├── module_a.rs # A module within the crate
-│   │   └── module_b.rs # Another module
-│   └── bin/
-│       ├── cli_tool.rs # A separate binary executable
-│       └── worker.rs   # Another binary executable
-├── tests/
-│   └── integration_test.rs # Integration tests
-├── benches/
-│   └── my_benchmark.rs # Benchmark tests using Criterion
-├── examples/
-│   └── example_usage.rs # Example code using the library
-├── README.md
-
-
-### 1.2. File Naming Conventions
-
--   Rust source files use the `.rs` extension.
--   Module files (e.g., `module_a.rs`) should be named after the module they define.
--   Use snake_case for file names (e.g., `my_module.rs`).
-
-### 1.3. Module Organization
-
--   Use modules to organize code into logical units.
--   Declare modules in `lib.rs` or `main.rs` using the `mod` keyword.
--   Use `pub mod` to make modules public.
--   Create separate files for each module to improve readability and maintainability.
--   Use `use` statements to bring items from other modules into scope.
-
-```rust
-// lib.rs
-
-pub mod my_module;
-
-mod internal_module; // Not public
-
-
-rust
-// my_module.rs
-
-pub fn my_function() {
-    //...
-}
+```bash
+cargo run                    # Run development server
+cargo run -- -c config.yaml  # Run with YAML config file
+cargo test                   # Run all tests
+cargo test test_name         # Run specific test
+cargo build --release        # Build for release
+cargo check                  # Check without building
+cargo fmt                    # Format code
+cargo clippy                 # Run linter
+docker build -t saynaai/sayna .      # Build Docker image
 ```
 
-### 1.4. Component Architecture
+### Feature Flags
+By default, no optional features are enabled.
 
--   For larger applications, consider using a component-based architecture.
--   Each component should be responsible for a specific part of the application's functionality.
--   Components should communicate with each other through well-defined interfaces (traits).
--   Consider using dependency injection to decouple components and improve testability.
+- `stt-vad` (disabled by default): Silero-VAD voice activity detection with integrated ONNX-based turn detection. When enabled, VAD monitors audio for silence and triggers the turn detection model to confirm if the speaker's turn is complete.
+- `noise-filter` (disabled by default): DeepFilterNet noise suppression. Disable to reduce dependencies.
+- `openapi` (disabled by default): OpenAPI 3.1 specification generation using utoipa crate.
 
-### 1.5. Code Splitting Strategies
+```bash
+cargo check                                        # Default build, no optional features
+cargo check --no-default-features                  # Explicitly disable optional features
+cargo build --features stt-vad                     # Enable VAD with turn detection
+cargo build --features stt-vad,openapi             # Enable specific features
+cargo run --features openapi -- openapi -o docs/openapi.yaml  # Generate OpenAPI spec
+```
 
--   Split code into smaller, reusable modules.
--   Use feature flags to conditionally compile code for different platforms or features.
--   Consider using dynamic linking (if supported by your target platform) to reduce binary size.
+## High-Level Architecture
 
-## 2. Common Patterns and Anti-patterns
+### Development Rules
 
-### 2.1. Design Patterns
+The codebase includes detailed development rules in `.cursor/rules/`:
+- **`rust.mdc`**: Rust best practices, design patterns, performance, security, testing
+- **`core.mdc`**: STT/TTS provider abstractions (`BaseSTT`, `TTSProvider` traits)
+- **`axum.mdc`**: Axum framework patterns for WebSocket and REST APIs
+- **`livekit.mdc`**: LiveKit integration patterns and WebSocket API details
+- **`openapi.mdc`**: OpenAPI 3.1 documentation guidelines using utoipa
 
--   **Builder Pattern**: For constructing complex objects with many optional parameters.
--   **Factory Pattern**: For creating objects without specifying their concrete types.
--   **Observer Pattern**: For implementing event-driven systems.
--   **Strategy Pattern**: For selecting algorithms at runtime.
--   **Visitor Pattern**: For adding new operations to existing data structures without modifying them.
+Always consult these rule files when implementing new features.
 
-### 2.2. Recommended Approaches for Common Tasks
+### Core Components
 
--   **Data Structures**: Use `Vec` for dynamic arrays, `HashMap` for key-value pairs, `HashSet` for unique elements, `BTreeMap` and `BTreeSet` for sorted collections.
--   **Concurrency**: Use `Arc` and `Mutex` for shared mutable state, channels for message passing, and the `rayon` crate for data parallelism.
--   **Asynchronous Programming**: Use `async` and `await` for writing asynchronous code.
--   **Error Handling**: Use the `Result` type for recoverable errors and `panic!` for unrecoverable errors.
+1. **VoiceManager** (`src/core/voice_manager/`): Central coordinator for STT/TTS
+   - Manages provider lifecycle and switching
+   - Thread-safe with `Arc<RwLock<>>` for concurrent access
+   - Handles callbacks for STT results and audio output
 
-### 2.3. Anti-patterns and Code Smells
+2. **Provider System** (`src/core/stt/` and `src/core/tts/`):
+   - Trait-based abstraction for pluggable providers
+   - **STT**: Deepgram, Google (gRPC), ElevenLabs, Microsoft Azure, Cartesia
+   - **TTS**: Deepgram, ElevenLabs, Google, Microsoft Azure, Cartesia
 
--   **Unnecessary Cloning**: Avoid cloning data unless it is absolutely necessary. Use references instead.
--   **Excessive `unwrap()` Calls**: Handle errors properly instead of using `unwrap()`, which can cause the program to panic.
--   **Overuse of `unsafe`**: Minimize the use of `unsafe` code and carefully review any unsafe code to ensure it is correct.
--   **Ignoring Compiler Warnings**: Treat compiler warnings as errors and fix them.
--   **Premature Optimization**: Focus on writing clear, correct code first, and then optimize only if necessary.
+3. **WebSocket Handler** (`src/handlers/ws/`):
+   - Real-time bidirectional communication at `/ws`
+   - Processes audio streams, config updates, control messages
 
-### 2.4. State Management
+4. **LiveKit Integration** (`src/livekit/`):
+   - WebRTC audio streaming with room/participant management
+   - Audio track subscription and data message forwarding
 
+5. **DeepFilterNet** (`src/utils/noise_filter.rs`):
+   - Advanced noise reduction with thread pool for CPU-intensive operations
+
+6. **Authentication** (`src/auth/` and `src/middleware/auth.rs`):
+   - Optional JWT-based auth with external validation service
+
+7. **VAD + Turn Detection** (`src/core/vad/`, `src/core/turn_detect/`) - Feature-gated: `stt-vad`:
+   - **SileroVAD**: ONNX-based voice activity detection model
+   - **SilenceTracker**: Tracks continuous silence duration from VAD
+   - **Turn Detection**: ONNX-based model that confirms turn completion when silence is detected
+   - Integrates with VoiceManager for audio processing
+   - VAD and turn detection are always bundled together under `stt-vad` feature
+
+### Voice Activity Detection (VAD) with Turn Detection
+
+When `stt-vad` feature is enabled, Sayna provides both Silero-VAD for audio-level silence detection and smart-turn v3 model for semantic turn detection. Both features are always bundled together under the `stt-vad` feature flag.
+
+**Why Use Both VAD and Smart-Turn?**
+
+VAD (Silero) provides:
+- Fast, efficient silence detection (~2ms per frame)
+- Low latency feedback on speech activity
+- Immediate signal when user stops speaking
+
+Smart-Turn provides:
+- Semantic understanding of turn completion
+- Higher accuracy (>90% for most languages)
+- Context-aware decision making
+
+**Combined Pattern**: VAD detects silence first (fast, cheap), then smart-turn confirms if the turn is semantically complete (more accurate, slightly slower). This two-stage approach provides both speed and accuracy.
+
+**How it works:**
+```
+Audio In -> VAD -> SilenceTracker -> TurnEnd Event -> Smart-Turn -> speech_final
+                         ^                               |
+                         |                               |
+                         +-- If false, reset and wait ---+
+```
+
+1. Audio frames are processed through Silero-VAD ONNX model
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
