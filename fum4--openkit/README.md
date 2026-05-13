@@ -7,11 +7,11 @@ The platform for your agents.
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [fum4/openkit](https://github.com/fum4/openkit).
+Original source: `CLAUDE.md` in [fum4/openkit](https://github.com/fum4/openkit).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
