@@ -7,11 +7,11 @@ Nix packages for AI coding agents and development tools. Automatically updated d
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [numtide/llm-agents.nix](https://github.com/numtide/llm-agents.nix).
+Original source: `CLAUDE.md` in [numtide/llm-agents.nix](https://github.com/numtide/llm-agents.nix).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
