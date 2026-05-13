@@ -1,0 +1,153 @@
+---
+trigger: always_on
+description: **Pointa** is a Chrome extension + local MCP server for AI-powered development annotations. Point at any UI element, leave feedback, and let AI implement changes.
+---
+
+# Pointa Project Context
+
+## Project Overview
+
+**Pointa** is a Chrome extension + local MCP server for AI-powered development annotations. Point at any UI element, leave feedback, and let AI implement changes.
+
+- **Chrome Extension** (Manifest V3) — Runs in browser, captures annotations, bugs, performance issues
+- **MCP Server** (`pointa-server` npm package) — Local Node.js server that runs on developer's machine
+- **Monorepo** — Both live in this single repo
+
+## Architecture
+
+```
+pointa-app/
+├── extension/              # Chrome extension (Manifest V3)
+│   ├── manifest.json       # Extension config (VERSION synced here)
+│   ├── background/         # Service worker
+│   ├── content/            # Content scripts + CSS
+│   └── popup/              # Extension popup UI
+├── annotations-server/     # npm package "pointa-server"
+│   ├── package.json        # (VERSION synced here)
+│   ├── lib/server.js       # Main MCP server
+│   └── bin/cli.js          # CLI entry point
+├── package.json            # Root workspace (VERSION synced here)
+├── .releaserc.json         # Semantic-release config
+├── scripts/
+│   ├── sync-versions.js    # Updates versions in all 3 files
+│   ├── load-demo.sh        # Load demo fixtures into ~/.pointa/
+│   └── clear-demo.sh       # Restore original data after demo
+├── testing/
+│   ├── demo-app/index.html # Demo landing page for fixtures
+│   ├── fixtures/demo/      # Pre-built annotation & bug report JSON
+│   └── DEMO.md             # Demo setup documentation
+└── CHANGELOG.md            # Auto-generated release notes
+```
+
+## Release & Versioning
+
+**Trigger:** Merge PR to `main` with conventional commit messages.
+
+**Semantic-release automatically:**
+1. Analyzes commit messages (feat/fix/etc)
+2. Determines version bump (major/minor/patch)
+3. Runs `scripts/sync-versions.js` to bump all 3 files
+4. Builds extension zip
+5. Publishes `pointa-server` to NPM
+6. Creates GitHub Release with extension zip attached
+7. Commits version bumps to git with `[skip ci]`
+
+### Commit Message Format
+
+Follow [Conventional Commits](https://www.conventionalcommits.org/):
+
+```
+<type>(<scope>): <description>
+
+[optional body]
+```
+
+**Types that trigger releases:**
+- `feat:` → MINOR bump (1.2.0 → 1.3.0)
+- `fix:` / `perf:` / `refactor:` → PATCH bump (1.2.0 → 1.2.1)
+- `feat!:` or `BREAKING CHANGE:` → MAJOR bump (1.2.0 → 2.0.0)
+
+**Types that DON'T release:**
+- `docs:` / `chore:` / `ci:` / `test:` / `style:` — no version bump
+
+**Examples:**
+```
+feat: add fallback handling for removed elements
+fix: correct sidebar CSS isolation with Shadow DOM
+docs: update README with backend log setup
+chore(release): 1.2.0 [skip ci]
+```
+
+## Version Sync
+
+All three locations are kept in sync by `scripts/sync-versions.js`:
+- `package.json` (root)
+- `annotations-server/package.json`
+- `extension/manifest.json`
+
+This runs automatically during release. If you ever need to manually sync versions:
+```bash
+node scripts/sync-versions.js <version>
+```
+
+## Key Files
+
+- **`.releaserc.json`** — Semantic-release pipeline config
+- **`.github/workflows/release.yml`** — CI/CD workflow (runs on push to main)
+- **`scripts/sync-versions.js`** — Version synchronization script
+- **`CHANGELOG.md`** — Release notes (auto-generated)
+- **`extension/manifest.json`** — Extension metadata + version
+- **`annotations-server/package.json`** — NPM package config + version
+
+## NPM Publishing
+
+The `pointa-server` package is published to npm at:
+- https://www.npmjs.com/package/pointa-server
+- Users install: `npm install -g pointa-server` or `npx pointa-server`
+
+**Not auto-published to Chrome Web Store** — that's manual (download zip from GitHub Release, upload to Web Store).
+
+## Development
+
+```bash
+# Install server deps
+cd annotations-server
+npm install
+
+# Run server locally (watches for changes)
+npm run dev
+
+# Lint
+npm run lint
+npm run lint:fix
+```
+
+## Demo & QA Fixtures
+
+Pre-built annotations and bug reports for demos and testing. See `testing/DEMO.md` for full docs.
+
+```bash
+./scripts/load-demo.sh                    # Load fixtures into ~/.pointa/
+cd annotations-server && npm run dev      # Start MCP server
+python3 -m http.server 8080               # Serve demo page (from repo root)
+# Open http://localhost:8080/testing/demo-app/index.html with Pointa extension
+./scripts/clear-demo.sh                   # Restore original data
+```
+
+**Fixtures live in** `testing/fixtures/demo/` (annotations + bug reports targeting the demo landing page).
+
+## Important Rules
+
+### Lock files must be committed
+`annotations-server/.gitignore` uses a blanket `*.json` rule (to exclude runtime data files) with explicit exceptions. **`package-lock.json` must stay in the exceptions list** (`!package-lock.json`). The CI release workflow uses `npm ci`, which hard-fails without a lock file. If you add dependencies, always commit the updated `package-lock.json`.
+
+### Don't edit auto-generated files
+- **`CHANGELOG.md`** — auto-generated by semantic-release. Never edit manually.
+- **Version numbers** in `package.json`, `annotations-server/package.json`, and `extension/manifest.json` — bumped automatically by `scripts/sync-versions.js` during release. Only edit manually via the sync script if needed.
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [AmElmo/pointa](https://github.com/AmElmo/pointa) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-04 -->
