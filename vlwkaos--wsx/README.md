@@ -7,11 +7,11 @@ project + worktree + session management made easy
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [vlwkaos/wsx](https://github.com/vlwkaos/wsx).
+Original source: `CLAUDE.md` in [vlwkaos/wsx](https://github.com/vlwkaos/wsx).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
