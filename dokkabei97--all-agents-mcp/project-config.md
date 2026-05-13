@@ -1,0 +1,96 @@
+---
+trigger: always_on
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+---
+
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project Overview
+
+all-agents-mcp is a stdio-based MCP server that orchestrates multiple AI CLI agents (Claude Code, Codex, Gemini CLI, Copilot CLI) through a unified interface. Exposes 14 tools and 3 resources.
+
+**Development methodology**: This project follows [AIDE (Agent-Informed Development Engineering) v1.0](./AIDE-REFERENCE.md) — a software development methodology for the agentic era. See `AIDE-REFERENCE.md` for the full reference. Key adopted principles noted below with `[AIDE P#]` tags.
+
+## Build & Development Commands
+
+```bash
+npm run build        # TypeScript compilation (tsc → dist/)
+npm run dev          # Watch mode (tsc --watch)
+npm run lint         # Biome check with auto-fix (biome check --write .)
+npm test             # Run all tests (vitest run)
+npm run test:watch   # Watch mode tests (vitest)
+npx vitest run src/path/to/file.test.ts  # Run a single test file
+```
+
+Debug logging: `AA_MCP_LOG_LEVEL=debug node dist/index.js` (levels: debug, info, warn, error)
+
+## Architecture
+
+### Entry Flow
+
+`src/index.ts` → `createServer()` in `src/server.ts` → registers all tools/resources → connects `StdioServerTransport`.
+
+### Layer Structure [AIDE P2: Locality]
+
+```
+src/
+├── agents/         # Agent abstraction — IAgent interface + per-agent implementations
+├── orchestrator/   # Process spawning, parallel execution, complexity analysis, verification
+├── tools/          # 14 MCP tool definitions (one file = one tool)
+├── resources/      # 3 MCP resource definitions
+├── session/        # File-based JSON session storage (~/.all-agents-mcp/sessions/)
+├── config/         # Env var config loader (AA_MCP_* overrides) + Zod schema
+├── utils/          # Logger (stderr-only), CLI detection
+├── server.ts       # McpServer factory — registers all tools and resources
+└── index.ts        # Entry point — stdio transport connection
+```
+
+### Agent Layer (`src/agents/`)
+
+- **`types.ts`**: `AgentId = "claude" | "codex" | "gemini" | "copilot"`. Core interfaces: `IAgent`, `AgentResponse`, `HealthStatus`, `ExecutionOptions`, `AgentConfig`.
+- **`base-agent.ts`**: Abstract class implementing `IAgent`. Subclasses implement `buildSpawnOptions()` to construct CLI-specific arguments. Delegates execution to `spawnAgent()` from the orchestrator.
+- **Agent-specific overrides**: `CodexAgent` overrides `execute()` entirely (uses temp file via `--output-last-message`). `ClaudeAgent` overrides `parseOutput()` (JSON output format).
+- **`registry.ts`**: Lazy-initialized singleton `Map<AgentId, IAgent>`. Applies **recursive call prevention** — detects the caller agent via `detectCaller()` and excludes it from the registry.
+
+### Orchestrator Layer (`src/orchestrator/`)
+
+- **`executor.ts`**: `spawnAgent()` — low-level `child_process.spawn` with `AbortController` timeout. All CLI invocations go through here.
+- **`parallel.ts`**: `Promise.allSettled` for concurrent multi-agent execution.
+- **`complexity.ts`**: Keyword-based heuristic (Korean + English) to classify tasks as `simple | complex | large` for `delegate_task`.
+- **`verifier.ts`**: Cross-model verification — one agent, multiple models.
+- **`aggregator.ts`**: Markdown formatting for responses — comparison tables, verification summaries.
+
+### Tool Registration Pattern
+
+Each file in `src/tools/` exports a `register*Tool(server: McpServer)` function:
+```typescript
+server.tool(name, description, zodSchema, async (params) => { ... })
+```
+All tools record interactions to the session store via `addEntry()`.
+
+## Key Patterns & Constraints
+
+- **ESM-only**: `"type": "module"`. All imports use `.js` extension (Node16 module resolution). [AIDE P7]
+- **Biome formatting**: Tab indentation, 100 char line width, double quotes, semicolons always.
+- **MCP stdout constraint**: Never write to stdout except via MCP SDK. All logging uses stderr via `logger`. This is the most critical invariant — violating it breaks the MCP protocol.
+- **Recursion guard**: The registry auto-excludes the caller agent (detected via CLI args → env vars → `process.env._`). This prevents infinite loops when all-agents-mcp is invoked from within an agent it orchestrates.
+- **Model config**: 에이전트별 모델 설정은 `src/config/models.json`에 정의. `models`는 `{name, timeoutSeconds?}` 객체 배열. 신규 모델 추가 시 JSON만 편집 → `npm run build` → publish. 환경 변수 오버라이드(`AA_MCP_*`)는 그대로 유지.
+- **Per-model timeout**: 모델별 타임아웃 우선순위: ①호출자 `options.timeout` → ②`models.json`의 `model.timeoutSeconds`×1000 → ③`agent.defaultTimeoutSeconds`×1000 → ④글로벌 기본값 `120_000ms`. 환경변수 `AA_MCP_{AGENT}_TIMEOUT`으로 에이전트 기본 타임아웃(초) 오버라이드 가능.
+- **Tests**: Vitest tests are co-located alongside source as `*.test.ts`. Run with `npm test`.
+
+## AIDE Methodology Reference [AIDE P10: Meta-Code as First-Class]
+
+This project adopts AIDE v1.0. The full reference is in [`AIDE-REFERENCE.md`](./AIDE-REFERENCE.md). Key principles applied:
+
+| Principle | Application in this project |
+|-----------|----------------------------|
+| **P1 Context Budget** | Files ≤300 lines, functions ≤50 lines, line width 100 chars |
+| **P2 Locality** | Each tool is a self-contained file. Agent implementations are co-located |
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [Dokkabei97/all-agents-mcp](https://github.com/Dokkabei97/all-agents-mcp) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-04 -->
