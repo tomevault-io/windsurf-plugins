@@ -1,136 +1,49 @@
 ---
 trigger: always_on
-description: Purpose: provide short, actionable guidance so Copilot suggestions match project conventions.
+description: API endpoint consistency — checklist to run after every API endpoint commit (Minitest behavior, rswag docs-only, API key auth).
 ---
 
 
-# Copilot instructions (English — concise)
+# API endpoint consistency (post-commit checklist)
 
-Purpose: provide short, actionable guidance so Copilot suggestions match project conventions.
+When adding or modifying API v1 endpoints, ensure the following so behavior, docs, and auth stay consistent.
 
-## Common Development Commands
+## 1. Minitest behavioral coverage
 
-### Development Server
-- `bin/dev` - Start development server (Rails, Sidekiq, Tailwind CSS watcher)
-- `bin/rails server` - Start Rails server only
-- `bin/rails console` - Open Rails console
+- **Location**: `test/controllers/api/v1/{resource}_controller_test.rb`
+- **Scope**: All new or changed actions must have Minitest coverage here. Do not rely on rswag specs for behavioral assertions.
+- **Pattern**:
+  - Use `ApiKey.create!` (read and read_write scopes) and `api_headers(api_key)` → `{ "X-Api-Key" => api_key.display_key }`. Do not use OAuth/Bearer in these tests.
+  - Cover: index/show (and create/update/destroy for write endpoints), read-only key blocking writes (403), invalid params (422), invalid date (422), not found (404), missing auth (401).
+  - Follow existing API v1 test style: see [valuations_controller_test.rb](mdc:test/controllers/api/v1/valuations_controller_test.rb) and [transactions_controller_test.rb](mdc:test/controllers/api/v1/transactions_controller_test.rb).
 
-### Testing
-- `bin/rails test` - Run all tests
-- `bin/rails test:db` - Run tests with database reset
-- `DISABLE_PARALLELIZATION=true bin/rails test:system` - Run system tests only (use sparingly - they take longer)
-- `bin/rails test test/models/account_test.rb` - Run specific test file
-- `bin/rails test test/models/account_test.rb:42` - Run specific test at line
+## 2. rswag is docs-only
 
-### Linting & Formatting
-- `bin/rubocop` - Run Ruby linter
-- `npm run lint` - Check JavaScript/TypeScript code
-- `npm run lint:fix` - Fix JavaScript/TypeScript issues
-- `npm run format` - Format JavaScript/TypeScript code
-- `bin/brakeman` - Run security analysis
+- **Location**: `spec/requests/api/v1/{resource}_spec.rb`
+- **Rule**: These specs exist only for OpenAPI generation. Do not add `expect(...)` or `assert_*` (or any behavioral assertions). Use `run_test!` without custom assertion blocks so the spec only documents request/response and regenerates `docs/api/openapi.yaml`.
+- **Regenerate**: After edits, run `RAILS_ENV=test bundle exec rake rswag:specs:swaggerize`.
 
-### Database
-- `bin/rails db:prepare` - Create and migrate database
-- `bin/rails db:migrate` - Run pending migrations
-- `bin/rails db:rollback` - Rollback last migration
-- `bin/rails db:seed` - Load seed data
+## 3. Same API key auth in all rswag specs
 
-### Setup
-- `bin/setup` - Initial project setup (installs dependencies, prepares database)
+- **Rule**: Every request spec in `spec/requests/api/v1/` must use the same API key auth pattern so generated docs are consistent.
+- **Pattern** (match holdings_spec, trades_spec, transactions_spec, etc.):
 
-## Pre-PR workflow (run locally before opening PR)
-- Tests: bin/rails test (all), DISABLE_PARALLELIZATION=true bin/rails test:system (when applicable)
-- Linters: bin/rubocop -f github -a; bundle exec erb_lint ./app/**/*.erb -a
-- Security: bin/brakeman --no-pager
+  ```ruby
+  let(:api_key) do
+    key = ApiKey.generate_secure_key
+    ApiKey.create!(
+      user: user,
+      name: 'API Docs Key',
+      key: key,
+      scopes: %w[read_write],
+      source: 'web'
+    )
+  end
 
-## High-Level Architecture
+  let(:'X-Api-Key') { api_key.plain_key }
+  ```
 
-### Application Modes
-The app runs in two modes:
-- **Managed** (Rails.application.config.app_mode = "managed")
-- **Self-hosted** (Rails.application.config.app_mode = "self_hosted")
-
-### Core Domain Model
-The application is built around financial data management with these key relationships:
-- **User** → has many **Accounts** → has many **Transactions**
-- **Account** types: checking, savings, credit cards, investments, crypto, loans, properties
-- **Transaction** → belongs to **Category**, can have **Tags** and **Rules**
-- **Investment accounts** → have **Holdings** → track **Securities** via **Trades**
-
-### API Architecture
-The application provides both internal and external APIs:
-- Internal API: Controllers serve JSON via Turbo for SPA-like interactions
-- External API: `/api/v1/` namespace with Doorkeeper OAuth and API key authentication
-- API responses use Jbuilder templates for JSON rendering.
-- Rate limiting via Rack::Attack with configurable limits per API key
-
-### Sync & Import System
-Two primary data ingestion methods:
-1. **Plaid Integration**: Real-time bank account syncing
-   - `PlaidItem` manages connections
-   - `Sync` tracks sync operations
-   - Background jobs handle data updates
-2. **CSV Import**: Manual data import with mapping
-   - `Import` manages import sessions
-   - Supports transaction and balance imports
-   - Custom field mapping with transformation rules
-
-### Background Processing
-Sidekiq handles asynchronous tasks:
-- Account syncing (`SyncJob`)
-- Import processing (`ImportJob`)
-- AI chat responses (`AssistantResponseJob`)
-- Scheduled maintenance via sidekiq-cron
-
-### Frontend Architecture
-- **Hotwire Stack**: Turbo + Stimulus for reactive UI without heavy JavaScript
-- **ViewComponents**: Reusable UI components in `app/components/`
-- **Stimulus Controllers**: Handle interactivity, organized alongside components
-- **Charts**: D3.js for financial visualizations (time series, donut, sankey)
-- **Styling**: Tailwind CSS v4.x with custom design system
-  - Design system defined in `app/assets/tailwind/sure-design-system.css`
-  - Always use functional tokens (e.g., `text-primary` not `text-white`)
-  - Prefer semantic HTML elements over JS components
-  - Use `icon` helper for icons, never `lucide_icon` directly
-
-### Multi-Currency Support
-- All monetary values stored in base currency (user's primary currency)
-- `Money` objects handle currency conversion and formatting
-- Historical exchange rates for accurate reporting
-
-### Security & Authentication
-- Session-based auth for web users
-- API authentication via:
-  - OAuth2 (Doorkeeper) for third-party apps
-  - API keys with JWT tokens for direct API access
-- Scoped permissions system for API access
-- Strong parameters and CSRF protection throughout
-
-## Key rules
-- Project modes: "managed" or "self_hosted".
-- Domain: User → Accounts → Transactions. Keep business logic in models, controllers thin.
-
-Authentication & context
-- Use Current.user and Current.family (never current_user / current_family).
-
-Testing conventions
-- Use Minitest + fixtures (no RSpec, no FactoryBot).
-- Use mocha for mocks where needed; VCR for external API tests.
-
-Frontend conventions
-- Hotwire-first: Turbo + Stimulus.
-- Prefer semantic HTML, Turbo Frames, server-side formatting.
-- Use the helper icon for icons (do not use lucide_icon directly).
-- Use Tailwind design tokens (text-primary, bg-container, etc.).
-
-Backend & architecture
-- Skinny controllers, fat models.
-- Prefer built-in Rails patterns; add dependencies only with strong justification.
-- Sidekiq for background jobs (e.g., SyncJob, ImportJob, AssistantResponseJob).
-
-API & security
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- Do not use Doorkeeper/OAuth in these specs (no `Doorkeeper::Application`, `Doorkeeper::AccessToken`, or `Authorization: "Bearer ..."`). Use API key only. Note: [valuations_spec.rb](mdc:spec/requests/api/v1/valuations_spec.rb) currently uses OAuth; update it to the API key pattern above when editing that file.
 
 ---
 > Source: [we-promise/sure](https://github.com/we-promise/sure) — distributed by [TomeVault](https://tomevault.io).
