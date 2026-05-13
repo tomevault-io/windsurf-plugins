@@ -7,11 +7,11 @@ A community-driven knowledge base of practical patterns for Effect-TS.
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [PaulJPhilp/EffectPatterns](https://github.com/PaulJPhilp/EffectPatterns).
+Original source: `CLAUDE.md` in [PaulJPhilp/EffectPatterns](https://github.com/PaulJPhilp/EffectPatterns).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
