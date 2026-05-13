@@ -7,11 +7,11 @@ Bash-based Git worktree manager with editor and AI tool integration. Automates p
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [coderabbitai/git-worktree-runner](https://github.com/coderabbitai/git-worktree-runner).
+Original source: `CLAUDE.md` in [coderabbitai/git-worktree-runner](https://github.com/coderabbitai/git-worktree-runner).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
