@@ -7,11 +7,11 @@ Knocker, a knock based access control service for your homelab
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [FarisZR/knocker](https://github.com/FarisZR/knocker).
+Original source: `CLAUDE.md` in [FarisZR/knocker](https://github.com/FarisZR/knocker).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
