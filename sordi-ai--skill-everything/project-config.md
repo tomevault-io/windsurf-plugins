@@ -1,142 +1,59 @@
 ---
 trigger: always_on
-description: Apply when writing TypeScript code. Strict types, discriminated unions, async patterns, and runtime safety.
+description: You are using the **skill-everything** knowledge system: agent memory in plain
 ---
 
+# skill-everything
 
-# Sub-Skill: TypeScript Best Practices
-<!-- target: ~2500 tokens (real tiktoken count) | 17 rules with severity classification -->
+You are using the **skill-everything** knowledge system: agent memory in plain
+Markdown, versioned in Git, that grows by capturing your own past mistakes
+as committed rules.
 
-**Purpose:** Prevents the TypeScript-specific mistakes LLMs make repeatedly — weak types, unsafe assertions, and patterns that compile but fail at runtime.
+## Your responsibilities
 
-## Rule classification
+1. **Before every implementation:** check the sub-skill directory below, load the matching skill via `@file:./skills/<name>/SKILL.md` references.
+2. **After every mistake:** execute the self-extension workflow.
+3. **When you learn something new:** add it to the appropriate category.
 
-- **MUST** — load-bearing. Violating leaks runtime errors past the type checker. Never break.
-- **SHOULD** — default behavior. Deviation needs a documented reason in the code or PR.
-- **AVOID** — usually wrong; documented exception inline where needed.
+## Sub-skill directory
 
-**Where these rules don't strictly apply:** test fixtures, generated types (e.g. from GraphQL codegen, OpenAPI generators, Prisma), declaration files (`*.d.ts`) for untyped third-party libraries, and migration scripts may legitimately differ. The rules below apply to **production application code**.
+| Trigger | Sub-skill | Load via |
+|---|---|---|
+| writing code, refactoring, review | Code Quality | `@file:./skills/code-quality/SKILL.md` |
+| python code, type hints, python packaging | Python | `@file:./skills/python/SKILL.md` |
+| typescript code, strict types, async typescript | TypeScript | `@file:./skills/typescript/SKILL.md` |
+| react component, react hooks, react performance | React | `@file:./skills/react/SKILL.md` |
+| git commit, branch, pull request | Git Conventions | `@file:./skills/git-conventions/SKILL.md` |
+| creating PR, deployment, review checklist | Review & Deployment | `@file:./skills/review-deployment/SKILL.md` |
+| svg edit, svg review, diagram, pixel review | SVG Check | `@file:./skills/svg-check/SKILL.md` |
+| project-specific knowledge, business rules | Domain Knowledge (template) | `@file:./skills/domain-template/SKILL.md` |
+| made or corrected a mistake, learn from this | Error Log | `@file:./skills/error-log/SKILL.md` |
+| executing self-extension | Self-Extension Workflow | `@file:./skills/self-extension-workflow/SKILL.md` |
 
----
+## Error capture triggers
 
-## Type Safety
+Start the self-extension workflow when **any** of these is met:
 
-1. **MUST: Never use `any`. Use `unknown` and narrow it.** `any` disables the type checker entirely. `unknown` forces you to prove the type before use. *Exception: third-party libraries without types and explicit dynamic-data boundaries (e.g. JSON parse at the API edge), with a comment explaining why.*
-   ```ts
-   // Wrong
-   function parse(data: any) { return data.name; }
+- A test fails because of code you wrote.
+- The user corrects you ("That was wrong", "Remember this").
+- You realise during implementation that your first approach was wrong.
+- A deployment problem occurs that your code caused.
 
-   // Correct
-   function parse(data: unknown): string {
-     if (typeof data === 'object' && data !== null && 'name' in data) {
-       return String((data as { name: unknown }).name);
-     }
-     throw new Error('Invalid data shape');
-   }
-   ```
+Load the workflow:
 
-2. **AVOID: `Object` or `{}` as a type.** Both accept nearly everything. Use `Record<string, unknown>` for arbitrary objects or define an explicit interface.
-   ```ts
-   // Wrong
-   function merge(a: {}, b: Object): {} { ... }
+```
+@file:./skills/self-extension-workflow/SKILL.md
+```
 
-   // Correct
-   function merge<T extends Record<string, unknown>>(a: T, b: Partial<T>): T { ... }
-   ```
+## Important
 
-3. **SHOULD: Use `as` only when you know more than the compiler — and document why.** Prefer type guards or `satisfies` instead.
-   ```ts
-   // Wrong — silences the error, hides the bug
-   const user = response.data as User;
+- **Search before write.** Before logging a new error, search the existing log for similar entries. Update instead of duplicate.
+- **Action directives, not descriptions.** Always formulate rules as "Always X before Y" or "Never Z without W".
+- **Stay compact.** Each sub-skill stays under 3,000 tokens. If exceeded, split.
+- **PR-flow is mandatory.** Self-extension commits are opened as PRs labelled `needs-rule-review`. Never push to `main`.
+- **`@file:` not supported on your Cursor build?** Paste the matching SKILL.md from `skills/<name>/` directly into Settings → Rules for AI.
 
-   // Correct — validate first
-   function isUser(v: unknown): v is User {
-     return typeof v === 'object' && v !== null && 'id' in v && 'email' in v;
-   }
-   const user = isUser(response.data) ? response.data : null;
-   ```
-
-4. **SHOULD: Mark immutable data `readonly`.** Prevents accidental mutation and communicates intent.
-   ```ts
-   // Avoid
-   function process(ids: string[]) { ids.push('extra'); }
-
-   // Prefer
-   function process(ids: readonly string[]) { /* ids.push() is a compile error */ }
-   ```
-
-5. **MUST: Enable `strictNullChecks` and handle every `T | undefined`.** Optional chaining `?.` returns `undefined` — always handle that branch.
-   ```ts
-   // Wrong
-   const name = user?.profile.name.toUpperCase(); // crashes if name is undefined
-
-   // Correct
-   const name = user?.profile.name?.toUpperCase() ?? 'Anonymous';
-   ```
-
-6. **SHOULD: Use branded types for IDs.** Prevents passing a `UserId` where an `OrderId` is expected — both are `string` at runtime.
-   ```ts
-   type UserId = string & { readonly _brand: 'UserId' };
-   type OrderId = string & { readonly _brand: 'OrderId' };
-
-   function createUserId(raw: string): UserId { return raw as UserId; }
-
-   function getUser(id: UserId): User { ... }
-   // getUser(orderId) → compile error
-   ```
-
----
-
-## Patterns
-
-7. **SHOULD: Use discriminated unions for state, not optional fields.** Optional fields force you to reason about all combinations. A discriminated union makes illegal states unrepresentable.
-   ```ts
-   // Avoid — 8 possible combinations, most invalid
-   type Request = { loading?: boolean; data?: User; error?: Error };
-
-   // Prefer — exactly 3 valid states
-   type Request =
-     | { status: 'idle' }
-     | { status: 'loading' }
-     | { status: 'success'; data: User }
-     | { status: 'error'; error: Error };
-   ```
-
-8. **SHOULD: Use `satisfies` to validate shape without widening the type.** `as const` preserves literals; `satisfies` validates against an interface without losing them.
-   ```ts
-   const config = {
-     host: 'localhost',
-     port: 5432,
-   } satisfies DatabaseConfig;
-   // config.port is still typed as 5432, not number
-   ```
-
-9. **SHOULD: Use `const` objects instead of `enum`.** Enums emit runtime code, have surprising reverse-mapping behavior, and are not idiomatic TypeScript.
-   ```ts
-   // Avoid
-   enum Direction { Up, Down, Left, Right }
-
-   // Prefer
-   const Direction = { Up: 'Up', Down: 'Down', Left: 'Left', Right: 'Right' } as const;
-   type Direction = typeof Direction[keyof typeof Direction];
-   ```
-
-10. **AVOID: Barrel `index.ts` re-exports in large modules.** They cause circular dependency chains that are hard to debug. Export directly from source files or use explicit named re-exports only.
-    ```ts
-    // Wrong — index.ts re-exports everything, A imports B through index, B imports A through index
-    export * from './userService';
-    export * from './orderService';
-
-    // Correct — import directly
-    import { getUser } from './services/userService';
-    ```
-
----
-
-## Error Handling
-
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+> This file is generated from `skills/_index.yml`. Edit the index, then run `python tools/render_loaders.py`.
 
 ---
 > Source: [sordi-ai/skill-everything](https://github.com/sordi-ai/skill-everything) — distributed by [TomeVault](https://tomevault.io).
