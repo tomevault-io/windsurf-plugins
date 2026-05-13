@@ -1,11 +1,9 @@
 ---
 trigger: always_on
-description: This document provides a high-level overview of the Depyler project, intended for new contributors and users.
+description: **NEVER write code before writing a provable contract.**
 ---
 
-# Depyler: Python to Rust Transpiler
-
-This document provides a high-level overview of the Depyler project, intended for new contributors and users.
+# CLAUDE.md - Depyler Compiler Implementation Protocol
 
 ## CRITICAL: Contract-First Design
 
@@ -17,98 +15,124 @@ All code changes MUST have a corresponding contract (YAML in ../provable-contrac
 - Minimum verification level: L1 (recommended L3+)
 - See docs/agent-instructions/provable-contract-first-agents.md for the full workflow
 
-## Project Overview
+## Prime Directive
+**Generate correct Rust code that compiles on first attempt. Quality is built-in, not bolted-on.**
 
-Depyler is a sophisticated transpiler that converts Python code into safe, idiomatic, and energy-efficient Rust code. It leverages Python's type annotations to generate high-quality Rust code, and includes a semantic verification engine to ensure that the transpiled code is behaviorally equivalent to the original Python source.
+## Project Context
+Depyler is a Python-to-Rust transpiler focusing on energy-efficient, safe code generation with progressive verification.
 
-The project is designed with a focus on correctness, performance, and developer productivity. It provides tools for not only transpilation but also for analyzing the complexity of migrating Python codebases to Rust.
+## Python Packaging Protocol
+**MANDATORY: Use `uv` for ALL Python operations** (`uv add`, `uv run pytest`, `uv run <script.py>`)
 
-## Key Features
+## Code Search (pmat query)
 
-*   **Python to Rust Transpilation:** Converts a significant subset of the Python language to Rust, including functions, classes, collections, control flow, and async/await.
-*   **Semantic Verification:** Uses property-based testing to verify the correctness of the transpiled code.
-*   **Migration Analysis:** Provides a tool to analyze Python code and estimate the effort required for migration to Rust.
-*   **Modular Architecture:** The project is organized as a Cargo workspace with several specialized crates, promoting separation of concerns and maintainability.
-*   **AI Assistant Integration:** Includes an MCP (Model Context Protocol) server for integration with AI assistants, enabling code transformation and analysis through a conversational interface.
-*   **High-Quality Standards:** The project adheres to strict quality gates, including high test coverage, low cyclomatic complexity, and comprehensive documentation.
-
-## Getting Started
-
-### Installation
-
-To install the Depyler CLI, use the following command:
+**NEVER use grep or rg for code discovery.** Use `pmat query` instead -- it returns quality-annotated, ranked results with TDG scores and fault annotations.
 
 ```bash
-cargo install depyler
+# Find functions by intent
+pmat query "python ast conversion" --limit 10
+
+# Find high-quality code
+pmat query "type inference" --min-grade A --exclude-tests
+
+# Find with fault annotations (unwrap, panic, unsafe, etc.)
+pmat query "transpilation pass" --faults
+
+# Filter by complexity
+pmat query "code generation" --max-complexity 10
+
+# Cross-project search
+pmat query "rust codegen" --include-project ../trueno
+
+# Git history search (find code by commit intent via RRF fusion)
+pmat query "fix type mapping" -G
+pmat query "ast visitor" --git-history
+
+# Enrichment flags (combine freely)
+pmat query "ast visitor" --churn              # git volatility (commit count, churn score)
+pmat query "pattern matcher" --duplicates           # code clone detection (MinHash+LSH)
+pmat query "code emitter" --entropy           # pattern diversity (repetitive vs unique)
+pmat query "transpilation" --churn --duplicates --entropy --faults -G  # full audit
 ```
 
-### Basic Usage
+## Build Environment
+- **Cargo Target**: `/Volumes/LambdaCache/cargo-target` (256GB APFS disk image, 16 jobs, incremental)
+- **DO NOT** create additional RAM disks or use /tmp for transpiler output
 
-**Transpile a Python file:**
+## Code Standard (A+)
+- Cyclomatic/Cognitive Complexity: **<=10**
+- Function Size: **<=30 lines**
+- Zero SATD (TODO/FIXME/HACK)
+- TDD Mandatory, Coverage: **>=80%** (cargo-llvm-cov)
 
+## CRITICAL: Never Add -D warnings to Convergence Compilation
+
+**File**: `crates/depyler/src/converge/compiler.rs` / `compile_with_cargo()`
+
+Adding `RUSTFLAGS=-D warnings` to convergence cargo build drops rate from 80%+ to ~0%. Generated code has harmless unused imports. Quality is enforced via clippy in CI, NOT during convergence.
+
+**Regression tests** in `compiler.rs`:
+1. `test_no_d_warnings_flag_in_source`
+2. `test_regression_warnings_must_not_cause_failure`
+3. `test_uses_cargo_when_cargo_toml_exists`
+
+**If convergence rate near 0%**: Check `compile_with_cargo()` for RUSTFLAGS, run `cargo test -p depyler -- test_no_d_warnings_flag`.
+
+## TDD Protocol
+Any transpiler/codegen bug: HALT -> comprehensive test suites -> failing test BEFORE fix -> validate all features after.
+
+## CLI Validation Gates
+15 gates mandatory for ALL examples: rustc --deny warnings, clippy -D warnings, rustfmt --check, basic compilation, LLVM IR, ASM, MIR, parse, type check, cargo tree, rustdoc, macro expansion, HIR dump, dead code, complexity. **NEVER bypass gates. Fix transpiler, not output.**
+
+## Development Principles
+- **Jidoka**: Never ship incomplete transpilation. Verification-first.
+- **Genchi Genbutsu**: Test against real Rust. Measure actual compilation.
+- **Hansei**: Fix broken functionality before new features.
+- **Kaizen**: Incremental verification. Performance baselines.
+- **Scientific Method**: No assumptions - prove with tests, measure everything, reproduce issues.
+
+## Critical Invariants
+1. Type safety: Must pass `cargo check`
+2. Determinism: Same input -> identical output
+3. Memory safety: No UB or leaks
+
+## Transpilation Workflow
 ```bash
-depyler transpile my_script.py
+depyler transpile <input.py>                      # Basic
+depyler transpile <input.py> --verify --gen-tests  # With verification
+rustc --crate-type lib --deny warnings <output.rs> # Validate
 ```
 
-**Analyze a Python file for migration complexity:**
-
-```bash
-depyler analyze my_script.py
+**MANDATORY Header** in all generated .rs files:
+```rust
+// Generated by: depyler transpile <source.py>
+// Source: <source.py>
 ```
 
-**Transpile and verify the output:**
+## Stop the Line: Bug-Fix Protocol
 
-```bash
-depyler transpile my_script.py --verify
-```
+When ANY defect is found in transpiled output, **STOP ALL WORK IMMEDIATELY**.
 
-## Project Structure
+1. STOP all feature work
+2. Document bug in `docs/bugs/DEPYLER-XXXX-<desc>.md`
+3. Assign sequential ticket number
+4. Root cause analysis (find transpiler bug source)
+5. **Fix the transpiler** (NEVER fix generated output)
+6. Re-transpile ALL affected files
+7. Verify comprehensively (compile, test, quality gates)
+8. Resume work only after 100% verification
 
-The Depyler project is a Cargo workspace with the following key components:
+**Severity**: P0 (compilation/type/memory safety) = STOP ALL WORK. P1 (clippy/perf) = BLOCK RELEASE. P2/P3 = TRACK.
 
-*   `crates/`: This directory contains the individual crates that make up the Depyler project.
-    *   `depyler-core/`: The core transpilation logic.
-    *   `depyler-analyzer/`: The migration complexity analysis tool.
-    *   `depyler-verify/`: The semantic verification engine.
-    *   `depyler-mcp/`: The MCP server for AI assistant integration.
-    *   `depyler/`: The main CLI application.
-*   `docs/`: Contains detailed documentation about the project's architecture, features, and usage.
-*   `examples/`: A collection of Python scripts that can be used to test and demonstrate Depyler's capabilities.
-*   `tests/`: Contains the integration and unit tests for the project.
-*   `Cargo.toml`: The workspace configuration file, which defines the project's dependencies and structure.
-*   `README.md`: The main README file for the project.
+Full protocol: [docs/processes/stop-the-line.md](docs/processes/stop-the-line.md)
 
-## Development
+## Testing Strategy
+- **Unit Tests**: >=5 per module, 85% coverage
+- **Property Tests**: >=3 per module, 1000 iterations
+- **Doctests**: >=2 per public function
 
-### Running Tests
-
-To run the full test suite for the project, use the following command:
-
-```bash
-cargo test --workspace
-```
-
-### Code Style and Quality
-
-The project enforces a strict code style and quality standards. Before submitting any changes, please run the following commands to ensure that your code meets these standards:
-
-**Format the code:**
-
-```bash
-cargo fmt --all
-```
-
-**Run the linter:**
-
-```bash
-cargo clippy --all-targets --all-features -- -D warnings
-```
-
-### Contributing
-
-Contributions are welcome! Please refer to the `CONTRIBUTING.md` file for more details on how to contribute to the project.
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/paiml)
-> This is a context snippet only. You'll also want the standalone SKILL.md file — [download at TomeVault](https://tomevault.io/claim/paiml)
-<!-- tomevault:4.0:windsurf_rules:2026-04-07 -->
+> Source: [paiml/depyler](https://github.com/paiml/depyler) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-04 -->
