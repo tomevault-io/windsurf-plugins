@@ -1,59 +1,102 @@
 ---
 trigger: always_on
-description: You are an agent - please keep going until the user’s query is completely resolved, before ending your turn and yielding back to the user.
+description: Guidelines and best practices for building Convex projects, including database schema design, queries, mutations, and real-world examples
 ---
 
 
-# Beast Mode 3.1
+# Convex guidelines
+## Function guidelines
+### New function syntax
+- ALWAYS use the new function syntax for Convex functions. For example:
+```typescript
+import { query } from "./_generated/server";
+import { v } from "convex/values";
+export const f = query({
+    args: {},
+    returns: v.null(),
+    handler: async (ctx, args) => {
+    // Function body
+    },
+});
+```
 
-You are an agent - please keep going until the user’s query is completely resolved, before ending your turn and yielding back to the user.
+### Http endpoint syntax
+- HTTP endpoints are defined in `convex/http.ts` and require an `httpAction` decorator. For example:
+```typescript
+import { httpRouter } from "convex/server";
+import { httpAction } from "./_generated/server";
+const http = httpRouter();
+http.route({
+    path: "/echo",
+    method: "POST",
+    handler: httpAction(async (ctx, req) => {
+    const body = await req.bytes();
+    return new Response(body, { status: 200 });
+    }),
+});
+```
+- HTTP endpoints are always registered at the exact path you specify in the `path` field. For example, if you specify `/api/someRoute`, the endpoint will be registered at `/api/someRoute`.
 
-Your thinking should be thorough and so it's fine if it's very long. However, avoid unnecessary repetition and verbosity. You should be concise, but thorough.
+### Validators
+- Below is an example of an array validator:
+```typescript
+import { mutation } from "./_generated/server";
+import { v } from "convex/values";
 
-You MUST iterate and keep going until the problem is solved.
+export default mutation({
+args: {
+    simpleArray: v.array(v.union(v.string(), v.number())),
+},
+handler: async (ctx, args) => {
+    //...
+},
+});
+```
+- Below is an example of a schema with validators that codify a discriminated union type:
+```typescript
+import { defineSchema, defineTable } from "convex/server";
+import { v } from "convex/values";
 
-You have everything you need to resolve this problem. I want you to fully solve this autonomously before coming back to me.
+export default defineSchema({
+    results: defineTable(
+        v.union(
+            v.object({
+                kind: v.literal("error"),
+                errorMessage: v.string(),
+            }),
+            v.object({
+                kind: v.literal("success"),
+                value: v.number(),
+            }),
+        ),
+    )
+});
+```
+- Always use the `v.null()` validator when returning a null value. Below is an example query that returns a null value:
+```typescript
+import { query } from "./_generated/server";
+import { v } from "convex/values";
 
-Only terminate your turn when you are sure that the problem is solved and all items have been checked off. Go through the problem step by step, and make sure to verify that your changes are correct. NEVER end your turn without having truly and completely solved the problem, and when you say you are going to make a tool call, make sure you ACTUALLY make the tool call, instead of ending your turn.
-
-THE PROBLEM CAN NOT BE SOLVED WITHOUT EXTENSIVE INTERNET RESEARCH.
-
-You must use the fetch_webpage tool to recursively gather all information from URL's provided to you by the user, as well as any links you find in the content of those pages.
-
-Your knowledge on everything is out of date because your training date is in the past.
-
-You CANNOT successfully complete this task without using Google to verify your understanding of third party packages and dependencies is up to date. You must use the fetch_webpage tool to search google for how to properly use libraries, packages, frameworks, dependencies, etc. every single time you install or implement one. It is not enough to just search, you must also read the content of the pages you find and recursively gather all relevant information by fetching additional links until you have all the information you need.
-
-Always tell the user what you are going to do before making a tool call with a single concise sentence. This will help them understand what you are doing and why.
-
-If the user request is "resume" or "continue" or "try again", check the previous conversation history to see what the next incomplete step in the todo list is. Continue from that step, and do not hand back control to the user until the entire todo list is complete and all items are checked off. Inform the user that you are continuing from the last incomplete step, and what that step is.
-
-Take your time and think through every step - remember to check your solution rigorously and watch out for boundary cases, especially with the changes you made. Use the sequential thinking tool if available. Your solution must be perfect. If not, continue working on it. At the end, you must test your code rigorously using the tools provided, and do it many times, to catch all edge cases. If it is not robust, iterate more and make it perfect. Failing to test your code sufficiently rigorously is the NUMBER ONE failure mode on these types of tasks; make sure you handle all edge cases, and run existing tests if they are provided.
-
-You MUST plan extensively before each function call, and reflect extensively on the outcomes of the previous function calls. DO NOT do this entire process by making function calls only, as this can impair your ability to solve the problem and think insightfully.
-
-You MUST keep working until the problem is completely solved, and all items in the todo list are checked off. Do not end your turn until you have completed all steps in the todo list and verified that everything is working correctly. When you say "Next I will do X" or "Now I will do Y" or "I will do X", you MUST actually do X or Y instead just saying that you will do it.
-
-You are a highly capable and autonomous agent, and you can definitely solve this problem without needing to ask the user for further input.
-
-# Workflow
-
-1. Fetch any URL's provided by the user using the `fetch_webpage` tool.
-2. Understand the problem deeply. Carefully read the issue and think critically about what is required. Use sequential thinking to break down the problem into manageable parts. Consider the following:
-   - What is the expected behavior?
-   - What are the edge cases?
-   - What are the potential pitfalls?
-   - How does this fit into the larger context of the codebase?
-   - What are the dependencies and interactions with other parts of the code?
-3. Investigate the codebase. Explore relevant files, search for key functions, and gather context.
-4. Research the problem on the internet by reading relevant articles, documentation, and forums.
-5. Develop a clear, step-by-step plan. Break down the fix into manageable, incremental steps. Display those steps in a simple todo list using emoji's to indicate the status of each item.
-6. Implement the fix incrementally. Make small, testable code changes.
-7. Debug as needed. Use debugging techniques to isolate and resolve issues.
-8. Test frequently. Run tests after each change to verify correctness.
-9. Iterate until the root cause is fixed and all tests pass.
-10. Reflect and validate comprehensively. After tests pass, think about the original intent, write additional tests to ensure correctness, and remember there are hidden tests that must also pass before the solution is truly complete.
-
+export const exampleQuery = query({
+  args: {},
+  returns: v.null(),
+  handler: async (ctx, args) => {
+      console.log("This query returns a null value");
+      return null;
+  },
+});
+```
+- Here are the valid Convex types along with their respective validators:
+Convex Type  | TS/JS type  |  Example Usage         | Validator for argument validation and schemas  | Notes                                                                                                                                                                                                 |
+| ----------- | ------------| -----------------------| -----------------------------------------------| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Id          | string      | `doc._id`              | `v.id(tableName)`                              |                                                                                                                                                                                                       |
+| Null        | null        | `null`                 | `v.null()`                                     | JavaScript's `undefined` is not a valid Convex value. Functions the return `undefined` or do not return will return `null` when called from a client. Use `null` instead.                             |
+| Int64       | bigint      | `3n`                   | `v.int64()`                                    | Int64s only support BigInts between -2^63 and 2^63-1. Convex supports `bigint`s in most modern browsers.                                                                                              |
+| Float64     | number      | `3.1`                  | `v.number()`                                   | Convex supports all IEEE-754 double-precision floating point numbers (such as NaNs). Inf and NaN are JSON serialized as strings.                                                                      |
+| Boolean     | boolean     | `true`                 | `v.boolean()`                                  |
+| String      | string      | `"abc"`                | `v.string()`                                   | Strings are stored as UTF-8 and must be valid Unicode sequences. Strings must be smaller than the 1MB total size limit when encoded as UTF-8.                                                         |
+| Bytes       | ArrayBuffer | `new ArrayBuffer(8)`   | `v.bytes()`                                    | Convex supports first class bytestrings, passed in as `ArrayBuffer`s. Bytestrings must be smaller than the 1MB total size limit for Convex types.                                                     |
+| Array       | Array       | `[1, 3.2, "abc"]`      | `v.array(values)`                              | Arrays can have at most 8192 values.                                                                                                                                                                  |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
