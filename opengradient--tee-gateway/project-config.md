@@ -1,0 +1,110 @@
+---
+trigger: always_on
+description: OpenGradient TEE-gateway is an LLM routing service designed to run within AWS Nitro Enclave TEE (Trusted Execution Environment). It provides a secure, cryptographically verifiable interface to multiple LLM providers (OpenAI, Anthropic, Google Gemini, xAI Grok) with remote attestation, response signing, and x402v2 micropayment access control. The tee-gateway is a part of the decentralized OpenGradient network providing verifiable inference.
+---
+
+# Project Overview
+
+OpenGradient TEE-gateway is an LLM routing service designed to run within AWS Nitro Enclave TEE (Trusted Execution Environment). It provides a secure, cryptographically verifiable interface to multiple LLM providers (OpenAI, Anthropic, Google Gemini, xAI Grok) with remote attestation, response signing, and x402v2 micropayment access control. The tee-gateway is a part of the decentralized OpenGradient network providing verifiable inference.
+
+The repo must provide a stable AWS Nitro PCR when the code doesn't change in order to allow anyone to reproduce the PCRs locally by building the image as a way to verify what code we are running and also for 3rd party operators to set up their own tee-gateway nodes with the same PCRs in order to participate in the network.
+
+## Project Structure highlighting core files
+
+```
+├── tee_gateway/             # Main application package (Flask/connexion)
+│   ├── __main__.py          # Entry point: app factory, x402 middleware setup, key injection
+│   ├── llm_backend.py       # LLM provider routing via LangChain, HTTP client management
+│   ├── tee_manager.py       # TEE key generation, nitriding registration, response signing
+│   ├── model_registry.py    # Model config and per-token pricing
+│   ├── definitions.py       # On-chain addresses, network IDs, payment amounts
+│   ├── facilitator_api.py   # x402 facilitator API client
+│   ├── heartbeat/           # Heartbeat/health monitoring
+│   ├── controllers/         # Request handlers (chat, completions, security)
+│   ├── models/              # OpenAI-compatible Pydantic models
+│   ├── openapi/             # openapi.yaml spec
+│   └── test/                # Unit tests
+├── scripts/
+│   ├── start.sh             # Enclave startup script (nitriding + server)
+│   ├── run-enclave.sh       # EC2 host launcher (gvproxy, EIF, key injection)
+├── pyproject.toml           # Project metadata and dependencies (managed by uv)
+├── Dockerfile               # Multi-stage: nitriding builder + python:3.12-slim-bullseye + uv
+├── Makefile
+└── measurements.txt         # PCR measurements for the deployed enclave image
+```
+
+## Common Commands
+
+```bash
+# Dependency management (uses uv — https://docs.astral.sh/uv/)
+uv sync                      # Install/update dependencies from uv.lock
+uv add <package>             # Add a new dependency
+uv lock                      # Regenerate lockfile after editing pyproject.toml
+# IMPORTANT: uv.lock is baked into the Docker image and affects PCR measurements.
+# Only regenerate the lockfile when intentionally changing dependencies.
+
+# Run server locally for development (without TEE)
+make test-local              # Runs: uv run python -m tee_gateway
+
+# Linting and type checking
+make lint                    # Run ruff format + ruff check + mypy
+make mypy                    # Run mypy type checker only
+
+# Build enclave image
+make image                   # Build Docker image as TAR using Kaniko
+
+# Build EIF and run in Nitro Enclave
+make run                     # or: make all
+
+# Clean build artifacts
+make clean
+
+# Show all available targets
+make help
+```
+
+## Environment Variables
+
+API keys (injected at runtime via POST /v1/keys — do NOT bake into the image):
+- `OPENAI_API_KEY`
+- `ANTHROPIC_API_KEY`
+- `GOOGLE_API_KEY`
+- `XAI_API_KEY`
+- `ARK_API_KEY` (BytePlus / ByteDance ModelArk; injected as `bytedance_api_key`)
+
+Server configuration:
+- `API_SERVER_PORT` (default: 8000)
+- `API_SERVER_HOST` (default: 0.0.0.0)
+- `EVM_PAYMENT_ADDRESS` — wallet address to receive x402 payments
+- `FACILITATOR_URL` — x402 facilitator endpoint
+
+## Architecture
+
+### Core Flow
+
+1. **TEEKeyManager** (`tee_manager.py`) generates RSA-2048 key pair on startup and registers the public key hash with the nitriding daemon
+2. Incoming requests pass through x402 payment middleware before reaching handlers
+3. Requests are routed to the appropriate LLM provider via LangChain (`llm_backend.py`)
+4. All responses are signed with RSA-PSS-SHA256 over `keccak256(requestHash || outputHash || timestamp)`
+5. Clients verify attestation → get public key → verify signatures
+
+### Key Components
+
+- **`tee_manager.py`**: RSA key generation, nitriding registration (`/enclave/hash`), response signing
+- **`llm_backend.py`**: LangChain model instantiation, HTTP client management, provider routing from model name
+- **`model_registry.py`**: Maps model names to providers and per-token USD pricing (used by dynamic cost calculator)
+- **`definitions.py`**: On-chain constants (addresses, network IDs, payment amounts) — configure here for your deployment
+- **`util.py`**: `dynamic_session_cost_calculator` converts actual token usage to x402 payment amounts
+
+### API Endpoints
+
+| Endpoint | Purpose |
+|----------|---------|
+| `/health` | Health check (status, version, tee_enabled) |
+| `/signing-key` | TEE public key (PEM) and tee_id |
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [OpenGradient/tee-gateway](https://github.com/OpenGradient/tee-gateway) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-04 -->
