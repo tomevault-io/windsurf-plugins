@@ -1,163 +1,157 @@
 ---
 trigger: always_on
-description: Swift macOS development guidelines and best practices for CodeLooper
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
+# CLAUDE.md
 
-# Swift macOS Development Guidelines for CodeLooper
-
-This document provides guidance for AI assistants when working with the CodeLooper Swift macOS application.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
 
-CodeLooper is a Swift macOS menu bar application that provides automation and workflow enhancement capabilities. The project uses:
+CodeLooper is a macOS menubar application that monitors Cursor IDE instances and automatically handles stuck states, connection errors, and other interruptions to maintain productive AI-assisted coding sessions. The project uses Swift 6 with strict concurrency checking, SwiftUI/AppKit hybrid architecture, and integrates with the AXorcist accessibility framework for UI automation.
 
-- **Swift Package Manager (SPM)** for dependency management
-- **SwiftUI** for modern UI components
-- **AppKit** for traditional macOS functionality
-- **AXorcist** accessibility framework integration
-- **Swift 6.0** with strict concurrency checking
+- This project uses Swift 6 with strict concurrency.
+- It supports macOS 15+.
+- Refactor properly, do not care about backwards compatibility.
+- After changing swift files, compile with xcodebuild to verify that everything works. (decide if regular or test build depending on which files you changed.)
 
-## Architecture Overview
+- To view log entries from the process as it runs, use: 
+  `/usr/bin/log show --process CodeLooper --style compact --last 5m | tail -n 50`
+  (5m means 5 minutes, tail -n 50 means last 50 entries)
 
-- **Application Layer** (`Sources/Application/`): Core app lifecycle, delegates, and coordination
-- **Components** (`Sources/Components/`): SwiftUI views, alerts, and UI components
-- **Diagnostics** (`Sources/Diagnostics/`): Logging, error handling, and debugging
-- **Settings** (`Sources/Settings/`): User preferences and configuration
-- **StatusBar** (`Sources/StatusBar/`): Menu bar interface and icon management
-- **Utilities** (`Sources/Utilities/`): Helper functions, extensions, and shared utilities
+## Essential Commands
 
-## Code Quality Standards
-
-### SwiftLint Configuration
-- Use the project's `.swiftlint.yml` configuration
-- **CRITICAL**: Preserve explicit `self.` references for Swift 6 concurrency compliance
-- The `redundant_self` rule is disabled to maintain capture semantics
-- Run `./run-swiftlint.sh` to check compliance
-
-### Swift 6 Concurrency
-- Use `@MainActor` for UI-related code
-- Add explicit `self.` in closures to satisfy capture semantics
-- Handle `Sendable` conformance properly
-- Use structured concurrency (`async`/`await`) over callbacks
-
-### Naming Conventions
-- Use descriptive variable names (avoid single letters like `i`, `x`, `y`)
-- Function names should be clear and self-documenting
-- Follow Swift API design guidelines
-
-## Common Development Commands
+### Building and Running
 
 ```bash
-# Build the project
-swift build
-
-# Run SwiftLint
-./run-swiftlint.sh
-
-# Run SwiftFormat
-./run-swiftformat.sh
-
-# Generate Xcode project (via Tuist)
+# Generate Xcode project (CRITICAL: Always use this script, not 'tuist generate' directly)
 ./scripts/generate-xcproj.sh
 
 # Open in Xcode
 ./scripts/open-xcode.sh
 
-# Run the application
+# Build with xcodebuild (after regenerating if files were added/removed)
+xcodebuild -workspace CodeLooper.xcworkspace -scheme CodeLooper -configuration Debug build
+
+# Run the app from command line
 ./scripts/run-app.sh
+
+# Build AXorcist tools
+cd AXorcist && swift build
 ```
 
-## Accessibility Integration
+### Code Quality and Linting
 
-The project integrates with **AXorcist** for macOS accessibility automation:
+```bash
+# Run SwiftLint (preserves self. references for Swift 6)
+./run-swiftlint.sh
 
-- Located in `AXorcist/` submodule
-- Provides UI element querying and interaction
-- Requires accessibility permissions
-- Use `axorc` command-line tool for testing
+# Run SwiftFormat
+./run-swiftformat.sh
 
-## File Organization Guidelines
-
-### New Swift Files
-- Place in appropriate source directory based on functionality
-- Use clear, descriptive file names
-- Include proper import statements
-- Follow existing code organization patterns
-
-### Extensions
-- Place utility extensions in `Sources/Utilities/Extensions/`
-- Keep extensions focused on single responsibilities
-- Use `// MARK:` comments for organization
-
-### SwiftUI Components
-- Place in `Sources/Components/SwiftUI/`
-- Use `@MainActor` for view models
-- Follow SwiftUI best practices for state management
-
-## Debugging and Logging
-
-### Diagnostic System
-- Use the project's `Logger` class for consistent logging
-- Different log levels: `debug`, `info`, `warning`, `error`
-- Category-based logging via `LogCategory`
-- File-based logging available via `FileLogger`
-
-### Debug Patterns
-```swift
-import Diagnostics
-
-// Use the logger
-private let logger = Logger(category: .application)
-
-// Log with context
-logger.info("Starting application setup")
-logger.error("Failed to initialize: \(error)")
+# Run both linting and formatting
+./lint.sh
 ```
 
-## Security Considerations
+### Testing
 
-- Never commit API keys or secrets
-- Use macOS Keychain for sensitive data
-- Validate all user inputs
-- Follow principle of least privilege for permissions
+```bash
+# Run Swift tests
+swift test
 
-## Performance Guidelines
+# Run AXorcist tests
+cd AXorcist && ./run_tests.sh
 
-- Use lazy initialization where appropriate
-- Avoid blocking the main thread
-- Use background queues for heavy operations
-- Profile memory usage in Instruments
+# Test AXorcist CLI
+./AXorcist/.build/debug/axorc --debug '{"command_id":"test","command":"ping"}'
+```
 
-## Testing Strategy
+## High-Level Architecture
 
-- Unit tests should go in `Tests/`
-- Use XCTest framework
-- Mock external dependencies
-- Test accessibility features with AXorcist tools
+### Project Structure
 
-## Agent Operational Guidelines
+The project uses a hybrid build system:
+- **Tuist**: Project generation and workspace management (Project.swift)
+- **Swift Package Manager**: Dependency management (Package.swift)
+- **Swift 6**: Strict concurrency checking enabled throughout
 
-### When Working on This Project
-1. **Always check SwiftLint** after making changes
-2. **Preserve `self.` references** in closures for Swift 6 compliance
-3. **Use TodoWrite tool** to track complex tasks
-4. **Read existing code** to understand patterns before implementing
-5. **Check for similar implementations** in the codebase first
+### Key Architectural Components
 
-### Common Patterns to Follow
-- Use `@MainActor` for UI code
-- Implement proper error handling with `Result` types
-- Use structured concurrency over completion handlers
-- Follow the existing diagnostic logging patterns
+The project follows a **feature-based architecture** with vertical slicing:
 
-### Before Submitting Changes
-1. Run SwiftLint: `./run-swiftlint.sh`
-2. Run SwiftFormat: `./run-swiftformat.sh`
-3. Verify build: `swift build`
-4. Test functionality manually if UI changes
+1. **App Layer** (`App/`)
+   - `CodeLooperApp.swift`: SwiftUI app entry point
+   - `AppDelegate.swift`: Legacy AppKit delegate for system integration
+   - Application-level infrastructure and resources
+   - Thread-safe with `@MainActor` isolation
 
-This guide ensures consistent, high-quality Swift code that follows the project's established patterns and requirements.
+2. **Features** (`Features/`) - Each feature is self-contained:
+   - **Monitoring** (`Features/Monitoring/`): Core monitoring functionality
+     - Domain: `CursorMonitorService`, instance models
+     - UI: Monitoring views and status displays
+     - Infrastructure: Window observers, lifecycle management
+   
+   - **Intervention** (`Features/Intervention/`): Automated recovery
+     - Domain: `InterventionEngine`, heuristics
+     - Strategies: Connection errors, stuck states, file conflicts
+     - Infrastructure: Intervention execution
+   
+   - **AIAnalysis** (`Features/AIAnalysis/`): AI-powered diagnostics
+     - Domain: Analysis services, screenshot analyzer
+     - Infrastructure: OpenAI/Ollama providers
+     - UI: Analysis configuration and results
+   
+   - **Settings** (`Features/Settings/`): User preferences
+     - Domain: Settings service, preference models
+     - UI: Settings tabs and coordinator
+     - Infrastructure: User defaults storage
+   
+   - Other features: StatusBar, GitTracking, MCPIntegration, Onboarding
+
+3. **Core** (`Core/`) - Shared functionality:
+   - **Accessibility**: AX framework integration, permissions
+   - **Diagnostics**: Logging system with categories
+   - **JSHook**: JavaScript injection for Cursor UI
+   - **Utilities**: Extensions, helpers, constants
+
+4. **External Packages** (`AXorcist/`, `AXpector/`, `DesignSystem/`)
+   - Local SPM packages for modularity
+   - AXorcist: Accessibility automation framework
+   - AXpector: Accessibility inspector
+   - DesignSystem: UI components and theming
+
+### Concurrency Model
+
+- **Swift 6 Strict Concurrency**: Complete checking enabled
+- **@MainActor**: All UI code and most managers
+- **Explicit self.**: Required in closures for capture semantics
+- **Sendable Compliance**: Custom types marked appropriately
+- **Actor Isolation**: Long-running operations use custom actors
+
+## Critical Development Notes
+
+### Tuist and Swift 6 Sendable Compliance
+
+**ALWAYS use `./scripts/generate-xcproj.sh` instead of `tuist generate`**
+
+The script performs critical patches for Swift 6 compatibility:
+1. Fixes Tuist-generated `TuistPlists+CodeLooper.swift` for Sendable compliance
+2. Converts `[String: Any]` to type-safe alternatives
+3. Updates `ResourceLoader.swift` to handle typed dictionaries
+
+### AXorcist and Electron Apps
+
+When working with Cursor (Electron app) accessibility:
+- Electron limits accessibility tree depth (~30-40 nodes)
+- Use focus-based queries for deep elements
+- The `debugloop.mdc` file contains extensive learnings about Cursor UI traversal
+- Key flags: `--scan-all`, `--no-stop-first`, `--timeout`
+
+### SwiftLint Configuration
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [steipete/CodeLooper](https://github.com/steipete/CodeLooper) — distributed by [TomeVault](https://tomevault.io).
