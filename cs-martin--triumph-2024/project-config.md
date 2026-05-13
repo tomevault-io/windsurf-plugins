@@ -1,102 +1,149 @@
 ---
 trigger: always_on
-description: Guidelines and best practices for building Convex projects, including database schema design, queries, mutations, and real-world examples
+description: Convex folder structure and function organization guidelines
 ---
 
 
-# Convex guidelines
-## Function guidelines
-### New function syntax
-- ALWAYS use the new function syntax for Convex functions. For example:
+# Convex Folder Structure Guidelines
+
+## Overview
+
+This project organizes Convex code by feature folders. Each feature lives in `convex/{feature}/` with an `index.ts` that declares Convex queries and mutations by wiring validators and handlers from files in `queries/` and `mutations/`.
+
+## Core Structure Pattern
+
+### 1. Main Feature Entry File
+
+- **Location**: `convex/{feature}/index.ts`
+- **Purpose**: Export the Convex runtime functions using `query` and `mutation`
+- **Pattern**: Import `{FunctionName}Args` (when needed) and `{FunctionName}Handler` from the function file
+
+**Example**: `convex/casinos/index.ts`
+
 ```typescript
-import { query } from "./_generated/server";
-import { v } from "convex/values";
-export const f = query({
-    args: {},
-    returns: v.null(),
-    handler: async (ctx, args) => {
-    // Function body
-    },
+import { mutation, query } from '../_generated/server';
+import { createCasinoArgs, createCasinoHandler } from './mutations/createCasino';
+import { createMultipleCasinosArgs, createMultipleCasinosHandler } from './mutations/createMultipleCasinos';
+import { deleteCasinoArgs, deleteCasinoHandler } from './mutations/deleteCasino';
+import { updateCasinoArgs, updateCasinoHandler } from './mutations/updateCasino';
+import { getAllCasinosHandler } from './queries/getAllCasino';
+import { getCasinoByIdArgs, getCasinoByIdHandler } from './queries/getCasinoById';
+import { getCasinosByStateArgs, getCasinosByStateHandler } from './queries/getCasinosByState';
+
+// Queries
+export const getAllCasinos = query({ handler: getAllCasinosHandler });
+export const getCasinoById = query({ args: getCasinoByIdArgs, handler: getCasinoByIdHandler });
+export const getCasinosByState = query({ args: getCasinosByStateArgs, handler: getCasinosByStateHandler });
+
+// Mutations
+export const createCasino = mutation({ args: createCasinoArgs, handler: createCasinoHandler });
+export const createMultipleCasinos = mutation({
+  args: createMultipleCasinosArgs,
+  handler: createMultipleCasinosHandler,
 });
+export const deleteCasino = mutation({ args: deleteCasinoArgs, handler: deleteCasinoHandler });
+export const updateCasino = mutation({ args: updateCasinoArgs, handler: updateCasinoHandler });
 ```
 
-### Http endpoint syntax
-- HTTP endpoints are defined in `convex/http.ts` and require an `httpAction` decorator. For example:
-```typescript
-import { httpRouter } from "convex/server";
-import { httpAction } from "./_generated/server";
-const http = httpRouter();
-http.route({
-    path: "/echo",
-    method: "POST",
-    handler: httpAction(async (ctx, req) => {
-    const body = await req.bytes();
-    return new Response(body, { status: 200 });
-    }),
-});
-```
-- HTTP endpoints are always registered at the exact path you specify in the `path` field. For example, if you specify `/api/someRoute`, the endpoint will be registered at `/api/someRoute`.
+### 2. Feature Folder Structure
 
-### Validators
-- Below is an example of an array validator:
-```typescript
-import { mutation } from "./_generated/server";
-import { v } from "convex/values";
+- **Location**: `convex/{feature}/`
+- **Contents**:
 
-export default mutation({
-args: {
-    simpleArray: v.array(v.union(v.string(), v.number())),
-},
-handler: async (ctx, args) => {
-    //...
-},
-});
 ```
-- Below is an example of a schema with validators that codify a discriminated union type:
-```typescript
-import { defineSchema, defineTable } from "convex/server";
-import { v } from "convex/values";
+convex/{feature}/
+├── index.ts           # Entry: wires handlers/args into Convex queries/mutations
+├── {feature}.model.ts # (optional) model helpers/types for the feature
+├── queries/           # Read operations (QueryCtx)
+└── mutations/         # Write operations (MutationCtx)
+```
 
-export default defineSchema({
-    results: defineTable(
-        v.union(
-            v.object({
-                kind: v.literal("error"),
-                errorMessage: v.string(),
-            }),
-            v.object({
-                kind: v.literal("success"),
-                value: v.number(),
-            }),
-        ),
-    )
-});
-```
-- Always use the `v.null()` validator when returning a null value. Below is an example query that returns a null value:
-```typescript
-import { query } from "./_generated/server";
-import { v } from "convex/values";
+### 3. Function File Pattern (queries/mutations)
 
-export const exampleQuery = query({
-  args: {},
-  returns: v.null(),
-  handler: async (ctx, args) => {
-      console.log("This query returns a null value");
-      return null;
-  },
-});
+Each function file exports:
+
+- `{FunctionName}Args`: Plain object of Convex validators (omit if no args)
+- `{FunctionName}Handler`: Async function implementing business logic
+- `{FunctionName}Returns` (optional): Validator describing structured returns when useful
+
+Signatures use Convex types from `convex/_generated/server` and `convex/values`.
+
+Examples from current codebase:
+
+```typescript
+// Mutation example: convex/casinos/mutations/createCasino.ts
+import { v } from 'convex/values';
+import { MutationCtx } from '../../_generated/server';
+import { Id } from '../../._generated/dataModel';
+
+export const createCasinoArgs = {
+  name: v.string(),
+  website: v.optional(v.string()),
+  license_status: v.optional(v.string()),
+  source_url: v.optional(v.string()),
+  state_id: v.id('states'),
+  is_tracked: v.boolean(),
+};
+
+export const createCasinoHandler = async (
+  ctx: MutationCtx,
+  args: {
+    name: string;
+    website: string;
+    license_status: string;
+    source_url: string;
+    state_id: Id<'states'>;
+    is_tracked: boolean;
+  }
+) => {
+  return await ctx.db.insert('casinos', { ...args });
+};
 ```
-- Here are the valid Convex types along with their respective validators:
-Convex Type  | TS/JS type  |  Example Usage         | Validator for argument validation and schemas  | Notes                                                                                                                                                                                                 |
-| ----------- | ------------| -----------------------| -----------------------------------------------| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Id          | string      | `doc._id`              | `v.id(tableName)`                              |                                                                                                                                                                                                       |
-| Null        | null        | `null`                 | `v.null()`                                     | JavaScript's `undefined` is not a valid Convex value. Functions the return `undefined` or do not return will return `null` when called from a client. Use `null` instead.                             |
-| Int64       | bigint      | `3n`                   | `v.int64()`                                    | Int64s only support BigInts between -2^63 and 2^63-1. Convex supports `bigint`s in most modern browsers.                                                                                              |
-| Float64     | number      | `3.1`                  | `v.number()`                                   | Convex supports all IEEE-754 double-precision floating point numbers (such as NaNs). Inf and NaN are JSON serialized as strings.                                                                      |
-| Boolean     | boolean     | `true`                 | `v.boolean()`                                  |
-| String      | string      | `"abc"`                | `v.string()`                                   | Strings are stored as UTF-8 and must be valid Unicode sequences. Strings must be smaller than the 1MB total size limit when encoded as UTF-8.                                                         |
-| Bytes       | ArrayBuffer | `new ArrayBuffer(8)`   | `v.bytes()`                                    | Convex supports first class bytestrings, passed in as `ArrayBuffer`s. Bytestrings must be smaller than the 1MB total size limit for Convex types.                                                     |
-| Array       | Array       | `[1, 3.2, "abc"]`      | `v.array(values)`                              | Arrays can have at most 8192 values.                                                                                                                                                                  |
+
+```typescript
+// Query example: convex/casinos/queries/getCasinoById.ts
+import { Id } from '../../_generated/dataModel';
+import { QueryCtx } from '../../_generated/server';
+import { v } from 'convex/values';
+
+export const getCasinoByIdArgs = { id: v.id('casinos') };
+
+export const getCasinoByIdHandler = async (ctx: QueryCtx, args: { id: Id<'casinos'> }) => {
+  return await ctx.db.get(args.id);
+};
+```
+
+Notes:
+
+- If a query has no inputs, omit `args` in both the file and the `query({ ... })` declaration (see `getAllCasino`).
+- Define `{FunctionName}Returns` only when you need runtime validation of a complex response.
+
+## Naming Conventions
+
+- **Feature folder**: `convex/{feature}/`
+- **Entry file**: `index.ts`
+- **Operations**: `queries/{functionName}.ts`, `mutations/{functionName}.ts`
+- **Exports per file**: `{functionName}Args` (optional), `{functionName}Handler`, `{functionName}Returns` (optional)
+
+## Benefits of This Structure
+
+1. **Clear wiring**: `index.ts` is the only place that calls `query`/`mutation`.
+2. **Feature isolation**: All logic for a feature lives together.
+3. **Type safety**: Args are validated with `convex/values`; handlers typed with `QueryCtx`/`MutationCtx`.
+4. **Maintainability**: Adding a function is a single new file plus an `index.ts` import/export.
+
+## Implementation Checklist
+
+### When Creating New Functions
+
+- [ ] Add a file in `queries/` or `mutations/` named after the function
+- [ ] Export `{FunctionName}Handler` and, if needed, `{FunctionName}Args`
+- [ ] Import into `convex/{feature}/index.ts` and declare with `query`/`mutation`
+- [ ] Add optional `{FunctionName}Returns` if response validation is desired
+- [ ] Verify types and runtime behavior
+
+### When Modifying Existing Functions
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
