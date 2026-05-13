@@ -1,70 +1,105 @@
 ---
 trigger: always_on
-description: This file, `safari.mdc`, serves as a repository for detailed working notes, observations, and learnings acquired during the process of automating Safari interactions, particularly for the MCP Inspector UI. It's intended to capture the nuances of trial-and-error, debugging steps, and insights into what worked, what didn't, and why.
+description: This file provides guidance to AI assistants when working with code in this repository.
 ---
 
-### Meta Note
+# Agent Instructions
 
-This file, `safari.mdc`, serves as a repository for detailed working notes, observations, and learnings acquired during the process of automating Safari interactions, particularly for the MCP Inspector UI. It's intended to capture the nuances of trial-and-error, debugging steps, and insights into what worked, what didn't, and why.
+This file provides guidance to AI assistants when working with code in this repository.
 
-This contrasts with `mcp-inspector.mdc`, which is designed to be the concise, polished, and operational ruleset for future automated runs once a specific automation flow (like connecting to the MCP Inspector) has been stabilized and proven reliable. `mcp-inspector.mdc` should contain the 'final' working scripts and minimal necessary commentary, while `safari.mdc` is the space for the extended antechamber of discovery.
+## Project Overview
 
----
+This is the `macos-automator-mcp` project, which provides a Model Context Protocol (MCP) server that enables executing AppleScript and JavaScript for Automation (JXA) scripts on macOS. The server features a knowledge base of pre-defined scripts accessible by ID and supports inline scripts, script files, and argument passing.
 
-### Key Learnings and Observations from Safari Automation (MCP Inspector)
+## Architecture
 
-#### 1. Managing Safari Windows and Tabs for the Inspector
+- **Server Configuration**: The server reads configuration from environment variables like `LOG_LEVEL` and `KB_PARSING`.
+- **MCP Tools**: Two main tools are provided:
+  1. `execute_script`: Executes AppleScript/JXA from inline content, file path, or knowledge base ID
+  2. `get_scripting_tips`: Retrieves information from the knowledge base
+- **Knowledge Base**: A collection of pre-defined scripts stored as Markdown files in `knowledge_base/` directory with YAML frontmatter
+- **ScriptExecutor**: Core component that executes scripts via `osascript` command
 
-*   **Objective:** Reliably direct Safari to the MCP Inspector URL (`http://127.0.0.1:6274`) in a predictable way, preferably using a single, consistent browser window and tab to avoid disrupting the user's workspace or losing context.
-*   **Initial Challenges & Evolution:
-    *   Simply using `make new document with properties {URL:"..."}` could lead to multiple windows/tabs if not managed.
-    *   Attempts to close all existing Inspector tabs first (`repeat with w in windows... close t...`) were functional but could be overly aggressive if the user had other work in Safari.
-    *   Identifying and reusing an *existing specific tab* for the Inspector requires careful targeting (e.g., `first tab whose URL starts with "..."`). If this tab was from a previous, unconfigured session, just switching to it wasn't enough; it needed to be reloaded/reset.
-*   **Refined & Recommended Approach (as implemented in `mcp-inspector.mdc`):
-    ```applescript
-    tell application "Safari"
-      activate
-      delay 0.2 -- Allow Safari to become the frontmost application
-      if (count of windows) is 0 then
-        -- No Safari windows are open, so create a new one.
-        make new document with properties {URL:"http://127.0.0.1:6274"}
-      else
-        -- Safari has windows open; use the frontmost one.
-        tell front window
-          set inspectorTab to missing value
-          try
-            -- Check if a tab for the Inspector is already open in this window.
-            set inspectorTab to (first tab whose URL starts with "http://127.0.0.1:6274")
-          end try
-          
-          if inspectorTab is not missing value then
-            -- An Inspector tab exists: set its URL again (to refresh/reset) and make it active.
-            set URL of inspectorTab to "http://127.0.0.1:6274"
-            set current tab to inspectorTab
-          else
-            -- No specific Inspector tab found: set the URL of the *current active tab*.
-            set URL of current tab to "http://127.0.0.1:6274"
-          end if
-        end tell
-      end if
-      delay 1 -- Pause to allow the page to begin loading.
-    end tell
-    ```
-    This logic aims to use the existing front window and either reuse/refresh an Inspector tab or repurpose the current active tab, falling back to creating a new window only if Safari isn't open.
+## Knowledge Base System
 
-#### 2. Clicking Elements Programmatically (The "Connect" Button Saga)
+The knowledge base (`knowledge_base/` directory) contains numerous Markdown files organized by category:
+- Each file has YAML frontmatter with metadata: `id`, `title`, `description`, `language`, etc.
+- The actual script code is contained in the Markdown body in a fenced code block
+- Scripts can use placeholders like `--MCP_INPUT:keyName` and `--MCP_ARG_N` for parameter substitution
 
-*   **The Core Challenge:** Programmatically clicking the "Connect" button in the MCP Inspector UI to initiate the server connection.
-*   **Strategies Explored & Lessons:
-    *   **CSS Selectors (`querySelector`):**
-        *   Simple selectors like `[data-testid='env-vars-button']` worked for some buttons but required escaping single quotes in AppleScript: `do JavaScript "document.querySelector('[data-testid=\\\'env-vars-button\\']').click();"`.
-        *   A complex `querySelector` for the "Connect" button (e.g., `'button[data-testid*=connect-button], button:not([disabled])... > span:contains(Connect)...'.click()`) ran without JS error but didn't reliably establish the connection, suggesting it might not have found the exact interactable element or the click wasn't registering correctly.
-    *   **XPath (`document.evaluate`):**
-        *   **Highly Specific XPaths:** An initial XPath based on the rule (`//button[contains(., 'Connect') and .//svg[.//polygon[@points='6 3 20 12 6 21 6 3']]]`) was very difficult to embed correctly in AppleScript due to nested single quotes requiring complex escaping (`\'`). This often led to AppleScript parsing errors (`-2741`).
-        *   **`character id 39` for AppleScript String Construction:** To combat escaping issues, building the JavaScript string in AppleScript using `set sQuote to character id 39` for internal single quotes was effective for getting the AppleScript parser to accept the command. Example:
-            ```applescript
-            set sQuote to character id 39
-            set jsConnectText to "Connect"
+## Common Development Commands
+
+```bash
+# Install dependencies
+npm install
+
+# Run the server in development mode with hot reloading
+npm run dev
+
+# Build the TypeScript project
+npm run build
+
+# Start the compiled server
+npm run start
+
+# Lint the codebase
+npm run lint
+
+# Format the codebase
+npm run format
+
+# Validate the knowledge base
+npm run validate
+```
+
+## Environment Variables
+
+- `LOG_LEVEL`: Set logging level (`DEBUG`, `INFO`, `WARN`, `ERROR`) - default is `INFO`
+- `KB_PARSING`: Controls when knowledge base is parsed:
+  - `lazy` (default): Parsed on first request
+  - `eager`: Parsed when server starts
+
+## Working with the Knowledge Base
+
+When adding new scripts to the knowledge base:
+1. Create a new `.md` file in the appropriate category folder
+2. Include required YAML frontmatter (`title`, `description`, etc.)
+3. Add the script code in a fenced code block
+4. Run `npm run validate` to ensure the new content is correctly formatted
+
+## Code Execution Flow
+
+1. The `server.ts` file defines the MCP server and its tools
+2. `knowledgeBaseService.ts` loads and indexes scripts from the knowledge base
+3. `ScriptExecutor.ts` handles the actual execution of scripts
+4. Input validation is handled via Zod schemas in `schemas.ts`
+5. Logging is managed by the `Logger` class in `logger.ts`
+
+## Security and Permissions
+
+Remember that scripts run on macOS require specific permissions:
+- Automation permissions for controlling applications
+- Accessibility permissions for UI scripting via System Events
+- Full Disk Access for certain file operations
+
+## Agent Operational Learnings and Debugging Strategies
+
+This section captures key operational strategies and debugging techniques for the agent (me) based on collaborative sessions.
+
+### Prioritizing Log Visibility for Debugging
+
+When an external tool or script (like AppleScript via `osascript`) returns cryptic errors, or when agent-generated code/substitutions might be faulty:
+
+1.  **Suspect Dynamic Content**: Issues often stem from the dynamic content being passed to the external tool (e.g., incorrect placeholder substitutions leading to syntax errors in the target language).
+2.  **Enable/Add Detailed Logging**: Prioritize enabling any built-in detailed logging features of the tool in question (e.g., `includeSubstitutionLogs: true` for this project's `execute_script` tool).
+3.  **Ensure Log Visibility**: If standard debug logging doesn't appear in the primary output channel the user is observing, attempt to modify the code to force critical diagnostic information (like step-by-step transformations, variable states, or the exact content being passed externally) into that main output. This might involve temporarily altering the structure of the success or error messages to include these logs.
+    *   **Confirm Restarts and Code Version**: For changes requiring server restarts (common in this project), leverage any features that confirm the new code is active. For example, the server startup timestamp and execution mode info appended to `get_scripting_tips` output helps verify that a restart was successful and the intended code version (e.g., TypeScript source via `tsx` vs. compiled `dist/server.js`) is running.
+
+### Iterative Simplification for Complex Patterns (e.g., Regex)
+
+If a complex pattern (like a regular expression) in code being generated or modified by the agent is not working as expected, and the cause isn't immediately obvious:
+
+1.  **Isolate the Pattern**: Identify the specific complex pattern (e.g., a regex for string replacement).
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
