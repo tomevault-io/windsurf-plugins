@@ -1,0 +1,51 @@
+---
+trigger: always_on
+description: <!-- crag:auto-start -->
+---
+
+<!-- crag:auto-start -->
+# CLAUDE.md — @whitehatd/crag
+
+> Generated from governance.md by [crag](https://crag.sh). Regenerate: `crag compile --target claude`
+
+Make every AI agent obey your codebase. One governance.md → compiled to CI, hooks, and every agent. No drift.
+
+**Stack:** node
+**Runtimes:** node
+
+## Quality Gates
+
+Run these in order before committing. Stop on first MANDATORY failure:
+
+- `node test/all.js`
+- `node --check bin/crag.js`
+- `node bin/crag.js help > /dev/null`
+- `node bin/crag.js version`
+- `node bin/crag.js analyze --dry-run > /dev/null`
+- `node bin/crag.js upgrade --check > /dev/null`
+- `node bin/crag.js workspace --json > /dev/null`
+- `node bin/crag.js analyze > /dev/null`
+
+## Rules
+
+1. Read `governance.md` at the start of every session — it is the single source of truth.
+2. Run all mandatory quality gates before committing.
+3. If a gate fails, attempt an automatic fix (lint/format) with bounded retry (max 2 attempts). If it still fails, escalate to the user.
+4. Never modify files outside this repository.
+5. Never run destructive system commands (`rm -rf /`, `DROP TABLE`, force-push to main).
+- Use conventional commits (feat:, fix:, docs:, etc.)
+- Commit trailer: `Co-Authored-By: Claude <noreply@anthropic.com>`
+
+## Security
+
+- No hardcoded secrets — grep for sk_live, AKIA, password= before commit
+
+## Tool Context
+
+This project uses **crag** (https://crag.sh) as its governance engine. The `governance.md` file is the authoritative source. Run `crag audit` to detect drift and `crag compile --target all` to recompile all targets.
+
+<!-- crag:auto-end -->
+
+---
+> Source: [WhitehatD/crag](https://github.com/WhitehatD/crag) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-04 -->
