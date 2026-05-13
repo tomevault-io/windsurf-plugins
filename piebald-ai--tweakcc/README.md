@@ -7,11 +7,11 @@ Customize Claude Code's system prompts, create custom toolsets, input pattern hi
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [Piebald-AI/tweakcc](https://github.com/Piebald-AI/tweakcc).
+Original source: `CLAUDE.md` in [Piebald-AI/tweakcc](https://github.com/Piebald-AI/tweakcc).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
