@@ -7,11 +7,11 @@ ESP32-P4 public transit departures display open firmware
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [joined/ESPTransit](https://github.com/joined/ESPTransit).
+Original source: `CLAUDE.md` in [joined/ESPTransit](https://github.com/joined/ESPTransit).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
