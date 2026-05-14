@@ -85,4 +85,4 @@ When the operator says "what's next?" or "review the plans," apply `skills/strat
 
 ---
 > Source: [tomevault-io/companyos](https://github.com/tomevault-io/companyos) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-30 -->
+<!-- tomevault:4.0:windsurf_rules:2026-05-14 -->
