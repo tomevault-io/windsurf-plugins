@@ -7,11 +7,11 @@ A vibe-coded Git Smart HTTP v2 server on Cloudflare Workers with Durable Objects
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [zllovesuki/git-on-cloudflare](https://github.com/zllovesuki/git-on-cloudflare).
+Original source: `CLAUDE.md` in [zllovesuki/git-on-cloudflare](https://github.com/zllovesuki/git-on-cloudflare).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
