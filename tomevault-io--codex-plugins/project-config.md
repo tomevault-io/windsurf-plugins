@@ -1,139 +1,94 @@
 ---
 trigger: always_on
-description: This file provides guidance to all Coding Agents such as Claude Code (claude.ai/code), Codex when working with code in this repository.
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
 # AGENTS.md
 
-This file provides guidance to all Coding Agents such as Claude Code (claude.ai/code), Codex when working with code in this repository.
-
-## Quick Start
-
-### Most Common Tasks
-
-| Task                     | Command                                | Location       |
-| ------------------------ | -------------------------------------- | -------------- |
-| Start development server | `npm run dev`                          | Root directory |
-| Build library            | `npm run build`                        | Root directory |
-| Run Storybook            | `npm run storybook`                    | Root directory |
-| Run tests                | `npm test`                             | Root directory |
-| Run linting              | `npm run lint`                         | Root directory |
-| Format code              | `npm run format`                       | Root directory |
-| Check code quality       | `npm run lint && npm run format:check` | Root directory |
-
-### Essential Files and Directories
-
-```bash
-# Core library components
-src/components/           # Main UI components
-src/lib/                 # Utility functions
-src/index.ts            # Main export file
-
-# Documentation and examples
-.storybook/             # Storybook configuration
-src/**/*.stories.ts     # Component stories
-README.md              # Project documentation
-
-# Configuration
-package.json           # Dependencies and scripts
-tsconfig.json         # TypeScript configuration
-eslint.config.mjs     # ESLint configuration
-.prettierrc           # Prettier formatting rules
-```
-
-## Critical Warnings ⚠️
-
-### MUST DO Before Any Commit
-
-1. **Run lint and format checks**: `npm run lint && npm run format:check` (MANDATORY)
-2. **Test your changes**: Run `npm test` and verify Storybook examples work
-3. **Build the library**: Run `npm run build` to ensure no build errors
-4. **Use English for all code**: Comments, variables, commit messages
-5. **Follow Conventional Commits**: `type: description` (lowercase type, imperative mood)
-6. **Update Storybook stories**: Add/update stories for new or modified components
-
-### Common Pitfalls to Avoid
-
-- **Never hardcode user-facing strings** - Use props and make components configurable
-- **Don't skip linting/formatting** - Pre-commit hooks will catch these issues
-- **Don't commit secrets** - No API keys or sensitive data in code
-- **Don't use non-English in code** - English only (except for user-facing content examples)
-- **Don't break existing APIs** - Maintain backward compatibility for public interfaces
-- **Don't forget TypeScript types** - All public APIs must be properly typed
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
 
-markdown-flow-ui is a React UI library for rendering markdown with interactive flow components, typewriter effects, and plugin support. It provides components for creating dynamic, interactive markdown experiences with features like:
+Emu is a lazygit-inspired TUI for managing Android emulators and iOS simulators, built with Rust. Async-first architecture with trait-based platform abstraction (`DeviceManager`), centralized state (`AppState` with `Arc<Mutex<>>`), and ratatui-based UI.
 
-- Real-time markdown rendering with syntax highlighting
-- Typewriter effect animations
-- Interactive flow components with single-select and multi-select support
-- Plugin system for custom components
-- Server-Sent Events (SSE) support for streaming content
-- Mermaid diagram rendering
-- Mathematical expressions with KaTeX
-- Internationalization (i18n) support for UI components
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for full architecture details.
 
-## Architecture
+## Development Commands
 
-The project follows a component-based architecture with these main parts:
-
-- **Core Components (`src/components/`)**: Main UI components for markdown rendering
-- **Utility Functions (`src/lib/`)**: Helper functions and utilities
-- **Plugin System**: Extensible architecture for custom markdown components
-- **Storybook Integration**: Documentation and examples for all components
-
-### Main Components
-
-#### ContentRender (`src/components/ContentRender/`)
-
-- **Purpose**: Core markdown rendering component with typewriter effects
-- **Key Features**:
-  - Markdown-to-HTML conversion with syntax highlighting
-  - Typewriter animation support
-  - Plugin system for custom components
-  - Stream processing capabilities
-  - Interactive variable system with single-select and multi-select support
-  - Internationalization support for UI elements
-- **Key Files**:
-  - `ContentRender.tsx`: Main component implementation
-  - `useTypewriter.ts`: Typewriter effect logic
-  - `plugins/`: Custom component plugins (MermaidChart, CustomVariable)
-  - `utils/`: Processing utilities
-
-##### Interactive Variable System
-
-The CustomVariable plugin supports various interaction modes:
-
-**Single-Select Mode (using `|` separator):**
-
-```markdown
-Choose your role: ?[%{{role}}Developer|Designer|Manager]
+```bash
+cargo build                                              # Build
+cargo run                                                # Run (default: emu binary)
+cargo run -- --check                                     # Verify local environment without opening TUI
+cargo run -- --debug                                     # Run with debug logging
+cargo check                                              # Type check (fast)
+cargo clippy --all-targets --all-features -- -D warnings # Lint (CI-level)
+cargo fmt                                                # Format
+cargo test --bins --tests                                # Run tests (recommended)
+cargo test --features test-utils                         # Run all tests including integration
 ```
 
-**Multi-Select Mode (using `||` separator):**
+## Key Files
 
-```markdown
-Select skills: ?[%{{skills}}React||Vue||Angular||Node.js]
+| File                            | Role                                                                                     |
+| ------------------------------- | ---------------------------------------------------------------------------------------- |
+| `src/app/mod.rs`                | Main event loop shell and app coordination                                               |
+| `src/app/state/mod.rs`          | `AppState`, `ApiLevelManagementState::is_busy()`                                         |
+| `src/managers/android/mod.rs`   | Android AVD facade and runtime orchestration                                             |
+| `src/managers/android/*.rs`     | Android helper modules (`create/details/discovery/install/lifecycle/parser/sdk/version`) |
+| `src/managers/ios/mod.rs`       | iOS simulator facade and orchestration (macOS only)                                      |
+| `src/managers/ios/*.rs`         | iOS helper modules (`details/discovery/lifecycle/tests`)                                 |
+| `src/managers/common.rs`        | `DeviceManager` trait                                                                    |
+| `src/app/api_levels.rs`         | API level management mode handling and install/uninstall orchestration                   |
+| `src/app/tests.rs`              | `App` orchestration characterization tests and startup fixtures                          |
+| `src/app/state/ui.rs`           | UI-facing state enums and confirmation dialog structs                                    |
+| `src/app/state/logs.rs`         | Log entry state and log-related `AppState` methods                                       |
+| `src/managers/android/tests.rs` | `AndroidManager` facade and helper module regression tests                               |
+| `src/managers/ios/tests.rs`     | `IosManager` facade and helper module regression tests                                   |
+| `src/ui/render.rs`              | Three-panel layout rendering and panel composition                                       |
+| `src/ui/dialogs/mod.rs`         | Modal dialog entrypoint and dialog composition                                           |
+| `src/ui/dialogs/*.rs`           | Dialog-specific renderers (`create/confirm/api-level/notifications`)                     |
+| `src/ui/panels/mod.rs`          | Panel rendering entrypoint and panel composition helpers                                 |
+| `src/ui/panels/*.rs`            | Panel-specific renderers (`device_lists/details/logs/commands`)                          |
+| `src/models/device_info/mod.rs` | Dynamic device info entrypoint, cache access, and public surface                         |
+| `src/models/device_info/*.rs`   | Device info helpers (`priority/parsing/tests`)                                           |
+| `src/constants/`                | All constants (NO hardcoded values in source)                                            |
+| `src/models/`                   | Core data structures                                                                     |
+
+## Code Conventions
+
+### String Formatting — CRITICAL
+
+**Always** use inline variable syntax in `format!` and all logging macros:
+
+```rust
+// ✅ Correct
+format!("Device {name} created")
+log::info!("Starting {identifier}")
+
+// ❌ Wrong — clippy::uninlined_format_args error in CI
+format!("Device {} created", name)
+log::info!("Starting {}", identifier)
 ```
 
-**Mixed Mode (Multi-select + Text Input):**
+This applies to `format!`, `println!`, `eprintln!`, `bail!`, `anyhow!`, `log::*`, and test assertions.
 
-```markdown
-Choose technologies: ?[%{{tech}}Frontend||Backend||Mobile||...Other technologies]
-```
+### Constants
 
-**Props for Multi-Select Support:**
+All hardcoded values must be defined in `src/constants/`. Never use magic numbers or strings in source.
 
-- `confirmButtonText`: Text for the confirm button (supports i18n)
-- `selectedValues`: Array of selected values in callback
-- `isMultiSelect`: Automatically detected from syntax
+### Error Handling
 
-#### MarkdownFlow (`src/components/MarkdownFlow/`)
+- `anyhow` for propagation, `thiserror` for custom types
+- Never `.unwrap()` or `.expect()` in user-facing code
 
-- **Purpose**: Flow-based markdown rendering with scroll management
-- **Key Features**:
-  - Scrollable markdown container
+### Async
+
+- Use `impl Future + Send` for trait methods
+- `Arc<Mutex<>>` for shared state; prefer `Arc<AtomicBool>` for simple flags
+- Never use `std::sync::Mutex` in async contexts — use `tokio::sync::Mutex`
+
+## Testing
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
