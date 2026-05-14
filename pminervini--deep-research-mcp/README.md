@@ -7,11 +7,11 @@ MCP server for OpenAI's Deep Research APIs, Gemini Deep Research Agent, Allen AI
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [pminervini/deep-research-mcp](https://github.com/pminervini/deep-research-mcp).
+Original source: `CLAUDE.md` in [pminervini/deep-research-mcp](https://github.com/pminervini/deep-research-mcp).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
