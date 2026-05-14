@@ -1,214 +1,109 @@
 ---
 trigger: always_on
-description: Guidelines for writing Trigger.dev tasks
+description: **What**: A B2B SaaS billing system to support complex pricing models. Startup of 2 people focussed on shipping fast.
 ---
 
-# How to write Trigger.dev tasks
+# Lumen Development Guide
 
-## Overview of writing a Trigger.dev task
+## 1. Project Overview
 
-1. Run the CLI `init` command: `npx trigger.dev@latest init`.
-2. Create a Trigger.dev task.
-3. Set up any environment variables.
-4. Run the Trigger.dev dev command: `npx trigger.dev@latest dev`.
+**What**: A B2B SaaS billing system to support complex pricing models. Startup of 2 people focussed on shipping fast.
 
-## Essential requirements when generating task code
+**Architecture**: Monorepo (`api`, `ui`, `common`) with Hono/TypeScript API, Next.js UI, Drizzle ORM, PostgreSQL
 
-1. You MUST use `@trigger.dev/sdk/v3`
-2. You MUST NEVER use `client.defineJob`
-3. YOU MUST `export` every task, including subtasks
-4. If you are able to generate an example payload for a task, do so.
+**Commands**: `bun run dev`, `dev:api`, `dev:ui`, `docker:up`, `docker:down`, `lint`, `format`
 
-## 🚨 CRITICAL INSTRUCTIONS FOR AI LANGUAGE MODELS 🚨
+## 2. Development Guidelines
 
-As an AI language model, you MUST NOT generate any of the following code patterns, as they are DEPRECATED and will BREAK the application:
+### 2.1 Code Style
 
-```ts
-// ❌ NEVER GENERATE THIS CODE - IT WILL BREAK THE APPLICATION
+- TypeScript with strict typing and explicit return types
+- camelCase for variables/functions, PascalCase for components
+- Double quotes for strings, required semicolons
+- Group imports (external, internal, types) with empty line between groups
+- Use path aliases: `@/common/...` not `@lumen/common/...`
 
-client.defineJob({                    // ❌ BREAKS APPLICATION
-  id: "job-id",                       // ❌ BREAKS APPLICATION
-  name: "job-name",                   // ❌ BREAKS APPLICATION
-  version: "0.0.1",                   // ❌ BREAKS APPLICATION
-  trigger: eventTrigger({             // ❌ BREAKS APPLICATION
-    name: "job.trigger",              // ❌ BREAKS APPLICATION
-    schema: z.object({                // ❌ BREAKS APPLICATION
-      // Input schema here            // ❌ BREAKS APPLICATION
-    }),                               // ❌ BREAKS APPLICATION
-  }),                                 // ❌ BREAKS APPLICATION
-  integrations: {                     // ❌ BREAKS APPLICATION
-    // Integrations here              // ❌ BREAKS APPLICATION
-  },                                  // ❌ BREAKS APPLICATION
-  run: async (payload, io) => {       // ❌ BREAKS APPLICATION
-    // Job logic goes here            // ❌ BREAKS APPLICATION                               
-    return {                          // ❌ BREAKS APPLICATION
-      // Return job results           // ❌ BREAKS APPLICATION
-    };                                // ❌ BREAKS APPLICATION
-  },                                  // ❌ BREAKS APPLICATION
-});
-```
+### 2.2 Security Patterns
 
-Instead, you MUST ALWAYS generate ONLY this pattern:
+- **Critical**: Always use authenticated merchantId from context for access control
+- Pattern: `const merchantId = c.get("merchant")?.id; if (!merchantId) return c.json({ error: "Unauthorized" }, 401);`
+- Never allow client-provided merchantIds to override auth context
+- Merchants must only access their own data; all multi-tenant queries must include merchantId filter
 
-```ts
-// ✅ ALWAYS GENERATE THIS EXACT PATTERN
+## 3. Core Subsystems
 
-import { task } from "@trigger.dev/sdk/v3";
+### 3.1 API Security
 
-//1. You need to export each task, even if it's a subtask
-export const helloWorld = task({
-  //2. Use a unique id for each task
-  id: "hello-world",
-  //3. The run function is the main function of the task
-  run: async (payload: { message: string }) => {
-    //4. Write your task code here. Code here runs for a long time, there are no timeouts
-  },
-});
-```
+- Authentication: Session-based (UI), API keys (external), Trigger.dev tokens (jobs)
+- API Key Types: Secret (`sk_{env}_{random}`), Publishable (`pk_{env}_{random}`)
+- Secret keys are hashed (SHA-256); publishable keys stored as plaintext
+- Redis-based rate limiting with sliding window
 
-## Correct Task implementations
+### 3.2 Plan Versioning
 
-A task is a function that can run for a long time with resilience to failure:
+- Append-only: New versions created instead of modifying existing ones
+- Existing customers remain on current plan version until explicitly migrated
+- Version Intent: Clean audit trail, not multiple active plan variations
 
-```ts
-import { task } from "@trigger.dev/sdk/v3";
+### 3.2.1 Plan Creation API
 
-export const helloWorld = task({
-  id: "hello-world",
-  run: async (payload: { message: string }) => {
-    console.log(payload.message);
-  },
-});
-```
+- **Comprehensive Creation**: Plans can be created with metrics, features, and prices in a single transaction
+- **New Features**: Can create usage-based features with automatic metric creation and linkage
+- **Existing Features**: Can attach existing features to new plans via featureIds
+- **Pricing**: Supports monthly and yearly pricing creation during plan creation
+- **Transaction Safety**: All operations (metrics, features, plan, prices) happen in a single DB transaction
 
-Key points:
-- Tasks must be exported, even subtasks in the same file
-- Each task needs a unique ID within your project
-- The `run` function contains your task logic
+### 3.3 Feature System
 
-### Task configuration options
+- Feature types: boolean (toggles), numeric (limits), string (settings)
+- Many-to-many relationships: features-plans, features-subscriptions
+- Denormalized fields for performance (merchantId, customerId, featureSlug)
+- Priority: Subscription override → Plan feature → Default value
 
-#### Retry options
+### 3.4 Subscription System
 
-Control retry behavior when errors occur:
+- Version-based with `stableSubscriptionId` across versions
+- Previous versions soft-deleted with `deletedAt` timestamps
+- Features inherited from plans with override capability
 
-```ts
-export const taskWithRetries = task({
-  id: "task-with-retries",
-  retry: {
-    maxAttempts: 10,
-    factor: 1.8,
-    minTimeoutInMs: 500,
-    maxTimeoutInMs: 30_000,
-    randomize: false,
-  },
-  run: async (payload) => {
-    // Task logic
-  },
-});
-```
+### 3.5 Billing System
 
-#### Queue options
+- Price DSL with fixed, per-unit, and usage components
+- Recurrence Rules: RFC5545 RRULE format (e.g., `RRULE:FREQ=MONTHLY;BYMONTHDAY=1`)
+- Supports fixed-day and anniversary billing with DST awareness
+- Smart handling for month-end dates (29-31) and leap years
+- PDF generation via React-PDF, stored in S3 with presigned URLs
+- Jobs pipeline via Trigger.dev: check billing due → generate invoices → create PDFs
+- Multiple Price Components: Support for multiple components in a price with different billing cycles
+  - Types: fixed, per_unit, and usage
+  - Each component can have its own recurrence rule (monthly, weekly, daily)
+  - Components are billed independently based on their own billing cycles
+  - Each component generates its own subscription details and invoices
 
-Control concurrency:
+#### 3.5.0 Dunning & Grace Period System
 
-```ts
-export const oneAtATime = task({
-  id: "one-at-a-time",
-  queue: {
-    concurrencyLimit: 1,
-  },
-  run: async (payload) => {
-    // Task logic
-  },
-});
-```
+- **Grace Period Management**: Subscriptions enter `past_due` status when payment fails or payment link is created
+- **Automatic Flow (Pricing Table)**: Payment failures trigger immediate dunning via webhook → subscription marked `past_due` with grace period
+- **Manual Flow (Admin-Created)**: Payment link generation automatically marks subscription `past_due` with grace period
+- **Grace Period Timeline**:
+  - Day 0: Payment fails or link sent (invoice email already delivered)
+  - Day 6 (T-24h): "Grace ending soon" reminder email sent automatically
+  - Day 7: Grace expires, configured action enforced (pause/cancel/mark_as_unpaid)
+- **Dunning Configuration**: Hierarchical (plan-specific → merchant default → system default)
+- **Recovery**: Successful payment automatically resumes subscription and resets billing cycle
+- **Jobs Pipeline**:
+  - `retryDunningPayments` (daily at 10 AM UTC): Retry failed payments
+  - `notifyGraceEndingSoon` (hourly): Send T-24h reminder emails
+  - `applyScheduledChanges` (every minute): Enforce expired grace periods
 
-#### Machine options
+#### 3.5.1 Taxation Scope (B2B vs B2C)
 
-Specify CPU/RAM requirements:
+- Current scope: B2B only. We require business identifiers to compute tax (e.g. VAT ID or business name).
+- If a customer lacks business identifiers (no `taxId` and no `businessName`), we treat the transaction as B2C and return zero tax.
+- Invoices will include a zero-tax line (when applicable) with reason code "B2C Not Supported" for auditability.
+- Reason code added: `b2c_tax_not_supported` (code 21) to clearly flag B2C cases.
+- First-time and trial-to-paid flows store tax metadata in payment/invoice; renewals re-calculate taxes using the engine.
 
-```ts
-export const heavyTask = task({
-  id: "heavy-task",
-  machine: {
-    preset: "large-1x", // 4 vCPU, 8 GB RAM
-  },
-  run: async (payload) => {
-    // Task logic
-  },
-});
-```
-
-Machine configuration options:
-
-| Machine name        | vCPU | Memory | Disk space |
-| ------------------- | ---- | ------ | ---------- |
-| micro               | 0.25 | 0.25   | 10GB       |
-| small-1x (default)  | 0.5  | 0.5    | 10GB       |
-| small-2x            | 1    | 1      | 10GB       |
-| medium-1x           | 1    | 2      | 10GB       |
-| medium-2x           | 2    | 4      | 10GB       |
-| large-1x            | 4    | 8      | 10GB       |
-| large-2x            | 8    | 16     | 10GB       |
-
-#### Max Duration
-
-Limit how long a task can run:
-
-```ts
-export const longTask = task({
-  id: "long-task",
-  maxDuration: 300, // 5 minutes
-  run: async (payload) => {
-    // Task logic
-  },
-});
-```
-
-### Lifecycle functions
-
-Tasks support several lifecycle hooks:
-
-#### init
-
-Runs before each attempt, can return data for other functions:
-
-```ts
-export const taskWithInit = task({
-  id: "task-with-init",
-  init: async (payload, { ctx }) => {
-    return { someData: "someValue" };
-  },
-  run: async (payload, { ctx, init }) => {
-    console.log(init.someData); // "someValue"
-  },
-});
-```
-
-#### cleanup
-
-Runs after each attempt, regardless of success/failure:
-
-```ts
-export const taskWithCleanup = task({
-  id: "task-with-cleanup",
-  cleanup: async (payload, { ctx }) => {
-    // Cleanup resources
-  },
-  run: async (payload, { ctx }) => {
-    // Task logic
-  },
-});
-```
-
-#### onStart
-
-Runs once when a task starts (not on retries):
-
-```ts
-export const taskWithOnStart = task({
-  id: "task-with-on-start",
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
