@@ -1,155 +1,189 @@
 ---
 trigger: always_on
-description: This rule provides comprehensive best practices for Rust development, covering code organization, common patterns, performance, security, testing, pitfalls, and tooling. It aims to guide developers in writing idiomatic, efficient, secure, and maintainable Rust code.
+description: Enforces comprehensive test-driven development practices based on lessons learned from testing gaps and failures
 ---
 
-# Rust Essentials - Must-Have Basics
 
-**Purpose:** Core quality requirements for reliable Rust code generation. Use this for basic code generation tasks, learning Rust fundamentals, or when you need clean, safe code that compiles without warnings.
+# Comprehensive Test-Driven Development Rules
 
-**When to use:** AI code generation, code reviews, teaching Rust basics, or any situation requiring solid foundation patterns.
+## Critical TDD Failures to Avoid
 
-## Core Quality Requirements
+**NEVER do "TDD Theater"** - Tests that look like they test but don't actually validate functionality.
 
-**CRITICAL: All generated Rust code MUST:**
-- Compile without warnings on stable Rust
-- Pass `cargo clippy --deny warnings`
-- Follow `rustfmt` formatting standards
-- Use Rust 2021 edition features
-- Include proper error handling (no production `unwrap()`)
-
-## Error Handling Fundamentals
-
-**Rule: Never use `unwrap()`, `expect()`, or `panic!()` in production code paths.**
-Why: These cause immediate program termination, making your application unreliable. Always return `Result<T, E>` for operations that can fail, allowing callers to decide how to handle errors.
-
-**Use Result<T, E> for all fallible operations:**
+### ❌ TDD Theater Examples (AVOID)
 ```rust
-// ✅ GOOD
-pub fn read_config(path: &Path) -> Result<Config, ConfigError> {
-    let content = fs::read_to_string(path)?;
-    toml::from_str(&content).map_err(ConfigError::ParseError)
+// ❌ BAD: Pseudo-test that proves nothing
+#[tokio::test]
+async fn test_analyze_code_quality_returns_real_analysis() {
+    let test_content = r#"fn example() { ... }"#;
+    assert!(test_content.contains("example")); // Tests string, not functionality!
 }
 
-// ❌ BAD - never use unwrap() in production
-pub fn read_config(path: &Path) -> Config {
-    let content = fs::read_to_string(path).unwrap();
-    toml::from_str(&content).unwrap()
+// ❌ BAD: Test that doesn't call the actual function
+#[tokio::test] 
+async fn test_tool_exists() {
+    let server = create_server();
+    // Missing: Actually calling the tool and validating output
+    assert!(server.is_ok());
 }
 ```
 
-**Rule: Use doc test features to ensure examples remain accurate and demonstrate different scenarios.**
-Why: Doc tests are automatically run by `cargo test`, ensuring examples never become outdated. Use different doc test attributes to show various use cases and error conditions.
-
-**Run doc tests with:** `cargo test --doc` or `cargo test` (includes all tests)
-
-**Doc test best practices:**
+### ✅ Proper TDD Examples (FOLLOW)
 ```rust
-/// Parses configuration from various sources.
-/// 
-/// # Examples
-/// 
-/// Basic usage:
-/// ```
-/// let config = parse_config("app.toml")?;
-/// assert!(config.port > 0);
-/// # Ok::<(), ConfigError>(())
-/// ```
-/// 
-/// This example doesn't run but shows the API:
-/// ```no_run
-/// let config = parse_config("/etc/myapp/config.toml")?;
-/// deploy_with_config(config);
-/// # Ok::<(), Box<dyn std::error::Error>>(())
-/// ```
-/// 
-/// Demonstrating error handling:
-/// ```should_panic
-/// let config = parse_config("nonexistent.toml").unwrap();
-/// ```
-/// 
-/// Hidden setup code (lines starting with #):
-/// ```
-/// # use std::fs;
-/// # fs::write("test.toml", "port = 8080").unwrap();
-/// let config = parse_config("test.toml")?;
-/// assert_eq!(config.port, 8080);
-/// # fs::remove_file("test.toml").unwrap();
-/// # Ok::<(), ConfigError>(())
-/// ```
-pub fn parse_config(path: &str) -> Result<Config, ConfigError> {
-    // Implementation
-}
-
-**Rule: Create specific error types instead of using generic errors.**
-Why: Specific errors enable proper error handling by callers and provide better debugging information. Use `thiserror` to reduce boilerplate.
-
-**Define custom error types:**
-```rust
-#[derive(Debug, thiserror::Error)]
-pub enum ConfigError {
-    #[error("IO error: {0}")]
-    Io(#[from] std::io::Error),
-    #[error("Parse error: {0}")]
-    ParseError(#[from] toml::de::Error),
+// ✅ GOOD: Test that actually calls and validates functionality
+#[tokio::test]
+async fn test_analyze_code_quality_comprehensive() {
+    let server = create_test_server().await;
+    
+    // Create actual test file with quality issues
+    let test_file = create_test_file_with_known_issues().await;
+    
+    // ACTUALLY CALL THE TOOL
+    let params = json!({
+        "target": test_file.path(),
+        "quality_types": ["all"],
+        "detailed_analysis": true
+    });
+    
+    let result = server.call_tool("analyze_code_quality", params).await;
+    
+    // VALIDATE REAL FUNCTIONALITY
+    assert!(result.is_ok());
+    let analysis = result.unwrap();
+    assert_eq!(analysis.is_error, Some(false));
+    
+    // Verify specific analysis content
+    let content = &analysis.content[0].text;
+    assert!(content.contains("quality_metrics"));
+    assert!(content.contains("overall_score"));
+    assert!(content.contains("code_smells"));
 }
 ```
 
-**Rule: Use the `?` operator to propagate errors up the call stack.**
-Why: The `?` operator provides clean error propagation without nested match statements. It automatically converts errors using the `From` trait.
+## Mandatory TDD Workflow
 
-**Use the ? operator for error propagation:**
+### 1. STUDY EXISTING PATTERNS FIRST
+Before implementing ANY feature:
+- Study existing test patterns in related modules
+- Identify comprehensive test coverage requirements  
+- Plan test scenarios based on proven patterns
+- Reference: [codeprism-mcp-server tests](mdc:crates/codeprism-mcp-server/src/server.rs) for comprehensive examples
+
+### 2. COMPREHENSIVE TEST PLANNING
+For every feature, write tests covering:
+
+**Success Cases:**
+- Basic functionality with valid inputs
+- Complex scenarios with realistic data
+- Integration with dependent systems
+
+**Error Cases:**
+- Invalid parameters
+- Missing required inputs
+- System failures and timeouts
+- Resource exhaustion scenarios
+
+**Edge Cases:**
+- Boundary conditions
+- Empty inputs
+- Very large inputs
+- Concurrent access scenarios
+
+**Performance Cases:**
+- Response time requirements
+- Memory usage limits
+- Throughput under load
+
+### 3. TEST QUALITY STANDARDS
+
+**Every test MUST:**
+- Actually call the function under test
+- Use realistic input data
+- Validate meaningful outputs
+- Include descriptive failure messages
+- Exercise the actual code path being tested
+
+**Test Naming Convention:**
 ```rust
-pub fn process_user_data(id: u32) -> Result<UserProfile, UserError> {
-    let user = database::find_user(id)?;  // Propagates database errors
-    let profile = build_profile(&user)?;  // Propagates profile errors
-    Ok(profile)
+#[tokio::test]
+async fn test_{component}_{scenario}_{expected_outcome}() {
+    // Examples:
+    // test_analyze_code_quality_with_valid_file_returns_analysis()
+    // test_search_symbols_with_invalid_pattern_returns_error()
+    // test_trace_path_with_circular_dependency_detects_cycle()
 }
 ```
 
-## Documentation Standards
+### 4. COVERAGE REQUIREMENTS
 
-**Rule: Every public function, struct, and module must have rustdoc comments with working code examples.**
-Why: Documentation is part of the API contract. Good docs prevent misuse, reduce support burden, and make your code maintainable. Code examples are automatically tested by `cargo test`, ensuring documentation stays accurate.
+**For Tool Implementation:**
+- ✅ Individual tool tests (one per tool)
+- ✅ Parameter validation tests  
+- ✅ Error handling tests
+- ✅ Edge case tests
+- ✅ Integration tests
+- ✅ Performance tests
 
-**Every public item needs rustdoc with examples:**
+**Minimum Coverage Targets:**
+- Unit Tests: 90%+ of functions
+- Integration Tests: 80%+ of workflows  
+- Error Tests: 100% of error paths
+- Edge Cases: 75%+ of boundary conditions
+
+### 5. RED-GREEN-REFACTOR IMPLEMENTATION
+
+**RED Phase:** Write comprehensive failing tests
 ```rust
-/// Represents a user in the system.
-///
-/// # Examples
-/// 
-/// Creating a valid user:
-/// ```
-/// let user = User::new("alice@example.com", "Alice Smith")?;
-/// assert_eq!(user.email(), "alice@example.com");
-/// assert_eq!(user.name(), "Alice Smith");
-/// # Ok::<(), UserError>(())
-/// ```
-/// 
-/// Handling invalid email:
-/// ```should_panic
-/// let user = User::new("invalid-email", "Alice Smith").unwrap();
-/// ```
-///
-/// # Errors
-/// Returns `UserError::InvalidEmail` if email format is invalid.
-#[derive(Debug, Clone)]
-pub struct User {
-    email: String,
-    name: String,
-}
+// Write tests for ALL scenarios before any implementation
+#[tokio::test] async fn test_tool_success_case() { /* ... */ }
+#[tokio::test] async fn test_tool_error_case() { /* ... */ }  
+#[tokio::test] async fn test_tool_edge_case() { /* ... */ }
+#[tokio::test] async fn test_tool_performance() { /* ... */ }
+```
 
-impl User {
-    /// Creates a new user with validated email.
-    /// 
-    /// # Examples
-    /// ```
-    /// use my_crate::User;
-    /// 
-    /// let user = User::new("bob@example.com", "Bob Jones")?;
-    /// assert!(user.email().contains("@"));
-    /// # Ok::<(), my_crate::UserError>(())
-    /// ```
+**GREEN Phase:** Implement functionality to pass ALL tests
+```rust
+// Implement complete functionality, not minimal stubs
+pub async fn analyze_code_quality(params: Params) -> Result<Analysis> {
+    // Real implementation that passes all test scenarios
+}
+```
+
+**REFACTOR Phase:** Optimize while maintaining ALL test coverage
+```rust
+// Refactor for performance/clarity while ensuring all tests still pass
+cargo test --all-features  // Must pass 100%
+```
+
+## Enforcement Checks
+
+**Before any commit:**
+```bash
+# 1. All tests must pass
+cargo test --all-features
+
+# 2. Check test coverage
+cargo tarpaulin --out xml && python scripts/check_coverage.py --min 90
+
+# 3. Verify no "testing theater" patterns
+grep -r "assert.*contains" tests/ && echo "❌ Potential testing theater found"
+
+# 4. Validate actual function calls in tests
+grep -r "#\[tokio::test\]" -A 20 tests/ | grep "call_tool\|\..*(" || echo "❌ Tests may not call actual functions"
+```
+
+## Test Organization Patterns
+
+### Individual Tool Testing
+```rust
+// REQUIRED: Every tool needs individual validation
+#[tokio::test]
+async fn test_provide_guidance_tool() { /* comprehensive test */ }
+
+#[tokio::test] 
+async fn test_optimize_code_tool() { /* comprehensive test */ }
+
+#[tokio::test]
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
