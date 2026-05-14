@@ -1,205 +1,194 @@
 ---
 trigger: always_on
-description: 1. **返回类型注解**：必须使用 Pydantic 模型作为返回类型
+description: MCP 服务器测试模式与调试指南：单元测试模式、工具 (Tools) 测试、资源 (Resources) 测试；MCP 协议测试、HTTP 端点测试、
 ---
 
-# 🎯 MCP outputSchema 强制开发规范
+# MCP 服务器测试模式与调试指南
 
-## 🚨 CRITICAL REQUIREMENTS
+## 测试策略概览
+基于 MCP 协议的特殊性，需要采用多层次的测试策略来确保服务器的可靠性和性能。
 
-### ✅ 每个工具必须满足的条件
-1. **返回类型注解**：必须使用 Pydantic 模型作为返回类型
-2. **导入响应模型**：从 `server.models.responses` 导入标准模型
-3. **结构化返回**：返回实例化的 Pydantic 模型对象
-4. **错误处理**：使用 `ErrorResult` 处理异常情况
+## 单元测试模式
 
-## 📋 标准开发模板
+### 1. 工具 (Tools) 测试 - ⭐ outputSchema 强制要求
 
-### 工具实现模板
+#### ✅ 标准工具测试模板（必须包含 outputSchema 验证）
 ```python
-# ✅ 正确的工具实现
+import pytest
+from unittest.mock import AsyncMock, patch
+from server.tools.example_tool import example_tool
 from server.models.responses import CalculationResult, ErrorResult
-from typing import Union
 
-@mcp.tool(title="工具标题", description="详细描述")
-def tool_name(param1: type, param2: type) -> Union[CalculationResult, ErrorResult]:
-    """
-    工具文档字符串
+@pytest.mark.asyncio
+async def test_example_tool_success():
+    """测试工具正常执行和 outputSchema"""
+    result = await example_tool("test_input")
     
-    Args:
-        param1: 参数1描述
-        param2: 参数2描述
-        
-    Returns:
-        CalculationResult: 成功时返回计算结果
-        ErrorResult: 失败时返回错误信息
-    """
-    try:
-        # 业务逻辑处理
-        result = perform_calculation(param1, param2)
-        
-        return CalculationResult(
-            success=True,
-            result=result,
-            operation="tool_operation",
-            expression=f"{param1} op {param2}"
-        )
-    except Exception as e:
-        return ErrorResult(
-            success=False,
-            error_type=type(e).__name__,
-            error_message=str(e),
-            error_code="TOOL_ERROR"
-        )
-```
-
-### 测试模板
-```python
-# ✅ 正确的测试实现
-def test_tool_name():
-    """测试工具的 outputSchema 和功能"""
-    # 测试成功情况
-    result = tool_name("valid_param1", "valid_param2")
-    
-    # 验证返回类型
+    # ⭐ CRITICAL: 验证返回类型是 Pydantic 模型
     assert isinstance(result, (CalculationResult, ErrorResult))
     assert hasattr(result, 'success')
     assert hasattr(result, 'timestamp')
     
-    # 验证 Pydantic 模型验证
+    # ⭐ CRITICAL: 验证 Pydantic 模型序列化/反序列化
     validated = result.model_validate(result.model_dump())
     assert validated == result
     
-    # 测试错误情况
-    error_result = tool_name("invalid_param1", "invalid_param2")
-    if isinstance(error_result, ErrorResult):
-        assert error_result.success is False
-        assert error_result.error_type is not None
+    # 验证业务逻辑
+    if isinstance(result, CalculationResult):
+        assert result.success is True
+        assert result.result is not None
+
+@pytest.mark.asyncio
+async def test_example_tool_outputschema_structure():
+    """⭐ 专门测试 outputSchema 结构"""
+    result = await example_tool("test_input")
+    
+    # 验证基础响应字段
+    assert hasattr(result, 'success')
+    assert hasattr(result, 'timestamp')
+    assert isinstance(result.success, bool)
+    
+    # 验证具体模型字段
+    if isinstance(result, CalculationResult):
+        assert hasattr(result, 'result')
+        assert hasattr(result, 'operation')
+        assert isinstance(result.result, (int, float))
+        assert isinstance(result.operation, str)
+
+@pytest.mark.asyncio
+async def test_example_tool_validation():
+    """测试输入验证和错误响应"""
+    result = await example_tool("")
+    
+    # ⭐ 错误也必须返回结构化响应
+    assert isinstance(result, ErrorResult)
+    assert result.success is False
+    assert result.error_type is not None
+    assert result.error_message is not None
+
+@pytest.mark.asyncio
+async def test_example_tool_with_mock():
+    """测试带外部依赖的工具"""
+    with patch('server.tools.example_tool.external_api_call') as mock_api:
+        mock_api.return_value = {"status": "success"}
+        
+        result = await example_tool("test_input")
+        
+        mock_api.assert_called_once_with("test_input")
+        
+        # ⭐ 验证模拟调用也返回正确的结构
+        assert isinstance(result, (CalculationResult, ErrorResult))
+        if isinstance(result, CalculationResult):
+            assert result.success is True
+
+@pytest.mark.asyncio
+async def test_example_tool_error_handling():
+    """测试错误处理返回 ErrorResult"""
+    with patch('server.tools.example_tool.external_api_call') as mock_api:
+        mock_api.side_effect = ConnectionError("Network error")
+        
+        result = await example_tool("test_input")
+        
+        # ⭐ 错误必须返回 ErrorResult，不能抛出异常
+        assert isinstance(result, ErrorResult)
+        assert result.success is False
+        assert "Network error" in result.error_message
+        assert result.error_type == "ConnectionError"
+
+@pytest.mark.asyncio 
+async def test_tool_json_schema_generation():
+    """⭐ 测试工具的 JSON Schema 自动生成"""
+    from server.tools.example_tool import example_tool
+    
+    # 获取函数的返回类型注解
+    return_annotation = example_tool.__annotations__.get('return')
+    assert return_annotation is not None
+    
+    # 验证返回类型是 Pydantic 模型
+    from pydantic import BaseModel
+    assert issubclass(return_annotation, BaseModel) or \
+           (hasattr(return_annotation, '__origin__') and 
+            all(issubclass(arg, BaseModel) for arg in return_annotation.__args__))
 ```
 
-## 🔧 可用的响应模型
-
-### 基础模型
-- `BaseToolResponse`: 所有响应的基类
-- `SimpleResult`: 简单操作结果
-- `ErrorResult`: 错误结果
-
-### 计算类模型
-- `CalculationResult`: 数学计算结果
-- `BMIResult`: BMI 计算专用
-- `StatisticsResult`: 统计计算结果
-
-### 文本处理模型
-- `TextAnalysisResult`: 文本分析结果
-- `CaseConversionResult`: 大小写转换结果
-- `ExtractionResult`: 文本提取结果
-
-### 文件操作模型
-- `FileOperationResult`: 文件操作结果
-- `FileInfoResult`: 文件信息结果
-- `DirectoryResult`: 目录操作结果
-
-### 系统信息模型
-- `SystemInfoResult`: 系统信息结果
-
-## ❌ 禁止的实现方式
-
-### 错误示例 1：返回字符串
+### 2. 资源 (Resources) 测试
 ```python
-# ❌ 错误：不要返回字符串
-@mcp.tool(title="错误工具")
-def bad_tool() -> str:
-    return "这样不对"
+import pytest
+from server.resources.example_resource import get_resource_data
+
+@pytest.mark.asyncio
+async def test_resource_retrieval():
+    """测试资源获取"""
+    resource_id = "test_resource_123"
+    data = await get_resource_data(resource_id)
+    
+    assert data is not None
+    assert "content" in data
+    assert data["id"] == resource_id
+
+@pytest.mark.asyncio
+async def test_resource_not_found():
+    """测试资源不存在的情况"""
+    with pytest.raises(FileNotFoundError):
+        await get_resource_data("nonexistent_resource")
+
+@pytest.mark.asyncio
+async def test_resource_caching():
+    """测试资源缓存机制"""
+    resource_id = "cached_resource"
+    
+    # 第一次调用
+    start_time = time.time()
+    data1 = await get_resource_data(resource_id)
+    first_call_time = time.time() - start_time
+    
+    # 第二次调用（应该使用缓存）
+    start_time = time.time()
+    data2 = await get_resource_data(resource_id)
+    second_call_time = time.time() - start_time
+    
+    assert data1 == data2
+    assert second_call_time < first_call_time  # 缓存应该更快
 ```
 
-### 错误示例 2：返回字典
+### 3. 提示 (Prompts) 测试
 ```python
-# ❌ 错误：不要返回字典
-@mcp.tool(title="错误工具")
-def bad_tool() -> Dict[str, Any]:
-    return {"result": "value"}
+import pytest
+from server.prompts.example_prompt import generate_prompt
+
+def test_prompt_generation():
+    """测试提示生成"""
+    context = {"user": "John", "task": "summarize"}
+    prompt = generate_prompt(context)
+    
+    assert "John" in prompt
+    assert "summarize" in prompt
+    assert len(prompt) > 0
+
+def test_prompt_template_validation():
+    """测试提示模板验证"""
+    invalid_context = {}
+    
+    with pytest.raises(KeyError):
+        generate_prompt(invalid_context)
+
+def test_prompt_length_limits():
+    """测试提示长度限制"""
+    large_context = {"content": "x" * 10000}
+    prompt = generate_prompt(large_context)
+    
+    # 确保提示不会过长
+    assert len(prompt) < 8000
 ```
 
-### 错误示例 3：无返回类型注解
+## 集成测试模式
+
+### 1. MCP 协议测试
 ```python
-# ❌ 错误：必须有类型注解
-@mcp.tool(title="错误工具")
-def bad_tool():
-    return some_value
-```
+import pytest
+import httpx
 
-### 错误示例 4：不使用标准模型
-```python
-# ❌ 错误：不要自定义简单返回类型
-@mcp.tool(title="错误工具")
-def bad_tool() -> tuple:
-    return (True, "result")
-```
-
-## 🚀 快速检查清单
-
-在提交代码前，确保你的工具满足以下条件：
-
-- [ ] 导入了正确的响应模型
-- [ ] 工具函数有明确的返回类型注解
-- [ ] 返回类型是 Pydantic 模型
-- [ ] 实现了错误处理并返回 ErrorResult
-- [ ] 包含完整的工具文档字符串
-- [ ] 编写了相应的测试用例
-- [ ] 测试验证了 outputSchema 生成
-
-## 🔍 常见问题解决
-
-### 问题 1：如何选择合适的响应模型？
-**解决方案**：根据工具的功能选择：
-- 数学计算 → `CalculationResult`
-- 文本处理 → `TextAnalysisResult` 或其他文本模型
-- 文件操作 → `FileOperationResult` 或 `DirectoryResult`
-- 简单操作 → `SimpleResult`
-
-### 问题 2：需要自定义响应字段怎么办？
-**解决方案**：在 `server/models/responses.py` 中创建新模型：
-```python
-class CustomResult(BaseToolResponse):
-    """自定义结果模型"""
-    custom_field: str = Field(description="自定义字段")
-    special_data: Optional[Dict[str, Any]] = Field(None, description="特殊数据")
-```
-
-### 问题 3：如何处理复杂的错误情况？
-**解决方案**：使用 Union 类型和详细的 ErrorResult：
-```python
-def complex_tool() -> Union[SuccessResult, ErrorResult]:
-    try:
-        # 复杂逻辑
-        pass
-    except SpecificError as e:
-        return ErrorResult(
-            success=False,
-            error_type="SpecificError",
-            error_message=str(e),
-            error_code="SPECIFIC_001"
-        )
-    except Exception as e:
-        return ErrorResult(
-            success=False,
-            error_type="UnknownError",
-            error_message=str(e),
-            error_code="UNKNOWN_001"
-        )
-```
-
-## 📚 参考资源
-
-- [响应模型库](mdc:server/models/responses.py)
-- [计算器工具示例](mdc:server/tools/calculator.py)
-- [文本处理工具示例](mdc:server/tools/text_processing.py)
-- [测试示例](mdc:tests/test_output_schema.py)
-- [使用指南](mdc:docs/OUTPUTSCHEMA_GUIDE.md)
-
----
-
-**🎯 记住：每个工具都必须返回 Pydantic 模型，这是 MCP v1.11.0 的核心要求！**
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [WW-AI-Lab/Awesome-MCP-Scaffold](https://github.com/WW-AI-Lab/Awesome-MCP-Scaffold) — distributed by [TomeVault](https://tomevault.io).
