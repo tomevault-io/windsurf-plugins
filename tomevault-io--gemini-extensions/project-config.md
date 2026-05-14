@@ -3,7 +3,7 @@ trigger: always_on
 description: > This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-## n8n-mcp
+## be-framework
 
 > This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
@@ -13,67 +13,154 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-n8n-mcp is a comprehensive documentation and knowledge server that provides AI assistants with complete access to n8n node information through the Model Context Protocol (MCP). It serves as a bridge between n8n's workflow automation platform and AI models, enabling them to understand and work with n8n nodes effectively.
+Be Framework v0 - The Ontological Programming Framework for PHP implementing "Be, Don't Do" philosophy. Objects represent immutable states that undergo constructor-driven metamorphosis through `#[Be]` attributes.
 
-## ✅ Latest Updates (v2.7.4)
+**Documentation**: https://be-framework.github.io/
 
-### Update (v2.7.4) - Self-Documenting MCP Tools:
-- ✅ **RENAMED: start_here_workflow_guide → tools_documentation** - More descriptive name
-- ✅ **NEW: Depth parameter** - Control documentation detail level with "essentials" or "full"
-- ✅ **NEW: Per-tool documentation** - Get help for any specific tool by name
-- ✅ **Concise by default** - Essential info only, unless full depth requested
-- ✅ **LLM-friendly format** - Plain text, not JSON for better readability
-- ✅ **Two-tier documentation**:
-  - **Essentials**: Brief description, key parameters, example, performance, 2-3 tips
-  - **Full**: Complete documentation with all parameters, examples, use cases, best practices, pitfalls
-- ✅ **Quick reference** - Call without parameters for immediate help
-- ✅ **8 documented tools** - Comprehensive docs for most commonly used tools
-- ✅ **Performance guidance** - Clear indication of which tools are fast vs slow
-- ✅ **Error prevention** - Common pitfalls documented upfront
+## Core Architecture
 
-### Update (v2.7.0) - Diff-Based Workflow Editing with Transactional Updates:
-- ✅ **NEW: n8n_update_partial_workflow tool** - Update workflows using diff operations for precise, incremental changes
-- ✅ **RENAMED: n8n_update_workflow → n8n_update_full_workflow** - Clarifies that it replaces the entire workflow
-- ✅ **NEW: WorkflowDiffEngine** - Applies targeted edits without sending full workflow JSON
-- ✅ **80-90% token savings** - Only send the changes, not the entire workflow
-- ✅ **13 diff operations** - addNode, removeNode, updateNode, moveNode, enableNode, disableNode, addConnection, removeConnection, updateConnection, updateSettings, updateName, addTag, removeTag
-- ✅ **Smart node references** - Use either node ID or name for operations
-- ✅ **Transaction safety** - Validates all operations before applying any changes
-- ✅ **Validation-only mode** - Test your diff operations without applying them
-- ✅ **Comprehensive test coverage** - All operations and edge cases tested
-- ✅ **Example guide** - See [workflow-diff-examples.md](./docs/workflow-diff-examples.md) for usage patterns
-- ✅ **FIXED: MCP validation error** - Simplified schema to fix "additional properties" error in Claude Desktop
-- ✅ **FIXED: n8n API validation** - Updated cleanWorkflowForUpdate to remove all read-only fields
-- ✅ **FIXED: Claude Desktop compatibility** - Added additionalProperties: true to handle extra metadata from Claude Desktop
-- ✅ **NEW: Transactional Updates** - Two-pass processing allows adding nodes and connections in any order
-- ✅ **Operation Limit** - Maximum 5 operations per request ensures reliability
-- ✅ **Order Independence** - Add connections before nodes - engine handles dependencies automatically
+### Metamorphosis Engine
+The `Becoming` class (`src/Becoming.php`) processes objects through continuous transformations:
+- Follows `#[Be]` attributes to determine transformation paths
+- Linear: `#[Be(NextClass::class)]` or Branching: `#[Be([ClassA::class, ClassB::class])]`
+- All business logic in constructors - no methods for data transformation
+- Properties must be `public readonly` for immutability
 
-### Update (v2.6.3) - n8n Instance Workflow Validation:
-- ✅ **NEW: n8n_validate_workflow tool** - Validate workflows directly from n8n instance by ID
-- ✅ **Fetches and validates** - Retrieves workflow from n8n API and runs comprehensive validation
-- ✅ **Same validation logic** - Uses existing WorkflowValidator for consistency
-- ✅ **Full validation options** - Supports all validation profiles and options
-- ✅ **Integrated workflow** - Part of complete lifecycle: discover → build → validate → deploy → execute
-- ✅ **No JSON needed** - AI agents can validate by just providing workflow ID
+### Constructor Argument Resolution
+- **`#[Input]`**: Immanent data from source object properties
+- **`#[Inject]`**: Transcendent dependencies from DI container (Ray.Di)
+- Arguments resolved by `BecomingArguments` class during metamorphosis
 
-### Update (v2.6.2) - Enhanced Workflow Creation Validation:
-- ✅ **NEW: Node type validation** - Verifies node types actually exist in n8n
-- ✅ **FIXED: nodes-base prefix detection** - Now catches `nodes-base.webhook` BEFORE database lookup
-- ✅ **NEW: Smart suggestions** - Detects `nodes-base.webhook` and suggests `n8n-nodes-base.webhook`
-- ✅ **NEW: Common mistake detection** - Catches missing package prefixes (e.g., `webhook` → `n8n-nodes-base.webhook`)
-- ✅ **NEW: Minimum viable workflow validation** - Prevents single-node workflows (except webhooks)
-- ✅ **NEW: Empty connection detection** - Catches multi-node workflows with no connections
-- ✅ **Enhanced error messages** - Clear guidance on proper workflow structure
-- ✅ **Connection examples** - Shows correct format: `connections: { "Node Name": { "main": [[{ "node": "Target", "type": "main", "index": 0 }]] } }`
-- ✅ **Helper functions** - `getWorkflowStructureExample()` and `getWorkflowFixSuggestions()`
-- ✅ **Prevents broken workflows** - Like single webhook nodes with empty connections that show as question marks
-- ✅ **Reinforces best practices** - Use node NAMES (not IDs) in connections
+### Key Components
+- **`src/Attribute/`**: Framework attributes (`Be`, `Validate`, `Message`, `SemanticTag`)
+- **`src/BecomingArguments.php`**: Constructor argument resolution
+- **`src/BecomingType.php`**: Type matching for branching transformations
+- **`src/SemanticLog/`**: Transformation lifecycle logging
+- **`src/SemanticVariable/`**: Semantic validation for constructor parameters
 
-### Update (v2.6.1) - Enhanced typeVersion Validation:
-- ✅ **NEW: typeVersion validation** - Workflow validator now enforces typeVersion on all versioned nodes
+## Development Commands
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+```bash
+# Testing
+composer test                    # Run all unit tests
+php vendor/bin/phpunit --filter testMethodName   # Run specific test method
+php vendor/bin/phpunit tests/TestFile.php        # Run specific test file
+
+# Code Quality (ALWAYS run after modifying PHP files)
+composer cs-fix                  # Auto-fix coding style issues (Doctrine standards)
+composer cs                      # Check coding style without fixing
+composer sa                      # Run static analysis (phpstan + psalm)
+composer phpmd                   # Analyze PHP code for potential issues
+
+# Coverage
+composer coverage                # Generate coverage report with xdebug
+composer phpdbg                  # Generate coverage with phpdbg
+composer pcov                    # Generate coverage with pcov
+
+# Comprehensive Checks
+composer tests                   # Run cs + sa + phpmd + test
+composer build                   # Full build: clean + cs + sa + phpmd + coverage + crc
+
+# Utilities
+composer clean                   # Clear analysis caches
+composer baseline                # Generate baselines for PHPStan and Psalm
+composer crc                     # Run composer require checker
+composer metrics                 # Generate code metrics report
+```
+
+## Debugging Tools
+
+### Forward Trace Debugging (xdebug-debug)
+```bash
+# Always verify test works first
+php vendor/bin/phpunit --filter testMethodName tests/TestFile.php
+
+# Then add tracing
+./vendor/bin/xdebug-debug --context="Debug context" \
+  --break="file.php:lineNumber" \
+  --exit-on-break \
+  --steps=10 \
+  --json \
+  -- php vendor/bin/phpunit --filter testMethodName tests/TestFile.php
+```
+
+### Performance Profiling
+```bash
+./vendor/bin/xdebug-profile -- php vendor/bin/phpunit --filter testMethodName
+```
+
+## Testing
+
+```bash
+# Run specific test method (use --filter, not ::method)
+php vendor/bin/phpunit --filter testMethodName
+
+# Run specific test file
+php vendor/bin/phpunit tests/SemanticLog/LoggerTest.php
+
+# Run tests matching pattern
+php vendor/bin/phpunit --filter "Semantic"
+```
+
+- Test fixtures in `tests/Fake/` and `tests/FakeApp/`
+- Schema validation tests verify semantic log output against `docs/schemas/*.json`
+
+## Creating Transformation Classes
+
+1. Declare transformation with `#[Be]` attribute
+2. Use `public readonly` properties only
+3. Put all logic in constructor
+4. Use `#[Input]` for data from source object
+5. Use `#[Inject]` for external dependencies
+
+```php
+#[Be(ProcessedData::class)]
+final class InputData
+{
+    public function __construct(
+        public readonly string $value
+    ) {}
+}
+
+final class ProcessedData
+{
+    public readonly string $result;
+
+    public function __construct(
+        #[Input] string $value,           // From InputData
+        #[Inject] ProcessorService $proc  // From DI container
+    ) {
+        $this->result = $proc->process($value);
+    }
+}
+```
+
+## Code Style Guidelines
+
+### Early Return Pattern (No Else)
+Avoid `else` statements - use early returns:
+
+```php
+// ✅ Good
+if ($condition) {
+    return $this->handleCondition();
+}
+return $this->handleDefault();
+
+// ❌ Avoid
+if ($condition) {
+    return $this->handleCondition();
+} else {
+    return $this->handleDefault();
+}
+```
+
+### After Modifying PHP Files
+**ALWAYS** run: `composer cs-fix`
+
+---
+> Source: [be-framework/Be.Framework](https://github.com/be-framework/Be.Framework) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:gemini_md:2026-05-06 -->
 
 ---
 > Source: [tomevault-io/gemini-extensions](https://github.com/tomevault-io/gemini-extensions) — distributed by [TomeVault](https://tomevault.io).
