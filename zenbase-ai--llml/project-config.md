@@ -1,65 +1,141 @@
 ---
 trigger: always_on
-description: The TypeScript implementation is a minimalist, functional, and robust library with zero production dependencies besides `dedent`. It prioritizes predictable output and developer experience through a simple API and strict typing, while gracefully handling varied and unpredictable input data.
+description: Read .cursor/rules/spec.mdc
 ---
 
-# TypeScript Coding Rules for LLML Project
+# LLML Project - Claude AI Documentation
 
-## Overall Philosophy
+## Core LLML Specification
 
-The TypeScript implementation is a minimalist, functional, and robust library with zero production dependencies besides `dedent`. It prioritizes predictable output and developer experience through a simple API and strict typing, while gracefully handling varied and unpredictable input data.
+Read .cursor/rules/spec.mdc
 
-## Project Structure & Conventions
+## Coding Rules
 
-### Tooling
-- **Runtime and Package Management:** Use `bun` for all operations (installing dependencies, running scripts, building). The project is configured with `bun.lockb`.
-- **Testing:** `vitest` is the testing framework. Use `bun test` to run the test suite.
-- **Type Checking:** `typescript` is used for static analysis. Run `bun run tsc --noEmit` to check for type errors without generating JavaScript files.
+Reference .cursor/rules/{language = ["py", "ts", "go", "rs"]}.mdc
 
-### Module System
-- The project uses **ES Modules (ESM)** exclusively, as defined by `"type": "module"` in `package.json`.
-- Use `import`/`export` syntax. Do not use `require`/`module.exports`.
+## Project Overview
 
-### File Organization
-- **Source Code:** All core logic resides in the `src/` directory. The main entry point is `src/index.ts`.
-- **Utilities:** Pure, reusable helper functions (like `kebabCase`) should be placed in `src/utils.ts`.
-- **Tests:** All test files are located in the `tests/` directory. Maintain the one-to-one mapping of feature-to-test-file (e.g., `nested.ts` logic is tested in `tests/nested.test.ts`).
+LLML (Lightweight Language Markup Language) is **React for Prompts** - a multi-language compositional primitive that revolutionizes AI context engineering. Just as React transformed web development by making complex UIs composable and maintainable, LLML transforms AI development by making complex contexts composable and maintainable.
 
-## Coding Style & Patterns
+The project provides identical functionality across four programming languages: Python, TypeScript/JavaScript, Rust, and Go, converting nested data structures into human-readable, XML-like markup optimized for AI model attention.
 
-- **Functional Approach:** The core logic is implemented as a set of pure functions. The main `llml` function is recursive and delegates formatting tasks to helpers. Avoid classes and stateful logic.
-- **Immutability:** Do not mutate input data. Functions should return new, transformed values.
-- **Dependencies:** Maintain the zero-dependency principle for production code. The only exception is `dedent`, which is used for cleaning up multiline strings. Do not add new production dependencies without strong justification.
-- **Readability:** Use `const` by default and `let` only when a variable must be reassigned. Code is formatted with a 2-space indent.
-- **Comments:** Add JSDoc-style comments to exported functions and complex utility functions to explain their purpose, parameters, and return values, as seen in `src/utils.ts`.
+### Core Purpose
+- **Compositional Context Engineering**: Build complex AI contexts from simple, reusable components
+- **Declarative AI Interactions**: Describe what your prompt should contain, not how to format it
+- **Maintainable AI Systems**: Replace brittle string concatenation with robust data composition
+- **Structured Document Creation**: Generate documents with clear hierarchy from data structures
+- **Data Serialization**: Convert data into more readable format than JSON/YAML for AI applications
 
-## Type Usage & Safety
+### Key Benefits
+- **Component-Like Composition**: Build complex prompts from simple, reusable pieces
+- **Declarative Approach**: Focus on what you want, not how to format it
+- **Maintainable & Robust**: Changes to data automatically propagate without breaking
+- **Zero Configuration**: Works out-of-the-box with sensible defaults
+- **Consistent Output**: Identical results across all language implementations
+- **LLM-Optimized**: Structured format reduces AI model cognitive load and improves performance
+- **Developer Experience**: Type-safe, predictable, debuggable context engineering
+- **Extensible Formatters**: Customizable formatter system like React's component system
 
-- **Strict Mode:** The project enforces `"strict": true` in `tsconfig.json`. All new code must adhere to strict type-checking rules.
-- **Input Flexibility (`any`):** The main `llml` function accepts `any` as its primary data input. This is an intentional design choice to allow the library to serialize any valid JavaScript object structure.
-- **Internal Type Guarding:** Because the input is `any`, it is **critical** to use type guards to safely handle the data internally. Use `typeof`, `Array.isArray`, `instanceof`, and `value == null` checks to narrow down the type before processing it.
-- **Explicit Interfaces:** Define and export interfaces for configuration objects, as demonstrated by `LLMLOptions`.
-- **Function Overloads:** Use function overloads for the main `llml` function to provide clearer type definitions and better autocompletion for consumers based on how they call it (e.g., with no arguments vs. with data).
+## Project Structure
 
-## Error Handling
+```
+/Users/knrz/Git/zenbase-ai/llml/
+├── README.md                 # Main project documentation
+├── justfile                  # Cross-language task runner
+├── py/                       # Python implementation
+│   ├── README.md
+│   ├── pyproject.toml
+│   ├── src/
+│   │   └── zenbase_llml/
+│   │       ├── llml.py      # Main implementation
+│   │       └── formatters/  # Formatter system
+│   │           ├── base/    # Base type formatters
+│   │           └── vibe_xml/ # VibeXML formatters
+│   └── tests/
+├── ts/                       # TypeScript implementation
+│   ├── README.md
+│   ├── package.json
+│   ├── src/
+│   │   ├── index.ts         # Main implementation
+│   │   └── formatters/      # Formatter system
+│   │       ├── base/        # Base type formatters
+│   │       └── vibe-xml/    # VibeXML formatters
+│   └── tests/
+├── rs/                       # Rust implementation
+│   ├── README.md
+│   ├── Cargo.toml
+│   ├── src/
+│   │   ├── lib.rs           # Main implementation
+│   │   └── formatters.rs    # Core formatting logic
+│   └── tests/
+└── go/                       # Go implementation
+    ├── README.md
+    ├── go.mod
+    ├── pkg/llml/
+    │   └── llml.go          # Main implementation
+    └── tests/
+```
 
-- **No-Throw Policy:** The library does not throw errors for invalid or unexpected input data (e.g., empty objects, `null` values).
-- **Graceful Fallbacks:**
-  - For empty objects (`{}`) or empty arrays (`[]`), return an empty string (`""`).
-  - For `null` or `undefined` passed as the top-level data, return an empty string.
-  - When `null` or `undefined` are values within an object, they should be stringified as `"null"` or `"undefined"`.
-  - For primitive values passed directly to `llml`, return their string representation.
+Each language implementation is completely self-contained with its own:
+- Source code and utilities
+- Dependency management files
+- Comprehensive test suites
+- Language-specific documentation
 
-## Testing Approach
+## Development Environment
 
-- **File-per-Feature:** Each distinct feature or area of concern should have its own test file in the `tests/` directory (e.g., `lists.test.ts`, `prefix.test.ts`).
-- **Test Structure:** Use `describe` to group tests for a specific feature and `it` to define individual, atomic test cases. Test names should be descriptive.
-- **Globals:** `vitest` is configured with `globals: true`, so you can use `describe`, `it`, and `expect` without importing them.
-- **Comprehensive Coverage:** Ensure high test coverage by testing:
-  - **Happy Path:** The expected output for valid inputs.
-  - **Edge Cases:** `null`, `undefined`, empty strings, empty arrays, empty objects, `0`, and `false`.
-  - **All Features:** Ensure every option and transformation rule (kebab-casing, lists, nesting, prefixes, indentation) is explicitly tested.
-- **Assertions:** Use `expect(result).toBe(expected)` for clear, readable assertions. For multiline strings, construct the `expected` string using an array and `.join('\n')` for readability.
+### Task Runner: Just
+The project uses `just` as a cross-platform task runner for coordinating commands across all implementations.
+
+#### Key Commands
+```bash
+# Run tests for all languages
+just test
+
+# Language-specific commands
+just py <command>    # Run command in Python environment (uv)
+just ts <command>    # Run command in TypeScript environment (bun)
+just go <command>    # Run command in Go environment (go)
+just rs <command>    # Run command in Rust environment (cargo)
+
+# AI commands
+just claude
+just claude -p "your prompt here"      # Run Claude Code CLI
+just gemini
+just gemini -a -p "your prompt here"   # Run Gemini CLI
+```
+
+### CLI Tools
+
+- Instead of `find`, use `fd`
+- Instead of `grep`, use `rg`
+- Instead of `sed`, use `rg+(awk|sed)` or ast-grep: `ast-grep -p '$A && $A()' -r '$A?.()'`
+
+### Development Tools by Language
+- **Python**: `uv` for dependency management, `pytest` for testing, `ruff` for linting
+- **TypeScript**: `bun` for runtime and package management, `vitest` for testing
+- **Rust**: `cargo` for dependency management and testing
+- **Go**: Standard Go toolchain (`go test`, `go mod`)
+
+### Configuration Options
+- **Custom Formatters**: Extensible formatter system for specialized data types (like React components)
+- **Formatter Composition**: Combine and override default formatters for custom behavior
+- **Type-Specific Processing**: Define custom formatting logic for any data type
+- **Component-Like Reusability**: Build libraries of reusable prompt components
+
+For a deep dive into the React analogy and compositional patterns, see [REACT.md](REACT.md).
+
+## Testing & Quality Assurance
+
+### Cross-Language Consistency
+The test suites ensure that all four implementations produce identical output for the same input data, maintaining consistency across the entire project.
+
+## Usage Examples
+
+### 1. Compositional Context Engineering
+```python
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [zenbase-ai/llml](https://github.com/zenbase-ai/llml) — distributed by [TomeVault](https://tomevault.io).
