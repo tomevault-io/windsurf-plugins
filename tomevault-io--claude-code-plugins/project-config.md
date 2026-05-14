@@ -1,11 +1,11 @@
 ---
 trigger: always_on
-description: > > A peer-to-peer chat substrate that lets multiple Claude Code instances share the same context. See @README.md for the user story and demo flow; this file is for Claude.
+description: > > This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
 # gemini-md
 
-> > A peer-to-peer chat substrate that lets multiple Claude Code instances share the same context. See @README.md for the user story and demo flow; this file is for Claude.
+> > This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Usage
 
@@ -17,61 +17,105 @@ Read and follow the instructions in .claude/skills/gemini-md/SKILL.md
 
 Or copy the instructions below directly into your CLAUDE.md:
 
-## cc-connect
+## mcp
 
-> A peer-to-peer chat substrate that lets multiple Claude Code instances share the same context. See @README.md for the user story and demo flow; this file is for Claude.
+> This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-# cc-connect — agent guide
+# CLAUDE.md
 
-A peer-to-peer chat substrate that lets multiple Claude Code instances share the same context. See @README.md for the user story and demo flow; this file is for Claude.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## What this repo is (mental model)
+## Overview
 
-- **Rust workspace** with five crates (`cc-connect`, `cc-connect-core`, `cc-connect-hook`, `cc-connect-mcp`, `cc-connect-tui`) plus a **Bun + React + Ink** chat panel under `chat-ui/`. Both build into `target/release/`.
-- The substrate is **chat-as-context**: every Peer's Claude reads from a locally-replicated `~/.cc-connect/rooms/<topic>/log.jsonl`. The `UserPromptSubmit` hook (`cc-connect-hook`) injects unread messages into the next prompt. That's the magic.
-- The MCP server (`cc-connect-mcp`) lets Claude write back into the room — `cc_send`, `cc_at`, `cc_drop`, etc.
+This is a production-ready Fastify adapter for the Model Context Protocol (MCP). The project implements a Fastify plugin that enables MCP communication through the JSON-RPC 2.0 specification with full horizontal scaling capabilities. The codebase includes MCP protocol specifications in the `spec/` directory that define the messaging format, lifecycle management, and various protocol features.
 
-## Read these before deep work
+## Key Features
 
-The canonical specs live in repo root, not in this file. Do not duplicate them here.
+- **Complete MCP Protocol Support**: Implements the full Model Context Protocol specification
+- **Server-Sent Events (SSE)**: Real-time streaming communication with session management
+- **Horizontal Scaling**: Redis-backed session management and message broadcasting
+- **Session Persistence**: Message history and reconnection support with Last-Event-ID
+- **Dual Backend Support**: Memory-based for development, Redis-based for production
+- **Cross-Instance Broadcasting**: Messages sent from any instance reach all connected clients
+- **High Availability**: Sessions survive server restarts with automatic cleanup
 
-- @CONTEXT.md — Ubiquitous Language. **Use these terms verbatim** (Room, Ticket, Substrate, Peer, Host, Identity, Pubkey, Message, Hook, Cursor, Backfill, Session, Injection, Context). Never drift to "channel", "session", "client", "history", "memory" except when the term genuinely applies.
-- [PROTOCOL.md](PROTOCOL.md) — wire spec, RFC 2119 keywords. Read on demand for anything touching gossip payloads, Tickets, Backfill RPC, file_drop, or on-disk layout. **Wire-format changes are breaking** — bump `v` and the ALPN.
-- [SECURITY.md](SECURITY.md) — threat model. Read on demand before changing anything in `cc_drop` blocklists, hook injection paths, identity handling, or relay routing.
-- [TODOS.md](TODOS.md) — known gaps and the v0.1 → v1.0 migration list. Read on demand when picking up unfinished work.
-- `docs/adr/` — decisions already made. Don't re-litigate; if you must reopen, mark the contradiction explicitly.
+## Development Commands
 
-## Commands you can't infer from the code
+- **Build**: `npm run build` - Compiles TypeScript to `dist/` directory
+- **Lint**: `npm run lint` - Run ESLint with caching
+- **Lint Fix**: `npm run lint:fix` - Run ESLint with auto-fix
+- **Type Check**: `npm run typecheck` - Run TypeScript compiler without emitting files
+- **Test Individual**: `node --experimental-strip-types --no-warnings --test test/filename.test.ts` - Run a specific test file
+- **Test**: `npm run test` - Run Node.js test runner on test files, do not use `npm run test -- individual.ts` to run individual test file
+- **CI**: `npm run ci` - Full CI pipeline (build + lint + test)
 
-```bash
-# Workspace build (Rust + chat-ui together — install.sh wraps this)
-./install.sh                               # interactive, idempotent; sets up hook + MCP
-cargo build --workspace --release          # Rust only
-(cd chat-ui && bun install && bun run build)   # chat-ui → target/release/cc-chat-ui
+## Architecture
 
-# Tests
-cargo test --workspace                     # Rust unit + integration
-scripts/smoke-test.sh                      # end-to-end: spin two peers, check gossip
-scripts/smoke-test-mcp.sh                  # MCP server tools
-scripts/smoke-test-bg.sh                   # background host-daemon path
-(cd chat-ui && bun test && bunx tsc --noEmit)
+The main entry point is `src/index.ts` which exports a Fastify plugin built with `fastify-plugin`. The plugin structure follows Fastify's standard plugin pattern with proper TypeScript types and supports both memory and Redis backends for horizontal scaling.
 
-# Diagnostics
-./target/release/cc-connect doctor         # verify install (hook entry, identity, perms)
+### Core Components
+
+**Session Management:**
+- `SessionStore` interface with `MemorySessionStore` and `RedisSessionStore` implementations
+- Session metadata storage with automatic TTL (1-hour expiration)
+- Message history storage with configurable limits and automatic trimming
+
+**Message Broadcasting:**
+- `MessageBroker` interface with `MemoryMessageBroker` and `RedisMessageBroker` implementations
+- Topic-based pub/sub using MQEmitter (memory) or MQEmitter-Redis (distributed)
+- Session-specific topics: `mcp/session/{sessionId}/message`
+- Broadcast topics: `mcp/broadcast/notification`
+
+**SSE Integration:**
+- Complete SSE support with session management and persistence
+- Message replay using Last-Event-ID for resumable connections
+- Heartbeat mechanism for connection health monitoring
+- Support for both GET and POST endpoints
+
+### File Structure
+
+```
+src/
+├── brokers/
+│   ├── message-broker.ts          # Interface definition
+│   ├── memory-message-broker.ts   # MQEmitter implementation
+│   └── redis-message-broker.ts    # Redis-backed implementation
+├── stores/
+│   ├── session-store.ts           # Interface definition
+│   ├── memory-session-store.ts    # In-memory implementation
+│   └── redis-session-store.ts     # Redis-backed implementation
+├── decorators/
+│   ├── decorators.ts              # Core MCP decorators
+│   └── pubsub-decorators.ts       # Pub/sub decorators
+├── handlers.ts                    # MCP protocol handlers
+├── routes.ts                      # SSE connection handling
+├── index.ts                       # Plugin entry point with backend selection
+├── schema.ts                      # MCP protocol types
+└── types.ts                       # Plugin types
 ```
 
-`Cargo.lock` **is tracked on purpose** — this repo ships binaries and reproducible builds gate the v0.1 release. Do not gitignore it.
+The complete MCP protocol TypeScript definitions are in `src/schema.ts`, which includes:
+- JSON-RPC 2.0 message types (requests, responses, notifications, batches)
+- MCP protocol lifecycle (initialization, capabilities, ping)
+- Core features: resources, prompts, tools, logging, sampling
+- Client/server request/response/notification types
+- Content types (text, image, audio, embedded resources)
+- Protocol constants and error codes
 
-## Non-obvious gotchas
+Key dependencies:
+- `fastify-plugin` for plugin registration
+- `typed-rpc` for RPC communication
+- `neostandard` for ESLint configuration
+- `ioredis` for Redis connectivity
+- `mqemitter` and `mqemitter-redis` for message broadcasting
 
-- **Vendored ed25519 / ed25519-dalek**. `Cargo.toml`'s `[patch.crates-io]` points at `vendored/ed25519` + `vendored/ed25519-dalek`. The published `ed25519-3.0.0-rc.4` is broken against current `pkcs8` (`Error::KeyMalformed` enum-variant break). Drop the patch only when upstream ships a working `ed25519-dalek`. See [TODOS.md](TODOS.md).
-- **MSRV is 1.89** (`workspace.package.rust-version`). Driven by the iroh stack itself (`iroh@0.97`, `iroh-blobs@0.99`, `iroh-gossip@0.97`, `iroh-relay@0.97` all require 1.89). CI gates on this; install.sh actively `rustup update`s when the user has an older toolchain.
-- **Hook trust boundary**. `cc-connect-hook` injects chat context only when `CC_CONNECT_ROOM` is set in its env (set by `cc-connect-tui` when it spawns the Claude PTY). Unrelated `claude` invocations on the same machine see nothing. Don't loosen this — it's the cross-process isolation guarantee in [SECURITY.md](SECURITY.md).
-- **PID-based active-rooms discovery** lives at `/tmp/cc-connect-$UID/active-rooms/<topic>.active`, not under `~`. PIDs are per-machine; cloud-synced homes would collide. See `docs/adr/0003-pid-based-active-rooms-discovery.md`.
-- **8 KB hook stdout budget.** `cc-connect-hook` keeps each `UserPromptSubmit` payload ≤ 8 KB so it stays inline; over that, Claude Code falls back to a 2 KB preview + persisted file. See `docs/adr/0004-hook-budget-and-graceful-overflow.md`.
-- **`cc_drop` path blocklist** rejects `~/.ssh`, `~/.aws`, `.env*`, `id_rsa*`, `*.pem`, etc. Don't widen it without a SECURITY.md update; don't narrow it without an explicit threat-model justification.
-- **iroh dependency pin** — `iroh 0.97`, `iroh-gossip 0.97`, `iroh-blobs 0.99`. The combo is non-trivial; bumping any one usually requires bumping all three together.
+The project uses ESM modules (`"type": "module"`) and includes comprehensive MCP protocol specifications in markdown format under `spec/` covering the same areas as the TypeScript schema.
 
+## Configuration Options
+
+### Plugin Options
+- `serverInfo`: Server identification (name, version)
+- `capabilities`: MCP capabilities configuration
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
