@@ -1,149 +1,165 @@
 ---
 trigger: always_on
-description: > This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: > MPA-First Development Mandate (Relaxed) - Guidelines for building Multi-Page Applications with jQuery for progressive enhancement
 ---
 
-## reddit-mcp-server
+## mpa-relaxed-rules
 
-> This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+> MPA-First Development Mandate (Relaxed) - Guidelines for building Multi-Page Applications with jQuery for progressive enhancement
 
-# CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+# GitHub Copilot Instructions: MPA-First Mandate
 
-## Project Overview
+## Core Philosophy
 
-This is a Reddit MCP (Model Context Protocol) server that provides tools for interacting with the Reddit API. It's built with TypeScript and uses FastMCP to expose Reddit functionality as tools that can be used by AI assistants.
+My primary goal is to build performant, resilient, and maintainable server-rendered **Multi-Page Applications (MPAs)**.
 
-## Available Tools
+- **Prioritize the Platform:** Use HTML, CSS, and server-side logic (PHP) first.
+- **Simplicity Over Complexity:** Choose simple, durable solutions over complex, trendy ones.
+- **Progressive Enhancement:** JavaScript is an enhancement, not a requirement. Core functionality must work without it. I use **jQuery** to implement these enhancements.
 
-### Read-only Tools (Client Credentials Only)
+---
 
-- `get_reddit_post` - Get a specific Reddit post with engagement analysis
-- `get_top_posts` - Get top posts from a subreddit or home feed
-- `get_user_info` - Get detailed information about a Reddit user
-- `get_subreddit_info` - Get subreddit details, stats, and community insights
-- `get_trending_subreddits` - Get currently trending/popular subreddits
-- `search_reddit` - Search for posts across Reddit with filters
-- `get_post_comments` - Get comments from a specific post with threading
-- `get_user_posts` - Get posts submitted by a specific user
-- `get_user_comments` - Get comments made by a specific user
+## 1. PRIME DIRECTIVE: MPA-Only Architecture
 
-### Write Tools (User Credentials Required)
+- **You MUST build server-rendered MPAs.** Each distinct page or view is its own file (e.g., `.php`, `.html`) at a unique URL.
+- **Navigation MUST use standard anchor links (`<a href="...">`)** that trigger a full page load.
+- **Core functionality MUST work with JavaScript disabled.**
 
-**IMPORTANT**: These tools require both REDDIT_USERNAME and REDDIT_PASSWORD to be configured.
+### 🚫 BANNED TECHNOLOGIES & PATTERNS
 
-- `create_post` - Create a new post in a subreddit (text or link)
-- `reply_to_post` - Post a reply to an existing Reddit post or comment
-- `edit_post` - Edit your own Reddit post (self-text posts only, titles cannot be edited)
-- `edit_comment` - Edit your own Reddit comment
-- `delete_post` - **PERMANENTLY** delete your own Reddit post (cannot be undone!)
-- `delete_comment` - **PERMANENTLY** delete your own Reddit comment (cannot be undone!)
+- **DO NOT** use or reference any Single-Page Application (SPA) frameworks or libraries. This includes **React, Angular, Vue, Svelte, Next.js, and Nuxt.js**.
+- **DO NOT** use **JSX, TSX, or any form of client-side routing**.
 
-### Server Modes
+---
 
-The server supports two transport modes:
+## 2. JavaScript Rules (Progressive Enhancement with jQuery)
 
-1. **HTTP Server (Default)**: Runs on port 3000 with `/mcp` endpoint
-   - Used for Docker deployments and direct execution
-   - Access via: `http://localhost:3000/mcp`
-   - SSE endpoint: `http://localhost:3000/sse`
+- **jQuery is the standard.** Use jQuery for all DOM manipulation, event handling, and AJAX requests.
+- **Include jQuery from a CDN** in the base layout file, just before the closing `</body>` tag.
+- **Write Unobtrusive JavaScript.** Always ensure the site is fully functional if JavaScript fails or is disabled.
+- Wrap all jQuery code in `$(function() { ... });` to ensure the DOM is ready.
+- Handle AJAX errors gracefully using `.done()`, `.fail()`, and `.always()`.
 
-2. **Stdio Mode**: For CLI and npx usage
-   - Automatically enabled when using `npx reddit-mcp-server` or the bin entry point
-   - Used for integration with Claude Desktop and other MCP clients
-
-## Development Commands
-
-```bash
-# Install dependencies
-pnpm install
-
-# Build TypeScript to JavaScript with tsup
-pnpm build
-
-# Run the MCP inspector for development/testing
-pnpm inspect
-
-# Build and run inspector in one command
-pnpm dev
-
-# Build and start the server via npx
-pnpm start
-
-# Format code with Prettier
-pnpm format
-
-# Check code formatting
-pnpm format:check
-
-# Lint code with ESLint
-pnpm lint
-
-# Fix linting issues
-pnpm lint:fix
+**Correct Pattern: Unobtrusive Toggle with jQuery**
+```html
+<!-- HTML works on its own -->
+<a href="?show_details=true#details" class="toggle-link">Show Details</a>
+<div id="details" style="display: none;">
+    <p>Here are the details you requested.</p>
+</div>
+```
+```javascript
+// JS enhances the experience
+$(function() {
+  $('.toggle-link').on('click', function(event) {
+    event.preventDefault();
+    $('#details').slideToggle(300, () => {
+      const isVisible = $('#details').is(':visible');
+      $(this).text(isVisible ? 'Hide Details' : 'Show Details');
+    });
+  });
+});
 ```
 
-## Architecture
+---
 
-### Core Components
+## 3. HTML Rules
 
-1. **Reddit Client** (`src/client/reddit-client.ts`): Singleton pattern implementation that handles:
-   - OAuth2 authentication (client credentials and password flow)
-   - Automatic token refresh via axios interceptors
-   - Rate limiting and error handling
-   - Both read-only and authenticated operations
+- **Semantic HTML is Mandatory:** Use `<header>`, `<nav>`, `<main>`, `<article>`, `<footer>`, etc., correctly.
+- **Accessibility (A11Y) is critical (WCAG 2.1 AA):**
+  - All form inputs must have a `<label>`.
+  - Use descriptive `alt` text for images. `alt=""` for decorative images.
+- **Use Speculation Rules** in the `<head>` to prerender links for instant navigation.
+  ```html
+  <script type="speculationrules">
+  { "prerender": [{"source": "document", "where": {"href_matches": "/*"}, "eagerness": "moderate"}] }
+  </script>
+  ```
+- **SEO is a top priority.** Every page needs a complete `<head>` with `title`, `meta description`, `canonical` link, and Open Graph tags.
 
-2. **Tool Modules** (`src/tools/`): Modular organization by functionality:
-   - `post-tools.ts`: Post creation, retrieval, and management
-   - `comment-tools.ts`: Comment retrieval and threading
-   - `subreddit-tools.ts`: Subreddit info, statistics, trending
-   - `user-tools.ts`: User information and engagement insights
-   - `search-tools.ts`: Reddit search functionality
+---
 
-3. **Type Definitions** (`src/types.ts`): Comprehensive TypeScript types for all Reddit entities
+## 4. CSS Rules
 
-### Authentication Flow
+- **Use Modern CSS:** Use Flexbox and Grid for all layouts.
+- **Use Custom Properties (`--var-name`)** for theming and maintainability.
+- **Use Native CSS View Transitions** for fluid "app-like" navigation.
+  ```css
+  @view-transition { navigation: auto; }
 
-The server supports three authentication modes configured via `REDDIT_AUTH_MODE`:
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: fade-out 0.3s ease-out both;
+  }
 
-1. **auto (default)**: Automatically chooses the best authentication method
-   - If REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET are provided: Uses OAuth (60-100 req/min)
-   - Otherwise: Falls back to anonymous mode (~10 req/min)
-   - Gracefully degrades without failing
+  @keyframes fade-out {
+    from { opacity: 1; }
+    to { opacity: 0; }
+  }
+  ```
 
-2. **authenticated**: Requires OAuth credentials
-   - Requires REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET
-   - Server fails to start if credentials are missing
-   - Provides higher rate limits (60-100 req/min)
-   - Use for production environments with guaranteed credentials
+---
 
-3. **anonymous**: Uses public JSON API without authentication
-   - No credentials required - zero-setup experience
-   - Lower rate limit (~10 req/min)
-   - Perfect for testing and development
-   - Read-only operations work without any Reddit app setup
+## 5. PHP Rules
 
-**Write operations** (create_post, reply_to_post, edit_post, edit_comment, delete_post, delete_comment):
+- **Target PHP 8.1+** and always start files with `declare(strict_types=1);`.
+- **Adhere to PSR-12** for clean, standardized code.
+- **Use modern PHP features:** constructor property promotion, `readonly` properties, `match` expressions, and enums.
 
-- Require REDDIT_USERNAME and REDDIT_PASSWORD in **any** mode
-- Will fail gracefully with a clear error message if credentials are missing
-- Token management is handled automatically by the Reddit client
+**Correct Pattern: Modern PHP Class**
+```php
+<?php
+declare(strict_types=1);
+namespace App\Models;
 
-### Safe Mode (Spam Protection)
+readonly class User
+{
+    public function __construct(
+        public int $id,
+        public string $name,
+    ) {}
+}
+```
 
-The server includes optional safeguards to protect against Reddit's spam detection, configured via `REDDIT_SAFE_MODE`:
+---
 
-1. **off (default)**: No safeguards, original behavior
-2. **standard**: Recommended for normal use
-   - 2-second delay between write operations
-   - Duplicate content detection (tracks last 10 items)
-3. **strict**: For cautious automated posting
-   - 5-second delay between write operations
-   - Aggressive duplicate detection (tracks last 20 items)
+## 6. Security Rules
 
-**Features:**
+- **Always use parameterized queries** to prevent SQL injection. No exceptions.
+- **All POST forms must have CSRF protection.** Generate a token, store it in the session, and validate it on submission.
+- **Implement a strict Content Security Policy (CSP).** Whitelist any CDNs you use (like for jQuery).
 
+**Correct Pattern: CSP Header with jQuery CDN**
+```php
+<?php
+$csp = "default-src 'self'; " .
+       "script-src 'self' https://code.jquery.com; " . // Whitelist the CDN
+       "style-src 'self'; " .
+       "img-src 'self'; " .
+       "form-action 'self'; " .
+       "frame-ancestors 'none';";
+header("Content-Security-Policy: " . $csp);
+?>
+```
+
+---
+
+## 7. Folder Structure
+
+Follow this MVC-style folder structure for all projects.
+
+```
+project-root/
+├── public/                # Web root
+│   ├── assets/
+│   │   ├── css/
+│   │   ├── js/
+│   └── index.php
+├── src/                   # Application source code
+│   ├── controllers/       # Handles user requests
+│   ├── models/            # Business logic and data
+│   ├── views/             # HTML templates/partials
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
