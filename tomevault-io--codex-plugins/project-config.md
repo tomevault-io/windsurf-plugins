@@ -1,93 +1,146 @@
 ---
 trigger: always_on
-description: SEO Brain is a Claude Code-first plugin that should remain portable to Codex, Antigravity, and other agents that read `AGENTS.md`.
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-# SEO Brain Agent Instructions
+# CLAUDE.md
 
-SEO Brain is a Claude Code-first plugin that should remain portable to Codex, Antigravity, and other agents that read `AGENTS.md`.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Product Direction
+## Project Overview
 
-SEO Brain implements Agentic SEO through six pillars:
+This is a Reddit MCP (Model Context Protocol) server that provides tools for interacting with the Reddit API. It's built with TypeScript and uses FastMCP to expose Reddit functionality as tools that can be used by AI assistants.
 
-1. Strategy
-2. LLM Wiki
-3. Technology
-4. Technical SEO
-5. Content
-6. Data and Analysis
+## Available Tools
 
-Humans own judgment. Agents execute intelligence. A draft created by an agent is not approved strategic context until the user explicitly approves it.
+### Read-only Tools (Client Credentials Only)
 
-## Repository Shape
+- `get_reddit_post` - Get a specific Reddit post with engagement analysis
+- `get_top_posts` - Get top posts from a subreddit or home feed
+- `get_user_info` - Get detailed information about a Reddit user
+- `get_subreddit_info` - Get subreddit details, stats, and community insights
+- `get_trending_subreddits` - Get currently trending/popular subreddits
+- `search_reddit` - Search for posts across Reddit with filters
+- `get_post_comments` - Get comments from a specific post with threading
+- `get_user_posts` - Get posts submitted by a specific user
+- `get_user_comments` - Get comments made by a specific user
 
-This repository root is the plugin root.
+### Write Tools (User Credentials Required)
 
-- Claude Code manifest: `.claude-plugin/plugin.json`
-- Codex manifest: `.codex-plugin/plugin.json`
-- Skills: `skills/<skill-name>/SKILL.md`
-- Shared skill references: `skills/_shared/references/`
-- Templates: `templates/`
-- Utility scripts: `scripts/`
-- Runtime project: `project/` and ignored by git except `project/.gitkeep`
+**IMPORTANT**: These tools require both REDDIT_USERNAME and REDDIT_PASSWORD to be configured.
 
-## Compatibility Rules
+- `create_post` - Create a new post in a subreddit (text or link)
+- `reply_to_post` - Post a reply to an existing Reddit post or comment
+- `edit_post` - Edit your own Reddit post (self-text posts only, titles cannot be edited)
+- `edit_comment` - Edit your own Reddit comment
+- `delete_post` - **PERMANENTLY** delete your own Reddit post (cannot be undone!)
+- `delete_comment` - **PERMANENTLY** delete your own Reddit comment (cannot be undone!)
 
-- Keep skill bodies in standard `SKILL.md` directories so Claude Code and Codex can discover them.
-- Keep cross-tool behavior in `AGENTS.md`, not only in Claude-specific files.
-- Keep user-facing runtime behavior in the canonical `seo-brain` skill; `AGENTS.md` and `CLAUDE.md` are development guidance.
-- Do not rely on terminal output as the primary UX for nontechnical users.
-- Prefer local web UI artifacts for previews, approvals, and reports.
-- Do not commit secrets, raw user project data, generated runs, or provider responses from real clients.
+### Server Modes
 
-## Process Integrity
+The server supports two transport modes:
 
-The default is to follow the full documented process. Do not skip analysis, approval, review, lint, source separation, or other gates because the user gave a narrow request, because an old artifact exists, or because a shortcut seems sufficient.
+1. **HTTP Server (Default)**: Runs on port 3000 with `/mcp` endpoint
+   - Used for Docker deployments and direct execution
+   - Access via: `http://localhost:3000/mcp`
+   - SSE endpoint: `http://localhost:3000/sse`
 
-- A process step may be skipped only when the current user explicitly asks to skip that specific step or confirms the bypass after the agent names the missing step and consequence.
-- Existing drafts, previous briefings, homepage-only context, or agent confidence do not waive preconditions.
-- When a bypass is explicit, record it in the artifact and log before presenting the result. State clearly that the artifact is not data-backed for the skipped dimension.
-- Approval of an artifact is not approval of an undisclosed bypass. Approval requests must show missing analysis, missing sources, and skipped checks before the user decides.
-- If a required process cannot run, stop at the gate, run the local browser handoff as the agent when possible, and present only a friendly user instruction. Do not hand bash commands to the user as the UX for approvals or gates.
+2. **Stdio Mode**: For CLI and npx usage
+   - Automatically enabled when using `npx reddit-mcp-server` or the bin entry point
+   - Used for integration with Claude Desktop and other MCP clients
 
-## Language Fidelity
+## Development Commands
 
-SEO Brain is English-first and supports Brazilian Portuguese as an official second language, but generated natural-language output should work in any requested language.
+```bash
+# Install dependencies
+pnpm install
 
-- Preserve the spelling, accents, and diacritics of the output language in all human-facing prose, headings, UI text, Markdown, logs, reports, prompts, and review notes.
-- For pt-BR, write correct Portuguese with accents: `página`, `conteúdo`, `análise`, `evidência`, `aprovação`, `técnico`, `não`, `até`.
-- ASCII transliteration is allowed only for slugs, file paths, IDs, enum values, command names, provider payloads, code identifiers, or verbatim source text that originally has no diacritics.
-- Never strip accents from user-provided names, titles, claims, excerpts, anchors, or editorial text while summarizing, extracting, reviewing, or rewriting.
+# Build TypeScript to JavaScript with tsup
+pnpm build
 
-## Wiki Rules
+# Run the MCP inspector for development/testing
+pnpm inspect
 
-Every SEO Brain project should use Obsidian-compatible Markdown and separate sources from synthesis.
+# Build and run inspector in one command
+pnpm dev
 
-- Raw sources live in `sources/` and should be treated as immutable or append-only.
-- Generated and curated knowledge lives in `wiki/`; open `project/wiki/` as the Obsidian vault.
-- `wiki/fontes/index.md` is a catalog of raw evidence, but the raw files themselves remain in `sources/`.
-- Use Obsidian wikilinks only for real pages inside `wiki/`; use normal Markdown links for files under `../sources/`.
-- Strategic pages require explicit human approval.
-- Operational and observational pages may be updated by agents when checks pass.
-- Important events must be appended to `wiki/log/index.md`. Each entry must declare a `type` of `strategic-approval` or `operational-decision` so events can be filtered by audience.
-- The wiki never holds drafts or hypotheses. Pages either reflect approved/measured state or do not exist yet.
-- `project/workbench/` is only for construction: research, briefing, auxiliary analysis, and intermediate context.
-- Complete deliverables, including v0 artifacts, live in `project/artifacts/`; content drafts live in `project/artifacts/contents/<slug>/`.
-- Public content also lives in `project/wiki/conteudos/` only after final approval and `status: published`.
-- Hypothetical or unverified strategic work stays outside the Wiki until explicit human approval; operational pages may be promoted only after automated checks pass.
+# Build and start the server via npx
+pnpm start
 
-Required strategic approval pages:
+# Format code with Prettier
+pnpm format
 
-- `wiki/index.md`
-- `wiki/eeat.md`
-- `wiki/tecnologia/index.md`
-- `wiki/tom-de-voz/index.md`
+# Check code formatting
+pnpm format:check
 
-## Browser Handoff
+# Lint code with ESLint
+pnpm lint
 
-For previews, approvals, sensitive input, and option selection, prefer a local browser handoff over terminal interaction.
+# Fix linting issues
+pnpm lint:fix
+```
 
+## Architecture
+
+### Core Components
+
+1. **Reddit Client** (`src/client/reddit-client.ts`): Singleton pattern implementation that handles:
+   - OAuth2 authentication (client credentials and password flow)
+   - Automatic token refresh via axios interceptors
+   - Rate limiting and error handling
+   - Both read-only and authenticated operations
+
+2. **Tool Modules** (`src/tools/`): Modular organization by functionality:
+   - `post-tools.ts`: Post creation, retrieval, and management
+   - `comment-tools.ts`: Comment retrieval and threading
+   - `subreddit-tools.ts`: Subreddit info, statistics, trending
+   - `user-tools.ts`: User information and engagement insights
+   - `search-tools.ts`: Reddit search functionality
+
+3. **Type Definitions** (`src/types.ts`): Comprehensive TypeScript types for all Reddit entities
+
+### Authentication Flow
+
+The server supports three authentication modes configured via `REDDIT_AUTH_MODE`:
+
+1. **auto (default)**: Automatically chooses the best authentication method
+   - If REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET are provided: Uses OAuth (60-100 req/min)
+   - Otherwise: Falls back to anonymous mode (~10 req/min)
+   - Gracefully degrades without failing
+
+2. **authenticated**: Requires OAuth credentials
+   - Requires REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET
+   - Server fails to start if credentials are missing
+   - Provides higher rate limits (60-100 req/min)
+   - Use for production environments with guaranteed credentials
+
+3. **anonymous**: Uses public JSON API without authentication
+   - No credentials required - zero-setup experience
+   - Lower rate limit (~10 req/min)
+   - Perfect for testing and development
+   - Read-only operations work without any Reddit app setup
+
+**Write operations** (create_post, reply_to_post, edit_post, edit_comment, delete_post, delete_comment):
+
+- Require REDDIT_USERNAME and REDDIT_PASSWORD in **any** mode
+- Will fail gracefully with a clear error message if credentials are missing
+- Token management is handled automatically by the Reddit client
+
+### Safe Mode (Spam Protection)
+
+The server includes optional safeguards to protect against Reddit's spam detection, configured via `REDDIT_SAFE_MODE`:
+
+1. **off (default)**: No safeguards, original behavior
+2. **standard**: Recommended for normal use
+   - 2-second delay between write operations
+   - Duplicate content detection (tracks last 10 items)
+3. **strict**: For cautious automated posting
+   - 5-second delay between write operations
+   - Aggressive duplicate detection (tracks last 20 items)
+
+**Features:**
+
+- **Rate Limiting**: Enforces minimum delays between write operations to avoid spam flags
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
