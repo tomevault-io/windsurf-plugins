@@ -1,6 +1,6 @@
 ---
 trigger: always_on
-description: - Don't use `accessKey` attribute on any HTML element.
+description: Ultracite Rules
 ---
 
 
@@ -90,6 +90,7 @@ description: - Don't use `accessKey` attribute on any HTML element.
 - Don't use super() incorrectly inside classes. Also check that super() is called in classes that extend other constructors.
 - Don't use variables and function parameters before they're declared.
 - Don't use 8 and 9 escape sequences in string literals.
+- Don't use literal numbers that lose precision.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
