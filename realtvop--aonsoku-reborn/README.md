@@ -7,11 +7,11 @@ A modern desktop client for Navidrome/Subsonic servers built with React and Elec
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [realtvop/aonsoku-reborn](https://github.com/realtvop/aonsoku-reborn).
+Original source: `CLAUDE.md` in [realtvop/aonsoku-reborn](https://github.com/realtvop/aonsoku-reborn).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
