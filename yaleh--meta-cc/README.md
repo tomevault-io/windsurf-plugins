@@ -7,11 +7,11 @@ Meta-Cognition tool for Claude Code - analyze session history for workflow optim
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [yaleh/meta-cc](https://github.com/yaleh/meta-cc).
+Original source: `CLAUDE.md` in [yaleh/meta-cc](https://github.com/yaleh/meta-cc).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
