@@ -7,11 +7,11 @@ RustFS k8s operator
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [rustfs/operator](https://github.com/rustfs/operator).
+Original source: `CLAUDE.md` in [rustfs/operator](https://github.com/rustfs/operator).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
