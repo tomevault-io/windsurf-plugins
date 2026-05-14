@@ -7,12 +7,12 @@ A modern, secure file and link sharing platform built with Next.js, Prisma, and 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `copilot-instructions.md` in [TuroYT/snowshare](https://github.com/TuroYT/snowshare).
+Original source: `CLAUDE.md` in [TuroYT/snowshare](https://github.com/TuroYT/snowshare).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
+- **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
