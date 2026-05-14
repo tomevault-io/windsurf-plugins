@@ -1,153 +1,175 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: - **PEP8 & Odoo Standards:**
 ---
 
-# CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+### 1\. Code Style & Formatting
 
-## Project Overview
+- **PEP8 & Odoo Standards:**
+  - Enforce PEP8 for all Python code.
+  - Adopt Odoo's recommended code styles for module structures, naming conventions, and documentation.
+- **Multi-language Formatting:**
+  - Apply consistent formatting for XML, QWeb templates, and CSS to align with Odoo's UI guidelines.
 
-Claude Gate is a high-performance Go OAuth proxy for Anthropic's Claude API that enables FREE Claude usage for Pro/Max subscribers by identifying as "Claude Code" (Anthropic's official CLI). This is the official Go port of the original Python implementation.
+---
 
-**Key Features:**
-- OAuth 2.0 PKCE authentication flow
-- Secure token storage with OS keychain integration (planned)
-- Interactive TUI dashboard for monitoring
-- Cross-platform support (macOS, Linux, Windows)
-- Multiple distribution methods (NPM, Homebrew, direct binary)
+### 2\. Module Structure & Best Practices
 
-## Quick Navigation
+- **Mandatory Files & Structure:**
+  - Ensure every module includes essential files (e.g., `__manifest__.py`, `__init__.py`, subdirectories for models, views, controllers).
+- **Separation of Concerns:**
+  - Keep business logic, data models, views, and controllers distinct.
+  - Validate module dependencies and use Odoo's ORM patterns effectively.
+- **Template & Scaffolding:**
+  - Include commands to scaffold new modules using customizable templates that reflect Odoo 18's best practices.
 
-### Core Implementation Files
-- Main entry: `cmd/claude-gate/main.go`
-- OAuth client: `internal/auth/client.go`
-- Proxy handler: `internal/proxy/handler.go`
-- Dashboard: `internal/ui/dashboard/dashboard.go`
+---
 
-### Configuration Files
-- Go module: `go.mod`
-- Build config: `.goreleaser.yml`
-- CI/CD: `.github/workflows/release.yml`
-- NPM package: `npm/package.json`
+### 3\. Linting & Static Analysis
 
-### Test Files
-- Unit tests: `*_test.go` (alongside source)
-- Integration: `internal/test/integration/*_test.go`
-- E2E: `internal/test/e2e/*_test.go`
-- Test helpers: `internal/test/helpers/helpers.go`
+- **Customized Linters:**
+  - Integrate Python linters (like flake8 and pylint) with rules specifically tuned for Odoo projects.
+- **Static Code Checks:**
+  - Automatically flag deviations from Odoo's module guidelines and coding patterns.
 
-### Scripts
-- Version update: `scripts/update-version.sh`
-- NPM test: `scripts/test-npm-local.sh`
-- Add co-author: `.claude/scripts/add-claude-coauthor.sh`
+---
 
-## Common Commands
+### 4\. Testing & Debugging
 
-### Building
-```bash
-make build        # Build for current platform
-make snapshot     # Build all platforms (uses GoReleaser)
-make install      # Install to ~/bin
+- **Integrated Testing Frameworks:**
+  - Support running unit and integration tests via Odoo's built-in testing framework.
+  - Automatically trigger tests on file changes or pre-commit actions.
+- **Robust Debugging Tools:**
+  - Configure breakpoints, step-through debugging, and live log monitoring tailored for Odoo server mode.
+  - Enable hot-reloading and module-specific debugging for rapid iteration.
+
+---
+
+### 5\. Auto-completion & IntelliSense
+
+- **Odoo-Aware Suggestions:**
+  - Enhance auto-completion for Odoo-specific API calls, models, and ORM methods.
+  - Utilize dynamic code analysis to recommend improvements based on Odoo development patterns.
+- **Smart Imports:**
+  - Automatically suggest and manage imports for frequently used Odoo libraries and modules.
+
+---
+
+### 6\. Deployment & Version Control Integration
+
+- **Git Integration:**
+  - Integrate seamlessly with Git for versioning, branching, and merge conflict resolution.
+  - Set up automated pre-commit hooks to run tests, linting, and module integrity checks.
+- **CI/CD Pipelines:**
+  - Provide support for continuous integration pipelines tailored to Odoo module deployment and server restarts.
+
+---
+
+### 7\. Security & Error Handling
+
+- **Best Practice Enforcement:**
+  - Implement checks to ensure safe coding practices in user input, ORM queries, and API interactions.
+  - Integrate guidelines for comprehensive error handling, logging, and exception management.
+- **Static Security Analysis:**
+  - Run static analysis to detect potential security vulnerabilities common in Odoo development.
+
+---
+
+### 8\. Custom Cursor Commands for Odoo Development
+
+- **Module Management Commands:**
+  - Create custom commands to scaffold new modules, update module lists, and manage server configurations.
+- **Database & Migration Tools:**
+  - Incorporate one-click tools for database migration management, upgrade scripts, and seamless Odoo server restarts.
+
+---
+
+### 9\. Documentation & Code Comments
+
+- **Inline Documentation:**
+  - Enforce comprehensive inline comments and module-level docstrings that follow Odoo documentation standards.
+- **Auto-Documentation Tools:**
+  - Utilize tools to auto-generate documentation for models, fields, and business logic with direct links to official Odoo documentation.
+
+---
+
+### 10\. Environment Management & Odoo-Specific Configurations
+
+- **Multi-Environment Support:**
+  - Manage different development environments (local, staging, production) with clear configuration profiles.
+- **Dynamic Settings:**
+  - Auto-detect and adjust to changes in Odoo 18 settings (e.g., database connections, port settings, logging levels).
+- **Real-Time Collaboration:**
+
+  - Optionally enable real-time collaboration features to facilitate team coding, code reviews, and shared debugging sessions.
+
+  # Odoo 18 Technical Guide
+
+## 1. XML View Changes
+
+### 1.1 Tree to List Tag Change
+
+The `<tree>` tag has been renamed to `<list>` in all views.
+
+**Before:**
+
+```xml
+<tree>
+    <field name="name"/>
+</tree>
 ```
 
-### Testing
-```bash
-make test              # Run unit tests with coverage
-make test-unit         # Run unit tests only (short mode)
-make test-integration  # Run integration tests
-make test-e2e          # Run end-to-end tests
-make test-all          # Run all test types
-make npm-test          # Test NPM package locally
-go test -v ./...       # Quick test during development
+**After:**
+
+```xml
+<list>
+    <field name="name"/>
+</list>
 ```
 
-### Running
-```bash
-claude-gate start --host 127.0.0.1 --port 5789  # Start proxy server
-claude-gate dashboard                            # Start with interactive dashboard
-claude-gate auth login                           # Authenticate with Claude
+### 1.2 Simplified Conditional Attributes
+
+Odoo 18 simplifies the use of conditional attributes by replacing `attrs` and `states` with direct attributes.
+
+**Single Condition:**
+
+```xml
+<!-- Before -->
+<field name="field_name" attrs="{'invisible': [('condition_field', '=', False)]}"/>
+
+<!-- After -->
+<field name="field_name" invisible="not condition_field"/>
 ```
 
-### Releasing
-```bash
-make release VERSION=0.2.0  # Create new release
-./scripts/update-version.sh # Update version in all files
+**Multiple Conditions with OR:**
+
+```xml
+<!-- Before -->
+<field name="field_name" attrs="{'invisible': ['|', ('state', '=', 'done'), ('type', '=', 'internal')]}"/>
+
+<!-- After -->
+<field name="field_name" invisible="state == 'done' or type == 'internal'"/>
 ```
 
-## Architecture
+**Multiple Conditions with AND:**
 
-The codebase follows clean architecture principles with clear separation of concerns:
+```xml
+<!-- Before -->
+<field name="field_name" attrs="{'readonly': [('state', '=', 'approved'), ('user_id', '!=', user.id)]}"/>
 
-### Core Components
-
-1. **CLI Layer** (`cmd/claude-gate/`)
-   - Uses Kong framework for command parsing
-   - Entry point for all operations
-
-2. **Auth Package** (`internal/auth/`)
-   - OAuth 2.0 PKCE implementation
-   - Token storage and management
-   - Browser automation for login flow
-
-3. **Proxy Package** (`internal/proxy/`)
-   - HTTP proxy server implementation
-   - Request/response transformation
-   - Enhanced server with monitoring capabilities
-
-4. **UI Package** (`internal/ui/`)
-   - Bubble Tea-based TUI components
-   - Interactive dashboard for monitoring
-   - Reusable components (spinner, progress, styles)
-
-### Request Flow
-1. Client connects to local proxy (default: 127.0.0.1:5789)
-2. Proxy validates authentication token
-3. Request transformed to identify as "Claude Code"
-4. Forwarded to Claude API with OAuth credentials
-5. Response streamed back to client
-
-### Security Model
-- OAuth 2.0 PKCE flow for authentication
-- Tokens stored securely (keychain integration planned)
-- Local-only proxy binding by default
-- Optional proxy authentication token for additional security
-
-## Project Structure
-
+<!-- After -->
+<field name="field_name" readonly="state == 'approved' and user_id != user.id"/>
 ```
-claude-gate/
-├── cmd/
-│   └── claude-gate/          # CLI application entry point
-│       ├── main.go          # Main entry point with Kong CLI setup
-│       └── auth_storage.go  # Storage-related CLI commands
-├── internal/                 # Private application code (Go convention)
-│   ├── auth/                # Authentication & token management
-│   │   ├── client.go        # OAuth client implementation
-│   │   ├── oauth.go         # OAuth flow logic
-│   │   ├── storage_*.go     # Various storage backends
-│   │   └── *_test.go        # Unit tests
-│   ├── config/              # Configuration management
-│   ├── proxy/               # Proxy server implementation
-│   │   ├── handler.go       # Main proxy handler
-│   │   ├── server.go        # Enhanced server with monitoring
-│   │   └── transformer.go   # Request/response transformation
-│   ├── test/                # Test infrastructure
-│   │   ├── integration/     # Integration tests (build tag: integration)
-│   │   ├── e2e/            # End-to-end tests (build tag: e2e)
-│   │   ├── helpers/        # Shared test utilities
-│   │   └── testdata/       # Test fixtures
-│   └── ui/                  # Terminal UI components
-│       ├── components/      # Reusable UI components
-│       ├── dashboard/       # Interactive dashboard
-│       ├── styles/         # Terminal styling (Lipgloss)
-│       └── utils/          # UI utilities
-├── docs/                    # Project documentation
-│   ├── architecture/       # Architecture decisions and diagrams
-│   ├── deployment/         # Deployment guides
-│   ├── getting-started/    # User guides
-│   └── testing/           # Testing documentation
+
+### 1.3 Button States
+
+Button states attribute has been replaced with invisible conditions:
+
+```xml
+<!-- Before -->
+<button string="Submit" states="draft"/>
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
