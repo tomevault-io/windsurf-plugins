@@ -1,114 +1,207 @@
 ---
 trigger: always_on
-description: Use Bun instead of Node.js, npm, bun, or vite.
+description: AI-powered video sequence platform built with TanStack Start, optimized for edge deployment.
 ---
 
+# CLAUDE.md
 
-Default to using Bun instead of Node.js.
+AI-powered video sequence platform built with TanStack Start, optimized for edge deployment.
 
-- Use `bun <file>` instead of `node <file>` or `ts-node <file>`
-- Use `bun test` instead of `jest` or `vitest`
-- Use `bun build <file.html|file.ts|file.css>` instead of `webpack` or `esbuild`
-- Use `bun install` instead of `npm install` or `yarn install` or `bun install`
-- Use `bun run <script>` instead of `npm run <script>` or `yarn run <script>` or `bun run <script>`
-- Bun automatically loads .env, so don't use dotenv.
+## Architecture Overview
 
-## APIs
+**Tech Stack:**
 
-- `Bun.serve()` supports WebSockets, HTTPS, and routes. Don't use `express`.
-- `bun:sqlite` for SQLite. Don't use `better-sqlite3`.
-- `Bun.redis` for Redis. Don't use `ioredis`.
-- `Bun.sql` for Postgres. Don't use `pg` or `postgres.js`.
-- `WebSocket` is built-in. Don't use `ws`.
-- Prefer `Bun.file` over `node:fs`'s readFile/writeFile
-- Bun.$`ls` instead of execa.
+- **Runtime**: Bun (not Node.js)
+- **Framework**: TanStack Start + TanStack Router + Vite
+- **Database**: Turso (libSQL/SQLite) + Drizzle ORM
+- **Workflows**: QStash (durable execution for AI tasks)
+- **Storage**: Cloudflare R2 (S3-compatible)
+- **Auth**: Better Auth
+- **Styling**: Tailwind v4 + shadcn/ui
+- **Testing**: Bun test
 
-## Testing
+**Core Principles:**
 
-Use `bun test` to run tests.
+- Database access ONLY in server handlers (never in components)
+- Anonymous-first → upgrade to save work
+- Team-based resources (sequences, styles, characters)
+- Script-driven generation for consistency
 
-```ts#index.test.ts
-import { test, expect } from "bun:test";
+**Data Model:**
 
-test("hello world", () => {
-  expect(1).toBe(1);
-});
+```
+teams
+  ├── users (members)
+  ├── sequences (videos)
+  │   └── frames (scenes with metadata)
+  └── libraries (styles, characters, vfx, audio)
 ```
 
-## Frontend
+---
 
-Use HTML imports with `Bun.serve()`. Don't use `vite`. HTML imports fully support React, CSS, Tailwind.
+## Setup
 
-Server:
+```bash
+bun install
+bun setup                          # Auto-configure local dev (SQLite + QStash)
+bun db:setup                       # Migrate + seed database
+```
 
-```ts#index.ts
-import index from "./index.html"
+**Daily workflow (2 terminals):**
 
-Bun.serve({
-  routes: {
-    "/": index,
-    "/api/users/:id": {
-      GET: (req) => {
-        return new Response(JSON.stringify({ id: req.params.id }));
+- Terminal 1: `bun qstash:dev` (async job processing)
+- Terminal 2: `bun dev`
+
+**Before commit:** Lefthook auto-checks quality. Branch `123-feature` → commits tagged `#123`.
+
+---
+
+## Server Handler Pattern
+
+All API routes use TanStack Start server handlers:
+
+```typescript
+// src/routes/api/example/$id.ts
+import { createFileRoute } from '@tanstack/react-router';
+import { json } from '@tanstack/react-start';
+import { requireUser } from '@/lib/auth/action-utils';
+import { handleApiError } from '@/lib/errors';
+
+export const Route = createFileRoute('/api/example/$id')({
+  server: {
+    handlers: {
+      POST: async ({ params, request }) => {
+        try {
+          // 1. Validate input
+          const input = schema.parse(await request.json());
+
+          // 2. Check auth/team permissions
+          const user = await requireUser();
+
+          // 3. Execute business logic (DB operations ONLY here)
+          const record = await db.insert(table).values({
+            ...input,
+            teamId: user.teamId,
+          });
+
+          // 4. Trigger workflows for async AI tasks
+          const { messageId } = await qstash.publishJSON({
+            url: `${getQStashWebhookUrl()}/workflows/image`,
+            body: { userId: user.id, teamId: user.teamId, ...input },
+          });
+
+          // 5. Return standardized response
+          return json({ id: record.id, workflowRunId: messageId });
+        } catch (error) {
+          const handledError = handleApiError(error);
+          return json(
+            { success: false, error: handledError.toJSON() },
+            { status: handledError.statusCode }
+          );
+        }
       },
     },
   },
-  // optional websocket support
-  websocket: {
-    open: (ws) => {
-      ws.send("Hello, world!");
+});
+```
+
+---
+
+## Workflow Pattern
+
+**Triggering workflows (from server handlers):**
+
+```typescript
+// ❌ WRONG - Direct fetch() calls don't include QStash signatures
+await fetch('/api/workflows/image', {
+  method: 'POST',
+  body: JSON.stringify(data),
+});
+
+// ✅ CORRECT - Use qstash.publishJSON() for proper signatures
+const qstash = getQStashClient();
+const { messageId } = await qstash.publishJSON({
+  url: `${getQStashWebhookUrl()}/workflows/image`, // External URL QStash can reach
+  body: { userId, teamId, prompt, ...params },
+});
+const workflowRunId = messageId;
+```
+
+**Implementing workflows (TanStack Start + serveMany):**
+
+```typescript
+// src/routes/api/workflows/$.ts - Register with serveMany
+import { createFileRoute } from '@tanstack/react-router';
+import { serveMany } from '@upstash/workflow/tanstack';
+
+const handler = serveMany({
+  image: generateImageWorkflow,
+  motion: generateMotionWorkflow,
+  storyboard: generateStoryboardWorkflow,
+});
+
+export const Route = createFileRoute('/api/workflows/$')({
+  server: {
+    handlers: {
+      POST: async ({ request }) => {
+        return handler.POST({ request });
+      },
     },
-    message: (ws, message) => {
-      ws.send(message);
-    },
-    close: (ws) => {
-      // handle close
-    }
   },
-  development: {
-    hmr: true,
-    console: true,
-  }
-})
+});
+
+// Individual workflow (src/lib/workflows/image-workflow.ts)
+export const generateImageWorkflow = async (
+  context: WorkflowContext<ImageWorkflowInput>
+) => {
+  const input = context.requestPayload;
+  validateWorkflowAuth(input); // Check userId/teamId passed through context
+
+  const result = await context.run('generate-image', async () => {
+    // Step logic - automatically retried on failure
+    const image = await generateImage(input.prompt);
+
+    // Update database directly
+    await db
+      .update(frames)
+      .set({ thumbnailUrl: image.url })
+      .where(eq(frames.id, input.frameId));
+
+    return { imageUrl: image.url };
+  });
+
+  return result;
+};
 ```
 
-HTML files can import .tsx, .jsx or .js files directly and Bun's bundler will transpile & bundle automatically. `<link>` tags can point to stylesheets and Bun's CSS bundler will bundle.
+**Key principles:**
 
-```html#index.html
-<html>
-  <body>
-    <h1>Hello, world!</h1>
-    <script type="module" src="./frontend.tsx"></script>
-  </body>
-</html>
-```
+- Workflows handle their own state (no DB job tracking needed)
+- Pass auth (userId/teamId) through workflow context
+- Steps are durable - execution continues even if server restarts
+- Update DB records directly in workflow steps
 
-With the following `frontend.tsx`:
+---
 
-```tsx#frontend.tsx
-import React from "react";
+## Frame System
 
-// import .css files directly and it works
-import './index.css';
+Frames are the core content unit - each represents one scene from script analysis.
 
-import { createRoot } from "react-dom/client";
+**Frame Structure:**
 
-const root = createRoot(document.body);
+- `thumbnailUrl` - Generated image
+- `videoUrl` - Motion video (image-to-video)
+- `metadata` - Complete `Scene` object (typed JSONB)
 
-export default function Frontend() {
-  return <h1>Hello, world!</h1>;
-}
+**Frame.metadata IS the Scene object** (no wrapper):
 
-root.render(<Frontend />);
-```
+```typescript
+// src/lib/ai/frame.schema.ts
+frame.metadata = {
+  sceneId: string,
+  sceneNumber: number,
 
-Then, run index.ts
-
-```sh
-bun --hot ./index.ts
-```
-
-For more information, read the Bun API docs in `node_modules/bun-types/docs/**.md`.
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [openstory-so/openstory](https://github.com/openstory-so/openstory) — distributed by [TomeVault](https://tomevault.io).
