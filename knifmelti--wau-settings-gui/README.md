@@ -7,12 +7,12 @@ Provides a user-friendly portable standalone interface to modify every aspect of
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `copilot-instructions.md` in [KnifMelti/WAU-Settings-GUI](https://github.com/KnifMelti/WAU-Settings-GUI).
+Original source: `CLAUDE.md` in [KnifMelti/WAU-Settings-GUI](https://github.com/KnifMelti/WAU-Settings-GUI).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
+- **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
