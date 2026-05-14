@@ -1,121 +1,178 @@
 ---
 trigger: always_on
-description: > > This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: > - **PEP8 & Odoo Standards:**
 ---
 
-# gemini-md
+# odoo18
 
-> > This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+> - **PEP8 & Odoo Standards:**
 
 ## Usage
 
 Add this to your project's CLAUDE.md to activate this skill:
 
 ```
-Read and follow the instructions in .claude/skills/gemini-md/SKILL.md
+Read and follow the instructions in .claude/skills/odoo18/SKILL.md
 ```
 
 Or copy the instructions below directly into your CLAUDE.md:
 
-## mcp
 
-> This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+### 1\. Code Style & Formatting
 
-# CLAUDE.md
+- **PEP8 & Odoo Standards:**
+  - Enforce PEP8 for all Python code.
+  - Adopt Odoo's recommended code styles for module structures, naming conventions, and documentation.
+- **Multi-language Formatting:**
+  - Apply consistent formatting for XML, QWeb templates, and CSS to align with Odoo's UI guidelines.
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+---
 
-## Overview
+### 2\. Module Structure & Best Practices
 
-This is a production-ready Fastify adapter for the Model Context Protocol (MCP). The project implements a Fastify plugin that enables MCP communication through the JSON-RPC 2.0 specification with full horizontal scaling capabilities. The codebase includes MCP protocol specifications in the `spec/` directory that define the messaging format, lifecycle management, and various protocol features.
+- **Mandatory Files & Structure:**
+  - Ensure every module includes essential files (e.g., `__manifest__.py`, `__init__.py`, subdirectories for models, views, controllers).
+- **Separation of Concerns:**
+  - Keep business logic, data models, views, and controllers distinct.
+  - Validate module dependencies and use Odoo's ORM patterns effectively.
+- **Template & Scaffolding:**
+  - Include commands to scaffold new modules using customizable templates that reflect Odoo 18's best practices.
 
-## Key Features
+---
 
-- **Complete MCP Protocol Support**: Implements the full Model Context Protocol specification
-- **Server-Sent Events (SSE)**: Real-time streaming communication with session management
-- **Horizontal Scaling**: Redis-backed session management and message broadcasting
-- **Session Persistence**: Message history and reconnection support with Last-Event-ID
-- **Dual Backend Support**: Memory-based for development, Redis-based for production
-- **Cross-Instance Broadcasting**: Messages sent from any instance reach all connected clients
-- **High Availability**: Sessions survive server restarts with automatic cleanup
+### 3\. Linting & Static Analysis
 
-## Development Commands
+- **Customized Linters:**
+  - Integrate Python linters (like flake8 and pylint) with rules specifically tuned for Odoo projects.
+- **Static Code Checks:**
+  - Automatically flag deviations from Odoo's module guidelines and coding patterns.
 
-- **Build**: `npm run build` - Compiles TypeScript to `dist/` directory
-- **Lint**: `npm run lint` - Run ESLint with caching
-- **Lint Fix**: `npm run lint:fix` - Run ESLint with auto-fix
-- **Type Check**: `npm run typecheck` - Run TypeScript compiler without emitting files
-- **Test Individual**: `node --experimental-strip-types --no-warnings --test test/filename.test.ts` - Run a specific test file
-- **Test**: `npm run test` - Run Node.js test runner on test files, do not use `npm run test -- individual.ts` to run individual test file
-- **CI**: `npm run ci` - Full CI pipeline (build + lint + test)
+---
 
-## Architecture
+### 4\. Testing & Debugging
 
-The main entry point is `src/index.ts` which exports a Fastify plugin built with `fastify-plugin`. The plugin structure follows Fastify's standard plugin pattern with proper TypeScript types and supports both memory and Redis backends for horizontal scaling.
+- **Integrated Testing Frameworks:**
+  - Support running unit and integration tests via Odoo's built-in testing framework.
+  - Automatically trigger tests on file changes or pre-commit actions.
+- **Robust Debugging Tools:**
+  - Configure breakpoints, step-through debugging, and live log monitoring tailored for Odoo server mode.
+  - Enable hot-reloading and module-specific debugging for rapid iteration.
 
-### Core Components
+---
 
-**Session Management:**
-- `SessionStore` interface with `MemorySessionStore` and `RedisSessionStore` implementations
-- Session metadata storage with automatic TTL (1-hour expiration)
-- Message history storage with configurable limits and automatic trimming
+### 5\. Auto-completion & IntelliSense
 
-**Message Broadcasting:**
-- `MessageBroker` interface with `MemoryMessageBroker` and `RedisMessageBroker` implementations
-- Topic-based pub/sub using MQEmitter (memory) or MQEmitter-Redis (distributed)
-- Session-specific topics: `mcp/session/{sessionId}/message`
-- Broadcast topics: `mcp/broadcast/notification`
+- **Odoo-Aware Suggestions:**
+  - Enhance auto-completion for Odoo-specific API calls, models, and ORM methods.
+  - Utilize dynamic code analysis to recommend improvements based on Odoo development patterns.
+- **Smart Imports:**
+  - Automatically suggest and manage imports for frequently used Odoo libraries and modules.
 
-**SSE Integration:**
-- Complete SSE support with session management and persistence
-- Message replay using Last-Event-ID for resumable connections
-- Heartbeat mechanism for connection health monitoring
-- Support for both GET and POST endpoints
+---
 
-### File Structure
+### 6\. Deployment & Version Control Integration
 
+- **Git Integration:**
+  - Integrate seamlessly with Git for versioning, branching, and merge conflict resolution.
+  - Set up automated pre-commit hooks to run tests, linting, and module integrity checks.
+- **CI/CD Pipelines:**
+  - Provide support for continuous integration pipelines tailored to Odoo module deployment and server restarts.
+
+---
+
+### 7\. Security & Error Handling
+
+- **Best Practice Enforcement:**
+  - Implement checks to ensure safe coding practices in user input, ORM queries, and API interactions.
+  - Integrate guidelines for comprehensive error handling, logging, and exception management.
+- **Static Security Analysis:**
+  - Run static analysis to detect potential security vulnerabilities common in Odoo development.
+
+---
+
+### 8\. Custom Cursor Commands for Odoo Development
+
+- **Module Management Commands:**
+  - Create custom commands to scaffold new modules, update module lists, and manage server configurations.
+- **Database & Migration Tools:**
+  - Incorporate one-click tools for database migration management, upgrade scripts, and seamless Odoo server restarts.
+
+---
+
+### 9\. Documentation & Code Comments
+
+- **Inline Documentation:**
+  - Enforce comprehensive inline comments and module-level docstrings that follow Odoo documentation standards.
+- **Auto-Documentation Tools:**
+  - Utilize tools to auto-generate documentation for models, fields, and business logic with direct links to official Odoo documentation.
+
+---
+
+### 10\. Environment Management & Odoo-Specific Configurations
+
+- **Multi-Environment Support:**
+  - Manage different development environments (local, staging, production) with clear configuration profiles.
+- **Dynamic Settings:**
+  - Auto-detect and adjust to changes in Odoo 18 settings (e.g., database connections, port settings, logging levels).
+- **Real-Time Collaboration:**
+
+  - Optionally enable real-time collaboration features to facilitate team coding, code reviews, and shared debugging sessions.
+
+  # Odoo 18 Technical Guide
+
+## 1. XML View Changes
+
+### 1.1 Tree to List Tag Change
+
+The `<tree>` tag has been renamed to `<list>` in all views.
+
+**Before:**
+
+```xml
+<tree>
+    <field name="name"/>
+</tree>
 ```
-src/
-├── brokers/
-│   ├── message-broker.ts          # Interface definition
-│   ├── memory-message-broker.ts   # MQEmitter implementation
-│   └── redis-message-broker.ts    # Redis-backed implementation
-├── stores/
-│   ├── session-store.ts           # Interface definition
-│   ├── memory-session-store.ts    # In-memory implementation
-│   └── redis-session-store.ts     # Redis-backed implementation
-├── decorators/
-│   ├── decorators.ts              # Core MCP decorators
-│   └── pubsub-decorators.ts       # Pub/sub decorators
-├── handlers.ts                    # MCP protocol handlers
-├── routes.ts                      # SSE connection handling
-├── index.ts                       # Plugin entry point with backend selection
-├── schema.ts                      # MCP protocol types
-└── types.ts                       # Plugin types
+
+**After:**
+
+```xml
+<list>
+    <field name="name"/>
+</list>
 ```
 
-The complete MCP protocol TypeScript definitions are in `src/schema.ts`, which includes:
-- JSON-RPC 2.0 message types (requests, responses, notifications, batches)
-- MCP protocol lifecycle (initialization, capabilities, ping)
-- Core features: resources, prompts, tools, logging, sampling
-- Client/server request/response/notification types
-- Content types (text, image, audio, embedded resources)
-- Protocol constants and error codes
+### 1.2 Simplified Conditional Attributes
 
-Key dependencies:
-- `fastify-plugin` for plugin registration
-- `typed-rpc` for RPC communication
-- `neostandard` for ESLint configuration
-- `ioredis` for Redis connectivity
-- `mqemitter` and `mqemitter-redis` for message broadcasting
+Odoo 18 simplifies the use of conditional attributes by replacing `attrs` and `states` with direct attributes.
 
-The project uses ESM modules (`"type": "module"`) and includes comprehensive MCP protocol specifications in markdown format under `spec/` covering the same areas as the TypeScript schema.
+**Single Condition:**
 
-## Configuration Options
+```xml
+<!-- Before -->
+<field name="field_name" attrs="{'invisible': [('condition_field', '=', False)]}"/>
 
-### Plugin Options
-- `serverInfo`: Server identification (name, version)
-- `capabilities`: MCP capabilities configuration
+<!-- After -->
+<field name="field_name" invisible="not condition_field"/>
+```
+
+**Multiple Conditions with OR:**
+
+```xml
+<!-- Before -->
+<field name="field_name" attrs="{'invisible': ['|', ('state', '=', 'done'), ('type', '=', 'internal')]}"/>
+
+<!-- After -->
+<field name="field_name" invisible="state == 'done' or type == 'internal'"/>
+```
+
+**Multiple Conditions with AND:**
+
+```xml
+<!-- Before -->
+<field name="field_name" attrs="{'readonly': [('state', '=', 'approved'), ('user_id', '!=', user.id)]}"/>
+
+<!-- After -->
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
