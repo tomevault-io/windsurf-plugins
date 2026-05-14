@@ -1,146 +1,95 @@
 ---
 trigger: always_on
-description: You are building a professional-grade TypeScript CLI application for Solana validator switching. This is a critical infrastructure tool for validator operators that requires ultra-fast switching (~300ms), zero credential storage, and SSH key-based authentication.
+description: Professional-grade CLI tool for ultra-fast Solana validator switching with runtime node status detection, built in Rust. Used by validator operators to maintain uptime by quickly switching between primary and backup nodes.
 ---
 
-# Solana Validator Switch CLI - Cursor Rules
+# Solana Validator Switch CLI Project
 
-## Project Context
-You are building a professional-grade TypeScript CLI application for Solana validator switching. This is a critical infrastructure tool for validator operators that requires ultra-fast switching (~300ms), zero credential storage, and SSH key-based authentication.
+## Overview
 
-## Technology Stack
-- **Language**: TypeScript (strict mode)
-- **Runtime**: Node.js
-- **CLI Framework**: Commander.js
-- **SSH**: openssh-rs
-- **UI**: Inquirer, blessed, ora, chalk, cli-table3
-- **Testing**: Jest with ts-jest
-- **Build**: TypeScript compiler
+Professional-grade CLI tool for ultra-fast Solana validator switching with runtime node status detection, built in Rust. Used by validator operators to maintain uptime by quickly switching between primary and backup nodes.
 
-## Core Architecture Principles
-- **Type Safety First**: All functions, classes, and data structures must be strongly typed
-- **Zero Credential Storage**: Never store SSH keys, passwords, or private keys
-- **Error Handling**: Comprehensive error types and graceful degradation
-- **Performance**: Optimize for ultra-fast switching operations
-- **Security**: SSH key-based authentication only, input validation
-- **Professional UX**: Clean CLI interface with proper error messages
+## Key Features
 
-## TypeScript Configuration
-- Use strict TypeScript configuration with all strict checks enabled
-- Define interfaces for all data structures before implementation
-- Use proper error types (never throw strings, always Error objects)
-- Prefer readonly properties where applicable
-- Use branded types for sensitive data (SSH keys, file paths)
-- Export types separately from implementations
+- **Ultra-fast switching**: Sub-second identity switches with optimized streaming operations
+- **SSH connection pooling**: Persistent connections with multiplexing for instant commands
+- **Real-time monitoring**: Interactive dashboard with Ratatui-based terminal UI
+- **Telegram alerts**: Notifications for validator health, delinquency, and switch events
+- **Universal support**: Works with Firedancer, Agave, Solana, and Jito validators
 
-## Code Style Guidelines
+## Architecture
 
-### File Naming
-- Use kebab-case for file names: `ssh-manager.ts`, `config-manager.ts`
-- Use PascalCase for class names: `SSHManager`, `ConfigManager`
-- Use camelCase for variables and functions: `switchValidator`, `getConfig`
-- Use UPPER_CASE for constants: `DEFAULT_SSH_TIMEOUT`, `MAX_RETRIES`
+- **Language**: Rust
+- **Async Runtime**: Tokio
+- **CLI Framework**: Clap
+- **Terminal UI**: Ratatui
+- **SSH Library**: openssh-rs v0.10 (with native multiplexing)
+- **Configuration**: YAML-based (~/.solana-validator-switch/config.yaml)
 
-### Import Organization
-```typescript
-// 1. Node.js built-in modules
-import { promises as fs } from 'fs';
-import { join } from 'path';
+## Project Structure
 
-// 2. Third-party modules
-import { Command } from 'commander';
-import inquirer from 'inquirer';
+- `src/` - Main source code
+  - `main.rs` - Entry point and CLI setup
+  - `commands/` - Command implementations (status, switch, test-alert)
+  - `ssh.rs` - SSH connection pooling and management
+  - `alert.rs` - Telegram alert functionality
+  - `config.rs` - Configuration management
+  - `solana_rpc.rs` - Solana RPC interactions
+- `docs/` - Technical documentation
+- `tests/` - Integration and unit tests
+- `wiki/` - GitHub wiki pages
 
-// 3. Local modules (absolute imports preferred)
-import { Config, NodeConfig } from '../types/config';
-import { SSHManager } from '../lib/ssh-manager';
-import { Logger } from '../utils/logger';
-```
+## Development Workflow
 
-### Error Handling Pattern
-```typescript
-// Always use custom error classes
-export class ValidatorSwitchError extends Error {
-  constructor(
-    message: string,
-    public readonly code: string,
-    public readonly cause?: Error
-  ) {
-    super(message);
-    this.name = 'ValidatorSwitchError';
-  }
-}
+1. **Testing**: Run `cargo test` before commits
+2. **Linting**: Run `cargo clippy -- -D warnings`
+3. **Formatting**: Run `cargo fmt`
+4. **Building**: Run `cargo build --release`
+5. **Pre-commit hooks**: Set up with `./setup-hooks.sh`
 
-// Use Result pattern for operations that can fail
-export type Result<T, E = Error> = 
-  | { success: true; data: T }
-  | { success: false; error: E };
-```
+## Recent Updates (v1.2.0)
 
-### Async/Await Pattern
-- Always use async/await instead of Promises
-- Handle errors with try/catch blocks
-- Use proper error propagation
-- Add timeout handling for SSH operations
+- Side-by-side table layout with SSH health monitoring
+- Catchup failure alerts for standby nodes
+- Enhanced test alerts showing all alert types
+- Improved status UI with countdown timers
+- Better error handling and recovery strategies
 
-## Directory Structure Rules
-```
-src/
-├── index.ts                    # Main entry point
-├── types/                      # TypeScript interfaces only
-│   ├── config.ts              # Configuration types
-│   ├── ssh.ts                 # SSH-related types
-│   ├── validator.ts           # Validator types
-│   └── index.ts               # Re-export all types
-├── commands/                   # CLI command handlers
-│   ├── setup.ts               # Setup command
-│   ├── config.ts              # Config management
-│   ├── monitor.ts             # Monitoring dashboard
-│   ├── switch.ts              # Switching logic
-│   └── status.ts              # Status queries
-├── lib/                        # Core business logic
-│   ├── ssh-manager.ts         # SSH connection management
-│   ├── switch-manager.ts      # Validator switching
-│   ├── tower-manager.ts       # Tower file operations
-│   ├── health-checker.ts      # Health monitoring
-│   └── solana-rpc.ts          # Solana RPC client
-├── utils/                      # Utility functions
-│   ├── config-manager.ts      # Configuration utilities
-│   ├── logger.ts              # Logging system
-│   ├── validator.ts           # Input validation
-│   └── error-handler.ts       # Error handling
-├── ui/                         # Terminal UI components
-│   ├── dashboard.ts           # Interactive dashboard
-│   ├── components.ts          # Reusable UI components
-│   └── prompts.ts             # Interactive prompts
-└── constants/                  # Application constants
-    ├── defaults.ts            # Default values
-    ├── errors.ts              # Error messages
-    └── commands.ts            # Command definitions
-```
+## Key Commands
 
-## CLI Development Patterns
+- `svs` - Interactive mode (recommended)
+- `svs status` - Check validator status
+- `svs switch` - Perform validator switch
+- `svs switch --dry-run` - Preview switch without executing
+- `svs test-alert` - Test Telegram alerts
 
-### Command Structure
-```typescript
-// Use this pattern for all CLI commands
-import { Command } from 'commander';
-import { Config } from '../types/config';
+## Performance Characteristics
 
-interface CommandOptions {
-  config?: string;
-  verbose?: boolean;
-  dryRun?: boolean;
-}
+- **Switch time**: 25-40 seconds total
+- **Voting gap**: 15-25 seconds
+- **Memory usage**: ~30MB base + 5MB per SSH session
+- **CPU usage**: <3% monitoring, 8-15% during switch
 
-export function createSetupCommand(): Command {
-  return new Command('setup')
-    .description('Interactive setup wizard')
-    .option('-c, --config <path>', 'custom config file')
-    .option('-v, --verbose', 'verbose output')
-    .action(async (options: CommandOptions) => {
+## Security Considerations
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- No credential storage (SSH keys referenced by path only)
+- No passwords or private keys in config
+- Session data in memory only
+- Secure file permissions (0600) for config
+
+## Testing
+
+- Run all tests: `cargo test`
+- Integration tests available in `tests/`
+- Test configurations in `tests/test_config.yaml`
+
+## Important Notes
+
+- This is a defensive security tool for validator operators
+- Helps maintain validator uptime and prevent slashing
+- Used in production by Huisky Labs validators
+- Open source project with active development
+- Never include CLAUDE inside commit message
 
 ---
 > Source: [huiskylabs/solana-validator-switch](https://github.com/huiskylabs/solana-validator-switch) — distributed by [TomeVault](https://tomevault.io).
