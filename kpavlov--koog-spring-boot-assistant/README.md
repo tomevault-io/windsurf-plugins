@@ -7,11 +7,11 @@ Kotlin + SpringBoot + Koog + Promptfoo example
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [kpavlov/koog-spring-boot-assistant](https://github.com/kpavlov/koog-spring-boot-assistant).
+Original source: `CLAUDE.md` in [kpavlov/koog-spring-boot-assistant](https://github.com/kpavlov/koog-spring-boot-assistant).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
