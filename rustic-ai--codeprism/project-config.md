@@ -1,132 +1,108 @@
 ---
 trigger: always_on
-description: Enforces structured development workflow using GitHub issues, milestones, and projects. Ensures systematic progression through milestone-focused development with comprehensive tracking and verification.
+description: This rule provides comprehensive best practices for developing and maintaining Kubernetes applications and infrastructure, covering coding standards, security, performance, testing, and deployment.
 ---
 
-# GitHub Development Workflow Rules
+# Kubernetes Development and Operations Best Practices
 
-**Purpose:** Enforces structured development workflow using GitHub issues, milestones, and projects. Ensures systematic progression through milestone-focused development with comprehensive tracking and verification.
+This document outlines a collection of guidelines, style suggestions, and tips for writing code and managing infrastructure within the Kubernetes ecosystem. It emphasizes clarity, maintainability, security, and performance.
 
-**When to use:** All development work in GitHub repositories, milestone-based projects, systematic feature development, and any work requiring complete traceability.
+## 1. Code Organization and Structure
 
-## Milestone-Focused Development
+### 1.1 Directory Structure
 
-**Rule: Work on ONE milestone at a time from start to complete finish.**
-Why: Focused development ensures functional releases, prevents context switching, and maintains clear progress tracking. Milestones represent complete functional value delivery.
+- **Root Level:**
+  - `cmd/`:  Main application entry points. Each subdirectory represents a separate command-line tool or service.
+  - `pkg/`: Reusable libraries and components that can be imported by other projects.
+  - `internal/`: Private code that should not be imported by external projects.  Enforces encapsulation.
+  - `api/`:  API definitions, including protobuf files and OpenAPI specifications.
+  - `config/`: Configuration files, such as YAML manifests, Kustomize configurations, and Helm charts.
+  - `scripts/`: Utility scripts for building, testing, and deploying the application.
+  - `docs/`: Documentation for the project.
+  - `examples/`: Example usage of the library or application.
+  - `vendor/`: (If using `go modules` without external dependency management) Contains vendored dependencies.  Generally discouraged in modern Go with `go modules`.
+- **Component-Specific Directories:** Inside `pkg/` or `internal/`, organize code by component or module. Each component should have its own directory with clear separation of concerns.
 
-**Milestone Requirements:**
-- **Start Only One**: Never work on multiple milestones simultaneously
-- **Complete ALL Issues**: Milestone is done only when 100% of issues are closed
-- **No Partial Releases**: Don't close milestone until every issue is resolved
-- **Emergency Exception**: Only P0 critical bugs can interrupt current milestone
+Example:
 
-**Milestone Selection Process:**
-```bash
-# Check current milestone status
-gh issue list --milestone "current-milestone" --state open
 
-# If no open issues in current milestone, select next milestone
-# If issues remain, continue working on current milestone
-```
+my-kubernetes-project/
+├── cmd/
+│   └── controller/
+│       └── main.go
+├── pkg/
+│   └── api/
+│       ├── types.go
+│   └── controller/
+│       ├── controller.go
+│       ├── reconciler.go
+│   └── util/
+│       └── util.go
+├── internal/
+│   └── admission/
+│       └── webhook.go
+├── config/
+│   ├── deploy/
+│   │   └── deployment.yaml
+│   └── kustomize/
+│       ├── base/
+│       │   ├── kustomization.yaml
+│       │   └── ...
+│       └── overlays/
+│           ├── dev/
+│           │   ├── kustomization.yaml
+│           │   └── ...
+│           └── prod/
+│               ├── kustomization.yaml
+│               └── ...
+├── scripts/
+│   └── build.sh
+├── docs/
+│   └── architecture.md
+└── go.mod
 
-## Issue Discovery and Creation
 
-**Rule: Immediately create new issues when discovering bugs, limitations, or missing work during development.**
-Why: Comprehensive tracking prevents lost work, maintains milestone completeness, and provides audit trail for all discovered requirements.
+### 1.2 File Naming Conventions
 
-**Discovery Triggers - Create New Issue When:**
-- **Bug Found**: Code doesn't work as expected during testing
-- **Design Limitation**: Current approach won't achieve requirements  
-- **Missing Functionality**: Additional work needed for completion
-- **Performance Issue**: Implementation doesn't meet requirements
-- **Integration Problem**: Feature doesn't work with existing code
-- **Documentation Gap**: Missing or incorrect documentation
+- **Go Files:** Use lowercase with underscores (e.g., `my_controller.go`).
+- **YAML Files:** Use lowercase with dashes (e.g., `deployment.yaml`).
+- **Configuration Files:** Be descriptive and consistent (e.g., `config.yaml`, `kustomization.yaml`).
+- **Test Files:** Follow the standard Go convention: `*_test.go` (e.g., `my_controller_test.go`).
 
-**New Issue Creation Process:**
-```bash
-# Stop current work, create issue immediately
-gh issue create --title "Bug: [description]" \
-  --body "Discovered while working on #123
-  
-## Problem
-[Description of discovered issue]
+### 1.3 Module Organization (Go)
 
-## Impact  
-[How this affects original work]
+- **Packages:**  Organize code into meaningful packages that represent logical units of functionality.
+- **Internal Packages:** Use `internal/` directories to create packages that are only visible within the project.
+- **Interfaces:** Define interfaces to abstract dependencies and promote testability.
 
-## Required Action
-[What needs to be done]" \
-  --label "found-during-dev,bug,P1" \
-  --milestone "current-milestone"
+### 1.4 Component Architecture
 
-# Link to original issue in description
-# Assign appropriate priority based on impact
-# Always assign to current milestone
-```
+- **Microservices:** Design applications as a collection of loosely coupled microservices.
+- **Separation of Concerns:** Each component should have a single responsibility and well-defined interfaces.
+- **API Gateway:** Use an API gateway to handle routing, authentication, and rate limiting for external requests.
+- **Service Mesh:** Consider using a service mesh (e.g., Istio, Linkerd) to manage inter-service communication, observability, and security.
 
-**Issue Linking Requirements:**
-- **Reference Original**: "Discovered while working on #123"
-- **Explain Impact**: How discovery affects original work
-- **Set Priority**: Based on blocking impact on milestone
-- **Assign to Current Milestone**: Keep all related work together
+### 1.5 Code Splitting Strategies
 
-## Documentation-First + TDD Workflow
+- **Feature-Based Splitting:** Group code by feature or functionality.
+- **Layer-Based Splitting:** Separate code into layers, such as data access, business logic, and presentation.
+- **Component-Based Splitting:** Divide code into reusable components that can be shared across multiple projects.
 
-**Rule: Every issue must follow Documentation-First + TDD workflow before any implementation.**
-Why: Documentation-first ensures clear requirements understanding, TDD ensures robust implementation, and this combination prevents rework and missing requirements.
+## 2. Common Patterns and Anti-Patterns
 
-**Mandatory Workflow Sequence:**
-```markdown
-1. **Documentation Phase** (before any code)
-   - Write/update design documentation for the issue
-   - Document expected API and behavior
-   - Define acceptance criteria clearly
-   - Update user documentation if needed
+### 2.1 Design Patterns
 
-2. **TDD Phase** (before implementation)  
-   - Write failing tests first (red phase)
-   - Write minimal code to pass tests (green phase)
-   - Refactor code while keeping tests green
-   - Repeat until feature complete
+- **Controller Pattern:** Implement controllers to reconcile the desired state of Kubernetes resources with the actual state.
+- **Operator Pattern:** Extend the Kubernetes API with custom resources and controllers to automate complex application management tasks.
+- **Sidecar Pattern:** Deploy a sidecar container alongside the main application container to provide supporting functionality, such as logging, monitoring, or security.
+- **Ambassador Pattern:**  Use an ambassador container to proxy network traffic to the main application container, providing features such as load balancing, routing, and authentication.
+- **Adapter Pattern:** Translate requests from one interface to another, allowing different components to work together.
+- **Singleton Pattern:** Implement a singleton pattern for managing global resources, such as database connections or configuration settings. Be extremely cautious, as this can hurt testability and introduce implicit dependencies.
 
-3. **Implementation Phase**
-   - Complete implementation following TDD cycle
-   - Maintain test coverage ≥90%
-   - Follow code quality rules from rust-essentials.md
+### 2.2 Recommended Approaches for Common Tasks
 
-4. **Verification Phase** (mandatory before completion)
-   - Run complete verification checklist
-   - Create additional issues if problems discovered
-   - Only proceed to commit after verification passes
-
-5. **Commit & Push Phase** (mandatory after verification)
-   - Commit all changes with proper issue linking
-   - Push changes to upstream repository
-   - Ensure all work is saved and available
-
-6. **Issue Completion**
-   - Mark issue as done only after commit/push complete
-   - Update issue status to reflect completion
-```
-
-**Documentation Requirements:**
-- **API Documentation**: Every public function has rustdoc with examples
-- **User Documentation**: Feature usage and integration guides
-- **Design Documentation**: Technical approach and architecture decisions
-- **Test Documentation**: Test strategy and coverage rationale
-
-## Task Completion Verification
-
-**Rule: No issue can be marked as 'done' without completing the full verification checklist.**
-Why: Systematic verification prevents incomplete work, ensures quality standards, and catches integration issues before they compound.
-
-**Mandatory Verification Checklist:**
-```markdown
-## Task Completion Verification (Required Before Done)
-
-### Requirements Verification
-- [ ] Re-read original issue requirements completely
-- [ ] Verify each requirement is implemented and working
+- **Resource Management:** Use Kubernetes resource requests and limits to ensure that applications have sufficient resources and prevent resource contention.
+- **Configuration Management:** Use ConfigMaps and Secrets to manage configuration data and sensitive information separately from the application code.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
