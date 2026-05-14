@@ -3,7 +3,7 @@ trigger: always_on
 description: > This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-## twsemcpserver
+## formcraft
 
 > This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
@@ -11,80 +11,159 @@ description: > This file provides guidance to Claude Code (claude.ai/code) when 
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Project Overview
+## Build and Development Commands
 
-TWStockMCPServer is a Model Context Protocol (MCP) server for Taiwan stock market data analysis. Built with FastMCP (Python) and `requests`. Data sources:
-- **TWSE OpenAPI** (`openapi.twse.com.tw`) — 143 tools: 公司治理、ESG、財報、交易、指數、券商
-- **TWSE exchangeReport** (`twse.com.tw/exchangeReport`) — 4 tools: 歷史日K、月均價、估值、融資融券（legacy JSON，非 Swagger）
-- **MIS 即時報價** (`mis.twse.com.tw`) — 1 tool: 盤中多股即時報價
-- **TPEx OpenAPI** (`tpex.org.tw/openapi`) — 3 tools: 上櫃日收盤、三大法人、本益比
-- **TAIFEX OpenAPI** (`openapi.taifex.com.tw`) — 16 tools: 三大法人系列、大額交易人部位、每日行情、選擇權分析（Delta/OI增減）、保證金、年月統計
+### Building the Project
+```bash
+# Restore dependencies and build
+dotnet restore
+dotnet build
 
-## Development Commands
+# Build in Release mode
+dotnet build --configuration Release
 
-| Task | Command |
-|------|---------|
-| Install dependencies | `uv sync` |
-| Install with test deps | `uv sync --extra dev` |
-| Run server (dev) | `uv run fastmcp dev server.py` |
-| Run server (prod) | `uv run fastmcp run server.py` |
-| Run all tests | `uv run pytest` |
-| Run specific test file | `uv run pytest tests/e2e/test_esg_api.py -v` |
-| Run tests by category | `python run_tests.py esg` (also: `company`, `financials`, `trading`, `warrants`, `other`, `history`, `realtime`, `otc`, `taifex`, `api`, `e2e`) |
-| Quick test (fail fast) | `python run_tests.py quick` |
-| Tests with coverage | `python run_tests.py cov` (opens HTML report) |
-| Run server directly | `python server.py` (HTTP on port 8000) |
+# Build with warnings as errors (for CI/CD validation)
+dotnet build /p:TreatWarningsAsErrors=true
 
-## Code Architecture
-
-### High-Level Structure
-
-```
-server.py                     # Thin entrypoint: FastMCP init, prompt registration, tool registration
-models/                       # Pydantic-style data models (MarketInfo, BrokerInfo, RealTimeStats)
-utils/
-├── api_client.py             # TWSEAPIClient - all TWSE HTTP calls
-├── config.py                 # APIConfig, DisplayConfig, TestConfig (env var overrides)
-├── constants.py              # Localized message templates (Chinese)
-├── decorators.py             # @handle_api_errors, @handle_empty_response
-├── formatters.py             # Data → string formatting functions
-├── tool_factory.py           # create_company_tool() for dynamically named tools
-└── types.py                  # TWSEDataItem TypedDict, DataFormatter Protocol
-tools/
-├── __init__.py               # register_all_tools() - auto-discovers and registers all tool modules
-├── broker.py                 # Broker data tools (top-level module)
-├── other.py                  # Misc tools: funds, bonds, holidays (top-level module)
-├── company/                  # Company tools: basic_info, financials, esg, listing, news
-├── trading/                  # Trading tools: daily, periodic, valuation, dividend_schedule, etf, market, warrants
-├── market/                   # Market tools: indices, statistics, foreign
-├── history/                  # TWSE legacy exchangeReport: stock_day, stock_day_avg, bwibbu_all, margin_balance
-├── realtime/                 # MIS real-time quotes: stock_info
-├── otc/                      # TPEx OTC market: daily_close, institutional, peratio
-└── taifex/                   # TAIFEX derivatives: futures_position, put_call_ratio, institutional_general,
-                              #   institutional_details, daily_market_report, large_traders_oi,
-                              #   options_analytics, margin, trading_statistics
-prompts/                      # 5 prompt templates registered in server.py
+# Create local NuGet package
+./pack-local.sh  # macOS/Linux - Creates packages in ./nupkg/
+./pack-local.ps1 # Windows
 ```
 
-### Key Architectural Patterns
+### Running Tests
+```bash
+# Run all tests (600+ unit tests across 2 test projects)
+dotnet test
 
-**Dependency Injection**: `server.py` creates one `TWSEAPIClient` instance and passes it to `register_all_tools(mcp, api_client)`. The auto-discovery engine in `tools/__init__.py` uses `pkgutil.iter_modules` to find all tool modules, then calls `module.register_tools(mcp, client)` on each.
+# Run specific test project
+dotnet test FormCraft.UnitTests/FormCraft.UnitTests.csproj
+dotnet test FormCraft.ForMudBlazor.UnitTests/FormCraft.ForMudBlazor.UnitTests.csproj
 
-**Tool Module Contract**: Every tool module must expose:
-```python
-def register_tools(mcp: FastMCP, client: Optional[TWSEAPIClient] = None) -> None:
+# Run tests with coverage
+dotnet test --collect:"XPlat Code Coverage"
+
+# Run specific test class or method
+dotnet test --filter "FullyQualifiedName~FormBuilderTests"
+dotnet test --filter "DisplayName~Should_Build_Valid_Configuration"
+
+# Run tests by category
+dotnet test --filter "Category=Builder"
+dotnet test --filter "Category=Renderer"
+dotnet test --filter "Category=Security"
 ```
-The `client` is captured via closure. Tools are registered with `@mcp.tool` — the function docstring becomes the MCP tool description.
 
-**Auto-Discovery**: `tools/__init__.py` scans direct modules (`tools/broker.py`, `tools/other.py`) and subpackage modules (`tools/company/*.py`, etc.) automatically. No manual registration needed in `server.py` when adding new tool modules.
+### Running the Demo Application
+```bash
+cd FormCraft.DemoBlazorApp
+dotnet run
+# Navigate to https://localhost:5001 (or http://localhost:5000)
+```
 
-**API Client**: `TWSEAPIClient` has instance methods (`fetch_data`, `fetch_company_data`, `fetch_latest_market_data`) and class-method wrappers (`get_data`, `get_company_data`, `get_latest_market_data`) for backward compatibility. Instance methods are preferred. Includes built-in rate limiting (0.5s between requests). For non-OpenAPI sources (legacy TWSE, MIS, TPEx, TAIFEX), use `fetch_json(url, params)` / `get_json(url, params)` which accepts full URLs with query parameters and returns raw JSON.
+### NUKE Build System
+The project uses NUKE for sophisticated build automation:
+```bash
+# Run full build pipeline (macOS/Linux)
+./build.sh
 
-**Decorators**: Tool functions use decorators from `utils/decorators.py`:
-- `@handle_api_errors(data_type="...", use_code_param=True)` — wraps in try/except, returns localized error message
-- `@handle_empty_response(data_type="...")` — returns localized "no data" message for None/empty results
+# Run full build pipeline (Windows)
+./build.ps1
 
-**Formatters**: `utils/formatters.py` provides:
+# Available NUKE targets:
+# - Clean: Cleans build outputs
+# - Restore: Restores NuGet packages
+# - Compile: Builds the solution
+# - Test: Runs all unit tests
+# - Pack: Creates NuGet packages
+# - Changelog: Generates changelog using git-cliff
+```
+
+## High-Level Architecture
+
+### Solution Structure
+```
+FormCraft/                      # Core library (framework-agnostic)
+├── Builders/                   # Fluent API builders
+│   ├── FormBuilder.cs         # Main entry point
+│   ├── FieldBuilder.cs        # Individual field configuration
+│   └── FieldGroupBuilder.cs   # Field grouping and layout
+├── Configuration/              # Configuration models
+├── Rendering/                  # Rendering pipeline
+│   ├── IFieldRenderer.cs      # Renderer contract
+│   └── FieldRendererService.cs # Renderer registry
+├── Validation/                 # Validation system
+│   └── IFieldValidator.cs     # Validator contract
+├── Security/                   # Security features (v2.0.0+)
+│   ├── IEncryptionService.cs  # Field encryption
+│   └── ICsrfTokenService.cs   # CSRF protection
+└── Extensions/                 # Extension methods
+
+FormCraft.ForMudBlazor/         # MudBlazor UI implementation
+├── Renderers/                  # MudBlazor-specific renderers
+└── Services/                   # UI framework services
+
+FormCraft.DemoBlazorApp/        # Interactive demo application
+FormCraft.UnitTests/            # Core library test suite (560+ tests)
+FormCraft.ForMudBlazor.UnitTests/ # MudBlazor integration tests (47 tests)
+build/                          # NUKE build automation
+```
+
+### Target Frameworks
+- **net9.0** and **net10.0** - Multi-targeting for .NET 9 and .NET 10
+
+### Core Design Patterns
+
+#### 1. Fluent Builder Pattern (Primary Architecture)
+The entire API is built around method chaining with immutable configuration:
+```csharp
+FormBuilder<TModel>.Create()
+    .AddField(x => x.Property, field => field.ConfigureField())
+    .AddFieldGroup(group => group.ConfigureGroup())
+    .WithLayout(FormLayout.Grid)
+    .WithSecurity(security => security.ConfigureSecurity())
+    .Build() // Returns immutable IFormConfiguration<TModel>
+```
+
+**Key Builder Classes:**
+- `FormBuilder<TModel>` - Root builder, entry point via `.Create()`
+- `FieldBuilder<TModel, TValue>` - Configures individual fields
+- `FieldGroupBuilder<TModel>` - Groups fields with layout options
+- `SecurityBuilder<TModel>` - Security features configuration (encryption, CSRF, rate limiting)
+
+#### 2. Strategy Pattern (Field Rendering)
+Pluggable rendering system with type-based renderer selection:
+```csharp
+public interface IFieldRenderer
+{
+    bool CanRender(Type fieldType, IFieldConfiguration<object, object> field);
+    RenderFragment Render<TModel>(IFieldRenderContext<TModel> context);
+}
+```
+
+**Renderer Registration:**
+- Default renderers registered in DI container
+- Custom renderers via `.WithCustomRenderer()`
+- Priority-based selection when multiple renderers match
+
+#### 3. Command Pattern (Validation)
+Async validation with command pattern:
+```csharp
+public interface IFieldValidator<TModel, TValue>
+{
+    Task<ValidationResult> ValidateAsync(TModel model, TValue value, IServiceProvider services);
+}
+```
+
+**Built-in Validators:**
+- `RequiredValidator<TModel, TValue>`
+- `CustomValidator<TModel, TValue>`
+- `AsyncValidator<TModel, TValue>`
+- FluentValidation integration via `DynamicFormValidator`
+
+#### 4. Observer Pattern (Field Dependencies)
+Reactive field updates based on dependencies:
+```csharp
+.AddField(x => x.TotalPrice)
+    .DependsOn(x => x.Quantity, x => x.Price)
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
