@@ -1,214 +1,55 @@
 ---
 trigger: always_on
-description: Guidelines and best practices for building applications with [Beefree SDK](https://docs.beefree.io/beefree-sdk), including installation, authentication, configuration, customization, and template management
+description: Blender Python add-on rules for operators, panels, properties, registration, testing, and API-safe scripting
 ---
 
-# Beefree SDK Guidelines
-Guidelines and best practices for building applications with [Beefree SDK](https://docs.beefree.io/beefree-sdk), including installation, authentication, configuration, customization, and template management.
 
-## Installation Guidelines
+# Blender Python Add-on Rules
 
-### Package Installation
-- Install the Beefree SDK package using npm or yarn:
-  ```bash
-  npm install @beefree.io/sdk
-  # or
-  yarn add @beefree.io/sdk
-  ```
+## Add-on Structure
 
-### Dependencies
-- Beefree SDK requires the following core dependencies:
-  ```json
-  {
-    "dependencies": {
-      "@beefree.io/sdk": "^9.0.2-fix-optional-url-config.0",
-      "axios": "^1.10.0",
-      "express": "^5.1.0",
-      "cors": "^2.8.5",
-      "dotenv": "^17.2.0"
-    }
-  }
-  ```
+- Keep add-on entry points in `__init__.py` with clear `register()` and `unregister()` functions.
+- Group operators, panels, properties, preferences, and utilities into separate modules for non-trivial add-ons.
+- Use `bl_info` or `blender_manifest.toml` according to the Blender version and packaging target.
+- Keep UI labels concise and user-facing text translatable where appropriate.
 
-### Environment Setup
-- Create a `.env` file in your project root with your Beefree credentials:
-  ```env
-  BEE_CLIENT_ID=your_client_id_here
-  BEE_CLIENT_SECRET=your_client_secret_here
-  ```
+## API Usage
 
-## Authentication Guidelines
+- Use `bpy.types.Operator` for actions, `bpy.types.Panel` for UI, and `bpy.types.PropertyGroup` for grouped settings.
+- Define `bl_idname`, `bl_label`, and `bl_options` explicitly.
+- Validate context in `poll()` before enabling operators.
+- Use `invoke()` for interactive setup and `execute()` for the actual operation.
+- Return `{'FINISHED'}` or `{'CANCELLED'}` consistently.
+- Use dependency graph updates and evaluated objects when reading final scene state.
 
-### Proxy Server Setup
-- ALWAYS use a proxy server for authentication to protect your credentials
-- Create a proxy server file (e.g., `proxy-server.js`) to handle authentication:
-  ```javascript
-  import express from 'express';
-  import cors from 'cors';
-  import axios from 'axios';
-  import dotenv from 'dotenv';
+## Data and Properties
 
-  dotenv.config();
+- Register custom properties through `PropertyGroup` classes instead of loose global state.
+- Store add-on preferences in `AddonPreferences`.
+- Use `PointerProperty`, `CollectionProperty`, and typed properties with names and descriptions.
+- Clean up custom properties and handlers during `unregister()`.
 
-  const app = express();
-  const PORT = 3001;
+## Safety and Performance
 
-  app.use(cors());
-  app.use(express.json());
+- Do not run destructive scene operations without explicit user action.
+- Avoid blocking UI work in modal operators; use timers or modal state machines for long operations.
+- Batch mesh changes and use `bmesh` when editing mesh data programmatically.
+- Avoid repeatedly scanning large scenes in draw methods.
+- Keep file paths configurable and use Blender path utilities.
 
-  const BEE_CLIENT_ID = process.env.BEE_CLIENT_ID;
-  const BEE_CLIENT_SECRET = process.env.BEE_CLIENT_SECRET;
+## Testing and Debugging
 
-  // V2 Auth Endpoint
-  app.post('/proxy/bee-auth', async (req, res) => {
-    try {
-      const { uid } = req.body;
-      
-      const response = await axios.post(
-        'https://auth.getbee.io/loginV2',
-        {
-          client_id: BEE_CLIENT_ID,
-          client_secret: BEE_CLIENT_SECRET,
-          uid: uid || 'demo-user'
-        },
-        { headers: { 'Content-Type': 'application/json' } }
-      );
-      
-      res.json(response.data);
-    } catch (error) {
-      console.error('Auth error:', error.message);
-      res.status(500).json({ error: 'Failed to authenticate' });
-    }
-  });
+- Test scripts in a clean Blender profile and a representative production scene.
+- Add smoke tests that import the add-on, register it, run core operators, and unregister cleanly.
+- Log actionable messages with `self.report()` for user-facing operator feedback.
+- Keep version-specific API differences isolated behind helper functions.
 
-  app.listen(PORT, () => {
-    console.log(`Proxy server running on http://localhost:${PORT}`);
-  });
-  ```
+## Common Mistakes
 
-### Authentication Process
-- Use the V2 authentication endpoint: `https://auth.getbee.io/loginV2`
-- Pass the ENTIRE API response to the Beefree SDK, not just the token
-- Example authentication call:
-  ```typescript
-  const token = await fetch('http://localhost:3001/proxy/bee-auth', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ uid: 'demo-user' })
-  }).then(res => res.json());
-  ```
-
-## Container Setup Guidelines
-
-### HTML Container
-- Create a dedicated container element for the Beefree SDK:
-  ```html
-  <div id="beefree-sdk-container"></div>
-  ```
-
-### CSS Styling
-- Style the container to ensure proper display:
-  ```css
-  #beefree-sdk-container {
-    position: absolute;
-    top: 0px;
-    bottom: 0px;
-    left: 0px;
-    right: 0px;
-    height: 600px;
-    width: 90%;
-    margin: 20px auto;
-    border: 1px solid #ddd;
-    border-radius: 8px;
-  }
-  ```
-
-### React Container
-- For React applications, the following code snippet shows an example using refs to manage the container:
-  ```typescript
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  return (
-    <div
-      id="beefree-react-demo"
-      ref={containerRef}
-      style={{
-        height: '600px',
-        width: '90%',
-        margin: '20px auto',
-        border: '1px solid #ddd',
-        borderRadius: '8px'
-      }}
-    />
-  );
-  ```
-
-## Configuration Guidelines
-
-### Required Configuration Parameters
-- ALWAYS include the `container` parameter in your configuration:
-  ```typescript
-  const beeConfig = {
-    container: 'beefree-sdk-container', // Required
-    language: 'en-US'
-  };
-  ```
-
-### Optional Configuration Parameters
-- Customize your SDK with optional parameters:
-  ```typescript
-  const beeConfig = {
-    container: 'beefree-sdk-container', // Required
-    language: 'en-US',
-    specialLinks: [
-      {
-        type: "unsubscribe",
-        label: "Unsubscribe",
-        link: "http://[unsubscribe]/",
-      },
-      {
-        type: "subscribe",
-        label: "Subscribe",
-        link: "http://[subscribe]/",
-      },
-    ],
-    mergeTags: [
-      {
-        name: "First Name",
-        value: "[first_name]",
-      },
-      {
-        name: "Last Name",
-        value: "[last_name]",
-      },
-      {
-        name: "Email",
-        value: "[email]",
-      },
-    ]
-  };
-  ```
-
-### Callback Functions
-- Implement essential callback functions for proper functionality:
-  ```typescript
-  const beeConfig = {
-    container: 'beefree-sdk-container',
-    onSave: function (jsonFile, htmlFile) {
-      console.log("Template saved:", jsonFile);
-      // Implement custom save logic here
-    },
-    onAutoSave: function (jsonFile) {
-      console.log("Auto-saving template...");
-      localStorage.setItem("email.autosave", jsonFile);
-    },
-    onSend: function (htmlFile) {
-      console.log("Email ready to send:", htmlFile);
-      // Implement custom send logic here
-    },
-    onError: function (errorMessage) {
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- Do not forget to unregister classes, handlers, timers, and keymaps.
+- Do not mutate Blender data from panel `draw()` methods.
+- Do not assume an active object, selected object, or mode without checking context.
+- Do not hardcode absolute asset paths.
 
 ---
 > Source: [XD3an/awesome-ai-coding-all-in-one](https://github.com/XD3an/awesome-ai-coding-all-in-one) — distributed by [TomeVault](https://tomevault.io).
