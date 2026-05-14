@@ -1,175 +1,141 @@
 ---
 trigger: always_on
-description: Enforces proper TDD workflow planning to prevent scope limitation and incomplete test coverage
+description: Enforces comprehensive test coverage requirements and validation standards
 ---
 
 
-# TDD Workflow Planning Rules
+# Test Coverage Requirements and Validation
 
-## Critical TDD Planning Mistakes to Avoid
+## Mandatory Coverage Standards
 
-### ❌ Scope Limitation Failures
+### ❌ Coverage Failures That Led to Testing Gaps
 
-**NEVER limit TDD scope to individual functions - always consider the entire system.**
+**The codeprism-mcp-server testing gap (6 tests vs 80+ needed) occurred because:**
 
-```rust
-// ❌ BAD: Micro-TDD that misses the big picture
-// Writing test for just one tool function without considering:
-// - Integration with other tools
-// - Error handling across the system  
-// - Performance under load
-// - Edge cases in the broader context
+1. **No systematic coverage planning** - Ad hoc test writing instead of comprehensive planning
+2. **No comparison to reference implementation** - Failed to study comprehensive testing patterns  
+3. **No coverage validation** - No enforcement of minimum coverage thresholds
+4. **Scope limitation** - Testing individual functions instead of entire system functionality
 
-#[tokio::test]
-async fn test_single_tool_basic_case() {
-    // Narrow focus that misses system-wide requirements
-}
-```
+### ✅ Required Coverage Standards
 
-```rust
-// ✅ GOOD: Macro-TDD that considers entire ecosystem
-// Plan comprehensive test coverage first:
+**Minimum coverage targets for comprehensive testing:**
 
-// 1. Individual tool functionality (26 tools)
-#[tokio::test] async fn test_all_tools_individually() { }
+| **Coverage Type** | **Target** | **Validation Method** | **Reference** |
+|-------------------|------------|----------------------|---------------|
+| **Overall Test Coverage** | **90%+** | `cargo tarpaulin --min 90` | [codeprism-mcp-server: comprehensive coverage](mdc:crates/codeprism-mcp-server/src/) |
+| **Tool-Specific Tests** | **100%** (26/26 tools) | Individual test per tool | [Tool test patterns](mdc:crates/codeprism-mcp-server/src/server.rs) |
+| **Error Handling Tests** | **100%** of error paths | Error scenario coverage | [Error test examples](mdc:crates/codeprism-mcp-server/src/integration_test.rs) |
+| **Integration Tests** | **80%** of workflows | End-to-end validation | [Integration patterns](mdc:tests/test_mcp_test_harness_end_to_end.rs) |
+| **Edge Case Tests** | **75%** of boundaries | Boundary condition testing | [Edge case patterns](mdc:crates/codeprism-mcp-server/src/server.rs) |
 
-// 2. Tool integration and workflow
-#[tokio::test] async fn test_tool_interaction_scenarios() { }
+## Coverage Validation Requirements
 
-// 3. Error handling across system
-#[tokio::test] async fn test_system_error_recovery() { }
+### Pre-Commit Coverage Checks
 
-// 4. Performance and scalability  
-#[tokio::test] async fn test_concurrent_tool_execution() { }
-
-// 5. Edge cases and boundary conditions
-#[tokio::test] async fn test_edge_cases_comprehensive() { }
-```
-
-### ❌ Planning Sequence Failures
-
-**NEVER start implementation without comprehensive test planning.**
-
-**Wrong Sequence (What I did):**
-```
-1. Implement tool functionality ❌
-2. Write minimal test to pass ❌  
-3. Move to next feature ❌
-4. Discover massive testing gaps later ❌
-```
-
-**Correct Sequence:**
-```
-1. ✅ Study existing test patterns (codeprism-mcp-server)
-2. ✅ Analyze comprehensive requirements  
-3. ✅ Plan ALL test scenarios upfront
-4. ✅ Write ALL failing tests first
-5. ✅ Implement functionality to pass tests
-6. ✅ Refactor while maintaining coverage
-```
-
-## Mandatory Pre-Implementation Analysis
-
-### 1. Study Existing Patterns FIRST
-
-**Before implementing ANY feature:**
+**MANDATORY: Run before every commit**
 
 ```bash
-# REQUIRED: Analyze existing comprehensive tests
-grep -r "#\[tokio::test\]" crates/codeprism-mcp-server/src/ --include="*.rs" | wc -l
-# Expected: 80+ tests to study
+#!/bin/bash
+# .git/hooks/pre-commit
 
-# REQUIRED: Identify test categories  
-grep -r "async fn test_.*_tool" crates/codeprism-mcp-server/src/
-# Study individual tool test patterns
+set -e
 
-# REQUIRED: Map error handling patterns
-grep -r "test_.*_error\|test_.*_invalid" crates/codeprism-mcp-server/src/
-# Understand error test coverage
+echo "🔍 Validating test coverage requirements..."
 
-# REQUIRED: Study edge case patterns  
-grep -r "test_.*_edge\|test_.*_boundary" crates/codeprism-mcp-server/src/
-# Learn edge case testing approaches
+# 1. Check total test count (must match reference implementation)
+CURRENT_TESTS=$(grep -r "#\[tokio::test\]" crates/codeprism-mcp-server/src/ --include="*.rs" | wc -l)
+REFERENCE_TESTS=80  # Based on comprehensive testing analysis
+MIN_REQUIRED_TESTS=76
+
+if [ "$CURRENT_TESTS" -lt "$MIN_REQUIRED_TESTS" ]; then
+    echo "❌ COVERAGE FAILURE: Only $CURRENT_TESTS tests found, need $MIN_REQUIRED_TESTS+"
+    echo "   Reference implementation has $REFERENCE_TESTS tests"
+    echo "   Add missing tests before committing"
+    exit 1
+fi
+
+# 2. Check tool-specific coverage (all 26 tools must have tests)
+TOOLS_WITH_TESTS=$(grep -r "test_.*_tool\|test_provide_guidance\|test_optimize_code\|test_analyze_" crates/codeprism-mcp-server/src/ --include="*.rs" | wc -l)
+REQUIRED_TOOL_TESTS=26
+
+if [ "$TOOLS_WITH_TESTS" -lt "$REQUIRED_TOOL_TESTS" ]; then
+    echo "❌ TOOL COVERAGE FAILURE: Only $TOOLS_WITH_TESTS/26 tools have tests"
+    echo "   Every tool needs individual test coverage"
+    exit 1
+fi
+
+# 3. Check error handling coverage
+ERROR_TESTS=$(grep -r "test_.*_error\|test_.*_invalid\|test_.*_missing" crates/codeprism-mcp-server/src/ --include="*.rs" | wc -l)
+MIN_ERROR_TESTS=20
+
+if [ "$ERROR_TESTS" -lt "$MIN_ERROR_TESTS" ]; then
+    echo "❌ ERROR COVERAGE FAILURE: Only $ERROR_TESTS error tests found, need $MIN_ERROR_TESTS+"
+    echo "   Add comprehensive error scenario testing"
+    exit 1
+fi
+
+# 4. Check integration test coverage
+INTEGRATION_TESTS=$(grep -r "test_.*_integration\|test_.*_workflow\|test_full_" crates/codeprism-mcp-server/src/ --include="*.rs" | wc -l)
+MIN_INTEGRATION_TESTS=10
+
+if [ "$INTEGRATION_TESTS" -lt "$MIN_INTEGRATION_TESTS" ]; then
+    echo "❌ INTEGRATION COVERAGE FAILURE: Only $INTEGRATION_TESTS integration tests found, need $MIN_INTEGRATION_TESTS+"
+    echo "   Add end-to-end workflow testing"
+    exit 1
+fi
+
+# 5. Check code coverage percentage
+if command -v cargo-tarpaulin >/dev/null 2>&1; then
+    COVERAGE=$(cargo tarpaulin --skip-clean --out xml 2>/dev/null | grep -oP '(?<=line-rate=")[^"]*' | head -1 | awk '{print $1*100}')
+    MIN_COVERAGE=90
+    
+    if (( $(echo "$COVERAGE < $MIN_COVERAGE" | bc -l) )); then
+        echo "❌ CODE COVERAGE FAILURE: ${COVERAGE}% coverage, need ${MIN_COVERAGE}%+"
+        echo "   Add tests to cover untested code paths"
+        exit 1
+    fi
+    
+    echo "✅ Code coverage: ${COVERAGE}%"
+fi
+
+echo "✅ All coverage requirements met:"
+echo "   - Total tests: $CURRENT_TESTS (≥$MIN_REQUIRED_TESTS required)"
+echo "   - Tool tests: $TOOLS_WITH_TESTS/26 tools covered"
+echo "   - Error tests: $ERROR_TESTS (≥$MIN_ERROR_TESTS required)"  
+echo "   - Integration tests: $INTEGRATION_TESTS (≥$MIN_INTEGRATION_TESTS required)"
 ```
 
-### 2. Comprehensive Requirement Analysis
+### Coverage Reporting
 
-**Create test requirement matrix BEFORE coding:**
+**REQUIRED: Generate comprehensive coverage reports**
 
-| **Component** | **Success Tests** | **Error Tests** | **Edge Tests** | **Integration Tests** | **Performance Tests** |
-|---------------|-------------------|-----------------|----------------|----------------------|----------------------|
-| Tool 1: provide_guidance | ✅ Required | ✅ Required | ✅ Required | ✅ Required | ✅ Required |
-| Tool 2: optimize_code | ✅ Required | ✅ Required | ✅ Required | ✅ Required | ✅ Required |
-| Tool 3: analyze_dependencies | ✅ Required | ✅ Required | ✅ Required | ✅ Required | ✅ Required |
-| ... (All 26 tools) | ✅ Required | ✅ Required | ✅ Required | ✅ Required | ✅ Required |
-| **Total Required** | **26 tests** | **26 tests** | **26 tests** | **26 tests** | **26 tests** |
+```bash
+# Generate detailed coverage report
+cargo tarpaulin \
+    --out Html --out Xml \
+    --exclude-files "target/*" \
+    --exclude-files "tests/*" \
+    --fail-under 90 \
+    --timeout 300
 
-### 3. Test Planning Documentation
+# Validate coverage against requirements
+python3 << 'EOF'
+import xml.etree.ElementTree as ET
 
-**Document comprehensive test plan BEFORE implementation:**
+# Parse coverage XML
+tree = ET.parse('tarpaulin-report.xml')
+root = tree.getroot()
 
-```rust
-// REQUIRED: Create test plan document before coding
-/*
-TEST PLAN: codeprism-mcp-server Tool Implementation
+# Extract coverage metrics
+line_coverage = float(root.attrib.get('line-rate', 0)) * 100
+branch_coverage = float(root.attrib.get('branch-rate', 0)) * 100
 
-SCOPE: All 26 tools with comprehensive coverage
-REFERENCE: codeprism-mcp-server test patterns
+# Validate against requirements
+print(f"Line Coverage: {line_coverage:.1f}%")
+print(f"Branch Coverage: {branch_coverage:.1f}%")
 
-COVERAGE REQUIREMENTS:
-1. Individual Tool Tests (26 tests)
-   - Each tool: success, error, edge cases
-   - Parameter validation
-   - Output format verification
-
-2. Integration Tests (10+ tests)  
-   - Tool interaction workflows
-   - Server lifecycle management
-   - Resource management
-
-3. Error Handling Tests (20+ tests)
-   - Invalid parameters for each tool
-   - System failures and recovery
-   - Timeout and resource exhaustion
-
-4. Edge Case Tests (15+ tests)
-   - Boundary conditions
-   - Empty/large inputs
-   - Concurrent access
-
-5. Performance Tests (5+ tests)
-   - Response time requirements
-   - Memory usage validation
-   - Concurrent execution stress
-
-TOTAL TARGET: 76+ tests (comprehensive coverage)
-*/
-```
-
-## TDD Implementation Workflow
-
-### Phase 1: Comprehensive Test Creation (RED)
-
-**Write ALL failing tests before ANY implementation:**
-
-```rust
-// 1. Individual tool tests (ALL 26 tools)
-#[tokio::test] async fn test_provide_guidance_success() { todo!() }
-#[tokio::test] async fn test_provide_guidance_error() { todo!() }  
-#[tokio::test] async fn test_optimize_code_success() { todo!() }
-#[tokio::test] async fn test_optimize_code_error() { todo!() }
-// ... Continue for all 26 tools
-
-// 2. Integration tests
-#[tokio::test] async fn test_full_mcp_workflow() { todo!() }
-#[tokio::test] async fn test_concurrent_tool_execution() { todo!() }
-
-// 3. Error handling tests
-#[tokio::test] async fn test_invalid_tool_parameters() { todo!() }
-#[tokio::test] async fn test_system_error_recovery() { todo!() }
-
-// 4. Edge case tests
-#[tokio::test] async fn test_boundary_conditions() { todo!() }
+if line_coverage < 90:
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
