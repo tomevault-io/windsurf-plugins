@@ -7,11 +7,11 @@ Build your own AI-powered automation tools in the terminal with this extensible 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [serialx/vibecore](https://github.com/serialx/vibecore).
+Original source: `CLAUDE.md` in [serialx/vibecore](https://github.com/serialx/vibecore).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
