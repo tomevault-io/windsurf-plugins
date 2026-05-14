@@ -1,192 +1,264 @@
 ---
 trigger: always_on
-description: MCP 服务器测试模式与调试指南：单元测试模式、工具 (Tools) 测试、资源 (Resources) 测试；MCP 协议测试、HTTP 端点测试、
+description: Streamable HTTP 开发部署指南：基础 Streamable HTTP 设置、安全配置、容器化部署等
 ---
 
-# MCP 服务器测试模式与调试指南
+# Streamable HTTP 生产环境部署指南
 
-## 测试策略概览
-基于 MCP 协议的特殊性，需要采用多层次的测试策略来确保服务器的可靠性和性能。
+## 概述
+Streamable HTTP 是 MCP 推荐的生产环境传输协议，提供与负载均衡器和授权中间件的最佳兼容性，支持 HTTP2/H2C，并且具备内建 SSE 支持。
 
-## 单元测试模式
+## 核心配置
 
-### 1. 工具 (Tools) 测试 - ⭐ outputSchema 强制要求
-
-#### ✅ 标准工具测试模板（必须包含 outputSchema 验证）
+### 1. 基础 Streamable HTTP 设置
 ```python
-import pytest
-from unittest.mock import AsyncMock, patch
-from server.tools.example_tool import example_tool
-from server.models.responses import CalculationResult, ErrorResult
+from mcp.server.fastmcp import FastMCP
 
-@pytest.mark.asyncio
-async def test_example_tool_success():
-    """测试工具正常执行和 outputSchema"""
-    result = await example_tool("test_input")
-    
-    # ⭐ CRITICAL: 验证返回类型是 Pydantic 模型
-    assert isinstance(result, (CalculationResult, ErrorResult))
-    assert hasattr(result, 'success')
-    assert hasattr(result, 'timestamp')
-    
-    # ⭐ CRITICAL: 验证 Pydantic 模型序列化/反序列化
-    validated = result.model_validate(result.model_dump())
-    assert validated == result
-    
-    # 验证业务逻辑
-    if isinstance(result, CalculationResult):
-        assert result.success is True
-        assert result.result is not None
+mcp = FastMCP(
+    name="ProductionServer",
+    stateless_http=True,  # 关键：启用无状态模式便于水平扩容
+)
 
-@pytest.mark.asyncio
-async def test_example_tool_outputschema_structure():
-    """⭐ 专门测试 outputSchema 结构"""
-    result = await example_tool("test_input")
-    
-    # 验证基础响应字段
-    assert hasattr(result, 'success')
-    assert hasattr(result, 'timestamp')
-    assert isinstance(result.success, bool)
-    
-    # 验证具体模型字段
-    if isinstance(result, CalculationResult):
-        assert hasattr(result, 'result')
-        assert hasattr(result, 'operation')
-        assert isinstance(result.result, (int, float))
-        assert isinstance(result.operation, str)
+# 获取 FastAPI 应用实例
+app = mcp.streamable_http_app()
 
-@pytest.mark.asyncio
-async def test_example_tool_validation():
-    """测试输入验证和错误响应"""
-    result = await example_tool("")
-    
-    # ⭐ 错误也必须返回结构化响应
-    assert isinstance(result, ErrorResult)
-    assert result.success is False
-    assert result.error_type is not None
-    assert result.error_message is not None
-
-@pytest.mark.asyncio
-async def test_example_tool_with_mock():
-    """测试带外部依赖的工具"""
-    with patch('server.tools.example_tool.external_api_call') as mock_api:
-        mock_api.return_value = {"status": "success"}
-        
-        result = await example_tool("test_input")
-        
-        mock_api.assert_called_once_with("test_input")
-        
-        # ⭐ 验证模拟调用也返回正确的结构
-        assert isinstance(result, (CalculationResult, ErrorResult))
-        if isinstance(result, CalculationResult):
-            assert result.success is True
-
-@pytest.mark.asyncio
-async def test_example_tool_error_handling():
-    """测试错误处理返回 ErrorResult"""
-    with patch('server.tools.example_tool.external_api_call') as mock_api:
-        mock_api.side_effect = ConnectionError("Network error")
-        
-        result = await example_tool("test_input")
-        
-        # ⭐ 错误必须返回 ErrorResult，不能抛出异常
-        assert isinstance(result, ErrorResult)
-        assert result.success is False
-        assert "Network error" in result.error_message
-        assert result.error_type == "ConnectionError"
-
-@pytest.mark.asyncio 
-async def test_tool_json_schema_generation():
-    """⭐ 测试工具的 JSON Schema 自动生成"""
-    from server.tools.example_tool import example_tool
-    
-    # 获取函数的返回类型注解
-    return_annotation = example_tool.__annotations__.get('return')
-    assert return_annotation is not None
-    
-    # 验证返回类型是 Pydantic 模型
-    from pydantic import BaseModel
-    assert issubclass(return_annotation, BaseModel) or \
-           (hasattr(return_annotation, '__origin__') and 
-            all(issubclass(arg, BaseModel) for arg in return_annotation.__args__))
+# 生产环境运行
+if __name__ == "__main__":
+    mcp.run(
+        transport="streamable-http",
+        host="0.0.0.0",  # 监听所有接口
+        port=8000,
+        path="/mcp"      # 默认 MCP 端点路径
+    )
 ```
 
-### 2. 资源 (Resources) 测试
+### 2. 安全配置
 ```python
-import pytest
-from server.resources.example_resource import get_resource_data
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
-@pytest.mark.asyncio
-async def test_resource_retrieval():
-    """测试资源获取"""
-    resource_id = "test_resource_123"
-    data = await get_resource_data(resource_id)
+# CORS 配置
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://yourdomain.com"],  # 生产环境限制来源
+    allow_credentials=True,
+    allow_methods=["GET", "POST"],
+    allow_headers=["*"],
+)
+
+# 可信主机配置
+app.add_middleware(
+    TrustedHostMiddleware, 
+    allowed_hosts=["yourdomain.com", "*.yourdomain.com"]
+)
+```
+
+## 生产环境架构模式
+
+### 1. 容器化部署
+```dockerfile
+# Dockerfile
+FROM python:3.13-slim
+
+WORKDIR /app
+
+# 安装依赖
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# 复制应用代码
+COPY server/ ./server/
+COPY config/ ./config/
+
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:8000/health || exit 1
+
+# 运行应用
+CMD ["python", "-m", "server.main"]
+```
+
+### 2. Kubernetes 部署配置
+```yaml
+# k8s/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mcp-server
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: mcp-server
+  template:
+    metadata:
+      labels:
+        app: mcp-server
+    spec:
+      containers:
+      - name: mcp-server
+        image: your-registry/mcp-server:latest
+        ports:
+        - containerPort: 8000
+        env:
+        - name: MCP_LOG_LEVEL
+          value: "INFO"
+        - name: MCP_CORS_ORIGINS
+          value: "https://yourdomain.com"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+```
+
+### 3. 负载均衡器配置
+```yaml
+# k8s/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp-server-service
+spec:
+  selector:
+    app: mcp-server
+  ports:
+  - port: 80
+    targetPort: 8000
+  type: LoadBalancer
+
+---
+# k8s/ingress.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mcp-server-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+spec:
+  tls:
+  - hosts:
+    - mcp.yourdomain.com
+    secretName: mcp-tls-secret
+  rules:
+  - host: mcp.yourdomain.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: mcp-server-service
+            port:
+              number: 80
+```
+
+## 监控和可观测性
+
+### 1. 健康检查端点
+```python
+from fastapi import FastAPI
+from fastapi.responses import JSONResponse
+
+@app.get("/health")
+async def health_check():
+    """基础健康检查"""
+    return JSONResponse({"status": "healthy", "timestamp": datetime.utcnow()})
+
+@app.get("/health/live")
+async def liveness_check():
+    """存活检查 - K8s liveness probe"""
+    return JSONResponse({"status": "alive"})
+
+@app.get("/health/ready")
+async def readiness_check():
+    """就绪检查 - K8s readiness probe"""
+    # 检查依赖服务（数据库、Redis 等）
+    dependencies_healthy = await check_dependencies()
     
-    assert data is not None
-    assert "content" in data
-    assert data["id"] == resource_id
+    if dependencies_healthy:
+        return JSONResponse({"status": "ready"})
+    else:
+        return JSONResponse(
+            {"status": "not_ready", "reason": "dependencies_unhealthy"}, 
+            status_code=503
+        )
+```
 
-@pytest.mark.asyncio
-async def test_resource_not_found():
-    """测试资源不存在的情况"""
-    with pytest.raises(FileNotFoundError):
-        await get_resource_data("nonexistent_resource")
+### 2. Prometheus 指标
+```python
+from prometheus_client import Counter, Histogram, Gauge, start_http_server
 
-@pytest.mark.asyncio
-async def test_resource_caching():
-    """测试资源缓存机制"""
-    resource_id = "cached_resource"
-    
-    # 第一次调用
+# 定义指标
+REQUEST_COUNT = Counter(
+    'mcp_requests_total', 
+    'Total MCP requests', 
+    ['method', 'endpoint', 'status']
+)
+
+REQUEST_DURATION = Histogram(
+    'mcp_request_duration_seconds',
+    'MCP request duration',
+    ['method', 'endpoint']
+)
+
+ACTIVE_CONNECTIONS = Gauge(
+    'mcp_active_connections',
+    'Number of active MCP connections'
+)
+
+# 中间件收集指标
+@app.middleware("http")
+async def metrics_middleware(request: Request, call_next):
     start_time = time.time()
-    data1 = await get_resource_data(resource_id)
-    first_call_time = time.time() - start_time
     
-    # 第二次调用（应该使用缓存）
-    start_time = time.time()
-    data2 = await get_resource_data(resource_id)
-    second_call_time = time.time() - start_time
+    response = await call_next(request)
     
-    assert data1 == data2
-    assert second_call_time < first_call_time  # 缓存应该更快
+    # 记录指标
+    REQUEST_COUNT.labels(
+        method=request.method,
+        endpoint=request.url.path,
+        status=response.status_code
+    ).inc()
+    
+    REQUEST_DURATION.labels(
+        method=request.method,
+        endpoint=request.url.path
+    ).observe(time.time() - start_time)
+    
+    return response
+
+# 启动 Prometheus 指标服务器
+start_http_server(9090)
 ```
 
-### 3. 提示 (Prompts) 测试
+### 3. 结构化日志
 ```python
-import pytest
-from server.prompts.example_prompt import generate_prompt
+import structlog
 
-def test_prompt_generation():
-    """测试提示生成"""
-    context = {"user": "John", "task": "summarize"}
-    prompt = generate_prompt(context)
-    
-    assert "John" in prompt
-    assert "summarize" in prompt
-    assert len(prompt) > 0
-
-def test_prompt_template_validation():
-    """测试提示模板验证"""
-    invalid_context = {}
-    
-    with pytest.raises(KeyError):
-        generate_prompt(invalid_context)
-
-def test_prompt_length_limits():
-    """测试提示长度限制"""
-    large_context = {"content": "x" * 10000}
-    prompt = generate_prompt(large_context)
-    
-    # 确保提示不会过长
-    assert len(prompt) < 8000
-```
-
-## 集成测试模式
-
-### 1. MCP 协议测试
-```python
-import pytest
-import httpx
+# 配置结构化日志
+structlog.configure(
+    processors=[
+        structlog.stdlib.filter_by_level,
+        structlog.stdlib.add_logger_name,
+        structlog.stdlib.add_log_level,
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
