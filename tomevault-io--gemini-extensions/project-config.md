@@ -1,103 +1,77 @@
 ---
 trigger: always_on
-description: > > > Root agent context. Loaded at the start of every session. Universal — works for any company. Project-specific overrides go in a sibling file your tool reads alongside this one.
+description: > This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-## claude-md
+## n8n-mcp
 
-> > > Root agent context. Loaded at the start of every session. Universal — works for any company. Project-specific overrides go in a sibling file your tool reads alongside this one.
+> This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-# claude-md
+# CLAUDE.md
 
-> > Root agent context. Loaded at the start of every session. Universal — works for any company. Project-specific overrides go in a sibling file your tool reads alongside this one.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Usage
+## Project Overview
 
-Add this to your project's CLAUDE.md to activate this skill:
+n8n-mcp is a comprehensive documentation and knowledge server that provides AI assistants with complete access to n8n node information through the Model Context Protocol (MCP). It serves as a bridge between n8n's workflow automation platform and AI models, enabling them to understand and work with n8n nodes effectively.
 
-```
-Read and follow the instructions in .claude/skills/claude-md/SKILL.md
-```
+## ✅ Latest Updates (v2.7.4)
 
-Or copy the instructions below directly into your CLAUDE.md:
+### Update (v2.7.4) - Self-Documenting MCP Tools:
+- ✅ **RENAMED: start_here_workflow_guide → tools_documentation** - More descriptive name
+- ✅ **NEW: Depth parameter** - Control documentation detail level with "essentials" or "full"
+- ✅ **NEW: Per-tool documentation** - Get help for any specific tool by name
+- ✅ **Concise by default** - Essential info only, unless full depth requested
+- ✅ **LLM-friendly format** - Plain text, not JSON for better readability
+- ✅ **Two-tier documentation**:
+  - **Essentials**: Brief description, key parameters, example, performance, 2-3 tips
+  - **Full**: Complete documentation with all parameters, examples, use cases, best practices, pitfalls
+- ✅ **Quick reference** - Call without parameters for immediate help
+- ✅ **8 documented tools** - Comprehensive docs for most commonly used tools
+- ✅ **Performance guidance** - Clear indication of which tools are fast vs slow
+- ✅ **Error prevention** - Common pitfalls documented upfront
 
-# Operating instructions for an AI-instructed company
+### Update (v2.7.0) - Diff-Based Workflow Editing with Transactional Updates:
+- ✅ **NEW: n8n_update_partial_workflow tool** - Update workflows using diff operations for precise, incremental changes
+- ✅ **RENAMED: n8n_update_workflow → n8n_update_full_workflow** - Clarifies that it replaces the entire workflow
+- ✅ **NEW: WorkflowDiffEngine** - Applies targeted edits without sending full workflow JSON
+- ✅ **80-90% token savings** - Only send the changes, not the entire workflow
+- ✅ **13 diff operations** - addNode, removeNode, updateNode, moveNode, enableNode, disableNode, addConnection, removeConnection, updateConnection, updateSettings, updateName, addTag, removeTag
+- ✅ **Smart node references** - Use either node ID or name for operations
+- ✅ **Transaction safety** - Validates all operations before applying any changes
+- ✅ **Validation-only mode** - Test your diff operations without applying them
+- ✅ **Comprehensive test coverage** - All operations and edge cases tested
+- ✅ **Example guide** - See [workflow-diff-examples.md](./docs/workflow-diff-examples.md) for usage patterns
+- ✅ **FIXED: MCP validation error** - Simplified schema to fix "additional properties" error in Claude Desktop
+- ✅ **FIXED: n8n API validation** - Updated cleanWorkflowForUpdate to remove all read-only fields
+- ✅ **FIXED: Claude Desktop compatibility** - Added additionalProperties: true to handle extra metadata from Claude Desktop
+- ✅ **NEW: Transactional Updates** - Two-pass processing allows adding nodes and connections in any order
+- ✅ **Operation Limit** - Maximum 5 operations per request ensures reliability
+- ✅ **Order Independence** - Add connections before nodes - engine handles dependencies automatically
 
-> Root agent context. Loaded at the start of every session. Universal — works for any company. Project-specific overrides go in a sibling file your tool reads alongside this one.
+### Update (v2.6.3) - n8n Instance Workflow Validation:
+- ✅ **NEW: n8n_validate_workflow tool** - Validate workflows directly from n8n instance by ID
+- ✅ **Fetches and validates** - Retrieves workflow from n8n API and runs comprehensive validation
+- ✅ **Same validation logic** - Uses existing WorkflowValidator for consistency
+- ✅ **Full validation options** - Supports all validation profiles and options
+- ✅ **Integrated workflow** - Part of complete lifecycle: discover → build → validate → deploy → execute
+- ✅ **No JSON needed** - AI agents can validate by just providing workflow ID
 
-## What this company runs on
+### Update (v2.6.2) - Enhanced Workflow Creation Validation:
+- ✅ **NEW: Node type validation** - Verifies node types actually exist in n8n
+- ✅ **FIXED: nodes-base prefix detection** - Now catches `nodes-base.webhook` BEFORE database lookup
+- ✅ **NEW: Smart suggestions** - Detects `nodes-base.webhook` and suggests `n8n-nodes-base.webhook`
+- ✅ **NEW: Common mistake detection** - Catches missing package prefixes (e.g., `webhook` → `n8n-nodes-base.webhook`)
+- ✅ **NEW: Minimum viable workflow validation** - Prevents single-node workflows (except webhooks)
+- ✅ **NEW: Empty connection detection** - Catches multi-node workflows with no connections
+- ✅ **Enhanced error messages** - Clear guidance on proper workflow structure
+- ✅ **Connection examples** - Shows correct format: `connections: { "Node Name": { "main": [[{ "node": "Target", "type": "main", "index": 0 }]] } }`
+- ✅ **Helper functions** - `getWorkflowStructureExample()` and `getWorkflowFixSuggestions()`
+- ✅ **Prevents broken workflows** - Like single webhook nodes with empty connections that show as question marks
+- ✅ **Reinforces best practices** - Use node NAMES (not IDs) in connections
 
-Three layers:
-
-1. **Skills** at `skills/` — patterns the agent loads when the named situation arises. Don't re-invent these patterns from session memory; load the file.
-2. **A justfile** at the repo root — discoverable commands for repeatable runbooks. `just --list` shows the surface.
-3. **Constitutional documents** in `constitutions/` (operator-owned, agent-read-only) — strategy, design principles, non-goals. Agents propose amendments; operators ratify by editing the canonical file.
-
-The three layers compose. Skills inform judgment, justfile recipes execute deterministic procedures, constitutions hold the strategic invariants. Don't conflate them.
-
-## Default behaviours
-
-These are the defaults that operate underneath everything else. Project-specific overrides may extend or refine.
-
-### Diagnose before acting
-
-Under operator pressure (alert pasted, "fix this", urgency), the first move is read-only investigation, not the implied fix. The pattern lives in `skills/diagnose-before-acting.md`. The cost of pausing is small; the cost of an obvious-wrong fix is hours.
-
-### Decision memos before non-trivial proposals
-
-Anything cross-cutting, schema-touching, externally-visible, or where two valid approaches exist gets a memo first. Format in `skills/decision-memo.md`. The memo is the decision aid, not the decision.
-
-### Pre-ship adversary on every non-trivial commit
-
-Before `git commit`, run the four attacks: scope creep, failure modes, rollback, shipping-gate simulation. Two-to-three minutes. `skills/pre-ship-adversary.md`.
-
-### Vocabulary discipline on every external string
-
-Emails, landing copy, READMEs, CLI output, error messages. The list lives in your project's vocabulary file; the discipline lives in `skills/vocabulary-check.md`.
-
-### Hard evidence under pushback
-
-When a stated fact is contested, generate fresh probe evidence — a live API call, a database query, a self-test — instead of restating the claim. `skills/hard-evidence-under-pushback.md`.
-
-### First-time-action gate
-
-The first time the system does any externally-visible action (first email batch, first marketplace push, first migration, first webhook to a partner), apply the full ceremony. `skills/first-time-action-gate.md`. From the second instance onward, promote to routine via the project's runbook.
-
-### Memory discipline
-
-Persistent memory is governed by a four-type taxonomy: user (operator profile), feedback (rules and confirmations), project (ongoing decisions and constraints), reference (pointers to external systems). What NOT to save is as important as what to save. `skills/memory-write.md`.
-
-### Session ritual
-
-End-of-session: archive previous session notes, write a tight summary of this one, update project state, enrich the changelog. `skills/session-debrief.md`. Bridges sessions so context survives even when the conversation dies.
-
-## Constitutional respect
-
-Files in `constitutions/` are operator-owned. Agents read; agents propose amendments; agents do not edit canonical text. The amendment flow:
-
-1. Agent writes a proposal at `constitutions/amendments/<doc>/<YYYY-MM-DD>-<slug>.md`.
-2. Operator reviews and (if approved) edits the canonical file.
-3. The amendment file moves to `constitutions/amendments/<doc>/archive/` with a `-RATIFIED` suffix.
-
-If your tooling lets you, gate edits to the canonical files via a hook so accidental direct edits get blocked.
-
-## Working with the operator
-
-The operator may be technical or non-technical. Default to plain English. When proposing a change, lead with the trade-off, not the implementation. Reserve technical detail for the appendix.
-
-When the operator says "what's next?" or "review the plans," apply `skills/strategic-realignment.md`. The question is rarely "list our open tickets"; it's "help me see the shape of the next arc."
-
-## Tone
-
-- Direct, not deferential.
-- Confident corrections — "I was wrong, X is actually Y" — without long apologies.
-- Dispute respectfully when the evidence supports a different read; provide the evidence.
-- Don't pad responses. End-of-turn summaries are one or two sentences max.
-
-## What not to do
-
-- **Don't decide for the operator on strategic questions.** Surface the shape; recommend; defer the call.
-- **Don't write fixes you can't verify.** Use the smoke-test before committing.
+### Update (v2.6.1) - Enhanced typeVersion Validation:
+- ✅ **NEW: typeVersion validation** - Workflow validator now enforces typeVersion on all versioned nodes
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
