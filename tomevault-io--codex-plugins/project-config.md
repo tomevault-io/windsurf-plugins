@@ -1,102 +1,75 @@
 ---
 trigger: always_on
-description: > - No classes/OOP — functions, factories, functional composition. Extend via composition not modification. ES6+, 400 LOC/file max unless absolutely necessary.
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-# future
+# CLAUDE.md
 
-> - No classes/OOP — functions, factories, functional composition. Extend via composition not modification. ES6+, 400 LOC/file max unless absolutely necessary.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Usage
+## Project Overview
 
-Add this to your project's CLAUDE.md to activate this skill:
+n8n-mcp is a comprehensive documentation and knowledge server that provides AI assistants with complete access to n8n node information through the Model Context Protocol (MCP). It serves as a bridge between n8n's workflow automation platform and AI models, enabling them to understand and work with n8n nodes effectively.
 
-```
-Read and follow the instructions in .claude/skills/future/SKILL.md
-```
+## ✅ Latest Updates (v2.7.4)
 
-Or copy the instructions below directly into your CLAUDE.md:
+### Update (v2.7.4) - Self-Documenting MCP Tools:
+- ✅ **RENAMED: start_here_workflow_guide → tools_documentation** - More descriptive name
+- ✅ **NEW: Depth parameter** - Control documentation detail level with "essentials" or "full"
+- ✅ **NEW: Per-tool documentation** - Get help for any specific tool by name
+- ✅ **Concise by default** - Essential info only, unless full depth requested
+- ✅ **LLM-friendly format** - Plain text, not JSON for better readability
+- ✅ **Two-tier documentation**:
+  - **Essentials**: Brief description, key parameters, example, performance, 2-3 tips
+  - **Full**: Complete documentation with all parameters, examples, use cases, best practices, pitfalls
+- ✅ **Quick reference** - Call without parameters for immediate help
+- ✅ **8 documented tools** - Comprehensive docs for most commonly used tools
+- ✅ **Performance guidance** - Clear indication of which tools are fast vs slow
+- ✅ **Error prevention** - Common pitfalls documented upfront
 
-# Agent Coding Rules
+### Update (v2.7.0) - Diff-Based Workflow Editing with Transactional Updates:
+- ✅ **NEW: n8n_update_partial_workflow tool** - Update workflows using diff operations for precise, incremental changes
+- ✅ **RENAMED: n8n_update_workflow → n8n_update_full_workflow** - Clarifies that it replaces the entire workflow
+- ✅ **NEW: WorkflowDiffEngine** - Applies targeted edits without sending full workflow JSON
+- ✅ **80-90% token savings** - Only send the changes, not the entire workflow
+- ✅ **13 diff operations** - addNode, removeNode, updateNode, moveNode, enableNode, disableNode, addConnection, removeConnection, updateConnection, updateSettings, updateName, addTag, removeTag
+- ✅ **Smart node references** - Use either node ID or name for operations
+- ✅ **Transaction safety** - Validates all operations before applying any changes
+- ✅ **Validation-only mode** - Test your diff operations without applying them
+- ✅ **Comprehensive test coverage** - All operations and edge cases tested
+- ✅ **Example guide** - See [workflow-diff-examples.md](./docs/workflow-diff-examples.md) for usage patterns
+- ✅ **FIXED: MCP validation error** - Simplified schema to fix "additional properties" error in Claude Desktop
+- ✅ **FIXED: n8n API validation** - Updated cleanWorkflowForUpdate to remove all read-only fields
+- ✅ **FIXED: Claude Desktop compatibility** - Added additionalProperties: true to handle extra metadata from Claude Desktop
+- ✅ **NEW: Transactional Updates** - Two-pass processing allows adding nodes and connections in any order
+- ✅ **Operation Limit** - Maximum 5 operations per request ensures reliability
+- ✅ **Order Independence** - Add connections before nodes - engine handles dependencies automatically
 
-## Core
+### Update (v2.6.3) - n8n Instance Workflow Validation:
+- ✅ **NEW: n8n_validate_workflow tool** - Validate workflows directly from n8n instance by ID
+- ✅ **Fetches and validates** - Retrieves workflow from n8n API and runs comprehensive validation
+- ✅ **Same validation logic** - Uses existing WorkflowValidator for consistency
+- ✅ **Full validation options** - Supports all validation profiles and options
+- ✅ **Integrated workflow** - Part of complete lifecycle: discover → build → validate → deploy → execute
+- ✅ **No JSON needed** - AI agents can validate by just providing workflow ID
 
-- No classes/OOP — functions, factories, functional composition. Extend via composition not modification. ES6+, 400 LOC/file max unless absolutely necessary.
-- Factory pattern: `createUser()` returns `{ activate, deactivate, ... }` — plain object with methods, not `class User`
-- Names: `verbNoun`, `isActive`, `CONSTANTS`, `kebab-case.ts`
-- Domain folders with barrel `index.ts`: `/users/get-users.ts, update-users.ts → index.ts`
-- JSDoc for all public APIs (explain WHY not what). Comments only where intent unclear
-- Critical/missing-dep errors → `throw` (language-native). Runtime/user errors → handle gracefully using project's error handling + logging patterns
-- Code for humans: readability over cleverness. Many small functions > one monolith
+### Update (v2.6.2) - Enhanced Workflow Creation Validation:
+- ✅ **NEW: Node type validation** - Verifies node types actually exist in n8n
+- ✅ **FIXED: nodes-base prefix detection** - Now catches `nodes-base.webhook` BEFORE database lookup
+- ✅ **NEW: Smart suggestions** - Detects `nodes-base.webhook` and suggests `n8n-nodes-base.webhook`
+- ✅ **NEW: Common mistake detection** - Catches missing package prefixes (e.g., `webhook` → `n8n-nodes-base.webhook`)
+- ✅ **NEW: Minimum viable workflow validation** - Prevents single-node workflows (except webhooks)
+- ✅ **NEW: Empty connection detection** - Catches multi-node workflows with no connections
+- ✅ **Enhanced error messages** - Clear guidance on proper workflow structure
+- ✅ **Connection examples** - Shows correct format: `connections: { "Node Name": { "main": [[{ "node": "Target", "type": "main", "index": 0 }]] } }`
+- ✅ **Helper functions** - `getWorkflowStructureExample()` and `getWorkflowFixSuggestions()`
+- ✅ **Prevents broken workflows** - Like single webhook nodes with empty connections that show as question marks
+- ✅ **Reinforces best practices** - Use node NAMES (not IDs) in connections
 
-## Patterns
-
-- Single responsibility. DI via params (unified context object). Guard clauses early return. Object lookup > switch
-- Contract-based boundaries: types define expected shapes, enforced at module boundaries
-- Prefer `type` over `interface`, ban `enum`. Explicit return types on public functions
-- Co-locate standalone modules. Abstract only when reused. Extraction before 3 uses = premature
-- No barrel re-exports across domains — circular deps, slow type-checking
-- `safeTry` over try/catch. `.filter().map()` over for loops
-- `{ name, email }` not `(name, email, ...)` basically named params in an object vs positional unless param is single.
-- Defensive: anticipate failure. Critical harm → throw fast. Known failure paths → handle gracefully
-
-## React
-
-- State logic → hooks. Components pure presentational. Containers handle state, pure components render props
-- Prop drilling max 2 levels. Use context/state management beyond
-- Check `data?.length > 0` before `.map()`. `useMemo`, `useCallback`, `React.memo`
-- Build complex UIs from small, focused components
-
-## Philosophy
-
-- **Plan first** → systematize → implement. Never rush. Break complex tasks into phases
-- **Follow my strategy exactly**, suggest before deviating. I approve changes
-- **Occam's Razor**: simplest solution that works. Add complexity only when needed
-- **Existing patterns first**: work with what's there. Don't rewrite when fix works
-- **Reflect after tasks**: what worked, what failed, what learned. QA your own work
-- **Multi-agent collaboration**: delegate to other agents where possible
-- **Document decisions**: record reasoning behind changes, tradeoffs, impacts
-- **Agree on tradeoffs before committing**: I approve tradeoffs before they hit the codebase
-- **Keep code taste matching mine**: your code style should blend with existing
-- **Be brief**: conciseness over verbosity in communication
-- **Not demo/prototypes**: real thing or don't do it. One clear way to do something
-
-### Think Outside the Box
-
-When the obvious approach isn't working after 2 attempts, stop and reconsider. The repeated failure is a signal — either escalate to me for direction, or find a creative alternative. Don't tunnel-vision on one approach. If you're patching the same thing twice, the fix is probably wrong. Ask: "what am I assuming that might be wrong?"
-
-### Think in Systems
-
-Every change ripples. Before implementing, map the blast radius:
-
-- What contracts (types, APIs, DB schemas) does this break or require changes to?
-- What downstream consumers depend on the current behavior?
-- Does this stabilize or destabilize the system? A fix that introduces new edge cases is worse than the bug.
-- Is the tradeoff worth it? Document it. Get approval before committing.
-- Trace the full call chain, not just the immediate function. A change in `utils.ts` affects every caller.
-
-### Think in First Principles
-
-When a problem recurs or fixes don't stick, don't apply more patches. Break it down:
-
-- What is the base assumption? Is it actually true? (e.g., "safeTry preserves Result nesting" — it doesn't)
-- Can we isolate and test the assumption independently?
-- Divide and conquer: split the problem into independently verifiable pieces. Prove each piece works before composing.
-- If the foundation is wrong, no amount of upper-layer fixes will hold. Fix the foundation first.
-
-## Libraries
-
-- `slang-ts` (safeTry/result), `z-fetch` (fetch), `regist` (regex)
-- Understand library edge cases: read source enough to know when behavior diverges from types
-- Check Context7 MCP for library docs. Need more? Ask me. Source in node_modules if you want to inspect directly
-- agent-browser CLI for frontend debugging. `agent-browser -h` for usage
-- MCPs/tools/agents available → use them. Skills available → load them when relevant. Ask me if unsure how
-- Use caveman skill if available, but not its ultra version!
-
-## Boundaries — DO NOT CROSS WITHOUT APPROVAL
-
-- **Servers**: you never start. Ask me
-- **DB**: all db commands/decisions → ask me first
+### Update (v2.6.1) - Enhanced typeVersion Validation:
+- ✅ **NEW: typeVersion validation** - Workflow validator now enforces typeVersion on all versioned nodes
+- ✅ **Catches missing typeVersion** - Returns error with correct version to use
+- ✅ **Warns on outdated versions** - Alerts when using older node versions
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
