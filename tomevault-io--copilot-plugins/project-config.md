@@ -3,7 +3,7 @@ trigger: always_on
 description: > This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-## mcp
+## claude-gate
 
 > This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
@@ -11,104 +11,144 @@ description: > This file provides guidance to Claude Code (claude.ai/code) when 
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Overview
+## Project Overview
 
-This is a production-ready Fastify adapter for the Model Context Protocol (MCP). The project implements a Fastify plugin that enables MCP communication through the JSON-RPC 2.0 specification with full horizontal scaling capabilities. The codebase includes MCP protocol specifications in the `spec/` directory that define the messaging format, lifecycle management, and various protocol features.
+Claude Gate is a high-performance Go OAuth proxy for Anthropic's Claude API that enables FREE Claude usage for Pro/Max subscribers by identifying as "Claude Code" (Anthropic's official CLI). This is the official Go port of the original Python implementation.
 
-## Key Features
+**Key Features:**
+- OAuth 2.0 PKCE authentication flow
+- Secure token storage with OS keychain integration (planned)
+- Interactive TUI dashboard for monitoring
+- Cross-platform support (macOS, Linux, Windows)
+- Multiple distribution methods (NPM, Homebrew, direct binary)
 
-- **Complete MCP Protocol Support**: Implements the full Model Context Protocol specification
-- **Server-Sent Events (SSE)**: Real-time streaming communication with session management
-- **Horizontal Scaling**: Redis-backed session management and message broadcasting
-- **Session Persistence**: Message history and reconnection support with Last-Event-ID
-- **Dual Backend Support**: Memory-based for development, Redis-based for production
-- **Cross-Instance Broadcasting**: Messages sent from any instance reach all connected clients
-- **High Availability**: Sessions survive server restarts with automatic cleanup
+## Quick Navigation
 
-## Development Commands
+### Core Implementation Files
+- Main entry: `cmd/claude-gate/main.go`
+- OAuth client: `internal/auth/client.go`
+- Proxy handler: `internal/proxy/handler.go`
+- Dashboard: `internal/ui/dashboard/dashboard.go`
 
-- **Build**: `npm run build` - Compiles TypeScript to `dist/` directory
-- **Lint**: `npm run lint` - Run ESLint with caching
-- **Lint Fix**: `npm run lint:fix` - Run ESLint with auto-fix
-- **Type Check**: `npm run typecheck` - Run TypeScript compiler without emitting files
-- **Test Individual**: `node --experimental-strip-types --no-warnings --test test/filename.test.ts` - Run a specific test file
-- **Test**: `npm run test` - Run Node.js test runner on test files, do not use `npm run test -- individual.ts` to run individual test file
-- **CI**: `npm run ci` - Full CI pipeline (build + lint + test)
+### Configuration Files
+- Go module: `go.mod`
+- Build config: `.goreleaser.yml`
+- CI/CD: `.github/workflows/release.yml`
+- NPM package: `npm/package.json`
+
+### Test Files
+- Unit tests: `*_test.go` (alongside source)
+- Integration: `internal/test/integration/*_test.go`
+- E2E: `internal/test/e2e/*_test.go`
+- Test helpers: `internal/test/helpers/helpers.go`
+
+### Scripts
+- Version update: `scripts/update-version.sh`
+- NPM test: `scripts/test-npm-local.sh`
+- Add co-author: `.claude/scripts/add-claude-coauthor.sh`
+
+## Common Commands
+
+### Building
+```bash
+make build        # Build for current platform
+make snapshot     # Build all platforms (uses GoReleaser)
+make install      # Install to ~/bin
+```
+
+### Testing
+```bash
+make test              # Run unit tests with coverage
+make test-unit         # Run unit tests only (short mode)
+make test-integration  # Run integration tests
+make test-e2e          # Run end-to-end tests
+make test-all          # Run all test types
+make npm-test          # Test NPM package locally
+go test -v ./...       # Quick test during development
+```
+
+### Running
+```bash
+claude-gate start --host 127.0.0.1 --port 5789  # Start proxy server
+claude-gate dashboard                            # Start with interactive dashboard
+claude-gate auth login                           # Authenticate with Claude
+```
+
+### Releasing
+```bash
+make release VERSION=0.2.0  # Create new release
+./scripts/update-version.sh # Update version in all files
+```
 
 ## Architecture
 
-The main entry point is `src/index.ts` which exports a Fastify plugin built with `fastify-plugin`. The plugin structure follows Fastify's standard plugin pattern with proper TypeScript types and supports both memory and Redis backends for horizontal scaling.
+The codebase follows clean architecture principles with clear separation of concerns:
 
 ### Core Components
 
-**Session Management:**
-- `SessionStore` interface with `MemorySessionStore` and `RedisSessionStore` implementations
-- Session metadata storage with automatic TTL (1-hour expiration)
-- Message history storage with configurable limits and automatic trimming
+1. **CLI Layer** (`cmd/claude-gate/`)
+   - Uses Kong framework for command parsing
+   - Entry point for all operations
 
-**Message Broadcasting:**
-- `MessageBroker` interface with `MemoryMessageBroker` and `RedisMessageBroker` implementations
-- Topic-based pub/sub using MQEmitter (memory) or MQEmitter-Redis (distributed)
-- Session-specific topics: `mcp/session/{sessionId}/message`
-- Broadcast topics: `mcp/broadcast/notification`
+2. **Auth Package** (`internal/auth/`)
+   - OAuth 2.0 PKCE implementation
+   - Token storage and management
+   - Browser automation for login flow
 
-**SSE Integration:**
-- Complete SSE support with session management and persistence
-- Message replay using Last-Event-ID for resumable connections
-- Heartbeat mechanism for connection health monitoring
-- Support for both GET and POST endpoints
+3. **Proxy Package** (`internal/proxy/`)
+   - HTTP proxy server implementation
+   - Request/response transformation
+   - Enhanced server with monitoring capabilities
 
-### File Structure
+4. **UI Package** (`internal/ui/`)
+   - Bubble Tea-based TUI components
+   - Interactive dashboard for monitoring
+   - Reusable components (spinner, progress, styles)
+
+### Request Flow
+1. Client connects to local proxy (default: 127.0.0.1:5789)
+2. Proxy validates authentication token
+3. Request transformed to identify as "Claude Code"
+4. Forwarded to Claude API with OAuth credentials
+5. Response streamed back to client
+
+### Security Model
+- OAuth 2.0 PKCE flow for authentication
+- Tokens stored securely (keychain integration planned)
+- Local-only proxy binding by default
+- Optional proxy authentication token for additional security
+
+## Project Structure
 
 ```
-src/
-├── brokers/
-│   ├── message-broker.ts          # Interface definition
-│   ├── memory-message-broker.ts   # MQEmitter implementation
-│   └── redis-message-broker.ts    # Redis-backed implementation
-├── stores/
-│   ├── session-store.ts           # Interface definition
-│   ├── memory-session-store.ts    # In-memory implementation
-│   └── redis-session-store.ts     # Redis-backed implementation
-├── decorators/
-│   ├── decorators.ts              # Core MCP decorators
-│   └── pubsub-decorators.ts       # Pub/sub decorators
-├── handlers.ts                    # MCP protocol handlers
-├── routes.ts                      # SSE connection handling
-├── index.ts                       # Plugin entry point with backend selection
-├── schema.ts                      # MCP protocol types
-└── types.ts                       # Plugin types
-```
-
-The complete MCP protocol TypeScript definitions are in `src/schema.ts`, which includes:
-- JSON-RPC 2.0 message types (requests, responses, notifications, batches)
-- MCP protocol lifecycle (initialization, capabilities, ping)
-- Core features: resources, prompts, tools, logging, sampling
-- Client/server request/response/notification types
-- Content types (text, image, audio, embedded resources)
-- Protocol constants and error codes
-
-Key dependencies:
-- `fastify-plugin` for plugin registration
-- `typed-rpc` for RPC communication
-- `neostandard` for ESLint configuration
-- `ioredis` for Redis connectivity
-- `mqemitter` and `mqemitter-redis` for message broadcasting
-
-The project uses ESM modules (`"type": "module"`) and includes comprehensive MCP protocol specifications in markdown format under `spec/` covering the same areas as the TypeScript schema.
-
-## Configuration Options
-
-### Plugin Options
-- `serverInfo`: Server identification (name, version)
-- `capabilities`: MCP capabilities configuration
-- `instructions`: Optional server instructions
-- `enableSSE`: Enable Server-Sent Events support (default: false)
-- `redis`: Redis configuration for horizontal scaling (optional)
-  - `host`: Redis server hostname
-  - `port`: Redis server port
-  - `db`: Redis database number
-  - `password`: Redis authentication password
+claude-gate/
+├── cmd/
+│   └── claude-gate/          # CLI application entry point
+│       ├── main.go          # Main entry point with Kong CLI setup
+│       └── auth_storage.go  # Storage-related CLI commands
+├── internal/                 # Private application code (Go convention)
+│   ├── auth/                # Authentication & token management
+│   │   ├── client.go        # OAuth client implementation
+│   │   ├── oauth.go         # OAuth flow logic
+│   │   ├── storage_*.go     # Various storage backends
+│   │   └── *_test.go        # Unit tests
+│   ├── config/              # Configuration management
+│   ├── proxy/               # Proxy server implementation
+│   │   ├── handler.go       # Main proxy handler
+│   │   ├── server.go        # Enhanced server with monitoring
+│   │   └── transformer.go   # Request/response transformation
+│   ├── test/                # Test infrastructure
+│   │   ├── integration/     # Integration tests (build tag: integration)
+│   │   ├── e2e/            # End-to-end tests (build tag: e2e)
+│   │   ├── helpers/        # Shared test utilities
+│   │   └── testdata/       # Test fixtures
+│   └── ui/                  # Terminal UI components
+│       ├── components/      # Reusable UI components
+│       ├── dashboard/       # Interactive dashboard
+│       ├── styles/         # Terminal styling (Lipgloss)
+│       └── utils/          # UI utilities
+├── docs/                    # Project documentation
+│   ├── architecture/       # Architecture decisions and diagrams
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
