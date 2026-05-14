@@ -1,51 +1,98 @@
 ---
 trigger: always_on
-description: Code Quality Guidelines
+description: Cursor rules for Convex development with best practices.
 ---
 
-# Code Quality Guidelines
+# Convex guidelines
+## Function guidelines
+### New function syntax
+- ALWAYS use the new function syntax for Convex functions. For example:
+      ```typescript
+      import { query } from "./_generated/server";
+      import { v } from "convex/values";
+      export const f = query({
+          args: {},
+          returns: v.null(),
+          handler: async (ctx, args) => {
+          // Function body
+          },
+      });
+      ```
 
-## Verify Information
-Always verify information before presenting it. Do not make assumptions or speculate without clear evidence.
+### Http endpoint syntax
+- HTTP endpoints are defined in `convex/http.ts` and require an `httpAction` decorator. For example:
+      ```typescript
+      import { httpRouter } from "convex/server";
+      import { httpAction } from "./_generated/server";
+      const http = httpRouter();
+      http.route({
+          path: "/echo",
+          method: "POST",
+          handler: httpAction(async (ctx, req) => {
+          const body = await req.bytes();
+          return new Response(body, { status: 200 });
+          }),
+      });
+      ```
+- HTTP endpoints are always registered at the exact path you specify in the `path` field. For example, if you specify `/api/someRoute`, the endpoint will be registered at `/api/someRoute`.
 
-## File-by-File Changes
-Make changes file by file and give me a chance to spot mistakes.
+### Validators
+- Below is an example of an array validator:
+                            ```typescript
+                            import { mutation } from "./_generated/server";
+                            import { v } from "convex/values";
 
-## No Apologies
-Never use apologies.
+                            export default mutation({
+                            args: {
+                                simpleArray: v.array(v.union(v.string(), v.number())),
+                            },
+                            handler: async (ctx, args) => {
+                                //...
+                            },
+                            });
+                            ```
+- Below is an example of a schema with validators that codify a discriminated union type:
+                            ```typescript
+                            import { defineSchema, defineTable } from "convex/server";
+                            import { v } from "convex/values";
 
-## No Understanding Feedback
-Avoid giving feedback about understanding in comments or documentation.
+                            export default defineSchema({
+                                results: defineTable(
+                                    v.union(
+                                        v.object({
+                                            kind: v.literal("error"),
+                                            errorMessage: v.string(),
+                                        }),
+                                        v.object({
+                                            kind: v.literal("success"),
+                                            value: v.number(),
+                                        }),
+                                    ),
+                                )
+                            });
+                            ```
+- Always use the `v.null()` validator when returning a null value. Below is an example query that returns a null value:
+                                  ```typescript
+                                  import { query } from "./_generated/server";
+                                  import { v } from "convex/values";
 
-## No Whitespace Suggestions
-Don't suggest whitespace changes.
+                                  export const exampleQuery = query({
+                                    args: {},
+                                    returns: v.null(),
+                                    handler: async (ctx, args) => {
+                                        console.log("This query returns a null value");
+                                        return null;
+                                    },
+                                  });
+                                  ```
+- Here are the valid Convex types along with their respective validators:
+ Convex Type  | TS/JS type  |  Example Usage         | Validator for argument validation and schemas  | Notes                                                                                                                                                                                                 |
+| ----------- | ------------| -----------------------| -----------------------------------------------| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Id          | string      | `doc._id`              | `v.id(tableName)`                              |                                                                                                                                                                                                       |
+| Null        | null        | `null`                 | `v.null()`                                     | JavaScript's `undefined` is not a valid Convex value. Functions the return `undefined` or do not return will return `null` when called from a client. Use `null` instead.                             |
+| Int64       | bigint      | `3n`                   | `v.int64()`                                    | Int64s only support BigInts between -2^63 and 2^63-1. Convex supports `bigint`s in most modern browsers.                                                                                              |
 
-## No Summaries
-Don't summarize changes made.
-
-## No Inventions
-Don't invent changes other than what's explicitly requested.
-
-## No Unnecessary Confirmations
-Don't ask for confirmation of information already provided in the context.
-
-## Preserve Existing Code
-Don't remove unrelated code or functionalities. Pay attention to preserving existing structures.
-
-## Single Chunk Edits
-Provide all edits in a single chunk instead of multiple-step instructions or explanations for the same file.
-
-## No Implementation Checks
-Don't ask the user to verify implementations that are visible in the provided context.
-
-## No Unnecessary Updates
-Don't suggest updates or changes to files when there are no actual modifications needed.
-
-## Provide Real File Links
-Always provide links to the real files, not x.md.
-
-## No Current Implementation
-Don't show or discuss the current implementation unless specifically requested.
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [XD3an/awesome-ai-coding-all-in-one](https://github.com/XD3an/awesome-ai-coding-all-in-one) — distributed by [TomeVault](https://tomevault.io).
