@@ -1,34 +1,146 @@
 ---
 trigger: always_on
-description: Cursor rules for ES Module development with Node.js guidelines.
+description: Cursor rules for FastAPI services with router/service/repository boundaries, typed provider adapters, bulkhead isolation, idempotency, and domain exceptions.
 ---
 
-## General
+# FastAPI Production Architecture Rules
+# Principles for production-ready FastAPI services.
 
-- Follow best practices, lean towards agile methodologies
-- Prioritize modularity, DRY, performance, and security
-- First break tasks into distinct prioritized steps, then follow the steps
-- Prioritize tasks/steps you’ll address in each response
-- Don't repeat yourself
-- Keep responses very short, unless I include a Vx value:
-  - V0 default, code golf
-  - V1 concise
-  - V2 simple
-  - V3 verbose, DRY with extracted functions
+## LAYER ARCHITECTURE (Principles A1-A8)
 
-## Code
+This codebase follows strict 4-layer architecture: Router → Service → Repository → ORM/HTTP/Storage.
+Imports flow downward only. Each layer has hard boundaries you must NOT cross.
 
-- Use ES module syntax
-- Where appropriate suggest refactorings and code improvements
-- Favor using the latest ES and nodejs features
-- Don’t apologize for errors: fix them
-  * If you can’t finish code, add TODO: comments
+### Router rules (app/routers/**)
+- Handlers are THIN: ≤10 lines of executable code per handler
+- Allowed imports: fastapi, app.schemas.*, app.core.deps, app.services.*
+- FORBIDDEN imports: sqlalchemy, httpx, boto3, app.models.*, app.repositories.*
+- Every endpoint declares response_model= for OpenAPI fidelity
+- Every protected/business endpoint requires user_id: str = Depends(get_current_user_id)
+- Public endpoints (health checks, webhooks, callbacks) are exempt from auth
+- Business logic lives in services. Routers parse input, call one service method, return response.
 
-## Comments
+GOOD:
+@router.post("/wallet/charge", response_model=WalletResponse, status_code=201)
+async def charge(
+    req: ChargeRequest,
+    user_id: str = Depends(get_current_user_id),
+    svc: WalletUserService = Depends(get_wallet_service),
+) -> WalletResponse:
+    wallet = await svc.charge(
+        user_id=user_id,
+        amount=req.amount,
+        idempotency_key=req.idempotency_key,
+    )
+    return WalletResponse.from_domain(wallet)
 
-- Comments should be created where the operation isn't clear from the code, or where uncommon libraries are used
-- Code must start with path/filename as a one-line comment
-- Comments should describe purpose, not effect
+BAD (business logic + SQL in router):
+@router.post("/wallet/charge")
+async def charge(req: ChargeRequest, db: Session = Depends(get_db)):
+    wallet = db.query(Wallet).filter(Wallet.user_id == user_id).with_for_update().one()
+    ...
+
+### Service rules (app/services/**)
+- FORBIDDEN imports: sqlalchemy, httpx, boto3, redis, FastAPI Request/Response/HTTPException
+- Constructor injects Protocol-typed dependencies, not concrete classes
+- Raise domain exceptions (InsufficientFundsError), not HTTPException
+
+GOOD:
+from app.repositories.protocols import WalletRepoProtocol
+class WalletUserService:
+    def __init__(self, repo: WalletRepoProtocol):  # Protocol, not SQLAlchemy Session
+        self._repo = repo
+
+BAD:
+from sqlalchemy.orm import Session
+class WalletUserService:
+    def __init__(self, db: Session): ...  # Wrong — service depends on infrastructure
+
+### Repository rules (app/repositories/**)
+- ONLY layer allowed to import sqlalchemy
+- Implements Protocol from app/repositories/protocols.py
+- Returns domain objects, not ORM models
+- Every query scoped by user_id (multi-tenancy)
+
+### Provider rules (app/providers/**)
+- ONLY layer allowed to import httpx directly
+- Returns GenerateResult | ProviderError — NEVER raw dict
+- Uses per-provider httpx.AsyncClient (bulkhead pattern)
+
+## FILE SIZE RULES (Principle A1)
+
+| LOC      | State  | Action                                      |
+|----------|--------|---------------------------------------------|
+| 0–399    | Green  | None.                                       |
+| 400–599  | Yellow | Plan split. Add TODO(decompose) header.     |
+| 600+     | Red    | BLOCK merge. Decompose first.               |
+
+Convert file to package when ANY is true:
+- Crosses 400 LOC and next change pushes past 500
+- Contains 2+ disjoint sub-domains (image vs video, user vs admin)
+- Mixes HTTP handlers with worker handlers
+- Has 2+ callers each importing only one symbol
+
+Safe split pattern (atomic PR):
+1. Create <file>/__init__.py (empty for now)
+2. Move pieces to sub-files (a.py, b.py, c.py)
+3. Re-export old public names from __init__.py
+4. Run tests — must pass without changes
+5. Follow-up PR to migrate callers off legacy alias
+
+__init__.py pattern:
+from .user import WalletUserService
+from .admin import WalletAdminService
+WalletService = WalletUserService  # backwards-compat alias
+__all__ = ["WalletUserService", "WalletAdminService", "WalletService"]
+
+## EXTERNAL INTEGRATION RULES (Principles B1-B10)
+
+### Rule 1: Anti-Corruption Layer (ACL)
+Providers return GenerateResult | ProviderError, never dict.
+
+from dataclasses import dataclass
+from decimal import Decimal
+
+@dataclass(frozen=True)
+class GenerateResult:
+    url: str
+    cost_usd: Decimal
+    latency_ms: int
+    provider_request_id: str
+
+class ProviderError(Exception):
+    def __init__(self, message: str, *, retryable: bool, code: str | None = None):
+        super().__init__(message); self.retryable = retryable; self.code = code
+
+class ProviderTimeout(ProviderError):
+    def __init__(self, message: str): super().__init__(message, retryable=True, code="timeout")
+
+### Rule 2: Per-Provider Bulkhead
+Each external provider has its OWN httpx.AsyncClient with its OWN Limits. NEVER share.
+
+GOOD:
+FAL_HTTP = httpx.AsyncClient(
+    base_url=settings.FAL_BASE_URL,
+    timeout=httpx.Timeout(connect=5.0, read=60.0, write=10.0, pool=5.0),
+    limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
+)
+OPENAI_HTTP = httpx.AsyncClient(
+    base_url="https://api.openai.com/v1",
+    limits=httpx.Limits(max_connections=50, max_keepalive_connections=20),
+)
+
+BAD:
+HTTP = httpx.AsyncClient()  # shared across all providers — no bulkhead isolation
+
+# Shutdown cleanup — close all provider clients in FastAPI lifespan
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app):
+    yield  # app startup
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [XD3an/awesome-ai-coding-all-in-one](https://github.com/XD3an/awesome-ai-coding-all-in-one) — distributed by [TomeVault](https://tomevault.io).
