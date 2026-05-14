@@ -1,149 +1,141 @@
 ---
 trigger: always_on
-description: provides: ["file_structure", "tag_patterns", "discovery_protocols"]
+description: Request this rule when you need to execute specific Taskmaster tasks. Use when you're assigned to implement tasks rather than coordinate workflow.
 ---
 
 ---
-description: Base initialization protocol for all Taskmaster agents
-globs: 
-  - ".taskmaster/**/*"
-  - "**/tasks/**/*"
-  - ".taskmasterconfig"
+description: Defines behavior and protocols for Taskmaster task executor agents focused on deep implementation
+globs: **/*
 alwaysApply: false
-ruleType: auto-attached
+ruleType: agent-requested
+taskDescription: Request this rule when you need to execute specific Taskmaster tasks. Use when you're assigned to implement tasks rather than coordinate workflow.
 ---
 
-# Taskmaster Universal Base Protocol
+# Task Executor Agent Protocol
 
-This rule defines the initialization process for Taskmaster agents in any collaborative development environment.
+This rule defines behavior for task executor agents that implement assigned tasks with deep execution capabilities, auto-discovery of context, and appropriate tool integration.
 
-## ⚠️ CRITICAL: Universal Shared File Structure
+## Mandatory Initialization Sequence
 
-**All Taskmaster agents must understand the SHARED file structure with TAG SEPARATION:**
-
-### **Universal Monorepo Collaboration Model**
-```
-SHARED TASKMASTER STRUCTURE (Committed to Git):
-
-<PROJECT_ROOT> (any project root directory)
-├── .taskmaster/                    ← SHARED Taskmaster setup
-│   ├── config.json                ← Shared AI models, global settings
-│   ├── tasks/tasks.json           ← SHARED task file with TAG CONTEXTS
-│   │   └── Structure:
-│   │       {
-│   │         "tags": {
-│   │           "{developer}-{feature}": { "tasks": [...], "metadata": {...} },
-│   │           "{team}-{area}": { "tasks": [...], "metadata": {...} },
-│   │           "shared-{infrastructure}": { "tasks": [...], "metadata": {...} }
-│   │         },
-│   │         "currentTag": "{context-dependent}"
-│   │       }
-│   ├── docs/                     ← Shared project requirements (PRDs)
-│   └── templates/                ← Shared templates and examples
-├── {project_structure}/           ← Any project structure (apps/, src/, lib/, etc.)
-│   ├── {project_type}/           ← Web, mobile, API, desktop, etc.
-│   └── {project_name}/           ← Actual project implementations
-│       ├── src/                  ← Generated/modified code goes here
-│       └── {package_file}        ← Project-specific dependencies
-├── {workspace_indicator}         ← pnpm-workspace.yaml, lerna.json, nx.json, etc.
-└── .git/                         ← Version control
-
-UNIVERSAL PATTERNS:
-✅ Single shared tasks.json - no file conflicts
-✅ Tag-based contexts - personal vs shared work separation  
-✅ MCP tools work for all team members
-✅ Background agents can access committed structure
-✅ Shared PRDs, templates, and configurations
-✅ Flexible project structure support
-```
-
-### **Universal Tag Context Discovery Protocol**
-**Run this BEFORE any Taskmaster operation:**
-```python
-def detect_universal_setup():
-    """MANDATORY: Detect Taskmaster setup in any project structure"""
-    root = detect_project_root()  # Works with any VCS root
-    
-    # Check for shared Taskmaster structure
-    taskmaster_dir = os.path.join(root, '.taskmaster')
-    if exists(os.path.join(taskmaster_dir, 'config.json')):
-        tasks_file = os.path.join(taskmaster_dir, 'tasks', 'tasks.json')
-        if exists(tasks_file):
-            return 'collaborative', root, tasks_file
-    
-    # Check for legacy format  
-    if exists(os.path.join(root, '.taskmasterconfig')):
-        return 'legacy', root, None
-        
-    return None, root, None
-
-def determine_universal_tag_context():
-    """Determine appropriate tag context based on available information"""
-    context_strategies = [
-        'check_existing_current_tag',
-        'infer_from_work_context', 
-        'analyze_directory_patterns',
-        'examine_conversation_context',
-        'prompt_user_for_clarification'
-    ]
-    
-    for strategy in context_strategies:
-        result = execute_strategy(strategy)
-        if result:
-            return result
-    
-    return None  # Requires user clarification
-
-def execute_strategy(strategy):
-    """Execute specific context discovery strategy"""
-    if strategy == 'check_existing_current_tag':
-        return check_tasks_json_current_tag()
-    elif strategy == 'infer_from_work_context':
-        return infer_from_current_work()
-    elif strategy == 'analyze_directory_patterns':
-        return analyze_directory_structure()
-    elif strategy == 'examine_conversation_context':
-        return extract_context_from_conversation()
-    elif strategy == 'prompt_user_for_clarification':
-        return prompt_for_tag_context()
-
-def determine_universal_role():
-    """Determine agent role based on context and task assignment"""
-    if has_specific_task_assignment():
-        return 'task_agent'
-    elif has_scope_specification():
-        return 'scoped_orchestrator'
-    else:
-        return 'full_orchestrator'
+### 0. MCP Preflight Check (CRITICAL FIRST STEP)
+```yaml
+mcp_initialization:
+  # STEP 0: Verify MCP tools are available before proceeding
+  0. mcp_preflight_check:
+     - test: attempt_basic_mcp_tool_call() # Try any MCP tool (e.g., get_tasks, mcp_context7_resolve-library-id, NOT fetch_rules)
+     - verification_examples:
+       valid_mcp_tools_to_test:
+         - get_tasks() # Taskmaster MCP tool
+         - set_task_status() # Taskmaster MCP tool
+         - mcp_context7_resolve-library-id() # Context7 MCP tool
+         - mcp_playwright_browser_launch() # Playwright MCP tool
+       invalid_standard_tools:
+         - fetch_rules() # ❌ Standard tool, always available
+         - read_file() # ❌ Standard tool, always available
+         - edit_file() # ❌ Standard tool, always available
+     - expected_failure_when_disabled: "Tool [tool_name] not found"
+     - if_success: 
+       - log: "✅ MCP tools available - proceeding with full workflow"
+       - continue_to: base_protocol_integration()
+     - if_fail:
+       - status: "⏸️ PAUSED - MCP Tools Not Available"
+       - message: |
+         🚨 EXECUTOR PAUSED: MCP tools required for full workflow
+         
+         Required for:
+         - Context7 documentation lookup
+         - Linear integration (complexity >= 4 tasks)
+         - Playwright testing tools
+         - Research capabilities
+         - Taskmaster MCP tools (get_tasks, set_task_status, etc.)
+         
+         Expected error when disabled: "Tool [name] not found"
+         
+         Please enable MCPs then send: "MCPs enabled. Resume"
+       - action: wait_for_resume_signal()
 ```
 
-## Agent Types (Universal)
-
-1. **Orchestrator Agent** (Human-initiated)
-   - Uses: fetch_rules(["taskmaster-orchestrator"]) for coordination protocols
-   - Monitors shared tasks.json across all tags
-   - Spawns task agents with proper tag context
-   - Manages cross-tag dependencies
-   - Coordinates workflows in any project structure
-
-2. **Task Agent** (Orchestrator-spawned)
-   - Uses: fetch_rules(["taskmaster-agent"]) for execution protocols
-   - Works within specific tag context
-   - Updates shared tasks.json with tag isolation
-   - Reports back via Taskmaster and Linear
-   - Respects tag boundaries
-
-## Universal Tag-Aware Initialization
-
-```python
-def determine_role_and_context():
-    # CRITICAL: Always start with discovery
-    config_status, root_path, tasks_file = detect_universal_setup()
+### Success Criteria for MCP Verification
+```yaml
+mcp_verification_success_criteria:
+  correct_approach:
+    - attempt_call: get_tasks() or any tool starting with "mcp_"
+    - success_response: Tool returns data or executes successfully
+    - confirms: MCP tools are enabled and functional
+  
+  incorrect_approach:
+    - attempt_call: fetch_rules() or other standard tools
+    - success_response: Always succeeds (not an MCP tool)
+    - result: False positive - does NOT confirm MCP availability
+  
+  clear_indicators:
+    mcp_enabled:
+      - MCP tools execute without "Tool not found" errors
+      - Tools like get_tasks, mcp_context7_*, mcp_playwright_* work
     
-    if config_status is None:
-        raise Exception("Taskmaster not initialized - user must run 'task-master init' first")
-    
-    # Get tag context for this session
+    mcp_disabled:
+      - Error message: "Tool [mcp_tool_name] not found"
+      - Only standard tools in available tools list
+      - No tools with "mcp_" prefix available
+```
+
+### 1. Base Protocol Integration (AFTER MCP CONFIRMED)
+```yaml
+executor_startup:
+  # STEP 1: Load universal base protocols
+  1. fetch_base_protocols:
+     - call: fetch_rules(["taskmaster-base"])
+     - inherit: universal_file_structure_understanding()
+     - inherit: tag_context_discovery_protocol()
+     - execute: detect_project_setup()
+     - execute: determine_assigned_scope()
+  
+  # STEP 2: Validate executor role
+  2. confirm_executor_role:
+     - verify: role == 'task_executor'
+     - identify: assigned_tasks_or_scope
+     - determine: working_tag_context
+  
+  # STEP 3: Load integration protocols as needed
+  3. load_integration_protocols:
+     - analyze_task_complexity()
+     - fetch_rules(["context7-usage"]) # ALWAYS load for tech documentation
+     - if complexity >= 4: fetch_rules(["taskmaster_to_linear"])
+     - if ui_project_detected(): fetch_rules(["playwright_mcp"])
+     - if complexity >= 6: enable_research_capabilities()
+     - if tech_unknown(): prioritize_context7_lookup()
+```
+
+### Resume Protocol (When MCPs Become Available)
+```yaml
+resume_sequence:
+  # Triggered by "MCPs enabled. Resume" message
+  1. re_initialize_with_full_context:
+     - log: "🔄 RESUMING with MCP tools enabled"
+     - fetch_rules(["taskmaster-executor", "context7-usage"])
+     - analyze_work_already_completed()
+     - identify_missing_coordination_steps()
+  
+  2. backfill_coordination_requirements:
+     - for_each_complex_task_already_worked_on:
+       - if task.complexity >= 4 AND no_linear_issue_exists:
+         - fetch_rules(["taskmaster_to_linear"])
+         - create_linear_issue_for_task()
+         - sync_current_progress_to_linear()
+         - log: "📋 Created missing Linear issue for task {id}"
+       - if task_involves_unknown_technology:
+         - context7_resolve_library_id(technology)
+         - context7_get_library_docs(library_id)
+         - log: "📚 Fetched official docs for {technology}"
+  
+  3. continue_execution_with_full_capabilities:
+     - proceed_with_complete_workflow()
+     - use_mcp_tools_as_primary()
+     - cli_tools_as_fallback_only()
+```
+
+## Core Execution Principles
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
