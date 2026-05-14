@@ -1,120 +1,142 @@
 ---
 trigger: always_on
-description: name: SmartLead MCP Tools Reference
+description: name: SmartLead MCP Server Project Overview
 ---
 
 ---
-name: SmartLead MCP Tools Reference
-description: Complete reference guide for all 116+ MCP tools organized by category
+name: SmartLead MCP Server Project Overview
+description: Complete project structure guide and navigation for the SmartLead MCP Server
 author: LeadMagic Team
 version: 1.0.0
-# 🛠️ SmartLead MCP Tools - Complete Implementation Guide
+# 🚀 SmartLead MCP Server - Project Overview & Navigation
 
-> **Tool Master Reference**: Your comprehensive guide to all 116+ MCP tools in the SmartLead server. Find tools by category, understand implementation patterns, and master the complete SmartLead automation toolkit.
+> **Quick Start**: This is your complete guide to the SmartLead MCP Server codebase. Use this to understand the project structure, find files quickly, and navigate the architecture.
 
-## 🎯 **Quick Tool Finder**
+## 🎯 **What is This Project?**
 
-### **🔥 Most Used Tools**
-1. **Campaign Management**: `smartlead_create_campaign`, `smartlead_list_campaigns`
-2. **Lead Management**: `smartlead_add_leads_to_campaign`, `smartlead_list_leads_by_campaign`
-3. **Analytics**: `smartlead_get_analytics_overall_stats_v2`, `smartlead_fetch_campaign_statistics`
-4. **Email Accounts**: `smartlead_create_email_account`, `smartlead_fetch_all_email_accounts`
+The **SmartLead MCP Server** is a comprehensive Model Context Protocol (MCP) server that provides complete access to SmartLead's cold email automation platform through AI coding assistants like Claude, Cursor, Windsurf, and Continue.dev.
 
-### **📊 Tool Categories Overview**
-- 🎯 **Campaign Tools**: 14 tools for campaign management
-- 👥 **Lead Tools**: 17 tools for prospect management
-- 📧 **Email Account Tools**: 15 tools for account management
-- 📊 **Analytics Tools**: 18 tools for reporting
-- 📈 **Statistics Tools**: 18 tools for metrics
-- 🚀 **Smart Delivery Tools**: 11 tools for deliverability
-- 🤖 **Smart Senders Tools**: 12 tools for domain management
-- 🔗 **Webhook Tools**: 9 tools for automation
-- 👤 **Client Management Tools**: 8 tools for team management
+### **🔥 Key Stats**
+- **116+ MCP Tools** covering the complete SmartLead API
+- **9 API Modules** for different functionality areas
+- **TypeScript-first** with comprehensive type safety
+- **Production-ready** with proper error handling
+- **Cross-platform** (macOS, Linux, Windows)
 
-## 🛠️ **Tool Categories Reference**
+## 🏗️ **Architecture Overview**
 
-### **🎯 Campaign Tools** (`src/tools/campaigns.ts`)
-> **14 tools** for complete campaign lifecycle management
-
-#### **🚀 Core Campaign Operations**
-```typescript
-// Create and manage campaigns
-smartlead_create_campaign              // Create new email campaigns
-smartlead_update_campaign_schedule     // Modify sending schedules
-smartlead_get_campaigns_with_analytics // Get campaigns with performance data
-smartlead_list_campaigns              // List all campaigns with filtering
-smartlead_get_campaign_by_id          // Fetch specific campaign details
-smartlead_update_campaign_settings    // Modify campaign configuration
-smartlead_delete_campaign             // Remove campaigns
+### **🚪 Entry Points** (Start Here)
+```
+📁 Root Entry Points
+├── 🎯 src/index.ts          → Main CLI entry point (server/installer router)
+├── 🖥️  src/server.ts         → MCP server implementation (registers all tools)
+└── 🎨 src/installer.tsx      → Beautiful React Ink installer with purple gradients
 ```
 
-#### **⚙️ Campaign Configuration**
-```typescript
-// Advanced campaign settings
-smartlead_pause_campaign              // Pause active campaigns
-smartlead_resume_campaign             // Resume paused campaigns
-smartlead_clone_campaign              // Duplicate existing campaigns
-smartlead_update_campaign_sequences   // Modify email sequences
-smartlead_set_campaign_limits         // Configure sending limits
-smartlead_update_campaign_tracking    // Enable/disable tracking
-smartlead_schedule_campaign           // Set up campaign scheduling
+### **🧠 Core Components**
+```
+📁 Core System
+├── 🔌 src/client/index.ts    → Modern SmartLead API client (aggregates all modules)
+├── 🛠️  src/client/base.ts     → Base HTTP client (retry logic, error handling)
+└── 📋 src/types.ts           → Global TypeScript types & Zod validation schemas
 ```
 
-**💡 Use Cases:**
-- 🎯 **New Campaign Setup**: Use `create_campaign` → `add_leads_to_campaign` → `resume_campaign`
-- 📊 **Performance Review**: Use `get_campaigns_with_analytics` for overview
-- ⚙️ **Campaign Optimization**: Use `update_campaign_settings` and `update_campaign_sequences`
+## 📂 **Directory Structure Map**
 
-### **👥 Lead Tools** (`src/tools/leads.ts`)
-> **17 tools** for comprehensive prospect and lead management
+### **🔧 API Modules** (`src/modules/`)
+> Each module handles a specific SmartLead API category
 
-#### **📥 Lead Import & Management**
-```typescript
-// Core lead operations
-smartlead_add_leads_to_campaign        // Import prospects to campaigns (bulk)
-smartlead_list_leads_by_campaign       // Get all prospects in a campaign
-smartlead_fetch_lead_by_email          // Find specific prospect by email
-smartlead_update_lead_category         // Categorize prospects (interested, not_interested, etc.)
-smartlead_remove_lead_from_campaign    // Remove prospects from campaigns
-smartlead_get_lead_details             // Fetch detailed prospect information
+```
+📁 src/modules/
+├── 🎯 campaigns/client.ts        → Campaign management & automation
+├── 👥 leads/client.ts            → Lead & prospect management  
+├── 📧 email-accounts/client.ts   → Email account management & warmup
+├── 📊 analytics/client.ts        → Analytics & reporting data
+├── 📈 statistics/client.ts       → Statistics & performance metrics
+├── 🚀 smart-delivery/client.ts   → Deliverability optimization & spam testing
+├── 🤖 smart-senders/client.ts    → Domain & sender reputation management
+├── 🔗 webhooks/client.ts         → Webhook management & automation
+└── 👤 client-management/client.ts → Team & client management
 ```
 
-#### **📊 Lead Analytics & Tracking**
-```typescript
-// Lead performance and tracking
-smartlead_get_lead_activity_history    // View prospect interaction timeline
-smartlead_fetch_lead_email_history     // Get all emails sent to prospect
-smartlead_get_lead_response_data       // Analyze prospect responses
-smartlead_track_lead_engagement        // Monitor engagement metrics
-smartlead_get_lead_conversion_data     // Track conversion funnel
+### **🛠️ MCP Tools** (`src/tools/`)
+> Each tool file exposes SmartLead functionality as MCP tools
+
+```
+📁 src/tools/
+├── 📋 index.ts              → Central tool registration exports
+├── 🎯 campaigns.ts          → 14 campaign management tools
+├── 👥 leads.ts              → 17 lead management tools
+├── 📧 email-accounts.ts     → 15 email account tools
+├── 📊 analytics.ts          → 18 analytics & reporting tools
+├── 📈 statistics.ts         → 18 statistics tools
+├── 🚀 smart-delivery.ts     → 11 deliverability tools
+├── 🤖 smart-senders.ts      → 12 domain management tools
+├── 🔗 webhooks.ts           → 9 webhook tools
+└── 👤 client-management.ts  → 8 team management tools
 ```
 
-#### **🔄 Lead Automation**
-```typescript
-// Automated lead management
-smartlead_bulk_update_leads            // Update multiple prospects at once
-smartlead_auto_categorize_leads        // AI-powered lead categorization
-smartlead_schedule_lead_followup       // Set up automated follow-ups
-smartlead_sync_leads_with_crm          // CRM integration and sync
-smartlead_export_leads_data            // Export prospect data
-smartlead_import_leads_from_csv        // Bulk import from CSV files
+### **⚙️ Configuration & Setup**
+```
+📁 Configuration Files
+├── 📦 package.json           → NPM package config & dependencies
+├── 🔧 tsconfig.json          → TypeScript compiler settings
+├── 🎨 biome.json             → Biome linter & formatter config
+├── 🔒 .env.example           → Environment variables template
+└── ⚙️  mcp-settings-example.json → MCP client configuration template
 ```
 
-**💡 Use Cases:**
-- 📥 **Lead Import**: Use `import_leads_from_csv` → `add_leads_to_campaign`
-- 📊 **Performance Analysis**: Use `get_lead_activity_history` and `get_lead_response_data`
-- 🔄 **Lead Management**: Use `update_lead_category` and `bulk_update_leads`
+### **📚 Documentation Hub**
+```
+📁 Documentation
+├── 🏠 README.md              → Marketing-optimized project overview
+├── 📖 INSTALLATION.md        → Detailed installation & setup guide
+├── 🏗️  PROJECT_STRUCTURE.md  → Comprehensive architecture documentation
+├── 🔒 SECURITY.md            → Security best practices & guidelines
+└── 📝 CHANGELOG.md           → Version history & release notes
+```
 
-### **📧 Email Account Tools** (`src/tools/email-accounts.ts`)
-> **15 tools** for email account management and warmup
+## 🎯 **Quick Navigation Guide**
 
-#### **🔧 Account Setup & Configuration**
-```typescript
-// Email account management
-smartlead_create_email_account         // Add new sending accounts
-smartlead_fetch_all_email_accounts     // List all email accounts
-smartlead_update_email_account         // Modify account settings
-smartlead_delete_email_account         // Remove email accounts
+### **🔍 Need to Find Something?**
+
+| **I want to...** | **Go to...** | **File(s)** |
+|------------------|--------------|-------------|
+| 🚀 **Start the server** | Entry point | `src/index.ts` |
+| 🛠️ **Add a new MCP tool** | Tools directory | `src/tools/[category].ts` |
+| 🔌 **Add API functionality** | Modules directory | `src/modules/[category]/client.ts` |
+| 📋 **Define new types** | Types file | `src/types.ts` |
+| ⚙️ **Configure the project** | Config files | `package.json`, `tsconfig.json` |
+| 📚 **Read documentation** | Docs | `README.md`, `INSTALLATION.md` |
+| 🎨 **Customize installer** | Installer | `src/installer.tsx` |
+| 🔧 **Debug issues** | Base client | `src/client/base.ts` |
+
+### **🚦 Development Workflow**
+
+```mermaid
+graph LR
+    A[📝 Edit Source] --> B[🔨 Build]
+    B --> C[🧪 Test]
+    C --> D[📦 Package]
+    D --> E[🚀 Deploy]
+    
+    A --> F[src/ directory]
+    B --> G[npm run build]
+    C --> H[npm test]
+    D --> I[npm pack]
+    E --> J[npm publish]
+```
+
+## 🚀 **Key Features & Capabilities**
+
+### **✨ What Makes This Special**
+- 🎯 **Complete API Coverage**: 116+ tools covering every SmartLead endpoint
+- 🎨 **Beautiful Installer**: React Ink interface with purple gradients
+- 🔧 **Zero-config Setup**: Auto-detects and configures MCP clients
+- 🛡️ **Production Ready**: Comprehensive error handling & security
+- 🌍 **Cross-platform**: Works on macOS, Linux, Windows
+- 📊 **Real-time Validation**: API key testing and environment setup
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
