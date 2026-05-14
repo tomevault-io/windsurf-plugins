@@ -1,69 +1,150 @@
 ---
 trigger: always_on
-description: Comprehensive reference for Taskmaster MCP tools and CLI commands.
+description: Request this rule when you need to convert Taskmaster tasks into Linear issues, maintaining proper relationships, preventing duplicates, and ensuring consistent formatting and structure.
 ---
 
-# Taskmaster Tool & Command Reference
-
-This document provides a detailed reference for interacting with Taskmaster, covering both the recommended MCP tools, suitable for integrations like Cursor, and the corresponding `task-master` CLI commands, designed for direct user interaction or fallback.
-
-**Note:** For interacting with Taskmaster programmatically or via integrated tools, using the **MCP tools is strongly recommended** due to better performance, structured data, and error handling. The CLI commands serve as a user-friendly alternative and fallback. 
-
-**Important:** Several MCP tools involve AI processing... The AI-powered tools include `parse_prd`, `analyze_project_complexity`, `update_subtask`, `update_task`, `update`, `expand_all`, `expand_task`, and `add_task`.
-
 ---
-
-## Initialization & Setup
-
-### 1. Initialize Project (`init`)
-
-*   **MCP Tool:** `initialize_project`
-*   **CLI Command:** `task-master init [options]`
-*   **Description:** `Set up the basic Taskmaster file structure and configuration in the current directory for a new project.`
-*   **Key CLI Options:**
-    *   `--name <name>`: `Set the name for your project in Taskmaster's configuration.`
-    *   `--description <text>`: `Provide a brief description for your project.`
-    *   `--version <version>`: `Set the initial version for your project, e.g., '0.1.0'.`
-    *   `-y, --yes`: `Initialize Taskmaster quickly using default settings without interactive prompts.`
-*   **Usage:** Run this once at the beginning of a new project.
-*   **MCP Variant Description:** `Set up the basic Taskmaster file structure and configuration in the current directory for a new project by running the 'task-master init' command.`
-*   **Key MCP Parameters/Options:**
-    *   `projectName`: `Set the name for your project.` (CLI: `--name <name>`)
-    *   `projectDescription`: `Provide a brief description for your project.` (CLI: `--description <text>`)
-    *   `projectVersion`: `Set the initial version for your project, e.g., '0.1.0'.` (CLI: `--version <version>`)
-    *   `authorName`: `Author name.` (CLI: `--author <author>`)
-    *   `skipInstall`: `Skip installing dependencies. Default is false.` (CLI: `--skip-install`)
-    *   `addAliases`: `Add shell aliases tm and taskmaster. Default is false.` (CLI: `--aliases`)
-    *   `yes`: `Skip prompts and use defaults/provided arguments. Default is false.` (CLI: `-y, --yes`)
-*   **Usage:** Run this once at the beginning of a new project, typically via an integrated tool like Cursor. Operates on the current working directory of the MCP server. 
-*   **Important:** Once complete, you *MUST* parse a prd in order to generate tasks. There will be no tasks files until then. The next step after initializing should be to create a PRD using the example PRD in scripts/example_prd.txt. 
-
-### 2. Parse PRD (`parse_prd`)
-
-*   **MCP Tool:** `parse_prd`
-*   **CLI Command:** `task-master parse-prd [file] [options]`
-*   **Description:** `Parse a Product Requirements Document, PRD, or text file with Taskmaster to automatically generate an initial set of tasks in tasks.json.`
-*   **Key Parameters/Options:**
-    *   `input`: `Path to your PRD or requirements text file that Taskmaster should parse for tasks.` (CLI: `[file]` positional or `-i, --input <file>`)
-    *   `output`: `Specify where Taskmaster should save the generated 'tasks.json' file. Defaults to 'tasks/tasks.json'.` (CLI: `-o, --output <file>`)
-    *   `numTasks`: `Approximate number of top-level tasks Taskmaster should aim to generate from the document.` (CLI: `-n, --num-tasks <number>`)
-    *   `force`: `Use this to allow Taskmaster to overwrite an existing 'tasks.json' without asking for confirmation.` (CLI: `-f, --force`)
-*   **Usage:** Useful for bootstrapping a project from an existing requirements document.
-*   **Notes:** Task Master will strictly adhere to any specific requirements mentioned in the PRD, such as libraries, database schemas, frameworks, tech stacks, etc., while filling in any gaps where the PRD isn't fully specified. Tasks are designed to provide the most direct implementation path while avoiding over-engineering.
-*   **Important:** This MCP tool makes AI calls and can take up to a minute to complete. Please inform users to hang tight while the operation is in progress. If the user does not have a PRD, suggest discussing their idea and then use the example PRD in `scripts/example_prd.txt` as a template for creating the PRD based on their idea, for use with `parse-prd`.
-
+description: Guidelines for creating Linear issues from Taskmaster tasks with proper structure and relationships
+globs: .taskmaster/tasks/*.txt
+alwaysApply: false
+ruleType: agent-requested
+taskDescription: Request this rule when you need to convert Taskmaster tasks into Linear issues, maintaining proper relationships, preventing duplicates, and ensuring consistent formatting and structure.
 ---
+# Universal Taskmaster → Linear Integration Protocol
 
-## AI Model Configuration
+This rule defines the standardized process for converting Taskmaster tasks into Linear issues across any development project, ensuring proper relationships, preventing duplicates, and maintaining consistent structure within tag-aware workflows.
 
-### 2. Manage Models (`models`)
-*   **MCP Tool:** `models`
-*   **CLI Command:** `task-master models [options]`
-*   **Description:** `View the current AI model configuration or set specific models for different roles (main, research, fallback). Allows setting custom model IDs for Ollama and OpenRouter.`
-*   **Key MCP Parameters/Options:**
-    *   `setMain <model_id>`: `Set the primary model ID for task generation/updates.` (CLI: `--set-main <model_id>`)
-    *   `setResearch <model_id>`: `Set the model ID for research-backed operations.` (CLI: `--set-research <model_id>`)
-    *   `setFallback <model_id>`: `Set the model ID to use if the primary fails.` (CLI: `--set-fallback <model_id>`)
+## Core Integration Principles
+
+- **Tag-Aware Conversion**: Respect tag contexts and project boundaries when creating Linear issues
+- **Project Discovery**: Dynamically identify project names and structure for proper issue organization
+- **Duplicate Prevention**: Check existing Linear issues before creation to avoid conflicts
+- **Relationship Preservation**: Maintain parent-child subtask relationships in Linear
+- **Consistent Structure**: Standardized issue creation with complete information across all projects
+- **Status Synchronization**: Bidirectional sync between Taskmaster and Linear status updates
+- **Cross-Project Coordination**: Handle dependencies across different projects and tags
+
+## Mandatory Prerequisites
+
+### 1. Tag Context and Project Discovery
+```yaml
+before_linear_operations:
+  # STEP 1: Ensure proper tag context (from @taskmaster-base.mcp)
+  1. verify_tag_context:
+     - confirm_current_tag_is_appropriate()
+     - discover_project_name_from_tag_and_structure()
+     - validate_project_exists_in_monorepo()
+  
+  # STEP 2: Load Linear workspace context
+  2. linear_workspace_discovery:
+     - identify_linear_workspace_for_project()
+     - detect_team_assignments()
+     - map_project_to_linear_labels()
+  
+  # STEP 3: Validate permissions and access
+  3. permission_validation:
+     - verify_linear_api_access()
+     - confirm_project_team_membership()
+     - validate_issue_creation_permissions()
+```
+
+### 2. Pre-Conversion Analysis
+```yaml
+conversion_analysis:
+  task_assessment:
+    # Analyze task structure and requirements
+    - determine_if_conversion_needed(task_complexity, scope)
+    - identify_parent_child_relationships()
+    - extract_cross_project_dependencies()
+    - assess_linear_issue_type_requirements()
+  
+  duplicate_prevention:
+    # Comprehensive duplicate checking
+    - search_existing_linear_issues_by_title()
+    - check_taskmaster_id_references_in_linear()
+    - identify_potential_duplicate_patterns()
+    - validate_unique_conversion_opportunity()
+  
+  project_context_mapping:
+    # Map discovered project to Linear organization
+    - map_discovered_project_to_linear_team()
+    - determine_appropriate_linear_labels()
+    - identify_milestone_or_project_associations()
+    - assess_priority_level_mapping()
+```
+
+## Universal Conversion Strategies
+
+### Strategy 1: Single Task Conversion (Complexity 1-3)
+```yaml
+simple_task_conversion:
+  when: task.complexity <= 3 AND no_subtasks AND single_project_scope
+  
+  linear_issue_creation:
+    title: "{Discovered Project}: {Task Title}"
+    description: |
+      **Project**: {dynamically_discovered_project_name}
+      **Tag Context**: {current_tag}
+      **Taskmaster ID**: {task_id}
+      **Complexity**: {score}/10
+      
+      ## Description
+      {task.description}
+      
+      ## Implementation Details
+      {task.details}
+      
+      ## Test Strategy
+      {task.testStrategy}
+      
+      ## Success Criteria
+      - [ ] Implementation complete in {discovered_project_path}
+      - [ ] Tests pass using appropriate testing framework
+      - [ ] Task marked as 'done' in Taskmaster
+    
+    labels: ["{discovered_project}", "taskmaster-sync", "complexity-{score}"]
+    team: "{mapped_team_from_project_discovery}"
+    priority: "{mapped_priority_from_taskmaster}"
+    
+  post_creation:
+    - update_taskmaster_with_linear_issue_id()
+    - add_linear_url_to_task_details()
+    - set_bidirectional_sync_metadata()
+```
+
+### Strategy 2: Parent-Child Task Conversion (Complexity 4-7)
+```yaml
+hierarchical_task_conversion:
+  when: task.has_subtasks OR task.complexity >= 4
+  
+  parent_issue_creation:
+    title: "{Discovered Project}: {Parent Task Title}"
+    description: |
+      **Project**: {dynamically_discovered_project_name}  
+      **Tag Context**: {current_tag}
+      **Taskmaster Parent ID**: {parent_task_id}
+      **Complexity**: {score}/10
+      **Subtask Count**: {subtask_count}
+      
+      ## Epic Description
+      {parent_task.description}
+      
+      ## Implementation Scope
+      {parent_task.details}
+      
+      ## Subtasks Overview
+      {list_of_subtask_titles_and_ids}
+      
+      ## Success Criteria
+      - [ ] All subtasks completed
+      - [ ] Integration testing complete
+      - [ ] Epic marked as 'done' in Taskmaster
+    
+    type: "Epic" # or "Feature" based on Linear workspace configuration
+    labels: ["{discovered_project}", "taskmaster-epic", "complexity-{score}"]
+  
+  subtask_issue_creation:
+    for_each_subtask:
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
