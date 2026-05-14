@@ -1,109 +1,140 @@
 ---
 trigger: always_on
-description: > This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: > This file provides guidance to all Coding Agents such as Claude Code (claude.ai/code), Codex when working with code in this repository.
 ---
 
-## llm-agents-from-scratch
+## markdown-flow-ui
 
-> This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+> This file provides guidance to all Coding Agents such as Claude Code (claude.ai/code), Codex when working with code in this repository.
 
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to all Coding Agents such as Claude Code (claude.ai/code), Codex when working with code in this repository.
+
+## Quick Start
+
+### Most Common Tasks
+
+| Task                     | Command                                | Location       |
+| ------------------------ | -------------------------------------- | -------------- |
+| Start development server | `npm run dev`                          | Root directory |
+| Build library            | `npm run build`                        | Root directory |
+| Run Storybook            | `npm run storybook`                    | Root directory |
+| Run tests                | `npm test`                             | Root directory |
+| Run linting              | `npm run lint`                         | Root directory |
+| Format code              | `npm run format`                       | Root directory |
+| Check code quality       | `npm run lint && npm run format:check` | Root directory |
+
+### Essential Files and Directories
+
+```bash
+# Core library components
+src/components/           # Main UI components
+src/lib/                 # Utility functions
+src/index.ts            # Main export file
+
+# Documentation and examples
+.storybook/             # Storybook configuration
+src/**/*.stories.ts     # Component stories
+README.md              # Project documentation
+
+# Configuration
+package.json           # Dependencies and scripts
+tsconfig.json         # TypeScript configuration
+eslint.config.mjs     # ESLint configuration
+.prettierrc           # Prettier formatting rules
+```
+
+## Critical Warnings ⚠️
+
+### MUST DO Before Any Commit
+
+1. **Run lint and format checks**: `npm run lint && npm run format:check` (MANDATORY)
+2. **Test your changes**: Run `npm test` and verify Storybook examples work
+3. **Build the library**: Run `npm run build` to ensure no build errors
+4. **Use English for all code**: Comments, variables, commit messages
+5. **Follow Conventional Commits**: `type: description` (lowercase type, imperative mood)
+6. **Update Storybook stories**: Add/update stories for new or modified components
+
+### Common Pitfalls to Avoid
+
+- **Never hardcode user-facing strings** - Use props and make components configurable
+- **Don't skip linting/formatting** - Pre-commit hooks will catch these issues
+- **Don't commit secrets** - No API keys or sensitive data in code
+- **Don't use non-English in code** - English only (except for user-facing content examples)
+- **Don't break existing APIs** - Maintain backward compatibility for public interfaces
+- **Don't forget TypeScript types** - All public APIs must be properly typed
 
 ## Project Overview
 
-**llm-agents-from-scratch** is a Python library for building LLM agents from the ground up, designed to accompany a technical book on creating intelligent agents with Model Context Protocol (MCP) integration. It provides abstract base classes and concrete implementations for LLMs, tools, and agents.
+markdown-flow-ui is a React UI library for rendering markdown with interactive flow components, typewriter effects, and plugin support. It provides components for creating dynamic, interactive markdown experiences with features like:
 
-## Commands
-
-```bash
-# Install dependencies
-uv sync --all-extras --dev
-
-# Run all tests
-make test                    # or: pytest tests -v --capture=no
-
-# Run a single test file
-pytest tests/test_file.py -v --capture=no
-
-# Run a specific test
-pytest tests/test_file.py::test_function_name -v
-
-# Lint and format (runs pre-commit hooks: ruff, mypy)
-make lint
-
-# Format only (ruff)
-make format
-
-# Coverage
-make coverage                # Generate XML report
-make coverage-report         # Terminal summary
-make coverage-html           # HTML report in htmlcov/
-
-# Generate UML diagrams
-make diagrams
-```
+- Real-time markdown rendering with syntax highlighting
+- Typewriter effect animations
+- Interactive flow components with single-select and multi-select support
+- Plugin system for custom components
+- Server-Sent Events (SSE) support for streaming content
+- Mermaid diagram rendering
+- Mathematical expressions with KaTeX
+- Internationalization (i18n) support for UI components
 
 ## Architecture
 
-### Core Abstractions
+The project follows a component-based architecture with these main parts:
 
-The library uses abstract base classes with type aliases for flexibility:
+- **Core Components (`src/components/`)**: Main UI components for markdown rendering
+- **Utility Functions (`src/lib/`)**: Helper functions and utilities
+- **Plugin System**: Extensible architecture for custom markdown components
+- **Storybook Integration**: Documentation and examples for all components
 
-- **`BaseLLM`** (`base/llm.py`) → Type alias `LLM`
-  - Abstract methods: `complete()`, `structured_output()`, `chat()`, `continue_chat_with_tool_results()`
-  - Implementation: `OllamaLLM` (primary), `OpenAILLM` (optional extra)
+### Main Components
 
-- **`BaseTool` / `AsyncBaseTool`** (`base/tool.py`) → Type alias `Tool = BaseTool | AsyncBaseTool`
-  - Required properties: `name`, `description`, `parameters_json_schema`
-  - Implementations:
-    - `SimpleFunctionTool` / `AsyncSimpleFunctionTool` - Direct function wrapping with JSON schema generation
-    - `PydanticFunctionTool` / `AsyncPydanticFunctionTool` - Type-safe functions using Pydantic models
-    - `MCPTool` / `MCPToolProvider` - Model Context Protocol integration
+#### ContentRender (`src/components/ContentRender/`)
 
-### Agent Layer
+- **Purpose**: Core markdown rendering component with typewriter effects
+- **Key Features**:
+  - Markdown-to-HTML conversion with syntax highlighting
+  - Typewriter animation support
+  - Plugin system for custom components
+  - Stream processing capabilities
+  - Interactive variable system with single-select and multi-select support
+  - Internationalization support for UI elements
+- **Key Files**:
+  - `ContentRender.tsx`: Main component implementation
+  - `useTypewriter.ts`: Typewriter effect logic
+  - `plugins/`: Custom component plugins (MermaidChart, CustomVariable)
+  - `utils/`: Processing utilities
 
-- **`LLMAgent`** (`agent/llm_agent.py`) - Main agent class managing LLM and tool registry
-  - Contains nested `TaskHandler` class extending `asyncio.Future` for async task execution
-  - Step-based execution with rollout tracking
+##### Interactive Variable System
 
-- **`LLMAgentBuilder`** (`agent/builder.py`) - Fluent builder pattern for agent construction
+The CustomVariable plugin supports various interaction modes:
 
-### Data Structures (Pydantic Models)
+**Single-Select Mode (using `|` separator):**
 
-All in `data_structures/`:
+```markdown
+Choose your role: ?[%{{role}}Developer|Designer|Manager]
+```
 
-- **Task pipeline**: `Task` → `TaskStep` → `TaskStepResult` → `TaskResult`
-- **LLM communication**: `ChatMessage`, `ChatRole`, `CompleteResult`
-- **Tool invocation**: `ToolCall`, `ToolCallResult`
-- **Decision making**: `NextStepDecision`
+**Multi-Select Mode (using `||` separator):**
 
-### Error Hierarchy
+```markdown
+Select skills: ?[%{{skills}}React||Vue||Angular||Node.js]
+```
 
-Base: `LLMAgentsFromScratchError` (`errors/core.py`)
+**Mixed Mode (Multi-select + Text Input):**
 
-- `LLMAgentError` → `LLMAgentBuilderError`, `MaxStepsReachedError`
-- `MCPError` → `MissingMCPServerParamsError`
-- `TaskHandlerError`
-- `MissingExtraError`
+```markdown
+Choose technologies: ?[%{{tech}}Frontend||Backend||Mobile||...Other technologies]
+```
 
-## Code Style
+**Props for Multi-Select Support:**
 
-- **Line length**: 80 characters
-- **Docstrings**: Google style (enforced by ruff)
-- **Type hints**: Required throughout (mypy strict mode with `disallow_untyped_defs`)
-- **Imports**: Sorted by ruff (isort rules, black profile, line-length 79)
+- `confirmButtonText`: Text for the confirm button (supports i18n)
+- `selectedValues`: Array of selected values in callback
+- `isMultiSelect`: Automatically detected from syntax
 
-## Testing
 
-- Uses pytest with `pytest-asyncio` (asyncio_mode=auto in pytest.ini)
-- Tests in `tests/` directory mirror source structure
-- Docstrings not required in test files (ruff D rules ignored)
-
----
-> Source: [nerdai/llm-agents-from-scratch](https://github.com/nerdai/llm-agents-from-scratch) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:gemini_md:2026-05-06 -->
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [tomevault-io/gemini-extensions](https://github.com/tomevault-io/gemini-extensions) — distributed by [TomeVault](https://tomevault.io).
