@@ -7,11 +7,11 @@ artifact/secret management concept for nixos
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [mrVanDalo/nixos-artifacts](https://github.com/mrVanDalo/nixos-artifacts).
+Original source: `CLAUDE.md` in [mrVanDalo/nixos-artifacts](https://github.com/mrVanDalo/nixos-artifacts).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
