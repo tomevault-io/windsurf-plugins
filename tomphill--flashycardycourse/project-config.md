@@ -1,197 +1,208 @@
 ---
 trigger: always_on
-description: This app uses Clerk Billing to manage B2C SaaS subscriptions and feature access. All billing, payment processing, and subscription management is handled through Clerk's integrated billing system with Stripe.
+description: This project follows strict patterns for data handling to ensure security, type safety, and performance. All data operations must follow these established patterns.
 ---
 
-# Clerk Billing & Subscription Management
+# Data Handling Patterns
 
 ## Overview
-This app uses Clerk Billing to manage B2C SaaS subscriptions and feature access. All billing, payment processing, and subscription management is handled through Clerk's integrated billing system with Stripe.
+This project follows strict patterns for data handling to ensure security, type safety, and performance. All data operations must follow these established patterns.
 
-## Available Plans & Features
+## 🚨 MANDATORY: Centralized Query Functions
 
-### Subscription Plans
-- **`free_user`**: Default free tier with limited features
-- **`pro`**: Premium subscription with full feature access
+### Database Query Organization
+**CRITICAL REQUIREMENT**: ALL database operations (SELECT, INSERT, UPDATE, DELETE) MUST be performed through dedicated helper functions located in the `src/db/queries/` directory. NEVER perform direct database operations in components, server actions, or API routes.
 
-### Available Features
-- **`3_deck_limit`**: Free users can create up to 3 flashcard decks
-- **`unlimited_decks`**: Pro users can create unlimited flashcard decks
-- **`ai_flashcard_generation`**: Pro users can generate flashcards using AI
-
-## Access Control Implementation
-
-### Server-Side Protection with `has()` Method
-**MANDATORY**: Use the `has()` method from Clerk's `auth()` for server-side access control in Server Components and Server Actions.
-
-#### Plan-Based Protection
-```typescript
-import { auth } from '@clerk/nextjs/server';
-
-export default async function DashboardPage() {
-  const { has } = await auth();
-  
-  // Check if user has pro plan
-  const hasProPlan = has({ plan: 'pro' });
-  const isFreeUser = has({ plan: 'free_user' });
-  
-  return (
-    <div>
-      {hasProPlan && <ProFeatures />}
-      {isFreeUser && <UpgradePrompt />}
-    </div>
-  );
-}
+#### Directory Structure
+```
+src/db/queries/
+├── decks.ts      # Deck-related queries
+├── cards.ts      # Card-related queries
+└── index.ts      # Re-export all queries
 ```
 
-#### Feature-Based Protection
-```typescript
-import { auth } from '@clerk/nextjs/server';
-
-export default async function CreateDeckPage() {
-  const { has } = await auth();
-  
-  // Check for specific features
-  const hasUnlimitedDecks = has({ feature: 'unlimited_decks' });
-  const hasAIGeneration = has({ feature: 'ai_flashcard_generation' });
-  const hasThreeDeckLimit = has({ feature: '3_deck_limit' });
-  
-  return (
-    <div>
-      {hasAIGeneration && <AIGenerationButton />}
-      {hasThreeDeckLimit && <DeckLimitWarning />}
-    </div>
-  );
-}
-```
-
-### Client-Side Protection with `<Protect>` Component
-**MANDATORY**: Use the `<Protect>` component for conditional rendering in Client Components.
-
-#### Plan-Based Component Protection
-```typescript
-import { Protect } from '@clerk/nextjs';
-
-export function ProFeatureSection() {
-  return (
-    <Protect
-      plan="pro"
-      fallback={
-        <div className="p-4 border-2 border-dashed border-gray-300 rounded-lg">
-          <p className="text-center text-muted-foreground">
-            Upgrade to Pro to unlock this feature
-          </p>
-        </div>
-      }
-    >
-      <AIFlashcardGenerator />
-    </Protect>
-  );
-}
-```
-
-#### Feature-Based Component Protection
-```typescript
-import { Protect } from '@clerk/nextjs';
-
-export function CreateDeckButton() {
-  return (
-    <Protect
-      feature="unlimited_decks"
-      fallback={
-        <Button disabled variant="outline">
-          Upgrade to create more decks
-        </Button>
-      }
-    >
-      <Button>Create New Deck</Button>
-    </Protect>
-  );
-}
-```
-
-## Flashcard App-Specific Patterns
-
-### Deck Creation Limits
-**MANDATORY**: Enforce deck creation limits based on user plan and existing deck count.
+#### Query Function Pattern
+Every query function MUST follow this exact pattern:
 
 ```typescript
-// In src/db/queries/decks.ts
-import { auth } from '@clerk/nextjs/server';
+// src/db/queries/decks.ts
+import { auth } from "@clerk/nextjs/server";
+import { db } from '@/db';
+import { decksTable } from '@/db/schema';
+import { eq, and } from 'drizzle-orm';
 
-export async function canCreateDeck(): Promise<{ canCreate: boolean; reason?: string }> {
-  const { has, userId } = await auth();
-  if (!userId) return { canCreate: false, reason: "Unauthorized" };
-  
-  const hasUnlimitedDecks = has({ feature: 'unlimited_decks' });
-  
-  if (hasUnlimitedDecks) {
-    return { canCreate: true };
+export async function getUserDecks() {
+  const { userId } = await auth();
+  if (!userId) {
+    throw new Error("Unauthorized");
   }
   
-  // Check deck count for free users
-  const deckCount = await db.select({ count: sql<number>`count(*)` })
+  return await db.select()
+    .from(decksTable)
+    .where(eq(decksTable.userId, userId));
+}
+
+export async function getDeckById(deckId: string) {
+  const { userId } = await auth();
+  if (!userId) {
+    throw new Error("Unauthorized");
+  }
+  
+  const deck = await db.select()
+    .from(decksTable)
+    .where(
+      and(
+        eq(decksTable.id, deckId),
+        eq(decksTable.userId, userId)
+      )
+    )
+    .limit(1);
+    
+  return deck[0] || null;
+}
+
+export async function createDeck(data: { title: string; description?: string }) {
+  const { userId } = await auth();
+  if (!userId) {
+    throw new Error("Unauthorized");
+  }
+  
+  const newDeck = await db.insert(decksTable)
+    .values({
+      ...data,
+      userId,
+    })
+    .returning();
+    
+  return newDeck[0];
+}
+
+export async function updateDeck(deckId: string, data: { title?: string; description?: string }) {
+  const { userId } = await auth();
+  if (!userId) {
+    throw new Error("Unauthorized");
+  }
+  
+  const updatedDeck = await db.update(decksTable)
+    .set(data)
+    .where(
+      and(
+        eq(decksTable.id, deckId),
+        eq(decksTable.userId, userId)
+      )
+    )
+    .returning();
+    
+  return updatedDeck[0] || null;
+}
+
+export async function deleteDeck(deckId: string) {
+  const { userId } = await auth();
+  if (!userId) {
+    throw new Error("Unauthorized");
+  }
+  
+  await db.delete(decksTable)
+    .where(
+      and(
+        eq(decksTable.id, deckId),
+        eq(decksTable.userId, userId)
+      )
+    );
+}
+```
+
+#### Query Re-exports
+**MANDATORY**: Create an index file to re-export all queries:
+
+```typescript
+// src/db/queries/index.ts
+export * from './decks';
+export * from './cards';
+```
+
+## Data Retrieval Rules
+
+### Server Components with Query Functions
+**MANDATORY**: All data retrieval operations MUST be performed in Server Components using the centralized query functions.
+
+```typescript
+// ✅ CORRECT: Data fetching in Server Component using query functions
+import { getUserDecks } from '@/db/queries';
+
+export default async function DashboardPage() {
+  // Use centralized query function
+  const userDecks = await getUserDecks();
+    
+  return <DecksList decks={userDecks} />;
+}
+```
+
+```typescript
+// ❌ WRONG: Direct database operations in components
+import { auth } from "@clerk/nextjs/server";
+import { db } from '@/db';
+import { decksTable } from '@/db/schema';
+import { eq } from 'drizzle-orm';
+
+export default async function DashboardPage() {
+  // ❌ This violates the centralized query rule
+  const { userId } = await auth();
+  if (!userId) redirect('/');
+  
+  const userDecks = await db.select()
     .from(decksTable)
     .where(eq(decksTable.userId, userId));
     
-  const currentCount = deckCount[0]?.count || 0;
-  
-  if (currentCount >= 3) {
-    return { 
-      canCreate: false, 
-      reason: "Free users can only create 3 decks. Upgrade to Pro for unlimited decks." 
-    };
-  }
-  
-  return { canCreate: true };
+  return <DecksList decks={userDecks} />;
 }
 ```
 
-### AI Feature Protection
-**MANDATORY**: Protect AI flashcard generation features for Pro users only.
+```typescript
+// ❌ WRONG: Never fetch data in Client Components
+"use client";
+import { useEffect, useState } from 'react';
+
+export default function DashboardPage() {
+  const [decks, setDecks] = useState([]);
+  
+  useEffect(() => {
+    // ❌ This violates the server component rule
+    fetch('/api/decks').then(res => res.json()).then(setDecks);
+  }, []);
+  
+  return <DecksList decks={decks} />;
+}
+```
+
+## Database Mutations Rules
+
+### Server Actions with Query Functions
+**MANDATORY**: All database mutations MUST be performed via Server Actions that use the centralized query functions.
 
 ```typescript
-// In server actions
+// ✅ CORRECT: Server Actions using centralized query functions
 "use server";
 
-import { auth } from '@clerk/nextjs/server';
+import { createDeck, updateDeck, deleteDeck } from '@/db/queries';
+import { z } from 'zod';
 
-export async function generateAIFlashcards(prompt: string) {
-  const { has, userId } = await auth();
-  if (!userId) throw new Error("Unauthorized");
+const CreateDeckSchema = z.object({
+  title: z.string().min(1, "Title is required"),
+  description: z.string().optional(),
+});
+
+type CreateDeckInput = z.infer<typeof CreateDeckSchema>;
+
+export async function createDeckAction(input: CreateDeckInput) {
+  // Validate input with Zod
+  const validatedInput = CreateDeckSchema.parse(input);
   
-  const hasAIFeature = has({ feature: 'ai_flashcard_generation' });
-  
-  if (!hasAIFeature) {
-    throw new Error("AI flashcard generation requires a Pro subscription");
-  }
-  
-  // Proceed with AI generation
-  return await generateFlashcardsWithAI(prompt);
+  // Use centralized query function
+  return await createDeck(validatedInput);
 }
-```
 
-### Dashboard Feature Differentiation
-**MANDATORY**: Show different UI elements based on user subscription level.
-
-```typescript
-import { auth } from '@clerk/nextjs/server';
-import { Protect } from '@clerk/nextjs';
-
-export default async function DashboardPage() {
-  const { has } = await auth();
-  const userDecks = await getUserDecks();
-  
-  const hasUnlimitedDecks = has({ feature: 'unlimited_decks' });
-  const deckCount = userDecks.length;
-  
-  return (
-    <div>
-      <div className="flex justify-between items-center">
-        <h1>My Flashcard Decks ({deckCount})</h1>
-        
-        <Protect
-          feature="unlimited_decks"
+export async function updateDeckAction(deckId: string, input: Partial<CreateDeckInput>) {
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
