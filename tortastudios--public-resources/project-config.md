@@ -1,141 +1,69 @@
 ---
 trigger: always_on
-description: Request this rule when you need to execute specific Taskmaster tasks. Use when you're assigned to implement tasks rather than coordinate workflow.
+description: Comprehensive reference for Taskmaster MCP tools and CLI commands.
 ---
 
+# Taskmaster Tool & Command Reference
+
+This document provides a detailed reference for interacting with Taskmaster, covering both the recommended MCP tools, suitable for integrations like Cursor, and the corresponding `task-master` CLI commands, designed for direct user interaction or fallback.
+
+**Note:** For interacting with Taskmaster programmatically or via integrated tools, using the **MCP tools is strongly recommended** due to better performance, structured data, and error handling. The CLI commands serve as a user-friendly alternative and fallback. 
+
+**Important:** Several MCP tools involve AI processing... The AI-powered tools include `parse_prd`, `analyze_project_complexity`, `update_subtask`, `update_task`, `update`, `expand_all`, `expand_task`, and `add_task`.
+
 ---
-description: Defines behavior and protocols for Taskmaster task executor agents focused on deep implementation
-globs: **/*
-alwaysApply: false
-ruleType: agent-requested
-taskDescription: Request this rule when you need to execute specific Taskmaster tasks. Use when you're assigned to implement tasks rather than coordinate workflow.
+
+## Initialization & Setup
+
+### 1. Initialize Project (`init`)
+
+*   **MCP Tool:** `initialize_project`
+*   **CLI Command:** `task-master init [options]`
+*   **Description:** `Set up the basic Taskmaster file structure and configuration in the current directory for a new project.`
+*   **Key CLI Options:**
+    *   `--name <name>`: `Set the name for your project in Taskmaster's configuration.`
+    *   `--description <text>`: `Provide a brief description for your project.`
+    *   `--version <version>`: `Set the initial version for your project, e.g., '0.1.0'.`
+    *   `-y, --yes`: `Initialize Taskmaster quickly using default settings without interactive prompts.`
+*   **Usage:** Run this once at the beginning of a new project.
+*   **MCP Variant Description:** `Set up the basic Taskmaster file structure and configuration in the current directory for a new project by running the 'task-master init' command.`
+*   **Key MCP Parameters/Options:**
+    *   `projectName`: `Set the name for your project.` (CLI: `--name <name>`)
+    *   `projectDescription`: `Provide a brief description for your project.` (CLI: `--description <text>`)
+    *   `projectVersion`: `Set the initial version for your project, e.g., '0.1.0'.` (CLI: `--version <version>`)
+    *   `authorName`: `Author name.` (CLI: `--author <author>`)
+    *   `skipInstall`: `Skip installing dependencies. Default is false.` (CLI: `--skip-install`)
+    *   `addAliases`: `Add shell aliases tm and taskmaster. Default is false.` (CLI: `--aliases`)
+    *   `yes`: `Skip prompts and use defaults/provided arguments. Default is false.` (CLI: `-y, --yes`)
+*   **Usage:** Run this once at the beginning of a new project, typically via an integrated tool like Cursor. Operates on the current working directory of the MCP server. 
+*   **Important:** Once complete, you *MUST* parse a prd in order to generate tasks. There will be no tasks files until then. The next step after initializing should be to create a PRD using the example PRD in scripts/example_prd.txt. 
+
+### 2. Parse PRD (`parse_prd`)
+
+*   **MCP Tool:** `parse_prd`
+*   **CLI Command:** `task-master parse-prd [file] [options]`
+*   **Description:** `Parse a Product Requirements Document, PRD, or text file with Taskmaster to automatically generate an initial set of tasks in tasks.json.`
+*   **Key Parameters/Options:**
+    *   `input`: `Path to your PRD or requirements text file that Taskmaster should parse for tasks.` (CLI: `[file]` positional or `-i, --input <file>`)
+    *   `output`: `Specify where Taskmaster should save the generated 'tasks.json' file. Defaults to 'tasks/tasks.json'.` (CLI: `-o, --output <file>`)
+    *   `numTasks`: `Approximate number of top-level tasks Taskmaster should aim to generate from the document.` (CLI: `-n, --num-tasks <number>`)
+    *   `force`: `Use this to allow Taskmaster to overwrite an existing 'tasks.json' without asking for confirmation.` (CLI: `-f, --force`)
+*   **Usage:** Useful for bootstrapping a project from an existing requirements document.
+*   **Notes:** Task Master will strictly adhere to any specific requirements mentioned in the PRD, such as libraries, database schemas, frameworks, tech stacks, etc., while filling in any gaps where the PRD isn't fully specified. Tasks are designed to provide the most direct implementation path while avoiding over-engineering.
+*   **Important:** This MCP tool makes AI calls and can take up to a minute to complete. Please inform users to hang tight while the operation is in progress. If the user does not have a PRD, suggest discussing their idea and then use the example PRD in `scripts/example_prd.txt` as a template for creating the PRD based on their idea, for use with `parse-prd`.
+
 ---
 
-# Task Executor Agent Protocol
+## AI Model Configuration
 
-This rule defines behavior for task executor agents that implement assigned tasks with deep execution capabilities, auto-discovery of context, and appropriate tool integration.
-
-## Mandatory Initialization Sequence
-
-### 0. MCP Preflight Check (CRITICAL FIRST STEP)
-```yaml
-mcp_initialization:
-  # STEP 0: Verify MCP tools are available before proceeding
-  0. mcp_preflight_check:
-     - test: attempt_basic_mcp_tool_call() # Try any MCP tool (e.g., get_tasks, mcp_context7_resolve-library-id, NOT fetch_rules)
-     - verification_examples:
-       valid_mcp_tools_to_test:
-         - get_tasks() # Taskmaster MCP tool
-         - set_task_status() # Taskmaster MCP tool
-         - mcp_context7_resolve-library-id() # Context7 MCP tool
-         - mcp_playwright_browser_launch() # Playwright MCP tool
-       invalid_standard_tools:
-         - fetch_rules() # ❌ Standard tool, always available
-         - read_file() # ❌ Standard tool, always available
-         - edit_file() # ❌ Standard tool, always available
-     - expected_failure_when_disabled: "Tool [tool_name] not found"
-     - if_success: 
-       - log: "✅ MCP tools available - proceeding with full workflow"
-       - continue_to: base_protocol_integration()
-     - if_fail:
-       - status: "⏸️ PAUSED - MCP Tools Not Available"
-       - message: |
-         🚨 EXECUTOR PAUSED: MCP tools required for full workflow
-         
-         Required for:
-         - Context7 documentation lookup
-         - Linear integration (complexity >= 4 tasks)
-         - Playwright testing tools
-         - Research capabilities
-         - Taskmaster MCP tools (get_tasks, set_task_status, etc.)
-         
-         Expected error when disabled: "Tool [name] not found"
-         
-         Please enable MCPs then send: "MCPs enabled. Resume"
-       - action: wait_for_resume_signal()
-```
-
-### Success Criteria for MCP Verification
-```yaml
-mcp_verification_success_criteria:
-  correct_approach:
-    - attempt_call: get_tasks() or any tool starting with "mcp_"
-    - success_response: Tool returns data or executes successfully
-    - confirms: MCP tools are enabled and functional
-  
-  incorrect_approach:
-    - attempt_call: fetch_rules() or other standard tools
-    - success_response: Always succeeds (not an MCP tool)
-    - result: False positive - does NOT confirm MCP availability
-  
-  clear_indicators:
-    mcp_enabled:
-      - MCP tools execute without "Tool not found" errors
-      - Tools like get_tasks, mcp_context7_*, mcp_playwright_* work
-    
-    mcp_disabled:
-      - Error message: "Tool [mcp_tool_name] not found"
-      - Only standard tools in available tools list
-      - No tools with "mcp_" prefix available
-```
-
-### 1. Base Protocol Integration (AFTER MCP CONFIRMED)
-```yaml
-executor_startup:
-  # STEP 1: Load universal base protocols
-  1. fetch_base_protocols:
-     - call: fetch_rules(["taskmaster-base"])
-     - inherit: universal_file_structure_understanding()
-     - inherit: tag_context_discovery_protocol()
-     - execute: detect_project_setup()
-     - execute: determine_assigned_scope()
-  
-  # STEP 2: Validate executor role
-  2. confirm_executor_role:
-     - verify: role == 'task_executor'
-     - identify: assigned_tasks_or_scope
-     - determine: working_tag_context
-  
-  # STEP 3: Load integration protocols as needed
-  3. load_integration_protocols:
-     - analyze_task_complexity()
-     - fetch_rules(["context7-usage"]) # ALWAYS load for tech documentation
-     - if complexity >= 4: fetch_rules(["taskmaster_to_linear"])
-     - if ui_project_detected(): fetch_rules(["playwright_mcp"])
-     - if complexity >= 6: enable_research_capabilities()
-     - if tech_unknown(): prioritize_context7_lookup()
-```
-
-### Resume Protocol (When MCPs Become Available)
-```yaml
-resume_sequence:
-  # Triggered by "MCPs enabled. Resume" message
-  1. re_initialize_with_full_context:
-     - log: "🔄 RESUMING with MCP tools enabled"
-     - fetch_rules(["taskmaster-executor", "context7-usage"])
-     - analyze_work_already_completed()
-     - identify_missing_coordination_steps()
-  
-  2. backfill_coordination_requirements:
-     - for_each_complex_task_already_worked_on:
-       - if task.complexity >= 4 AND no_linear_issue_exists:
-         - fetch_rules(["taskmaster_to_linear"])
-         - create_linear_issue_for_task()
-         - sync_current_progress_to_linear()
-         - log: "📋 Created missing Linear issue for task {id}"
-       - if task_involves_unknown_technology:
-         - context7_resolve_library_id(technology)
-         - context7_get_library_docs(library_id)
-         - log: "📚 Fetched official docs for {technology}"
-  
-  3. continue_execution_with_full_capabilities:
-     - proceed_with_complete_workflow()
-     - use_mcp_tools_as_primary()
-     - cli_tools_as_fallback_only()
-```
-
-## Core Execution Principles
-
+### 2. Manage Models (`models`)
+*   **MCP Tool:** `models`
+*   **CLI Command:** `task-master models [options]`
+*   **Description:** `View the current AI model configuration or set specific models for different roles (main, research, fallback). Allows setting custom model IDs for Ollama and OpenRouter.`
+*   **Key MCP Parameters/Options:**
+    *   `setMain <model_id>`: `Set the primary model ID for task generation/updates.` (CLI: `--set-main <model_id>`)
+    *   `setResearch <model_id>`: `Set the model ID for research-backed operations.` (CLI: `--set-research <model_id>`)
+    *   `setFallback <model_id>`: `Set the model ID to use if the primary fails.` (CLI: `--set-fallback <model_id>`)
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
