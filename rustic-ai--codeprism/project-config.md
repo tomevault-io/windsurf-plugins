@@ -1,170 +1,188 @@
 ---
 trigger: always_on
-description: Enterprise-grade patterns for production systems including security, complex architecture, and deployment. Use this for high-stakes applications requiring authentication, comprehensive testing, and production deployment.
+description: **Purpose:** Design patterns, architecture, and performance optimizations for real-world applications. Use this when building web APIs, CLI tools, or any application requiring proper structure and scalability.
 ---
 
-# Rust Advanced - Complex Scenarios
+# Rust Intermediate - Additional Patterns
 
-**Purpose:** Enterprise-grade patterns for production systems including security, complex architecture, and deployment. Use this for high-stakes applications requiring authentication, comprehensive testing, and production deployment.
+**Purpose:** Design patterns, architecture, and performance optimizations for real-world applications. Use this when building web APIs, CLI tools, or any application requiring proper structure and scalability.
 
-**When to use:** Production services, security-critical applications, enterprise systems, microservices, or any system requiring bulletproof reliability and performance.
+**When to use:** Production applications, team projects, systems requiring testing/mocking, async programming, or performance-sensitive code.
 
-## Architecture Patterns
+## Design Patterns
 
-**Rule: Use dependency injection with traits for testable, decoupled business logic.**
-Why: Enables testing with mocks, follows SOLID principles, and allows swapping implementations.
+**Rule: Use Builder pattern for structs with 4+ parameters or complex optional configuration.**
+Why: Prevents parameter confusion and enables future extensibility without breaking changes.
 
 ```rust
-#[async_trait]
-pub trait UserRepository: Send + Sync {
-    async fn find_by_id(&self, id: UserId) -> RepositoryResult<Option<User>>;
-    async fn save(&self, user: &User) -> RepositoryResult<()>;
+pub struct DatabaseConfig {
+    host: String,
+    port: u16,
+    database: String,
+    pool_size: Option<u32>,
 }
 
-#[async_trait]
-pub trait EventPublisher: Send + Sync {
-    async fn publish(&self, event: DomainEvent) -> Result<(), EventError>;
+impl DatabaseConfig {
+    pub fn builder() -> DatabaseConfigBuilder { DatabaseConfigBuilder::default() }
 }
 
-pub struct UserDomainService<R, E> 
-where R: UserRepository, E: EventPublisher {
-    repository: Arc<R>,
-    event_publisher: Arc<E>,
+#[derive(Default)]
+pub struct DatabaseConfigBuilder {
+    host: Option<String>,
+    port: Option<u16>,
+    database: Option<String>,
+    pool_size: Option<u32>,
 }
 
-impl<R, E> UserDomainService<R, E>
-where R: UserRepository, E: EventPublisher {
-    pub async fn create_user(&self, cmd: CreateUserCommand) -> DomainResult<User> {
-        let user = User::create(cmd.email, cmd.name, cmd.role)?;
-        self.repository.save(&user).await?;
+impl DatabaseConfigBuilder {
+    pub fn host(mut self, host: impl Into<String>) -> Self {
+        self.host = Some(host.into()); self
+    }
+    
+    pub fn build(self) -> Result<DatabaseConfig, BuildError> {
+        Ok(DatabaseConfig {
+            host: self.host.ok_or(BuildError::MissingHost)?,
+            port: self.port.unwrap_or(5432),
+            database: self.database.ok_or(BuildError::MissingDatabase)?,
+            pool_size: self.pool_size,
+        })
+    }
+}
+```
+
+**Rule: Use Factory pattern for creating different implementations based on runtime conditions.**
+Why: Decouples object creation from usage, essential for dependency injection and testing.
+
+```rust
+pub trait UserRepository {
+    fn find_by_id(&self, id: UserId) -> Result<Option<User>, RepositoryError>;
+}
+
+pub enum StorageType { InMemory, Database(String) }
+
+impl RepositoryFactory {
+    pub fn create(storage_type: StorageType) -> Result<Box<dyn UserRepository>, Error> {
+        match storage_type {
+            StorageType::InMemory => Ok(Box::new(InMemoryRepo::new())),
+            StorageType::Database(url) => Ok(Box::new(DatabaseRepo::new(&url)?)),
+        }
+    }
+}
+```
+
+## Module Organization
+
+**Rule: Group related functionality into modules with clear public interfaces.**
+Why: Improves maintainability and enables better encapsulation.
+
+```rust
+// lib.rs
+pub mod models;
+pub mod repositories;  
+pub mod services;
+
+pub use models::User;
+pub use services::UserService;
+
+// services/user_service.rs
+pub struct UserService<R: UserRepository> {
+    repository: R,
+    validator: UserValidator,
+}
+
+impl<R: UserRepository> UserService<R> {
+    pub async fn create_user(&self, request: CreateUserRequest) -> Result<User, UserServiceError> {
+        self.validator.validate(&request)?;
         
-        let event = DomainEvent::UserCreated {
-            user_id: user.id(),
-            email: user.email().to_string(),
-            created_at: Utc::now(),
-        };
-        self.event_publisher.publish(event).await?;
+        if self.repository.exists_by_email(&request.email).await? {
+            return Err(UserServiceError::EmailAlreadyExists);
+        }
+        
+        let user = User::new(request.email, request.name)?;
+        self.repository.save(&user).await?;
         Ok(user)
     }
 }
 ```
 
-**Rule: Separate commands (writes) from queries (reads) for complex domains.**
-Why: CQRS improves performance, enables event sourcing, and simplifies complex business logic.
+## Advanced Error Handling
+
+**Rule: Create domain-specific error types with context and use type aliases.**
+Why: Provides better debugging information and cleaner function signatures.
 
 ```rust
-// Command side
-#[derive(Debug)]
-pub struct CreateUserCommand {
-    pub email: String,
-    pub name: String,
-    pub role: Role,
+#[derive(Debug, thiserror::Error)]
+pub enum UserServiceError {
+    #[error("Validation failed: {0}")]
+    Validation(#[from] ValidationError),
+    #[error("User with email '{email}' already exists")]
+    EmailAlreadyExists { email: String },
+    #[error("Repository error: {0}")]
+    Repository(#[from] RepositoryError),
 }
 
+pub type UserResult<T> = Result<T, UserServiceError>;
+
+// Usage becomes cleaner
+pub async fn find_user(&self, id: UserId) -> UserResult<User> {
+    self.repository.find_by_id(id).await?
+        .ok_or_else(|| UserServiceError::UserNotFound { id })
+}
+```
+
+## Enhanced Testing
+
+**Rule: Use parameterized tests and fixtures to reduce test duplication.**
+Why: Provides comprehensive coverage with minimal boilerplate.
+
+```rust
+use rstest::*;
+
+#[rstest]
+#[case("test@example.com", true)]
+#[case("invalid-email", false)]
+#[case("", false)]
+fn test_email_validation(#[case] email: &str, #[case] expected: bool) {
+    assert_eq!(is_valid_email(email), expected);
+}
+
+// Test fixtures
+struct TestSetup {
+    service: UserService<MockUserRepository>,
+}
+
+impl TestSetup {
+    fn new() -> Self {
+        let mock_repo = MockUserRepository::new();
+        let service = UserService::new(mock_repo);
+        Self { service }
+    }
+}
+
+#[tokio::test]
+async fn test_create_user_success() {
+    let setup = TestSetup::new();
+    // Configure mocks and test...
+}
+```
+
+## Async Programming
+
+**Rule: Use async traits for I/O operations and concurrent processing for independent tasks.**
+Why: Enables non-blocking operations and better scalability.
+
+```rust
 #[async_trait]
-pub trait CommandHandler<C> {
-    type Result;
-    type Error;
-    async fn handle(&self, command: C) -> Result<Self::Result, Self::Error>;
+pub trait EmailService: Send + Sync {
+    async fn send_email(&self, to: &str, subject: &str, body: &str) -> Result<(), EmailError>;
 }
 
-// Query side
-#[derive(Debug, Serialize)]
-pub struct UserView {
-    pub id: UserId,
-    pub email: String,
-    pub name: String,
-    pub status: UserStatus,
-}
+// Concurrent processing
+use futures::future::join_all;
 
-#[async_trait]
-pub trait QueryHandler<Q> {
-    type Result;
-    async fn handle(&self, query: Q) -> Result<Self::Result, Self::Error>;
-}
-```
-
-## Security Implementation
-
-**Rule: Hash passwords with Argon2 and implement secure JWT handling.**
-Why: Prevents authentication bypass and protects against credential theft.
-
-```rust
-use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
-use jsonwebtoken::{encode, decode, Header, Algorithm, Validation};
-
-pub struct AuthService {
-    encoding_key: EncodingKey,
-    decoding_key: DecodingKey,
-    argon2: Argon2<'static>,
-}
-
-impl AuthService {
-    pub fn hash_password(&self, password: &str) -> Result<String, AuthError> {
-        let salt = SaltString::generate(&mut OsRng);
-        let hash = self.argon2.hash_password(password.as_bytes(), &salt)
-            .map_err(AuthError::HashingFailed)?;
-        Ok(hash.to_string())
-    }
-    
-    pub fn authenticate(&self, email: &str, password: &str, stored_hash: &str) -> Result<String, AuthError> {
-        let parsed_hash = PasswordHash::new(stored_hash)
-            .map_err(|_| AuthError::InvalidCredentials)?;
-            
-        self.argon2.verify_password(password.as_bytes(), &parsed_hash)
-            .map_err(|_| AuthError::InvalidCredentials)?;
-        
-        let claims = Claims {
-            sub: email.to_string(),
-            exp: (Utc::now() + Duration::hours(24)).timestamp() as usize,
-            roles: vec!["user".to_string()],
-        };
-        
-        encode(&Header::default(), &claims, &self.encoding_key)
-            .map_err(AuthError::TokenGeneration)
-    }
-}
-```
-
-**Rule: Sanitize and validate all inputs to prevent injection attacks.**
-Why: Input validation prevents most security vulnerabilities including XSS and injection attacks.
-
-```rust
-use regex::Regex;
-use once_cell::sync::Lazy;
-
-static EMAIL_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^[^\s@]+@[^\s@]+\.[^\s@]+$").unwrap()
-});
-
-pub struct SecurityValidator;
-
-impl SecurityValidator {
-    pub fn sanitize_string(&self, input: &str, max_length: usize) -> Result<String, ValidationError> {
-        if input.len() > max_length {
-            return Err(ValidationError::InputTooLong { max: max_length });
-        }
-        
-        // Remove dangerous characters
-        let sanitized = input.chars()
-            .filter(|c| c.is_alphanumeric() || " .,!?-_@".contains(*c))
-            .collect();
-        
-        Ok(sanitized)
-    }
-    
-    pub fn validate_email(&self, email: &str) -> Result<(), ValidationError> {
-        if !EMAIL_REGEX.is_match(email) || email.len() > 254 {
-            return Err(ValidationError::InvalidEmail);
-        }
-        Ok(())
-    }
-}
-```
-
-## Advanced Testing
-
-**Rule: Use property-based testing to verify invariants across many inputs.**
+pub async fn process_users_concurrently<F, Fut>(
+    users: Vec<User>,
+    processor: F,
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
