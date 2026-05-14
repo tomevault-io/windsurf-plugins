@@ -1,113 +1,104 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: > - No classes/OOP — functions, factories, functional composition. Extend via composition not modification. ES6+, 400 LOC/file max unless absolutely necessary.
 ---
 
-# CLAUDE.md
+# future
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+> - No classes/OOP — functions, factories, functional composition. Extend via composition not modification. ES6+, 400 LOC/file max unless absolutely necessary.
 
-## Development Commands
+## Usage
 
-### Core Commands
-- `npm run dev` - Start Vite development server (frontend only)
-- `npm run server` - Start Express.js backend server
-- `npm run build` - TypeScript compilation + Vite production build
-- `npm start` - Full production build and server start (kills port 3000 first)
+Add this to your project's CLAUDE.md to activate this skill:
 
-### Development Workflow
-For development mode, run both servers concurrently:
-1. Terminal 1: `npm run server` (backend on port 3000)
-2. Terminal 2: `npm run dev` (frontend dev server with hot reload)
+```
+Read and follow the instructions in .claude/skills/future/SKILL.md
+```
 
-### Testing & Quality
-- `npm test` - Run Jest test suite
-- `npm run test:watch` - Jest in watch mode
-- `npm run test:coverage` - Generate coverage report (70% minimum threshold)
-- `npm run test:server` - Run server-specific tests
-- `npm run lint` - ESLint code quality checks
-- `npm run lint:fix` - Auto-fix ESLint issues
-- `npm run type-check` - TypeScript type checking without emit
-- `npm run format` - Prettier code formatting
-- `npm run format:check` - Check Prettier formatting
+Or copy the instructions below directly into your CLAUDE.md:
 
-## Architecture Overview
+# Agent Coding Rules
 
-### Monolithic Frontend Pattern
-The main application logic is contained in `src/App.tsx` (~6,700 lines) which handles:
-- OAuth authentication flows for 4 platforms (LinkedIn, Twitter/X, Mastodon, Bluesky)
-- Real-time text editing with Unicode formatting
-- Platform-specific content adaptation and posting
-- Unified tagging system with autocomplete
-- Post scheduling, reminders, and management
+## Core
 
-### Hybrid OAuth Architecture
-The Express.js server (`server.js`) implements multiple OAuth flows:
-- **LinkedIn**: OAuth 2.0 with `w_member_social` scope
-- **Twitter/X**: Hybrid OAuth 2.0 for tweets + OAuth 1.0a for media uploads
-- **Mastodon**: OAuth 2.0 with instance-specific configuration
-- **Bluesky**: App password authentication via AT Protocol
+- No classes/OOP — functions, factories, functional composition. Extend via composition not modification. ES6+, 400 LOC/file max unless absolutely necessary.
+- Factory pattern: `createUser()` returns `{ activate, deactivate, ... }` — plain object with methods, not `class User`
+- Names: `verbNoun`, `isActive`, `CONSTANTS`, `kebab-case.ts`
+- Domain folders with barrel `index.ts`: `/users/get-users.ts, update-users.ts → index.ts`
+- JSDoc for all public APIs (explain WHY not what). Comments only where intent unclear
+- Critical/missing-dep errors → `throw` (language-native). Runtime/user errors → handle gracefully using project's error handling + logging patterns
+- Code for humans: readability over cleverness. Many small functions > one monolith
 
-### Utility Organization
-Core functionality is modularized in `src/utils/`:
-- `textFormatting.ts` - Unicode character conversion (bold/italic)
-- `tagging.ts` - Unified `@{Person Name}` tagging system with platform conversion
-- `bluesky-facets.ts` - AT Protocol facet handling for Bluesky
+## Patterns
 
-### Platform Abstraction
-Text processing includes platform-specific adaptations:
-- Character limits: LinkedIn (3,000), Twitter (280/25,000), Mastodon (500), Bluesky (300)
-- Tag format conversion: `@{Person Name}` → platform-specific mentions
-- Smart chunking at sentence/paragraph boundaries for long content
+- Single responsibility. DI via params (unified context object). Guard clauses early return. Object lookup > switch
+- Contract-based boundaries: types define expected shapes, enforced at module boundaries
+- Prefer `type` over `interface`, ban `enum`. Explicit return types on public functions
+- Co-locate standalone modules. Abstract only when reused. Extraction before 3 uses = premature
+- No barrel re-exports across domains — circular deps, slow type-checking
+- `safeTry` over try/catch. `.filter().map()` over for loops
+- `{ name, email }` not `(name, email, ...)` basically named params in an object vs positional unless param is single.
+- Defensive: anticipate failure. Critical harm → throw fast. Known failure paths → handle gracefully
 
-## Key Technical Details
+## React
 
-### Authentication Flow
-OAuth token exchange happens server-side to protect client secrets. Tokens are stored in localStorage with automatic refresh handling.
+- State logic → hooks. Components pure presentational. Containers handle state, pure components render props
+- Prop drilling max 2 levels. Use context/state management beyond
+- Check `data?.length > 0` before `.map()`. `useMemo`, `useCallback`, `React.memo`
+- Build complex UIs from small, focused components
 
-### Data Persistence
-- **Client-side**: localStorage for drafts, posts, person mappings, and preferences
-- **Export/Import**: JSON format for post backup and migration
+## Philosophy
 
-### Text Formatting Engine
-Uses Unicode characters for cross-platform bold/italic text:
-- `**text**` → 𝗯𝗼𝗹𝗱 (Mathematical Bold)
-- `_text_` → 𝘪𝘵𝘢𝘭𝘪𝘤 (Mathematical Italic)
+- **Plan first** → systematize → implement. Never rush. Break complex tasks into phases
+- **Follow my strategy exactly**, suggest before deviating. I approve changes
+- **Occam's Razor**: simplest solution that works. Add complexity only when needed
+- **Existing patterns first**: work with what's there. Don't rewrite when fix works
+- **Reflect after tasks**: what worked, what failed, what learned. QA your own work
+- **Multi-agent collaboration**: delegate to other agents where possible
+- **Document decisions**: record reasoning behind changes, tradeoffs, impacts
+- **Agree on tradeoffs before committing**: I approve tradeoffs before they hit the codebase
+- **Keep code taste matching mine**: your code style should blend with existing
+- **Be brief**: conciseness over verbosity in communication
+- **Not demo/prototypes**: real thing or don't do it. One clear way to do something
 
-### Tagging System
-Unified `@{Person Name}` syntax converts to platform-specific formats:
-- LinkedIn: `@Display Name` (requires manual selection after paste)
-- Twitter/X: `@username` (automatic clickable mentions)
-- Mastodon: `@username@instance` (automatic mentions)
-- Bluesky: `@handle.domain` (with AT Protocol facets)
+### Think Outside the Box
 
-## Testing Strategy
+When the obvious approach isn't working after 2 attempts, stop and reconsider. The repeated failure is a signal — either escalate to me for direction, or find a creative alternative. Don't tunnel-vision on one approach. If you're patching the same thing twice, the fix is probably wrong. Ask: "what am I assuming that might be wrong?"
 
-### Test Structure
-- **Unit tests**: `src/utils/*.test.ts` for text formatting and tagging
-- **Component tests**: `src/components/__tests__/` for React components
-- **Integration tests**: `tests/` directory for OAuth flows and API endpoints
-- **Server tests**: `tests/server/` for Express.js API testing
+### Think in Systems
 
-### Coverage Requirements
-Minimum 70% coverage across all metrics (branches, functions, lines, statements).
+Every change ripples. Before implementing, map the blast radius:
 
-## Build & Deployment
+- What contracts (types, APIs, DB schemas) does this break or require changes to?
+- What downstream consumers depend on the current behavior?
+- Does this stabilize or destabilize the system? A fix that introduces new edge cases is worse than the bug.
+- Is the tradeoff worth it? Document it. Get approval before committing.
+- Trace the full call chain, not just the immediate function. A change in `utils.ts` affects every caller.
 
-### Production Build
-1. TypeScript compilation with strict type checking
-2. Vite optimized build to `dist/` directory
-3. Express.js serves both API and static files on single port
+### Think in First Principles
 
-### Environment Setup
-Copy `.env.example` to `.env` and configure OAuth credentials:
-- LinkedIn Client ID/Secret
-- Twitter OAuth 2.0 Client ID + OAuth 1.0a credentials
-- No server-side config needed for Mastodon/Bluesky (client-side auth)
+When a problem recurs or fixes don't stick, don't apply more patches. Break it down:
 
----
-> Source: [terrytangyuan/social-media-kit](https://github.com/terrytangyuan/social-media-kit) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:agents_md:2026-05-06 -->
+- What is the base assumption? Is it actually true? (e.g., "safeTry preserves Result nesting" — it doesn't)
+- Can we isolate and test the assumption independently?
+- Divide and conquer: split the problem into independently verifiable pieces. Prove each piece works before composing.
+- If the foundation is wrong, no amount of upper-layer fixes will hold. Fix the foundation first.
+
+## Libraries
+
+- `slang-ts` (safeTry/result), `z-fetch` (fetch), `regist` (regex)
+- Understand library edge cases: read source enough to know when behavior diverges from types
+- Check Context7 MCP for library docs. Need more? Ask me. Source in node_modules if you want to inspect directly
+- agent-browser CLI for frontend debugging. `agent-browser -h` for usage
+- MCPs/tools/agents available → use them. Skills available → load them when relevant. Ask me if unsure how
+- Use caveman skill if available, but not its ultra version!
+
+## Boundaries — DO NOT CROSS WITHOUT APPROVAL
+
+- **Servers**: you never start. Ask me
+- **DB**: all db commands/decisions → ask me first
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [tomevault-io/codex-plugins](https://github.com/tomevault-io/codex-plugins) — distributed by [TomeVault](https://tomevault.io).
