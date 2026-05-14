@@ -1,11 +1,11 @@
 ---
 trigger: always_on
-description: > > This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: > > A peer-to-peer chat substrate that lets multiple Claude Code instances share the same context. See @README.md for the user story and demo flow; this file is for Claude.
 ---
 
 # gemini-md
 
-> > This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+> > A peer-to-peer chat substrate that lets multiple Claude Code instances share the same context. See @README.md for the user story and demo flow; this file is for Claude.
 
 ## Usage
 
@@ -17,70 +17,61 @@ Read and follow the instructions in .claude/skills/gemini-md/SKILL.md
 
 Or copy the instructions below directly into your CLAUDE.md:
 
-## n8n-mcp
+## cc-connect
 
-> This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+> A peer-to-peer chat substrate that lets multiple Claude Code instances share the same context. See @README.md for the user story and demo flow; this file is for Claude.
 
-# CLAUDE.md
+# cc-connect — agent guide
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+A peer-to-peer chat substrate that lets multiple Claude Code instances share the same context. See @README.md for the user story and demo flow; this file is for Claude.
 
-## Project Overview
+## What this repo is (mental model)
 
-n8n-mcp is a comprehensive documentation and knowledge server that provides AI assistants with complete access to n8n node information through the Model Context Protocol (MCP). It serves as a bridge between n8n's workflow automation platform and AI models, enabling them to understand and work with n8n nodes effectively.
+- **Rust workspace** with five crates (`cc-connect`, `cc-connect-core`, `cc-connect-hook`, `cc-connect-mcp`, `cc-connect-tui`) plus a **Bun + React + Ink** chat panel under `chat-ui/`. Both build into `target/release/`.
+- The substrate is **chat-as-context**: every Peer's Claude reads from a locally-replicated `~/.cc-connect/rooms/<topic>/log.jsonl`. The `UserPromptSubmit` hook (`cc-connect-hook`) injects unread messages into the next prompt. That's the magic.
+- The MCP server (`cc-connect-mcp`) lets Claude write back into the room — `cc_send`, `cc_at`, `cc_drop`, etc.
 
-## ✅ Latest Updates (v2.7.4)
+## Read these before deep work
 
-### Update (v2.7.4) - Self-Documenting MCP Tools:
-- ✅ **RENAMED: start_here_workflow_guide → tools_documentation** - More descriptive name
-- ✅ **NEW: Depth parameter** - Control documentation detail level with "essentials" or "full"
-- ✅ **NEW: Per-tool documentation** - Get help for any specific tool by name
-- ✅ **Concise by default** - Essential info only, unless full depth requested
-- ✅ **LLM-friendly format** - Plain text, not JSON for better readability
-- ✅ **Two-tier documentation**:
-  - **Essentials**: Brief description, key parameters, example, performance, 2-3 tips
-  - **Full**: Complete documentation with all parameters, examples, use cases, best practices, pitfalls
-- ✅ **Quick reference** - Call without parameters for immediate help
-- ✅ **8 documented tools** - Comprehensive docs for most commonly used tools
-- ✅ **Performance guidance** - Clear indication of which tools are fast vs slow
-- ✅ **Error prevention** - Common pitfalls documented upfront
+The canonical specs live in repo root, not in this file. Do not duplicate them here.
 
-### Update (v2.7.0) - Diff-Based Workflow Editing with Transactional Updates:
-- ✅ **NEW: n8n_update_partial_workflow tool** - Update workflows using diff operations for precise, incremental changes
-- ✅ **RENAMED: n8n_update_workflow → n8n_update_full_workflow** - Clarifies that it replaces the entire workflow
-- ✅ **NEW: WorkflowDiffEngine** - Applies targeted edits without sending full workflow JSON
-- ✅ **80-90% token savings** - Only send the changes, not the entire workflow
-- ✅ **13 diff operations** - addNode, removeNode, updateNode, moveNode, enableNode, disableNode, addConnection, removeConnection, updateConnection, updateSettings, updateName, addTag, removeTag
-- ✅ **Smart node references** - Use either node ID or name for operations
-- ✅ **Transaction safety** - Validates all operations before applying any changes
-- ✅ **Validation-only mode** - Test your diff operations without applying them
-- ✅ **Comprehensive test coverage** - All operations and edge cases tested
-- ✅ **Example guide** - See [workflow-diff-examples.md](./docs/workflow-diff-examples.md) for usage patterns
-- ✅ **FIXED: MCP validation error** - Simplified schema to fix "additional properties" error in Claude Desktop
-- ✅ **FIXED: n8n API validation** - Updated cleanWorkflowForUpdate to remove all read-only fields
-- ✅ **FIXED: Claude Desktop compatibility** - Added additionalProperties: true to handle extra metadata from Claude Desktop
-- ✅ **NEW: Transactional Updates** - Two-pass processing allows adding nodes and connections in any order
-- ✅ **Operation Limit** - Maximum 5 operations per request ensures reliability
-- ✅ **Order Independence** - Add connections before nodes - engine handles dependencies automatically
+- @CONTEXT.md — Ubiquitous Language. **Use these terms verbatim** (Room, Ticket, Substrate, Peer, Host, Identity, Pubkey, Message, Hook, Cursor, Backfill, Session, Injection, Context). Never drift to "channel", "session", "client", "history", "memory" except when the term genuinely applies.
+- [PROTOCOL.md](PROTOCOL.md) — wire spec, RFC 2119 keywords. Read on demand for anything touching gossip payloads, Tickets, Backfill RPC, file_drop, or on-disk layout. **Wire-format changes are breaking** — bump `v` and the ALPN.
+- [SECURITY.md](SECURITY.md) — threat model. Read on demand before changing anything in `cc_drop` blocklists, hook injection paths, identity handling, or relay routing.
+- [TODOS.md](TODOS.md) — known gaps and the v0.1 → v1.0 migration list. Read on demand when picking up unfinished work.
+- `docs/adr/` — decisions already made. Don't re-litigate; if you must reopen, mark the contradiction explicitly.
 
-### Update (v2.6.3) - n8n Instance Workflow Validation:
-- ✅ **NEW: n8n_validate_workflow tool** - Validate workflows directly from n8n instance by ID
-- ✅ **Fetches and validates** - Retrieves workflow from n8n API and runs comprehensive validation
-- ✅ **Same validation logic** - Uses existing WorkflowValidator for consistency
-- ✅ **Full validation options** - Supports all validation profiles and options
-- ✅ **Integrated workflow** - Part of complete lifecycle: discover → build → validate → deploy → execute
-- ✅ **No JSON needed** - AI agents can validate by just providing workflow ID
+## Commands you can't infer from the code
 
-### Update (v2.6.2) - Enhanced Workflow Creation Validation:
-- ✅ **NEW: Node type validation** - Verifies node types actually exist in n8n
-- ✅ **FIXED: nodes-base prefix detection** - Now catches `nodes-base.webhook` BEFORE database lookup
-- ✅ **NEW: Smart suggestions** - Detects `nodes-base.webhook` and suggests `n8n-nodes-base.webhook`
-- ✅ **NEW: Common mistake detection** - Catches missing package prefixes (e.g., `webhook` → `n8n-nodes-base.webhook`)
-- ✅ **NEW: Minimum viable workflow validation** - Prevents single-node workflows (except webhooks)
-- ✅ **NEW: Empty connection detection** - Catches multi-node workflows with no connections
-- ✅ **Enhanced error messages** - Clear guidance on proper workflow structure
-- ✅ **Connection examples** - Shows correct format: `connections: { "Node Name": { "main": [[{ "node": "Target", "type": "main", "index": 0 }]] } }`
-- ✅ **Helper functions** - `getWorkflowStructureExample()` and `getWorkflowFixSuggestions()`
+```bash
+# Workspace build (Rust + chat-ui together — install.sh wraps this)
+./install.sh                               # interactive, idempotent; sets up hook + MCP
+cargo build --workspace --release          # Rust only
+(cd chat-ui && bun install && bun run build)   # chat-ui → target/release/cc-chat-ui
+
+# Tests
+cargo test --workspace                     # Rust unit + integration
+scripts/smoke-test.sh                      # end-to-end: spin two peers, check gossip
+scripts/smoke-test-mcp.sh                  # MCP server tools
+scripts/smoke-test-bg.sh                   # background host-daemon path
+(cd chat-ui && bun test && bunx tsc --noEmit)
+
+# Diagnostics
+./target/release/cc-connect doctor         # verify install (hook entry, identity, perms)
+```
+
+`Cargo.lock` **is tracked on purpose** — this repo ships binaries and reproducible builds gate the v0.1 release. Do not gitignore it.
+
+## Non-obvious gotchas
+
+- **Vendored ed25519 / ed25519-dalek**. `Cargo.toml`'s `[patch.crates-io]` points at `vendored/ed25519` + `vendored/ed25519-dalek`. The published `ed25519-3.0.0-rc.4` is broken against current `pkcs8` (`Error::KeyMalformed` enum-variant break). Drop the patch only when upstream ships a working `ed25519-dalek`. See [TODOS.md](TODOS.md).
+- **MSRV is 1.89** (`workspace.package.rust-version`). Driven by the iroh stack itself (`iroh@0.97`, `iroh-blobs@0.99`, `iroh-gossip@0.97`, `iroh-relay@0.97` all require 1.89). CI gates on this; install.sh actively `rustup update`s when the user has an older toolchain.
+- **Hook trust boundary**. `cc-connect-hook` injects chat context only when `CC_CONNECT_ROOM` is set in its env (set by `cc-connect-tui` when it spawns the Claude PTY). Unrelated `claude` invocations on the same machine see nothing. Don't loosen this — it's the cross-process isolation guarantee in [SECURITY.md](SECURITY.md).
+- **PID-based active-rooms discovery** lives at `/tmp/cc-connect-$UID/active-rooms/<topic>.active`, not under `~`. PIDs are per-machine; cloud-synced homes would collide. See `docs/adr/0003-pid-based-active-rooms-discovery.md`.
+- **8 KB hook stdout budget.** `cc-connect-hook` keeps each `UserPromptSubmit` payload ≤ 8 KB so it stays inline; over that, Claude Code falls back to a 2 KB preview + persisted file. See `docs/adr/0004-hook-budget-and-graceful-overflow.md`.
+- **`cc_drop` path blocklist** rejects `~/.ssh`, `~/.aws`, `.env*`, `id_rsa*`, `*.pem`, etc. Don't widen it without a SECURITY.md update; don't narrow it without an explicit threat-model justification.
+- **iroh dependency pin** — `iroh 0.97`, `iroh-gossip 0.97`, `iroh-blobs 0.99`. The combo is non-trivial; bumping any one usually requires bumping all three together.
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
