@@ -1,141 +1,203 @@
 ---
 trigger: always_on
-description: name: SmartLead MCP Server Project Overview
+description: name: SmartLead MCP TypeScript Standards
 ---
 
 ---
-name: SmartLead MCP Server Project Overview
-description: Complete project structure guide and navigation for the SmartLead MCP Server
+name: SmartLead MCP TypeScript Standards
+description: TypeScript coding standards, patterns, and best practices for the SmartLead MCP Server
 author: LeadMagic Team
 version: 1.0.0
-# 🚀 SmartLead MCP Server - Project Overview & Navigation
+# 📝 SmartLead TypeScript Standards & Best Practices
 
-> **Quick Start**: This is your complete guide to the SmartLead MCP Server codebase. Use this to understand the project structure, find files quickly, and navigate the architecture.
+> **Code Quality Guide**: Master TypeScript patterns and standards used in the SmartLead MCP Server. Write clean, type-safe, maintainable code that follows our established conventions.
 
-## 🎯 **What is This Project?**
+## 🎯 **Quick Reference**
 
-The **SmartLead MCP Server** is a comprehensive Model Context Protocol (MCP) server that provides complete access to SmartLead's cold email automation platform through AI coding assistants like Claude, Cursor, Windsurf, and Continue.dev.
+### **🔥 Core Principles**
+1. **Strict Type Safety** → No `any` types, use proper interfaces
+2. **Zod Integration** → All inputs validated with Zod schemas
+3. **Error Handling** → Use `SmartLeadError` for API errors
+4. **Async Patterns** → Consistent async/await usage
+5. **Documentation** → JSDoc for public APIs
 
-### **🔥 Key Stats**
-- **116+ MCP Tools** covering the complete SmartLead API
-- **9 API Modules** for different functionality areas
-- **TypeScript-first** with comprehensive type safety
-- **Production-ready** with proper error handling
-- **Cross-platform** (macOS, Linux, Windows)
+### **⚡ Quick Checklist**
+- [ ] No `any` types used
+- [ ] Zod schemas for validation
+- [ ] Proper error handling
+- [ ] JSDoc for public methods
+- [ ] Consistent naming conventions
 
-## 🏗️ **Architecture Overview**
+# SmartLead MCP Server - TypeScript Standards
 
-### **🚪 Entry Points** (Start Here)
-```
-📁 Root Entry Points
-├── 🎯 src/index.ts          → Main CLI entry point (server/installer router)
-├── 🖥️  src/server.ts         → MCP server implementation (registers all tools)
-└── 🎨 src/installer.tsx      → Beautiful React Ink installer with purple gradients
-```
+## 🎯 **TypeScript Configuration**
 
-### **🧠 Core Components**
-```
-📁 Core System
-├── 🔌 src/client/index.ts    → Modern SmartLead API client (aggregates all modules)
-├── 🛠️  src/client/base.ts     → Base HTTP client (retry logic, error handling)
-└── 📋 src/types.ts           → Global TypeScript types & Zod validation schemas
-```
+### **Compiler Settings** (`tsconfig.json`)
+The project uses strict TypeScript configuration defined in **[tsconfig.json](mdc:tsconfig.json)**:
+- **Target**: ES2022 for modern JavaScript features
+- **Module**: ESNext with bundler resolution for optimal tree-shaking
+- **Strict Mode**: All strict options enabled for maximum type safety
+- **JSX**: React JSX for the installer components in **[src/installer.tsx](mdc:src/installer.tsx)**
 
-## 📂 **Directory Structure Map**
-
-### **🔧 API Modules** (`src/modules/`)
-> Each module handles a specific SmartLead API category
-
-```
-📁 src/modules/
-├── 🎯 campaigns/client.ts        → Campaign management & automation
-├── 👥 leads/client.ts            → Lead & prospect management  
-├── 📧 email-accounts/client.ts   → Email account management & warmup
-├── 📊 analytics/client.ts        → Analytics & reporting data
-├── 📈 statistics/client.ts       → Statistics & performance metrics
-├── 🚀 smart-delivery/client.ts   → Deliverability optimization & spam testing
-├── 🤖 smart-senders/client.ts    → Domain & sender reputation management
-├── 🔗 webhooks/client.ts         → Webhook management & automation
-└── 👤 client-management/client.ts → Team & client management
+### **Key Compiler Options**
+```json
+{
+  "strict": true,
+  "noImplicitAny": true,
+  "strictNullChecks": true,
+  "noImplicitReturns": true,
+  "noFallthroughCasesInSwitch": true,
+  "noUncheckedIndexedAccess": true,
+  "useUnknownInCatchVariables": true
+}
 ```
 
-### **🛠️ MCP Tools** (`src/tools/`)
-> Each tool file exposes SmartLead functionality as MCP tools
+## 📝 **Type Definition Patterns**
 
-```
-📁 src/tools/
-├── 📋 index.ts              → Central tool registration exports
-├── 🎯 campaigns.ts          → 14 campaign management tools
-├── 👥 leads.ts              → 17 lead management tools
-├── 📧 email-accounts.ts     → 15 email account tools
-├── 📊 analytics.ts          → 18 analytics & reporting tools
-├── 📈 statistics.ts         → 18 statistics tools
-├── 🚀 smart-delivery.ts     → 11 deliverability tools
-├── 🤖 smart-senders.ts      → 12 domain management tools
-├── 🔗 webhooks.ts           → 9 webhook tools
-└── 👤 client-management.ts  → 8 team management tools
-```
+### **Global Types** (`src/types.ts`)
+All shared types and Zod schemas are defined in **[src/types.ts](mdc:src/types.ts)**:
+```typescript
+// Zod schema with TypeScript type inference
+const CreateCampaignSchema = z.object({
+  name: z.string(),
+  from_email: z.string().email(),
+  // ... other fields
+});
 
-### **⚙️ Configuration & Setup**
-```
-📁 Configuration Files
-├── 📦 package.json           → NPM package config & dependencies
-├── 🔧 tsconfig.json          → TypeScript compiler settings
-├── 🎨 biome.json             → Biome linter & formatter config
-├── 🔒 .env.example           → Environment variables template
-└── ⚙️  mcp-settings-example.json → MCP client configuration template
+// Inferred TypeScript type
+type CreateCampaignRequest = z.infer<typeof CreateCampaignSchema>;
 ```
 
-### **📚 Documentation Hub**
-```
-📁 Documentation
-├── 🏠 README.md              → Marketing-optimized project overview
-├── 📖 INSTALLATION.md        → Detailed installation & setup guide
-├── 🏗️  PROJECT_STRUCTURE.md  → Comprehensive architecture documentation
-├── 🔒 SECURITY.md            → Security best practices & guidelines
-└── 📝 CHANGELOG.md           → Version history & release notes
-```
-
-## 🎯 **Quick Navigation Guide**
-
-### **🔍 Need to Find Something?**
-
-| **I want to...** | **Go to...** | **File(s)** |
-|------------------|--------------|-------------|
-| 🚀 **Start the server** | Entry point | `src/index.ts` |
-| 🛠️ **Add a new MCP tool** | Tools directory | `src/tools/[category].ts` |
-| 🔌 **Add API functionality** | Modules directory | `src/modules/[category]/client.ts` |
-| 📋 **Define new types** | Types file | `src/types.ts` |
-| ⚙️ **Configure the project** | Config files | `package.json`, `tsconfig.json` |
-| 📚 **Read documentation** | Docs | `README.md`, `INSTALLATION.md` |
-| 🎨 **Customize installer** | Installer | `src/installer.tsx` |
-| 🔧 **Debug issues** | Base client | `src/client/base.ts` |
-
-### **🚦 Development Workflow**
-
-```mermaid
-graph LR
-    A[📝 Edit Source] --> B[🔨 Build]
-    B --> C[🧪 Test]
-    C --> D[📦 Package]
-    D --> E[🚀 Deploy]
-    
-    A --> F[src/ directory]
-    B --> G[npm run build]
-    C --> H[npm test]
-    D --> I[npm pack]
-    E --> J[npm publish]
+### **Module-Specific Types**
+Each module can define its own types when needed:
+```typescript
+// In src/modules/campaigns/client.ts
+interface CampaignResponse {
+  id: number;
+  name: string;
+  status: 'active' | 'paused' | 'completed';
+  created_at: string;
+}
 ```
 
-## 🚀 **Key Features & Capabilities**
+### **MCP Configuration Types** (`src/types/config.ts`)
+MCP-specific types are in **[src/types/config.ts](mdc:src/types/config.ts)**:
+```typescript
+export interface MCPToolResponse {
+  content: Array<{
+    type: 'text';
+    text: string;
+  }>;
+  isError?: boolean;
+}
+```
 
-### **✨ What Makes This Special**
-- 🎯 **Complete API Coverage**: 116+ tools covering every SmartLead endpoint
-- 🎨 **Beautiful Installer**: React Ink interface with purple gradients
-- 🔧 **Zero-config Setup**: Auto-detects and configures MCP clients
-- 🛡️ **Production Ready**: Comprehensive error handling & security
-- 🌍 **Cross-platform**: Works on macOS, Linux, Windows
-- 📊 **Real-time Validation**: API key testing and environment setup
+## 🏗️ **Class and Interface Patterns**
+
+### **Base Client Pattern**
+All API clients extend from the base class in **[src/client/base.ts](mdc:src/client/base.ts)**:
+```typescript
+export abstract class BaseSmartLeadClient {
+  protected config: SmartLeadConfig;
+  
+  constructor(config: SmartLeadConfig) {
+    this.config = config;
+  }
+  
+  protected async withRetry<T>(operation: () => Promise<T>): Promise<T> {
+    // Implementation with proper typing
+  }
+}
+```
+
+### **Module Client Pattern**
+Individual modules follow this pattern:
+```typescript
+export class CampaignManagementClient extends BaseSmartLeadClient {
+  async createCampaign(params: CreateCampaignRequest): Promise<CampaignResponse> {
+    return this.withRetry(() => this.post('/campaigns', params));
+  }
+}
+```
+
+### **Error Class Pattern**
+Custom error classes with proper typing:
+```typescript
+export class SmartLeadError extends Error {
+  constructor(
+    message: string,
+    public readonly code: string,
+    public readonly status: number,
+    public readonly data?: unknown,
+    public readonly isRetryable: boolean = false
+  ) {
+    super(message);
+    this.name = 'SmartLeadError';
+  }
+}
+```
+
+## 🔍 **Type Safety Best Practices**
+
+### **Avoid `any` Types**
+❌ **Don't do this:**
+```typescript
+function handleResponse(data: any): any {
+  return data.result;
+}
+```
+
+✅ **Do this instead:**
+```typescript
+interface ApiResponse<T> {
+  success: boolean;
+  data: T;
+  message?: string;
+}
+
+function handleResponse<T>(data: ApiResponse<T>): T {
+  return data.data;
+}
+```
+
+### **Use Type Guards**
+```typescript
+function isSmartLeadError(error: unknown): error is SmartLeadError {
+  return error instanceof SmartLeadError;
+}
+
+// Usage in error handling
+catch (error: unknown) {
+  if (isSmartLeadError(error)) {
+    // TypeScript knows this is SmartLeadError
+    console.log(error.code, error.status);
+  }
+}
+```
+
+### **Proper Async/Await Typing**
+```typescript
+async function fetchCampaign(id: number): Promise<CampaignResponse> {
+  try {
+    const response = await this.get<CampaignResponse>(`/campaigns/${id}`);
+    return response.data;
+  } catch (error: unknown) {
+    throw this.handleError(error);
+  }
+}
+```
+
+## 📋 **Zod Integration Patterns**
+
+### **Schema Definition**
+Schemas are defined in **[src/types.ts](mdc:src/types.ts)** with proper validation:
+```typescript
+const UpdateCampaignSchema = z.object({
+  id: z.number().int().positive('Campaign ID must be positive'),
+  name: z.string().min(1, 'Campaign name is required').optional(),
+  status: z.enum(['active', 'paused', 'completed']).optional(),
+  settings: z.record(z.unknown()).optional()
+});
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
