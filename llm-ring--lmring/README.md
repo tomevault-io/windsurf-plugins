@@ -7,11 +7,11 @@ Open-source, self-hostable LLM arena with model compare, voting, and leaderboard
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [llm-ring/lmring](https://github.com/llm-ring/lmring).
+Original source: `CLAUDE.md` in [llm-ring/lmring](https://github.com/llm-ring/lmring).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
