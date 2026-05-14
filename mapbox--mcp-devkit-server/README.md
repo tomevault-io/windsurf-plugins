@@ -7,11 +7,11 @@ Developer-focused Mapbox MCP Server
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [mapbox/mcp-devkit-server](https://github.com/mapbox/mcp-devkit-server).
+Original source: `CLAUDE.md` in [mapbox/mcp-devkit-server](https://github.com/mapbox/mcp-devkit-server).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
