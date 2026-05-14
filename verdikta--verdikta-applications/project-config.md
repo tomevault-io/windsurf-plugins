@@ -1,290 +1,282 @@
 ---
 trigger: always_on
-description: Documentation standards and when to update docs
+description: React component patterns and frontend best practices
 ---
 
 
-# Documentation Standards
+# Frontend Patterns
 
-## Documentation Structure
+## Component Structure
 
-### Essential Documents
-1. **README.md** - User-facing overview, quick start, features
-2. **PROJECT-OVERVIEW.md** - Architecture, concepts, data models
-3. **CURRENT-STATE.md** - Implementation status, setup instructions
-4. **DEVELOPER-GUIDE.md** - Quick reference for developers
-5. **DESIGN.md** - Complete technical specification
+### Standard Component Layout
+```jsx
+import { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { apiService } from '../services/api';
+import './ComponentName.css';
 
-### When to Create New Docs
-Create new documentation when:
-- Adding a major feature (e.g., MULTI-FILE-SUBMISSION-GUIDE.md)
-- Implementing complex workflow (e.g., TESTING-GUIDE.md)
-- Consolidating information (e.g., IMPLEMENTATION-SUMMARY.md)
-
-Don't create docs for:
-- Minor bug fixes
-- Small UI tweaks
-- Internal refactoring
-
-## Update Checklist
-
-### When Adding Features
-- [ ] Update README.md with feature description
-- [ ] Update CURRENT-STATE.md with implementation status
-- [ ] Add to DEVELOPER-GUIDE.md if it's a new pattern
-- [ ] Create feature-specific guide if complex
-- [ ] Update relevant section in DESIGN.md
-
-### When Changing Architecture
-- [ ] Update PROJECT-OVERVIEW.md
-- [ ] Update DESIGN.md
-- [ ] Update any affected diagrams
-- [ ] Note in CURRENT-STATE.md
-
-### When Fixing Bugs
-- [ ] If significant, note in CURRENT-STATE.md
-- [ ] Update TROUBLESHOOTING section if applicable
-- [ ] No need to update for minor fixes
-
-## Document Formatting
-
-### Headers
-```markdown
-# Main Title (H1 - only one per document)
-
-## Section (H2)
-
-### Subsection (H3)
-
-#### Minor Section (H4)
-```
-
-### Code Blocks
-Always specify language:
-````markdown
-```javascript
-const example = "code";
-```
-
-```bash
-npm install
-```
-
-```json
-{
-  "key": "value"
+function ComponentName({ walletState }) {
+  // State
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  
+  // Hooks
+  const { id } = useParams();
+  const navigate = useNavigate();
+  
+  // Effects
+  useEffect(() => {
+    loadData();
+  }, [id]);
+  
+  // Handlers
+  const handleAction = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      // ... operation
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Render helpers
+  if (loading) return <LoadingState />;
+  if (error) return <ErrorState error={error} />;
+  
+  return (
+    <div className="component-name">
+      {/* Content */}
+    </div>
+  );
 }
-```
-````
 
-### File References
-Use absolute paths from repo root:
-```markdown
-See [archiveGenerator.js](example-bounty-program/server/utils/archiveGenerator.js)
+export default ComponentName;
 ```
 
-### Status Indicators
-Use emoji for quick status:
-```markdown
-✅ Complete - Feature is done and tested
-🔄 In Progress - Currently working on
-⏳ Pending - Planned but not started
-❌ Blocked - Cannot proceed
-⚠️ Needs Attention - Issues to resolve
+## State Management
+
+### Loading States
+Always show loading indicators:
+```jsx
+const [loading, setLoading] = useState(false);
+
+{loading && (
+  <div className="loading-status">
+    <div className="spinner"></div>
+    <p>Processing...</p>
+  </div>
+)}
 ```
 
-### Command Examples
-Show full commands with context:
-```markdown
-### Start Backend
-```bash
-cd example-bounty-program/server
-npm install
-npm run dev
-```
-```
+### Error Handling
+Display user-friendly errors:
+```jsx
+const [error, setError] = useState(null);
 
-### Tables
-Use for structured data:
-```markdown
-| Feature | Status | Notes |
-|---------|--------|-------|
-| Jobs    | ✅     | Complete |
-| Submit  | ✅     | Complete |
+{error && (
+  <div className="alert alert-error">
+    <p>❌ {error}</p>
+  </div>
+)}
 ```
 
-## README.md Structure
+### Form Validation
+Validate on both change and submit:
+```jsx
+const handleInputChange = (e) => {
+  const value = e.target.value;
+  
+  // Real-time validation
+  if (value.length > MAX_LENGTH) return;
+  
+  setValue(value);
+  setError(null);
+};
 
-```markdown
-# Project Name
-
-**Status:** 🟡 Status  
-**Version:** 0.2.0
-
-## Overview
-Brief description (2-3 paragraphs)
-
-## Quick Links
-Links to essential docs
-
-## Key Features
-- Feature 1
-- Feature 2
-
-## Getting Started
-Prerequisites and setup
-
-## Development Roadmap
-Phases with checkboxes
-
-## FAQ
-Common questions
-
-## Support & Contact
-Links and resources
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  
+  // Pre-submit validation
+  if (!value.trim()) {
+    alert('Field is required');
+    return;
+  }
+  
+  // Submit
+};
 ```
 
-## Technical Documentation
+## API Integration
 
-### Include
-1. **Purpose** - Why this exists
-2. **How it works** - Technical details
-3. **Examples** - Code snippets
-4. **Validation** - How to verify
-5. **Troubleshooting** - Common issues
+### Use API Service Layer
+Never use axios directly in components:
+```jsx
+// ✅ Good
+const result = await apiService.createJob(jobData);
 
-### Structure
-```markdown
-# Feature Name
-
-**Status:** Complete  
-**Date:** October 2025
-
-## Overview
-What and why
-
-## Implementation Details
-How it works
-
-## Usage
-Examples
-
-## Testing
-How to test
-
-## Troubleshooting
-Common issues
+// ❌ Bad
+const result = await axios.post('/api/jobs/create', jobData);
 ```
 
-## API Documentation
-
-### Endpoint Documentation
-```markdown
-### POST /api/endpoint
-
-**Description:** What it does
-
-**Request:**
-```json
-{
-  "field": "value"
+### Handle API Errors
+```jsx
+try {
+  const result = await apiService.operation();
+  // Handle success
+} catch (err) {
+  console.error('Operation failed:', err);
+  setError(err.response?.data?.details || err.message);
+  alert(`❌ Error: ${err.response?.data?.details || err.message}`);
 }
 ```
 
-**Response:**
-```json
-{
-  "success": true,
-  "data": { }
+## Form Patterns
+
+### Multiple File Upload
+```jsx
+const [files, setFiles] = useState([]);
+
+const handleFileAdd = (e) => {
+  const selectedFiles = Array.from(e.target.files);
+  
+  // Validate each file
+  const validFiles = selectedFiles.filter(file => {
+    if (file.size > MAX_SIZE) {
+      alert(`File too large: ${file.name}`);
+      return false;
+    }
+    return true;
+  });
+  
+  setFiles(prev => [...prev, ...validFiles.map(file => ({
+    file,
+    description: `Default description for ${file.name}`
+  }))]);
+};
+
+const handleFileRemove = (index) => {
+  setFiles(prev => prev.filter((_, i) => i !== index));
+};
+```
+
+### FormData Construction
+```jsx
+const formData = new FormData();
+
+// Add files
+files.forEach(({ file }) => {
+  formData.append('files', file);
+});
+
+// Add other fields
+formData.append('field1', value1);
+formData.append('field2', value2);
+
+// Add JSON data
+const metadata = { ... };
+formData.append('metadata', JSON.stringify(metadata));
+
+// Submit
+await apiService.submitWithFiles(formData);
+```
+
+## Wallet Integration
+
+### Check Wallet Connection
+Always check before operations:
+```jsx
+if (!walletState.isConnected) {
+  return (
+    <div className="alert alert-warning">
+      <h2>Wallet Not Connected</h2>
+      <p>Please connect your wallet to continue.</p>
+    </div>
+  );
 }
 ```
 
-**Errors:**
-- 400: Invalid input
-- 404: Not found
-- 500: Server error
+### Use Wallet Address
+```jsx
+const handleSubmit = async () => {
+  if (!walletState.isConnected) {
+    alert('Please connect your wallet first');
+    return;
+  }
+  
+  await apiService.createJob({
+    creator: walletState.address,
+    // ... other fields
+  });
+};
 ```
 
-## Inline Code Documentation
+## Word Count Validation
 
-### Function Documentation
-```javascript
-/**
- * Brief description of what function does
- * 
- * @param {Object} options - Configuration options
- * @param {string} options.field1 - Description of field1
- * @param {Array} options.field2 - Description of field2
- * @returns {Promise<Object>} - What it returns
- * @throws {Error} - When it might throw
- */
-async function exampleFunction(options) {
-  // Implementation
+### Real-time Word Counter
+```jsx
+const [text, setText] = useState('');
+const MAX_WORDS = 200;
+
+const getWordCount = () => {
+  return text.trim().split(/\s+/).filter(w => w.length > 0).length;
+};
+
+const handleTextChange = (e) => {
+  const newText = e.target.value;
+  const wordCount = newText.trim().split(/\s+/).filter(w => w.length > 0).length;
+  
+  if (wordCount <= MAX_WORDS) {
+    setText(newText);
+  }
+};
+
+// Display
+<label>
+  Text (Max {MAX_WORDS} words)
+  <span className="word-count">{getWordCount()} / {MAX_WORDS}</span>
+</label>
+<textarea value={text} onChange={handleTextChange} />
+```
+
+## CSS Patterns
+
+### Use BEM-like Naming
+```css
+.component-name { }
+.component-name__element { }
+.component-name--modifier { }
+```
+
+### CSS Variables
+Use existing variables:
+```css
+.element {
+  color: var(--text-primary);
+  background-color: var(--bg);
+  border: 1px solid var(--border);
 }
 ```
 
-### Complex Logic
-Add comments for:
-- Non-obvious logic
-- Business rules
-- Important constraints
-- Workarounds
-
-```javascript
-// Word count validation: max 200 words per specification
-const wordCount = text.trim().split(/\s+/).length;
-if (wordCount > 200) {
-  return error;
+### Responsive Design
+Always include mobile breakpoints:
+```css
+@media (max-width: 768px) {
+  .desktop-layout {
+    flex-direction: column;
+  }
 }
 ```
 
-## Version History
+## Dialog/Modal Patterns
 
-### In README.md
-Track major changes:
-```markdown
-## Changelog
-
-### v0.2.0 (October 2025)
-- Added multi-file submission support
-- Added custom submission narratives
-- Enhanced CID display dialog
-
-### v0.1.0 (September 2025)
-- Initial implementation
-- Basic job creation and submission
-```
-
-## Links and References
-
-### External Links
-Include context and target:
-```markdown
-See the [Verdikta Manifest Specification](https://docs.verdikta.com/verdikta-common/MANIFEST_SPECIFICATION/) for details.
-```
-
-### Internal Links
-Use relative paths:
-```markdown
-See [DEVELOPER-GUIDE.md](DEVELOPER-GUIDE.md) for setup.
-```
-
-## Documentation Checklist
-
-Before committing documentation changes:
-- [ ] Spell check completed
-- [ ] Code examples tested
-- [ ] Links verified (no 404s)
-- [ ] Status indicators accurate
-- [ ] Version numbers updated
-- [ ] Breaking changes highlighted
-- [ ] Examples are complete
-- [ ] File paths are correct
-- [ ] Formatting is consistent
-
-## Best Practices
-
-1. **Keep it current** - Update docs with code changes
+### Overlay with Click-to-Close
+```jsx
+<div className="dialog-overlay" onClick={handleClose}>
+  <div className="dialog" onClick={(e) => e.stopPropagation()}>
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
