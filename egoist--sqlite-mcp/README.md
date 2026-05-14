@@ -7,13 +7,13 @@ MCP server for SQLite
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `.cursor/rules/*.mdc` in [egoist/sqlite-mcp](https://github.com/egoist/sqlite-mcp).
+Original source: `CLAUDE.md` in [egoist/sqlite-mcp](https://github.com/egoist/sqlite-mcp).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
+- **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
