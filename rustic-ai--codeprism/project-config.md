@@ -1,148 +1,92 @@
 ---
 trigger: always_on
-description: **Purpose:** Ensures all documentation is accurate, complete, and synchronized with actual codebase. Prevents documentation drift, validates code examples, and maintains high-quality user experience through reliable documentation.
+description: This rule provides essential guidance for executing GitHub CLI (gh) commands correctly when using the run_terminal_cmd tool. It covers the critical workaround for pager-related issues that cause gh commands to fail with "cannot open '|' for reading" errors. The rule documents why piping gh commands to cat (e.g., gh run list | cat) is necessary and provides templates for common GitHub workflow operations, issue management, and pull request commands. Essential for debugging GitHub Actions workflow
 ---
 
-# Documentation Rules - Accuracy & Completeness
+# GitHub CLI (gh) Command Best Practices
 
-**Purpose:** Ensures all documentation is accurate, complete, and synchronized with actual codebase. Prevents documentation drift, validates code examples, and maintains high-quality user experience through reliable documentation.
+This rule documents the correct way to execute GitHub CLI (`gh`) commands when using the `run_terminal_cmd` tool to avoid common pager-related issues.
 
-**When to use:** All documentation writing, code example creation, API documentation, user guides, and any content that references code functionality.
+## The Problem
 
-## Code Snippet Accuracy
+The `gh` CLI automatically detects when it's running in what it thinks is an interactive terminal and attempts to use a pager (like `less` or `more`) to display output. This causes issues with the `run_terminal_cmd` tool, resulting in errors like:
 
-**Rule: Every code snippet in documentation must be verified to compile and work with the current codebase.**
-Why: Broken documentation examples frustrate users, waste developer time, and damage project credibility. Accurate examples ensure users can successfully follow documentation.
+```
+/usr/bin/head: cannot open '|' for reading: No such file or directory
+```
 
-**Code Snippet Validation Process:**
+## The Solution
+
+Always pipe `gh` command output to `cat` to prevent the pager from being invoked:
+
+### ✅ Correct Usage
+
 ```bash
-# 1. Extract all code snippets from documentation
-find docs/ -name "*.md" -exec grep -l "```rust" {} \;
-
-# 2. Create temporary test files for each snippet
-# 3. Verify compilation with current dependencies
-cargo check --manifest-path snippet_test/Cargo.toml
-
-# 4. Run doc tests to verify examples work
-cargo test --doc --all-features
-
-# 5. Integration test with actual codebase APIs
-cargo test --test doc_example_validation
+gh run list --workflow=ci.yml --limit 5 | cat
+gh run view 12345 --log | cat
+gh run list --workflow=docker.yml --limit 1 --json databaseId --jq '.[0].databaseId' | cat
 ```
 
-**Snippet Requirements:**
-- **Must Compile**: Every ````rust` block must compile successfully
-- **Must Execute**: Examples with `assert!` must run and pass
-- **Current Dependencies**: Use exact versions from project Cargo.toml
-- **Complete Context**: Include necessary imports and setup code
-- **Error Handling**: Show proper error handling patterns
+### ❌ Incorrect Usage
 
-**Example of Correct Code Snippet:**
-```rust
-/// # Examples
-/// ```
-/// use my_crate::{UserManager, CreateUserRequest, UserError};
-/// 
-/// # tokio_test::block_on(async {
-/// let manager = UserManager::new().await?;
-/// let request = CreateUserRequest {
-///     email: "test@example.com".to_string(),
-///     name: "Test User".to_string(),
-/// };
-/// 
-/// let user = manager.create_user(request).await?;
-/// assert_eq!(user.email(), "test@example.com");
-/// # Ok::<(), UserError>(())
-/// # });
-/// ```
-```
-
-## API Documentation Synchronization
-
-**Rule: API documentation must exactly match the current function signatures, types, and behavior.**
-Why: Incorrect API documentation leads to integration failures, confusion, and wasted development time. Documentation must be the authoritative source of truth.
-
-**API Sync Verification:**
 ```bash
-# Generate documentation and check for warnings
-cargo doc --all-features --no-deps 2>&1 | grep -i "warning\|error"
-
-# Verify no broken intra-doc links
-cargo doc --all-features --no-deps --document-private-items
-
-# Check that public API documentation exists
-cargo doc --all-features --document-private-items --open
-# Manually verify all public items have documentation
+gh run list --workflow=ci.yml --limit 5
+gh run view 12345 --log
+gh run list --workflow=docker.yml --limit 1 --json databaseId --jq '.[0].databaseId'
 ```
 
-**Required Documentation Elements:**
-```rust
-/// Brief description of what the function does.
-///
-/// Longer description explaining the purpose, use cases, and any important
-/// implementation details that affect usage.
-///
-/// # Arguments
-/// * `param1` - Description of first parameter, including type constraints
-/// * `param2` - Description of second parameter and expected values
-///
-/// # Returns
-/// Description of return value, including all possible variants for Result types:
-/// - `Ok(User)` - Successfully created user with validated data
-/// - `Err(UserError::InvalidEmail)` - Email format validation failed
-/// - `Err(UserError::DatabaseError)` - Database operation failed
-///
-/// # Errors
-/// This function will return an error if:
-/// - Email format is invalid (checked against RFC 5322)
-/// - Database connection fails or times out
-/// - User with email already exists in system
-///
-/// # Panics
-/// This function panics if:
-/// - Internal invariants are violated (should never happen in normal usage)
-/// - System resources are exhausted (extremely rare)
-///
-/// # Examples
-/// ```
-/// # use my_crate::*;
-/// # tokio_test::block_on(async {
-/// let user = create_user("valid@example.com", "John Doe").await?;
-/// assert_eq!(user.email(), "valid@example.com");
-/// # Ok::<(), UserError>(())
-/// # });
-/// ```
-///
-/// # Safety
-/// This function is thread-safe and can be called concurrently.
-/// 
-/// # Performance
-/// Expected execution time: <5ms for standard inputs.
-/// Memory usage: O(1) relative to input size.
-pub async fn create_user(email: &str, name: &str) -> Result<User, UserError> {
-    // Implementation
-}
+## Common GitHub CLI Commands with Proper Piping
+
+### Listing Workflow Runs
+```bash
+gh run list --workflow=<workflow-name> --limit <number> | cat
 ```
 
-## Documentation Completeness Verification
+### Viewing Run Logs
+```bash
+gh run view <run-id> --log | cat
+```
 
-**Rule: All public APIs, modules, and user-facing features must have complete documentation.**
-Why: Incomplete documentation creates knowledge gaps, forces users to read source code, and reduces project adoption and usability.
+### Getting Run Status
+```bash
+gh run list --workflow=<workflow-name> --limit 1 | cat
+```
 
-**Completeness Checklist:**
-```markdown
-## Public API Documentation Audit
+### JSON Output with jq
+```bash
+gh run list --workflow=<workflow-name> --limit 1 --json databaseId --jq '.[0].databaseId' | cat
+```
 
-### Crate Level
-- [ ] lib.rs has comprehensive module documentation
-- [ ] README.md covers installation, basic usage, and key features
-- [ ] CHANGELOG.md documents all user-facing changes
-- [ ] Cargo.toml has accurate description and keywords
+### Listing Issues
+```bash
+gh issue list | cat
+```
 
-### Module Level  
-- [ ] Every public module has module documentation (//!)
+### Viewing Pull Requests
+```bash
+gh pr list | cat
+gh pr view <pr-number> | cat
+```
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+## Why This Works
+
+- The `| cat` prevents `gh` from detecting an interactive terminal
+- This forces `gh` to output raw text instead of trying to use a pager
+- The `cat` command simply passes through the output unchanged
+- Other commands like `ls`, `git`, and `cargo` don't have this issue because they don't automatically invoke pagers
+
+## When This Rule Applies
+
+This rule specifically applies when:
+- Using the `run_terminal_cmd` tool
+- Executing any `gh` command that might produce multi-line output
+- The command would normally trigger a pager in an interactive terminal
+
+## Alternative Solutions
+
+If piping to `cat` is not suitable for your use case, you can also:
+- Set the `PAGER` environment variable to empty: `PAGER= gh run list`
+- Use the `--no-pager` flag if available for the specific `gh` command
 
 ---
 > Source: [rustic-ai/codeprism](https://github.com/rustic-ai/codeprism) — distributed by [TomeVault](https://tomevault.io).
