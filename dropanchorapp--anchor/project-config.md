@@ -1,134 +1,145 @@
 ---
 trigger: always_on
-description: This project uses Swift 6 with strict concurrency enabled across all targets. Follow these patterns for modern, safe concurrent code. See [swift-concurrency.md](mdc:Anchor/Anchor/Docs/swift-concurrency.md) for complete Swift 6 concurrency guide.
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-# Swift Development Patterns for Anchor Project
+# CLAUDE.md
 
-## Swift 6 Conventions
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-This project uses Swift 6 with strict concurrency enabled across all targets. Follow these patterns for modern, safe concurrent code. See [swift-concurrency.md](mdc:Anchor/Anchor/Docs/swift-concurrency.md) for complete Swift 6 concurrency guide.
+## Build Commands
 
-### Concurrency
-- Use `async/await` for all network operations
-- Use `Sendable` protocol for data models that cross concurrency boundaries
-- Follow strict concurrency checking for data race prevention
-- Use actors for protecting mutable state
-- Apply `@MainActor` for UI-related code
+All xcodebuild and swift commands should be piped through `xcsift` to clean up output.
 
-### Project Structure
-- **CLI Target**: [AnchorCLI/Sources/AnchorCLI/main.swift](mdc:Anchor/Anchor/AnchorCLI/Sources/AnchorCLI/main.swift)
-- **Menu Bar App**: [Anchor/AnchorMenubarApp.swift](mdc:Anchor/Anchor/Anchor/AnchorMenubarApp.swift)
-- **Mobile App**: [AnchorMobile/AnchorMobileApp.swift](mdc:Anchor/Anchor/AnchorMobile/AnchorMobileApp.swift)
-- **Shared Library**: AnchorKit module for reusable components
-- **Dependencies**: Defined in [Package.swift](mdc:Anchor/Anchor/Package.swift) with local AnchorKit package
+### Using Makefile (Recommended)
 
-## MV Pattern Architecture
-
-Follow the **MV Pattern** (Model-View without ViewModels) as outlined in [mv_pattern_guidelines.md](mdc:Anchor/Anchor/Docs/mv_pattern_guidelines.md):
-
-### Core Principles
-- **No ViewModels** - Use `@Observable` classes for business logic
-- **Views own UI state** - Use `@State` for temporary UI concerns  
-- **Stores handle operations** - Create focused `@Observable` classes
-- **Environment for sharing** - Use `@Environment` across view hierarchies
-
-### Property Wrapper Guide
-
-| Use Case | Wrapper | Example |
-|----------|---------|---------|
-| Create store | `@State` | `@State private var store = AnchorStore()` |
-| Share store | `@Environment` | `@Environment(AnchorStore.self) private var store` |
-| UI state | `@State` | `@State private var showingSheet = false` |
-| Settings | `@AppStorage` | `@AppStorage("theme") var theme = "light"` |
-| SwiftData display | `@Query` | `@Query private var checkins: [CheckIn]` |
-
-### Code Organization
-
-#### Feature-Based Organization
-```
-AppName/Features/
-├── CheckIn/
-│   └── Views/          ← SwiftUI views with @State for UI
-├── Feed/
-│   └── Views/          ← Display views using @Query + @Environment
-├── Nearby/
-│   └── Views/          ← Nearby places views
-└── Settings/
-    └── Views/          ← Settings interface
+```bash
+make help          # Show all available commands
+make build         # Build AnchorMobile iOS app
+make test          # Run ATProtoFoundation + AnchorKit tests
+make test-ui       # Run AnchorMobile iOS tests
+make lint          # Run SwiftLint
+make lint-fix      # Auto-fix SwiftLint violations
+make clean         # Clean all build artifacts
+make info          # Show project/environment info
 ```
 
-#### Models
-**Shared Models** in `AnchorKit/Sources/AnchorKit/Models/`:
-- [Place.swift](mdc:Anchor/Anchor/AnchorKit/Sources/AnchorKit/Models/Place.swift) - Location data from Overpass API
-- [AuthCredentials.swift](mdc:Anchor/Anchor/AnchorKit/Sources/AnchorKit/Models/AuthCredentials.swift) - Bluesky authentication (SwiftData @Model)
-- [AnchorSettings.swift](mdc:Anchor/Anchor/AnchorKit/Sources/AnchorKit/Models/AnchorSettings.swift) - User preferences
+### Direct Commands
 
-#### Services  
-Place service classes in `AnchorKit/Sources/AnchorKit/Services/`:
-- `BlueskyService.swift` - AT Protocol communication
-- `OverpassService.swift` - OpenStreetMap queries
-- `LocationService.swift` - CoreLocation wrapper
-- `CredentialsStorage.swift` - Platform-agnostic credential management
+```bash
+# Build iOS app
+xcodebuild -project Anchor.xcodeproj -scheme AnchorMobile build -destination 'platform=iOS Simulator,name=iPhone 16' | xcsift
 
-#### Stores (Minimal Business Logic)
-For Anchor's simple use case, place one main store in `AnchorKit/Sources/AnchorKit/Stores/`:
+# Run all package tests
+cd ATProtoFoundation && swift test | xcsift
+cd AnchorKit && swift test | xcsift
 
-```swift
-@Observable
-class AnchorStore {
-    // State
-    private(set) var isCreatingCheckIn = false
-    private(set) var isLoadingNearby = false
-    private(set) var currentLocation: CLLocation?
-    private(set) var nearbyPlaces: [Place] = []
-    private(set) var error: Error?
-    
-    // Services
-    private let locationService: LocationService
-    private let blueskyService: BlueskyService
-    private let overpassService: OverpassService
-    
-    init(locationService: LocationService, blueskyService: BlueskyService, overpassService: OverpassService) {
-        self.locationService = locationService
-        self.blueskyService = blueskyService
-        self.overpassService = overpassService
-    }
-    
-    func createCheckIn(at place: Place? = nil, message: String? = nil) async throws {
-        isCreatingCheckIn = true
-        defer { isCreatingCheckIn = false }
-        
-        // Get location if not provided
-        let location = place?.coordinate ?? (try await locationService.getCurrentLocation())
-        
-        // Post to Bluesky
-        try await blueskyService.postCheckIn(location: location, message: message)
-    }
-    
-    func loadNearbyPlaces() async throws {
-        isLoadingNearby = true
-        defer { isLoadingNearby = false }
-        
-        let location = try await locationService.getCurrentLocation()
-        nearbyPlaces = try await overpassService.searchNearby(location: location)
-    }
-}
+# Run specific test by name
+cd AnchorKit && swift test --filter "testMethodName" | xcsift
+
+# Run tests by tag
+cd AnchorKit && swift test --filter .unit | xcsift
+cd AnchorKit && swift test --filter .integration | xcsift
+
+# Run iOS app tests
+xcodebuild -project Anchor.xcodeproj -scheme AnchorMobile test -destination 'platform=iOS Simulator,name=iPhone 16' | xcsift
 ```
 
-## SwiftUI Patterns
+### Code Quality
 
-Follow modern SwiftUI patterns as documented in [SwiftUI-api-20250627.md](mdc:Anchor/Anchor/Docs/SwiftUI-api-20250627.md):
+```bash
+swiftlint          # Check for issues
+swiftlint --fix    # Auto-fix violations
+swiftlint --strict # Treat warnings as errors (used in CI)
+```
 
-### Store Creation and Sharing
+Key SwiftLint rules: force_cast/force_try as errors, 120 char line length warning, 500 line file limit.
 
-```swift
-// App Setup - Minimal store creation
-@main
-struct AnchorApp: App {
-    @State private var anchorStore = AnchorStore()
-    
-    var body: some Scene {
+## Project Architecture
+
+### Three-Package Structure
+
+```
+Anchor/
+├── ATProtoFoundation/   # Generic AT Protocol & OAuth library (no app dependencies)
+│   └── Sources/ATProtoFoundation/
+│       ├── Auth/        # OAuth, credentials storage, cookie management
+│       ├── Models/      # AuthCredentials, ATProtoModels, AuthenticationState
+│       ├── Network/     # IronSessionAPIClient (multipart support)
+│       └── Utilities/   # Logger, RichTextProcessor, URLSessionProtocol
+│
+├── AnchorKit/           # App-specific business logic (depends on ATProtoFoundation)
+│   └── Sources/AnchorKit/
+│       ├── ATProtocol/  # CheckinTextBuilder, ATProtoModels
+│       ├── Models/      # Place, FeedModels, AnchorSettings, CategoryModels
+│       ├── Services/    # LocationService, AnchorFeedService, AnchorPlacesService
+│       ├── Stores/      # CheckInStore, FeedStore
+│       └── Utils/       # FeedTextProcessor, LocationFormatter, ImageProcessor
+│
+└── AnchorMobile/        # iOS app (SwiftUI, depends on AnchorKit)
+    ├── Features/
+    │   ├── Auth/        # Sign-in UI
+    │   ├── CheckIn/     # Place discovery, compose, nearby places
+    │   ├── Feed/        # Feed views, post components
+    │   └── Settings/    # Settings UI
+    └── Stores/          # AppStateStore (app lifecycle)
+```
+
+### Key Architectural Patterns
+
+1. **Protocol-First Testing**: Services accept `AuthCredentialsProtocol` instead of SwiftData models, enabling testing without ModelContainer
+2. **Observable Pattern**: `@Observable` for reactive UI updates (LocationService, stores)
+3. **Dependency Injection**: URLSession mocking, in-memory storage for isolated tests
+4. **StrongRef Architecture**: Check-ins create two records atomically (address + checkin) with CID verification
+
+### StrongRef Check-in Flow
+
+When creating a check-in, two records are created on the user's PDS:
+
+1. **Address Record** (`community.lexicon.location.address`): Reusable venue data
+2. **Check-in Record** (`app.dropanchor.checkin`): References address via StrongRef (URI + CID)
+
+Key methods:
+- `ATProtoClient.createCheckinWithAddress()` - Atomic creation with automatic cleanup on failure
+- `verifyStrongRef()` - Validates content integrity via CID comparison
+
+## Development Notes
+
+### Platform Requirements
+
+- iOS 18.6+, macOS 14+
+- Swift 6.0+ with strict concurrency
+- No external dependencies - built-in frameworks only (SwiftUI, CoreLocation, Foundation)
+
+### Testing
+
+Uses Swift Testing framework with semantic tags for filtering:
+
+| Tag | Description |
+|-----|-------------|
+| `.unit` | Fast unit tests (models, utilities) |
+| `.integration` | Network-dependent tests |
+| `.services` | Service layer tests |
+| `.stores` | Store layer tests |
+| `.auth` | Authentication tests |
+| `.feed` | Feed parsing tests |
+| `.network` | Can filter out for offline development |
+
+Mock implementations available: `TestAuthCredentials`, `MockCredentialsStorage`, `MockURLSession`, `MockATProtoClient`, `MockBlueskyPostService`
+
+## OAuth Authentication
+
+- **Backend**: [anchor-appview](https://github.com/dropanchorapp/anchor-appview) handles OAuth
+- **Mobile flow**: WebView loads `https://dropanchor.app/mobile-auth`
+- **Callback**: Custom URL scheme `anchor-app://auth-callback`
+- **PDS resolution**: Backend resolves actual PDS URL from DID document (supports personal PDS servers)
+- **Cookie recreation**: On app launch, `sid` cookie is recreated from stored `sessionId` in credentials
+
+## Backend Integration
+
+- **Backend URL**: `https://dropanchor.app`
+- **Feed API**: Public, no auth required
+- **Deploy**: `deno task deploy` (from anchor-appview repo)
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
