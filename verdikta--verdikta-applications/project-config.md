@@ -1,282 +1,263 @@
 ---
 trigger: always_on
-description: React component patterns and frontend best practices
+description: Verdikta manifest.json structure and archive generation patterns
 ---
 
 
-# Frontend Patterns
+# Verdikta Manifest Specification
 
-## Component Structure
+## Required Reading
+Official specification: https://docs.verdikta.com/verdikta-common/MANIFEST_SPECIFICATION/
 
-### Standard Component Layout
-```jsx
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { apiService } from '../services/api';
-import './ComponentName.css';
+## Archive Structure
 
-function ComponentName({ walletState }) {
-  // State
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  
-  // Hooks
-  const { id } = useParams();
-  const navigate = useNavigate();
-  
-  // Effects
-  useEffect(() => {
-    loadData();
-  }, [id]);
-  
-  // Handlers
-  const handleAction = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      // ... operation
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
+### Primary Archive (Evaluation Instructions)
+```
+primary-archive.zip
+├── manifest.json
+└── primary_query.json
+```
+
+**manifest.json:**
+```json
+{
+  "version": "1.0",
+  "name": "Job Title - Evaluation for Payment Release",
+  "primary": {
+    "filename": "primary_query.json"
+  },
+  "juryParameters": {
+    "NUMBER_OF_OUTCOMES": 2,
+    "AI_NODES": [
+      {
+        "AI_MODEL": "gpt-4o",
+        "AI_PROVIDER": "OpenAI",
+        "NO_COUNTS": 1,
+        "WEIGHT": 0.5
+      }
+    ],
+    "ITERATIONS": 1
+  },
+  "additional": [
+    {
+      "name": "gradingRubric",
+      "type": "ipfs/cid",
+      "hash": "QmXXX...",
+      "description": "Evaluation rubric"
     }
-  };
-  
-  // Render helpers
-  if (loading) return <LoadingState />;
-  if (error) return <ErrorState error={error} />;
-  
-  return (
-    <div className="component-name">
-      {/* Content */}
-    </div>
-  );
-}
-
-export default ComponentName;
-```
-
-## State Management
-
-### Loading States
-Always show loading indicators:
-```jsx
-const [loading, setLoading] = useState(false);
-
-{loading && (
-  <div className="loading-status">
-    <div className="spinner"></div>
-    <p>Processing...</p>
-  </div>
-)}
-```
-
-### Error Handling
-Display user-friendly errors:
-```jsx
-const [error, setError] = useState(null);
-
-{error && (
-  <div className="alert alert-error">
-    <p>❌ {error}</p>
-  </div>
-)}
-```
-
-### Form Validation
-Validate on both change and submit:
-```jsx
-const handleInputChange = (e) => {
-  const value = e.target.value;
-  
-  // Real-time validation
-  if (value.length > MAX_LENGTH) return;
-  
-  setValue(value);
-  setError(null);
-};
-
-const handleSubmit = async (e) => {
-  e.preventDefault();
-  
-  // Pre-submit validation
-  if (!value.trim()) {
-    alert('Field is required');
-    return;
+  ],
+  "bCIDs": {
+    "submittedWork": "QmYYY..."
   }
-  
-  // Submit
-};
-```
-
-## API Integration
-
-### Use API Service Layer
-Never use axios directly in components:
-```jsx
-// ✅ Good
-const result = await apiService.createJob(jobData);
-
-// ❌ Bad
-const result = await axios.post('/api/jobs/create', jobData);
-```
-
-### Handle API Errors
-```jsx
-try {
-  const result = await apiService.operation();
-  // Handle success
-} catch (err) {
-  console.error('Operation failed:', err);
-  setError(err.response?.data?.details || err.message);
-  alert(`❌ Error: ${err.response?.data?.details || err.message}`);
 }
 ```
 
-## Form Patterns
+**primary_query.json:**
+```json
+{
+  "query": "WORK PRODUCT EVALUATION REQUEST...",
+  "references": ["gradingRubric"],
+  "outcomes": ["DONT_FUND", "FUND"]
+}
+```
 
-### Multiple File Upload
-```jsx
-const [files, setFiles] = useState([]);
+### Hunter Archive (Work Submission)
+```
+hunter-archive.zip
+├── manifest.json
+├── primary_query.json
+└── submission/
+    ├── file1.txt
+    ├── file2.pdf
+    └── chart.jpg
+```
 
-const handleFileAdd = (e) => {
-  const selectedFiles = Array.from(e.target.files);
-  
-  // Validate each file
-  const validFiles = selectedFiles.filter(file => {
-    if (file.size > MAX_SIZE) {
-      alert(`File too large: ${file.name}`);
-      return false;
+**manifest.json:**
+```json
+{
+  "version": "1.0",
+  "name": "submittedWork",
+  "primary": {
+    "filename": "primary_query.json"
+  },
+  "additional": [
+    {
+      "name": "submitted-work-1",
+      "type": "text/plain",
+      "filename": "submission/file1.txt",
+      "description": "Main document with findings"
+    },
+    {
+      "name": "submitted-work-2",
+      "type": "application/pdf",
+      "filename": "submission/file2.pdf",
+      "description": "Supporting research data"
+    },
+    {
+      "name": "submitted-work-3",
+      "type": "image/jpeg",
+      "filename": "submission/chart.jpg",
+      "description": "Data visualization chart"
     }
-    return true;
-  });
-  
-  setFiles(prev => [...prev, ...validFiles.map(file => ({
-    file,
-    description: `Default description for ${file.name}`
-  }))]);
-};
-
-const handleFileRemove = (index) => {
-  setFiles(prev => prev.filter((_, i) => i !== index));
-};
-```
-
-### FormData Construction
-```jsx
-const formData = new FormData();
-
-// Add files
-files.forEach(({ file }) => {
-  formData.append('files', file);
-});
-
-// Add other fields
-formData.append('field1', value1);
-formData.append('field2', value2);
-
-// Add JSON data
-const metadata = { ... };
-formData.append('metadata', JSON.stringify(metadata));
-
-// Submit
-await apiService.submitWithFiles(formData);
-```
-
-## Wallet Integration
-
-### Check Wallet Connection
-Always check before operations:
-```jsx
-if (!walletState.isConnected) {
-  return (
-    <div className="alert alert-warning">
-      <h2>Wallet Not Connected</h2>
-      <p>Please connect your wallet to continue.</p>
-    </div>
-  );
+  ]
 }
 ```
 
-### Use Wallet Address
-```jsx
-const handleSubmit = async () => {
-  if (!walletState.isConnected) {
-    alert('Please connect your wallet first');
-    return;
-  }
-  
-  await apiService.createJob({
-    creator: walletState.address,
-    // ... other fields
-  });
-};
-```
-
-## Word Count Validation
-
-### Real-time Word Counter
-```jsx
-const [text, setText] = useState('');
-const MAX_WORDS = 200;
-
-const getWordCount = () => {
-  return text.trim().split(/\s+/).filter(w => w.length > 0).length;
-};
-
-const handleTextChange = (e) => {
-  const newText = e.target.value;
-  const wordCount = newText.trim().split(/\s+/).filter(w => w.length > 0).length;
-  
-  if (wordCount <= MAX_WORDS) {
-    setText(newText);
-  }
-};
-
-// Display
-<label>
-  Text (Max {MAX_WORDS} words)
-  <span className="word-count">{getWordCount()} / {MAX_WORDS}</span>
-</label>
-<textarea value={text} onChange={handleTextChange} />
-```
-
-## CSS Patterns
-
-### Use BEM-like Naming
-```css
-.component-name { }
-.component-name__element { }
-.component-name--modifier { }
-```
-
-### CSS Variables
-Use existing variables:
-```css
-.element {
-  color: var(--text-primary);
-  background-color: var(--bg);
-  border: 1px solid var(--border);
+**primary_query.json:**
+```json
+{
+  "query": "Custom hunter narrative explaining their submission...",
+  "references": ["submitted-work-1", "submitted-work-2", "submitted-work-3"]
 }
 ```
 
-### Responsive Design
-Always include mobile breakpoints:
-```css
-@media (max-width: 768px) {
-  .desktop-layout {
-    flex-direction: column;
-  }
+## Key Fields
+
+### manifest.json
+
+**Required:**
+- `version` - Always "1.0"
+- `primary` - Reference to primary_query.json
+
+**Optional but Important:**
+- `name` - Human-readable identifier
+- `juryParameters` - AI jury configuration (Primary archive only)
+- `additional` - Array of file references
+- `bCIDs` - References to other archives (Primary archive only)
+
+### additional Array
+
+**Each entry must have:**
+```json
+{
+  "name": "unique-reference-name",
+  "type": "mime/type",
+  "filename": "path/to/file",
+  "description": "Human-readable description"
 }
 ```
 
-## Dialog/Modal Patterns
+**Important:**
+- `name` must be unique within the array
+- `name` must be referenced in primary_query.json `references` array
+- `filename` is relative to archive root
+- `description` is REQUIRED per specification (helps AI understand file purpose)
 
-### Overlay with Click-to-Close
-```jsx
-<div className="dialog-overlay" onClick={handleClose}>
-  <div className="dialog" onClick={(e) => e.stopPropagation()}>
+### primary_query.json
+
+**Required:**
+- `query` - The main text/instructions
+
+**Optional:**
+- `references` - Array of file reference names from `additional`
+- `outcomes` - Array of outcome names (for evaluation queries)
+
+## File Organization
+
+### Always Use Subdirectories
+```
+✅ Good:
+submission/file.txt
+submission/docs/report.pdf
+submission/images/chart.jpg
+
+❌ Bad:
+file.txt (no subdirectory)
+```
+
+### Reference Names
+```javascript
+// Single file
+"name": "submitted-work"
+
+// Multiple files
+"name": "submitted-work-1"
+"name": "submitted-work-2"
+"name": "submitted-work-3"
+```
+
+## Archive Creation Pattern
+
+### Using AdmZip
+```javascript
+const AdmZip = require('adm-zip');
+const zip = new AdmZip();
+
+// Add root files
+zip.addLocalFile(path.join(dir, 'manifest.json'));
+zip.addLocalFile(path.join(dir, 'primary_query.json'));
+
+// Add directory
+zip.addLocalFolder(path.join(dir, 'submission'), 'submission');
+
+// Write ZIP
+zip.writeZip(outputPath);
+```
+
+### File Structure Before Zipping
+```
+temp-dir/
+├── manifest.json
+├── primary_query.json
+└── submission/
+    ├── file1.txt
+    └── file2.pdf
+
+→ Creates: archive.zip
+```
+
+## Multi-CID Workflow
+
+1. **Create Rubric** → Upload to IPFS → Get RUBRIC_CID
+2. **Create Primary Archive** (references RUBRIC_CID, has placeholder for hunter)
+3. **Upload Primary** → Get PRIMARY_CID
+4. **Hunter submits work** → Create Hunter Archive → Get HUNTER_CID
+5. **Update Primary Archive** (replace placeholder with HUNTER_CID)
+6. **Upload Updated Primary** → Get UPDATED_PRIMARY_CID
+7. **Evaluate**: Use format `UPDATED_PRIMARY_CID,HUNTER_CID`
+
+## Common Mistakes
+
+❌ **Missing descriptions** in additional array
+```json
+// Wrong
+{ "name": "file1", "type": "text/plain", "filename": "file.txt" }
+
+// Correct
+{ "name": "file1", "type": "text/plain", "filename": "file.txt", 
+  "description": "Main document" }
+```
+
+❌ **Incorrect file paths**
+```json
+// Wrong - no subdirectory
+"filename": "file.txt"
+
+// Correct
+"filename": "submission/file.txt"
+```
+
+❌ **Unreferenced files**
+```json
+// manifest.json
+"additional": [{ "name": "file1", ... }]
+
+// primary_query.json - must reference it
+"references": ["file1"]  // ✅
+"references": []         // ❌ file1 not referenced
+```
+
+❌ **Non-unique names**
+```json
+// Wrong - duplicate names
+{ "name": "file", ... },
+{ "name": "file", ... }
+
+// Correct - unique names
+{ "name": "file-1", ... },
+{ "name": "file-2", ... }
+```
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
