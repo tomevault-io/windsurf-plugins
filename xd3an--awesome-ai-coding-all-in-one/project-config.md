@@ -1,6 +1,6 @@
 ---
 trigger: always_on
-description: Cursor rules for embedding Beefree SDK's no-code content editors (for emails, pages, and popups) into a web application.
+description: Guidelines and best practices for building applications with [Beefree SDK](https://docs.beefree.io/beefree-sdk), including installation, authentication, configuration, customization, and template management
 ---
 
 # Beefree SDK Guidelines
@@ -207,8 +207,6 @@ Guidelines and best practices for building applications with [Beefree SDK](https
       // Implement custom send logic here
     },
     onError: function (errorMessage) {
-      console.error("Beefree SDK error:", errorMessage);
-      // Handle errors appropriately
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
