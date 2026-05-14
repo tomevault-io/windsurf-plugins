@@ -1,6 +1,6 @@
 ---
 trigger: always_on
-description: Cursor rules for C++ development with programming guidelines integration.
+description: Guide Cursor to write modern C++ and CMake code with clear structure, RAII, const-correctness, and safe error handling.
 ---
 
 # C++ Programming Guidelines
