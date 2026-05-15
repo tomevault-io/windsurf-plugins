@@ -1,139 +1,123 @@
 ---
 trigger: always_on
-description: Tests
+description: Provides unified interface for Stripe, PayPal, and Square payments.
 ---
 
-# Testing Guide 
+# GitHub Copilot Instructions
 
-## Directory Structure & Organization
+This file provides comprehensive guidance to AI to assist with development tasks in this Python project. Follow these instructions for all code generation, documentation, and testing activities.
 
-```
-tests/
-├── unit/                    # Unit tests with heavy mocking
-│   └── somedirectory/           # Mirror source code structure
-│       ├── langchain_related/
-│       ├── user_client/
-│       └── ...
-└── integration/            # Integration tests with mocking of external dependencies / APIs only
-```
+## 🐍 Python Development Standards
 
-**File Naming**: Test files prefixed with `test_` and mirror source structure:
-- Source: `somedirectory/langchain_related/tools/planer.py`
-- Test: `tests/unit/somedirectory/langchain_related/tools/test_planer.py`
+### Code Style & Structure
+- **Base Standard**: Google Python Style Guide with PEP 8 compliance
+- **Line Length**: 120 characters maximum
+- **Purpose Documentation**: Every file and class must explain its purpose with detailed docstrings
+- **Readability First**: Code is read more often than written - prioritize clarity
+- **Linting**: Use `ruff check` and `ruff format` for code quality and formatting
+- **Type Checking**: Use `mypy` for static type checking to catch type-related issues early
 
-## 🚨 **CRITICAL: AVOID OVER-TESTING**
-
-*Preventing excessive test code and maintaining focus on behavior*
-
-### **The Over-Testing Problem**
-
-**WARNING SIGNS:**
-- Test code exceeds business code by 2:1 ratio
-- Testing every possible internal error scenario
-- Multiple tests for the same behavior
-- Testing implementation details instead of user outcomes
-- Complex test setup for simple functions
-
-### **Test-to-Code Ratio Guidelines**
-
-**✅ HEALTHY RATIOS:**
-```
-Simple Functions (< 50 lines):    1:1 to 1.5:1 test-to-code ratio
-Complex Business Logic:           1.5:1 to 2:1 test-to-code ratio
-Critical System Components:       2:1 to 2.5:1 test-to-code ratio
-```
-
-**❌ UNHEALTHY RATIOS:**
-```
-> 3:1 ratio = Over-testing likely
-> 5:1 ratio = Definitely over-testing
-```
-
-### **Simple Function Testing Strategy**
-
-**For a simple function like `display_image()`:**
-
-**✅ GOOD - Behavior-Focused (5-6 tests max):**
+### Import Organization
 ```python
-class TestDisplayImage:
-    """Tests for display_image function - behavior focused."""
+from __future__ import annotations
 
-    def test_successfully_displays_image(self):
-        """Test that image is displayed when called."""
-        # Test the core behavior
+# Standard library
+import os
+from typing import Dict, List, Optional
 
-    def test_clears_screen_when_requested(self):
-        """Test clear_first=True behavior."""
-        # Test parameter behavior
+# Third-party
+import requests
+from pydantic import BaseModel, Field
 
-    def test_skips_clearing_when_not_requested(self):
-        """Test clear_first=False behavior."""
-        # Test parameter behavior
-
-    def test_handles_errors_gracefully(self):
-        """Test error handling behavior."""
-        # Test error scenarios
-
-    @pytest.mark.parametrize("image_name", [...])
-    def test_works_with_different_images(self):
-        """Test with various inputs."""
-        # Test input variations
+# Project imports
+from mixins.mixin_secrets import SecretsMixin
+from our_utils.our_logger import get_formatted_logger
 ```
 
-**❌ BAD - Implementation-Focused (10+ tests):**
+### Class Documentation Pattern
 ```python
-# DON'T DO THIS - Over-testing implementation details
-def test_display_image_handles_clear_error_during_error_recovery(self):
-    """Testing internal error recovery mechanisms."""
-
-def test_display_image_calls_correct_internal_methods_in_order(self):
-    """Testing internal method call patterns."""
-
-def test_display_image_prints_exact_messages_in_sequence(self):
-    """Testing internal print statement details."""
-```
-
-### **When to Stop Testing**
-
-**STOP adding tests when:**
-- You're testing the same behavior in different ways
-- You're testing internal implementation details
-- Your test setup is more complex than the function being tested
-- You have more test code than business logic code for simple functions
-- Tests are breaking when you refactor internals (not behavior)
-
-**ASK YOURSELF:**
-- "Does this test verify something the user cares about?"
-- "Would this test catch a real bug that affects end users?"
-- "Am I testing behavior or implementation?"
-
-## Running Tests
-
-### Direct UV Execution
-```bash
-uv run pytest tests/unit/ -v
-uv run pytest tests/unit/path/to/test.py::TestClass::test_method -v
-```
-
-## Test Structure Patterns
-
-### Test Organization
-```python
-class TestPlanModel:
-    """Tests for PlanModel class."""
+class PaymentProcessor:
+    """Processes payments through multiple payment gateways.
     
-    def test_valid_model(self):
-        """Test creating a valid PlanModel."""
+    Provides unified interface for Stripe, PayPal, and Square payments.
+    Handles validation, error handling, and transaction logging with
+    automatic retry logic for failed transactions.
+    
+    Attributes:
+        retry_attempts: Number of retries for failed transactions.
+        supported_currencies: List of supported currency codes.
+    """
+```
+
+### Error Handling Patterns
+- Use specific exception types with descriptive messages
+- Implement fallback mechanisms - avoid crashes when possible
+- Log errors but continue with sane defaults
+- Use `ToolException` for external service errors
+
+```python
+from langchain_core.tools import ToolException
+
+def process_data(data: str) -> dict:
+    """Process user data with proper error handling."""
+    try:
+        result = external_service.process(data)
+        LOGGER.info("Data processed successfully", data_size=len(data))
+        return result
+    except ValidationError as e:
+        LOGGER.error("Validation failed", error=str(e), data=data)
+        raise ToolException(f"Invalid data format: {e}")
+    except ExternalServiceError as e:
+        LOGGER.error("External service failed", service="processor", error=str(e))
+        raise ToolException("Service temporarily unavailable. Please try again.")
+```
+
+### Domain Models with Pydantic
+```python
+from pydantic import BaseModel, Field
+from datetime import datetime
+
+class User(BaseModel):
+    """Domain aggregate for user data and business logic."""
+    
+    id: str = Field(..., description="Unique user identifier")
+    preferences: Dict[str, Any] = Field(
+        default_factory=dict, 
+        description="User preferences and settings"
+    )
+    created_at: datetime = Field(
+        default_factory=datetime.now,
+        description="User creation timestamp"
+    )
+    
+    def has_active_subscription(self) -> bool:
+        """Check if user has an active subscription."""
+        return self.subscription is not None and self.subscription.is_active
+```
+
+## 🧪 Testing Standards
+
+### Test Structure & Organization
+- **Directory Structure**: Mirror source code structure in `tests/unit/` and `tests/integration/`
+- **File Naming**: Prefix with `test_` and mirror source structure
+- **Given-When-Then Pattern**: Mandatory for all tests
+
+### Test Template
+```python
+class TestMyComponent:
+    """Tests for MyComponent class."""
+    
+    def test_basic_functionality(self, component):
+        """Test basic component functionality."""
         # given
-        data = {"selected_tool_names": ["Tool1"], "main_goal": "Test"}
+        input_data = "test input"
         
         # when
-        model = PlanModel(**data)
+        result = component.process(input_data)
         
         # then
-        assert model.selected_tool_names == ["Tool1"]
-        assert model.main_goal == "Test"
-
+        assert result == "expected output"
+    
     @pytest.mark.parametrize("input_data, expected", [
         pytest.param("input1", "output1", id="scenario1"),
         pytest.param("input2", "output2", id="scenario2"),
@@ -148,22 +132,6 @@ class TestPlanModel:
         
         # then
         assert result == expected
-```
-
-### Given-When-Then Pattern (Required)
-```python
-def test_feature_functionality(self):
-    """Test description of what this validates."""
-    # given: setup test conditions
-    mock_data = {"key": "value"}
-    component = ComponentUnderTest()
-    
-    # when: execute the action being tested
-    result = component.method_under_test(mock_data)
-    
-    # then: verify expected outcomes
-    assert result == "expected_result"
-    assert component.state == "expected_state"
 ```
 
 ### Async Testing
@@ -183,10 +151,19 @@ async def test_async_functionality(self):
     mock_service.process.assert_called_once()
 ```
 
-## Common Test Patterns
+### Testing Best Practices
+- Use Given-When-Then structure for all tests
+- Group related tests in classes
+- Use descriptive test names explaining what is being tested
+- Leverage autouse fixtures - don't manually mock what's auto-mocked
+- Test both success and error paths
+- Use parametrization for multiple scenarios
+- Keep tests focused with one assertion per test concept
 
-### Unit Test Template
-```python
+## 📝 Documentation Standards
+
+### Inline Code Documentation
+- **Keep all existing comments** - only remove if wrong, not helpful, or outdated
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
