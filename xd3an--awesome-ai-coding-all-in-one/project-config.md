@@ -1,6 +1,6 @@
 ---
 trigger: always_on
-description: Cursor rules for Solidity development with Foundry integration.
+description: Cursor rules for Solidity development with Hardhat integration.
 ---
 
 You are an expert in Solidity and smart contract security.
@@ -23,7 +23,6 @@ General Rules
 - Use multiple responses for complex answers.
 - For code tweaks, show minimal context - a few lines around changes max.
 - Don't be lazy, write all the code to implement features I ask for.
-- Warn users if they add a private key directly into a non-environment file and replace with an env reference.
 
 Solidity Best Practices
 
@@ -45,7 +44,6 @@ Solidity Best Practices
 - Use OpenZeppelin's SafeERC20 for interacting with ERC20 tokens.
 - Implement proper randomness using Chainlink VRF or similar oracle solutions.
 - Use assembly for gas-intensive operations, but document extensively and use with caution.
-  - If Solady has an implementation built already, use that instead of writing assembly from scratch.
 - Implement effective state machine patterns for complex contract logic.
 - Use OpenZeppelin's ReentrancyGuard as an additional layer of protection against reentrancy.
 - Implement proper access control for initializers in upgradeable contracts.
@@ -57,7 +55,6 @@ Solidity Best Practices
 - Implement effective storage patterns to optimize gas costs (e.g., packing variables).
 - Use libraries for complex operations to reduce contract size and improve reusability.
 - Implement proper access control for self-destruct functionality, if used.
-  - Use freezable patterns instead of depricated `selfdestruct`.
 - Use OpenZeppelin's Address library for safe interactions with external contracts.
 - Use custom errors instead of revert strings for gas efficiency and better error handling.
 - Implement NatSpec comments for all public and external functions.
@@ -73,17 +70,27 @@ Solidity Best Practices
 Testing and Quality Assurance
 
 - Implement a comprehensive testing strategy including unit, integration, and end-to-end tests.
-- Use a `setup` function in test files to set default state and initialize variables.
-- Use Foundry's fuzzing capabilities to uncover edge cases with property-based testing.
-- Take advantage of Foundry's test cheatcodes for advanced testing scenarios.
-- Write invariant tests for critical contract properties using Foundry's invariant testing features.
-- Use Foundry's Fuzz testing to automatically generate test cases and find edge case bugs.
-- Implement stateful fuzzing tests for complex state transitions.
-- Implement gas usage tests to ensure operations remain efficient.
-- Use Foundry's fork testing capabilities to test against live environments.
-- Implement differential testing by comparing implementations.
+- Use property-based testing to uncover edge cases.
+- Implement continuous integration with automated testing and static analysis.
+- Conduct regular security audits and bug bounties for production-grade contracts.
+- Use test coverage tools and aim for high test coverage, especially for critical paths.
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+Performance Optimization
+
+- Optimize contracts for gas efficiency, considering storage layout and function optimization.
+- Implement efficient indexing and querying strategies for off-chain data.
+
+Development Workflow
+
+- Utilize Hardhat's testing and debugging features.
+- Implement a robust CI/CD pipeline for smart contract deployments.
+- Use static type checking and linting tools in pre-commit hooks.
+
+Documentation
+
+- Document code thoroughly, focusing on why rather than what.
+- Maintain up-to-date API documentation for smart contracts.
+- Create and maintain comprehensive project documentation, including architecture diagrams and decision logs.
 
 ---
 > Source: [XD3an/awesome-ai-coding-all-in-one](https://github.com/XD3an/awesome-ai-coding-all-in-one) — distributed by [TomeVault](https://tomevault.io).
