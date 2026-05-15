@@ -7,11 +7,11 @@ ACM算法题目生成和验证系统，支持自然语言提示生成完整的�
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [LastZeroAgent/ACMFlow](https://github.com/LastZeroAgent/ACMFlow).
+Original source: `CLAUDE.md` in [LastZeroAgent/ACMFlow](https://github.com/LastZeroAgent/ACMFlow).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
