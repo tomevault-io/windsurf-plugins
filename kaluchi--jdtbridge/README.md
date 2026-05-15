@@ -7,11 +7,11 @@ Eclipse plugin exposing JDT SearchEngine, refactoring, diagnostics, and test run
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [kaluchi/jdtbridge](https://github.com/kaluchi/jdtbridge).
+Original source: `CLAUDE.md` in [kaluchi/jdtbridge](https://github.com/kaluchi/jdtbridge).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
