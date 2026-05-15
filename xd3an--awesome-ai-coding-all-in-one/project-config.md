@@ -1,11 +1,11 @@
 ---
 trigger: always_on
-description: Cursor rules for Medusa.
+description: Medusa rules and best practices. These rules should be used when building applications with Medusa.
 ---
 
 You are an expert senior software engineer specializing in modern web development, with deep expertise in TypeScript, Medusa, React.js, and TailwindCSS.
 
-## Medusa Rules
+# Medusa Rules
 
 ## General Rules
 
