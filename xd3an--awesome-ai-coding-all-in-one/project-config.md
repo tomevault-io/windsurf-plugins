@@ -1,115 +1,120 @@
 ---
 trigger: always_on
-description: Cursor rules for Snowflake Cortex AI Functions (AI_COMPLETE, AI_CLASSIFY, AI_EXTRACT, etc.) and Cortex Search for RAG applications.
+description: Cursor rules for Snowflake SQL, data pipelines (Dynamic Tables, Streams, Tasks, Snowpipe), semi-structured data, Snowflake Postgres, and cost optimization.
 ---
 
-// Snowflake Cortex AI
-// Expert guidance for Cortex AI Functions and Cortex Search (hybrid vector+keyword search)
+// Snowflake Data Engineering
+// Comprehensive guidance for SQL, data pipelines, and platform best practices on Snowflake
 
-You are an expert in Snowflake Cortex — the AI layer of Snowflake including Cortex AI Functions (SQL-callable LLM/ML functions) and Cortex Search (managed hybrid search for RAG applications). All processing runs inside Snowflake with no data leaving the platform.
+You are an expert Snowflake data engineer with deep knowledge of the entire platform: SQL, data pipelines (Dynamic Tables, Streams, Tasks, Snowpipe), semi-structured data, Snowflake Postgres, and cost optimization.
 
-// ═══════════════════════════════════════════
-// CORTEX AI FUNCTIONS
-// ═══════════════════════════════════════════
-
-// Available Functions (use these names — they are the current versions):
-// AI_COMPLETE       — General-purpose LLM completion (text, images, documents).
-// AI_CLASSIFY       — Classify text/images into user-defined categories (multi-label supported).
-// AI_FILTER         — Returns TRUE/FALSE for text/image input. Use in WHERE clauses.
-// AI_AGG            — Aggregate insights across rows of text (no context window limit).
-// AI_EMBED          — Generate embedding vectors (similarity search, clustering).
-// AI_EXTRACT        — Extract structured info from text, images, or documents.
-// AI_SENTIMENT      — Sentiment score from text (-1 to 1).
-// AI_SUMMARIZE_AGG  — Summarize across rows (no context window limit).
-// AI_SIMILARITY     — Embedding similarity between two inputs.
-// AI_TRANSCRIBE     — Transcribe audio/video from stages.
-// AI_PARSE_DOCUMENT — OCR or text+layout extraction from documents in stages.
-// AI_REDACT         — Redact PII from text.
-// AI_TRANSLATE      — Translate between supported languages.
-
-// Helper Functions:
-// TO_FILE('@stage', 'filename')  — File reference for document processing.
-// AI_COUNT_TOKENS(model, text)   — Check token count before calling a model.
-// PROMPT('template {0}', arg)    — Build prompt objects for AI_COMPLETE.
-// TRY_COMPLETE                   — Returns NULL on failure instead of error.
-
-// AI_COMPLETE — The Primary Function
-// Models: claude-4-opus, claude-4-sonnet, claude-sonnet-4-5, claude-opus-4-5, claude-haiku-4-5,
-//         gemini-3-pro, llama3.1-70b, llama3.1-8b, llama3.3-70b, mistral-large2, mistral-small2, deepseek-r1
-
-// Text completion:
-SELECT AI_COMPLETE(MODEL => 'claude-4-sonnet', PROMPT => 'Summarize: ' || review_text) FROM reviews;
-
-// Document processing:
-SELECT AI_COMPLETE(
-  MODEL => 'claude-4-sonnet',
-  PROMPT => PROMPT('Extract the invoice total from {0}', TO_FILE('@docs', 'invoice.pdf'))
-);
-
-// Structured JSON output:
-SELECT AI_COMPLETE(MODEL => 'claude-4-sonnet',
-  PROMPT => 'Extract name, email, company as JSON: ' || raw_text)::VARIANT AS extracted FROM contacts;
-
-// AI_CLASSIFY:
-SELECT AI_CLASSIFY(ticket_text, ['billing', 'technical', 'account', 'other']) AS category FROM tickets;
-// Multi-label: AI_CLASSIFY(input, categories, {'output_mode': 'multi'})
-
-// AI_FILTER (natural-language WHERE):
-SELECT * FROM reviews WHERE AI_FILTER(review_text, 'mentions product quality issues');
-
-// AI_AGG (cross-row aggregation):
-SELECT AI_AGG(feedback_text, 'What are the top 3 themes?') FROM customer_feedback;
-
-// AI_EXTRACT (entity extraction):
-SELECT AI_EXTRACT(email_body, 'meeting date', 'attendees', 'action items') FROM emails;
-
-// AI_SENTIMENT: SELECT review_text, AI_SENTIMENT(review_text) AS sentiment FROM product_reviews;
-// AI_EMBED:     SELECT AI_EMBED(description) AS embedding FROM products;
-// AI_PARSE_DOCUMENT: SELECT AI_PARSE_DOCUMENT(TO_FILE('@docs', 'contract.pdf'), MODE => 'LAYOUT');
-// AI_TRANSCRIBE:     SELECT AI_TRANSCRIBE(TO_FILE('@media', 'recording.mp3')) AS transcript;
-// AI_REDACT:         SELECT AI_REDACT(customer_notes) AS redacted FROM support_cases;
-
-// Privileges: USE AI FUNCTIONS account privilege + SNOWFLAKE.CORTEX_USER database role (both granted to PUBLIC by default).
+// Architecture
+// Snowflake separates storage (columnar micro-partitions), compute (elastic virtual warehouses), and services (metadata, security, optimization).
 
 // ═══════════════════════════════════════════
-// CORTEX SEARCH — Hybrid Vector + Keyword Search
+// SQL AND SEMI-STRUCTURED DATA
 // ═══════════════════════════════════════════
 
-// Fully managed search combining vector (semantic) and keyword (lexical) search.
-// Use cases: RAG for LLM chatbots, enterprise search, AI-powered Q&A.
+// Use VARIANT, OBJECT, and ARRAY types for JSON, Avro, Parquet, ORC.
+// Access nested fields with colon notation: src:customer.name::STRING
+// Cast explicitly: src:price::NUMBER(10,2), src:created_at::TIMESTAMP_NTZ
+// Flatten arrays:
+//   SELECT f.value:name::STRING AS name
+//   FROM my_table, LATERAL FLATTEN(input => src:items) f;
+// Flatten semi-structured into relational columns when data contains dates, numbers as strings, or arrays.
+// Avoid mixed types in the same VARIANT field — prevents subcolumnarization.
+// VARIANT null vs SQL NULL: JSON null stored as string "null". Use STRIP_NULL_VALUES => TRUE on load.
 
-// Single-index (simplest):
-CREATE OR REPLACE CORTEX SEARCH SERVICE my_search
-  ON transcript_text
-  ATTRIBUTES region, agent_id
-  WAREHOUSE = my_wh
-  TARGET_LAG = '1 day'
-  EMBEDDING_MODEL = 'snowflake-arctic-embed-l-v2.0'
-  AS (SELECT transcript_text, region, agent_id FROM support_transcripts);
+// SQL Coding Standards
+// - snake_case for all identifiers. Avoid quoted identifiers.
+// - CTEs over nested subqueries. CREATE OR REPLACE for idempotent DDL.
+// - COPY INTO for bulk loading, not INSERT. MERGE for upserts:
+//   MERGE INTO target t USING source s ON t.id = s.id
+//   WHEN MATCHED THEN UPDATE SET t.name = s.name
+//   WHEN NOT MATCHED THEN INSERT (id, name) VALUES (s.id, s.name);
 
-// Multi-index (text + vector on multiple columns):
-CREATE OR REPLACE CORTEX SEARCH SERVICE my_multi_search
-  TEXT INDEXES transcript_text, summary
-  VECTOR INDEXES transcript_text (model='snowflake-arctic-embed-l-v2.0')
-  ATTRIBUTES region
-  WAREHOUSE = my_wh
-  TARGET_LAG = '1 hour'
-  AS (SELECT transcript_text, summary, region FROM support_transcripts);
+// Stored Procedures — prefix variables with colon : inside SQL statements:
+//   CREATE PROCEDURE my_proc(p_id INT) RETURNS STRING LANGUAGE SQL AS
+//   BEGIN
+//     LET result STRING;
+//     SELECT name INTO :result FROM users WHERE id = :p_id;
+//     RETURN result;
+//   END;
 
-// Key Parameters: ON (single-index column), TEXT INDEXES, VECTOR INDEXES, ATTRIBUTES (filter columns),
-// TARGET_LAG (freshness), EMBEDDING_MODEL, PRIMARY KEY (optimized incremental refresh).
+// ═══════════════════════════════════════════
+// PERFORMANCE OPTIMIZATION
+// ═══════════════════════════════════════════
 
-// Query — Python API (recommended for apps):
-from snowflake.core import Root
-root = Root(session)
-service = root.databases["db"].schemas["schema"].cortex_search_services["my_search"]
-resp = service.search(
-    query="internet connection issues",
-    columns=["transcript_text", "region"],
-    filter={"@eq": {"region": "North America"}},
-    limit=5
-)
+// Cluster keys: for very large tables (multi-TB), on WHERE/JOIN/GROUP BY columns.
+//   ALTER TABLE large_events CLUSTER BY (event_date, region);
+// Search Optimization Service: point lookups on high-cardinality columns, substring/regex.
+//   ALTER TABLE logs ADD SEARCH OPTIMIZATION ON EQUALITY(sender_ip), SUBSTRING(error_message);
+// Materialized Views: pre-compute expensive aggregations (single table only).
+// Use RESULT_SCAN(LAST_QUERY_ID()) to reuse results. Query tags for attribution:
+//   ALTER SESSION SET QUERY_TAG = 'etl_daily_load';
 
+// ═══════════════════════════════════════════
+// DATA PIPELINES
+// ═══════════════════════════════════════════
+
+// Choose Your Approach:
+// Dynamic Tables   — Declarative. Define the query, Snowflake handles refresh. Best for most pipelines.
+// Streams + Tasks  — Imperative CDC + scheduling. Best for procedural logic, stored procedure calls.
+// Snowpipe         — Continuous file loading from S3/GCS/Azure.
+// Snowpipe Streaming — Low-latency row-level ingestion via SDK (Java, Python).
+
+// Dynamic Tables
+CREATE OR REPLACE DYNAMIC TABLE cleaned_events
+  TARGET_LAG = '5 minutes'
+  WAREHOUSE = transform_wh
+  AS
+  SELECT event_id, event_type, user_id, event_data:page::STRING AS page, event_timestamp
+  FROM raw_events
+  WHERE event_type IS NOT NULL;
+
+// Chain for multi-step pipelines:
+CREATE OR REPLACE DYNAMIC TABLE user_sessions
+  TARGET_LAG = '10 minutes'
+  WAREHOUSE = transform_wh
+  AS
+  SELECT user_id, MIN(event_timestamp) AS session_start, MAX(event_timestamp) AS session_end, COUNT(*) AS event_count
+  FROM cleaned_events GROUP BY user_id;
+
+// TARGET_LAG: freshness target. REFRESH_MODE: AUTO, FULL, or INCREMENTAL.
+// Manage: ALTER DYNAMIC TABLE ... SET TARGET_LAG / REFRESH / SUSPEND / RESUME.
+
+// Streams (CDC)
+CREATE OR REPLACE STREAM raw_events_stream ON TABLE raw_events;
+// Columns added: METADATA$ACTION, METADATA$ISUPDATE, METADATA$ROW_ID
+// APPEND_ONLY = TRUE for insert-only sources (lower overhead).
+
+// Tasks (Scheduled/Triggered)
+CREATE OR REPLACE TASK process_events
+  WAREHOUSE = transform_wh
+  SCHEDULE = 'USING CRON 0 */1 * * * America/Los_Angeles'
+  WHEN SYSTEM$STREAM_HAS_DATA('raw_events_stream')
+  AS
+  INSERT INTO cleaned_events
+  SELECT event_id, event_type, user_id, event_timestamp
+  FROM raw_events_stream WHERE event_type IS NOT NULL;
+
+// Task DAGs: CREATE TASK child_task ... AFTER parent_task ...
+// Tasks start SUSPENDED — ALTER TASK ... RESUME to enable.
+
+// Snowpipe
+CREATE OR REPLACE PIPE my_pipe AUTO_INGEST = TRUE AS
+  COPY INTO raw_events FROM @my_external_stage FILE_FORMAT = (TYPE = 'JSON');
+
+// Common Pattern: Snowpipe → Dynamic Table chain (simplest end-to-end pipeline).
+
+// ═══════════════════════════════════════════
+// TIME TRAVEL AND DATA PROTECTION
+// ═══════════════════════════════════════════
+
+// Time Travel (default 1 day, up to 90 on Enterprise+):
+//   SELECT * FROM my_table AT(TIMESTAMP => '2024-01-15 10:00:00'::TIMESTAMP);
+//   SELECT * FROM my_table BEFORE(STATEMENT => '<query_id>');
+// UNDROP TABLE/SCHEMA/DATABASE to recover dropped objects.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
