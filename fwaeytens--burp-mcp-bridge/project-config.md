@@ -1,0 +1,146 @@
+---
+trigger: always_on
+description: **EVERY SESSION MUST BEGIN WITH:**
+---
+
+# Burp MCP Bridge - Agent Context File (v2.4.3)
+
+## 🚀 MANDATORY: Always Start With Documentation Discovery
+
+**EVERY SESSION MUST BEGIN WITH:**
+```javascript
+// Step 1: List all available tools
+await use_mcp_tool("burp-mcp-bridge", "burp_help", {
+  "list": true
+});
+
+// Step 2: Discover tools by capability
+await use_mcp_tool("burp-mcp-bridge", "burp_help", {
+  "capability": "scan for vulnerabilities"
+});
+
+// Step 3: Get detailed help for specific tools
+await use_mcp_tool("burp-mcp-bridge", "burp_help", {
+  "tool": "burp_scanner",
+  "section": "examples"  // Options: full, examples, parameters, summary
+});
+
+// Step 4: Get usage guide (no parameters)
+await use_mcp_tool("burp-mcp-bridge", "burp_help", {});
+```
+
+## ⚠️ CRITICAL TOOL DISTINCTION
+
+### ✅ Tools That CAN Execute Actions (Automated)
+- **burp_custom_http** - ⭐ PRIMARY TOOL for sending HTTP requests
+- **burp_scanner** - Automated vulnerability scanning (includes CRAWL_ONLY action for content discovery)
+- **burp_collaborator** - Out-of-band interaction testing
+- **burp_proxy_history** - Query and analyze captured traffic
+
+### ❌ Tools That CANNOT Execute (Configuration Only)
+- **burp_repeater** - Only creates UI tabs, CANNOT send requests
+- **burp_intruder** - Only configures attacks, CANNOT execute them
+
+## 📝 GOLDEN RULES
+
+1. **NEVER use burp_repeater to send requests** - Use burp_custom_http
+2. **NEVER use burp_intruder to execute attacks** - Use burp_custom_http
+3. **ALWAYS use burp_custom_http for HTTP operations**
+4. **⚠️ ALWAYS specify port in Host header** - `Host: example.com:80` for HTTP, `Host: example.com:443` for HTTPS
+5. **DEFAULT is HTTPS (port 443)** - Without port, requests go to HTTPS which times out on HTTP-only servers
+6. **ALWAYS call burp_help first** - List tools or discover by capability
+7. **ALWAYS use burp_scanner GET_STATUS** to check scan progress
+
+## 🎯 Common Task Mappings
+
+| Task | CORRECT Tool | WRONG Tool |
+|------|-------------|------------|
+| Send HTTP request | burp_custom_http | ❌ burp_repeater |
+| Modify and resend | burp_custom_http | ❌ burp_repeater |
+| Fuzz parameters | burp_custom_http (loop) | ❌ burp_intruder |
+| Test race conditions | burp_custom_http (SEND_PARALLEL) | ❌ burp_intruder |
+| Scan for vulns | burp_scanner | ✅ |
+| View proxy traffic | burp_proxy_history | ✅ |
+
+## 🔄 Quick Workflows
+
+### Sending Modified Requests
+
+**⚠️ CRITICAL: Always Specify Port in Host Header**
+
+Without explicit port, the tool defaults to HTTPS:443 which **times out on HTTP-only servers**.
+
+```javascript
+// ✅ CORRECT - HTTP with explicit port 80
+await use_mcp_tool("burp-mcp-bridge", "burp_custom_http", {
+  "action": "SEND_REQUEST",
+  "request": "GET /admin HTTP/1.1\r\nHost: example.com:80\r\nConnection: close\r\n\r\n"
+});
+
+// ✅ CORRECT - HTTPS with explicit port 443
+await use_mcp_tool("burp-mcp-bridge", "burp_custom_http", {
+  "action": "SEND_REQUEST",
+  "request": "GET /admin HTTP/1.1\r\nHost: example.com:443\r\nConnection: close\r\n\r\n"
+});
+
+// ❌ WRONG - No port specified, defaults to HTTPS:443, times out on HTTP servers
+await use_mcp_tool("burp-mcp-bridge", "burp_custom_http", {
+  "action": "SEND_REQUEST",
+  "request": "GET /admin HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\n\r\n"  // ❌ NO PORT!
+});
+
+// ❌ WRONG - Don't use burp_repeater, it only creates UI tabs
+await use_mcp_tool("burp-mcp-bridge", "burp_repeater", {...}); // ❌
+```
+
+**Line endings**: Both `\n` and `\r\n` work (auto-normalized to CRLF).
+**Content-Length**: Automatically calculated — no need to specify it accurately.
+
+### Scanning with Targeted Parameters (Scan Selected Insertion Points)
+```javascript
+// By parameter name (PREFERRED - auto-finds byte offsets)
+await use_mcp_tool("burp-mcp-bridge", "burp_scanner", {
+  "action": "SCAN_SPECIFIC_REQUEST",
+  "request": "POST /login HTTP/1.1\r\nHost: target.com:443\r\n\r\nusername=admin&password=secret",
+  "useHttps": true,
+  "insertionPointParams": ["username", "password"]  // Scans only these parameters
+});
+
+// By value string (finds the value anywhere in the request)
+await use_mcp_tool("burp-mcp-bridge", "burp_scanner", {
+  "action": "SCAN_SPECIFIC_REQUEST",
+  "request": "GET /api?token=abc123 HTTP/1.1\r\nHost: target.com:443\r\n\r\n",
+  "useHttps": true,
+  "insertionPointValues": ["abc123"]  // Scans only this value
+});
+
+// By byte offsets (manual - only if you need exact control)
+await use_mcp_tool("burp-mcp-bridge", "burp_scanner", {
+  "action": "ADD_TO_SCAN",
+  "request": "POST /login HTTP/1.1\r\n...",
+  "insertionPoints": [{"start": 50, "end": 55}]
+});
+```
+
+### Parallel Requests / Sweeps (SEND_PARALLEL)
+```javascript
+// Default: max_concurrency=10 (prevents tail-of-batch drops)
+// Responses come back in INPUT ORDER (.index matches requests[] position)
+await use_mcp_tool("burp-mcp-bridge", "burp_custom_http", {
+  "action": "SEND_PARALLEL",
+  "requests": [...50 requests...],
+  "max_concurrency": 10,        // default; raise to 50 for race conditions
+  "request_delay_ms": 100       // optional: pace dispatch for rate-limited targets
+});
+
+// Race condition (opt-in to fire-all-at-once)
+await use_mcp_tool("burp-mcp-bridge", "burp_custom_http", {
+  "action": "SEND_PARALLEL",
+  "max_concurrency": 50,        // bypass the throttle
+  "requests": [
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [fwaeytens/burp-mcp-bridge](https://github.com/fwaeytens/burp-mcp-bridge) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-13 -->
