@@ -7,11 +7,11 @@ Single-container deployment: Gastown + OpenClaw + KimiGas — multi-agent AI wor
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [gastown-publish/gasclaw](https://github.com/gastown-publish/gasclaw).
+Original source: `CLAUDE.md` in [gastown-publish/gasclaw](https://github.com/gastown-publish/gasclaw).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
