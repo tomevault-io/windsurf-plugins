@@ -1,197 +1,133 @@
 ---
 trigger: always_on
-description: Follow these rules when working on the backend.
+description: handleSuccess(result)
 ---
 
-### Backend Rules
+Rule Name: coding-standards
+Description: 
+This rule defines the coding standards and formatting guidelines that must be followed for all code changes in this project.
 
-Follow these rules when working on the backend.
+<coding_format>
 
-It uses Postgres, Supabase, Drizzle ORM, and Server Actions.
+A. Syntax & Structure
+- File names must be dash-case (word-cloud.service.ts) unless an existing pattern differs.
+- Group imports: node/standard → npm packages → internal paths. No unused imports.
+- Use arrow functions everywhere except inside class bodies, where concise method syntax is allowed.
+- Prefer early returns; nested if/else blocks deeper than two levels are disallowed.
+- Early returns must use block format with braces (e.g., `if (!value) { return }`) for readability.
+- Extract function call results as scope variables before using in conditions (e.g., `const trimmedText = text.trim(); if (!trimmedText) {...}` instead of `if (!text.trim()) {...}`).
+- Use async/await—never chain .then().
+- No .forEach for side effects; use for (const x of arr) instead.
+- Array combinators (map, reduce, filter) are allowed only when you return their result.
+- Identifiers must be English.
+- No commented code allowed.
 
-#### General Rules
+B. Functional-Programming Rules
+- Each function must:
+    * Be ≤ 50 lines (preferably; extract helpers if longer).
+    * Take ≤ 4 parameters (optional ones last).
+    * Have a single responsibility.
+    * Be pure unless it is an intentional I/O wrapper (e.g. DB write); such wrappers must be ≤ 15 lines.
+    * Name functions with camelCase imperative verbs (calculateTotals, getUserById).
 
-- Never generate migrations. You do not have to do anything in the `db/migrations` folder including migrations and metadata. Ignore it.
+C. Type Safety & Error Handling
+- Explicitly type all function parameters, return types, and exported constants.
+- Type all local variables inside a function.
+- **Special attention for async operations**: Variables from awaited functions (e.g., `const { userId } = await auth()`) must be explicitly typed, especially in Next.js components where auth results should use proper domain types.
+- No any; if an external library forces it, wrap and narrow.
+- Error handling in catch blocks:
+  - If the error variable is not used, use `catch {}` (no parameter).
+  - If the error is used, type it as `unknown` and handle it safely within the catch block.
 
-#### Organization
+D. React Component Standards
 
-#### Schemas
+- Always define props with interfaces, never inline types
+- Place interfaces directly above component definitions
+- Use const arrow functions for component definitions
+- Use implicit return syntax when components only return JSX (no logic before return)
+- Export components using export default pattern (required for Next.js pages/layouts)
+- Handler functions inside components must be ≤ 20 lines and have a single, clear responsibility. Extract helper functions for complex logic.
 
-- When importing schemas, use `@/db/schema`
-- Name files like `example-schema.ts`
-- All schemas should go in `db/schema`
-- Make sure to export the schema in `db/schema/index.ts`
-- Make sure to add the schema to the `schema` object in `db/db.ts`
-- If using a userId, always use `userId: text("user_id").notNull()`
-- Always include createdAt and updatedAt columns in all tables
-- Make sure to cascade delete when necessary
-- Use enums for columns that have a limited set of possible values such as:
-
-```ts
-import { pgEnum } from "drizzle-orm/pg-core"
-
-export const MEMBERSHIP: PgEnum<Membership> = pgEnum(
-  "membership",
-  MEMBERSHIP_VALUES
-)
-
-membership: MEMBERSHIP("membership").notNull().default("free")
-```
-
-Example of a schema:
-
-`db/schema/todos-schema.ts`
-
-```ts
-import { boolean, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core"
-
-export const todosTable = pgTable("todos", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  userId: text("user_id").notNull(),
-  content: text("content").notNull(),
-  completed: boolean("completed").default(false).notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at")
-    .defaultNow()
-    .notNull()
-    .$onUpdate(() => new Date())
-})
-
-export type InsertTodo = typeof todosTable.$inferInsert
-export type SelectTodo = typeof todosTable.$inferSelect
-```
-
-And exporting it:
-
-`db/schema/index.ts`
-
-```ts
-export * from "./todos-schema"
-```
-
-And adding it to the schema in `db/db.ts`:
-
-`db/db.ts`
-
-```ts
-import { todosTable } from "@/db/schema"
-
-const schema = {
-  todos: todosTable
-}
-```
-
-And a more complex schema:
-
-```ts
-import { pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core"
-
-export const chatsTable = pgTable("chats", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  userId: text("user_id").notNull(),
-  name: text("name").notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at")
-    .defaultNow()
-    .notNull()
-    .$onUpdate(() => new Date())
-})
-
-export type InsertChat = typeof chatsTable.$inferInsert
-export type SelectChat = typeof chatsTable.$inferSelect
-```
-
-```ts
-import { pgEnum, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core"
-import { chatsTable } from "./chats-schema"
-
-export const roleEnum = pgEnum("role", ["assistant", "user"])
-
-export const messagesTable = pgTable("messages", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  chatId: uuid("chat_id")
-    .references(() => chatsTable.id, { onDelete: "cascade" })
-    .notNull(),
-  content: text("content").notNull(),
-  role: roleEnum("role").notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at")
-    .defaultNow()
-    .notNull()
-    .$onUpdate(() => new Date())
-})
-
-export type InsertMessage = typeof messagesTable.$inferInsert
-export type SelectMessage = typeof messagesTable.$inferSelect
-```
-
-And exporting it:
-
-`db/schema/index.ts`
-
-```ts
-export * from "./chats-schema"
-export * from "./messages-schema"
-```
-
-And adding it to the schema in `db/db.ts`:
-
-`db/db.ts`
-
-```ts
-import { chatsTable, messagesTable } from "@/db/schema"
-
-const schema = {
-  chats: chatsTable,
-  messages: messagesTable
-}
-```
-
-#### Server Actions
-
-- When importing actions, use `@/actions` or `@/actions/db` if db related
-- DB related actions should go in the `actions/db` folder
-- Other actions should go in the `actions` folder
-- Name files like `example-actions.ts`
-- All actions should go in the `actions` folder
-- Only write the needed actions
-- Return an ActionState with the needed data type from actions
-- Include Action at the end of function names `Ex: exampleFunction -> exampleFunctionAction`
-- Actions should return a Promise<ActionState<T>>
-- Sort in CRUD order: Create, Read, Update, Delete
-- Make sure to return undefined as the data type if the action is not supposed to return any data
-- **Date Handling:** For columns defined as `PgDateString` (or any date string type), always convert JavaScript `Date` objects to ISO strings using `.toISOString()` before performing operations (e.g., comparisons or insertions). This ensures value type consistency and prevents type errors.
-
-```ts
-export type ActionState<T> =
-  | { isSuccess: true; message: string; data: T }
-  | { isSuccess: false; message: string; data?: never }
-```
-
-Example of an action:
-
-`actions/db/todos-actions.ts`
-
-```ts
-"use server"
-
-import { db } from "@/db/db"
-import { InsertTodo, SelectTodo, todosTable } from "@/db/schema/todos-schema"
-import { ActionState } from "@/types"
-import { eq } from "drizzle-orm"
-
-export async function createTodoAction(
-  todo: InsertTodo
-): Promise<ActionState<SelectTodo>> {
-  try {
-    const [newTodo] = await db.insert(todosTable).values(todo).returning()
-    return {
-      isSuccess: true,
-      message: "Todo created successfully",
-      data: newTodo
+  **Wrong (~50 lines in one handler):**
+  ```tsx
+  const handleFormSubmit = async (): Promise<void> => {
+    const trimmedName: string = formData.name.trim()
+    const trimmedEmail: string = formData.email.trim()
+    const trimmedMessage: string = formData.message.trim()
+    
+    if (!trimmedName) {
+      setErrors({ ...errors, name: "Name is required" })
+      toast({ title: "Error", description: "Name is required", variant: "destructive" })
+      return
     }
-  } catch (error) {
-    console.error("Error creating todo:", error)
+    
+    if (!trimmedEmail || !trimmedEmail.includes("@")) {
+      setErrors({ ...errors, email: "Valid email is required" })
+      toast({ title: "Error", description: "Valid email is required", variant: "destructive" })
+      return
+    }
+    
+    if (!trimmedMessage || trimmedMessage.length < 10) {
+      setErrors({ ...errors, message: "Message must be at least 10 characters" })
+      toast({ title: "Error", description: "Message too short", variant: "destructive" })
+      return
+    }
+    
+    setIsSubmitting(true)
+    setErrors({})
+    
+    try {
+      const payload: FormPayload = {
+        name: trimmedName,
+        email: trimmedEmail,
+        message: trimmedMessage,
+        timestamp: new Date().toISOString()
+      }
+      
+      const response: Response = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      })
+      
+      if (!response.ok) {
+        throw new Error("Failed to submit")
+      }
+      
+      const result: SubmissionResult = await response.json()
+      
+      setFormData({ name: "", email: "", message: "" })
+      setSubmissionCount(prev => prev + 1)
+      
+      toast({ title: "Success", description: "Message sent successfully!" })
+      
+      if (onSuccess) {
+        onSuccess(result)
+      }
+    } catch (error: unknown) {
+      const errorMessage: string = error instanceof Error ? error.message : "Unknown error"
+      console.error("Submission error:", errorMessage)
+      setErrors({ submit: "Failed to send message" })
+      toast({ title: "Error", description: "Failed to send message", variant: "destructive" })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+  ```
+
+  **Good (broken into focused helpers ≤ 20 lines each):**
+  ```tsx
+  const validateForm = (): boolean => {
+    const trimmedName: string = formData.name.trim()
+    const trimmedEmail: string = formData.email.trim()
+    const trimmedMessage: string = formData.message.trim()
+    
+    if (!trimmedName) {
+      setErrors({ ...errors, name: "Name is required" })
+      toast({ title: "Error", description: "Name is required", variant: "destructive" })
+      return false
+    }
+    
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
