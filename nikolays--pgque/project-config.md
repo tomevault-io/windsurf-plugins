@@ -40,13 +40,18 @@ snapshot isolation, batch_event_sql algorithm, dual-filter optimization).
 
 ## Style Rules
 
-Follow the shared rules at https://gitlab.com/postgres-ai/rules/-/tree/main/rules
+These rules are the source of truth for agentic engineering in this repo. Agents and AI coding tools must read this file before making changes.
 
 ### SQL Style
 
 - Lowercase SQL keywords: `select`, `create function`, not `SELECT`, `CREATE FUNCTION`
 - `snake_case` for all identifiers
 - Schema-qualify all internal references: `pgque.queue`, not just `queue`
+- **Root SQL keywords must be left-aligned within the statement.** Do not use
+  decorative vertical indentation like `select` / `from` / `where` shifted by
+  different amounts. This is non-negotiable for generated and source SQL.
+- Put `and` / `or` at the start of continuation lines, aligned under the
+  statement's `where` clause indentation.
 - All `SECURITY DEFINER` functions MUST include
   `SET search_path = pgque, pg_catalog`
 - Use `xid8` for transaction ID columns, `pg_snapshot` for snapshot columns
@@ -68,6 +73,28 @@ set -Eeuo pipefail
 
 - 2-space indent, no tabs
 - Quote all variable expansions
+
+### Documentation
+
+- **Write for new users.** README and docs target someone arriving today, not
+  someone migrating from an older state. Do not include "before X" or
+  "previously did Y, now does Z" framing in the README or under `docs/`.
+  Migration notes belong in release notes (`CHANGELOG.md` / GitHub releases),
+  full stop.
+- **No PR or issue numbers, and no concrete version tags, in the README or
+  `docs/` unless it really helps the reader.** No `#123`, no `(see PR #456)`,
+  no `refs #102, #106`, no `Breaking change in v0.2`, no `PgQue v0.2.0 has
+  …`. Refer to behavior, not the change history or release labels that
+  produced it. (External citations to other projects' issue trackers, used
+  as evidence for a claim, are fine. Version tags are fine in roadmap-style
+  contexts under `blueprints/` where the version IS the topic.) PR/issue
+  numbers and version tags may appear in commit messages, release notes,
+  `blueprints/`, and `CONTRIBUTING.md`.
+- **Installation docs must be self-complete but not bloated.** Every
+  install/quickstart doc covers: install command, ticker setup (or how to skip
+  it), and role grants (`pgque_reader` / `pgque_writer` / `pgque_admin`,
+  including the produce+consume case that needs both). One short snippet,
+  not a tour.
 
 ### Git Commits
 
@@ -94,41 +121,13 @@ pgque/
   docs/                -- user-facing documentation (flat layout)
     README.md          -- index of the docs directory
     tutorial.md        -- hands-on walkthrough (start here for new users)
-    reference.md       -- per-function reference for the v0.1 install
+    reference.md       -- per-function reference for the default install
     examples.md        -- short patterns (fan-out, exactly-once, etc.)
     benchmarks.md      -- throughput numbers + methodology
     pgq-concepts.md    -- contributor glossary (batch, tick, rotation)
-    pgq-history.md     -- short timeline from Skype to PgQue
-  clients/             -- client libraries
-    python/            -- pgque-py
-    go/                -- pgque-go
-    typescript/        -- pgque-ts
-  cli/                 -- pgque CLI (Go)
-```
 
-## Key Design Rules
-
-1. **Every SECURITY DEFINER function must pin search_path.** No exceptions.
-2. **The PgQ engine is sacred.** Batch/tick/rotation/consumer tracking logic
-   is inherited from PgQ and must not be modified without deep understanding.
-3. **Modern API functions must reduce cleanly to PgQ primitives.**
-   If `pgque.send()` cannot be explained as "calls `pgque.insert_event()` with
-   these args," it is too complex.
-4. **No subtransactions in hot paths.** Avoid `BEGIN ... EXCEPTION WHEN ... END`
-   in ticker, event insertion, and trigger functions.
-5. **Test against PG 14, 15, 16, 17, 18.** CI must cover all supported versions.
-6. **Red/green TDD for all new code.** Write the failing test first, then
-   the implementation. Applies to pgque-api, observability, client libraries,
-   CLI. Does NOT apply to pgque-core repackaging (PgQ already has tests).
-   See SPECx.md section 13.2.
-
-## Copyright
-
-Copyright 2026 Nikolay Samokhvalov. Apache-2.0 license.
-
-PgQue includes code derived from PgQ (ISC license, Marko Kreen / Skype Technologies OU).
-Always preserve the PgQ copyright notice in source headers.
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Source: [NikolayS/pgque](https://github.com/NikolayS/pgque) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-19 -->
+> Source: [NikolayS/PgQue](https://github.com/NikolayS/PgQue) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-09 -->
