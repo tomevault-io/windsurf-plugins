@@ -7,14 +7,14 @@ ComfyUI custom node for automatic background removal and transparency generation
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `GEMINI.md` in [Limbicnation/ComfyUI-TransparencyBackgroundRemover](https://github.com/Limbicnation/ComfyUI-TransparencyBackgroundRemover).
+Original source: `CLAUDE.md` in [Limbicnation/ComfyUI-TransparencyBackgroundRemover](https://github.com/Limbicnation/ComfyUI-TransparencyBackgroundRemover).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
+- **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
 From [Limbicnation/ComfyUI-TransparencyBackgroundRemover](https://github.com/Limbicnation/ComfyUI-TransparencyBackgroundRemover) — a repo with 18+ stars on GitHub.
