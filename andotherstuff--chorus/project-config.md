@@ -1,135 +1,58 @@
 ---
 trigger: always_on
-description: This project is a Nostr client application built with React 18.x, TailwindCSS 3.x, Vite, shadcn/ui, and Nostrify.
+description: Global Rule. This rule should ALWAYS be loaded
 ---
 
-# Project Overview
+vibe-tools is a CLI tool that allows you to interact with AI models and other tools.
+vibe-tools is installed on this machine and it is available to you to execute. You're encouraged to use it.
 
-This project is a Nostr client application built with React 18.x, TailwindCSS 3.x, Vite, shadcn/ui, and Nostrify.
+<vibe-tools Integration>
+# Instructions
+Use the following commands to get AI assistance:
 
-## Technology Stack
+**Direct Model Queries:**
+`vibe-tools ask "<your question>" --provider <provider> --model <model>` - Ask any model from any provider a direct question (e.g., `vibe-tools ask "What is the capital of France?" --provider openai --model o3-mini`). Note that this command is generally less useful than other commands like `repo` or `plan` because it does not include any context from your codebase or repository. In general you should not use the ask command because it does not include any context. The other commands like `web`, `doc`, `repo`, or `plan` are usually better. If you are using it, make sure to include in your question all the information and context that the model might need to answer usefully.
 
-- **React 18.x**: Stable version of React with hooks, concurrent rendering, and improved performance
-- **TailwindCSS 3.x**: Utility-first CSS framework for styling
-- **Vite**: Fast build tool and development server
-- **shadcn/ui**: Unstyled, accessible UI components built with Radix UI and Tailwind
-- **Nostrify**: Nostr protocol framework for Deno and web
-- **React Router**: For client-side routing
-- **TanStack Query**: For data fetching, caching, and state management
-- **TypeScript**: For type-safe JavaScript development
+**Ask Command Options:**
+--provider=<provider>: AI provider to use (openai, anthropic, perplexity, gemini, modelbox, openrouter, or xai)
+--model=<model>: Model to use (required for the ask command)
+--reasoning-effort=<low|medium|high>: Control the depth of reasoning for supported models (OpenAI o1/o3-mini models and Claude 3.7 Sonnet). Higher values produce more thorough responses for complex questions.
+--with-doc=<doc_url>: Fetch content from one or more document URLs and include it as context. Can be specified multiple times (e.g., `--with-doc=<url1> --with-doc=<url2>`).
 
-## Project Structure
+**Implementation Planning:**
+`vibe-tools plan "<query>"` - Generate a focused implementation plan using AI (e.g., `vibe-tools plan "Add user authentication to the login page"`)
+The plan command uses multiple AI models to:
+1. Identify relevant files in your codebase (using Gemini by default)
+2. Extract content from those files
+3. Generate a detailed implementation plan (using OpenAI o3-mini by default)
 
-- `/src/components/`: UI components including NostrProvider for Nostr integration
-- `/src/hooks/`: Custom hooks including `useNostr` and `useNostrQuery`
-- `/src/pages/`: Page components used by React Router
-- `/src/lib/`: Utility functions and shared logic
-- `/public/`: Static assets
+**Plan Command Options:**
+--fileProvider=<provider>: Provider for file identification (gemini, openai, anthropic, perplexity, modelbox, openrouter, or xai)
+--thinkingProvider=<provider>: Provider for plan generation (gemini, openai, anthropic, perplexity, modelbox, openrouter, or xai)
+--fileModel=<model>: Model to use for file identification
+--thinkingModel=<model>: Model to use for plan generation
+--with-doc=<doc_url>: Fetch content from one or more document URLs and include it as context for both file identification and planning. Can be specified multiple times (e.g., `--with-doc=<url1> --with-doc=<url2>`).
 
-## UI Components
+**Web Search:**
+`vibe-tools web "<your question>"` - Get answers from the web using a provider that supports web search (e.g., Perplexity models and Gemini Models either directly or from OpenRouter or ModelBox) (e.g., `vibe-tools web "latest shadcn/ui installation instructions"`)
+Note: web is a smart autonomous agent with access to the internet and an extensive up to date knowledge base. Web is NOT a web search engine. Always ask the agent for what you want using a proper sentence, do not just send it a list of keywords. In your question to web include the context and the goal that you're trying to acheive so that it can help you most effectively.
+when using web for complex queries suggest writing the output to a file somewhere like local-research/<query summary>.md. However if user provides a specific url, you should always use any command with --with-doc instead of web.
 
-The project uses shadcn/ui components located in `@/components/ui`. These are unstyled, accessible components built with Radix UI and styled with Tailwind CSS. Available components include:
+**Web Command Options:**
+--provider=<provider>: AI provider to use (perplexity, gemini, modelbox, or openrouter)
 
-- **Accordion**: Vertically collapsing content panels
-- **Alert**: Displays important messages to users
-- **AlertDialog**: Modal dialog for critical actions requiring confirmation
-- **AspectRatio**: Maintains consistent width-to-height ratio
-- **Avatar**: User profile pictures with fallback support
-- **Badge**: Small status descriptors for UI elements
-- **Breadcrumb**: Navigation aid showing current location in hierarchy
-- **Button**: Customizable button with multiple variants and sizes
-- **Calendar**: Date picker component 
-- **Card**: Container with header, content, and footer sections
-- **Carousel**: Slideshow for cycling through elements
-- **Chart**: Data visualization component
-- **Checkbox**: Selectable input element
-- **Collapsible**: Toggle for showing/hiding content
-- **Command**: Command palette for keyboard-first interfaces
-- **ContextMenu**: Right-click menu component
-- **Dialog**: Modal window overlay
-- **Drawer**: Side-sliding panel
-- **DropdownMenu**: Menu that appears from a trigger element
-- **Form**: Form validation and submission handling
-- **HoverCard**: Card that appears when hovering over an element
-- **InputOTP**: One-time password input field
-- **Input**: Text input field
-- **Label**: Accessible form labels
-- **Menubar**: Horizontal menu with dropdowns
-- **NavigationMenu**: Accessible navigation component
-- **Pagination**: Controls for navigating between pages
-- **Popover**: Floating content triggered by a button
-- **Progress**: Progress indicator
-- **RadioGroup**: Group of radio inputs
-- **Resizable**: Resizable panels and interfaces
-- **ScrollArea**: Scrollable container with custom scrollbars
-- **Select**: Dropdown selection component
-- **Separator**: Visual divider between content
-- **Sheet**: Side-anchored dialog component
-- **Sidebar**: Navigation sidebar component
-- **Skeleton**: Loading placeholder
-- **Slider**: Input for selecting a value from a range
-- **Sonner**: Toast notification manager
-- **Switch**: Toggle switch control
-- **Table**: Data table with headers and rows
-- **Tabs**: Tabbed interface component
-- **Textarea**: Multi-line text input
-- **Toast**: Toast notification component
-- **ToggleGroup**: Group of toggle buttons
-- **Toggle**: Two-state button
-- **Tooltip**: Informational text that appears on hover
+**Repository Context:**
+`vibe-tools repo "<your question>" [--subdir=<path>] [--from-github=<username/repo>] [--with-doc=<doc_url>...]` - Get context-aware answers about this repository using Google Gemini (e.g., `vibe-tools repo "explain authentication flow"`)
+Use the optional `--subdir` parameter to analyze a specific subdirectory instead of the entire repository (e.g., `vibe-tools repo "explain the code structure" --subdir=src/components`). Use the optional `--from-github` parameter to analyze a remote GitHub repository without cloning it locally (e.g., `vibe-tools repo "explain the authentication system" --from-github=username/repo-name`). Use the optional `--with-doc` parameter multiple times to include content from several URLs as additional context (e.g., `vibe-tools repo "summarize findings" --with-doc=https://example.com/spec1 --with-doc=https://example.com/spec2`).
 
-These components follow a consistent pattern using React's `forwardRef` and use the `cn()` utility for class name merging. Many are built on Radix UI primitives for accessibility and customized with Tailwind CSS.
+**Documentation Generation:**
+`vibe-tools doc [options] [--with-doc=<doc_url>...]` - Generate comprehensive documentation for this repository (e.g., `vibe-tools doc --output docs.md`). Can incorporate document context from multiple URLs (e.g., `vibe-tools doc --with-doc=https://example.com/existing-docs --with-doc=https://example.com/new-spec`).
 
-## Nostr Protocol Integration
+**YouTube Video Analysis:**
+`vibe-tools youtube "<youtube-url>" [question] [--type=<summary|transcript|plan|review|custom>]` - Analyze YouTube videos and generate detailed reports (e.g., `vibe-tools youtube "https://youtu.be/43c-Sm5GMbc" --type=summary`)
+Note: The YouTube command requires a `GEMINI_API_KEY` to be set in your environment or .vibe-tools.env file as the GEMINI API is the only interface that supports YouTube analysis.
 
-This project comes with custom hooks for querying and publishing events on the Nostr network.
-
-### The `useNostr` Hook
-
-The `useNostr` hook returns an object containing a `nostr` property, with `.query()` and `.event()` methods for querying and publishing Nostr events respectively.
-
-```typescript
-import { useNostr } from '@nostrify/react';
-
-function useCustomHook() {
-  const { nostr } = useNostr();
-
-  // ...
-}
-```
-
-### Query Nostr Data with `useNostr` and Tanstack Query
-
-When querying Nostr, the best practice is to create custom hooks that combine `useNostr` and `useQuery` to get the required data.
-
-```typescript
-import { useNostr } from '@nostrify/react';
-import { useQuery } from '@tanstack/query';
-
-function usePosts() {
-  const { nostr } = useNostr();
-
-  return useQuery({
-    queryKey: ['posts'],
-    queryFn: async (c) => {
-      const signal = AbortSignal.any([c.signal, AbortSignal.timeout(1500)]);
-      const events = await nostr.query([{ kinds: [1], limit: 20 }], { signal });
-      return events; // these events could be transformed into another format
-    },
-  });
-}
-```
-
-The data may be transformed into a more appropriate format if needed, and multiple calls to `nostr.query()` may be made in a single queryFn.
-
-### The `useAuthor` Hook
-
-To display profile data for a user by their Nostr pubkey (such as an event author), use the `useAuthor` hook.
-
-```tsx
-import { NostrEvent, NostrMetadata } from '@nostrify/nostrify';
-import { useAuthor } from '@/hooks/useAuthor';
-
+**GitHub Information:**
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
