@@ -7,11 +7,11 @@ A Zotero plugin that seamlessly integrates with Eagle, allowing you to save PDF 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [yueneiqi/zotero2eagle](https://github.com/yueneiqi/zotero2eagle).
+Original source: `CLAUDE.md` in [yueneiqi/zotero2eagle](https://github.com/yueneiqi/zotero2eagle).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
