@@ -7,11 +7,11 @@ A desktop pet that tracks your AI coding activity (Cursor, Claude Code, Codex, T
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [funAgent/ai-bubu](https://github.com/funAgent/ai-bubu).
+Original source: `CLAUDE.md` in [funAgent/ai-bubu](https://github.com/funAgent/ai-bubu).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
