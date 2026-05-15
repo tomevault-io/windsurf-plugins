@@ -1,162 +1,141 @@
 ---
 trigger: always_on
-description: This document contains domain-specific knowledge for developing WhatsApp bots for digital store management, covering business logic, technical patterns, and domain expertise.
+description: This is a **WhatsApp Bot for Digital Store Management** built with Node.js ES6 modules, Baileys library, and a sophisticated queue-based architecture. The bot handles customer service automation, product management, group moderation, and order processing for digital stores.
 ---
 
-# .cursor/rules/02-whatsapp-bot-domain-knowledge.mdc
+# KoalaStore WhatsApp Bot - AI Agent Instructions
 
-## WhatsApp Bot Domain Knowledge
+## Project Overview
+This is a **WhatsApp Bot for Digital Store Management** built with Node.js ES6 modules, Baileys library, and a sophisticated queue-based architecture. The bot handles customer service automation, product management, group moderation, and order processing for digital stores.
 
-This document contains domain-specific knowledge for developing WhatsApp bots for digital store management, covering business logic, technical patterns, and domain expertise.
+## Core Architecture Understanding
 
-## WhatsApp Bot Architecture Patterns
-
-### Message Flow Understanding
+### Message Processing Pipeline
 ```
-Incoming Message → Message Handler → Command Parser → Context Creation → Command Execution → Response Queue → WhatsApp API
+WhatsApp → MessageHandler → CommandHandler → Services → Response Queue → WhatsApp
 ```
 
-### Context Object Structure
-The context object is the core data structure passed to all commands:
+All message processing uses **p-queue** for race condition prevention. Never bypass the queue system without `queueHelpers.safeAdd()` wrapper.
+
+### Command Discovery System
+Commands are **automatically discovered** from filesystem structure via `CommandRegistry.js`:
+- Add new commands: Create `.js` file in appropriate `src/commands/{category}/` folder
+- Metadata: Configure in `src/commands/registry/commandsConfig.js`
+- Categories: `general`, `admin`, `owner`, `store`, `calculator`
+- Hot reload: Use `reloadcommands` command (owner only)
+
+### Context Object Pattern
+Every command receives a rich context object with WhatsApp data, services, and utilities:
 ```javascript
-const context = {
-    // Core WhatsApp data
-    msg,                    // Original Baileys message object
-    from,                   // Chat/Group ID
-    sender,                 // User ID who sent message
-    pushname,               // User's display name
-    body,                   // Message text content
-    
-    // Group metadata (if applicable)
-    isGroup,                // Boolean: is this a group chat
-    groupMetadata,          // Group info (name, participants, etc.)
-    groupMembers,           // Array of group members
-    isGroupAdmin,           // Boolean: is sender group admin
-    isBotGroupAdmin,        // Boolean: is bot group admin
-    
-    // User permissions
-    isOwner,                // Boolean: is sender bot owner
-    
-    // Message analysis
-    isQuotedMsg,            // Boolean: is replying to a message
-    quotedMsg,              // Quoted message object
-    
-    // Services and managers
-    messageService,         // For sending messages
-    groupService,           // For group operations
-    listManager,            // Product management
-    testiManager,           // Testimonial management
-    afkManager,             // AFK status management
-    sewaManager,            // Subscription management
-    // ... other managers
-    
-    // Utility functions
-    reply: async (text) => {} // Quick reply function
-};
-```
-
-### Command Categories & Responsibilities
-
-#### **Admin Commands** (`src/commands/admin/`)
-- **Purpose**: Group moderation and management
-- **Access**: Group admins only
-- **Common patterns**: Member management, message moderation, group settings
-- **Examples**: `kick`, `promote`, `demote`, `hidetag`, `antilink`
-
-#### **Owner Commands** (`src/commands/owner/`)
-- **Purpose**: Bot administration and system management
-- **Access**: Bot owner only
-- **Common patterns**: System monitoring, data management, bot configuration
-- **Examples**: `botstat`, `resetqueue`, `broadcast`, `addproduk`
-
-#### **Store Commands** (`src/commands/store/`)
-- **Purpose**: Digital store operations
-- **Access**: All users (with business logic restrictions)
-- **Common patterns**: Product browsing, payment info, testimonials
-- **Examples**: `list`, `produk`, `payment`, `testi`
-
-#### **General Commands** (`src/commands/general/`)
-- **Purpose**: Universal utility functions
-- **Access**: All users
-- **Common patterns**: Information retrieval, utilities, help
-- **Examples**: `help`, `ping`, `sticker`, `afk`
-
-## Digital Store Business Logic
-
-### Product Management Workflow
-```
-Add Product → Validate Data → Store in Database → Update Catalog → Notify Admins
-```
-
-### Order Processing States
-1. **Inquiry** - Customer asks about product
-2. **Quotation** - Price and details provided
-3. **Processing** - Order being prepared (`set_proses.json`)
-4. **Completion** - Order delivered (`set_done.json`)
-5. **Testimonial** - Customer feedback collection
-
-### Payment Flow Understanding
-```
-Customer Inquiry → Product Selection → Payment Info → Payment Proof → Order Processing → Delivery → Completion
-```
-
-## WhatsApp API Specific Knowledge
-
-### Message Types & Handling
-```javascript
-// Text messages
-msg.message?.conversation
-
-// Media messages with captions
-msg.message?.imageMessage?.caption
-msg.message?.videoMessage?.caption
-
-// Extended text (links, mentions)
-msg.message?.extendedTextMessage?.text
-
-// Button responses
-msg.message?.buttonsResponseMessage?.selectedButtonId
-
-// List responses
-msg.message?.listResponseMessage?.singleSelectReply?.selectedRowId
-```
-
-### Group Operations Best Practices
-```javascript
-// Always check bot admin status before group operations
-const isBotAdmin = await groupService.isBotGroupAdmin(groupId);
-if (!isBotAdmin) {
-    return messageService.reply('Bot harus menjadi admin untuk operasi ini');
-}
-
-// Validate target user permissions
-const isTargetAdmin = await groupService.isGroupAdmin(groupId, targetUserId);
-if (isTargetAdmin && action === 'kick') {
-    return messageService.reply('Tidak bisa kick admin grup');
+export default async function myCommand(context, args) {
+    const { from, sender, isOwner, isGroupAdmin, messageService, listManager } = context;
+    // Always use context.messageService.reply() instead of direct client calls
 }
 ```
 
-### Media Handling Patterns
-```javascript
-// Image processing for products
-if (quotedMsg?.imageMessage) {
-    const imageUrl = await mediaService.uploadImage(quotedMsg);
-    product.image_url = imageUrl;
-    product.isImage = true;
-}
+## Essential Development Patterns
 
-// Sticker creation
-const stickerBuffer = await mediaService.createSticker(mediaBuffer);
-await messageService.sendSticker(from, stickerBuffer);
+### Data Management via Managers
+**Never** access JSON files directly. Always use manager classes:
+```javascript
+// ✅ Correct
+const products = await context.listManager.getListDb();
+await context.listManager.saveListDb(updatedProducts);
+
+// ❌ Wrong - bypasses data consistency
+const products = JSON.parse(fs.readFileSync('database/list.json'));
 ```
 
-## Customer Service Automation Patterns
+### Command Argument Parsing
+Use pipe-separated arguments for complex data:
+```javascript
+// Command: addlist Product Name|Description here|25000|Electronics
+const { args } = commandHandler.parseMultipleArgs(text, 4);
+const [name, description, price, category] = args;
+```
 
-### AFK System Domain Logic
-- **Scope**: Group-specific (user can be AFK in one group but not another)
+### Permission-Aware Operations
+Always validate permissions before group operations:
+```javascript
+if (command.adminOnly && !context.isGroupAdmin) {
+    return context.messageService.reply(from, "❌ Admin only command", msg);
+}
+
+// For bot group operations, check bot's admin status
+const isBotAdmin = await context.groupService.isBotGroupAdmin(groupId);
+```
+
+### Queue-First Development
+All async operations must use queue helpers:
+```javascript
+// Message sending
+await queueHelpers.safeAdd(messageQueue,
+    async () => messageService.reply(from, text, msg),
+    async () => messageService.sendTextDirect(from, text) // fallback
+);
+```
+
+### Group Metadata Validation
+All group message sending automatically validates metadata before sending:
+```javascript
+// Automatically handled in MessageService - ensures group metadata exists
+await messageService.sendText(groupId, "Message"); // ✅ Safe for groups
+await messageService.reply(groupId, "Reply", msg); // ✅ Metadata validated
+
+// Pattern used internally:
+// await this.ensureGroupMetadata(jid); // Validates if jid.endsWith('@g.us')
+```
+
+### Group Message Encryption
+Group messages automatically include encryption options for better compatibility:
+```javascript
+// Automatically applied for group messages (jid.endsWith('@g.us'))
+const sendOptions = to.endsWith('@g.us') ? {
+    ephemeralExpiration: 0,
+    messageId: undefined, // Let Baileys generate the message ID
+    ...options
+} : options;
+
+// All MessageService methods handle this automatically
+await messageService.sendText(groupId, "Message"); // ✅ Encryption applied
+await messageService.sendImage(groupId, buffer, "Caption"); // ✅ Encryption applied
+```## Critical Developer Workflows
+
+### Adding New Commands
+1. Create file: `src/commands/{category}/commandname.js`
+2. Add metadata: `src/commands/registry/commandsConfig.js`
+3. Test with: `npm run dev` (auto-discovery active)
+4. Hot reload: Send `reloadcommands` command as owner
+
+### Development Setup
+```bash
+npm run dev              # Development with auto-restart
+npm run pm2:start        # Production deployment
+npm run pm2:logs         # Monitor logs
+npm run clean:win        # Reset WhatsApp session (Windows)
+```
+
+### Debugging Commands
+- `botstat` - System health and queue statistics
+- `commandinfo` - Registry status and command metrics
+- `resetqueue` - Emergency queue reset for stuck operations
+- `reloadcommands` - Hot reload all commands
+
+### PM2 Production Patterns
+- **Non-interactive setup**: `pm2-windows.bat` for Windows deployment
+- **Pairing code mode**: Set `USE_PAIRING_CODE=true` to avoid QR scanning
+- **Memory monitoring**: Auto-restart at 1GB RAM usage
+- **Log rotation**: Configured in `ecosystem.config.js`
+
+## Project-Specific Conventions
+
+### File Organization
+```
+src/
+├── commands/{category}/     # Auto-discovered commands
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/pemudakoding) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-10 -->
+> Source: [pemudakoding/Digital-Store-Assistant](https://github.com/pemudakoding/Digital-Store-Assistant) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-14 -->
