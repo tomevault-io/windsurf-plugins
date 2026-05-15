@@ -1,110 +1,131 @@
 ---
 trigger: always_on
-description: Authoritative operational standard for all AI coding agents (Copilot, Claude, GPT, others) contributing to this repository. Defines mandatory engineering rules, workflow protocol, architectural constraints, and decision heuristics to ensure consistent, safe, high‑quality, effect‑based TypeScript contributions.
+description: This is a TypeScript-based MCP (Model Context Protocol) server that enables AI agents to interact with Gremlin-compatible graph databases. The server provides 6 tools and 2 resources for comprehensive graph database operations.
 ---
 
-# AI AGENTS GUIDELINES
+## Project Overview
 
-## 1. Title & Purpose
+This is a TypeScript-based MCP (Model Context Protocol) server that enables AI agents to interact with Gremlin-compatible graph databases. The server provides 6 tools and 2 resources for comprehensive graph database operations.
 
-Authoritative operational standard for all AI coding agents (Copilot, Claude, GPT, others) contributing to this repository. Defines mandatory engineering rules, workflow protocol, architectural constraints, and decision heuristics to ensure consistent, safe, high‑quality, effect‑based TypeScript contributions.
+**Implementation Status**: This project is fully implemented using **Effect.ts** functional programming patterns throughout.
 
-## 2. Scope (What this file governs / What it does not)
+## Architecture
 
-Governs: Code generation, refactors, tests, docs authored by AI; architectural changes; effect modeling; schema & Gremlin interactions; error & data modeling; PR structure; automation hygiene.
-Does NOT govern: Human editorial style guides, product roadmap, infrastructure ops, non-code repository assets. If a conflict exists with LICENSE or SECURITY.md, those take precedence.
+### Core Components
 
-## 3. Core Principles (short list)
+- **server.ts** - Effect-based MCP server with graceful startup/shutdown using Effect composition
+- **gremlin/service.ts** - Effect-based Gremlin service with Context.Tag service pattern
+- **gremlin/schema-service.ts** - Effect-based schema management with dependency injection
+- **config.ts** - Effect.Config-based configuration validation (no backward compatibility)
+- **handlers/** - Effect-based modular MCP request handlers with service injection
+- **utils/** - Effect-based utility modules with composable operations
 
-1. KISS – minimal viable abstraction.
-2. YAGNI – add complexity only with a concrete second use.
-3. DRY – no duplicated logic; prefer reuse/composition.
-4. Purity – isolate side effects at explicit boundaries.
-5. Explicitness – types, errors, contracts are declared, not inferred from context.
-6. Determinism – schema generation & transformations must be reproducible.
-7. Composability – build small effectful units combined via functional operators.
-8. Safety – no unchecked external data, no silent failures.
-9. Observability of intent – names reveal purpose; no hidden coupling.
-10. Focus – each change addresses one coherent concern.
+### Available Tools
 
-## 4. Operational Rules (MUST / MUST NOT)
+1. `get_graph_status` - Check database connection status
+2. `get_graph_schema` - Get complete schema with vertex/edge labels and relationship patterns
+3. `run_gremlin_query` - Execute any Gremlin traversal query
+4. `refresh_schema_cache` - Force immediate refresh of cached schema
+5. `import_graph_data` - Import data from GraphSON or CSV formats with batch processing
+6. `export_subgraph` - Export subgraph data to JSON, GraphSON, or CSV formats
 
-### Architecture & Design
+### Available Resources
 
-MUST:
+1. `gremlin://status` - Real-time connection status
+2. `gremlin://schema` - Cached schema information (JSON format)
 
-- Preserve existing layered separation (config / gremlin services / schema / handlers / utils / models).
-- Keep modules single‑purpose; split when a file exceeds clearly separated responsibilities (heuristic: > ~300 lines with 2+ conceptual domains).
-- Encapsulate traversal construction behind utilities/services; expose intention, not query strings.
-- Represent cross‑cutting concerns (config, schema cache, connection) via injectable services.
-- Maintain deterministic schema assembly (stable ordering, idempotent recomputation, cache invalidation explicit).
-- Introduce an abstraction only after a second concrete call site or clear complexity reduction.
-- Ensure new layers or services declare explicit dependency requirements (no implicit global access).
+## Development Rules
 
-MUST NOT:
+### MUST Follow RULES.md
 
-- Mix query building logic with schema generation or result parsing.
-- Create circular dependencies between modules.
-- Leak internal traversal fragments to handlers or tests.
-- Add global singletons outside controlled Layer/service patterns.
-- Hide IO inside ostensibly pure helpers.
+Always follow the development rules in `RULES.md` - these are mandatory for all code changes, testing, security, and architecture decisions.
 
-### TypeScript & Types
+### Code Standards
 
-MUST:
+- Use TypeScript with strict type checking
+- Follow ESLint and Prettier configurations
+- Use Effect.ts functional programming patterns throughout
+- Use Zod for runtime validation with Effect.Config
+- Implement Effect-based error handling with custom error types
+- Write tests for all new functionality using Effect testing patterns
 
-- Use strict, explicit public function signatures (return + parameter types).
-- Prefer `type` for unions/intersections/discriminated unions; `interface` for extensible object contracts.
-- Use discriminated unions for state variants instead of boolean flags.
-- Prefer readonly & immutable data structures unless a justified hotspot.
-- Replace magic literals with named `const` declarations.
-- Use `unknown` + type guards instead of `any` for external/unvalidated data.
-- Export only stable public surface from barrel indexes; keep internals file‑scoped.
+### Testing Requirements
 
-MUST NOT:
+- Use Jest with ts-jest for ESM support
+- Mock external dependencies properly
+- Include integration tests for end-to-end validation
+- Maintain high test coverage
 
-- Use `any` (except in a boundary shim with justification comment).
-- Silence compiler warnings via assertions (`as`, `!`) unless after explicit validation.
-- Re‑declare types already available through inference if local, unless clarity improves public API.
-- Overuse generics where a concrete type is simpler.
+### Key Patterns
 
-### Functional & Effects
+- **Effect.ts Functional Programming**: All operations use Effect's composable, type-safe approach
+- **Service-Oriented Architecture**: Dependencies managed through Effect's Context.Tag patterns
+- **Layer-Based Composition**: Application built using Effect.Layer for dependency resolution
+- **Immutable State Management**: All state changes handled through Effect.Ref
+- **Type Safety**: Comprehensive TypeScript with Effect's type system + Zod validation
+- **Configuration Management**: Effect.Config-based environment validation
+- **Error Handling**: Effect-based error handling with custom error types
+- **Generic Gremlin Support**: Compatible with any Gremlin database
 
-MUST:
+## Development Commands
 
-- Model all side effects as typed Effects (or typed result constructs) rather than raw Promises.
-- Keep effect execution (unsafe run / actual IO) at boundary layers (server entrypoints, handler adapters, CLI bootstrap).
-- Compose behavior with `pipe`, `map`, `flatMap`, `mapError`, avoiding nested callbacks.
-- Separate pure data transformation from effect orchestration.
-- Provide explicit effect return type annotations for exported functions.
+### Essential Commands
 
-MUST NOT:
+```bash
+npm run validate    # Run complete validation (format, lint, type-check, test)
+npm run dev        # Development mode with hot reload
+npm test          # Run all tests
+npm run build     # Compile TypeScript to JavaScript
+```
 
-- Interleave imperative mutation with effect composition.
-- Block or busy‑wait inside effects; use async composition.
-- Partially execute effects during module top‑level evaluation.
+### Testing Commands
 
-### Error Handling
+```bash
+npm run test:watch     # Run tests in watch mode
+npm run test:coverage  # Generate test coverage report
+npm run test:it       # Run integration tests (requires GREMLIN_ENDPOINT)
+```
 
-MUST:
+### Code Quality Commands
 
-- Represent failures using typed error/result constructs (Either/Option/Result style or domain error classes) – never raw throwing in core logic.
-- Include structured context fields (e.g. code, operation, parameters) in error values.
-- Distinguish operational (retryable) vs. domain (validation) vs. programmer errors via type shape or discriminant.
-- Fail fast on invalid schema definitions; do not continue with partial state.
-- Convert external/library exceptions into domain error representations at the boundary.
+```bash
+npm run lint          # Run ESLint on source and test files
+npm run lint:fix      # Auto-fix ESLint issues
+npm run format        # Format code with Prettier
+npm run format:check  # Check code formatting
+```
 
-MUST NOT:
+## Environment Variables
 
-- Throw raw errors inside domain, parsing, schema, or transformation layers.
-- Swallow or log‑only errors without returning a typed failure.
-- Return opaque string errors.
+Required:
 
-### Data & Models
+- `GREMLIN_ENDPOINT` - Server endpoint (host:port or host:port/traversal_source)
 
-MUST:
+Optional:
 
-- Validate external/untrusted data immediately (type guards or schema parsing) before internal use.
+- `GREMLIN_USE_SSL` - Enable SSL/TLS connections (default: false)
+- `GREMLIN_USERNAME` - Authentication username
+- `GREMLIN_PASSWORD` - Authentication password
+- `GREMLIN_IDLE_TIMEOUT` - Connection idle timeout in seconds (default: 300)
+- `LOG_LEVEL` - Logging level: error, warn, info, debug (default: info)
+
+## File Structure Guidelines
+
+### Source Code (`src/`)
+
+- **server.ts** - Effect-based MCP server with graceful startup/shutdown
+- **config.ts** - Effect.Config-based configuration validation (no backward compatibility)
+- **constants.ts** - Application constants integrated with Effect configuration
+- **gremlin/** - Effect-based graph database code
+  - **service.ts** - GremlinService using Effect.Context.Tag pattern
+  - **schema-service.ts** - SchemaService with Effect dependency injection
+  - **models.ts** - Zod schemas and TypeScript types
+- **handlers/** - Effect-based MCP request handlers
+  - **resources.ts** - Effect-based resource handlers with service injection
+  - **tools.ts** - Effect-based tool handlers with createEffectTool helpers
+  - **runtime-context.ts** - ManagedRuntime container for Effect execution
+- **utils/** - Effect-based utility modules
+  - **type-guards.ts** - Runtime type checking functions
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
