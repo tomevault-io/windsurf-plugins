@@ -1,117 +1,64 @@
 ---
 trigger: always_on
-description: Guide for using Task Master to manage task-driven development workflows
+description: mcp-debug provides core debugging tools to test and explore the functionality implemented in the aggregated MCP server. This guide focuses on mcp-debugs internal debugging capabilities.
 ---
 
-# Task Master Development Workflow
-This guide outlines the typical process for using Task Master to manage software development projects.
+## Debugging mcp-opsgenie via mcp-debug
 
-# The Development Workflow
+mcp-debug provides core debugging tools to test and explore the functionality implemented in the aggregated MCP server. This guide focuses on mcp-debugs internal debugging capabilities.
 
-This document outlines the standard, iterative process for all development work. Following this workflow is **mandatory** to ensure consistency, quality, and effective collaboration across the project.
+## Core Debugging Tools
 
-## The Core Development Loop
+mcp-debug exposes these categories of internal tools for debugging the aggregated mcp server end-to-end:
 
-All work, from new features to bug fixes, follows this fundamental three-phase cycle:
+list_tools: list all the tools exposed by the aggregated mcp server
+describe_tool: describe a tool exposed by the aggregated mcp server
+call_tool: execute a tool exposed by the aggregated mcp server
 
-1.  **Phase 1: Planning & Alignment**
-    -   Select an issue from the backlog.
-    -   Create a dedicated branch for your work.
-    -   Explore the codebase to create a detailed implementation strategy.
+## Debugging Workflow
 
-2.  **Phase 2: Iterative Implementation**
-    -   **Log your plan first.** Document your intended changes in the relevant task *before* writing code.
-    -   Implement the changes, adhering to the project's architectural guidelines.
-    -   Continuously log progress, discoveries, and setbacks as you work to create a rich history of the task.
+### 1. Verify All Services Are Running
+Start by checking the overall health of the system:
+```
+mcp_mcp-debug_call_tool(name="core_service_list", arguments={})
+```
 
-3.  **Phase 3: Finalization & Committing**
-    -   Write and pass all required tests.
-    -   Format your code according to project standards.
-    -   Update any relevant project rules based on your changes.
-    -   Commit your work using a structured, conventional commit message.
-    -   Close the corresponding issue.
+### 2. Check MCP Server Registration
+Verify that all expected MCP servers are properly registered with the aggregator:
+```
+mcp_mcp-debug_call_tool(name="core_mcp_server_list", arguments={})
+```
 
----
+### 5. Troubleshoot Connection Issues
+If a service shows as unhealthy:
+1. Check its detailed status: `core_service_status`
+2. Try restarting it: `core_service_restart`
+3. Check if its MCP client is attached in the service list
 
-## Phase 1: Planning & Alignment
+## Important Notes
 
-Before writing a single line of implementation code, you must have a clear plan and be working on the correct branch.
+- The prefix `x_` is configurable via `EnvctlPrefix` in the aggregator config
+- Tool names from individual MCP servers get prefixed to avoid conflicts
+- The agent automatically handles tool name resolution and routing
+- Service health is continuously monitored and reflected in the status
+- Workflows provide a way to test complex multi-step operations
 
-### 1.1. Select an Issue & State Your Intent
+## Common Issues and Solutions
 
-1.  **List Open Issues:** Use `mcp_github_list_issues` to see available tasks for `giantswarm/mcp-opsgenie`.
-2.  **Choose an Issue:** Select the highest-priority issue you are able to work on.
-3.  **Get Details:** Use `mcp_github_get_issue` to retrieve its full details.
-4.  **Announce Your Plan:** In the chat, you **MUST** summarize the issue (title, number) and your intended high-level approach.
-    -   **Example:** *"I am starting work on issue #37: Refactor Capability API. My plan is to start by defining the new interfaces in the API package..."*
+**"CallTool not implemented" errors**
+- This means the MCP client is not properly attached to the service
+- Check `core_service_list` to see if the service shows a client
+- The fix involves ensuring `GetServiceData()` returns the MCP client
 
-### 1.2. Create a Dedicated Git Branch
+**Service shows as unhealthy**
+- Check logs in the mcp-opsgenie TUI (if available)
+- Use `core_service_status` for detailed information
+- Try `core_service_restart` to recover
 
-**NEVER** commit directly to the `main` branch.
-
-1.  **Check Your Current Branch:** Run `git rev-parse --abbrev-ref HEAD`.
-2.  **Create a New Branch:** If you are on `main`, create a new branch immediately. Branch names **MUST** follow this format:
-    > `<type>/issue-<number>-<kebab-case-title>`
-3.  **Branch Types:** `feature`, `fix`, `refactor`, `docs`, `test`, `chore`.
-4.  **Example:** `git checkout -b feature/issue-42-add-prometheus-provider`
-
-### 1.3. Explore and Plan
-
-This is a critical step to ensure your implementation is well-considered.
-
-1.  **Explore the Codebase:** Identify the specific files, functions, and lines of code that need to be added, removed, or changed.
-2.  **Formulate a Detailed Plan:** Based on your exploration, create a precise implementation plan. What is the exact diff you intend to apply? What potential challenges do you foresee? This plan will be logged in the next step.
-
----
-
-## Phase 2: Iterative Implementation & Logging
-
-This cycle is the heart of the workflow. It's designed to build a rich, contextual history of the implementation, which is invaluable for debugging, collaboration, and future reference.
-
-### 2.1. Log Your Plan *Before* Coding
-
-1.  Before you start implementing, log the detailed plan you created in step 1.3.
-2.  Use the `mcp_taskmaster-ai_update_subtask` tool. The prompt should be a complete summary of your findings and your intended approach.
-3.  Verify that the plan was successfully logged by viewing the task details again.
-
-### 2.2. Implement & Log Progress
-
-1.  **Set Task Status:** Mark the task as `in-progress` (e.g., `mcp_taskmaster-ai_set_task_status --id=<subtaskId> --status=in-progress`).
-2.  **Write Code:** Begin writing code according to your plan and the project's [architecture.mdc](mdc:.cursor/rules/architecture.mdc).
-3.  **Log Continuously:** As you work, you will learn things. **You must log them.** Regularly use `mcp_taskmaster-ai_update_subtask` to append new findings.
-    -   ✅ **What Worked:** Confirmed approaches, "fundamental truths."
-    -   ❌ **What Didn't Work:** Dead ends, failed experiments, and why.
-    -   ⚙️ **Specifics:** Successful code snippets, configurations, or commands.
-    -   🗣️ **Decisions:** Any choices made, especially if confirmed with the user.
-
----
-
-## Phase 3: Finalization & Committing
-
-### 3.1. Pre-Commit Quality Check
-
-Before **every** commit, you **MUST** perform these checks:
-
-1.  **Format Code:**
-    ```bash
-    goimports -w .
-    go fmt ./...
-    ```
-2.  **Run All Tests:**
-    ```bash
-    make test
-    ```
-    -   **DO NOT** commit if any tests are failing. Fix the tests first.
-    -   Code must meet the test coverage minimums defined in [architecture.mdc](mdc:.cursor/rules/architecture.mdc).
-3.  **Update TUI Snapshots (if applicable):**
-    -   If you made changes to the TUI, update the golden files: `NO_COLOR=true go test ./internal/tui/view/... -update`.
-    -   Review the changes to ensure they are intentional.
-
-### 3.2. Review & Update Rules
-
-1.  Review your implementation and the chat history.
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+**Workflow validation fails**
+- Use `core_workflow_validate` to check syntax
+- Ensure tool names exist (check with `mcp_mcp-debug_list_tools`)
+- Verify argument schemas match the tool requirements
 
 ---
 > Source: [giantswarm/mcp-opsgenie](https://github.com/giantswarm/mcp-opsgenie) — distributed by [TomeVault](https://tomevault.io).
