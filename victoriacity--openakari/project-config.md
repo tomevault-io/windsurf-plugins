@@ -1,58 +1,78 @@
 ---
 trigger: always_on
-description: Bridge Claude skills into Cursor — instructs agent to find and use skills from .claude/skills/. See AGENTS.md for unified entry point.
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
+# CLAUDE.md
 
-# Claude Skills Bridge
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-> **Note:** This repo uses `AGENTS.md` as a unified entry point for all AI coding agents (Claude Code, Cursor, opencode). The fallback chain is: Claude Code → Cursor → opencode. Read `AGENTS.md` for an overview, then `CLAUDE.md` for comprehensive instructions.
+## What this repo is
 
-This repo has skills defined in `.claude/skills/`. Each skill is a directory containing a `SKILL.md` file with instructions for specific workflows (e.g., `/orient`, `/diagnose`, `/compound`).
+akari is a research group monorepo operated autonomously by LLM agents. The repo serves as both artifact storage and cognitive state — it is the agents' persistent memory between sessions. See [docs/design.md](docs/design.md) for rationale.
 
-## How to Use Skills in Cursor
+## Work cycle
 
-Since Cursor does not have a native Skill tool, use the Read tool to load skill files when needed:
+The conversation is ephemeral; the repo is permanent. Record as you go, not at the end.
 
-1. **When the user invokes a skill by name** (e.g., `/orient`, `/diagnose`, `/compound`), read the corresponding skill file at `.claude/skills/<skill-name>/SKILL.md` and follow its instructions.
+- **Finding → file, immediately.** When you discover a fact (data path, schema, limitation, dependency), update the relevant project file (e.g., `existing-data.md`, `datasets.md`) in the same turn. Do not defer recording to later.
+- **Decision → log or decision record.** When you make a choice or resolve an open question, write a log entry or decision record before moving on.
+- **Plan → plans/ directory.** When you produce a non-trivial plan, write it to `plans/<name>.md` in the project directory. Plans in conversation history are lost.
+- **Session summary → log entry.** Before ending a session, add a dated log entry to every project README you touched, summarizing what happened and what changed.
+- **Open questions → README.** When you identify something you can't resolve, add it to the project's `## Open questions` section.
 
-2. **Before starting non-trivial work**, check if a relevant skill exists. Available skills:
+The test: if you started a fresh session and read only the repo, would you know everything the previous session learned? If not, something is missing.
 
-   | Skill | When to use |
-   |-------|-------------|
-   | `orient` | Start of every work session — assess state and select task |
-   | `self-audit` | Convention compliance check |
-   | `coordinator` | Multi-step coordination |
-   | `compound` | End of session — embed learnings |
-   | `diagnose` | Something went wrong with data/results |
-   | `slack-diagnosis` | Slack-reported issue triage |
-   | `postmortem` | Agent reasoning failure analysis |
-   | `design` | Designing a new experiment |
-   | `develop` | Software development workflow |
-   | `architecture` | Infrastructure health check |
-   | `critique` | Correctness review of a plan/design |
-   | `simplify` | Complexity reduction check |
-   | `synthesize` | Cross-session findings synthesis |
-   | `gravity` | Recurring manual pattern absorption |
-   | `lit-review` | Literature search |
-   | `review` | Validate experiment metrics and findings |
-   | `audit-references` | Verify citations |
-   | `report` | Generate a report |
-   | `publish` | Paper submission preparation |
-   | `horizon-scan` | Scan for new developments |
-   | `feedback` | Process PI/human feedback |
-   | `project` | Create new projects — propose (gap analysis) or scaffold (interview + setup) |
-   | `refresh-skills` | Audit skills against current code |
+### Knowledge output
 
-3. **To load a skill**: `Read .claude/skills/<skill-name>/SKILL.md` — then follow the instructions in the file exactly.
+akari is a research institute, not a task runner. Every plan, experiment, and session
+should be evaluated by the knowledge it produces — findings, decisions, hypotheses
+tested, questions resolved. Operational health (error rates, cost, uptime) is a
+supporting indicator: it measures whether the system is healthy enough to produce
+knowledge. The fundamental efficiency metric is findings per dollar.
 
-4. **Skill files may reference additional files** in their directory (e.g., examples, templates). Read those as needed.
+Before any implementation plan, ask: "What knowledge does this produce?" If the
+answer is "none — it just makes the system work better," reframe: operational
+improvements are experiments on the system itself, and their findings ARE knowledge.
 
-## Priority
+**Inline logging checklist** (see `decisions/0004-inline-logging.md`):
 
-- Process skills first (orient, diagnose, debugging) — they determine HOW to approach the task.
-- Implementation skills second (develop, architecture) — they guide execution.
-- When the user says a slash-command like `/orient`, always load and follow the skill.
+1. Discovery of a non-obvious fact → write to project file **in the same turn**, before proceeding.
+2. Config/env change → log entry with before/after and rationale, immediately.
+3. Successful verification → log the exact command and output (not just "tested successfully").
+4. Log incrementally throughout the session. A single end-of-session summary is a fallback, not the primary mechanism.
+5. **Findings provenance:** Every numerical claim in an EXPERIMENT.md Findings section must include either (a) the script + data file that produces it, or (b) inline arithmetic from referenced data (e.g., "96/242 = 39.7%"). Claims without provenance are unverifiable and should be treated as suspect by downstream sessions.
+
+## Autonomous execution
+
+This repo runs autonomous agent sessions via [`infra/scheduler/`](infra/scheduler/README.md).
+Each session follows the SOP at [docs/sops/autonomous-work-cycle.md](docs/sops/autonomous-work-cycle.md).
+See [decisions/0005-autonomous-execution.md](decisions/0005-autonomous-execution.md) for rationale.
+
+For governance (project priority, task selection, goal-directed planning, approval gates), see [docs/conventions/governance.md](docs/conventions/governance.md).
+
+For session discipline (fire-and-forget, sleep limits, incremental commits, analysis throttling), see [docs/conventions/session-discipline.md](docs/conventions/session-discipline.md).
+
+For enforcement layers (L0 code-enforced and L2 convention-only tables), see [docs/conventions/enforcement-layers.md](docs/conventions/enforcement-layers.md).
+
+For task lifecycle tags, fleet-first task creation, and task decomposition, see [docs/conventions/task-lifecycle.md](docs/conventions/task-lifecycle.md).
+
+Tasks are selected from project `TASKS.md` files. Priority order:
+1. Tasks in the project recommended by /orient (respecting project priority)
+2. Unblocked tasks (no `[blocked-by: ...]` tag)
+3. When project budget is >90% consumed or exhausted, prefer `[zero-resource]` tasks
+4. Tasks with concrete "Done when" conditions
+5. Routine tasks before resource-intensive tasks
+6. Tasks with explicit `Priority: high` before `Priority: medium` before untagged
+
+### Approval gates
+
+Autonomous sessions MUST NOT proceed with:
+- **Resource decisions**: Requests to increase `budget.yaml` limits or extend deadlines
+- **Governance changes**: Changes to approval workflow, budget rules, or other governance mechanisms in CLAUDE.md. Convention clarifications, gotcha additions, and skill improvements may be applied directly — they are verifiable and do not change governance. When in doubt, the test is: "Does this change what requires approval or how resources are allocated?" If yes, it's governance; write to APPROVAL_QUEUE.md.
+- **Tool access**: Requests for tools, APIs, or model access not currently configured (see [decisions/0024](decisions/0024-tool-access-approval.md))
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [victoriacity/openakari](https://github.com/victoriacity/openakari) — distributed by [TomeVault](https://tomevault.io).
