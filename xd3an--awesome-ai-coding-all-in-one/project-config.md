@@ -1,177 +1,70 @@
 ---
 trigger: always_on
-description: Cursor rules for TestRail development with test case integration.
+description: Toss-style UI design rules for disciplined spacing, typography, grayscale hierarchy, restrained color, cards, metrics, dark mode, and accessibility
 ---
 
-# Persona
 
-You are an experienced QA Engineer with expertise in writing clear, detailed test cases
-for TestRail that help testers efficiently execute tests and validate functionality.
-You understand testing methodologies and how to structure test cases that provide
-comprehensive coverage while remaining maintainable and reusable.
+# Toss-Style Design System Rules
 
-# Documentation Focus
+## Design Direction
 
-Focus on creating standardized TestRail test cases with these key components:
+- Build quiet, high-trust product UI with clear hierarchy, generous spacing, and minimal ornament.
+- Use one primary accent color and rely on grayscale for most structure.
+- Avoid decorative gradients, unnecessary shadows, and competing accent colors.
+- Prioritize readability, confidence, and fast scanning over visual novelty.
 
-- Clear, descriptive test case title
-- Concise test case objective/purpose
-- Preconditions required for test execution
-- Step-by-step test procedure with expected results
-- Test data requirements
-- Post-conditions after test execution
-- Appropriate custom fields for TestRail
+## Typography
 
-# Best Practices
+- Use a strict type scale with clear roles for page title, section title, body, supporting text, and metadata.
+- Use font weight and color before using large size changes.
+- Never use pure black text; use a dark grayscale foreground.
+- Keep line height comfortable for body copy and tighter for short labels or metrics.
+- For metrics, make the number visually dominant and the unit smaller but still legible.
 
-**1** **Clear Title**: Create descriptive, specific test case titles
-**2** **Complete Preconditions**: List all necessary setup requirements
-**3** **Numbered Steps**: Present test steps in a clear, sequential order
-**4** **Explicit Expected Results**: Specify precise expected outcomes for each step
-**5** **Appropriate Test Type**: Assign the correct test type (functional, regression, etc.)
-**6** **Test Data**: Include specific test data values where applicable
-**7** **Environment Details**: Specify relevant environment information
-**8** **Organized Sections**: Group related test cases in logical sections
+## Layout and Rhythm
 
-# TestRail CSV Format Example
+- Use consistent spacing tokens.
+- Keep related content close and unrelated content separated by whitespace.
+- Use section rhythm: summary, details, action, and supporting context.
+- Align form fields, values, and controls predictably.
+- Avoid nested cards and excessive borders.
 
-```csv
-Title,Section,Type,Priority,Preconditions,Steps,Expected Results
-"Login with Valid Credentials","User Authentication","Functional","Critical","User has valid account credentials","1. Navigate to the login page.
-2. Enter valid username 'testuser'.
-3. Enter valid password 'Password123'.
-4. Click the 'Login' button.","1. Login page loads correctly.
-2. Username field accepts input.
-3. Password field accepts input.
-4. User is successfully logged in and redirected to the dashboard."
-"Login with Invalid Password","User Authentication","Functional","High","User has valid account credentials","1. Navigate to the login page.
-2. Enter valid username 'testuser'.
-3. Enter invalid password 'wrongpassword'.
-4. Click the 'Login' button.","1. Login page loads correctly.
-2. Username field accepts input.
-3. Password field accepts input.
-4. Error message is displayed: 'Invalid username or password'."
-"Password Reset Request","User Authentication","Functional","Medium","User has registered email address","1. Navigate to the login page.
-2. Click the 'Forgot Password' link.
-3. Enter valid email 'test@example.com'.
-4. Click the 'Reset Password' button.","1. Login page loads correctly.
-2. Forgot password page loads correctly.
-3. Email field accepts input.
-4. Success message is displayed: 'Password reset link sent'."
-```
+## Cards and Surfaces
 
-# Converting Automated Tests to TestRail Format
+- Use cards only for grouped content that needs a surface.
+- Keep card radius restrained and consistent.
+- Use subtle shadows or borders, not both heavily.
+- Keep shadow opacity low and avoid dramatic elevation.
+- Do not place important controls in low-contrast decorative surfaces.
 
-When converting automated tests or feature descriptions to TestRail format:
+## Color
 
-1. Identify the overall test objective and create a descriptive title
-2. Extract preconditions from setup code or implied requirements
-3. Convert test actions into numbered steps
-4. Transform assertions into expected results
-5. Group related test cases into sections
-6. Assign appropriate test types and priorities
-7. Include specific test data values
-8. Add environmental notes if necessary
+- Use the accent color for primary actions, selected state, links, or critical brand moments.
+- Use semantic colors for status only: success, warning, error, and information.
+- Keep disabled and secondary states in grayscale.
+- Ensure status is never communicated by color alone.
 
-Example:
+## Dark Mode
 
-Automated Test:
+- Rebuild the grayscale scale for dark mode rather than inverting colors.
+- Reduce bright accent intensity on dark backgrounds.
+- Preserve contrast between surface, border, and foreground layers.
+- Test charts, cards, and form controls in both modes.
 
-```js
-describe('Login Functionality', () => {
-  it('should allow login with valid credentials', () => {
-    cy.visit('/login');
-    cy.get('#username').type('testuser');
-    cy.get('#password').type('Password123');
-    cy.get('#loginButton').click();
-    cy.url().should('include', '/dashboard');
-    cy.get('.welcome-message').should('contain', 'Welcome, testuser');
-  });
-});
-```
+## Accessibility
 
-TestRail CSV Format:
+- Meet WCAG AA contrast for text and controls.
+- Provide visible focus states.
+- Keep tap targets large enough for touch.
+- Use semantic HTML and labels before adding ARIA.
+- Respect reduced motion preferences.
 
-```csv
-Title,Section,Type,Priority,Preconditions,Steps,Expected Results
-"Login with Valid Credentials","User Authentication","Functional","Critical","User has valid account credentials","1. Navigate to the login page.
-2. Enter valid username 'testuser'.
-3. Enter valid password 'Password123'.
-4. Click the 'Login' button.","1. User is redirected to the dashboard page.
-2. Welcome message is displayed: 'Welcome, testuser'."
-```
+## Common Mistakes
 
-# Test Case Structure
-
-Structure TestRail test cases using this format:
-
-```
-# Test Case: [Descriptive title]
-
-## Section
-[Section/Module/Feature]
-
-## Priority
-[Critical/High/Medium/Low]
-
-## Type
-[Functional/Regression/Usability/Performance/Security/etc.]
-
-## Objective
-[Clear statement of what the test aims to verify]
-
-## Preconditions
-1. [Precondition 1]
-2. [Precondition 2]
-...
-
-## Test Data
-- [Test data item 1: value]
-- [Test data item 2: value]
-...
-
-## Steps and Expected Results
-| # | Step | Expected Result |
-|---|------|----------------|
-| 1 | [Action to perform] | [Expected outcome] |
-| 2 | [Action to perform] | [Expected outcome] |
-...
-
-## Post-conditions
-1. [Post-condition 1]
-2. [Post-condition 2]
-...
-
-## Automation Status
-[Not Automated/To Be Automated/Automated]
-
-## References
-- [Requirement ID/User Story/Documentation Link]
-```
-
-# Example Test Case
-
-Here's an example of a well-structured TestRail test case:
-
-```
-# Test Case: User Login with Valid Credentials
-
-## Section
-Authentication
-
-## Priority
-High
-
-## Type
-Functional
-
-## Objective
-Verify that a user can successfully log in to the application using valid credentials.
-
-## Preconditions
-1. The application is accessible
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- Do not create one-off spacing values.
+- Do not mix multiple unrelated accent colors.
+- Do not overuse cards to separate every piece of content.
+- Do not rely on large hero typography inside dense product screens.
 
 ---
 > Source: [XD3an/awesome-ai-coding-all-in-one](https://github.com/XD3an/awesome-ai-coding-all-in-one) — distributed by [TomeVault](https://tomevault.io).
