@@ -1,104 +1,102 @@
 ---
 trigger: always_on
-description: MPA-First Development Mandate - Strict rules for building performant, resilient Multi-Page Applications
+description: This is a **reference documentation repository** containing MPA (Multi-Page Application) development guidelines for AI coding agents. Users copy these guidelines into their own projects to teach AI tools (GitHub Copilot, Cursor, Claude, Codex, etc.) to generate MPA-first code instead of defaulting to SPA frameworks.
 ---
 
+# Copilot Instructions: MPA-First Guidelines Repository
 
-# AI Coding Agent Guidelines: The MPA-First Mandate
+## Repository Purpose
 
-## Introduction: Why We Build This Way
+This is a **reference documentation repository** containing MPA (Multi-Page Application) development guidelines for AI coding agents. Users copy these guidelines into their own projects to teach AI tools (GitHub Copilot, Cursor, Claude, Codex, etc.) to generate MPA-first code instead of defaulting to SPA frameworks.
 
-For over a decade, web development has trended towards complex, JavaScript-heavy Single-Page Applications (SPAs). The promise was a slick, "app-like" user experience. The reality, in most cases, has been bloated, fragile, and over-engineered websites that are slow to load, difficult to maintain, and hostile to users and search engines.
+## Key Files & Their Roles
 
-This document outlines a return to a more resilient, performant, and durable web. We are intentionally choosing a **Multi-Page Application (MPA)** architecture. The guiding principle is to **use the platform**. We build upon the native strengths of HTML, CSS, and the browser itself, which have evolved significantly. Modern features like CSS View Transitions and Speculation Rules now provide the fluid user experience that once required megabytes of JavaScript, but without the performance penalty.
+**Base rule files:**
+- **`mpa-rules.md`** - Comprehensive, strict MPA-first mandate with strict PHP & vanilla JS only. This is the primary reference document.
 
-We are choosing simplicity, speed, and maintainability over unnecessary complexity. We build for users and outcomes, not for developer experience (DX) or architectural novelty. JavaScript is a powerful tool for progressive enhancement, not the default foundation for every page.
+- **`mpa-relaxed-rules.md`** - Variant ruleset allowing full use of PHP & jQuery for progressive enhancement while maintaining MPA architecture.
 
----
+**Assistant-specific base instruction files:**
+- **`.github/agents/mpa-strict-agent.md`** - Copilot agent-specific instructions file based on `mpa-rules.md` for strict MPA adherence.
 
-## PRIME DIRECTIVE: MPA-Only Architecture
+- **`.github/agents/mpa-relaxed-agent.md`** - Copilot agent-specific instructions file based on `mpa-relaxed-rules.md` for a more lenient MPA approach.
 
-- You **MUST** create server-rendered, multi-page websites (MPAs). Each distinct page or view must be its own unique file (e.g., `.html`, `.php`) served at a distinct URL.
-- Navigation **MUST** use standard anchor links (`<a href="...">`) that trigger a full page navigation. The browser will handle the request, and the server will respond with a new HTML document.
-- The goal is to produce sites that are fundamentally functional with zero client-side JavaScript. JS should only be used to enhance, not to enable, core functionality.
+**Documentation:**
+- **`README.md`** - User-facing documentation explaining the problem, solution, and how to integrate these rules into AI coding workflows.
 
-### 🚫 BANNED TECHNOLOGIES & PATTERNS
+## Writing Style & Tone
 
-- **DO NOT** use or reference any Single-Page Application (SPA) frameworks, libraries, or patterns.
-  - This includes, but is not limited to: React, Angular, Vue, Svelte, Next.js, Nuxt.js.
-- **DO NOT** use JSX, TSX, TypeScript-based routing, or any form of client-side routing.
+When editing these guidelines:
 
----
+- **Be authoritative and prescriptive** - Use "MUST" and "DO NOT" language. These are rules, not suggestions.
+- **Provide concrete examples** - Every principle should have a code snippet showing the correct pattern.
+- **Explain the "why"** - Help developers understand the philosophy, not just the mechanics.
+- **Stay opinionated** - The entire premise is rejecting the SPA-default paradigm. Don't hedge or equivocate.
 
-## Guiding Complex Changes
+## Content Maintenance Patterns
 
-When approaching a complex change or refactoring a large file, prioritize clarity and communication:
+### Adding New Rules or Sections
 
-1. **Outline a Plan:** Before diving in, briefly describe your approach. What is the goal? Which parts of the code will you touch?
-2. **Communicate as You Go:** Explain your changes in small, logical steps. This allows for feedback and course correction without rigid, multi-step approval gates.
-3. **Focus on Conceptual Changes:** Group your edits logically. For example, a commit might be "Refactor user authentication logic," not "Change 15 different files."
+1. **Keep examples realistic** - Use patterns that would appear in actual projects
+2. **Maintain parallelism** - Both `mpa-rules.*` with `.github/agents/mpa-strict-agent.md` and `mpa-relaxed-rules.*` with `.github/agents/mpa-relaxed-agent.md`
+ should cover the same topics in the same order
+3. **Update the table of contents** - If you add major sections, ensure navigation is clear
 
----
+### Updating Existing Content
 
-## Folder Structure
+- **Preserve the document structure** - The current flow (Prime Directive → HTML → CSS → PHP → JS → Security) is intentional
+- **Keep code examples modern** - Target current 2025-26 web standards (PHP 8.1+, ES2020+, modern CSS)
+- **Maintain accessibility focus** - A11Y is not optional in these guidelines
+- **Update agent files in parallel** - When modifying base rule files, ensure corresponding assistant-specific files are updated to maintain consistency, keeping them concise and directive for AI prompts
 
-This structure promotes a clean separation of concerns and follows the Model-View-Controller (MVC) architectural pattern:
+## Technical Constraints
 
-```
-project-root/
-├── public/                # Web root, all publicly accessible files
-│   ├── assets/
-│   │   ├── css/
-│   │   ├── js/
-│   │   ├── images/
-│   │   ├── fonts/
-│   └── index.php          # Or index.html
-├── src/                   # Application source code
-│   ├── controllers/       # Handles user requests
-│   ├── models/            # Business logic and data interaction
-│   ├── views/             # HTML templates/partials
-│   └── utilities/         # Helper functions, etc.
-├── vendor/                # Composer dependencies
-├── config/                # Configuration files
-├── tests/                 # Automated tests
-└── docs/                  # Project documentation
-```
+- **Markdown formatting** - All rule files use standard markdown with fenced code blocks
+- **No dependencies** - This is a pure documentation repository with no build tools or runtime
+- **Git-friendly** - Keep line lengths reasonable for clean diffs
 
----
+## Philosophy to Preserve
 
-## SEO Best Practices: A Top Priority
+This repository champions:
 
-Excellent SEO is not an afterthought; it's a direct result of building a clean, semantic, and performant MPA.
+1. **Platform-first thinking** - HTML, CSS, PHP, and browser APIs over JavaScript frameworks
+2. **Progressive enhancement** - Core functionality works without JS
+3. **Performance as a feature** - Fast load times from server-rendered HTML
+4. **SEO & accessibility by default** - Not bolted on as afterthoughts
+5. **Simplicity over novelty** - Boring, proven technology over the latest trends
 
-### 1. The Head is Everything
+## Common Edits & How to Handle Them
 
-Ensure every page has a comprehensive and valid `<head>` section:
+### "Should we add framework X?"
+No. If it's a client-side SPA framework (React, Vue, Svelte, etc.), it's explicitly banned. Even if "everyone uses it."
 
-**Example: Detailed `<head>` for a Blog Post**
+### "Can we include framework-based SSR?"
+No. Next.js, Nuxt, SvelteKit, etc. are still SPA architectures at their core. True MPAs use traditional server-side rendering (PHP, Node.js + templates, Ruby, Python, etc.).
 
-```html
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>It's Time for Modern CSS to Kill the SPA | My Awesome Blog</title>
-    <meta name="description" content="Native CSS transitions have quietly killed the strongest argument for client-side routing. Learn how to build faster, simpler websites.">
+### "What about Htmx/Alpine.js/other minimal JS libraries?"
+These could be mentioned as acceptable enhancement tools since they embrace progressive enhancement, but only in the relaxed variant. The strict `mpa-rules.md` stays vanilla-only.
 
-    <link rel="canonical" href="https://www.example.com/blog/css-kills-spa">
+## When Users Request Changes
 
-    <meta property="og:title" content="It's Time for Modern CSS to Kill the SPA">
-    <meta property="og:description" content="Native CSS transitions have quietly killed the strongest argument for client-side routing. Learn how to build faster, simpler websites.">
-    <meta property="og:type" content="article">
-    <meta property="og:url" content="https://www.example.com/blog/css-kills-spa">
-    <meta property="og:image" content="https://www.example.com/assets/images/blog/og-image-css-spa.jpg">
-    <meta property="og:image:width" content="1200">
-    <meta property="og:image:height" content="630">
-    <meta property="og:site_name" content="My Awesome Blog">
+If a user wants to add content:
+- Ask what problem they're solving
+- Ensure it aligns with MPA-first principles
+- Add concrete examples, not abstract advice
+- Update both variants if applicable
 
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:site" content="@MyAwesomeBlog">
-    <meta name="twitter:title" content="It's Time for Modern CSS to Kill the SPA">
+If a user wants to make rules more lenient:
+- Consider whether it compromises the MPA architecture (banned)
+- Or just adds a helpful tool for enhancement (potentially allowed in relaxed variant)
+
+## Documentation Standards
+
+- **Use semantic HTML examples** - Always show proper `<header>`, `<main>`, `<article>`, etc.
+- **Include accessibility attributes** - `alt` text, `aria-label`, proper `<label>` associations
+- **Show security patterns** - CSRF tokens, parameterized queries, CSP headers
+- **Demonstrate modern CSS** - Grid, Flexbox, Custom Properties, View Transitions
+
+## Adapting for Different AI Assistants
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
