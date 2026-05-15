@@ -7,11 +7,11 @@ A modern macOS menu bar application for managing AeroSpace window manager spaces
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [rdrkr/AeroSpaceBar](https://github.com/rdrkr/AeroSpaceBar).
+Original source: `CLAUDE.md` in [rdrkr/AeroSpaceBar](https://github.com/rdrkr/AeroSpaceBar).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
