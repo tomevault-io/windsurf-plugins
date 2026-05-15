@@ -1,0 +1,12 @@
+---
+trigger: always_on
+description: <!-- Use this file to provide workspace-specific custom instructions to Copilot. For more details, visit https://code.visualstudio.com/docs/copilot/copilot-customization#_use-a-githubcopilotinstructionsmd-file -->
+---
+
+<!-- Use this file to provide workspace-specific custom instructions to Copilot. For more details, visit https://code.visualstudio.com/docs/copilot/copilot-customization#_use-a-githubcopilotinstructionsmd-file -->
+
+This project is a FastAPI + Strawberry GraphQL demo. Use best practices for FastAPI and Strawberry integration.
+
+---
+> Source: [allmonday/resolver-vs-graphql](https://github.com/allmonday/resolver-vs-graphql) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-15 -->
