@@ -9,9 +9,9 @@ A modern Django admin interface with auto-generated REST API for any Django proj
 
 Created by: **asbilim**
 
-- **Twitter:** [@iampaullilian](https://twitter.com/iampaullilian)
-- **GitHub:** [asbilim](https://github.com/asbilim)
-- **Portfolio:** [paullilian.dev](https://paullilian.dev)
+- **Twitter:** [@iampaullilian](mdc:https:/twitter.com/iampaullilian)
+- **GitHub:** [asbilim](mdc:https:/github.com/asbilim)
+- **Portfolio:** [paullilian.dev](mdc:https:/paullilian.dev)
 
 ## Features
 
@@ -26,7 +26,7 @@ Created by: **asbilim**
 - **User & Group Management:** Super admins can manage users and groups via the API.
 - **Frontend Ready:** Provides configuration endpoints for easy integration with a frontend dashboard.
 - **Customizable:** Easily extend and customize serializers, viewsets, and permissions.
-- **Automatic Translations:** All text fields are available in English, German and French without manual setup.
+- **Automatic Translations:** All text fields are available in English, German and French. The public-facing APIs (like the Blog API) serve translated content based on the `Accept-Language` header. See the `BLOG_API_GUIDE.md` for more details.
 - **UI Component Metadata:** Each API response includes suggested components for creating, editing and displaying fields, plus predefined choices for things like icons and categories to ensure a consistent look and feel.
 
 ## Quick Start
@@ -127,12 +127,7 @@ This project uses JWT for authentication. Here is a summary of the authenticatio
 These endpoints require an active `access` token in the authorization header.
 
 - **User Profile**:
-  - `GET /api/auth/me/`: Retrieve the current user's profile (`username`, `email`, `first_name`, `last_name`).
-  - `PATCH /api/auth/me/`: Update the current user's profile data.
-- **Change Password**:
-  - `POST /api/auth/me/change-password/`: Change the password by providing `old_password` and `new_password`.
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+  - `GET /api/auth/me/`: Retrieve the current user's profile (`
 
 ---
 > Source: [asbilim/modern-django-frontend](https://github.com/asbilim/modern-django-frontend) — distributed by [TomeVault](https://tomevault.io).
