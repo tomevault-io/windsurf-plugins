@@ -1,170 +1,279 @@
 ---
 trigger: always_on
-description: 你好，AI 助手！这份文档是你的核心工作指南。在你进行任何编码、重构或分析工作之前，**必须**完整阅读并理解本文档。你的首要任务是确保你的所有操作都与本文档中描述的架构和原则保持一致，并在你对项目架构做出任何修改后，**主动更新本文档本身 [global.mdc](mdc:.cursor/rules/global.mdc) **。
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
+# CLAUDE.md
 
-# 工作指导手册
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-你好，AI 助手！这份文档是你的核心工作指南。在你进行任何编码、重构或分析工作之前，**必须**完整阅读并理解本文档。你的首要任务是确保你的所有操作都与本文档中描述的架构和原则保持一致，并在你对项目架构做出任何修改后，**主动更新本文档本身 [global.mdc](mdc:.cursor/rules/global.mdc) **。
+## 项目概述
 
-## 1. 项目核心定位
+**NekroEndpoint** 是一个基于 Cloudflare Workers 构建的**端点编排平台**，允许用户在全球边缘节点上创建和管理 API 端点。
 
-这是一个基于 **Cloudflare** 技术栈的、**生产级**、**类型安全**的 **Hono + React + D1** 全栈应用模板。
+### 核心功能
 
-- **核心价值**: 提供开箱即用的开发体验，整合最佳实践，实现从数据库到前端的端到端类型安全。
-- **目标用户**: 希望在 Cloudflare 生态中快速构建现代化 Web 应用的开发者。
-- **你的角色**: 维护并增强这个模板的工程化能力、易用性和健壮性。始终以"最佳实践"和"最低维护成本"为原则进行开发。
+- **三种端点类型**：
+  - **静态端点**（Static）：托管文本内容、配置文件
+  - **代理端点**（Proxy）：转发请求到目标 URL（如加速 GitHub raw 内容）
+  - **脚本端点**（Script）：运行自定义 JavaScript 脚本（Phase 3）
 
-**当前项目状态**（NekroEndpoint 实现）：
+- **双层密钥机制**：
+  - **Platform API Key**：用户管理平台功能的凭证（创建/编辑端点、管理权限组）
+  - **Endpoint Access Key**：访问已发布端点的凭证（通过权限组管理，可对外分发）
 
-- **Phase 1（MVP）**：100% 完成 ✅
-- **Phase 2（权限组系统）**：100% 完成 ✅
-- **Phase 3.1（动态代理端点）**：100% 完成 ✅
-- **Phase 3.2（脚本端点）**：计划中 ⏳
-- **可投入生产使用**：适用于静态内容托管、固定代理和动态子路径代理场景
+- **权限组系统**：创建权限组 → 生成访问密钥 → 端点关联权限组 → 细粒度访问控制
 
-## 2. 核心技术与架构
+- **树形端点管理**：层级化组织端点，支持拖拽排序，每个节点都是完整的端点
 
-### 2.1. 整体架构
+- **用户激活制**：管理员手动激活后才能发布端点（未激活用户可创建和编辑，但不能发布）
 
-这是一个**混合渲染模式 (Hybrid Rendering)** 的单体应用，部署在 Cloudflare Pages & Workers 上。
+- **管理员审查**：查看所有用户的端点树和内容，强制下线任何端点
 
-- **开发环境 (`pnpm dev`)**:
-  - Hono 后端 (Wrangler) 运行在 `localhost:8787`，作为**主入口**。
-  - Vite 前端服务器运行在 `localhost:5173`。
-  - **关键认知**: `index.ts` 中的开发逻辑会将所有非 API 的前端请求**代理**到 Vite 服务器 (`5173`)。这使得前端能享受 Vite 带来的**热更新 (HMR)**。**你绝不能假设开发时后端可以直接访问 `frontend/dist` 下的任何文件**。
-- **生产环境 (`pnpm deploy`)**:
-  - Vite 将前端代码构建为静态资源，输出到 `frontend/dist` 目录。
-  - Hono 后端 (`src/index.ts`) 会根据 `manifest.json` **服务器端渲染 (SSR)** 初始 HTML，并由 Cloudflare Pages 提供静态资源。
-  - **关键认知**: `index.ts` 中通过**动态 `import()`** 来加载生产构建产物 (`manifest.json` 和 `index.html`)，这是为了避免在开发环境中因找不到这些文件而导致构建失败。**这是本项目的核心架构设计，必须理解并维护**。
+### 技术栈
 
-### 2.2. 后端 (`src/`)
+- **后端**：Hono (OpenAPI)、Cloudflare Workers、Cloudflare D1 (SQLite)
+- **前端**：React 18、Material-UI、Monaco Editor、React Router、Vite
+- **数据库 ORM**：Drizzle ORM
+- **类型安全**：Zod（验证）、TypeScript
+- **认证**：GitHub OAuth + 会话管理
+- **部署**：Cloudflare Pages & Workers
 
-- **入口: `src/index.ts`**:
-  - 这是应用的统一入口。
-  - 使用 `if (c.env.NODE_ENV === "development")` 来分离开发和生产逻辑。
-  - **OpenAPI 注册**: API 路由通过一个独立的 `OpenAPIHono` 实例 (`apiApp`) 进行注册，然后统一挂载到主 `app` 上。这是为了确保 Swagger UI 能正确发现所有端点。在添加新的 API 模块时，必须遵循这个模式。
-- **路由: `src/routes/`**:
-  - Hono 的路由模块。包含功能示例和认证路由。
-  - 使用 `@hono/zod-openapi` 的 `createRoute` 来创建类型安全且自动生成文档的路由。
-  - **认证路由** (`auth.ts`): 实现 GitHub OAuth 登录、用户信息获取、登出和 API Key 重新生成功能。
-- **中间件: `src/middleware/`**:
-  - **认证中间件** (`auth.ts`): 验证用户会话，注入用户信息到 context，保护需要认证的路由。
-- **数据校验: `src/validators/` 和 `common/validators/`**:
-  - 使用 Zod 定义所有 API 的请求/响应/路径参数的 Schema。这些 Schema 是类型安全和 API 文档的来源。
-  - **认证 Schema** (`common/validators/auth.schema.ts`): 定义认证相关的数据结构。
-- **数据库 ORM: `src/db/`**:
-  - `schema.ts` 文件使用 Drizzle ORM 定义数据库表结构。这是**唯一的数据源 (Single Source of Truth)**。
-  - 包含 `features`（功能开关）、`users`（用户）、`userSessions`（会话）表。
-- **工具函数: `src/utils/`**:
-  - **加密工具** (`encryption.ts`): 生成用户专属的 API Key。
-  - **HTML 模板**: 统一的 HTML 模板生成器，避免重复代码。
-- **集中化配置管理**:
-  - **SEO 配置**: `src/config/seo.ts` - 所有 SEO 相关配置的单一数据源
-  - **自动化脚本**: `scripts/generateHtml.ts` - 自动生成开发环境的 HTML 模板
+## 常用开发命令
 
-### 2.3. 前端 (`frontend/`)
+### 开发环境
 
-#### 路由与入口
+```bash
+# 启动全栈开发服务器（后端 :8787 + 前端 :5173）
+pnpm dev
 
-- **统一路由配置**:
-  - **核心改进**: `frontend/src/routes.tsx` - 唯一的路由定义文件，被客户端和服务端入口共享使用。
-  - **开发友好**: 添加新页面时，只需要在此文件中修改一次，避免了在多个入口文件中重复定义。
-- **入口文件**:
-  - `entry-client.tsx`: **客户端入口**。负责在浏览器中"激活"(hydrate) 由服务器渲染的 HTML。使用统一的路由配置。
-  - `entry-server.tsx`: **服务器端渲染入口**。负责在后端生成初始的 HTML 字符串。使用统一的路由配置。
-  - **关键优化**: 两个入口文件都使用 `AppRoutes` 组件，确保路由定义的一致性。
+# 仅启动后端（Wrangler）
+pnpm dev:backend
 
-#### 页面结构（完整实现）
+# 仅启动前端（Vite）
+pnpm dev:frontend
 
-- **pages/HomePage.tsx**: 首页，展示项目介绍
-- **pages/AuthCallbackPage.tsx**: GitHub OAuth 回调处理页面
-- **pages/DashboardPage.tsx**: 用户仪表盘
-  - 用户信息展示
-  - API Key 查看/复制/重新生成
-  - 账户统计信息
-- **pages/EndpointsPage.tsx**: 端点管理页面（核心功能）
-  - 左侧：路径树视图（TreeView）
-  - 右侧：端点编辑器（Monaco Editor）
-  - 功能：创建、编辑、删除、发布、移动端点
-  - 支持：静态端点、代理端点配置
-- **pages/PermissionGroupsPage.tsx**: 权限组管理页面
-  - 权限组列表
-  - 访问密钥管理（生成、编辑、撤销、删除）
-  - 密钥显示/隐藏切换
-  - 快捷到期时间设置
-- **pages/InitPage.tsx**: 系统初始化页面
-  - 检查系统状态
-  - 选择首个管理员
-  - 自动激活用户
-- **pages/admin/AdminUsersPage.tsx**: 管理员用户管理页面
-  - 用户列表（分页、搜索、筛选）
-  - 激活/停用用户
-  - 删除用户
-- **pages/DocsPage.tsx**: 文档页面
-- **pages/Features.tsx**: 功能开关页面（模板遗留）
+# 类型检查（前后端）
+pnpm typecheck
+```
 
-#### 主题系统
+### 数据库操作
 
-- **核心**:
-  - `frontend/src/context/ThemeContextProvider.tsx` 提供了一个全局的 `AppThemeProvider` 和 `useAppTheme` hook。
-  - `frontend/src/theme/` 目录是我们中心化的主题定义模块。
-- **架构与规则**:
-  - **自定义主题**: 我们通过对 Material-UI 主题进行模块扩展 (module augmentation) 来添加自定义、类型安全的主题属性。类型定义位于 `frontend/src/theme/types.ts`。
-  - **中心化管理**: 所有与主题相关的样式（如特定页面的背景、自定义组件颜色等）都**必须**在 `frontend/src/theme/index.ts` 中的 `lightTheme` 和 `darkTheme` 对象里进行定义。
-  - **组件内使用**: 组件**禁止**通过 `theme.palette.mode === 'dark'` 这样的条件判断来硬编码样式。**必须**直接从主题对象中获取预先定义好的自定义属性 (例如 `theme.pageBackground`)。
-  - **状态切换**: 所有主题状态的读取和切换都**必须**通过 `useAppTheme` hook 进行。
+```bash
+# 修改 schema 后生成迁移文件
+pnpm db:generate
 
-#### 认证系统
+# 应用迁移（本地开发）
+pnpm db:migrate
 
-- **useAuth Hook** (`hooks/useAuth.ts`): 统一的认证状态管理，提供 login/logout/refetch 方法。
-- **Storage 工具** (`utils/storage.ts`): SSR 安全的 localStorage 封装，支持跨标签页状态同步。
-- **认证流程**:
-  1. 用户点击登录按钮
-  2. 调用 `/api/auth/github` 获取 OAuth URL
-  3. 跳转到 GitHub 授权页面
-  4. GitHub 回调到 `/auth/callback`
-  5. `AuthCallbackPage` 处理回调，获取 sessionToken
-  6. 存储 sessionToken 到 localStorage
-  7. 跳转到 Dashboard
+# 应用迁移（生产环境）
+pnpm db:migrate:prod
 
-#### 状态管理
+# 打开 Drizzle Studio（数据库可视化工具）
+pnpm db:studio
 
-- **React Query**: 用于服务器状态管理
-  - `hooks/useEndpoints.ts`: 端点数据管理
-  - `hooks/usePermissionGroups.ts`: 权限组数据管理
-  - `hooks/useAccessKeys.ts`: 访问密钥数据管理
-  - `hooks/useAuth.ts`: 认证状态管理
-- **React Context**: 用于全局客户端状态
-  - `ThemeContext`: 主题状态管理
+# 检查 schema 一致性
+pnpm db:check
 
-#### 核心组件
+# 数据库填充（seed）
+pnpm db:seed         # 本地
+pnpm db:seed:prod    # 生产
+```
 
-- **components/WorkspaceTopBar.tsx**: 工作区顶栏组件
-  - macOS 风格紧凑设计（40px 高度）
-  - Logo + 导航按钮 + 更多菜单 + 用户头像
-  - 主题切换按钮
-- **components/endpoints/EndpointEditor.tsx**: 端点编辑器组件
-  - Monaco Editor 集成
-  - 静态端点内容编辑
-  - 代理端点配置表单
-  - 动态代理端点配置表单（Phase 3.1）
-- **App.tsx**: 标准网页布局
-  - 导航栏
-  - 用户头像菜单
-  - 登录按钮
-  - 页脚
-  - 主题切换按钮
-  - 用于首页、文档、控制台等内容页面
+### 构建与部署
 
-#### 布局系统
+```bash
+# 构建前端（客户端 + 服务端 SSR 包）
+pnpm build
 
-项目现有**两套布局系统**，根据页面类型选择：
+# 生产构建（包含数据库迁移）
+pnpm build:prod
 
-**1. 标准网页布局（App.tsx）**
+# 部署到 Cloudflare
+pnpm deploy
 
-- 用途：首页、文档等内容展示页面
+# 本地测试生产构建
+pnpm serve:prod
+```
+
+### 测试
+
+```bash
+# 运行测试
+pnpm test
+
+# 运行特定测试文件
+pnpm test <test-file-name>
+```
+
+## 核心架构原理
+
+### 1. 混合渲染模式（开发 vs 生产）
+
+**这是本项目最关键的架构设计，必须深刻理解。**
+
+#### 开发模式 (`pnpm dev`)
+
+- Hono 后端运行在 `localhost:8787`（通过 Wrangler）
+- Vite 前端运行在 `localhost:5173`
+- **关键机制**：所有非 API 请求到 `:8787` 都会被**代理**到 `:5173`，实现 HMR（热模块替换）
+- **禁止假设**：`frontend/dist` 目录在开发环境下**不存在**
+
+```typescript
+// src/index.ts:84-97
+if (c.env.NODE_ENV === "development") {
+  // 代理所有前端请求到 Vite 开发服务器
+  const url = new URL(c.req.url);
+  url.hostname = "localhost";
+  url.port = "5173";
+  return fetch(url.toString());
+}
+```
+
+#### 生产模式 (`pnpm deploy`)
+
+- Vite 将前端构建到：
+  - `frontend/dist/client`（静态资源）
+  - `dist/server`（SSR 渲染包）
+- Hono 通过 `ASSETS` binding 服务静态文件
+- **动态导入**：使用 `import()` 加载构建产物，避免开发环境找不到文件导致构建失败
+
+```typescript
+// src/index.ts:116-127
+const manifestModule = await import("../dist/client/.vite/manifest.json");
+const { render } = await import("../dist/server/entry-server.mjs");
+```
+
+**为什么使用动态 import？** 因为这些文件只在生产构建后才存在。如果使用静态 `import`，开发环境下会立即报错导致无法启动。
+
+### 2. 端到端类型安全（单一数据源）
+
+**所有类型定义只在 `common/` 目录下维护一次，前后端共享。**
+
+#### 目录结构
+
+```
+common/
+├── types/index.ts              # TypeScript 类型（从 Zod 推导）
+├── validators/                 # Zod Schema（验证 + 类型生成）
+│   ├── endpoint.schema.ts      # 端点 Schema
+│   ├── permission.schema.ts    # 权限组 Schema
+│   ├── auth.schema.ts          # 认证 Schema
+│   └── admin.schema.ts         # 管理员 Schema
+└── config/api.ts               # 共享 API 配置
+```
+
+#### 工作流
+
+1. **定义 Schema**（`common/validators/`）：
+
+```typescript
+export const EndpointSchema = z.object({
+  id: z.string(),
+  path: z.string(),
+  type: z.enum(["static", "proxy", "script"]),
+  // ...
+});
+```
+
+2. **推导类型**（`common/types/index.ts`）：
+
+```typescript
+export type Endpoint = z.infer<typeof EndpointSchema>;
+```
+
+3. **后端使用**（`src/routes/`）：
+
+```typescript
+import { EndpointSchema } from "../../common/validators/endpoint.schema";
+
+const route = createRoute({
+  responses: {
+    200: {
+      content: { "application/json": { schema: EndpointSchema } },
+    },
+  },
+});
+```
+
+4. **前端使用**（`frontend/src/hooks/`）：
+
+```typescript
+import type { Endpoint } from "../../../common/types";
+
+export function useEndpoints() {
+  return useQuery({
+    queryFn: async () => {
+      const res = await fetch(`${getApiBase()}/endpoints`);
+      return res.json() as Promise<ApiResponse<{ tree: Endpoint[] }>>;
+    },
+  });
+}
+```
+
+### 3. 统一路由系统
+
+**唯一路由定义文件**：`frontend/src/routes.tsx`
+
+客户端入口（`entry-client.tsx`）和服务端入口（`entry-server.tsx`）都使用这个文件，避免重复定义。
+
+#### 添加新页面的步骤
+
+1. 创建页面组件：`frontend/src/pages/NewPage.tsx`
+2. 在 `frontend/src/routes.tsx` 中导入并添加路由：
+
+```typescript
+import NewPage from './pages/NewPage';
+
+<Route path="new-page" element={<NewPage />} />
+```
+
+3. **完成** —— 无需修改任何入口文件
+
+### 4. 数据库 Schema 与迁移
+
+**单一数据源**：`src/db/schema.ts`
+
+#### 核心数据表
+
+根据设计文档（`design.md`），项目包含以下数据表：
+
+- **users**：用户表（GitHub ID、用户名、邮箱、角色、激活状态、Platform API Key）
+- **userSessions**：会话表（token、过期时间）
+- **endpoints**：端点表（支持树形结构，`parent_id` 字段）
+  - `path`：相对路径（如 `/clash-config`）
+  - `type`：`static` | `proxy` | `script`
+  - `config`：JSON 配置（根据类型不同结构不同）
+  - `access_control`：`public` | `authenticated`
+  - `required_permission_groups`：JSON array of group IDs
+  - `is_published`：是否已发布
+  - `sort_order`：排序字段（支持手动拖拽排序）
+- **permissionGroups**：权限组表
+- **accessKeys**：访问密钥表（格式：`ep-<32位随机字符串>`）
+- **envVars**：环境变量表（加密存储）
+- **accessLogs**：访问日志表（统计端点访问情况）
+
+#### 迁移工作流
+
+```bash
+# 1. 修改 src/db/schema.ts
+# 2. 生成迁移文件
+pnpm db:generate
+
+# 3. 查看生成的 SQL（drizzle/ 目录）
+# 4. 应用迁移
+pnpm db:migrate         # 本地
+pnpm db:migrate:prod    # 生产
+```
+
+### 5. 主题系统（Material-UI）
+
+**集中化主题管理**：所有主题定义在 `frontend/src/theme/index.ts`
+
+#### 规则
+
+1. **定义自定义主题属性**：在 `theme/types.ts` 中扩展 MUI 主题类型
+2. **集中配置**：所有主题相关样式在 `lightTheme` 和 `darkTheme` 中定义
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
