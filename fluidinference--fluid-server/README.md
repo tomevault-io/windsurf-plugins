@@ -7,11 +7,11 @@ Local AI server for your Windows apps.
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [FluidInference/fluid-server](https://github.com/FluidInference/fluid-server).
+Original source: `CLAUDE.md` in [FluidInference/fluid-server](https://github.com/FluidInference/fluid-server).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
