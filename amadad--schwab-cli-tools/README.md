@@ -7,11 +7,11 @@ Agent-friendly Schwab CLI tools for portfolio analysis and market insights
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [amadad/schwab-cli-tools](https://github.com/amadad/schwab-cli-tools).
+Original source: `CLAUDE.md` in [amadad/schwab-cli-tools](https://github.com/amadad/schwab-cli-tools).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
