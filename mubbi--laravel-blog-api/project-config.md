@@ -1,137 +1,212 @@
 ---
 trigger: always_on
-description: Cursor Rules for Laravel 12 Blog API Project for writing codes
+description: Development rules to follow while developing the project
 ---
 
 
-# Cursor Rules for Laravel 12 Blog API Project
+# Laravel Development Standards for Cursor AI
 
-> **Note:** This document contains project-specific rules and patterns. General Laravel development standards are covered in `development-guide-ai.mdc`. Both documents should be followed together.
+> **Note:** This is a general Laravel development guide. For project-specific requirements, patterns, and configurations, see `laravel-blog-api-rules.mdc`.
 
-## Project Overview
+**Tech Stack:** PHP 8.2+, Laravel 12+, MySQL 8+
 
-This is a modern Laravel 12 Blog API built with PHP 8.4, featuring clean architecture, comprehensive testing, Docker-based development environment, and advanced code quality tools. The API serves as a production-ready backend for a blog platform with authentication, role-based permissions, content management, and automated quality assurance.
+## Core Principles
 
-## Technology Stack
+- **SOLID**, **YAGNI**, **KISS**
+- **Strict typing**: `declare(strict_types=1);` in all PHP files
+- **Thin controllers**: No business logic
+- **Type safety**: All properties, parameters, return types explicit
+- **PHPStan level 10**: No ignored errors (project requirement)
 
-- **Laravel Framework**: 12.0+ (latest features)
-- **PHP**: 8.2+ (with strict typing enabled, targeting 8.4+ features)
-- **Database**: MySQL 8.0 (development) + MySQL 8.0 (testing - isolated environment)
-- **Cache/Session**: Redis (development) + Redis (testing - isolated environment)
-- **Authentication**: Laravel Sanctum (API tokens with abilities)
-- **Testing**: Pest PHP 3.8+ (BDD-style testing framework)
-- **Static Analysis**: Larastan 3.0+ (PHPStan level 10 for Laravel)
-- **Code Formatting**: Laravel Pint (PHP-CS-Fixer preset)
-- **API Documentation**: Scramble (OpenAPI/Swagger automatic generation)
-- **Containerization**: Docker & Docker Compose (multi-service architecture)
-- **Quality Analysis**: SonarQube integration (optional)
-- **Git Tools**: Husky hooks, semantic commits, automated validation
+## PHP Standards
 
-## PHP Coding Standards (MANDATORY)
-
-> **Note:** General PHP and Laravel standards are covered in `development-guide-ai.mdc`. This section covers project-specific requirements and additions.
-
-### File Structure Requirements
-
-- **ALWAYS** use `declare(strict_types=1);` at the top of all PHP files after the `<?php` starting tag
-- Follow **PSR-12** coding standards strictly
-- Use **descriptive, meaningful** names for variables, functions, classes, and files
-- Include **comprehensive PHPDoc** for classes, methods, and complex logic
-- Prefer **typed properties**, **typed function parameters**, and **typed return types**
-- Break code into small, single-responsibility functions or classes
-- Avoid magic numbers and hard-coded strings; use **constants**, **config files**, or **Enums**
-- Use strict type declarations throughout
-
-### PHP 8.4 Best Practices
-
-- Use **readonly properties** to enforce immutability where appropriate
-- Leverage **Enums** for clear, type-safe constants
-- Use **First-class callable syntax** for cleaner callbacks
-- Utilize **Constructor Property Promotion**
-- Use **Union Types**, **Intersection Types**, **true/false return types**, and **Static Return Types**
-- Apply the **Nullsafe Operator (?->)** for safe method/property access
-- Use **Named Arguments** for clarity when calling functions with multiple parameters
-- Prefer **final classes** for utility or domain-specific classes that shouldn't be extended
-- Adopt **new `Override` attribute** (PHP 8.4) to explicitly mark overridden methods
-- Use **dynamic class constants in Enums** where version-specific behavior is needed
-
-### PHP 8.4 Override Attribute Example
+### Type Safety (Mandatory)
+- Scalar type hints, return types, property types
+- Union types (`string|int`), nullable types (`?Type`)
+- Readonly properties for DTOs
+- Enums for fixed value sets
 
 ```php
-<?php
-
 declare(strict_types=1);
 
-namespace App\Models;
-
-use Illuminate\Database\Eloquent\Model;
-
-final class YourModel extends Model
+enum UserStatus: string
 {
-    #[Override]
-    protected function casts(): array
+    case ACTIVE = 'active';
+    case INACTIVE = 'inactive';
+}
+
+class UserDTO
+{
+    public function __construct(
+        public readonly string $email,
+        public readonly UserStatus $status
+    ) {}
+}
+```
+
+### Modern PHP Features
+- Readonly properties, Enums, Match expressions
+- Named arguments, Attributes (PHP 8.0+)
+- Constructor property promotion
+
+## Laravel Architecture
+
+### Project Structure
+```
+app/
+├── Actions/              # Complex orchestration (use sparingly per YAGNI)
+├── Data/                 # DTOs (create as needed)
+├── Enums/                # Type-safe constants
+├── Http/
+│   ├── Controllers/      # Thin, API/V1/
+│   ├── Requests/         # Form Requests
+│   └── Resources/        # API Resources
+├── Models/
+├── Policies/             # Authorization
+├── Repositories/         # Data access layer (use per decision matrix)
+│   ├── Contracts/         # Interfaces
+│   └── Eloquent/          # Implementations
+└── Services/             # Business logic
+```
+
+Note: This is a general structure. See project-specific rules for exact directory structure used in this project.
+
+### Controllers (Thin)
+- Only: validation, authorization, delegation, response formatting
+- Use Form Requests, Policies, Services/Actions
+- Return typed `JsonResponse` with Resources
+- Use dependency injection with readonly properties
+- Be final classes for immutability
+- Note: For this project, use invokable pattern with `__invoke()` method (see project-specific rules)
+
+### Form Requests
+- Always use for validation
+- Implement `authorize()` when needed
+- Custom messages and attributes
+- Note: For this project, implement `withDefaults()` method (see project-specific rules)
+
+### API Resources
+- Always use for API responses
+- Separate resources for different contexts
+- Note: For this project, use specific response format with `status`, `message`, and `data` fields (see project-specific rules)
+
+## Pattern Stack (YAGNI)
+
+### Decision Matrix
+| Complexity | Action | Service | Repository | DTO |
+|------------|--------|---------|------------|-----|
+| Complex (multi-service) | ✅ | ✅ | ✅ | ✅ |
+| Medium (business logic) | ❌ | ✅ | ✅ | ✅ |
+| Simple (data access) | ❌ | ❌ | ✅ | ✅ |
+| Very Simple | ❌ | ❌ | ✅ | ⚠️ |
+
+### Complex Operations
+```
+Controller → Action → Service → Repository → Model
+            ↓
+          DTO
+```
+
+### Simple CRUD
+```
+Controller → Service → Repository → Model
+            ↓
+          DTO
+```
+
+### DTOs (Always Recommended)
+- Prevent array abuse, ensure type safety
+- Readonly properties, `toArray()` method
+- Static factory methods
+
+```php
+final class UserDTO
+{
+    public function __construct(
+        public readonly string $email,
+        public readonly string $password,
+        public readonly ?string $name = null,
+    ) {}
+
+    public static function fromRequest(StoreUserRequest $request): self
+    {
+        return new self(
+            email: $request->validated('email'),
+            password: $request->validated('password'),
+            name: $request->validated('name'),
+        );
+    }
+
+    public function toArray(): array
     {
         return [
-            'created_at' => 'datetime',
-            'updated_at' => 'datetime',
+            'email' => $this->email,
+            'password' => $this->password,
+            'name' => $this->name,
         ];
     }
 }
 ```
 
-## Laravel 12 Project Structure & Conventions
+### Services
+- Business logic only
+- Depend on repositories, not models
+- Constructor injection
 
-### Directory Structure
+```php
+final class UserService
+{
+    public function __construct(
+        private readonly UserRepositoryInterface $repository
+    ) {}
 
-```
-app/
-├── Actions/              # Single-responsibility action classes (create as needed)
-├── Console/              # Artisan commands (create as needed)
-├── Data/                 # Data Transfer Objects (DTOs) (create as needed)
-├── Enums/                # Enums for type-safe constants ✅
-├── Events/               # Domain events (create as needed)
-├── Exceptions/           # Custom exceptions (create as needed)
-├── Http/
-│   ├── Controllers/      # Thin controllers ✅
-│   ├── Middleware/       # HTTP middleware ✅
-│   ├── Requests/         # Form Request validation ✅
-│   ├── Resources/        # API Resource responses ✅
-├── Jobs/                 # Queued jobs (create as needed)
-├── Listeners/            # Event listeners (create as needed)
-├── Models/               # Eloquent models ✅
-├── Policies/             # Authorization policies ✅
-├── Providers/            # Service providers ✅
-├── Services/             # Business logic ✅
-├── Support/              # Helpers & utility classes (create as needed)
-└── Rules/                # Custom validation rules (create as needed)
+    public function register(UserDTO $dto): User
+    {
+        return $this->repository->create($dto->toArray());
+    }
+}
 ```
 
-### Domain Models
+### Repositories
+- Data access only
+- Interface + Eloquent implementation
+- Bind in service provider
 
-The application follows a blog-centric domain model with the following entities:
+```php
+interface UserRepositoryInterface
+{
+    public function create(array $data): User;
+    public function findById(int $id): ?User;
+}
 
-#### Core Entities
+class EloquentUserRepository implements UserRepositoryInterface
+{
+    public function create(array $data): User
+    {
+        return User::create($data);
+    }
+}
+```
 
-- **User**: Blog users with role-based permissions
-- **Article**: Blog posts with status management
-- **Category**: Hierarchical content organization
-- **Tag**: Flexible content labeling
-- **Comment**: User interactions on articles
+### Actions (Complex Orchestration Only)
+- Single-purpose operations
+- Orchestrate multiple services
+- Use only when needed (YAGNI)
 
-#### Supporting Entities
+```php
+final class RegisterUserAction
+{
+    public function __construct(
+        private readonly UserService $userService,
+        private readonly EmailService $emailService
+    ) {}
 
-- **Role**: User access levels (Administrator, Editor, Author, Contributor, Subscriber)
-- **Permission**: Granular access control
-- **Notification**: System-wide messaging
-- **NewsletterSubscriber**: Email subscription management
-
-### Enums (PHP 8.1+ Features)
-
-All status and type fields use PHP enums for type safety:
-
+    public function execute(UserDTO $dto): User
+    {
+        $user = $this->userService->register($dto);
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/mubbi) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-10 -->
+> Source: [mubbi/laravel-blog-api](https://github.com/mubbi/laravel-blog-api) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-14 -->
