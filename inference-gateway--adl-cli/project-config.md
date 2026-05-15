@@ -1,123 +1,175 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: This file provides comprehensive guidance for AI agents working with the ADL CLI project. It covers project architecture, development workflow, testing strategies, and conventions.
 ---
 
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides comprehensive guidance for AI agents working with the ADL CLI project. It covers project architecture, development workflow, testing strategies, and conventions.
 
-## Commands
+## Project Overview
 
-### Build & Test
+**ADL CLI** (Agent Definition Language Command Line Interface) is a Go-based tool for generating enterprise-ready A2A (Agent-to-Agent) servers from YAML-based Agent Definition Language (ADL) files. It eliminates boilerplate code and ensures consistent patterns across agent implementations.
 
-- `task build` - Build the ADL CLI binary to `bin/adl`
-- `task test` - Run all tests
-- `task test:coverage` - Run tests with coverage report
-- `task lint` - Run golangci-lint
-- `task fmt` - Format all Go code
-- `task ci` - Run complete CI pipeline: fmt, lint, test, build
+### Key Technologies
+- **Language**: Go 1.26+
+- **Framework**: Cobra CLI framework
+- **Templating**: Go templates with Sprig functions
+- **Build System**: Taskfile for automation
+- **CI/CD**: GitHub Actions with semantic-release
+- **Containerization**: Docker with multi-platform support
 
-### Running Specific Tests
+## Architecture and Structure
 
-- `go test -v ./cmd -run TestInit` - Run specific test by name
-- `go test -v ./internal/generator` - Test specific package
-
-### Development Mode
-
-- `task dev -- init my-agent` - Run CLI init command
-- `task dev -- generate --file agent.yaml --output ./test` - Generate project
-- `task dev -- validate examples/go-agent.yaml` - Validate ADL file
-- `task examples:test` - Validate all example ADL files
-- `task examples:generate` - Generate projects from all examples
-
-## Architecture
-
-The ADL CLI generates A2A (Agent-to-Agent) agent projects from YAML-based Agent Definition Language files.
+### Project Layout
+```text
+adl-cli/
+├── cmd/                    # CLI command implementations
+│   ├── root.go            # Main CLI setup
+│   ├── generate.go        # Generate command
+│   ├── init.go            # Init command
+│   ├── validate.go        # Validate command
+│   └── *_test.go          # Command tests
+├── internal/              # Internal packages
+│   ├── generator/         # Code generation engine
+│   ├── schema/           # ADL schema definitions and validation
+│   ├── templates/        # Template system
+│   │   ├── common/       # Cross-language templates
+│   │   ├── languages/    # Language-specific templates
+│   │   └── sandbox/      # Environment templates
+│   └── prompt/           # Interactive prompt system
+├── examples/              # Example ADL files
+├── .github/workflows/     # CI/CD workflows
+├── Taskfile.yml          # Build automation
+├── go.mod                # Go dependencies
+└── main.go               # Application entry point
+```
 
 ### Core Components
 
-```text
-main.go                       # Entry point, sets version
-├── cmd/                      # CLI commands (Cobra framework)
-│   ├── root.go              # Root command setup
-│   ├── init.go              # Interactive ADL manifest creation
-│   ├── generate.go          # Project generation from ADL
-│   └── validate.go          # ADL schema validation
-└── internal/
-    ├── generator/           # Code generation engine
-    │   ├── generator.go     # Main generation logic, CI/CD generation
-    │   └── ignore.go        # .adl-ignore handling
-    ├── schema/              # ADL schema definitions
-    │   ├── types.go         # All ADL type definitions (ADL, Spec, Skill, etc.)
-    │   └── validator.go     # JSON Schema validation
-    ├── prompt/              # Interactive prompts for `init` command
-    └── templates/           # Template system
-        ├── engine.go        # Template rendering with Sprig v3 functions
-        ├── registry.go      # Template loading and file mapping per language
-        ├── headers.go       # Generated file headers
-        ├── common/          # Universal templates (config, docs, CI/CD)
-        ├── languages/       # Language-specific templates (go/, rust/, typescript/)
-        └── sandbox/         # Dev environment templates (flox/, devcontainer/)
+1. **CLI Interface** (`cmd/`): Cobra-based command structure with `init`, `generate`, and `validate` commands
+2. **Template Engine** (`internal/templates/`): Multi-language template system with support for Go, Rust, and TypeScript
+3. **Schema System** (`internal/schema/`): YAML schema validation using JSON Schema
+4. **Generator** (`internal/generator/`): File generation engine with `.adl-ignore` support
+5. **Prompt System** (`internal/prompt/`): Interactive CLI prompts for project initialization
+
+## Development Environment Setup
+
+### Prerequisites
+- Go 1.26+ (as specified in `go.mod`)
+- [Task](https://taskfile.dev/) for build automation
+- Docker (for container operations)
+- Git for version control
+
+### Quick Setup
+```bash
+# Clone the repository
+git clone https://github.com/inference-gateway/adl-cli.git
+cd adl-cli
+
+# Install dependencies
+task mod
+
+# Build the CLI
+task build
+
+# Run tests
+task test
 ```
 
-### Generation Flow
+### Development Tools
+- **Task Runner**: Use `task <command>` for all development operations
+- **Linting**: `golangci-lint` configured in CI workflow
+- **Formatting**: `go fmt` and `prettier` for consistent code style
+- **Testing**: Go's built-in testing framework with coverage support
 
-1. **Parse & Validate**: Load ADL YAML, validate against schema, check required fields
-2. **Template Selection**: Detect language from `spec.language`, build file mapping via `registry.go`
-3. **Generate**: Render templates with ADL context, respect `.adl-ignore`, write files
-4. **Post-Process**: Run formatters (`go fmt`, `cargo fmt`), execute custom hooks
+## Key Commands
 
-### Key Types (internal/schema/types.go)
+### Build and Development
+```bash
+# Build the ADL CLI binary
+task build                    # Build to bin/adl
+task install                  # Install to GOPATH/bin
 
-- `ADL` - Root structure with `apiVersion`, `kind`, `metadata`, `spec`
-- `Spec` - Contains `capabilities`, `agent`, `skills`, `services`, `server`, `language`, `deployment`
-- `Skill` - Agent capability with `id`, `name`, `schema`, `inject` (for service injection)
-- `Service` - Injectable service with `interface`, `factory`, `description`
-
-### Service Injection
-
-Skills can inject services via the `inject` field. The `logger` service is built-in:
-
-```yaml
-spec:
-  services:
-    database:
-      type: service
-      interface: DatabaseService
-      factory: NewDatabaseService
-  skills:
-    - id: query_database
-      inject:
-        - logger # logger is built-in
-        - database
+# Development mode
+task dev -- <args>           # Run CLI with arguments
+task dev -- init my-agent    # Interactive project setup
 ```
 
-Generated services go to `internal/<service>/` with interface and factory function.
+### Code Quality
+```bash
+# Format code
+task fmt                     # Format Go code
+task format                  # Run prettier formatter
 
-## Adding a New Language
+# Lint and vet
+task lint                    # Run golangci-lint
+task vet                     # Run go vet
 
-1. Create `internal/templates/languages/<lang>/` with templates
-2. Add file mapping method in `registry.go` (e.g., `getRustFiles`)
-3. Add language detection in `DetectLanguageFromADL` and `detectLanguage`
-4. Add language config type in `schema/types.go` (e.g., `RustConfig`)
-5. Add example ADL file in `examples/`
+# Complete CI pipeline
+task ci                      # fmt → lint → test → build
+```
 
-## Adding a New Command
+### Testing
+```bash
+# Run tests
+task test                    # Run all tests
+task test:coverage           # Tests with coverage
 
-1. Create `cmd/<command>.go` with Cobra command
-2. Register in `cmd/root.go` via `rootCmd.AddCommand()`
-3. Add tests in `cmd/<command>_test.go`
+# Example validation
+task examples:test           # Validate all example ADL files
+task examples:generate       # Generate projects from examples
+```
 
-## Important Notes
+### Release and Distribution
+```bash
+# Build release binaries
+task release                 # Multi-platform builds via goreleaser
 
-- Go 1.25+ required
-- Templates use Go `text/template` with Sprig v3 functions
-- ADL schema version: `adl.dev/v1`
-- Supports Go, Rust (TypeScript planned)
-- Use table-driven tests with isolated mocks
+# Docker operations
+task docker:build           # Build Docker image
+```
+
+## Testing Instructions
+
+### Test Structure
+- **Unit Tests**: Test individual functions and methods
+- **Integration Tests**: Test command execution and file generation
+- **Example Tests**: Validate example ADL files and generated output
+
+### Running Tests
+```bash
+# Run all tests
+go test -v ./...
+
+# Run specific package tests
+go test -v ./cmd
+go test -v ./internal/generator
+go test -v ./internal/schema
+
+# Run with coverage
+go test -v -cover ./...
+```
+
+### Test Patterns
+1. **Table-driven tests**: Use for comprehensive test coverage
+2. **Golden files**: Compare generated output with expected results
+3. **Mock file system**: Test file operations without touching disk
+4. **Command testing**: Test CLI commands with different arguments
+
+### Example Testing
+```bash
+# Validate example ADL files
+adl validate examples/go-agent.yaml
+adl validate examples/rust-agent.yaml
+adl validate examples/cloudrun-agent.yaml
+
+# Generate and test example projects
+rm -rf test-output
+mkdir -p test-output
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/inference-gateway)
-> This is a context snippet only. You'll also want the standalone SKILL.md file — [download at TomeVault](https://tomevault.io/claim/inference-gateway)
-<!-- tomevault:4.0:windsurf_rules:2026-04-09 -->
+> Source: [inference-gateway/adl-cli](https://github.com/inference-gateway/adl-cli) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-14 -->
