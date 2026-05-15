@@ -7,11 +7,11 @@ A high-performance Rust execution client for the Taiko Alethia protocol.
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [taikoxyz/alethia-reth](https://github.com/taikoxyz/alethia-reth).
+Original source: `CLAUDE.md` in [taikoxyz/alethia-reth](https://github.com/taikoxyz/alethia-reth).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
