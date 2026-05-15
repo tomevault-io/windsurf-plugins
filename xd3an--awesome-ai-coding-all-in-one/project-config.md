@@ -1,66 +1,81 @@
 ---
 trigger: always_on
-description: Cursor rules for WebAssembly development with Z80 Cellular Automata integration.
+description: Complete AI coding setup for WordPress — themes, plugins, Gutenberg, WooCommerce, ACF, REST API with .cursorrules + CLAUDE.md + Copilot instructions + 5 generation skills.
 ---
 
-We're implementing a higher-level control structure for our z80 cellular automata simulation, which we call the "environmental region grid." This system allows users to define and manipulate larger areas of influence over the underlying "primordial soup" of cells.
+You are an expert WordPress developer with deep knowledge of PHP, Gutenberg, WooCommerce, ACF, and the WordPress ecosystem.
 
-Key Concepts:
+## Core Principles
+- Follow WordPress Coding Standards (WPCS) strictly
+- Always use `declare(strict_types=1)` in PHP files
+- Escape ALL output, sanitize ALL input, prepare ALL queries
+- Use WordPress APIs — never reinvent what WordPress provides
+- Prefix everything with project namespace to avoid conflicts
 
-1. Soup Cells: The individual units of our cellular automata, which follow basic rules and interact with their neighbors.
-2. Regions: Larger areas that encompass multiple soup cells. Each region can have unique properties that influence the behavior of the soup cells within it.
-3. Environmental Region Grid: A grid overlaid on top of the soup cell grid, dividing the simulation space into discrete regions. This grid can be 4x4, 8x8, or 16x16, allowing for different levels of granularity.
-4. Region Parameters: Each region has a set of adjustable parameters that affect the soup cells within it. These could include:
-   - Obstacle (A region that blocks the movement of soup cells)
-   - Directional influence (biasing cell interactions in specific directions)
-   - Randomness factor (introducing more or less chaos in cell behavior)
-   - Temperature (affecting overall activity levels)
-   - Energy levels (influencing the likelihood of certain cell states or interactions)
-   - Other custom parameters as needed
-5. Dynamic Influence: The region parameters dynamically modify the behavior of soup cells, creating areas of distinct characteristics within the larger simulation.
-6. User Interaction: Users can interact with the simulation by adjusting region parameters in real-time, allowing for on-the-fly modification of the simulation's behavior.
-7. Visualization: The region grid and its effects are visually represented, allowing users to see the influence of their changes on the simulation.
+## PHP Rules
+- Type hints on all parameters and return types
+- Use `WP_Query` or `get_posts()` — never `query_posts()`
+- Use `$wpdb->prepare()` for ALL database queries
+- Use `wp_verify_nonce()` on ALL form submissions
+- Use `current_user_can()` for ALL permission checks
+- Use `esc_html()`, `esc_attr()`, `esc_url()`, `wp_kses_post()` for output
+- Use `sanitize_text_field()`, `absint()`, `wp_unslash()` for input
 
-Purpose:
+## Theme Development
+- Use `add_theme_support()` for WordPress features
+- Enqueue scripts/styles with `wp_enqueue_script()` / `wp_enqueue_style()`
+- Use template hierarchy: `single-{post_type}.php`, `archive-{post_type}.php`
+- Use `get_template_part()` for reusable components
+- Keep logic in `functions.php` / `inc/`, templates should only render
 
-This system adds a new layer of complexity and control to the cellular automata simulation. It allows for the creation of diverse environments within a single simulation, enabling users to explore how different regional properties affect the emergent behavior of the cellular automata.
+## Plugin Development
+- Main plugin class pattern with singleton or DI
+- Activation/deactivation hooks with `register_activation_hook()`
+- `uninstall.php` for cleanup on uninstall
+- Use WordPress Settings API for admin pages
+- Use `register_rest_route()` for REST endpoints
 
-By implementing this region grid system, we're providing a powerful tool for users to experiment with large-scale influences on cellular automata behavior, potentially leading to new insights and interesting emergent phenomena.
+## Gutenberg Blocks
+- Use `block.json` for metadata
+- Use `@wordpress/scripts` for build tooling
+- Use `useBlockProps()` and `InnerBlocks` in React/JSX
+- Register with `register_block_type()` in PHP
+- Dynamic blocks: use `render_callback` or `render.php`
 
-Plan:
+## WooCommerce
+- Override templates via `theme/woocommerce/` directory
+- Use WooCommerce hooks, never modify core
+- Use `wc_get_product()`, `WC()->cart`, `WC()->session`
+- Use HPOS-compatible code (no direct postmeta for orders)
 
-1. Define the Region Structure:
-   Create a comprehensive data structure to represent each region. This structure should be flexible enough to accommodate various parameters that can influence the behavior of soup cells within that region. Consider including:
-   - Obstacle
-   - Directional influence (for each cardinal direction)
-   - Randomness factor
-   - Temperature
-   - Energy level
-   - Any other relevant parameters
-   Ensure that each parameter is represented by an appropriate data type, typically using floating-point numbers for continuous values or integers for discrete states. This structure will be the foundation of your region system, so design it with extensibility in mind.
+## Advanced Custom Fields
+- Register field groups in PHP for version control
+- Use `get_field()`, `the_field()`, `have_rows()`
+- Use ACF blocks for Gutenberg integration
+- Always provide fallback values
 
-2. Create the Region Grid:
-   Implement a two-dimensional array to represent the region grid. This grid should be flexible in size, allowing for configurations such as 4x4, 8x8, or 16x16. Each element of this array will be an instance of the region structure defined in step 1. Initialize this grid with default values for all parameters, ensuring a consistent starting state. Consider implementing methods to easily resize the grid and maintain the aspect ratio with the underlying soup cells.
+## Security
+- Never trust user input
+- Always escape, sanitize, prepare, verify nonces, check capabilities
+- Never use `extract()`, `eval()`, or short PHP tags
 
-3. Implement Soup Cell to Region Mapping:
-   Develop a system to efficiently map each soup cell to its corresponding region. This mapping is crucial for quick lookups during simulation. Create a separate array where each element represents a soup cell and contains the index or reference to its associated region. Implement functions to update this mapping whenever the region grid size changes. Ensure that this mapping system is optimized for performance, as it will be frequently accessed during the simulation.
+## Database
+- `get_option()` / `update_option()` for settings
+- `get_post_meta()` / `update_post_meta()` for post data
+- `get_transient()` / `set_transient()` for caching
+- Custom tables only when WP data structures don't fit
+- Always `$wpdb->prepare()` for custom queries
 
-4. Modify the Main Simulation Loop:
-   Update the core simulation logic to incorporate region parameters. For each soup cell update:
-   a. Determine the cell's corresponding region using the mapping created in step 3.
-   b. Retrieve the region's parameters.
-   c. Apply the effects of each parameter to the soup cell's behavior.
-   This might involve adjusting probabilities, modifying state transition rules, or influencing the cell's interaction with neighbors. Ensure that this integration is done efficiently to maintain simulation performance.
-
-5. Implement Parameter-Specific Logic:
-   For each parameter in the region structure, create dedicated functions or methods to apply its effects. For example:
-   - Obstacle: Turns the cell into an obstacle, preventing it from being randomly selected, and preventing neighbor soup cells from interacting with it.
-   - Directional influence: Adjust the probability of a cell interacting with neighbors in specific directions.
-   - Randomness: Introduce variability in state transitions or cell behavior.
-   - Temperature: Affect the overall activity level or energy of cells within the region.
-   - Energy level: Influence the likelihood of certain operations or state changes.
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+## Do NOT
+- Modify WordPress core files
+- Use `query_posts()`
+- Echo unescaped data
+- Write raw SQL without prepare
+- Use `extract()` or `eval()`
+- Hardcode URLs — use `home_url()`, `admin_url()`
+- Skip nonce verification
+- Put business logic in templates
+- Use short PHP tags
 
 ---
 > Source: [XD3an/awesome-ai-coding-all-in-one](https://github.com/XD3an/awesome-ai-coding-all-in-one) — distributed by [TomeVault](https://tomevault.io).
