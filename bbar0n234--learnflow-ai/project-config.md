@@ -1,0 +1,111 @@
+---
+trigger: always_on
+description: LearnFlowAI — AI-powered learning platform. Core stack: LangGraph agent, FastAPI backend, React/TypeScript frontend, PostgreSQL.
+---
+
+# CLAUDE.md
+
+## Project Context
+
+LearnFlowAI — AI-powered learning platform. Core stack: LangGraph agent, FastAPI backend, React/TypeScript frontend, PostgreSQL.
+
+This project follows AIDD (AI-Driven Development): the developer acts as architect defining contracts and architecture; the LLM agent implements based on prepared documentation context. All docs live in `doc/` — read them before making assumptions.
+
+## Project Structure
+
+uv workspace monorepo — each package has its own `pyproject.toml` and dependencies. Root `pyproject.toml` is the workspace root, not a runnable package.
+
+Python commands must run from the package directory (where the relevant `pyproject.toml` lives), not from the project root. Makefile targets handle this automatically.
+
+## Documentation
+
+When exploring the codebase for a task, start from architectural documents in `doc/tech/`, not source code. Documents describe interfaces, contracts, and flows at the right abstraction level for design decisions. Code is an implementation detail — use it to verify specifics not covered by documentation.
+
+When discussing architecture, visualize components, layers, and data flows so the architect can give quality feedback with the full picture in front of them. Don't wait to be asked. In chat — ASCII diagrams; when writing to documents — Mermaid.
+
+Start from [doc/index.md](doc/index.md). Key entry points by concern:
+
+```
+doc/
+├── idea.md              # Problem, ICP, JTBD, product boundaries
+├── vision.md            # System architecture, stack, MVP criteria
+├── product/             # Use cases, roadmap, versioned scope
+├── tech/
+│   ├── backend.md           # Layers, API, persistence, configuration
+│   ├── frontend.md          # Screens, components, state, API integration
+│   ├── auth.md              # JWT + refresh tokens, rate limiting, interceptor
+│   ├── streaming.md         # SSE protocol, events, cancellation
+│   ├── agent-runtime.md     # LangGraph graph, tools, skills, context, MCP
+│   ├── knowledge-sphere.md  # Project memory, storage, fuzzy patch, REST API
+│   ├── user-memory.md       # Custom instructions, agent memory, personalization
+│   ├── prompt-management.md # Langfuse prompts, dev/prod, seed/sync
+│   ├── observability.md     # Langfuse tracing, cost tracking, feedback loop
+│   ├── conventions.md       # Git flow, naming, code quality, documentation
+│   └── adr/                 # Architecture Decision Records
+├── research/            # Technology research, deep-dives, approach analysis
+├── reference/           # Reference materials: patterns, domain handbooks
+├── security/            # Threat model + defense architecture (architecture.md)
+└── tasks/               # Task lists and iterations
+```
+
+## Key Commands
+
+Use Makefile targets — not raw shell commands.
+
+| Target | Purpose |
+|--------|---------|
+| `make check` | All backend checks: ruff + mypy (CI gate) |
+| `make check-fe` | All frontend checks: ESLint + Prettier --check (CI gate) |
+| `make lint` / `make format` | Ruff linter / formatter |
+| `make type-check` | mypy |
+| `make lint-fe` / `make format-fe` | ESLint / Prettier |
+| `make test` | pytest |
+| `make dev` / `make dev-fe` | Backend / frontend dev server |
+| `make docker-up` / `make docker-up-db` | Full stack / DB only |
+| `make migrate` | Alembic upgrade head |
+| `make migration msg="..."` | Create new Alembic migration |
+
+## Makefile Conventions
+
+Makefile is the canonical interface to the project. Prefer `make <target>` over typing raw commands.
+
+If a target is missing or inconvenient — improve the Makefile rather than running raw commands repeatedly. Obvious fixes (typos, wrong flags) can be applied directly. Non-obvious changes (new targets, workflow modifications) require architect approval.
+
+One-off commands that won't be reused are fine to run directly.
+
+## Code Quality Tools
+
+Linters and formatters are the project's quality gate — work with them, not around them.
+
+When a check fails:
+- **Understand the root cause** — determine whether it's a genuine code issue or a tooling false positive.
+- **Genuine issue** — fix in code.
+- **False positive or missing rule** — discuss with the architect to decide whether to adjust the rule configuration.
+- Never add blind suppressions (`# noqa`, `# type: ignore`) without clear justification. Suppressing real issues defeats the purpose of the tooling.
+
+Rule changes (enabling, disabling, configuring) always go through the architect.
+
+## Tool & Library Freshness
+
+Do not rely on training data for fast-moving tools. Verify against these sources (in priority order):
+
+1. **Installed packages** — Python inspect, docstrings, signatures
+2. **Skills** — langgraph-patterns, uv-package-manager, etc.
+3. **MCP** — docs-langchain for up-to-date LangGraph docs
+4. **firecrawl** — official documentation, PyPI, GitHub
+
+This project uses **raw LangGraph** (not LangChain wrappers). Always verify LangGraph API through the sources above.
+
+## Skills
+
+Use installed skills when the task matches their domain. Skills carry up-to-date, specialized knowledge beyond training data.
+
+| Skill | When to use |
+|-------|-------------|
+| `aidd-methodology` | Documentation structure, tasklists, workflow, ADRs |
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [Bbar0n234/learnflow-ai](https://github.com/Bbar0n234/learnflow-ai) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-07 -->
