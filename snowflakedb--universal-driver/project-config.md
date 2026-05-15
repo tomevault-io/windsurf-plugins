@@ -1,98 +1,114 @@
 ---
 trigger: always_on
-description: ODBC test reviewer agent — reviews test code for best practices, anti-patterns, and correctness
+description: Generate representative replay tests from an ODBC trace file
 ---
 
 
-# ODBC Test Reviewer Agent
+# ODBC Trace Replay Sampling
 
-When asked to review ODBC test code, systematically check each category below. Report findings grouped by severity (High / Medium / Low). For each finding, cite the exact line(s), explain the issue, and show the corrected code.
+Generate a representative sample of replay tests from a raw ODBC trace file. The user provides:
 
-## 1. RAII Resource Management
+- **Trace file path** (e.g. `odbc_traces.txt`)
+- **Output directory** (e.g. `odbc_tests/tests/replay/customer_name/`)
 
-- All ODBC handles must use RAII wrappers (`Connection`, `Schema`, `TestTable`, `HandleWrapper` variants).
-- Flag manual `SQLAllocHandle` / `SQLDisconnect` / `SQLFreeHandle` — these leak on test failure.
-- `Schema::use_temp_session_schema(conn)` is required when the test creates tables. Do NOT flag its absence for literal-only queries.
-- Prefer `CREATE OR REPLACE TABLE` over `DROP TABLE IF EXISTS` + `CREATE TABLE` — saves a server round-trip.
+## Phase 1: Split the trace
 
-## 2. Test Structure
-
-- E2E tests (`odbc_tests/tests/e2e/`): require `TEST_CASE` + `Connection` RAII. Must have Given-When-Then comments, each followed by code (no empty Gherkin stubs).
-- API tests (`odbc_tests/tests/basic_tests/`, `odbc_tests/tests/datatype_tests/`): require `TEST_CASE_METHOD(Fixture, ...)` with the appropriate fixture (`EnvFixture`, `DbcFixture`, `StmtFixture`).
-- Test names: E2E should start with "should …"; API tests use `SQLFunctionName: description`.
-- Flag leftover debug sections named "TEST".
-
-## 3. ODBC Call Validation
-
-- Every ODBC call return value **must** be checked. Flag unchecked `SQLGetData`, `SQLFetch`, `SQLExecDirect`, etc.
-- Setup steps (Given): use `REQUIRE_ODBC(ret, handle)` or `REQUIRE_ODBC_SUCCESS(ret, handle)`.
-- Behaviour assertions (Then): use `REQUIRE_THAT` / `CHECK_THAT` with `OdbcMatchers`:
-
-```cpp
-// Correct: assert error with SQLSTATE
-REQUIRE_THAT(OdbcResult(ret, stmt),
-             OdbcMatchers::IsError() && OdbcMatchers::HasSqlState("42000"));
-
-// Correct: assert error with diagnostic message
-REQUIRE_THAT(OdbcResult(ret, stmt),
-             OdbcMatchers::IsError() && OdbcMatchers::HasDiagMessage("syntax error"));
+```bash
+cargo run -p odbc_trace_tool -- split \
+  -i <trace_file> \
+  -o <temp_split_dir> \
+  -m statement \
+  --require-complete-sql
 ```
 
-Available matchers: `Succeeded()`, `IsSuccess()`, `IsSuccessWithInfo()`, `IsError()`, `HasSqlState(code)`, `HasDiagMessage(substring)`. Compose with `&&` / `||`.
+This produces one `ir.yaml` per statement handle in `<temp_split_dir>/stmt*/ir.yaml`. Report the total count to the user.
 
-## 4. Assertions — CHECK vs REQUIRE
+## Phase 2: Select representative sample (~30 traces)
 
-- `CHECK` for value assertions (non-fatal — all failures are reported).
-- `REQUIRE` only for preconditions whose failure makes subsequent code meaningless.
-- **Flag `REQUIRE` inside loops or multi-column checks** — first failure hides the rest.
-- Pattern: `REQUIRE_ODBC` on fetch, then `CHECK(value == expected)` per column.
+Use iterative greedy farthest-point sampling:
 
-## 5. Data Retrieval
+1. Pick the first trace manually -- examine a few candidates, choose one with an interesting query pattern.
+2. Create its directory under `<output_dir>/<descriptive_name>/` and copy `ir.yaml`.
+3. Loop until ~30 traces or max distance drops below ~0.05:
+   - Run: `cargo run -p odbc_trace_tool -- compare -r <output_dir>/*/ir.yaml -i <temp_split_dir>/stmt*/ir.yaml | tail -n 30`
+   - Pick a random trace from those with highest distance.
+   - Inspect its function profile to derive a descriptive directory name:
+     ```bash
+     grep 'function:' <path>/ir.yaml | sort | uniq -c | sort -rn
+     ```
+   - Create directory and copy the `ir.yaml`.
+4. Clean up `<temp_split_dir>` when done.
 
-- Prefer `get_data<SQL_C_TYPE>(stmt, col)` (auto-checks return).
-- Use `get_data_optional<SQL_C_TYPE>(stmt, col)` when NULLs are expected.
-- For type conversion tests, use `conversion_checks.hpp` helpers (`check_fractional_truncation`, `check_no_truncation`, `check_numeric_out_of_range`).
+**Directory naming convention:** describe the trace structure, e.g. `exec_direct_getdata_13col_3rows`, `exec_direct_5col_empty_result`, `select_distinct`.
 
-## 6. Behavior Differences
+## Phase 3: Generate tests
 
-- Prefer `OLD_DRIVER_ONLY("BD#N")` / `NEW_DRIVER_ONLY("BD#N")` over `SKIP` for behavior differences.
-- Each BD must be documented in `BehaviorDifferences.yaml` with sequential ID, name, and type.
-- `SKIP("SNOW-XXXXXX: reason")` is only acceptable when the test truly cannot execute (missing feature/infra).
+For each trace directory:
 
-## 7. Code Style
+```bash
+cargo run -p odbc_trace_tool -- generate \
+  -i <output_dir>/<name>/ir.yaml \
+  -n "<name>" \
+  -t "<tag>"
+```
 
-- No hardcoded SQL type integers (e.g. `3`) — use ODBC constants (`SQL_DECIMAL`).
-- No C-style casts `(SQLCHAR*)` — use `sqlchar()` from `odbc_cast.hpp` or `reinterpret_cast`.
-- File-local helpers must be `static` or in an anonymous namespace (flag bare file-scope functions).
-- Avoid verbose table names like `universal_driver_odbc_small_binding_integer_test_table` — use short names within a random schema.
-- Flag duplicated fetch/validation loops — suggest extracting a helper.
+This produces `test.cpp` and `queries.yaml` (auto-created on first run) in each directory.
 
-## 8. Abstraction Levels
+Create `<output_dir>/CMakeLists.txt` with one `add_odbc_test(replay_<tag>_<name> <name>/test.cpp)` entry per test. Add `add_subdirectory(...)` to the parent `CMakeLists.txt` if needed.
 
-- **Given (setup)**: high-level abstractions — `Connection`, `Schema::use_temp_session_schema`, `TestTable`, `get_data<>()`, `conn.execute_fetch()`.
-- **When/Then (test)**: raw ODBC calls (`SQLExecDirect`, `SQLFetch`, `SQLGetData`) or purpose-built helpers to make the tested code path explicit and auditable.
-- Flag tests that use raw ODBC for setup or high-level wrappers for the behaviour under test.
+## Phase 4: Validate and report
 
-## 9. ODBC Spec Compliance
+Run both drivers and present a summary report to the user.
 
-Before reviewing a test file for a specific ODBC function, fetch the function's Microsoft documentation page using `https://learn.microsoft.com/en-us/sql/odbc/reference/syntax/<function-lowercase>-function` (e.g. `sqlgetdata-function`). Cross-reference the test against the spec:
+**Reference driver:**
 
-### Return Codes
-- Every function documents a set of possible return codes (`SQL_SUCCESS`, `SQL_SUCCESS_WITH_INFO`, `SQL_ERROR`, `SQL_INVALID_HANDLE`, `SQL_NO_DATA`, `SQL_NEED_DATA`, `SQL_STILL_EXECUTING`). Flag return codes listed in the spec that have no test coverage.
-- Verify that tests for `SQL_SUCCESS_WITH_INFO` also check the accompanying SQLSTATE (e.g. `01004` for truncation, `01S02` for option value changed).
+```bash
+./odbc_tests/run_reference.sh -R "replay_<tag>"
+```
 
-### SQLSTATEs
-- The spec lists all possible SQLSTATEs for each function. Flag any documented SQLSTATE with no corresponding test case.
-- Prioritize coverage for these common classes:
-  - **HY009** — null pointer arguments
-  - **HY010** — function sequence errors (calling in wrong state)
-  - **HY090** — invalid string or buffer length
-  - **HY024** — invalid attribute value
-  - **HY092** — invalid attribute/option identifier
-  - **08003** — connection not open
-  - **24000** — invalid cursor state
+**New driver:**
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+```bash
+./odbc_tests/run.sh -R "replay_<tag>"
+```
+
+Present the results as a table:
+
+| Test | Reference (OLD) | New Driver |
+|------|-----------------|------------|
+| test_name_1 | Pass | Pass |
+| test_name_2 | Pass | SEGFAULT |
+| test_name_3 | Failed (1/133 -- colSize) | Failed (1/133 -- colSize) |
+
+Include assertion counts (e.g. `132/133 passed`) and a brief description of each failure cause.
+
+## Phase 5: Apply SKIP for new-driver failures
+
+For tests that pass on reference but fail/segfault with the new driver, add `SKIP_NEW_DRIVER_NOT_IMPLEMENTED()` as the first line of the test body and include `compatibility.hpp`:
+
+```cpp
+#include "compatibility.hpp"
+// ... other includes ...
+
+TEST_CASE_METHOD(DbcDefaultDSNFixture, "Replay: <name>", "[<tag>]") {
+  SKIP_NEW_DRIVER_NOT_IMPLEMENTED();
+  // ... rest of test body unchanged ...
+}
+```
+
+## Phase 6: Final verification
+
+- Run `./odbc_tests/run_reference.sh -R "replay_<tag>"` -- all tests must pass.
+- Run `./odbc_tests/run.sh -R "replay_<tag>"` -- new-driver failures should show as Skipped, not SEGFAULT.
+- Present the updated report to the user.
+
+## Key References
+
+- Trace tool commands: `cargo run -p odbc_trace_tool -- <split|compare|generate> --help`
+- Generator source: `odbc_trace_tool/src/generator/cpp.rs`
+- Existing example: `odbc_tests/tests/replay/datometry/`
+- Setup pattern: `odbc_tests/tests/setup/setup_datometry_replay.cpp` + `scripts/odbc/setup_datometry_replay.sql`
+- Setup CMake: `odbc_tests/tests/setup/CMakeLists.txt` (needs `BUILD_SETUP_TOOLS=ON`)
 
 ---
 > Source: [snowflakedb/universal-driver](https://github.com/snowflakedb/universal-driver) — distributed by [TomeVault](https://tomevault.io).
