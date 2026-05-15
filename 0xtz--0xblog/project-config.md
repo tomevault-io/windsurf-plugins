@@ -1,6 +1,6 @@
 ---
 trigger: always_on
-description: Ultracite enforces strict type safety, accessibility standards, and consistent code quality for JavaScript/TypeScript projects using Biome's lightning-fast formatter and linter.
+description: Ultracite Rules - AI-Ready Formatter and Linter
 ---
 
 
@@ -99,6 +99,8 @@ Ultracite enforces strict type safety, accessibility standards, and consistent c
 - Use while loops instead of for loops when you don't need initializer and update expressions.
 - Don't pass children as props.
 - Don't reassign const variables.
+- Don't use constant expressions in conditions.
+- Don't use `Math.min` and `Math.max` to clamp values when the result is constant.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
