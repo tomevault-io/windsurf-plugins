@@ -1,65 +1,81 @@
 ---
 trigger: always_on
-description: Cursor rules for Semiotic data visualization library with 30+ chart types, MCP server, and AI-assisted chart generation.
+description: Best practices for Shopify theme development with Liquid, JavaScript, and CSS
 ---
 
-# Semiotic — AI Assistant Guide
+# Shopify Theme Development Best Practices
 
-## Quick Start
-- Install: `npm install semiotic`
-- Import: `semiotic`, `semiotic/xy`, `semiotic/ordinal`, `semiotic/network`, `semiotic/geo`, `semiotic/realtime`, `semiotic/ai`, `semiotic/data`, `semiotic/server`
-- CLI: `npx semiotic-ai [--schema|--compact|--examples|--doctor]`
-- MCP: `npx semiotic-mcp`
-- Every HOC has a built-in error boundary (never blanks the page) and dev-mode validation warnings
+## Project Structure
+- Adopt a clear **directory structure**, e.g., `sections`, `snippets`, `templates`, `assets`.
+- Organize **generic modules** (like JavaScript functionalities) into separate files.
+- Keep **Liquid files** concise and focused on single responsibilities, avoiding monolithic files.
+- Organize templates and sections by **page or functionality**.
+- Implement proper **internationalization (i18n)** file management.
+- Utilize **SCSS/CSS Modules** for style organization to prevent global pollution.
 
-## Architecture
-- **HOC Charts**: Simple props, sensible defaults. **Stream Frames**: Full control.
-- **Always use HOC charts** (`ForceDirectedGraph`, `SankeyDiagram`, `LineChart`, `RealtimeLineChart`, `ChoroplethMap`, etc.) unless you need sophisticated control they don't expose. Stream Frames (`StreamNetworkFrame`, `StreamXYFrame`, `StreamOrdinalFrame`, `StreamGeoFrame`) are low-level escape hatches — they accept raw `RealtimeNode`/`RealtimeEdge` wrappers in callbacks, not your data objects directly.
-- Every HOC accepts `frameProps` to pass through. TypeScript `strict: true`.
+## Liquid Templating
+- Prefer the `render` tag over `include`.
+- Limit **database queries** within loops to avoid N+1 issues.
+- Use **filters** judiciously, especially complex computational ones.
+- Leverage Liquid's **caching mechanisms** to reduce redundant calculations.
+- Avoid complex **logic handling** directly in Liquid; move intricate logic to JavaScript.
+- Use `assign` and `capture` to define and reuse variables effectively.
 
-## Common Props (all HOCs)
-`title`, `width` (600), `height` (400), `responsiveWidth`, `responsiveHeight`, `margin`, `className`, `enableHover` (true), `tooltip` (boolean | `(datum) => ReactNode` | config object), `showLegend`, `showGrid` (false), `frameProps`, `onObservation` (callback, see below), `chartId`, `loading` (false), `emptyContent`, `legendInteraction` ("none"|"highlight"|"isolate"), `legendPosition` ("right"|"left"|"top"|"bottom", default "right"), `emphasis` ("primary"|"secondary")
+## JavaScript Development
+- Modularize JS, using **ES Modules** for imports and exports.
+- Follow modern JavaScript **best practices**, such as `const`/`let`, arrow functions, etc.
+- Avoid direct **DOM manipulation**; prioritize event delegation.
+- Optimize **JavaScript performance** to reduce repaints and reflows.
+- Consider using **Webpack/Rollup** for bundling and code optimization.
+- Write clear **comments** and **JSDoc**.
 
-### tooltip
-`tooltip` accepts: `true` (default tooltip), `false` (disabled), a **function** `(datum: Record<string, any>) => ReactNode`, or a config `{ fields?: string[], title?: accessor, format?: fn, style?: CSSProperties }`. The function form receives your raw data object directly.
+## CSS/SCSS Styling
+- Adhere to naming conventions like **BEM, OOCSS, or Utility-First CSS**.
+- Optimize **CSS selectors** to improve rendering performance.
+- Use **CSS variables** to manage theme configurations like colors and fonts.
+- Implement **responsive design** to ensure consistent theme appearance across devices.
+- Minimize **CSS file size** by removing unused styles.
+- Make good use of **SCSS mixins** and **functions**.
 
-### onObservation
-`onObservation` receives a `ChartObservation` with `type` and event-specific fields:
-- **hover**: `{ type: "hover", datum: <your data>, x, y, timestamp, chartType, chartId }`
-- **hover-end**: `{ type: "hover-end", timestamp, chartType, chartId }`
-- **click**: `{ type: "click", datum: <your data>, x, y, timestamp, chartType, chartId }`
-- **brush**: `{ type: "brush", extent: { x: [min, max], y: [min, max] }, timestamp, chartType }`
-- **selection**: `{ type: "selection", selection: { name, fields }, timestamp, chartType }`
+## Sections and Blocks
+- Utilize Section **Schema** to define configurable options.
+- Maintain **section independence and reusability**.
+- Provide clear **presets** for sections.
+- Use **Blocks** appropriately to enhance section flexibility.
+- Ensure sections provide a good user experience in the **Shopify Customizer**.
+- Avoid hardcoding content within sections; use Schema configurations whenever possible.
 
-The `datum` field contains your original data object (not a wrapper).
+## Performance Optimization
+- Optimize **image loading** by using Shopify's CDN and the `image_url` filter.
+- Minify **JavaScript and CSS files**.
+- Leverage **browser caching**.
+- Reduce the number of **HTTP requests**.
+- Consider **lazy loading**.
+- Monitor **theme performance** using Google Lighthouse and Shopify Theme Check.
 
-## XY Charts (`semiotic/xy`)
+## Accessibility (A11y)
+- Ensure all interactive elements are **keyboard accessible**.
+- Provide meaningful **`alt` text** for images.
+- Use correct **HTML semantic tags**.
+- Consider **color contrast**.
+- Implement clear **focus states**.
+- Use **ARIA attributes** to enhance the accessibility of complex components.
 
-**LineChart** — `data`, `xAccessor` ("x"), `yAccessor` ("y"), `lineBy`, `lineDataAccessor` ("coordinates"), `colorBy`, `colorScheme`, `curve`, `lineWidth` (2), `showPoints`, `pointRadius` (3), `fillArea`, `areaOpacity` (0.3), `anomaly` (AnomalyConfig), `forecast` (ForecastConfig), `directLabel` (boolean|{position,fontSize}), `gapStrategy` ("break"|"interpolate"|"zero"), `xScaleType` ("linear"|"log"), `yScaleType` ("linear"|"log")
+## Maintenance and Scalability
+- Write clear **code comments** and documentation.
+- Follow **naming conventions** to maintain code consistency.
+- Regularly **test** theme functionalities.
+- Ensure compatibility across different **browsers and devices**.
+- Consider future **extensibility**, avoiding tight coupling.
+- Use **Shopify CLI** for local development and deployment.
 
-**AreaChart** — LineChart props + `areaBy`, `y0Accessor` (band/ribbon), `gradientFill` (boolean|{topOpacity,bottomOpacity}), `areaOpacity` (0.7), `showLine` (true)
-
-**StackedAreaChart** — flat array data + `areaBy` (required, groups into stacked areas), `colorBy`, `normalize` (false). Do NOT use `lineBy` or `lineDataAccessor` — those are LineChart props.
-
-**Scatterplot** — `data`, `xAccessor`, `yAccessor`, `colorBy`, `sizeBy`, `sizeRange`, `pointRadius` (5), `pointOpacity` (0.8), `marginalGraphics`
-
-**BubbleChart** — Scatterplot + `sizeBy` (required), `sizeRange` ([5,40]), `bubbleOpacity` (0.6)
-
-**ConnectedScatterplot** — `data`, `xAccessor`, `yAccessor`, `orderAccessor` (number|Date field for sequencing), `pointRadius` (4). Viridis colored start→end, line width = point radius, white halo under lines when <100 points.
-
-**QuadrantChart** — Scatterplot divided into four labeled, colored quadrants. `data`, `xAccessor`, `yAccessor`, `quadrants` (required: `{ topRight, topLeft, bottomRight, bottomLeft }` each with `label`, `color`, optional `opacity`), `xCenter` (vertical center line in data units), `yCenter` (horizontal center line), `centerlineStyle` (`{ stroke, strokeWidth, strokeDasharray }`), `showQuadrantLabels` (true), `quadrantLabelSize` (12), `colorBy`, `sizeBy`, `sizeRange`, `pointRadius` (5), `pointOpacity` (0.8). Supports push API. Quadrant fills and labels drawn via `canvasPreRenderers`.
-
-**Heatmap** — `data`, `xAccessor`, `yAccessor`, `valueAccessor`, `colorScheme` ("blues"|"reds"|"greens"|"viridis" or custom), `showValues`, `cellBorderColor`. Accessors can be string field names (including string/categorical fields) or functions.
-
-## Ordinal Charts (`semiotic/ordinal`)
-
-**BarChart** — `data`, `categoryAccessor`, `valueAccessor`, `orientation`, `colorBy`, `sort`, `barPadding` (40)
-**StackedBarChart** — + `stackBy` (required), `normalize`, `barPadding` (40)
-**GroupedBarChart** — + `groupBy` (required), `barPadding` (60)
-**SwarmPlot** — `data`, `categoryAccessor`, `valueAccessor`, `colorBy`, `sizeBy`, `pointRadius`, `pointOpacity`
-**BoxPlot** — + `showOutliers`, `outlierRadius`
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+## Quality and Testing
+- Use **Shopify Theme Check** for static code analysis.
+- Write **unit tests** (where applicable).
+- Conduct thorough **end-to-end testing**.
+- Test in various environments (local, development store, production store).
+- Focus on **compatibility testing** (browsers, devices, Shopify versions).
+- Test **error handling** and edge cases.
 
 ---
 > Source: [XD3an/awesome-ai-coding-all-in-one](https://github.com/XD3an/awesome-ai-coding-all-in-one) — distributed by [TomeVault](https://tomevault.io).
