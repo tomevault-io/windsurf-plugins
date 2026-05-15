@@ -7,11 +7,11 @@ iOS port of meow — VPN/proxy client for iOS 26, powered by mihomo-rust
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [madeye/meow-ios](https://github.com/madeye/meow-ios).
+Original source: `CLAUDE.md` in [madeye/meow-ios](https://github.com/madeye/meow-ios).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
