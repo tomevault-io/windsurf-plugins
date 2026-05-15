@@ -1,81 +1,189 @@
 ---
 trigger: always_on
-description: Tailwind CSS and UI component best practices for modern web applications
+description: Cursor rules for TanStack Query v5 with query options, query key factories, mutations, optimistic updates, infinite queries, Suspense, and prefetching.
 ---
 
-# Tailwind CSS Best Practices
+You are an expert in TanStack Query v5 (formerly React Query), TypeScript, and async state management for React applications.
 
-## Project Setup
-- Use proper Tailwind configuration
-- Configure theme extension properly
-- Set up proper purge configuration
-- Use proper plugin integration
-- Configure custom spacing and breakpoints
-- Set up proper color palette
+# TanStack Query v5 Guidelines
 
-## Component Styling
-- Use utility classes over custom CSS
-- Group related utilities with @apply when needed
-- Use proper responsive design utilities
-- Implement dark mode properly
-- Use proper state variants
-- Keep component styles consistent
+## Core Philosophy
+- TanStack Query manages server state — it is NOT a general state manager for client-only state
+- Every query should have a stable, serializable query key that uniquely describes the data
+- Mutations handle writes; queries handle reads — never blur this boundary
+- Prefer `queryOptions()` helper for reusable, co-located query definitions
+- v5 breaking changes: `useQuery` no longer accepts positional args; always use the options object form
 
-## Layout
-- Use Flexbox and Grid utilities effectively
-- Implement proper spacing system
-- Use container queries when needed
-- Implement proper responsive breakpoints
-- Use proper padding and margin utilities
-- Implement proper alignment utilities
+## Setup
+```tsx
+// main.tsx
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 
-## Typography
-- Use proper font size utilities
-- Implement proper line height
-- Use proper font weight utilities
-- Configure custom fonts properly
-- Use proper text alignment
-- Implement proper text decoration
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60, // 1 minute default stale time
+      retry: 2,
+      refetchOnWindowFocus: true,
+    },
+  },
+})
 
-## Colors
-- Use semantic color naming
-- Implement proper color contrast
-- Use opacity utilities effectively
-- Configure custom colors properly
-- Use proper gradient utilities
-- Implement proper hover states
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <YourApp />
+      <ReactQueryDevtools initialIsOpen={false} />
+    </QueryClientProvider>
+  )
+}
+```
 
-## Components
-- Use shadcn/ui components when available
-- Extend components properly
-- Keep component variants consistent
-- Implement proper animations
-- Use proper transition utilities
-- Keep accessibility in mind
+## Query Keys
+- Always structure keys as arrays: `['entity', 'list']`, `['entity', 'detail', id]`
+- Use a query key factory to avoid typos and enable easy invalidation
+```ts
+// queryKeys.ts
+export const postKeys = {
+  all: ['posts'] as const,
+  lists: () => [...postKeys.all, 'list'] as const,
+  list: (filters: PostFilters) => [...postKeys.lists(), filters] as const,
+  details: () => [...postKeys.all, 'detail'] as const,
+  detail: (id: string) => [...postKeys.details(), id] as const,
+}
+```
 
-## Responsive Design
-- Use mobile-first approach
-- Implement proper breakpoints
-- Use container queries effectively
-- Handle different screen sizes properly
-- Implement proper responsive typography
-- Use proper responsive spacing
+## queryOptions Helper (v5)
+- Use `queryOptions()` to define queries once and reuse across components and loaders
+```ts
+import { queryOptions } from '@tanstack/react-query'
 
-## Performance
-- Use proper purge configuration
-- Minimize custom CSS
-- Use proper caching strategies
-- Implement proper code splitting
-- Optimize for production
-- Monitor bundle size
+export const postQueryOptions = (id: string) =>
+  queryOptions({
+    queryKey: postKeys.detail(id),
+    queryFn: () => fetchPost(id),
+    staleTime: 1000 * 60 * 5, // 5 min
+  })
 
-## Best Practices
-- Follow naming conventions
-- Keep styles organized
-- Use proper documentation
-- Implement proper testing
-- Follow accessibility guidelines
-- Use proper version control
+// In component
+const { data } = useQuery(postQueryOptions(postId))
+
+// In router loader (TanStack Router integration)
+loader: ({ params, context: { queryClient } }) =>
+  queryClient.ensureQueryData(postQueryOptions(params.postId))
+```
+
+## useQuery
+```tsx
+const {
+  data,
+  isLoading,    // true only on first load with no cached data
+  isFetching,   // true whenever a fetch is in-flight
+  isError,
+  error,
+  isSuccess,
+} = useQuery({
+  queryKey: postKeys.detail(postId),
+  queryFn: () => fetchPost(postId),
+  enabled: !!postId, // disable query if params not ready
+})
+```
+
+## useMutation
+```tsx
+const { mutate, mutateAsync, isPending } = useMutation({
+  mutationFn: (newPost: CreatePostInput) => createPost(newPost),
+  onSuccess: (data) => {
+    // Invalidate and refetch
+    queryClient.invalidateQueries({ queryKey: postKeys.lists() })
+    toast.success('Post created!')
+  },
+  onError: (error) => {
+    toast.error(error.message)
+  },
+})
+
+// Usage
+mutate({ title: 'Hello', body: '...' })
+```
+
+## Optimistic Updates
+```tsx
+const queryClient = useQueryClient()
+
+const mutation = useMutation({
+  mutationFn: updatePost,
+  onMutate: async (updatedPost) => {
+    await queryClient.cancelQueries({ queryKey: postKeys.detail(updatedPost.id) })
+    const previous = queryClient.getQueryData(postKeys.detail(updatedPost.id))
+    queryClient.setQueryData(postKeys.detail(updatedPost.id), updatedPost)
+    return { previous }
+  },
+  onError: (err, updatedPost, context) => {
+    queryClient.setQueryData(postKeys.detail(updatedPost.id), context?.previous)
+  },
+  onSettled: (_, __, updatedPost) => {
+    queryClient.invalidateQueries({ queryKey: postKeys.detail(updatedPost.id) })
+  },
+})
+```
+
+## Infinite Queries
+```tsx
+const {
+  data,
+  fetchNextPage,
+  hasNextPage,
+  isFetchingNextPage,
+} = useInfiniteQuery({
+  queryKey: postKeys.lists(),
+  queryFn: ({ pageParam }) => fetchPosts({ cursor: pageParam }),
+  initialPageParam: undefined as string | undefined,
+  getNextPageParam: (lastPage) => lastPage.nextCursor,
+})
+
+// data.pages is an array of page results — flatten for rendering
+const allPosts = data?.pages.flatMap((page) => page.items) ?? []
+```
+
+## Prefetching
+- Prefetch on hover or during routing to eliminate loading states
+```ts
+// Hover prefetch
+const handleMouseEnter = () => {
+  queryClient.prefetchQuery(postQueryOptions(postId))
+}
+
+// In router loader (eliminates all loading spinners)
+export const Route = createFileRoute('/posts/$postId')({
+  loader: ({ context: { queryClient }, params }) =>
+    queryClient.ensureQueryData(postQueryOptions(params.postId)),
+})
+```
+
+## Cache Invalidation Patterns
+```ts
+// Invalidate all post queries
+queryClient.invalidateQueries({ queryKey: postKeys.all })
+
+// Invalidate only post lists
+queryClient.invalidateQueries({ queryKey: postKeys.lists() })
+
+// Remove from cache entirely
+queryClient.removeQueries({ queryKey: postKeys.detail(id) })
+
+// Directly update cache without refetch
+queryClient.setQueryData(postKeys.detail(id), newData)
+```
+
+## Suspense Mode
+- Use `useSuspenseQuery` for Suspense-based data fetching (v5)
+- Wrap with `<Suspense fallback={<Skeleton />}>`
+- Pair with `<ErrorBoundary>` for error handling
+```tsx
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [XD3an/awesome-ai-coding-all-in-one](https://github.com/XD3an/awesome-ai-coding-all-in-one) — distributed by [TomeVault](https://tomevault.io).
