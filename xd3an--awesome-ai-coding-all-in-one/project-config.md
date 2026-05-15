@@ -1,49 +1,65 @@
 ---
 trigger: always_on
-description: Cursor rules for secure coding, secret handling, dependency hygiene, authentication, authorization, security testing, and compliance documentation.
+description: Cursor rules for Semiotic data visualization library with 30+ chart types, MCP server, and AI-assisted chart generation.
 ---
 
-# DevSecOps + SSDLC + AppSec Cursor Rule
+# Semiotic — AI Assistant Guide
 
-## General Security Principles
-- Never hardcode secrets, credentials, or API keys. Use environment variables or secure vaults for sensitive data.
-- Prohibit the inclusion of `.env`, secret config files, or unknown tokens in source control.
-- Never log sensitive data, secrets, or session tokens in application logs.
-- Validate and sanitize all user input. Escape output in HTML, JS, and SQL contexts.
-- Avoid unsafe functions such as `exec`, `eval`, or similar dynamic code execution.
+## Quick Start
+- Install: `npm install semiotic`
+- Import: `semiotic`, `semiotic/xy`, `semiotic/ordinal`, `semiotic/network`, `semiotic/geo`, `semiotic/realtime`, `semiotic/ai`, `semiotic/data`, `semiotic/server`
+- CLI: `npx semiotic-ai [--schema|--compact|--examples|--doctor]`
+- MCP: `npx semiotic-mcp`
+- Every HOC has a built-in error boundary (never blanks the page) and dev-mode validation warnings
 
-## Database Security
-- Use parameterized queries or ORM for all database access. Do not use string concatenation for query building.
-- Ensure database users have the least privilege required for their tasks.
-- Regularly review and update database access policies.
+## Architecture
+- **HOC Charts**: Simple props, sensible defaults. **Stream Frames**: Full control.
+- **Always use HOC charts** (`ForceDirectedGraph`, `SankeyDiagram`, `LineChart`, `RealtimeLineChart`, `ChoroplethMap`, etc.) unless you need sophisticated control they don't expose. Stream Frames (`StreamNetworkFrame`, `StreamXYFrame`, `StreamOrdinalFrame`, `StreamGeoFrame`) are low-level escape hatches — they accept raw `RealtimeNode`/`RealtimeEdge` wrappers in callbacks, not your data objects directly.
+- Every HOC accepts `frameProps` to pass through. TypeScript `strict: true`.
 
-## Dependency Management
-- Only use packages from verified sources.
-- Do not add new dependencies without explicit approval and security review.
-- Regularly update dependencies and scan for known vulnerabilities (SCA).
+## Common Props (all HOCs)
+`title`, `width` (600), `height` (400), `responsiveWidth`, `responsiveHeight`, `margin`, `className`, `enableHover` (true), `tooltip` (boolean | `(datum) => ReactNode` | config object), `showLegend`, `showGrid` (false), `frameProps`, `onObservation` (callback, see below), `chartId`, `loading` (false), `emptyContent`, `legendInteraction` ("none"|"highlight"|"isolate"), `legendPosition` ("right"|"left"|"top"|"bottom", default "right"), `emphasis` ("primary"|"secondary")
 
-## Authentication & Authorization
-- Use secure authentication frameworks; never implement custom authentication.
-- Store passwords using strong, salted hashes (e.g., Argon2, bcrypt).
-- Implement Role-Based Access Control (RBAC) for sensitive operations.
-- Enforce the principle of least privilege for APIs and UI actions.
+### tooltip
+`tooltip` accepts: `true` (default tooltip), `false` (disabled), a **function** `(datum: Record<string, any>) => ReactNode`, or a config `{ fields?: string[], title?: accessor, format?: fn, style?: CSSProperties }`. The function form receives your raw data object directly.
 
-## Secure SDLC Practices
-- Integrate Static Application Security Testing (SAST) and Software Composition Analysis (SCA) into the CI pipeline.
-- Scan all code for secrets before merging (Secret Scanning).
-- Use Infrastructure as Code (IaC) scanning for all infrastructure code.
-- Integrate Dynamic Application Security Testing (DAST) in the CD pipeline for deployed applications.
-- Enforce Policy as Code (PaC) for automated, version-controlled security policies.
+### onObservation
+`onObservation` receives a `ChartObservation` with `type` and event-specific fields:
+- **hover**: `{ type: "hover", datum: <your data>, x, y, timestamp, chartType, chartId }`
+- **hover-end**: `{ type: "hover-end", timestamp, chartType, chartId }`
+- **click**: `{ type: "click", datum: <your data>, x, y, timestamp, chartType, chartId }`
+- **brush**: `{ type: "brush", extent: { x: [min, max], y: [min, max] }, timestamp, chartType }`
+- **selection**: `{ type: "selection", selection: { name, fields }, timestamp, chartType }`
 
-## Monitoring & Feedback
-- Enable continuous vulnerability monitoring and alerting.
-- Integrate Runtime Application Self-Protection (RASP) and Web Application Firewall (WAF) as appropriate.
-- Encourage regular vulnerability assessments and penetration testing.
-- Maintain a feedback loop to update rules and prompts based on recurring vulnerabilities.
+The `datum` field contains your original data object (not a wrapper).
 
-## Compliance & Documentation
-- Align with industry standards (e.g., OWASP Top 10, NIST, ISO 27001).
-- Document all security controls and decisions for auditability.
+## XY Charts (`semiotic/xy`)
+
+**LineChart** — `data`, `xAccessor` ("x"), `yAccessor` ("y"), `lineBy`, `lineDataAccessor` ("coordinates"), `colorBy`, `colorScheme`, `curve`, `lineWidth` (2), `showPoints`, `pointRadius` (3), `fillArea`, `areaOpacity` (0.3), `anomaly` (AnomalyConfig), `forecast` (ForecastConfig), `directLabel` (boolean|{position,fontSize}), `gapStrategy` ("break"|"interpolate"|"zero"), `xScaleType` ("linear"|"log"), `yScaleType` ("linear"|"log")
+
+**AreaChart** — LineChart props + `areaBy`, `y0Accessor` (band/ribbon), `gradientFill` (boolean|{topOpacity,bottomOpacity}), `areaOpacity` (0.7), `showLine` (true)
+
+**StackedAreaChart** — flat array data + `areaBy` (required, groups into stacked areas), `colorBy`, `normalize` (false). Do NOT use `lineBy` or `lineDataAccessor` — those are LineChart props.
+
+**Scatterplot** — `data`, `xAccessor`, `yAccessor`, `colorBy`, `sizeBy`, `sizeRange`, `pointRadius` (5), `pointOpacity` (0.8), `marginalGraphics`
+
+**BubbleChart** — Scatterplot + `sizeBy` (required), `sizeRange` ([5,40]), `bubbleOpacity` (0.6)
+
+**ConnectedScatterplot** — `data`, `xAccessor`, `yAccessor`, `orderAccessor` (number|Date field for sequencing), `pointRadius` (4). Viridis colored start→end, line width = point radius, white halo under lines when <100 points.
+
+**QuadrantChart** — Scatterplot divided into four labeled, colored quadrants. `data`, `xAccessor`, `yAccessor`, `quadrants` (required: `{ topRight, topLeft, bottomRight, bottomLeft }` each with `label`, `color`, optional `opacity`), `xCenter` (vertical center line in data units), `yCenter` (horizontal center line), `centerlineStyle` (`{ stroke, strokeWidth, strokeDasharray }`), `showQuadrantLabels` (true), `quadrantLabelSize` (12), `colorBy`, `sizeBy`, `sizeRange`, `pointRadius` (5), `pointOpacity` (0.8). Supports push API. Quadrant fills and labels drawn via `canvasPreRenderers`.
+
+**Heatmap** — `data`, `xAccessor`, `yAccessor`, `valueAccessor`, `colorScheme` ("blues"|"reds"|"greens"|"viridis" or custom), `showValues`, `cellBorderColor`. Accessors can be string field names (including string/categorical fields) or functions.
+
+## Ordinal Charts (`semiotic/ordinal`)
+
+**BarChart** — `data`, `categoryAccessor`, `valueAccessor`, `orientation`, `colorBy`, `sort`, `barPadding` (40)
+**StackedBarChart** — + `stackBy` (required), `normalize`, `barPadding` (40)
+**GroupedBarChart** — + `groupBy` (required), `barPadding` (60)
+**SwarmPlot** — `data`, `categoryAccessor`, `valueAccessor`, `colorBy`, `sizeBy`, `pointRadius`, `pointOpacity`
+**BoxPlot** — + `showOutliers`, `outlierRadius`
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [XD3an/awesome-ai-coding-all-in-one](https://github.com/XD3an/awesome-ai-coding-all-in-one) — distributed by [TomeVault](https://tomevault.io).
