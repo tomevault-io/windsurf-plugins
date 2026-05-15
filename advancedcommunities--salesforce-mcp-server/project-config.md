@@ -1,0 +1,147 @@
+---
+trigger: always_on
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+---
+
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Build and Development Commands
+
+```bash
+# Build the TypeScript project
+npm run build
+
+# Run development mode with MCP inspector for debugging
+npm run dev
+
+# Build MCP Bundle (.mcpb) for distribution
+npm run build:mcpb
+
+# Install dependencies
+npm install
+```
+
+## Architecture Overview
+
+This is a Model Context Protocol (MCP) server that enables AI assistants to interact with Salesforce orgs through the Salesforce CLI. The codebase follows a modular architecture with clear separation of concerns.
+
+### Core Components
+
+1. **Tool Registration Pattern**: Each tool category has its own file in `src/tools/` that exports a registration function. Tools are registered in `src/index.ts` using functions like `registerApexTools(server)`.
+
+2. **Permission System**: All tools check permissions via `src/config/permissions.ts` which enforces:
+    - `READ_ONLY` mode: Prevents Apex execution when enabled
+    - `ALLOWED_ORGS`: Restricts access to specific org aliases
+
+3. **Salesforce Integration**: Two approaches are used:
+    - Native API calls via `@salesforce/apex-node` for Apex operations
+    - CLI commands via `src/utils/sfCommand.ts` for most other operations
+
+4. **Connection Management**: `src/shared/connection.ts` handles Salesforce authentication by reusing existing Salesforce CLI auth tokens.
+
+### Tool Implementation Pattern
+
+When implementing new tools, follow this pattern:
+
+```typescript
+// 1. Define Zod schema for input validation (targetOrg is optional — falls back to SF CLI default)
+const MyToolSchema = z.object({
+    targetOrg: z.string().optional(),
+    // other parameters
+});
+
+// 2. Resolve target org (uses default if not provided)
+let targetOrg: string;
+try {
+    targetOrg = await resolveTargetOrg(input.targetOrg);
+} catch (error: any) {
+    return {
+        content: [
+            {
+                type: "text",
+                text: JSON.stringify({
+                    success: false,
+                    message: error.message,
+                }),
+            },
+        ],
+    };
+}
+
+// 3. Check permissions
+if (!permissions.canAccessOrg(targetOrg)) {
+    return { error: "Access denied" };
+}
+
+// 4. Execute operation (via CLI or native API)
+const result = await executeSfCommand(["command", "args"], targetOrg);
+
+// 5. Return structured response
+return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+```
+
+### Tool Categories
+
+The MCP server provides tools organized by functionality:
+
+- **Apex Tools** (`src/tools/apex.ts`): Execute anonymous Apex, run tests, get coverage, manage logs, generate classes/triggers
+- **Query Tools** (`src/tools/query.ts`): Query records with SOQL, export to files
+- **SObject Tools** (`src/tools/sobjects.ts`): List and describe Salesforce objects
+- **Org Tools** (`src/tools/orgs.ts`): List connected orgs, login, logout, open org in browser
+- **Admin Tools** (`src/tools/admin.ts`): Manage permissions, users, metadata
+- **Schema Tools** (`src/tools/schema.ts`): Generate custom tabs
+- **Package Tools** (`src/tools/package.ts`): Install and uninstall packages
+- **Code Analysis Tools** (`src/tools/code-analyzer.ts`, `src/tools/scanner.ts`): Static code analysis and security scanning
+- **Record Tools** (`src/tools/records.ts`): Open records in browser, create/update/delete records via REST API
+- **Lightning Tools** (`src/tools/lightning.ts`): Generate Lightning Web Components and Aura components
+- **Project Tools** (`src/tools/project.ts`): Deploy metadata to Salesforce orgs
+
+### Adding New Tools
+
+1. Create or update the appropriate file in `src/tools/`
+2. Define the tool with Zod schema validation
+3. Implement permission checks if needed
+4. Register the tool in the export function
+5. Make sure new tools are registered in **both** the tool file and `manifest.json`
+6. Rebuild the project with `npm run build`
+7. Build the MCP Bundle with `npm run build:mcpb`
+
+### Error Handling
+
+- Always return structured JSON responses instead of throwing errors
+- Use the pattern: `{ error: "message" }` for error responses
+- Include helpful context in error messages
+
+### Key Files to Understand
+
+- `src/index.ts` - Server initialization and tool registration
+- `src/config/permissions.ts` - Permission enforcement logic
+- `src/utils/sfCommand.ts` - Salesforce CLI integration
+- `src/utils/resolveTargetOrg.ts` - Default org resolution with caching
+- `src/shared/connection.ts` - Salesforce authentication handling
+- `manifest.json` - Desktop Extension configuration and tool metadata
+
+### TypeScript Configuration
+
+- Target: ES2022
+- Module: Node16
+- Output: `./build` directory
+- Type: ES modules (`"type": "module"` in package.json)
+
+### Distribution
+
+The project supports MCP Bundle (.mcpb) packaging for one-click installation. The `manifest.json` file defines the extension metadata, tools, and user configuration options.
+
+## Important Implementation Notes
+
+- All Salesforce CLI commands should use `executeSfCommand()` from `src/utils/sfCommand.ts`
+- Native Apex operations should use the `@salesforce/apex-node` library when possible for better performance
+- Always validate inputs with Zod schemas before processing
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [advancedcommunities/salesforce-mcp-server](https://github.com/advancedcommunities/salesforce-mcp-server) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-07 -->
