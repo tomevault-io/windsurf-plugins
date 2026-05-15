@@ -1,8 +1,12 @@
 ---
 trigger: always_on
-description: ModelExpress project rules and coding standards
+description: SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 ---
 
+<!--
+SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+SPDX-License-Identifier: Apache-2.0
+-->
 
 # ModelExpress
 
@@ -102,9 +106,6 @@ When making changes, update the appropriate documentation files:
 | Coding standards, build commands, new patterns | `CLAUDE.md`, `.github/copilot-instructions.md`, `.cursor/rules/rust.mdc` |
 | CLI arguments or commands | `docs/CLI.md` + all 3 agent files (Adding CLI Arguments section) |
 | Configuration, environment variables | `docs/DEPLOYMENT.md` |
-| Deployment (Docker, K8s, Helm, P2P) | `docs/DEPLOYMENT.md` |
-| Known issues, FP8 handling | `docs/ARCHITECTURE.md` |
-| Dev setup, scripts, pre-commit hooks | `CONTRIBUTING.md` |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
