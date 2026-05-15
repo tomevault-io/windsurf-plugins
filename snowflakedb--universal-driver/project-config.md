@@ -1,126 +1,96 @@
 ---
 trigger: always_on
-description: ODBC specific test generation
+description: ODBC test reviewer agent — reviews test code for best practices, anti-patterns, and correctness
 ---
 
 
-# ODBC Test Generation Rules
+# ODBC Test Reviewer Agent
 
-## Validation Workflow (MANDATORY)
+When asked to review ODBC test code, systematically check each category below. Report findings grouped by severity (High / Medium / Low). For each finding, cite the exact line(s), explain the issue, and show the corrected code.
 
-1. **Validate against OLD driver first** using `odbc_tests/run_reference.sh -R <test_suite_name>`
-2. **Run format validator** with `tests/tests_format_validator/run_validator.sh`
-3. **Run precommit** to ensure linter compliance
+## 1. RAII Resource Management
 
-## ODBC Reference Documentation
+- All ODBC handles must use RAII wrappers (`Connection`, `Schema`, `TestTable`, `HandleWrapper` variants).
+- Flag manual `SQLAllocHandle` / `SQLDisconnect` / `SQLFreeHandle` — these leak on test failure.
+- `Schema::use_temp_session_schema(conn)` is required when the test creates tables. Do NOT flag its absence for literal-only queries.
+- Prefer `CREATE OR REPLACE TABLE` over `DROP TABLE IF EXISTS` + `CREATE TABLE` — saves a server round-trip.
 
-When writing or reviewing ODBC tests, fetch the relevant Microsoft ODBC API reference pages for context. Use these URLs as needed:
-- Function reference index: https://learn.microsoft.com/en-us/sql/odbc/reference/syntax/odbc-api-reference
-- Individual function (replace `sqlfunctionname` with lowercase function name, e.g. `sqlgetdata`, `sqlexecdirect`, `sqlfetch`): `https://learn.microsoft.com/en-us/sql/odbc/reference/syntax/sqlfunctionname-function`
-- Data types: https://learn.microsoft.com/en-us/sql/odbc/reference/appendixes/sql-data-types
-- Return codes: https://learn.microsoft.com/en-us/sql/odbc/reference/develop-app/return-codes-odbc
-- Diagnostics / SQLGetDiagRec: https://learn.microsoft.com/en-us/sql/odbc/reference/syntax/sqlgetdiagrec-function
-- SQLSTATE reference: https://learn.microsoft.com/en-us/sql/odbc/reference/appendixes/appendix-a-odbc-error-codes
+## 2. Test Structure
 
-Before writing or modifying a test for a specific ODBC function, use the WebFetch tool to retrieve that function's documentation page. For example, when working on a `SQLGetData` test, fetch `https://learn.microsoft.com/en-us/sql/odbc/reference/syntax/sqlgetdata-function`. Use the fetched content to verify correct parameter types, buffer sizes, expected return codes, SQLSTATE values, and documented edge cases.
+- E2E tests (`odbc_tests/tests/e2e/`): require `TEST_CASE` + `Connection` RAII. Must have Given-When-Then comments, each followed by code (no empty Gherkin stubs).
+- API tests (`odbc_tests/tests/basic_tests/`, `odbc_tests/tests/datatype_tests/`): require `TEST_CASE_METHOD(Fixture, ...)` with the appropriate fixture (`EnvFixture`, `DbcFixture`, `StmtFixture`).
+- Test names: E2E should start with "should …"; API tests use `SQLFunctionName: description`.
+- Flag leftover debug sections named "TEST".
 
-## C++ Test Structure
+## 3. ODBC Call Validation
 
-### Framework & Includes
-- Use **Catch2** testing framework
-- Standard includes:
-  ```cpp
-  #include <catch2/catch_test_macros.hpp>
-  #include "Connection.hpp"
-  #include "HandleWrapper.hpp"
-  #include "macros.hpp"
-  #include "test_setup.hpp"
-  ```
-
-### Test Case Naming & Structure
-- Use `TEST_CASE` + `Connection` RAII. Names start with `"should ..."`.
-- Use `TEST_CASE_METHOD(Fixture, ...)` with the appropriate fixture (`EnvFixture`, `DbcFixture`, `StmtFixture`).
-- Tags should match category: `[datatype][string]`, `[put_get]`, `[auth]`, `[query]`
-
-### Given-When-Then Comments
-Always structure tests with Gherkin comments. Each comment must be followed by relevant code (no empty stubs).
-
-**E2E example:**
-```cpp
-TEST_CASE("should select data from file uploaded to stage", "[put_get]") {
-  // Given File is uploaded to stage
-  Connection conn;
-  // setup code using high-level abstractions...
-
-  // When File data is queried using Select command
-  SQLRETURN ret = SQLExecDirect(stmt.getHandle(), sqlchar("SELECT ..."), SQL_NTS);
-
-  // Then File data should be correctly returned
-  CHECK(result == expected);
-}
-```
-
-**API test example:**
-```cpp
-TEST_CASE_METHOD(StmtFixture, "SQLGetData: should return correct integer value", "[sqlgetdata]") {
-  // Given A query returning an integer is executed
-  SQLRETURN ret = SQLExecDirect(stmt, sqlchar("SELECT 42"), SQL_NTS);
-  REQUIRE_ODBC(ret, stmt);
-  ret = SQLFetch(stmt);
-  REQUIRE_ODBC(ret, stmt);
-
-  // When Data is retrieved via SQLGetData
-  SQLINTEGER value = 0;
-  SQLLEN indicator = 0;
-  ret = SQLGetData(stmt, 1, SQL_C_LONG, &value, sizeof(value), &indicator);
-
-  // Then The call should succeed and return the correct value
-  REQUIRE_THAT(OdbcResult(ret, stmt), OdbcMatchers::Succeeded());
-  CHECK(value == 42);
-}
-```
-
-## Core Patterns
-
-### Connection Management
-```cpp
-Connection conn;  // Uses default connection string
-// OR
-Connection conn(custom_connection_string);
-
-auto stmt = conn.createStatement();
-auto stmt = conn.execute("SQL QUERY");
-auto stmt = conn.execute_fetch("SQL QUERY");  // execute + fetch first row
-```
-
-### ODBC Return Value Checking
-Every ODBC call return value **must** be checked. Use different macros depending on context:
-- **Setup (Given)**: use `REQUIRE_ODBC(ret, handle)` or `REQUIRE_ODBC_SUCCESS(ret, handle)` — failure is fatal, subsequent code is meaningless.
-- **Behaviour assertions (Then)**: use `REQUIRE_THAT` / `CHECK_THAT` with `OdbcMatchers` (see below).
+- Every ODBC call return value **must** be checked. Flag unchecked `SQLGetData`, `SQLFetch`, `SQLExecDirect`, etc.
+- Setup steps (Given): use `REQUIRE_ODBC(ret, handle)` or `REQUIRE_ODBC_SUCCESS(ret, handle)`.
+- Behaviour assertions (Then): use `REQUIRE_THAT` / `CHECK_THAT` with `OdbcMatchers`:
 
 ```cpp
-// Setup — fatal on failure
-SQLRETURN ret = SQLExecDirect(stmt.getHandle(), sqlchar("SELECT 1"), SQL_NTS);
-REQUIRE_ODBC(ret, stmt);
-
-// Behaviour assertion — the return code itself is what we're testing
-ret = SQLExecDirect(stmt.getHandle(), sqlchar("INVALID SQL"), SQL_NTS);
+// Correct: assert error with SQLSTATE
 REQUIRE_THAT(OdbcResult(ret, stmt),
              OdbcMatchers::IsError() && OdbcMatchers::HasSqlState("42000"));
+
+// Correct: assert error with diagnostic message
+REQUIRE_THAT(OdbcResult(ret, stmt),
+             OdbcMatchers::IsError() && OdbcMatchers::HasDiagMessage("syntax error"));
 ```
 
-### Schema & Table Management
+Available matchers: `Succeeded()`, `IsSuccess()`, `IsSuccessWithInfo()`, `IsError()`, `HasSqlState(code)`, `HasDiagMessage(substring)`. Compose with `&&` / `||`.
 
-Call `Schema::use_temp_session_schema(conn)` (or the `SQLHDBC` overload) before creating any tables. In CI, all test processes share a single schema (`ODBC_TEST_SCHEMA` env var); in IDE/direct runs, each process gets its own random schema with automatic cleanup.
+## 4. Assertions — CHECK vs REQUIRE
 
-**Table creation strategy (ordered by preference):**
+- `CHECK` for value assertions (non-fatal — all failures are reported).
+- `REQUIRE` only for preconditions whose failure makes subsequent code meaningless.
+- **Flag `REQUIRE` inside loops or multi-column checks** — first failure hides the rest.
+- Pattern: `REQUIRE_ODBC` on fetch, then `CHECK(value == expected)` per column.
 
-1. **`CREATE TEMPORARY TABLE`** (default) — session-scoped, auto-dropped on disconnect, session-isolated so names can be simple. Use for all normal data tests.
-   ```cpp
-   Schema::use_temp_session_schema(conn);
-   conn.execute("CREATE TEMPORARY TABLE my_table (id INT, value VARCHAR(100))");
-   ```
+## 5. Data Retrieval
 
+- Prefer `get_data<SQL_C_TYPE>(stmt, col)` (auto-checks return).
+- Use `get_data_optional<SQL_C_TYPE>(stmt, col)` when NULLs are expected.
+- For type conversion tests, use `conversion_checks.hpp` helpers (`check_fractional_truncation`, `check_no_truncation`, `check_numeric_out_of_range`).
+
+## 6. Behavior Differences
+
+- Prefer `OLD_DRIVER_ONLY("BD#N")` / `NEW_DRIVER_ONLY("BD#N")` over `SKIP` for behavior differences.
+- Each BD must be documented in `BehaviorDifferences.yaml` with sequential ID, name, and type.
+- `SKIP("SNOW-XXXXXX: reason")` is only acceptable when the test truly cannot execute (missing feature/infra).
+
+## 7. Code Style
+
+- No hardcoded SQL type integers (e.g. `3`) — use ODBC constants (`SQL_DECIMAL`).
+- No C-style casts `(SQLCHAR*)` — use `sqlchar()` from `odbc_cast.hpp` or `reinterpret_cast`.
+- File-local helpers must be `static` or in an anonymous namespace (flag bare file-scope functions).
+- Avoid verbose table names like `universal_driver_odbc_small_binding_integer_test_table` — use short names within a random schema.
+- Flag duplicated fetch/validation loops — suggest extracting a helper.
+
+## 8. Abstraction Levels
+
+- **Given (setup)**: high-level abstractions — `Connection`, `Schema::use_temp_session_schema`, `TestTable`, `get_data<>()`, `conn.execute_fetch()`.
+- **When/Then (test)**: raw ODBC calls (`SQLExecDirect`, `SQLFetch`, `SQLGetData`) or purpose-built helpers to make the tested code path explicit and auditable.
+- Flag tests that use raw ODBC for setup or high-level wrappers for the behaviour under test.
+
+## 9. ODBC Spec Compliance
+
+Before reviewing a test file for a specific ODBC function, fetch the function's Microsoft documentation page using `https://learn.microsoft.com/en-us/sql/odbc/reference/syntax/<function-lowercase>-function` (e.g. `sqlgetdata-function`). Cross-reference the test against the spec:
+
+### Return Codes
+- Every function documents a set of possible return codes (`SQL_SUCCESS`, `SQL_SUCCESS_WITH_INFO`, `SQL_ERROR`, `SQL_INVALID_HANDLE`, `SQL_NO_DATA`, `SQL_NEED_DATA`, `SQL_STILL_EXECUTING`). Flag return codes listed in the spec that have no test coverage.
+- Verify that tests for `SQL_SUCCESS_WITH_INFO` also check the accompanying SQLSTATE (e.g. `01004` for truncation, `01S02` for option value changed).
+
+### SQLSTATEs
+- The spec lists all possible SQLSTATEs for each function. Flag any documented SQLSTATE with no corresponding test case.
+- Prioritize coverage for these common classes:
+  - **HY009** — null pointer arguments
+  - **HY010** — function sequence errors (calling in wrong state)
+  - **HY090** — invalid string or buffer length
+  - **HY024** — invalid attribute value
+  - **HY092** — invalid attribute/option identifier
+  - **08003** — connection not open
+  - **24000** — invalid cursor state
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
