@@ -7,11 +7,11 @@ Define once, Etch forever.
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [ByteSmelt/etch](https://github.com/ByteSmelt/etch).
+Original source: `CLAUDE.md` in [ByteSmelt/etch](https://github.com/ByteSmelt/etch).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
