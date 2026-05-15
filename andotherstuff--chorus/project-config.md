@@ -134,5 +134,5 @@ import { useAuthor } from '@/hooks/useAuthor';
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/andotherstuff) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-09 -->
+> Source: [andotherstuff/chorus](https://github.com/andotherstuff/chorus) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-14 -->
