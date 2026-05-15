@@ -7,11 +7,11 @@ Git-backed sync for ~/.claude across macOS, Linux, and Windows/WSL
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [berlinguyinca/ai-sync](https://github.com/berlinguyinca/ai-sync).
+Original source: `CLAUDE.md` in [berlinguyinca/ai-sync](https://github.com/berlinguyinca/ai-sync).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
