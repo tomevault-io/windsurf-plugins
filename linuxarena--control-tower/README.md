@@ -7,11 +7,11 @@ A python library built on top of UKAISI Inspect to support Control research, by 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [linuxarena/control-tower](https://github.com/linuxarena/control-tower).
+Original source: `CLAUDE.md` in [linuxarena/control-tower](https://github.com/linuxarena/control-tower).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
