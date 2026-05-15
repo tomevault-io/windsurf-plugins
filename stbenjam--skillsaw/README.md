@@ -7,14 +7,14 @@ Keep your skills sharp. Intelligence for agent context.
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `.cursor/rules/*.mdc` in [stbenjam/skillsaw](https://github.com/stbenjam/skillsaw).
+Original source: `GEMINI.md` in [stbenjam/skillsaw](https://github.com/stbenjam/skillsaw).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
-- **Gemini CLI** — `GEMINI.md`
+- **Cursor** — `project-config.mdc`
 - **Windsurf** — `project-config.md`
 
 From [stbenjam/skillsaw](https://github.com/stbenjam/skillsaw) — a repo with 8+ stars on GitHub.
