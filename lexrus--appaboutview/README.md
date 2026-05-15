@@ -7,11 +7,11 @@ A drop in micro-framework for "About" views in your next macOS/iOS/visionOS/tvOS
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [lexrus/AppAboutView](https://github.com/lexrus/AppAboutView).
+Original source: `CLAUDE.md` in [lexrus/AppAboutView](https://github.com/lexrus/AppAboutView).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
