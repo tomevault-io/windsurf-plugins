@@ -7,11 +7,11 @@ LLM Classification with Gemma and Mentallama
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [OscarTsao/LLM_Criteria_Gemma](https://github.com/OscarTsao/LLM_Criteria_Gemma).
+Original source: `CLAUDE.md` in [OscarTsao/LLM_Criteria_Gemma](https://github.com/OscarTsao/LLM_Criteria_Gemma).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
