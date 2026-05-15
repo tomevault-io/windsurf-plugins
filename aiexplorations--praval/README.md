@@ -7,11 +7,11 @@ Multi-agent framework for building large scale Agentic AI. Simple agents, powerf
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [aiexplorations/praval](https://github.com/aiexplorations/praval).
+Original source: `CLAUDE.md` in [aiexplorations/praval](https://github.com/aiexplorations/praval).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
