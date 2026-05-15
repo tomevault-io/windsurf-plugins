@@ -1,116 +1,172 @@
 ---
 trigger: always_on
-description: This is **Vibercode CLI** - a command-line tool for generating Go web APIs with clean architecture, built entirely in Go using Cobra CLI and native Go templates.
+description: ViberCode CLI es una herramienta de línea de comandos para generar APIs Go con arquitectura limpia, incluyendo operaciones CRUD completas, integración con bases de datos, y un sistema de chat AI interactivo.
 ---
 
-# Cursor Rules for Vibercode CLI Go Project
+# ViberCode CLI
 
-## Project Overview
-This is **Vibercode CLI** - a command-line tool for generating Go web APIs with clean architecture, built entirely in Go using Cobra CLI and native Go templates.
+## Información General
 
-## Task Management System
+ViberCode CLI es una herramienta de línea de comandos para generar APIs Go con arquitectura limpia, incluyendo operaciones CRUD completas, integración con bases de datos, y un sistema de chat AI interactivo.
 
-### Task Organization Rules
-- All project tasks are managed in `tasks.md` with prioritized dependency order
-- Individual task details are stored in `/tasks/` directory as separate markdown files
-- When adding new tasks, analyze dependencies and insert in correct order for coherent development flow
+## Nuevas Características
 
-### Task Management Workflow
-1. **New Task Addition**: Always check `tasks.md` for existing tasks and dependencies before adding new ones
-2. **Dependency Analysis**: New tasks must be placed in correct position relative to existing tasks
-3. **Coherent Development**: Task order should ensure logical development progression
-4. **Task Documentation**: Each task requires detailed specification in `/tasks/` directory
+### 🔌 Servidor MCP (Model Context Protocol)
 
-### Database Provider Priority
-- **Supabase Integration**: High priority database provider to be added alongside existing PostgreSQL, MySQL, and SQLite support
-- Supabase includes: connection configuration, auth integration, real-time subscriptions, and storage setup
+El nuevo servidor MCP permite que agentes de IA interactúen directamente con ViberCode para:
 
-## Code Generation Standards
+- **Edición de componentes en vivo**: Actualizar propiedades, posición y tamaño de componentes en tiempo real
+- **Chat integrado**: Enviar mensajes al asistente Viber AI desde agentes externos
+- **Generación de código**: Crear APIs Go completas usando agentes IA
+- **Gestión de estado**: Obtener y actualizar el estado de la vista y componentes
 
-### File Structure
-- CLI commands in `cmd/` directory
-- Code generation logic in `internal/generator/`
-- Template strings in `internal/templates/`
-- Data models in `internal/models/`
+#### Uso Rápido
 
-### Go Template System
-- Use Go's native `text/template` package for all code generation
-- Template helper functions: `ToCamel`, `ToLowerCamel`, `ToSnake`, `ToKebab`
-- No external template engines (Handlebars, Mustache, etc.)
+```bash
+# Iniciar servidor MCP
+vibercode mcp
 
-### Field Type System
-Support comprehensive field types in `internal/models/field.go`:
-- Basic: `string`, `text`, `number`, `float`, `boolean`
-- Special: `date`, `uuid`, `json`
-- Relations: `relation`, `relation-array`
+# Probar el servidor
+./test-mcp-server.sh
+```
+
+#### Configuración para Claude Desktop
+
+Agregar al archivo `.mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "vibercode": {
+      "name": "ViberCode MCP Server",
+      "description": "ViberCode CLI integration for live component editing",
+      "command": "vibercode",
+      "args": ["mcp"],
+      "env": {
+        "ANTHROPIC_API_KEY": "${ANTHROPIC_API_KEY}",
+        "VIBE_DEBUG": "true"
+      }
+    }
+  }
+}
+```
+
+#### Herramientas Disponibles
+
+- `vibe_start`: Iniciar modo vibe con chat AI y preview
+- `component_update`: Actualizar componentes en tiempo real
+- `view_state_get`: Obtener estado actual de la vista
+- `chat_send`: Enviar mensaje al asistente Viber AI
+- `generate_code`: Generar código Go API
+- `project_status`: Estado del proyecto y servidores
+
+## Arquitectura
+
+### CLI Structure
+
+```
+vibercode-cli-go/
+├── main.go                      # Application entry point
+├── cmd/                         # Cobra CLI commands
+│   ├── root.go                 # Root command definition
+│   └── generate.go             # Generate subcommands
+├── internal/
+│   ├── generator/              # Code generation logic
+│   │   ├── api.go             # API project generator
+│   │   └── resource.go        # Resource CRUD generator
+│   ├── models/                 # Data structures
+│   │   └── field.go           # Field types and resource models
+│   └── templates/              # Go template strings
+│       ├── model.go           # Model template
+│       ├── handler.go         # HTTP handler template
+│       ├── service.go         # Business logic template
+│       └── repository.go      # Data access template
+├── go.mod                      # Go module definition
+└── README.md                   # Documentation
+```
 
 ### Generated Project Architecture
-Follow clean architecture principles:
-- `cmd/server/main.go` - Application entry point
-- `internal/handlers/` - HTTP layer (Gin framework)
-- `internal/services/` - Business logic layer
-- `internal/repositories/` - Data access layer
-- `internal/models/` - Domain models and DTOs
-- `pkg/database/` - Database connection utilities
 
-## Development Best Practices
+The CLI generates Go projects following clean architecture principles:
 
-### Code Quality
-- Follow Go naming conventions
-- Use GORM best practices for database models
-- Include proper error handling in generated code
-- Generate comprehensive validation logic
-- Maintain clean architecture separation
-- Include proper HTTP status codes and responses
+```
+generated-project/
+├── cmd/server/main.go          # Application entry point
+├── internal/
+│   ├── handlers/               # HTTP layer (Gin framework)
+│   ├── services/               # Business logic layer
+│   ├── repositories/           # Data access layer
+│   ├── models/                 # Domain models and DTOs
+│   └── middleware/             # HTTP middleware
+├── pkg/
+│   ├── database/               # Database connection utilities
+│   ├── config/                 # Configuration management
+│   └── utils/                  # Shared utilities
+└── go.mod                      # Go module
+```
 
-### Dependencies
-- **Core CLI**: cobra, promptui, strcase
-- **Generated Projects**: gin, gorm, godotenv, uuid
-- Database drivers: postgres, mysql, sqlite (and Supabase)
+### Integración MCP
 
-### Testing Requirements
-- Unit tests for all generators
-- Template validation tests
-- Integration tests with databases
-- CLI command testing
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   AI Agent      │    │   MCP Server    │    │   ViberCode     │
+│   (Claude)      │◄──►│   (JSON-RPC)    │◄──►│   Services      │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+                                │
+                                ▼
+                       ┌─────────────────┐
+                       │   WebSocket     │
+                       │   + HTTP API    │
+                       └─────────────────┘
+                                │
+                                ▼
+                       ┌─────────────────┐
+                       │  React Editor   │
+                       │  + Live Preview │
+                       └─────────────────┘
+```
 
-## Task Implementation Guidelines
+## Comandos Disponibles
 
-### Before Starting New Tasks
-1. Check `tasks.md` for current task priorities
-2. Review task dependencies in `/tasks/` directory
-3. Ensure prerequisites are completed
-4. Update task status during development
+### CLI Commands
 
-### When Adding Features
-1. Analyze impact on existing task dependencies
-2. Update task documentation if needed
-3. Maintain coherent development flow
-4. Test integration with existing features
+- `vibercode generate api` - Generate a complete Go API project with clean architecture
+- `vibercode generate resource` - Generate CRUD resources with models, handlers, services, and repositories
+- `vibercode --help` - Show help information
+- `vibercode generate --help` - Show help for generate commands
 
-### Database Provider Development
-- Prioritize Supabase integration
-- Support multiple database providers
-- Include connection pooling and SSL configuration
-- Generate provider-specific templates
+### Development Commands
 
-## File Naming and Organization
+- `go build -o vibercode main.go` - Build the CLI binary
+- `go mod tidy` - Clean up dependencies
+- `go test ./...` - Run tests
+- `go run main.go` - Run CLI during development
 
-### Template Files
-- Use descriptive names: `model.go`, `handler.go`, `service.go`
-- Group related templates together
-- Include provider-specific templates when needed
+### `vibercode mcp`
 
-### Generator Files
-- Separate generators by functionality: `api.go`, `resource.go`
-- Include validation and error handling
-- Support interactive prompts
+Inicia el servidor MCP para integración con agentes IA.
 
-### Documentation
-- Update CLAUDE.md for major changes
-- Maintain task documentation in `/tasks/`
-- Include usage examples and best practices
+```bash
+vibercode mcp
+```
+
+**Características:**
+
+- Protocolo MCP 2024-11-05 compatible
+- Comunicación JSON-RPC via stdin/stdout
+- Herramientas bien definidas con validación
+- Integración con WebSocket y HTTP API
+
+## Key Features
+
+### Field Type System
+
+The CLI supports a comprehensive field type system defined in `internal/models/field.go`:
+
+- **Basic Types**: `string`, `text`, `number`, `float`, `boolean`
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/vibercode) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-14 -->
+> Source: [vibercode/cli](https://github.com/vibercode/cli) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-13 -->
