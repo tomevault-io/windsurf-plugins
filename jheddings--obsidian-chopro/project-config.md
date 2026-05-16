@@ -1,0 +1,123 @@
+---
+trigger: always_on
+description: manages file embeds for setlists and song structure
+---
+
+# CLAUDE.md - obsidian-chopro
+
+Obsidian plugin for rendering ChordPro format chord sheets. Parses bracketed
+chord notation (e.g. `[Am]`) within `chopro` code blocks and renders them with
+accurate chord-to-lyric alignment. Supports transposition, Nashville number
+notation, flow-based song organization, and callout-driven rendering.
+
+## Architecture
+
+Source files live in `src/`, each with a single responsibility:
+
+- **main.ts** - Plugin lifecycle (`onload`/`onunload`), command registration,
+  settings persistence, markdown processor registration
+- **config.ts** - Settings interfaces only (`RenderSettings`, `FlowSettings`,
+  `ChoproPluginSettings`); no logic
+- **settings.ts** - Settings UI using tabbed pages (obskit `SettingsTabPage`)
+- **parser.ts** - Core AST: tokenizes ChordPro source into segment/line/block
+  hierarchy; YAML frontmatter parsing
+- **music.ts** - Music theory: `AbstractNote` hierarchy (`MusicNote`,
+  `NashvilleNumber`), `KeyInfo` hierarchy, note/chord utilities
+- **render.ts** - `ContentRenderer`: walks AST and produces HTML DOM elements
+- **transpose.ts** - Transposition: `ChoproTransposer` walks AST, delegates to
+  `NoteTransposer` / `NashvilleTransposer` for interval-based note shifting
+- **convert.ts** - `ChordLineConverter`: converts chord-over-lyrics format to
+  bracketed `[chord]` notation
+- **flow.ts** - `FlowManager`: resolves transclusion references (`![[...]]`),
+  manages file embeds for setlists and song structure
+- **callout.ts** - `CalloutProcessor`: processes `[!chopro]` callouts with YAML
+  feature extraction
+- **styles.ts** - `ChoproStyleManager`: dynamic CSS injection based on settings
+- **modals.ts** - `TransposeModal`, `FlowFileSelector`: user input dialogs
+
+### Key Design Patterns
+
+- **AST-based pipeline**: Source -> Parser (AST) -> Renderer (DOM). All
+  transformations (transpose, convert) operate on the AST, not raw text.
+
+- **Abstract base + static factory**: Type hierarchies use abstract base classes
+  with static `parse()` and `test()` methods for construction. Pattern:
+  `if (ClassName.test(input)) return ClassName.parse(input)`.
+
+- **Strategy pattern** in transposition: `NoteTransposer` and
+  `NashvilleTransposer` implement different transposition strategies.
+  `ChoproTransposer` walks the AST and delegates to the appropriate transposer.
+
+- **Observer-like settings**: `applySettings()` recreates renderer, flow
+  manager, and style manager whenever settings change. Settings persist
+  immediately; there is no apply/cancel pattern.
+
+- **Segment hierarchy** for parsed elements: `LineSegment` base with
+  `TextSegment`, `BracketChord`, `ChordSegment` (letter/nashville), and
+  `Annotation` subtypes.
+
+- **Line hierarchy** for parsed lines: `ChoproLine` base with `EmptyLine`,
+  `TextLine`, `DirectiveLine`, `CommentLine`, `ChordLine`, `ChordLyricsLine`,
+  and `InstrumentalLine` subtypes.
+
+### Settings Management
+
+Settings use nested interfaces (`rendering`, `flow`, `logLevel`). When loading
+persisted data, a deep merge with `DEFAULT_SETTINGS` is required to handle new
+or restructured settings across plugin versions. Shallow `Object.assign` is
+insufficient for nested objects.
+
+When modifying settings interfaces, always update `DEFAULT_SETTINGS` in main.ts
+to ensure backwards compatibility with existing user data.
+
+## Dependencies
+
+- **obskit** (production) - Logger, settings UI base classes (`SettingsTabPage`,
+  typed setting controls). Shared library across Obsidian plugins.
+- **yaml** (production) - YAML parsing for frontmatter and callout features.
+- **obsidian** (dev/external) - Obsidian API, externalized from the bundle.
+
+## Tooling & Scripts
+
+| Command          | Purpose                                |
+| ---------------- | -------------------------------------- |
+| `just build`     | Type-check & build `main.js` bundle    |
+| `just tidy`      | Format all supported files             |
+| `just check`     | Run all static checks                  |
+| `just preflight` | Full preflight checks before commiting |
+
+- **Bundler**: esbuild targeting ES6, CommonJS output to `main.js`
+- **Externals**: obsidian, electron, @codemirror/\*, @lezer/\*, builtin-modules
+- **Pre-commit hooks**: husky + lint-staged runs prettier --check and eslint
+- **Test framework**: Vitest; tests live in `test/`
+
+## Code Conventions
+
+- **Formatting**: Prettier (no semicolons)
+- **Linting**: ESLint with TypeScript parser; curly braces always required
+- **Logging**: one `Logger.getLogger("moduleName")` per module; global level
+  controlled via settings
+- **Unused params**: underscore prefix (`_editor`)
+
+## Testing
+
+Tests live in `test/` and use Vitest. The `test/__mocks__/` directory contains
+mocks for external dependencies (obskit), wired via the `alias` option in
+`vitest.config.ts`. Tests use `test.each()` for property-based patterns and
+rely on Vitest's `globals: true` setting so `describe`/`test`/`expect` need
+not be imported.
+
+When adding new parsing or transposition logic, add corresponding test cases.
+The parser and music theory modules have the most comprehensive coverage.
+
+## Workflow Guardrails
+
+- **Never push directly to `main`**. Create a feature branch or use a worktree
+  based on `main` for all changes.
+- **Do not use git worktrees when already on a feature branch**. Worktrees are
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [jheddings/obsidian-chopro](https://github.com/jheddings/obsidian-chopro) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-14 -->
