@@ -1,151 +1,204 @@
 ---
 trigger: always_on
-description: APPLY modern modular architecture patterns when developing core agent systems to ensure scalability and edge-first design
+description: APPLY AI portal integration standards when working with AI provider code
 ---
 
-# Modern SYMindX Architecture Patterns 2025
+globs: mind-agents/src/portals/**/*
+alwaysApply: false
+---
+# AI Integration Patterns
 
 **Rule Priority:** Core Architecture  
 **Activation:** Always Active  
-**Scope:** System design, modular architecture, and edge computing
+**Scope:** AI provider integrations and portal management
 
-## System Architecture Overview
+## AI Portal Architecture
 
-SYMindX follows a **modular, event-driven architecture** designed for scalability, hot-swappable components, and multi-platform agent deployment. The system is organized as a workspace with three main components:
+SYMindX implements a **unified portal architecture** that abstracts AI provider interactions through the Vercel AI SDK v5, enabling seamless switching between providers and models.
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     SYMindX Workspace                        │
-├─────────────────────────────────────────────────────────────┤
-│  mind-agents/     │  website/        │  docs-site/          │
-│  (Core Runtime)   │  (React UI)      │  (Documentation)     │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                    ┌─────────┴─────────┐
-                    │  SYMindX Runtime  │
-                    │   (Event-Driven)  │
-                    └─────────┬─────────┘
-                              │
-        ┌─────────────────────┼─────────────────────┐
-        │                     │                     │
-   ┌────▼────┐        ┌──────▼──────┐       ┌─────▼─────┐
-   │ Module  │        │   Event     │       │ Extension │
-   │Registry │◄──────►│    Bus      │◄─────►│  Loader   │
-   └─────────┘        └─────────────┘       └───────────┘
-```
-
-## 2025 Architectural Principles
-
-### 1. Edge-First Modular Design
-
-- **Hot-swappable modules** for memory, emotion, and cognition
-- **Edge-deployable components** for distributed processing
-- **Plugin-based extensions** for platform integrations
-- **Provider pattern** with edge-compatible AI service abstractions
-- **Registry pattern** for component discovery and lifecycle
-- **Micro-frontend integration** for distributed UI components
-
-### 2. Event-Driven Architecture with Edge Distribution
-
-- **Centralized Event Bus** for component communication
-- **Edge-distributed event processing** for reduced latency
-- **Pub/Sub pattern** with WebSocket and WebRTC support
-- **Message-driven interactions** between agents and extensions
-- **Real-time event processing** with streaming capabilities
-- **Event sourcing** for distributed state management
-
-### 3. Multi-Agent Coordination with Cloud-Edge Hybrid
-
-- **Agent isolation** with shared resource management
-- **Centralized coordination** through multi-agent manager
-- **Edge deployment** for latency-sensitive operations
-- **Resource pooling** for memory and AI portals
-- **Conflict resolution** for concurrent operations
-- **Auto-scaling** based on demand and resource availability
-
-### 4. 2025 Performance Optimization Patterns
-
-- **Progressive Web App (PWA)** architecture for offline capabilities
-- **Service Worker** integration for background processing
-- **WebAssembly (WASM)** modules for compute-intensive operations
-- **HTTP/3 and QUIC** protocol support for faster communication
-- **Streaming data processing** with backpressure handling
-- **Adaptive resource allocation** based on device capabilities
-
-## Module Architecture Patterns
-
-### Memory Module Pattern
+### Portal Abstraction Layer
 ```typescript
-interface MemoryProvider {
+interface AIPortal {
   readonly id: string;
-  readonly type: 'sqlite' | 'supabase' | 'neon' | 'postgres' | 'memory';
+  readonly provider: string;
+  readonly models: ModelInfo[];
+  readonly capabilities: PortalCapability[];
   
-  initialize(config: MemoryConfig): Promise<void>;
-  store(conversation: Conversation): Promise<void>;
-  retrieve(query: SearchQuery): Promise<Memory[]>;
-  search(embedding: number[]): Promise<Memory[]>;
+  // Core operations
+  generate(request: GenerationRequest): Promise<GenerationResponse>;
+  stream(request: StreamRequest): AsyncIterable<StreamChunk>;
+  embed(text: string, options?: EmbedOptions): Promise<number[]>;
+  moderate(content: string): Promise<ModerationResult>;
+  
+  // Management
+  initialize(config: PortalConfig): Promise<void>;
+  healthCheck(): Promise<HealthStatus>;
   shutdown(): Promise<void>;
 }
 
-// Hot-swappable implementation
-abstract class BaseMemoryProvider implements MemoryProvider {
-  protected abstract onHotReload(newConfig: MemoryConfig): Promise<void>;
-  protected abstract validateConfig(config: MemoryConfig): boolean;
+// Base portal implementation
+abstract class BasePortal implements AIPortal {
+  protected abstract createProvider(): Provider;
+  protected abstract handleRateLimit(error: Error): Promise<void>;
+  protected abstract selectModel(task: TaskType): string;
 }
 ```
 
-**Available Providers:**
+## Supported AI Providers
 
-- `sqlite/` - Local SQLite database with vector search
-- `supabase/` - Supabase with pgvector for embeddings
-- `neon/` - Neon database with vector capabilities
-- `postgres/` - Direct PostgreSQL with pgvector
-- `memory/` - In-memory storage (non-persistent)
-
-### Emotion Module Pattern
+### OpenAI Portal (`portals/openai/`)
 ```typescript
-interface EmotionModule {
-  readonly id: string;
-  readonly emotions: EmotionType[];
-  
-  processEvent(event: EmotionalEvent): Promise<EmotionState>;
-  getCurrentState(): EmotionState;
-  getEmotionHistory(): EmotionHistory[];
-  influenceResponse(response: string): string;
+interface OpenAIConfig {
+  apiKey: string;
+  organization?: string;
+  baseURL?: string;
+  models: {
+    chat: string;          // Default: "gpt-4o"
+    tools: string;         // Default: "gpt-4.1-mini"
+    embedding: string;     // Default: "text-embedding-3-small"
+  };
 }
 
-// Composite emotion system
-class CompositeEmotion implements EmotionModule {
-  private readonly emotions = [
-    'happy', 'sad', 'angry', 'curious', 'confident', 
-    'anxious', 'empathetic', 'nostalgic', 'proud', 
-    'confused', 'neutral'
-  ];
+// Implementation with retries and fallbacks
+class OpenAIPortal extends BasePortal {
+  private readonly client: OpenAI;
+  
+  async generate(request: GenerationRequest): Promise<GenerationResponse> {
+    return await this.withRetry(async () => {
+      const result = await generateText({
+        model: this.openai(this.selectModel('chat')),
+        messages: request.messages,
+        temperature: request.temperature,
+        maxTokens: request.maxTokens,
+        tools: request.tools
+      });
+      
+      return this.transformResponse(result);
+    });
+  }
 }
 ```
 
-**11 Distinct Emotions** (RuneScape-inspired):
-
-- Individual emotion modules in `emotion/{type}/`
-- Composite emotion system combining multiple states
-- Context-aware emotional transitions
-- Emotion influence on response generation
-
-### Cognition Module Pattern
+### Anthropic Portal (`portals/anthropic/`)
 ```typescript
-interface CognitionModule {
-  readonly id: string;
-  readonly type: 'htn_planner' | 'reactive' | 'hybrid';
+interface AnthropicConfig {
+  apiKey: string;
+  baseURL?: string;
+  models: {
+    chat: string;          // Default: "claude-3-6-sonnet-20250101"
+tools: string;         // Default: "claude-3-6-haiku-20250101"
+  };
+}
+
+class AnthropicPortal extends BasePortal {
+  private readonly client: Anthropic;
   
-  plan(goal: Goal, context: Context): Promise<Plan>;
-  execute(plan: Plan): Promise<ActionResult>;
-  adapt(feedback: Feedback): Promise<void>;
-  reflect(outcome: Outcome): Promise<void>;
+  // Handle Anthropic-specific message format
+  protected transformMessages(messages: Message[]): AnthropicMessage[] {
+    return messages.map(msg => ({
+      role: msg.role === 'assistant' ? 'assistant' : 'user',
+      content: msg.content
+    }));
+  }
 }
 ```
 
-**Available Cognition Types:**
+### Groq Portal (`portals/groq/`)
+```typescript
+interface GroqConfig {
+  apiKey: string;
+  models: {
+    chat: string;          // Default: "llama-3.3-70b-versatile"
+    tools: string;         // Default: "llama-3.1-8b-instant"
+  };
+}
 
+// Optimized for speed
+class GroqPortal extends BasePortal {
+  // Ultra-fast inference configuration
+  protected getDefaultOptions(): GenerationOptions {
+    return {
+      temperature: 0.7,
+      maxTokens: 2048,
+      stream: true,           // Always stream for responsiveness
+      parallel_tool_calls: true
+    };
+  }
+}
+```
+
+### Google Vertex AI Portal (`portals/google-vertex/`)
+```typescript
+interface VertexConfig {
+  projectId: string;
+  location: string;
+  credentialsPath?: string;
+  models: {
+    chat: string;          // Default: "gemini-1.5-pro"
+    embedding: string;     // Default: "text-embedding-004"
+  };
+}
+
+class GoogleVertexPortal extends BasePortal {
+  // Handle Google's safety settings
+  protected getSafetySettings(): SafetySetting[] {
+    return [
+      { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+      { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_MEDIUM_AND_ABOVE' }
+    ];
+  }
+}
+```
+
+### Local AI Portals
+
+#### Ollama Portal (`portals/ollama/`)
+```typescript
+interface OllamaConfig {
+  baseURL: string;       // Default: "http://localhost:11434"
+  models: {
+    chat: string;        // e.g., "llama3.2:latest"
+    embedding: string;   // e.g., "nomic-embed-text"
+  };
+}
+
+class OllamaPortal extends BasePortal {
+  // Check model availability
+  async checkModelAvailability(model: string): Promise<boolean> {
+    try {
+      const response = await fetch(`${this.baseURL}/api/tags`);
+      const { models } = await response.json();
+      return models.some((m: any) => m.name === model);
+    } catch {
+      return false;
+    }
+  }
+}
+```
+
+#### LM Studio Portal (`portals/lmstudio/`)
+```typescript
+interface LMStudioConfig {
+  baseURL: string;       // Default: "http://localhost:1234"
+  model: string;         // Currently loaded model
+}
+
+class LMStudioPortal extends BasePortal {
+  // OpenAI-compatible API
+  protected createProvider(): Provider {
+    return openai({
+      baseURL: this.config.baseURL + '/v1',
+      apiKey: 'not-needed'  // LM Studio doesn't require API key
+    });
+  }
+}
+```
+
+## Portal Integration Patterns
+
+### Provider Selection Strategy
+```typescript
+interface ProviderSelector {
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
