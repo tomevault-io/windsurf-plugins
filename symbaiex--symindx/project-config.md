@@ -1,224 +1,165 @@
 ---
 trigger: always_on
-description: **Rule Priority:** Advanced Integration
+description: **Rule Priority:** Advanced Intelligence
 ---
 
-# Model Context Protocol (MCP) Integration
+# Advanced Context Awareness and Dynamic Rule Activation
 
-**Rule Priority:** Advanced Integration  
-**Activation:** External tool integration and service connections  
-**Scope:** All MCP-compatible tools and service integrations
+**Rule Priority:** Advanced Intelligence  
+**Activation:** All development activities with dynamic context switching  
+**Scope:** Global context management and intelligent rule selection
 
 ## Overview
 
-Model Context Protocol (MCP) in Cursor v1.2+ enables seamless integration with external tools and services through standardized interfaces. This allows one-click installation of tools, OAuth authentication flows, and powerful service integrations without complex setup.
+Cursor's advanced context system in v1.2+ enables sophisticated awareness of development environment, file types, git status, time of day, project phase, and user patterns. This rule creates intelligent context switching that dynamically activates relevant rules and optimizes AI assistance based on current conditions.
 
-## MCP Architecture
+## Context Detection Systems
 
-### Core MCP Components
+### Environment Context Detection
 
 ```typescript
-// MCP Server Implementation
-interface MCPServer {
-  name: string;
-  version: string;
-  capabilities: MCPCapabilities;
-  tools: MCPTool[];
-  resources: MCPResource[];
-  prompts: MCPPrompt[];
+// Advanced context detection engine
+interface ContextState {
+  // File and Project Context
+  currentFile: string;
+  fileType: string;
+  fileSize: number;
+  projectType: string;
+  
+  // Git Context
+  gitBranch: string;
+  gitStatus: 'clean' | 'modified' | 'staged' | 'conflict';
+  uncommittedChanges: number;
+  lastCommitTime: Date;
+  
+  // Development Context
+  activeRules: string[];
+  recentFiles: string[];
+  openTabs: string[];
+  cursorPosition: { line: number; column: number };
+  
+  // Temporal Context
+  timeOfDay: 'morning' | 'afternoon' | 'evening' | 'night';
+  dayOfWeek: string;
+  timezone: string;
+  
+  // User Context
+  workingPattern: 'focused' | 'exploratory' | 'debugging' | 'reviewing';
+  errorCount: number;
+  productivityScore: number;
+  
+  // System Context
+  cpuUsage: number;
+  memoryUsage: number;
+  networkStatus: 'online' | 'offline' | 'slow';
 }
 
-interface MCPCapabilities {
-  logging?: boolean;
-  notifications?: boolean;
-  resources?: {
-    subscribe?: boolean;
-    listChanged?: boolean;
-  };
-  tools?: {
-    listChanged?: boolean;
-  };
-  prompts?: {
-    listChanged?: boolean;
-  };
-}
-
-interface MCPTool {
-  name: string;
-  description: string;
-  inputSchema: JSONSchema;
-  handler: (params: any) => Promise<MCPResult>;
-}
-
-interface MCPResource {
-  uri: string;
-  name: string;
-  description?: string;
-  mimeType?: string;
-}
-
-interface MCPPrompt {
-  name: string;
-  description: string;
-  arguments?: MCPPromptArgument[];
-}
-```
-
-### MCP Client Configuration
-
-```json
-// .cursor/mcp-config.json
-{
-  "mcpServers": {
-    "supabase": {
-      "command": "npx",
-      "args": ["@modelcontextprotocol/server-supabase"],
-      "env": {
-        "SUPABASE_URL": "process.env.SUPABASE_URL",
-        "SUPABASE_ANON_KEY": "process.env.SUPABASE_ANON_KEY"
-      }
-    },
-    "github": {
-      "command": "npx", 
-      "args": ["@modelcontextprotocol/server-github"],
-      "env": {
-        "GITHUB_PERSONAL_ACCESS_TOKEN": "process.env.GITHUB_TOKEN"
-      }
-    },
-    "memory": {
-      "command": "npx",
-      "args": ["@modelcontextprotocol/server-memory"],
-      "env": {
-        "MEMORY_STORE_PATH": "./data/mcp-memory"
-      }
-    },
-    "sequential-thinking": {
-      "command": "npx",
-      "args": ["@modelcontextprotocol/server-sequential-thinking"]
-    },
-    "playwright": {
-      "command": "npx",
-      "args": ["@modelcontextprotocol/server-playwright"]
-    },
-    "context7": {
-      "command": "npx", 
-      "args": ["@context7/mcp-server"]
-    }
-  },
-  "allowedOrigins": [
-    "cursor://",
-    "vscode://",
-    "localhost"
-  ],
-  "enableOAuth": true,
-  "oauthConfig": {
-    "providers": ["github", "google", "microsoft"],
-    "redirectUrl": "cursor://oauth/callback"
+class ContextEngine {
+  private state: ContextState;
+  private listeners: ContextListener[] = [];
+  
+  async detectContext(): Promise<ContextState> {
+    return {
+      // File context
+      currentFile: await this.getCurrentFile(),
+      fileType: await this.detectFileType(),
+      fileSize: await this.getFileSize(),
+      projectType: await this.detectProjectType(),
+      
+      // Git context
+      gitBranch: await this.getGitBranch(),
+      gitStatus: await this.getGitStatus(),
+      uncommittedChanges: await this.countUncommittedChanges(),
+      lastCommitTime: await this.getLastCommitTime(),
+      
+      // Development context
+      activeRules: await this.getActiveRules(),
+      recentFiles: await this.getRecentFiles(),
+      openTabs: await this.getOpenTabs(),
+      cursorPosition: await this.getCursorPosition(),
+      
+      // Temporal context
+      timeOfDay: this.getTimeOfDay(),
+      dayOfWeek: new Date().toLocaleDateString('en-US', { weekday: 'long' }),
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      
+      // User context
+      workingPattern: await this.detectWorkingPattern(),
+      errorCount: await this.getErrorCount(),
+      productivityScore: await this.calculateProductivityScore(),
+      
+      // System context
+      cpuUsage: await this.getCPUUsage(),
+      memoryUsage: await this.getMemoryUsage(),
+      networkStatus: await this.getNetworkStatus()
+    };
+  }
+  
+  onContextChange(listener: ContextListener): void {
+    this.listeners.push(listener);
+  }
+  
+  private async detectWorkingPattern(): Promise<string> {
+    // Analyze recent activity patterns
+    const recentActions = await this.getRecentActions();
+    
+    if (recentActions.includes('debugging')) return 'debugging';
+    if (recentActions.includes('exploring')) return 'exploratory';
+    if (recentActions.includes('reviewing')) return 'reviewing';
+    return 'focused';
   }
 }
 ```
 
-## One-Click Tool Installation
-
-### Built-in MCP Tools
+### SYMindX-Specific Context
 
 ```typescript
-// Available MCP tools for one-click installation
-const availableMCPTools = {
-  // Database and Storage
-  supabase: {
-    name: '@modelcontextprotocol/server-supabase',
-    description: 'Supabase database operations',
-    category: 'database',
-    requiresAuth: true,
-    capabilities: ['read', 'write', 'schema', 'realtime']
-  },
-  
-  // Code and Documentation
-  github: {
-    name: '@modelcontextprotocol/server-github',
-    description: 'GitHub repository operations',
-    category: 'development',
-    requiresAuth: true,
-    capabilities: ['repos', 'issues', 'prs', 'files']
-  },
-  
-  // AI and ML
-  context7: {
-    name: '@context7/mcp-server',
-    description: 'Context7 library documentation',
-    category: 'ai',
-    requiresAuth: false,
-    capabilities: ['search', 'documentation', 'examples']
-  },
-  
-  // Web and Testing
-  playwright: {
-    name: '@modelcontextprotocol/server-playwright',
-    description: 'Web browser automation',
-    category: 'testing',
-    requiresAuth: false,
-    capabilities: ['navigate', 'interact', 'screenshot', 'test']
-  },
-  
-  // Productivity
-  memory: {
-    name: '@modelcontextprotocol/server-memory',
-    description: 'Persistent knowledge graphs',
-    category: 'productivity',
-    requiresAuth: false,
-    capabilities: ['store', 'retrieve', 'search', 'graph']
-  },
-  
-  // AI Reasoning
-  'sequential-thinking': {
-    name: '@modelcontextprotocol/server-sequential-thinking',
-    description: 'Step-by-step problem solving',
-    category: 'ai',
-    requiresAuth: false,
-    capabilities: ['reasoning', 'analysis', 'planning']
+// SYMindX project-specific context detection
+class SYMindXContextDetector {
+  async detectSYMindXContext(): Promise<SYMindXContext> {
+    const currentFile = await this.getCurrentFile();
+    
+    return {
+      // Component detection
+      component: this.detectComponent(currentFile),
+      
+      // Agent context
+      agentType: this.detectAgentType(currentFile),
+      
+      // Module context
+      moduleType: this.detectModuleType(currentFile),
+      
+      // Portal context
+      portalProvider: this.detectPortalProvider(currentFile),
+      
+      // Architecture layer
+      layer: this.detectArchitectureLayer(currentFile)
+    };
   }
-};
-
-// Installation workflow
-class MCPInstaller {
-  async installTool(toolName: string): Promise<InstallResult> {
-    const tool = availableMCPTools[toolName];
-    if (!tool) throw new Error(`Tool ${toolName} not found`);
-    
-    // 1. Install package
-    await this.installPackage(tool.name);
-    
-    // 2. Configure MCP server
-    await this.configureMCPServer(toolName, tool);
-    
-    // 3. Setup authentication if required
-    if (tool.requiresAuth) {
-      await this.setupAuthentication(toolName);
+  
+  private detectComponent(filePath: string): string {
+    if (filePath.includes('mind-agents/src/core/')) return 'core-runtime';
+    if (filePath.includes('mind-agents/src/portals/')) return 'ai-portal';
+    if (filePath.includes('mind-agents/src/memory/')) return 'memory-system';
+    if (filePath.includes('mind-agents/src/emotion/')) return 'emotion-system';
+    if (filePath.includes('mind-agents/src/cognition/')) return 'cognition-module';
+    if (filePath.includes('mind-agents/src/extensions/')) return 'platform-extension';
+    if (filePath.includes('mind-agents/src/characters/')) return 'character-system';
+    if (filePath.includes('website/')) return 'web-interface';
+    if (filePath.includes('docs-site/')) return 'documentation';
+    return 'general';
+  }
+  
+  private detectAgentType(filePath: string): string | null {
+    // Extract agent type from file path or content
+    if (filePath.includes('characters/')) {
+      const filename = filePath.split('/').pop();
+      return filename?.replace('.json', '') || null;
     }
-    
-    // 4. Verify installation
-    return this.verifyInstallation(toolName);
+    return null;
   }
   
-  private async setupAuthentication(toolName: string): Promise<void> {
-    // Launch OAuth flow or prompt for API keys
-    const authMethod = await this.detectAuthMethod(toolName);
-    
-    if (authMethod === 'oauth') {
-      await this.launchOAuthFlow(toolName);
-    } else {
-      await this.promptForAPIKey(toolName);
-    }
-  }
-}
-```
-
-### SYMindX-Specific MCP Integrations
-
-```typescript
-// Custom MCP server for SYMindX
-export class SYMindXMCPServer implements MCPServer {
+  private detectModuleType(filePath: string): string | null {
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
