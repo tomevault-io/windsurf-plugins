@@ -1,150 +1,88 @@
 ---
 trigger: always_on
-description: This is a Next.js 15.3.3 application using App Router with authentication (NextAuth), Stripe payments, and Prisma ORM. The project structure follows modern Next.js best practices with server components and TypeScript.
+description: Next.js 15 + Stripe + NextAuth + Prisma + ShadcnUI starter kit for SaaS applications with subscription management and token-based usage tracking.
 ---
 
-# Cursor Rules for Forger Starter Kit - Next.js 15 + Stripe
+# The AI Forger Starter Kit - AI Assistant Guide
 
 ## Project Overview
+Next.js 15 + Stripe + NextAuth + Prisma + ShadcnUI starter kit for SaaS applications with subscription management and token-based usage tracking.
 
-This is a Next.js 15.3.3 application using App Router with authentication (NextAuth), Stripe payments, and Prisma ORM. The project structure follows modern Next.js best practices with server components and TypeScript.
+## Detailed Documentation
+For comprehensive understanding of each system component, refer to the specialized documentation in `/for_llms/`:
 
-## Architecture & Tech Stack
+- **`design-patterns.md`** - Architecture patterns, code organization, and performance strategies
+- **`api.md`** - API routes, webhooks, security, and request/response patterns
+- **`authentication.md`** - NextAuth.js setup, session management, and access control
+- **`payments.md`** - Stripe integration, subscription flow, and token system
+- **`database.md`** - Prisma schema, relationships, and data operations
+- **`admin.md`** - Admin panel functionality and user management
 
-### Core Dependencies
+## Essential Commands
+```bash
+# Development
+npm run dev                 # Start dev server with turbopack
+npm run build              # Production build
+npm run lint               # ESLint checking
 
-- **Next.js**: 15.3.3 (App Router)
-- **React**: 19.0.0
-- **TypeScript**: 5.x
-- **Authentication**: NextAuth 4.24.11 with Google Provider
-- **Database**: PostgreSQL with Prisma 6.9.0 ORM
-- **Payments**: Stripe 18.2.1
-- **Styling**: Tailwind CSS 4.x with custom CSS variables
-- **UI Components**: Radix UI primitives with shadcn/ui patterns
-- **Package Manager**: Yarn
-
-### File Structure
-
-```
-app/                     # Next.js App Router directory
-  ├── api/              # API routes
-  │   ├── auth/[...nextauth]/route.ts  # NextAuth configuration
-  │   ├── stripe/
-  │   │   ├── checkout/route.ts        # Stripe checkout sessions
-  │   │   └── webhook/route.ts         # Stripe webhook handler
-  │   └── admin/
-  │       └── update-user/route.ts     # Admin user management
-  ├── auth/signin/      # Authentication pages
-  ├── dashboard/        # User dashboard
-  ├── admin/           # Admin panel
-  ├── pricing/         # Pricing page
-  ├── premium-content/ # Protected premium content
-  ├── free-content/    # Free content for authenticated users
-  ├── banned/          # Banned user page
-  └── layout.tsx       # Root layout with providers
-
-components/             # Reusable components
-  ├── ui/              # shadcn/ui components (button, card, etc.)
-  ├── auth/            # Authentication components
-  ├── dashboard/       # Dashboard-specific components
-  ├── admin/           # Admin panel components
-  ├── pricing/         # Pricing components
-  └── providers/       # Context providers
-
-lib/                   # Utility libraries
-  ├── auth.ts          # NextAuth configuration & session management
-  ├── stripe.ts        # Stripe client configuration
-  ├── stripe-admin.ts  # Stripe admin utilities & webhook handlers
-  ├── subscription.ts  # Subscription management utilities
-  ├── prisma.ts        # Prisma client
-  └── utils.ts         # General utilities
-
-prisma/               # Database configuration
-  ├── schema.prisma   # Database schema
-  ├── migrations/     # Database migrations
-  └── seed.ts         # Database seeding scripts
-
-types/
-  └── next-auth.d.ts  # NextAuth type extensions
+# Database
+npm run db:migrate         # Run Prisma migrations
+npm run db:generate        # Generate Prisma client
+npm run db:sync-stripe     # Sync Stripe products to database
+npm run db:setup-admin     # Set up admin user (requires ADMIN_EMAIL env)
+npm run db:reset           # Reset database
 ```
 
-## Development Rules & Guidelines
+## Development Guidelines for AI Assistants
 
-### NEVER USE
+### Code Quality Standards
+- **NO COMMENTS**: Do not add code comments unless explicitly requested
+- **Modular Code**: Keep functions small and focused on single responsibilities
+- **Type Safety**: Use TypeScript strictly, avoid `any` types
+- **Error Handling**: Implement proper try-catch blocks and error responses
+- **Security**: Validate all inputs, verify permissions, use environment variables
 
-- `middleware.ts` - Authentication and routing should be handled in components/pages
-- `"use client;"` in `layout.tsx` or `page.tsx` files - Only use in actual components
-- `yarn build` unless specifically requested - Assume `yarn dev` is running
+### Package Management
+- **Updated Packages**: Always use latest stable versions when adding dependencies
+- **Dependency Audit**: Check for security vulnerabilities regularly
+- **Minimal Dependencies**: Only add necessary packages, prefer built-in solutions
 
-### Always Use
+### Testing & Validation
+- **Build Verification**: Run `npm run build` after major changes to ensure no build errors
+- **Type Checking**: Verify TypeScript compilation passes
+- **Lint Compliance**: Ensure `npm run lint` passes without errors
+- **Database Integrity**: Test database operations in development environment
 
-- **Package Manager**: `yarn` for all package operations
-- **Server Components**: Default to Server Components for data fetching
-- **App Router**: Use Next.js 15 App Router patterns
-- **TypeScript**: Strict typing for all code
+### File Update Requirements
+When modifying features, **ALWAYS UPDATE** the corresponding documentation in `/for_llms/`:
+- Authentication changes → Update `authentication.md`
+- Payment/Stripe changes → Update `payments.md`
+- Database schema changes → Update `database.md`
+- API route changes → Update `api.md`
+- Admin panel changes → Update `admin.md`
+- Architecture changes → Update `design-patterns.md`
 
-### Route Parameters
-
-When a route uses params, always follow this pattern:
-
-```typescript
-// CORRECT
-export default async function Page({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const { id } = await params;
-  // use id here
-}
-
-// WRONG
-export default async function Page({ params }: { params: { id: string } }) {
-  // direct usage without awaiting
-}
+### Environment Setup
+```env
+DATABASE_URL="postgresql://..."
+NEXTAUTH_URL="http://localhost:3000"
+NEXTAUTH_SECRET="32-char-secret"
+GOOGLE_CLIENT_ID="..."
+GOOGLE_CLIENT_SECRET="..."
+STRIPE_SECRET_KEY="sk_test_..."
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY="pk_test_..."
+STRIPE_WEBHOOK_SECRET="whsec_..."
+ADMIN_EMAIL="admin@example.com"
+NEXT_PUBLIC_APP_URL="http://localhost:3000"
 ```
 
-### Styling Guidelines
-
-- **Primary Styling**: All styles in `globals.css` using Tailwind CSS
-- **Design System**: Uses custom CSS variables for theming (light/dark mode support)
-- **UI Components**: Use existing shadcn/ui components from `components/ui/`:
-  - `badge`, `button`, `calendar`, `card`, `dialog`, `form`, `input`, `label`, `popover`, `select`, `sonner`
-- **Loading States**: Use Skeleton components from shadcn (check if specific skeleton exists first)
-- **Icons**: Use Lucide React For icons.
-
-### Authentication & Authorization
-
-- **Auth Provider**: NextAuth with Google OAuth
-- **Session Management**: `getSession()` from `lib/auth.ts`
-- **User Roles**: `USER`, `PREMIUM`, `ADMIN`, `BANNED` (defined in Prisma schema)
-- **Route Protection**: Check authentication in page components, redirect to `/auth/signin`
-- **Admin Access**: Use `isUserAdmin(userId)` from `lib/subscription.ts`
-
-### Database & Prisma
-
-- **ORM**: Prisma with PostgreSQL
-- **Client Location**: Generated to `app/generated/prisma`
-- **Key Models**: `User`, `StripeProduct`, `StripePrice`, `UserSubscription`, `StripeCustomer`
-- **Subscription Management**: Use utilities from `lib/subscription.ts`
-
-### Stripe Integration
-
-- **Configuration**: `lib/stripe.ts` for client, `lib/stripe-admin.ts` for server operations
-- **Checkout Flow**: POST to `/api/stripe/checkout` with `priceId`
-- **Webhooks**: Handled in `/api/stripe/webhooks/route.ts`
-- **Products/Prices**: Synced via webhooks to database
-- **Customer Management**: Auto-create/retrieve customers in checkout flow
-
-### API Routes Structure
-
-```
-/api/auth/[...nextauth]     # NextAuth handler
-/api/stripe/checkout        # Create checkout sessions
-/api/stripe/webhooks         # Process Stripe webhooks
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+## Critical System Notes
+- **Admin Setup**: Run `db:setup-admin` AFTER user signs in (creates DB record first)
+- **Stripe Sync**: Webhooks handle automatic updates, manual sync available
+- **Token System**: 30-day expiration with auto-renewal for active subscribers
+- **Database Location**: Prisma client outputs to `app/generated/prisma` (custom location)
+- **Role Preservation**: Admin roles preserved during subscription changes
 
 ---
-> Source: [leonardogrig/the-ai-forger-starter-kit](https://github.com/leonardogrig/the-ai-forger-starter-kit) — distributed by [TomeVault](https://tomevault.io/claim/leonardogrig).
-<!-- tomevault:4.0:windsurf_rules:2026-04-18 -->
+> Source: [leonardogrig/the-ai-forger-starter-kit](https://github.com/leonardogrig/the-ai-forger-starter-kit) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-13 -->
