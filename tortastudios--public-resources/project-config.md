@@ -1,152 +1,102 @@
 ---
 trigger: always_on
-description: Request this rule when you need to convert Taskmaster tasks into Linear issues, maintaining proper relationships, preventing duplicates, and ensuring consistent formatting and structure.
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
----
-description: Guidelines for creating Linear issues from Taskmaster tasks with proper structure and relationships
-globs: .taskmaster/tasks/*.txt
-alwaysApply: false
-ruleType: agent-requested
-taskDescription: Request this rule when you need to convert Taskmaster tasks into Linear issues, maintaining proper relationships, preventing duplicates, and ensuring consistent formatting and structure.
----
-# Universal Taskmaster → Linear Integration Protocol
+# CLAUDE.md
 
-This rule defines the standardized process for converting Taskmaster tasks into Linear issues across any development project, ensuring proper relationships, preventing duplicates, and maintaining consistent structure within tag-aware workflows.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Core Integration Principles
+## Build/Lint/Test Commands
 
-- **Tag-Aware Conversion**: Respect tag contexts and project boundaries when creating Linear issues
-- **Project Discovery**: Dynamically identify project names and structure for proper issue organization
-- **Duplicate Prevention**: Check existing Linear issues before creation to avoid conflicts
-- **Relationship Preservation**: Maintain parent-child subtask relationships in Linear
-- **Consistent Structure**: Standardized issue creation with complete information across all projects
-- **Status Synchronization**: Bidirectional sync between Taskmaster and Linear status updates
-- **Cross-Project Coordination**: Handle dependencies across different projects and tags
+### Project-Specific Commands
+Configure your build, lint, and test commands based on your technology stack:
 
-## Mandatory Prerequisites
+```bash
+# Example: Next.js Web Application
+cd src && npm run dev    # Start development server
+cd src && npm run build  # Build for production
+cd src && npm run lint   # Run ESLint
 
-### 1. Tag Context and Project Discovery
-```yaml
-before_linear_operations:
-  # STEP 1: Ensure proper tag context (from @taskmaster-base.mcp)
-  1. verify_tag_context:
-     - confirm_current_tag_is_appropriate()
-     - discover_project_name_from_tag_and_structure()
-     - validate_project_exists_in_monorepo()
-  
-  # STEP 2: Load Linear workspace context
-  2. linear_workspace_discovery:
-     - identify_linear_workspace_for_project()
-     - detect_team_assignments()
-     - map_project_to_linear_labels()
-  
-  # STEP 3: Validate permissions and access
-  3. permission_validation:
-     - verify_linear_api_access()
-     - confirm_project_team_membership()
-     - validate_issue_creation_permissions()
+# Example: iOS Swift Application  
+# XcodeBuildMCP handles builds automatically
+swiftformat .            # Format Swift code
+swiftlint               # Lint Swift code
 ```
 
-### 2. Pre-Conversion Analysis
-```yaml
-conversion_analysis:
-  task_assessment:
-    # Analyze task structure and requirements
-    - determine_if_conversion_needed(task_complexity, scope)
-    - identify_parent_child_relationships()
-    - extract_cross_project_dependencies()
-    - assess_linear_issue_type_requirements()
-  
-  duplicate_prevention:
-    # Comprehensive duplicate checking
-    - search_existing_linear_issues_by_title()
-    - check_taskmaster_id_references_in_linear()
-    - identify_potential_duplicate_patterns()
-    - validate_unique_conversion_opportunity()
-  
-  project_context_mapping:
-    # Map discovered project to Linear organization
-    - map_discovered_project_to_linear_team()
-    - determine_appropriate_linear_labels()
-    - identify_milestone_or_project_associations()
-    - assess_priority_level_mapping()
+## Code Style Guidelines
+
+### General
+- Follow trunk-based development workflow
+- Make small, atomic commits
+- Pull frequently from main
+
+### Language-Specific Guidelines
+Configure based on your tech stack:
+
+#### TypeScript/React
+- Use TypeScript for type safety
+- Follow framework conventions for routing
+- Use React hooks for stateful logic
+- Use CSS modules for component styling
+
+#### Swift (if applicable)
+- Use SwiftUI for new UI components
+- Follow MVVM architecture for feature modules
+- Group related files in feature directories
+- Follow Apple's Swift API Design Guidelines
+
+### Error Handling
+- Use structured error handling
+- Log errors with appropriate context
+- Implement error tracking (Sentry, etc.)
+
+### Naming Conventions
+- Use descriptive, meaningful names
+- PascalCase for components/types
+- camelCase for variables/functions
+- snake_case for cursor rule files
+
+## Project Management Integration
+
+**CORE PRINCIPLE: Taskmaster + Linear Sync**
+
+This project uses Taskmaster for task management with automated Linear synchronization for team coordination and Slack notifications. See [Taskmaster Workflow Documentation](docs/ai-context/taskmaster-workflow.md) for complete details.
+
+### Essential Commands
+- `/start` - Initialize complete workflow from PRD to Linear
+- `/work` - Execute tasks with intelligent parallelization
+- `/sync-linear` - Bidirectional Taskmaster-Linear synchronization
+- `/status` - Comprehensive project progress view
+- `/enhance-docs` - Update tasks with Context7 documentation
+
+### Quick Start Pattern
+```typescript
+1. Initialize: /start
+2. Execute: /work  
+3. Monitor: /status
 ```
 
-## Universal Conversion Strategies
+## Testing Integration
 
-### Strategy 1: Single Task Conversion (Complexity 1-3)
-```yaml
-simple_task_conversion:
-  when: task.complexity <= 3 AND no_subtasks AND single_project_scope
-  
-  linear_issue_creation:
-    title: "{Discovered Project}: {Task Title}"
-    description: |
-      **Project**: {dynamically_discovered_project_name}
-      **Tag Context**: {current_tag}
-      **Taskmaster ID**: {task_id}
-      **Complexity**: {score}/10
-      
-      ## Description
-      {task.description}
-      
-      ## Implementation Details
-      {task.details}
-      
-      ## Test Strategy
-      {task.testStrategy}
-      
-      ## Success Criteria
-      - [ ] Implementation complete in {discovered_project_path}
-      - [ ] Tests pass using appropriate testing framework
-      - [ ] Task marked as 'done' in Taskmaster
-    
-    labels: ["{discovered_project}", "taskmaster-sync", "complexity-{score}"]
-    team: "{mapped_team_from_project_discovery}"
-    priority: "{mapped_priority_from_taskmaster}"
-    
-  post_creation:
-    - update_taskmaster_with_linear_issue_id()
-    - add_linear_url_to_task_details()
-    - set_bidirectional_sync_metadata()
-```
+**Intelligent Playwright Testing**: Claude automatically determines when to run UI tests based on component detection. Screenshots saved to `tests/taskmaster-screenshots/` with naming pattern `task-{taskId}-subtask-{subtaskId}-{ComponentName}.png`.
 
-### Strategy 2: Parent-Child Task Conversion (Complexity 4-7)
-```yaml
-hierarchical_task_conversion:
-  when: task.has_subtasks OR task.complexity >= 4
-  
-  parent_issue_creation:
-    title: "{Discovered Project}: {Parent Task Title}"
-    description: |
-      **Project**: {dynamically_discovered_project_name}  
-      **Tag Context**: {current_tag}
-      **Taskmaster Parent ID**: {parent_task_id}
-      **Complexity**: {score}/10
-      **Subtask Count**: {subtask_count}
-      
-      ## Epic Description
-      {parent_task.description}
-      
-      ## Implementation Scope
-      {parent_task.details}
-      
-      ## Subtasks Overview
-      {list_of_subtask_titles_and_ids}
-      
-      ## Success Criteria
-      - [ ] All subtasks completed
-      - [ ] Integration testing complete
-      - [ ] Epic marked as 'done' in Taskmaster
-    
-    type: "Epic" # or "Feature" based on Linear workspace configuration
-    labels: ["{discovered_project}", "taskmaster-epic", "complexity-{score}"]
-  
-  subtask_issue_creation:
-    for_each_subtask:
+## Documentation Structure
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- **Foundation**: Essential project config (this file)
+- **Component**: Technology-specific guidance in `docs/ai-context/`
+- **Feature**: Workflow commands in `.claude/commands/`
+
+### Key Documentation Files
+- [Taskmaster Workflow](docs/ai-context/taskmaster-workflow.md) - Complete workflow process
+- [Claude Code Hooks](.claude/hooks/) - Deterministic sync automation
+- [Workflow Commands](.claude/commands/) - Interactive project commands
+
+## Important Instructions
+Do what has been asked; nothing more, nothing less.
+NEVER create files unless they're absolutely necessary for achieving your goal.
+ALWAYS prefer editing an existing file to creating a new one.
+NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.
 
 ---
 > Source: [tortastudios/public-resources](https://github.com/tortastudios/public-resources) — distributed by [TomeVault](https://tomevault.io).
