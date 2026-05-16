@@ -1,15 +1,15 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: This file provides guidance to AI coding agents when working with code in this repository.
 ---
 
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to AI coding agents when working with code in this repository.
 
 ## Project Overview
 
-dbfordevs is a cross-platform database management application built with Tauri 2.0 (Rust backend) and React 18 (TypeScript frontend). It provides a unified interface for PostgreSQL, MySQL, SQLite, Oracle, MSSQL, MongoDB, Redis, Cassandra and other databases with AI-powered query assistance.
+dbfordevs is a cross-platform database management application built with Tauri 2.0 (Rust backend) and React 18 (TypeScript frontend). It provides a unified interface for PostgreSQL, MySQL, SQLite, and other databases with AI-powered query assistance.
 
 ## Development Commands
 
@@ -37,22 +37,17 @@ bun scripts/bump-version.ts
 
 ### Frontend (src/)
 - **State Management**: Zustand stores with localStorage persistence in `src/stores/`
-  - `useConnectionsStore` - Database connections, groups, tags
+  - `useConnectionsStore` - Database connections
   - `useUIStore` - Theme, sidebar, modals, editor settings
-  - `useQueryStore` - Tabs, query results, table schemas, query history
+  - `useQueryStore` - Tabs, query results, table schemas
   - `useCRUDStore` - Row selection, cell editing, pending changes
-  - `useViewsStore`, `useIndexesStore`, `useProceduresStore`, `useFunctionsStore`, `useTriggersStore`, `useSequencesStore` - Database object management
-  - `useUsersStore` - Users, roles, and permissions
-  - `useGridStore` - Grid display settings and formatting
-  - `useDiffStore` - Schema diff state and snapshots
-  - `useSchemaSearchStore` - Global schema search
 - **Tauri Bridge**: All backend calls via `useDatabase` hook (`src/hooks/useDatabase.ts`) which wraps Tauri `invoke()` calls
 - **Components**: Radix UI primitives styled with Tailwind in `src/components/ui/`
 - **Editor**: Monaco editor with SQL syntax highlighting in `src/components/editor/`
 
 ### Backend (src-tauri/)
 - **Commands** (`src-tauri/src/commands/`): Tauri IPC handlers for connections, queries, tables
-- **Database Layer** (`src-tauri/src/db/`): sqlx-based async connection pooling with driver-specific implementations (postgres.rs, mysql.rs, sqlite.rs, oracle.rs, mssql.rs, mongodb.rs, redis.rs, cassandra.rs)
+- **Database Layer** (`src-tauri/src/db/`): sqlx-based async connection pooling with driver-specific implementations (postgres.rs, mysql.rs, sqlite.rs)
 - **Connection Manager**: `src-tauri/src/db/manager.rs` - manages active connection pools per connection ID
 
 ### AI Integration (Built-in)
@@ -68,7 +63,7 @@ bun scripts/bump-version.ts
 - **Components**: `src/components/ai/` - AI panel UI components
 
 ### Themes
-- **Built-in Themes**: Light, Dark, System (auto), Nordic Dark, Nordic Light, Solarized Dark, Solarized Light
+- **Built-in Themes**: Light, Dark, System (auto), Nordic Dark, Nordic Light
 - **Theme System**: CSS custom properties in `src/index.css`
 - **Theme Switching**: Managed by `useUIStore` in `src/stores/ui.ts`
 - **Monaco Editor**: Theme mapping in `src/components/editor/monaco-themes.ts`
@@ -104,19 +99,9 @@ bun scripts/bump-version.ts
 
 ## Database Support Status
 
-- **Fully Implemented**: PostgreSQL, MySQL, SQLite, Oracle, MSSQL, MongoDB, Redis, Cassandra
-
-## Recent Features (v0.5.x)
-
-- **Schema Diff**: Compare schemas across connections/tables/snapshots with migration script generation
-- **Global Schema Search**: Search across tables, columns, views, procedures, and more (Ctrl+Shift+F)
-- **Cassandra Support**: Full NoSQL support with CQL Shell, keyspace management, and cluster info
-- **MongoDB & Redis**: Complete driver implementations with connection management and UI
-- **MSSQL Enhancements**: Named instance support, SQL Server Browser, database create/delete
-- **Oracle Wallet Support**: Secure authentication using Oracle Wallet
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- **Implemented**: PostgreSQL, MySQL, SQLite (via sqlx)
+- **Typed but not implemented**: MSSQL, MongoDB, Redis
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/danielss-dev) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-10 -->
+> Source: [danielss-dev/dbfordevs](https://github.com/danielss-dev/dbfordevs) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-16 -->
