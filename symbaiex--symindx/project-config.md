@@ -1,205 +1,191 @@
 ---
 trigger: always_on
-description: This rule defines comprehensive patterns for leveraging Cursor's workflow automation capabilities, including background agents, action-based triggers, and multi-agent coordination for complex development tasks.
+description: **Rule Priority:** Critical Security
 ---
 
-# Cursor Workflow Automation & Action Orchestration
+# AI Safety and Responsible AI Patterns 2025
 
-This rule defines comprehensive patterns for leveraging Cursor's workflow automation capabilities, including background agents, action-based triggers, and multi-agent coordination for complex development tasks.
+**Rule Priority:** Critical Security  
+**Activation:** AI Integration Development  
+**Scope:** All AI provider integrations and agent systems
 
-## Core Workflow Architecture
+## 2025 AI Safety Standards
 
-### Workflow Definition Patterns
+### Mandatory Safety Checks
 
-**Declarative Workflow Files**
-```yaml
-# .cursor/workflows/ai-portal-validation.yaml
-name: "AI Portal Validation Pipeline"
-description: "Automated validation of new AI portal configurations"
-triggers:
-  - type: file_change
-    patterns: ["mind-agents/src/portals/*/config.json"]
-  - type: manual
-    command: "validate-portal"
-  - type: schedule
-    cron: "0 2 * * *"  # Daily at 2 AM
-
-actions:
-  - name: "validate-config"
-    agent: "config-validator"
-    inputs:
-      config_file: "${trigger.file_path}"
-    timeout: 300
-    
-  - name: "test-connection"
-    agent: "connection-tester"
-    depends_on: ["validate-config"]
-    inputs:
-      portal_name: "${actions.validate-config.outputs.portal_name}"
-    parallel: false
-    
-  - name: "generate-docs"
-    agent: "doc-generator"
-    depends_on: ["test-connection"]
-    inputs:
-      portal_config: "${actions.validate-config.outputs.config}"
-      test_results: "${actions.test-connection.outputs.results}"
-
-error_handling:
-  retry_attempts: 3
-  retry_delay: 30
-  fallback: "notify-maintainers"
-```
-
-**Workflow Orchestration Rules**
 ```typescript
-// .cursor/workflows/types.ts
-interface WorkflowDefinition {
-  name: string;
-  description: string;
-  triggers: WorkflowTrigger[];
-  actions: WorkflowAction[];
-  error_handling: ErrorHandlingConfig;
-  monitoring: MonitoringConfig;
+// REQUIRED: AI safety validation layer
+export interface AISafetyGuards {
+  readonly contentFilter: ContentFilter;
+  readonly rateLimit: RateLimit;
+  readonly auditLogger: AuditLogger;
+  readonly privacyFilter: PrivacyFilter;
+  readonly biasDetector: BiasDetector;
+  readonly hallucinationDetector: HallucinationDetector;
 }
 
-interface WorkflowAction {
-  name: string;
-  agent: string;
-  inputs: Record<string, any>;
-  outputs?: Record<string, any>;
-  depends_on?: string[];
-  parallel?: boolean;
-  timeout?: number;
-  retry_policy?: RetryPolicy;
+export class SafetyValidatedAIPortal implements AIPortal {
+  constructor(
+    private readonly provider: AIProvider,
+    private readonly safetyGuards: AISafetyGuards
+  ) {}
+
+  async generateResponse(request: AIRequest): Promise<SafeAIResponse> {
+    // Pre-processing safety checks
+    const sanitizedRequest = await this.safetyGuards.contentFilter.sanitize(request);
+    await this.safetyGuards.rateLimit.checkLimit(request.userId);
+    await this.safetyGuards.privacyFilter.validateRequest(sanitizedRequest);
+
+    // Generate response with monitoring
+    const response = await this.provider.generate(sanitizedRequest);
+
+    // Post-processing validation
+    const validatedResponse = await this.safetyGuards.hallucinationDetector.validate(response);
+    await this.safetyGuards.biasDetector.analyze(validatedResponse);
+    await this.safetyGuards.auditLogger.log({
+      request: sanitizedRequest,
+      response: validatedResponse,
+      timestamp: new Date(),
+      safety: 'validated'
+    });
+
+    return validatedResponse;
+  }
 }
 ```
 
-### Action-Based Trigger System
+### Content Filtering and Moderation
 
-**Event-Driven Automation**
-```yaml
-# .cursor/workflows/triggers/git-events.yaml
-triggers:
-  git_commit:
-    patterns:
-      - "feat(portals): *"
-      - "fix(memory): *"
-    actions:
-      - validate-affected-systems
-      - run-integration-tests
-      - update-documentation
-      
-  git_merge:
-    branches: ["main", "develop"]
-    actions:
-      - deploy-to-staging
-      - run-performance-tests
-      - notify-team
-      
-  file_change:
-    patterns:
-      - "mind-agents/src/characters/*.json"
-    actions:
-      - validate-character-schema
-      - update-character-docs
-      - test-character-behavior
+- **Implement real-time content scanning** for harmful, illegal, or inappropriate content
+- **Use multiple moderation layers** with cascading filters
+- **Log all filtered content** for analysis and improvement
+- **Provide clear rejection reasons** for filtered requests
+
+```typescript
+// GOOD: Multi-layer content filtering
+export class ContentFilter {
+  private readonly filters: ContentFilterLayer[] = [
+    new ProfanityFilter(),
+    new ViolenceFilter(),
+    new PrivacyFilter(),
+    new LegalComplianceFilter(),
+    new BiasFilter()
+  ];
+
+  async sanitize(content: string): Promise<ContentFilterResult> {
+    const violations: ContentViolation[] = [];
+    let filteredContent = content;
+
+    for (const filter of this.filters) {
+      const result = await filter.process(filteredContent);
+      if (result.violations.length > 0) {
+        violations.push(...result.violations);
+        filteredContent = result.sanitized;
+      }
+    }
+
+    return {
+      original: content,
+      sanitized: filteredContent,
+      violations,
+      safe: violations.length === 0
+    };
+  }
+}
 ```
 
-**Development Lifecycle Integration**
-```yaml
-# .cursor/workflows/triggers/development.yaml
-triggers:
-  pr_opened:
-    conditions:
-      - label: "needs-review"
-      - files_changed: "*.ts"
-    actions:
-      - code-quality-check
-      - security-scan
-      - documentation-check
-      
-  issue_labeled:
-    labels: ["bug", "high-priority"]
-    actions:
-      - create-hotfix-branch
-      - assign-emergency-team
-      - schedule-investigation
-      
-  deployment_complete:
-    environment: "production"
-    actions:
-      - run-smoke-tests
-      - update-monitoring
-      - notify-stakeholders
+## Privacy Protection Patterns
+
+### Data Minimization and Anonymization
+
+```typescript
+// REQUIRED: Privacy-first data handling
+export class PrivacyProtectedProcessor {
+  private readonly anonymizer = new DataAnonymizer();
+  private readonly retention = new DataRetentionManager();
+
+  async processUserData(data: UserData): Promise<AnonymizedData> {
+    // Remove or hash PII
+    const anonymized = await this.anonymizer.anonymize(data, {
+      removeEmails: true,
+      hashPhoneNumbers: true,
+      removeAddresses: true,
+      generalizeLocations: true
+    });
+
+    // Set retention policy
+    await this.retention.setPolicy(anonymized.id, {
+      type: 'ai-processing',
+      maxAge: '30d',
+      autoDelete: true
+    });
+
+    return anonymized;
+  }
+
+  async getDataForAI(userId: string): Promise<AICompatibleData> {
+    const userData = await this.getUserData(userId);
+    const anonymized = await this.processUserData(userData);
+    
+    return {
+      context: anonymized.context,
+      preferences: anonymized.preferences,
+      // Never include: real names, emails, addresses, phone numbers
+      metadata: {
+        region: anonymized.generalLocation,
+        sessionId: crypto.randomUUID(),
+        timestamp: new Date().toISOString()
+      }
+    };
+  }
+}
 ```
 
-## Agent Coordination Patterns
+### GDPR and Privacy Compliance
 
-### Multi-Agent Workflows
+- **Implement explicit consent** for AI processing
+- **Provide data deletion capabilities** (right to be forgotten)
+- **Enable data portability** for user data
+- **Maintain detailed audit logs** for compliance verification
 
-**Sequential Agent Pipeline**
-```yaml
-# .cursor/workflows/memory-optimization.yaml
-name: "Memory System Optimization"
-description: "Automated memory system maintenance and optimization"
+```typescript
+// GOOD: GDPR-compliant AI data handling
+export class GDPRCompliantAIService {
+  async processWithConsent(
+    userId: string, 
+    data: PersonalData, 
+    consent: ConsentRecord
+  ): Promise<ProcessingResult> {
+    // Verify explicit consent
+    if (!consent.aiProcessing || consent.expired) {
+      throw new ConsentError('Valid AI processing consent required');
+    }
 
-agents:
-  memory-analyzer:
-    model: "gpt-4o"
-    context: ["@mind-agents/src/memory/", "@docs/memory/"]
-    capabilities: ["analysis", "reporting"]
-    
-  memory-optimizer:
-    model: "claude-3.5-sonnet"
-    context: ["@mind-agents/src/memory/", "@AI_MEMORY.md"]
-    capabilities: ["code-modification", "optimization"]
-    
-  memory-tester:
-    model: "gpt-4.1-mini"
-    context: ["@mind-agents/src/__tests__/memory/"]
-    capabilities: ["testing", "validation"]
+    // Log consent usage
+    await this.auditLogger.logConsentUsage({
+      userId,
+      consentId: consent.id,
+      purpose: 'ai-processing',
+      timestamp: new Date()
+    });
 
-workflow:
-  - step: "analyze"
-    agent: "memory-analyzer"
-    task: "Analyze memory usage patterns and identify optimization opportunities"
-    outputs: ["analysis_report", "optimization_candidates"]
+    // Process with privacy protection
+    return await this.privacyProtectedProcessor.process(data);
+  }
+
+  async deleteUserData(userId: string): Promise<DeletionResult> {
+    // Remove all stored data
+    await this.dataStore.deleteUserData(userId);
+    await this.aiCache.clearUserCache(userId);
+    await this.auditLogger.logDeletion(userId);
     
-  - step: "optimize"
-    agent: "memory-optimizer"
-    depends_on: ["analyze"]
-    task: "Implement optimizations based on analysis report"
-    inputs: 
-      analysis: "${steps.analyze.outputs.analysis_report}"
-      candidates: "${steps.analyze.outputs.optimization_candidates}"
-    outputs: ["optimized_code", "change_summary"]
-    
-  - step: "test"
-    agent: "memory-tester"
-    depends_on: ["optimize"]
-    task: "Test optimized memory system for correctness and performance"
-    inputs:
-      changes: "${steps.optimize.outputs.change_summary}"
-    outputs: ["test_results", "performance_metrics"]
+    return { deleted: true, timestamp: new Date() };
+  }
+}
 ```
 
-**Parallel Agent Execution**
-```yaml
-# .cursor/workflows/comprehensive-testing.yaml
-name: "Comprehensive System Testing"
-description: "Parallel testing across all SYMindX components"
+## Bias Detection and Mitigation
 
-parallel_groups:
-  core_systems:
-    - agent: "portal-tester"
-      task: "Test all AI portal configurations"
-      context: ["@mind-agents/src/portals/"]
-      
-    - agent: "memory-tester"
-      task: "Test memory provider implementations"
-      context: ["@mind-agents/src/memory/"]
-      
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
