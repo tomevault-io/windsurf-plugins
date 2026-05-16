@@ -1,210 +1,198 @@
 ---
 trigger: always_on
-description: ENFORCE comprehensive testing standards when writing or modifying test files
+description: APPLY deployment best practices when working with Docker and infrastructure files
 ---
 
-globs: **/*.test.ts, **/*.spec.ts, jest.config.js
+globs: Dockerfile, docker-compose.yml, .github/workflows/*, config/**/*
 alwaysApply: false
 ---
-# Testing and Quality Standards
+# Deployment and Operations
 
 **Rule Priority:** Core Architecture  
 **Activation:** Always Active  
-**Scope:** Testing strategies, quality assurance, and code standards
+**Scope:** Production deployment, monitoring, scaling, and operational procedures
 
-## Testing Architecture Overview
+## Deployment Architecture Overview
 
-SYMindX follows a **comprehensive testing strategy** that ensures reliability, performance, and maintainability across all system components through multiple testing layers.
+SYMindX implements a **containerized, cloud-native deployment strategy** designed for scalability, reliability, and ease of maintenance across different environments.
 
-### Testing Pyramid Structure
+### Deployment Stack Structure
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                     SYMindX Testing Pyramid                  │
+│                  SYMindX Deployment Stack                    │
 ├─────────────────────────────────────────────────────────────┤
-│              E2E Tests (10%)                │              │
-│         ┌─────────────────────────────────────┐              │
-│         │  Integration Tests (20%)            │              │
-│    ┌─────────────────────────────────────────────────┐       │
-│    │           Unit Tests (70%)                      │       │
-│    └─────────────────────────────────────────────────┘       │
-│                                                               │
-│  Coverage Requirements:                                       │
-│  • Unit Tests: 90%+ coverage                                │
-│  • Integration Tests: Critical paths                         │
-│  • E2E Tests: User journeys                                 │
+│  Load Balancer    │  Container Orchestration │  Monitoring  │
+│  ├─ NGINX/Caddy   │  ├─ Docker Compose       │  ├─ Grafana │
+│  ├─ SSL/TLS       │  ├─ Kubernetes (opt)     │  ├─ Prometheus │
+│  └─ Rate Limiting │  ├─ Health Checks        │  ├─ Loki    │
+│                   │  └─ Auto-scaling         │  └─ Alerts  │
+├─────────────────────────────────────────────────────────────┤
+│  Application Layer                                          │
+│  ├─ Mind Agents Service ├─ Website Service ├─ Docs Service │
+│  ├─ Extension Services  ├─ API Gateway     ├─ MCP Server   │
+│  └─ Worker Services     └─ WebSocket       └─ Background   │
+├─────────────────────────────────────────────────────────────┤
+│  Data Layer                                                 │
+│  ├─ PostgreSQL/Supabase ├─ Redis Cache ├─ File Storage     │
+│  ├─ Vector Database     ├─ Log Storage ├─ Backup Storage   │
+│  └─ Configuration Store └─ Metrics DB  └─ Artifact Store   │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-## Unit Testing Standards
+## Docker Configuration
 
-### Jest Configuration
-```typescript
-// jest.config.ts
-import type { Config } from '@jest/types';
+### Multi-Stage Dockerfile
+```dockerfile
+# mind-agents/Dockerfile
+FROM oven/bun:1-alpine AS base
+WORKDIR /app
 
-const config: Config.InitialOptions = {
-  preset: 'ts-jest',
-  testEnvironment: 'node',
-  roots: ['<rootDir>/src', '<rootDir>/tests'],
-  testMatch: [
-    '**/__tests__/**/*.ts',
-    '**/?(*.)+(spec|test).ts'
-  ],
-  transform: {
-    '^.+\\.ts$': ['ts-jest', {
-      useESM: true,
-      tsconfig: {
-        module: 'esnext'
-      }
-    }]
-  },
-  collectCoverageFrom: [
-    'src/**/*.ts',
-    '!src/**/*.d.ts',
-    '!src/**/*.types.ts',
-    '!src/**/index.ts'
-  ],
-  coverageThreshold: {
-    global: {
-      branches: 90,
-      functions: 90,
-      lines: 90,
-      statements: 90
-    }
-  },
-  setupFilesAfterEnv: [
-    '<rootDir>/tests/setup.ts'
-  ],
-  moduleNameMapping: {
-    '^@/(.*)$': '<rootDir>/src/$1'
-  }
-};
+# Install dependencies
+FROM base AS deps
+COPY package.json bun.lockb ./
+RUN bun install --frozen-lockfile --production
 
-export default config;
+# Build stage
+FROM base AS build
+COPY package.json bun.lockb ./
+RUN bun install --frozen-lockfile
+COPY . .
+RUN bun run build
+RUN bun run test
+
+# Production stage
+FROM base AS runtime
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 mindagent
+
+COPY --from=deps --chown=mindagent:nodejs /app/node_modules ./node_modules
+COPY --from=build --chown=mindagent:nodejs /app/dist ./dist
+COPY --from=build --chown=mindagent:nodejs /app/package.json ./
+
+USER mindagent
+
+EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD bun run healthcheck
+
+ENV NODE_ENV=production
+CMD ["bun", "run", "start"]
 ```
 
-### Test File Organization
-```typescript
-// Standard test file structure
-describe('AIPortalManager', () => {
-  let portalManager: AIPortalManager;
-  let mockEventBus: jest.Mocked<EventBus>;
-  let mockConfig: AIPortalConfig;
-  
-  beforeEach(() => {
-    // Setup mocks and test instances
-    mockEventBus = createMockEventBus();
-    mockConfig = createTestConfig();
-    portalManager = new AIPortalManager(mockEventBus, mockConfig);
-  });
-  
-  afterEach(() => {
-    // Cleanup resources
-    jest.clearAllMocks();
-  });
-  
-  describe('initialization', () => {
-    it('should initialize all enabled portals', async () => {
-      // Test setup and execution
-    });
-    
-    it('should handle initialization failures gracefully', async () => {
-      // Error condition testing
-    });
-  });
-  
-  describe('provider selection', () => {
-    it('should select primary provider for standard requests', async () => {
-      // Normal flow testing
-    });
-    
-    it('should fallback to secondary provider when primary fails', async () => {
-      // Fallback behavior testing
-    });
-  });
-  
-  describe('error handling', () => {
-    it('should retry failed requests with exponential backoff', async () => {
-      // Retry logic testing
-    });
-    
-    it('should circuit break after repeated failures', async () => {
-      // Circuit breaker testing
-    });
-  });
-});
+### Website Dockerfile
+```dockerfile
+# website/Dockerfile
+FROM node:20-alpine AS base
+WORKDIR /app
+
+# Dependencies
+FROM base AS deps
+COPY package.json package-lock.json ./
+RUN npm ci --only=production
+
+# Build stage
+FROM base AS build
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+# Production stage with NGINX
+FROM nginx:alpine AS runtime
+COPY --from=build /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/nginx.conf
+
+EXPOSE 80
+HEALTHCHECK --interval=30s --timeout=3s \
+  CMD curl -f http://localhost/health || exit 1
+
+CMD ["nginx", "-g", "daemon off;"]
 ```
 
-### Mock Factory Patterns
-```typescript
-// Mock factories for consistent test data
-export class TestFactories {
-  static createMockAgent(overrides: Partial<Agent> = {}): Agent {
-    return {
-      id: 'test-agent-id',
-      name: 'Test Agent',
-      characterId: 'nyx',
-      status: 'inactive',
-      config: {
-        memoryProvider: 'sqlite',
-        emotionModule: 'confident',
-        cognitiveModule: 'reactive',
-        aiPortal: 'openai'
-      },
-      metadata: {
-        createdAt: new Date('2024-01-01'),
-        lastActive: null,
-        version: '1.0.0'
-      },
-      ...overrides
-    };
-  }
-  
-  static createMockMessage(overrides: Partial<Message> = {}): Message {
-    return {
-      id: `msg-${Date.now()}`,
-      content: 'Test message content',
-      sender: {
-        id: 'test-user',
-        name: 'Test User',
-        platform: 'test'
-      },
-      channel: {
-        id: 'test-channel',
-        type: 'direct',
-        platform: 'test'
-      },
-      timestamp: new Date(),
-      ...overrides
-    };
-  }
-  
-  static createMockEventBus(): jest.Mocked<EventBus> {
-    return {
-      emit: jest.fn(),
-      emitAndWait: jest.fn(),
-      on: jest.fn(),
-      off: jest.fn(),
-      once: jest.fn(),
-      removeAllListeners: jest.fn()
-    } as jest.Mocked<EventBus>;
-  }
-}
-```
+### Docker Compose Configuration
+```yaml
+# docker-compose.yml
+version: '3.8'
 
-### Testing AI Portal Integrations
-```typescript
-describe('OpenAIPortal', () => {
-  let portal: OpenAIPortal;
-  let mockOpenAI: jest.Mocked<OpenAI>;
-  
-  beforeEach(() => {
-    mockOpenAI = {
-      chat: {
-        completions: {
-          create: jest.fn()
-        }
-      }
+services:
+  # Core mind agents service
+  mind-agents:
+    build: 
+      context: ./mind-agents
+      dockerfile: Dockerfile
+    container_name: symindx-mind-agents
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./config:/app/config:ro
+      - mind-agents-data:/app/data
+      - mind-agents-logs:/app/logs
+    networks:
+      - symindx-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "bun", "run", "healthcheck"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Website service
+  website:
+    build:
+      context: ./website
+      dockerfile: Dockerfile
+    container_name: symindx-website
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://mind-agents:8080
+    networks:
+      - symindx-network
+    depends_on:
+      - mind-agents
+
+  # Documentation site
+  docs-site:
+    build:
+      context: ./docs-site
+      dockerfile: Dockerfile
+    container_name: symindx-docs
+    restart: unless-stopped
+    ports:
+      - "3001:80"
+    networks:
+      - symindx-network
+
+  # PostgreSQL database
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: symindx-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-symindx}
+      POSTGRES_USER: ${POSTGRES_USER:-symindx}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./config/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5432:5432"
+    networks:
+      - symindx-network
+    healthcheck:
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
