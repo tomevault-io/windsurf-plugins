@@ -1,63 +1,57 @@
 ---
 trigger: always_on
-description: description: Details best practices specific to Python and FastAPI implementations, including recommendations for asynchronous operations, API design, code quality, and performance improvements.
+description: You are an expert in Python, Mirascope, and the Sygaldry AI framework.
 ---
 
-  
-  ---
-description: Details best practices specific to Python and FastAPI implementations, including recommendations for asynchronous operations, API design, code quality, and performance improvements.
-globs: *.py
-alwaysApply: false
----
+# Sygaldry Development Rules
 
-# Running Commands
+You are an expert in Python, Mirascope, and the Sygaldry AI framework.
 
-Follow these guidelines when running commands in this project:
+## Core Principles
 
-## pip Commands
+- Write clean, maintainable Python code following PEP 8
+- Use Mirascope's functional patterns with `@prompt_template` decorators
+- Implement Pydantic models for all LLM responses
+- Prefer async/await patterns for optimal performance
+- Follow the component structure defined in component.json files
 
-- all pip commands should be prefixed with `uv` to ensure we are properly accessing our dependencies
+## Mirascope Best Practices
 
-## Environment Variables
+- Always use `@prompt_template` decorators for prompt construction
+- Define Pydantic response models for structured outputs
+- Use async functions for all LLM calls and tools
+- Implement proper error handling and validation
+- Include comprehensive docstrings and type hints
 
-- Always prefix commands with `doppler run` when access to environment variables is required
-- Example: `doppler run python app/main.py` instead of `python app/main.py`
-- For development, use: `doppler run --config dev [command]`
-- For production, use: `doppler run --config prod [command]`
+## Component Development
 
-## Dependency Management
+- Follow the sygaldry component structure with proper JSON manifests
+- Implement registry dependencies correctly
+- Include comprehensive examples and documentation
+- Test all functionality before committing
+- Support multiple LLM providers when possible
 
-- Use `uv` for all Python dependency management
-- Use `task uv:venv` to create a virtual environment
-- Use `source .venv/bin/activate` to activate the virual environment
-- Use `task uv:install` to install dependencies from pyproject.toml
-- Use `task uv:sync` to sync dependencies with lockfile
-- Use `task uv:lock` to update the project's lockfile (uv.lock)
-- Use `task uv:update-deps` to update dependencies
-- Use `task uv:export-reqs` to export requirements.txt
+## Available Components
 
-## Task Runner
+- **text_summarization_agent** (agent): Advanced text summarization agent using chain-of-thought reasoning, few-shot learning, and iterative refinement. Supports multiple styles (technical, executive, simple, academic, journalistic) and progressive summarization with validation.
+- **multi_source_news_verification** (agent): Advanced multi-source news verification agent with comprehensive fact-checking tools including academic search, government data verification, social media verification, and expert source validation for combating misinformation
+- **multi_agent_coordinator** (agent): Orchestrates multiple specialized agents to solve complex tasks through intelligent task decomposition, agent selection, and result synthesis
+- **recruiting_assistant_agent** (agent): Recruiting assistant for finding qualified candidates using Exa websets. Helps with technical recruiting, sales hiring, and executive search.
+- **game_theory_analysis** (agent): Analyzes complex strategic situations using game theory principles, identifying equilibria, predicting outcomes, and providing actionable recommendations
+- **enhanced_knowledge_graph_agent** (agent): Enhanced knowledge graph extraction using advanced prompt engineering. Features meta-reasoning for strategy planning, chain-of-thought entity extraction with detailed reasoning, multi-pass relationship detection, and self-consistency validation for high-accuracy results.
+- **document_segmentation_agent** (agent): Agent for intelligently segmenting documents into logical parts. Supports multiple strategies including semantic, structural, hybrid, and fixed-size segmentation. Features document structure analysis, segment summarization, and optimized chunking for vector embeddings.
+- **knowledge_graph_agent** (agent): Agent for extracting structured knowledge from text by identifying entities and their relationships. Builds comprehensive knowledge graph representations with support for hierarchical relationships, graph enrichment, and visualization-ready outputs.
+- **prompt_engineering_optimizer** (agent): Advanced prompt optimization agent that analyzes, generates variants, performs A/B testing, and delivers production-ready optimized prompts with comprehensive documentation
+- **academic_research_agent** (agent): Academic research agent for finding research papers using Exa websets. Perfect for academics, researchers, and anyone needing to discover scholarly publications.
+- **game_playing_catan** (agent): Multi-model turn-based Settlers of Catan game agent supporting AI vs AI, human vs AI, or mixed gameplay with resource management, trading, and strategic building
+- **research_assistant_agent** (agent): AI-powered research agent that conducts comprehensive research using Exa search
+- **pii_scrubbing_agent** (agent): Agent for detecting and removing Personally Identifiable Information (PII) from text. Combines regex patterns and LLM analysis for comprehensive PII detection. Supports multiple scrubbing methods including masking, redaction, generalization, and synthetic data replacement.
+- **dataset_builder_agent** (agent): AI-powered dataset builder that creates curated data collections using Exa Websets with custom criteria and enrichments
+- **dnd_game_master** (agent): A comprehensive D&D 5e game master agent with full rules enforcement and persistent campaign state. Features SQLite-based state persistence for multi-session campaigns, fair dice rolling with modifiers, complete D&D 5e API integration, multi-model orchestration, turn-based combat with positioning, spell slot tracking, condition management, death saves, XP/leveling, exhaustion, skill proficiencies, inventory management, and dynamic roleplay with human-in-the-loop support.
+- **multi_platform_social_media_manager** (agent): Enhanced multi-platform social media campaign manager with trend analysis, engagement prediction, and real-time adaptation capabilities for comprehensive campaign orchestration
+- **decision_quality_assessor** (agent): Comprehensive decision quality assessment agent that analyzes context, evaluates alternatives, detects cognitive biases, and provides actionable recommendations for better decision-making
 
-- Prefer using the task runner for common operations instead of direct commands
-- Use `task --list` to see all available tasks
-- Use namespaced tasks for specific operations:
-  - `task docker:*` for Docker operations
-  - `task doppler:*` for Doppler operations
-  - `task uv:*` for UV operations
-- Common tasks:
-  - `task install` - Install project dependencies
-  - `task lint` - Run linters
-  - `task format` - Run formatters
-  - `task test` - Run tests
-  - `task docker:build` - Build the Docker image
-  - `task docker:up` - Start the project with docker-compose
-  - `task doppler:setup` - Setup Doppler
-
-## Development Workflow
-
-1. Set up Doppler: `task doppler:setup`
-2. Install dependencies: `task uv:install`
-3. Run the application: `doppler run python app/main.py` or use the appropriate task
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [greyhaven-ai/sygaldry](https://github.com/greyhaven-ai/sygaldry) — distributed by [TomeVault](https://tomevault.io).
