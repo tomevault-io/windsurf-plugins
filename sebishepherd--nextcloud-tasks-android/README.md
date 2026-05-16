@@ -7,11 +7,11 @@ An Android app for the Nextcloud Tasks module.
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [SebiShepherd/nextcloud_tasks_android](https://github.com/SebiShepherd/nextcloud_tasks_android).
+Original source: `CLAUDE.md` in [SebiShepherd/nextcloud_tasks_android](https://github.com/SebiShepherd/nextcloud_tasks_android).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
