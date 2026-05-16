@@ -7,11 +7,11 @@ The Neo4j Kuberenetes Operator automates the deployment and management of Neo4j 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [neo4j-partners/neo4j-kubernetes-operator](https://github.com/neo4j-partners/neo4j-kubernetes-operator).
+Original source: `CLAUDE.md` in [neo4j-partners/neo4j-kubernetes-operator](https://github.com/neo4j-partners/neo4j-kubernetes-operator).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
