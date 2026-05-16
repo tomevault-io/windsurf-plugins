@@ -7,11 +7,11 @@ MPX68K: Sharp X68000 emulator for macOS (Apple Silicon and Intel Mac). SpriteKit
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [YosAwed/MPX68K](https://github.com/YosAwed/MPX68K).
+Original source: `CLAUDE.md` in [YosAwed/MPX68K](https://github.com/YosAwed/MPX68K).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
