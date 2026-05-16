@@ -1,222 +1,224 @@
 ---
 trigger: always_on
-description: **Rule Priority:** Advanced Automation
+description: **Rule Priority:** Advanced Integration
 ---
 
-# Background Agents for Cloud-Powered Development
+# Model Context Protocol (MCP) Integration
 
-**Rule Priority:** Advanced Automation  
-**Activation:** Complex multi-step tasks and parallel workflows  
-**Scope:** All development tasks suitable for agent delegation
+**Rule Priority:** Advanced Integration  
+**Activation:** External tool integration and service connections  
+**Scope:** All MCP-compatible tools and service integrations
 
 ## Overview
 
-Cursor's Background Agents feature enables cloud-powered AI agents to work on tasks in parallel while you focus on core development. These agents can handle UI fixes, content updates, pull request creation, and complex refactoring tasks without blocking your main workflow.
+Model Context Protocol (MCP) in Cursor v1.2+ enables seamless integration with external tools and services through standardized interfaces. This allows one-click installation of tools, OAuth authentication flows, and powerful service integrations without complex setup.
 
-## Background Agent Activation
+## MCP Architecture
 
-### Settings Configuration
+### Core MCP Components
+
+```typescript
+// MCP Server Implementation
+interface MCPServer {
+  name: string;
+  version: string;
+  capabilities: MCPCapabilities;
+  tools: MCPTool[];
+  resources: MCPResource[];
+  prompts: MCPPrompt[];
+}
+
+interface MCPCapabilities {
+  logging?: boolean;
+  notifications?: boolean;
+  resources?: {
+    subscribe?: boolean;
+    listChanged?: boolean;
+  };
+  tools?: {
+    listChanged?: boolean;
+  };
+  prompts?: {
+    listChanged?: boolean;
+  };
+}
+
+interface MCPTool {
+  name: string;
+  description: string;
+  inputSchema: JSONSchema;
+  handler: (params: any) => Promise<MCPResult>;
+}
+
+interface MCPResource {
+  uri: string;
+  name: string;
+  description?: string;
+  mimeType?: string;
+}
+
+interface MCPPrompt {
+  name: string;
+  description: string;
+  arguments?: MCPPromptArgument[];
+}
+```
+
+### MCP Client Configuration
 
 ```json
-// .cursor/background-agents.json
+// .cursor/mcp-config.json
 {
-  "enabled": true,
-  "maxConcurrentAgents": 5,
-  "autoCreatePRs": true,
-  "branchPrefix": "agent/",
-  "githubIntegration": true,
-  "costLimit": {
-    "dailyMax": 50.00,
-    "warningThreshold": 40.00
+  "mcpServers": {
+    "supabase": {
+      "command": "npx",
+      "args": ["@modelcontextprotocol/server-supabase"],
+      "env": {
+        "SUPABASE_URL": "process.env.SUPABASE_URL",
+        "SUPABASE_ANON_KEY": "process.env.SUPABASE_ANON_KEY"
+      }
+    },
+    "github": {
+      "command": "npx", 
+      "args": ["@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "process.env.GITHUB_TOKEN"
+      }
+    },
+    "memory": {
+      "command": "npx",
+      "args": ["@modelcontextprotocol/server-memory"],
+      "env": {
+        "MEMORY_STORE_PATH": "./data/mcp-memory"
+      }
+    },
+    "sequential-thinking": {
+      "command": "npx",
+      "args": ["@modelcontextprotocol/server-sequential-thinking"]
+    },
+    "playwright": {
+      "command": "npx",
+      "args": ["@modelcontextprotocol/server-playwright"]
+    },
+    "context7": {
+      "command": "npx", 
+      "args": ["@context7/mcp-server"]
+    }
   },
-  "agentTypes": {
-    "uiFixes": true,
-    "contentUpdates": true,
-    "refactoring": true,
-    "testing": true,
-    "documentation": true
+  "allowedOrigins": [
+    "cursor://",
+    "vscode://",
+    "localhost"
+  ],
+  "enableOAuth": true,
+  "oauthConfig": {
+    "providers": ["github", "google", "microsoft"],
+    "redirectUrl": "cursor://oauth/callback"
   }
 }
 ```
 
-### Authentication Setup
+## One-Click Tool Installation
 
-```bash
-# Enable Background Agents in Cursor Settings
-# 1. Settings → Beta → Enable Background Agents
-# 2. Authenticate GitHub for PR handling
-# 3. Snapshot environment for cloud agents
-# 4. Configure cost limits and permissions
-```
-
-## Agent Task Templates
-
-### UI Fix Agent Template
+### Built-in MCP Tools
 
 ```typescript
-// Template for delegating UI fixes to background agents
-interface UIFixTask {
-  type: 'ui-fix';
-  description: string;
-  targetFiles: string[];
-  screenshot?: string;
-  requirements: {
-    responsive: boolean;
-    accessibility: boolean;
-    designSystem: string;
-  };
-  priority: 'low' | 'medium' | 'high';
-}
-
-// Example UI fix delegation
-const uiFixTask: UIFixTask = {
-  type: 'ui-fix',
-  description: 'Fix mobile responsive layout for navbar component',
-  targetFiles: ['website/src/components/Navigation.tsx'],
-  requirements: {
-    responsive: true,
-    accessibility: true,
-    designSystem: 'tailwind'
+// Available MCP tools for one-click installation
+const availableMCPTools = {
+  // Database and Storage
+  supabase: {
+    name: '@modelcontextprotocol/server-supabase',
+    description: 'Supabase database operations',
+    category: 'database',
+    requiresAuth: true,
+    capabilities: ['read', 'write', 'schema', 'realtime']
   },
-  priority: 'medium'
+  
+  // Code and Documentation
+  github: {
+    name: '@modelcontextprotocol/server-github',
+    description: 'GitHub repository operations',
+    category: 'development',
+    requiresAuth: true,
+    capabilities: ['repos', 'issues', 'prs', 'files']
+  },
+  
+  // AI and ML
+  context7: {
+    name: '@context7/mcp-server',
+    description: 'Context7 library documentation',
+    category: 'ai',
+    requiresAuth: false,
+    capabilities: ['search', 'documentation', 'examples']
+  },
+  
+  // Web and Testing
+  playwright: {
+    name: '@modelcontextprotocol/server-playwright',
+    description: 'Web browser automation',
+    category: 'testing',
+    requiresAuth: false,
+    capabilities: ['navigate', 'interact', 'screenshot', 'test']
+  },
+  
+  // Productivity
+  memory: {
+    name: '@modelcontextprotocol/server-memory',
+    description: 'Persistent knowledge graphs',
+    category: 'productivity',
+    requiresAuth: false,
+    capabilities: ['store', 'retrieve', 'search', 'graph']
+  },
+  
+  // AI Reasoning
+  'sequential-thinking': {
+    name: '@modelcontextprotocol/server-sequential-thinking',
+    description: 'Step-by-step problem solving',
+    category: 'ai',
+    requiresAuth: false,
+    capabilities: ['reasoning', 'analysis', 'planning']
+  }
 };
 
-// Cursor will automatically:
-// 1. Create new branch: agent/fix-navbar-mobile
-// 2. Apply responsive fixes
-// 3. Test across breakpoints
-// 4. Create pull request with screenshots
-// 5. Notify when ready for review
-```
-
-### Content Update Agent Template
-
-```typescript
-// Template for content updates and data synchronization
-interface ContentUpdateTask {
-  type: 'content-update';
-  description: string;
-  contentType: 'documentation' | 'config' | 'assets' | 'data';
-  sourceFiles: string[];
-  updatePattern: 'replace' | 'merge' | 'append';
-  validation: string[];
-}
-
-// Example content update
-const contentTask: ContentUpdateTask = {
-  type: 'content-update',
-  description: 'Update AI portal configurations with new models',
-  contentType: 'config',
-  sourceFiles: ['mind-agents/src/portals/*/config.json'],
-  updatePattern: 'merge',
-  validation: ['schema-validation', 'connectivity-test']
-};
-```
-
-### Refactoring Agent Template
-
-```typescript
-// Template for complex refactoring tasks
-interface RefactoringTask {
-  type: 'refactoring';
-  description: string;
-  scope: 'file' | 'module' | 'system';
-  targetPattern: string;
-  transformations: RefactoringTransformation[];
-  preserveTests: boolean;
-}
-
-interface RefactoringTransformation {
-  name: string;
-  description: string;
-  pattern: string;
-  replacement: string;
-  validation: string;
-}
-
-// Example refactoring task
-const refactorTask: RefactoringTask = {
-  type: 'refactoring',
-  description: 'Extract common portal interface from all AI providers',
-  scope: 'module',
-  targetPattern: 'mind-agents/src/portals/*/index.ts',
-  transformations: [
-    {
-      name: 'extract-interface',
-      description: 'Create common BasePortal interface',
-      pattern: 'export class (.+)Portal',
-      replacement: 'export class $1Portal extends BasePortal',
-      validation: 'typescript-compile'
+// Installation workflow
+class MCPInstaller {
+  async installTool(toolName: string): Promise<InstallResult> {
+    const tool = availableMCPTools[toolName];
+    if (!tool) throw new Error(`Tool ${toolName} not found`);
+    
+    // 1. Install package
+    await this.installPackage(tool.name);
+    
+    // 2. Configure MCP server
+    await this.configureMCPServer(toolName, tool);
+    
+    // 3. Setup authentication if required
+    if (tool.requiresAuth) {
+      await this.setupAuthentication(toolName);
     }
-  ],
-  preserveTests: true
-};
+    
+    // 4. Verify installation
+    return this.verifyInstallation(toolName);
+  }
+  
+  private async setupAuthentication(toolName: string): Promise<void> {
+    // Launch OAuth flow or prompt for API keys
+    const authMethod = await this.detectAuthMethod(toolName);
+    
+    if (authMethod === 'oauth') {
+      await this.launchOAuthFlow(toolName);
+    } else {
+      await this.promptForAPIKey(toolName);
+    }
+  }
+}
 ```
 
-## Parallel Task Execution
-
-### Multi-Agent Workflows
+### SYMindX-Specific MCP Integrations
 
 ```typescript
-// Coordinate multiple agents for complex tasks
-interface MultiAgentWorkflow {
-  name: string;
-  agents: AgentTask[];
-  dependencies: AgentDependency[];
-  mergeStrategy: 'sequential' | 'parallel' | 'hybrid';
-}
-
-interface AgentTask {
-  id: string;
-  type: string;
-  description: string;
-  estimatedTime: number;
-  priority: number;
-}
-
-interface AgentDependency {
-  agentId: string;
-  dependsOn: string[];
-  condition: 'completion' | 'approval' | 'merge';
-}
-
-// Example: Complete feature implementation
-const featureWorkflow: MultiAgentWorkflow = {
-  name: 'Add New Emotion Support',
-  agents: [
-    {
-      id: 'emotion-types',
-      type: 'code-generation',
-      description: 'Add new emotion types to type definitions',
-      estimatedTime: 300, // 5 minutes
-      priority: 1
-    },
-    {
-      id: 'emotion-logic',
-      type: 'implementation',
-      description: 'Implement emotion calculation logic',
-      estimatedTime: 900, // 15 minutes
-      priority: 2
-    },
-    {
-      id: 'emotion-tests',
-      type: 'testing',
-      description: 'Generate comprehensive test suite',
-      estimatedTime: 600, // 10 minutes
-      priority: 3
-    },
-    {
-      id: 'emotion-docs',
-      type: 'documentation',
-      description: 'Update documentation and examples',
-      estimatedTime: 480, // 8 minutes
-      priority: 4
-    }
-  ],
-  dependencies: [
-    {
-      agentId: 'emotion-logic',
-      dependsOn: ['emotion-types'],
+// Custom MCP server for SYMindX
+export class SYMindXMCPServer implements MCPServer {
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
