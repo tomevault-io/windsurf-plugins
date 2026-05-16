@@ -7,11 +7,11 @@ cargo-hold makes your Rust CI caching actually work ✨💖
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [Ellipsis-Labs/cargo-hold](https://github.com/Ellipsis-Labs/cargo-hold).
+Original source: `CLAUDE.md` in [Ellipsis-Labs/cargo-hold](https://github.com/Ellipsis-Labs/cargo-hold).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
