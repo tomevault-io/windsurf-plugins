@@ -1,177 +1,180 @@
 ---
 trigger: always_on
-description: APPLY data management best practices when working with memory providers
+description: OPTIMIZE performance when implementing caching, memory, or compute-intensive features using 2025 edge computing patterns
 ---
 
 
-# Data Management and Database Patterns
+# Performance Optimization Patterns 2025
 
-## Data Architecture Overview
+## 2025 Performance Architecture Overview
 
-SYMindX implements a multi-provider data storage architecture supporting SQLite, PostgreSQL, Supabase, and Neon with vector embeddings, conversation persistence, and real-time synchronization across multiple agent instances.
+SYMindX implements cutting-edge performance optimization strategies leveraging 2025 technologies including edge computing, WebAssembly, service workers, and advanced caching patterns for sub-100ms AI responses and global scalability.
 
-### Core Data Principles
+### Core Performance Principles
 
-**🗃️ Provider Abstraction**
+**⚡ Response Time Optimization**
 
-- Unified interface across all memory providers
-- Hot-swappable database backends
-- Provider-specific optimization strategies
+- Sub-200ms agent response times for chat interactions
+- Parallel processing for AI portal requests
+- Intelligent caching across all system layers
 
-**📊 Vector-First Design**
+**🚀 Scalability Design**
 
-- All text data stored with semantic embeddings
-- Hybrid search capabilities (text + semantic)
-- Efficient similarity search and clustering
+- Horizontal scaling for agent instances
+- Load balancing across AI providers
+- Resource pooling and connection management
 
-**🔄 Real-time Synchronization**
+**📊 Resource Efficiency**
 
-- Multi-agent conversation synchronization
-- Event-driven data updates
-- Conflict resolution for concurrent modifications
+- Memory-efficient vector operations
+- CPU optimization for embedding calculations
+- I/O optimization for database operations
 
-## Database Schema Design
+## AI Portal Performance
 
-### Core Agent Tables
-
-```sql
--- Agent registry and metadata
-CREATE TABLE agents (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name VARCHAR(255) NOT NULL,
-  character_id VARCHAR(100) NOT NULL,
-  status VARCHAR(50) DEFAULT 'inactive',
-  config JSONB NOT NULL,
-  metadata JSONB DEFAULT '{}',
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  last_active TIMESTAMP WITH TIME ZONE
-);
-
--- Character definitions and personalities
-CREATE TABLE characters (
-  id VARCHAR(100) PRIMARY KEY,
-  name VARCHAR(255) NOT NULL,
-  description TEXT,
-  personality_traits JSONB NOT NULL,
-  behavioral_patterns JSONB DEFAULT '{}',
-  voice_settings JSONB DEFAULT '{}',
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Platform integrations and sessions
-CREATE TABLE platform_sessions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  agent_id UUID REFERENCES agents(id) ON DELETE CASCADE,
-  platform VARCHAR(50) NOT NULL,
-  platform_user_id VARCHAR(255),
-  session_data JSONB NOT NULL,
-  is_active BOOLEAN DEFAULT true,
-  expires_at TIMESTAMP WITH TIME ZONE,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  
-  UNIQUE(agent_id, platform, platform_user_id)
-);
-```
-
-### Conversation and Memory Tables
-
-```sql
--- Conversation threads
-CREATE TABLE conversations (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  agent_id UUID REFERENCES agents(id) ON DELETE CASCADE,
-  platform VARCHAR(50) NOT NULL,
-  platform_conversation_id VARCHAR(255),
-  title VARCHAR(255),
-  participants JSONB NOT NULL,
-  metadata JSONB DEFAULT '{}',
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  
-  UNIQUE(agent_id, platform, platform_conversation_id)
-);
-
--- Individual messages with vector embeddings
-CREATE TABLE messages (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  conversation_id UUID REFERENCES conversations(id) ON DELETE CASCADE,
-  agent_id UUID REFERENCES agents(id) ON DELETE CASCADE,
-  sender_id VARCHAR(255) NOT NULL,
-  sender_name VARCHAR(255),
-  content TEXT NOT NULL,
-  content_embedding vector(1536), -- OpenAI embedding dimension
-  message_type VARCHAR(50) DEFAULT 'text',
-  platform_message_id VARCHAR(255),
-  metadata JSONB DEFAULT '{}',
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  
-  -- Vector similarity search index
-  INDEX USING ivfflat (content_embedding vector_cosine_ops) WITH (lists = 100)
-);
-
--- Memory fragments for long-term storage
-CREATE TABLE memory_fragments (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  agent_id UUID REFERENCES agents(id) ON DELETE CASCADE,
-  content TEXT NOT NULL,
-  content_embedding vector(1536),
-  fragment_type VARCHAR(50) NOT NULL, -- 'conversation', 'knowledge', 'preference', 'experience'
-  importance_score FLOAT DEFAULT 0.5,
-  access_count INTEGER DEFAULT 0,
-  last_accessed TIMESTAMP WITH TIME ZONE,
-  source_conversation_id UUID REFERENCES conversations(id) ON DELETE SET NULL,
-  metadata JSONB DEFAULT '{}',
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  
-  INDEX USING ivfflat (content_embedding vector_cosine_ops) WITH (lists = 100)
-);
-```
-
-### Emotion and Cognition Data
-
-```sql
--- Emotional state tracking
-CREATE TABLE emotion_states (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  agent_id UUID REFERENCES agents(id) ON DELETE CASCADE,
-  emotion_type VARCHAR(50) NOT NULL,
-  intensity FLOAT NOT NULL CHECK (intensity >= 0 AND intensity <= 1),
-  triggers JSONB DEFAULT '[]',
-  context JSONB DEFAULT '{}',
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  expires_at TIMESTAMP WITH TIME ZONE
-);
-
--- Cognitive state and decision history
-CREATE TABLE cognition_events (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  agent_id UUID REFERENCES agents(id) ON DELETE CASCADE,
-  event_type VARCHAR(50) NOT NULL, -- 'decision', 'planning', 'reflection'
-  cognitive_module VARCHAR(50) NOT NULL,
-  input_data JSONB NOT NULL,
-  output_data JSONB NOT NULL,
-  processing_time_ms INTEGER,
-  success BOOLEAN DEFAULT true,
-  error_message TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-```
-
-## Data Provider Implementations
-
-### Base Provider Interface
+### Provider Selection Optimization
 
 ```typescript
-interface DataProvider {
-  // Connection management
-  connect(): Promise<void>;
-  disconnect(): Promise<void>;
-  healthCheck(): Promise<boolean>;
+interface PerformanceMetrics {
+  responseTime: number;
+  tokenThroughput: number;
+  errorRate: number;
+  costPerToken: number;
+  successRate: number;
+}
+
+class PerformanceOptimizedPortalSelector {
+  private metrics: Map<string, PerformanceMetrics> = new Map();
+  private loadBalancer: LoadBalancer;
   
-  // Agent management
-  createAgent(agent: AgentData): Promise<Agent>;
+  async selectOptimalProvider(request: GenerationRequest): Promise<string> {
+    const candidates = this.getAvailableProviders(request);
+    
+    // Real-time performance scoring
+    const scores = await Promise.all(
+      candidates.map(async (provider) => {
+        const metrics = await this.getRealtimeMetrics(provider);
+        const score = this.calculatePerformanceScore(metrics, request);
+        return { provider, score, metrics };
+      })
+    );
+    
+    // Sort by performance score (higher is better)
+    scores.sort((a, b) => b.score - a.score);
+    
+    // Select provider with circuit breaker protection
+    for (const candidate of scores) {
+      if (await this.circuitBreaker.isAvailable(candidate.provider)) {
+        return candidate.provider;
+      }
+    }
+    
+    throw new Error('No available AI providers');
+  }
+  
+  private calculatePerformanceScore(
+    metrics: PerformanceMetrics,
+    request: GenerationRequest
+  ): number {
+    const weights = {
+      responseTime: 0.4,
+      successRate: 0.3,
+      tokenThroughput: 0.2,
+      costEfficiency: 0.1
+    };
+    
+    // Normalize metrics to 0-1 scale
+    const normalizedResponseTime = Math.max(0, 1 - (metrics.responseTime / 5000)); // 5s max
+    const normalizedThroughput = Math.min(1, metrics.tokenThroughput / 1000); // 1000 tokens/s max
+    const normalizedCost = Math.max(0, 1 - (metrics.costPerToken / 0.01)); // $0.01/token max
+    
+    return (
+      weights.responseTime * normalizedResponseTime +
+      weights.successRate * metrics.successRate +
+      weights.tokenThroughput * normalizedThroughput +
+      weights.costEfficiency * normalizedCost
+    );
+  }
+}
+```
+
+### Request Batching and Streaming
+
+```typescript
+class OptimizedRequestProcessor {
+  private batchProcessor: BatchProcessor;
+  private streamingManager: StreamingManager;
+  
+  async processRequest(request: GenerationRequest): Promise<GenerationResponse> {
+    // Determine optimal processing strategy
+    if (this.shouldBatch(request)) {
+      return this.batchProcessor.addToBatch(request);
+    }
+    
+    if (this.shouldStream(request)) {
+      return this.streamingManager.processStreaming(request);
+    }
+    
+    return this.processImmediate(request);
+  }
+  
+  private shouldBatch(request: GenerationRequest): boolean {
+    // Batch non-urgent requests for efficiency
+    return (
+      !request.urgent &&
+      request.maxTokens < 500 &&
+      this.batchProcessor.hasCapacity()
+    );
+  }
+  
+  private shouldStream(request: GenerationRequest): boolean {
+    // Stream for real-time interactions
+    return (
+      request.stream === true ||
+      request.maxTokens > 1000 ||
+      request.conversationType === 'realtime'
+    );
+  }
+}
+
+class BatchProcessor {
+  private batch: GenerationRequest[] = [];
+  private batchSize = 10;
+  private batchTimeout = 100; // ms
+  private processingPromises: Map<string, Promise<GenerationResponse>> = new Map();
+  
+  async addToBatch(request: GenerationRequest): Promise<GenerationResponse> {
+    const requestId = this.generateRequestId();
+    this.batch.push({ ...request, id: requestId });
+    
+    // Create promise for this specific request
+    const promise = new Promise<GenerationResponse>((resolve, reject) => {
+      this.processingPromises.set(requestId, { resolve, reject });
+    });
+    
+    // Trigger batch processing if needed
+    if (this.batch.length >= this.batchSize) {
+      this.processBatch();
+    } else if (this.batch.length === 1) {
+      // Start timeout for first request in batch
+      setTimeout(() => this.processBatch(), this.batchTimeout);
+    }
+    
+    return promise;
+  }
+  
+  private async processBatch(): Promise<void> {
+    if (this.batch.length === 0) return;
+    
+    const currentBatch = [...this.batch];
+    this.batch = [];
+    
+    try {
+      // Process batch with optimal provider
+      const responses = await this.portalManager.processBatch(currentBatch);
+      
+      // Resolve individual promises
+      responses.forEach((response, index) => {
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
