@@ -1,182 +1,210 @@
 ---
 trigger: always_on
-description: APPLY extension patterns when developing platform integrations
+description: ENFORCE comprehensive testing standards when writing or modifying test files
 ---
 
-globs: mind-agents/src/extensions/**/*
+globs: **/*.test.ts, **/*.spec.ts, jest.config.js
 alwaysApply: false
 ---
-# Extension System Patterns
+# Testing and Quality Standards
 
 **Rule Priority:** Core Architecture  
 **Activation:** Always Active  
-**Scope:** Platform integrations, extensions, and external service connections
+**Scope:** Testing strategies, quality assurance, and code standards
 
-## Extension Architecture Overview
+## Testing Architecture Overview
 
-SYMindX implements a **pluggable extension system** that enables seamless integration with multiple communication platforms, APIs, and external services through a unified interface architecture.
+SYMindX follows a **comprehensive testing strategy** that ensures reliability, performance, and maintainability across all system components through multiple testing layers.
 
-### Extension System Structure
+### Testing Pyramid Structure
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                  SYMindX Extension System                    │
+│                     SYMindX Testing Pyramid                  │
 ├─────────────────────────────────────────────────────────────┤
-│  Communication Extensions  │  API Extensions  │  MCP       │
-│  ├─ Telegram Bot           │  ├─ REST API     │  ├─ Server │
-│  ├─ Discord Bot            │  ├─ WebSocket    │  ├─ Client │
-│  ├─ Slack Integration      │  ├─ GraphQL      │  └─ Tools  │
-│  ├─ Twitter/X Bot          │  └─ Webhooks     │            │
-│  └─ RuneLite Plugin        │                  │            │
+│              E2E Tests (10%)                │              │
+│         ┌─────────────────────────────────────┐              │
+│         │  Integration Tests (20%)            │              │
+│    ┌─────────────────────────────────────────────────┐       │
+│    │           Unit Tests (70%)                      │       │
+│    └─────────────────────────────────────────────────┘       │
+│                                                               │
+│  Coverage Requirements:                                       │
+│  • Unit Tests: 90%+ coverage                                │
+│  • Integration Tests: Critical paths                         │
+│  • E2E Tests: User journeys                                 │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-## Base Extension Framework
+## Unit Testing Standards
 
-### Extension Interface
+### Jest Configuration
 ```typescript
-interface Extension {
-  readonly id: string;
-  readonly name: string;
-  readonly version: string;
-  readonly capabilities: ExtensionCapability[];
-  readonly dependencies: ExtensionDependency[];
-  
-  // Lifecycle methods
-  initialize(context: ExtensionContext): Promise<void>;
-  activate(): Promise<void>;
-  deactivate(): Promise<void>;
-  dispose(): Promise<void>;
-  
-  // Event handling
-  onMessage(message: Message): Promise<void>;
-  onEvent(event: SystemEvent): Promise<void>;
-  handleError(error: Error): Promise<void>;
-}
+// jest.config.ts
+import type { Config } from '@jest/types';
 
-abstract class BaseExtension implements Extension {
-  protected context: ExtensionContext;
-  protected eventBus: EventBus;
-  protected logger: Logger;
-  
-  constructor(
-    public readonly id: string,
-    public readonly name: string,
-    public readonly version: string
-  ) {}
-  
-  async initialize(context: ExtensionContext): Promise<void> {
-    this.context = context;
-    this.eventBus = context.eventBus;
-    this.logger = context.logger.child({ extension: this.id });
-    
-    await this.onInitialize();
+const config: Config.InitialOptions = {
+  preset: 'ts-jest',
+  testEnvironment: 'node',
+  roots: ['<rootDir>/src', '<rootDir>/tests'],
+  testMatch: [
+    '**/__tests__/**/*.ts',
+    '**/?(*.)+(spec|test).ts'
+  ],
+  transform: {
+    '^.+\\.ts$': ['ts-jest', {
+      useESM: true,
+      tsconfig: {
+        module: 'esnext'
+      }
+    }]
+  },
+  collectCoverageFrom: [
+    'src/**/*.ts',
+    '!src/**/*.d.ts',
+    '!src/**/*.types.ts',
+    '!src/**/index.ts'
+  ],
+  coverageThreshold: {
+    global: {
+      branches: 90,
+      functions: 90,
+      lines: 90,
+      statements: 90
+    }
+  },
+  setupFilesAfterEnv: [
+    '<rootDir>/tests/setup.ts'
+  ],
+  moduleNameMapping: {
+    '^@/(.*)$': '<rootDir>/src/$1'
   }
-  
-  protected abstract onInitialize(): Promise<void>;
-  protected abstract onActivate(): Promise<void>;
-  protected abstract onDeactivate(): Promise<void>;
-}
+};
+
+export default config;
 ```
 
-### Extension Registry
+### Test File Organization
 ```typescript
-interface ExtensionRegistry {
-  register(extension: Extension): Promise<void>;
-  unregister(extensionId: string): Promise<void>;
-  get(extensionId: string): Extension | null;
-  getAll(): Extension[];
-  getByCapability(capability: ExtensionCapability): Extension[];
-}
+// Standard test file structure
+describe('AIPortalManager', () => {
+  let portalManager: AIPortalManager;
+  let mockEventBus: jest.Mocked<EventBus>;
+  let mockConfig: AIPortalConfig;
+  
+  beforeEach(() => {
+    // Setup mocks and test instances
+    mockEventBus = createMockEventBus();
+    mockConfig = createTestConfig();
+    portalManager = new AIPortalManager(mockEventBus, mockConfig);
+  });
+  
+  afterEach(() => {
+    // Cleanup resources
+    jest.clearAllMocks();
+  });
+  
+  describe('initialization', () => {
+    it('should initialize all enabled portals', async () => {
+      // Test setup and execution
+    });
+    
+    it('should handle initialization failures gracefully', async () => {
+      // Error condition testing
+    });
+  });
+  
+  describe('provider selection', () => {
+    it('should select primary provider for standard requests', async () => {
+      // Normal flow testing
+    });
+    
+    it('should fallback to secondary provider when primary fails', async () => {
+      // Fallback behavior testing
+    });
+  });
+  
+  describe('error handling', () => {
+    it('should retry failed requests with exponential backoff', async () => {
+      // Retry logic testing
+    });
+    
+    it('should circuit break after repeated failures', async () => {
+      // Circuit breaker testing
+    });
+  });
+});
+```
 
-class RuntimeExtensionRegistry implements ExtensionRegistry {
-  private extensions = new Map<string, Extension>();
-  private capabilityIndex = new Map<ExtensionCapability, Set<string>>();
-  
-  async register(extension: Extension): Promise<void> {
-    // Validate dependencies
-    await this.validateDependencies(extension);
-    
-    // Initialize extension
-    await extension.initialize(this.createContext(extension));
-    
-    // Register in indexes
-    this.extensions.set(extension.id, extension);
-    this.indexCapabilities(extension);
-    
-    this.logger.info(`Extension registered: ${extension.id}`);
-  }
-  
-  private createContext(extension: Extension): ExtensionContext {
+### Mock Factory Patterns
+```typescript
+// Mock factories for consistent test data
+export class TestFactories {
+  static createMockAgent(overrides: Partial<Agent> = {}): Agent {
     return {
-      extensionId: extension.id,
-      eventBus: this.eventBus,
-      logger: this.logger,
-      config: this.getExtensionConfig(extension.id),
-      storage: this.createExtensionStorage(extension.id)
+      id: 'test-agent-id',
+      name: 'Test Agent',
+      characterId: 'nyx',
+      status: 'inactive',
+      config: {
+        memoryProvider: 'sqlite',
+        emotionModule: 'confident',
+        cognitiveModule: 'reactive',
+        aiPortal: 'openai'
+      },
+      metadata: {
+        createdAt: new Date('2024-01-01'),
+        lastActive: null,
+        version: '1.0.0'
+      },
+      ...overrides
     };
   }
+  
+  static createMockMessage(overrides: Partial<Message> = {}): Message {
+    return {
+      id: `msg-${Date.now()}`,
+      content: 'Test message content',
+      sender: {
+        id: 'test-user',
+        name: 'Test User',
+        platform: 'test'
+      },
+      channel: {
+        id: 'test-channel',
+        type: 'direct',
+        platform: 'test'
+      },
+      timestamp: new Date(),
+      ...overrides
+    };
+  }
+  
+  static createMockEventBus(): jest.Mocked<EventBus> {
+    return {
+      emit: jest.fn(),
+      emitAndWait: jest.fn(),
+      on: jest.fn(),
+      off: jest.fn(),
+      once: jest.fn(),
+      removeAllListeners: jest.fn()
+    } as jest.Mocked<EventBus>;
+  }
 }
 ```
 
-## Communication Extensions
-
-### Telegram Extension (`extensions/communication/telegram/`)
+### Testing AI Portal Integrations
 ```typescript
-interface TelegramConfig {
-  botToken: string;
-  webhookUrl?: string;
-  allowedUsers?: string[];
-  commandPrefix: string;
-  features: {
-    inlineKeyboards: boolean;
-    fileUploads: boolean;
-    groupChats: boolean;
-  };
-}
-
-class TelegramExtension extends BaseExtension {
-  private bot: TelegramBot;
-  private config: TelegramConfig;
+describe('OpenAIPortal', () => {
+  let portal: OpenAIPortal;
+  let mockOpenAI: jest.Mocked<OpenAI>;
   
-  protected async onInitialize(): Promise<void> {
-    this.config = this.context.config as TelegramConfig;
-    this.bot = new TelegramBot(this.config.botToken, {
-      polling: !this.config.webhookUrl,
-      webhook: this.config.webhookUrl ? {
-        url: this.config.webhookUrl,
-        port: process.env.WEBHOOK_PORT ? parseInt(process.env.WEBHOOK_PORT) : 3000
-      } : undefined
-    });
-    
-    this.setupEventHandlers();
-  }
-  
-  private setupEventHandlers(): void {
-    this.bot.on('message', async (msg) => {
-      try {
-        await this.handleTelegramMessage(msg);
-      } catch (error) {
-        await this.handleError(error as Error);
+  beforeEach(() => {
+    mockOpenAI = {
+      chat: {
+        completions: {
+          create: jest.fn()
+        }
       }
-    });
-    
-    this.bot.on('callback_query', async (query) => {
-      await this.handleCallbackQuery(query);
-    });
-  }
-  
-  private async handleTelegramMessage(msg: TelegramMessage): Promise<void> {
-    // Security check
-    if (!this.isAuthorizedUser(msg.from?.id)) {
-      await this.bot.sendMessage(msg.chat.id, 'Unauthorized access');
-      return;
-    }
-    
-    // Convert to internal message format
-    const message: Message = {
-      id: msg.message_id.toString(),
-      content: msg.text || '',
-      sender: {
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
