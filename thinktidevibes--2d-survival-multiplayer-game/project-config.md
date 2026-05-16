@@ -1,86 +1,136 @@
 ---
 trigger: always_on
-description: Guide for adding new deployable items (e.g., structures, placeables) to the world.
+description: This rules file specifies the architecture, patterns, and conventions for the Vibe Coding 2D Survival Multiplayer project. AI assistants should use this information to understand the codebase structure and make appropriate recommendations.
 ---
 
-# Guide: Adding New Deployable Items
+# 2D Survival Multiplayer Architecture Guidelines
 
-This guide outlines the general steps to add a new deployable item (like campfires, storage boxes, or sleeping bags) to the game. Replace bracketed placeholders (e.g., `[Item Name]`, `[item_name]`) with your specific item's details.
+This rules file specifies the architecture, patterns, and conventions for the Vibe Coding 2D Survival Multiplayer project. AI assistants should use this information to understand the codebase structure and make appropriate recommendations.
 
-## 1. Server: Define the Item
+## Core Architecture
 
-*   **File:** [`server/src/items_database.rs`](mdc:server/src/items_database.rs)
-*   **Action:** Add a new `ItemDefinition` struct entry for your `[Item Name]`.
-        *   Set `category: ItemCategory::Placeable`.
-    *   Set `icon_asset_name: "[item_name].png"`.
-    *   Configure `is_stackable` (usually `false` for placeables), `stack_size` (usually `1`), `is_equippable: false`.
-    *   *(Optional)* Define a crafting recipe later if needed.
+The project implements a client-server architecture with these primary components:
 
-## 2. Server: Create the Entity Logic
+1. **Backend**: SpacetimeDB module written in Rust (`server/`) for game logic, state management, and data persistence
+2. **Frontend**: React/TypeScript client (`client/`) for rendering, input handling, and user interface
+3. **Communication Layer**: SpacetimeDB for real-time synchronization between clients and server
 
-*   **New File:** `server/src/[item_name].rs`
-*   **Action:**
-    *   Define the `[ItemName]` struct (e.g., `SleepingBag`) with `#[spacetimedb::table(name = [item_name], public)]`.
-    *   **Required Fields:** `id: u32` (PK, auto_inc), `pos_x: f32`, `pos_y: f32`, `chunk_index: u32`, `placed_by: Identity`, `placed_at: Timestamp`. Add other fields as needed for the item's function.
-    *   Add collision/interaction constants (copy/adapt from [`server/src/wooden_storage_box.rs`](mdc:server/src/wooden_storage_box.rs) or [`server/src/campfire.rs`](mdc:server/src/campfire.rs)).
-    *   Implement `place_[item_name]` reducer:
-        *   Find your item's definition ID.
-        *   Validate the item instance (ownership, type).
-        *   Validate placement distance/collision.
-        *   Consume the item from player inventory/hotbar (using helpers from [`server/src/items.rs`](mdc:server/src/items.rs) or [`server/src/inventory_management.rs`](mdc:server/src/inventory_management.rs)).
-        *   Calculate `chunk_index` using `calculate_chunk_index` from [`server/src/environment.rs`](mdc:server/src/environment.rs).
-        *   Insert the new `[ItemName]` entity.
-    *   Implement `interact_with_[item_name]` reducer (at least basic distance check if interaction is needed).
-    *   Implement `pickup_[item_name]` reducer (if applicable):
-        *   Validate interaction.
-        *   Check if pickup conditions met (e.g., empty).
-        *   Add item back to player inventory using `add_item_to_player_inventory` from [`server/src/items.rs`](mdc:server/src/items.rs).
-        *   Delete the entity if item added successfully.
-    *   Implement `validate_[item_name]_interaction` helper (if needed).
-*   **File:** [`server/src/lib.rs`](mdc:server/src/lib.rs)
-*   **Action:**
-    *   Add `mod [item_name];`
-    *   Add `pub use crate::[item_name]::[ItemName];` near the end of the file.
-    *   Add `use crate::[item_name]::[item_name] as [ItemName]TableTrait;` to the table trait imports near the top.
+## Server Architecture
 
-## 3. Server: Update Starting Items (Optional)
+The backend is organized into these logical components:
 
-*   **File:** [`server/src/starting_items.rs`](mdc:server/src/starting_items.rs)
-*   **Action:** If players should start with this item, add an entry for `"[Item Name]"` to the `starting_inv_items` array.
+- **Schema Definitions**: Tables defined in `server/lib.rs` with `#[spacetimedb::table]` attributes
+- **Game Logic**: Reducer functions (`#[spacetimedb::reducer]`) implementing core gameplay mechanics
+- **Module Organization**: Functionality separated into domain-specific files (e.g., `environment.rs`, `inventory_management.rs`)
 
-## 4. Client: Map the Icon
+### Key Server Patterns
 
-*   **File:** [`client/src/utils/itemIconUtils.ts`](mdc:client/src/utils/itemIconUtils.ts)
-*   **Action:**
-    *   Import the icon: `import [itemName]Icon from '../assets/items/[item_name].png';`
-    *   Add the mapping to `itemIcons`: `'[item_name].png': [itemName]Icon`.
+1. **Table Schema Convention**: 
+   - Use snake_case for table names (`name = "player"`)
+   - Mark tables as `public` when client access is required
+   - Use `Identity` type for player identification
+   - Implement `Clone` for all table structures
 
-## 5. Client: Create Rendering & Type Logic
+2. **Reducer Implementation**:
+   - Use `#[spacetimedb::reducer]` and appropriate return types
+   - Implement core game logic in separate modules
+   - Handle identity connection/disconnection explicitly
+   - Use `ctx.db` to access database tables
 
-*   **File:** [`client/src/config/gameConfig.ts`](mdc:client/src/config/gameConfig.ts)
-*   **Action:** Define constants for the item's dimensions (e.g., `[ITEM_NAME]_WIDTH`, `[ITEM_NAME]_HEIGHT`).
-*   **File:** [`client/src/utils/typeGuards.ts`](mdc:client/src/utils/typeGuards.ts)
-*   **Action:**
-    *   Import `[ItemName] as SpacetimeDB[ItemName]` from `../generated`.
-    *   Add `is[ItemName](mdc:entity: any): entity is SpacetimeDB[ItemName]` type guard.
-*   **New File:** `client/src/utils/[itemName]RenderingUtils.ts`
-*   **Action:**
-    *   Implement `render[ItemName](mdc:...)` to draw the item (using dimensions from `gameConfig`).
-    *   Implement `preload[ItemName]Image(...)` if needed.
+3. **Database Access Pattern**:
+   - Access tables via `ctx.db.table_name()`
+   - Use `.identity().find(id)`, `.identity().update(data)`, etc. for operations
+   - Handle errors with `Result<(), String>` return types
 
-## 6. Client: Integrate Rendering & Placement
+## Client Architecture
 
-*   **File:** [`client/src/utils/renderingUtils.ts`](mdc:client/src/utils/renderingUtils.ts)
-*   **Action:**
-    *   Import `render[ItemName]` and `is[ItemName]`.
-    *   Add `SpacetimeDB[ItemName]` to the `Entity` type union.
-    *   In `renderGroundEntities` or `renderYSortedEntities` (depending on item type), add check `if (is[ItemName](mdc:entity))` and call `render[ItemName]`. *Crucial for drawing!* 
-*   **File:** [`client/src/utils/placementRenderingUtils.ts`](mdc:client/src/utils/placementRenderingUtils.ts)
-*   **Action:** Update `renderPlacementPreview`:
-    *   Import dimensions from `gameConfig`.
-    *   Add an `else if` check for `placementInfo.iconAssetName === '[item_name].png'` to set the correct `drawWidth` and `drawHeight`. *Crucial for placement preview size!* 
-*   **File:** [`client/src/hooks/usePlacementManager.ts`](mdc:client/src/hooks/usePlacementManager.ts)
-*   **Action:** In the `attemptPlacement` function's `switch` statement, add a `case '[Item Name]':` that calls the correct server reducer (`connection.reducers.place_[item_name](mdc:...)`). *Crucial for initiating placement!* 
+The client follows these organizational principles:
+
+- **Core Components**: Main game loop in `App.tsx`, rendering in `GameScene.tsx`
+- **Component Structure**: Character system in `Player.tsx`, UI in `PlayerUI.tsx`
+- **State Management**: React hooks for local state, SpacetimeDB subscriptions for shared state
+
+### Key Client Patterns
+
+1. **SpacetimeDB Connection**:
+   - Initialize connection in top-level component with `useEffect`
+   - Store connection object for later use
+   - Handle connection events with callbacks
+
+2. **Data Subscription**:
+   - Use `conn.subscriptionBuilder()` with SQL queries
+   - Implement spatial filtering with WHERE clauses
+   - Register table callbacks with `conn.db.tableName.onUpdate()` (camelCase)
+
+3. **Rendering Optimization**:
+   - Use chunk-based loading for world data
+   - Implement view-distance culling
+   - Use interpolation for smooth movement
+
+## Integration Patterns
+
+When working with this codebase, observe these integration patterns:
+
+1. **Server-Client Data Flow**:
+   - Server is authoritative for game state
+   - Client predicts actions for responsiveness
+   - Server validates and reconciles conflicting actions
+
+2. **Schema Synchronization**:
+   - TypeScript bindings are generated from Rust schema
+   - Regenerate bindings when schema changes
+   - Use imported types from generated files
+
+3. **Development Workflow**:
+   - Build server module with `spacetime build` (usually done implicitly by `publish`)
+   - Publish to local instance from `server/` directory: `spacetime publish vibe-survival-game`
+   - Generate TypeScript bindings from `server/` directory: `spacetime generate --lang typescript --out-dir ../client/src/generated`
+   - **Run both publish and generate commands whenever the server schema (`lib.rs`) changes.**
+   - Run client with `npm run dev` (from project root)
+
+## Implementation Guidelines
+
+When implementing new features, follow these guidelines:
+
+1. **For New Entity Types**:
+   - Add table definition in server schema
+   - Create reducers for entity interactions
+   - Implement client-side rendering component
+   - Add appropriate subscriptions
+
+2. **For Game Systems**:
+   - Define data structures on server side
+   - Implement core logic as reducers
+   - Create client UI components
+   - Connect through appropriate subscriptions
+
+3. **For World Features**:
+   - Extend terrain generation in appropriate modules
+   - Ensure efficient loading/unloading based on player proximity
+   - Consider performance implications
+
+## Performance Considerations
+
+AI should prioritize these performance considerations:
+
+1. **Network Efficiency**:
+   - Use relevance filtering in subscriptions
+   - Limit update frequency for non-critical entities
+   - Batch related updates when possible
+
+2. **Rendering Optimization**:
+   - Implement entity culling based on view distance
+   - Use appropriate data structures for spatial queries
+   - Consider object pooling for frequently created entities
+
+3. **State Management**:
+   - Implement reconciliation for client-server state
+   - Use appropriate local caching
+   - Consider partial updates for large entities
+
+## Technical Constraints
+
+AI should be aware of these technical constraints:
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
