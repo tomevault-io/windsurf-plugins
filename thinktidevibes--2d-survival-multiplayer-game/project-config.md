@@ -1,103 +1,99 @@
 ---
 trigger: always_on
-description: Guide outlining the steps to add new consumable resources or gatherable nodes.
+description: > SpacetimeDB is a fully-featured relational database system that integrates
 ---
 
-# Guide: Adding New Resources and Nodes
+# SpacetimeDB
 
-This guide outlines the steps required to add new consumable resources (like Pumpkins) or gatherable nodes (like Metal Ore) to the 2D Survival Multiplayer game. Follow these steps to ensure consistency with the existing architecture.
+> SpacetimeDB is a fully-featured relational database system that integrates
+application logic directly within the database, eliminating the need for
+separate web or game servers. It supports multiple programming languages,
+including C# and Rust, allowing developers to write and deploy entire
+applications as a single binary. It is optimized for high-throughput and low
+latency multiplayer applications like multiplayer games.
 
-## General Workflow
+Users upload their application logic to run inside SpacetimeDB as a WebAssembly
+module. There are three main features of SpacetimeDB: tables, reducers, and
+subscription queries. Tables are relational database tables like you would find
+in a database like Postgres. Reducers are atomic, transactional, RPC functions
+that are defined in the WebAssembly module which can be called by clients.
+Subscription queries are SQL queries which are made over a WebSocket connection
+which are initially evaluated by SpacetimeDB and then incrementally evaluated
+sending changes to the query result over the WebSocket.
 
-1.  **Define Data (Server):** Add necessary item definitions and entity table structures.
-2.  **Implement Logic (Server):** Create server-side reducers for interaction, harvesting, spawning, and respawning.
-3.  **Integrate (Server):** Update server logic (seeding, respawning) to include the new resource.
-4.  **Generate Bindings (CLI):** Run `spacetime generate` **before** making client-side changes that depend on new server types or reducers.
-5.  **Add Assets (Client):** Place images for the resource doodad and its corresponding item.
-6.  **Client-Side State Management:**
-    *   Update `useSpacetimeTables.ts` to manage the new entity's state.
-    *   Update `App.tsx` to fetch and pass the new entity's data.
-    *   Update `GameScreen.tsx` to receive and pass down the new entity's data.
-7.  **Client Rendering & Logic (Client):**
-    *   Create rendering utilities (e.g., `pumpkinRenderingUtils.ts`) including image preloading.
-    *   Update type guards (`typeGuards.ts`).
-    *   Update entity filtering (`useEntityFiltering.ts`).
-    *   Integrate into the main rendering loop (`GameCanvas.tsx`).
-    *   Update interaction finding (`useInteractionFinder.ts`).
-    *   Update interaction labels (`labelRenderingUtils.ts`).
-    *   Update input handling (`useInputHandler.ts`) to call server reducers.
-    *   Update item icon mapping (`itemIconUtils.ts`).
-8.  **Testing:** Test spawning, interaction/harvesting, item yield, respawning, and UI rendering thoroughly.
+All data in the tables are stored in memory, but are persisted to the disk via a
+Write-Ahead Log (WAL) called the Commitlog. All tables are persistent in
+SpacetimeDB.
 
----
+SpacetimeDB allows users to code generate type-safe client libraries based on
+the tables, types, and reducers defined in their module. Subscription queries
+allows the client SDK to store a partial, live updating, replica of the servers
+state. This makes reading database state on the client extremely low-latency.
 
-## Adding a Consumable Resource (e.g., Pumpkin)
+Authentication is implemented in SpacetimeDB using the OpenID Connect protocol.
+An OpenID Connect token with a valid `iss`/`sub` pair constitutes a unique and
+authenticable SpacetimeDB identity. SpacetimeDB uses the `Identity` type as an
+identifier for all such identities. `Identity` is computed from the `iss`/`sub`
+pair using the following algorithm:
 
-This resource type is picked up directly by the player, disappears, and respawns after a timer. It yields an item (e.g., "Pumpkin" item).
+1. Concatenate the issuer and subject with a pipe symbol (`|`).
+2. Perform the first BLAKE3 hash on the concatenated string.
+3. Get the first 26 bytes of the hash (let's call this `idHash`).
+4. Create a 28-byte sequence by concatenating the bytes `0xc2`, `0x00`, and `idHash`.
+5. Compute the BLAKE3 hash of the 28-byte sequence from step 4 (let's call this `checksumHash`).
+6. Construct the final 32-byte `Identity` by concatenating: the two prefix bytes (`0xc2`, `0x00`), the first 4 bytes of `checksumHash`, and the 26-byte `idHash`.
+7. This final 32-byte value is typically represented as a hexadecimal string.
 
-### Server (`server/`)
+```ascii
+Byte Index: |  0  |  1  |  2  |  3  |  4  |  5  |  6  |  7  | ... | 31  |
+            +-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+
+Contents:   | 0xc2| 0x00| Checksum Hash (4 bytes) |  ID Hash (26 bytes) |
+            +-----+-----+-------------------------+---------------------+
+                      (First 4 bytes of           (First 26 bytes of
+                       BLAKE3(0xc200 || idHash))    BLAKE3(iss|sub))
+```
 
-1.  **Define Item:**
-    *   In `src/items_database.rs`, within the `get_item_definitions()` function's returned vector, add an `ItemDefinition` for the yielded item (e.g., "Pumpkin").
-        ```rust
-        ItemDefinition {
-            id: 0, // Will be auto-assigned
-            name: "Pumpkin".to_string(),
-            description: "A ripe pumpkin, good for eating or crafting.".to_string(),
-            category: ItemCategory::Consumable, // Or ItemCategory::Material if not directly edible
-            icon_asset_name: "pumpkin.png".to_string(), // Matches asset in client/src/assets/items/
-            is_stackable: true,
-            stack_size: 10,
-            // ... other fields as necessary
-            damage: None,
-            is_equippable: false,
-            equipment_slot_type: None,
-            fuel_burn_duration_secs: None,
-        }
+This allows SpacetimeDB to easily integrate with OIDC authentication
+providers like FirebaseAuth, Auth0, or SuperTokens.
+
+Clockwork Labs, the developers of SpacetimeDB, offers three products:
+
+1. SpacetimeDB Standalone: a source available (Business Source License), single node, self-hosted version
+2. SpacetimeDB Maincloud: a hosted, managed-service, serverless cluster
+3. SpacetimeDB Enterprise: a closed-source, clusterized version of SpacetimeDB which can be licensed for on-prem hosting or dedicated hosting
+
+## Basic Project Workflow
+
+Getting started with SpacetimeDB involves a few key steps:
+
+1.  **Install SpacetimeDB:** Install the `spacetime` CLI tool for your operating system. This tool is used for managing modules, databases, and local instances.
+
+    *   **macOS:**
+        ```bash
+        curl -sSf https://install.spacetimedb.com | sh
         ```
-2.  **Create Resource Module:**
-    *   Create a new file: `src/pumpkin.rs`.
-3.  **Define Entity Struct (`src/pumpkin.rs`):**
-    *   Define the `Pumpkin` struct:
-        ```rust
-        use spacetimedb::{table, ReducerContext, Identity, Timestamp, log};
-        use crate::collectible_resources::{validate_player_resource_interaction, collect_resource_and_schedule_respawn, BASE_RESOURCE_RADIUS, PLAYER_RESOURCE_INTERACTION_DISTANCE_SQUARED};
-        use crate::TILE_SIZE_PX; // If needed for positioning logic, though not directly for basic consumable
-
-        #[table(name = pumpkin, public)]
-        #[derive(Clone, Debug)]
-        pub struct Pumpkin {
-            #[primary_key]
-            #[auto_inc]
-            pub id: u64,
-            pub pos_x: f32,
-            pub pos_y: f32,
-            pub chunk_index: u32,
-            pub respawn_at: Option<Timestamp>,
-        }
-
-        // Constants
-        pub const PUMPKIN_YIELD_ITEM_NAME: &str = "Pumpkin"; // Name of the item defined in items_database.rs
-        pub const PUMPKIN_YIELD_AMOUNT: u32 = 1;
-        pub const PUMPKIN_RESPAWN_TIME_SECS: u64 = 180; // Example: 3 minutes
-        pub const PUMPKIN_RADIUS: f32 = BASE_RESOURCE_RADIUS; // Or a custom radius
-
-        // Spawning density and minimum distance constants (adjust as needed)
-        pub const PUMPKIN_DENSITY_PERCENT: f32 = 0.5;
-        pub const MIN_PUMPKIN_DISTANCE_SQ: f32 = (PUMPKIN_RADIUS * 2.0 + 50.0) * (PUMPKIN_RADIUS * 2.0 + 50.0);
-        pub const MIN_PUMPKIN_TREE_DISTANCE_SQ: f32 = (PUMPKIN_RADIUS + crate::tree::TREE_RADIUS + 50.0) * (PUMPKIN_RADIUS + crate::tree::TREE_RADIUS + 50.0);
-        pub const MIN_PUMPKIN_STONE_DISTANCE_SQ: f32 = (PUMPKIN_RADIUS + crate::stone::STONE_RADIUS + 50.0) * (PUMPKIN_RADIUS + crate::stone::STONE_RADIUS + 50.0);
-        // Add similar constants for other resources if needed (e.g., MIN_PUMPKIN_CORN_DISTANCE_SQ)
+    *   **Windows (PowerShell):**
+        ```powershell
+        iwr https://windows.spacetimedb.com -useb | iex
         ```
-4.  **Implement Interaction Reducer (`src/pumpkin.rs`):**
-    *   Create a reducer `interact_with_pumpkin(ctx: &ReducerContext, pumpkin_id: u64)`.
-        ```rust
-        #[spacetimedb::reducer]
-        pub fn interact_with_pumpkin(ctx: &ReducerContext, pumpkin_id: u64) -> Result<(), String> {
-            let sender_id = ctx.sender;
-
-            let pumpkin_entity = ctx.db.pumpkin().id().find(pumpkin_id)
-                .ok_or_else(|| format!("Pumpkin with ID {} not found.", pumpkin_id))?;
+    *   **Linux:**
+        ```bash
+        curl -sSf https://install.spacetimedb.com | sh
+        ```
+    *   **Docker (to run the server):**
+        ```bash
+        # This command starts a SpacetimeDB server instance in Docker
+        docker run --rm --pull always -p 3000:3000 clockworklabs/spacetime start 
+        # Note: While the CLI can be installed separately (see above), you can also execute 
+        # CLI commands *within* the running Docker container (e.g., using `docker exec`) 
+        # or use the image as a base for a custom image containing your module management tools.
+        ```
+    *   **Docker (to execute CLI commands directly):**
+        You can also use the Docker image to run `spacetime` CLI commands without installing the CLI locally. For commands that operate on local files (like `build`, `publish`, `generate`), this involves mounting your project directory into the container. For commands that only interact with a database instance (like `sql`, `status`), mounting is typically not required, but network access to the database is.
+        ```bash
+        # Example: Build a module located in the current directory (.)
+        # Mount current dir to /module inside container, set working dir to /module
+        docker run --rm -v "$(pwd):/module" -w /module clockworklabs/spacetime build --project-path .
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
