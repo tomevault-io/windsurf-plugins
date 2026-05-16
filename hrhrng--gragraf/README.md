@@ -7,13 +7,13 @@ Simple Agentic Workflow Base On LangGraph
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `.cursor/rules/*.mdc` in [hrhrng/gragraf](https://github.com/hrhrng/gragraf).
+Original source: `CLAUDE.md` in [hrhrng/gragraf](https://github.com/hrhrng/gragraf).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
+- **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
