@@ -7,11 +7,11 @@ Agent Squad for Requirements Engineering — 33 Specialists with System 2 Reflec
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [olbboy/BA-Kit](https://github.com/olbboy/BA-Kit).
+Original source: `CLAUDE.md` in [olbboy/BA-Kit](https://github.com/olbboy/BA-Kit).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
