@@ -1,78 +1,97 @@
 ---
 trigger: always_on
-description: Guidelines and best practices for building Convex projects, including database schema design, queries, mutations, and real-world examples
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
+# CLAUDE.md
 
-# Convex guidelines
-## Function guidelines
-### Http endpoint syntax
-- HTTP endpoints are defined in `convex/http.ts` and require an `httpAction` decorator. For example:
-```typescript
-import { httpRouter } from "convex/server";
-import { httpAction } from "./_generated/server";
-const http = httpRouter();
-http.route({
-    path: "/echo",
-    method: "POST",
-    handler: httpAction(async (ctx, req) => {
-    const body = await req.bytes();
-    return new Response(body, { status: 200 });
-    }),
-});
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## What This Is
+
+`@djpanda/convex-tenants` — a Convex component providing multi-tenant organization/team management with authorization via `@djpanda/convex-authz`. Published to npm as a reusable component.
+
+## Commands
+
+```sh
+npm run dev              # Run all dev servers (backend + frontend + build watch)
+npm run build            # TypeScript compilation (tsconfig.build.json)
+npm run build:codegen    # Generate Convex types + build
+npm run build:clean      # Clean dist + rebuild from scratch
+npm run typecheck        # Typecheck main + example + example/convex
+npm run lint             # ESLint
+npm run test             # Vitest with typecheck (edge-runtime)
+npm run test:watch       # Watch mode
+npm run test:coverage    # Coverage report
 ```
-- HTTP endpoints are always registered at the exact path you specify in the `path` field. For example, if you specify `/api/someRoute`, the endpoint will be registered at `/api/someRoute`.
 
-### Validators
-- Below is an example of an array validator:
-```typescript
-import { mutation } from "./_generated/server";
-import { v } from "convex/values";
+Run a single test file: `npx vitest run src/component/organizations.test.ts --typecheck`
 
-export default mutation({
-args: {
-    simpleArray: v.array(v.union(v.string(), v.number())),
-},
-handler: async (ctx, args) => {
-    //...
-},
-});
+## Architecture
+
+### Three-Layer Design
+
 ```
-- Below is an example of a schema with validators that codify a discriminated union type:
-```typescript
-import { defineSchema, defineTable } from "convex/server";
-import { v } from "convex/values";
-
-export default defineSchema({
-    results: defineTable(
-        v.union(
-            v.object({
-                kind: v.literal("error"),
-                errorMessage: v.string(),
-            }),
-            v.object({
-                kind: v.literal("success"),
-                value: v.number(),
-            }),
-        ),
-    )
-});
+src/component/   → Convex backend (queries, mutations, schema) — runs in Convex runtime
+src/client/      → TypeScript client layer (Tenants class, makeTenantsAPI factory, types)
+src/react/       → React integration (hooks, providers, pre-built UI components)
 ```
-- Here are the valid Convex types along with their respective validators:
-Convex Type  | TS/JS type  |  Example Usage         | Validator for argument validation and schemas  | Notes                                                                                                                                                                                                 |
-| ----------- | ------------| -----------------------| -----------------------------------------------| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Id          | string      | `doc._id`              | `v.id(tableName)`                              |                                                                                                                                                                                                       |
-| Null        | null        | `null`                 | `v.null()`                                     | JavaScript's `undefined` is not a valid Convex value. Functions the return `undefined` or do not return will return `null` when called from a client. Use `null` instead.                             |
-| Int64       | bigint      | `3n`                   | `v.int64()`                                    | Int64s only support BigInts between -2^63 and 2^63-1. Convex supports `bigint`s in most modern browsers.                                                                                              |
-| Float64     | number      | `3.1`                  | `v.number()`                                   | Convex supports all IEEE-754 double-precision floating point numbers (such as NaNs). Inf and NaN are JSON serialized as strings.                                                                      |
-| Boolean     | boolean     | `true`                 | `v.boolean()`                                  |
-| String      | string      | `"abc"`                | `v.string()`                                   | Strings are stored as UTF-8 and must be valid Unicode sequences. Strings must be smaller than the 1MB total size limit when encoded as UTF-8.                                                         |
-| Bytes       | ArrayBuffer | `new ArrayBuffer(8)`   | `v.bytes()`                                    | Convex supports first class bytestrings, passed in as `ArrayBuffer`s. Bytestrings must be smaller than the 1MB total size limit for Convex types.                                                     |
-| Array       | Array       | `[1, 3.2, "abc"]`      | `v.array(values)`                              | Arrays can have at most 8192 values.                                                                                                                                                                  |
-| Object      | Object      | `{a: "abc"}`           | `v.object({property: value})`                  | Convex only supports "plain old JavaScript objects" (objects that do not have a custom prototype). Objects can have at most 1024 entries. Field names must be nonempty and not start with "$" or "_". |
-| Record      | Record      | `{"a": "1", "b": "2"}` | `v.record(keys, values)`                       | Records are objects at runtime, but can have dynamic keys. Keys must be only ASCII characters, nonempty, and not start with "$" or "_".                                                               |
 
-### Function registration
+### Component Layer (`src/component/`)
+- **`schema.ts`** — Defines 5 tables: `organizations`, `members`, `teams`, `teamMembers`, `invitations`
+- **`convex.config.ts`** — Registers as a Convex component via `defineComponent("tenants")`
+- Each domain file (`organizations.ts`, `members.ts`, `teams.ts`, `invitations.ts`) exports Convex queries/mutations that operate on component-isolated tables
+- `helpers.ts` — Shared internal utilities (pagination, member lookup, org status checks)
+- All `userId` fields are `string` (not `Id<"users">`) because they reference the parent app's user table
+
+### Client Layer (`src/client/`)
+- **`makeTenantsAPI.ts`** — Main API factory. Takes component reference + options (authz, auth, getUser, permissionMap, hooks). Returns destructurable Convex query/mutation functions for file-based routing in the consumer app.
+- **`tenants-class.ts`** — `Tenants` class for direct component interaction (lower-level than makeTenantsAPI)
+- **`authz.ts`** — Exports `TENANTS_PERMISSIONS`, `TENANTS_ROLES`, `DEFAULT_TENANTS_PERMISSION_MAP`
+- **`helpers.ts`** — `orgScope()` (namespaces authz to org), `normalizeEmail()`, `generateSlug()`
+
+### React Layer (`src/react/`)
+- **`providers/`** — `TenantsProvider` wraps the app with tenant context
+- **`hooks/`** — `useOrganization`, `useMembers`, `useTeams`, `useInvitations`, `usePermission`, `useUserPermissions`
+- **`stores/`** — `organization-store` for active org state (localStorage-backed)
+- **`components/`** — Pre-built UI: `OrganizationSwitcher`, `MembersTable`, `TeamsGrid`, dialogs, settings panels
+- **`ui/`** — Radix UI-based primitives (button, dialog, dropdown, table, etc.)
+
+### Package Exports
+- `@djpanda/convex-tenants` → client API (`dist/client/`)
+- `@djpanda/convex-tenants/react` → React hooks/components (`dist/react/`)
+- `@djpanda/convex-tenants/test` → Test helper (`src/test.ts`)
+- `./convex.config.js` → Component registration
+
+### Example App (`example/`)
+Contains a full working integration: `convex/convex.config.ts` registers tenants + authz components, `convex/tenants.ts` uses `makeTenantsAPI`, `convex/authz.ts` defines permissions/roles.
+
+## Testing
+
+- **Framework**: Vitest with `edge-runtime` environment (matches Convex runtime)
+- **Test location**: Co-located with source as `*.test.ts` files
+- **Component tests** use `convex-test` library — create instances with `convexTest(schema, modules)`
+- **Integration tests** for consumer apps register the component via the test helper:
+  ```ts
+  import tenantsTest from "@djpanda/convex-tenants/test";
+  const t = convexTest(schema, modules);
+  tenantsTest.register(t, "tenants");
+  ```
+- **`scenarios.test.ts`** — End-to-end multi-tenant workflows (org creation, member management, team operations, invitations)
+- Path aliases in `vitest.config.js` allow self-referencing the package in example tests
+
+## Convex Conventions
+
+- Always include `args` and `returns` validators on all Convex functions (use `v.null()` for void returns)
+- Use `internalQuery`/`internalMutation`/`internalAction` for private functions; `query`/`mutation`/`action` for public API
+- Use `withIndex()` instead of `filter()` for queries — indexes are defined in `schema.ts`
+- Roles are flexible strings defined by the consuming app in their `authz.ts`, not hardcoded enums
+- The `permissionMap` pattern maps operations to permission strings, allowing consumers to override which permission is checked for each action
+
+## Authz Integration (peer ^2.3.0)
+
+Tenants depends on `@djpanda/convex-authz` as a peer. The `Tenants` class accepts an `Authz` instance (see `src/client/authz.ts` for the structural `AuthzClient` interface) and uses optional method probing (`if (this.authz.recomputeUser)`) to stay forward-compatible.
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
