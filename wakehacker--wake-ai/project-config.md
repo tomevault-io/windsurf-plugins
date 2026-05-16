@@ -1,0 +1,164 @@
+---
+trigger: always_on
+description: Wake AI is now a standalone Python package that provides AI-powered smart contract analysis capabilities. It has been extracted from the Wake framework into an independent module that can be used separately or integrated with other tools.
+---
+
+# Wake AI Architecture
+
+## Overview
+
+Wake AI is now a standalone Python package that provides AI-powered smart contract analysis capabilities. It has been extracted from the Wake framework into an independent module that can be used separately or integrated with other tools.
+
+## Module Structure
+
+The project is organized into two main directories:
+
+### 1. Core Framework (`wake_ai/`)
+Contains the AI framework implementation:
+- **core/** - Core Claude integration and workflow engine
+  - `claude.py` - Claude Code CLI wrapper with session management
+  - `flow.py` - Base workflow and step classes
+  - `exceptions.py` - Custom exceptions
+  - `utils.py` - Framework utilities
+- **detections.py** - Detection data models and formatters
+- **results.py** - Result types (AIResult, SimpleResult, AIDetectionResult)
+- **runner.py** - Workflow execution helper
+- **utils.py** - Shared utilities (YAML loading, validation)
+- **cli.py** - Command-line interface
+
+### 2. Workflows (`flows/`)
+Contains pre-built workflow implementations:
+- **audit/** - Comprehensive security audit workflow
+- **uniswap_detector.py** - Uniswap-specific detector
+
+### 3. Examples (`examples/`)
+Contains educational example workflows:
+- **reentrancy/** - Reentrancy detection workflow
+- **reentrancy_test/** - Reentrancy testing workflow
+- **hooks/** - Hook example workflow
+
+## Key Features
+
+### Standalone CLI
+Wake AI provides its own CLI interface:
+```bash
+wake-ai --flow audit                    # Run audit workflow
+wake-ai --flow audit -s contracts/*.sol # Audit specific files
+wake-ai --resume                        # Resume previous session
+wake-ai --export results.json           # Export results
+```
+
+### Session Management
+- Each workflow creates its own `ClaudeCodeSession`
+- Sessions can be resumed between runs
+- Working directory isolation per session
+- State persistence for interrupted workflows
+
+### Cost Management
+- `query_with_cost()` implements intelligent cost-limited execution
+- Configurable cost limits per step
+- Automatic prompt optimization when approaching limits
+- Cost tracking and reporting
+
+### Validation System
+- Step-level validation with automatic retries
+- Custom validators per workflow step
+- Error correction prompts on validation failure
+
+## Technical Implementation
+
+### Core Classes
+
+#### AIWorkflow (Base Class)
+- Abstract base for all workflows
+- Manages step execution and state
+- Handles context passing between steps
+- Provides resume capability
+
+#### WorkflowStep
+- Represents a single workflow step
+- Contains prompt template, tools, and validation
+- Configurable retry and cost limits
+
+#### ClaudeCodeSession
+- Wrapper around Claude Code CLI
+- Manages session lifecycle
+- Tracks costs and usage
+- Handles working directory setup
+
+### Execution Flow
+
+1. **Initialization**
+   - Workflow creates unique session ID
+   - Working directory is created at `.wake/ai/<session-id>/`
+   - Initial context is prepared
+
+2. **Step Execution**
+   - Each step gets its own ClaudeCodeSession
+   - Prompt is rendered with current context
+   - Claude executes with specified tools
+   - Results are validated (if validator provided)
+   - Context is updated with step output
+
+3. **Error Handling**
+   - Validation failures trigger retries
+   - Cost limits are monitored
+   - Sessions can be resumed on interruption
+
+### Context Management
+Wake AI provides methods to manage data flow between steps:
+
+```python
+# Add data to context
+workflow.add_context("key", value)
+
+# Retrieve data
+value = workflow.get_context("key")
+
+# List all keys
+keys = workflow.get_context_keys()
+```
+
+Each step has access to:
+- `{{working_dir}}` - Session working directory
+- `{{execution_dir}}` - Where workflow was launched
+- Previous step outputs as `{{step_name}_output}}`
+- User-defined context via `add_context()`
+- Extracted data from `add_extraction_step()`
+
+Context is automatically saved/restored when resuming workflows.
+
+### Template Syntax
+Wake AI uses Jinja2 templating for prompt templates:
+- Variables are referenced with double curly braces: `{{variable_name}}`
+- Code examples with curly braces no longer need escaping
+- Supports Jinja2 features like conditionals and loops (if needed)
+- Missing variables will raise errors to catch typos early
+
+## Working Directory Structure
+
+Each workflow session creates an isolated working directory:
+
+```
+.wake/ai/<session-id>/
+├── state/              # Workflow state for resume capability
+│   ├── workflow.json   # Workflow metadata and progress
+│   └── context.json    # Current context state
+├── results/            # AI-generated output files
+│   ├── detections.yaml # Security findings
+│   ├── report.md       # Analysis reports
+│   └── ...             # Other workflow outputs
+└── temp/               # Temporary working files
+```
+
+### Session Management
+- **Session ID Format**: `YYYYMMDD_HHMMSS_random` (e.g., `20250121_143022_abc123`)
+- **Path Template**: `.wake/ai/<session-id>/`
+- **Automatic Creation**: Directory created on workflow initialization
+- **Context Access**: Available as `{{working_dir}}` in all prompts
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [wakehacker/wake-ai](https://github.com/wakehacker/wake-ai) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-13 -->
