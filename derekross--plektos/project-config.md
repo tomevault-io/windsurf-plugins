@@ -133,5 +133,5 @@ import { useAuthor } from '@/hooks/useAuthor';
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Source: [derekross/plektos](https://github.com/derekross/plektos) — distributed by [TomeVault](https://tomevault.io/claim/derekross).
-<!-- tomevault:4.0:windsurf_rules:2026-04-18 -->
+> Source: [derekross/plektos](https://github.com/derekross/plektos) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-15 -->
