@@ -1,204 +1,182 @@
 ---
 trigger: always_on
-description: APPLY AI portal integration standards when working with AI provider code
+description: APPLY extension patterns when developing platform integrations
 ---
 
-globs: mind-agents/src/portals/**/*
+globs: mind-agents/src/extensions/**/*
 alwaysApply: false
 ---
-# AI Integration Patterns
+# Extension System Patterns
 
 **Rule Priority:** Core Architecture  
 **Activation:** Always Active  
-**Scope:** AI provider integrations and portal management
+**Scope:** Platform integrations, extensions, and external service connections
 
-## AI Portal Architecture
+## Extension Architecture Overview
 
-SYMindX implements a **unified portal architecture** that abstracts AI provider interactions through the Vercel AI SDK v5, enabling seamless switching between providers and models.
+SYMindX implements a **pluggable extension system** that enables seamless integration with multiple communication platforms, APIs, and external services through a unified interface architecture.
 
-### Portal Abstraction Layer
+### Extension System Structure
+```
+┌─────────────────────────────────────────────────────────────┐
+│                  SYMindX Extension System                    │
+├─────────────────────────────────────────────────────────────┤
+│  Communication Extensions  │  API Extensions  │  MCP       │
+│  ├─ Telegram Bot           │  ├─ REST API     │  ├─ Server │
+│  ├─ Discord Bot            │  ├─ WebSocket    │  ├─ Client │
+│  ├─ Slack Integration      │  ├─ GraphQL      │  └─ Tools  │
+│  ├─ Twitter/X Bot          │  └─ Webhooks     │            │
+│  └─ RuneLite Plugin        │                  │            │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## Base Extension Framework
+
+### Extension Interface
 ```typescript
-interface AIPortal {
+interface Extension {
   readonly id: string;
-  readonly provider: string;
-  readonly models: ModelInfo[];
-  readonly capabilities: PortalCapability[];
+  readonly name: string;
+  readonly version: string;
+  readonly capabilities: ExtensionCapability[];
+  readonly dependencies: ExtensionDependency[];
   
-  // Core operations
-  generate(request: GenerationRequest): Promise<GenerationResponse>;
-  stream(request: StreamRequest): AsyncIterable<StreamChunk>;
-  embed(text: string, options?: EmbedOptions): Promise<number[]>;
-  moderate(content: string): Promise<ModerationResult>;
+  // Lifecycle methods
+  initialize(context: ExtensionContext): Promise<void>;
+  activate(): Promise<void>;
+  deactivate(): Promise<void>;
+  dispose(): Promise<void>;
   
-  // Management
-  initialize(config: PortalConfig): Promise<void>;
-  healthCheck(): Promise<HealthStatus>;
-  shutdown(): Promise<void>;
+  // Event handling
+  onMessage(message: Message): Promise<void>;
+  onEvent(event: SystemEvent): Promise<void>;
+  handleError(error: Error): Promise<void>;
 }
 
-// Base portal implementation
-abstract class BasePortal implements AIPortal {
-  protected abstract createProvider(): Provider;
-  protected abstract handleRateLimit(error: Error): Promise<void>;
-  protected abstract selectModel(task: TaskType): string;
-}
-```
-
-## Supported AI Providers
-
-### OpenAI Portal (`portals/openai/`)
-```typescript
-interface OpenAIConfig {
-  apiKey: string;
-  organization?: string;
-  baseURL?: string;
-  models: {
-    chat: string;          // Default: "gpt-4o"
-    tools: string;         // Default: "gpt-4.1-mini"
-    embedding: string;     // Default: "text-embedding-3-small"
-  };
-}
-
-// Implementation with retries and fallbacks
-class OpenAIPortal extends BasePortal {
-  private readonly client: OpenAI;
+abstract class BaseExtension implements Extension {
+  protected context: ExtensionContext;
+  protected eventBus: EventBus;
+  protected logger: Logger;
   
-  async generate(request: GenerationRequest): Promise<GenerationResponse> {
-    return await this.withRetry(async () => {
-      const result = await generateText({
-        model: this.openai(this.selectModel('chat')),
-        messages: request.messages,
-        temperature: request.temperature,
-        maxTokens: request.maxTokens,
-        tools: request.tools
-      });
-      
-      return this.transformResponse(result);
-    });
+  constructor(
+    public readonly id: string,
+    public readonly name: string,
+    public readonly version: string
+  ) {}
+  
+  async initialize(context: ExtensionContext): Promise<void> {
+    this.context = context;
+    this.eventBus = context.eventBus;
+    this.logger = context.logger.child({ extension: this.id });
+    
+    await this.onInitialize();
   }
-}
-```
-
-### Anthropic Portal (`portals/anthropic/`)
-```typescript
-interface AnthropicConfig {
-  apiKey: string;
-  baseURL?: string;
-  models: {
-    chat: string;          // Default: "claude-3-6-sonnet-20250101"
-tools: string;         // Default: "claude-3-6-haiku-20250101"
-  };
-}
-
-class AnthropicPortal extends BasePortal {
-  private readonly client: Anthropic;
   
-  // Handle Anthropic-specific message format
-  protected transformMessages(messages: Message[]): AnthropicMessage[] {
-    return messages.map(msg => ({
-      role: msg.role === 'assistant' ? 'assistant' : 'user',
-      content: msg.content
-    }));
-  }
+  protected abstract onInitialize(): Promise<void>;
+  protected abstract onActivate(): Promise<void>;
+  protected abstract onDeactivate(): Promise<void>;
 }
 ```
 
-### Groq Portal (`portals/groq/`)
+### Extension Registry
 ```typescript
-interface GroqConfig {
-  apiKey: string;
-  models: {
-    chat: string;          // Default: "llama-3.3-70b-versatile"
-    tools: string;         // Default: "llama-3.1-8b-instant"
-  };
+interface ExtensionRegistry {
+  register(extension: Extension): Promise<void>;
+  unregister(extensionId: string): Promise<void>;
+  get(extensionId: string): Extension | null;
+  getAll(): Extension[];
+  getByCapability(capability: ExtensionCapability): Extension[];
 }
 
-// Optimized for speed
-class GroqPortal extends BasePortal {
-  // Ultra-fast inference configuration
-  protected getDefaultOptions(): GenerationOptions {
+class RuntimeExtensionRegistry implements ExtensionRegistry {
+  private extensions = new Map<string, Extension>();
+  private capabilityIndex = new Map<ExtensionCapability, Set<string>>();
+  
+  async register(extension: Extension): Promise<void> {
+    // Validate dependencies
+    await this.validateDependencies(extension);
+    
+    // Initialize extension
+    await extension.initialize(this.createContext(extension));
+    
+    // Register in indexes
+    this.extensions.set(extension.id, extension);
+    this.indexCapabilities(extension);
+    
+    this.logger.info(`Extension registered: ${extension.id}`);
+  }
+  
+  private createContext(extension: Extension): ExtensionContext {
     return {
-      temperature: 0.7,
-      maxTokens: 2048,
-      stream: true,           // Always stream for responsiveness
-      parallel_tool_calls: true
+      extensionId: extension.id,
+      eventBus: this.eventBus,
+      logger: this.logger,
+      config: this.getExtensionConfig(extension.id),
+      storage: this.createExtensionStorage(extension.id)
     };
   }
 }
 ```
 
-### Google Vertex AI Portal (`portals/google-vertex/`)
+## Communication Extensions
+
+### Telegram Extension (`extensions/communication/telegram/`)
 ```typescript
-interface VertexConfig {
-  projectId: string;
-  location: string;
-  credentialsPath?: string;
-  models: {
-    chat: string;          // Default: "gemini-1.5-pro"
-    embedding: string;     // Default: "text-embedding-004"
+interface TelegramConfig {
+  botToken: string;
+  webhookUrl?: string;
+  allowedUsers?: string[];
+  commandPrefix: string;
+  features: {
+    inlineKeyboards: boolean;
+    fileUploads: boolean;
+    groupChats: boolean;
   };
 }
 
-class GoogleVertexPortal extends BasePortal {
-  // Handle Google's safety settings
-  protected getSafetySettings(): SafetySetting[] {
-    return [
-      { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
-      { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_MEDIUM_AND_ABOVE' }
-    ];
+class TelegramExtension extends BaseExtension {
+  private bot: TelegramBot;
+  private config: TelegramConfig;
+  
+  protected async onInitialize(): Promise<void> {
+    this.config = this.context.config as TelegramConfig;
+    this.bot = new TelegramBot(this.config.botToken, {
+      polling: !this.config.webhookUrl,
+      webhook: this.config.webhookUrl ? {
+        url: this.config.webhookUrl,
+        port: process.env.WEBHOOK_PORT ? parseInt(process.env.WEBHOOK_PORT) : 3000
+      } : undefined
+    });
+    
+    this.setupEventHandlers();
   }
-}
-```
-
-### Local AI Portals
-
-#### Ollama Portal (`portals/ollama/`)
-```typescript
-interface OllamaConfig {
-  baseURL: string;       // Default: "http://localhost:11434"
-  models: {
-    chat: string;        // e.g., "llama3.2:latest"
-    embedding: string;   // e.g., "nomic-embed-text"
-  };
-}
-
-class OllamaPortal extends BasePortal {
-  // Check model availability
-  async checkModelAvailability(model: string): Promise<boolean> {
-    try {
-      const response = await fetch(`${this.baseURL}/api/tags`);
-      const { models } = await response.json();
-      return models.some((m: any) => m.name === model);
-    } catch {
-      return false;
-    }
-  }
-}
-```
-
-#### LM Studio Portal (`portals/lmstudio/`)
-```typescript
-interface LMStudioConfig {
-  baseURL: string;       // Default: "http://localhost:1234"
-  model: string;         // Currently loaded model
-}
-
-class LMStudioPortal extends BasePortal {
-  // OpenAI-compatible API
-  protected createProvider(): Provider {
-    return openai({
-      baseURL: this.config.baseURL + '/v1',
-      apiKey: 'not-needed'  // LM Studio doesn't require API key
+  
+  private setupEventHandlers(): void {
+    this.bot.on('message', async (msg) => {
+      try {
+        await this.handleTelegramMessage(msg);
+      } catch (error) {
+        await this.handleError(error as Error);
+      }
+    });
+    
+    this.bot.on('callback_query', async (query) => {
+      await this.handleCallbackQuery(query);
     });
   }
-}
-```
-
-## Portal Integration Patterns
-
-### Provider Selection Strategy
-```typescript
-interface ProviderSelector {
+  
+  private async handleTelegramMessage(msg: TelegramMessage): Promise<void> {
+    // Security check
+    if (!this.isAuthorizedUser(msg.from?.id)) {
+      await this.bot.sendMessage(msg.chat.id, 'Unauthorized access');
+      return;
+    }
+    
+    // Convert to internal message format
+    const message: Message = {
+      id: msg.message_id.toString(),
+      content: msg.text || '',
+      sender: {
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
