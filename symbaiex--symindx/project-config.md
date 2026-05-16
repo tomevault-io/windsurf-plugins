@@ -1,123 +1,118 @@
 ---
 trigger: always_on
-description: USE WHEN creating, updating, or structuring any .mdc rule file in .cursor/rules directory
+description: APPLY SYMindX architecture standards when working with any file to ensure consistency
 ---
 
-          ]]></correct-example>
-          <incorrect-example title="Invalid frontmatter" conditions="Creating any .mdc file" expected-result="Proper frontmatter" incorrectness-criteria="Missing required fields"><![CDATA[
----
-title: Some Rule
-author: Developer
----
-          ]]></incorrect-example>
-        </example>
-      </examples>
-    </non-negotiable>
+# SYMindX Workspace Architecture
 
-    <non-negotiable priority="critical">
-      <description>Description MUST follow ACTION when TRIGGER to OUTCOME format</description>
-      <examples>
-        <example title="Description Format">
-          <correct-example title="Proper description" conditions="Writing frontmatter" expected-result="Clear action-based description" correctness-criteria="Shows action, trigger, and outcome"><![CDATA[
-description: APPLY TypeScript strict rules when editing .ts files to ensure type safety
-          ]]></correct-example>
-          <incorrect-example title="Vague description" conditions="Writing frontmatter" expected-result="Clear action-based description" incorrectness-criteria="Too vague, no clear trigger"><![CDATA[
-description: TypeScript rules for the project
-          ]]></incorrect-example>
-        </example>
-      </examples>
-    </non-negotiable>
+## Project Overview
 
-    <requirement priority="high">
-      <description>Use hierarchical numbering system for rule organization</description>
-      <examples>
-        <example title="File Naming Convention">
-          <correct-example title="Proper numbering" conditions="Creating rule files" expected-result="Clear hierarchy" correctness-criteria="Uses 3-digit prefix with logical grouping"><![CDATA[
-000-rules.mdc          # Meta-rule
-001-symindx-workspace.mdc # Core workspace
-002-cursor-framework.mdc  # Framework rules
-010-typescript.mdc     # Language rules
-100-ai-portals.mdc     # Integration rules
-          ]]></correct-example>
-        </example>
-      </examples>
-    </requirement>
+SYMindX is an intelligent AI agent framework built with TypeScript, using Bun as the runtime and package manager. The system provides modular, hot-swappable components for memory, emotion, and cognition with multi-platform capabilities.
 
-    <requirement priority="high">
-      <description>Use structured pseudo-XML format for rule bodies when complexity requires it</description>
-      <examples>
-        <example title="Structured vs Simple Format">
-          <correct-example title="Simple format for basic rules" conditions="Writing simple guidelines" expected-result="Clean markdown" correctness-criteria="Uses bullet points for simple rules"><![CDATA[
-# TypeScript Standards
+### Core Architecture Components
 
-## Core Requirements
-- Use strict mode in all TypeScript files
-- Always define explicit return types for functions
-- Use interfaces for object shapes
-- Prefer const assertions for readonly data
-          ]]></correct-example>
-          <correct-example title="Structured format for complex rules" conditions="Writing complex validation rules" expected-result="Pseudo-XML structure" correctness-criteria="Uses XML tags for clarity and enforcement"><![CDATA[
-<rule>
-  <meta>
-    <title>API Route Standards</title>
-    <description>Enforces consistent API route structure</description>
-  </meta>
-  <requirements>
-    <non-negotiable priority="critical">
-      <description>All API routes must have error handling</description>
-      <examples>...</examples>
-    </non-negotiable>
-  </requirements>
-</rule>
-          ]]></correct-example>
-        </example>
-      </examples>
-    </requirement>
+**🧠 Core Runtime System** (`mind-agents/`)
+- Event-driven architecture with centralized Event Bus
+- Hot-swappable module registry for memory, emotion, cognition
+- Multi-agent coordination and lifecycle management
+- Extension system for platform integrations
 
-    <requirement priority="medium">
-      <description>Include cross-references to related rules</description>
-      <examples>
-        <example title="Rule References">
-          <correct-example title="Proper cross-reference" conditions="Writing related rules" expected-result="Clear relationships" correctness-criteria="Uses @filename syntax"><![CDATA[
-## Related Rules
-- @001-symindx-workspace.mdc - Core project standards
-- @003-typescript-standards.mdc - TypeScript configuration
-          ]]></correct-example>
-        </example>
-      </examples>
-    </requirement>
-  </requirements>
+**🌐 AI Portal Architecture** (`mind-agents/src/portals/`)
+- Multi-provider AI integration (OpenAI, Anthropic, Groq, xAI, Google)
+- Vercel AI SDK v5 implementation
+- Unified interface for model switching and optimization
 
-  <grammar>
-    <grammar-entry title="Valid Frontmatter Pattern">
-      <pattern description="YAML frontmatter format">^---\ndescription: .+\nglobs: .+\n---</pattern>
-      <example description="Minimal valid frontmatter">---
-description: ACTION when TRIGGER to OUTCOME
-globs: **/*.ts
----</example>
-    </grammar-entry>
-    
-    <grammar-entry title="Numbering Convention">
-      <pattern description="File naming pattern">^\d{3}-[a-z-]+\.mdc$</pattern>
-      <example description="Valid filename">010-typescript-standards.mdc</example>
-    </grammar-entry>
+**💾 Memory System** (`mind-agents/src/memory/`)
+- SQLite, PostgreSQL, Supabase, Neon providers
+- Vector embeddings and semantic search
+- Conversation persistence and context management
 
-    <schema title="Rule Categories" description="Numbering ranges for different rule types"><![CDATA[
-000-099: Meta and core workspace rules
-100-199: Integration and AI portal rules  
-200-299: Framework and language-specific rules
-300-399: Testing and quality rules
-400-499: Deployment and operations rules
-500-599: Documentation and community rules
-    ]]></schema>
-  </grammar>
+**❤️ Emotion System** (`mind-agents/src/emotion/`)
+- 11 distinct emotions (RuneScape-inspired)
+- Dynamic emotional state management
+- Contextual emotion weighting and responses
 
-  <context>
-    The .mdc format is Cursor's custom Markdown format that supports YAML frontmatter for AI context selection. The frontmatter tells Cursor when to apply the rule, while the body provides the actual guidance. This meta-rule ensures consistency across all project rules and follows 2025 best practices for Cursor IDE.
-  </context>
+**🎯 Cognition Modules** (`mind-agents/src/cognition/`)
+- HTN (Hierarchical Task Network) planner
+- Reactive response system
+- Hybrid cognitive architectures
 
-  <references>
-    <reference as="context" href=".cursor/docs/quick-start.md" reason="Developer onboarding">Quick Start Guide</reference>
+**🔌 Platform Extensions** (`mind-agents/src/extensions/`)
+- Telegram, Slack, Discord integrations
+- RuneLite/RuneScape game integration
+- Twitter/X social platform support
+
+### Directory Structure
+
+```
+symindx/                          # Root project (Bun workspace)
+├── .cursor/                      # Cursor IDE configuration
+│   ├── rules/                    # Cursor rules (001-017 core)
+│   ├── docs/                     # Quick start, architecture, contributing
+│   └── tools/                    # Project analyzer, code generator, debugging
+├── mind-agents/                  # Core agent runtime system
+│   ├── src/
+│   │   ├── core/                 # Runtime, EventBus, ModuleRegistry
+│   │   ├── portals/              # AI providers (15+ workspaces)
+│   │   │   ├── openai/           # OpenAI portal workspace
+│   │   │   ├── anthropic/        # Anthropic portal workspace
+│   │   │   ├── groq/             # Groq portal workspace
+│   │   │   ├── xai/              # xAI portal workspace
+│   │   │   ├── google-vertex/    # Google Vertex workspace
+│   │   │   ├── google-generative/ # Google Generative workspace
+│   │   │   ├── mistral/          # Mistral portal workspace
+│   │   │   ├── cohere/           # Cohere portal workspace
+│   │   │   ├── azure-openai/     # Azure OpenAI workspace
+│   │   │   ├── ollama/           # Ollama portal workspace
+│   │   │   ├── lmstudio/         # LM Studio workspace
+│   │   │   ├── openrouter/       # OpenRouter workspace
+│   │   │   ├── multimodal/       # Multimodal workspace
+│   │   │   ├── kluster.ai/       # Kluster.ai workspace
+│   │   │   └── vercel/           # Vercel portal workspace
+│   │   ├── modules/              # Memory, emotion, cognition modules
+│   │   ├── extensions/           # Platform integrations
+│   │   ├── characters/           # Character definitions
+│   │   ├── utils/                # Shared utilities
+│   │   ├── types/                # TypeScript type definitions
+│   │   ├── cli/                  # Command-line interface
+│   │   └── __tests__/           # Test files
+│   ├── data/                     # Runtime data storage
+│   ├── scripts/                  # Build and utility scripts
+│   ├── docs/                     # Agent documentation
+│   └── dist/                     # Build output
+├── website/                      # React web interface (Vite + Tailwind)
+│   ├── src/
+│   │   ├── components/           # React components
+│   │   ├── pages/                # Page components
+│   │   └── styles/               # Styling files
+│   ├── public/                   # Static assets
+│   ├── dist/                     # Build output
+│   ├── storybook-static/         # Storybook build
+│   └── .storybook/              # Storybook configuration
+├── docs-site/                    # Documentation site (separate workspace)
+├── redirect-package/             # NPM redirect package
+├── testing/                      # Comprehensive test suites
+├── monitoring/                   # System monitoring tools
+├── config/                       # Configuration management
+├── .github/                      # GitHub workflows
+├── .claude/                      # Claude AI configuration
+├── .gitmodules                   # Git submodules
+├── docker-compose.yml            # Multi-service deployment
+├── Dockerfile                    # Container configuration
+└── package.json                  # Root workspace configuration
+```
+
+## Development Standards
+
+### Code Quality
+- **TypeScript Required**: All code must use TypeScript with strict mode
+- **Bun Runtime**: Use Bun for package management and execution
+- **Modular Design**: Components must be hot-swappable and independently testable
+- **Event-Driven**: Use EventBus for inter-component communication
+
+### Architecture Principles
+- **Single Responsibility**: Each module has one clear purpose
+- **Dependency Injection**: Use registry pattern for component management
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
