@@ -1,182 +1,133 @@
 ---
 trigger: always_on
-description: OPTIMIZE performance when implementing caching, memory, or compute-intensive features using 2025 edge computing patterns
+description: IMPLEMENT proper error handling when writing error-prone or logging code
 ---
 
 
-# Performance Optimization Patterns 2025
+# Error Handling and Logging Patterns
 
-## 2025 Performance Architecture Overview
+## Error Handling Architecture
 
-SYMindX implements cutting-edge performance optimization strategies leveraging 2025 technologies including edge computing, WebAssembly, service workers, and advanced caching patterns for sub-100ms AI responses and global scalability.
+SYMindX implements comprehensive error handling across all system layers with structured logging, automated recovery mechanisms, and intelligent error propagation patterns for multi-agent coordination.
 
-### Core Performance Principles
+## Core Error Types
 
-**⚡ Response Time Optimization**
-
-- Sub-200ms agent response times for chat interactions
-- Parallel processing for AI portal requests
-- Intelligent caching across all system layers
-
-**🚀 Scalability Design**
-
-- Horizontal scaling for agent instances
-- Load balancing across AI providers
-- Resource pooling and connection management
-
-**📊 Resource Efficiency**
-
-- Memory-efficient vector operations
-- CPU optimization for embedding calculations
-- I/O optimization for database operations
-
-## AI Portal Performance
-
-### Provider Selection Optimization
+### Error Categories
 
 ```typescript
-interface PerformanceMetrics {
-  responseTime: number;
-  tokenThroughput: number;
-  errorRate: number;
-  costPerToken: number;
-  successRate: number;
+enum ErrorCategory {
+  NETWORK = 'network',
+  DATABASE = 'database', 
+  AI_PROVIDER = 'ai_provider',
+  VALIDATION = 'validation',
+  AUTHENTICATION = 'authentication',
+  AGENT_LIFECYCLE = 'agent_lifecycle',
+  MEMORY_OPERATION = 'memory_operation'
 }
 
-class PerformanceOptimizedPortalSelector {
-  private metrics: Map<string, PerformanceMetrics> = new Map();
-  private loadBalancer: LoadBalancer;
-  
-  async selectOptimalProvider(request: GenerationRequest): Promise<string> {
-    const candidates = this.getAvailableProviders(request);
-    
-    // Real-time performance scoring
-    const scores = await Promise.all(
-      candidates.map(async (provider) => {
-        const metrics = await this.getRealtimeMetrics(provider);
-        const score = this.calculatePerformanceScore(metrics, request);
-        return { provider, score, metrics };
-      })
-    );
-    
-    // Sort by performance score (higher is better)
-    scores.sort((a, b) => b.score - a.score);
-    
-    // Select provider with circuit breaker protection
-    for (const candidate of scores) {
-      if (await this.circuitBreaker.isAvailable(candidate.provider)) {
-        return candidate.provider;
-      }
-    }
-    
-    throw new Error('No available AI providers');
+interface StructuredError {
+  id: string;
+  category: ErrorCategory;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  message: string;
+  context: ErrorContext;
+  timestamp: Date;
+  correlationId?: string;
+  agentId?: string;
+  conversationId?: string;
+}
+```
+
+## Logging System
+
+### Structured Logger
+
+```typescript
+class StructuredLogger {
+  debug(message: string, metadata: Record<string, any> = {}): void {
+    this.log('debug', message, metadata);
   }
   
-  private calculatePerformanceScore(
-    metrics: PerformanceMetrics,
-    request: GenerationRequest
-  ): number {
-    const weights = {
-      responseTime: 0.4,
-      successRate: 0.3,
-      tokenThroughput: 0.2,
-      costEfficiency: 0.1
-    };
-    
-    // Normalize metrics to 0-1 scale
-    const normalizedResponseTime = Math.max(0, 1 - (metrics.responseTime / 5000)); // 5s max
-    const normalizedThroughput = Math.min(1, metrics.tokenThroughput / 1000); // 1000 tokens/s max
-    const normalizedCost = Math.max(0, 1 - (metrics.costPerToken / 0.01)); // $0.01/token max
-    
-    return (
-      weights.responseTime * normalizedResponseTime +
-      weights.successRate * metrics.successRate +
-      weights.tokenThroughput * normalizedThroughput +
-      weights.costEfficiency * normalizedCost
-    );
+  info(message: string, metadata: Record<string, any> = {}): void {
+    this.log('info', message, metadata);
+  }
+  
+  warn(message: string, metadata: Record<string, any> = {}): void {
+    this.log('warn', message, metadata);
+  }
+  
+  error(message: string, error?: Error, metadata: Record<string, any> = {}): void {
+    this.log('error', message, { ...metadata, error });
   }
 }
 ```
 
-### Request Batching and Streaming
+## Error Recovery
+
+### Circuit Breaker Pattern
 
 ```typescript
-class OptimizedRequestProcessor {
-  private batchProcessor: BatchProcessor;
-  private streamingManager: StreamingManager;
+class CircuitBreaker {
+  private state: 'closed' | 'open' | 'half-open' = 'closed';
+  private failureCount = 0;
   
-  async processRequest(request: GenerationRequest): Promise<GenerationResponse> {
-    // Determine optimal processing strategy
-    if (this.shouldBatch(request)) {
-      return this.batchProcessor.addToBatch(request);
+  async execute<T>(operation: () => Promise<T>): Promise<T> {
+    if (this.state === 'open') {
+      throw new Error('Circuit breaker is open');
     }
-    
-    if (this.shouldStream(request)) {
-      return this.streamingManager.processStreaming(request);
-    }
-    
-    return this.processImmediate(request);
-  }
-  
-  private shouldBatch(request: GenerationRequest): boolean {
-    // Batch non-urgent requests for efficiency
-    return (
-      !request.urgent &&
-      request.maxTokens < 500 &&
-      this.batchProcessor.hasCapacity()
-    );
-  }
-  
-  private shouldStream(request: GenerationRequest): boolean {
-    // Stream for real-time interactions
-    return (
-      request.stream === true ||
-      request.maxTokens > 1000 ||
-      request.conversationType === 'realtime'
-    );
-  }
-}
-
-class BatchProcessor {
-  private batch: GenerationRequest[] = [];
-  private batchSize = 10;
-  private batchTimeout = 100; // ms
-  private processingPromises: Map<string, Promise<GenerationResponse>> = new Map();
-  
-  async addToBatch(request: GenerationRequest): Promise<GenerationResponse> {
-    const requestId = this.generateRequestId();
-    this.batch.push({ ...request, id: requestId });
-    
-    // Create promise for this specific request
-    const promise = new Promise<GenerationResponse>((resolve, reject) => {
-      this.processingPromises.set(requestId, { resolve, reject });
-    });
-    
-    // Trigger batch processing if needed
-    if (this.batch.length >= this.batchSize) {
-      this.processBatch();
-    } else if (this.batch.length === 1) {
-      // Start timeout for first request in batch
-      setTimeout(() => this.processBatch(), this.batchTimeout);
-    }
-    
-    return promise;
-  }
-  
-  private async processBatch(): Promise<void> {
-    if (this.batch.length === 0) return;
-    
-    const currentBatch = [...this.batch];
-    this.batch = [];
     
     try {
-      // Process batch with optimal provider
-      const responses = await this.portalManager.processBatch(currentBatch);
-      
-      // Resolve individual promises
-      responses.forEach((response, index) => {
+      const result = await operation();
+      this.onSuccess();
+      return result;
+    } catch (error) {
+      this.onFailure(error);
+      throw error;
+    }
+  }
+}
+```
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+## Monitoring and Alerting
+
+### Health Checks
+
+```typescript
+interface HealthCheck {
+  name: string;
+  check: () => Promise<boolean>;
+  timeout: number;
+  critical: boolean;
+}
+
+class HealthCheckManager {
+  async runHealthChecks(): Promise<Map<string, boolean>> {
+    // Run all registered health checks
+    // Return status for each check
+  }
+}
+```
+
+## Configuration
+
+```typescript
+interface ErrorConfig {
+  logging: {
+    level: 'debug' | 'info' | 'warn' | 'error';
+    enableCorrelation: boolean;
+  };
+  
+  circuitBreaker: {
+    failureThreshold: number;
+    recoveryTimeout: number;
+  };
+  
+  retry: {
+    maxAttempts: number;
+    baseDelay: number;
+  };
+}
+```
 
 ---
 > Source: [SYMBaiEX/SYMindX](https://github.com/SYMBaiEX/SYMindX) — distributed by [TomeVault](https://tomevault.io).
