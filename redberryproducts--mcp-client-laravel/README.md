@@ -7,11 +7,11 @@ Laravel-native client for Model Context Protocol (MCP) servers. Built by Redberr
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [RedberryProducts/mcp-client-laravel](https://github.com/RedberryProducts/mcp-client-laravel).
+Original source: `CLAUDE.md` in [RedberryProducts/mcp-client-laravel](https://github.com/RedberryProducts/mcp-client-laravel).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
