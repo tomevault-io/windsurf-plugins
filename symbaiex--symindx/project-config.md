@@ -1,165 +1,205 @@
 ---
 trigger: always_on
-description: **Rule Priority:** Advanced Intelligence
+description: This rule defines comprehensive patterns for leveraging Cursor's workflow automation capabilities, including background agents, action-based triggers, and multi-agent coordination for complex development tasks.
 ---
 
-# Advanced Context Awareness and Dynamic Rule Activation
+# Cursor Workflow Automation & Action Orchestration
 
-**Rule Priority:** Advanced Intelligence  
-**Activation:** All development activities with dynamic context switching  
-**Scope:** Global context management and intelligent rule selection
+This rule defines comprehensive patterns for leveraging Cursor's workflow automation capabilities, including background agents, action-based triggers, and multi-agent coordination for complex development tasks.
 
-## Overview
+## Core Workflow Architecture
 
-Cursor's advanced context system in v1.2+ enables sophisticated awareness of development environment, file types, git status, time of day, project phase, and user patterns. This rule creates intelligent context switching that dynamically activates relevant rules and optimizes AI assistance based on current conditions.
+### Workflow Definition Patterns
 
-## Context Detection Systems
+**Declarative Workflow Files**
+```yaml
+# .cursor/workflows/ai-portal-validation.yaml
+name: "AI Portal Validation Pipeline"
+description: "Automated validation of new AI portal configurations"
+triggers:
+  - type: file_change
+    patterns: ["mind-agents/src/portals/*/config.json"]
+  - type: manual
+    command: "validate-portal"
+  - type: schedule
+    cron: "0 2 * * *"  # Daily at 2 AM
 
-### Environment Context Detection
+actions:
+  - name: "validate-config"
+    agent: "config-validator"
+    inputs:
+      config_file: "${trigger.file_path}"
+    timeout: 300
+    
+  - name: "test-connection"
+    agent: "connection-tester"
+    depends_on: ["validate-config"]
+    inputs:
+      portal_name: "${actions.validate-config.outputs.portal_name}"
+    parallel: false
+    
+  - name: "generate-docs"
+    agent: "doc-generator"
+    depends_on: ["test-connection"]
+    inputs:
+      portal_config: "${actions.validate-config.outputs.config}"
+      test_results: "${actions.test-connection.outputs.results}"
 
+error_handling:
+  retry_attempts: 3
+  retry_delay: 30
+  fallback: "notify-maintainers"
+```
+
+**Workflow Orchestration Rules**
 ```typescript
-// Advanced context detection engine
-interface ContextState {
-  // File and Project Context
-  currentFile: string;
-  fileType: string;
-  fileSize: number;
-  projectType: string;
-  
-  // Git Context
-  gitBranch: string;
-  gitStatus: 'clean' | 'modified' | 'staged' | 'conflict';
-  uncommittedChanges: number;
-  lastCommitTime: Date;
-  
-  // Development Context
-  activeRules: string[];
-  recentFiles: string[];
-  openTabs: string[];
-  cursorPosition: { line: number; column: number };
-  
-  // Temporal Context
-  timeOfDay: 'morning' | 'afternoon' | 'evening' | 'night';
-  dayOfWeek: string;
-  timezone: string;
-  
-  // User Context
-  workingPattern: 'focused' | 'exploratory' | 'debugging' | 'reviewing';
-  errorCount: number;
-  productivityScore: number;
-  
-  // System Context
-  cpuUsage: number;
-  memoryUsage: number;
-  networkStatus: 'online' | 'offline' | 'slow';
+// .cursor/workflows/types.ts
+interface WorkflowDefinition {
+  name: string;
+  description: string;
+  triggers: WorkflowTrigger[];
+  actions: WorkflowAction[];
+  error_handling: ErrorHandlingConfig;
+  monitoring: MonitoringConfig;
 }
 
-class ContextEngine {
-  private state: ContextState;
-  private listeners: ContextListener[] = [];
-  
-  async detectContext(): Promise<ContextState> {
-    return {
-      // File context
-      currentFile: await this.getCurrentFile(),
-      fileType: await this.detectFileType(),
-      fileSize: await this.getFileSize(),
-      projectType: await this.detectProjectType(),
-      
-      // Git context
-      gitBranch: await this.getGitBranch(),
-      gitStatus: await this.getGitStatus(),
-      uncommittedChanges: await this.countUncommittedChanges(),
-      lastCommitTime: await this.getLastCommitTime(),
-      
-      // Development context
-      activeRules: await this.getActiveRules(),
-      recentFiles: await this.getRecentFiles(),
-      openTabs: await this.getOpenTabs(),
-      cursorPosition: await this.getCursorPosition(),
-      
-      // Temporal context
-      timeOfDay: this.getTimeOfDay(),
-      dayOfWeek: new Date().toLocaleDateString('en-US', { weekday: 'long' }),
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-      
-      // User context
-      workingPattern: await this.detectWorkingPattern(),
-      errorCount: await this.getErrorCount(),
-      productivityScore: await this.calculateProductivityScore(),
-      
-      // System context
-      cpuUsage: await this.getCPUUsage(),
-      memoryUsage: await this.getMemoryUsage(),
-      networkStatus: await this.getNetworkStatus()
-    };
-  }
-  
-  onContextChange(listener: ContextListener): void {
-    this.listeners.push(listener);
-  }
-  
-  private async detectWorkingPattern(): Promise<string> {
-    // Analyze recent activity patterns
-    const recentActions = await this.getRecentActions();
-    
-    if (recentActions.includes('debugging')) return 'debugging';
-    if (recentActions.includes('exploring')) return 'exploratory';
-    if (recentActions.includes('reviewing')) return 'reviewing';
-    return 'focused';
-  }
+interface WorkflowAction {
+  name: string;
+  agent: string;
+  inputs: Record<string, any>;
+  outputs?: Record<string, any>;
+  depends_on?: string[];
+  parallel?: boolean;
+  timeout?: number;
+  retry_policy?: RetryPolicy;
 }
 ```
 
-### SYMindX-Specific Context
+### Action-Based Trigger System
 
-```typescript
-// SYMindX project-specific context detection
-class SYMindXContextDetector {
-  async detectSYMindXContext(): Promise<SYMindXContext> {
-    const currentFile = await this.getCurrentFile();
+**Event-Driven Automation**
+```yaml
+# .cursor/workflows/triggers/git-events.yaml
+triggers:
+  git_commit:
+    patterns:
+      - "feat(portals): *"
+      - "fix(memory): *"
+    actions:
+      - validate-affected-systems
+      - run-integration-tests
+      - update-documentation
+      
+  git_merge:
+    branches: ["main", "develop"]
+    actions:
+      - deploy-to-staging
+      - run-performance-tests
+      - notify-team
+      
+  file_change:
+    patterns:
+      - "mind-agents/src/characters/*.json"
+    actions:
+      - validate-character-schema
+      - update-character-docs
+      - test-character-behavior
+```
+
+**Development Lifecycle Integration**
+```yaml
+# .cursor/workflows/triggers/development.yaml
+triggers:
+  pr_opened:
+    conditions:
+      - label: "needs-review"
+      - files_changed: "*.ts"
+    actions:
+      - code-quality-check
+      - security-scan
+      - documentation-check
+      
+  issue_labeled:
+    labels: ["bug", "high-priority"]
+    actions:
+      - create-hotfix-branch
+      - assign-emergency-team
+      - schedule-investigation
+      
+  deployment_complete:
+    environment: "production"
+    actions:
+      - run-smoke-tests
+      - update-monitoring
+      - notify-stakeholders
+```
+
+## Agent Coordination Patterns
+
+### Multi-Agent Workflows
+
+**Sequential Agent Pipeline**
+```yaml
+# .cursor/workflows/memory-optimization.yaml
+name: "Memory System Optimization"
+description: "Automated memory system maintenance and optimization"
+
+agents:
+  memory-analyzer:
+    model: "gpt-4o"
+    context: ["@mind-agents/src/memory/", "@docs/memory/"]
+    capabilities: ["analysis", "reporting"]
     
-    return {
-      // Component detection
-      component: this.detectComponent(currentFile),
+  memory-optimizer:
+    model: "claude-3.5-sonnet"
+    context: ["@mind-agents/src/memory/", "@AI_MEMORY.md"]
+    capabilities: ["code-modification", "optimization"]
+    
+  memory-tester:
+    model: "gpt-4.1-mini"
+    context: ["@mind-agents/src/__tests__/memory/"]
+    capabilities: ["testing", "validation"]
+
+workflow:
+  - step: "analyze"
+    agent: "memory-analyzer"
+    task: "Analyze memory usage patterns and identify optimization opportunities"
+    outputs: ["analysis_report", "optimization_candidates"]
+    
+  - step: "optimize"
+    agent: "memory-optimizer"
+    depends_on: ["analyze"]
+    task: "Implement optimizations based on analysis report"
+    inputs: 
+      analysis: "${steps.analyze.outputs.analysis_report}"
+      candidates: "${steps.analyze.outputs.optimization_candidates}"
+    outputs: ["optimized_code", "change_summary"]
+    
+  - step: "test"
+    agent: "memory-tester"
+    depends_on: ["optimize"]
+    task: "Test optimized memory system for correctness and performance"
+    inputs:
+      changes: "${steps.optimize.outputs.change_summary}"
+    outputs: ["test_results", "performance_metrics"]
+```
+
+**Parallel Agent Execution**
+```yaml
+# .cursor/workflows/comprehensive-testing.yaml
+name: "Comprehensive System Testing"
+description: "Parallel testing across all SYMindX components"
+
+parallel_groups:
+  core_systems:
+    - agent: "portal-tester"
+      task: "Test all AI portal configurations"
+      context: ["@mind-agents/src/portals/"]
       
-      // Agent context
-      agentType: this.detectAgentType(currentFile),
+    - agent: "memory-tester"
+      task: "Test memory provider implementations"
+      context: ["@mind-agents/src/memory/"]
       
-      // Module context
-      moduleType: this.detectModuleType(currentFile),
-      
-      // Portal context
-      portalProvider: this.detectPortalProvider(currentFile),
-      
-      // Architecture layer
-      layer: this.detectArchitectureLayer(currentFile)
-    };
-  }
-  
-  private detectComponent(filePath: string): string {
-    if (filePath.includes('mind-agents/src/core/')) return 'core-runtime';
-    if (filePath.includes('mind-agents/src/portals/')) return 'ai-portal';
-    if (filePath.includes('mind-agents/src/memory/')) return 'memory-system';
-    if (filePath.includes('mind-agents/src/emotion/')) return 'emotion-system';
-    if (filePath.includes('mind-agents/src/cognition/')) return 'cognition-module';
-    if (filePath.includes('mind-agents/src/extensions/')) return 'platform-extension';
-    if (filePath.includes('mind-agents/src/characters/')) return 'character-system';
-    if (filePath.includes('website/')) return 'web-interface';
-    if (filePath.includes('docs-site/')) return 'documentation';
-    return 'general';
-  }
-  
-  private detectAgentType(filePath: string): string | null {
-    // Extract agent type from file path or content
-    if (filePath.includes('characters/')) {
-      const filename = filePath.split('/').pop();
-      return filename?.replace('.json', '') || null;
-    }
-    return null;
-  }
-  
-  private detectModuleType(filePath: string): string | null {
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
