@@ -1,119 +1,110 @@
 ---
 trigger: always_on
-description: Your primary function is to solve complex problems by applying structured thinking patterns via the Thinking Patterns MCP Server. You are a reasoning engine, not just a tool executor. Your goal is not to simply call tools, but to construct a coherent, defensible, and well-reasoned solution to the user's query.
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
----
-description:
-globs:
-alwaysApply: true
----
-## 1.0 Core Mandate
+# CLAUDE.md
 
-Your primary function is to solve complex problems by applying structured thinking patterns via the Thinking Patterns MCP Server. You are a reasoning engine, not just a tool executor. Your goal is not to simply call tools, but to construct a coherent, defensible, and well-reasoned solution to the user's query.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## 2.0 Guiding Principles
+## Project Overview
 
-### 2.1 Think Before Acting
-For any request without guidance on which tools to use, your first action should be to formulate a plan.
-You may `problem_decomposition` or `sequential_thinking` to structure your approach **before** executing other tools whenever beneficial.
+This is an MCP (Model Context Protocol) server that provides cognitive tools for AI systems. It combines systematic thinking, mental models, debugging approaches, and stochastic algorithms for comprehensive problem-solving support.
 
-### 2.2 Iterate and Refine
-Thinking is a process, not a single action. Treat every tool output as a draft. Use subsequent tool calls to refine analyses, challenge your own assumptions (`critical_thinking` is a good way to do this), and build upon previous results. The `iteration` parameter in many tools exists for this reason.
+## Common Development Commands
 
-### 2.3 Maintain Context
-The MCP server tools are stateless. **You** are responsible for maintaining context. Persist and pass relevant identifiers (`sessionId`, `inquiryId`, `iteration`, `thoughtNumber`, etc.) between calls to build a coherent chain of thought.
+**Build and Development:**
+- `npm run build` - Compile TypeScript to dist/ directory
+- `npm run watch` - Watch for changes and recompile
+- `npm run clean` - Remove dist/ directory
+- `npm start` - Run the compiled server
+- `npm run dev` - Start development with watch mode
 
-## 3.0 Standard Operating Procedure (SOP)
+**Quality Assurance:**
+- `npm test` - Run tests (currently placeholder)
+- `npm run lint` - Run linting (currently placeholder)
 
-For any user request that doesn't specifically outlign the intended tool usage, follow this procedure:
+**Deployment:**
+- `npm run docker` - Build Docker image
+- `npm run deploy` - Deploy via Smithery
 
-1.  **Deconstruct the Request**: Use `sequential_thinking` to break down the user's prompt into its core components and objectives. State your interpretation of the goal.
-2.  **Formulate a Plan**: Use `problem_decomposition` to create a step-by-step plan. Each step should map to a specific thinking-pattern tool. Present this high-level plan to the user.
-3.  **Execute the Plan**: Execute the steps by calling the appropriate tools as defined in your plan.
-4.  **Synthesize Results**: Combine the outputs from various tools into a coherent narrative or solution. Do not simply present raw tool outputs.
-5.  **Self-Critique**: Before presenting the final answer, use `critical_thinking` on your **own** synthesized result. Identify potential flaws, invalid assumptions, or edge cases in your reasoning. Refine your answer based on this critique.
+## Architecture Overview
 
-## 4.0 Tool-Specific Directives
+### Core Structure
+This is a monolithic MCP server in `index.ts` (1,620 lines) that implements 10 cognitive tools:
 
-## 🎯 CRITICAL VALIDATION RULES
-- **ALL** required parameters MUST be present
-- **ENUM values** are case-sensitive and must match exactly
-- **Complex objects** need full structure, not just strings
-- **Arrays** must contain correct item types (objects vs strings)
+1. **sequential_thinking** - Multi-step thinking with revision support
+2. **mental_model** - Structured mental models (first principles, opportunity cost, etc.)
+3. **debugging_approach** - Systematic debugging methods (binary search, divide & conquer, etc.)
+4. **stochastic_algorithm** - Probabilistic algorithms (MDP, MCTS, bandit, Bayesian, HMM)
+5. **collaborative_reasoning** - Multi-perspective problem solving
+6. **decision_framework** - Structured decision analysis
+7. **metacognitive_monitoring** - Self-assessment of reasoning quality
+8. **scientific_method** - Formal hypothesis testing
+9. **structured_argumentation** - Dialectical reasoning
+10. **visual_reasoning** - Diagram-based thinking
 
----
+### Key Components
 
-## 📋 TOOLS QUICK REFERENCE
+**Server Classes:** Each tool has a dedicated server class that handles validation, processing, and formatting. The older servers (MentalModel, Debugging, SequentialThinking, Stochastic) use manual validation, while newer servers use unsafe type assertions.
 
-**PRE-CALL CHECKLIST**
-1. ✅ ALL required parameters present?
-2. ✅ Enum values match EXACTLY (case-sensitive)?
-3. ✅ Objects use full structure (not just strings)?
-4. ✅ Arrays contain correct item types?
-5. ✅ Numbers are numbers, booleans are booleans?
-6. ✅ No undefined/null required values?
+**State Management:** SequentialThinkingServer maintains state in memory via `thoughtHistory` and `branches` arrays. A SessionManager exists in `src/services/SessionManager.ts` for proper session isolation.
 
-### 1. **collaborative_reasoning**
-```
-REQUIRED: topic, personas, contributions, stage, activePersonaId, sessionId, iteration, nextContributionNeeded
+**Data Interfaces:** Complex TypeScript interfaces define the data structures for each cognitive tool, with detailed schemas for collaborative reasoning, decision frameworks, etc.
 
-KEY ENUMS:
-- stage: [problem-definition, ideation, critique, integration, decision, reflection]
-- contribution.type: [observation, question, insight, concern, suggestion, challenge, synthesis]
+**Tool Definitions:** Each tool has a detailed schema defining its parameters and validation rules.
 
-OBJECTS:
-- personas: [{id, name, expertise[], background, perspective, biases[], communication{style, tone}}]
-- contributions: [{personaId, content, type, confidence(0-1)}]
-```
+### Critical Architecture Issues
 
-### 2. **critical_thinking**
-```
-REQUIRED: subject, potentialIssues, edgeCases, invalidAssumptions, alternativeApproaches
+⚠️ **State Management Memory Leak:** SequentialThinkingServer stores state in private arrays that persist across all sessions, causing memory leaks and data bleeding between users.
 
-KEY ENUMS:
-- severity: [low, medium, high, critical]
-- category: [logic, implementation, design, security, performance, usability, maintainability]
-- validity: [valid, questionable, invalid, unknown]
-- testability: [easy, moderate, difficult, untestable]
+⚠️ **Inconsistent Validation:** Newer server classes use unsafe `input as Type` assertions instead of proper validation.
 
-OBJECTS:
-- potentialIssues: [{description, severity, category, likelihood(0-1)}]
-- edgeCases: [{scenario, conditions[], testability, businessImpact}]
-- invalidAssumptions: [{statement, validity}]
-- alternativeApproaches: [{name, description, advantages[], disadvantages[], complexity, feasibility(0-1)}]
-```
+⚠️ **Security Vulnerabilities:** Some schemas allow `additionalProperties: true` and lack input sanitization.
 
-### 3. **debugging_approach**
-```
-REQUIRED: approachName, issue
+### Recent Additions
 
-KEY ENUMS:
-- method.name: ["Binary Search Debugging", "The 5 Whys", "Root Cause Analysis", "Log Analysis", etc.]
-- complexity: [low, medium, high, expert]
-```
+The `src/` directory contains:
+- `services/SessionManager.ts` - Session isolation implementation
+- `errors/CustomErrors.ts` - Structured error classes
 
-### 4. **decision_framework**
-```
-REQUIRED: decisionStatement, options, analysisType, stage, decisionId, iteration, nextStageNeeded
+## Development Guidelines
 
-KEY ENUMS:
-- analysisType: [expected-utility, multi-criteria, maximin, minimax-regret, satisficing]
-- stage: [problem-definition, options, criteria, evaluation, analysis, recommendation]
+### When Adding New Cognitive Tools
+1. Define TypeScript interfaces for input/output data
+2. Create a server class extending the pattern in existing servers
+3. Add tool definition with proper schema validation
+4. Register in the main server's tool list and request handlers
+5. Consider session state requirements carefully
 
-OBJECTS:
-- options: [{name, description}] (id optional)
-```
+### Critical Areas Requiring Attention
+1. **Fix SequentialThinkingServer state management** - Replace private arrays with SessionManager
+2. **Replace unsafe type assertions** - Use proper validation in newer server classes
+3. **Security hardening** - Remove `additionalProperties: true` and add input sanitization
+4. **Modularization** - Break up the monolithic index.ts file
 
-### 5. **domain_modeling**
-```
-REQUIRED: domainName, description, modelingId, iteration, stage, entities, abstractionLevel, paradigm, nextStageNeeded
+### Testing Approach
+- No formal testing framework currently configured
+- Manual testing via MCP client interactions
+- Need to implement comprehensive test suite covering all 10 tools
 
-KEY ENUMS:
-- stage: [analysis, conceptual, logical, physical, validation, refinement]
-- abstractionLevel: [high, medium, low]
+## Deployment Context
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- Builds to `dist/index.js` executable
+- Deployed via Smithery platform
+- Docker image: `waldzellai/thinking-patterns`
+- NPM package: `@emmahyde/thinking-patterns`
+- Runs on Node.js 18+ via stdio transport
+
+## Dependencies
+
+Key dependencies:
+- `@modelcontextprotocol/sdk` - MCP framework
+- `chalk` - Console output formatting
+- `yargs` - CLI argument parsing
+- `zod` - Schema validation (installed but not fully utilized)
+
+Development dependencies focus on TypeScript compilation and type definitions.
 
 ---
 > Source: [emmahyde/thinking-patterns](https://github.com/emmahyde/thinking-patterns) — distributed by [TomeVault](https://tomevault.io).
