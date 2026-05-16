@@ -1,110 +1,196 @@
 ---
 trigger: always_on
-description: description: UNDERSTAND SYMindX Cursor rules hierarchy when working with project rules
+description: **Rule Priority:** Core Architecture
 ---
 
+# TypeScript & Bun Development Standards 2025
 
----
-description: UNDERSTAND SYMindX Cursor rules hierarchy when working with project rules
-globs: .cursor/rules/*.mdc
----
+**Rule Priority:** Core Architecture  
+**Activation:** Always Active  
+**Scope:** All TypeScript/JavaScript development
 
-# Cursor Rules Framework for SYMindX
+## 2025 TypeScript Configuration Standards
 
-This document outlines the comprehensive rule framework used in the SYMindX project, providing intelligent navigation and context-aware rule activation for AI agents working within Cursor IDE.
-
-## Framework Overview
-
-The SYMindX Cursor rules framework consists of **24 comprehensive rules** (000-index.mdc + 000-022 core rules) organized in a hierarchical, extensible structure with intelligent cross-referencing and automated verification tools.
-
-### Complete Rule Index
-
-| Rule | Purpose | Dependencies | Triggers |
-|------|---------|--------------|----------|
-| 000-index.mdc | Master navigation hub | All rules | Always active |
-| 000-rules.mdc | Meta-rule defining framework standards | None | *.mdc files |
-| 001-symindx-workspace.mdc | Core project architecture | None | Always active |
-| 002-cursor-rules-framework.mdc | Framework organization | 000-rules.mdc | *.mdc files |
-| 003-typescript-standards.mdc | TypeScript and Bun standards | 001-symindx-workspace.mdc | **/*.ts,**/*.js |
-| 004-architecture-patterns.mdc | Modular design patterns | 003-typescript-standards.mdc | Core development |
-| 005-ai-integration-patterns.mdc | AI portal integration | 004-architecture-patterns.mdc | AI provider work |
-| 006-web-interface-patterns.mdc | React and frontend | 003-typescript-standards.mdc | **/*.tsx,website/** |
-| 007-extension-system-patterns.mdc | Platform integrations | 004-architecture-patterns.mdc | Extensions work |
-| 008-testing-and-quality-standards.mdc | Testing strategies | All development rules | **/*.test.ts,**/*.spec.ts |
-| 009-deployment-and-operations.mdc | Docker and deployment | 001-symindx-workspace.mdc | Docker files |
-| 010-security-and-authentication.mdc | Security standards | All system rules | Security-related code |
-| 011-data-management-patterns.mdc | Database and memory | 003-typescript-standards.mdc | Memory/database work |
-| 012-performance-optimization.mdc | Performance patterns | All development rules | Performance-critical code |
-| 013-error-handling-logging.mdc | Error handling patterns | All development rules | Error-prone code |
-| 014-cli-and-tooling-patterns.mdc | CLI design patterns | 003-typescript-standards.mdc | CLI development |
-| 015-configuration-management.mdc | Config and environment | 010-security-and-authentication.mdc | Config files |
-| 016-documentation-standards.mdc | Documentation patterns | None | **/*.md,docs/** |
-| 017-community-and-governance.mdc | Open source practices | 016-documentation-standards.mdc | Community files |
-| 018-git-hooks.mdc | Git automation | 008-testing-and-quality-standards.mdc | Git operations |
-| 019-background-agents.mdc | Cloud-powered agents | 004-architecture-patterns.mdc | Background tasks |
-| 020-mcp-integration.mdc | Model Context Protocol | 005-ai-integration-patterns.mdc | MCP work |
-| 021-advanced-context.mdc | Context-aware activation | All rules | Dynamic contexts |
-| 022-workflow-automation.mdc | Workflow orchestration | All automation rules | Workflow files |
-
-## Documentation and Tools Integration
-
-### Core Documentation (@.cursor/docs/)
-
-The framework integrates closely with comprehensive documentation that agents should reference:
-
-- **@.cursor/docs/quick-start.md** - Developer onboarding and first-time setup
-- **@.cursor/docs/architecture.md** - Detailed system architecture documentation  
-- **@.cursor/docs/contributing.md** - Development workflow and contribution guidelines
-
-These docs provide essential context for:
-- New developer onboarding
-- System architecture understanding
-- Development workflow guidance
-- Code contribution standards
-
-### Development Tools (@.cursor/tools/)
-
-The framework leverages specialized development tools that agents can utilize:
-
-- **@.cursor/tools/project-analyzer.md** - Project structure analysis and code metrics
-- **@.cursor/tools/debugging-guide.md** - Comprehensive debugging strategies and troubleshooting
-- **@.cursor/tools/code-generator.md** - Component templates and code generation patterns
-- **@.cursor/tools/verify-rule-links.js** - Automated cross-reference verification tool
-
-These tools enable:
-- Automated project analysis and insights
-- Systematic debugging approaches
-- Consistent code generation
-- Framework quality assurance
-
-## Cross-Reference System
-
-### Reference Syntax
-```markdown
-@rule-name.mdc           # Direct rule reference
-@.cursor/docs/file.md    # Documentation reference
-@.cursor/tools/file.md   # Development tool reference
+### Ultra-Strict Type Safety
+```typescript
+// REQUIRED: Advanced TypeScript 5.6+ configuration
+{
+  "compilerOptions": {
+    "strict": true,
+    "exactOptionalPropertyTypes": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "moduleDetection": "force",
+    "target": "ES2025",
+    "module": "ESNext",
+    "moduleResolution": "bundler"
+  }
+}
 ```
 
-### Smart Navigation by Context
+### Type Definitions 2025
 
-**🚀 Starting New Features**
-```
-Foundation: @001-symindx-workspace.mdc → @003-typescript-standards.mdc
-Architecture: @004-architecture-patterns.mdc
-Component-Specific: @005-ai-integration-patterns.mdc OR @007-extension-system-patterns.mdc
-Quality: @008-testing-and-quality-standards.mdc
-Documentation: @.cursor/docs/architecture.md, @.cursor/tools/code-generator.md
+- **Use `satisfies` operator** for type narrowing with inference preservation
+- **Leverage `const` assertions** with template literal types
+- **Implement branded types** for domain-specific validation
+- **Utilize mapped types** with conditional logic for complex transformations
+
+```typescript
+// GOOD: 2025 pattern with satisfies and branded types
+type UserId = string & { readonly __brand: unique symbol };
+type EmailAddress = string & { readonly __brand: unique symbol };
+
+const userConfig = {
+  id: "user123" as UserId,
+  email: "user@example.com" as EmailAddress,
+  settings: {
+    theme: "dark",
+    notifications: true
+  }
+} satisfies UserConfig;
+
+// GOOD: Advanced mapped type patterns
+type StrictPick<T, K extends keyof T> = {
+  [P in K]: T[P];
+} & { [P in Exclude<keyof T, K>]?: never };
+
+// GOOD: Template literal validation
+type HTTPMethod = `${'GET' | 'POST' | 'PUT' | 'DELETE'}`;
+type APIEndpoint<T extends string> = `/api/v1/${T}`;
 ```
 
-**🔧 Daily Development Tasks**
-```
-Standards: @003-typescript-standards.mdc
-Performance: @012-performance-optimization.mdc  
-Error Handling: @013-error-handling-logging.mdc
-Tools: @.cursor/tools/debugging-guide.md, @.cursor/tools/project-analyzer.md
+## Bun Runtime Standards 2025
+
+### Advanced Bun 1.2+ Features
+
+```bash
+# REQUIRED: Use Bun's latest performance optimizations
+bun install --frozen-lockfile    # Production builds
+bun add --dev --optional         # Development dependencies
+bun --bun run build             # Force Bun runtime (not Node.js)
+bun build --target browser --outdir dist --splitting
 ```
 
+### High-Performance Patterns
+
+- **Use `Bun.file()` with streaming** for large file operations
+- **Leverage `Bun.spawn()` with IPC** for multi-process coordination
+- **Implement `Bun.serve()` with WebSocket upgrades** for real-time features
+- **Utilize built-in PostgreSQL driver** for database operations
+
+```typescript
+// GOOD: Bun 1.2 native PostgreSQL integration
+import { Database } from 'bun:sqlite';
+import postgres from 'bun:postgres'; // Native driver
+
+// High-performance file streaming
+const file = Bun.file('./large-dataset.json');
+const stream = file.stream();
+
+// WebSocket server with HTTP/2 support
+export default {
+  port: 3000,
+  fetch(req: Request, server: Server) {
+    if (server.upgrade(req)) {
+      return; // WebSocket upgrade handled
+    }
+    return new Response("Regular HTTP response");
+  },
+  websocket: {
+    message(ws, message) {
+      ws.send(`Echo: ${message}`);
+    },
+  },
+  error(error) {
+    return new Response(`Error: ${error.message}`, { status: 500 });
+  },
+};
+```
+
+## 2025 Error Handling Patterns
+
+### AI-Assisted Error Recovery
+```typescript
+// 2025 pattern: Self-healing error handlers with context
+export abstract class SYMindXError extends Error {
+  abstract readonly code: string;
+  abstract readonly category: ErrorCategory;
+  abstract readonly severity: 'low' | 'medium' | 'high' | 'critical';
+  
+  constructor(
+    message: string,
+    public readonly context?: Record<string, unknown>,
+    public readonly recoveryHint?: string,
+    public readonly aiAssisted: boolean = true
+  ) {
+    super(message);
+    this.name = this.constructor.name;
+  }
+
+  toStructuredLog() {
+    return {
+      error: this.name,
+      code: this.code,
+      category: this.category,
+      severity: this.severity,
+      message: this.message,
+      context: this.context,
+      recovery: this.recoveryHint,
+      timestamp: new Date().toISOString(),
+      aiEnabled: this.aiAssisted
+    };
+  }
+}
+
+// Enhanced Result pattern with recovery strategies
+export type EnhancedResult<T, E = SYMindXError> = 
+  | { success: true; data: T; metrics?: PerformanceMetrics }
+  | { success: false; error: E; recovery?: () => Promise<EnhancedResult<T, E>> };
+```
+
+### Async Error Handling with Observability
+
+```typescript
+// GOOD: 2025 observability-first error handling
+export async function executeWithTelemetry<T>(
+  operation: string,
+  fn: () => Promise<T>,
+  fallback?: () => Promise<T>
+): Promise<EnhancedResult<T>> {
+  const startTime = performance.now();
+  const traceId = crypto.randomUUID();
+  
+  try {
+    console.time(`${operation}:${traceId}`);
+    const result = await fn();
+    const metrics = {
+      duration: performance.now() - startTime,
+      traceId,
+      operation
+    };
+    
+    return { success: true, data: result, metrics };
+  } catch (error) {
+    const enhancedError = new OperationError(
+      `Failed to execute ${operation}`,
+      { operation, traceId, duration: performance.now() - startTime },
+      fallback ? "Fallback available" : "No recovery strategy",
+      true
+    );
+    
+    if (fallback) {
+      return {
+        success: false,
+        error: enhancedError,
+        recovery: () => executeWithTelemetry(`${operation}:fallback`, fallback)
+      };
+    }
+    
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
