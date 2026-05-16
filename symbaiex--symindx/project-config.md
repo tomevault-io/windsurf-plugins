@@ -1,193 +1,96 @@
 ---
 trigger: always_on
-description: **Rule Priority:** Critical Security
+description: This document provides a high-level guide to working with **agents** in the SYMindX framework. It covers core concepts, lifecycle, configuration, and management via both the API and the CLI.
 ---
 
-# AI Safety and Responsible AI Patterns 2025
+# Agents Overview
 
-**Rule Priority:** Critical Security  
-**Activation:** AI Integration Development  
-**Scope:** All AI provider integrations and agent systems
+This document provides a high-level guide to working with **agents** in the SYMindX framework. It covers core concepts, lifecycle, configuration, and management via both the API and the CLI.
 
-## 2025 AI Safety Standards
+---
 
-### Mandatory Safety Checks
+## What Is an Agent?
 
-```typescript
-// REQUIRED: AI safety validation layer
-export interface AISafetyGuards {
-  readonly contentFilter: ContentFilter;
-  readonly rateLimit: RateLimit;
-  readonly auditLogger: AuditLogger;
-  readonly privacyFilter: PrivacyFilter;
-  readonly biasDetector: BiasDetector;
-  readonly hallucinationDetector: HallucinationDetector;
-}
+An **agent** is a running instance of a configured **character**. Agents encapsulate personality, memory, emotion, cognition, and integration modules to interact with users or other systems. Each agent is defined by a JSON-based character configuration and managed by the SYMindX runtime.
 
-export class SafetyValidatedAIPortal implements AIPortal {
-  constructor(
-    private readonly provider: AIProvider,
-    private readonly safetyGuards: AISafetyGuards
-  ) {}
+## Agent Architecture & Lifecycle
 
-  async generateResponse(request: AIRequest): Promise<SafeAIResponse> {
-    // Pre-processing safety checks
-    const sanitizedRequest = await this.safetyGuards.contentFilter.sanitize(request);
-    await this.safetyGuards.rateLimit.checkLimit(request.userId);
-    await this.safetyGuards.privacyFilter.validateRequest(sanitizedRequest);
+Agents are orchestrated by the `SYMindXRuntime`, which handles:
 
-    // Generate response with monitoring
-    const response = await this.provider.generate(sanitizedRequest);
+1. **Initialization**: Loading modules, portals (AI providers), and extensions
+2. **Agent Creation**: Spawning agents from character definitions
+3. **Runtime Loop**: Driving emotion decay, autonomous ticks (if enabled), and event dispatch
+4. **Communication**: Processing incoming messages and generating responses
+5. **Shutdown**: Gracefully stopping agents and releasing resources
 
-    // Post-processing validation
-    const validatedResponse = await this.safetyGuards.hallucinationDetector.validate(response);
-    await this.safetyGuards.biasDetector.analyze(validatedResponse);
-    await this.safetyGuards.auditLogger.log({
-      request: sanitizedRequest,
-      response: validatedResponse,
-      timestamp: new Date(),
-      safety: 'validated'
-    });
+Refer to the detailed architecture in [ARCHITECTURE.md](mind-agents/docs/ARCHITECTURE.md).
 
-    return validatedResponse;
-  }
-}
+## Character Configuration
+
+Agents are configured via **character files** (`*.json`) located in the characters directory. Each character defines traits, memory and emotion settings, cognition modules, communication style, extensions, and portals.
+
+```bash
+mind-agents/src/characters/
+├── README.md           # Character system development guide
+├── nyx.json            # Unethical hacker personality (active)
+├── aria.json           # Creative artist (disabled)
+├── rex.json            # Strategic thinker (disabled)
+├── nova.json           # Empathetic counselor (disabled)
+└── examples/           # Sample character templates
 ```
 
-### Content Filtering and Moderation
+For full schema and examples, see [CHARACTER_GUIDE.md](mind-agents/docs/CHARACTER_GUIDE.md) and the characters README in the source tree.
 
-- **Implement real-time content scanning** for harmful, illegal, or inappropriate content
-- **Use multiple moderation layers** with cascading filters
-- **Log all filtered content** for analysis and improvement
-- **Provide clear rejection reasons** for filtered requests
+## Agent Management via API
 
-```typescript
-// GOOD: Multi-layer content filtering
-export class ContentFilter {
-  private readonly filters: ContentFilterLayer[] = [
-    new ProfanityFilter(),
-    new ViolenceFilter(),
-    new PrivacyFilter(),
-    new LegalComplianceFilter(),
-    new BiasFilter()
-  ];
-
-  async sanitize(content: string): Promise<ContentFilterResult> {
-    const violations: ContentViolation[] = [];
-    let filteredContent = content;
-
-    for (const filter of this.filters) {
-      const result = await filter.process(filteredContent);
-      if (result.violations.length > 0) {
-        violations.push(...result.violations);
-        filteredContent = result.sanitized;
-      }
-    }
-
-    return {
-      original: content,
-      sanitized: filteredContent,
-      violations,
-      safe: violations.length === 0
-    };
-  }
-}
-```
-
-## Privacy Protection Patterns
-
-### Data Minimization and Anonymization
+The primary API for programmatic agent management is exposed by `SYMindXRuntime`. Core methods include:
 
 ```typescript
-// REQUIRED: Privacy-first data handling
-export class PrivacyProtectedProcessor {
-  private readonly anonymizer = new DataAnonymizer();
-  private readonly retention = new DataRetentionManager();
+const runtime = new SYMindXRuntime(runtimeConfig);
+await runtime.start();
 
-  async processUserData(data: UserData): Promise<AnonymizedData> {
-    // Remove or hash PII
-    const anonymized = await this.anonymizer.anonymize(data, {
-      removeEmails: true,
-      hashPhoneNumbers: true,
-      removeAddresses: true,
-      generalizeLocations: true
-    });
-
-    // Set retention policy
-    await this.retention.setPolicy(anonymized.id, {
-      type: 'ai-processing',
-      maxAge: '30d',
-      autoDelete: true
-    });
-
-    return anonymized;
-  }
-
-  async getDataForAI(userId: string): Promise<AICompatibleData> {
-    const userData = await this.getUserData(userId);
-    const anonymized = await this.processUserData(userData);
-    
-    return {
-      context: anonymized.context,
-      preferences: anonymized.preferences,
-      // Never include: real names, emails, addresses, phone numbers
-      metadata: {
-        region: anonymized.generalLocation,
-        sessionId: crypto.randomUUID(),
-        timestamp: new Date().toISOString()
-      }
-    };
-  }
-}
+// Create and manage agents
+const agent = await runtime.createAgent('nyx');
+await runtime.listAgents();
+await runtime.getAgent(agent.id);
+await runtime.removeAgent(agent.id);
+await runtime.stop();
 ```
 
-### GDPR and Privacy Compliance
+See [API_REFERENCE.md#agent-management-api](mind-agents/docs/API_REFERENCE.md#agent-management-api) for the complete interface.
 
-- **Implement explicit consent** for AI processing
-- **Provide data deletion capabilities** (right to be forgotten)
-- **Enable data portability** for user data
-- **Maintain detailed audit logs** for compliance verification
+## Agent Management via CLI
 
-```typescript
-// GOOD: GDPR-compliant AI data handling
-export class GDPRCompliantAIService {
-  async processWithConsent(
-    userId: string, 
-    data: PersonalData, 
-    consent: ConsentRecord
-  ): Promise<ProcessingResult> {
-    // Verify explicit consent
-    if (!consent.aiProcessing || consent.expired) {
-      throw new ConsentError('Valid AI processing consent required');
-    }
+SYMindX provides a rich CLI with built‑in agent management commands. Common operations:
 
-    // Log consent usage
-    await this.auditLogger.logConsentUsage({
-      userId,
-      consentId: consent.id,
-      purpose: 'ai-processing',
-      timestamp: new Date()
-    });
+```bash
+# List all agents
+symindx agent list
 
-    // Process with privacy protection
-    return await this.privacyProtectedProcessor.process(data);
-  }
+# Start or stop an agent
+symindx agent start nyx
+symindx agent stop nyx
 
-  async deleteUserData(userId: string): Promise<DeletionResult> {
-    // Remove all stored data
-    await this.dataStore.deleteUserData(userId);
-    await this.aiCache.clearUserCache(userId);
-    await this.auditLogger.logDeletion(userId);
-    
-    return { deleted: true, timestamp: new Date() };
-  }
-}
+# Show agent details
+symindx agent info nyx
+
+# Interactive agent creation wizard
+symindx agent create
 ```
 
-## Bias Detection and Mitigation
+For more commands and interactive menus, refer to [CLI_USER_GUIDE.md#agent-management](mind-agents/docs/CLI_USER_GUIDE.md#agent-management).
 
+## Further Resources
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- **Character Configuration**: mind-agents/docs/CHARACTER_GUIDE.md
+- **API Reference**: mind-agents/docs/API_REFERENCE.md
+- **CLI Guide**: mind-agents/docs/CLI_USER_GUIDE.md
+- **Architecture Overview**: mind-agents/docs/ARCHITECTURE.md
+- **Characters Development**: mind-agents/src/characters/README.md
+
+---
+
+*Generated by reviewing the SYMindX project structure and documentation.*
 
 ---
 > Source: [SYMBaiEX/SYMindX](https://github.com/SYMBaiEX/SYMindX) — distributed by [TomeVault](https://tomevault.io).
