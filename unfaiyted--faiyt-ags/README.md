@@ -7,11 +7,11 @@ Hyprland/AGS UI using modern design for Wayland environments.
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [unfaiyted/faiyt-ags](https://github.com/unfaiyted/faiyt-ags).
+Original source: `CLAUDE.md` in [unfaiyted/faiyt-ags](https://github.com/unfaiyted/faiyt-ags).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
