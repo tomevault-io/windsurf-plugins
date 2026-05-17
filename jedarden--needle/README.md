@@ -7,11 +7,11 @@ Headless agent orchestrator with deterministic state machine — processes a bea
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [jedarden/NEEDLE](https://github.com/jedarden/NEEDLE).
+Original source: `CLAUDE.md` in [jedarden/NEEDLE](https://github.com/jedarden/NEEDLE).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
