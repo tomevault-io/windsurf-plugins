@@ -1,8 +1,7 @@
 ---
 trigger: always_on
-description: AI外呼Prompt工程化工具包 - 提供生成Prompt、生成输入变量、评估通话质量三个技能
+description: 本项目包含 3 个 AI 技能，用于 AI 电话外呼访谈的全流程支持。
 ---
-
 
 # AI外呼 Prompt 工程化工具包
 
