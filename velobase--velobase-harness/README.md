@@ -7,11 +7,11 @@ An open-source framework that takes your AI app from code to cash.
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [velobase/velobase-harness](https://github.com/velobase/velobase-harness).
+Original source: `CLAUDE.md` in [velobase/velobase-harness](https://github.com/velobase/velobase-harness).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
