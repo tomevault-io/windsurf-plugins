@@ -1,12 +1,12 @@
 ---
 trigger: always_on
-description: Persona project-planner — planejamento sem codigo; leia .agent/agents/project-planner.md.
+description: Persona qa-automation-engineer — E2E e suites de regressao; leia .agent/agents/qa-automation-engineer.md.
 ---
 
 
-# Agente: Project Planner
+# Agente: QA Automation Engineer
 
-Antes de atuar neste papel, leia `.agent/agents/project-planner.md` e carregue as `skills:` do frontmatter em `.cursor/skills/` ou `.agent/skills/`.
+Antes de atuar neste papel, leia `.agent/agents/qa-automation-engineer.md` e carregue as `skills:` do frontmatter em `.cursor/skills/` ou `.agent/skills/`.
 
 ---
 > Source: [gabriellpequeno/Reserva-Aqui---Projeto-de-fim-de-ciclo](https://github.com/gabriellpequeno/Reserva-Aqui---Projeto-de-fim-de-ciclo) — distributed by [TomeVault](https://tomevault.io).
