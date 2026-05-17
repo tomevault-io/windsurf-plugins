@@ -7,12 +7,12 @@ Native iOS/iPadOS SSH terminal powered by Ghostty's terminal engine
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `copilot-instructions.md` in [daiimus/geistty](https://github.com/daiimus/geistty).
+Original source: `AGENTS.md` in [daiimus/geistty](https://github.com/daiimus/geistty).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
+- **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
