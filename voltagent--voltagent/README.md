@@ -7,11 +7,11 @@ AI Agent Engineering Platform built on an Open Source TypeScript AI Agent Framew
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [VoltAgent/voltagent](https://github.com/VoltAgent/voltagent).
+Original source: `AGENTS.md` in [VoltAgent/voltagent](https://github.com/VoltAgent/voltagent).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
