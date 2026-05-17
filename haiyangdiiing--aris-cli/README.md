@@ -7,11 +7,11 @@ ARIS CLI — Autonomous Research Iteration System. Track experiments, view resul
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [HaiyangDiiing/aris-cli](https://github.com/HaiyangDiiing/aris-cli).
+Original source: `CLAUDE.md` in [HaiyangDiiing/aris-cli](https://github.com/HaiyangDiiing/aris-cli).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
