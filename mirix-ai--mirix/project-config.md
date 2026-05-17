@@ -1,127 +1,105 @@
 ---
 trigger: always_on
-description: MIRIX is a Multi-Agent Personal Assistant with an Advanced Memory System. It features a six-agent memory architecture (Core, Episodic, Semantic, Procedural, Resource, Knowledge Vault) with screen activity tracking and privacy-first design.
+description: MIRIX is an async-native multi-agent personal assistant with a six-component memory system
 ---
 
-# MIRIX Project Rules for Cursor AI
+# MIRIX - Claude Code Instructions
 
-## Project Overview
-MIRIX is a Multi-Agent Personal Assistant with an Advanced Memory System. It features a six-agent memory architecture (Core, Episodic, Semantic, Procedural, Resource, Knowledge Vault) with screen activity tracking and privacy-first design.
+## What This Project Does
+MIRIX is an async-native multi-agent personal assistant with a six-component memory system
+(Core, Episodic, Semantic, Procedural, Resource, Knowledge Vault). It captures memories
+from conversations and screen activity, storing them in PostgreSQL with vector search via pgvector.
 
-## Tech Stack
-- **Backend**: Python 3.10+, FastAPI, PostgreSQL, Redis, Kafka
-- **Frontend**: React, TypeScript, Vite, TailwindCSS
-- **LLM Integration**: Multiple providers (OpenAI, Anthropic, Google, Azure, etc.)
-- **Observability**: LangFuse
-- **Testing**: pytest
-- **Linting**: Ruff, Pyright
+## Key Architecture
+- **Entry point**: `mirix/server/rest_api.py` (FastAPI, port 8531)
+- **Orchestration**: `mirix/agent/meta_agent.py` → 6 sub-agents
+- **Data flow**: ORM (`mirix/orm/`) → Schemas (`mirix/schemas/`) → Managers (`mirix/services/`) → API (`mirix/server/`)
+- **Queue**: Kafka-backed (`mirix/queue/`) for async memory extraction
+- **All I/O is async** — never introduce sync blocking calls (see `docs/Mirix_async_native_changes.md`)
 
-## Code Standards
+## Local Development Setup
 
-### Python Guidelines
-1. **Follow PEP 8** strictly
-   - Use 4 spaces for indentation (no tabs)
-   - Max line length: 79 characters for code, 72 for docstrings
-   - Use snake_case for variables/functions, CamelCase for classes, ALL_CAPS for constants
-   - Group imports: standard library, third-party, local application (blank lines between groups)
+### Prerequisites
+- Docker + Docker Compose
+- Python 3.10+
+- At least one LLM API key (OpenAI, Anthropic, or Google Gemini)
 
-2. **Type Hints**
-   - Always use type hints for function signatures
-   - Use `Optional[T]` for nullable types
-   - Use `Union` or `|` syntax for multiple types
-   - Example: `def create_user(user_id: str, name: Optional[str] = None) -> User:`
+### Start Infrastructure
+```bash
+cp docker/env.example .env   # then add your API keys to .env
+docker-compose up -d         # starts PostgreSQL (5432), Redis (6379), API (8531), Dashboard (5173)
+docker-compose ps            # verify all services healthy
+```
 
-3. **Documentation**
-   - Use triple-quoted docstrings for all modules, classes, and functions
-   - Include parameter descriptions, return types, and examples where helpful
-   - Document complex logic with inline comments explaining WHY, not WHAT
+### Run API Locally (without Docker)
+```bash
+pip install -e .
+export GEMINI_API_KEY=your-key   # or OPENAI_API_KEY / ANTHROPIC_API_KEY
+python scripts/start_server.py --port 8531
+```
 
-4. **Error Handling**
-   - Use specific exception types (ValueError, TypeError, HTTPException, etc.)
-   - Never use bare `except:` clauses
-   - Log errors with appropriate context
+### Access Points
+- Dashboard: http://localhost:5173
+- API Swagger: http://localhost:8531/docs
+- API ReDoc: http://localhost:8531/redoc
 
-5. **Async/Await**
-   - Use async/await for I/O operations
-   - Prefix async functions with `async def`
-   - Always await async calls
+## Running Tests
 
-### Async Architecture (Critical)
-The codebase is fully async-native. Violating these rules will break the server.
+```bash
+# Fast unit tests — no running server needed (~20s)
+pytest tests/test_memory_server.py -v
 
-1. **All new manager methods in `mirix/services/` MUST be `async def`**
-2. **Never call `asyncio.run()` inside the server** — the event loop is already running
-3. **Never use sync DB drivers** — use `asyncpg` (not `pg8000`), `aiosqlite` (not `sqlite3`)
-4. **Never use sync Redis** — use `redis.asyncio` only, never `redis.Redis`
-5. **Never use `requests`** — use `httpx.AsyncClient` for all HTTP calls
-6. **Wrap unavoidable sync calls** with `asyncio.to_thread()` — only for these 5 approved touch-points:
-   - LangFuse SDK (no async version)
-   - Gmail OAuth (inherently blocking)
-   - SQLAlchemy DDL at startup
-   - Cleanup job entry point
-   - Pure CPU helpers with no I/O
-7. **Do NOT add new sync touch-points** — check `docs/Mirix_async_native_changes.md` first
+# All tests except integration
+pytest -m "not integration" -v
 
-### Project-Specific Patterns
+# Integration tests — requires server on port 8899
+python scripts/start_server.py --port 8899          # Terminal 1
+pytest tests/test_memory_integration.py -v -m integration -s   # Terminal 2
 
-#### 1. Memory System Architecture
-- **Meta Agent** orchestrates specialized memory agents
-- **Sub-agents** extract specific memory types (episodic, semantic, etc.)
-- **Memory extraction** happens via queue-worker architecture
-- Each memory type has dedicated ORM models, schemas, and managers
+# Full suite
+pytest -v
+```
 
-#### 2. Database Patterns
-- **ORM Models**: Located in `mirix/orm/` using SQLAlchemy
-- **Schemas**: Located in `mirix/schemas/` using Pydantic
-- **Managers**: Located in `mirix/services/` for business logic
-- Always use `OrganizationMixin`, `UserMixin`, `AgentMixin` where applicable
+**Required env var for tests**: `GEMINI_API_KEY`
 
-#### 3. Agent Execution Flow
-- `step()` method is the main agent execution loop (like LangChain's AgentExecutor)
-- `inner_step()` handles single LLM interactions with tool calls
-- `save_agent()` persists agent state to database
-- Steps are logged to the `steps` table for audit/analytics (write-only)
+## Common Dev Tasks
 
-#### 4. Message Flow
-- Queue messages (transient) != Database messages (persistent)
-- Database messages stored via `MessageManager.create()` after agent execution
-- Messages link to steps via `step_id` foreign key
-- Messages table used for conversation history and search
+### Add a new API endpoint
+1. Add Pydantic request/response schemas to `mirix/schemas/`
+2. Add business logic method to the relevant manager in `mirix/services/`
+3. Add the route to `mirix/server/rest_api.py`
+4. Add the corresponding method to `mirix/client/remote_client.py`
 
-#### 5. API Patterns
-- REST endpoints in `mirix/server/rest_api.py`
-- Client SDK in `mirix/client/remote_client.py`
-- Always authenticate with JWT or API key
-- Use `create_or_get_user()` to ensure user exists before operations
+### Add a new memory type
+1. Create ORM model in `mirix/orm/`
+2. Create Pydantic schemas in `mirix/schemas/`
+3. Create manager in `mirix/services/`
+4. Create sub-agent in `mirix/agent/`
+5. Register in `mirix/agent/meta_agent.py`
 
-#### 6. Settings Management
-- Environment variables defined in `mirix/settings.py`
-- Use Pydantic BaseSettings with `env` prefix `MIRIX_`
-- Provider API keys in `ModelSettings`
-- Tool configs in `ToolSettings`
+### Format & lint
+```bash
+make format   # ruff import sort + format
+make lint     # ruff check + pyright
+make check    # format + lint + test
+```
 
-#### 7. Tool Execution
-- User-defined tools run in `ToolExecutionSandbox` for security
-- Tools defined in `mirix/functions/function_sets/`
-- Memory tools in `memory_tools.py`, base tools in `base.py`
+## Async Rules (Critical)
+- **All new manager methods must be `async def`**
+- **Never use `asyncio.run()` inside the server** — the event loop is already running
+- Only 5 intentional sync touch-points exist (LangFuse, Gmail OAuth, SQLAlchemy DDL at startup, cleanup job entry, pure CPU helpers) — do not add more
+- Use `asyncio.to_thread()` to wrap any unavoidably sync third-party calls
 
-### Code Review Checklist
-Before suggesting changes, verify:
-- [ ] No duplicate code or configurations
-- [ ] Type hints are present and correct
-- [ ] Error handling is specific and informative
-- [ ] Docstrings follow PEP 257
-- [ ] No hardcoded secrets or API keys
-- [ ] Database operations use proper ORM patterns
-- [ ] Async functions are properly awaited
-- [ ] Tests are included for new functionality
-- [ ] Logging uses appropriate levels (debug, info, warning, error)
+## Commit Convention
+Prefix commits with the Jira ticket: `[VEPEAGE-NNN] Description`
 
-### Common Pitfalls to Avoid
-1. **Do NOT** confuse queue messages with database messages
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+## Do Not
+- Confuse queue messages (transient) with database messages (persistent)
+- Call `step_manager.get_step()` — steps are write-only audit logs
+- Skip `create_or_get_user()` — always ensure users exist first
+- Commit secrets or API keys
+- Create README or doc files unless explicitly requested
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/Mirix-AI) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-09 -->
+> Source: [Mirix-AI/MIRIX](https://github.com/Mirix-AI/MIRIX) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-17 -->
