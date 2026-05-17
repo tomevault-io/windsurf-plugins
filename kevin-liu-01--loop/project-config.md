@@ -1,64 +1,126 @@
 ---
 trigger: always_on
-description: High-signal frontend art direction, system design, and anti-generic guardrails.
+description: Review this plan thoroughly before making any code changes. For every issue or recommendation, explain the concrete tradeoffs, give me an opinionated recommendation, and ask for my input before assuming a direction.
 ---
 
+# Claude Code Prompt for Plan Mode
 
-# High-Signal Frontend System
+#prompts
 
-When generating or editing frontend code:
+Review this plan thoroughly before making any code changes. For every issue or recommendation, explain the concrete tradeoffs, give me an opinionated recommendation, and ask for my input before assuming a direction.
+My engineering preferences (use these to guide your recommendations):
 
-- Start by choosing an explicit art direction. Do not default to generic SaaS.
-- Choose a methodology lens before choosing tactics: discovery, system, and evaluation.
-- Pick one primary visual thesis: editorial technical, premium AI SaaS, cinematic 3D, architectural blueprint, neo-brutalist, or experimental.
-- Build or extend a real design system before adding one-off styling.
-- Default to Tailwind CSS v4 `@theme` plus runtime CSS variables for token transport.
-- Use tokens for color, spacing, radii, shadows, blur, z-index, and motion.
-- Prefer OKLCH when authoring custom color scales.
-- Reject raw hex colors, arbitrary spacing, and accidental radius/shadow drift.
-- Prefer a type triad: display, sans, mono.
-- Avoid Inter, Roboto, default shadcn aesthetics, and generic purple gradients unless the existing product already uses them or the user explicitly asks for them.
-- Keep the primary UI to 3 active colors or fewer plus neutrals.
-- Use authored line breaks in headlines.
-- Use `text-wrap: balance` for headings and important short copy when helpful.
-- Use `antialiased` at the app layout level when it improves the chosen fonts.
-- Use `tabular-nums` for metrics, dates, prices, and changing numeric UI.
-- Make the product shot, dashboard mock, or diagram obey the same token system as the rest of the page.
-- Keep navigation, CTA hierarchy, and proof blocks simple and obvious.
-- Favor optical alignment over perfect geometry when they conflict.
-- Default to bold but coherent decisions, not safe average ones.
-- When the problem is craft quality, learn from manual-grade references like `userinterface.wiki`, Rauno, Devouring Details, Interface Craft, and UI Playbook, not only from spectacle-heavy marketing sites.
-- Preserve concentric radii on nested surfaces: outer radius = inner radius + padding.
-- Prefer subtle layered shadows over hard borders when the goal is depth.
-- Give images and screenshots a low-opacity outline when they need a cleaner edge.
-- CSS is the substrate for layout, tokens, and fallbacks. Do not default to raw CSS as the primary motion architecture.
-- For React frontends, prefer Motion, GSAP, Lenis, R3F/drei, OGL, and React transitions where appropriate.
-- If the product touches auth, user data, or public forms, include trust checks in the implementation: Supabase RLS where relevant, tested auth flows, rate limits, server-side validation, locked-down env vars, CAPTCHA on public forms when needed, CORS restrictions, and error handling that does not leak internals.
+- DRY is important--flag repetition aggressively.
+- Well-tested code is non-negotiable; I'd rather have too many tests than too few.
+- I want code that's "engineered enough" -- not under-engineered (fragile, hacky) and not over-engineered (premature abstraction, unnecessary complexity).
+- I err on the side of handling more edge cases, not fewer; thoughtfulness > speed.
+- Bias toward explicit over clever.
 
-Composition rules:
+1. Architecture review
+   Evaluate:
 
-- One hero focal point.
-- One dominant CTA.
-- One proof pattern near the claim.
-- One repeated motif across the page.
+- Overall system design and component boundaries.
+- Dependency graph and coupling concerns.
+- Data flow patterns and potential bottlenecks.
+- Scaling characteristics and single points of failure.
+- Security architecture (auth, data access, API boundaries).
 
-Tactic rules:
+2. Code quality review
+   Evaluate:
 
-- choose tactics intentionally: shell, density, motion, 3D/shaders, forms, data display, wait UX, resilience, search, AI, or docs
-- do not cargo-cult patterns because they were trendy on one reference site
+- Code organization and module structure.
+- DRY violations--be aggressive here.
+- Error handling patterns and missing edge cases (call these out explicitly).
+- Technical debt hotspots.
+- Areas that are over-engineered or under-engineered relative to my preferences.
 
-Ban these by default:
+3. Test review
+   Evaluate:
 
-- centered-everything landing pages
-- blur blobs with no material logic
-- glassmorphism on white for no reason
-- several competing accents
-- five unrelated section styles on one page
-- mismatched nested border radii
-- important headlines left to accidental wrapping
-- JS-only token systems when Tailwind v4 runtime vars would do the job better
+- Test coverage gaps (unit, integration, e2e).
+- Test quality and assertion strength.
+- Missing edge case coverage--be thorough.
+- Untested failure modes and error paths.
 
-If the task is docs-heavy, preserve docs usability first and add taste second.
+4. Performance review
+   Evaluate:
+
+- N+1 queries and database access patterns.
+- Memory-usage concerns.
+- Caching opportunities.
+- Slow or high-complexity code paths.
+
+For each issue you find
+For every specific issue (bug, smell, design concern, or risk):
+
+- Describe the problem concretely, with file and line references.
+- Present 2-3 options, including "do nothing" where that's reasonable.
+- For each option, specify: implementation effort, risk, impact on other code, and maintenance burden.
+- Give me your recommended option and why, mapped to my preferences above.
+- Then explicitly ask whether I agree or want to choose a different direction before proceeding.
+
+Workflow and interaction
+
+- Do not assume my priorities on timeline or scale.
+- After each section, pause and ask for my feedback before moving on.
+
+BEFORE YOU START,
+Ask if I want one of two options:
+1/ BIG CHANGE: Work through this interactively, one section at a time (Architecture -> Code Quality -> Tests -> Performance) with at most 4 top issues in each section
+2/ SMALL CHANGE: Work through interactively ONE question per review section
+
+FOR EACH STAGE OF REVIEW: output the explanation and pros and cons of each stage's questions AND your opinionated recommendation and why, and then use AskUserQuestion. Also NUMBER issues and then give LETTERS for options and when using AskUserQuestion make sure each option clearly labels the issue NUMBER and option LETTER so the user doesn't get confused. Make the recommended option always the 1st option.
+
+# Ultracite Code Standards
+
+This project uses **Ultracite**, a zero-config preset that enforces strict code quality standards through automated formatting and linting.
+
+## Quick Reference
+
+- **Format code**: `pnpm dlx ultracite fix`
+- **Check for issues**: `pnpm dlx ultracite check`
+- **Diagnose setup**: `pnpm dlx ultracite doctor`
+
+Oxlint + Oxfmt (the underlying engine) provides robust linting and formatting. Most issues are automatically fixable.
+
+---
+
+## Core Principles
+
+Write code that is **accessible, performant, type-safe, and maintainable**. Focus on clarity and explicit intent over brevity.
+
+### Type Safety & Explicitness
+
+- Use explicit types for function parameters and return values when they enhance clarity
+- Prefer `unknown` over `any` when the type is genuinely unknown
+- Use const assertions (`as const`) for immutable values and literal types
+- Leverage TypeScript's type narrowing instead of type assertions
+- Use meaningful variable names instead of magic numbers - extract constants with descriptive names
+
+### Modern JavaScript/TypeScript
+
+- Use arrow functions for callbacks and short functions
+- Prefer `for...of` loops over `.forEach()` and indexed `for` loops
+- Use optional chaining (`?.`) and nullish coalescing (`??`) for safer property access
+- Prefer template literals over string concatenation
+- Use destructuring for object and array assignments
+- Use `const` by default, `let` only when reassignment is needed, never `var`
+
+### Async & Promises
+
+- Always `await` promises in async functions - don't forget to use the return value
+- Use `async/await` syntax instead of promise chains for better readability
+- Handle errors appropriately in async code with try-catch blocks
+- Don't use async functions as Promise executors
+
+### React & JSX
+
+- Use function components over class components
+- Call hooks at the top level only, never conditionally
+- Specify all dependencies in hook dependency arrays correctly
+- Use the `key` prop for elements in iterables (prefer unique IDs over array indices)
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [Kevin-Liu-01/Loop](https://github.com/Kevin-Liu-01/Loop) — distributed by [TomeVault](https://tomevault.io).
