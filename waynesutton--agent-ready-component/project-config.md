@@ -1,211 +1,117 @@
 ---
 trigger: always_on
-description: Guidelines for preventing write conflicts when using React, useEffect, and Convex
+description: description: Guidelines and best practices for building Convex projects, including database schema design, queries, mutations, and real-world examples
 ---
 
 
-# Preventing Write Conflicts in Convex with React
+---
 
-Write conflicts occur when two functions running in parallel make conflicting changes to the same table or document. This rule provides patterns to avoid these conflicts.
+description: Guidelines and best practices for building Convex projects, including database schema design, queries, mutations, and real-world examples
+globs: **/\*.ts,**/_.tsx,\*\*/_.js,\*_/_.jsx
 
-## Understanding Write Conflicts
+---
 
-According to [Convex documentation](https://docs.convex.dev/error#1), write conflicts happen when:
+# Convex guidelines
 
-1. Multiple mutations update the same document concurrently
-2. A mutation reads data that changes during execution
-3. Mutations are called more rapidly than Convex can execute them
+## Function guidelines
 
-Convex uses optimistic concurrency control and will retry mutations automatically, but will eventually fail permanently if conflicts persist.
+### New function syntax
 
-## Backend Protection: Idempotent Mutations
-
-### Always Make Mutations Idempotent
-
-Mutations should be safe to call multiple times with the same result.
-
-**Good Pattern:**
-
-```typescript
-export const completeTask = mutation({
-  args: { taskId: v.id("tasks") },
-  returns: v.null(),
-  handler: async (ctx, args) => {
-    const task = await ctx.db.get(args.taskId);
-
-    // Early return if document doesn't exist
-    if (!task) {
-      return null;
-    }
-
-    // Early return if already in desired state
-    if (task.status === "completed") {
-      return null;
-    }
-
-    // Only update if state change is needed
-    await ctx.db.patch(args.taskId, {
-      status: "completed",
-      completedAt: Date.now(),
+- always create type-safe code
+- ALWAYS use the new function syntax for Convex functions. For example:
+  `typescript
+    import { query } from "./_generated/server";
+    import { v } from "convex/values";
+    export const f = query({
+        args: {},
+        returns: v.null(),
+        handler: async (ctx, args) => {
+        // Function body
+        },
     });
+    `
 
-    return null;
-  },
-});
-```
+### Http endpoint syntax
 
-**Bad Pattern:**
-
-```typescript
-// This will cause conflicts if called multiple times rapidly
-export const completeTask = mutation({
-  args: { taskId: v.id("tasks") },
-  returns: v.null(),
-  handler: async (ctx, args) => {
-    const task = await ctx.db.get(args.taskId);
-    // No check if already completed
-    await ctx.db.patch(args.taskId, {
-      status: "completed",
-      completedAt: Date.now(),
+- HTTP endpoints are defined in `convex/http.ts` and require an `httpAction` decorator. For example:
+  `typescript
+    import { httpRouter } from "convex/server";
+    import { httpAction } from "./_generated/server";
+    const http = httpRouter();
+    http.route({
+        path: "/echo",
+        method: "POST",
+        handler: httpAction(async (ctx, req) => {
+        const body = await req.bytes();
+        return new Response(body, { status: 200 });
+        }),
     });
-    return null;
-  },
-});
-```
+    `
+- HTTP endpoints are always registered at the exact path you specify in the `path` field. For example, if you specify `/api/someRoute`, the endpoint will be registered at `/api/someRoute`.
 
-### Avoid Unnecessary Reads - Patch Directly
+### Validators
 
-When you only need to update fields, patch directly without reading first. Database operations throw if the document doesn't exist.
+- Below is an example of an array validator:
+  ```typescript
+  import { mutation } from "./\_generated/server";
+  import { v } from "convex/values";
 
-**Good Pattern:**
+                            export default mutation({
+                            args: {
+                                simpleArray: v.array(v.union(v.string(), v.number())),
+                            },
+                            handler: async (ctx, args) => {
+                                //...
+                            },
+                            });
+                            ```
 
-```typescript
-export const updateNote = mutation({
-  args: { id: v.id("notes"), content: v.string() },
-  returns: v.null(),
-  handler: async (ctx, args) => {
-    // Patch directly without reading first
-    // ctx.db.patch throws if document doesn't exist
-    await ctx.db.patch(args.id, { content: args.content });
-    return null;
-  },
-});
-```
+- Below is an example of a schema with validators that codify a discriminated union type:
+  ```typescript
+  import { defineSchema, defineTable } from "convex/server";
+  import { v } from "convex/values";
 
-**Bad Pattern:**
+                            export default defineSchema({
+                                results: defineTable(
+                                    v.union(
+                                        v.object({
+                                            kind: v.literal("error"),
+                                            errorMessage: v.string(),
+                                        }),
+                                        v.object({
+                                            kind: v.literal("success"),
+                                            value: v.number(),
+                                        }),
+                                    ),
+                                )
+                            });
+                            ```
 
-```typescript
-export const updateNote = mutation({
-  args: { id: v.id("notes"), content: v.string() },
-  returns: v.null(),
-  handler: async (ctx, args) => {
-    // Reading the document first creates a conflict window
-    const note = await ctx.db.get(args.id);
-    if (!note) throw new Error("Not found");
+- Always use the `v.null()` validator when returning a null value. Below is an example query that returns a null value:
+  ```typescript
+  import { query } from "./\_generated/server";
+  import { v } from "convex/values";
 
-    // When typing rapidly, multiple mutations fire
-    // Each reads the same version, then all try to write, causing conflicts
-    await ctx.db.patch(args.id, { content: args.content });
-    return null;
-  },
-});
-```
+                                  export const exampleQuery = query({
+                                    args: {},
+                                    returns: v.null(),
+                                    handler: async (ctx, args) => {
+                                        console.log("This query returns a null value");
+                                        return null;
+                                    },
+                                  });
+                                  ```
 
-### Minimize Data Reads
-
-Only read the data you need. Avoid querying entire tables when you only need specific documents.
-
-**Good Pattern:**
-
-```typescript
-export const updateUserCount = mutation({
-  args: { userId: v.id("users") },
-  returns: v.null(),
-  handler: async (ctx, args) => {
-    // Only query tasks for this specific user
-    const tasks = await ctx.db
-      .query("tasks")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
-      .collect();
-
-    await ctx.db.patch(args.userId, {
-      taskCount: tasks.length,
-    });
-
-    return null;
-  },
-});
-```
-
-**Bad Pattern:**
-
-```typescript
-export const updateUserCount = mutation({
-  args: { userId: v.id("users") },
-  returns: v.null(),
-  handler: async (ctx, args) => {
-    // Reading entire table creates conflicts with any task change
-    const allTasks = await ctx.db.query("tasks").collect();
-    const userTasks = allTasks.filter((t) => t.userId === args.userId);
-
-    await ctx.db.patch(args.userId, {
-      taskCount: userTasks.length,
-    });
-
-    return null;
-  },
-});
-```
-
-### Use Indexes to Reduce Read Scope
-
-Always define and use indexes to limit the scope of data reads.
-
-```typescript
-// In schema.ts
-tasks: defineTable({
-  userId: v.string(),
-  status: v.string(),
-  content: v.string(),
-}).index("by_user", ["userId"])
-  .index("by_user_and_status", ["userId", "status"]),
-```
-
-## Frontend Protection: Preventing Duplicate Calls
-
-### Use Refs to Track Mutation Calls
-
-When mutations should only be called once per state change, use refs to track calls.
-
-**Good Pattern:**
-
-```typescript
-export function TimerComponent() {
-  const [session, setSession] = useState(null);
-  const hasCalledComplete = useRef(false);
-  const completeSession = useMutation(api.timer.completeSession);
-
-  useEffect(() => {
-    if (timeRemaining <= 0 && session && !hasCalledComplete.current) {
-      hasCalledComplete.current = true;
-      completeSession({ sessionId: session._id });
-    }
-  }, [timeRemaining, session, completeSession]);
-
-  // Reset ref when starting new session
-  const handleStartNewSession = async () => {
-    hasCalledComplete.current = false;
-    await startSession();
-  };
-
-  return <div>...</div>;
-}
-```
-
-**Bad Pattern:**
-
-```typescript
-export function TimerComponent() {
+- Here are the valid Convex types along with their respective validators:
+  Convex Type | TS/JS type | Example Usage | Validator for argument validation and schemas | Notes |
+  | ----------- | ------------| -----------------------| -----------------------------------------------| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+  | Id | string | `doc._id` | `v.id(tableName)` | |
+  | Null | null | `null` | `v.null()` | JavaScript's `undefined` is not a valid Convex value. Functions the return `undefined` or do not return will return `null` when called from a client. Use `null` instead. |
+  | Int64 | bigint | `3n` | `v.int64()` | Int64s only support BigInts between -2^63 and 2^63-1. Convex supports `bigint`s in most modern browsers. |
+  | Float64 | number | `3.1` | `v.number()` | Convex supports all IEEE-754 double-precision floating point numbers (such as NaNs). Inf and NaN are JSON serialized as strings. |
+  | Boolean | boolean | `true` | `v.boolean()` |
+  | String | string | `"abc"` | `v.string()` | Strings are stored as UTF-8 and must be valid Unicode sequences. Strings must be smaller than the 1MB total size limit when encoded as UTF-8. |
+  | Bytes | ArrayBuffer | `new ArrayBuffer(8)` | `v.bytes()` | Convex supports first class bytestrings, passed in as `ArrayBuffer`s. Bytestrings must be smaller than the 1MB total size limit for Convex types. |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
