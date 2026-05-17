@@ -1,0 +1,112 @@
+---
+trigger: always_on
+description: This file is the short repo-level guide for coding agents.
+---
+
+# Garyx Agent Guide
+
+This file is the short repo-level guide for coding agents.
+
+## IMPORTANT: No real personal data in tests or commits
+
+This is a public repository. NEVER use real personal data in test fixtures,
+docs, code samples, or commit messages. That includes — but is not limited to —
+real names, real Telegram/WeChat/Feishu chat IDs and user IDs, real bot IDs,
+real email addresses, real phone numbers, real `/Users/<username>` paths, and
+real tokens or secrets. Use clearly synthetic placeholders instead, e.g.
+`Test User`, `1000000001`, `/Users/test`, `bot@example.com`, `${TOKEN}`.
+
+Before staging a change, scan the diff for personal data and remove it. If a
+test needs to reference an account, build it from a placeholder fixture, not
+from a real chat captured during local debugging.
+
+## Repository Shape
+
+- `garyx`: CLI entrypoint and runtime assembly.
+- `garyx-gateway`: HTTP API, MCP server, automations, restart flow, and desktop surface.
+- `garyx-router`: canonical threads, transcripts, endpoint state, and routing.
+- `garyx-bridge`: provider orchestration for Claude Code, Codex, Gemini, and teams.
+- `garyx-channels`: built-in channel runtimes and subprocess plugin host.
+- `desktop/garyx-desktop`: Electron desktop app and shared renderer UI.
+
+## Source of Truth
+
+- Config: `~/.garyx/garyx.json`.
+- Channel accounts: `channels.<channel_id>.accounts[...]` (`channels.api.accounts[...]` for API).
+- Thread records and known endpoint state: `garyx-router`.
+- MCP schema and tool behavior: `garyx-gateway/src/mcp.rs`.
+- Provider session behavior: `garyx-bridge`.
+
+## Claude Code SDK Notes
+
+- In bidirectional Claude Code SDK sessions, every CLI `control_request` must
+  receive a `control_response`, even when the subtype is unsupported or newer
+  than this SDK. Dropping one can leave the CLI waiting forever.
+- Normal streaming completion should close stdin and wait for the Claude CLI
+  process to exit; force-closing the transport can race Claude's local
+  transcript flush and break later `--resume` behavior.
+- Claude SDK approval tests need a `can_use_tool` callback, which adds
+  `--permission-prompt-tool stdio`; changing only `permission_mode` may not
+  make Claude send `can_use_tool` requests to the SDK.
+- The standalone Claude SDK should preserve Claude Code's built-in system
+  prompt by default. Pass `--system-prompt` only when Garyx intentionally
+  replaces it; use `--append-system-prompt` to keep default tool behavior.
+
+## Working Loop
+
+1. Read the local code around the change before editing.
+2. Keep the change scoped to the smallest correct surface.
+3. Prefer existing crate and UI patterns over new abstractions.
+4. Run focused deterministic tests for the touched area.
+5. When touching the macOS app under `desktop/garyx-desktop`, start the dev
+   client and use it for user-facing previews unless the user explicitly asks
+   for a packaged app or the change affects packaging, install, release, or
+   startup behavior.
+6. For CLI/runtime features that depend on the managed gateway, install the new
+   binary and run a synthetic end-to-end CLI smoke test against the running
+   gateway after unit tests pass.
+7. Update [docs/configuration.md](docs/configuration.md) when user-facing configuration or behavior changes.
+8. Commit every completed code change before handoff. Stage only the files changed
+   for the current task, and leave unrelated user work untouched.
+
+## Desktop Dev Mode
+
+For fast macOS UI iteration, run the Electron dev build:
+
+```bash
+cd desktop/garyx-desktop && npm run dev
+```
+
+This launches the Garyx Mac app in development mode. Renderer changes are visible
+directly in the running Mac app as you edit, so use this mode for quick visual
+and interaction feedback. Prefer showing the user this dev client during normal
+UI iteration because code changes take effect without rebuilding a package.
+Packaging is optional unless the user asks for a packaged app or the change
+needs installed-app validation.
+
+## Desktop Transcript And File Tree Rules
+
+- Treat transcript history as user-turn based: one user message plus the
+  following agent activity until the next user message. Pagination, prefetch,
+  folding, and final-answer visibility should use that unit rather than raw
+  provider messages or tool-call counts.
+- In collapsed desktop transcript turns, keep each completed user turn's final
+  assistant text visible. Collapse only intermediate assistant/tool activity;
+  do not hide older turn answers because the current thread is still running.
+- While a desktop thread is still running, do not treat the trailing assistant
+  text as the final answer. Keep the active user-turn row and its React
+  container stable as tool calls arrive so existing message bubbles do not
+  remount or replay entry animations.
+- If an assistant text segment has streamed but the desktop thread is still
+  running and the tail is not an active tool group, keep a bottom "Thinking"
+  indicator visible until the run is done.
+- Desktop interruption controls must be gateway-backed. The local Mac app
+  process may not own the active WebSocket for runs started elsewhere or after
+  a reload; after trying any local active socket, call the gateway chat
+  interrupt endpoint so the bridge can interrupt or abort the active thread run.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [Pyiner/garyx](https://github.com/Pyiner/garyx) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-17 -->
