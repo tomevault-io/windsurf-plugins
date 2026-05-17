@@ -7,11 +7,11 @@ Stop re-explaining your project to AI agents every session. One memory layer for
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [sachinshelke/codevira](https://github.com/sachinshelke/codevira).
+Original source: `CLAUDE.md` in [sachinshelke/codevira](https://github.com/sachinshelke/codevira).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
