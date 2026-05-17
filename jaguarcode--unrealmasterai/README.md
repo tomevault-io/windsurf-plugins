@@ -7,11 +7,11 @@ Unreal Master AI agent that gives Claude Code bidirectional control over Unreal 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [jaguarcode/UnrealMasterAI](https://github.com/jaguarcode/UnrealMasterAI).
+Original source: `CLAUDE.md` in [jaguarcode/UnrealMasterAI](https://github.com/jaguarcode/UnrealMasterAI).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
