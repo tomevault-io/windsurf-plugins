@@ -7,12 +7,12 @@ Breakster is a real-time multiplayer music party game. Players listen to short p
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `copilot-instructions.md` in [ffoerster/breakster](https://github.com/ffoerster/breakster).
+Original source: `CLAUDE.md` in [ffoerster/breakster](https://github.com/ffoerster/breakster).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
+- **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
