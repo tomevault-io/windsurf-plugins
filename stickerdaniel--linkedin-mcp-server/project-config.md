@@ -1,0 +1,94 @@
+---
+trigger: always_on
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+---
+
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Development Commands
+
+- Use `uv` for dependency management: `uv sync` (dev: `uv sync --group dev`)
+- Lint: `uv run ruff check .` (auto-fix with `--fix`)
+- Format: `uv run ruff format .`
+- Type check: `uv run ty check` (using ty, not mypy)
+- Tests: `uv run pytest` (with coverage: `uv run pytest --cov`)
+- Pre-commit: `uv run pre-commit install` then `uv run pre-commit run --all-files`
+- Run server locally: `uv run -m linkedin_mcp_server --no-headless`
+- Run via uvx (PyPI/package verification only): `uvx linkedin-scraper-mcp`
+- Docker build: `docker build -t linkedin-mcp-server .`
+- Install browser: `uv run patchright install chromium`
+
+## Scraping Rules
+
+- **One section = one navigation.** Each entry in `PERSON_SECTIONS` / `COMPANY_SECTIONS` (`scraping/fields.py`) maps to exactly one page navigation. Never combine multiple URLs behind a single section.
+- **Minimize DOM dependence.** Prefer innerText and URL navigation over DOM selectors. When DOM access is unavoidable, use minimal generic selectors (`a[href*="/jobs/view/"]`) — never class names tied to LinkedIn's layout.
+- **Detection must be locale-independent.** Classification logic — connection state, action availability, button identity — must rely on URL patterns (`/preload/custom-invite/?vanityName=USER`, `/in/USER/edit/intro/`, `/messaging/compose/`), attribute *presence* (`aria-label` exists, `aria-expanded` exists, `aria-disabled` exists), or structural counts — never on text values like "Connect", "Follow", "Message", "1st", "Pending". The verb in an `aria-label` is locale-dependent; whether the attribute exists is not. Where text is genuinely the only signal, guard it behind an explicit per-locale table and document the limitation in code.
+
+## Tool Return Format
+
+All scraping tools return: `{url, sections: {name: raw_text}}`.
+
+Optional additional keys:
+
+- `references: {section_name: [{kind, url, text?, context?, value?}]}` — LinkedIn URLs are relative paths; `value` carries non-URL identifiers (e.g. company URN id for `kind: "company_urn"`)
+- `section_errors: {section_name: {error_type, error_message, issue_template_path, runtime, ...}}`
+- `unknown_sections: [name, ...]`
+- `job_ids: [id, ...]` (search_jobs only)
+- `references["feed"]` (get_feed only) — every entry is `kind: "feed_post"`; non-post anchors (sidebar profiles, employer logos) are filtered. URLs may carry either `/feed/update/<urn>/` (DOM-anchor-derived) or `/posts/<slug>` (SDUI-derived) form; both are valid LinkedIn permalinks. Cap is 50 entries, matching `get_feed`'s `num_posts` ceiling.
+
+## Verifying Bug Reports
+
+Always verify scraping bugs end-to-end against live LinkedIn, not just code analysis. Use `uv run`, not `uvx`, so the running process reflects your workspace. Use `uvx` only for packaged distribution verification. For live Docker investigations, refresh the source session first with `uv run -m linkedin_mcp_server --login` before testing each materially different approach. Assume a valid login profile already exists at `~/.linkedin-mcp/profile/`.
+
+```bash
+# Start server
+uv run -m linkedin_mcp_server --transport streamable-http --log-level DEBUG
+
+# Initialize MCP session (grab Mcp-Session-Id from response headers)
+curl -s -D /tmp/mcp-headers -X POST http://127.0.0.1:8000/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}'
+
+# Extract the session ID from saved headers
+SESSION_ID=$(grep -i 'Mcp-Session-Id' /tmp/mcp-headers | awk '{print $2}' | tr -d '\r')
+
+# Call a tool
+curl -s -X POST http://127.0.0.1:8000/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -H "Mcp-Session-Id: $SESSION_ID" \
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"get_person_profile","arguments":{"linkedin_username":"williamhgates","sections":"posts"}}}'
+```
+
+## Release Process
+
+```bash
+git checkout main && git pull
+uv version --bump minor          # or: major, patch — updates pyproject.toml AND uv.lock
+gt create -m "chore: Bump version to X.Y.Z"
+gt submit                        # merge PR to trigger release workflow
+```
+
+The CI release workflow automatically updates `manifest.json` and `docker-compose.yml` with the new version — do not update them manually.
+
+After the workflow completes, file a PR in the MCP registry to update the version.
+
+## Commit Messages
+
+- Follow conventional commits: `type(scope): subject`
+- Types: feat, fix, docs, style, refactor, test, chore, perf, ci
+- Keep subject <50 chars, imperative mood
+
+## Development Workflow
+
+Always read [`CONTRIBUTING.md`](CONTRIBUTING.md) before filing an issue or working on this repository.
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [stickerdaniel/linkedin-mcp-server](https://github.com/stickerdaniel/linkedin-mcp-server) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-17 -->
