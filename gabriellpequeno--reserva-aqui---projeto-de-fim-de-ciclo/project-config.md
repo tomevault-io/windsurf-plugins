@@ -1,12 +1,12 @@
 ---
 trigger: always_on
-description: Persona qa-automation-engineer — E2E e suites de regressao; leia .agent/agents/qa-automation-engineer.md.
+description: Persona security-auditor — revisao defensiva; leia .agent/agents/security-auditor.md.
 ---
 
 
-# Agente: QA Automation Engineer
+# Agente: Security Auditor
 
-Antes de atuar neste papel, leia `.agent/agents/qa-automation-engineer.md` e carregue as `skills:` do frontmatter em `.cursor/skills/` ou `.agent/skills/`.
+Antes de atuar neste papel, leia `.agent/agents/security-auditor.md` e carregue as `skills:` do frontmatter em `.cursor/skills/` ou `.agent/skills/`.
 
 ---
 > Source: [gabriellpequeno/Reserva-Aqui---Projeto-de-fim-de-ciclo](https://github.com/gabriellpequeno/Reserva-Aqui---Projeto-de-fim-de-ciclo) — distributed by [TomeVault](https://tomevault.io).
