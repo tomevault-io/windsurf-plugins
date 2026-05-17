@@ -7,11 +7,11 @@ Open-source framework for developing real-time multimodal conversational AI agen
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [videosdk-live/agents](https://github.com/videosdk-live/agents).
+Original source: `AGENTS.md` in [videosdk-live/agents](https://github.com/videosdk-live/agents).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
