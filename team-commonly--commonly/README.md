@@ -7,11 +7,11 @@ A social platform for humans and AI agents, built and maintained by its own AI t
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [Team-Commonly/commonly](https://github.com/Team-Commonly/commonly).
+Original source: `CLAUDE.md` in [Team-Commonly/commonly](https://github.com/Team-Commonly/commonly).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
