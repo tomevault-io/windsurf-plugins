@@ -1,160 +1,157 @@
 ---
 trigger: always_on
-description: Guidelines for managing task dependencies and relationships
+description: Guidelines for integrating new features into the Task Master CLI
 ---
 
 
-# Dependency Management Guidelines
+# Task Master Feature Integration Guidelines
 
-## Dependency Structure Principles
+## Feature Placement Decision Process
 
-- **Dependency References**:
-  - ✅ DO: Represent task dependencies as arrays of task IDs
-  - ✅ DO: Use numeric IDs for direct task references
-  - ✅ DO: Use string IDs with dot notation (e.g., "1.2") for subtask references
-  - ❌ DON'T: Mix reference types without proper conversion
+- **Identify Feature Type**:
+  - **Data Manipulation**: Features that create, read, update, or delete tasks belong in [`task-manager.js`](mdc:scripts/modules/task-manager.js)
+  - **Dependency Management**: Features that handle task relationships belong in [`dependency-manager.js`](mdc:scripts/modules/dependency-manager.js)
+  - **User Interface**: Features that display information to users belong in [`ui.js`](mdc:scripts/modules/ui.js)
+  - **AI Integration**: Features that use AI models belong in [`ai-services.js`](mdc:scripts/modules/ai-services.js)
+  - **Cross-Cutting**: Features that don't fit one category may need components in multiple modules
 
-  ```javascript
-  // ✅ DO: Use consistent dependency formats
-  // For main tasks
-  task.dependencies = [1, 2, 3]; // Dependencies on other main tasks
-  
-  // For subtasks
-  subtask.dependencies = [1, "3.2"]; // Dependency on main task 1 and subtask 2 of task 3
-  ```
+- **Command-Line Interface**:
+  - All new user-facing commands should be added to [`commands.js`](mdc:scripts/modules/commands.js)
+  - Use consistent patterns for option naming and help text
+  - Follow the Commander.js model for subcommand structure
 
-- **Subtask Dependencies**:
-  - ✅ DO: Allow numeric subtask IDs to reference other subtasks within the same parent
-  - ✅ DO: Convert between formats appropriately when needed
-  - ❌ DON'T: Create circular dependencies between subtasks
+## Implementation Pattern
 
-  ```javascript
-  // ✅ DO: Properly normalize subtask dependencies
-  // When a subtask refers to another subtask in the same parent
-  if (typeof depId === 'number' && depId < 100) {
-    // It's likely a reference to another subtask in the same parent task
-    const fullSubtaskId = `${parentId}.${depId}`;
-    // Now use fullSubtaskId for validation
-  }
-  ```
+The standard pattern for adding a feature follows this workflow:
 
-## Dependency Validation
+1. **Core Logic**: Implement the business logic in the appropriate module
+2. **UI Components**: Add any display functions to [`ui.js`](mdc:scripts/modules/ui.js)
+3. **Command Integration**: Add the CLI command to [`commands.js`](mdc:scripts/modules/commands.js)
+4. **Testing**: Write tests for all components of the feature (following [`tests.mdc`](mdc:.cursor/rules/tests.mdc))
+5. **Configuration**: Update any configuration in [`utils.js`](mdc:scripts/modules/utils.js) if needed
+6. **Documentation**: Update help text and documentation in [dev_workflow.mdc](mdc:scripts/modules/dev_workflow.mdc)
 
-- **Existence Checking**:
-  - ✅ DO: Validate that referenced tasks exist before adding dependencies
-  - ✅ DO: Provide clear error messages for non-existent dependencies
-  - ✅ DO: Remove references to non-existent tasks during validation
+```javascript
+// 1. CORE LOGIC: Add function to appropriate module (example in task-manager.js)
+/**
+ * Archives completed tasks to archive.json
+ * @param {string} tasksPath - Path to the tasks.json file
+ * @param {string} archivePath - Path to the archive.json file
+ * @returns {number} Number of tasks archived
+ */
+async function archiveTasks(tasksPath, archivePath = 'tasks/archive.json') {
+  // Implementation...
+  return archivedCount;
+}
 
-  ```javascript
-  // ✅ DO: Check if the dependency exists before adding
-  if (!taskExists(data.tasks, formattedDependencyId)) {
-    log('error', `Dependency target ${formattedDependencyId} does not exist in tasks.json`);
-    process.exit(1);
-  }
-  ```
+// Export from the module
+export {
+  // ... existing exports ...
+  archiveTasks,
+};
+```
 
-- **Circular Dependency Prevention**:
-  - ✅ DO: Check for circular dependencies before adding new relationships
-  - ✅ DO: Use graph traversal algorithms (DFS) to detect cycles
-  - ✅ DO: Provide clear error messages explaining the circular chain
+```javascript
+// 2. UI COMPONENTS: Add display function to ui.js
+/**
+ * Display archive operation results
+ * @param {string} archivePath - Path to the archive file
+ * @param {number} count - Number of tasks archived
+ */
+function displayArchiveResults(archivePath, count) {
+  console.log(boxen(
+    chalk.green(`Successfully archived ${count} tasks to ${archivePath}`),
+    { padding: 1, borderColor: 'green', borderStyle: 'round' }
+  ));
+}
 
-  ```javascript
-  // ✅ DO: Check for circular dependencies before adding
-  const dependencyChain = [formattedTaskId];
-  if (isCircularDependency(data.tasks, formattedDependencyId, dependencyChain)) {
-    log('error', `Cannot add dependency ${formattedDependencyId} to task ${formattedTaskId} as it would create a circular dependency.`);
-    process.exit(1);
-  }
-  ```
+// Export from the module
+export {
+  // ... existing exports ...
+  displayArchiveResults,
+};
+```
 
-- **Self-Dependency Prevention**:
-  - ✅ DO: Prevent tasks from depending on themselves
-  - ✅ DO: Handle both direct and indirect self-dependencies
+```javascript
+// 3. COMMAND INTEGRATION: Add to commands.js
+import { archiveTasks } from './task-manager.js';
+import { displayArchiveResults } from './ui.js';
 
-  ```javascript
-  // ✅ DO: Prevent self-dependencies
-  if (String(formattedTaskId) === String(formattedDependencyId)) {
-    log('error', `Task ${formattedTaskId} cannot depend on itself.`);
-    process.exit(1);
-  }
-  ```
+// In registerCommands function
+programInstance
+  .command('archive')
+  .description('Archive completed tasks to separate file')
+  .option('-f, --file <file>', 'Path to the tasks file', 'tasks/tasks.json')
+  .option('-o, --output <file>', 'Archive output file', 'tasks/archive.json')
+  .action(async (options) => {
+    const tasksPath = options.file;
+    const archivePath = options.output;
 
-## Dependency Modification
+    console.log(chalk.blue(`Archiving completed tasks from ${tasksPath} to ${archivePath}...`));
 
-- **Adding Dependencies**:
-  - ✅ DO: Format task and dependency IDs consistently
-  - ✅ DO: Check for existing dependencies to prevent duplicates
-  - ✅ DO: Sort dependencies for better readability
-
-  ```javascript
-  // ✅ DO: Format IDs consistently when adding dependencies
-  const formattedTaskId = typeof taskId === 'string' && taskId.includes('.') 
-    ? taskId : parseInt(taskId, 10);
-  
-  const formattedDependencyId = formatTaskId(dependencyId);
-  ```
-
-- **Removing Dependencies**:
-  - ✅ DO: Check if the dependency exists before removing
-  - ✅ DO: Handle different ID formats consistently
-  - ✅ DO: Provide feedback about the removal result
-
-  ```javascript
-  // ✅ DO: Properly handle dependency removal
-  const dependencyIndex = targetTask.dependencies.findIndex(dep => {
-    // Convert both to strings for comparison
-    let depStr = String(dep);
-    
-    // Handle relative subtask references
-    if (typeof dep === 'number' && dep < 100 && isSubtask) {
-      const [parentId] = formattedTaskId.split('.');
-      depStr = `${parentId}.${dep}`;
-    }
-    
-    return depStr === normalizedDependencyId;
+    const archivedCount = await archiveTasks(tasksPath, archivePath);
+    displayArchiveResults(archivePath, archivedCount);
   });
-  
-  if (dependencyIndex === -1) {
-    log('info', `Task ${formattedTaskId} does not depend on ${formattedDependencyId}, no changes made.`);
-    return;
+```
+
+## Cross-Module Features
+
+For features requiring components in multiple modules:
+
+- ✅ **DO**: Create a clear unidirectional flow of dependencies
+  ```javascript
+  // In task-manager.js
+  function analyzeTasksDifficulty(tasks) {
+    // Implementation...
+    return difficultyScores;
   }
-  
-  // Remove the dependency
-  targetTask.dependencies.splice(dependencyIndex, 1);
+
+  // In ui.js - depends on task-manager.js
+  import { analyzeTasksDifficulty } from './task-manager.js';
+
+  function displayDifficultyReport(tasks) {
+    const scores = analyzeTasksDifficulty(tasks);
+    // Render the scores...
+  }
   ```
 
-## Dependency Cleanup
-
-- **Duplicate Removal**:
-  - ✅ DO: Use Set objects to identify and remove duplicates
-  - ✅ DO: Handle both numeric and string ID formats
-
+- ❌ **DON'T**: Create circular dependencies between modules
   ```javascript
-  // ✅ DO: Remove duplicate dependencies
-  const uniqueDeps = new Set();
-  const uniqueDependencies = task.dependencies.filter(depId => {
-    // Convert to string for comparison to handle both numeric and string IDs
-    const depIdStr = String(depId);
-    if (uniqueDeps.has(depIdStr)) {
-      log('warn', `Removing duplicate dependency from task ${task.id}: ${depId}`);
-      return false;
-    }
-    uniqueDeps.add(depIdStr);
-    return true;
-  });
+  // In task-manager.js - depends on ui.js
+  import { displayDifficultyReport } from './ui.js';
+
+  function analyzeTasks() {
+    // Implementation...
+    displayDifficultyReport(tasks); // WRONG! Don't call UI functions from task-manager
+  }
+
+  // In ui.js - depends on task-manager.js
+  import { analyzeTasks } from './task-manager.js';
   ```
 
-- **Invalid Reference Cleanup**:
-  - ✅ DO: Check for and remove references to non-existent tasks
-  - ✅ DO: Check for and remove self-references
-  - ✅ DO: Track and report changes made during cleanup
+## Command-Line Interface Standards
 
+- **Naming Conventions**:
+  - Use kebab-case for command names (`analyze-complexity`, not `analyzeComplexity`)
+  - Use kebab-case for option names (`--output-format`, not `--outputFormat`)
+  - Use the same option names across commands when they represent the same concept
+
+- **Command Structure**:
   ```javascript
-  // ✅ DO: Filter invalid task dependencies
-  task.dependencies = task.dependencies.filter(depId => {
-    const numericId = typeof depId === 'string' ? parseInt(depId, 10) : depId;
-    if (!validTaskIds.has(numericId)) {
-      log('warn', `Removing invalid task dependency from task ${task.id}: ${depId} (task does not exist)`);
+  programInstance
+    .command('command-name')
+    .description('Clear, concise description of what the command does')
+    .option('-s, --short-option <value>', 'Option description', 'default value')
+    .option('--long-option <value>', 'Option description')
+    .action(async (options) => {
+      // Command implementation
+    });
+  ```
+
+## Utility Function Guidelines
+
+When adding utilities to [`utils.js`](mdc:scripts/modules/utils.js):
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
