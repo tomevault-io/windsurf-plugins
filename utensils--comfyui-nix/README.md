@@ -7,11 +7,11 @@ A slightly opinionated Nix flake for ComfyUI with curated custom nodes. Supports
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [utensils/comfyui-nix](https://github.com/utensils/comfyui-nix).
+Original source: `CLAUDE.md` in [utensils/comfyui-nix](https://github.com/utensils/comfyui-nix).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
