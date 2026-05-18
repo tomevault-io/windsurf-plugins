@@ -1,183 +1,196 @@
 ---
 trigger: always_on
-description: title: Data Table API Development Standards
+description: enableSorting: false,
 ---
 
 ---
-title: Data Table API Development Standards
-description: Guidelines for implementing RESTful APIs to support data tables, including CRUD operations, filtering, sorting, pagination, and response formats
-glob: "src/{api,server}/**/*.{ts,js,tsx,jsx}"
+title: Frontend Data Table Implementation Standards
+description: Guidelines for implementing data tables in React applications, including configuration, API integration, state management, and UI customization
+glob: "src/{components,features,pages}/**/{table,data-table}*.{ts,tsx,js,jsx}"
 alwaysApply: false
 ---
 
-# Data Table API Development Standards
+# Frontend Data Table Implementation Standards
 
 ## Introduction
 
-This rule defines standards for building server-side APIs that support data table components. The frontend data table requires consistent API patterns for CRUD operations, filtering, sorting, pagination, and error handling. Following these standards ensures seamless integration between the frontend table component and backend services.
+This rule defines standards for implementing data tables in our frontend React applications. These standards ensure consistent user experience, proper API integration, and maintainable code across our applications. All data table implementations should follow these guidelines to maintain consistency and provide a robust user experience.
 
-## API Overview
+## Data Table Component Overview
 
-A complete data table implementation requires the following API endpoints:
+Our advanced data table component provides the following features:
 
-1. **List/Query Endpoint**: Fetch multiple records with filtering, sorting, and pagination
-2. **Single Item Endpoint**: Get details for a specific record
-3. **Create Endpoint**: Add new records
-4. **Update Endpoint**: Modify existing records
-5. **Delete Endpoint**: Remove records (single or batch)
-6. **Batch Fetch Endpoint**: Retrieve multiple specific records by IDs
+1. **Server-side data fetching**: Integration with backend APIs
+2. **Pagination**: Navigate through large datasets
+3. **Sorting**: Order data by specific columns
+4. **Filtering**: Custom filtering including search and date ranges
+5. **Row selection**: Select single or multiple rows
+6. **Column visibility**: Toggle column visibility
+7. **Export functionality**: Export data to CSV or Excel
+8. **Row actions**: Perform operations on individual rows
+9. **Bulk actions**: Perform operations on multiple selected rows
+10. **URL state persistence**: Maintain table state in URL parameters
 
-For all endpoints, we follow a consistent request/response structure using RESTful principles.
+## Basic Usage Pattern
 
-## Common Response Structure
+### 1. Define Your Schema
 
-All API responses must follow these standard structures:
-
-### Success Response
-
-```typescript
-interface SuccessResponse<T> {
-  success: true;
-  data: T; // Single item or array of items
-  message?: string; // Optional success message
-  pagination?: {
-    page: number;
-    limit: number;
-    total_pages: number;
-    total_items: number;
-  };
-}
-```
-
-### Error Response
+Start by defining the schema for your data using Zod:
 
 ```typescript
-interface ErrorResponse {
-  success: false;
-  error: string; // Human-readable error message
-  details?: any; // Optional detailed error information
-  code?: string; // Optional error code
-}
-```
-
-## Endpoint Implementations
-
-### List/Query Endpoint
-
-**URL Pattern**: `/api/{resource}`  
-**Method**: `GET`  
-**Purpose**: Fetch a collection of resources with filtering, sorting, and pagination
-
-#### Query Parameters
-
-- `search`: Text search term
-- `from_date`: Start date filter (ISO format)
-- `to_date`: End date filter (ISO format)
-- `sort_by`: Field to sort by
-- `sort_order`: Sort direction (`asc` or `desc`)
-- `page`: Page number (1-based)
-- `limit`: Items per page
-- Additional custom filters as needed
-
-#### Implementation Example
-
-```typescript
-// Using Hono and Drizzle ORM with PostgreSQL
-import { Hono } from "hono";
 import { z } from "zod";
-import { and, asc, between, count, desc, eq, ilike, or, sql } from "drizzle-orm";
-import { db } from "@/db";
-import { myEntityTable } from "@/db/schema/my-entity";
 
-const router = new Hono();
-
-// Define query parameter schema with Zod
-const querySchema = z.object({
-  search: z.string().optional(),
-  from_date: z.string().optional(),
-  to_date: z.string().optional(),
-  sort_by: z.enum(["created_at", "name", "id", /* add other sortable fields */]).default("created_at"),
-  sort_order: z.enum(["asc", "desc"]).default("desc"),
-  page: z.coerce.number().default(1),
-  limit: z.coerce.number().default(10),
+export const entitySchema = z.object({
+  id: z.number(),
+  name: z.string(),
+  email: z.string().email().optional(),
+  created_at: z.string(),
+  status: z.enum(["active", "inactive", "pending"]),
+  // Add other fields as needed
 });
 
-// GET /api/my-entities
-router.get("/", async (c) => {
-  try {
-    // Parse and validate query parameters
-    const result = querySchema.safeParse(c.req.query());
+export type Entity = z.infer<typeof entitySchema>;
+
+export const entitiesResponseSchema = z.object({
+  success: z.boolean(),
+  data: z.array(entitySchema),
+  pagination: z.object({
+    page: z.number(),
+    limit: z.number(),
+    total_pages: z.number(),
+    total_items: z.number(),
+  }),
+});
+```
+
+### 2. Create API Functions
+
+Implement API functions to communicate with your backend:
+
+```typescript
+// src/api/entity/fetch-entities.ts
+import { entitiesResponseSchema } from "@/schemas/entity-schema";
+
+const API_BASE_URL = "/api";
+
+export async function fetchEntities({
+  search = "",
+  from_date = "",
+  to_date = "",
+  sort_by = "created_at",
+  sort_order = "desc",
+  page = 1,
+  limit = 10,
+}) {
+  // Build query parameters
+  const params = new URLSearchParams();
+  if (search) params.append("search", search);
+  if (from_date) params.append("from_date", from_date);
+  if (to_date) params.append("to_date", to_date);
+  params.append("sort_by", sort_by);
+  params.append("sort_order", sort_order);
+  params.append("page", page.toString());
+  params.append("limit", limit.toString());
+
+  // Fetch data
+  const response = await fetch(`${API_BASE_URL}/entities?${params.toString()}`);
+  
+  if (!response.ok) {
+    throw new Error(`Failed to fetch entities: ${response.statusText}`);
+  }
+  
+  const data = await response.json();
+  return entitiesResponseSchema.parse(data);
+}
+
+export async function fetchEntitiesByIds(ids: number[]) {
+  if (ids.length === 0) {
+    return [];
+  }
+  
+  // Use batching for efficiency
+  const BATCH_SIZE = 50;
+  const results = [];
+  
+  // Process in batches
+  for (let i = 0; i < ids.length; i += BATCH_SIZE) {
+    const batchIds = ids.slice(i, i + BATCH_SIZE);
+    const params = new URLSearchParams();
     
-    if (!result.success) {
-      return c.json({
-        success: false,
-        error: "Invalid query parameters",
-        details: result.error.format(),
-      }, 400);
+    // Add each ID as a parameter
+    batchIds.forEach(id => {
+      params.append("ids", id.toString());
+    });
+    
+    const response = await fetch(`${API_BASE_URL}/entities/batch?${params.toString()}`);
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch entities batch: ${response.statusText}`);
     }
     
-    const { search, from_date, to_date, sort_by, sort_order, page, limit } = result.data;
-    
-    // Build filters
-    const filters = [];
-    
-    // Search filter (search across multiple fields)
-    if (search) {
-      filters.push(
-        or(
-          ilike(myEntityTable.name, `%${search}%`),
-          ilike(myEntityTable.description, `%${search}%`),
-          // Add other searchable fields
-        )
-      );
+    const data = await response.json();
+    if (data.success && Array.isArray(data.data)) {
+      results.push(...data.data);
     }
-    
-    // Date filtering
-    if (from_date && to_date) {
-      filters.push(
-        between(
-          myEntityTable.created_at,
-          new Date(from_date),
-          new Date(to_date)
-        )
-      );
-    } else if (from_date) {
-      const fromDateTime = new Date(from_date);
-      filters.push(sql`${myEntityTable.created_at} >= ${fromDateTime}`);
-    } else if (to_date) {
-      const toDateTime = new Date(to_date);
-      filters.push(sql`${myEntityTable.created_at} <= ${toDateTime}`);
-    }
-    
-    // Add any custom filters here
-    
-    // Get data with pagination
-    const data = await db
-      .select()
-      .from(myEntityTable)
-      .where(filters.length > 0 ? and(...filters) : undefined)
-      .orderBy(
-        sort_by === "name"
-          ? sort_order === "asc" ? asc(myEntityTable.name) : desc(myEntityTable.name)
-          : sort_order === "asc" ? asc(myEntityTable.created_at) : desc(myEntityTable.created_at)
-        // Add other sort fields as needed
-      )
-      .limit(limit)
-      .offset((page - 1) * limit);
-    
-    // Count total items (for pagination)
-    const [{ value: totalItems }] = await db
-      .select({ value: count() })
-      .from(myEntityTable)
-      .where(filters.length > 0 ? and(...filters) : undefined);
-    
-    return c.json({
-      success: true,
-      data: data,
-      pagination: {
+  }
+  
+  return results;
+}
+```
+
+### 3. Create a Data Fetching Hook
+
+Create a custom hook to handle data fetching with React Query:
+
+```typescript
+// src/features/entity-table/utils/data-fetching.ts
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
+import { fetchEntities } from "@/api/entity/fetch-entities";
+import { preprocessSearch } from "@/components/data-table/utils";
+
+export function useEntitiesData(
+  page: number,
+  pageSize: number,
+  search: string,
+  dateRange: { from_date: string; to_date: string },
+  sortBy: string,
+  sortOrder: string
+) {
+  return useQuery({
+    queryKey: [
+      "entities",
+      page,
+      pageSize,
+      preprocessSearch(search),
+      dateRange,
+      sortBy,
+      sortOrder,
+    ],
+    queryFn: () =>
+      fetchEntities({
         page,
-        limit,
-        total_pages: Math.ceil(totalItems / limit),
+        limit: pageSize,
+        search: preprocessSearch(search),
+        from_date: dateRange.from_date,
+        to_date: dateRange.to_date,
+        sort_by: sortBy,
+        sort_order: sortOrder,
+      }),
+    placeholderData: keepPreviousData,
+  });
+}
+
+// Add this property for the DataTable component
+useEntitiesData.isQueryHook = true;
+```
+
+### 4. Define Table Columns
+
+Define the columns for your data table:
+
+```typescript
+// src/features/entity-table/components/columns.tsx
+import { format } from "date-fns";
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
