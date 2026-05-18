@@ -1,0 +1,128 @@
+---
+trigger: always_on
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+---
+
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project Overview
+
+**mcp-trino** is a dual-purpose tool that works as both:
+1. **MCP Server** - Enables AI assistants to interact with Trino's distributed SQL query engine through standardized MCP tools
+2. **Interactive CLI** - psql-like REPL for direct human access to Trino databases
+
+The tool automatically detects which mode to use based on arguments and environment.
+
+## Tech Stack
+
+- **Language:** Go 1.24.11+
+- **Key Dependencies:**
+  - `github.com/mark3labs/mcp-go` v0.41.1 (MCP protocol)
+  - `github.com/trinodb/trino-go-client` v0.328.0 (Trino client)
+  - `github.com/tuannvm/oauth-mcp-proxy` v0.0.2 (OAuth 2.1 authentication)
+- **Build Tools:** GoReleaser, Docker, GitHub Actions, golangci-lint
+
+## Development Commands
+
+```bash
+# Core development
+make build           # Build binary to ./bin/mcp-trino
+make test            # Run unit tests with race detection
+make run-dev         # Run from source code (go run ./cmd)
+make run             # Run built binary
+make clean           # Clean build artifacts
+make lint            # Run linting (same as CI: golangci-lint + go mod tidy)
+
+# Docker development
+make docker-compose-up   # Start with Docker Compose
+make docker-compose-down # Stop Docker Compose
+make run-docker          # Build and run Docker image locally
+
+# Release and packaging
+make release-snapshot    # Create snapshot release with GoReleaser
+make build-dxt          # Build platform-specific binaries for DXT
+make pack-dxt           # Package DXT extension
+
+# Testing individual components
+go test ./internal/config    # Test configuration package
+go test ./internal/trino     # Test Trino client package
+go test ./internal/mcp       # Test MCP handlers package
+go test ./internal/cli       # Test CLI commands and REPL
+go test ./cmd                # Test mode detection and integration
+```
+
+## Architecture
+
+### Core Components
+
+1. **Main Entry Point** (`cmd/main.go`):
+   - Dual-mode detection (MCP vs CLI based on args/environment)
+   - MCP server initialization and Trino connection testing
+   - Transport selection (STDIO vs HTTP with SSE)
+   - Graceful shutdown with signal handling
+   - CORS support for web clients
+   - Version management and build metadata
+
+2. **CLI Layer** (`internal/cli/`):
+   - `commands.go` - CLI subcommands with `io.Writer` injection for testability
+   - `repl.go` - Interactive REPL with injectable stdin/stdout for testing
+   - `config.go` - Dual-format config (YAML via `gopkg.in/yaml.v3` + JSON via `encoding/json`)
+   - Output formatting via `text/tabwriter` (table), `encoding/csv` (CSV), `encoding/json` (JSON)
+   - Structured LLM-friendly `--help` with NAME/SYNOPSIS/DESCRIPTION/COMMANDS/FLAGS/EXAMPLES/ENVIRONMENT
+   - Unix exit codes (0=success, 1=error, 2=usage) and signal handling (SIGINT/SIGTERM)
+
+3. **Configuration Layer** (`internal/config/config.go`):
+   - Environment-based configuration with validation
+   - Security defaults (HTTPS, read-only queries)
+   - Timeout configuration with validation
+   - Connection parameter management
+
+4. **Client Layer** (`internal/trino/client.go`):
+   - Database connection management with connection pooling
+   - SQL injection protection via read-only query enforcement
+   - Context-based timeout handling for queries
+   - Query result processing and formatting
+
+5. **Handler Layer** (`internal/mcp/handlers.go`):
+   - MCP tool implementations with JSON response formatting
+   - Parameter validation and error handling
+   - Consistent logging for debugging
+   - Tool result standardization
+
+### OAuth Authentication Architecture
+
+OAuth 2.1 authentication is provided by the external **[oauth-mcp-proxy](https://github.com/tuannvm/oauth-mcp-proxy)** library:
+- **Integration Point**: `internal/mcp/server.go` - OAuth middleware registration
+- **Configuration**: `internal/config/config.go` - OAuth config gathering (validation delegated to library)
+- **Modes**: Native (client-driven) and Proxy (server-driven) OAuth flows
+- **Providers**: HMAC, Okta, Google, Azure AD
+- **Documentation**: See [docs/oauth.md](docs/oauth.md) and [oauth-mcp-proxy docs](https://github.com/tuannvm/oauth-mcp-proxy#readme)
+
+### Transport Support
+
+- **STDIO Transport**: Direct MCP client integration (default)
+- **HTTP Transport**: StreamableHTTP support on `/mcp` endpoint with SSE backward compatibility on `/sse` endpoint
+- **Status Endpoint**: GET `/` returns server status and version
+
+### SQL Security Architecture
+
+The security model centers around the `isReadOnlyQuery()` function in `internal/trino/client.go`:
+- Allows: SELECT, SHOW, DESCRIBE, EXPLAIN, WITH (CTEs)
+- Blocks: INSERT, UPDATE, DELETE, CREATE, DROP, ALTER by default
+- Override: Set `TRINO_ALLOW_WRITE_QUERIES=true` to bypass (logs warning)
+
+### Available MCP Tools
+
+All tools return JSON-formatted responses and handle parameter validation:
+- `execute_query`: Execute SQL queries with security restrictions
+- `list_catalogs`: Discover available data catalogs
+- `list_schemas`: List schemas within catalogs (optional catalog param)
+- `list_tables`: List tables within schemas (optional catalog/schema params)
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [tuannvm/mcp-trino](https://github.com/tuannvm/mcp-trino) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-17 -->
