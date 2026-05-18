@@ -1,198 +1,114 @@
 ---
 trigger: always_on
-description: enableSorting: false,
+description: description: This rule explains how to create and manage task lists to track project progress.
 ---
 
 ---
-title: Frontend Data Table Implementation Standards
-description: Guidelines for implementing data tables in React applications, including configuration, API integration, state management, and UI customization
-glob: "src/{components,features,pages}/**/{table,data-table}*.{ts,tsx,js,jsx}"
+description: This rule explains how to create and manage task lists to track project progress.
+globs: *
 alwaysApply: false
 ---
 
-# Frontend Data Table Implementation Standards
+# Task List Management
 
-## Introduction
+Guidelines for creating and managing task lists in Markdown files to track project progress
 
-This rule defines standards for implementing data tables in our frontend React applications. These standards ensure consistent user experience, proper API integration, and maintainable code across our applications. All data table implementations should follow these guidelines to maintain consistency and provide a robust user experience.
+## Task List Creation
 
-## Data Table Component Overview
+1. Create task lists in a markdown file (in the project root):
+   - Use `TASKS.md` or a descriptive name relevant to the feature (e.g., `ASSISTANT_CHAT.md`)
+   - Include a clear title and description of the feature being implemented
 
-Our advanced data table component provides the following features:
+2. Structure the file with these sections:
+   ```markdown
+   # Feature Name Implementation
+   
+   Brief description of the feature and its purpose.
+   
+   ## Completed Tasks
+   
+   - [x] Task 1 that has been completed
+   - [x] Task 2 that has been completed
+   
+   ## In Progress Tasks
+   
+   - [ ] Task 3 currently being worked on
+   - [ ] Task 4 to be completed soon
+   
+   ## Future Tasks
+   
+   - [ ] Task 5 planned for future implementation
+   - [ ] Task 6 planned for future implementation
+   
+   ## Implementation Plan
+   
+   Detailed description of how the feature will be implemented.
+   
+   ### Relevant Files
+   
+   - path/to/file1.ts - Description of purpose
+   - path/to/file2.ts - Description of purpose
+   ```
 
-1. **Server-side data fetching**: Integration with backend APIs
-2. **Pagination**: Navigate through large datasets
-3. **Sorting**: Order data by specific columns
-4. **Filtering**: Custom filtering including search and date ranges
-5. **Row selection**: Select single or multiple rows
-6. **Column visibility**: Toggle column visibility
-7. **Export functionality**: Export data to CSV or Excel
-8. **Row actions**: Perform operations on individual rows
-9. **Bulk actions**: Perform operations on multiple selected rows
-10. **URL state persistence**: Maintain table state in URL parameters
+## Task List Maintenance
 
-## Basic Usage Pattern
+1. Update the task list as you progress:
+   - Mark tasks as completed by changing `[ ]` to `[x]`
+   - Add new tasks as they are identified
+   - Move tasks between sections as appropriate
 
-### 1. Define Your Schema
+2. Keep "Relevant Files" section updated with:
+   - File paths that have been created or modified
+   - Brief descriptions of each file's purpose
+   - Status indicators (e.g., ✅) for completed components
 
-Start by defining the schema for your data using Zod:
+3. Add implementation details:
+   - Architecture decisions
+   - Data flow descriptions
+   - Technical components needed
+   - Environment configuration
 
-```typescript
-import { z } from "zod";
+## AI Instructions
 
-export const entitySchema = z.object({
-  id: z.number(),
-  name: z.string(),
-  email: z.string().email().optional(),
-  created_at: z.string(),
-  status: z.enum(["active", "inactive", "pending"]),
-  // Add other fields as needed
-});
+When working with task lists, the AI should:
 
-export type Entity = z.infer<typeof entitySchema>;
+1. Regularly update the task list file after implementing significant components
+2. Mark completed tasks with [x] when finished
+3. Add new tasks discovered during implementation
+4. Maintain the "Relevant Files" section with accurate file paths and descriptions
+5. Document implementation details, especially for complex features
+6. When implementing tasks one by one, first check which task to implement next
+7. After implementing a task, update the file to reflect progress
 
-export const entitiesResponseSchema = z.object({
-  success: z.boolean(),
-  data: z.array(entitySchema),
-  pagination: z.object({
-    page: z.number(),
-    limit: z.number(),
-    total_pages: z.number(),
-    total_items: z.number(),
-  }),
-});
+## Example Task Update
+
+When updating a task from "In Progress" to "Completed":
+
+```markdown
+## In Progress Tasks
+
+- [ ] Implement database schema
+- [ ] Create API endpoints for data access
+
+## Completed Tasks
+
+- [x] Set up project structure
+- [x] Configure environment variables
 ```
 
-### 2. Create API Functions
+Should become:
 
-Implement API functions to communicate with your backend:
+```markdown
+## In Progress Tasks
 
-```typescript
-// src/api/entity/fetch-entities.ts
-import { entitiesResponseSchema } from "@/schemas/entity-schema";
+- [ ] Create API endpoints for data access
 
-const API_BASE_URL = "/api";
+## Completed Tasks
 
-export async function fetchEntities({
-  search = "",
-  from_date = "",
-  to_date = "",
-  sort_by = "created_at",
-  sort_order = "desc",
-  page = 1,
-  limit = 10,
-}) {
-  // Build query parameters
-  const params = new URLSearchParams();
-  if (search) params.append("search", search);
-  if (from_date) params.append("from_date", from_date);
-  if (to_date) params.append("to_date", to_date);
-  params.append("sort_by", sort_by);
-  params.append("sort_order", sort_order);
-  params.append("page", page.toString());
-  params.append("limit", limit.toString());
-
-  // Fetch data
-  const response = await fetch(`${API_BASE_URL}/entities?${params.toString()}`);
-  
-  if (!response.ok) {
-    throw new Error(`Failed to fetch entities: ${response.statusText}`);
-  }
-  
-  const data = await response.json();
-  return entitiesResponseSchema.parse(data);
-}
-
-export async function fetchEntitiesByIds(ids: number[]) {
-  if (ids.length === 0) {
-    return [];
-  }
-  
-  // Use batching for efficiency
-  const BATCH_SIZE = 50;
-  const results = [];
-  
-  // Process in batches
-  for (let i = 0; i < ids.length; i += BATCH_SIZE) {
-    const batchIds = ids.slice(i, i + BATCH_SIZE);
-    const params = new URLSearchParams();
-    
-    // Add each ID as a parameter
-    batchIds.forEach(id => {
-      params.append("ids", id.toString());
-    });
-    
-    const response = await fetch(`${API_BASE_URL}/entities/batch?${params.toString()}`);
-    
-    if (!response.ok) {
-      throw new Error(`Failed to fetch entities batch: ${response.statusText}`);
-    }
-    
-    const data = await response.json();
-    if (data.success && Array.isArray(data.data)) {
-      results.push(...data.data);
-    }
-  }
-  
-  return results;
-}
+- [x] Set up project structure
+- [x] Configure environment variables
+- [x] Implement database schema
 ```
-
-### 3. Create a Data Fetching Hook
-
-Create a custom hook to handle data fetching with React Query:
-
-```typescript
-// src/features/entity-table/utils/data-fetching.ts
-import { useQuery, keepPreviousData } from "@tanstack/react-query";
-import { fetchEntities } from "@/api/entity/fetch-entities";
-import { preprocessSearch } from "@/components/data-table/utils";
-
-export function useEntitiesData(
-  page: number,
-  pageSize: number,
-  search: string,
-  dateRange: { from_date: string; to_date: string },
-  sortBy: string,
-  sortOrder: string
-) {
-  return useQuery({
-    queryKey: [
-      "entities",
-      page,
-      pageSize,
-      preprocessSearch(search),
-      dateRange,
-      sortBy,
-      sortOrder,
-    ],
-    queryFn: () =>
-      fetchEntities({
-        page,
-        limit: pageSize,
-        search: preprocessSearch(search),
-        from_date: dateRange.from_date,
-        to_date: dateRange.to_date,
-        sort_by: sortBy,
-        sort_order: sortOrder,
-      }),
-    placeholderData: keepPreviousData,
-  });
-}
-
-// Add this property for the DataTable component
-useEntitiesData.isQueryHook = true;
-```
-
-### 4. Define Table Columns
-
-Define the columns for your data table:
-
-```typescript
-// src/features/entity-table/components/columns.tsx
-import { format } from "date-fns";
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [jacksonkasi1/tnks-data-table](https://github.com/jacksonkasi1/tnks-data-table) — distributed by [TomeVault](https://tomevault.io).
