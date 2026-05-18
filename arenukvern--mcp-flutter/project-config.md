@@ -1,9 +1,9 @@
 ---
 trigger: always_on
-description: Create detailed file-by-file action list.
+description: Provide a list of follow-up questions, and structure the plan with clear sections for research, implementation, and testing. Format the plan as a markdown list with headings.
 ---
 
-Create detailed file-by-file action list.
+Provide a list of follow-up questions, and structure the plan with clear sections for research, implementation, and testing. Format the plan as a markdown list with headings.
 
 ---
 > Source: [Arenukvern/mcp_flutter](https://github.com/Arenukvern/mcp_flutter) — distributed by [TomeVault](https://tomevault.io).
