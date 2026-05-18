@@ -1,109 +1,204 @@
 ---
 trigger: always_on
-description: Guidelines for integrating AI usage telemetry across Task Master.
+description: Before implementing the TDD workflow, ensure your project has a proper testing framework configured. This section covers setup for different technology stacks.
 ---
 
+# Test Workflow & Development Process
 
-# AI Usage Telemetry Integration
+## **Initial Testing Framework Setup**
 
-This document outlines the standard pattern for capturing, propagating, and handling AI usage telemetry data (cost, tokens, model, etc.) across the Task Master stack. This ensures consistent telemetry for both CLI and MCP interactions.
+Before implementing the TDD workflow, ensure your project has a proper testing framework configured. This section covers setup for different technology stacks.
 
-## Overview
+### **Detecting Project Type & Framework Needs**
 
-Telemetry data is generated within the unified AI service layer ([`ai-services-unified.js`](mdc:scripts/modules/ai-services-unified.js)) and then passed upwards through the calling functions.
+**AI Agent Assessment Checklist:**
+1. **Language Detection**: Check for `package.json` (Node.js/JavaScript), `requirements.txt` (Python), `Cargo.toml` (Rust), etc.
+2. **Existing Tests**: Look for test files (`.test.`, `.spec.`, `_test.`) or test directories
+3. **Framework Detection**: Check for existing test runners in dependencies
+4. **Project Structure**: Analyze directory structure for testing patterns
 
-- **Data Source**: [`ai-services-unified.js`](mdc:scripts/modules/ai-services-unified.js) (specifically its `generateTextService`, `generateObjectService`, etc.) returns an object like `{ mainResult: AI_CALL_OUTPUT, telemetryData: TELEMETRY_OBJECT }`.
-- **`telemetryData` Object Structure**:
-  ```json
-  {
-    "timestamp": "ISO_STRING_DATE",
-    "userId": "USER_ID_FROM_CONFIG",
-    "commandName": "invoking_command_or_tool_name",
-    "modelUsed": "ai_model_id",
-    "providerName": "ai_provider_name",
-    "inputTokens": NUMBER,
-    "outputTokens": NUMBER,
-    "totalTokens": NUMBER,
-    "totalCost": NUMBER, // e.g., 0.012414
-    "currency": "USD" // e.g., "USD"
-  }
-  ```
+### **JavaScript/Node.js Projects (Jest Setup)**
 
-## Integration Pattern by Layer
+#### **Prerequisites Check**
+```bash
+# Verify Node.js project
+ls package.json  # Should exist
 
-The key principle is that each layer receives telemetry data from the layer below it (if applicable) and passes it to the layer above it, or handles it for display in the case of the CLI.
+# Check for existing testing setup
+ls jest.config.js jest.config.ts  # Check for Jest config
+grep -E "(jest|vitest|mocha)" package.json  # Check for test runners
+```
 
-### 1. Core Logic Functions (e.g., in `scripts/modules/task-manager/`)
+#### **Jest Installation & Configuration**
 
-Functions in this layer that invoke AI services are responsible for handling the `telemetryData` they receive from [`ai-services-unified.js`](mdc:scripts/modules/ai-services-unified.js).
+**Step 1: Install Dependencies**
+```bash
+# Core Jest dependencies
+npm install --save-dev jest
 
-- **Actions**:
-    1.  Call the appropriate AI service function (e.g., `generateObjectService`).
-        -   Pass `commandName` (e.g., `add-task`, `expand-task`) and `outputType` (e.g., `cli` or `mcp`) in the `params` object to the AI service. The `outputType` can be derived from context (e.g., presence of `mcpLog`).
-    2.  The AI service returns an object, e.g., `aiServiceResponse = { mainResult: {/*AI output*/}, telemetryData: {/*telemetry data*/} }`.
-    3.  Extract `aiServiceResponse.mainResult` for the core processing.
-    4.  **Must return an object that includes `aiServiceResponse.telemetryData`**.
-        Example: `return { operationSpecificData: /*...*/, telemetryData: aiServiceResponse.telemetryData };`
+# TypeScript support (if using TypeScript)
+npm install --save-dev ts-jest @types/jest
 
-- **CLI Output Handling (If Applicable)**:
-    -   If the core function also handles CLI output (e.g., it has an `outputFormat` parameter that can be `'text'` or `'cli'`):
-        1.  Check if `outputFormat === 'text'` (or `'cli'`).
-        2.  If so, and if `aiServiceResponse.telemetryData` is available, call `displayAiUsageSummary(aiServiceResponse.telemetryData, 'cli')` from [`scripts/modules/ui.js`](mdc:scripts/modules/ui.js).
-        - This ensures telemetry is displayed directly to CLI users after the main command output.
+# Additional useful packages
+npm install --save-dev supertest @types/supertest  # For API testing
+npm install --save-dev jest-watch-typeahead  # Enhanced watch mode
+```
 
-- **Example Snippet (Core Logic in `scripts/modules/task-manager/someAiAction.js`)**:
-  ```javascript
-  import { generateObjectService } from '../ai-services-unified.js';
-  import { displayAiUsageSummary } from '../ui.js';
+**Step 2: Create Jest Configuration**
 
-  async function performAiRelatedAction(params, context, outputFormat = 'text') {
-    const { commandNameFromContext, /* other context vars */ } = context;
-    let aiServiceResponse = null;
+Create `jest.config.js` with the following production-ready configuration:
 
-    try {
-      aiServiceResponse = await generateObjectService({
-        // ... other parameters for AI service ...
-        commandName: commandNameFromContext || 'default-action-name',
-        outputType: context.mcpLog ? 'mcp' : 'cli' // Derive outputType
-      });
+```javascript
+/** @type {import('jest').Config} */
+module.exports = {
+  // Use ts-jest preset for TypeScript support
+  preset: 'ts-jest',
 
-      const usefulAiOutput = aiServiceResponse.mainResult.object;
-      // ... do work with usefulAiOutput ...
+  // Test environment
+  testEnvironment: 'node',
 
-      if (outputFormat === 'text' && aiServiceResponse.telemetryData) {
-        displayAiUsageSummary(aiServiceResponse.telemetryData, 'cli');
-      }
+  // Roots for test discovery
+  roots: ['<rootDir>/src', '<rootDir>/tests'],
 
-      return {
-        actionData: /* results of processing */,
-        telemetryData: aiServiceResponse.telemetryData
-      };
-    } catch (error) {
-      // ... handle error ...
-      throw error;
-    }
-  }
-  ```
+  // Test file patterns
+  testMatch: ['**/__tests__/**/*.ts', '**/?(*.)+(spec|test).ts'],
 
-### 2. Direct Function Wrappers (in `mcp-server/src/core/direct-functions/`)
+  // Transform files
+  transform: {
+    '^.+\\.ts$': [
+      'ts-jest',
+      {
+        tsconfig: {
+          target: 'es2020',
+          module: 'commonjs',
+          esModuleInterop: true,
+          allowSyntheticDefaultImports: true,
+          skipLibCheck: true,
+          strict: false,
+          noImplicitAny: false,
+        },
+      },
+    ],
+    '^.+\\.js$': [
+      'ts-jest',
+      {
+        useESM: false,
+        tsconfig: {
+          target: 'es2020',
+          module: 'commonjs',
+          esModuleInterop: true,
+          allowSyntheticDefaultImports: true,
+          allowJs: true,
+        },
+      },
+    ],
+  },
 
-These functions adapt core logic for the MCP server, ensuring structured responses.
+  // Module file extensions
+  moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
 
-- **Actions**:
-    1.  Call the corresponding core logic function.
-        -   Pass necessary context (e.g., `session`, `mcpLog`, `projectRoot`).
-        -   Provide the `commandName` (typically derived from the MCP tool name) and `outputType: 'mcp'` in the context object passed to the core function.
-        -   If the core function supports an `outputFormat` parameter, pass `'json'` to suppress CLI-specific UI.
-    2.  The core logic function returns an object (e.g., `coreResult = { actionData: ..., telemetryData: ... }`).
-    3.  Include `coreResult.telemetryData` as a field within the `data` object of the successful response returned by the direct function.
+  // Transform ignore patterns - adjust for ES modules
+  transformIgnorePatterns: ['node_modules/(?!(your-es-module-deps|.*\\.mjs$))'],
 
-- **Example Snippet (Direct Function `someAiActionDirect.js`)**:
-  ```javascript
-  import { performAiRelatedAction } from '../../../../scripts/modules/task-manager/someAiAction.js'; // Core function
-  import { createLogWrapper } from '../../tools/utils.js'; // MCP Log wrapper
+  // Coverage configuration
+  collectCoverage: true,
+  coverageDirectory: 'coverage',
+  coverageReporters: [
+    'text', // Console output
+    'text-summary', // Brief summary
+    'lcov', // For IDE integration
+    'html', // Detailed HTML report
+  ],
 
-  export async function someAiActionDirect(args, log, context = {}) {
-    const { session } = context;
+  // Files to collect coverage from
+  collectCoverageFrom: [
+    'src/**/*.ts',
+    '!src/**/*.d.ts',
+    '!src/**/*.test.ts',
+    '!src/**/index.ts', // Often just exports
+    '!src/generated/**', // Generated code
+    '!src/config/database.ts', // Database config (tested via integration)
+  ],
+
+  // Coverage thresholds - TaskMaster standards
+  coverageThreshold: {
+    global: {
+      branches: 70,
+      functions: 80,
+      lines: 80,
+      statements: 80,
+    },
+    // Higher standards for critical business logic
+    './src/utils/': {
+      branches: 85,
+      functions: 90,
+      lines: 90,
+      statements: 90,
+    },
+    './src/middleware/': {
+      branches: 80,
+      functions: 85,
+      lines: 85,
+      statements: 85,
+    },
+  },
+
+  // Setup files
+  setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
+
+  // Global teardown to prevent worker process leaks
+  globalTeardown: '<rootDir>/tests/teardown.ts',
+
+  // Module path mapping (if needed)
+  moduleNameMapper: {
+    '^@/(.*)$': '<rootDir>/src/$1',
+  },
+
+  // Clear mocks between tests
+  clearMocks: true,
+
+  // Restore mocks after each test
+  restoreMocks: true,
+
+  // Global test timeout
+  testTimeout: 10000,
+
+  // Projects for different test types
+  projects: [
+    // Unit tests - for pure functions only
+    {
+      displayName: 'unit',
+      testMatch: ['<rootDir>/src/**/*.test.ts'],
+      testPathIgnorePatterns: ['.*\\.integration\\.test\\.ts$', '/tests/'],
+      preset: 'ts-jest',
+      testEnvironment: 'node',
+      collectCoverageFrom: [
+        'src/**/*.ts',
+        '!src/**/*.d.ts',
+        '!src/**/*.test.ts',
+        '!src/**/*.integration.test.ts',
+      ],
+      coverageThreshold: {
+        global: {
+          branches: 70,
+          functions: 80,
+          lines: 80,
+          statements: 80,
+        },
+      },
+    },
+    // Integration tests - real database/services
+    {
+      displayName: 'integration',
+      testMatch: [
+        '<rootDir>/src/**/*.integration.test.ts',
+        '<rootDir>/tests/integration/**/*.test.ts',
+      ],
+      preset: 'ts-jest',
+      testEnvironment: 'node',
+      setupFilesAfterEnv: ['<rootDir>/tests/setup/integration.ts'],
+      testTimeout: 10000,
+    },
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
