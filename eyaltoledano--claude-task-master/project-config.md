@@ -1,103 +1,69 @@
 ---
 trigger: always_on
-description: Guidelines for implementing and interacting with the Task Master MCP Server
+description: Guidelines for integrating new features into the Task Master CLI
 ---
 
-# Task Master MCP Server Guidelines
+# Task Master Feature Integration Guidelines
 
-This document outlines the architecture and implementation patterns for the Task Master Model Context Protocol (MCP) server, designed for integration with tools like Cursor.
+## Feature Placement Decision Process
 
-## Architecture Overview (See also: [`architecture.mdc`](mdc:.cursor/rules/architecture.mdc))
+- **Identify Feature Type** (See [`architecture.mdc`](mdc:.cursor/rules/architecture.mdc) for module details):
+  - **Data Manipulation**: Features that create, read, update, or delete tasks belong in [`task-manager.js`](mdc:scripts/modules/task-manager.js). Follow guidelines in [`tasks.mdc`](mdc:.cursor/rules/tasks.mdc).
+  - **Dependency Management**: Features that handle task relationships belong in [`dependency-manager.js`](mdc:scripts/modules/dependency-manager.js). Follow guidelines in [`dependencies.mdc`](mdc:.cursor/rules/dependencies.mdc).
+  - **User Interface**: Features that display information to users belong in [`ui.js`](mdc:scripts/modules/ui.js). Follow guidelines in [`ui.mdc`](mdc:.cursor/rules/ui.mdc).
+  - **AI Integration**: Features that use AI models belong in [`ai-services.js`](mdc:scripts/modules/ai-services.js).
+  - **Cross-Cutting**: Features that don't fit one category may need components in multiple modules
 
-The MCP server acts as a bridge between external tools (like Cursor) and the core Task Master CLI logic. It leverages FastMCP for the server framework.
+- **Command-Line Interface** (See [`commands.mdc`](mdc:.cursor/rules/commands.mdc)):
+  - All new user-facing commands should be added to [`commands.js`](mdc:scripts/modules/commands.js)
+  - Use consistent patterns for option naming and help text
+  - Follow the Commander.js model for subcommand structure
 
-- **Flow**: `External Tool (Cursor)` <-> `FastMCP Server` <-> `MCP Tools` (`mcp-server/src/tools/*.js`) <-> `Core Logic Wrappers` (`mcp-server/src/core/direct-functions/*.js`, exported via `task-master-core.js`) <-> `Core Modules` (`scripts/modules/*.js`)
-- **Goal**: Provide a performant and reliable way for external tools to interact with Task Master functionality without directly invoking the CLI for every operation.
+## Implementation Pattern
 
-## Direct Function Implementation Best Practices
+The standard pattern for adding a feature follows this workflow:
 
-When implementing a new direct function in `mcp-server/src/core/direct-functions/`, follow these critical guidelines:
+1. **Core Logic**: Implement the business logic in the appropriate module (e.g., [`task-manager.js`](mdc:scripts/modules/task-manager.js)).
+2. **Context Gathering (If Applicable)**: 
+   - For AI-powered commands that benefit from project context, use the standardized context gathering patterns from [`context_gathering.mdc`](mdc:.cursor/rules/context_gathering.mdc).
+   - Import `ContextGatherer` and `FuzzyTaskSearch` utilities for reusable context extraction.
+   - Support multiple context types: tasks, files, custom text, project tree.
+   - Implement detailed token breakdown display for transparency.
+3. **AI Integration (If Applicable)**: 
+   - Import necessary service functions (e.g., `generateTextService`, `streamTextService`) from [`ai-services-unified.js`](mdc:scripts/modules/ai-services-unified.js).
+   - Prepare parameters (`role`, `session`, `systemPrompt`, `prompt`).
+   - Call the service function.
+   - Handle the response (direct text or stream object).
+   - **Important**: Prefer `generateTextService` for calls sending large context (like stringified JSON) where incremental display is not needed. See [`ai_services.mdc`](mdc:.cursor/rules/ai_services.mdc) for detailed usage patterns and cautions.
+4. **UI Components**: Add any display functions to [`ui.js`](mdc:scripts/modules/ui.js) following [`ui.mdc`](mdc:.cursor/rules/ui.mdc). Consider enhanced formatting with syntax highlighting for code blocks.
+5. **Command Integration**: Add the CLI command to [`commands.js`](mdc:scripts/modules/commands.js) following [`commands.mdc`](mdc:.cursor/rules/commands.mdc).
+6. **Testing**: Write tests for all components of the feature (following [`tests.mdc`](mdc:.cursor/rules/tests.mdc))
+7. **Configuration**: Update configuration settings or add new ones in [`config-manager.js`](mdc:scripts/modules/config-manager.js) and ensure getters/setters are appropriate. Update documentation in [`utilities.mdc`](mdc:.cursor/rules/utilities.mdc) and [`taskmaster.mdc`](mdc:.cursor/rules/taskmaster.mdc). Update the `.taskmasterconfig` structure if needed.
+8. **Documentation**: Update help text and documentation in [`dev_workflow.mdc`](mdc:.cursor/rules/dev_workflow.mdc) and [`taskmaster.mdc`](mdc:.cursor/rules/taskmaster.mdc).
 
-1. **Verify Function Dependencies**:
-   - ✅ **DO**: Check that all helper functions your direct function needs are properly exported from their source modules
-   - ✅ **DO**: Import these dependencies explicitly at the top of your file
-   - ❌ **DON'T**: Assume helper functions like `findTaskById` or `taskExists` are automatically available
-   - **Example**:
-     ```javascript
-     // At top of direct-function file
-     import { removeTask, findTaskById, taskExists } from '../../../../scripts/modules/task-manager.js';
-     ```
+## Critical Checklist for New Features
 
-2. **Parameter Verification and Completeness**:
-   - ✅ **DO**: Verify the signature of core functions you're calling and ensure all required parameters are provided
-   - ✅ **DO**: Pass explicit values for required parameters rather than relying on defaults
-   - ✅ **DO**: Double-check parameter order against function definition
-   - ❌ **DON'T**: Omit parameters assuming they have default values
-   - **Example**:
-     ```javascript
-     // Correct parameter handling in direct function
-     async function generateTaskFilesDirect(args, log) {
-       const tasksPath = findTasksJsonPath(args, log);
-       const outputDir = args.output || path.dirname(tasksPath);
-       
-       try {
-         // Pass all required parameters
-         const result = await generateTaskFiles(tasksPath, outputDir);
-         return { success: true, data: result, fromCache: false };
-       } catch (error) {
-         // Error handling...
-       }
-     }
-     ```
+- **Comprehensive Function Exports**:
+  - ✅ **DO**: Export **all core functions, helper functions (like `generateSubtaskPrompt`), and utility methods** needed by your new function or command from their respective modules.
+  - ✅ **DO**: **Explicitly review the module's `export { ... }` block** at the bottom of the file to ensure every required dependency (even seemingly minor helpers like `findTaskById`, `taskExists`, specific prompt generators, AI call handlers, etc.) is included.
+  - ❌ **DON'T**: Assume internal functions are already exported - **always verify**. A missing export will cause runtime errors (e.g., `ReferenceError: generateSubtaskPrompt is not defined`).
+  - **Example**: If implementing a feature that checks task existence, ensure the helper function is in exports:
+  ```javascript
+  // At the bottom of your module file:
+  export {
+    // ... existing exports ...
+    yourNewFunction,
+    taskExists,  // Helper function used by yourNewFunction
+    findTaskById, // Helper function used by yourNewFunction
+    generateSubtaskPrompt, // Helper needed by expand/add features
+    getSubtasksFromAI,     // Helper needed by expand/add features
+  };
+  ```
 
-3. **Consistent File Path Handling**:
-   - ✅ **DO**: Use `path.join()` instead of string concatenation for file paths
-   - ✅ **DO**: Follow established file naming conventions (`task_001.txt` not `1.md`)
-   - ✅ **DO**: Use `path.dirname()` and other path utilities for manipulating paths
-   - ✅ **DO**: When paths relate to task files, follow the standard format: `task_${id.toString().padStart(3, '0')}.txt`
-   - ❌ **DON'T**: Create custom file path handling logic that diverges from established patterns
-   - **Example**:
-     ```javascript
-     // Correct file path handling
-     const taskFilePath = path.join(
-       path.dirname(tasksPath),
-       `task_${taskId.toString().padStart(3, '0')}.txt`
-     );
-     ```
-
-4. **Comprehensive Error Handling**:
-   - ✅ **DO**: Wrap core function calls *and AI calls* in try/catch blocks
-   - ✅ **DO**: Log errors with appropriate severity and context
-   - ✅ **DO**: Return standardized error objects with code and message (`{ success: false, error: { code: '...', message: '...' } }`)
-   - ✅ **DO**: Handle file system errors, AI client errors, AI processing errors, and core function errors distinctly with appropriate codes.
-   - **Example**:
-     ```javascript
-     try {
-       // Core function call or AI logic
-     } catch (error) {
-       log.error(`Failed to execute direct function logic: ${error.message}`);
-       return {
-         success: false,
-         error: {
-           code: error.code || 'DIRECT_FUNCTION_ERROR', // Use specific codes like AI_CLIENT_ERROR, etc.
-           message: error.message,
-           details: error.stack // Optional: Include stack in debug mode
-         },
-         fromCache: false // Ensure this is included if applicable
-       };
-     }
-     ```
-
-5. **Handling Logging Context (`mcpLog`)**:
-   - **Requirement**: Core functions (like those in `task-manager.js`) may accept an `options` object containing an optional `mcpLog` property. If provided, the core function expects this object to have methods like `mcpLog.info(...)`, `mcpLog.error(...)`.
-   - **Solution: The Logger Wrapper Pattern**: When calling a core function from a direct function, pass the `log` object provided by FastMCP *wrapped* in the standard `logWrapper` object. This ensures the core function receives a logger with the expected method structure.
-     ```javascript
-     // Standard logWrapper pattern within a Direct Function
-     const logWrapper = {
-       info: (message, ...args) => log.info(message, ...args),
-       warn: (message, ...args) => log.warn(message, ...args),
-       error: (message, ...args) => log.error(message, ...args),
-       debug: (message, ...args) => log.debug && log.debug(message, ...args),
+- **Parameter Completeness and Matching**:
+  - ✅ **DO**: Pass all required parameters to functions you call within your implementation
+  - ✅ **DO**: Check function signatures before implementing calls to them
+  - ✅ **DO**: Verify that direct function parameters match their core function counterparts
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
