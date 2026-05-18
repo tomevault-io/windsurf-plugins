@@ -1,0 +1,108 @@
+---
+trigger: always_on
+description: Authoritative instructions for AI agents and contributors working in this repo. Trust this file first; only fall back to wider search when something here is missing or contradicts the code. When you discover a contradiction, **fix the code or fix this file** — never let them drift.
+---
+
+# MCPHub — Agent Guide
+
+Authoritative instructions for AI agents and contributors working in this repo. Trust this file first; only fall back to wider search when something here is missing or contradicts the code. When you discover a contradiction, **fix the code or fix this file** — never let them drift.
+
+This guide is intentionally short. It points to where the details live rather than restating them. Read the linked file when you need depth.
+
+---
+
+## 1. What this repo is
+
+`@samanhappy/mcphub` is a TypeScript/Node (ESM) hub that aggregates multiple MCP (Model Context Protocol) servers behind a single HTTP surface, with a React/Vite dashboard.
+
+| Layer    | Entry                                   | Notes                                        |
+| -------- | --------------------------------------- | -------------------------------------------- |
+| Backend  | [src/index.ts](src/index.ts) → [src/server.ts](src/server.ts) | Express + TypeORM (optional) + MCP SDK       |
+| Frontend | [frontend/src/](frontend/src/)          | Vite + React + Tailwind, i18n via react-i18next |
+| Config   | [mcp_settings.json](mcp_settings.json)  | MCP server defs, users, groups, OAuth state  |
+| Docs     | [docs/](docs/)                          | Public docs (Mintlify). See [docs/development/](docs/development/) for architecture |
+
+Layout map (read the directory when you need specifics, don't expand it here):
+
+- `src/{routes,controllers,services,dao,db,middlewares,models,utils,types,config,clients}/`
+- `src/services/mcpService.ts` — **core** MCP connection/lifecycle logic
+- `src/dao/` + `src/db/` — dual datasource (JSON file by default, PostgreSQL when `USE_DB=true`)
+- `tests/` mirrors `src/`; colocated `*.test.ts` also picked up
+- `locales/{en,fr,tr,zh}.json` — i18n strings
+- `dist/`, `frontend/dist/`, `coverage/` — generated; never hand-edit
+
+---
+
+## 2. Workflow contract
+
+### Commands (canonical list — don't duplicate elsewhere)
+
+| Purpose          | Command               |
+| ---------------- | --------------------- |
+| Install          | `pnpm install`        |
+| Dev (both)       | `pnpm dev`            |
+| Dev backend only | `pnpm backend:dev`    |
+| Dev frontend     | `pnpm frontend:dev`   |
+| Lint             | `pnpm lint`           |
+| Format           | `pnpm format`         |
+| Test (CI mode)   | `pnpm test:ci`        |
+| Test (watch)     | `pnpm test:watch`     |
+| Build all        | `pnpm build`          |
+| Verify dist      | `node scripts/verify-dist.js` |
+| Start prod       | `pnpm start`          |
+
+Backend listens on `:3000` (or `$PORT`). Frontend dev server `:5173` proxies API calls to the backend.
+
+### Pre-commit gate (must all pass)
+
+```bash
+pnpm lint && pnpm test:ci && pnpm build
+```
+
+CI runs the same on Node 20.x. If a hook fails, fix the root cause — do **not** bypass with `--no-verify`.
+
+### Post-change manual checks (when relevant)
+
+- Touched backend startup / MCP wiring → `pnpm dev`, hit `GET /health`, scan logs for `Successfully connected client for server: …`.
+- Touched frontend UI → open the page in `pnpm frontend:dev` and exercise the path; tests don't catch UX regressions.
+- Some MCP servers fail to connect without API keys — that is expected locally and not a regression signal.
+
+---
+
+## 3. Conventions (hard rules)
+
+- **ESM imports**: always use `.js` extensions for relative imports (e.g. `import { x } from './foo.js'`). TS files included.
+- **TypeScript strict** is on; do not weaken it. Don't paper over types with `any` — narrow or define a type.
+- **Comments in English only.**
+- **Formatting**: 2-space indent, single quotes — let Prettier decide (`pnpm format`). ESLint config is the flat [eslint.config.mjs](eslint.config.mjs).
+- **Naming**:
+  - Services / DAOs: `XxxService`, `XxxDao` (suffix-based).
+  - React components & their files: `PascalCase`.
+  - Utility modules: `camelCase`.
+- **Shared types live in [src/types/](src/types/)**. Don't redefine DTOs locally.
+- **Conventional Commits** (`feat:`, `fix:`, `chore:`, `refactor:`, …), imperative present tense.
+- **PRs**: describe behavior change, list manual + automated tests, attach before/after for UI work, link issues. Keep generated artifacts out of the diff.
+
+---
+
+## 4. Architecture invariants
+
+### Dual datasource (JSON ⇄ PostgreSQL)
+
+`USE_DB=true` + `DB_URL` switches storage from `mcp_settings.json` to Postgres via TypeORM.
+
+**When adding/changing a persisted field, update every layer or migrations will silently drop it:**
+
+| # | File                       | What to do                          |
+| - | -------------------------- | ----------------------------------- |
+| 1 | `src/types/index.ts`       | Add/modify the interface            |
+| 2 | `src/dao/*Dao.ts`          | JSON impl (if behavior changes)     |
+| 3 | `src/db/entities/*.ts`     | TypeORM `@Column` (mark `nullable`, use `simple-json` for objects) |
+| 4 | `src/dao/*DaoDbImpl.ts`    | Map field in create/update          |
+| 5 | `src/db/repositories/*.ts` | Update if the wrapper exposes it    |
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [samanhappy/mcphub](https://github.com/samanhappy/mcphub) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-17 -->
