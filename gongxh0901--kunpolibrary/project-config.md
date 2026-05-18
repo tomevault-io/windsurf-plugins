@@ -1,203 +1,260 @@
 ---
 trigger: always_on
-description: 热更新系统开发规范
+description: 日志系统和调试规范
 ---
 
 
-# 热更新系统开发规范
+# 日志系统和调试规范
 
-## 热更新架构设计
+## 统一日志接口
 
-### 管理器单例模式
+### 日志级别定义
 ```typescript
-export class HotUpdateManager {
-    private static _instance: HotUpdateManager;
-    
-    /** 获取单例实例 */
-    public static getInstance(): HotUpdateManager {
-        if (!this._instance) {
-            this._instance = new HotUpdateManager();
-        }
-        return this._instance;
-    }
-    
-    /** 禁用直接构造 */
-    private constructor() {}
-    
-    /** 配置属性 */
-    public manifestUrl: string = "";
-    public versionUrl: string = "";
-    
-    /** 初始化热更新 */
-    public init(manifestUrl: string, versionUrl: string): void {
-        this.manifestUrl = manifestUrl;
-        this.versionUrl = versionUrl;
-    }
-}
+import { debug, info, log, warn, error } from "../tool/log";
+
+/**
+ * 日志级别使用指南:
+ * - debug: 调试信息，仅在开发模式显示
+ * - log: 一般信息输出
+ * - info: 信息性消息，带有特殊图标
+ * - warn: 警告信息，黄色背景
+ * - error: 错误消息，红色背景
+ */
 ```
 
-### 热更新状态码定义
+### 日志使用规范
 ```typescript
-export enum HotUpdateCode {
-    /** 成功 */
-    Succeed = 0,
-    /** 已是最新版本 */
-    LatestVersion = 1,
-    /** 检查更新失败 */
-    CheckFailed = 2,
-    /** 下载失败 */
-    DownloadFailed = 3,
-    /** 解压失败 */
-    UnzipFailed = 4,
-    /** 网络错误 */
-    NetworkError = 5,
-    /** 空间不足 */
-    NoSpace = 6,
-    /** 未知错误 */
-    UnknownError = 7
-}
-```
-
-## Promise 结果模式
-
-### 统一结果接口
-```typescript
-export interface IPromiseResult {
-    /** 状态码 */
-    code: HotUpdateCode;
-    
-    /** 消息描述 */
-    message: string;
-    
-    /** 扩展数据 */
-    data?: any;
-}
-```
-
-### 热更新配置接口
-```typescript
-export interface IHotUpdateConfig {
-    /** 版本号 */
-    version: string;
-    
-    /** 远程manifest文件URL */
-    remoteManifestUrl: string;
-    
-    /** 远程version文件URL */
-    remoteVersionUrl: string;
-    
-    /** 资源包URL */
-    packageUrl: string;
-    
-    /** 资源文件列表 */
-    assets?: { [key: string]: any };
-    
-    /** 搜索路径 */
-    searchPaths?: string[];
-}
-```
-
-## 热更新核心实现
-
-### HotUpdate 核心类
-```typescript
-export class HotUpdate {
-    private _am: jsb.AssetsManager;
-    private _updating: boolean = false;
-    
-    constructor(manifestUrl: string) {
-        // 初始化 AssetsManager
-        this._am = new jsb.AssetsManager(manifestUrl, jsb.fileUtils.getWritablePath() + 'remote-assets');
-        this._am.setEventCallback(this.onUpdateEvent.bind(this));
-        this._am.setVerifyCallback(this.onVerifyCallback.bind(this));
-    }
-    
-    /**
-     * 检查更新
-     * @returns Promise<IPromiseResult>
-     */
-    public checkUpdate(): Promise<IPromiseResult> {
-        return new Promise((resolve) => {
-            if (this._updating) {
-                resolve({ code: HotUpdateCode.UnknownError, message: "正在更新中" });
-                return;
-            }
-            
-            if (!this._am.getLocalManifest() || !this._am.getLocalManifest().isLoaded()) {
-                resolve({ code: HotUpdateCode.CheckFailed, message: "本地manifest加载失败" });
-                return;
-            }
-            
-            this._am.setEventCallback((event) => {
-                switch (event.getEventCode()) {
-                    case jsb.EventAssetsManager.ERROR_NO_LOCAL_MANIFEST:
-                        resolve({ code: HotUpdateCode.CheckFailed, message: "本地manifest不存在" });
-                        break;
-                    case jsb.EventAssetsManager.ERROR_DOWNLOAD_MANIFEST:
-                        resolve({ code: HotUpdateCode.NetworkError, message: "下载manifest失败" });
-                        break;
-                    case jsb.EventAssetsManager.ALREADY_UP_TO_DATE:
-                        resolve({ code: HotUpdateCode.LatestVersion, message: "已是最新版本" });
-                        break;
-                    case jsb.EventAssetsManager.NEW_VERSION_FOUND:
-                        resolve({ code: HotUpdateCode.Succeed, message: "发现新版本" });
-                        break;
-                }
-            });
-            
-            this._am.checkUpdate();
-        });
-    }
-    
-    /**
-     * 执行热更新
-     * @returns Promise<IPromiseResult>
-     */
-    public hotUpdate(): Promise<IPromiseResult> {
-        return new Promise((resolve) => {
-            if (this._updating) {
-                resolve({ code: HotUpdateCode.UnknownError, message: "正在更新中" });
-                return;
-            }
-            
-            this._updating = true;
-            
-            this._am.setEventCallback((event) => {
-                switch (event.getEventCode()) {
-                    case jsb.EventAssetsManager.UPDATE_FINISHED:
-                        this._updating = false;
-                        resolve({ code: HotUpdateCode.Succeed, message: "更新完成" });
-                        break;
-                    case jsb.EventAssetsManager.UPDATE_FAILED:
-                        this._updating = false;
-                        resolve({ code: HotUpdateCode.DownloadFailed, message: "更新失败" });
-                        break;
-                    case jsb.EventAssetsManager.ERROR_DECOMPRESS:
-                        this._updating = false;
-                        resolve({ code: HotUpdateCode.UnzipFailed, message: "解压失败" });
-                        break;
-                }
-            });
-            
-            this._am.update();
-        });
-    }
-    
-    /**
-     * 事件回调处理
-     */
-    private onUpdateEvent(event: jsb.EventAssetsManager): void {
-        const code = event.getEventCode();
-        debug(`热更新事件: ${code}`);
+// ✅ 正确的日志使用
+export class WindowManager {
+    public static showWindow(windowName: string): void {
+        debug(`显示窗口: ${windowName}`);  // 调试信息
         
-        switch (code) {
-            case jsb.EventAssetsManager.UPDATE_PROGRESSION:
-                const progress = event.getPercent();
-                debug(`更新进度: ${progress}%`);
-                break;
-            case jsb.EventAssetsManager.ASSET_UPDATED:
+        if (!this._windows.has(windowName)) {
+            warn(`窗口不存在 ${windowName}`);  // 警告
+            return;
+        }
+        
+        try {
+            this.doShowWindow(windowName);
+            log(`窗口 ${windowName} 显示成功`);  // 普通信息
+        } catch (e) {
+            error(`显示窗口失败: ${windowName}`, e);  // 错误信息
+        }
+    }
+}
+```
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+## 调试模式管理
+
+### 调试开关设计
+```typescript
+// header.ts - 调试配置
+export let KUNPO_DEBUG: boolean = false;
+
+/**
+ * 启用或禁用调试模式
+ * @param enable 是否启用调试模式
+ */
+export function enableDebugMode(enable: boolean): void {
+    if (enable === true) {
+        KUNPO_DEBUG = true;
+        warn("调试模式已开启");
+    } else {
+        KUNPO_DEBUG = false;
+    }
+}
+
+// log.ts - 条件日志输出
+function debug(...args: any[]): void {
+    KUNPO_DEBUG && console.log("kunpo:", ...args);
+}
+```
+
+### 框架配置集成
+```typescript
+interface FrameConfig {
+    /** 开启debug 默认: false */
+    debug?: boolean;
+}
+
+export class CocosEntry extends Component {
+    public getConfig(): FrameConfig {
+        return {
+            debug: true  // 在开发环境设置为 true
+        };
+    }
+    
+    protected start(): void {
+        const config = this.getConfig();
+        enableDebugMode(config.debug);  // 根据配置启用调试
+    }
+}
+```
+
+## 日志格式规范
+
+### 统一前缀格式
+```typescript
+// 所有日志都带有 "kunpo:" 前缀
+function log(...args: any[]) {
+    console.log("kunpo:", ...args);
+}
+
+function debug(...args: any[]): void {
+    KUNPO_DEBUG && console.log("kunpo:", ...args);
+}
+```
+
+### 结构化日志信息
+```typescript
+// ✅ 推荐的日志格式
+debug(`窗口注册 - 窗口名:${name} 包名:${pkg} 组名:${group}`);
+log(`模块初始化完成: ${moduleName}`);
+warn(`资源加载失败: ${resourcePath}`);
+error(`网络请求异常: ${url}`, errorDetails);
+
+// ❌ 避免的日志格式  
+debug("window registered");  // 信息不够具体
+log(window);  // 直接输出对象
+```
+
+## 开发调试工具
+
+### 全局调试接口
+```typescript
+// 暴露调试接口到全局对象
+let _global = globalThis || window || global;
+
+(_global as any)["getKunpoRegisterWindowMaps"] = function () {
+    return _uidecorator.getWindowMaps() as any;
+};
+
+(_global as any)["getKunpoRegisterComponentMaps"] = function () {
+    return _uidecorator.getComponentMaps() as any;
+};
+
+(_global as any)["getKunpoRegisterHeaderMaps"] = function () {
+    return _uidecorator.getHeaderMaps() as any;
+};
+```
+
+### 运行时信息输出
+```typescript
+// 系统信息调试
+private initPlatform(): void {
+    debug(`系统类型: ${sys.os}`);
+    debug(`平台类型: ${PlatformType[Platform.platform]}`);
+    debug(`是否原生: ${Platform.isNative}`);
+    debug(`是否移动端: ${Platform.isMobile}`);
+}
+
+// 模块注册调试
+public static registerUI(): void {
+    for (const { ctor, res } of _uidecorator.getWindowMaps().values()) {
+        debug(`窗口注册 - 窗口名:${res.name} 包名:${res.pkg} 组名:${res.group}`);
+    }
+}
+```
+
+## 错误处理和日志
+
+### Promise 错误处理
+```typescript
+public static showWindow(windowName: string, userdata?: any): Promise<void> {
+    return new Promise((resolve, reject) => {
+        debug(`准备显示窗口: ${windowName}`);
+        
+        this._resPool.loadWindowRes(windowName, {
+            complete: () => {
+                debug(`窗口资源加载完成: ${windowName}`);
+                this.showWindowIm(windowName, userdata);
+                resolve();
+            },
+            fail: (pkgs: string[]) => {
+                error(`窗口资源加载失败: ${windowName}`, pkgs);
+                reject(pkgs);
+            }
+        });
+    });
+}
+```
+
+### 异常捕获和记录
+```typescript
+try {
+    this.doSomethingRisky();
+} catch (error) {
+    // 记录详细的错误信息
+    error(`操作执行失败: ${operation}`, {
+        error: error.message,
+        stack: error.stack,
+        context: this.getContext()
+    });
+    
+    // 根据错误类型决定是否继续执行
+    if (error instanceof CriticalError) {
+        throw error;  // 关键错误需要向上抛出
+    }
+}
+```
+
+## 性能监控日志
+
+### 时间统计
+```typescript
+export class WindowManager {
+    public static showWindow(windowName: string): Promise<void> {
+        const startTime = performance.now();
+        debug(`开始显示窗口: ${windowName}`);
+        
+        return new Promise((resolve) => {
+            this._resPool.loadWindowRes(windowName, {
+                complete: () => {
+                    const loadTime = performance.now() - startTime;
+                    debug(`窗口显示完成: ${windowName}, 耗时: ${loadTime.toFixed(2)}ms`);
+                    resolve();
+                }
+            });
+        });
+    }
+}
+```
+
+### 资源使用监控
+```typescript
+export class WindowResPool {
+    private logResourceUsage(): void {
+        if (KUNPO_DEBUG) {
+            const windowCount = this._windowInfos.size;
+            const headerCount = this._headerInfos.size;
+            debug(`资源池状态 - 窗口: ${windowCount}, 头部: ${headerCount}`);
+        }
+    }
+}
+```
+
+## 调试最佳实践
+
+### 1. 日志分级使用
+- `debug`: 仅开发时需要的详细信息
+- `log`: 系统运行的关键节点信息  
+- `warn`: 可能的问题但不影响运行
+- `error`: 必须处理的错误情况
+
+### 2. 信息完整性
+- 包含足够的上下文信息
+- 记录输入参数和状态
+- 包含时间戳和调用路径
+
+### 3. 性能考虑
+- 避免在日志中进行重度计算
+- 使用条件编译减少生产环境开销
+- 延迟计算日志参数
+
+### 4. 安全性
+- 避免输出敏感信息到日志
+- 在生产环境关闭详细日志
+- 注意日志文件的权限设置
 
 ---
 > Source: [gongxh0901/kunpolibrary](https://github.com/gongxh0901/kunpolibrary) — distributed by [TomeVault](https://tomevault.io).
