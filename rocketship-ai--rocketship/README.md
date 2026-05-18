@@ -7,11 +7,11 @@ A QA testing framework for your coding agent.
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [rocketship-ai/rocketship](https://github.com/rocketship-ai/rocketship).
+Original source: `CLAUDE.md` in [rocketship-ai/rocketship](https://github.com/rocketship-ai/rocketship).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
