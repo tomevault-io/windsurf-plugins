@@ -1,145 +1,98 @@
 ---
 trigger: always_on
-description: SpacetimeDB command workflow for server changes, publish, and binding generation
+description: SpacetimeDB reference: reducers, tables, subscriptions, scheduling, and RLS patterns. Apply when implementing or reviewing server module logic, schema changes, generated bindings impacts, or client callback/dataflow behavior tied to SpacetimeDB.
 ---
 
-# SpacetimeDB Development Workflow
+# SpacetimeDB
 
-Essential commands and patterns for developing with SpacetimeDB in this 2D multiplayer survival game.
+> SpacetimeDB is a fully-featured relational database system that integrates
+> application logic directly within the database, eliminating the need for
+> separate web or game servers. It supports multiple programming languages,
+> including C# and Rust, allowing developers to write and deploy entire
+> applications as a single binary. It is optimized for high-throughput and low
+> latency multiplayer applications like multiplayer games.
 
-## Core Development Commands
+Users upload their application logic to run inside SpacetimeDB as a WebAssembly
+module. There are three main features of SpacetimeDB: tables, reducers, and
+subscription queries. Tables are relational database tables like you would find
+in a database like Postgres. Reducers are atomic, transactional, RPC functions
+that are defined in the WebAssembly module which can be called by clients.
+Subscription queries are SQL queries which are made over a WebSocket connection
+which are initially evaluated by SpacetimeDB and then incrementally evaluated
+sending changes to the query result over the WebSocket.
 
-### Server Development
-```bash
-# Build server (run from project root)
-spacetime build -p ./server
+All data in the tables are stored in memory, but are persisted to the disk via a
+Write-Ahead Log (WAL) called the Commitlog. All tables are persistent in
+SpacetimeDB.
 
-# Publish to local database  
-spacetime publish -p ./server broth-bullets-local
+SpacetimeDB allows users to code generate type-safe client libraries based on
+the tables, types, and reducers defined in their module. Subscription queries
+allows the client SDK to store a partial, live updating, replica of the servers
+state. This makes reading database state on the client extremely low-latency.
 
-# View server logs
-spacetime logs broth-bullets-local
+Authentication is implemented in SpacetimeDB using the OpenID Connect protocol.
+An OpenID Connect token with a valid `iss`/`sub` pair constitutes a unique and
+authenticable SpacetimeDB identity. SpacetimeDB uses the `Identity` type as an
+identifier for all such identities. `Identity` is computed from the `iss`/`sub`
+pair using the following algorithm:
 
-# SQL query the database
-spacetime sql broth-bullets-local "SELECT * FROM player LIMIT 5"
+1. Concatenate the issuer and subject with a pipe symbol (`|`).
+2. Perform the first BLAKE3 hash on the concatenated string.
+3. Get the first 26 bytes of the hash (let's call this `idHash`).
+4. Create a 28-byte sequence by concatenating the bytes `0xc2`, `0x00`, and `idHash`.
+5. Compute the BLAKE3 hash of the 28-byte sequence from step 4 (let's call this `checksumHash`).
+6. Construct the final 32-byte `Identity` by concatenating: the two prefix bytes (`0xc2`, `0x00`), the first 4 bytes of `checksumHash`, and the 26-byte `idHash`.
+7. This final 32-byte value is typically represented as a hexadecimal string.
 
-# Clear database and republish (destructive!)
-spacetime publish -c -p ./server broth-bullets-local
+```ascii
+Byte Index: |  0  |  1  |  2  |  3  |  4  |  5  |  6  |  7  | ... | 31  |
+            +-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+
+Contents:   | 0xc2| 0x00| Checksum Hash (4 bytes) |  ID Hash (26 bytes) |
+            +-----+-----+-------------------------+---------------------+
+                      (First 4 bytes of           (First 26 bytes of
+                       BLAKE3(0xc200 || idHash))    BLAKE3(iss|sub))
 ```
 
-### Client Development
-```bash
-# Generate TypeScript bindings (CRITICAL after server changes)
-spacetime generate --lang typescript --out-dir ./client/src/generated -p ./server
+This allows SpacetimeDB to easily integrate with OIDC authentication
+providers like FirebaseAuth, Auth0, or SuperTokens.
 
-# Start client development server
-npm run dev
-```
+Clockwork Labs, the developers of SpacetimeDB, offers three products:
 
-## Essential Workflow Pattern
+1. SpacetimeDB Standalone: a source available (Business Source License), single node, self-hosted version
+2. SpacetimeDB Maincloud: a hosted, managed-service, serverless cluster
+3. SpacetimeDB Enterprise: a closed-source, clusterized version of SpacetimeDB which can be licensed for on-prem hosting or dedicated hosting
 
-### 1. Making Server Changes
-1. Edit server Rust files in `server/src/`
-2. Test build: `spacetime build -p ./server`
-3. Publish: `spacetime publish -p ./server broth-bullets-local`
-4. **Generate client bindings**: `spacetime generate --lang typescript --out-dir ./client/src/generated -p ./server`
+## Documentation Directory
 
-### 2. Making Client Changes  
-1. Update client TypeScript files in `client/src/`
-2. Restart dev server if needed: `npm run dev`
+### Getting Started
+- [What is SpacetimeDB](/intro/what-is-spacetimedb) - Overview and core concepts
+- [Key Architecture](/intro/key-architecture) - How SpacetimeDB works
+- [Language Support](/intro/language-support) - Supported languages and SDKs
+- [FAQ](/intro/faq) - Frequently asked questions
 
-### 3. Testing Full Stack
-1. Server logs: `spacetime logs broth-bullets-local`
-2. Browser console for client errors
-3. Database inspection: `spacetime sql broth-bullets-local "SELECT * FROM {table}"`
+### Quickstarts
+- [React Quickstart](/quickstarts/react) - Get started with React + TypeScript
+- [TypeScript Quickstart](/quickstarts/typescript) - TypeScript server module
+- [Rust Quickstart](/quickstarts/rust) - Rust server module
+- [C# Quickstart](/quickstarts/c-sharp) - C# server module
 
-## Key Files & Patterns
+### Core Concepts
+- [Databases](/databases) - Database modules overview
+- [Tables](/tables) - Defining and working with tables
+  - [Columns](/tables/columns) - Column types and definitions
+  - [Indexes](/tables/indexes) - Creating and using indexes
+  - [Scheduled Tables](/tables/scheduled-tables) - Time-based scheduling
+  - [Access Permissions](/tables/access-permissions) - Table visibility (public/private)
+- [Functions](/functions) - Server-side logic
+  - [Reducers](/functions/reducers) - Transactional RPC functions
+  - [Reducer Context](/functions/reducers/reducer-context) - ctx.db, ctx.sender, etc.
+  - [Lifecycle Reducers](/functions/reducers/lifecycle) - init, client_connected, client_disconnected
+  - [Error Handling](/functions/reducers/error-handling) - Handling errors in reducers
+  - [Procedures](/functions/procedures) - Non-transactional functions with side effects
+  - [Views](/functions/views) - Computed data views
+- [Subscriptions](/subscriptions) - Real-time data synchronization
 
-### Server-side Key Files
-- **[server/src/lib.rs](mdc:server/src/lib.rs)** - Module declarations and table trait imports
-- **[server/src/environment.rs](mdc:server/src/environment.rs)** - World generation and resource seeding
-- **[server/src/items_database.rs](mdc:server/src/items_database.rs)** - Item definitions
-
-### Client-side Key Files  
-- **[client/src/generated/](mdc:client/src/generated)** - Auto-generated SpacetimeDB bindings
-- **[client/src/hooks/useSpacetimeTables.ts](mdc:client/src/hooks/useSpacetimeTables.ts)** - Data subscriptions and state
-- **[client/src/App.tsx](mdc:client/src/App.tsx)** - Main data flow coordination
-
-## Common Errors & Solutions
-
-### "Property 'X' does not exist on RemoteReducers"
-**Cause:** Client bindings are outdated  
-**Solution:** Run `spacetime generate --lang typescript --out-dir ./client/src/generated -p ./server`
-
-### "Module has no exported member 'SomeType'"  
-**Cause:** Server table/type not published or bindings outdated  
-**Solution:** Ensure server builds and publishes, then regenerate bindings
-
-### "could not find 'X' in the crate root"
-**Cause:** Missing module declaration in server/src/lib.rs  
-**Solution:** Add `mod X;` and appropriate `use` statements
-
-### Client TypeScript Errors After Server Changes
-**Always run this sequence:**
-1. `spacetime build -p ./server`
-2. `spacetime publish -p ./server broth-bullets-local` 
-3. `spacetime generate --lang typescript --out-dir ./client/src/generated -p ./server`
-4. Restart client dev server
-
-## Database Management
-
-### Viewing Data
-```bash
-# List all tables
-spacetime sql broth-bullets-local "SHOW TABLES"
-
-# View specific table structure  
-spacetime sql broth-bullets-local "DESCRIBE player"
-
-# Query with conditions
-spacetime sql broth-bullets-local "SELECT * FROM mushroom WHERE respawn_at IS NOT NULL"
-```
-
-### Performance Monitoring
-```bash
-# View connection info
-spacetime list
-
-# Monitor logs in real-time
-spacetime logs -f broth-bullets-local
-```
-
-## Development Tips
-
-### Reducer Testing
-- Check server logs for reducer errors: `spacetime logs broth-bullets-local`
-- Use `log::info!()` in Rust reducers for debugging
-- Test reducer calls in browser dev console
-
-### State Management
-- Client state is automatically synced via subscriptions
-- Use `useState` + `useEffect` pattern for local client state
-- SpacetimeDB handles client-server synchronization
-
-### Performance
-- Chunk-based subscriptions reduce data transfer
-- Use `useMemo` for expensive client-side calculations  
-- Entity filtering happens client-side for smooth rendering
-
-## Quick Reference
-
-### New Resource Checklist
-See [resources.mdc](mdc:.cursor/rules/resources.mdc) for complete guide.
-
-### Data Flow Pattern
-Server Table → SpacetimeDB → Generated Bindings → useSpacetimeTables → App.tsx → Components
-
-### When to Regenerate Bindings
-- ✅ After adding/modifying tables
-- ✅ After adding/modifying reducers  
-- ✅ After changing table field types
-- ❌ Only changing reducer implementation (same signature)
-- ❌ Only changing client-side code
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [SeloSlav/2d-multiplayer-survival-mmorpg](https://github.com/SeloSlav/2d-multiplayer-survival-mmorpg) — distributed by [TomeVault](https://tomevault.io).
