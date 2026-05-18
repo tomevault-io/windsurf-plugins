@@ -1,163 +1,103 @@
 ---
 trigger: always_on
-description: Guidelines for implementing tasks imported from Hamster using Task Master CLI
+description: Guidelines for implementing and interacting with the Task Master MCP Server
 ---
 
+# Task Master MCP Server Guidelines
 
-# Hamster Integration Workflow
+This document outlines the architecture and implementation patterns for the Task Master Model Context Protocol (MCP) server, designed for integration with tools like Cursor.
 
-This guide outlines the process for working with tasks imported from Hamster briefs using Task Master. When connected to a Hamster brief, follow these specific guidelines to ensure proper task management and workflow execution.
+## Architecture Overview (See also: [`architecture.mdc`](mdc:.cursor/rules/architecture.mdc))
 
-## **Command Restrictions**
+The MCP server acts as a bridge between external tools (like Cursor) and the core Task Master CLI logic. It leverages FastMCP for the server framework.
 
-### **Supported Commands**
-- **✅ DO**: Use only these Task Master CLI commands when working with Hamster briefs:
-  ```bash
-  tm list                      # List all tasks
-  tm show <sub/task id> --json # Show task details
-  tm set-status                # Update task status
-  tm auth refresh              # Refresh authentication token
-  tm context <brief url>       # Reconnect to Hamster brief context
-  ```
+- **Flow**: `External Tool (Cursor)` <-> `FastMCP Server` <-> `MCP Tools` (`mcp-server/src/tools/*.js`) <-> `Core Logic Wrappers` (`mcp-server/src/core/direct-functions/*.js`, exported via `task-master-core.js`) <-> `Core Modules` (`scripts/modules/*.js`)
+- **Goal**: Provide a performant and reliable way for external tools to interact with Task Master functionality without directly invoking the CLI for every operation.
 
-### **Unsupported Commands**
-- **❌ DON'T**: Use MCP tools when connected with Hamster briefs - they are not yet up to date with Hamster integration
-- **❌ DON'T**: Use other Task Master CLI commands that haven't been verified to work with Hamster integration
+## Direct Function Implementation Best Practices
 
-## **Task Workflow Process**
+When implementing a new direct function in `mcp-server/src/core/direct-functions/`, follow these critical guidelines:
 
-### **Starting a Task**
-```bash
-# ✅ DO: Mark task and subtasks as in-progress when starting
-tm set-status -i 1,1.1 -s in-progress
+1. **Verify Function Dependencies**:
+   - ✅ **DO**: Check that all helper functions your direct function needs are properly exported from their source modules
+   - ✅ **DO**: Import these dependencies explicitly at the top of your file
+   - ❌ **DON'T**: Assume helper functions like `findTaskById` or `taskExists` are automatically available
+   - **Example**:
+     ```javascript
+     // At top of direct-function file
+     import { removeTask, findTaskById, taskExists } from '../../../../scripts/modules/task-manager.js';
+     ```
 
-# Multiple tasks/subtasks can be marked at once using comma separation
-tm set-status -i 1,1.1,1.2,2 -s in-progress
-```
+2. **Parameter Verification and Completeness**:
+   - ✅ **DO**: Verify the signature of core functions you're calling and ensure all required parameters are provided
+   - ✅ **DO**: Pass explicit values for required parameters rather than relying on defaults
+   - ✅ **DO**: Double-check parameter order against function definition
+   - ❌ **DON'T**: Omit parameters assuming they have default values
+   - **Example**:
+     ```javascript
+     // Correct parameter handling in direct function
+     async function generateTaskFilesDirect(args, log) {
+       const tasksPath = findTasksJsonPath(args, log);
+       const outputDir = args.output || path.dirname(tasksPath);
+       
+       try {
+         // Pass all required parameters
+         const result = await generateTaskFiles(tasksPath, outputDir);
+         return { success: true, data: result, fromCache: false };
+       } catch (error) {
+         // Error handling...
+       }
+     }
+     ```
 
-### **Task Implementation Flow**
-1. **Read the Task**: Use `tm show <id> --json` to understand the task requirements (json used to save tokens, gets you same information)
-2. **Check for Subtasks**: If the task has subtasks, implement them one at a time
-3. **Implement Subtask**: Complete the subtask implementation
-4. **Verify Quality**: Run lint and typecheck before marking as done
-   ```bash
-   npm lint
-   npm typecheck
-   ```
-5. **Mark Complete**: If verification passes, mark the subtask as done
-   ```bash
-   tm set-status -i 1.1 -s done
-   ```
-6. **Commit Changes**: Commit the completed subtask work
-7. **Repeat**: Continue until all subtasks are complete
+3. **Consistent File Path Handling**:
+   - ✅ **DO**: Use `path.join()` instead of string concatenation for file paths
+   - ✅ **DO**: Follow established file naming conventions (`task_001.txt` not `1.md`)
+   - ✅ **DO**: Use `path.dirname()` and other path utilities for manipulating paths
+   - ✅ **DO**: When paths relate to task files, follow the standard format: `task_${id.toString().padStart(3, '0')}.txt`
+   - ❌ **DON'T**: Create custom file path handling logic that diverges from established patterns
+   - **Example**:
+     ```javascript
+     // Correct file path handling
+     const taskFilePath = path.join(
+       path.dirname(tasksPath),
+       `task_${taskId.toString().padStart(3, '0')}.txt`
+     );
+     ```
 
-### **Parent Task Completion**
-- After all subtasks are done, run final verification:
-  ```bash
-  npm lint
-  npm typecheck
-  ```
-- Mark the parent task as done:
-  ```bash
-  tm set-status -i 1 -s done
-  ```
-- Move to the next task and repeat the process
+4. **Comprehensive Error Handling**:
+   - ✅ **DO**: Wrap core function calls *and AI calls* in try/catch blocks
+   - ✅ **DO**: Log errors with appropriate severity and context
+   - ✅ **DO**: Return standardized error objects with code and message (`{ success: false, error: { code: '...', message: '...' } }`)
+   - ✅ **DO**: Handle file system errors, AI client errors, AI processing errors, and core function errors distinctly with appropriate codes.
+   - **Example**:
+     ```javascript
+     try {
+       // Core function call or AI logic
+     } catch (error) {
+       log.error(`Failed to execute direct function logic: ${error.message}`);
+       return {
+         success: false,
+         error: {
+           code: error.code || 'DIRECT_FUNCTION_ERROR', // Use specific codes like AI_CLIENT_ERROR, etc.
+           message: error.message,
+           details: error.stack // Optional: Include stack in debug mode
+         },
+         fromCache: false // Ensure this is included if applicable
+       };
+     }
+     ```
 
-## **Multiple Task Context**
-
-### **Viewing Multiple Tasks**
-```bash
-# ✅ DO: Use comma-separated IDs to get context from multiple tasks
-tm show 1,1.1,2,2.1 --json
-
-# This is more efficient than calling tm show multiple times
-```
-
-### **Parallel Subtask Execution**
-- **When to Parallelize**: If a task has subtasks that can be completed in parallel
-- **Requirements**:
-  - Ensure work/files to adjust are **not the same** across subtasks
-  - Spawn sub-agents for each parallel subtask
-  - Verify clear separation of work before parallelizing
-- **Example**: If subtask 1.1 modifies `src/api.js` and subtask 1.2 modifies `src/utils.js`, these can run in parallel
-
-## **Pull Request Management**
-
-### **PR Creation Strategy**
-- **Preferred Approach**: Keep everything in one PR if scope remains manageable
-- **When to Split**: Create separate PRs if the work becomes too large
-- **Multi-PR Strategy**: If splitting is necessary:
-  - Create PRs that build on top of previous ones
-  - **Always confirm with the human** before creating multiple PRs
-- **PR Creation**: Use GitHub CLI after completing a task:
-  ```bash
-  gh pr create --title "Task X: [Task Title]" --body "Description"
-  ```
-
-### **Committing to PRs**
-- Keep committing to the same PR as long as the scope is maintained
-- An entire task list (brief) might fit into a single PR
-- If scope grows too large, discuss with human before creating new PRs
-
-## **Authentication & Context Management**
-
-### **Token Refresh**
-```bash
-# ✅ DO: Refresh token if JWT seems expired or commands don't work
-tm auth refresh
-
-# If refresh doesn't work, reconnect context
-tm context <brief url>
-```
-
-### **Context Reconnection**
-- **When Needed**: If commands stop working or authentication fails
-- **Required Information**: Brief URL (ask user if not available)
-- **Best Practice**: Store brief URL at the beginning of the session
-- **Command**: `tm context <brief url>`
-
-## **Integration with Git Workflow**
-
-When working with Hamster briefs, follow the standard Git workflow patterns outlined in [git_workflow.mdc](mdc:.cursor/rules/git_workflow.mdc):
-
-- Create task-specific branches: `task-XXX`
-- Commit subtask work incrementally
-- Create PRs after task completion
-- Follow commit message standards
-
-## **Workflow Summary**
-
-```mermaid
-flowchart TD
-    A[Start: Connect to Hamster Brief] --> B[Get Brief URL]
-    B --> C[tm list - View Tasks]
-    C --> D[Select Task]
-    D --> E[tm show <id> --json - Read Task]
-    E --> F{Has Subtasks?}
-    F -->|Yes| G[Select First Subtask]
-    F -->|No| M[Implement Task]
-    G --> H[tm set-status -i X.Y -s in-progress]
-    H --> I[Implement Subtask]
-    I --> J[npm lint && npm typecheck]
-    J --> K{Passes?}
-    K -->|Yes| L[tm set-status -i X.Y -s done]
-    K -->|No| I
-    L --> N{More Subtasks?}
-    N -->|Yes| G
-    N -->|No| O[Final lint/typecheck]
-    M --> O
-    O --> P[tm set-status -i X -s done]
-    P --> Q[Commit & Create PR]
-    Q --> R{More Tasks?}
-    R -->|Yes| D
-    R -->|No| S[Complete]
-    
-    style A fill:#e1f5fe
-    style H fill:#fff3e0
-    style L fill:#e8f5e8
-    style Q fill:#fce4ec
-```
-
+5. **Handling Logging Context (`mcpLog`)**:
+   - **Requirement**: Core functions (like those in `task-manager.js`) may accept an `options` object containing an optional `mcpLog` property. If provided, the core function expects this object to have methods like `mcpLog.info(...)`, `mcpLog.error(...)`.
+   - **Solution: The Logger Wrapper Pattern**: When calling a core function from a direct function, pass the `log` object provided by FastMCP *wrapped* in the standard `logWrapper` object. This ensures the core function receives a logger with the expected method structure.
+     ```javascript
+     // Standard logWrapper pattern within a Direct Function
+     const logWrapper = {
+       info: (message, ...args) => log.info(message, ...args),
+       warn: (message, ...args) => log.warn(message, ...args),
+       error: (message, ...args) => log.error(message, ...args),
+       debug: (message, ...args) => log.debug && log.debug(message, ...args),
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
