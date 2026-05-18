@@ -1,50 +1,153 @@
 ---
 trigger: always_on
-description: Basic guidelines for the project so vibe coders don't fuck it up
+description: This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 ---
 
+# AGENTS.md
 
-when using 'text-right', always add 'text-balance' so its not ugly
+This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 
-When working on anything, try to split off components, utils, anything reusable to ensure better loading speed and less complexity
+## Overview
 
-LESS COMPLEXITY IS BETTER, the fewer lines, the less complex logic the better
+Databuddy is a comprehensive analytics platform — a Turborepo monorepo using Bun as the package manager and runtime. It consists of multiple apps (dashboard, API, data collectors) and shared packages, backed by PostgreSQL, ClickHouse, and Redis.
 
-Naming convention is lower-case-like-this
+## Development Commands
 
-Think about mobile responsiveness when doing any UI tasks or changes
+```bash
+# Start dashboard + API only (most common)
+bun run dev:dashboard
 
-NEVER add placeholders, mock data, or anything similar
+# Start all apps
+bun run dev
 
-Always use rounded, not rounded-xl or rounded-md, always rounded
+# Lint
+bun run lint
 
-ALWAYS use bun, never npm, never pnpm, just bun
+# Format
+bun run format
 
-Don't use lucide for icons, ONLY use phosphor icons, use width="duotone" for most, but for arrows use fill, for plus icons don't add width
+# Type check
+bun run check-types
 
-Handle complex data transformations independently of React.
-Keep these modules decoupled from React for improved modularity and testability.
-View Components:
+# Run tests
+bun run test
+bun run test:watch
 
-Decouple state management, data transformations, and API interactions from the React lifecycle.
-Simplify data flow to eliminate prop drilling and callback hell.
-Prioritize modularity and testability in all components.
+# Database
+bun run db:push          # Apply schema changes (no migration files)
+bun run db:migrate       # Run migration files
+bun run db:studio        # Open Drizzle Studio GUI
+bun run db:seed <WEBSITE_ID> [EVENT_COUNT]  # Seed sample analytics data
 
-ALWAYS use error boundaries properly
+# SDK (must build before dev if SDK changed)
+bun run sdk:build
 
-Use Dayjs NEVER date-fns, and Tanstack query for hooks, NEVER SWR
+# Build everything
+bun run build
+```
 
-use Icon at the end of phosphor react icons, like CaretIcon not Caret AND THATS THE DEFAULT IMPORT, NOT AS
+**Note:** All commands use `dotenv --` prefix internally to load `.env` — just run them from root.
 
-use json.stringify() when adding debugging
+### Running a single test
 
-Almost NEVER use useEffect unless it's critical
+```bash
+# From root
+cd apps/api && bun test path/to/test.ts
 
-do NOT use types any, unknown or never, use proper explicit types
+# Or with filter
+cd apps/api && bun test --test-name-pattern "test name"
+```
 
-Suffix functions with Action in types, like type Test = { testAction }
+## Initial Setup
 
-Never use barrel exports or create index files
+```bash
+bun install
+cp .env.example .env
+docker-compose up -d          # PostgreSQL, ClickHouse, Redis
+bun run db:push
+bun run clickhouse:init       # from packages/db
+bun run sdk:build
+bun run dev:dashboard
+```
+
+## Architecture
+
+### Monorepo Structure
+
+```
+apps/
+  dashboard/   # Next.js 16 frontend (React 19, TailwindCSS 4)
+  api/         # Elysia.js backend (Bun, port 3001)
+  basket/      # Analytics event ingestion service
+  uptime/      # Uptime monitoring
+  cron/        # Scheduled jobs
+  links/       # Short link service
+  docs/        # Documentation site
+
+packages/
+  db/          # Drizzle ORM schemas + clients (PostgreSQL + ClickHouse)
+  rpc/         # ORPC router — type-safe API layer between dashboard and api
+  auth/        # Better-Auth integration + permission system
+  sdk/         # Public analytics SDK (React, Vue, Node.js)
+  cache/       # Redis-backed Drizzle caching layer
+  redis/       # Redis client, pub/sub, BullMQ job queues
+  shared/      # Shared types, utilities, constants
+  validation/  # Zod schemas
+  ai/          # AI/LLM integrations (OpenAI, Groq, OpenRouter)
+  services/    # Business logic services
+  email/       # Email via Resend
+  notifications/ # Notification system
+  tracker/     # Lightweight client-side tracking scripts
+  mapper/      # Data transformation utilities
+  query/       # Query builders
+  env/         # Environment configuration (type-safe env vars)
+```
+
+### Data Flow
+
+```
+Browser (SDK/tracker) → basket (ingestion) → ClickHouse (analytics warehouse)
+                                           → PostgreSQL (relational data)
+
+Dashboard (Next.js) ←→ ORPC (rpc package) ←→ API (Elysia) → PostgreSQL + ClickHouse + Redis
+```
+
+### Key Patterns
+
+**RPC Layer (`packages/rpc`)**: The central type-safe API contract between dashboard and api. Dashboard uses ORPC client with TanStack Query; API implements the procedures. Adding a new endpoint means defining it in `rpc`, implementing it in `api`, and calling it from `dashboard`.
+
+**Database Layer (`packages/db`)**: Single source of truth for all schemas. Uses Drizzle ORM for PostgreSQL (relational data: users, websites, settings) and a ClickHouse client for analytics data (events, sessions, pageviews). Schema changes use `db:push` for development; `db:migrate` for production migrations.
+
+**Caching (`packages/cache`)**: Redis cache sits in front of Drizzle queries. Cache keys and TTLs are defined alongside queries.
+
+**Auth (`packages/auth`)**: Better-Auth handles sessions. The package also contains the permission system used across all apps.
+
+**State management in Dashboard**: Jotai for local UI state, TanStack Query for server state.
+
+**Dashboard design system (`apps/dashboard/components/ds`)**: Dashboard UI must be built from DS primitives. Feature code should not use raw form/control primitives (`button`, `input`, `select`, `textarea`, native dialogs), Base UI, Radix, or one-off styled controls directly. If a needed primitive or variant does not exist, add or extend a DS component first, then consume it from the feature. Raw control elements belong inside `components/ds` implementations only.
+
+For picker controls, use the component that matches the interaction:
+- Use `DropdownMenu` for menu-style folder/status/filter/sort/action pickers.
+- Use `Select` only when the established UI pattern is explicitly a select/combobox.
+- Use `Field` with DS inputs for form labeling, descriptions, errors, ids, and accessibility wiring.
+
+### Tech Stack
+
+- **Runtime**: Bun 1.3.14+
+- **Frontend**: Next.js 16, React 19, TailwindCSS 4, Radix UI, Recharts
+- **Backend**: Elysia.js (Bun-native HTTP framework)
+- **API layer**: ORPC (type-safe RPC with OpenAPI generation)
+- **Auth**: Better-Auth
+- **ORM**: Drizzle ORM
+- **Databases**: PostgreSQL 17, ClickHouse 25.5, Redis 7
+- **Validation**: Zod 4
+- **Linting/Formatting**: Biome via Ultracite
+- **Build**: Turborepo + Bun
+
+## Code Style
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [databuddy-analytics/Databuddy](https://github.com/databuddy-analytics/Databuddy) — distributed by [TomeVault](https://tomevault.io).
