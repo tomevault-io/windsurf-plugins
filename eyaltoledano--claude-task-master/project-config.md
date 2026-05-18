@@ -1,131 +1,150 @@
 ---
 trigger: always_on
-description: Guidelines for implementing CLI commands using Commander.js
+description: Standardized patterns for gathering and processing context from multiple sources in Task Master commands, particularly for AI-powered features.
 ---
 
+# Context Gathering Patterns and Utilities
 
-# Command-Line Interface Implementation Guidelines
+This document outlines the standardized patterns for gathering and processing context from multiple sources in Task Master commands, particularly for AI-powered features.
 
-**Note on Interaction Method:**
+## Core Context Gathering Utility
 
-While this document details the implementation of Task Master's **CLI commands**, the **preferred method for interacting with Task Master in integrated environments (like Cursor) is through the MCP server tools**. 
+The `ContextGatherer` class (`scripts/modules/utils/contextGatherer.js`) provides a centralized, reusable utility for extracting context from multiple sources:
 
-- **Use MCP Tools First**: Always prefer using the MCP tools (e.g., `get_tasks`, `add_task`) when interacting programmatically or via an integrated tool. They offer better performance, structured data, and richer error handling. See [`taskmaster.mdc`](mdc:.cursor/rules/taskmaster.mdc) for a comprehensive list of MCP tools and their corresponding CLI commands.
-- **CLI as Fallback/User Interface**: The `task-master` CLI commands described here are primarily intended for:
-    - Direct user interaction in the terminal.
-    - A fallback mechanism if the MCP server is unavailable or a specific functionality is not exposed via an MCP tool.
-- **Implementation Context**: This document (`commands.mdc`) focuses on the standards for *implementing* the CLI commands using Commander.js within the [`commands.js`](mdc:scripts/modules/commands.js) module.
+### **Key Features**
+- **Multi-source Context**: Tasks, files, custom text, project file tree
+- **Token Counting**: Detailed breakdown using `gpt-tokens` library
+- **Format Support**: Different output formats (research, chat, system-prompt)
+- **Error Handling**: Graceful handling of missing files, invalid task IDs
+- **Performance**: File size limits, depth limits for tree generation
 
-## Command Structure Standards
+### **Usage Pattern**
+```javascript
+import { ContextGatherer } from '../utils/contextGatherer.js';
 
-- **Basic Command Template**:
-  ```javascript
-  // ✅ DO: Follow this structure for all commands
-  programInstance
-    .command('command-name')
-    .description('Clear, concise description of what the command does')
-    .option('-o, --option <value>', 'Option description', 'default value')
-    .option('--long-option <value>', 'Option description')
-    .action(async (options) => {
-      // Command implementation
-    });
-  ```
+// Initialize with project paths
+const gatherer = new ContextGatherer(projectRoot, tasksPath);
 
-- **Command Handler Organization**:
-  - ✅ DO: Keep action handlers concise and focused
-  - ✅ DO: Extract core functionality to appropriate modules
-  - ✅ DO: Have the action handler import and call the relevant functions from core modules, like `task-manager.js` or `init.js`, passing the parsed `options`.
-  - ✅ DO: Perform basic parameter validation, such as checking for required options, within the action handler or at the start of the called core function.
-  - ❌ DON'T: Implement business logic in command handlers
+// Gather context with detailed token breakdown
+const result = await gatherer.gather({
+    tasks: ['15', '16.2'],           // Task and subtask IDs
+    files: ['src/api.js', 'README.md'], // File paths
+    customContext: 'Additional context text',
+    includeProjectTree: true,        // Include file tree
+    format: 'research',              // Output format
+    includeTokenCounts: true         // Get detailed token breakdown
+});
 
-## Best Practices for Removal/Delete Commands
+// Access results
+const contextString = result.context;
+const tokenBreakdown = result.tokenBreakdown;
+```
 
-When implementing commands that delete or remove data (like `remove-task` or `remove-subtask`), follow these specific guidelines:
+### **Token Breakdown Structure**
+```javascript
+{
+    customContext: { tokens: 150, characters: 800 },
+    tasks: [
+        { id: '15', type: 'task', title: 'Task Title', tokens: 245, characters: 1200 },
+        { id: '16.2', type: 'subtask', title: 'Subtask Title', tokens: 180, characters: 900 }
+    ],
+    files: [
+        { path: 'src/api.js', tokens: 890, characters: 4500, size: '4.5 KB' }
+    ],
+    projectTree: { tokens: 320, characters: 1600 },
+    total: { tokens: 1785, characters: 8000 }
+}
+```
 
-- **Confirmation Prompts**:
-  - ✅ **DO**: Include a confirmation prompt by default for destructive operations
-  - ✅ **DO**: Provide a `--yes` or `-y` flag to skip confirmation, useful for scripting or automation
-  - ✅ **DO**: Show what will be deleted in the confirmation message
-  - ❌ **DON'T**: Perform destructive operations without user confirmation unless explicitly overridden
+## Fuzzy Search Integration
 
-  ```javascript
-  // ✅ DO: Include confirmation for destructive operations
-  programInstance
-    .command('remove-task')
-    .description('Remove a task or subtask permanently')
-    .option('-i, --id <id>', 'ID of the task to remove')
-    .option('-y, --yes', 'Skip confirmation prompt', false)
-    .action(async (options) => {
-      // Validation code...
-      
-      if (!options.yes) {
-        const confirm = await inquirer.prompt([{
-          type: 'confirm',
-          name: 'proceed',
-          message: `Are you sure you want to permanently delete task ${taskId}? This cannot be undone.`,
-          default: false
-        }]);
-        
-        if (!confirm.proceed) {
-          console.log(chalk.yellow('Operation cancelled.'));
-          return;
-        }
-      }
-      
-      // Proceed with removal...
-    });
-  ```
+The `FuzzyTaskSearch` class (`scripts/modules/utils/fuzzyTaskSearch.js`) provides intelligent task discovery:
 
-- **File Path Handling**:
-  - ✅ **DO**: Use `path.join()` to construct file paths
-  - ✅ **DO**: Follow established naming conventions for tasks, like `task_001.txt`
-  - ✅ **DO**: Check if files exist before attempting to delete them
-  - ✅ **DO**: Handle file deletion errors gracefully
-  - ❌ **DON'T**: Construct paths with string concatenation
+### **Key Features**
+- **Semantic Matching**: Uses Fuse.js for similarity scoring
+- **Purpose Categories**: Pattern-based task categorization
+- **Relevance Scoring**: High/medium/low relevance thresholds
+- **Context-Aware**: Different search configurations for different use cases
 
-  ```javascript
-  // ✅ DO: Properly construct file paths
-  const taskFilePath = path.join(
-    path.dirname(tasksPath),
-    `task_${taskId.toString().padStart(3, '0')}.txt`
-  );
-  
-  // ✅ DO: Check existence before deletion
-  if (fs.existsSync(taskFilePath)) {
-    try {
-      fs.unlinkSync(taskFilePath);
-      console.log(chalk.green(`Task file deleted: ${taskFilePath}`));
-    } catch (error) {
-      console.warn(chalk.yellow(`Could not delete task file: ${error.message}`));
+### **Usage Pattern**
+```javascript
+import { FuzzyTaskSearch } from '../utils/fuzzyTaskSearch.js';
+
+// Initialize with tasks data and context
+const fuzzySearch = new FuzzyTaskSearch(tasksData.tasks, 'research');
+
+// Find relevant tasks
+const searchResults = fuzzySearch.findRelevantTasks(query, {
+    maxResults: 8,
+    includeRecent: true,
+    includeCategoryMatches: true
+});
+
+// Get task IDs for context gathering
+const taskIds = fuzzySearch.getTaskIds(searchResults);
+```
+
+## Implementation Patterns for Commands
+
+### **1. Context-Aware Command Structure**
+```javascript
+// In command action handler
+async function commandAction(prompt, options) {
+    // 1. Parameter validation and parsing
+    const taskIds = options.id ? parseTaskIds(options.id) : [];
+    const filePaths = options.files ? parseFilePaths(options.files) : [];
+    
+    // 2. Initialize context gatherer
+    const projectRoot = findProjectRoot() || '.';
+    const tasksPath = path.join(projectRoot, 'tasks', 'tasks.json');
+    const gatherer = new ContextGatherer(projectRoot, tasksPath);
+    
+    // 3. Auto-discover relevant tasks if none specified
+    if (taskIds.length === 0) {
+        const fuzzySearch = new FuzzyTaskSearch(tasksData.tasks, 'research');
+        const discoveredIds = fuzzySearch.getTaskIds(
+            fuzzySearch.findRelevantTasks(prompt)
+        );
+        taskIds.push(...discoveredIds);
     }
-  }
-  ```
-
-- **Clean Up References**:
-  - ✅ **DO**: Clean up references to the deleted item in other parts of the data
-  - ✅ **DO**: Handle both direct and indirect references
-  - ✅ **DO**: Explain what related data is being updated
-  - ❌ **DON'T**: Leave dangling references
-
-  ```javascript
-  // ✅ DO: Clean up references when deleting items
-  console.log(chalk.blue('Cleaning up task dependencies...'));
-  let referencesRemoved = 0;
-  
-  // Update dependencies in other tasks
-  data.tasks.forEach(task => {
-    if (task.dependencies && task.dependencies.includes(taskId)) {
-      task.dependencies = task.dependencies.filter(depId => depId !== taskId);
-      referencesRemoved++;
+    
+    // 4. Gather context with token breakdown
+    const contextResult = await gatherer.gather({
+        tasks: taskIds,
+        files: filePaths,
+        customContext: options.context,
+        includeProjectTree: options.projectTree,
+        format: 'research',
+        includeTokenCounts: true
+    });
+    
+    // 5. Display token breakdown (for CLI)
+    if (outputFormat === 'text') {
+        displayDetailedTokenBreakdown(contextResult.tokenBreakdown);
     }
-  });
-  
-  if (referencesRemoved > 0) {
-    console.log(chalk.green(`Removed ${referencesRemoved} references to task ${taskId} from other tasks`));
-  }
-  ```
+    
+    // 6. Use context in AI call
+    const aiResult = await generateTextService(role, session, systemPrompt, userPrompt);
+    
+    // 7. Display results with enhanced formatting
+    displayResults(aiResult, contextResult.tokenBreakdown);
+}
+```
 
-- **Task File Regeneration**:
+### **2. Token Display Pattern**
+```javascript
+function displayDetailedTokenBreakdown(tokenBreakdown, systemTokens, userTokens) {
+    const sections = [];
+    
+    // Build context breakdown
+    if (tokenBreakdown.tasks?.length > 0) {
+        const taskDetails = tokenBreakdown.tasks.map(task => 
+            `${task.type === 'subtask' ? '  ' : ''}${task.id}: ${task.tokens.toLocaleString()}`
+        ).join('\n');
+        sections.push(`Tasks (${tokenBreakdown.tasks.reduce((sum, t) => sum + t.tokens, 0).toLocaleString()}):\n${taskDetails}`);
+    }
+    
+    if (tokenBreakdown.files?.length > 0) {
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
