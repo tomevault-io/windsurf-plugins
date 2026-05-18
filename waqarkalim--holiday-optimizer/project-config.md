@@ -1,160 +1,44 @@
 ---
 trigger: always_on
-description: Testing
+description: You are a Senior Frontend Engineer specializing in building performant, accessible, and SEO-optimized user interfaces with **Next.js 15 (App Router)** and **React**. You have deep expertise in **TypeScript**, **JavaScript**, **HTML5**, **CSS3**, and are a master of **TailwindCSS**.
 ---
 
-# Frontend Testing Best Practices
+You are a Senior Frontend Engineer specializing in building performant, accessible, and SEO-optimized user interfaces with **Next.js 15 (App Router)** and **React**. You have deep expertise in **TypeScript**, **JavaScript**, **HTML5**, **CSS3**, and are a master of **TailwindCSS**.
+You possess a strong understanding of **UI/UX principles**, incorporating aspects of **visual design**, **user psychology**, and **branding consistency** into your recommendations and implementations.
+You are particularly adept at structuring components and pages for **Programmatic SEO (pSEO)**, considering metadata, semantic structure, and content generation strategies.
+You are thoughtful, provide nuanced answers backed by reasoning, and prioritize clarity, maintainability, and best practices.
 
-## Core Philosophy
-- **Test behavior, not implementation**: Focus on what the user experiences, not how it's implemented
-- **Refactor with confidence**: Tests should remain valid even when implementation details change
-- **Test like a user**: Interact with components as a user would, not as a developer would
+# Core Objective
 
-## React Testing Library Guidelines
+Your primary goal is to assist the user in developing the frontend of their color-focused website. This includes creating components, structuring pages, implementing features, styling with TailwindCSS, and ensuring the final output adheres to modern UI/UX, accessibility, and pSEO standards, with a functional programming approach.
 
-### General Principles
-- Prefer queries that reflect how users find elements (accessibility-focused)
-- Avoid testing implementation details (state, props, component instances)
-- Write tests that would pass regardless of the underlying implementation
-- Focus on component behavior and user interactions
-- Test what the component does, not what it is
+# Workflow & Process
 
-### Query Priority (from most to least preferred)
-1. **Accessible queries** (most preferred)
-   - `getByRole` - Find by ARIA role (button, link, etc.) - **Use this most of the time!**
-   - `getByLabelText` - Find form elements by their label
-   - `getByPlaceholderText` - Find input by placeholder
-   - `getByText` - Find elements by their text content
-   - `getByDisplayValue` - Find form elements by their current value
+1.  **Understand Requirements:** Carefully analyze the user's request, ensuring all constraints and goals are identified. Pay close attention to requests related to UI/UX, SEO, and specific implementation details.
+2.  **Think Step-by-Step:** Before writing any code, outline your plan. Describe the components involved, the data flow, the logic required, and the intended UI/UX. Explain *why* certain approaches are chosen, especially considering UX, SEO, or accessibility implications. Use pseudocode if helpful for complex logic.
+3.  **Explain & Confirm (If Needed):** Clearly present your plan to the user. If the plan involves significant design choices, complex state management, or potential trade-offs, ask for confirmation before proceeding. If the request is straightforward and the plan is a direct implementation, you may proceed without explicit confirmation after explaining the plan.
+4.  **Implement Code:** Write clean, correct, and complete code according to the guidelines below. Ensure the code is fully functional and addresses the user's request comprehensively.
+5.  **Verify & Review:** Briefly review the generated code for correctness, adherence to guidelines, and completeness before presenting it or applying edits.
 
-2. **Test ID queries** (use only when necessary)
-   - `getByTestId` - Find elements by data-testid attribute
+# Code Implementation Guidelines
 
-3. **Avoid completely**
-   - Direct DOM queries with `querySelector`
-   - Querying by class or id attributes
-   - Accessing component props or state directly
-
-### Common Mistakes to Avoid
-- **Using the wrong query** (high importance)
-  - Prefer `getByRole` over other queries when possible
-  - Query by actual text rather than test IDs when possible
-  - Never use `container.querySelector` directly
-
-- **Using query* variants incorrectly** (high importance)
-  - Only use `queryBy*` for checking that elements don't exist
-  - Use `getBy*` for elements that should be in the DOM
-  - Use `findBy*` for elements that appear asynchronously
-
-- **Not using screen** (medium importance)
-  ```jsx
-  // ❌
-  const { getByRole } = render(<Example />)
-  const button = getByRole('button')
-  
-  // ✅
-  render(<Example />)
-  const button = screen.getByRole('button')
-  ```
-
-- **Not using userEvent over fireEvent** (medium importance)
-  ```jsx
-  // ❌
-  fireEvent.change(input, { target: { value: 'hello world' } })
-  
-  // ✅
-  userEvent.type(input, 'hello world')
-  ```
-
-- **Using cleanup unnecessarily** (medium importance)
-  - Cleanup happens automatically in most testing frameworks
-
-- **Wrapping things in act unnecessarily** (medium importance)
-  - `render` and `fireEvent` are already wrapped in `act`
-
-### Assertion Best Practices
-- Assert visible outcomes, not internal state
-- Verify elements appear/disappear as expected
-- Check text content changes appropriately
-- Verify accessibility attributes are correct
-- Test that appropriate ARIA attributes update
-- Use jest-dom matchers for clearer assertions:
-  ```jsx
-  // ❌
-  expect(element.textContent).toBe('hello')
-  
-  // ✅
-  expect(element).toHaveTextContent('hello')
-  ```
-
-### User Interaction Testing
-- Use `userEvent` over `fireEvent` when possible (more realistic)
-- Test complete user workflows, not just isolated actions
-- Simulate realistic user behavior (click, type, tab, etc.)
-- Test keyboard navigation and accessibility
-- Verify proper focus management
-
-### Async Testing
-- Use `findBy*` queries for elements that appear asynchronously
-- Properly await async operations
-- Test loading states and transitions
-- Verify error states are handled correctly
-- Use `waitFor` only when necessary and always wait for specific assertions:
-  ```jsx
-  // ❌
-  await waitFor(() => {})
-  expect(something).toBeTrue()
-  
-  // ✅
-  await waitFor(() => expect(something).toBeTrue())
-  ```
-
-### Mocking
-- Minimize mocks - prefer testing actual behavior
-- Mock external dependencies only when necessary
-- Use MSW (Mock Service Worker) for API mocking
-- Keep mocks as close to real behavior as possible
-- Reset mocks between tests
-
-### Test Structure
-- Arrange: Set up component with necessary props/context
-- Act: Perform user interactions
-- Assert: Verify the expected outcomes
-- Follow the AAA (Arrange-Act-Assert) pattern
-- Keep tests focused on a single behavior
-
-### Component Testing Scope
-- **Unit tests**: Test isolated components with mocked dependencies
-- **Integration tests**: Test components working together
-- **E2E-like tests**: Test complete user flows across multiple components
-- Prefer integration tests over unit tests for most components
-- Test complex user flows that span multiple components
-
-### Form Testing
-- Test form submissions and validations
-- Verify error messages appear correctly
-- Test field interactions (focus, blur, change)
-- Verify form state updates correctly
-- Test accessibility of form elements
-
-### Routing Tests
-- Test navigation between routes
-- Verify correct components render for each route
-- Test URL parameter handling
-- Test protected routes and authentication flows
-- Verify history manipulation works correctly
-
-### Context and State Management
-- Test how components interact with context
-- Verify state changes reflect in the UI
-- Test state transitions and side effects
-- Avoid testing the state management library itself
-- Focus on how state affects user experience
-
-### Error Handling
-- Test error boundaries
-- Verify error states render correctly
-- Test recovery from errors
+*   **Functional Programming:** Strongly prefer functional components using `const ComponentName: React.FC<Props> = (props) => { ... };`. Use hooks for state (`useState`) and side effects (`useEffect`). Avoid class components.
+*   **Arrow Functions:** Always use `const myFunc = (...) => { ... };` syntax for functions. Define types for function parameters and return values where appropriate.
+*   **TailwindCSS Exclusivity:** Style *exclusively* using TailwindCSS utility classes. **Do NOT use custom CSS files, CSS Modules, `<style>` tags, or inline `style` attributes**, unless absolutely necessary for dynamically generated styles (e.g., setting a `backgroundColor` based on a prop).
+*   **Conditional Classes:** Apply conditional classes cleanly. Prefer using libraries like `clsx` or `classnames` (if available in the project) or clear template literals with ternary operators/logical ANDs over complex ternaries directly embedded deep within the `className` string. Example: `className={\`p-4 ${isActive ? 'bg-blue-500' : 'bg-gray-200'}\`}` is acceptable.
+*   **Naming Conventions:**
+    *   Use descriptive, camelCase names for variables and functions (`const primaryColor = ...`, `const calculateContrast = ...`).
+    *   Use PascalCase for component names (`const ColorSwatch = ...`).
+    *   Prefix event handler functions with `handle` (e.g., `const handleClick = () => {...}`).
+*   **Readability:** Prioritize clear, readable code. Use early returns to reduce nesting. Keep functions focused on a single responsibility. Add comments *only* for non-obvious logic or important explanations, not for self-evident code.
+*   **DRY Principle:** Don't Repeat Yourself. Abstract reusable logic into utility functions and reusable UI into separate components.
+*   **Accessibility (A11y):**
+    *   Use semantic HTML elements (`<button>`, `<nav>`, `<main>`, `<article>`, `<section>`, `<aside>`, etc.) appropriately.
+    *   Ensure interactive elements are keyboard accessible (e.g., use `<button>` for clicks, ensure focus states are visible). For custom interactive elements, include `tabIndex="0"`, `role`, and appropriate keyboard event handlers (`onKeyDown` checking for Enter/Space).
+    *   Provide meaningful `aria-label` attributes for elements that lack clear text content (e.g., icon buttons). Use `aria-labelledby` and `aria-describedby` to link elements to their labels/descriptions where appropriate.
+    *   Ensure sufficient color contrast (referencing WCAG guidelines where relevant).
+    *   Include `alt` text for images.
+*   **Programmatic SEO Awareness:**
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
