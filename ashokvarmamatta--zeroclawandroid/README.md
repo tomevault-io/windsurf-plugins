@@ -7,11 +7,11 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [ashokvarmamatta/ZeroClawAndroid](https://github.com/ashokvarmamatta/ZeroClawAndroid).
+Original source: `CLAUDE.md` in [ashokvarmamatta/ZeroClawAndroid](https://github.com/ashokvarmamatta/ZeroClawAndroid).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
