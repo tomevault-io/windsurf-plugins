@@ -1,215 +1,238 @@
 ---
 trigger: always_on
-description: Always use bun to install dependencies.
+description: Alchemy is a Typescript-native Infrastructure-as-Code repository.
 ---
 
-Always use bun to install dependencies.
+# Alchemy
 
-All dependencies must be peer dependencies.
+Alchemy is a Typescript-native Infrastructure-as-Code repository.
+Your job is to implement "Resource" providers for various cloud services by following a set of strict conventions and patterns.
 
-Always use alchemy.secret() instead of new Secret() to create secrets.
+Your job is to build and maintain resource providers following the following convention and structure:
 
-# Running Tests with Vitest
-
-We use Vitest for testing. Here's how to run tests:
-
-```bash
-# Run all tests
-bunx vitest
-
-# Run tests in a specific file
-bunx vitest alchemy/test/stripe/price.test.ts
-
-# Run a specific test in a specific file
-bunx vitest --test-name-pattern="create and update price" alchemy/test/stripe/price.test.ts
-```
-
-For resource tests, create a dedicated test file for each resource type following the pattern `alchemy/test/service-name/resource-name.test.ts`.
-
-# Creating a New Service Resource
-
-This guide provides step-by-step instructions for creating a new resource for a service (like Stripe's Price, Product, or Webhook resources).
-
-## Step 1: Create the Resource File
-
-Create a new file in the service directory with kebab-case naming:
+## Provider Layout
 
 ```
-alchemy/src/{{service-name}}/{{resource-name}}.ts
+alchemy/
+  src/
+    {provider}/
+      README.md
+      {resource}.ts
+  test/
+    {provider}/
+      {resource}.test.ts
+alchemy-web/
+  guides/
+    {provider}.md # guide on how to get started with the {provider}
+  docs/
+    providers/
+      {provider}/
+        index.md # overview of usage and link to all the resources for the provider
+        {resource}.md # example-oriented reference docs for the resource
+examples/
+  {provider}-{qualifier?}/ # only add a qualifier if there are more than one example for this {provider}, e.g. {cloudflare}-{vitejs}
+    package.json
+    tsconfig.json
+    alchemy.run.ts
+    README.md #
+    src/
+      # source code
 ```
 
-Example: `alchemy/src/stripe/price.ts`
+## Convention
 
-## Step 2: Define Resource Interfaces
+> Each Resource has one .ts file, one test suite and one documentation page
 
-Start by importing dependencies and defining the resource interfaces:
+## README
 
-```typescript
-import type { Context } from "../context";
-import { Resource } from "../resource";
+Please provide a comprehensive document of all the Resources for this provider with relevant links to documentation. This is effectively the design and internal documentation.
 
-/**
- * Properties for creating or updating a {{ResourceName}}
- */
-export interface {{ResourceName}}Props {
-  /**
-   * {{Property description}}
-   */
-  propertyName: string;
+## Resource File
 
-  /**
-   * {{Property description}}
-   */
-  anotherProperty?: number;
+> [!NOTE]
+> Follow rules and conventions laid out in the [cursorrules](./.cursorrules).
 
-  // Add all required and optional properties
-  // Include JSDoc comments for each property
+```ts
+// ./alchemy/src/{provider}/{resource}.ts
+import { Context } from "../context.ts";
+
+export interface {Resource}Props {
+    // input props
+}
+
+export interface {Resource} extends Resource<"{provider}::{resource}"> {
+    // output props
 }
 
 /**
- * Output returned after {{ResourceName}} creation/update
- * IMPORTANT: The interface name MUST match the exported resource name
- * For example, if your resource is exported as "Product", this interface
- * should be named "Product" (not "ProductOutput")
+ * {overview}
  *
+ * @example
+ * ## {Example Title}
+ *
+ * {concise description}
+ *
+ * {example snippet}
+ *
+ * @example
+ * // .. repeated for all examples
  */
-export interface {{ResourceName}} extends Resource<"{{service-name}}::{{ResourceName}}"> {{ResourceName}}Props {
-  /**
-   * The ID of the resource
-   */
-  id: string;
+export const {Resource} = Resource(
+  "{provider}::{resource}",
+  async function (this: Context<>, id: string, props: {Resource}Props): Promise<{Resource}> {
+    // Create, Update, Delete lifecycle
+  }
+);
+```
 
-  /**
-   * Time at which the object was created
-   */
-  createdAt: number;
+> [!CAUTION]
+> When designing input props, there is the common case of having a property that references another entity in the {provider} domain by Id, e.g. tableId, bucketArn, etc.
+>
+> In these cases, you should instead opt to represent this as `{resource}: string | {Resource}`, e.g. `table: string | Table`. This "lifts" the Resource into the Alchemy abstraction without sacrificing support for referencing external entities by name.
 
-  // Add all additional properties returned by the service
-  // Include JSDoc comments for each property
+## Test Suite
+
+> [!NOTE]
+> Follow rules and conventions laid out in the [cursorrules](./.cursorrules).
+
+```ts
+// ./alchemy/test/{provider}/{resource}.test.ts
+import { destroy } from "../src/destroy.ts"
+import { BRANCH_PREFIX } from "../util.ts";
+
+import "../../src/test/vitest.ts";
+
+const test = alchemy.test(import.meta, {
+  prefix: BRANCH_PREFIX,
+});
+
+describe("{Provider}", () => {
+  test("{test case}", async (scope) => {
+    const resourceId = `${BRANCH_PREFIX}-{id}` // an ID that is: 1) deterministic (non-random), 2) unique across all tests and all test suites
+    let resource: {Resource}
+    try {
+      // create
+      resource = await {Resource}("{id}", {
+        // {props}
+      })
+
+      expect(resource).toMatchObject({
+        // {assertions}
+      })
+
+      // update
+      resource = await {Resource}("{id}", {
+        // {update props}
+      })
+
+      expect(resource).toMatchObject({
+        // {updated assertions}
+      })
+    } finally {
+      await destroy(scope);
+      await assert{ResourceDoesNotExist}(resource)
+    }
+  })
+});
+
+async function assert{Resource}DoesNotExist(api: {Provider}Client, resource: {Resource}) {
+    // {call api to check it does not exist, throw test error if it does}
 }
 ```
 
-## Step 3: API Client Implementation
+## Provider Overview Docs (index.md)
 
-Create a minimal API client that wraps fetch calls without excessive abstraction:
+Each provider folder should have an `index.md` that indexes and summarizes the provider and links to each resource.
 
-```typescript
-/**
- * Options for {{ServiceName}} API requests
- */
-export interface {{ServiceName}}ApiOptions {
-  /**
-   * API key or token to use (overrides environment variable)
-   */
-  apiKey?: string;
+```md
+# {Provider}
 
-  /**
-   * Account or project ID (overrides environment variable)
-   */
-  accountId?: string;
-}
+{overview of the provider}
 
-/**
- * Minimal API client using raw fetch
- */
-export class {{ServiceName}}Api {
-  /** Base URL for API */
-  readonly baseUrl: string;
+{official links out to the provider website}
 
-  /** API key or token */
-  readonly apiKey: string;
+## Resources
 
-  /** Account ID */
-  readonly accountId: string;
+- [{Resource}1](./{resource}1.md) - {brief description}
+- [{Resource}2](./{resource}2.md) - {brief description}
+- ..
+- [{Resource}N](./{resource}n.md) - {brief description}
 
-  /**
-   * Create a new API client
-   *
-   * @param options API options
-   */
-  constructor(options: {{ServiceName}}ApiOptions = {}) {
-    // Initialize with environment variables or provided values
-    this.baseUrl = "https://api.{{service-name}}.com/v1";
-    this.apiKey = options.apiKey || process.env.{{SERVICE_API_KEY}} || '';
-    this.accountId = options.accountId || process.env.{{SERVICE_ACCOUNT_ID}} || '';
+## Example Usage
 
-    // Validate required configuration
-    if (!this.apiKey) {
-      throw new Error("{{SERVICE_API_KEY}} environment variable is required");
-    }
-  }
-
-  /**
-   * Make a request to the API
-   *
-   * @param path API path (without base URL)
-   * @param init Fetch init options
-   * @returns Raw Response object from fetch
-   */
-  async fetch(path: string, init: RequestInit = {}): Promise<Response> {
-    // Set up authentication headers
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${this.apiKey}`
-    };
-
-    // Add headers from init if provided
-    if (init.headers) {
-      const initHeaders = init.headers as Record<string, string>;
-      Object.keys(initHeaders).forEach(key => {
-        headers[key] = initHeaders[key];
-      });
-    }
-
-    // For FormData, remove Content-Type
-    if (init.body instanceof FormData) {
-      delete headers["Content-Type"];
-    }
-
-    // Make the request
-    return fetch(`${this.baseUrl}${path}`, {
-      ...init,
-      headers
-    });
-  }
-
-  /**
-   * Helper for GET requests
-   */
-  async get(path: string, init: RequestInit = {}): Promise<Response> {
-    return this.fetch(path, { ...init, method: "GET" });
-  }
-
-  /**
-   * Helper for POST requests
-   */
-  async post(path: string, body: any, init: RequestInit = {}): Promise<Response> {
-    const requestBody = body instanceof FormData ? body : JSON.stringify(body);
-    return this.fetch(path, { ...init, method: "POST", body: requestBody });
-  }
-
-  /**
-   * Helper for PUT requests
-   */
-  async put(path: string, body: any, init: RequestInit = {}): Promise<Response> {
-    const requestBody = body instanceof FormData ? body : JSON.stringify(body);
-    return this.fetch(path, { ...init, method: "PUT", body: requestBody });
-  }
-
-  /**
-   * Helper for DELETE requests
-   */
-  async delete(path: string, init: RequestInit = {}): Promise<Response> {
-    return this.fetch(path, { ...init, method: "DELETE" });
-  }
-}
+\`\`\`ts
+// {comprehensive end-to-end usage}
+\`\`\`
 ```
 
-## Step 4: Implement the Resource
+## Example Project
+
+An example project is effectively a whole NPM package that demonstrates
+
+```
+examples/
+  {provider}-{qualifier?}/
+    package.json
+    tsconfig.json # extends ../../tsconfig.base.json
+    alchemy.run.ts
+    README.md
+    src/
+      # code
+tsconfig.json # is updated to reference examples/{provider}-{qualifier?}
+```
+
+## Guide
+
+Each Provider has a getting started guide in ./alchemy-web/docs/guides/{provider}.md.
+
+```md
+---
+order: { number to decide the position in the tree view }
+title: { Provider }
+description: { concise description of the tutorial }
+---
+
+# Getting Started {Provider}
+
+{1 sentence overview of what this tutorial will set the user up with}
+
+## Install
+
+{any installation pre-requisites}
+
+::: code-group
+
+\`\`\`sh [bun]
+bun ..
+\`\`\`
+
+\`\`\`sh [npm]
+npm ...
+\`\`\`
+
+\`\`\`sh [pnpm]
+pnpm ..
+\`\`\`
+
+\`\`\`sh [yarn]
+yarn ..
+\`\`\`
+
+:::
+
+## Credentials
+
+{how to get credentials and store in .env}
+
+## Create a {Provider} application
+
+{code group with commands to run to init a new project}
+
+## Create `alchemy.run.ts`
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/alchemy-run) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-09 -->
+> Source: [alchemy-run/alchemy](https://github.com/alchemy-run/alchemy) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-18 -->
