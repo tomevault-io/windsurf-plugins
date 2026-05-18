@@ -7,11 +7,11 @@ BlueKing Lite is an AI first platform for ops
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [TencentBlueKing/bk-lite](https://github.com/TencentBlueKing/bk-lite).
+Original source: `CLAUDE.md` in [TencentBlueKing/bk-lite](https://github.com/TencentBlueKing/bk-lite).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
