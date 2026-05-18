@@ -1,163 +1,164 @@
 ---
 trigger: always_on
-description: TypeScript Next.js View Component Development Rules
+description: Python CLI Development Rules for Nixopus CLI
 ---
 
 
-# Nixopus View Development Guidelines
+# Nixopus CLI Development Guidelines
 
-You are a senior frontend engineer building the Nixopus dashboard — a modern, visually rich Next.js application with TypeScript. Your focus is on crafting maintainable, performant, and beautiful user interfaces while maintaining strict code quality standards.
+You are a senior Python engineer building the Nixopus CLI — a production-grade command-line tool using Typer, Rich, and Pydantic. Your focus is on writing clean, maintainable, and user-friendly CLI commands following established patterns.
 
 ## Core Principles
 
 ### DRY (Don't Repeat Yourself) — Highest Priority
-- **Before writing any new logic**, search the codebase for existing implementations
-- Check `view/hooks/` for reusable hooks (e.g., `use-searchable`, `use-translation`, `use-mobile`)
-- Check `view/lib/utils.ts` for utility functions (e.g., `cn()`, `formatBytes()`, `formatDate()`)
-- Check `view/components/ui/` for shadcn components before creating custom elements
-- Reuse RTK Query hooks from `view/redux/services/` for data fetching
-- Extract repeated patterns into custom hooks or shared components
+- **Before writing new code**, search the codebase for existing implementations
+- Check `app/utils/` for shared utilities (`logger`, `config`, `output_formatter`, `timeout`)
+- Check `app/utils/protocols.py` for protocol definitions
+- Reuse existing message patterns from `messages.py` files
+- Extract common validation logic to shared validators
 
 ### Single Responsibility Principle (SRP)
-- **Hooks**: Handle state management, side effects, and business logic
-- **Components**: Handle UI rendering and user interactions only
-- **Utils**: Pure functions for data transformation
-- **Services (RTK Query)**: API communication only
-- One hook/component should do one thing well
+- **Commands**: CLI interface and argument parsing only
+- **Run/Logic files**: Business logic and orchestration
+- **Messages**: User-facing strings (separated from logic)
+- **Types**: Data classes and type definitions
+- **Utils**: Reusable utility functions
+- Each file should have one primary purpose
 
 ### Code Readability
-```typescript
-// ✅ Good: Early returns, flat structure
-function useDeployment(id: string) {
-  const { data, isLoading, error } = useGetDeploymentQuery(id);
-  
-  if (!id) return { deployment: null, isReady: false };
-  if (isLoading) return { deployment: null, isReady: false };
-  if (error) return { deployment: null, isReady: false, error };
-  
-  return { deployment: data, isReady: true };
-}
+```python
+# ✅ Good: Early returns, flat structure
+def clone_repository(repo: str, path: str, logger: LoggerProtocol) -> tuple[bool, Optional[str]]:
+    if not repo:
+        return False, "Repository URL is required"
+    
+    if not validate_repo_url(repo):
+        return False, "Invalid repository URL"
+    
+    try:
+        result = git_clone(repo, path)
+        return True, None
+    except Exception as e:
+        return False, str(e)
 
-// ❌ Bad: Nested conditions
-function useDeployment(id: string) {
-  const { data, isLoading, error } = useGetDeploymentQuery(id);
-  
-  if (id) {
-    if (!isLoading) {
-      if (!error) {
-        return { deployment: data, isReady: true };
-      }
-    }
-  }
-  return { deployment: null, isReady: false };
-}
+# ❌ Bad: Nested conditions
+def clone_repository(repo: str, path: str, logger: LoggerProtocol) -> tuple[bool, Optional[str]]:
+    if repo:
+        if validate_repo_url(repo):
+            try:
+                result = git_clone(repo, path)
+                return True, None
+            except Exception as e:
+                return False, str(e)
+        else:
+            return False, "Invalid repository URL"
+    else:
+        return False, "Repository URL is required"
 ```
 
 ## Architecture
 
 ### Directory Structure
 ```
-view/
-├── app/                    # Next.js pages organized by domain
-│   └── [domain]/
-│       ├── components/     # Domain-specific components
-│       ├── hooks/          # Domain-specific hooks
-│       ├── utils/          # Domain-specific utilities
-│       └── page.tsx
-├── components/
-│   ├── ui/                 # shadcn base components (DO NOT MODIFY)
-│   └── [feature]/          # Shared feature components
-├── hooks/                  # Global reusable hooks
-├── lib/
-│   ├── i18n/              # Internationalization
-│   └── utils.ts           # Global utilities
-└── redux/
-    ├── services/          # RTK Query API definitions
-    ├── features/          # Redux slices
-    └── types/             # TypeScript interfaces
+cli/
+├── app/
+│   ├── __init__.py
+│   ├── main.py                 # Entry point, Typer app registration
+│   ├── commands/               # Command modules
+│   │   └── [command]/
+│   │       ├── __init__.py
+│   │       ├── command.py      # Typer command definitions
+│   │       ├── messages.py     # User-facing strings
+│   │       ├── types.py        # Dataclasses & types
+│   │       └── [logic].py      # Business logic
+│   └── utils/                  # Shared utilities
+│       ├── __init__.py
+│       ├── config.py           # Configuration loading
+│       ├── logger.py           # Logging utilities
+│       ├── message.py          # Global messages
+│       ├── output_formatter.py # Output formatting
+│       ├── protocols.py        # Protocol definitions
+│       └── timeout.py          # Timeout utilities
+├── pyproject.toml              # Poetry configuration
+└── tests/                      # Test files
 ```
 
-### Component Organization by Domain
-- Keep domain-related components in `app/[domain]/components/`
-- Shared components go in `components/[feature]/`
-- Break large components into smaller, focused chunks
-- Each component file should export one main component
+### Creating a New Command
 
-## State Management — RTK Query Always
-
-### Creating API Services
-```typescript
-// view/redux/services/[domain]/[domain]Api.ts
-import { createApi } from '@reduxjs/toolkit/query/react';
-import { baseQueryWithReauth } from '@/redux/base-query';
-import { ENDPOINTS } from '@/redux/api-conf';
-
-export const domainApi = createApi({
-  reducerPath: 'domainApi',
-  baseQuery: baseQueryWithReauth,
-  tagTypes: ['Domain'],
-  endpoints: (builder) => ({
-    getDomainItems: builder.query<DomainItem[], void>({
-      query: () => ({
-        url: ENDPOINTS.GET_DOMAIN_ITEMS,
-        method: 'GET'
-      }),
-      providesTags: [{ type: 'Domain', id: 'LIST' }],
-      transformResponse: (response: { data: DomainItem[] }) => response.data
-    }),
-    createDomainItem: builder.mutation<DomainItem, CreateDomainItemRequest>({
-      query: (data) => ({
-        url: ENDPOINTS.CREATE_DOMAIN_ITEM,
-        method: 'POST',
-        body: data
-      }),
-      invalidatesTags: [{ type: 'Domain', id: 'LIST' }]
-    })
-  })
-});
-
-export const { useGetDomainItemsQuery, useCreateDomainItemMutation } = domainApi;
+1. Create the directory structure:
+```
+app/commands/[command]/
+├── __init__.py
+├── command.py      # or [command].py
+├── messages.py
+└── types.py        # if needed
 ```
 
-### Using Redux Hooks
-```typescript
-// Always use typed hooks from @/redux/hooks
-import { useAppDispatch, useAppSelector } from '@/redux/hooks';
+2. Register in `app/main.py`:
+```python
+from app.commands.[command].command import [command]_app
 
-// ✅ Correct
-const dispatch = useAppDispatch();
-const user = useAppSelector((state) => state.user);
-
-// ❌ Never use untyped versions
-import { useDispatch, useSelector } from 'react-redux';
+app.add_typer([command]_app, name="[command]")
 ```
 
-## UI Components — shadcn Only
+## Typer Command Patterns
 
-### Always Use shadcn Components
-```typescript
-// ✅ Correct: Use shadcn components
-import { Button } from '@nixopus/ui';
-import { Card, CardHeader, CardContent } from '@nixopus/ui';
-import { Badge } from '@nixopus/ui';
-import { Skeleton } from '@nixopus/ui';
+### Command File Structure
+```python
+from typing import Optional
+import typer
+from app.utils.logger import create_logger, log_error, log_success
+from app.utils.timeout import timeout_wrapper
+from .messages import operation_failed, operation_success
+from .types import CommandParams
 
-// ❌ Never write plain HTML for interactive elements
-<button className="...">Click</button>
-<div className="card">...</div>
+command_app = typer.Typer(help="Command description", invoke_without_command=True)
+
+
+@command_app.callback()
+def command_callback(
+    ctx: typer.Context,
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Show more details"),
+    timeout: int = typer.Option(300, "--timeout", "-t", help="Timeout in seconds"),
+    dry_run: bool = typer.Option(False, "--dry-run", "-d", help="Preview changes without executing"),
+    force: bool = typer.Option(False, "--force", "-f", help="Force operation"),
+):
+    """Main command description"""
+    if ctx.invoked_subcommand is None:
+        logger = create_logger(verbose=verbose)
+        params = CommandParams(
+            logger=logger,
+            verbose=verbose,
+            timeout=timeout,
+            dry_run=dry_run,
+            force=force,
+        )
+        run_command(params)
+
+
+@command_app.command(name="subcommand")
+def subcommand(
+    arg: str = typer.Argument(..., help="Required argument"),
+    option: str = typer.Option(None, "--option", "-o", help="Optional argument"),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output"),
+):
+    """Subcommand description"""
+    logger = create_logger(verbose=verbose)
+    try:
+        with timeout_wrapper(timeout):
+            result = execute_subcommand(arg, option)
+        log_success(operation_success, verbose=verbose)
+    except TimeoutError as e:
+        log_error(str(e), verbose=verbose)
+        raise typer.Exit(1)
+    except Exception as e:
+        log_error(str(e), verbose=verbose)
+        raise typer.Exit(1)
 ```
 
-### Available shadcn Components
-Reference `view/components/ui/` for all available components:
-- Layout: `Card`, `Dialog`, `Sheet`, `Tabs`, `Collapsible`
-- Forms: `Button`, `Input`, `Select`, `Checkbox`, `Switch`, `Form`
-- Data: `Table`, `DataTable`, `Pagination`, `Badge`
-- Feedback: `Alert`, `Skeleton`, `Loading`, `Progress`
-- Navigation: `Breadcrumb`, `DropdownMenu`, `ContextMenu`
-
-### Styling with Tailwind
-```typescript
-// Use cn() utility for conditional classes
+### Standard CLI Options
+```python
+# Always include these common options where applicable
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
