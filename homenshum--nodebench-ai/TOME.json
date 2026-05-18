@@ -2,7 +2,7 @@
   "name": "nodebench-ai",
   "owner": "HomenShum",
   "repo": "nodebench-ai",
-  "description": "",
+  "description": "Entity intelligence workspace for public research, sourced dossiers, Convex runtime state, MCP tools, and agent context packs.",
   "type": "config",
   "source_format": ".cursor/rules/*.mdc",
   "formats": [
@@ -40,5 +40,5 @@
   "skills": [],
   "source_url": "https://github.com/HomenShum/nodebench-ai",
   "distributed_by": "TomeVault",
-  "distributed_at": "2026-04-22T20:26:35Z"
+  "distributed_at": "2026-05-18T06:36:55Z"
 }
