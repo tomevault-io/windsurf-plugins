@@ -1,126 +1,154 @@
 ---
 trigger: always_on
-description: DeepSearchAgent uses a flexible configuration system with multiple options for customization.
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-# DeepSearchAgent Configuration
+# CLAUDE.md
 
-DeepSearchAgent uses a flexible configuration system with multiple options for customization.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Configuration Sources
+## DeepSearchAgent Project
 
-1. **@config.toml** configuration file
-2. **Environment Variables**: Override config file settings
-3. **Command Line Arguments**: Highest precedence overrides
+DeepSearchAgent is an intelligent agent system that combines the ReAct (Reasoning + Acting) framework and the CodeAct concept (executable code agents) to enable deep web search and reasoning capabilities. Built on Hugging Face's `smolagents` framework, it provides multi-step reasoning for complex queries through various interfaces.
 
-## Key Configuration Sections
+**Version 0.3.3.dev** introduces a complete web frontend with real-time streaming, metadata-driven component routing, and a simplified WebSocket API architecture.
 
-### Model Configuration
+## Development Commands
 
-```yaml
-models:
-  orchestrator_id: "openrouter/openai/o4-mini-high"  # Main LLM orchestration
-  search_id: "openrouter/openai/o4-mini-high"        # Search model (if different)
-  reranker_type: "jina-reranker-m0"                  # Reranker model type
+### Common Development Tasks
+```bash
+# Install dependencies (with development tools)
+uv pip install -e ".[dev,test,cli]"
+
+# Run tests
+make test
+
+# Run specific test file
+uv run -- pytest tests/test_specific.py
+
+# Run tests with coverage
+uv run -- pytest --cov=src tests
+
+# Start development servers
+make run        # FastAPI server (default port 8000)
+# Web API v2 is accessible via the main FastAPI server
+make cli        # Interactive CLI mode
+
+# CLI with specific agent modes
+make cli-react  # ReAct agent (non-interactive)
+make cli-codact # CodeAct agent (non-interactive)
+
+# MCP server
+python -m src.agents.servers.run_fastmcp
+
+# Frontend development
+cd frontend && npm install   # Install dependencies
+cd frontend && npm run dev   # Start development server (port 3000)
+cd frontend && npm run build # Build for production
+cd frontend && npm run lint  # Run linting
 ```
 
-### Common Agent Settings
-
-```yaml
-agents:
-  common:
-    verbose_tool_callbacks: true  # Show full tool inputs/outputs
+### Configuration Setup
+```bash
+cp config.template.toml config.toml  # Non-sensitive settings
+cp .env.example .env                 # API keys
 ```
 
-### ReAct Agent Settings
+## High-Level Architecture
 
-```yaml
-agents:
-  react:
-    max_steps: 25                # Max reasoning steps
-    enable_streaming: false      # Enable streaming output (recommended: false)
-    planning_interval: 7         # Interval for planning steps
+### Agent System Design
+The project implements a dual-agent architecture:
+- **CodeAct Agent**: Executes Python code to perform actions, suitable for computational tasks
+- **ReAct Agent**: Uses structured tool calling with JSON responses, better for web search tasks
+- **Runtime Manager**: Handles execution environment and tool availability for both agent types
+- **Model Routing**: Supports multiple LLM providers through LiteLLM with configurable model selection
+- **Web API v2**: Simplified WebSocket API with direct Gradio message pass-through (~500 lines, down from ~5000)
+
+### Core Components Interaction
+```
+User Input → Agent Selection → Planning/Reasoning → Tool Execution → Response Streaming
+                    ↓                    ↓                ↓
+              config.toml          Prompt Templates    Toolbox Manager
+                    
+Web API v2 → WebSocket → Session Manager → Gradio Passthrough → stream_to_gradio → Agent
+                           │
+                           ▼
+                    Frontend (Next.js)
+                           │
+                    ┌──────┴──────┐
+                    │  WebSocket  │
+                    │    Hook     │
+                    └──────┬──────┘
+                           │
+                    ┌──────▼──────┐
+                    │  Component  │
+                    │   Router    │
+                    └──────┬──────┘
+                           │
+         ┌─────────────────┼─────────────────┐
+         │                 │                 │
+    ┌────▼────┐      ┌────▼────┐      ┌────▼────┐
+    │Planning │      │ Action  │      │ Final   │
+    │  Card   │      │ Thought │      │ Answer  │
+    └─────────┘      └─────────┘      └─────────┘
 ```
 
-### CodeAct Agent Settings
+### Tool Ecosystem
+Tools are unified through a common interface supporting both sync/async operations:
+- **Search Tools**: Multi-engine support (Google via Serper, X.com via xAI)
+- **Content Processing**: URL reading, text chunking, embedding, reranking
+- **Computation**: WolframAlpha integration for mathematical queries
+- **Final Answer**: Structured response generation with source attribution
 
-```yaml
-agents:
-  codact:
-    executor_type: "local"       # Code execution environment
-    max_steps: 25                # Max execution steps
-    verbosity_level: 1           # 0=minimal, 1=normal, 2=verbose
-    enable_streaming: false      # Enable streaming response (recommended: false)
-    planning_interval: 4         # Interval for planning steps
-    # Additional options
-    executor_kwargs: {}          # Additional executor parameters
-    additional_authorized_imports: []  # Additional allowed Python imports
-```
-
-### Service Configuration
-
-```yaml
-service:
-  host: "0.0.0.0"
-  port: 8000
-  version: "0.2.4.dev"
-  deepsearch_agent_mode: "codact"  # Default agent type
-```
-
-### Logging Configuration
-
-```yaml
-logging:
-  litellm_level: "WARNING"        # Reduce INFO logs from LiteLLM
-  filter_repeated_logs: true      # Enable repeated log filtering
-  filter_cost_calculator: true    # Filter cost calculation logs
-  filter_token_counter: true      # Filter token count logs
-  format: "minimal"               # Use simplified format
-```
-
-## API Keys Management
-
-API keys are managed through environment variables or `.env` file:
-
-- `LITELLM_MASTER_KEY`: LLM API access
-- `LITELLM_BASE_URL`: LiteLLM proxy base URL
-- `SERPER_API_KEY`: Web search API
-- `JINA_API_KEY`: Content processing
-- `WOLFRAM_ALPHA_APP_ID`: Computational queries (optional)
-
-## Important Configuration Notes
-
-### Streaming Mode Not Recommended
-
-The current streaming implementation has known issues:
-- Set `enable_streaming: false` for both agent types
-- Exception handling is incomplete
-- May cause stability issues
-
-### New Chunking System
-
-When using the new Jina AI Segmenter for text chunking:
-- No additional configuration needed
-- Works with backward compatibility
-- Performance improvements are automatic
-
-### Improved Logging
-
-The updated logging configuration provides:
-- More granular log filtering options
-- Reduced noise from token counting and cost calculation
-- Cleaner CLI output
-
-## Configuration Loading Logic
-
-The @config_loader.py handles loading and merging configuration from multiple sources with the following precedence:
-
-1. Command line arguments (highest priority)
+### Configuration Hierarchy
+1. Command-line arguments (highest priority)
 2. Environment variables
-3. Configuration file values 
+3. config.toml settings
 4. Default values (lowest priority)
 
+### Streaming Architecture
+- Streaming is now available but disabled by default for stability
+- When enabled, provides real-time visibility into agent reasoning process
+- Supports both FastAPI SSE and Gradio streaming interfaces
+- CLI now supports streaming output with the new StreamingConsoleFormatter
+
+#### Enabling Streaming
+To enable streaming output in the CLI:
+
+1. **In config.toml**:
+```toml
+[agents.common]
+cli_streaming_enabled = true  # Global toggle for CLI streaming
+
+[agents.react]
+enable_streaming = true  # Enable for React agent
+
+[agents.codact]
+enable_streaming = true  # Enable for CodeAct agent
+```
+
+2. **Via command line**:
+```bash
+# Enable streaming for a single query
+python -m src.cli --agent-type react --enable-streaming --query "your query"
+```
+
+3. **Environment variables** (highest priority):
+```bash
+export REACT_ENABLE_STREAMING=true
+export CODACT_ENABLE_STREAMING=true
+export CLI_STREAMING_ENABLED=true
+```
+
+Note: Streaming support depends on the agent and model capabilities. Not all models support streaming output.
+
+### Web API v2 Design Principles
+
+The v2 API follows a simplified architecture:
+1. **Direct Pass-through**: Messages from smolagents' stream_to_gradio are passed with minimal transformation
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/lwyBZss8924d)
-> This is a context snippet only. You'll also want the standalone SKILL.md file — [download at TomeVault](https://tomevault.io/claim/lwyBZss8924d)
-<!-- tomevault:4.0:windsurf_rules:2026-04-08 -->
+> Source: [lwyBZss8924d/DeepSearchAgents](https://github.com/lwyBZss8924d/DeepSearchAgents) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-17 -->
