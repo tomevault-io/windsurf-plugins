@@ -1,220 +1,64 @@
 ---
 trigger: always_on
-description: OSMEA text system - OsmeaComponents.text, OsmeaTextStyle, typography
+description: Next.js website - App Router, TypeScript, SSG, accessibility, SEO
 ---
 
 
-# OSMEA Text System - Cursor Rules
+# OSMEA Website (Next.js) — Cursor Rules
 
-## 📦 Package Overview
-OSMEA Text System provides a unified text solution through `OsmeaComponents.text` with comprehensive style selection. This system offers 20+ text variants, 15+ extension categories, and simplified component usage for consistent typography across Flutter applications.
+This file defines development rules for the `website/` app (Next.js + TypeScript). These guidelines align with the shared rule sets and are tailored for the web site context.
 
-## Import Statement
-Always import OsmeaComponents at the top of your files:
-```dart
-import 'package:osmea_components/osmea_components.dart';
+## Scope
+- Framework: Next.js (App Router) + TypeScript
+- Purpose: Mostly static/SSG marketing and documentation site
+- Goals: Core Web Vitals, accessibility, SEO, simple and reliable content loading
+
+## Directory & Module Layout
+- `src/app/` — Pages, `layout.tsx`, app-level metadata
+- `src/components/` — Prefer Server Components; opt into Client Components only if interaction is required
+- `src/components/ui/` — Low-level, reusable UI primitives
+- `src/lib/` — Helpers (`data-loader.ts`, `utils.ts`), framework-agnostic logic
+- `src/config/env.ts` — Environment variables (do not leak secrets to the client)
+- `public/` — Static assets (SVG, favicon, images)
+
+## Coding Guidelines
+- Type safety: Avoid `any`; keep types explicit and narrow
+- Import order: stdlib → third-party → local modules
+- Server-first: Default to Server Components; add `"use client"` only when interaction is necessary
+- Accessibility: Correct roles, labels, focus order, and contrast; links vs. buttons used appropriately
+- SEO/Metadata: Prefer Next.js App Router `metadata`; use `next/link` and `next/image`
+- Performance: Avoid unnecessary `use client`; minimize bundle size; prefer image optimization
+
+## Data Loading & Content
+- Static data: Use `src/data/*.json` and `src/lib/data-loader.ts` for build-time loading
+- Networking: Avoid runtime `fetch` unless content must be dynamic; prefer SSG/ISR for stable content
+- Configuration: Keep secrets server-only; surface only safe values to the client when needed
+
+## Style & UI
+- Follow accessibility, consistency, and responsive behavior
+- Components should be small, composable, and reusable; avoid unnecessary global state
+
+## Quality, Tests, and Lint
+- Lint: Conform to `eslint.config.mjs`; `npm run lint` must pass cleanly
+- Type check: `tsc --noEmit` must pass cleanly
+- Tests: Optional for this site; add integration/E2E for critical flows if needed
+
+## Commands
+```bash
+npm run dev    # Development
+npm run build  # Production build
+npm run lint   # Lint checks
 ```
 
-## 🎯 Development Guidelines
-
-### 📁 File Structure
-```
-packages/components/lib/src/
-├── components/text/
-│   └── text.dart                    # Main text components
-├── styles/
-│   └── text_style.dart              # Typography system
-└── utils/
-    └── text_extensions.dart         # Text utility extensions
-```
-
-### 🎨 System Architecture
-
-#### 1. **Text Extensions** (`text_extensions.dart`)
-- Font families, weights, sizes, and styles
-- Text alignment, decoration, and overflow
-- Letter spacing, word spacing, and line height
-- Font features and variations
-
-#### 2. **Text Styles** (`text_style.dart`)
-- Predefined typography system
-- 20+ text variants (display, headline, body, etc.)
-- Consistent spacing and sizing
-- Theme integration
-
-#### 3. **Text Components** (`text.dart`)
-- Unified `OsmeaComponents.Text` component
-- Style selection through variants
-- Animation and interaction support
-- Accessibility features
-
-### 🔧 Usage Rules
-
-#### 1. Color Usage
-```dart
-// ✅ Good - Use OsmeaColors for consistent theming
-OsmeaComponents.text(
-  'Primary text',
-  textStyle: OsmeaTextStyle.headlineLarge(context),
-  color: OsmeaColors.nordicBlue,
-)
-
-OsmeaComponents.text(
-  'Secondary text',
-  textStyle: OsmeaTextStyle.bodyMedium(context),
-  color: OsmeaColors.thunder,
-)
-
-OsmeaComponents.text(
-  'Muted text',
-  textStyle: OsmeaTextStyle.captionMedium(context),
-  color: OsmeaColors.steel,
-)
-
-// ❌ Bad - Using standard Colors
-Text(
-  'Primary text',
-  style: TextStyle(color: Colors.blue),
-)
-```
-
-#### 2. Primary Usage Pattern
-```dart
-// ✅ Good - Use OsmeaComponents.text with textStyle parameter
-OsmeaComponents.text(
-  'Page Title',
-  textStyle: OsmeaTextStyle.headlineLarge(context),
-  color: OsmeaColors.nordicBlue,
-)
-
-OsmeaComponents.text(
-  'This is the main content text that explains the feature.',
-  textStyle: OsmeaTextStyle.bodyMedium(context),
-  textAlign: context.textLeft,
-)
-
-OsmeaComponents.text(
-  'Form Field Label',
-  textStyle: OsmeaTextStyle.labelMedium(context),
-  fontWeight: context.medium,
-)
-
-// ❌ Bad - Using generic Text with manual styling
-Text(
-  'Page Title',
-  style: TextStyle(
-    fontSize: 24,
-    fontWeight: FontWeight.w600,
-    color: Colors.blue,
-  ),
-)
-```
-
-#### 3. Style Selection Patterns
-```dart
-// ✅ Good - Use OsmeaComponents.text with textStyle parameter
-OsmeaComponents.text(
-  'Custom styled text',
-  textStyle: OsmeaTextStyle.headlineLarge(context),
-  color: OsmeaColors.red,
-  letterSpacing: context.letterSpacingWide,
-)
-
-// ✅ Good - Use extensions for additional styling
-OsmeaComponents.text(
-  'Styled text with extensions',
-  textStyle: OsmeaTextStyle.bodyLarge(context),
-  fontFamily: context.fontRoboto,
-  fontWeight: context.medium,
-  textAlign: context.textCenter,
-)
-
-// ❌ Bad - Manual TextStyle creation
-Text(
-  'Custom styled text',
-  style: TextStyle(
-    fontSize: 20,
-    fontWeight: FontWeight.w500,
-    color: Colors.red,
-    letterSpacing: 0.5,
-  ),
-)
-```
-
-#### 4. Extension Usage Patterns
-```dart
-// ✅ Good - Use extensions for consistent styling
-OsmeaComponents.text(
-  'Styled text',
-  textStyle: OsmeaTextStyle.bodyMedium(context),
-  fontFamily: context.fontRoboto,
-  fontWeight: context.medium,
-  letterSpacing: context.letterSpacingNormal,
-  wordSpacing: context.wordSpacingNormal,
-  textAlign: context.textCenter,
-  maxLines: context.maxLineTwo,
-  overflow: context.ellipsis,
-)
-
-// ❌ Bad - Hard-coded values
-OsmeaComponents.text(
-  'Styled text',
-  textStyle: OsmeaTextStyle.bodyMedium(context),
-  fontFamily: 'Roboto',
-  fontWeight: FontWeight.w500,
-  letterSpacing: 0.0,
-  wordSpacing: 0.0,
-  textAlign: TextAlign.center,
-  maxLines: 2,
-  overflow: TextOverflow.ellipsis,
-)
-```
-
-### 📱 Responsive Typography
-
-#### 1. Dynamic Text Sizing
-```dart
-// ✅ Good - Responsive text with style selection
-class ResponsiveText extends StatelessWidget {
-  final String text;
-  
-  const ResponsiveText({required this.text});
-  
-  @override
-  Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    
-    OsmeaTextVariant style;
-    if (screenWidth < 600) {
-      style = OsmeaTextVariant.bodyMedium;
-    } else if (screenWidth < 900) {
-      style = OsmeaTextVariant.bodyLarge;
-    } else {
-      style = OsmeaTextVariant.headlineSmall;
-    }
-    
-    return OsmeaComponents.text(
-      text,
-      textStyle: OsmeaTextStyle.fromVariant(context, style),
-      textAlign: context.textCenter,
-      letterSpacing: context.letterSpacingNormal,
-    );
-  }
-}
-```
-
-#### 2. Mobile-First Typography
-```dart
-// ✅ Good - Mobile-first approach with proper scaling
-Widget buildArticleText(BuildContext context) {
-  return Column(
-    crossAxisAlignment: context.crossStart,
-    children: [
-      OsmeaComponents.text(
-        'Article Title',
-        textStyle: OsmeaTextStyle.headlineLarge(context),
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+## Review Checklist
+- [ ] Server Components by default; `"use client"` only when required
+- [ ] Proper usage of `next/link`, `next/image`, and App Router `metadata`
+- [ ] Accessibility: labels, focus, contrast, and keyboard navigation
+- [ ] Strong typing; no `any`; minimal side effects
+- [ ] Static data / SSG preferred; no unnecessary runtime fetches
+- [ ] Clean import order and consistent file layout
+- [ ] No stray console logs; no oversized dependencies
+- [ ] Lint and type checks are clean
 
 ---
 > Source: [masterfabric-mobile/osmea](https://github.com/masterfabric-mobile/osmea) — distributed by [TomeVault](https://tomevault.io).
