@@ -1,140 +1,92 @@
 ---
 trigger: always_on
-description: **Import Task Master's development workflow commands and guidelines, treat as if import is in the main CLAUDE.md file.**
+description: Guidelines for interacting with the unified AI service layer.
 ---
 
-# Claude Code Instructions
 
-## Task Master AI Instructions
+# AI Services Layer Guidelines
 
-**Import Task Master's development workflow commands and guidelines, treat as if import is in the main CLAUDE.md file.**
-@./.taskmaster/CLAUDE.md
+This document outlines the architecture and usage patterns for interacting with Large Language Models (LLMs) via Task Master's unified AI service layer (`ai-services-unified.js`). The goal is to centralize configuration, provider selection, API key management, fallback logic, and error handling.
 
-## Test Guidelines
+**Core Components:**
 
-### Test File Placement
+*   **Configuration (`.taskmasterconfig` & [`config-manager.js`](mdc:scripts/modules/config-manager.js)):**
+    *   Defines the AI provider and model ID for different **roles** (`main`, `research`, `fallback`).
+    *   Stores parameters like `maxTokens` and `temperature` per role.
+    *   Managed via the `task-master models --setup` CLI command.
+    *   [`config-manager.js`](mdc:scripts/modules/config-manager.js) provides **getters** (e.g., `getMainProvider()`, `getParametersForRole()`) to access these settings. Core logic should **only** use these getters for *non-AI related application logic* (e.g., `getDefaultSubtasks`). The unified service fetches necessary AI parameters internally based on the `role`.
+    *   **API keys** are **NOT** stored here; they are resolved via `resolveEnvVariable` (in [`utils.js`](mdc:scripts/modules/utils.js)) from `.env` (for CLI) or the MCP `session.env` object (for MCP calls). See [`utilities.mdc`](mdc:.cursor/rules/utilities.mdc) and [`dev_workflow.mdc`](mdc:.cursor/rules/dev_workflow.mdc).
 
-- **Package & tests**: Place in `packages/<package-name>/src/<module>/<file>.spec.ts` or `apps/<app-name>/src/<module>/<file.spec.ts>` alongside source
-- **Package integration tests**: Place in `packages/<package-name>/tests/integration/<module>/<file>.test.ts` or `apps/<app-name>/tests/integration/<module>/<file>.test.ts` alongside source
-- **Isolated unit tests**: Use `tests/unit/packages/<package-name>/` only when parallel placement isn't possible
-- **Test extension**: Always use `.ts` for TypeScript tests, never `.js`
+*   **Unified Service (`ai-services-unified.js`):**
+    *   Exports primary interaction functions: `generateTextService`, `generateObjectService`. (Note: `streamTextService` exists but has known reliability issues with some providers/payloads).
+    *   Contains the core `_unifiedServiceRunner` logic.
+    *   Internally uses `config-manager.js` getters to determine the provider/model/parameters based on the requested `role`.
+    *   Implements the **fallback sequence** (e.g., main -> fallback -> research) if the primary provider/model fails.
+    *   Constructs the `messages` array required by the Vercel AI SDK.
+    *   Implements **retry logic** for specific API errors (`_attemptProviderCallWithRetries`).
+    *   Resolves API keys automatically via `_resolveApiKey` (using `resolveEnvVariable`).
+    *   Maps requests to the correct provider implementation (in `src/ai-providers/`) via `PROVIDER_FUNCTIONS`.
+    *   Returns a structured object containing the primary AI result (`mainResult`) and telemetry data (`telemetryData`). See [`telemetry.mdc`](mdc:.cursor/rules/telemetry.mdc) for details on how this telemetry data is propagated and handled.
 
-### Synchronous Tests
+*   **Provider Implementations (`src/ai-providers/*.js`):**
+    *   Contain provider-specific wrappers around Vercel AI SDK functions (`generateText`, `generateObject`).
 
-- **NEVER use async/await in test functions** unless testing actual asynchronous operations
-- Use synchronous top-level imports instead of dynamic `await import()`
-- Test bodies should be synchronous whenever possible
-- Example:
+**Usage Pattern (from Core Logic like `task-manager/*.js`):**
 
-  ```typescript
-  // ✅ CORRECT - Synchronous imports with .ts extension
-  import { MyClass } from '../src/my-class.js';
+1.  **Import Service:** Import `generateTextService` or `generateObjectService` from `../ai-services-unified.js`.
+    ```javascript
+    // Preferred for most tasks (especially with complex JSON)
+    import { generateTextService } from '../ai-services-unified.js';
 
-  it('should verify behavior', () => {
-    expect(new MyClass().property).toBe(value);
-  });
+    // Use if structured output is reliable for the specific use case
+    // import { generateObjectService } from '../ai-services-unified.js';
+    ```
 
-  // ❌ INCORRECT - Async imports
-  it('should verify behavior', async () => {
-    const { MyClass } = await import('../src/my-class.js');
-    expect(new MyClass().property).toBe(value);
-  });
-  ```
+2.  **Prepare Parameters:** Construct the parameters object for the service call.
+    *   `role`: **Required.** `'main'`, `'research'`, or `'fallback'`. Determines the initial provider/model/parameters used by the unified service.
+    *   `session`: **Required if called from MCP context.** Pass the `session` object received by the direct function wrapper. The unified service uses `session.env` to find API keys.
+    *   `systemPrompt`: Your system instruction string.
+    *   `prompt`: The user message string (can be long, include stringified data, etc.).
+    *   (For `generateObjectService` only): `schema` (Zod schema), `objectName`.
 
-### When to Write Tests
+3.  **Call Service:** Use `await` to call the service function.
+    ```javascript
+    // Example using generateTextService (most common)
+    try {
+        const resultText = await generateTextService({
+            role: useResearch ? 'research' : 'main', // Determine role based on logic
+            session: context.session, // Pass session from context object
+            systemPrompt: "You are...",
+            prompt: userMessageContent
+        });
+        // Process the raw text response (e.g., parse JSON, use directly)
+        // ...
+    } catch (error) {
+        // Handle errors thrown by the unified service (if all fallbacks/retries fail)
+        report('error', `Unified AI service call failed: ${error.message}`);
+        throw error;
+    }
 
-**ALWAYS write tests for:**
+    // Example using generateObjectService (use cautiously)
+    try {
+        const resultObject = await generateObjectService({
+            role: 'main',
+            session: context.session,
+            schema: myZodSchema,
+            objectName: 'myDataObject',
+            systemPrompt: "You are...",
+            prompt: userMessageContent
+        });
+        // resultObject is already a validated JS object
+        // ...
+    } catch (error) {
+        report('error', `Unified AI service call failed: ${error.message}`);
+        throw error;
+    }
+    ```
 
-- **Bug fixes**: Add a regression test that would have caught the bug
-- **Business logic**: Complex calculations, validations, transformations
-- **Edge cases**: Boundary conditions, error handling, null/undefined cases
-- **Public APIs**: Methods other code depends on
-- **Integration points**: Database, file system, external APIs
+4.  **Handle Results/Errors:** Process the returned text/object or handle errors thrown by the unified service layer.
 
-**SKIP tests for:**
-
-- Simple getters/setters: `getX() { return this.x; }`
-- Trivial pass-through functions with no logic
-- Pure configuration objects
-- Code that just delegates to another tested function
-
-**Examples:**
-
-```javascript
-// ✅ WRITE A TEST - Bug fix with regression prevention
-it('should use correct baseURL from defaultBaseURL config', () => {
-  const provider = new ZAIProvider();
-  expect(provider.defaultBaseURL).toBe('https://api.z.ai/api/paas/v4/');
-});
-
-// ✅ WRITE A TEST - Business logic with edge cases
-it('should parse subtask IDs correctly', () => {
-  expect(parseTaskId('1.2.3')).toEqual({ taskId: 1, subtaskId: 2, subSubtaskId: 3 });
-  expect(parseTaskId('invalid')).toBeNull();
-});
-
-// ❌ SKIP TEST - Trivial getter
-class Task {
-  get id() { return this._id; } // No test needed
-}
-
-// ❌ SKIP TEST - Pure delegation
-function getTasks() {
-  return taskManager.getTasks(); // Already tested in taskManager
-}
-```
-
-**Bug Fix Workflow:**
-
-1. Encounter a bug
-2. Write a failing test that reproduces it
-3. Fix the bug
-4. Verify test now passes
-5. Commit both fix and test together
-
-### Testing Guidelines
-
-**Principles**: FIRST (Fast, Independent, Repeatable, Self-validating, Timely)
-**Structure**: AAA (Arrange, Act, Assert)
-**Coverage**: Right-BICEP (Right results, Boundary, Inverse, Cross-check, Error conditions, Performance)
-
-#### What to Mock
-
-**Unit tests** (`.spec.ts` - test single unit in isolation):
-- **@tm/core**: Mock only external I/O (Supabase, APIs, filesystem). Use real internal services.
-- **apps/cli**: Mock tm-core responses. Use real Commander/chalk/inquirer/other npm packages (test display logic).
-- **apps/mcp**: Mock tm-core responses. Use real MCP framework (test response formatting).
-
-**Integration tests** (`tests/integration/` - test multiple units together):
-- **All packages**: Use real tm-core, mock only external boundaries (APIs, DB, filesystem).
-
-**Never mock**:
-- Internal utilities/helpers in the same package
-- Standard frameworks (Commander, Express) - let them run
-- Standard library
-
-**Rule of thumb**: Mock what you're NOT testing. CLI unit tests test display → mock tm-core. Core unit tests test logic → mock I/O. Integration tests test full flow → mock only external APIs.
-
-**Red flag**: Mocking 3+ dependencies in a unit test means code is doing too much or is in the wrong layer.
-
-**Anti-pattern**: Heavily mocked tests don't verify real behavior—they verify that you wired up mocks correctly. You end up writing orchestration code to satisfy tests, rather than tests that validate your actual implementation. If testing is hard, move the logic to where it's naturally testable.
-
-## Architecture Guidelines
-
-### Business Logic Separation
-
-**CRITICAL RULE**: ALL business logic must live in `@tm/core`, NOT in presentation layers.
-
-- **`@tm/core`** (packages/tm-core/):
-  - Contains ALL business logic, domain models, services, and utilities
-  - Provides clean facade APIs through domain objects (tasks, auth, workflow, git, config)
-  - Houses all complexity - parsing, validation, transformations, calculations, etc.
-  - Example: Task ID parsing, subtask extraction, status validation, dependency resolution
-
-- **`@tm/cli`** (apps/cli/):
-  - Thin presentation layer ONLY
-  - Calls tm-core methods and displays results
-  - Handles CLI-specific concerns: argument parsing, output formatting, user prompts
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
