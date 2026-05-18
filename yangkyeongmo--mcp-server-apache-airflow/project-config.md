@@ -1,188 +1,78 @@
 ---
 trigger: always_on
-description: At the start of your every response, say "APPLIED MODELCONTEXTPROTOCOL RULE".
+description: At the start of your every response, say "APPLIED PYTHON RULE".
 ---
 
-At the start of your every response, say "APPLIED MODELCONTEXTPROTOCOL RULE".
+At the start of your every response, say "APPLIED PYTHON RULE".
 
-# Model Context Protocol (MCP) Server Development Rules and Guidelines
+# Python Language Rule
 
-## Overview
+## Key Principles
+- Write concise, technical Python code with accurate examples.
+- Use functional programming; prefer functions over classes where possible.
+- Prefer iteration and modularization over code duplication.
+- Use descriptive variable names with auxiliary verbs (e.g., is_active, has_permission).
+- Use lowercase_with_underscores for variables, functions, and file names.
+- Follow PEP 8 style guidelines.
 
-This document provides comprehensive rules, guidelines, and best practices for developing Model Context Protocol (MCP) servers, based on the official MCP specification and the Apache Airflow MCP server implementation.
+## Python Language Guidelines
+- Use `def` for functions, `async def` for asynchronous operations.
+- Use type hints for all function signatures and variables where helpful.
+- Use f-strings for string formatting.
+- Prefer list/dict comprehensions over loops when readable.
+- Use `with` statements for resource management (files, connections).
+- Use `*args` and `**kwargs` appropriately for flexible function signatures.
 
-## Core MCP Concepts
+## Code Style (Ruff Configuration)
+Follow these ruff settings for consistent style:
+- Line length: 120 characters
+- Target Python version: 3.9+
+- Enable: pycodestyle errors/warnings (E, W), pyflakes (F), isort (I), flake8-comprehensions (C), flake8-bugbear (B)
+- Known first-party imports: ["src"]
+- Combine imports as single statements and force sort within sections
+- Allow unused imports in `__init__.py` files
 
-### 1. MCP Server Capabilities
+## Error Handling
+- Handle errors and edge cases at the start of functions (guard clauses).
+- Use early returns for error conditions; avoid deep nesting and unnecessary `else`.
+- Place the happy path last in the function.
+- Use specific exception types rather than bare `except:`.
+- Implement proper exception handling with meaningful error messages.
+- Use `try`/`except`/`finally` blocks appropriately.
+- **Keep try-except blocks minimal** - cover only the specific operations that can fail.
 
-MCP servers can provide three main types of capabilities:
+## Code Structure
+- **Put constants (strings, string templates, etc.) at the top of the file** after imports.
+- Import standard library modules first, then third-party, then local imports.
+- **Caller should come before callee** - define functions before they are called.
+- Use docstrings for functions and classes following PEP 257.
+- Keep functions small and focused on a single responsibility.
+- Use meaningful function and variable names that explain intent.
+- Avoid global variables; pass data through function parameters.
 
-1. **Resources**: File-like data that can be read by clients (like API responses or file contents)
-2. **Tools**: Functions that can be called by the LLM (with user approval)
-3. **Prompts**: Pre-written templates that help users accomplish specific tasks
+## Python Conventions
+- Use `if __name__ == "__main__":` for script entry points.
+- Prefer `is` and `is not` for `None` comparisons.
+- Use `enumerate()` instead of manual counter variables.
+- Use `zip()` for parallel iteration.
+- Prefer `pathlib` over `os.path` for file operations.
+- Use context managers for resource cleanup.
 
-### 2. Architecture Principles
-
-- **Stateless Design**: Servers should be stateless and handle each request independently
-- **Standard Transport**: Use stdio or SSE transport protocols as defined in the MCP specification
-- **Type Safety**: Leverage Python type hints for automatic tool definition generation
-- **Async First**: Use asynchronous programming patterns for better performance
-
-## Development Guidelines
-
-### 1. Project Structure
-
-Follow this recommended project structure:
-
-```
-project-root/
-├── src/
-│   ├── __init__.py
-│   ├── __main__.py
-│   ├── main.py              # CLI entry point
-│   ├── server.py            # FastMCP server instance
-│   ├── enums.py             # Project enums
-│   ├── envs.py              # Environment configuration
-│   └── [domain]/            # Domain-specific modules
-│       ├── __init__.py
-│       ├── client.py        # External API client setup
-│       └── [feature].py     # Feature-specific tool implementations
-├── pyproject.toml
-├── README.md
-├── Makefile
-└── @modelcontextprotocol.mdc  # This file
-```
-
-### 2. Tool Implementation Standards
-
-#### Tool Function Signature
-
-All tool functions must follow this pattern:
-
-```python
-from typing import Any, List, Optional, Union
-import mcp.types as types
-
-async def tool_name(
-    required_param: str,
-    optional_param: Optional[str] = None
-) -> List[Union[types.TextContent, types.ImageContent, types.EmbeddedResource]]:
-    """
-    Brief description of what the tool does.
-    
-    Args:
-        required_param: Description of required parameter
-        optional_param: Description of optional parameter
-    
-    Returns:
-        List of MCP content types
-    """
-    # Implementation here
-    return [types.TextContent(type="text", text=str(result))]
-```
-
-#### Tool Registration Pattern
-
-Use this pattern in each feature module:
-
-```python
-def get_all_functions() -> list[tuple[Callable, str, str]]:
-    """Return list of (function, name, description) tuples for registration."""
-    return [
-        (function_name, "tool_name", "Tool description"),
-        # Add more tools here
-    ]
-```
-
-### 3. Configuration Management
-
-#### Environment Variables
-
-- Use descriptive environment variable names with consistent prefixes
-- Provide sensible defaults where appropriate
-- Document all required environment variables in README
-- Validate environment variables at startup
-
-```python
-import os
-from urllib.parse import urlparse
-
-# Example from envs.py
-SERVICE_HOST = urlparse(os.getenv("SERVICE_HOST"))._replace(path="").geturl().rstrip("/")
-SERVICE_USERNAME = os.getenv("SERVICE_USERNAME")
-SERVICE_PASSWORD = os.getenv("SERVICE_PASSWORD")
-SERVICE_API_VERSION = os.getenv("SERVICE_API_VERSION", "v1")
-```
-
-#### Client Configuration
-
-- Centralize external API client configuration
-- Use configuration objects for complex setups
-- Handle authentication securely
-
-```python
-from external_client import ApiClient, Configuration
-
-configuration = Configuration(
-    host=urljoin(SERVICE_HOST, f"/api/{SERVICE_API_VERSION}"),
-    username=SERVICE_USERNAME,
-    password=SERVICE_PASSWORD,
-)
-api_client = ApiClient(configuration)
-```
-
-### 4. Error Handling
-
-#### Graceful Degradation
-
-- Handle API failures gracefully
-- Provide meaningful error messages
-- Use try-catch blocks for external API calls
-- Return informative error responses
-
-```python
-async def resilient_tool():
-    try:
-        response = await external_api.call()
-        return [types.TextContent(type="text", text=str(response))]
-    except ExternalAPIError as e:
-        error_msg = f"Failed to fetch data: {str(e)}"
-        return [types.TextContent(type="text", text=error_msg)]
-```
-
-#### Validation
-
-- Validate input parameters
-- Check required environment variables at startup
-- Provide clear validation error messages
-
-### 5. Response Format Standards
-
-#### Consistent Response Structure
-
-- Always return List[Union[types.TextContent, types.ImageContent, types.EmbeddedResource]]
-- Convert API responses to dictionaries for easier manipulation
-- Add metadata when helpful (e.g., UI URLs, timestamps)
-
-```python
-async def get_resource(resource_id: str):
-    response = api.get_resource(resource_id)
-    response_dict = response.to_dict()
-    
-    # Add helpful metadata
-    response_dict["ui_url"] = get_resource_url(resource_id)
-    response_dict["fetched_at"] = datetime.utcnow().isoformat()
-    
-    return [types.TextContent(type="text", text=str(response_dict))]
-```
-
-### 6. CLI Interface Standards
-
-#### Click Integration
-
-Use Click for command-line interfaces:
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+## Testing Guidelines
+- Create comprehensive unit tests for all modules using the `pytest` framework.
+- Place test files directly in the test directory without mirroring subdirectories (e.g., `src/main.py` → `test/test_main.py`).
+- Use descriptive test method names that clearly indicate what is being tested.
+- Include `__init__.py` files in test directories to make them proper Python packages.
+- Mock external dependencies and side effects using `unittest.mock.patch` and `MagicMock`.
+- Test both happy path and error conditions, including edge cases and exception handling.
+- Use pytest fixtures for test setup and shared test data.
+- Ensure tests are isolated and don't depend on external state or other tests.
+- Include tests for CLI interfaces using `click.testing.CliRunner` with pytest fixtures.
+- Verify function behavior, return types, and side effects in tests using assert statements.
+- Use `pytest.mark.parametrize` for testing multiple input combinations efficiently.
+- Add integration tests with `pytest.mark.integration` for complex workflows and API interactions.
+- Use `conftest.py` for shared fixtures and test configuration.
+- Organize tests in classes when testing related functionality together.
 
 ---
 > Source: [yangkyeongmo/mcp-server-apache-airflow](https://github.com/yangkyeongmo/mcp-server-apache-airflow) — distributed by [TomeVault](https://tomevault.io).
