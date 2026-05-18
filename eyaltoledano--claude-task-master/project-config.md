@@ -1,92 +1,78 @@
 ---
 trigger: always_on
-description: Guidelines for interacting with the unified AI service layer.
+description: Describes the high-level architecture of the Task Master CLI application.
 ---
 
+# Application Architecture Overview
 
-# AI Services Layer Guidelines
+- **Modular Structure**: The Task Master CLI is built using a modular architecture, with distinct modules responsible for different aspects of the application. This promotes separation of concerns, maintainability, and testability.
 
-This document outlines the architecture and usage patterns for interacting with Large Language Models (LLMs) via Task Master's unified AI service layer (`ai-services-unified.js`). The goal is to centralize configuration, provider selection, API key management, fallback logic, and error handling.
+- **Main Modules and Responsibilities**:
 
-**Core Components:**
+  - **[`commands.js`](mdc:scripts/modules/commands.js): Command Handling**
+    - **Purpose**: Defines and registers all CLI commands using Commander.js.
+    - **Responsibilities** (See also: [`commands.mdc`](mdc:.cursor/rules/commands.mdc)):
+      - Parses command-line arguments and options.
+      - Invokes appropriate core logic functions from `scripts/modules/`.
+      - Handles user input/output for CLI.
+      - Implements CLI-specific validation.
 
-*   **Configuration (`.taskmasterconfig` & [`config-manager.js`](mdc:scripts/modules/config-manager.js)):**
-    *   Defines the AI provider and model ID for different **roles** (`main`, `research`, `fallback`).
-    *   Stores parameters like `maxTokens` and `temperature` per role.
-    *   Managed via the `task-master models --setup` CLI command.
-    *   [`config-manager.js`](mdc:scripts/modules/config-manager.js) provides **getters** (e.g., `getMainProvider()`, `getParametersForRole()`) to access these settings. Core logic should **only** use these getters for *non-AI related application logic* (e.g., `getDefaultSubtasks`). The unified service fetches necessary AI parameters internally based on the `role`.
-    *   **API keys** are **NOT** stored here; they are resolved via `resolveEnvVariable` (in [`utils.js`](mdc:scripts/modules/utils.js)) from `.env` (for CLI) or the MCP `session.env` object (for MCP calls). See [`utilities.mdc`](mdc:.cursor/rules/utilities.mdc) and [`dev_workflow.mdc`](mdc:.cursor/rules/dev_workflow.mdc).
+  - **[`task-manager.js`](mdc:scripts/modules/task-manager.js) & `task-manager/` directory: Task Data & Core Logic**
+    - **Purpose**: Contains core functions for task data manipulation (CRUD), AI interactions, and related logic.
+    - **Responsibilities**:
+      - Reading/writing `tasks.json` with tagged task lists support.
+      - Implementing functions for task CRUD, parsing PRDs, expanding tasks, updating status, etc.
+      - **Tagged Task Lists**: Handles task organization across multiple contexts (tags) like "master", branch names, or project phases.
+      - **Tag Resolution**: Provides backward compatibility by resolving tagged format to legacy format transparently.
+      - **Delegating AI interactions** to the `ai-services-unified.js` layer.
+      - Accessing non-AI configuration via `config-manager.js` getters.
+    - **Key Files**: Individual files within `scripts/modules/task-manager/` handle specific actions (e.g., `add-task.js`, `expand-task.js`).
 
-*   **Unified Service (`ai-services-unified.js`):**
-    *   Exports primary interaction functions: `generateTextService`, `generateObjectService`. (Note: `streamTextService` exists but has known reliability issues with some providers/payloads).
-    *   Contains the core `_unifiedServiceRunner` logic.
-    *   Internally uses `config-manager.js` getters to determine the provider/model/parameters based on the requested `role`.
-    *   Implements the **fallback sequence** (e.g., main -> fallback -> research) if the primary provider/model fails.
-    *   Constructs the `messages` array required by the Vercel AI SDK.
-    *   Implements **retry logic** for specific API errors (`_attemptProviderCallWithRetries`).
-    *   Resolves API keys automatically via `_resolveApiKey` (using `resolveEnvVariable`).
-    *   Maps requests to the correct provider implementation (in `src/ai-providers/`) via `PROVIDER_FUNCTIONS`.
-    *   Returns a structured object containing the primary AI result (`mainResult`) and telemetry data (`telemetryData`). See [`telemetry.mdc`](mdc:.cursor/rules/telemetry.mdc) for details on how this telemetry data is propagated and handled.
+  - **[`dependency-manager.js`](mdc:scripts/modules/dependency-manager.js): Dependency Management**
+    - **Purpose**: Manages task dependencies.
+    - **Responsibilities**: Add/remove/validate/fix dependencies across tagged task contexts.
 
-*   **Provider Implementations (`src/ai-providers/*.js`):**
-    *   Contain provider-specific wrappers around Vercel AI SDK functions (`generateText`, `generateObject`).
+  - **[`ui.js`](mdc:scripts/modules/ui.js): User Interface Components**
+    - **Purpose**: Handles CLI output formatting (tables, colors, boxes, spinners).
+    - **Responsibilities**: Displaying tasks, reports, progress, suggestions, and migration notices for tagged systems.
 
-**Usage Pattern (from Core Logic like `task-manager/*.js`):**
+  - **[`ai-services-unified.js`](mdc:scripts/modules/ai-services-unified.js): Unified AI Service Layer**
+    - **Purpose**: Centralized interface for all LLM interactions using Vercel AI SDK.
+    - **Responsibilities** (See also: [`ai_services.mdc`](mdc:.cursor/rules/ai_services.mdc)):
+      - Exports `generateTextService`, `generateObjectService`.
+      - Handles provider/model selection based on `role` and `.taskmasterconfig`.
+      - Resolves API keys (from `.env` or `session.env`).
+      - Implements fallback and retry logic.
+      - Orchestrates calls to provider-specific implementations (`src/ai-providers/`).
+    - Telemetry data generated by the AI service layer is propagated upwards through core logic, direct functions, and MCP tools. See [`telemetry.mdc`](mdc:.cursor/rules/telemetry.mdc) for the detailed integration pattern.
 
-1.  **Import Service:** Import `generateTextService` or `generateObjectService` from `../ai-services-unified.js`.
-    ```javascript
-    // Preferred for most tasks (especially with complex JSON)
-    import { generateTextService } from '../ai-services-unified.js';
+  - **[`src/ai-providers/*.js`](mdc:src/ai-providers/): Provider-Specific Implementations**
+    - **Purpose**: Provider-specific wrappers for Vercel AI SDK functions.
+    - **Responsibilities**: Interact directly with Vercel AI SDK adapters.
 
-    // Use if structured output is reliable for the specific use case
-    // import { generateObjectService } from '../ai-services-unified.js';
-    ```
+  - **[`config-manager.js`](mdc:scripts/modules/config-manager.js): Configuration Management**
+    - **Purpose**: Loads, validates, and provides access to configuration.
+    - **Responsibilities** (See also: [`utilities.mdc`](mdc:.cursor/rules/utilities.mdc)):
+      - Reads and merges `.taskmasterconfig` with defaults.
+      - Provides getters (e.g., `getMainProvider`, `getLogLevel`, `getDefaultSubtasks`) for accessing settings.
+      - **Tag Configuration**: Manages `global.defaultTag` and `tags` section for tag system settings.
+      - **Note**: Does **not** store or directly handle API keys (keys are in `.env` or MCP `session.env`).
 
-2.  **Prepare Parameters:** Construct the parameters object for the service call.
-    *   `role`: **Required.** `'main'`, `'research'`, or `'fallback'`. Determines the initial provider/model/parameters used by the unified service.
-    *   `session`: **Required if called from MCP context.** Pass the `session` object received by the direct function wrapper. The unified service uses `session.env` to find API keys.
-    *   `systemPrompt`: Your system instruction string.
-    *   `prompt`: The user message string (can be long, include stringified data, etc.).
-    *   (For `generateObjectService` only): `schema` (Zod schema), `objectName`.
+  - **[`utils.js`](mdc:scripts/modules/utils.js): Core Utility Functions**
+    - **Purpose**: Low-level, reusable CLI utilities.
+    - **Responsibilities** (See also: [`utilities.mdc`](mdc:.cursor/rules/utilities.mdc)):
+      - Logging (`log` function), File I/O (`readJSON`, `writeJSON`), String utils (`truncate`).
+      - Task utils (`findTaskById`), Dependency utils (`findCycles`).
+      - API Key Resolution (`resolveEnvVariable`).
+      - Silent Mode Control (`enableSilentMode`, `disableSilentMode`).
+      - **Tagged Task Lists**: Silent migration system, tag resolution, current tag management.
+      - **Migration System**: `performCompleteTagMigration`, `migrateConfigJson`, `createStateJson`.
 
-3.  **Call Service:** Use `await` to call the service function.
-    ```javascript
-    // Example using generateTextService (most common)
-    try {
-        const resultText = await generateTextService({
-            role: useResearch ? 'research' : 'main', // Determine role based on logic
-            session: context.session, // Pass session from context object
-            systemPrompt: "You are...",
-            prompt: userMessageContent
-        });
-        // Process the raw text response (e.g., parse JSON, use directly)
-        // ...
-    } catch (error) {
-        // Handle errors thrown by the unified service (if all fallbacks/retries fail)
-        report('error', `Unified AI service call failed: ${error.message}`);
-        throw error;
-    }
-
-    // Example using generateObjectService (use cautiously)
-    try {
-        const resultObject = await generateObjectService({
-            role: 'main',
-            session: context.session,
-            schema: myZodSchema,
-            objectName: 'myDataObject',
-            systemPrompt: "You are...",
-            prompt: userMessageContent
-        });
-        // resultObject is already a validated JS object
-        // ...
-    } catch (error) {
-        report('error', `Unified AI service call failed: ${error.message}`);
-        throw error;
-    }
-    ```
-
-4.  **Handle Results/Errors:** Process the returned text/object or handle errors thrown by the unified service layer.
-
+  - **[`mcp-server/`](mdc:mcp-server/): MCP Server Integration**
+    - **Purpose**: Provides MCP interface using FastMCP.
+    - **Responsibilities** (See also: [`mcp.mdc`](mdc:.cursor/rules/mcp.mdc)):
+      - Registers tools (`mcp-server/src/tools/*.js`). Tool `execute` methods **should be wrapped** with the `withNormalizedProjectRoot` HOF (from `tools/utils.js`) to ensure consistent path handling.
+      - The HOF provides a normalized `args.projectRoot` to the `execute` method.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
