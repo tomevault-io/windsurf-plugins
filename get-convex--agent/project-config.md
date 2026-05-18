@@ -1,136 +1,102 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: Guidelines and best practices for building Convex projects, including database schema design, queries, mutations, and real-world examples
 ---
 
-# CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
-## Project Overview
-
-@convex-dev/agent is a TypeScript/NPM package that provides an AI Agent component for Convex. It enables building agentic AI applications with thread/message management, LLM integration via AI SDK, WebSocket streaming, tool calling, vector embeddings, and RAG.
-
-Documentation: [Convex Agent Docs](https://docs.convex.dev/agents)
-
-## Commands
-
-### Development
-```bash
-npm run dev          # Run backend + frontend + build watch concurrently
-npm run build        # TypeScript build (tsc --project ./tsconfig.build.json)
-```
-
-### Testing
-```bash
-npm test             # Run tests with typecheck (vitest run --typecheck)
-npm run test:watch   # Watch mode (vitest --typecheck)
-```
-
-### Code Quality
-```bash
-npm run lint         # ESLint
-npm run typecheck    # Full TypeScript validation including example/convex
-```
-
-## Architecture
-
-### Source Structure (`/src`)
-
-**Three-Layer Architecture:**
-1. **Client** (`src/client/`) - Public API for consuming applications
-   - `index.ts` - Main `Agent` class and exports
-   - `start.ts` - `startGeneration()` core generation logic
-   - `streaming.ts`, `search.ts`, `messages.ts`, `threads.ts` - Feature modules
-
-2. **Component** (`src/component/`) - Convex backend (runs on Convex servers)
-   - `schema.ts` - Database schema (threads, messages, streamingMessages, streamDeltas, memories, files)
-   - `index.ts` - Main component implementation
-   - Backend operations for messages, threads, streaming, vector search
-
-3. **React** (`src/react/`) - React hooks for UI integration
-   - `useThreadMessages.ts` - Paginated + streaming messages
-   - `useUIMessages.ts` - UIMessage-first hook with metadata
-   - `useSmoothText.ts` - Animated text rendering
-
-**Shared Files:**
-- `validators.ts` - Convex validators (vMessage, vMessageDoc, vThreadDoc, etc.)
-- `UIMessages.ts` - UIMessage types and conversion utilities
-- `mapping.ts` - Message serialization between ModelMessage and stored formats
-
-### Key Patterns
-
-- **Streaming via WebSocket deltas** - Not HTTP streaming. Delta compression with heartbeats.
-- **Message-centric design** - All operations revolve around message persistence/retrieval
-- **Component-based encapsulation** - Uses Convex Components pattern
-- **Multi-user support** - Threads have optional `userId` for ownership
-- **Tool approval flow** - Tools can require human approval via `needsApproval`, with `agent.approveToolCall()` and `agent.denyToolCall()` methods
-
-### Database Tables (Convex Component)
-
-- **threads** - Conversations with userId, title, summary, status
-- **messages** - Chat messages with order, stepOrder, status, metadata
-- **streamingMessages** - Real-time streaming state (streaming/finished/aborted)
-- **streamDeltas** - Stream chunks with start/end ranges
-- **memories** - User/thread memories for RAG with embedding references
-
-## Convex-Specific Guidelines
-
-Follow the rules in `.cursor/rules/convex_rules.mdc`:
-
-- **Function syntax**: Always use new syntax with `args` and `returns` validators
-- **Validators**: Use `v.null()` for null returns, `v.int64()` instead of deprecated `v.bigint()`
-- **Indexes**: Include all fields in index name (e.g., `by_threadId_and_status`)
-- **Queries**: Use `withIndex` instead of `filter`; define indexes in schema
-- **Internal functions**: Use `internalQuery`/`internalMutation`/`internalAction` for private functions
-- **Actions**: Add `"use node";` for Node.js modules; actions cannot use `ctx.db`
-- **Type safety**: Use `Id<'tableName'>` for document IDs, strict TypeScript
-
-## Export Surfaces
-
-- `@convex-dev/agent` - Main exports (Agent class, types, validators, tools)
-- `@convex-dev/agent/react` - React hooks (useThreadMessages, useUIMessages, etc.)
-- `@convex-dev/agent/validators` - Convex validators for integration
-- `@convex-dev/agent/test` - Testing utilities
-
-## AI Guidance: Helping Users Upgrade to v0.6.0
-
-**IMPORTANT: v0.6.0 requires AI SDK v6 (ai@^6.0.0)**
-
-When helping users upgrade from @convex-dev/agent v0.3.x (AI SDK v5) to v0.6.0 (AI SDK v6):
-
-### Step 1: Update Dependencies First
-
-Update all AI SDK packages together to avoid peer dependency conflicts:
-
-```bash
-npm install @convex-dev/agent@^0.6.0 ai@^6.0.35 @ai-sdk/provider-utils@^4.0.6
-npm install @ai-sdk/openai@^3.0.10  # or whichever provider
-```
-
-**Compatible sibling packages:**
-- `@convex-dev/rag@^0.7.0` (v0.6.0 has type conflicts with AI SDK v6)
-- `@convex-dev/workflow@^0.3.2`
-
-### Step 2: Detect v5 Patterns
-
-Search for these patterns indicating v5 usage:
-- `createTool({ args:` - should be `inputSchema`
-- `createTool({ handler:` - should be `execute`
-- `textEmbeddingModel:` - should be `embeddingModel`
-- `maxSteps:` in generateText/streamText - should be `stopWhen: stepCountIs(N)`
-- `mode: "json"` in generateObject - removed in v6
-- `@ai-sdk/*` packages at v1.x or v2.x - should be v3.x
-- Type imports: `LanguageModelV2` → `LanguageModelV3`, `EmbeddingModel<string>` → `EmbeddingModelV3`
-
-### Step 3: Apply Transformations
-
-**Tool definitions:**
+# Convex guidelines
+## Function guidelines
+### New function syntax
+- ALWAYS use the new function syntax for Convex functions. For example:
 ```typescript
-// BEFORE (v5)
-const myTool = createTool({
-  description: "...",
-  parameters: z.object({ query: z.string() }),
+import { query } from "./_generated/server";
+import { v } from "convex/values";
+export const f = query({
+    args: {},
+    returns: v.null(),
+    handler: async (ctx, args) => {
+    // Function body
+    },
+});
+```
+
+### Http endpoint syntax
+- HTTP endpoints are defined in `convex/http.ts` and require an `httpAction` decorator. For example:
+```typescript
+import { httpRouter } from "convex/server";
+import { httpAction } from "./_generated/server";
+const http = httpRouter();
+http.route({
+    path: "/echo",
+    method: "POST",
+    handler: httpAction(async (ctx, req) => {
+    const body = await req.bytes();
+    return new Response(body, { status: 200 });
+    }),
+});
+```
+- HTTP endpoints are always registered at the exact path you specify in the `path` field. For example, if you specify `/api/someRoute`, the endpoint will be registered at `/api/someRoute`.
+
+### Validators
+- Below is an example of an array validator:
+```typescript
+import { mutation } from "./_generated/server";
+import { v } from "convex/values";
+
+export default mutation({
+args: {
+    simpleArray: v.array(v.union(v.string(), v.number())),
+},
+handler: async (ctx, args) => {
+    //...
+},
+});
+```
+- Below is an example of a schema with validators that codify a discriminated union type:
+```typescript
+import { defineSchema, defineTable } from "convex/server";
+import { v } from "convex/values";
+
+export default defineSchema({
+    results: defineTable(
+        v.union(
+            v.object({
+                kind: v.literal("error"),
+                errorMessage: v.string(),
+            }),
+            v.object({
+                kind: v.literal("success"),
+                value: v.number(),
+            }),
+        ),
+    )
+});
+```
+- Always use the `v.null()` validator when returning a null value. Below is an example query that returns a null value:
+```typescript
+import { query } from "./_generated/server";
+import { v } from "convex/values";
+
+export const exampleQuery = query({
+  args: {},
+  returns: v.null(),
+  handler: async (ctx, args) => {
+      console.log("This query returns a null value");
+      return null;
+  },
+});
+```
+- Here are the valid Convex types along with their respective validators:
+Convex Type  | TS/JS type  |  Example Usage         | Validator for argument validation and schemas  | Notes                                                                                                                                                                                                 |
+| ----------- | ------------| -----------------------| -----------------------------------------------| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Id          | string      | `doc._id`              | `v.id(tableName)`                              |                                                                                                                                                                                                       |
+| Null        | null        | `null`                 | `v.null()`                                     | JavaScript's `undefined` is not a valid Convex value. Functions the return `undefined` or do not return will return `null` when called from a client. Use `null` instead.                             |
+| Int64       | bigint      | `3n`                   | `v.int64()`                                    | Int64s only support BigInts between -2^63 and 2^63-1. Convex supports `bigint`s in most modern browsers.                                                                                              |
+| Float64     | number      | `3.1`                  | `v.number()`                                   | Convex supports all IEEE-754 double-precision floating point numbers (such as NaNs). Inf and NaN are JSON serialized as strings.                                                                      |
+| Boolean     | boolean     | `true`                 | `v.boolean()`                                  |
+| String      | string      | `"abc"`                | `v.string()`                                   | Strings are stored as UTF-8 and must be valid Unicode sequences. Strings must be smaller than the 1MB total size limit when encoded as UTF-8.                                                         |
+| Bytes       | ArrayBuffer | `new ArrayBuffer(8)`   | `v.bytes()`                                    | Convex supports first class bytestrings, passed in as `ArrayBuffer`s. Bytestrings must be smaller than the 1MB total size limit for Convex types.                                                     |
+| Array       | Array       | `[1, 3.2, "abc"]`      | `v.array(values)`                              | Arrays can have at most 8192 values.                                                                                                                                                                  |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
