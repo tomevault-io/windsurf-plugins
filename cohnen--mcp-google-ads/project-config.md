@@ -1,170 +1,186 @@
 ---
 trigger: always_on
-description: Use it to get full context on fastmcp
+description: Use this to write better GAQL queries
 ---
 
-├── .github
-    ├── ai-labeler.yml
-    ├── release.yml
-    └── workflows
-    │   ├── ai-labeler.yml
-    │   ├── publish.yml
-    │   ├── run-static.yml
-    │   └── run-tests.yml
-├── .gitignore
-├── .pre-commit-config.yaml
-├── .python-version
-├── LICENSE
-├── README.md
-├── Windows_Notes.md
-├── docs
-    └── assets
-    │   └── demo-inspector.png
-├── examples
-    ├── complex_inputs.py
-    ├── desktop.py
-    ├── echo.py
-    ├── memory.py
-    ├── readme-quickstart.py
-    ├── screenshot.py
-    ├── simple_echo.py
-    └── text_me.py
-├── pyproject.toml
-├── src
-    └── fastmcp
-    │   ├── __init__.py
-    │   ├── cli
-    │       ├── __init__.py
-    │       ├── claude.py
-    │       └── cli.py
-    │   ├── exceptions.py
-    │   ├── prompts
-    │       ├── __init__.py
-    │       ├── base.py
-    │       ├── manager.py
-    │       └── prompt_manager.py
-    │   ├── py.typed
-    │   ├── resources
-    │       ├── __init__.py
-    │       ├── base.py
-    │       ├── resource_manager.py
-    │       ├── templates.py
-    │       └── types.py
-    │   ├── server.py
-    │   ├── tools
-    │       ├── __init__.py
-    │       ├── base.py
-    │       └── tool_manager.py
-    │   └── utilities
-    │       ├── __init__.py
-    │       ├── func_metadata.py
-    │       ├── logging.py
-    │       └── types.py
-├── tests
-    ├── __init__.py
-    ├── prompts
-    │   ├── __init__.py
-    │   ├── test_base.py
-    │   └── test_manager.py
-    ├── resources
-    │   ├── __init__.py
-    │   ├── test_file_resources.py
-    │   ├── test_function_resources.py
-    │   ├── test_resource_manager.py
-    │   ├── test_resource_template.py
-    │   └── test_resources.py
-    ├── servers
-    │   ├── __init__.py
-    │   └── test_file_server.py
-    ├── test_cli.py
-    ├── test_func_metadata.py
-    ├── test_server.py
-    └── test_tool_manager.py
-└── uv.lock
+# Google Ads Query Language (GAQL) Guidelines
 
+## Overview
 
-/.github/ai-labeler.yml:
---------------------------------------------------------------------------------
- 1 | instructions: |
- 2 |   Apply the minimal set of labels that accurately characterize the issue/PR:
- 3 |   - Use at most 1-2 labels unless there's a compelling reason for more. It's ok to use no labels.
- 4 |   - Prefer specific labels (bug, feature) over generic ones (question, help wanted)
- 5 |   - For PRs that fix bugs, use 'bug' not 'enhancement'
- 6 |   - Never combine: bug + enhancement, feature + enhancement. For these labels, only choose the most relevant one.
- 7 |   - Reserve 'question' and 'help wanted' for when they're the primary characteristic
- 8 | 
- 9 | labels:
-10 |   - bug:
-11 |     description: "Something isn't working as expected"
-12 |     instructions: |
-13 |       Apply when describing or fixing unexpected behavior:
-14 |       - Issues: Clear error messages or unexpected outcomes
-15 |       - PRs: Standalone fixes for broken functionality or closing bug reports.
-16 |       Don't apply bug unless the issue or PR is predominantly about a specific bug.
-17 | 
-18 |   - documentation:
-19 |     description: "Improvements or additions to documentation"
-20 |     instructions: |
-21 |       Apply only when documentation is the primary focus:
-22 |       - README updates
-23 |       - Code comments and docstrings
-24 |       - API documentation
-25 |       - Usage examples
-26 |       Don't apply for minor doc updates alongside code changes
-27 | 
-28 |   - enhancement:
-29 |     description: "Improvements to existing features"
-30 |     instructions: |
-31 |       Apply only for improvements to existing functionality:
-32 |       - Performance improvements
-33 |       - UI/UX improvements
-34 |       - Expanded capabilities of existing features
-35 |       Don't apply to:
-36 |       - Bug fixes
-37 |       - New features
-38 |       - Minor tweaks
-39 | 
-40 |   - feature:
-41 |     description: "New functionality"
-42 |     instructions: |
-43 |       Apply only for net-new functionality:
-44 |       - New API endpoints
-45 |       - New commands or tools
-46 |       - New user-facing capabilities
-47 |       Don't apply to:
-48 |       - Improvements to existing features (use enhancement)
-49 |       - Bug fixes
-50 | 
-51 |   - good first issue:
-52 |     description: "Good for newcomers"
-53 |     instructions: |
-54 |       Apply very selectively to issues that are:
-55 |       - Small in scope
-56 |       - Well-documented
-57 |       - Require minimal context
-58 |       - Have clear success criteria
-59 |       Don't apply if the task requires significant background knowledge
-60 | 
-61 |   - help wanted:
-62 |     description: "Extra attention is needed"
-63 |     instructions: |
-64 |       Apply only when it's the primary characteristic:
-65 |       - Issue needs external expertise
-66 |       - Current maintainers can't address it
-67 |       - Additional contributors would be valuable
-68 |       Don't apply just because an issue is open or needs work
-69 | 
-70 |   - question:
-71 |     description: "Further information is requested"
-72 |     instructions: |
-73 |       Apply only when the primary purpose is seeking information:
-74 |       - Clarification needed before work can begin
-75 |       - Architectural discussions
-76 |       - Implementation strategy questions
-77 |       Don't apply to:
-78 |       - Bug reports that need more details
-79 |       - Feature requests that need refinement
-80 | 
+The Google Ads Query Language (GAQL) is a powerful tool for querying the Google Ads API that allows you to retrieve:
+
+1. **Resources** and their related attributes, segments, and metrics using `GoogleAdsService.Search` or `GoogleAdsService.SearchStream`
+2. **Metadata** about available fields and resources using `GoogleAdsFieldService`
+
+## Field Categories
+
+Understanding field categories is essential for building effective GAQL queries:
+
+1. **RESOURCE**: Represents a primary entity (e.g., `campaign`, `ad_group`) that can be used in the FROM clause
+2. **ATTRIBUTE**: Properties of a resource (e.g., `campaign.id`, `campaign.name`). Including these may segment results depending on the resource relationship
+3. **SEGMENT**: Fields that always segment search queries (e.g., `segments.date`, `segments.device`)
+4. **METRIC**: Performance data fields (e.g., `metrics.impressions`, `metrics.clicks`) that never segment search queries
+
+## Query Structure
+
+A GAQL query consists of the following components:
+
+```
+SELECT
+  <field_1>,
+  <field_2>,
+  ...
+FROM <resource>
+WHERE <condition_1> AND <condition_2> AND ...
+ORDER BY <field_1> [ASC|DESC], <field_2> [ASC|DESC], ...
+LIMIT <number_of_results>
+```
+
+### SELECT Clause
+
+The `SELECT` clause specifies the fields to return in the query results:
+
+```
+SELECT
+  campaign.id,
+  campaign.name,
+  metrics.impressions,
+  segments.device
+```
+
+Only fields that are marked as `selectable: true` in the `GoogleAdsField` metadata can be used in the SELECT clause.
+
+### FROM Clause
+
+The `FROM` clause specifies the primary resource type to query from. Only one resource can be specified, and it must have the category `RESOURCE`.
+
+```
+FROM campaign
+```
+
+### WHERE Clause (optional)
+
+The `WHERE` clause specifies conditions to filter the results. Only fields marked as `filterable: true` in the `GoogleAdsField` metadata can be used for filtering.
+
+```
+WHERE 
+  campaign.status = 'ENABLED'
+  AND metrics.impressions > 1000
+  AND segments.date DURING LAST_30_DAYS
+```
+
+### ORDER BY Clause (optional)
+
+The `ORDER BY` clause specifies how to sort the results. Only fields marked as `sortable: true` in the `GoogleAdsField` metadata can be used for sorting.
+
+```
+ORDER BY metrics.impressions DESC, campaign.id
+```
+
+### LIMIT Clause (optional)
+
+The `LIMIT` clause restricts the number of results returned.
+
+```
+LIMIT 100
+```
+
+## Field Metadata Exploration
+
+To explore available fields and their properties, use the `GoogleAdsFieldService`:
+
+```
+SELECT
+  name,
+  category,
+  selectable,
+  filterable,
+  sortable,
+  selectable_with,
+  attribute_resources,
+  metrics,
+  segments,
+  data_type,
+  enum_values,
+  is_repeated
+WHERE name = "campaign.id"
+```
+
+Key metadata properties to understand:
+
+- **`selectable`**: Whether the field can be used in a SELECT clause
+- **`filterable`**: Whether the field can be used in a WHERE clause
+- **`sortable`**: Whether the field can be used in an ORDER BY clause
+- **`selectable_with`**: Lists resources, segments, and metrics that are selectable with this field
+- **`attribute_resources`**: For RESOURCE fields, lists the resources that are selectable with this resource and don't segment metrics
+- **`metrics`**: For RESOURCE fields, lists metrics that are selectable when this resource is in the FROM clause
+- **`segments`**: For RESOURCE fields, lists fields that segment metrics when this resource is used in the FROM clause
+- **`data_type`**: Determines which operators can be used with the field in WHERE clauses
+- **`enum_values`**: Lists possible values for ENUM type fields
+- **`is_repeated`**: Whether the field can contain multiple values
+
+## Data Types and Operators
+
+Different field data types support different operators in WHERE clauses:
+
+### String Fields
+- `=`, `!=`, `IN`, `NOT IN`
+- `LIKE`, `NOT LIKE` (case-sensitive string matching)
+- `CONTAINS ANY`, `CONTAINS ALL`, `CONTAINS NONE` (for repeated fields)
+
+### Numeric Fields
+- `=`, `!=`, `<`, `<=`, `>`, `>=`
+- `IN`, `NOT IN`
+
+### Date Fields
+- `=`, `!=`, `<`, `<=`, `>`, `>=`
+- `DURING` (with named date ranges)
+- `BETWEEN` (with date literals)
+
+### Enum Fields
+- `=`, `!=`, `IN`, `NOT IN`
+- Values must match exactly as listed in `enum_values`
+
+### Boolean Fields
+- `=`, `!=`
+- Values must be `TRUE` or `FALSE`
+
+## Date Ranges
+
+### Literal Date Ranges
+```
+WHERE segments.date BETWEEN '2020-01-01' AND '2020-01-31'
+```
+
+### Named Date Ranges
+```
+WHERE segments.date DURING LAST_7_DAYS
+WHERE segments.date DURING LAST_14_DAYS
+WHERE segments.date DURING LAST_30_DAYS
+WHERE segments.date DURING LAST_90_DAYS
+WHERE segments.date DURING THIS_MONTH
+WHERE segments.date DURING LAST_MONTH
+WHERE segments.date DURING THIS_QUARTER
+```
+
+### Date Functions
+```
+WHERE segments.date = YESTERDAY
+WHERE segments.date = TODAY
+```
+
+## Case Sensitivity Rules
+
+1. **Field and resource names**: Case-sensitive (`campaign.id` not `Campaign.Id`)
+2. **Enumeration values**: Case-sensitive (`'ENABLED'` not `'enabled'`)
+3. **String literals in conditions**:
+   - Case-insensitive by default (`WHERE campaign.name = 'brand campaign'`)
+   - Use `LIKE` for case-sensitive matching (`WHERE campaign.name LIKE 'Brand Campaign'`)
+
+## Ordering and Limiting Results
+
+### Ordering
+- Results can be ordered by one or more fields
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
