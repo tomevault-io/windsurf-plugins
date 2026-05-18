@@ -1,192 +1,60 @@
 ---
 trigger: always_on
-description: This document outlines the standardized patterns that **ALL** Task Master commands must follow to properly support the tagged task lists system.
+description: Comprehensive reference for Taskmaster MCP tools and CLI commands.
 ---
 
-# Tagged Task Lists Command Patterns
+# Taskmaster Tool & Command Reference
 
-This document outlines the standardized patterns that **ALL** Task Master commands must follow to properly support the tagged task lists system.
+This document provides a detailed reference for interacting with Taskmaster, covering both the recommended MCP tools, suitable for integrations like Cursor, and the corresponding `task-master` CLI commands, designed for direct user interaction or fallback.
 
-## Core Principles
+**Note:** For interacting with Taskmaster programmatically or via integrated tools, using the **MCP tools is strongly recommended** due to better performance, structured data, and error handling. The CLI commands serve as a user-friendly alternative and fallback. 
 
-- **Every command** that reads or writes tasks.json must be tag-aware
-- **Consistent tag resolution** across all commands using `getCurrentTag(projectRoot)`
-- **Proper context passing** to core functions with `{ projectRoot, tag }`
-- **Standardized CLI options** with `--tag <tag>` flag
+**Important:** Several MCP tools involve AI processing... The AI-powered tools include `parse_prd`, `analyze_project_complexity`, `update_subtask`, `update_task`, `update`, `expand_all`, `expand_task`, and `add_task`.
 
-## Required Imports
+**🏷️ Tagged Task Lists System:** Task Master now supports **tagged task lists** for multi-context task management. This allows you to maintain separate, isolated lists of tasks for different features, branches, or experiments. Existing projects are seamlessly migrated to use a default "master" tag. Most commands now support a `--tag <name>` flag to specify which context to operate on. If omitted, commands use the currently active tag.
 
-All command files must import `getCurrentTag`:
+---
 
-```javascript
-// ✅ DO: Import getCurrentTag in commands.js
-import { 
-  log, 
-  readJSON, 
-  writeJSON, 
-  findProjectRoot, 
-  getCurrentTag 
-} from './utils.js';
+## Initialization & Setup
 
-// ✅ DO: Import getCurrentTag in task-manager files
-import { 
-  readJSON, 
-  writeJSON, 
-  getCurrentTag 
-} from '../utils.js';
-```
+### 1. Initialize Project (`init`)
 
-## CLI Command Pattern
+*   **MCP Tool:** `initialize_project`
+*   **CLI Command:** `task-master init [options]`
+*   **Description:** `Set up the basic Taskmaster file structure and configuration in the current directory for a new project.`
+*   **Key CLI Options:**
+    *   `--name <name>`: `Set the name for your project in Taskmaster's configuration.`
+    *   `--description <text>`: `Provide a brief description for your project.`
+    *   `--version <version>`: `Set the initial version for your project, e.g., '0.1.0'.`
+    *   `--no-git`: `Skip initializing a Git repository entirely.`
+    *   `-y, --yes`: `Initialize Taskmaster quickly using default settings without interactive prompts.`
+*   **Usage:** Run this once at the beginning of a new project.
+*   **MCP Variant Description:** `Set up the basic Taskmaster file structure and configuration in the current directory for a new project by running the 'task-master init' command.`
+*   **Key MCP Parameters/Options:**
+    *   `projectName`: `Set the name for your project.` (CLI: `--name <name>`)
+    *   `projectDescription`: `Provide a brief description for your project.` (CLI: `--description <text>`)
+    *   `projectVersion`: `Set the initial version for your project, e.g., '0.1.0'.` (CLI: `--version <version>`)
+    *   `authorName`: `Author name.` (CLI: `--author <author>`)
+    *   `skipInstall`: `Skip installing dependencies. Default is false.` (CLI: `--skip-install`)
+    *   `addAliases`: `Add shell aliases tm and taskmaster. Default is false.` (CLI: `--aliases`)
+    *   `noGit`: `Skip initializing a Git repository entirely. Default is false.` (CLI: `--no-git`)
+    *   `yes`: `Skip prompts and use defaults/provided arguments. Default is false.` (CLI: `-y, --yes`)
+*   **Usage:** Run this once at the beginning of a new project, typically via an integrated tool like Cursor. Operates on the current working directory of the MCP server. 
+*   **Important:** Once complete, you *MUST* parse a prd in order to generate tasks. There will be no tasks files until then. The next step after initializing should be to create a PRD using the example PRD in .taskmaster/templates/example_prd.txt. 
+*   **Tagging:** Use the `--tag` option to parse the PRD into a specific, non-default tag context. If the tag doesn't exist, it will be created automatically. Example: `task-master parse-prd spec.txt --tag=new-feature`.
 
-Every CLI command that operates on tasks must follow this exact pattern:
+### 2. Parse PRD (`parse_prd`)
 
-```javascript
-// ✅ DO: Standard tag-aware CLI command pattern
-programInstance
-  .command('command-name')
-  .description('Command description')
-  .option('-f, --file <file>', 'Path to the tasks file', TASKMASTER_TASKS_FILE)
-  .option('--tag <tag>', 'Specify tag context for task operations') // REQUIRED
-  .action(async (options) => {
-    // 1. Find project root
-    const projectRoot = findProjectRoot();
-    if (!projectRoot) {
-      console.error(chalk.red('Error: Could not find project root.'));
-      process.exit(1);
-    }
-
-    // 2. Resolve tag using standard pattern
-    const tag = options.tag || getCurrentTag(projectRoot) || 'master';
-
-    // 3. Call core function with proper context
-    await coreFunction(
-      tasksPath,
-      // ... other parameters ...
-      { projectRoot, tag } // REQUIRED context object
-    );
-  });
-```
-
-## Core Function Pattern
-
-All core functions in `scripts/modules/task-manager/` must follow this pattern:
-
-```javascript
-// ✅ DO: Standard tag-aware core function pattern
-async function coreFunction(
-  tasksPath,
-  // ... other parameters ...
-  context = {} // REQUIRED context parameter
-) {
-  const { projectRoot, tag } = context;
-  
-  // Use tag-aware readJSON/writeJSON
-  const data = readJSON(tasksPath, projectRoot, tag);
-  
-  // ... function logic ...
-  
-  writeJSON(tasksPath, data, projectRoot, tag);
-}
-```
-
-## Tag Resolution Priority
-
-The tag resolution follows this exact priority order:
-
-1. **Explicit `--tag` flag**: `options.tag`
-2. **Current active tag**: `getCurrentTag(projectRoot)`  
-3. **Default fallback**: `'master'`
-
-```javascript
-// ✅ DO: Standard tag resolution pattern
-const tag = options.tag || getCurrentTag(projectRoot) || 'master';
-```
-
-## Commands Requiring Updates
-
-### High Priority (Core Task Operations)
-- [x] `add-task` - ✅ Fixed
-- [x] `list` - ✅ Fixed  
-- [x] `update-task` - ✅ Fixed
-- [x] `update-subtask` - ✅ Fixed
-- [x] `set-status` - ✅ Already correct
-- [x] `remove-task` - ✅ Already correct
-- [x] `remove-subtask` - ✅ Fixed
-- [x] `add-subtask` - ✅ Already correct
-- [x] `clear-subtasks` - ✅ Fixed
-- [x] `move-task` - ✅ Already correct
-
-### Medium Priority (Analysis & Expansion)
-- [x] `expand` - ✅ Fixed
-- [ ] `next` - ✅ Fixed
-- [ ] `show` (get-task) - Needs checking
-- [ ] `analyze-complexity` - Needs checking
-- [ ] `generate` - ✅ Fixed
-
-### Lower Priority (Utilities)
-- [ ] `research` - Needs checking
-- [ ] `complexity-report` - Needs checking
-- [ ] `validate-dependencies` - ✅ Fixed
-- [ ] `fix-dependencies` - ✅ Fixed
-- [ ] `add-dependency` - ✅ Fixed
-- [ ] `remove-dependency` - ✅ Fixed
-
-## MCP Integration Pattern
-
-MCP direct functions must also follow the tag-aware pattern:
-
-```javascript
-// ✅ DO: Tag-aware MCP direct function
-export async function coreActionDirect(args, log, context = {}) {
-  const { session } = context;
-  const { projectRoot, tag } = args; // MCP passes these in args
-  
-  try {
-    const result = await coreAction(
-      tasksPath,
-      // ... other parameters ...
-      { projectRoot, tag, session, mcpLog: logWrapper }
-    );
-    
-    return { success: true, data: result };
-  } catch (error) {
-    return { success: false, error: { code: 'ERROR_CODE', message: error.message } };
-  }
-}
-```
-
-## File Generation Tag-Aware Naming
-
-The `generate` command must use tag-aware file naming:
-
-```javascript
-// ✅ DO: Tag-aware file naming
-const taskFileName = targetTag === 'master' 
-  ? `task_${task.id.toString().padStart(3, '0')}.txt`
-  : `task_${task.id.toString().padStart(3, '0')}_${targetTag}.txt`;
-```
-
-**Examples:**
-- Master tag: `task_001.txt`, `task_002.txt`
-- Other tags: `task_001_feature.txt`, `task_002_feature.txt`
-
-## Common Anti-Patterns
-
-```javascript
-// ❌ DON'T: Missing getCurrentTag import
-import { readJSON, writeJSON } from '../utils.js'; // Missing getCurrentTag
-
-// ❌ DON'T: Hard-coded tag resolution
-const tag = options.tag || 'master'; // Missing getCurrentTag
-
-// ❌ DON'T: Missing --tag option
-.option('-f, --file <file>', 'Path to tasks file') // Missing --tag option
-
-// ❌ DON'T: Missing context parameter
-await coreFunction(tasksPath, param1, param2); // Missing { projectRoot, tag }
-
-// ❌ DON'T: Incorrect readJSON/writeJSON calls
-const data = readJSON(tasksPath); // Missing projectRoot and tag
+*   **MCP Tool:** `parse_prd`
+*   **CLI Command:** `task-master parse-prd [file] [options]`
+*   **Description:** `Parse a Product Requirements Document, PRD, or text file with Taskmaster to automatically generate an initial set of tasks in tasks.json.`
+*   **Key Parameters/Options:**
+    *   `input`: `Path to your PRD or requirements text file that Taskmaster should parse for tasks.` (CLI: `[file]` positional or `-i, --input <file>`)
+    *   `output`: `Specify where Taskmaster should save the generated 'tasks.json' file. Defaults to '.taskmaster/tasks/tasks.json'.` (CLI: `-o, --output <file>`)
+    *   `numTasks`: `Approximate number of top-level tasks Taskmaster should aim to generate from the document.` (CLI: `-n, --num-tasks <number>`)
+    *   `force`: `Use this to allow Taskmaster to overwrite an existing 'tasks.json' without asking for confirmation.` (CLI: `-f, --force`)
+*   **Usage:** Useful for bootstrapping a project from an existing requirements document.
+*   **Notes:** Task Master will strictly adhere to any specific requirements mentioned in the PRD, such as libraries, database schemas, frameworks, tech stacks, etc., while filling in any gaps where the PRD isn't fully specified. Tasks are designed to provide the most direct implementation path while avoiding over-engineering.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
