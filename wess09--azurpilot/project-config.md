@@ -1,103 +1,114 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: - **任务（task）层**: 映射到 `args.json` 的第一层键，例如 `Main`、`OpsiScheduling` 等，对应侧边栏中的“任务卡片”。
 ---
 
-# CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+### 配置系统与 GUI 选项映射规则（task / group / argument）
 
-## Project Overview
+- **核心概念**
+  - **任务（task）层**: 映射到 `args.json` 的第一层键，例如 `Main`、`OpsiScheduling` 等，对应侧边栏中的“任务卡片”。
+  - **选项组（group）层**: 映射到 `args.json` 的第二层键，例如 `Scheduler`、`Campaign`、`OpsiHazard1Leveling` 等，用于将一组相关的 GUI 选项归类。
+  - **选项（argument）层**: 映射到 `args.json` 的第三层键，每个选项是一个带属性的对象，属性包括:
+    - `type`: 控件类型，例如 `checkbox` / `select` / `textarea` / `input` / `datetime` / `storage` / `stored` / `state` / `lock` 等
+    - `value`: 实际的配置值（可以是标量、字符串、时间、列表等）
+    - `option`（可选）: 下拉/单选列表的可选值数组
+    - `validate`（可选）: 校验信息，例如 `[min, max]` 或 `'datetime'`
+    - `display`（可选）: 显示控制，例如 `hide` / `disabled` / 省略（正常）
+    - 其他辅助属性如 `valuetype`、`mode` 等也可以在 `argument.yaml` 中直接声明
 
-AzurLaneAutoScript (ALAS / AzurPilot) is an automation framework for the mobile game Azur Lane. It controls Android emulators via ADB/uiautomator2, takes screenshots, recognizes UI elements through image matching and OCR, and executes game tasks automatically. Supports CN/EN/JP/TW game servers with server-specific assets. Licensed under GPL-3.0.
+- **手动维护的配置文件**
+  - **`module/config/argument/task.yaml`**:
+    - 定义“任务分组”与“任务列表”，以及每个任务对应的“选项组列表”。
+    - 结构为三层: `<task_group> -> tasks -> <task> -> [<group>, ...]`。
+    - 这些映射最终控制:
+      - GUI 侧边栏卡组（任务列表、所属分组）
+      - 每个任务页中出现哪些 `group`（对应哪些配置分段）。
+  - **`module/config/argument/argument.yaml`**:
+    - 定义每个“选项组”包含的“选项”以及其属性。
+    - 结构为两层: `<group> -> <argument> -> {type/value/option/validate/display/...}`。
+    - 若某个 `<argument>` 直接写标量值，会在 `config_updater.py` 中转换为:
+      - `type`: 自动推断（例如 bool -> `checkbox`，有 `option` 时 -> `select`，时间类型 -> `datetime`）
+      - `value`: 使用原始值
+    - 若 `<argument>` 已显式写成字典，则该字典内容（包括 `type`、`value`、`option`、`validate`、`display` 等）优先级最高，会直接覆盖自动推断。
+    - 以 `_` 开头的 group 会在加载时被过滤（不会进入 GUI/args）。
+  - **`module/config/argument/override.yaml`**:
+    - 按 `task/group/argument` 路径，覆盖某些特殊选项的值或属性，常用于:
+      - 硬编码服务器刷新时间等不应在 GUI 中修改的项
+      - 将某些字段设置为隐藏 (`display: hide`) 或只读
+      - 特殊 `type`（如 `state` / `lock`）的覆盖逻辑
+    - 覆盖逻辑（见 `ConfigGenerator.args` 中 `check_override` 与 override 合并逻辑）:
+      - 只对已存在的 argument 生效（不存在会打印警告）
+      - 默认要求新旧值类型一致（除 `SuccessInterval` / `FailureInterval`）
+      - 若原 argument 有 `option`，覆盖的值必须在其 `option` 列表内
+      - 若 `override.yaml` 中该项是字典:
+        - 对其中的每个键逐一写入（包括 `value` / `display` / `type` 等）
+        - 若提供了非 `state` / `lock` 类型且存在非空 `value`，通常会附带 `display: hide`（使其在 GUI 中隐藏但生效）
+      - 若 `override.yaml` 中该项不是字典:
+        - 直接写入 `value`
+        - 同时将 `display` 设为 `hide`
+  - **`module/config/argument/gui.yaml`**:
+    - 定义 GUI 上出现的其他文本（例如按钮、标题、提示），用于 i18n。
+    - 结构: `<i18n_group> -> <i18n_key>: value or null`。
+    - 在 `generate_i18n` 中会被合并到 `i18n/<lang>.json` 的 `Gui` 节点下。
 
-**Design constraints**: Designed for 7×24h continuous operation. Real Android devices are not supported (black screen/freeze under long runs, screenshot compression, OCR model migration issues). Fixed 1280×720 resolution only — best balance between clarity and screenshot latency, non-standard aspect ratios have no unified standard.
+- **自动生成的配置文件与数据流**
+  - **`module/config/config_updater.py`** 中 `ConfigGenerator` 负责读入上述 YAML，生成多种产物:
+    - **`args.json`**（GUI 选项树的主数据源，三层结构: task -> group -> argument）:
+      - 由 `ConfigGenerator.args` 构造:
+        - 从 `task.yaml` 与 `dashboard.yaml` 读取每个 task 下的 group 列表（并为所有 task 自动附加 `Storage` 组）。
+        - 对每个 group，从 `argument` 属性中复制整组 argument 定义（包含 type/value/option/validate/display 等）。
+        - 再依次合入 `default.yaml` 与 `override.yaml` 的值:
+          - `default.yaml` 仅设置初始 `value`。
+          - `override.yaml` 会根据规则修改 `value` / `display` / `type` 等，使某些字段隐藏或锁定。
+        - 对每个有 `Scheduler.Command` 的 task，自动将其 `.value` 设为该 task 名，并将 `.display` 设为 `hide`，避免用户在 GUI 中误改。
+      - 最终写入 `config/argument/args.json`（具体路径由 `filepath_args()` 决定）。
+    - **`menu.json`**（侧边栏任务卡组）:
+      - 由 `ConfigGenerator.menu` 从 `task.yaml` 生成，结构约为:
+        - `<task_group> -> {menu, page, tasks: [<task>, ...]}`。
+      - 控制 GUI 左侧菜单（折叠/列表模式、是“设置页”还是“工具页”等）。
+    - **`config_generated.py`**:
+      - 由 `ConfigGenerator.generate_code` 基于 `argument` 结构与 `args.json` 的默认 `value` 生成。
+      - 提供 IDE 代码自动补全/静态引用（`GeneratedConfig` 类中为每个 `<group>.<argument>` 生成属性）。
+    - **`template.json`**:
+      - 由 `ConfigUpdater().update_file('template', is_template=True)` 生成。
+      - 基于 `args.json` 填充默认用户配置，并额外处理:
+        - 初始化 `Alas.DropRecord.AzurStatsID` 等字段
+        - 为事件、战役等任务注入最新活动的默认关卡/事件 ID
+        - 针对云手机环境等进行默认值 override。
+    - **`i18n/{lang}.json`**:
+      - 由 `ConfigGenerator.generate_i18n(lang)` 生成。
+      - 依赖:
+        - `args.json` 中的 task / group / argument 结构
+        - 旧 `i18n/<lang>.json`（保留和更新已有翻译）
+        - `gui.yaml`（补充 GUI 相关文案）
+        - 活动/服务器信息等动态内容。
+    - **部署模板相关 YAML**:
+      - `ConfigGenerator.generate_deploy_template()` 会基于 `deploy.template*.yaml` 模板生成多个平台的部署配置文件。
 
-## Commands
-
-This project uses **uv** for Python dependency management and script execution. All Python commands should be run via `uv run`.
-
-### Environment Setup
-```bash
-uv venv                                        # Create virtual environment
-uv pip install -r requirements-linux.txt       # Linux
-uv pip install -r requirements.txt             # Windows
-```
-
-### Running the Application
-```bash
-uv run gui.py          # Start WebUI server (default port 22267)
-uv run alas.py          # Run scheduler directly (headless)
-```
-
-### Linting
-```bash
-# Python (CI uses ruff with permissive settings - fatal syntax errors and undefined names only)
-uv run ruff check . --select E9,F63,F7,F82 --ignore F821,F722
-
-# Webapp (Electron/Vue)
-cd webapp && pnpm lint
-cd webapp && pnpm typecheck
-```
-
-### Building the Webapp
-```bash
-cd webapp && pnpm install
-cd webapp && pnpm build && pnpm compile
-```
-
-### Config Generation (required after modifying config YAML files)
-```bash
-uv run -m module.config.config_updater
-```
-This regenerates `args.json`, `menu.json`, `config_generated.py`, `template.json`, and `i18n/*.json`.
-
-### Asset Management
-```bash
-uv run -m dev_tools.button_extract    # Extract button definitions from screenshots
-```
-
-## Architecture
-
-### Core Flow
-1. `gui.py` starts the web server and manages config instances
-2. `alas.py` (`AzurLaneAutoScript`) is the task runner — loads config, initializes device, dispatches tasks to handlers
-3. Each task handler (e.g., `module/research/research.py`) inherits from base classes, uses the device for screenshots, UI detection, and input
-4. `module/device/device.py` wraps ADB/uiautomator2 for screenshot capture and touch input
-5. UI navigation (`module/ui/ui.py`) handles page detection and routing between game screens
-6. Template matching (`module/base/template.py`) and OCR (`module/ocr/`) identify game UI elements
-
-### Entry Points
-- **`alas.py`** — Core scheduler. `AzurLaneAutoScript.loop()` runs an infinite scheduling loop: pick next task by priority, dispatch to method, handle errors, sleep until next task.
-- **`gui.py`** — WebUI backend (PyWebIO + Starlette + uvicorn). Each ALAS config instance runs in its own `multiprocessing.Process`.
-- **`mcp_server_sse.py`** — MCP server exposing 18 tools over SSE for external AI assistant integration.
-
-### Module Layer Structure (`module/`)
-
-**Base layer** (`module/base/`):
-- `ModuleBase` (`base.py`) — Root class for all game logic. Composes `AzurLaneConfig` + `Device`. Provides `appear()`, `appear_then_click()`, `loop()`, image utilities.
-- `Button` (`button.py`) — UI element with bounding box, color, click area, template image. Supports server-specific assets.
-- `Template` (`template.py`) — Template matching against screenshots.
-- `Resource` (`resource.py`) — Base class tracking all Button/Template instances, supports cache release.
-
-**Device layer** (`module/device/`):
-- `Device` (`device.py`) — Multiple inheritance: `Screenshot + Control + AppControl + Input`. Unified interface for emulator interaction.
-- `module/device/method/` — Multiple screenshot/input backends: adb, minitouch, maatouch, droidcast, uiautomator2, nemu_ipc, ldopengl, hermit, wsa, ascreencap.
-- `module/device/platform/` — Emulator management (LDPlayer, BlueStacks, NoxPlayer, MuMu, etc.).
-
-**Config system** (`module/config/`):
-- `config/template.json` defines the schema and defaults for all config options.
-- `module/config/config_generated.py` is auto-generated from `template.json` — provides IDE autocomplete.
-- `module/config/config_updater.py` regenerates `config_generated.py` when `template.json` changes.
-- `module/config/config.py` (`AzurLaneConfig`) loads user config from `config/{config_name}.json` and merges with the template.
-- User config files are stored in `config/{config_name}.json` (e.g., `config/alas.json`).
-- 3-layer YAML pipeline for GUI: `task.yaml` (task→group mapping) → `argument.yaml` (group→argument definitions) → `override.yaml` (value/display patches).
-- `config_updater.py` generates: `args.json`, `menu.json`, `config_generated.py`, `template.json`, `i18n/*.json`.
-- Config path format: `<Task>.<Group>.<Argument>` (e.g., `Main.Campaign.Name`).
-- Access config: `self.config.Group_Argument` (underscore-separated).
-
-**UI navigation** (`module/ui/`):
-- `Page` (`page.py`) — Graph-based navigation. Each page has a `check_button` and `links` dict. Uses A* pathfinding for shortest navigation.
+- **开发与修改流程（如何让 GUI 选项落到 `args.json`）**
+  - **新增或修改一个 GUI 选项的大致步骤**:
+    1. **在 `argument.yaml` 中定义或修改一个选项**:
+       - 确定放在哪个 group 下: 例如在 `OpsiScheduling` 组中新增 `OperationCoinsReturnThreshold`。
+       - 写出其属性，例如:
+         - `type`: 控制 GUI 控件类型（若省略，`config_updater.py` 会按 value 类型自动推断）。
+         - `value`: 默认值。
+         - `option`: 若为下拉或单选，给出所有可选值列表。
+         - `validate`: 若需要范围校验或时间格式校验，填入对应内容。
+         - `display`: 若需要在 GUI 中隐藏或只读，使用 `hide` / `disabled` 等标记。
+    2. **确保该 group 已在 `task.yaml` 中挂到正确的 task**:
+       - 在相应 `task_group` 下的 `tasks` 中，为对应的 `<task>` 添加该 group。
+       - 例如 `OpsiScheduling` 任务下应包含 `OpsiScheduling` 这个 group，才能在 GUI 中显示这组选项，并最终出现在 `args.json` 的 `OpsiScheduling.OpsiScheduling.*` 路径下。
+    3. **如需强制覆盖/隐藏某些值（比如服务器刷新时间）**:
+       - 在 `override.yaml` 中为对应路径添加条目，例如:
+         - `<task> -> <group> -> <argument>: <value>`
+         - 或写成字典并设置 `display: hide`，防止 GUI 修改。
+    4. **如需新增界面文本或翻译 key**:
+       - 在 `gui.yaml` 中定义对应的 GUI 文案键值。
+    5. **运行 `config_updater.py` 完整生成**:
+       - 在项目根目录执行:
+         - `python -m module.config.config_updater`
+       - 或直接运行 `module/config/config_updater.py`（脚本自身会 `chdir` 到 Alas 根目录），它将:
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
