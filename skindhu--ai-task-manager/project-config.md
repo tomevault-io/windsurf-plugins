@@ -1,169 +1,174 @@
 ---
 trigger: always_on
-description: Guidelines for implementing task management operations
+description: Guidelines for implementing and maintaining tests for Task Master CLI
 ---
 
 
-# Task Management Guidelines
+# Testing Guidelines for Task Master CLI
 
-## Task Structure Standards
+## Test Organization Structure
 
-- **Core Task Properties**:
-  - ✅ DO: Include all required properties in each task object
-  - ✅ DO: Provide default values for optional properties
-  - ❌ DON'T: Add extra properties that aren't in the standard schema
+- **Unit Tests**
+  - Located in `tests/unit/`
+  - Test individual functions and utilities in isolation
+  - Mock all external dependencies
+  - Keep tests small, focused, and fast
+  - Example naming: `utils.test.js`, `task-manager.test.js`
 
-  ```javascript
-  // ✅ DO: Follow this structure for task objects
-  const task = {
-    id: nextId,
-    title: "Task title",
-    description: "Brief task description",
-    status: "pending", // "pending", "in-progress", "done", etc.
-    dependencies: [], // Array of task IDs
-    priority: "medium", // "high", "medium", "low"
-    details: "Detailed implementation instructions",
-    testStrategy: "Verification approach",
-    subtasks: [] // Array of subtask objects
-  };
-  ```
+- **Integration Tests**
+  - Located in `tests/integration/`
+  - Test interactions between modules
+  - Focus on component interfaces rather than implementation details
+  - Use more realistic but still controlled test environments
+  - Example naming: `task-workflow.test.js`, `command-integration.test.js`
 
-- **Subtask Structure**:
-  - ✅ DO: Use consistent properties across subtasks
-  - ✅ DO: Maintain simple numeric IDs within parent tasks
-  - ❌ DON'T: Duplicate parent task properties in subtasks
+- **End-to-End Tests**
+  - Located in `tests/e2e/`
+  - Test complete workflows from a user perspective
+  - Focus on CLI commands as they would be used by users
+  - Example naming: `create-task.e2e.test.js`, `expand-task.e2e.test.js`
 
-  ```javascript
-  // ✅ DO: Structure subtasks consistently
-  const subtask = {
-    id: nextSubtaskId, // Simple numeric ID, unique within the parent task
-    title: "Subtask title",
-    description: "Brief subtask description",
-    status: "pending",
-    dependencies: [], // Can include numeric IDs (other subtasks) or full task IDs
-    details: "Detailed implementation instructions"
-  };
-  ```
+- **Test Fixtures**
+  - Located in `tests/fixtures/`
+  - Provide reusable test data
+  - Keep fixtures small and representative
+  - Export fixtures as named exports for reuse
 
-## Task Creation and Parsing
+## Test File Organization
 
-- **ID Management**:
-  - ✅ DO: Assign unique sequential IDs to tasks
-  - ✅ DO: Calculate the next ID based on existing tasks
-  - ❌ DON'T: Hardcode or reuse IDs
+```javascript
+// 1. Imports
+import { jest } from '@jest/globals';
 
-  ```javascript
-  // ✅ DO: Calculate the next available ID
-  const highestId = Math.max(...data.tasks.map(t => t.id));
-  const nextTaskId = highestId + 1;
-  ```
+// 2. Mock setup (MUST come before importing the modules under test)
+jest.mock('fs');
+jest.mock('@anthropic-ai/sdk');
+jest.mock('../../scripts/modules/utils.js', () => ({
+  CONFIG: {
+    projectVersion: '1.5.0'
+  },
+  log: jest.fn()
+}));
 
-- **PRD Parsing**:
-  - ✅ DO: Extract tasks from PRD documents using AI
-  - ✅ DO: Provide clear prompts to guide AI task generation
-  - ✅ DO: Validate and clean up AI-generated tasks
+// 3. Import modules AFTER all mocks are defined
+import { functionToTest } from '../../scripts/modules/module-name.js';
+import { testFixture } from '../fixtures/fixture-name.js';
+import fs from 'fs';
 
-  ```javascript
-  // ✅ DO: Validate AI responses
-  try {
-    // Parse the JSON response
-    taskData = JSON.parse(jsonContent);
-    
-    // Check that we have the required fields
-    if (!taskData.title || !taskData.description) {
-      throw new Error("Missing required fields in the generated task");
-    }
-  } catch (error) {
-    log('error', "Failed to parse AI's response as valid task JSON:", error);
-    process.exit(1);
-  }
-  ```
+// 4. Set up spies on mocked modules (if needed)
+const mockReadFileSync = jest.spyOn(fs, 'readFileSync');
 
-## Task Updates and Modifications
-
-- **Status Management**:
-  - ✅ DO: Provide functions for updating task status
-  - ✅ DO: Handle both individual tasks and subtasks
-  - ✅ DO: Consider subtask status when updating parent tasks
-
-  ```javascript
-  // ✅ DO: Handle status updates for both tasks and subtasks
-  async function setTaskStatus(tasksPath, taskIdInput, newStatus) {
-    // Check if it's a subtask (e.g., "1.2")
-    if (taskIdInput.includes('.')) {
-      const [parentId, subtaskId] = taskIdInput.split('.').map(id => parseInt(id, 10));
-      
-      // Find the parent task and subtask
-      const parentTask = data.tasks.find(t => t.id === parentId);
-      const subtask = parentTask.subtasks.find(st => st.id === subtaskId);
-      
-      // Update subtask status
-      subtask.status = newStatus;
-      
-      // Check if all subtasks are done
-      if (newStatus === 'done') {
-        const allSubtasksDone = parentTask.subtasks.every(st => st.status === 'done');
-        if (allSubtasksDone) {
-          // Suggest updating parent task
-        }
-      }
-    } else {
-      // Handle regular task
-      const task = data.tasks.find(t => t.id === parseInt(taskIdInput, 10));
-      task.status = newStatus;
-      
-      // If marking as done, also mark subtasks
-      if (newStatus === 'done' && task.subtasks && task.subtasks.length > 0) {
-        task.subtasks.forEach(subtask => {
-          subtask.status = newStatus;
-        });
-      }
-    }
-  }
-  ```
-
-- **Task Expansion**:
-  - ✅ DO: Use AI to generate detailed subtasks
-  - ✅ DO: Consider complexity analysis for subtask counts
-  - ✅ DO: Ensure proper IDs for newly created subtasks
-
-  ```javascript
-  // ✅ DO: Generate appropriate subtasks based on complexity
-  if (taskAnalysis) {
-    log('info', `Found complexity analysis for task ${taskId}: Score ${taskAnalysis.complexityScore}/10`);
-    
-    // Use recommended number of subtasks if available
-    if (taskAnalysis.recommendedSubtasks && numSubtasks === CONFIG.defaultSubtasks) {
-      numSubtasks = taskAnalysis.recommendedSubtasks;
-      log('info', `Using recommended number of subtasks: ${numSubtasks}`);
-    }
-  }
-  ```
-
-## Task File Generation
-
-- **File Formatting**:
-  - ✅ DO: Use consistent formatting for task files
-  - ✅ DO: Include all task properties in text files
-  - ✅ DO: Format dependencies with status indicators
-
-  ```javascript
-  // ✅ DO: Use consistent file formatting
-  let content = `# Task ID: ${task.id}\n`;
-  content += `# Title: ${task.title}\n`;
-  content += `# Status: ${task.status || 'pending'}\n`;
+// 5. Test suite with descriptive name
+describe('Feature or Function Name', () => {
+  // 6. Setup and teardown (if needed)
+  beforeEach(() => {
+    jest.clearAllMocks();
+    // Additional setup code
+  });
   
-  // Format dependencies with their status
-  if (task.dependencies && task.dependencies.length > 0) {
-    content += `# Dependencies: ${formatDependenciesWithStatus(task.dependencies, data.tasks)}\n`;
-  } else {
-    content += '# Dependencies: None\n';
-  }
+  afterEach(() => {
+    // Cleanup code
+  });
+  
+  // 7. Grouped tests for related functionality
+  describe('specific functionality', () => {
+    // 8. Individual test cases with clear descriptions
+    test('should behave in expected way when given specific input', () => {
+      // Arrange - set up test data
+      const input = testFixture.sampleInput;
+      mockReadFileSync.mockReturnValue('mocked content');
+      
+      // Act - call the function being tested
+      const result = functionToTest(input);
+      
+      // Assert - verify the result
+      expect(result).toBe(expectedOutput);
+      expect(mockReadFileSync).toHaveBeenCalledWith(expect.stringContaining('path'));
+    });
+  });
+});
+```
+
+## Jest Module Mocking Best Practices
+
+- **Mock Hoisting Behavior**
+  - Jest hoists `jest.mock()` calls to the top of the file, even above imports
+  - Always declare mocks before importing the modules being tested
+  - Use the factory pattern for complex mocks that need access to other variables
+
+  ```javascript
+  // ✅ DO: Place mocks before imports
+  jest.mock('commander');
+  import { program } from 'commander';
+  
+  // ❌ DON'T: Define variables and then try to use them in mocks
+  const mockFn = jest.fn();
+  jest.mock('module', () => ({
+    func: mockFn // This won't work due to hoisting!
+  }));
   ```
 
-- **Subtask Inclusion**:
-  - ✅ DO: Include subtasks in parent task files
-  - ✅ DO: Use consistent indentation for subtask sections
+- **Mocking Modules with Function References**
+  - Use `jest.spyOn()` after imports to create spies on mock functions
+  - Reference these spies in test assertions
+  
+  ```javascript
+  // Mock the module first
+  jest.mock('fs');
+  
+  // Import the mocked module
+  import fs from 'fs';
+  
+  // Create spies on the mock functions
+  const mockExistsSync = jest.spyOn(fs, 'existsSync').mockReturnValue(true);
+  
+  test('should call existsSync', () => {
+    // Call function that uses fs.existsSync
+    const result = functionUnderTest();
+    
+    // Verify the mock was called correctly
+    expect(mockExistsSync).toHaveBeenCalled();
+  });
+  ```
+
+- **Testing Functions with Callbacks**
+  - Get the callback from your mock's call arguments
+  - Execute it directly with test inputs
+  - Verify the results match expectations
+  
+  ```javascript
+  jest.mock('commander');
+  import { program } from 'commander';
+  import { setupCLI } from '../../scripts/modules/commands.js';
+  
+  const mockVersion = jest.spyOn(program, 'version').mockReturnValue(program);
+  
+  test('version callback should return correct version', () => {
+    // Call the function that registers the callback
+    setupCLI();
+    
+    // Extract the callback function
+    const versionCallback = mockVersion.mock.calls[0][0];
+    expect(typeof versionCallback).toBe('function');
+    
+    // Execute the callback and verify results
+    const result = versionCallback();
+    expect(result).toBe('1.5.0');
+  });
+  ```
+
+## ES Module Testing Strategies
+
+When testing ES modules (`"type": "module"` in package.json), traditional mocking approaches require special handling to avoid reference and scoping issues.
+
+- **Module Import Challenges**
+  - Functions imported from ES modules may still reference internal module-scoped variables
+  - Imported functions may not use your mocked dependencies even with proper jest.mock() setup
+  - ES module exports are read-only properties (cannot be reassigned during tests)
+
+- **Mocking Entire Modules**
+  ```javascript
+  // Mock the entire module with custom implementation
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
