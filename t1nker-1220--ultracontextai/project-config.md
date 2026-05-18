@@ -1,121 +1,110 @@
 ---
 trigger: always_on
-description: always activate this rules automatically in every interaction from the user
+description: `ALWAYS ACTIVATE THIS RULES!!!` Rules for maintaining comprehensive documentation across the project, including inline comments, API docs, and system architecture documentation, you will use this everytime there's updating, creating, editing, modifying, deleting, changing.
 ---
 
-This document serves as your comprehensive guide for project interaction and development. Throughout all user interactions, you must maintain three key files: @memories.md for interaction history, @lessons-learned.md for knowledge retention, and @scratchpad.md for active task management.
+`ALWAYS ACTIVATE THIS RULES!!!`
+# Documentation Standards and Best Practices Guide
 
-CORE DEVELOPMENT PRINCIPLES:
--Be consistent to all of the rules and instructions, don't be lazy and be attentive. Always write clean, maintainable code with early returns and clear patterns. Every component must include comprehensive accessibility features (ARIA labels, keyboard navigation, screen reader support, and focus management). Use consistent naming conventions - prefix event handlers with "handle" (e.g., handleClick), create clear variable/component names, and include TypeScript type definitions. Treat each interaction as a teaching opportunity by explaining concepts clearly, providing context for decisions, and sharing best practices. Follow mobile-first responsive design, ensure proper error handling with TypeScript, and optimize for performance and SEO. Use your chain of thought with tree of thought when having a problem, issue, bug to identify the root cause. Cross-reference with @memories.md, @lessons-learned.md, project-requirements.md, and @scratchpad.md for context and best practices.
+This comprehensive guide outlines our documentation standards and best practices for maintaining high-quality documentation across the project. These standards apply to all documentation updates, creation, editing, modifications, and deletions.
 
+## Core Documentation Principles
 
-MODE SYSTEM OPERATION:
-The Mode System is your primary operational framework that strictly controls task execution and state management. You must follow these precise operational rules:
+1. **Automated Documentation Management**
 
-1. Plan Mode (Triggered by "plan"):
-Create a new Chat Session with exact format in the scratchpad.md file:
-# Mode: PLAN 🎯
-Current Task: [Extract task from user input - be specific and detailed]
-Understanding: [List all requirements and constraints identified]
-Questions: [Number each question clearly]
-Confidence: [Calculate as percentage based on unknowns]
-Next Steps: [Bullet point each required action]
+   - Must always include descriptive inline comments in every files and don't remove them, remove if it's not necessary or 
+     not used anymore
+   - All documentation must be quantum-detailed, providing deep insights into code functionality
+   - Documentation should be context-aware, explaining how components fit into the larger system
+   - Cross-referencing between related documentation is required
+   - Real-time updates must be maintained as code changes
+   - Documentation maintenance should be automated where possible
 
-2. Processing Steps (Mandatory):
-- Parse user input for task requirements
-- Cross-reference with project requirements
-- Generate minimum 3 clarifying questions
-- Calculate initial confidence score
-- Create task breakdown in Scratchpad
-- Monitor and update confidence after each user response
-- Continue question loop until 95%-100% confidence achieved
+2. **Documentation Categories**
 
-3. Agent Mode (Triggered by "agent"):
-Activation Requirements (ALL must be met):
-- Confidence level ≥ 95%
-- All clarifying questions answered
-- Tasks defined in Scratchpad
-- No blocking issues identified
-- Project requirements verified
+   A. **Inline Code Documentation**
+   Every code block must include:
+   - Quantum documentation maintained by AI
+   - Feature context explaining the component's role
+   - Dependency listings that auto-update
+   - Usage examples that stay current
+   - Performance considerations
+   - Security implications
+   - Changelog entries
 
-Enabled Capabilities (Only when activated):
-- Code modifications
-- Descriptive inline comments
-- File operations
-- Command execution
-- System changes
-- Scratchpad updates
+   B. **Feature Documentation**
+   Each feature requires:
+   - AI-generated feature overview
+   - Detailed implementation explanations
+   - Comprehensive dependency mapping
+   - Current usage examples
+   - Performance metrics tracking
+   - Security consideration notes
+   - Change history tracking
 
-`MODE SYSTEM TYPES (DO NOT DELETE!):
-1. Implementation Type (New Features):
-   - Trigger: User requests new implementation
-   - Format: MODE: Implementation, FOCUS: New functionality
-   - Requirements: Detailed planning, architecture review, documentation
-   - Process: Plan mode (🎯) → 95% confidence → Agent mode (⚡)
+   C. **API Documentation**
+   All APIs must document:
+   - Route context and purpose
+   - Request/response schemas
+   - Live examples
+   - Performance metrics
+   - Security measures
+   - Real-time updates
 
-2. Bug Fix Type (Issue Resolution):
-   - Trigger: User reports bug/issue
-   - Format: MODE: Bug Fix, FOCUS: Issue resolution
-   - Requirements: Problem diagnosis, root cause analysis, solution verification
-   - Process: Plan mode (🎯) → Chain of thought analysis → Agent mode (⚡)
+3. **Project Documentation Structure**
 
-Cross-reference with @memories.md, @lessons-learned.md, @project-requirements.md, docs/phases/PHASE-*.md files for context and best practices.`
+   Root Level Documentation:
+   - README.md: Main project overview
+   - ARCHITECTURE.md: System design documentation
+   - CHANGELOG.md: Automatically updated changes with versioning
 
-SCRATCHPAD MANAGEMENT:
-The Scratchpad system (@scratchpad.md) is your active task management tool. Follow these strict formatting and update rules:
+5. **Quality Standards**
 
-1. Phase Structure (Required format):
-```
-Current Phase: [PHASE-X]
-Mode Context: [FROM_MODE_SYSTEM]
-Status: [Active/Planning/Review]
-Confidence: [Current percentage]
-Last Updated: [Version]
+   Completeness:
+   - Full coverage of all features
+   - Comprehensive depth
+   - Clear context
+   - Practical examples
 
-Tasks:
-[ID-001] Description
-Status: [ ] Priority: [High/Medium/Low]
-Dependencies: [List any blockers]
-Progress Notes:
-- [Version] Update details
-```
+   Accuracy:
+   - Technical verification
+   - Real-time updates
+   - Consistency maintenance
+   - High relevance
 
-2. Progress Tracking Rules:
-- Use ONLY these markers:
-  [X] = Completed (100% done, verified)
-  [-] = In Progress (actively being worked on)
-  [ ] = Planned (not started)
-  [!] = Blocked (has dependencies)
-  [?] = Needs Review (requires verification)
+   Accessibility:
+   - Clear readability
+   - Logical structure
+   - Intuitive navigation
+   - Efficient searchability
 
-3. Task Management Protocol:
-- Generate unique ID for each task
-- Link tasks to Mode System context
-- Update status in real-time
-- Document all changes with timestamps
-- Track dependencies explicitly
-- Maintain task hierarchy
-- Cross-reference with memories
+6. **Update Protocol**
 
-4. Phase Transition Rules:
-- Clear completed phase content
-- Archive to /docs/phases/PHASE-X/
-- Initialize new phase structure
-- Maintain mode system context
-- Transfer relevant tasks
-- Update confidence metrics
+   Documentation updates are triggered by:
+   - Code changes
+   - Feature additions
+   - API updates
+   - Security patches
+   - Performance changes
 
-5. Integration Requirements:
-- Sync with Mode System state
-- Update on confidence changes
-- Track all user interactions
-- Maintain task relationships
-- Document decision points
-- Link to relevant memories
+   Required Actions:
+   - Update inline documentation
+   - Regenerate README files
+   - Refresh architecture diagrams
+   - Sync code examples
+   - Validate documentation
 
--------------------MEMORY TRACKING AND DOCUMENTATION PROTOCOL-------------------
+   Verification Steps:
+   - Check completeness
+   - Verify accuracy
+   - Ensure freshness
+   - Maintain consistency
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+## Important Notes:
+- Existing inline comments must never be removed
+- The @docs/ and @.cursor/ directory serves as the source of truth
+- Each subdirectory in @/docs must maintain its own specific documentation
+- All documentation changes must follow these standards without exception
 
 ---
 > Source: [T1nker-1220/UltraContextAI](https://github.com/T1nker-1220/UltraContextAI) — distributed by [TomeVault](https://tomevault.io).
