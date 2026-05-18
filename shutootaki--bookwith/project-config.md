@@ -1,0 +1,224 @@
+---
+trigger: always_on
+description: This file offers comprehensive guidance for Claude Code (claude.ai/code) when working with the BookWith project codebase.
+---
+
+# CLAUDE.md
+
+This file offers comprehensive guidance for Claude Code (claude.ai/code) when working with the BookWith project codebase.
+
+**Last updated**: 2025-06-29  
+**Project Version**: v0.1.0  
+**Supported Claude Code**: claude.ai/code
+
+## Project Overview
+
+This project is an AI-powered next-generation browser-based ePub reader called "BookWith".
+
+**Differentiators from conventional e-book readers:**
+
+- **Interactive reading with an AI assistant** that understands the book's content
+- **Multi-tier memory system**: short-, mid-, and long-term memory for context retention
+- **Semantic search**: discover related information via vector search
+- **Integrated annotation**: seamless integration of highlights, notes, and AI conversations
+- **Reading continuity**: a continuous reading experience across sessions
+
+**Target users:**
+
+- Academic researchers (deep understanding of papers and technical books)
+- Avid readers (enhanced enjoyment of novels and general-interest books)
+- Learners (efficient study with textbooks and reference books)
+- Business professionals (grasp key points of business books and reports)
+
+## Architecture
+
+### Monorepo Setup
+
+**Turbo + pnpm Workspaces**
+
+```
+packages:
+  - 'apps/*' # applications
+  - 'packages/*' # shared libraries
+```
+
+**Directory Structure**
+
+- **apps/api/**: FastAPI backend (Python 3.13+)
+  - Dependency management with Poetry
+  - DDD layered architecture
+  - Automatic OpenAPI generation
+- **apps/reader/**: Next.js frontend (TypeScript/React)
+  - App Router + Turbopack
+  - Automatic type generation (OpenAPI → TypeScript)
+  - State management with Valtio
+- **packages/**: Shared libraries (planned)
+  - Shared type definitions
+  - Utility functions
+  - Common components
+
+### Backend Architecture
+
+DDD (Domain-Driven Design) layered architecture:
+
+- **Domain Layer** (`src/domain/`): Entities, value objects, repository interfaces
+- **UseCase Layer** (`src/usecase/`): Application-specific business logic
+- **Infrastructure Layer** (`src/infrastructure/`): Integration with external tech (DB, DI, memory)
+- **Presentation Layer** (`src/presentation/`): FastAPI routes & schemas
+
+## Development Commands
+
+### Environment Setup
+
+```bash
+# 1. Install dependencies (repo root)
+pnpm i
+
+# 2. Set environment variables
+cd apps/api
+cp src/config/.env.example src/config/.env
+# Edit .env (set API keys, etc.)
+
+# 3. Start Docker services (Weaviate + GCS emulator)
+make docker.up
+
+# 4. Launch API in dev mode
+make configure  # poetry install --no-root
+make run        # FastAPI on port 8000
+
+# 5. Launch frontend in another terminal
+cd apps/reader
+pnpm dev        # Next.js on port 7127
+
+# Or launch everything at once (repo root)
+pnpm dev        # turbo run dev --parallel
+```
+
+### Build & Test
+
+```bash
+# Build all
+pnpm build      # turbo run build
+
+# Lint all
+pnpm lint       # turbo run lint
+
+# API lint & type-check
+cd apps/api
+make lint       # mypy + pre-commit
+
+# Frontend type-check
+cd apps/reader
+pnpm ts:check   # tsc --noEmit
+```
+
+### API Development
+
+```bash
+cd apps/api
+
+# Start dev server
+make run
+
+# Lint & type-check
+make lint
+
+# Run via Docker
+make docker.up
+
+# Generate OpenAPI schema (for frontend)
+cd ../reader
+pnpm openapi:ts
+```
+
+## Key Tech Stack
+
+### Backend (apps/api/)
+
+- **FastAPI** – web framework
+- **SQLAlchemy** – ORM (PostgreSQL)
+- **Pydantic** – data validation
+- **Weaviate** – vector DB (memory)
+- **LangChain** – LLM integration
+- **OpenAI API** – GPT-4 for chat & summarization
+
+### Frontend (apps/reader/)
+
+- **Next.js 15** – React framework
+- **TypeScript** – type safety
+- **Tailwind CSS** – styling
+- **SWR** – data fetching
+- **Epub.js** – ePub rendering
+- **Valtio & Jotai** – state management
+
+## Memory Management Feature
+
+A distinctive feature is long-term memory in LLM interactions.
+
+### Memory Levels
+
+- **Short-term memory** – recent conversation buffer
+- **Mid-term memory** – automatic conversation summaries
+- **Long-term memory** – vector search for relevant info
+- **User profile** – extraction & use of personal info
+
+### Implementation Locations
+
+- `src/infrastructure/memory/` – memory functionality
+- `src/usecase/message/` – message processing logic
+- `src/config/app_config.py` – memory-related settings
+
+## Domain Model
+
+### Main Entities
+
+- **Book** – book entity (ID, title, description, status)
+- **Chat** – chat entity (user + book)
+- **Message** – individual message within a chat
+- **Annotation** – highlights & notes
+
+### Repository Pattern
+
+For each entity:
+
+- Interface defined in domain layer
+- PostgreSQL implementation in infrastructure layer
+
+## Development Notes
+
+### DDD Principles
+
+- Entity identity by ID
+- Value objects immutable with `@dataclass(frozen=True)`
+- Business logic in domain layer
+- Maintain dependency direction (upper → lower)
+
+### Type Safety
+
+- Backend: mandatory MyPy checks
+- Frontend: TypeScript strict mode
+- API schema: automatic OpenAPI generation
+
+### Configuration Management
+
+- `apps/api/src/config/.env*` – env vars
+- `AppConfig` class – Pydantic settings
+- Memory-related thresholds & limits also here
+
+## Deployment
+
+### Docker Support
+
+**Docker Compose**
+
+```
+services:
+  weaviate: # vector DB
+    - Ports: 8080 (HTTP), 50051 (gRPC)
+    - Persistence: weaviate_data volume
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [shutootaki/bookwith](https://github.com/shutootaki/bookwith) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-18 -->
