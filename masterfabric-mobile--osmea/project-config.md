@@ -1,106 +1,207 @@
 ---
 trigger: always_on
-description: OSMEA sizer extensions - responsive, spacing, duration, padding, alignment
+description: OSMEA text extensions - font, alignment, spacing, decoration with context
 ---
 
 
-# OSMEA Sizer Extensions - Cursor Rules
+# OSMEA Text Extensions - Cursor Rules
 
 ## 📦 Package Overview
-OSMEA Sizer Extensions provides comprehensive utilities for responsive design, spacing, animations, and UI layout in Flutter applications. This file contains 25+ extension categories with 800+ utility methods for consistent, responsive UI development.
+OSMEA Text Extensions provide comprehensive utility extensions for text styling in Flutter applications. These extensions work seamlessly with `OsmeaComponents.text` to provide consistent typography, spacing, and styling across the entire application.
 
 ## Import Statement
-Always import the sizer extensions at the top of your files:
+Always import OsmeaComponents at the top of your files:
 ```dart
 import 'package:osmea_components/osmea_components.dart';
+```
+
+## Color Usage
+
+### ✅ Use OsmeaColors
+```dart
+// ✅ Correct - using OsmeaColors
+OsmeaComponents.text(
+  'Hello',
+  color: OsmeaColors.nordicBlue,
+  fontSize: context.fontSizeMedium,
+)
+
+OsmeaComponents.text(
+  'Primary text',
+  color: OsmeaColors.textPrimary,
+  fontSize: context.fontSizeLarge,
+)
+
+OsmeaComponents.text(
+  'Secondary text',
+  color: OsmeaColors.textSecondary,
+  fontSize: context.fontSizeMedium,
+)
+```
+
+### ❌ Don't Use Standard Colors
+```dart
+// ❌ Wrong - using standard Colors
+OsmeaComponents.text(
+  'Hello',
+  color: Colors.blue,
+  fontSize: context.fontSizeMedium,
+)
+
+OsmeaComponents.text(
+  'Primary text',
+  color: Colors.black,
+  fontSize: context.fontSizeLarge,
+)
 ```
 
 ## 🎯 Development Guidelines
 
 ### 📁 File Structure
 ```
-packages/components/lib/src/utils/
-└── sizer_extensions.dart    # Main sizer extensions file (858 lines)
+packages/components/lib/src/
+└── utils/
+    └── text_extensions.dart         # Text utility extensions
 ```
 
-### 🎨 Extension Categories Overview
+### 🎨 Extension Categories
 
-#### 1. 📱 Core Sizer Extensions (`SizerExtension`)
-- **Screen Dimensions**: `allHeight`, `allWidth`, `mediaQuery`
-- **Text Scaling**: `textScaler`, `textScaleFactor`
-- **Dynamic Sizing**: `dynamicWidth()`, `dynamicHeight()`
-- **Value Scaling**: `lowValue`, `normalValue`, `mediumValue`, `highValue`
-- **Radius Values**: `radiusNone`, `radiusLow`, `radiusNormal`, `radiusMedium`, `radiusHigh`
-- **Scale Values**: `scaleLowValue`, `scaleMediumValue`, `scaleHighValue`
-- **Utility Values**: `nullValue`, `infinity`
-- **Dividers**: `divider1`, `divider2`, `divider3`
+#### 1. **Core Typography Extensions**
+- `FontWeightExtension` - Font weight utilities (thin to black)
+- `TextSizeX` - Font size utilities (tiny to extra large)
+- `FontStyleExtension` - Font style options (normal, italic)
+- `FontFamilyExtension` - Font family selection (20+ fonts)
 
-#### 2. ⭕ Border Radius Extensions (`BorderRadiusExtension`)
-- **Basic Radius**: `borderRadiusZero`, `borderRadiusNone`, `borderRadiusLow`
-- **Standard Radius**: `borderRadiusNormal`, `borderRadiusMedium`, `borderRadiusHigh`
-- **Special Radius**: `borderRadiusMinStandard` (7), `borderRadiusMaxStandard` (13)
+#### 2. **Text Layout Extensions**
+- `TextAlignExtension` - Text alignment (left, right, center, justify, start, end)
+- `TextOverflowExtension` - Text overflow handling (clip, fade, ellipsis, visible)
+- `TextMaxLineExtension` - Line limit controls (1 to unlimited)
+- `TextBaselineExtension` - Baseline alignment (alphabetic, ideographic)
 
-#### 3. 🔲 Border Width Extensions (`BorderWidthExtension`)
-- **Standard Width**: `borderWidth` (0.5)
+#### 3. **Text Styling Extensions**
+- `TextDecorationExtension` - Text decorations (none, underline, overline, lineThrough)
+- `TextDecorationStyleExtension` - Decoration styles (solid, double, dotted, dashed, wavy)
+- `TextCapitalizationExtension` - Text capitalization (words, sentences, characters, none)
 
-#### 4. ⏱️ Duration Extensions (`DurationExtension`)
-- **Time Units**: `7.seconds`, `7.minutes`, `7.hours`, `7.days`, `7.weeks`
-- **Micro Units**: `7.microseconds`, `7.milliseconds`
-- **Zero Duration**: `7.zero`
+#### 4. **Advanced Typography Extensions**
+- `FontFeatureExtension` - Font features (smallCaps, oldstyleNums, liningNums, etc.)
+- `FontVariationExtension` - Font variations (normal, wide, condensed, slant)
+- `LetterSpacingExtension` - Letter spacing (tight to extra loose)
+- `WordSpacingExtension` - Word spacing (tight to loose)
+- `TextLeadingDistributionExtension` - Line height distribution (proportional, even)
 
-#### 5. ⏰ Duration Values Extensions (`DurationValuesExtension`)
-- **Basic Durations**: `durationZero`, `durationInstant`, `durationFast`, `durationQuick`
-- **Standard Durations**: `durationNormal`, `durationMedium`, `durationSlow`, `durationVerySlow`
-- **Long Durations**: `durationLong`, `durationVeryLong`
-- **Animation Durations**: `animationShort`, `animationMedium`, `animationLong`, `animationSlow`
-- **Delay Durations**: `delayShort`, `delayMedium`, `delayLong`
-- **Timeout Durations**: `timeoutQuick`, `timeoutNormal`, `timeoutLong`, `timeoutVeryLong`
+### 🔧 Usage Rules
 
-#### 6. 📐 Alignment Extensions (`AlignmentExtension`)
-- **Position Alignments**: `topLeft`, `topCenter`, `topRight`, `centerLeft`, `center`, `centerRight`, `bottomLeft`, `bottomCenter`, `bottomRight`
-- **Main Axis**: `start`, `end`, `centerMain`, `spaceBetween`, `spaceAround`, `spaceEvenly`
-- **Cross Axis**: `crossStart`, `crossEnd`, `crossCenter`, `crossStretch`, `crossBaseline`
-- **Wrap Alignment**: `wrapStart`, `wrapEnd`, `wrapCenter`, `wrapSpaceBetween`, `wrapSpaceAround`, `wrapSpaceEvenly`
-- **Axis Size**: `min`, `max`
-- **Text Direction**: `ltr`, `rtl`
-- **Axis Direction**: `horizontal`, `vertical`
+#### 1. Primary Usage Pattern with OsmeaComponents.text
+```dart
+// ✅ Good - Use extensions with OsmeaComponents.text
+OsmeaComponents.text(
+  'Page Title',
+  fontSize: context.fontSizeExtraLarge,
+  fontFamily: context.fontRoboto,
+  fontWeight: context.semiBold,
+  letterSpacing: context.letterSpacingWide,
+  textAlign: context.textCenter,
+  maxLines: context.maxLineTwo,
+  overflow: context.ellipsis,
+  color: OsmeaColors.nordicBlue,
+)
 
-#### 7. 📦 Box Fit Extensions (`BoxFitExtension`)
-- **Fit Types**: `fill`, `contain`, `cover`, `fitWidth`, `fitHeight`, `scaleDown`
+// ✅ Good - Use extensions for additional styling
+OsmeaComponents.text(
+  'Styled text with extensions',
+  fontSize: context.fontSizeMedium,
+  fontFamily: context.fontMontserrat,
+  fontWeight: context.medium,
+  letterSpacing: context.letterSpacingNormal,
+  wordSpacing: context.wordSpacingWide,
+  textAlign: context.textJustify,
+  decoration: context.underline,
+  decorationStyle: context.solid,
+  color: OsmeaColors.textPrimary,
+)
 
-#### 8. 📐 Stack Fit Extensions (`StackFitExtension`)
-- **Stack Fits**: `loose`, `expand`, `passthrough`
+// ❌ Bad - Hard-coded values instead of extensions
+OsmeaComponents.text(
+  'Styled text',
+  fontSize: 16,
+  fontFamily: 'Roboto',
+  fontWeight: FontWeight.w500,
+  letterSpacing: 0.5,
+  wordSpacing: 1.0,
+  textAlign: TextAlign.center,
+  maxLines: 2,
+  overflow: TextOverflow.ellipsis,
+)
+```
 
-#### 9. 📏 Spacing Extensions (`SpacingExtension`)
-- **Dynamic Spacing**: `spacingZero`, `spacingLow`, `spacingNormal`, `spacingMedium`, `spacingHigh`
-- **Fixed Spacing**: `spacing2`, `spacing4`, `spacing6`, `spacing8`, `spacing10`, `spacing12`, `spacing16`, `spacing20`, `spacing24`, `spacing32`, `spacing40`, `spacing48`, `spacing56`, `spacing64`
+#### 2. Font Family Selection
+```dart
+// ✅ Good - Use font family extensions
+OsmeaComponents.text(
+  'Primary text',
+  fontSize: context.fontSizeLarge,
+  fontFamily: context.fontRoboto,
+  color: OsmeaColors.textPrimary,
+)
 
-#### 10. 📐 Width Extensions (`WidthExtension`)
-- **Dynamic Width**: `widthZero`, `widthLow`, `widthNormal`, `widthMedium`, `widthHigh`
-- **Fixed Width**: `width1` to `width384` (1, 2, 4, 8, 12, 16, 20, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 224, 240, 256, 288, 320, 384)
+OsmeaComponents.text(
+  'Code text',
+  fontSize: context.fontSizeMedium,
+  fontFamily: context.fontFiraCode,
+  color: OsmeaColors.textSecondary,
+)
 
-#### 11. 📏 Height Extensions (`HeightExtension`)
-- **Dynamic Height**: `heightZero`, `heightLow`, `heightNormal`, `heightMedium`, `heightHigh`
-- **Fixed Height**: `height1` to `height640` (1, 2, 4, 8, 12, 16, 20, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 224, 240, 256, 288, 320, 384, 448, 512, 576, 640)
+OsmeaComponents.text(
+  'Display text',
+  fontSize: context.fontSizeExtraLarge,
+  fontFamily: context.fontPlayfairDisplay,
+  color: OsmeaColors.nordicBlue,
+)
 
-#### 12. 🔄 Wrap Cross Alignment Extensions (`WrapCrossAlignmentExtension`)
-- **Wrap Cross**: `wrapCrossStart`, `wrapCrossEnd`, `wrapCrossCenter`
+// ❌ Bad - Hard-coded font names
+OsmeaComponents.text(
+  'Primary text',
+  fontSize: context.fontSizeLarge,
+  fontFamily: 'Roboto',
+)
+```
 
-#### 13. 🎪 Animation Status Extensions (`AnimationStatusExtension`)
-- **Animation States**: `dismissed`, `forward`, `reverse`, `completed`
+#### 3. Font Weight and Size
+```dart
+// ✅ Good - Use weight and size extensions
+OsmeaComponents.text(
+  'Bold heading',
+  fontSize: context.fontSizeExtraLarge,
+  fontWeight: context.bold,
+  color: OsmeaColors.textPrimary,
+)
 
-#### 14. 🔧 Clip Behavior Extensions (`ClipBehaviorExtension`)
-- **Clip Types**: `clipNone`, `clipHardEdge`, `clipAntiAlias`, `clipAntiAliasWithSaveLayer`
+OsmeaComponents.text(
+  'Light text',
+  fontSize: context.fontSizeMedium,
+  fontWeight: context.light,
+  color: OsmeaColors.textSecondary,
+)
 
-#### 15. ➖ Empty Widget Extensions (`EmptyWidget`)
-- **Empty Boxes**: `emptySizedBox`, `emptySizedWidthBoxLow`, `emptySizedWidthBoxNormal`, `emptySizedWidthBoxHigh`
-- **Height Boxes**: `emptySizedHeightBoxLow`, `emptySizedHeightBoxNormal`, `emptySizedHeightBoxMedium`, `emptySizedHeightBoxHigh`
-- **Zero Boxes**: `emptySized`, `emptySizedWidthBoxZero`, `emptySizedHeightBoxZero`
+// ❌ Bad - Hard-coded weights and sizes
+OsmeaComponents.text(
+  'Bold heading',
+  fontSize: 32,
+  fontWeight: FontWeight.w700,
+)
+```
 
-#### 16. 🟫 Divider Extensions (`DividerX`)
-- **Custom Divider**: `divider({Color? color})` - Creates divider with 13% indent/endIndent
+#### 4. Text Alignment and Layout
+```dart
+// ✅ Good - Use alignment extensions
+OsmeaComponents.text(
+  'Centered title',
+  fontSize: context.fontSizeExtraLarge,
+  textAlign: context.textCenter,
+  color: OsmeaColors.textPrimary,
+)
 
-#### 17. 🖼️ Image Asset Extensions (`ImageAssetX`)
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
