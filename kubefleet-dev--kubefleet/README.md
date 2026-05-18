@@ -7,12 +7,12 @@ KubeFleet is an open-source Kubernetes multi-cluster application management solu
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `copilot-instructions.md` in [kubefleet-dev/kubefleet](https://github.com/kubefleet-dev/kubefleet).
+Original source: `CLAUDE.md` in [kubefleet-dev/kubefleet](https://github.com/kubefleet-dev/kubefleet).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
+- **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
