@@ -1,60 +1,27 @@
 ---
 trigger: always_on
-description: The project implements a web application designed to run as a **Databricks App**. Databricks Apps are Python web applications configured via an `app.yaml` file (Databricks Asset Bundle format). This app provides Unity Catalog and general Databricks-related services, focusing on metadata management, governance, and operational tools.
+description: - **Frontend:** Each feature has a dedicated React View (`src/views`).
 ---
 
 
-### Project Overview
+### System Components & Requirements
 
-The project implements a web application designed to run as a **Databricks App**. Databricks Apps are Python web applications configured via an `app.yaml` file (Databricks Asset Bundle format). This app provides Unity Catalog and general Databricks-related services, focusing on metadata management, governance, and operational tools.
-
-**Core Features:**
-
-- **Data Contracts:** Instrument Data Products with technical metadata based on the Open Data Contract Standard. Managed by `DataContractsManager`. Includes schema validation, quality checks, access control verification, sample data display, etc.
-    - Data Contracts can be written in any text format, like plain text, YAML, JSON. For structured formats, like JSON, we support also existing standards, such as the BITOL ODCS (source: https://github.com/bitol-io/open-data-contract-standard/blob/main/schema/odcs-json-schema-latest.json)
-- **Data Products:** Group Databricks assets (tables, views, functions, models, dashboards, jobs, notebooks) using tags (e.g., `data-product-name`, `data-product-domain`). Managed by `DataProductsManager`.
-    - Data Products follow the BITOL ODPS specification (source: https://github.com/bitol-io/open-data-product-standard/blob/main/schema/odps-json-schema-latest.json)
-- **Business Glossaries:** Hierarchical glossaries per organizational unit (company, LOB, department, team, project). Merged bottom-up for users, allowing overrides. Terms have tags, markdown descriptions, lifecycle status, assigned assets. Managed by `BusinessGlossariesManager`.
-- **Master Data Management (MDM):** Integrates with Zingg.ai for MDM capabilities. Managed by `MasterDataManagementManager`.
-- **Entitlements:** Combines access privileges into personas (roles) and assigns them to directory groups. Managed by `EntitlementsManager`.
-- **Security:** Enables advanced security features (e.g., differential privacy) on assets. Managed by `SecurityFeaturesManager`.
-- **Compliance:** Define and verify compliance rules, calculating an overall score. Managed by `ComplianceManager`.
-- **Catalog Commander:** Norton Commander-inspired dual-pane explorer for managing catalog assets (copy/move tables/schemas). Managed by `CatalogCommanderManager`.
-- **Data Asset Reviews:** Workflow for reviewing and approving assets (tables, views, functions). Managed by `DataAssetReviewManager`. Includes notifications for reviewers/requesters.
-- **Settings:** Configure app settings, Databricks connection, Git integration, background jobs, and RBAC (Roles). Managed by `SettingsManager`.
-- **About:** Application summary and links.
-
-**General Usage:**
-
-- Users see **different features** in the UI based on their group memberships. For example, an Admin sees and has read/write access to everything. A Data Producer has read/write access to Data Contracts and Products (among other related things). A Data Consumer has read-only access to the Data Products and Contracts.
-- **Creating Data Products** entails these steps:
-    - Data Producer and Consumers use the app to design an initial version of a Data Contract in draft status.
-    - This contract is refined until both parties agree on the overlapping details, such as the schema(s), data quality checks, etc.
-    - The Data Producer enhance the contract with further information, such as owner (likely themselves), access control requirements, business semantics, and so on
-    - Eventually they contract is released with a specific version and status
-    - Data Producer either subsequently, or asynchronously, build a Data Product that uses the contract for a specific output port of the product
-    - Once the Data Product is released with a specific version and status consumers can "purchase" (or "check out"/"subscribe") the product, creating a linkage between contract via the product and the consumer
-    - This creates an implicit Compliance check that verifies the contract regularly via a background job
-    - If a violation is detected, the owner and subscribers are alerted via the built-in ITSM notification feature
-    - App users with the Data Governance role maintain Data Domains and Business Glossaries, which are used to assign specific values to Data Products and Data Contracts
-- The **Home Page** differs for each app user role, for instance, for Data Consumers, they find an easy discovery option (like a marketplace) for Data Products to subscribe to. For Data Producers, they find the options to create Data Products or continue working on draft products and contracts.
-
-### General Data Product Details
-
-#### 1. Inception
-- **Start with desired business outcomes**
-  - Clearly define what the business aims to achieve with the data product.
-- **Assign owner**
-  - Appoint a responsible product owner for governance and delivery.
-- **Assign resources**
-  - Allocate the necessary team members and budget.
-- **Define business metrics**
-  - Set measurable objectives for success.
-
-#### 2. Design
-- **Create a data contract**
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- **Frontend:** Each feature has a dedicated React View (`src/views`).
+- **Backend:** Each feature has a dedicated FastAPI endpoint (`api/routes`), prefixed with `/api/` (e.g., `/api/data-products`).
+- **Controller Pattern:** FastAPI routes delegate business logic to service controller classes (`api/controller/*_manager.py`, e.g., `DataProductsManager`).
+- **Repository Pattern:** Controllers delegate database operations to repository classes (`api/repositories/*_repository.py`, e.g., `DataProductRepository`).
+- **Database Models:** SQLAlchemy models define the database schema (`api/db_models/*.py`).
+- **API Models:** Pydantic models define the API request/response structure and perform validation (`api/models/*.py`). Data is often mapped between DB and API models.
+- **Data Storage:** Metadata (settings, roles, reviews, etc.) is stored in a database (e.g., Postgres or potentially Databricks SQL using JDBC/ODBC). Configuration can optionally be synced to a Git repository as YAML files.
+- **Background Jobs:** Heavy workloads (syncing, validation) are delegated to Databricks Workflows, installed and managed via the Settings UI and `SettingsManager`. A job runner class handles job operations.
+- **Notifications:** A shared system (`NotificationsManager`) notifies users about asynchronous operations (job progress, review requests).
+- **Search:** A shared search service (`SearchManager`) indexes data from various managers (those implementing `SearchableAsset` via the `@searchable_asset` decorator and `SEARCHABLE_ASSET_MANAGERS` registry). Users can search across features (Data Products, Contracts, Glossary Terms, Reviews, etc.).
+- **Tagging System:** The app uses a **unified tagging system** via `EntityTagAssociationDb` for ALL app objects (Data Products, Datasets, Contracts, Teams, Projects, etc.). Tags are managed through `TagsManager` with namespaces and permissions.
+  - **`EntityTagAssociationDb`**: The primary unified tag assignment table linking tags to any entity type.
+  - **`DataContractTagDb`**: Legacy storage for tags imported from ODCS contracts (the ODCS schema has its own `tags` array of strings). On contract export, both the original ODCS tags AND any unified system tags are written out.
+  - **IMPORTANT**: All entities should use `EntityTagAssociationDb` via `TagsManager` for tag assignments. Do NOT use per-entity tag tables like `DatasetTagDb` (deprecated).
+- **Git Sync:** Changes to configurations (potentially other data) can be saved as YAML files to a configured Git repository. A background process detects changes and prompts the user (via notifications) to commit/push with a pre-filled message.
+- **Startup:** The `api/app.py` defines the FastAPI app. `api/utils/startup_tasks.py` handles initialization: database setup (`initialize_database`), manager instantiation (`initialize_managers`), and demo data loading (`load_initial_data`). Managers are stored as singletons in `app.state` and accessed via FastAPI dependencies (e.g., `get_data_products_manager`).
 
 ---
 > Source: [databrickslabs/ontos](https://github.com/databrickslabs/ontos) — distributed by [TomeVault](https://tomevault.io).
