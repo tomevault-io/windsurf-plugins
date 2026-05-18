@@ -1,8 +1,7 @@
 ---
 trigger: always_on
-description: Ripple project overview and development guidelines
+description: Ripple is a TypeScript-first UI framework and monorepo maintained by Dominic
 ---
-
 
 # Ripple Project Guide for AI Agents
 
