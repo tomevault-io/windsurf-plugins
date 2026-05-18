@@ -7,13 +7,13 @@ A beautiful and interactive web application that deconstructs words into their m
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `.cursor/rules/*.mdc` in [hyusap/deconstructor](https://github.com/hyusap/deconstructor).
+Original source: `CLAUDE.md` in [hyusap/deconstructor](https://github.com/hyusap/deconstructor).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
+- **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
