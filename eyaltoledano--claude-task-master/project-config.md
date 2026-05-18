@@ -1,204 +1,186 @@
 ---
 trigger: always_on
-description: Before implementing the TDD workflow, ensure your project has a proper testing framework configured. This section covers setup for different technology stacks.
+description: Guidelines for implementing and maintaining user interface components
 ---
 
-# Test Workflow & Development Process
 
-## **Initial Testing Framework Setup**
+# User Interface Implementation Guidelines
 
-Before implementing the TDD workflow, ensure your project has a proper testing framework configured. This section covers setup for different technology stacks.
+## Core UI Component Principles
 
-### **Detecting Project Type & Framework Needs**
+- **Function Scope Separation**:
+  - ✅ DO: Keep display logic separate from business logic
+  - ✅ DO: Import data processing functions from other modules
+  - ❌ DON'T: Include task manipulations within UI functions
+  - ❌ DON'T: Create circular dependencies with other modules
 
-**AI Agent Assessment Checklist:**
-1. **Language Detection**: Check for `package.json` (Node.js/JavaScript), `requirements.txt` (Python), `Cargo.toml` (Rust), etc.
-2. **Existing Tests**: Look for test files (`.test.`, `.spec.`, `_test.`) or test directories
-3. **Framework Detection**: Check for existing test runners in dependencies
-4. **Project Structure**: Analyze directory structure for testing patterns
+- **Standard Display Pattern**:
+  ```javascript
+  // ✅ DO: Follow this pattern for display functions
+  /**
+   * Display information about a task
+   * @param {Object} task - The task to display
+   */
+  function displayTaskInfo(task) {
+    console.log(boxen(
+      chalk.white.bold(`Task: #${task.id} - ${task.title}`),
+      { padding: 1, borderColor: 'blue', borderStyle: 'round' }
+    ));
+  }
+  ```
 
-### **JavaScript/Node.js Projects (Jest Setup)**
+## Visual Styling Standards
 
-#### **Prerequisites Check**
-```bash
-# Verify Node.js project
-ls package.json  # Should exist
+- **Color Scheme**:
+  - Use `chalk.blue` for informational messages
+  - Use `chalk.green` for success messages
+  - Use `chalk.yellow` for warnings
+  - Use `chalk.red` for errors
+  - Use `chalk.cyan` for prompts and highlights
+  - Use `chalk.magenta` for subtask-related information
 
-# Check for existing testing setup
-ls jest.config.js jest.config.ts  # Check for Jest config
-grep -E "(jest|vitest|mocha)" package.json  # Check for test runners
-```
+- **Box Styling**:
+  ```javascript
+  // ✅ DO: Use consistent box styles by content type
+  // For success messages:
+  boxen(content, { 
+    padding: 1, 
+    borderColor: 'green', 
+    borderStyle: 'round', 
+    margin: { top: 1 } 
+  })
 
-#### **Jest Installation & Configuration**
+  // For errors:
+  boxen(content, { 
+    padding: 1, 
+    borderColor: 'red', 
+    borderStyle: 'round'
+  })
 
-**Step 1: Install Dependencies**
-```bash
-# Core Jest dependencies
-npm install --save-dev jest
+  // For information:
+  boxen(content, { 
+    padding: 1, 
+    borderColor: 'blue', 
+    borderStyle: 'round', 
+    margin: { top: 1, bottom: 1 } 
+  })
+  ```
 
-# TypeScript support (if using TypeScript)
-npm install --save-dev ts-jest @types/jest
+## Table Display Guidelines
 
-# Additional useful packages
-npm install --save-dev supertest @types/supertest  # For API testing
-npm install --save-dev jest-watch-typeahead  # Enhanced watch mode
-```
+- **Table Structure**:
+  - Use [`cli-table3`](mdc:node_modules/cli-table3/README.md) for consistent table rendering
+  - Include colored headers with bold formatting
+  - Use appropriate column widths for readability
 
-**Step 2: Create Jest Configuration**
-
-Create `jest.config.js` with the following production-ready configuration:
-
-```javascript
-/** @type {import('jest').Config} */
-module.exports = {
-  // Use ts-jest preset for TypeScript support
-  preset: 'ts-jest',
-
-  // Test environment
-  testEnvironment: 'node',
-
-  // Roots for test discovery
-  roots: ['<rootDir>/src', '<rootDir>/tests'],
-
-  // Test file patterns
-  testMatch: ['**/__tests__/**/*.ts', '**/?(*.)+(spec|test).ts'],
-
-  // Transform files
-  transform: {
-    '^.+\\.ts$': [
-      'ts-jest',
-      {
-        tsconfig: {
-          target: 'es2020',
-          module: 'commonjs',
-          esModuleInterop: true,
-          allowSyntheticDefaultImports: true,
-          skipLibCheck: true,
-          strict: false,
-          noImplicitAny: false,
-        },
-      },
+  ```javascript
+  // ✅ DO: Create well-structured tables
+  const table = new Table({
+    head: [
+      chalk.cyan.bold('ID'),
+      chalk.cyan.bold('Title'),
+      chalk.cyan.bold('Status'),
+      chalk.cyan.bold('Priority'),
+      chalk.cyan.bold('Dependencies')
     ],
-    '^.+\\.js$': [
-      'ts-jest',
-      {
-        useESM: false,
-        tsconfig: {
-          target: 'es2020',
-          module: 'commonjs',
-          esModuleInterop: true,
-          allowSyntheticDefaultImports: true,
-          allowJs: true,
-        },
-      },
-    ],
-  },
+    colWidths: [5, 40, 15, 10, 20]
+  });
+  
+  // Add content rows
+  table.push([
+    task.id,
+    truncate(task.title, 37),
+    getStatusWithColor(task.status),
+    chalk.white(task.priority || 'medium'),
+    formatDependenciesWithStatus(task.dependencies, allTasks, true)
+  ]);
+  
+  console.log(table.toString());
+  ```
 
-  // Module file extensions
-  moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
+## Loading Indicators
 
-  // Transform ignore patterns - adjust for ES modules
-  transformIgnorePatterns: ['node_modules/(?!(your-es-module-deps|.*\\.mjs$))'],
+- **Animation Standards**:
+  - Use [`ora`](mdc:node_modules/ora/readme.md) for spinner animations
+  - Create and stop loading indicators correctly
 
-  // Coverage configuration
-  collectCoverage: true,
-  coverageDirectory: 'coverage',
-  coverageReporters: [
-    'text', // Console output
-    'text-summary', // Brief summary
-    'lcov', // For IDE integration
-    'html', // Detailed HTML report
-  ],
+  ```javascript
+  // ✅ DO: Properly manage loading state
+  const loadingIndicator = startLoadingIndicator('Processing task data...');
+  try {
+    // Do async work...
+    stopLoadingIndicator(loadingIndicator);
+    // Show success message
+  } catch (error) {
+    stopLoadingIndicator(loadingIndicator);
+    // Show error message
+  }
+  ```
 
-  // Files to collect coverage from
-  collectCoverageFrom: [
-    'src/**/*.ts',
-    '!src/**/*.d.ts',
-    '!src/**/*.test.ts',
-    '!src/**/index.ts', // Often just exports
-    '!src/generated/**', // Generated code
-    '!src/config/database.ts', // Database config (tested via integration)
-  ],
+## Helper Functions
 
-  // Coverage thresholds - TaskMaster standards
-  coverageThreshold: {
-    global: {
-      branches: 70,
-      functions: 80,
-      lines: 80,
-      statements: 80,
-    },
-    // Higher standards for critical business logic
-    './src/utils/': {
-      branches: 85,
-      functions: 90,
-      lines: 90,
-      statements: 90,
-    },
-    './src/middleware/': {
-      branches: 80,
-      functions: 85,
-      lines: 85,
-      statements: 85,
-    },
-  },
+- **Status Formatting**:
+  - Use `getStatusWithColor` for consistent status display
+  - Use `formatDependenciesWithStatus` for dependency lists
+  - Use `truncate` to handle text that may overflow display
 
-  // Setup files
-  setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
+- **Progress Reporting**:
+  - Use visual indicators for progress (bars, percentages)
+  - Include both numeric and visual representations
+  
+  ```javascript
+  // ✅ DO: Show clear progress indicators
+  console.log(`${chalk.cyan('Tasks:')} ${completedTasks}/${totalTasks} (${completionPercentage.toFixed(1)}%)`);
+  console.log(`${chalk.cyan('Progress:')} ${createProgressBar(completionPercentage)}`);
+  ```
 
-  // Global teardown to prevent worker process leaks
-  globalTeardown: '<rootDir>/tests/teardown.ts',
+## Command Suggestions
 
-  // Module path mapping (if needed)
-  moduleNameMapper: {
-    '^@/(.*)$': '<rootDir>/src/$1',
-  },
+- **Action Recommendations**:
+  - Provide next step suggestions after command completion
+  - Use a consistent format for suggested commands
 
-  // Clear mocks between tests
-  clearMocks: true,
+  ```javascript
+  // ✅ DO: Show suggested next actions
+  console.log(boxen(
+    chalk.white.bold('Next Steps:') + '\n\n' +
+    `${chalk.cyan('1.')} Run ${chalk.yellow('task-master list')} to view all tasks\n` +
+    `${chalk.cyan('2.')} Run ${chalk.yellow('task-master show --id=' + newTaskId)} to view details`,
+    { padding: 1, borderColor: 'cyan', borderStyle: 'round', margin: { top: 1 } }
+  ));
+  ```
 
-  // Restore mocks after each test
-  restoreMocks: true,
+## Enhanced Display Patterns
 
-  // Global test timeout
-  testTimeout: 10000,
+### **Token Breakdown Display**
+- Use detailed, granular token breakdowns for AI-powered commands
+- Display context sources with individual token counts
+- Show both token count and character count for transparency
 
-  // Projects for different test types
-  projects: [
-    // Unit tests - for pure functions only
-    {
-      displayName: 'unit',
-      testMatch: ['<rootDir>/src/**/*.test.ts'],
-      testPathIgnorePatterns: ['.*\\.integration\\.test\\.ts$', '/tests/'],
-      preset: 'ts-jest',
-      testEnvironment: 'node',
-      collectCoverageFrom: [
-        'src/**/*.ts',
-        '!src/**/*.d.ts',
-        '!src/**/*.test.ts',
-        '!src/**/*.integration.test.ts',
-      ],
-      coverageThreshold: {
-        global: {
-          branches: 70,
-          functions: 80,
-          lines: 80,
-          statements: 80,
-        },
-      },
-    },
-    // Integration tests - real database/services
-    {
-      displayName: 'integration',
-      testMatch: [
-        '<rootDir>/src/**/*.integration.test.ts',
-        '<rootDir>/tests/integration/**/*.test.ts',
-      ],
-      preset: 'ts-jest',
-      testEnvironment: 'node',
-      setupFilesAfterEnv: ['<rootDir>/tests/setup/integration.ts'],
-      testTimeout: 10000,
-    },
+  ```javascript
+  // ✅ DO: Display detailed token breakdown
+  function displayDetailedTokenBreakdown(tokenBreakdown, systemTokens, userTokens) {
+    const sections = [];
+    
+    if (tokenBreakdown.tasks?.length > 0) {
+      const taskDetails = tokenBreakdown.tasks.map(task => 
+        `${task.type === 'subtask' ? '  ' : ''}${task.id}: ${task.tokens.toLocaleString()}`
+      ).join('\n');
+      sections.push(`Tasks (${tokenBreakdown.tasks.reduce((sum, t) => sum + t.tokens, 0).toLocaleString()}):\n${taskDetails}`);
+    }
+    
+    const content = sections.join('\n\n');
+    console.log(boxen(content, {
+      title: chalk.cyan('Token Usage'),
+      padding: { top: 1, bottom: 1, left: 2, right: 2 },
+      borderStyle: 'round',
+      borderColor: 'cyan'
+    }));
+  }
+  ```
+
+### **Code Block Syntax Highlighting**
+- Use `cli-highlight` library for syntax highlighting in terminal output
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
