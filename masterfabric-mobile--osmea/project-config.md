@@ -1,100 +1,108 @@
 ---
 trigger: always_on
-description: OSMEA packages - structure, dependencies, docs, testing, publishing
+description: OSMEA sizer extensions - responsive, spacing, duration, padding, alignment
 ---
 
 
-# OSMEA Packages - Cursor Rules
+# OSMEA Sizer Extensions - Cursor Rules
 
-## 📦 Overview
-OSMEA Packages is a modular Flutter ecosystem designed to provide developers with a complete toolkit for building modern, scalable applications.
+## 📦 Package Overview
+OSMEA Sizer Extensions provides comprehensive utilities for responsive design, spacing, animations, and UI layout in Flutter applications. This file contains 25+ extension categories with 800+ utility methods for consistent, responsive UI development.
+
+## Import Statement
+Always import the sizer extensions at the top of your files:
+```dart
+import 'package:osmea_components/osmea_components.dart';
+```
 
 ## 🎯 Development Guidelines
 
-### 📁 Package Structure
+### 📁 File Structure
 ```
-packages/
-├── components/          # UI Component Library
-├── core/               # Foundation & Utilities
-├── apis/               # Network Layer & API Integration
-└── README.md           # Package Documentation
+packages/components/lib/src/utils/
+└── sizer_extensions.dart    # Main sizer extensions file (858 lines)
 ```
 
-### 🏗️ Package Development Rules
+### 🎨 Extension Categories Overview
 
-#### 1. Package Naming
-- **Package Name**: Use descriptive, lowercase names with underscores
-- **Example**: `osmea_components`, `osmea_core`, `osmea_apis`
-- **Version**: Follow semantic versioning (MAJOR.MINOR.PATCH)
+#### 1. 📱 Core Sizer Extensions (`SizerExtension`)
+- **Screen Dimensions**: `allHeight`, `allWidth`, `mediaQuery`
+- **Text Scaling**: `textScaler`, `textScaleFactor`
+- **Dynamic Sizing**: `dynamicWidth()`, `dynamicHeight()`
+- **Value Scaling**: `lowValue`, `normalValue`, `mediumValue`, `highValue`
+- **Radius Values**: `radiusNone`, `radiusLow`, `radiusNormal`, `radiusMedium`, `radiusHigh`
+- **Scale Values**: `scaleLowValue`, `scaleMediumValue`, `scaleHighValue`
+- **Utility Values**: `nullValue`, `infinity`
+- **Dividers**: `divider1`, `divider2`, `divider3`
 
-#### 2. Dependencies Management
-```yaml
-# ✅ Good Example - pubspec.yaml
-name: osmea_components
-description: A comprehensive UI component library for Flutter applications
-version: 0.1.0
+#### 2. ⭕ Border Radius Extensions (`BorderRadiusExtension`)
+- **Basic Radius**: `borderRadiusZero`, `borderRadiusNone`, `borderRadiusLow`
+- **Standard Radius**: `borderRadiusNormal`, `borderRadiusMedium`, `borderRadiusHigh`
+- **Special Radius**: `borderRadiusMinStandard` (7), `borderRadiusMaxStandard` (13)
 
-environment:
-  sdk: '>=3.0.0 <4.0.0'
-  flutter: ">=3.19.0"
+#### 3. 🔲 Border Width Extensions (`BorderWidthExtension`)
+- **Standard Width**: `borderWidth` (0.5)
 
-dependencies:
-  flutter:
-    sdk: flutter
-  core:
-    git:
-      url: https://github.com/masterfabric-mobile/osmea.git
-      path: packages/core
+#### 4. ⏱️ Duration Extensions (`DurationExtension`)
+- **Time Units**: `7.seconds`, `7.minutes`, `7.hours`, `7.days`, `7.weeks`
+- **Micro Units**: `7.microseconds`, `7.milliseconds`
+- **Zero Duration**: `7.zero`
 
-dev_dependencies:
-  flutter_test:
-    sdk: flutter
-  flutter_lints: ^3.0.0
-```
+#### 5. ⏰ Duration Values Extensions (`DurationValuesExtension`)
+- **Basic Durations**: `durationZero`, `durationInstant`, `durationFast`, `durationQuick`
+- **Standard Durations**: `durationNormal`, `durationMedium`, `durationSlow`, `durationVerySlow`
+- **Long Durations**: `durationLong`, `durationVeryLong`
+- **Animation Durations**: `animationShort`, `animationMedium`, `animationLong`, `animationSlow`
+- **Delay Durations**: `delayShort`, `delayMedium`, `delayLong`
+- **Timeout Durations**: `timeoutQuick`, `timeoutNormal`, `timeoutLong`, `timeoutVeryLong`
 
-#### 3. Export Structure
-- Core exports: components, core, enums, styles, theme, utils
-- Component-specific exports in main library file
+#### 6. 📐 Alignment Extensions (`AlignmentExtension`)
+- **Position Alignments**: `topLeft`, `topCenter`, `topRight`, `centerLeft`, `center`, `centerRight`, `bottomLeft`, `bottomCenter`, `bottomRight`
+- **Main Axis**: `start`, `end`, `centerMain`, `spaceBetween`, `spaceAround`, `spaceEvenly`
+- **Cross Axis**: `crossStart`, `crossEnd`, `crossCenter`, `crossStretch`, `crossBaseline`
+- **Wrap Alignment**: `wrapStart`, `wrapEnd`, `wrapCenter`, `wrapSpaceBetween`, `wrapSpaceAround`, `wrapSpaceEvenly`
+- **Axis Size**: `min`, `max`
+- **Text Direction**: `ltr`, `rtl`
+- **Axis Direction**: `horizontal`, `vertical`
 
-### 🔄 Package Integration Rules
-- **Core Package**: Foundation for all other packages
-- **Components Package**: Depends on Core
-- **APIs Package**: Depends on Core
-- **Applications**: Can depend on any combination of packages
+#### 7. 📦 Box Fit Extensions (`BoxFitExtension`)
+- **Fit Types**: `fill`, `contain`, `cover`, `fitWidth`, `fitHeight`, `scaleDown`
 
-### 📚 Documentation Rules
-- README: Overview, Features, Installation, Usage, API Reference
-- Code: Document all public classes with examples and parameters
+#### 8. 📐 Stack Fit Extensions (`StackFitExtension`)
+- **Stack Fits**: `loose`, `expand`, `passthrough`
 
-### 🧪 Testing Rules
-- Test structure: unit/, widget/, integration/, mocks/
-- Coverage target: Minimum 80%
-- Write unit tests, widget tests, integration tests
+#### 9. 📏 Spacing Extensions (`SpacingExtension`)
+- **Dynamic Spacing**: `spacingZero`, `spacingLow`, `spacingNormal`, `spacingMedium`, `spacingHigh`
+- **Fixed Spacing**: `spacing2`, `spacing4`, `spacing6`, `spacing8`, `spacing10`, `spacing12`, `spacing16`, `spacing20`, `spacing24`, `spacing32`, `spacing40`, `spacing48`, `spacing56`, `spacing64`
 
-### 📦 Publishing Rules
-- Use semantic versioning; update CHANGELOG.md; tag releases
-- Run all tests and check coverage before publishing
+#### 10. 📐 Width Extensions (`WidthExtension`)
+- **Dynamic Width**: `widthZero`, `widthLow`, `widthNormal`, `widthMedium`, `widthHigh`
+- **Fixed Width**: `width1` to `width384` (1, 2, 4, 8, 12, 16, 20, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 224, 240, 256, 288, 320, 384)
 
-### 🔍 Code Quality Standards
-- Use `flutter_lints`; prefer_const_constructors; prefer_final_fields
-- Optimize widget rebuilds; use const constructors
+#### 11. 📏 Height Extensions (`HeightExtension`)
+- **Dynamic Height**: `heightZero`, `heightLow`, `heightNormal`, `heightMedium`, `heightHigh`
+- **Fixed Height**: `height1` to `height640` (1, 2, 4, 8, 12, 16, 20, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 224, 240, 256, 288, 320, 384, 448, 512, 576, 640)
 
-### 🚀 Best Practices
-1. **Modularity**: Keep packages focused and single-purpose
-2. **Reusability**: Design for reuse across different applications
-3. **Performance**: Optimize for speed and efficiency
-4. **Documentation**: Provide comprehensive documentation
-5. **Testing**: Ensure high test coverage
-6. **Maintainability**: Write clean, readable code
+#### 12. 🔄 Wrap Cross Alignment Extensions (`WrapCrossAlignmentExtension`)
+- **Wrap Cross**: `wrapCrossStart`, `wrapCrossEnd`, `wrapCrossCenter`
 
-### 🔍 Code Review Checklist
-- [ ] Package follows naming conventions
-- [ ] Dependencies are properly managed
-- [ ] Documentation is complete
-- [ ] Tests are comprehensive
-- [ ] Code quality standards are met
-- [ ] Version is properly updated
-- [ ] CHANGELOG is updated
+#### 13. 🎪 Animation Status Extensions (`AnimationStatusExtension`)
+- **Animation States**: `dismissed`, `forward`, `reverse`, `completed`
+
+#### 14. 🔧 Clip Behavior Extensions (`ClipBehaviorExtension`)
+- **Clip Types**: `clipNone`, `clipHardEdge`, `clipAntiAlias`, `clipAntiAliasWithSaveLayer`
+
+#### 15. ➖ Empty Widget Extensions (`EmptyWidget`)
+- **Empty Boxes**: `emptySizedBox`, `emptySizedWidthBoxLow`, `emptySizedWidthBoxNormal`, `emptySizedWidthBoxHigh`
+- **Height Boxes**: `emptySizedHeightBoxLow`, `emptySizedHeightBoxNormal`, `emptySizedHeightBoxMedium`, `emptySizedHeightBoxHigh`
+- **Zero Boxes**: `emptySized`, `emptySizedWidthBoxZero`, `emptySizedHeightBoxZero`
+
+#### 16. 🟫 Divider Extensions (`DividerX`)
+- **Custom Divider**: `divider({Color? color})` - Creates divider with 13% indent/endIndent
+
+#### 17. 🖼️ Image Asset Extensions (`ImageAssetX`)
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [masterfabric-mobile/osmea](https://github.com/masterfabric-mobile/osmea) — distributed by [TomeVault](https://tomevault.io).
