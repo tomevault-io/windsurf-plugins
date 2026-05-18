@@ -1,52 +1,69 @@
 ---
 trigger: always_on
-description: Design system basics and living patterns; agents extend this file when UI conventions stabilize. Use with ui-guidelines for all UI work.
+description: Performance patterns and lessons learned — update this rule when new performance wins are discovered
 ---
 
 
-# Design system (starter)
+# Performance Playbook
 
-This file is **intentionally small**. It grows as we lock patterns. **Interaction, motion, a11y, and hard constraints** stay in `.cursor/rules/ui-guidelines.mdc` and `.cursor/rules/01-MUST-DO.mdc`—follow those first.
+When you discover a new performance improvement, optimization pattern, or fix a performance regression, add a concise bullet to the relevant section below in the same session.
 
-## Foundations
+## Rendering strategy
 
-- **Contrast:** In `apps/dashboard/app/globals.css`, **`muted-foreground`** and **`secondary-foreground`** (dark) are tuned so secondary copy on fills meets **WCAG 2.1 AA** for normal text. **`--border`** stays **subtle** on purpose (light dividers, not high-chroma edges); do not darken it for “contrast” without review—prefer spacing, surface, or focus rings. New semantic colors: verify with a checker (e.g. WebAIM) before shipping.
-- **Surfaces:** Prefer theme / Tailwind tokens; one accent per view; no new gradients unless explicitly requested (see ui-guidelines).
-- **Radius:** `rounded` only (per project MUST-DO).
-- **Spacing:** Default Tailwind scale; avoid arbitrary spacing unless there is a clear, reusable reason.
-- **Typography:** Headings `text-balance`, body `text-pretty`, numeric data `tabular-nums` (see ui-guidelines).
-- **Primitives:** Use existing app primitives (Base UI / Radix / project components) before inventing new ones (see ui-guidelines).
+- Avoid `headers()` / `cookies()` in server components that can be static — they force dynamic rendering on every request
+- Use ISR (`export const revalidate = N`) with `unstable_cache` for pages that don't need per-request freshness
+- Create a separate headerless RPC client for public endpoints so server components aren't forced dynamic
 
-## Detail page metadata bars
+## Client/server split
 
-- Use a compact inline `flex` bar at `min-h-10` / `py-2.5` (40px, matching sidebar item height and the 10px spacing grid) for metadata like status, frequency, timestamps.
-- Stat items are inline `flex items-center gap-1.5` with `text-xs` labels in `text-muted-foreground` and `font-medium` values in `text-foreground`.
-- Status uses a dot (`size-1.5 rounded`) + colored text — not a `Badge` — for compactness.
-- Use `flex-wrap` with `gap-x-5 gap-y-1` so the bar wraps cleanly on mobile without breaking the 10px grid.
-- Canonical reference: `apps/dashboard/app/(main)/monitors/[id]/page.tsx` → `StatusIndicator` + stats bar.
+- Default to server components — only add `"use client"` for interactivity that truly needs it
+- Split large client components into a server shell + small client islands (timestamp, chart, toggle)
+- Use `@phosphor-icons/react/ssr` for icons in server components instead of pulling in the client bundle
+- Lazy-load heavy client components with `dynamic(() => import(...), { ssr: false })`
 
-## Composables v2 — `List` (list pages)
+## Caching layers
 
-**Prefer** `components/ui/composables/` for new list and chart shells — this is the v2 pattern meant to replace ad-hoc list/chart layouts elsewhere.
+- **In-process**: `lru-cache` (Map + TTL) in front of Redis — eliminates network round-trip on hot paths, sub-millisecond reads
+- Use `NULL_SENTINEL` pattern (`Object.freeze({ __null: true })`) to cache negative lookups in LRU — avoids repeated Redis/DB calls for non-existent keys
+- Cache pure CPU work (UA parsing, bot detection, ETag hashing, geo lookups) in LRU — these repeat with the same inputs across requests
+- Cache dedup/idempotency results in LRU — once a write is known to be a no-op (e.g. click already recorded), skip the Redis check entirely on repeat calls
+- **Next.js layer**: `unstable_cache` with `revalidate` and `tags` for page-level data
+- **API layer**: Redis `cacheable` wrapper with `staleWhileRevalidate` to absorb concurrent requests
+- **CDN layer**: `Cache-Control: public, s-maxage=N, stale-while-revalidate=M` headers for edge caching
+- Stack all four — in-process > Redis > DB on the API side, CDN in front of everything
+- `@elysiajs/cors` with `origin: true` sets `Vary: *` which prevents CDN caching — override with `set.headers.vary = "Origin"` on cacheable endpoints
 
-All list views use the `List` compound component (`components/ui/composables/list.tsx`). Wrap in `<List className="rounded bg-card">` — no border on root.
+## API middleware
 
-- **Row defaults:** `List.Row` defaults to `align="center"` (vertical center). Use `align="start"` when multi-line text should stay top-aligned (monitors, goals, anomalies). `w-full` is built-in — don't repeat it.
-- **Cell defaults:** `shrink-0` and `min-w-0` are built-in — don't repeat them. `text-start` is the browser default — don't add it.
-- **Inactive/paused state:** `opacity-50` on the Row, not a badge.
-- **Cell vertical alignment:** `ListCell` is `flex items-center` by default — content is always vertically centered. **Do not** add `pt-0.5` or other manual padding hacks to align cells. If you need top-alignment, set `align="start"` on the Row and override individual cells with `items-start`.
-- **Icon containers:** `size-8 rounded` with semantic `bg-{color}-500/10 text-{color}-600 dark:text-{color}-400`. Use a `TYPE_CONFIG` const map when multiple types exist.
-- **Skeletons:** plain `div`s, not `List.Row`. Merge name + secondary into one `flex-1` block.
-- **Status badges:** Use `Badge` with `variant="green"` / `"amber"` / `"secondary"` for row-level status (`Active`, `Paused`, `Empty`). Keep it to one badge per row.
-- **Description as secondary text:** Show descriptions as a secondary `text-xs text-muted-foreground` line *below* the name in the same cell — not in a separate cell. This avoids wasting a column on optional text.
-- **Slug / URL display:** For short identifiers (slugs), show just `/{slug}` in the grow cell — not the full URL. Reserve full URLs for the dropdown menu / external link action.
-- **Derived counts from RPC:** When a list page needs child counts (e.g. "3 monitors"), include them in the list RPC response (join + count server-side) rather than making N+1 queries or fetching full relations. Keep the response shape flat (`monitorCount: number`).
-- Canonical refs: `monitor-row.tsx`, `status-page-row.tsx`, `funnel-item.tsx`, `goal-item.tsx`, `flags-list.tsx`.
+- Skip expensive middleware for routes that don't need it — `applyAuthWideEvent` does a session DB lookup on every request; skip it for anonymous `/public/` routes via URL check in `onBeforeHandle`
+- Use `@elysiajs/server-timing` to profile per-phase durations (CORS, beforeHandle, handle, afterHandle) without manual instrumentation
+- Elysia's JIT compiler is on by default (`precompile: true`) — no extra config needed
 
-## Composables v2 — `Chart` (chart shells)
+## Database queries
 
+- Add time-bound filters to ClickHouse queries (e.g. `AND timestamp >= now() - INTERVAL 7 DAY`) to avoid full table scans
+- Combine sequential Postgres queries into a single JOIN when fetching related data
+- Use `Promise.all` for independent queries that can run in parallel
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+## Frontend rendering
+
+- Use `Map` for O(1) lookups instead of `Array.find()` inside loops
+- Skip rendering expensive wrappers (e.g. `Tooltip`, `TooltipProvider`) when not needed — check a boolean prop first
+- Use `useMemo` for derived data that's expensive to compute from props
+
+## Layout shift prevention
+
+- Derive loading booleans from query state instead of managing with `useState`/`useEffect` — e.g. `allItems.length === 0 && (isPending || isFetching)` instead of a manually toggled `isInitialLoad` flag
+- Show `Skeleton` placeholders at the exact dimensions of real content for data-dependent cells — never render text that changes (e.g. "Unknown" → "Operational")
+- Use `min-h-*` on containers whose content loads asynchronously to reserve stable space
+- Avoid conditional banners/bars that insert/remove height — fold the info into existing UI (header buttons, stat rows) instead
+- Loading skeletons should structurally match the real page: same sections, same heights, same padding — include placeholders for dynamically loaded chunks (e.g. `LatencyChartChunkPlaceholder`)
+
+## Perceived performance
+
+- Add `loading.tsx` skeletons for routes that may take time to generate
+- Use `router.refresh()` with a countdown for auto-refresh instead of full page reloads
+- Gate skeleton → page transition on the fastest critical query, then show inline skeletons for remaining data — avoids blocking on the slowest query while preventing staggered pop-in
 
 ---
 > Source: [databuddy-analytics/Databuddy](https://github.com/databuddy-analytics/Databuddy) — distributed by [TomeVault](https://tomevault.io).
