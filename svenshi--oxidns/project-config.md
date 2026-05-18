@@ -1,0 +1,67 @@
+---
+trigger: always_on
+description: - OxiDNS is a high-performance, plugin-driven DNS server written in Rust.
+---
+
+# Repository Guidelines
+
+## Project Focus
+
+- OxiDNS is a high-performance, plugin-driven DNS server written in Rust.
+- The current project already includes UDP/TCP/DoT/DoQ/DoH server and upstream support, sequence-based policy orchestration, TTL-aware cache with negative caching, fallback chains, local and synthetic answers, query/response rewriting, ECS handling, dual-stack selection, provider-backed domain/IP rule sets, management APIs, health endpoints, metrics, and system integrations such as `ipset`, `nftset`, and MikroTik route sync.
+- Prefer designs that preserve the core request path: `server -> DnsContext -> matcher/executor/provider pipeline -> upstream or side effects -> response`.
+
+## Project Structure & Module Organization
+
+- `src/main.rs` boots the Tokio runtime, parses CLI options, loads config, initializes logging, starts the application, and handles graceful shutdown.
+- `src/lib.rs` exposes the library surface used by tests and embedding scenarios, including `api`, `app`, `config`, `core`, `message`, `network`, `plugin`, and `service`.
+- `src/app/` contains bootstrap and logging setup for wiring the runtime from config to live services.
+- `src/api/` contains the management/control and health HTTP endpoints.
+- `src/message/` contains OxiDNS's DNS message model and wire codec implementation.
+- `src/core/` contains shared runtime types such as `DnsContext`, errors, rule matching helpers, task orchestration, and TTL cache primitives.
+- `src/config/` defines the YAML schema and validation for runtime configuration.
+- `src/network/` contains listeners, protocol transports, TLS setup, upstream resolution, bootstrap logic, pooling, and Linux-specific networking helpers.
+- `src/plugin/` is the main extension surface and is split into server, executor, matcher, and provider categories.
+- `src/plugin/server/` handles inbound DNS protocols, including UDP, TCP, QUIC, and HTTP-based DNS with dedicated HTTP/2 and HTTP/3 support under `src/plugin/server/http/`.
+- `src/plugin/executor/` contains request processors such as `sequence`, `forward`, `cache`, `fallback`, `hosts`, `arbitrary`, `redirect`, `ecs_handler`, `ttl`, `dual_selector`, observability plugins, and system-integration plugins.
+- `src/plugin/matcher/` contains rule matchers for qname/qtype/qclass, client IP, response IP, CNAME, response presence, RCODE, marks, env, random rollout, rate limits, and related predicates.
+- `src/plugin/provider/` contains reusable domain/IP datasets consumed by matchers and executors.
+- `src/service.rs` contains service-management integration for installing or controlling OxiDNS as a system service.
+- `crates/macros/` provides proc-macros used by the plugin registration system (`register_plugin_factory!` and related derives).
+- `crates/ripset/` is a pure-Rust Linux netlink implementation for ipset/nftset operations, used by the ipset and nftset executor plugins.
+- `crates/proto/` contains the low-level DNS wire protocol types (header, name, question, record, rdata) that back `src/message/`.
+- `crates/zoneparser/` is a standalone zone-file parser used for loading hosts and local zone data.
+- `tests/plugin_integration.rs` covers config parsing, plugin registry wiring, sequence quick-setup, and live server integration.
+- `tests/message_hickory_compat.rs` validates message codec compatibility behavior against Hickory.
+- `config.yaml` is the canonical runnable default configuration for the current plugin composition.
+- `README.md` and `README_EN.md` describe the architecture and capability set; keep them aligned with behavior changes.
+- WebUI-specific guidance lives in `webui/AGENTS.md`; follow it for changes under `webui/`.
+
+## Build, Test, and Development Commands
+
+**Toolchain note:** `rustfmt.toml` uses `unstable_features = true`, so formatting and the pre-commit hook both require the nightly toolchain (`cargo +nightly fmt`). Install it with `rustup toolchain install nightly` if needed.
+
+**Git hooks:** Run `just install-hooks` once per clone to activate the pre-commit hook (`cargo +nightly fmt --check` + `cargo +nightly clippy -- -D warnings`).
+
+**Preferred quality gates (via `just`):**
+- `just check` — full gate: fmt check + clippy (`-D warnings`) + tests. Run this before opening a PR.
+- `just fix` — auto-applies fmt and Clippy fixes; use during active development.
+- `just lint` — fmt check + clippy only, no tests; faster iteration cycle.
+
+**Individual commands:**
+- `cargo check` — fastest sanity check during iteration.
+- `cargo build --release` — builds the optimized binary.
+- `cargo run -- -c config.yaml` — runs OxiDNS with the default config.
+- `cargo run --release -- -c config.yaml` — preferred for performance-sensitive validation.
+- `cargo run -- -c config.yaml -l debug` — overrides the log level for local debugging.
+- `cargo test` — runs all unit and integration tests.
+- `cargo test --test plugin_integration` — runs the end-to-end plugin/config integration suite.
+- `cargo test <filter>` — runs tests whose names match the filter string (e.g., `cargo test cache` runs all cache-related tests).
+- `cargo test --test plugin_integration <filter>` — runs a specific integration test by name.
+- `cargo +nightly fmt` — formats code; nightly is required due to unstable rustfmt features.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [svenshi/oxidns](https://github.com/svenshi/oxidns) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-17 -->
