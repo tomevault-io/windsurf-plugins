@@ -1,303 +1,251 @@
 ---
 trigger: always_on
-description: This document defines the Git workflow for the guarahooks project, including commit conventions, branches, and contribution process.
+description: This document establishes standards for creating performant React hooks, avoiding unnecessary re-renders and memory leaks.
 ---
 
+# Performance Guidelines
 
+This document establishes standards for creating performant React hooks, avoiding unnecessary re-renders and memory leaks.
 
-# Git Workflow
+## 🚀 Performance Principles
 
-This document defines the Git workflow for the guarahooks project, including commit conventions, branches, and contribution process.
+### 1. Reference Stability
 
-## 🌳 Branch Strategy
+- Functions should maintain stable reference
+- Objects should be memoized when necessary
+- Avoid unnecessary creation of objects/arrays
 
-### Simplified Flow
+### 2. Re-render Optimization
 
-```tree
-main (production)
-├── feature/add-use-toggle
-├── feature/improve-docs
-├── fix/use-fetch-bug
-├── hotfix/critical-fix
-└── docs/update-readme
+- Minimize `useEffect` dependencies
+- Use `useCallback` and `useMemo` strategically
+- Avoid unnecessary state updates
+
+### 3. Resource Cleanup
+
+- Clean up timers and intervals
+- Cancel ongoing requests
+- Remove event listeners
+
+## 🎯 Mandatory Optimizations
+
+### useCallback for Functions
+
+```typescript
+// ✅ Correct: Stable function
+const toggle = useCallback(() => {
+  setValue(prev => !prev);
+}, []);
+
+// ✅ Correct: Callback with minimal dependencies
+const handleChange = useCallback((newValue: T) => {
+  setValue(newValue);
+  onToggle?.(newValue);
+}, [onToggle]);
+
+// ❌ Incorrect: New function on every render
+const handleClick = () => {
+  setValue(!value);
+};
 ```
 
-### Branch Types
+### useMemo for Computations
 
-#### `main`
+```typescript
+// ✅ Correct: Memoization of serialize/deserialize
+const serialize = useMemo(
+  () => options?.serialize ?? JSON.stringify,
+  [options?.serialize]
+);
 
-- Main production branch
-- Always stable and deployable
-- All merges via Pull Request
-- Release tags created here
-- **Base for all other branches**
+// ✅ Correct: Memoized expensive computation
+const expensiveValue = useMemo(() => {
+  return heavyComputation(data);
+}, [data]);
 
-#### `feature/*`
-
-- New functionalities
-- New hooks
-- Existing improvements
-- **Base: `main`**
-
-#### `fix/*`
-
-- Bug fixes
-- **Base: `main`**
-- Merge to `main`
-
-#### `hotfix/*`
-
-- Critical urgent fixes
-- **Base: `main`**
-- Direct merge to `main`
-
-#### `docs/*`
-
-- Documentation updates
-- **Base: `main`**
-- Merge to `main`
-
-## 📝 Conventional Commits
-
-### Basic Structure
-
-```bash
-<type>[optional scope]: <description>
-
-[optional body]
-
-[optional footer(s)]
+// ❌ Incorrect: Expensive computation on every render
+const result = heavyComputation(data);
 ```
 
-### Commit Types
+### useRef for Stable Values
 
-#### `feat` - New Feature
+```typescript
+// ✅ Correct: Ref for initial value
+const initialRef = useRef(initialValue);
 
-```bash
-feat: add useToggle hook
-feat(hooks): add useLocalStorage with cross-tab sync
-feat(cli): add hook installation command
+// ✅ Correct: Ref for timer
+const timeoutRef = useRef<NodeJS.Timeout>();
+
+// ✅ Correct: Ref for latest callback
+const latestCallback = useRef(callback);
+latestCallback.current = callback;
 ```
 
-#### `fix` - Bug Fix
+## 🧹 Cleanup Patterns
 
-```bash
-fix: resolve memory leak in useInterval
-fix(hooks): handle SSR properly in useWindowSize
-fix(docs): correct useToggle example
+### Timers and Intervals
+
+```typescript
+// ✅ Correct: Timeout cleanup
+useEffect(() => {
+  const timeoutId = setTimeout(() => {
+    setValue(newValue);
+  }, delay);
+
+  return () => clearTimeout(timeoutId);
+}, [delay, newValue]);
+
+// ✅ Correct: Interval cleanup
+useEffect(() => {
+  const intervalId = setInterval(() => {
+    updateData();
+  }, 1000);
+
+  return () => clearInterval(intervalId);
+}, []);
 ```
 
-#### `docs` - Documentation
+### AbortController for Requests
 
-```bash
-docs: add API reference for useToggle
-docs(hooks): improve useLocalStorage examples
-docs: update contributing guidelines
+```typescript
+// ✅ Correct: Request cancellation
+useEffect(() => {
+  const abortController = new AbortController();
+
+  fetch(url, { signal: abortController.signal })
+    .then(response => response.json())
+    .then(setData)
+    .catch(error => {
+      if (!abortController.signal.aborted) {
+        setError(error);
+      }
+    });
+
+  return () => abortController.abort();
+}, [url]);
 ```
 
-#### `style` - Formatting
+### Event Listeners
 
-```bash
-style: format code with prettier
-style(hooks): fix eslint warnings
+```typescript
+// ✅ Correct: Event listener cleanup
+useEffect(() => {
+  const handleResize = () => {
+    setWindowSize({
+      width: window.innerWidth,
+      height: window.innerHeight,
+    });
+  };
+
+  window.addEventListener('resize', handleResize);
+  return () => window.removeEventListener('resize', handleResize);
+}, []);
 ```
 
-#### `refactor` - Refactoring
+## 🔄 State and Updates
 
-```bash
-refactor: simplify useToggle implementation
-refactor(types): improve TypeScript definitions
+### Avoid Unnecessary Updates
+
+```typescript
+// ✅ Correct: Update only if value changed
+const setValue = useCallback((newValue: T) => {
+  if (newValue !== currentValue) {
+    setCurrentValue(newValue);
+    localStorage.setItem(key, JSON.stringify(newValue));
+  }
+}, [currentValue, key]);
+
+// ✅ Correct: Deep comparison when necessary
+const setValue = useCallback((newValue: T) => {
+  if (!isEqual(newValue, currentValue)) {
+    setCurrentValue(newValue);
+  }
+}, [currentValue]);
 ```
 
-#### `perf` - Performance
+### Update Batching
 
-```bash
-perf: optimize useDebounce memory usage
-perf(hooks): reduce bundle size of useFetch
+```typescript
+// ✅ Correct: Use functional updates for batching
+const updateMultipleValues = useCallback(() => {
+  setValues(prev => ({
+    ...prev,
+    count: prev.count + 1,
+    timestamp: Date.now(),
+  }));
+}, []);
+
+// ❌ Incorrect: Multiple separate setState calls
+const updateValues = () => {
+  setCount(count + 1);
+  setTimestamp(Date.now());
+};
 ```
 
-#### `test` - Tests
+## 📊 Debounce and Throttle
 
-```bash
-test: add unit tests for useToggle
-test(hooks): improve coverage for useLocalStorage
+### Debounced State
+
+```typescript
+// ✅ Performant debounce implementation
+export function useDebouncedState<T>(
+  defaultValue: T,
+  delay: number = 500
+) {
+  const [value, setValue] = useState<T>(defaultValue);
+  const timeoutRef = useRef<NodeJS.Timeout>();
+
+  const debouncedSetValue = useCallback((newValue: T) => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+    
+    timeoutRef.current = setTimeout(() => {
+      setValue(newValue);
+    }, delay);
+  }, [delay]);
+
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
+
+  return [value, debouncedSetValue] as const;
+}
 ```
 
-#### `build` - Build System
+### Throttled Callbacks
 
-```bash
-build: update pnpm to v9.15.3
-build(ci): add automated testing workflow
+```typescript
+// ✅ Throttle for frequent events
+const useThrottledCallback = <T extends (...args: any[]) => any>(
+  callback: T,
+  delay: number
+): T => {
+  const throttledRef = useRef<boolean>(false);
+  const timeoutRef = useRef<NodeJS.Timeout>();
+
+  return useCallback((...args: Parameters<T>) => {
+    if (!throttledRef.current) {
+      callback(...args);
+      throttledRef.current = true;
+      
+      timeoutRef.current = setTimeout(() => {
+        throttledRef.current = false;
+      }, delay);
+    }
+  }, [callback, delay]) as T;
+};
 ```
 
-#### `ci` - Continuous Integration
+## 🎭 SSR and Hydration
 
-```bash
-ci: add automated hook registry validation
-ci: setup semantic release workflow
-```
+### Safe Initial Values
 
-#### `chore` - Maintenance
-
-```bash
-chore: update dependencies
-chore: bump version to 1.2.0
-```
-
-### Main Scopes
-
-#### `hooks`
-
-```bash
-feat(hooks): add useGeolocation hook
-fix(hooks): resolve useLocalStorage race condition
-```
-
-#### `docs`
-
-```bash
-docs(hooks): improve useToggle documentation
-feat(docs): add interactive examples
-```
-
-#### `cli`
-
-```bash
-feat(cli): add hook template generator
-fix(cli): resolve installation path issues
-```
-
-#### `registry`
-
-```bash
-feat(registry): add hook categories
-fix(registry): resolve dependency resolution
-```
-
-## 🔀 Development Workflow
-
-### 1. Creating Feature Branch
-
-```bash
-# Sync with main
-git checkout main
-git pull origin main
-
-# Create feature branch
-git checkout -b feature/add-use-geolocation
-
-# First implementation
-git add .
-git commit -m "feat(hooks): add basic useGeolocation implementation"
-
-# Push branch
-git push -u origin feature/add-use-geolocation
-```
-
-### 2. Iterative Development
-
-```bash
-# Implement hook
-git add registry/hooks/use-geolocation.tsx
-git commit -m "feat(hooks): implement useGeolocation with options"
-
-# Add example
-git add registry/example/use-geolocation-demo.tsx
-git commit -m "feat(hooks): add useGeolocation demo component"
-
-# Add documentation
-git add content/docs/hooks/use-geolocation.mdx
-git commit -m "docs(hooks): add useGeolocation documentation"
-
-# Register in system
-git add registry/registry-hooks.ts registry/registry-examples.ts
-git commit -m "feat(registry): register useGeolocation hook and example"
-
-# Update navigation
-git add config/docs.ts
-git commit -m "feat(docs): add useGeolocation to navigation"
-```
-
-### 3. Finalizing Feature
-
-```bash
-# Build and tests
-pnpm build:registry
-pnpm build:docs
-pnpm lint
-
-# Final adjustments commit
-git add .
-git commit -m "fix(hooks): resolve linting issues in useGeolocation"
-
-# Final push
-git push origin feature/add-use-geolocation
-```
-
-### 4. Pull Request to Main
-
-```markdown
-## 🎯 Type of Change
-- [x] New feature (feature)
-- [ ] Bug fix (fix)
-- [ ] Documentation (docs)
-- [ ] Refactoring (refactor)
-
-## 📋 Description
-Adds `useGeolocation` hook to access user location with:
-- Precision options support
-- Robust error handling
-- Loading states
-- Complete documentation
-
-## 🧪 Tests
-- [x] Hook tested manually
-- [x] Functional example
-- [x] Build without errors
-- [x] Complete documentation
-
-## 📚 Documentation
-- [x] Hook documentation created
-- [x] Example added
-- [x] API documented
-- [x] Navigation updated
-```
-
-## 🏷️ Versioning and Releases
-
-### Semantic Versioning
-
-```tree
-MAJOR.MINOR.PATCH
-
-1.2.3
-│ │ │
-│ │ └── Patch: Bug fixes
-│ └──── Minor: New features
-└────── Major: Breaking changes
-```
-
-### Release Types
-
-#### Patch (1.0.1)
-
-```bash
-fix: resolve useToggle callback issue
-fix(hooks): handle edge case in useLocalStorage
-docs: fix typo in useGeolocation example
-```
-
-#### Minor (1.1.0)
-
-```bash
-feat: add useGeolocation hook
-feat: add useNotifications hook
-feat(cli): add hook scaffolding command
-```
-
-#### Major (2.0.0)
-
-```bash
+```typescript
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
