@@ -1,7 +1,8 @@
 ---
 trigger: always_on
-description: SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+description: AIPerf project rules and coding standards
 ---
+
 
 <!--
 SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
