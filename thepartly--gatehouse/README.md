@@ -7,11 +7,11 @@ A flexible authorization library that combines role-based (RBAC), attribute-base
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [thepartly/gatehouse](https://github.com/thepartly/gatehouse).
+Original source: `CLAUDE.md` in [thepartly/gatehouse](https://github.com/thepartly/gatehouse).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
