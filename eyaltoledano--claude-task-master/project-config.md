@@ -1,71 +1,177 @@
 ---
 trigger: always_on
-description: Guide for using Taskmaster to manage task-driven development workflows
+description: Git workflow integrated with Task Master for feature development and collaboration
 ---
 
+# Git Workflow with Task Master Integration
 
-# Taskmaster Development Workflow
+## **Branch Strategy**
 
-This guide outlines the standard process for using Taskmaster to manage software development projects. It is written as a set of instructions for you, the AI agent.
+### **Main Branch Protection**
+- **main** branch contains production-ready code
+- All feature development happens on task-specific branches
+- Direct commits to main are prohibited
+- All changes merge via Pull Requests
 
-- **Your Default Stance**: For most projects, the user can work directly within the `master` task context. Your initial actions should operate on this default context unless a clear pattern for multi-context work emerges.
-- **Your Goal**: Your role is to elevate the user's workflow by intelligently introducing advanced features like **Tagged Task Lists** when you detect the appropriate context. Do not force tags on the user; suggest them as a helpful solution to a specific need.
+### **Task Branch Naming**
+```bash
+# ✅ DO: Use consistent task branch naming
+task-001  # For Task 1
+task-004  # For Task 4
+task-015  # For Task 15
 
-## The Basic Loop
-The fundamental development cycle you will facilitate is:
-1.  **`list`**: Show the user what needs to be done.
-2.  **`next`**: Help the user decide what to work on.
-3.  **`show <id>`**: Provide details for a specific task.
-4.  **`expand <id>`**: Break down a complex task into smaller, manageable subtasks.
-5.  **Implement**: The user writes the code and tests.
-6.  **`update-subtask`**: Log progress and findings on behalf of the user.
-7.  **`set-status`**: Mark tasks and subtasks as `done` as work is completed.
-8.  **Repeat**.
+# ❌ DON'T: Use inconsistent naming
+feature/user-auth
+fix-database-issue
+random-branch-name
+```
 
-All your standard command executions should operate on the user's current task context, which defaults to `master`.
+## **Tagged Task Lists Integration**
 
----
+Task Master's **tagged task lists system** provides significant benefits for Git workflows:
 
-## Standard Development Workflow Process
+### **Multi-Context Development**
+- **Branch-Specific Tasks**: Each branch can have its own task context using tags
+- **Merge Conflict Prevention**: Tasks in different tags are completely isolated
+- **Context Switching**: Seamlessly switch between different development contexts
+- **Parallel Development**: Multiple team members can work on separate task contexts
 
-### Simple Workflow (Default Starting Point)
+### **Migration and Compatibility**
+- **Seamless Migration**: Existing projects automatically migrate to use a "master" tag
+- **Zero Disruption**: All existing Git workflows continue unchanged
+- **Backward Compatibility**: Legacy projects work exactly as before
 
-For new projects or when users are getting started, operate within the `master` tag context:
+### **Manual Git Integration**
+- **Manual Tag Creation**: Use `--from-branch` option to create tags from current git branch
+- **Manual Context Switching**: Explicitly switch tag contexts as needed for different branches
+- **Simplified Integration**: Focused on manual control rather than automatic workflows
 
--   Start new projects by running `initialize_project` tool / `task-master init` or `parse_prd` / `task-master parse-prd --input='<prd-file.txt>'` (see [`taskmaster.mdc`](mdc:.cursor/rules/taskmaster.mdc)) to generate initial tasks.json with tagged structure
--   Configure rule sets during initialization with `--rules` flag (e.g., `task-master init --rules cursor,windsurf`) or manage them later with `task-master rules add/remove` commands  
--   Begin coding sessions with `get_tasks` / `task-master list` (see [`taskmaster.mdc`](mdc:.cursor/rules/taskmaster.mdc)) to see current tasks, status, and IDs
--   Determine the next task to work on using `next_task` / `task-master next` (see [`taskmaster.mdc`](mdc:.cursor/rules/taskmaster.mdc))
--   Analyze task complexity with `analyze_project_complexity` / `task-master analyze-complexity --research` (see [`taskmaster.mdc`](mdc:.cursor/rules/taskmaster.mdc)) before breaking down tasks
--   Review complexity report using `complexity_report` / `task-master complexity-report` (see [`taskmaster.mdc`](mdc:.cursor/rules/taskmaster.mdc))
--   Select tasks based on dependencies (all marked 'done'), priority level, and ID order
--   View specific task details using `get_task` / `task-master show <id>` (see [`taskmaster.mdc`](mdc:.cursor/rules/taskmaster.mdc)) to understand implementation requirements
--   Break down complex tasks using `expand_task` / `task-master expand --id=<id> --force --research` (see [`taskmaster.mdc`](mdc:.cursor/rules/taskmaster.mdc)) with appropriate flags like `--force` (to replace existing subtasks) and `--research`
--   Implement code following task details, dependencies, and project standards
--   Mark completed tasks with `set_task_status` / `task-master set-status --id=<id> --status=done` (see [`taskmaster.mdc`](mdc:.cursor/rules/taskmaster.mdc))
--   Update dependent tasks when implementation differs from original plan using `update` / `task-master update --from=<id> --prompt="..."` or `update_task` / `task-master update-task --id=<id> --prompt="..."` (see [`taskmaster.mdc`](mdc:.cursor/rules/taskmaster.mdc))
+## **Workflow Overview**
 
----
+```mermaid
+flowchart TD
+    A[Start: On main branch] --> B[Pull latest changes]
+    B --> C[Create task branch<br/>git checkout -b task-XXX]
+    C --> D[Set task status: in-progress]
+    D --> E[Get task context & expand if needed<br/>Tasks automatically use current tag]
+    E --> F[Identify next subtask]
+    
+    F --> G[Set subtask: in-progress]
+    G --> H[Research & collect context<br/>update_subtask with findings]
+    H --> I[Implement subtask]
+    I --> J[Update subtask with completion]
+    J --> K[Set subtask: done]
+    K --> L[Git commit subtask]
+    
+    L --> M{More subtasks?}
+    M -->|Yes| F
+    M -->|No| N[Run final tests]
+    
+    N --> O[Commit tests if added]
+    O --> P[Push task branch]
+    P --> Q[Create Pull Request]
+    Q --> R[Human review & merge]
+    R --> S[Switch to main & pull]
+    S --> T[Delete task branch]
+    T --> U[Ready for next task]
+    
+    style A fill:#e1f5fe
+    style C fill:#f3e5f5
+    style G fill:#fff3e0
+    style L fill:#e8f5e8
+    style Q fill:#fce4ec
+    style R fill:#f1f8e9
+    style U fill:#e1f5fe
+```
 
-## Leveling Up: Agent-Led Multi-Context Workflows
+## **Complete Task Development Workflow**
 
-While the basic workflow is powerful, your primary opportunity to add value is by identifying when to introduce **Tagged Task Lists**. These patterns are your tools for creating a more organized and efficient development environment for the user, especially if you detect agentic or parallel development happening across the same session.
+### **Phase 1: Task Preparation**
+```bash
+# 1. Ensure you're on main branch and pull latest
+git checkout main
+git pull origin main
 
-**Critical Principle**: Most users should never see a difference in their experience. Only introduce advanced workflows when you detect clear indicators that the project has evolved beyond simple task management.
+# 2. Check current branch status
+git branch  # Verify you're on main
 
-### When to Introduce Tags: Your Decision Patterns
+# 3. Create task-specific branch
+git checkout -b task-004  # For Task 4
 
-Here are the patterns to look for. When you detect one, you should propose the corresponding workflow to the user.
+# 4. Set task status in Task Master (tasks automatically use current tag context)
+# Use: set_task_status tool or `task-master set-status --id=4 --status=in-progress`
+```
 
-#### Pattern 1: Simple Git Feature Branching
-This is the most common and direct use case for tags.
+### **Phase 2: Task Analysis & Planning**
+```bash
+# 5. Get task context and expand if needed (uses current tag automatically)
+# Use: get_task tool or `task-master show 4`
+# Use: expand_task tool or `task-master expand --id=4 --research --force` (if complex)
 
-- **Trigger**: The user creates a new git branch (e.g., `git checkout -b feature/user-auth`).
-- **Your Action**: Propose creating a new tag that mirrors the branch name to isolate the feature's tasks from `master`.
-- **Your Suggested Prompt**: *"I see you've created a new branch named 'feature/user-auth'. To keep all related tasks neatly organized and separate from your main list, I can create a corresponding task tag for you. This helps prevent merge conflicts in your `tasks.json` file later. Shall I create the 'feature-user-auth' tag?"*
-- **Tool to Use**: `task-master add-tag --from-branch`
+# 6. Identify next subtask to work on
+# Use: next_task tool or `task-master next`
+```
 
-#### Pattern 2: Team Collaboration
+### **Phase 3: Subtask Implementation Loop**
+For each subtask, follow this pattern:
+
+```bash
+# 7. Mark subtask as in-progress
+# Use: set_task_status tool or `task-master set-status --id=4.1 --status=in-progress`
+
+# 8. Gather context and research (if needed)
+# Use: update_subtask tool with research flag or:
+# `task-master update-subtask --id=4.1 --prompt="Research findings..." --research`
+
+# 9. Collect code context through AI exploration
+# Document findings in subtask using update_subtask
+
+# 10. Implement the subtask
+# Write code, tests, documentation
+
+# 11. Update subtask with completion details
+# Use: update_subtask tool or:
+# `task-master update-subtask --id=4.1 --prompt="Implementation complete..."`
+
+# 12. Mark subtask as done
+# Use: set_task_status tool or `task-master set-status --id=4.1 --status=done`
+
+# 13. Commit the subtask implementation
+git add .
+git commit -m "feat(task-4): Complete subtask 4.1 - [Subtask Title]
+
+- Implementation details
+- Key changes made
+- Any important notes
+
+Subtask 4.1: [Brief description of what was accomplished]
+Relates to Task 4: [Main task title]"
+```
+
+### **Phase 4: Task Completion**
+```bash
+# 14. When all subtasks are complete, run final testing
+# Create test file if needed, ensure all tests pass
+npm test  # or jest, or manual testing
+
+# 15. If tests were added/modified, commit them
+git add .
+git commit -m "test(task-4): Add comprehensive tests for Task 4
+
+- Unit tests for core functionality
+- Integration tests for API endpoints
+- All tests passing
+
+Task 4: [Main task title] - Testing complete"
+
+# 16. Push the task branch
+git push origin task-004
+
+# 17. Create Pull Request
+# Title: "Task 4: [Task Title]"
+# Description should include:
+# - Task overview
+# - Subtasks completed
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
