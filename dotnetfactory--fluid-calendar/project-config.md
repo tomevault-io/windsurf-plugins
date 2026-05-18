@@ -1,0 +1,96 @@
+---
+trigger: always_on
+description: send this with every request so the AI knows what to do
+---
+
+send this with every request so the AI knows what to do.
+
+- this app will be a clone of the Motion app for calendar and task management
+- user can add a google,outlook or caldav calendars, by clicking add calendar, get the  auth screen, authorizes the app full access to the calendar
+- we will be using postgres
+- this app is built with nextjs, tailwind, prisma, postgres, shadcn, zod, zustand
+- it uses fullcalendar package
+- when adding an external calendar like google or outlook, we still need to sync the data in our database so we are always working with our local data
+- the google/outlook/caldav auth needs to handle refreshing tokens so when the token expires an hour later, we can get a new one and continue syncing.
+- use shadcn whenever possible, the correct command to use is `npx shadcn@latest add`
+- make minimal changes and don't change or break existing logic and only apply the changes requested.
+- no need to touch files after making changes
+- don't use .gitignore to ignore saas-only source files, since the code is synced between the projects, instead update the sync-repos.sh script to exclude files that should not be in the open source version
+- if there are changes to the rules or setup, update the main-rule.mdc file accordingly
+- if you add methods or code that need implementation add a //todo comment explaining what it needs to do so we can implement it later
+- when generating react content make sure to replace quotes and apostrohpes with &apos; and &quot;
+- as you make changes update a CHANGELOG.md file with the changes under the [unreleased] section, so we can keep track for release notes
+- when adding new features, consider if they should be in the saas version or the open source version or both and if you are not sure, ask to confirm
+- when adding new features, consider if they should be in the cmdk commands, if so ask me to confirm then add them to src/lib/commands or @useCommands.ts
+- use bullmq for backgound jobs and queue management.  all jobs are in the saas/jobs folder
+
+
+## SAAS vs Open Source
+
+This project is available in two versions:
+1. **Open Source Version**: Free, self-hosted version with core functionality
+2. **SAAS Version**: Hosted service with premium features
+
+### Code Organization:
+- All SAAS-specific code is in the `src/saas/` directory, which is excluded from the open source repository via `.gitignore`
+- The open source repository is at https://github.com/dotnetfactory/fluid-calendar
+- The private SAAS repository contains both the open source code and the SAAS-specific code
+- all pages for saas are in the `src/app/(saas)` folder and all common pages are in the `src/app/(common)` folder and open source in `src/app/(open)`
+- we should still add a .saas extension and .open extension to files in (saas) and (open) folders to avoid compiling them
+
+### File Extension Convention:
+- Files with `.saas.tsx`/`.saas.ts` extension are only included in the SAAS build
+- Files with `.open.tsx`/`.open.ts` extension are only included in the open source build
+- Regular files (without special extensions) are included in both builds
+
+### Feature Flags:
+- Use the `isSaasEnabled` and `isFeatureEnabled()` functions from `src/lib/config.ts` to conditionally enable SAAS features
+- SAAS features are controlled by the `NEXT_PUBLIC_ENABLE_SAAS_FEATURES` environment variable
+
+### Component Loading:
+- Use route groups to organize pages: `(saas)`, `(open)`, and `(common)`
+- Place SAAS-specific pages in `src/app/(saas)/` and open source pages in `src/app/(open)/`
+- Common pages that work in both versions go in `src/app/(common)/`
+- For shared components with different implementations:
+  - Create separate files with `.saas.tsx` and `.open.tsx` extensions in the same directory
+  - Use dynamic imports with template literals to select the correct file based on the environment variable
+  - Example: `dynamic(() => import(./path/component${process.env.NEXT_PUBLIC_ENABLE_SAAS_FEATURES === "true" ? ".saas" : ".open"}))`
+  - See `src/app/(common)/settings/page.tsx` for an example of this pattern
+
+### Admin Access Control:
+- Admin-only features should be secured using the `useAdmin` hook or the `AdminOnly` component
+- For pages in the settings section:
+  - Use the `useAdmin` hook to check if the user is an admin
+  - Show an access denied message using the `AccessDeniedMessage` component
+  - Example: 
+    ```tsx
+    const { isAdmin } = useAdmin();
+    if (!isAdmin) {
+      return <AccessDeniedMessage message="Custom access denied message" />;
+    }
+    ```
+- For components:
+  - Use the `AdminOnly` wrapper component from `@/components/auth/AdminOnly`
+  - Provide a fallback component to show for non-admin users
+  - Example:
+    ```tsx
+    <AdminOnly fallback={<AccessDeniedMessage message="Custom access denied message" />}>
+      {/* Admin-only content */}
+    </AdminOnly>
+    ```
+- For more complex access denied messages, create a custom component that uses the layout appropriate for that section
+- In the settings page, use the `isSaasEnabled` constant to conditionally include admin-only tabs:
+  ```tsx
+  if (isAdmin) {
+    const adminTabs = [/* ... */];
+    
+    if (isSaasEnabled) {
+      return [...baseTabs, ...adminTabs, { id: "saas-feature", label: "SAAS Feature" }];
+    }
+    
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [dotnetfactory/fluid-calendar](https://github.com/dotnetfactory/fluid-calendar) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-18 -->
