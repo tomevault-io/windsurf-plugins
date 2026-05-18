@@ -1,150 +1,90 @@
 ---
 trigger: always_on
-description: This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
+description: Benchmarking playbook — HTTP load testing with oha and Server-Timing profiling. Update this rule when new benchmarking lessons are learned.
 ---
 
-# AGENTS.md
 
-This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
+# Benchmarking Playbook
 
-## Overview
+When you discover a new benchmarking technique, pitfall, or best practice, add a concise bullet to the relevant section below in the same session.
 
-Databuddy is a comprehensive analytics platform — a Turborepo monorepo using Bun as the package manager and runtime. It consists of multiple apps (dashboard, API, data collectors) and shared packages, backed by PostgreSQL, ClickHouse, and Redis.
+## Tools
 
-## Development Commands
+- **CPU microbenchmarks**: mitata (`bun add -d mitata`) — picosecond-accurate, JIT-aware, boxplot/lineplot/barplot/summary visualizations
+- **HTTP load testing**: oha — Rust-based, real-time TUI, percentile distribution, supports POST/headers/JSON bodies
+- NEVER roll your own `performance.now()` loops — mitata handles warmup, GC, JIT deopt detection, and batching correctly
 
-```bash
-# Start dashboard + API only (most common)
-bun run dev:dashboard
+## mitata essentials
 
-# Start all apps
-bun run dev
+- Always use `do_not_optimize(returnValue)` to prevent dead code elimination — JIT will remove pure functions with no side effects
+- Use generator functions with `state.get()` + `.args()` / `.range()` for parameterized benchmarks instead of duplicating bench calls
+- Use computed parameters (`[0]() { return val }, bench(p0) { ... }`) to prevent loop invariant code motion optimization
+- Use `.gc('inner')` for allocation-heavy benchmarks to get consistent results
+- Wrap related benchmarks in `summary(() => { ... })` to get automatic comparison (Nx faster/slower)
+- Wrap summaries in `boxplot()` for distribution visualization — use `lineplot()` for scaling curves
+- Run with `--expose-gc` on Node for accurate GC metrics; Bun exposes GC natively
+- Install `@mitata/counters` on Apple Silicon or Linux for IPC and cache stats
+- Watch for the `!` warning in output — it means the benchmark was likely optimized out (dead code elimination)
 
-# Lint
-bun run lint
+## oha essentials
 
-# Format
-bun run format
+- Basic: `oha -n 1000 -c 50 URL` (1000 requests, 50 concurrent)
+- Duration-based: `oha -z 30s -c 100 URL`
+- POST with JSON: `oha -m POST -d '{"key":"value"}' -T application/json URL`
+- Custom headers: `oha -H "Authorization: Bearer token" -H "x-api-key: key" URL`
+- Rate-limited: `oha -q 200 -z 30s URL` (200 req/sec for 30s)
+- JSON output for CI: `oha -n 500 --json URL`
+- Disable TUI for scripting: `oha --no-tui -n 500 URL`
+- Use `--latency-correction` for coordinated omission correction
 
-# Type check
-bun run check-types
+## Writing good benchmarks
 
-# Run tests
-bun run test
-bun run test:watch
+- Test one thing per bench — isolate the function under test from setup, I/O, and side effects
+- Always benchmark both the hit path AND the miss path (match vs no-match, cache hit vs miss)
+- Vary input sizes — use `.args()` or `.range()` to expose scaling characteristics (O(n) vs O(1))
+- Include a trivial baseline (e.g. a simple boolean flag eval) so relative cost is obvious
+- Pre-build fixtures outside bench scope — never allocate inside the measured function unless testing allocation
+- Test with realistic data shapes and sizes, not just minimal inputs
+- Test worst-case scenarios explicitly (max rules, max batch values, deepest nesting)
+- Simulate real production workloads (mixed flag types, multiple contexts)
 
-# Database
-bun run db:push          # Apply schema changes (no migration files)
-bun run db:migrate       # Run migration files
-bun run db:studio        # Open Drizzle Studio GUI
-bun run db:seed <WEBSITE_ID> [EVENT_COUNT]  # Seed sample analytics data
+## Structuring benchmark files
 
-# SDK (must build before dev if SDK changed)
-bun run sdk:build
+- Name files `*.bench.ts` next to the code they test
+- Group related benchmarks with `summary()` inside `boxplot()` blocks
+- Order sections from primitives → single operations → scaling → bulk → worst case → production simulation
+- Use factory functions for test data to keep the file readable
+- Export nothing — the file should be self-contained and runnable with `bun path/to/file.bench.ts`
 
-# Build everything
-bun run build
-```
+## Interpreting results
 
-**Note:** All commands use `dotenv --` prefix internally to load `.env` — just run them from root.
+- Sub-nanosecond (< 1 ns) results often indicate dead code elimination — add `do_not_optimize()`
+- If p99 is wildly higher than avg, GC pressure or JIT recompilation is happening
+- Compare within the same `summary()` block — cross-block comparison is unreliable due to CPU thermal state
+- Linear scaling in `lineplot()` is expected for O(n) operations — unexpected curves indicate algorithmic issues
+- For HTTP tests, focus on p99 latency under load, not just throughput
 
-### Running a single test
+## Server-Timing profiling
 
-```bash
-# From root
-cd apps/api && bun test path/to/test.ts
+- Use `@elysiajs/server-timing` to get per-phase durations in response headers — no code instrumentation needed
+- Read with `curl -sf -D - -o /dev/null URL` to see `Server-Timing` header breakdown
+- Phases: `request` (CORS/parsing), `beforeHandle` (auth/middleware), `handle` (your handler), `afterHandle` (response transform), `total`
+- Use to identify whether latency is in middleware, cache lookup, DB query, or evaluation logic
+- Run locally with `dotenv -e .env -- bun --hot apps/api/src/index.ts --port 3001` to test with real env vars
+- Compare cold (first request, cache miss) vs warm (subsequent, cache hit) to see cache effectiveness
 
-# Or with filter
-cd apps/api && bun test --test-name-pattern "test name"
-```
+## HTTP benchmarking with oha against real servers
 
-## Initial Setup
+- Prefer hitting the actual running server (dev or prod) over building mock servers — measures the real stack
+- Warm up caches before benchmarking by sending a few throwaway requests first
+- Subtract DNS+dialup time from response time to see actual server processing time
+- p99 tells you more than average — a 130ms avg with 400ms p99 means tail latency issues
+- Use `unset NO_COLOR` before oha if running in shells that set it (breaks `--no-tui`)
+- Keep the oha script as a `.sh` file next to the route it tests, taking clientId as an argument
+- Always test error paths (missing params, 404s) — they should be faster than happy paths
+- p99 spikes on otherwise fast endpoints usually mean cache TTL expiry hitting Redis/DB — tune TTL or use stale-while-revalidate
 
-```bash
-bun install
-cp .env.example .env
-docker-compose up -d          # PostgreSQL, ClickHouse, Redis
-bun run db:push
-bun run clickhouse:init       # from packages/db
-bun run sdk:build
-bun run dev:dashboard
-```
-
-## Architecture
-
-### Monorepo Structure
-
-```
-apps/
-  dashboard/   # Next.js 16 frontend (React 19, TailwindCSS 4)
-  api/         # Elysia.js backend (Bun, port 3001)
-  basket/      # Analytics event ingestion service
-  uptime/      # Uptime monitoring
-  cron/        # Scheduled jobs
-  links/       # Short link service
-  docs/        # Documentation site
-
-packages/
-  db/          # Drizzle ORM schemas + clients (PostgreSQL + ClickHouse)
-  rpc/         # ORPC router — type-safe API layer between dashboard and api
-  auth/        # Better-Auth integration + permission system
-  sdk/         # Public analytics SDK (React, Vue, Node.js)
-  cache/       # Redis-backed Drizzle caching layer
-  redis/       # Redis client, pub/sub, BullMQ job queues
-  shared/      # Shared types, utilities, constants
-  validation/  # Zod schemas
-  ai/          # AI/LLM integrations (OpenAI, Groq, OpenRouter)
-  services/    # Business logic services
-  email/       # Email via Resend
-  notifications/ # Notification system
-  tracker/     # Lightweight client-side tracking scripts
-  mapper/      # Data transformation utilities
-  query/       # Query builders
-  env/         # Environment configuration (type-safe env vars)
-```
-
-### Data Flow
-
-```
-Browser (SDK/tracker) → basket (ingestion) → ClickHouse (analytics warehouse)
-                                           → PostgreSQL (relational data)
-
-Dashboard (Next.js) ←→ ORPC (rpc package) ←→ API (Elysia) → PostgreSQL + ClickHouse + Redis
-```
-
-### Key Patterns
-
-**RPC Layer (`packages/rpc`)**: The central type-safe API contract between dashboard and api. Dashboard uses ORPC client with TanStack Query; API implements the procedures. Adding a new endpoint means defining it in `rpc`, implementing it in `api`, and calling it from `dashboard`.
-
-**Database Layer (`packages/db`)**: Single source of truth for all schemas. Uses Drizzle ORM for PostgreSQL (relational data: users, websites, settings) and a ClickHouse client for analytics data (events, sessions, pageviews). Schema changes use `db:push` for development; `db:migrate` for production migrations.
-
-**Caching (`packages/cache`)**: Redis cache sits in front of Drizzle queries. Cache keys and TTLs are defined alongside queries.
-
-**Auth (`packages/auth`)**: Better-Auth handles sessions. The package also contains the permission system used across all apps.
-
-**State management in Dashboard**: Jotai for local UI state, TanStack Query for server state.
-
-**Dashboard design system (`apps/dashboard/components/ds`)**: Dashboard UI must be built from DS primitives. Feature code should not use raw form/control primitives (`button`, `input`, `select`, `textarea`, native dialogs), Base UI, Radix, or one-off styled controls directly. If a needed primitive or variant does not exist, add or extend a DS component first, then consume it from the feature. Raw control elements belong inside `components/ds` implementations only.
-
-For picker controls, use the component that matches the interaction:
-- Use `DropdownMenu` for menu-style folder/status/filter/sort/action pickers.
-- Use `Select` only when the established UI pattern is explicitly a select/combobox.
-- Use `Field` with DS inputs for form labeling, descriptions, errors, ids, and accessibility wiring.
-
-### Tech Stack
-
-- **Runtime**: Bun 1.3.14+
-- **Frontend**: Next.js 16, React 19, TailwindCSS 4, Radix UI, Recharts
-- **Backend**: Elysia.js (Bun-native HTTP framework)
-- **API layer**: ORPC (type-safe RPC with OpenAPI generation)
-- **Auth**: Better-Auth
-- **ORM**: Drizzle ORM
-- **Databases**: PostgreSQL 17, ClickHouse 25.5, Redis 7
-- **Validation**: Zod 4
-- **Linting/Formatting**: Biome via Ultracite
-- **Build**: Turborepo + Bun
-
-## Code Style
+## Common pitfalls
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
