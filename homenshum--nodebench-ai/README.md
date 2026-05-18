@@ -2,6 +2,8 @@
 
 > Source: [HomenShum/nodebench-ai](https://github.com/HomenShum/nodebench-ai) — distributed by [TomeVault](https://tomevault.io)
 
+Entity intelligence workspace for public research, sourced dossiers, Convex runtime state, MCP tools, and agent context packs.
+
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
@@ -15,7 +17,7 @@ Original source: `.cursor/rules/*.mdc` in [HomenShum/nodebench-ai](https://githu
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
-From [HomenShum/nodebench-ai](https://github.com/HomenShum/nodebench-ai) — a repo with 0+ stars on GitHub.
+From [HomenShum/nodebench-ai](https://github.com/HomenShum/nodebench-ai) — a repo with 13+ stars on GitHub.
 
 ---
 
