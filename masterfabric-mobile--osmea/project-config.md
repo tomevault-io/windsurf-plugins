@@ -1,13 +1,13 @@
 ---
 trigger: always_on
-description: OSMEA text extensions - font, alignment, spacing, decoration with context
+description: OSMEA text system - OsmeaComponents.text, OsmeaTextStyle, typography
 ---
 
 
-# OSMEA Text Extensions - Cursor Rules
+# OSMEA Text System - Cursor Rules
 
 ## 📦 Package Overview
-OSMEA Text Extensions provide comprehensive utility extensions for text styling in Flutter applications. These extensions work seamlessly with `OsmeaComponents.text` to provide consistent typography, spacing, and styling across the entire application.
+OSMEA Text System provides a unified text solution through `OsmeaComponents.text` with comprehensive style selection. This system offers 20+ text variants, 15+ extension categories, and simplified component usage for consistent typography across Flutter applications.
 
 ## Import Statement
 Always import OsmeaComponents at the top of your files:
@@ -15,193 +15,204 @@ Always import OsmeaComponents at the top of your files:
 import 'package:osmea_components/osmea_components.dart';
 ```
 
-## Color Usage
-
-### ✅ Use OsmeaColors
-```dart
-// ✅ Correct - using OsmeaColors
-OsmeaComponents.text(
-  'Hello',
-  color: OsmeaColors.nordicBlue,
-  fontSize: context.fontSizeMedium,
-)
-
-OsmeaComponents.text(
-  'Primary text',
-  color: OsmeaColors.textPrimary,
-  fontSize: context.fontSizeLarge,
-)
-
-OsmeaComponents.text(
-  'Secondary text',
-  color: OsmeaColors.textSecondary,
-  fontSize: context.fontSizeMedium,
-)
-```
-
-### ❌ Don't Use Standard Colors
-```dart
-// ❌ Wrong - using standard Colors
-OsmeaComponents.text(
-  'Hello',
-  color: Colors.blue,
-  fontSize: context.fontSizeMedium,
-)
-
-OsmeaComponents.text(
-  'Primary text',
-  color: Colors.black,
-  fontSize: context.fontSizeLarge,
-)
-```
-
 ## 🎯 Development Guidelines
 
 ### 📁 File Structure
 ```
 packages/components/lib/src/
+├── components/text/
+│   └── text.dart                    # Main text components
+├── styles/
+│   └── text_style.dart              # Typography system
 └── utils/
     └── text_extensions.dart         # Text utility extensions
 ```
 
-### 🎨 Extension Categories
+### 🎨 System Architecture
 
-#### 1. **Core Typography Extensions**
-- `FontWeightExtension` - Font weight utilities (thin to black)
-- `TextSizeX` - Font size utilities (tiny to extra large)
-- `FontStyleExtension` - Font style options (normal, italic)
-- `FontFamilyExtension` - Font family selection (20+ fonts)
+#### 1. **Text Extensions** (`text_extensions.dart`)
+- Font families, weights, sizes, and styles
+- Text alignment, decoration, and overflow
+- Letter spacing, word spacing, and line height
+- Font features and variations
 
-#### 2. **Text Layout Extensions**
-- `TextAlignExtension` - Text alignment (left, right, center, justify, start, end)
-- `TextOverflowExtension` - Text overflow handling (clip, fade, ellipsis, visible)
-- `TextMaxLineExtension` - Line limit controls (1 to unlimited)
-- `TextBaselineExtension` - Baseline alignment (alphabetic, ideographic)
+#### 2. **Text Styles** (`text_style.dart`)
+- Predefined typography system
+- 20+ text variants (display, headline, body, etc.)
+- Consistent spacing and sizing
+- Theme integration
 
-#### 3. **Text Styling Extensions**
-- `TextDecorationExtension` - Text decorations (none, underline, overline, lineThrough)
-- `TextDecorationStyleExtension` - Decoration styles (solid, double, dotted, dashed, wavy)
-- `TextCapitalizationExtension` - Text capitalization (words, sentences, characters, none)
-
-#### 4. **Advanced Typography Extensions**
-- `FontFeatureExtension` - Font features (smallCaps, oldstyleNums, liningNums, etc.)
-- `FontVariationExtension` - Font variations (normal, wide, condensed, slant)
-- `LetterSpacingExtension` - Letter spacing (tight to extra loose)
-- `WordSpacingExtension` - Word spacing (tight to loose)
-- `TextLeadingDistributionExtension` - Line height distribution (proportional, even)
+#### 3. **Text Components** (`text.dart`)
+- Unified `OsmeaComponents.Text` component
+- Style selection through variants
+- Animation and interaction support
+- Accessibility features
 
 ### 🔧 Usage Rules
 
-#### 1. Primary Usage Pattern with OsmeaComponents.text
+#### 1. Color Usage
 ```dart
-// ✅ Good - Use extensions with OsmeaComponents.text
+// ✅ Good - Use OsmeaColors for consistent theming
+OsmeaComponents.text(
+  'Primary text',
+  textStyle: OsmeaTextStyle.headlineLarge(context),
+  color: OsmeaColors.nordicBlue,
+)
+
+OsmeaComponents.text(
+  'Secondary text',
+  textStyle: OsmeaTextStyle.bodyMedium(context),
+  color: OsmeaColors.thunder,
+)
+
+OsmeaComponents.text(
+  'Muted text',
+  textStyle: OsmeaTextStyle.captionMedium(context),
+  color: OsmeaColors.steel,
+)
+
+// ❌ Bad - Using standard Colors
+Text(
+  'Primary text',
+  style: TextStyle(color: Colors.blue),
+)
+```
+
+#### 2. Primary Usage Pattern
+```dart
+// ✅ Good - Use OsmeaComponents.text with textStyle parameter
 OsmeaComponents.text(
   'Page Title',
-  fontSize: context.fontSizeExtraLarge,
-  fontFamily: context.fontRoboto,
-  fontWeight: context.semiBold,
-  letterSpacing: context.letterSpacingWide,
-  textAlign: context.textCenter,
-  maxLines: context.maxLineTwo,
-  overflow: context.ellipsis,
+  textStyle: OsmeaTextStyle.headlineLarge(context),
   color: OsmeaColors.nordicBlue,
+)
+
+OsmeaComponents.text(
+  'This is the main content text that explains the feature.',
+  textStyle: OsmeaTextStyle.bodyMedium(context),
+  textAlign: context.textLeft,
+)
+
+OsmeaComponents.text(
+  'Form Field Label',
+  textStyle: OsmeaTextStyle.labelMedium(context),
+  fontWeight: context.medium,
+)
+
+// ❌ Bad - Using generic Text with manual styling
+Text(
+  'Page Title',
+  style: TextStyle(
+    fontSize: 24,
+    fontWeight: FontWeight.w600,
+    color: Colors.blue,
+  ),
+)
+```
+
+#### 3. Style Selection Patterns
+```dart
+// ✅ Good - Use OsmeaComponents.text with textStyle parameter
+OsmeaComponents.text(
+  'Custom styled text',
+  textStyle: OsmeaTextStyle.headlineLarge(context),
+  color: OsmeaColors.red,
+  letterSpacing: context.letterSpacingWide,
 )
 
 // ✅ Good - Use extensions for additional styling
 OsmeaComponents.text(
   'Styled text with extensions',
-  fontSize: context.fontSizeMedium,
-  fontFamily: context.fontMontserrat,
+  textStyle: OsmeaTextStyle.bodyLarge(context),
+  fontFamily: context.fontRoboto,
   fontWeight: context.medium,
-  letterSpacing: context.letterSpacingNormal,
-  wordSpacing: context.wordSpacingWide,
-  textAlign: context.textJustify,
-  decoration: context.underline,
-  decorationStyle: context.solid,
-  color: OsmeaColors.textPrimary,
+  textAlign: context.textCenter,
 )
 
-// ❌ Bad - Hard-coded values instead of extensions
+// ❌ Bad - Manual TextStyle creation
+Text(
+  'Custom styled text',
+  style: TextStyle(
+    fontSize: 20,
+    fontWeight: FontWeight.w500,
+    color: Colors.red,
+    letterSpacing: 0.5,
+  ),
+)
+```
+
+#### 4. Extension Usage Patterns
+```dart
+// ✅ Good - Use extensions for consistent styling
 OsmeaComponents.text(
   'Styled text',
-  fontSize: 16,
+  textStyle: OsmeaTextStyle.bodyMedium(context),
+  fontFamily: context.fontRoboto,
+  fontWeight: context.medium,
+  letterSpacing: context.letterSpacingNormal,
+  wordSpacing: context.wordSpacingNormal,
+  textAlign: context.textCenter,
+  maxLines: context.maxLineTwo,
+  overflow: context.ellipsis,
+)
+
+// ❌ Bad - Hard-coded values
+OsmeaComponents.text(
+  'Styled text',
+  textStyle: OsmeaTextStyle.bodyMedium(context),
   fontFamily: 'Roboto',
   fontWeight: FontWeight.w500,
-  letterSpacing: 0.5,
-  wordSpacing: 1.0,
+  letterSpacing: 0.0,
+  wordSpacing: 0.0,
   textAlign: TextAlign.center,
   maxLines: 2,
   overflow: TextOverflow.ellipsis,
 )
 ```
 
-#### 2. Font Family Selection
+### 📱 Responsive Typography
+
+#### 1. Dynamic Text Sizing
 ```dart
-// ✅ Good - Use font family extensions
-OsmeaComponents.text(
-  'Primary text',
-  fontSize: context.fontSizeLarge,
-  fontFamily: context.fontRoboto,
-  color: OsmeaColors.textPrimary,
-)
-
-OsmeaComponents.text(
-  'Code text',
-  fontSize: context.fontSizeMedium,
-  fontFamily: context.fontFiraCode,
-  color: OsmeaColors.textSecondary,
-)
-
-OsmeaComponents.text(
-  'Display text',
-  fontSize: context.fontSizeExtraLarge,
-  fontFamily: context.fontPlayfairDisplay,
-  color: OsmeaColors.nordicBlue,
-)
-
-// ❌ Bad - Hard-coded font names
-OsmeaComponents.text(
-  'Primary text',
-  fontSize: context.fontSizeLarge,
-  fontFamily: 'Roboto',
-)
+// ✅ Good - Responsive text with style selection
+class ResponsiveText extends StatelessWidget {
+  final String text;
+  
+  const ResponsiveText({required this.text});
+  
+  @override
+  Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    
+    OsmeaTextVariant style;
+    if (screenWidth < 600) {
+      style = OsmeaTextVariant.bodyMedium;
+    } else if (screenWidth < 900) {
+      style = OsmeaTextVariant.bodyLarge;
+    } else {
+      style = OsmeaTextVariant.headlineSmall;
+    }
+    
+    return OsmeaComponents.text(
+      text,
+      textStyle: OsmeaTextStyle.fromVariant(context, style),
+      textAlign: context.textCenter,
+      letterSpacing: context.letterSpacingNormal,
+    );
+  }
+}
 ```
 
-#### 3. Font Weight and Size
+#### 2. Mobile-First Typography
 ```dart
-// ✅ Good - Use weight and size extensions
-OsmeaComponents.text(
-  'Bold heading',
-  fontSize: context.fontSizeExtraLarge,
-  fontWeight: context.bold,
-  color: OsmeaColors.textPrimary,
-)
-
-OsmeaComponents.text(
-  'Light text',
-  fontSize: context.fontSizeMedium,
-  fontWeight: context.light,
-  color: OsmeaColors.textSecondary,
-)
-
-// ❌ Bad - Hard-coded weights and sizes
-OsmeaComponents.text(
-  'Bold heading',
-  fontSize: 32,
-  fontWeight: FontWeight.w700,
-)
-```
-
-#### 4. Text Alignment and Layout
-```dart
-// ✅ Good - Use alignment extensions
-OsmeaComponents.text(
-  'Centered title',
-  fontSize: context.fontSizeExtraLarge,
-  textAlign: context.textCenter,
-  color: OsmeaColors.textPrimary,
-)
-
+// ✅ Good - Mobile-first approach with proper scaling
+Widget buildArticleText(BuildContext context) {
+  return Column(
+    crossAxisAlignment: context.crossStart,
+    children: [
+      OsmeaComponents.text(
+        'Article Title',
+        textStyle: OsmeaTextStyle.headlineLarge(context),
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
