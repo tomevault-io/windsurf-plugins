@@ -1,11 +1,11 @@
 ---
 trigger: always_on
-description: This file provides architectural guidelines and development standards for Gemini when working in this repository (optimized for Zed Assistant).
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-# GEMINI.md - Context & Guidance for FerrisKey
+# CLAUDE.md
 
-This file provides architectural guidelines and development standards for Gemini when working in this repository (optimized for Zed Assistant).
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Overview
 
@@ -198,138 +198,9 @@ sea-orm-cli generate entity \
 **Unit Tests:**
 - Embedded in source files with `#[test]` or `#[tokio::test]`
 - Domain services use `mockall` for repository mocking
-- Infrastructure tests validate implementations (e.g., Argon2, recovery codes)
 
-**Integration Tests:**
-- Located in `api/tests/it/`
-- Use `test-context` crate for test lifecycle
-- `postgres_context.rs` helper for database setup
-- `axum-test` for HTTP endpoint testing
-
-**Run specific test:**
-```bash
-# Single test function
-cargo test test_name
-
-# All tests in a file
-cargo test --test it
-
-# With output
-cargo test -- --nocapture
-```
-
-## Key Domain Concepts
-
-**Multi-Tenancy (Realms):**
-- Every user, client, role, credential belongs to a realm
-- Complete isolation between realms
-- Realm-specific configuration and settings
-
-**Bitwise Role System:**
-- Roles are bitmasks for efficient permission checks
-- User/client roles stored as integers
-- Quick AND operations for authorization
-
-**Required Actions:**
-- Users can have required actions (e.g., MFA setup, password reset)
-- Enforced before full authentication completes
-- Handled in `domain/user/required_actions.rs`
-
-**Trident Module (MFA):**
-- TOTP (Time-based One-Time Password)
-- WebAuthn (passwordless with security keys)
-- Magic Links (email-based)
-- Recovery Codes (backup codes)
-
-**SeaWatch Module (Audit):**
-- Security event logging for all critical actions
-- Queryable event trail
-- Exportable audit logs
-
-**Webhooks:**
-- Event-driven extensibility
-- Subscribe to lifecycle events (user created, client updated, etc.)
-- Async delivery to configured endpoints
-
-## Error Handling
-
-Layered error types:
-1. `CoreError` (domain) - Business logic errors in `core/src/domain/common/errors.rs`
-2. `ApiError` (HTTP) - HTTP response format in `api/src/application/http/errors/error.rs`
-3. Automatic conversion via `From<CoreError> for ApiError`
-
-Errors are traced through the system with context.
-
-## Configuration
-
-- **Clap** for CLI args and environment variables
-- Main config in `api/src/Args` struct
-- Environment variables override defaults
-- Copy `.env.example` to `.env` in `api/` directory
-
-**Key variables:**
-```bash
-DATABASE_URL=postgres://ferriskey:ferriskey@localhost:5432/ferriskey
-PORT=3333
-ADMIN_USERNAME=admin
-ADMIN_PASSWORD=admin
-ADMIN_EMAIL=admin@ferriskey.rs
-ALLOWED_ORIGINS=http://localhost:5555
-LOG_LEVEL=info
-```
-
-## Observability
-
-- **Metrics:** Prometheus endpoint at `/metrics` (via `axum-prometheus`)
-- **Tracing:** Structured logging with `tracing` crate
-- **OpenTelemetry:** Optional OTLP integration for distributed tracing
-- **OpenAPI Docs:** Available at `/swagger-ui`, `/redoc`, `/rapidoc`, `/scalar`
-
-## Common Patterns
-
-**Adding a new domain entity:**
-1. Create migration in `core/migrations/`
-2. Run migration and regenerate entities
-3. Create domain module in `core/src/domain/your_feature/`
-4. Define entities, ports, services, value_objects
-5. Implement repository in `core/src/infrastructure/repositories/`
-6. Wire up in `ApplicationService` (`core/src/application/mod.rs`)
-7. Add HTTP handlers in `api/src/application/http/your_feature/`
-8. Add routes to main router in `api/src/application/http/server/http_server.rs`
-
-**Repository pattern:**
-All repositories are traits defined in `domain/*/ports.rs`, implemented in `infrastructure/repositories/*_repository.rs`. Services depend on traits, not concrete implementations (enables mocking).
-
-**Generic services:**
-Domain services use generic type parameters for repositories (e.g., `UserService<R: UserRepository>`). Type aliases in `application/services.rs` provide concrete types.
-
-**Error propagation:**
-Use `?` operator liberally. Errors convert automatically via `From` implementations. Add context with `.map_err()` where helpful.
-
-## CI/CD
-
-GitHub Actions workflows in `.github/workflows/`:
-- `docker.yaml` - Builds and pushes Docker images on main/tags
-- `helm.yaml` - Packages and publishes Helm charts
-- `pre-commit.yaml` - Runs pre-commit hooks
-- `release.yaml` - Creates GitHub releases
-
-## Important Notes
-
-- **Never edit** `core/src/entity/` files manually - they're generated from migrations
-- **Async everywhere** - Use `tokio::test` for async tests, `.await` on all DB/HTTP calls
-- **Type safety** - Leverage Rust's type system; prefer compile-time errors over runtime
-- **No unwrap()** - Current refactor (branch 623-remove-unwrap-in-codebase) eliminates `.unwrap()` calls
-- **Cookie handling** - Uses `axum-extra` for cookie management (see recent commit 1fc8d81)
-- **Default credentials** - admin/admin for local development (change in production)
-
-## Useful Links
-
-- Documentation: https://docs.ferriskey.rs/getting-started/introduction
-- Helm Chart: `oci://ghcr.io/ferriskey/charts/ferriskey`
-- Discussions: https://github.com/ferriskey/ferriskey/discussions
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/ferriskey)
-> This is a context snippet only. You'll also want the standalone SKILL.md file — [download at TomeVault](https://tomevault.io/claim/ferriskey)
-<!-- tomevault:4.0:windsurf_rules:2026-04-08 -->
+> Source: [ferriskey/ferriskey](https://github.com/ferriskey/ferriskey) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-18 -->
