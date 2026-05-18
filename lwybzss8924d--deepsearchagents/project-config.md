@@ -1,151 +1,100 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: DeepSearchAgent implements two agent paradigms: "CodeAct Agent" & normal "ReAct Agent". Version 0.2.4.dev introduces comprehensive enhancements to both agent types with a focus on text chunking, prompt organization, and planning capabilities.
 ---
 
-# CLAUDE.md
+# Agent Architecture
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+DeepSearchAgent implements two agent paradigms: "CodeAct Agent" & normal "ReAct Agent". Version 0.2.4.dev introduces comprehensive enhancements to both agent types with a focus on text chunking, prompt organization, and planning capabilities.
 
-## DeepSearchAgent Project
+## Architecture Overview
 
-DeepSearchAgent is an intelligent agent system that combines the ReAct (Reasoning + Acting) framework and the CodeAct concept (executable code agents) to enable deep web search and reasoning capabilities. Built on Hugging Face's `smolagents` framework, it provides multi-step reasoning for complex queries through various interfaces.
+The codebase implements a dual-agent architecture pattern:
 
-**Version 0.3.3.dev** introduces a complete web frontend with real-time streaming, metadata-driven component routing, and a simplified WebSocket API architecture.
+1. **CodeAct Agent**: Generates and executes Python code to perform research actions
+2. **ReAct Agent**: Uses structured JSON for tool calling with explicit reasoning steps
 
-## Development Commands
+Both agent types share common tools but differ in how they invoke these tools and process the results. The architecture includes a sophisticated template system and state management across both paradigms.
 
-### Common Development Tasks
-```bash
-# Install dependencies (with development tools)
-uv pip install -e ".[dev,test,cli]"
+## CodeAct Agent Implementation
 
-# Run tests
-make test
+[codact_agent.py](mdc:src/agents/codact_agent.py) implements the Code Execution paradigm:
 
-# Run specific test file
-uv run -- pytest tests/test_specific.py
+- Based on `smolagents.CodeAgent` - generates executable Python code to perform actions
+- Uses `create_codact_agent()` factory function for agent initialization
+- Extends the base smolagents prompt templates with custom extensions
+- Maintains persistent variables between execution steps for state management
+- Implements sophisticated planning at regular intervals (default every 4 steps)
+- Streaming support through optional `StreamingCodeAgent` wrapper
 
-# Run tests with coverage
-uv run -- pytest --cov=src tests
+### Key Technical Features:
 
-# Start development servers
-make run        # FastAPI server (default port 8000)
-# Web API v2 is accessible via the main FastAPI server
-make cli        # Interactive CLI mode
+- **Template Merging System**: Uses `merge_prompt_templates()` to combine base templates from smolagents with custom extensions
+- **Structured State Management**: Maintains global variables (`visited_urls`, `search_queries`, `key_findings`, etc.)
+- **Authorized Imports Management**: Carefully controls which Python modules can be used in the execution environment
+- **Tool Integration**: Provides direct access to tools as callable Python functions
+- **Failure Handling**: Implements robust error checks and safe access patterns for tools and variables
+- **Periodic Planning**: Reassesses strategy at configurable intervals via `planning_interval` parameter
 
-# CLI with specific agent modes
-make cli-react  # ReAct agent (non-interactive)
-make cli-codact # CodeAct agent (non-interactive)
+## ReAct Agent Implementation
 
-# MCP server
-python -m src.agents.servers.run_fastmcp
+[agent.py](mdc:src/agents/agent.py) implements the Reasoning + Acting paradigm:
 
-# Frontend development
-cd frontend && npm install   # Install dependencies
-cd frontend && npm run dev   # Start development server (port 3000)
-cd frontend && npm run build # Build for production
-cd frontend && npm run lint  # Run linting
-```
+- Based on `smolagents.ToolCallingAgent` - uses structured tool calling via JSON
+- Uses `create_react_agent()` factory function for agent initialization
+- Uses complete `PromptTemplates` structure for all agent interaction
+- Implements explicit reasoning (Thought) before each tool call (Action)
+- Supports periodic planning via `planning_interval` parameter (default 7 steps)
+- Streaming via optional `StreamingReactAgent` wrapper
 
-### Configuration Setup
-```bash
-cp config.template.toml config.toml  # Non-sensitive settings
-cp .env.example .env                 # API keys
-```
+### Key Technical Features:
 
-## High-Level Architecture
+- **JSON-based Tool Calls**: Uses structured JSON format for tool invocation
+- **Explicit Reasoning Traces**: Records thought process before each action
+- **State Tracking**: Maintains state through step memory rather than variables
+- **Tool Integration**: Consistent tool interface with both agent paradigms
+- **Standardized Prompt Structure**: Uses comprehensive PromptTemplates system
+- **Periodic Planning**: Reassesses strategy at regular intervals via `planning_interval`
 
-### Agent System Design
-The project implements a dual-agent architecture:
-- **CodeAct Agent**: Executes Python code to perform actions, suitable for computational tasks
-- **ReAct Agent**: Uses structured tool calling with JSON responses, better for web search tasks
-- **Runtime Manager**: Handles execution environment and tool availability for both agent types
-- **Model Routing**: Supports multiple LLM providers through LiteLLM with configurable model selection
-- **Web API v2**: Simplified WebSocket API with direct Gradio message pass-through (~500 lines, down from ~5000)
+## Prompt Template System
 
-### Core Components Interaction
-```
-User Input → Agent Selection → Planning/Reasoning → Tool Execution → Response Streaming
-                    ↓                    ↓                ↓
-              config.toml          Prompt Templates    Toolbox Manager
-                    
-Web API v2 → WebSocket → Session Manager → Gradio Passthrough → stream_to_gradio → Agent
-                           │
-                           ▼
-                    Frontend (Next.js)
-                           │
-                    ┌──────┴──────┐
-                    │  WebSocket  │
-                    │    Hook     │
-                    └──────┬──────┘
-                           │
-                    ┌──────▼──────┐
-                    │  Component  │
-                    │   Router    │
-                    └──────┬──────┘
-                           │
-         ┌─────────────────┼─────────────────┐
-         │                 │                 │
-    ┌────▼────┐      ┌────▼────┐      ┌────▼────┐
-    │Planning │      │ Action  │      │ Final   │
-    │  Card   │      │ Thought │      │ Answer  │
-    └─────────┘      └─────────┘      └─────────┘
-```
+The [prompt_templates](mdc:src/agents/prompt_templates) directory contains a modular prompt template system:
 
-### Tool Ecosystem
-Tools are unified through a common interface supporting both sync/async operations:
-- **Search Tools**: Multi-engine support (Google via Serper, X.com via xAI)
-- **Content Processing**: URL reading, text chunking, embedding, reranking
-- **Computation**: WolframAlpha integration for mathematical queries
-- **Final Answer**: Structured response generation with source attribution
+- **[codact_prompts.py](mdc:src/agents/prompt_templates/codact_prompts.py)**: Contains:
+  - `CODACT_SYSTEM_EXTENSION`: System prompt extension for CodeAct agent
+  - `PLANNING_TEMPLATES`: Initial and update planning prompts
+  - `FINAL_ANSWER_EXTENSION`: Final answer generation formats
+  - `MANAGED_AGENT_TEMPLATES`: Agent team coordination patterns
+  - `merge_prompt_templates()`: Function to merge with smolagents base templates
 
-### Configuration Hierarchy
-1. Command-line arguments (highest priority)
-2. Environment variables
-3. config.toml settings
-4. Default values (lowest priority)
+- **[react_prompts.py](mdc:src/agents/prompt_templates/react_prompts.py)**: Contains:
+  - Complete `REACT_PROMPT` structures using smolagents `PromptTemplates` class
+  - System prompts, tool descriptions and examples
+  - Workflow explanations and best practices
+  - Planning templates for strategic assessment
+  - Final answer formatting requirements
 
-### Streaming Architecture
-- Streaming is now available but disabled by default for stability
-- When enabled, provides real-time visibility into agent reasoning process
-- Supports both FastAPI SSE and Gradio streaming interfaces
-- CLI now supports streaming output with the new StreamingConsoleFormatter
+- **[__init__.py](mdc:src/agents/prompt_templates/__init__.py)**: Exports the prompt components for both agent types
 
-#### Enabling Streaming
-To enable streaming output in the CLI:
+## Text Chunking System
 
-1. **In config.toml**:
-```toml
-[agents.common]
-cli_streaming_enabled = true  # Global toggle for CLI streaming
+- **[chunk.py](mdc:src/agents/tools/chunk.py)**: Agent tool interface utilizing Jina AI Segmenter
+  - Implements `ChunkTextTool` class inheriting from `smolagents.Tool`
+  - Provides consistent interface across both agent paradigms
+  - Passes chunking requests to the core segmenter implementation
 
-[agents.react]
-enable_streaming = true  # Enable for React agent
+- **[segmenter.py](mdc:src/agents/core/chunk/segmenter.py)**: Core segmentation implementation
+  - `JinaAISegmenter` class: Primary implementation using Jina AI Segment API
+  - Provides both synchronous and asynchronous interfaces
+  - Implements robust error handling and retry mechanisms
+  - Includes batch processing capability for multiple texts
+  - `Chunker` wrapper class: Maintains backward compatibility with original interface
 
-[agents.codact]
-enable_streaming = true  # Enable for CodeAct agent
-```
+## Streaming Architecture
 
-2. **Via command line**:
-```bash
-# Enable streaming for a single query
-python -m src.cli --agent-type react --enable-streaming --query "your query"
-```
-
-3. **Environment variables** (highest priority):
-```bash
-export REACT_ENABLE_STREAMING=true
-export CODACT_ENABLE_STREAMING=true
-export CLI_STREAMING_ENABLED=true
-```
-
-Note: Streaming support depends on the agent and model capabilities. Not all models support streaming output.
-
-### Web API v2 Design Principles
-
-The v2 API follows a simplified architecture:
-1. **Direct Pass-through**: Messages from smolagents' stream_to_gradio are passed with minimal transformation
+### ⚠️ Important Note: Streaming Functionality Not Recommended
+- Current streaming implementation has known issues and stability concerns
+- **Developers and users are advised not to enable streaming mode** until future optimizations
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
