@@ -7,14 +7,14 @@ Exploring the value that private DNS can bring us.
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `GEMINI.md` in [NullPrivate/NullPrivate](https://github.com/NullPrivate/NullPrivate).
+Original source: `AGENTS.md` in [NullPrivate/NullPrivate](https://github.com/NullPrivate/NullPrivate).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
+- **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
 Quality verified by TomeVault's automated analysis pipeline. Source: [github.com/NullPrivate/NullPrivate](https://github.com/NullPrivate/NullPrivate)
