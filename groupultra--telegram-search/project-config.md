@@ -1,235 +1,55 @@
 ---
 trigger: always_on
-description: 这是一个把 Telegram 消息导入、导出到数据库中并提供搜索的服务。支持向量搜索和语义匹配，基于 OpenAI 的语义向量技术。
+description: - **Role**: Thin WebSocket + HTTP edge that:
 ---
 
 
-# Telegram Search - Architecture & Development Guide
+## Backend Server (apps/server)
 
-## 项目概述
+- **Role**: Thin WebSocket + HTTP edge that:
+  - Hosts a **`CoreContext` per WebSocket connection**.
+  - Exposes health/metrics endpoints.
+  - Delegates all business logic to `packages/core`.
+- Do **not** add business rules, Telegram API calls, or heavy data processing into `apps/server`; push those into `packages/core`.
 
-这是一个把 Telegram 消息导入、导出到数据库中并提供搜索的服务。支持向量搜索和语义匹配，基于 OpenAI 的语义向量技术。
+### Bootstrap & Lifecycle
 
-## Monorepo 结构
+- Preserve the bootstrap sequence from `src/app.ts`:
+  1. Parse env flags (`parseEnvFlags`).
+  2. Initialize logging (`initLogger` + `useLogger().useGlobalConfig()`).
+  3. Build runtime config from environment (`parseEnvToConfig(process.env)`).
+  4. Initialize database via `initDrizzle` using that config.
+  5. Configure the HTTP/WebSocket server.
+  6. Start listening via `listhen` and register graceful shutdown handlers.
+- Any changes must keep this order clear and failure modes explicit.
 
-项目采用 pnpm workspace 管理，包含以下包：
+### HTTP & WebSocket Design
 
-### Apps
+- HTTP:
+  - Keep endpoints minimal: health checks, metrics, and potentially a small set of diagnostics.
+  - Reuse `h3` helpers (`createApp`, `createRouter`, `defineEventHandler`) and centralize error handling in `onError`.
+  - Never leak internal error details in HTTP responses; log full details, return generic messages.
+- WebSocket:
+  - Route all WS traffic through a dedicated module (e.g. `ws/routes`) that knows how to instantiate and manage `CoreContext`.
+  - Enforce **one `CoreContext` per connection**; no cross-connection sharing.
+  - When adding new events, ensure types are synchronized with `@tg-search/server/types` and `@tg-search/core`.
 
-- **[apps/web](mdc:apps/web)**: 前端应用
-  - Vue 3 + Pinia + Vue Router
-  - 支持浏览器模式（PGlite）和服务器模式（PostgreSQL）
-  - 主入口：[apps/web/src/main.ts](mdc:apps/web/src/main.ts)
-  - 布局：[apps/web/src/layouts/default.vue](mdc:apps/web/src/layouts/default.vue)
-  
-- **[apps/server](mdc:apps/server)**: WebSocket 服务器
-  - 实时双向通信
-  - 事件路由和会话管理
-  - WebSocket 实现：[apps/server/src/ws](mdc:apps/server/src/ws)
+### Configuration & Environment
 
-### Packages
+- Source configuration from `config.yaml` + environment variables only; avoid hard-coding URLs, ports, or credentials.
+- Keep the config schema compatible between server and browser modes where applicable (database, embedding, Telegram API).
+- When adding new configuration options:
+  - Document them in `.env.example`.
+  - Provide safe defaults that will not break existing deployments.
 
-- **[packages/core](mdc:packages/core)**: 核心业务逻辑
-  - CoreContext 事件总线：[packages/core/src/context.ts](mdc:packages/core/src/context.ts)
-  - 事件处理器：[packages/core/src/event-handlers](mdc:packages/core/src/event-handlers)
-  - 服务层：[packages/core/src/services](mdc:packages/core/src/services)
-  - 消息解析器：[packages/core/src/message-resolvers](mdc:packages/core/src/message-resolvers)
-  - 数据库模型：[packages/core/src/models](mdc:packages/core/src/models)
-  - 数据库 Schema：[packages/core/src/schemas](mdc:packages/core/src/schemas)
+### Error Handling & Observability
 
-- **[packages/client](mdc:packages/client)**: 客户端集成层
-  - WebSocket 适配器：[packages/client/src/adapters/websocket.ts](mdc:packages/client/src/adapters/websocket.ts)
-  - Core Bridge 适配器：[packages/client/src/adapters/core-bridge.ts](mdc:packages/client/src/adapters/core-bridge.ts)
-  - 客户端事件处理器：[packages/client/src/event-handlers](mdc:packages/client/src/event-handlers)
-  - Pinia Stores：[packages/client/src/stores](mdc:packages/client/src/stores)
-  - 组合式函数：[packages/client/src/composables](mdc:packages/client/src/composables)
-
-- **[packages/common](mdc:packages/common)**: 共享工具
-  - 日志封装：使用 @guiiai/logg
-  - 通用工具函数
-
-## 核心架构模式
-
-### 事件驱动架构
-
-整个系统基于事件驱动架构，使用 EventEmitter3 作为核心：
-
-#### CoreContext（[packages/core/src/context.ts](mdc:packages/core/src/context.ts)）
-
-- **ToCoreEvent**: 发送到核心系统的事件（如 `auth:login`, `message:query`）
-- **FromCoreEvent**: 从核心系统发出的事件（如 `message:data`, `auth:status`）
-- **Event Wrapping**: 自动错误处理和日志记录
-- **Session Management**: 每个客户端会话有独立的 CoreContext 实例
-
-#### 事件流程
-
-```
-Frontend (Vue Component)
-  ↓ 用户操作
-Client Store (Pinia)
-  ↓ sendEvent via WebSocket Adapter
-WebSocket Server
-  ↓ 路由事件
-CoreContext (Event Bus)
-  ↓ 分发到对应的
-Event Handler
-  ↓ 调用
-Service (Business Logic)
-  ↓ 执行操作（Telegram API / Database）
-  ↓ emit 结果事件
-CoreContext
-  ↓ 通过 WebSocket
-Client Event Handler
-  ↓ 更新
-Client Store
-  ↓ 响应式更新
-Frontend (UI Update)
-```
-
-### 核心事件处理器
-
-位于 [packages/core/src/event-handlers](mdc:packages/core/src/event-handlers)：
-
-- **auth.ts**: 认证流程（登录、验证码、密码）
-- **message.ts**: 消息查询和处理
-- **dialog.ts**: 对话列表管理
-- **storage.ts**: 消息同步和存储
-- **entity.ts**: 用户、频道、群组信息
-- **config.ts**: 配置管理
-- **session.ts**: 会话管理
-- **gram-events.ts**: Telegram 事件监听
-- **message-resolver.ts**: 消息解析协调
-- **takeout.ts**: 大量数据导出
-
-### 服务层
-
-位于 [packages/core/src/services](mdc:packages/core/src/services)：
-
-每个服务对应一个事件处理器，处理具体的业务逻辑。服务通过 CoreContext 发送和接收事件。
-
-### 消息处理管道
-
-位于 [packages/core/src/message-resolvers](mdc:packages/core/src/message-resolvers)：
-
-- **embedding-resolver.ts**: 生成向量嵌入（OpenAI/Ollama）
-- **jieba-resolver.ts**: 中文分词
-- **link-resolver.ts**: 链接提取和处理
-- **media-resolver.ts**: 媒体文件处理
-- **user-resolver.ts**: 用户引用处理
-
-消息通过多个 resolver 流式处理，每个 resolver 负责一个特定方面。
-
-## 数据库
-
-### ORM 和迁移
-
-- **ORM**: Drizzle ORM
-- **Schema 定义**: [packages/core/src/schemas](mdc:packages/core/src/schemas)
-- **迁移文件**: [drizzle](mdc:drizzle)
-- **配置**: [drizzle.config.ts](mdc:drizzle.config.ts)
-
-### 数据库支持
-
-1. **PostgreSQL + pgvector**: 生产环境，完整向量搜索
-2. **PGlite**: 浏览器模式，实验性功能
-
-### 主要表
-
-- `chat_messages`: 消息主表
-- `chat_message_stats`: 消息统计
-- `joined_chats`: 已加入的聊天
-- `photos`: 照片资源
-- `stickers`: 贴纸
-- `sticker_packs`: 贴纸包
-- `recent_sent_stickers`: 最近发送的贴纸
-
-## Telegram 集成
-
-### 客户端管理
-
-使用 [packages/core/src/context.ts](mdc:packages/core/src/context.ts) 进行 Telegram 客户端的上下文管理：
-
-```typescript
-// 设置客户端
-ctx.setClient(telegramClient)
-
-// 获取客户端（确保已设置）
-const client = ctx.getClient()
-```
-
-### 重要细节
-
-- **Message ID**: 递增的，优先使用 Message ID 而不是时间戳
-- **Telegram API**: 使用 gram.js 库
-- **事件监听**: 通过 GramEventsHandler 监听 Telegram 实时事件
-
-## 日志系统
-
-使用 @guiiai/logg，在 [packages/common](mdc:packages/common) 封装。
-
-### 使用方式
-
-```typescript
-import { useLogger } from '@guiiai/logg'
-
-// 基本日志
-useLogger().log('Message')
-
-// 带字段
-useLogger().withFields({ userId: 123 }).log('User action')
-
-// 错误日志
-useLogger().withError(error).error('Operation failed')
-```
-
-## 包管理
-
-### 工具
-
-- **包管理器**: pnpm
-- **Workspace**: pnpm workspace
-- **快捷命令**: 可使用 `ni` 和 `nr` (如果安装了 ni 工具)
-
-### 常用脚本
-
-查看 [package.json](mdc:package.json) 中的 scripts：
-
-```bash
-# 开发模式
-pnpm run dev              # 浏览器模式（带 Core）
-pnpm run web:dev          # 仅前端
-pnpm run server:dev       # 仅后端
-
-# 启动完整服务
-pnpm run start            # 后端 + 前端预览
-
-# 构建
-pnpm run build            # 构建前端（浏览器模式）
-pnpm run web:build        # 构建前端（服务器模式）
-pnpm run packages:build   # 构建所有 packages
-
-# 数据库
-pnpm run db:generate      # 生成迁移文件
-
-# 代码质量
-pnpm run lint             # ESLint 检查
-pnpm run lint:fix         # 自动修复
-pnpm run typecheck        # 类型检查
-pnpm run test run         # 运行测试
-```
-
-## 配置文件
-
-### 环境配置
-
-- **浏览器模式**: `.env` 文件
-  - `VITE_TELEGRAM_API_ID`
-  - `VITE_TELEGRAM_API_HASH`
-
-- **服务器模式**: 通过环境变量配置，由 `.env` / `.env.local` 加载并通过 dotenvx 注入 `apps/server`
-  - `TELEGRAM_API_ID`, `TELEGRAM_API_HASH`
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- Use central error handlers:
+  - `setupErrorHandlers` for process-level errors (uncaughtException, unhandledRejection).
+  - `h3`'s `onError` hook for HTTP path errors.
+- Metrics:
+  - Use `prom-client` and expose metrics from `/metrics` using the shared registry.
+  - Only add new metrics when they support explicit SLOs (latency, error rate, throughput).
 
 ---
 > Source: [groupultra/telegram-search](https://github.com/groupultra/telegram-search) — distributed by [TomeVault](https://tomevault.io).
