@@ -1,160 +1,71 @@
 ---
 trigger: always_on
-description: Guidelines for managing task dependencies and relationships
+description: Guide for using Taskmaster to manage task-driven development workflows
 ---
 
 
-# Dependency Management Guidelines
+# Taskmaster Development Workflow
 
-## Dependency Structure Principles
+This guide outlines the standard process for using Taskmaster to manage software development projects. It is written as a set of instructions for you, the AI agent.
 
-- **Dependency References**:
-  - ✅ DO: Represent task dependencies as arrays of task IDs
-  - ✅ DO: Use numeric IDs for direct task references
-  - ✅ DO: Use string IDs with dot notation (e.g., "1.2") for subtask references
-  - ❌ DON'T: Mix reference types without proper conversion
+- **Your Default Stance**: For most projects, the user can work directly within the `master` task context. Your initial actions should operate on this default context unless a clear pattern for multi-context work emerges.
+- **Your Goal**: Your role is to elevate the user's workflow by intelligently introducing advanced features like **Tagged Task Lists** when you detect the appropriate context. Do not force tags on the user; suggest them as a helpful solution to a specific need.
 
-  ```javascript
-  // ✅ DO: Use consistent dependency formats
-  // For main tasks
-  task.dependencies = [1, 2, 3]; // Dependencies on other main tasks
-  
-  // For subtasks
-  subtask.dependencies = [1, "3.2"]; // Dependency on main task 1 and subtask 2 of task 3
-  ```
+## The Basic Loop
+The fundamental development cycle you will facilitate is:
+1.  **`list`**: Show the user what needs to be done.
+2.  **`next`**: Help the user decide what to work on.
+3.  **`show <id>`**: Provide details for a specific task.
+4.  **`expand <id>`**: Break down a complex task into smaller, manageable subtasks.
+5.  **Implement**: The user writes the code and tests.
+6.  **`update-subtask`**: Log progress and findings on behalf of the user.
+7.  **`set-status`**: Mark tasks and subtasks as `done` as work is completed.
+8.  **Repeat**.
 
-- **Subtask Dependencies**:
-  - ✅ DO: Allow numeric subtask IDs to reference other subtasks within the same parent
-  - ✅ DO: Convert between formats appropriately when needed
-  - ❌ DON'T: Create circular dependencies between subtasks
+All your standard command executions should operate on the user's current task context, which defaults to `master`.
 
-  ```javascript
-  // ✅ DO: Properly normalize subtask dependencies
-  // When a subtask refers to another subtask in the same parent
-  if (typeof depId === 'number' && depId < 100) {
-    // It's likely a reference to another subtask in the same parent task
-    const fullSubtaskId = `${parentId}.${depId}`;
-    // Now use fullSubtaskId for validation
-  }
-  ```
+---
 
-## Dependency Validation
+## Standard Development Workflow Process
 
-- **Existence Checking**:
-  - ✅ DO: Validate that referenced tasks exist before adding dependencies
-  - ✅ DO: Provide clear error messages for non-existent dependencies
-  - ✅ DO: Remove references to non-existent tasks during validation
+### Simple Workflow (Default Starting Point)
 
-  ```javascript
-  // ✅ DO: Check if the dependency exists before adding
-  if (!taskExists(data.tasks, formattedDependencyId)) {
-    log('error', `Dependency target ${formattedDependencyId} does not exist in tasks.json`);
-    process.exit(1);
-  }
-  ```
+For new projects or when users are getting started, operate within the `master` tag context:
 
-- **Circular Dependency Prevention**:
-  - ✅ DO: Check for circular dependencies before adding new relationships
-  - ✅ DO: Use graph traversal algorithms (DFS) to detect cycles
-  - ✅ DO: Provide clear error messages explaining the circular chain
+-   Start new projects by running `initialize_project` tool / `task-master init` or `parse_prd` / `task-master parse-prd --input='<prd-file.txt>'` (see [`taskmaster.mdc`](mdc:.cursor/rules/taskmaster.mdc)) to generate initial tasks.json with tagged structure
+-   Configure rule sets during initialization with `--rules` flag (e.g., `task-master init --rules cursor,windsurf`) or manage them later with `task-master rules add/remove` commands  
+-   Begin coding sessions with `get_tasks` / `task-master list` (see [`taskmaster.mdc`](mdc:.cursor/rules/taskmaster.mdc)) to see current tasks, status, and IDs
+-   Determine the next task to work on using `next_task` / `task-master next` (see [`taskmaster.mdc`](mdc:.cursor/rules/taskmaster.mdc))
+-   Analyze task complexity with `analyze_project_complexity` / `task-master analyze-complexity --research` (see [`taskmaster.mdc`](mdc:.cursor/rules/taskmaster.mdc)) before breaking down tasks
+-   Review complexity report using `complexity_report` / `task-master complexity-report` (see [`taskmaster.mdc`](mdc:.cursor/rules/taskmaster.mdc))
+-   Select tasks based on dependencies (all marked 'done'), priority level, and ID order
+-   View specific task details using `get_task` / `task-master show <id>` (see [`taskmaster.mdc`](mdc:.cursor/rules/taskmaster.mdc)) to understand implementation requirements
+-   Break down complex tasks using `expand_task` / `task-master expand --id=<id> --force --research` (see [`taskmaster.mdc`](mdc:.cursor/rules/taskmaster.mdc)) with appropriate flags like `--force` (to replace existing subtasks) and `--research`
+-   Implement code following task details, dependencies, and project standards
+-   Mark completed tasks with `set_task_status` / `task-master set-status --id=<id> --status=done` (see [`taskmaster.mdc`](mdc:.cursor/rules/taskmaster.mdc))
+-   Update dependent tasks when implementation differs from original plan using `update` / `task-master update --from=<id> --prompt="..."` or `update_task` / `task-master update-task --id=<id> --prompt="..."` (see [`taskmaster.mdc`](mdc:.cursor/rules/taskmaster.mdc))
 
-  ```javascript
-  // ✅ DO: Check for circular dependencies before adding
-  const dependencyChain = [formattedTaskId];
-  if (isCircularDependency(data.tasks, formattedDependencyId, dependencyChain)) {
-    log('error', `Cannot add dependency ${formattedDependencyId} to task ${formattedTaskId} as it would create a circular dependency.`);
-    process.exit(1);
-  }
-  ```
+---
 
-- **Self-Dependency Prevention**:
-  - ✅ DO: Prevent tasks from depending on themselves
-  - ✅ DO: Handle both direct and indirect self-dependencies
+## Leveling Up: Agent-Led Multi-Context Workflows
 
-  ```javascript
-  // ✅ DO: Prevent self-dependencies
-  if (String(formattedTaskId) === String(formattedDependencyId)) {
-    log('error', `Task ${formattedTaskId} cannot depend on itself.`);
-    process.exit(1);
-  }
-  ```
+While the basic workflow is powerful, your primary opportunity to add value is by identifying when to introduce **Tagged Task Lists**. These patterns are your tools for creating a more organized and efficient development environment for the user, especially if you detect agentic or parallel development happening across the same session.
 
-## Dependency Modification
+**Critical Principle**: Most users should never see a difference in their experience. Only introduce advanced workflows when you detect clear indicators that the project has evolved beyond simple task management.
 
-- **Adding Dependencies**:
-  - ✅ DO: Format task and dependency IDs consistently
-  - ✅ DO: Check for existing dependencies to prevent duplicates
-  - ✅ DO: Sort dependencies for better readability
+### When to Introduce Tags: Your Decision Patterns
 
-  ```javascript
-  // ✅ DO: Format IDs consistently when adding dependencies
-  const formattedTaskId = typeof taskId === 'string' && taskId.includes('.') 
-    ? taskId : parseInt(taskId, 10);
-  
-  const formattedDependencyId = formatTaskId(dependencyId);
-  ```
+Here are the patterns to look for. When you detect one, you should propose the corresponding workflow to the user.
 
-- **Removing Dependencies**:
-  - ✅ DO: Check if the dependency exists before removing
-  - ✅ DO: Handle different ID formats consistently
-  - ✅ DO: Provide feedback about the removal result
+#### Pattern 1: Simple Git Feature Branching
+This is the most common and direct use case for tags.
 
-  ```javascript
-  // ✅ DO: Properly handle dependency removal
-  const dependencyIndex = targetTask.dependencies.findIndex(dep => {
-    // Convert both to strings for comparison
-    let depStr = String(dep);
-    
-    // Handle relative subtask references
-    if (typeof dep === 'number' && dep < 100 && isSubtask) {
-      const [parentId] = formattedTaskId.split('.');
-      depStr = `${parentId}.${dep}`;
-    }
-    
-    return depStr === normalizedDependencyId;
-  });
-  
-  if (dependencyIndex === -1) {
-    log('info', `Task ${formattedTaskId} does not depend on ${formattedDependencyId}, no changes made.`);
-    return;
-  }
-  
-  // Remove the dependency
-  targetTask.dependencies.splice(dependencyIndex, 1);
-  ```
+- **Trigger**: The user creates a new git branch (e.g., `git checkout -b feature/user-auth`).
+- **Your Action**: Propose creating a new tag that mirrors the branch name to isolate the feature's tasks from `master`.
+- **Your Suggested Prompt**: *"I see you've created a new branch named 'feature/user-auth'. To keep all related tasks neatly organized and separate from your main list, I can create a corresponding task tag for you. This helps prevent merge conflicts in your `tasks.json` file later. Shall I create the 'feature-user-auth' tag?"*
+- **Tool to Use**: `task-master add-tag --from-branch`
 
-## Dependency Cleanup
-
-- **Duplicate Removal**:
-  - ✅ DO: Use Set objects to identify and remove duplicates
-  - ✅ DO: Handle both numeric and string ID formats
-
-  ```javascript
-  // ✅ DO: Remove duplicate dependencies
-  const uniqueDeps = new Set();
-  const uniqueDependencies = task.dependencies.filter(depId => {
-    // Convert to string for comparison to handle both numeric and string IDs
-    const depIdStr = String(depId);
-    if (uniqueDeps.has(depIdStr)) {
-      log('warn', `Removing duplicate dependency from task ${task.id}: ${depId}`);
-      return false;
-    }
-    uniqueDeps.add(depIdStr);
-    return true;
-  });
-  ```
-
-- **Invalid Reference Cleanup**:
-  - ✅ DO: Check for and remove references to non-existent tasks
-  - ✅ DO: Check for and remove self-references
-  - ✅ DO: Track and report changes made during cleanup
-
-  ```javascript
-  // ✅ DO: Filter invalid task dependencies
-  task.dependencies = task.dependencies.filter(depId => {
-    const numericId = typeof depId === 'string' ? parseInt(depId, 10) : depId;
-    if (!validTaskIds.has(numericId)) {
-      log('warn', `Removing invalid task dependency from task ${task.id}: ${depId} (task does not exist)`);
+#### Pattern 2: Team Collaboration
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
