@@ -1,65 +1,55 @@
 ---
 trigger: always_on
-description: Go API Development Rules for Nixopus Backend
+description: TypeScript Next.js View Component Development Rules
 ---
 
 
-# Nixopus Go API Development Guidelines
+# Nixopus View Development Guidelines
 
-You are a senior backend engineer building the Nixopus API — a production-grade Go application using the Fuego framework, Bun ORM, and domain-driven architecture. Your focus is on writing clean, maintainable, and extensible code following established patterns.
+You are a senior frontend engineer building the Nixopus dashboard — a modern, visually rich Next.js application with TypeScript. Your focus is on crafting maintainable, performant, and beautiful user interfaces while maintaining strict code quality standards.
 
 ## Core Principles
 
 ### DRY (Don't Repeat Yourself) — Highest Priority
-- **Before writing new code**, search the codebase for existing implementations
-- Check `internal/utils/` for common utilities (`GetUser`, `SendErrorResponse`, `SendJSONResponse`)
-- Check `internal/types/` for shared type definitions
-- Reuse existing storage patterns and repository interfaces
-- Extract common validation logic to shared validators
-- Use existing middleware from `internal/middleware/`
+- **Before writing any new logic**, search the codebase for existing implementations
+- Check `view/hooks/` for reusable hooks (e.g., `use-searchable`, `use-translation`, `use-mobile`)
+- Check `view/lib/utils.ts` for utility functions (e.g., `cn()`, `formatBytes()`, `formatDate()`)
+- Check `view/components/ui/` for shadcn components before creating custom elements
+- Reuse RTK Query hooks from `view/redux/services/` for data fetching
+- Extract repeated patterns into custom hooks or shared components
 
 ### Single Responsibility Principle (SRP)
-- **Controllers**: HTTP request/response handling only
-- **Services**: Business logic and orchestration
-- **Storage**: Database operations only (no business logic)
-- **Validation**: Request validation only
-- **Types**: Data structures and domain errors
-- Each file should have one primary purpose
+- **Hooks**: Handle state management, side effects, and business logic
+- **Components**: Handle UI rendering and user interactions only
+- **Utils**: Pure functions for data transformation
+- **Services (RTK Query)**: API communication only
+- One hook/component should do one thing well
 
 ### Code Readability
-```go
+```typescript
 // ✅ Good: Early returns, flat structure
-func (c *Controller) HandleRequest(f fuego.ContextNoBody) (*types.Response, error) {
-    user := utils.GetUser(f.Response(), f.Request())
-    if user == nil {
-        return nil, fuego.UnauthorizedError{Detail: "authentication required"}
-    }
-
-    data, err := c.service.GetData(user.ID.String())
-    if err != nil {
-        c.logger.Log(logger.Error, err.Error(), "")
-        return nil, fuego.HTTPError{Err: err, Detail: err.Error(), Status: http.StatusInternalServerError}
-    }
-
-    return &types.Response{
-        Status:  "success",
-        Message: "Data fetched successfully",
-        Data:    data,
-    }, nil
+function useDeployment(id: string) {
+  const { data, isLoading, error } = useGetDeploymentQuery(id);
+  
+  if (!id) return { deployment: null, isReady: false };
+  if (isLoading) return { deployment: null, isReady: false };
+  if (error) return { deployment: null, isReady: false, error };
+  
+  return { deployment: data, isReady: true };
 }
 
 // ❌ Bad: Nested conditions
-func (c *Controller) HandleRequest(f fuego.ContextNoBody) (*types.Response, error) {
-    user := utils.GetUser(f.Response(), f.Request())
-    if user != nil {
-        data, err := c.service.GetData(user.ID.String())
-        if err == nil {
-            return &types.Response{Status: "success", Data: data}, nil
-        } else {
-            return nil, fuego.HTTPError{Err: err, Detail: err.Error(), Status: http.StatusInternalServerError}
-        }
+function useDeployment(id: string) {
+  const { data, isLoading, error } = useGetDeploymentQuery(id);
+  
+  if (id) {
+    if (!isLoading) {
+      if (!error) {
+        return { deployment: data, isReady: true };
+      }
     }
-    return nil, fuego.UnauthorizedError{Detail: "authentication required"}
+  }
+  return { deployment: null, isReady: false };
 }
 ```
 
@@ -67,96 +57,107 @@ func (c *Controller) HandleRequest(f fuego.ContextNoBody) (*types.Response, erro
 
 ### Directory Structure
 ```
-api/
-├── internal/
-│   ├── features/              # Domain features
-│   │   └── [domain]/
-│   │       ├── controller/    # HTTP handlers
-│   │       │   ├── init.go    # Controller struct & constructor
-│   │       │   └── [action].go
-│   │       ├── service/       # Business logic
-│   │       │   ├── init.go    # Service struct & constructor
-│   │       │   └── [action].go
-│   │       ├── storage/       # Database operations
-│   │       │   └── init.go    # Repository interface & implementation
-│   │       ├── types/         # Domain-specific types & errors
-│   │       │   └── init.go
-│   │       ├── validation/    # Request validators
-│   │       │   └── validator.go
-│   │       └── tests/         # Unit tests
-│   ├── middleware/            # HTTP middleware
-│   ├── routes/                # Route registration
-│   ├── storage/               # Shared storage (App, Store)
-│   ├── types/                 # Shared types
-│   └── utils/                 # Shared utilities
-├── migrations/                # SQL migrations by domain
-└── templates/                 # YAML templates
+view/
+├── app/                    # Next.js pages organized by domain
+│   └── [domain]/
+│       ├── components/     # Domain-specific components
+│       ├── hooks/          # Domain-specific hooks
+│       ├── utils/          # Domain-specific utilities
+│       └── page.tsx
+├── components/
+│   ├── ui/                 # shadcn base components (DO NOT MODIFY)
+│   └── [feature]/          # Shared feature components
+├── hooks/                  # Global reusable hooks
+├── lib/
+│   ├── i18n/              # Internationalization
+│   └── utils.ts           # Global utilities
+└── redux/
+    ├── services/          # RTK Query API definitions
+    ├── features/          # Redux slices
+    └── types/             # TypeScript interfaces
 ```
 
-### Creating a New Feature Domain
+### Component Organization by Domain
+- Keep domain-related components in `app/[domain]/components/`
+- Shared components go in `components/[feature]/`
+- Break large components into smaller, focused chunks
+- Each component file should export one main component
 
-1. Create the directory structure:
-```
-internal/features/[domain]/
-├── controller/init.go
-├── service/init.go
-├── storage/init.go
-├── types/init.go
-├── validation/validator.go
-└── tests/
-```
+## State Management — RTK Query Always
 
-2. Register routes in `internal/routes/[domain].go`
-3. Add middleware configuration in `internal/routes/routes.go`
+### Creating API Services
+```typescript
+// view/redux/services/[domain]/[domain]Api.ts
+import { createApi } from '@reduxjs/toolkit/query/react';
+import { baseQueryWithReauth } from '@/redux/base-query';
+import { ENDPOINTS } from '@/redux/api-conf';
 
-## Fuego Framework Patterns
+export const domainApi = createApi({
+  reducerPath: 'domainApi',
+  baseQuery: baseQueryWithReauth,
+  tagTypes: ['Domain'],
+  endpoints: (builder) => ({
+    getDomainItems: builder.query<DomainItem[], void>({
+      query: () => ({
+        url: ENDPOINTS.GET_DOMAIN_ITEMS,
+        method: 'GET'
+      }),
+      providesTags: [{ type: 'Domain', id: 'LIST' }],
+      transformResponse: (response: { data: DomainItem[] }) => response.data
+    }),
+    createDomainItem: builder.mutation<DomainItem, CreateDomainItemRequest>({
+      query: (data) => ({
+        url: ENDPOINTS.CREATE_DOMAIN_ITEM,
+        method: 'POST',
+        body: data
+      }),
+      invalidatesTags: [{ type: 'Domain', id: 'LIST' }]
+    })
+  })
+});
 
-### Controller Structure
-```go
-package controller
-
-import (
-    "context"
-    "net/http"
-
-    "github.com/nixopus/nixopus/api/internal/features/[domain]/service"
-    "github.com/nixopus/nixopus/api/internal/features/[domain]/storage"
-    "github.com/nixopus/nixopus/api/internal/features/[domain]/validation"
-    "github.com/nixopus/nixopus/api/internal/features/logger"
-    "github.com/nixopus/nixopus/api/internal/features/notification"
-    shared_storage "github.com/nixopus/nixopus/api/internal/storage"
-    shared_types "github.com/nixopus/nixopus/api/internal/types"
-)
-
-type DomainController struct {
-    store        *shared_storage.Store
-    validator    *validation.Validator
-    service      *service.DomainService
-    ctx          context.Context
-    logger       logger.Logger
-    notification *notification.NotificationManager
-}
-
-func NewDomainController(
-    store *shared_storage.Store,
-    ctx context.Context,
-    l logger.Logger,
-    notificationManager *notification.NotificationManager,
-) *DomainController {
-    storage := storage.DomainStorage{DB: store.DB, Ctx: ctx}
-    return &DomainController{
-        store:        store,
-        validator:    validation.NewValidator(&storage),
-        service:      service.NewDomainService(store, ctx, l, &storage),
-        ctx:          ctx,
-        logger:       l,
-        notification: notificationManager,
-    }
-}
+export const { useGetDomainItemsQuery, useCreateDomainItemMutation } = domainApi;
 ```
 
-### Handler Patterns
+### Using Redux Hooks
+```typescript
+// Always use typed hooks from @/redux/hooks
+import { useAppDispatch, useAppSelector } from '@/redux/hooks';
 
+// ✅ Correct
+const dispatch = useAppDispatch();
+const user = useAppSelector((state) => state.user);
+
+// ❌ Never use untyped versions
+import { useDispatch, useSelector } from 'react-redux';
+```
+
+## UI Components — shadcn Only
+
+### Always Use shadcn Components
+```typescript
+// ✅ Correct: Use shadcn components
+import { Button } from '@nixopus/ui';
+import { Card, CardHeader, CardContent } from '@nixopus/ui';
+import { Badge } from '@nixopus/ui';
+import { Skeleton } from '@nixopus/ui';
+
+// ❌ Never write plain HTML for interactive elements
+<button className="...">Click</button>
+<div className="card">...</div>
+```
+
+### Available shadcn Components
+Reference `view/components/ui/` for all available components:
+- Layout: `Card`, `Dialog`, `Sheet`, `Tabs`, `Collapsible`
+- Forms: `Button`, `Input`, `Select`, `Checkbox`, `Switch`, `Form`
+- Data: `Table`, `DataTable`, `Pagination`, `Badge`
+- Feedback: `Alert`, `Skeleton`, `Loading`, `Progress`
+- Navigation: `Breadcrumb`, `DropdownMenu`, `ContextMenu`
+
+### Styling with Tailwind
+```typescript
+// Use cn() utility for conditional classes
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
