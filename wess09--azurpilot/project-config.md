@@ -1,114 +1,301 @@
 ---
 trigger: always_on
-description: - **任务（task）层**: 映射到 `args.json` 的第一层键，例如 `Main`、`OpsiScheduling` 等，对应侧边栏中的“任务卡片”。
+description: 本文档是 Alas（AzurLaneAutoScript）项目的开发规范，讲述框架和设计模式，介绍常用组件，帮助新开发者熟悉项目。具体函数的使用说明应参阅 API 文档或源码。
 ---
 
 
-### 配置系统与 GUI 选项映射规则（task / group / argument）
+# Alas 开发文档规则
 
-- **核心概念**
-  - **任务（task）层**: 映射到 `args.json` 的第一层键，例如 `Main`、`OpsiScheduling` 等，对应侧边栏中的“任务卡片”。
-  - **选项组（group）层**: 映射到 `args.json` 的第二层键，例如 `Scheduler`、`Campaign`、`OpsiHazard1Leveling` 等，用于将一组相关的 GUI 选项归类。
-  - **选项（argument）层**: 映射到 `args.json` 的第三层键，每个选项是一个带属性的对象，属性包括:
-    - `type`: 控件类型，例如 `checkbox` / `select` / `textarea` / `input` / `datetime` / `storage` / `stored` / `state` / `lock` 等
-    - `value`: 实际的配置值（可以是标量、字符串、时间、列表等）
-    - `option`（可选）: 下拉/单选列表的可选值数组
-    - `validate`（可选）: 校验信息，例如 `[min, max]` 或 `'datetime'`
-    - `display`（可选）: 显示控制，例如 `hide` / `disabled` / 省略（正常）
-    - 其他辅助属性如 `valuetype`、`mode` 等也可以在 `argument.yaml` 中直接声明
+本文档是 Alas（AzurLaneAutoScript）项目的开发规范，讲述框架和设计模式，介绍常用组件，帮助新开发者熟悉项目。具体函数的使用说明应参阅 API 文档或源码。
 
-- **手动维护的配置文件**
-  - **`module/config/argument/task.yaml`**:
-    - 定义“任务分组”与“任务列表”，以及每个任务对应的“选项组列表”。
-    - 结构为三层: `<task_group> -> tasks -> <task> -> [<group>, ...]`。
-    - 这些映射最终控制:
-      - GUI 侧边栏卡组（任务列表、所属分组）
-      - 每个任务页中出现哪些 `group`（对应哪些配置分段）。
-  - **`module/config/argument/argument.yaml`**:
-    - 定义每个“选项组”包含的“选项”以及其属性。
-    - 结构为两层: `<group> -> <argument> -> {type/value/option/validate/display/...}`。
-    - 若某个 `<argument>` 直接写标量值，会在 `config_updater.py` 中转换为:
-      - `type`: 自动推断（例如 bool -> `checkbox`，有 `option` 时 -> `select`，时间类型 -> `datetime`）
-      - `value`: 使用原始值
-    - 若 `<argument>` 已显式写成字典，则该字典内容（包括 `type`、`value`、`option`、`validate`、`display` 等）优先级最高，会直接覆盖自动推断。
-    - 以 `_` 开头的 group 会在加载时被过滤（不会进入 GUI/args）。
-  - **`module/config/argument/override.yaml`**:
-    - 按 `task/group/argument` 路径，覆盖某些特殊选项的值或属性，常用于:
-      - 硬编码服务器刷新时间等不应在 GUI 中修改的项
-      - 将某些字段设置为隐藏 (`display: hide`) 或只读
-      - 特殊 `type`（如 `state` / `lock`）的覆盖逻辑
-    - 覆盖逻辑（见 `ConfigGenerator.args` 中 `check_override` 与 override 合并逻辑）:
-      - 只对已存在的 argument 生效（不存在会打印警告）
-      - 默认要求新旧值类型一致（除 `SuccessInterval` / `FailureInterval`）
-      - 若原 argument 有 `option`，覆盖的值必须在其 `option` 列表内
-      - 若 `override.yaml` 中该项是字典:
-        - 对其中的每个键逐一写入（包括 `value` / `display` / `type` 等）
-        - 若提供了非 `state` / `lock` 类型且存在非空 `value`，通常会附带 `display: hide`（使其在 GUI 中隐藏但生效）
-      - 若 `override.yaml` 中该项不是字典:
-        - 直接写入 `value`
-        - 同时将 `display` 设为 `hide`
-  - **`module/config/argument/gui.yaml`**:
-    - 定义 GUI 上出现的其他文本（例如按钮、标题、提示），用于 i18n。
-    - 结构: `<i18n_group> -> <i18n_key>: value or null`。
-    - 在 `generate_i18n` 中会被合并到 `i18n/<lang>.json` 的 `Gui` 节点下。
+---
 
-- **自动生成的配置文件与数据流**
-  - **`module/config/config_updater.py`** 中 `ConfigGenerator` 负责读入上述 YAML，生成多种产物:
-    - **`args.json`**（GUI 选项树的主数据源，三层结构: task -> group -> argument）:
-      - 由 `ConfigGenerator.args` 构造:
-        - 从 `task.yaml` 与 `dashboard.yaml` 读取每个 task 下的 group 列表（并为所有 task 自动附加 `Storage` 组）。
-        - 对每个 group，从 `argument` 属性中复制整组 argument 定义（包含 type/value/option/validate/display 等）。
-        - 再依次合入 `default.yaml` 与 `override.yaml` 的值:
-          - `default.yaml` 仅设置初始 `value`。
-          - `override.yaml` 会根据规则修改 `value` / `display` / `type` 等，使某些字段隐藏或锁定。
-        - 对每个有 `Scheduler.Command` 的 task，自动将其 `.value` 设为该 task 名，并将 `.display` 设为 `hide`，避免用户在 GUI 中误改。
-      - 最终写入 `config/argument/args.json`（具体路径由 `filepath_args()` 决定）。
-    - **`menu.json`**（侧边栏任务卡组）:
-      - 由 `ConfigGenerator.menu` 从 `task.yaml` 生成，结构约为:
-        - `<task_group> -> {menu, page, tasks: [<task>, ...]}`。
-      - 控制 GUI 左侧菜单（折叠/列表模式、是“设置页”还是“工具页”等）。
-    - **`config_generated.py`**:
-      - 由 `ConfigGenerator.generate_code` 基于 `argument` 结构与 `args.json` 的默认 `value` 生成。
-      - 提供 IDE 代码自动补全/静态引用（`GeneratedConfig` 类中为每个 `<group>.<argument>` 生成属性）。
-    - **`template.json`**:
-      - 由 `ConfigUpdater().update_file('template', is_template=True)` 生成。
-      - 基于 `args.json` 填充默认用户配置，并额外处理:
-        - 初始化 `Alas.DropRecord.AzurStatsID` 等字段
-        - 为事件、战役等任务注入最新活动的默认关卡/事件 ID
-        - 针对云手机环境等进行默认值 override。
-    - **`i18n/{lang}.json`**:
-      - 由 `ConfigGenerator.generate_i18n(lang)` 生成。
-      - 依赖:
-        - `args.json` 中的 task / group / argument 结构
-        - 旧 `i18n/<lang>.json`（保留和更新已有翻译）
-        - `gui.yaml`（补充 GUI 相关文案）
-        - 活动/服务器信息等动态内容。
-    - **部署模板相关 YAML**:
-      - `ConfigGenerator.generate_deploy_template()` 会基于 `deploy.template*.yaml` 模板生成多个平台的部署配置文件。
+## 1. 基本运作模式与设计原则
 
-- **开发与修改流程（如何让 GUI 选项落到 `args.json`）**
-  - **新增或修改一个 GUI 选项的大致步骤**:
-    1. **在 `argument.yaml` 中定义或修改一个选项**:
-       - 确定放在哪个 group 下: 例如在 `OpsiScheduling` 组中新增 `OperationCoinsReturnThreshold`。
-       - 写出其属性，例如:
-         - `type`: 控制 GUI 控件类型（若省略，`config_updater.py` 会按 value 类型自动推断）。
-         - `value`: 默认值。
-         - `option`: 若为下拉或单选，给出所有可选值列表。
-         - `validate`: 若需要范围校验或时间格式校验，填入对应内容。
-         - `display`: 若需要在 GUI 中隐藏或只读，使用 `hide` / `disabled` 等标记。
-    2. **确保该 group 已在 `task.yaml` 中挂到正确的 task**:
-       - 在相应 `task_group` 下的 `tasks` 中，为对应的 `<task>` 添加该 group。
-       - 例如 `OpsiScheduling` 任务下应包含 `OpsiScheduling` 这个 group，才能在 GUI 中显示这组选项，并最终出现在 `args.json` 的 `OpsiScheduling.OpsiScheduling.*` 路径下。
-    3. **如需强制覆盖/隐藏某些值（比如服务器刷新时间）**:
-       - 在 `override.yaml` 中为对应路径添加条目，例如:
-         - `<task> -> <group> -> <argument>: <value>`
-         - 或写成字典并设置 `display: hide`，防止 GUI 修改。
-    4. **如需新增界面文本或翻译 key**:
-       - 在 `gui.yaml` 中定义对应的 GUI 文案键值。
-    5. **运行 `config_updater.py` 完整生成**:
-       - 在项目根目录执行:
-         - `python -m module.config.config_updater`
-       - 或直接运行 `module/config/config_updater.py`（脚本自身会 `chdir` 到 Alas 根目录），它将:
+### 1.1 Alas 的应用场景
+
+- Alas 是为长时间运行（7×24 小时）而设计的
+- 放弃安卓真机支持的原因：
+  - 安卓机在长时间运行下容易出现黑屏/假死
+  - 部分安卓机型截图会压缩
+  - OCR 模型迁移困难
+- 仅支持 1280×720 分辨率：
+  - 720p 在图像清晰度和截图耗时之间有较好平衡
+  - 异型屏没有统一标准，适配成本高
+
+### 1.2 状态循环模式（核心原则）
+
+**禁止使用"点击-等待"模式：**
+
+```python
+# 禁止这样写
+click(XXXX)
+sleep(2)
+click(YYYY)
+sleep(3)
+```
+
+**必须使用"状态循环"模式：**
+
+```python
+while 1:
+    self.device.screenshot()
+
+    if self.appear_then_click(ENTRANCE):
+        continue
+    if self.appear_then_click(MAP_PREPARATION):
+        continue
+    if self.appear_then_click(FLEET_PREPARATION):
+        continue
+
+    # End
+    if self.handle_in_map_with_enemy_searching():
+        break
+```
+
+- 状态循环在高配电脑上运行快，在低配电脑上也有很好的兼容性
+- 可以在点击失败时自动重试
+- 不需要关心点击的执行顺序
+
+### 1.3 处理死循环
+
+Alas 内置两种异常来检测死循环：
+
+- **GameStuckError**: 无操作连续截图超过 1 分钟（战斗中和客户端启动中延长至 5 分钟）
+- **GameTooManyClickError**: 最后 15 次操作中，有一项操作 ≥12 次，或有两项操作都 ≥6 次
+
+### 1.4 性能优化
+
+- 开发者在编写 Alas 时不需要特别注意性能优化
+- Alas 运行超过 99% 的时间是在等待模拟器截图
+- 截图耗时约 350ms，处理只花费约 2.5ms
+- 海图识别或 OCR 耗时约 100-180ms
+
+---
+
+## 2. 注释规范
+
+### 2.1 Google 注释规范
+
+使用 Google 注释规范，例如：
+
+```python
+"""
+Re-focus to the center of a grid.
+
+Args:
+    tolerance (float): 0 to 0.5. If None, use MAP_GRID_CENTER_TOLERANCE
+
+Returns:
+    bool: Map swiped.
+"""
+```
+
+### 2.2 Pages 注释
+
+增加 Pages 说明函数进出时的游戏界面：
+
+```python
+"""
+Pages:
+    in: page_moewfficer
+    out: MEOWFFICER_BUY
+"""
+```
+
+### 2.3 注释要求
+
+- 在注释中，应当全部使用简体中文
+
+**尽量做到：**
+
+- 一个函数的注释占 1/3 ~ 1/2
+- 一个函数不超过一个屏幕
+- 一个 .py 文件不超过 500 行
+
+---
+
+## 3. 调试规范
+
+### 3.1 调试入口
+
+Alas 的入口文件有两个：
+- 调度器 `alas.py`
+- 网页后端 `gui.py`
+
+### 3.2 调试一个 Button
+
+```python
+# 假设 Alas 无法识别 SOS 模块中的 SIGNAL_LIST_CHECK
+# 将游戏切换到 SOS 信号列表的界面，截图
+
+az = CampaignSos('alas', task='Sos')
+az.image_file = r'xxxxx.png'
+
+print(az.appear(SIGNAL_LIST_CHECK))
+```
+
+### 3.3 调试其他服务器
+
+在导入任何 Alas 内容之前，切换服务器：
+
+```python
+import module.config.server as server
+server.server = 'en'
+```
+
+### 3.4 调试一个识别函数
+
+```python
+from module.statistics.utils import load_folder
+from module.handler.info_handler import InfoHandler
+
+folder = r'xxxxx'
+az = InfoHandler('alas', task='Alas')
+for file in load_folder(folder).values():
+    az.image_file = file
+    print(az._story_option_buttons())
+```
+
+### 3.5 调试海图识别
+
+```python
+from PIL import Image
+from module.config.config import AzurLaneConfig
+from module.map_detection.view import *
+
+file = r'xxxxx'
+
+class Config:  # 把地图文件中的 Config 粘贴到这里
+    pass
+
+md = View(AzurLaneConfig('template').merge(Config()))
+image = np.array(Image.open(file).convert('RGB'))
+md.load(image)
+md.predict()
+md.show()
+md.backend.draw()
+```
+
+### 3.6 为测试提供方便
+
+- Alas 所有模块都可以独立运行，不依赖 GUI 也不依赖用户配置
+- 每个模块通常只有一个方法是依赖用户配置的
+- 提供两份方法：例如 `fleet_repair` 和 `handle_port_repair`
+
+---
+
+## 4. 工具类（module/base/utils.py）
+
+### 4.1 命名约定
+
+- **point**: 含 2 个元素的 tuple (x, y)，指屏幕上的一个点
+- **area**: 含 4 个元素的 tuple (upper_left_x, upper_left_y, bottom_right_x, bottom_right_y)
+- **location**: 含 2 个元素的 tuple (x, y)，指游戏海域中的网格坐标
+- **node**: str 类型，如 "E3"，指游戏海域中的网格坐标
+
+### 4.2 常用工具函数
+
+- `random_normal_distribution_int(a, b, n=3)`: 在区间 [a, b) 内产生符合正态分布的随机数
+- `random_rectangle_point(area)`: 在区域内产生符合二维正态分布的随机点
+- `random_rectangle_vector(vector, box, random_range, padding)`: 在区域按二维正态分布放置向量
+- `random_line_segments(p1, p2, n, random_range)`: 在两点之间插入中间值
+- `crop(image, area)`: 裁切图片
+- `get_color(image, area)`: 计算区域的平均颜色
+- `color_similarity(color1, color2)`: 计算两个颜色之间的差值
+- `color_similar(color1, color2, threshold)`: 判断颜色是否相似
+- `color_similarity_2d(image, color)`: 计算二维数组上的颜色差值
+- `extract_letters(image, letter, threshold)`: 将含文字的图片转换为白底黑字
+- `color_bar_percentage(image, area, prev_color, reverse, starter, threshold)`: 计算进度条的百分比
+
+---
+
+## 5. 装饰器（module/base/decorators.py）
+
+### 5.1 @Config.when()
+
+让一个函数在特定的设置情况下运行：
+
+```python
+from module.base.decorator import Config
+from module.base.base import ModuleBase
+
+class AnotherModule(ModuleBase):
+    @Config.when(SERVER='en')
+    def function(self):
+        # 此方法将仅在 EN 服务器中调用
+        pass
+
+    @Config.when(SERVER=None)
+    def function(self):
+        # 此方法将在其他服务器中调用
+        pass
+```
+
+### 5.2 @cached_property
+
+缓存属性，只计算一次：
+
+```python
+@cached_property
+def bug_threshold(self):
+    return random_normal_distribution_int(55, 105, n=2)
+```
+
+### 5.3 @timer
+
+打印函数运行的耗时：
+
+```python
+@timer
+def do_something():
+    pass
+```
+
+### 5.4 @function_drop(rate, default)
+
+随机执行或者不执行某个函数：
+
+```python
+@function_drop(rate=0.5, default=None)
+def some_function():
+    pass
+```
+
+---
+
+## 6. 日志规范（module/logger.py）
+
+### 6.1 日志格式
+
+- 格式: `%(asctime)s.%(msecs)03d | %(levelname)s | %(message)s`
+- 时间格式: `%Y-%m-%d %H:%M:%S`
+- 示例: `2020-09-11 08:35:59.460 | INFO | XXXXXXXX`
+
+### 6.2 日志级别使用规范
+
+- **logger.hr(title, level=0)**: 仅在脚本开始运行时使用
+- **logger.hr(title, level=1)**: 表示开始执行 GUI 中的某个功能
+- **logger.hr(title, level=2)**: 表示功能的某个阶段的开始
+- **logger.hr(title, level=3)**: 表示功能的某个细分阶段的开始
+- **logger.attr(name, text)**: 用于打印属性值
+- **logger.attr_align(name, text, front, align)**: 用于打印属性值，有一定格式
+
+### 6.3 日志注意事项
+
+- log 需要人工阅读，请避免大量使用 `logger.hr()`、`logger.warning()`、感叹号等表示强调
+- 强调是相对的，如果强调了所有事物，相当于没有强调任何一个事物
+
+---
+
+## 7. 异常处理（module/exception.py）
+
+### 7.1 主要异常类
+
+- **CampaignEnd**: 关卡战斗结束
+- **MapDetectionError**: 海域地图识别错误
+- **MapWalkError**: 无法移动至目标点
+- **MapEnemyMoved**: 敌人已经移动，需要重新进行地图扫描
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
