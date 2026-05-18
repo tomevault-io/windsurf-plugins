@@ -1,126 +1,78 @@
 ---
 trigger: always_on
-description: 3D multiplayer game starter kit — React 19 + Three.js + SpacetimeDB 2.0.1 (Rust backend).
+description: Global rules always followed
 ---
 
-# Vibe Coding Starter Pack: 3D Multiplayer
+# Vibe Coding Starter Pack: 3D Multiplayer - Technical Guide
 
-3D multiplayer game starter kit — React 19 + Three.js + SpacetimeDB 2.0.1 (Rust backend).
+This document describes the architecture, setup, workflow, and key development patterns for the Vibe Coding Starter Pack 3D Multiplayer project. **SpacetimeDB v2.0.1** is used throughout.
 
-## Architecture
+## 1. Project Overview
 
-- `server/` — SpacetimeDB Rust module (compiled to WASM, runs on SpacetimeDB server)
-- `client/` — Vite + React + React Three Fiber frontend
+*   **Goal:** Provide a foundation for building 3D multiplayer web games using SpacetimeDB as the backend.
+*   **Backend:** SpacetimeDB module written in Rust (`server/`). Handles game logic, state management, and data persistence. Compiled to WASM.
+*   **Frontend:** Client application built with Vite, React 19, TypeScript, and React Three Fiber (`client/`). Connects to SpacetimeDB via WebSocket, subscribes to data, calls reducers, and renders the game state.
 
-Data flow: client input (20Hz) → WebSocket → `updatePlayerInput` reducer → server updates PlayerData table → subscription pushes changes → all clients render.
+## 2. Game Architecture
 
-## Key Files
+The starter pack uses a modular, component-based architecture with the following core systems:
 
-### Server (Rust)
-- `server/src/lib.rs` — Tables (`PlayerData`, `LoggedOutPlayerData`, `GameTickSchedule`), reducers (`register_player`, `update_player_input`), lifecycle handlers (`init`, `identity_connected`, `identity_disconnected`)
-- `server/src/player_logic.rs` — `calculate_new_position()`, `update_input_state()`, `update_players_logic()` (game tick placeholder)
-- `server/src/common.rs` — Shared types: `Vector3`, `InputState`. Constants: `PLAYER_SPEED = 7.5`, `SPRINT_MULTIPLIER = 1.8`
+1. **Core Game Loop**: Managed in `client/src/App.tsx`, which initializes all components and runs the input send cycle at 20Hz
+2. **Rendering System**: Handled by Three.js via React Three Fiber with scene setup in `client/src/components/GameScene.tsx`
+3. **Character System**: Player controls, FBX model loading, animations, and client-side prediction in `client/src/components/Player.tsx`
+4. **UI System**: HUD elements and feedback in `client/src/components/PlayerUI.tsx` and `client/src/components/DebugPanel.tsx`
+5. **Multiplayer System**: Client-server communication in `client/src/App.tsx` and server-side code in `server/src/` directory
+6. **Load Testing**: Bot simulation in `client/src/simulation.ts` for stress-testing with configurable bot count
 
-### Client (TypeScript/React)
-- `client/src/App.tsx` — SpacetimeDB connection, input handling (keyboard/mouse), game loop (requestAnimationFrame throttled to 20Hz), state management
-- `client/src/components/Player.tsx` — FBX model loading, animation system, client-side prediction, camera follow/orbital modes, nametags
-- `client/src/components/GameScene.tsx` — R3F Canvas, sky, lighting, shadows, ground plane, player rendering
-- `client/src/components/DebugPanel.tsx` — Collapsible dev panel: status, player list, controls reference, model checker
-- `client/src/components/PlayerUI.tsx` — HUD overlay: health/mana bars, damage flash
-- `client/src/components/JoinGameDialog.tsx` — Username + class selection modal
-- `client/src/simulation.ts` — Bot load-testing tool (spawns N SpacetimeDB clients)
-- `client/src/generated/` — Auto-generated bindings (do NOT edit manually)
+## 3. Core SpacetimeDB v2 Concepts
 
-## SpacetimeDB v2 API Patterns
+*   **Tables:** Relational data storage defined as Rust structs with `#[spacetimedb::table]`. Key tables include `player` and `logged_out_player`. Tables must be marked `public` for client access. The `name = "..."` attribute defines the SQL table name; the `accessor = "..."` attribute defines the Rust accessor name used in `ctx.db`. Table names in client SQL subscriptions are **case-sensitive** (e.g., `name = "player"` requires `SELECT * FROM player`).
+*   **Reducers:** Atomic, transactional Rust functions (`#[spacetimedb::reducer]`) that modify table state. Triggered by client calls or internal events. Key reducers: `register_player`, `update_player_input`, lifecycle reducers (`identity_connected`, `identity_disconnected`).
+*   **Subscriptions:** Clients subscribe to SQL queries (e.g., `SELECT * FROM player`) using `conn.subscriptionBuilder()`. **IMPORTANT:** Register `.onApplied()` and `.onError()` callbacks *before* calling `.subscribe()` — in v2, backfill data fires immediately on subscribe.
+*   **Generated Bindings:** The `spacetime generate` command creates TypeScript code (`client/src/generated/`) based on the Rust module's schema, providing type-safe access to tables, reducers, and types on the client. Types are in `generated/types.ts`.
+*   **Identity:** Represents a unique, authenticated user. In v2 reducers: `ctx.sender()` (method call with parentheses). On client: `conn.identity`. Used as the primary key for player-related tables.
 
-### Server (Rust)
-```rust
-// Table macro uses `accessor`, not `name`
-#[spacetimedb::table(name = "player", public)]
-#[derive(Clone, Debug)]
-pub struct PlayerData {
-    #[primary_key]
-    pub identity: Identity,
-    // ...
-}
+## 4. Prerequisites
 
-// ctx.sender() is a METHOD in v2 (not a field)
-// ctx.timestamp is still a FIELD (not a method)
-let caller = ctx.sender();
-let time = ctx.timestamp;
+1.  **Rust & Cargo:** ([https://rustup.rs/](mdc:https:/rustup.rs))
+    *   Version: **1.93+** required for SpacetimeDB 2.0.1
+    *   Install: `curl https://sh.rustup.rs -sSf | sh`
+    *   Add WASM target: `rustup target add wasm32-unknown-unknown`
+    *   Ensure `~/.cargo/bin` is in PATH (restart terminal or `source ~/.cargo/env`).
+2.  **SpacetimeDB CLI (v2.0.1):** ([https://install.spacetimedb.com](mdc:https:/install.spacetimedb.com))
+    *   Install: `curl -sSf https://install.spacetimedb.com | sh`
+    *   Ensure install location (e.g., `~/.local/bin`) is in PATH (restart terminal or `source ~/.zshrc`/`.bashrc`).
+    *   Verify: `spacetime version` (Should show `2.0.1` or compatible).
+3.  **Node.js 22+ & npm:** Install via [nvm](mdc:https:/github.com/nvm-sh/nvm) (`nvm install 22`).
+4.  **(Optional) `wasm-opt`:** For optimizing the built Rust module (part of `binaryen`). Install via system package manager (e.g., `brew install binaryen`, `apt install binaryen`). If missing, builds will still work but show a warning.
+
+## 5. Project Structure
+
 ```
+vibe-coding-starter-pack-3d-multiplayer/
+├── client/                   # Vite+React+TS client
+│   ├── public/
+│   │   └── models/           # FBX character models (wizard/, paladin/)
+│   ├── src/
+│   │   ├── components/       # GameScene, Player, DebugPanel, PlayerUI, JoinGameDialog
+│   │   ├── generated/        # Auto-generated TS bindings (DO NOT EDIT)
+│   │   ├── App.css           # Component styles
+│   │   ├── App.tsx           # Main React component — connection, input, game loop
+│   │   ├── simulation.ts     # Bot load-testing tool
+│   │   ├── index.css         # Global styles/resets
+│   │   └── main.tsx          # React entry point
+│   ├── index.html
+│   ├── package.json
+│   ├── tsconfig.json         # Main TS config
+│   ├── tsconfig.app.json     # App-specific TS config (used by Vite)
+│   └── vite.config.ts
+├── server/                   # SpacetimeDB Server Module (Rust)
+│   ├── src/
+│   │   ├── common.rs         # Shared types (Vector3, InputState), constants
+│   │   ├── player_logic.rs   # Server-side movement calculation
+│   │   └── lib.rs            # Tables, reducers, lifecycle handlers
 
-### Client (TypeScript)
-```typescript
-// Package is "spacetimedb" (not @clockworklabs/spacetimedb-sdk)
-import { DbConnection, EventContext, ErrorContext } from './generated';
-import { PlayerData, InputState } from './generated/types';
-
-// Connection — use withDatabaseName (not withModuleName), add withConfirmedReads(false)
-DbConnection.builder()
-  .withUri('ws://localhost:3000')
-  .withDatabaseName('vibe-multiplayer')
-  .withConfirmedReads(false)  // v2 defaults to confirmed reads — this reduces latency
-  .onConnect(onConnect)
-  .onDisconnect(onDisconnect)
-  .build();
-
-// Tables are PROPERTY access (no parentheses)
-conn.db.player.onInsert(callback);  // correct
-conn.db.player.iter();              // correct
-
-// Reducers take a SINGLE OBJECT argument
-conn.reducers.registerPlayer({ username, characterClass });
-conn.reducers.updatePlayerInput({ input, clientPos, clientRot, clientAnimation });
-
-// Subscriptions: register callbacks BEFORE subscribing (backfill fires immediately in v2)
-conn.subscriptionBuilder()
-  .onApplied(() => { /* ... */ })
-  .onError((err) => { /* ... */ })
-  .subscribe('SELECT * FROM player');
-```
-
-## Development Commands
-
-```bash
-# Server
-cd server
-spacetime build                    # Compile Rust → WASM
-spacetime start                    # Start local SpacetimeDB server (port 3000)
-spacetime publish vibe-multiplayer # Upload module to running server
-spacetime publish vibe-multiplayer -y  # Auto-accept major version upgrades
-
-# Regenerate client bindings (after schema/reducer changes)
-spacetime generate --lang typescript --out-dir ../client/src/generated
-
-# Client
-cd client
-npm run dev                        # Vite dev server (localhost:5173)
-npm run build                      # Production build
-
-# Load testing
-npm run simulate                   # 10 bots, 10 seconds
-npm run simulate -- 100 30         # 100 bots, 30 seconds
-```
-
-## Critical Conventions
-
-- **Stale closure avoidance**: Use `useRef` for identity, localPlayer, connected status — React state captured in `useCallback` goes stale. See `identityRef`, `localPlayerRef`, `connectedRef` in App.tsx.
-- **sendInputRef pattern**: Wrap `sendInput` in a ref so the game loop `useEffect` doesn't restart on every state change.
-- **Client-side prediction**: Uses actual frame `dt` from `useFrame`, NOT a fixed `SERVER_TICK_DELTA`. Speed constants must match server (`PLAYER_SPEED = 7.5`).
-- **Register callbacks before subscribing**: In v2, table backfill fires immediately on subscribe. If callbacks aren't registered yet, you miss the initial data.
-- **Game loop at 20Hz**: The `requestAnimationFrame` loop in App.tsx throttles input sends to every 50ms. Server `delta_time_estimate = 1/20` matches this.
-- **FBX models**: Wizard scale `0.02`, Paladin scale `1.0`. Models in `client/public/models/`.
-- **Connection config**: Hardcoded to `localhost:3000`, database `vibe-multiplayer` in both `App.tsx` and `simulation.ts`.
-
-## Schema Changes
-
-Adding/removing table columns requires deleting and republishing the database:
-```bash
-cd server
-spacetime delete vibe-multiplayer
-spacetime publish vibe-multiplayer
-```
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [majidmanzarpour/vibe-coding-starter-pack-3d-multiplayer](https://github.com/majidmanzarpour/vibe-coding-starter-pack-3d-multiplayer) — distributed by [TomeVault](https://tomevault.io).
