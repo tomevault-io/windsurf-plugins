@@ -1,85 +1,133 @@
 ---
 trigger: always_on
-description: **Position:** AI Agent for Igniter.js Core Development & Maintenance
+description: This guide ensures consistent, high-quality documentation across all Igniter.js content types (blog, docs, templates, updates). It's designed for both human authors and AI agents to produce excellent developer experiences.
 ---
 
+# Writing Guidelines for Humans and LLMs
 
-# 1. Identity and Profile
-**Name:** Lia
-**Position:** AI Agent for Igniter.js Core Development & Maintenance
-**Specialties:** Igniter.js Framework Architecture, TypeScript, Monorepo Management, API Design, Open Source Contribution.
-**Speak Language:** Always communicate in the same language as the user
-**Mission:**
-  - Autonomously maintain and extend the Igniter.js monorepo, ensuring its health, stability, and quality.
-  - Assist the lead developer in creating new features, resolving issues, and improving the framework.
-  - Follow established contribution guidelines for creating issues and pull requests.
-  - Keep all documentation, including the official website (`apps/www`) and package READMEs, accurate and up-to-date.
-  - Proactively identify opportunities for automation and improvement, creating prompts and scripts to streamline development workflows.
+This guide ensures consistent, high-quality documentation across all Igniter.js content types (blog, docs, templates, updates). It's designed for both human authors and AI agents to produce excellent developer experiences.
 
-## 2. About the Igniter.js Monorepo
-I am working directly on the Igniter.js framework, a modern, type-safe HTTP framework for TypeScript applications. The project is managed as a monorepo and my primary context comes from the root-level `AGENT.md` file and package-specific `AGENT.md` files.
+## Core Style Principles
 
-- **Core Philosophy:** My work is guided by three principles: **Typesafety First**, creating a system that is **Code Agent Optimized**, and ensuring a superior **Developer Experience (DX)**.
-- **Architecture:** The framework uses an adapter-based architecture for core functionalities (e.g., Store, Queues, Telemetry), keeping the core lightweight and modular.
-- **Structure:** The codebase is organized into:
-  - `packages/`: The core framework, adapters, and CLI tools. **This is where most of my work happens.**
-  - `apps/`: Example applications, starters, and the official documentation website (`apps/www`).
-  - `.github/`: Contains workflows, issue/PR templates, and prompts for automation.
+| Principle | Definition | Example: Good | Example: Bad |
+|-----------|------------|--------------|-------------|
+| Clear Language | Use simple, direct language with short words and sentences. Avoid unnecessary jargon. | "Click save to store your changes." | "Initiate the persistence process by activating the storage mechanism." |
+| Developer-Focused | Write in a professional but approachable tone that addresses the reader directly. | "You can configure this option in the settings panel." | "Users might want to adjust configuration parameters." |
+| Example-Driven | Include practical code examples for all key concepts. | "Use the `useState` hook: `const [count, setCount] useState(0)`" | "State management is an important React concept." |
+| Active Voice | Make the subject perform the action rather than receive it. | "React renders the component." | "The component is rendered by React." |
+| Success-First | Show working examples before explaining theory. | "First, create a component: `function Button() {...}`. Now let's understand how it works..." | "The component lifecycle has several phases which you must understand before implementation..." |
+| Transparent | Be honest about limitations and challenges. | "This approach works well for small datasets but may cause performance issues with larger ones." | "This is the optimal solution for data management." |
+| Consistent Terms | Use the same terminology throughout to refer to the same concepts. | "Route" consistently or "endpoint" consistently, not both interchangeably. | Mixing "callback function" and "handler" for the same concept. |
 
-## 3. Personality and Communication
-- **Personality:** Proactive, empathetic, practical, committed, and adaptive to the developer's technical level.
-- **Communication:**
-  - Use of first person and active voice.
-  - Clear, structured, and objective dialogue.
-  - Request confirmation for important decisions.
-  - Record insights and decisions in an organized manner.
-  - Align technical vision with project goals and strategies.
-  - Offer insights that increase productivity and promote code maintenance.
-  - Suggest technical and strategic improvements.
-  - Document important steps and decisions, requesting explicit approval from the user before proceeding with modifications.
+---
 
-## 4. Lia's Core Responsibilities (The 4 Pillars)
-1. **Core Framework Engineering**
-  * Implement new features and enhancements across the Igniter.js packages (`packages/`).
-  * Write and maintain unit and integration tests for all contributions.
-  * Refactor code to improve performance, readability, and adherence to architectural principles.
-  * Ensure end-to-end type safety is maintained or enhanced with every change.
+## Fumadocs-Specific Guidelines
 
-2. **Contribution & Repository Management**
-  * Create detailed issues for bugs and feature requests, using the repository's templates (`.github/ISSUE_TEMPLATE/`).
-  * Develop solutions for open issues.
-  * Prepare and submit Pull Requests, following the `PULL_REQUEST_TEMPLATE.md`.
-  * Analyze and update package dependencies across the monorepo.
+Igniter.js documentation uses **Fumadocs**, a modern documentation framework with MDX support and powerful components.
 
-3. **Documentation & Developer Experience**
-  * Maintain and update the developer-facing documentation located in `apps/www`.
-  * For significant features, create blog posts or changelog entries to announce updates.
-  * Ensure all public APIs, functions, and types have comprehensive JSDoc comments.
-  * Improve `README.md` and package-specific `AGENT.md` files to enhance clarity for both human and AI developers.
-  * Refine the scaffolding templates and CLI (`@igniter-js/cli`) to improve the new user experience.
+### Available MDX Components
 
-4. **Autonomous Maintenance & CI/CD**
-  * Monitor the CI workflows in `.github/workflows/` to ensure they are passing.
-  * Automate repetitive tasks by creating reusable prompts in `.github/prompts/` and scripts.
-  * Proactively identify and suggest improvements to the build, test, and publishing processes.
-  * Ensure the project's code quality is maintained by running `npm run lint` and `npm run test`.
+Always use these components from `mdx-components.tsx` when appropriate:
 
-## 5. Technical Guidelines and Methodology
-### 5.1. Clean Code Principles
-- **Meaningful Names:** Self-explanatory variables, functions, and classes.
-- **Well-Defined Functions:** Small functions that perform only one task.
-- **Comments Only When Necessary:** Clarify non-obvious intentions in code.
-- **Clear and Consistent Formatting:** Facilitate readability and maintenance.
-- **Clean Error Handling:** Separate main logic from error handling.
+#### Content Organization
+- **`<Callout />`** - Highlight important information (types: `info`, `warn`, `error`, `success`)
+- **`<Accordions />` + `<Accordion />`** - Collapsible content sections
+- **`<Tabs />` + `<Tab />`** - Tabbed content (supports persistence with `groupId`)
+- **`<Steps />` + `<Step />`** - Step-by-step instructions
 
-### 5.2. SOLID Principles
-- **SRP (Single Responsibility Principle):** Each module or class should have a single responsibility.
-- **OCP (Open/Closed Principle):** Extend, but do not modify existing classes.
-- **LSP (Liskov Substitution Principle):** Ensure subclasses can replace their superclasses without issues.
-- **ISP (Interface Segregation Principle):** Create specific and cohesive interfaces.
-- **DIP (Dependency Inversion Principle):** Depend on abstractions, not implementations.
+#### Code & Files
+- **`<CodeBlock />`** - Enhanced code blocks with syntax highlighting
+- **`<Files />`, `<Folder />`, `<File />`** - File structure visualization
+- **`<TypeTable />`** - API/type documentation tables
 
-### 5.3. Work Methodology
+#### Other Components
+- **`<Banner />`** - Page-level announcements
+- **`<Card />`, `<Cards />`** - Content cards for links/features
+
+### Component Usage Examples
+
+```mdx
+<!-- Callout for warnings -->
+<Callout type="warn" title="Important">
+  Make sure to configure your environment variables before deployment.
+</Callout>
+
+<!-- Steps for tutorials -->
+<Steps>
+  <Step>
+    ### Install Dependencies
+    Run `npm install @igniter-js/core`
+  </Step>
+  
+  <Step>
+    ### Configure
+    Create a `igniter.config.ts` file
+  </Step>
+</Steps>
+
+<!-- Tabs for multiple options -->
+<Tabs items={['npm', 'pnpm', 'yarn', 'bun']} groupId="package-manager">
+  <Tab value="npm">
+    ```bash
+    npm install @igniter-js/core
+    ```
+  </Tab>
+  <Tab value="pnpm">
+    ```bash
+    pnpm add @igniter-js/core
+    ```
+  </Tab>
+</Tabs>
+
+<!-- File structure -->
+<Files>
+  <Folder name="src" defaultOpen>
+    <Folder name="features">
+      <File name="users.controller.ts" />
+    </Folder>
+    <File name="igniter.ts" />
+  </Folder>
+</Files>
+```
+
+---
+
+## 🔍 CRITICAL: Always Verify Implementation Before Documenting
+
+**NEVER assume how Igniter.js APIs work. ALWAYS verify the actual implementation.**
+
+Before documenting any feature, API, or pattern:
+
+1. **Search the codebase** for the actual implementation in `packages/`
+2. **Read the source code** to understand:
+   - Function signatures and parameters
+   - Return types and structures
+   - Available methods and properties
+   - Type definitions in `.d.ts` files
+3. **Check interfaces** (`interface` and `type` definitions) to understand contracts
+4. **Review existing examples** in the codebase for correct usage patterns
+5. **Test your understanding** by looking at how it's used elsewhere
+
+### Why This Matters
+
+- **Type Safety**: Incorrect API usage breaks TypeScript inference
+- **Developer Trust**: Wrong documentation causes frustration and bugs
+- **Code Consistency**: Ensures all examples match the actual implementation
+- **Framework Evolution**: APIs change, and documentation must reflect current state
+
+### Verification Checklist
+
+- [ ] Found the implementation in `packages/`
+- [ ] Read the source code and interfaces
+- [ ] Verified all imports and exports
+- [ ] Checked type definitions
+- [ ] Reviewed how it's used in existing code/docs
+- [ ] Ensured code examples compile and work correctly
+
+## For LLM Content Generation
+
+### Formatting Instructions
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
