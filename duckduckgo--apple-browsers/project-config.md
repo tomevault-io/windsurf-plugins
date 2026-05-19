@@ -1,176 +1,197 @@
 ---
 trigger: always_on
-description: DuckDuckGo's subscription system provides access to premium features including VPN (Network Protection), Personal Information Removal (PIR), Identity Theft Restoration (ITR), and AI Chat. The system supports multiple purchase platforms and cross-platform activation.
+description: Create reusable ViewModifiers for common styling:
 ---
 
 
-# Subscription Architecture & Implementation
+# Advanced SwiftUI Patterns
 
-## Overview
-DuckDuckGo's subscription system provides access to premium features including VPN (Network Protection), Personal Information Removal (PIR), Identity Theft Restoration (ITR), and AI Chat. The system supports multiple purchase platforms and cross-platform activation.
-
-## Core Architecture
-
-### Shared Foundation: BrowserServicesKit
-All subscription logic is centralized in `BrowserServicesKit/Sources/Subscription/`:
+## ViewModifier Composition
+Create reusable ViewModifiers for common styling:
 
 ```swift
-// ✅ CORRECT - Use BrowserServicesKit for core subscription logic
-import BrowserServicesKit
-
-final class SubscriptionViewModel: ObservableObject {
-    private let subscriptionManager: SubscriptionManager
+// ✅ ADVANCED - Composable ViewModifiers
+struct DuckDuckGoButtonStyle: ViewModifier {
+    let style: ButtonStyleType
     
-    init(subscriptionManager: SubscriptionManager = SubscriptionManager.shared) {
-        self.subscriptionManager = subscriptionManager
+    func body(content: Content) -> some View {
+        content
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(backgroundColorForStyle())
+            .foregroundColor(textColorForStyle())
+            .cornerRadius(8)
+            .font(.body.weight(.medium))
+    }
+    
+    private func backgroundColorForStyle() -> Color {
+        switch style {
+        case .primary:
+            return Color(designSystemColor: .buttonPrimaryBackground)
+        case .secondary:
+            return Color(designSystemColor: .buttonSecondaryBackground)
+        case .ghost:
+            return .clear
+        }
+    }
+    
+    private func textColorForStyle() -> Color {
+        switch style {
+        case .primary:
+            return Color(designSystemColor: .buttonPrimaryText)
+        case .secondary:
+            return Color(designSystemColor: .buttonSecondaryText)
+        case .ghost:
+            return Color(designSystemColor: .textLink)
+        }
     }
 }
 
-// ❌ INCORRECT - Don't duplicate subscription logic in platform code
-final class SubscriptionViewModel: ObservableObject {
-    func checkSubscriptionStatus() {
-        // Don't reimplement subscription logic
+// Usage
+extension View {
+    func duckDuckGoButtonStyle(_ style: ButtonStyleType) -> some View {
+        modifier(DuckDuckGoButtonStyle(style: style))
     }
 }
 ```
 
-### Platform-Specific Purchase Methods
-
-#### iOS
-- **Purchase Method**: App Store only (StoreKit)
-- **Geographic Coverage**: Global
-- **Cross-Platform**: Can activate Stripe subscriptions from other platforms
-
-#### macOS App Store Build
-- **Purchase Method**: App Store only (StoreKit)
-- **Geographic Coverage**: Global
-- **Cross-Platform**: Can activate Stripe subscriptions
-
-#### macOS Direct Download Build
-- **US Users**: Stripe web purchases
-- **Non-US Users**: Redirected to iOS App Store
-- **Cross-Platform**: Primary platform for Stripe purchases
-
-### Version Management
-ALWAYS use V2 implementations for new code:
+## PreferenceKey for Cross-View Communication
+Use PreferenceKey for sophisticated view communication:
 
 ```swift
-// ✅ CORRECT - Use V2 implementations
-let subscriptionManager = SubscriptionManagerV2()
-let purchaseManager = StorePurchaseManagerV2()
-let purchaseFlow = AppStorePurchaseFlowV2()
-
-// ❌ INCORRECT - Don't use V1 implementations
-let subscriptionManager = SubscriptionManager() // Legacy
-let purchaseFlow = AppStorePurchaseFlow() // Legacy
-```
-
-## Premium Features Implementation
-
-### Feature Entitlements
-```swift
-// ✅ CORRECT - Check entitlements through SubscriptionManager
-final class FeatureViewModel: ObservableObject {
-    private let subscriptionManager: SubscriptionManager
+// ✅ ADVANCED - PreferenceKey for collecting data from child views
+struct ViewSizePreferenceKey: PreferenceKey {
+    static var defaultValue: [String: CGSize] = [:]
     
-    var isFeatureEnabled: Bool {
-        subscriptionManager.hasEntitlement(for: .networkProtection)
+    static func reduce(value: inout [String: CGSize], nextValue: () -> [String: CGSize]) {
+        value.merge(nextValue()) { $1 }
+    }
+}
+
+struct SizeReportingView<Content: View>: View {
+    let id: String
+    let content: Content
+    
+    init(id: String, @ViewBuilder content: () -> Content) {
+        self.id = id
+        self.content = content()
     }
     
-    var availableFeatures: [SubscriptionFeature] {
-        subscriptionManager.entitlements.compactMap { entitlement in
-            switch entitlement {
-            case .networkProtection:
-                return .vpn
-            case .dataBrokerProtection:
-                return .personalInformationRemoval
-            case .identityTheftRestoration:
-                return .identityTheftRestoration
-            default:
-                return nil
+    var body: some View {
+        content
+            .background(
+                GeometryReader { geometry in
+                    Color.clear
+                        .preference(key: ViewSizePreferenceKey.self, 
+                                  value: [id: geometry.size])
+                }
+            )
+    }
+}
+
+// Usage
+struct ParentView: View {
+    @State private var childSizes: [String: CGSize] = [:]
+    
+    var body: some View {
+        VStack {
+            SizeReportingView(id: "header") {
+                HeaderView()
+            }
+            
+            SizeReportingView(id: "content") {
+                ContentView()
+            }
+        }
+        .onPreferenceChange(ViewSizePreferenceKey.self) { sizes in
+            self.childSizes = sizes
+        }
+    }
+}
+```
+
+## Environment-based Dependency Injection
+Use SwiftUI Environment for dependency injection:
+
+```swift
+// ✅ ADVANCED - Environment-based DI
+struct DependencyProviderKey: EnvironmentKey {
+    static let defaultValue: DependencyProvider = AppDependencyProvider.shared
+}
+
+extension EnvironmentValues {
+    var dependencies: DependencyProvider {
+        get { self[DependencyProviderKey.self] }
+        set { self[DependencyProviderKey.self] = newValue }
+    }
+}
+
+// Usage in views
+struct FeatureView: View {
+    @Environment(\.dependencies) var dependencies
+    @StateObject private var viewModel: FeatureViewModel
+    
+    init() {
+        // Note: This approach has limitations - see ios-architecture.md for preferred DI pattern
+    }
+    
+    var body: some View {
+        // View implementation
+    }
+}
+```
+
+## Complex Animation Patterns
+Use sophisticated animations for better UX:
+
+```swift
+// ✅ ADVANCED - Coordinated animations
+struct TabSwitcherView: View {
+    @State private var selectedTab: Int = 0
+    @State private var animationPhase: AnimationPhase = .idle
+    
+    enum AnimationPhase {
+        case idle, switching, settled
+    }
+    
+    var body: some View {
+        VStack {
+            TabPickerView(selectedTab: $selectedTab)
+                .animation(.easeInOut(duration: 0.3), value: selectedTab)
+            
+            TabContent(selectedTab: selectedTab)
+                .transition(.asymmetric(
+                    insertion: .move(edge: .trailing).combined(with: .opacity),
+                    removal: .move(edge: .leading).combined(with: .opacity)
+                ))
+                .animation(.spring(response: 0.6, dampingFraction: 0.8), value: selectedTab)
+        }
+        .onChange(of: selectedTab) { newValue in
+            withAnimation(.easeInOut(duration: 0.1)) {
+                animationPhase = .switching
+            }
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                withAnimation(.easeOut(duration: 0.1)) {
+                    animationPhase = .settled
+                }
             }
         }
     }
 }
 ```
 
-### VPN Integration
-```swift
-// ✅ CORRECT - VPN entitlement integration
-final class VPNManager: ObservableObject {
-    private let subscriptionManager: SubscriptionManager
-    
-    func enableVPN() async {
-        guard subscriptionManager.hasEntitlement(for: .networkProtection) else {
-            await showSubscriptionPrompt()
-            return
-        }
-        
-        // Enable VPN functionality
-        await startVPNConnection()
-    }
-}
-```
+## Custom Layout with Layout Protocol (iOS 16+)
+Create sophisticated layouts:
 
-### Personal Information Removal (PIR)
 ```swift
-// ✅ CORRECT - PIR implementation with freemium support
-final class PIRManager: ObservableObject {
-    private let subscriptionManager: SubscriptionManager
+// ✅ ADVANCED - Custom layout for complex arrangements
+@available(iOS 16.0, macOS 13.0, *)
+struct FlexibleGrid: Layout {
+    let spacing: CGFloat
+    let itemSize: CGSize
     
-    var isFreemiumEligible: Bool {
-        // Check feature flag and eligibility
-        FeatureFlags.shared.isEnabled(.freemiumPIR) &&
-        !subscriptionManager.isUserSubscribed &&
-        isUSUser
-    }
-    
-    func performScan() async {
-        if subscriptionManager.hasEntitlement(for: .dataBrokerProtection) {
-            await performFullScan()
-        } else if isFreemiumEligible {
-            await performLimitedScan()
-        } else {
-            await showSubscriptionPrompt()
-        }
-    }
-}
-```
-
-## Purchase Flow Implementation
-
-### Free Trial Support
-```swift
-// ✅ CORRECT - Free trial implementation
-final class SubscriptionPurchaseViewModel: ObservableObject {
-    @Published var isTrialEligible = false
-    @Published var trialPeriod: String = ""
-    
-    func checkTrialEligibility() async {
-        guard FeatureFlags.shared.isEnabled(.privacyProFreeTrial) else {
-            isTrialEligible = false
-            return
-        }
-        
-        // Check server-side eligibility
-        let eligible = await subscriptionManager.checkFreshFreeTrialEligibility()
-        await MainActor.run {
-            isTrialEligible = eligible
-            if let product = subscriptionManager.currentProduct,
-               let offer = product.introductoryOffer {
-                trialPeriod = offer.localizedPeriod
-            }
-        }
-    }
-}
-```
-
-### Platform-Specific Purchase
-```swift
-// ✅ CORRECT - Platform-aware purchase flow
-final class PurchaseFlowCoordinator {
-    private let subscriptionManager: SubscriptionManager
-    
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
