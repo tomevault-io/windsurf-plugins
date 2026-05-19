@@ -1,165 +1,180 @@
 ---
 trigger: always_on
-description: Generates realistic test content using LLM.
+description: **End-to-end testing framework for Airweave connectors using real external APIs**
 ---
 
-# Building Monke Tests for Source Connectors
+# Monke - Airweave Connector Testing Framework
+
+**End-to-end testing framework for Airweave connectors using real external APIs**
 
 ## Overview
 
-**Monke** is Airweave's end-to-end testing framework for source connectors. It creates real test data in external systems, triggers syncs, and verifies data appears correctly in the search index.
-
-This guide shows you how to build comprehensive tests that verify **every entity type** your connector supports.
+Monke validates Airweave's data synchronization pipeline by creating real test data in external systems, triggering sync jobs, verifying data in the vector database, and testing update/deletion scenarios. The framework separates configuration from runtime state, uses pluggable authentication, and supports parallel execution.
 
 ---
 
-## Why Test Every Entity Type?
+## Core Architecture
 
-**Important: Your Monke tests should create and verify all entity types defined in your source connector.**
+**Test Runner** (`runner.py`) - Entry point that orchestrates parallel test execution across connectors
 
-Many connector tests only verify top-level entities (e.g., tasks) but ignore nested entities (e.g., comments, files).
+**Test Flow** (`core/flow.py`) - Executes complete lifecycle for a connector: setup → test steps → cleanup
 
-**Impact:**
-- Comments might not sync properly → Silent failures in production
-- File attachments might not be indexed → Missing searchable content
-- Entity relationships might be broken → Poor search results
-- Users can't search the full breadth of data they expect
+**Test Steps** (`core/steps.py`) - Individual operations (create, sync, verify, update, delete) with retry logic
 
-**Solution:** Create test entities for every entity type your connector syncs, and verify each one appears in Qdrant.
+**Configuration** (`core/config.py`) - YAML-based config with classes: `TestConfig`, `ConnectorConfig`, `TestFlowConfig`, `DeletionConfig`
 
-**Before Writing Monke Tests:**
-1. Open your source file: `backend/airweave/platform/sources/{short_name}.py`
-2. List all entity types yielded in `generate_entities()`:
-   - Example: WorkspaceEntity, ProjectEntity, TaskEntity, CommentEntity, FileEntity
-3. Your Monke tests should create at least one instance of each type
-4. Verify each instance appears in Qdrant after sync
+**Test Context** (`core/context.py`) - Runtime state separate from config: tracks entities, infrastructure IDs, metrics
 
-**Validation:**
-- Count entity classes in `entities/{short_name}.py`
-- Count entity types created in `bongos/{short_name}.py::create_entities()`
-- These counts should match (excluding parent/workspace entities that don't get stored)
+**Infrastructure** (`core/infrastructure.py`) - Creates/tears down test collections and source connections
+
+**Authentication** (`auth/`) - Pluggable auth brokers (`BaseAuthBroker`, `ComposioBroker`) for credential resolution
 
 ---
 
-## Core Components
+## Test Flow
 
-Every Monke test requires four components:
-
-1. **Bongo implementation** (`monke/bongos/{short_name}.py`)
-2. **Generation schemas** (`monke/generation/schemas/{short_name}.py`)
-3. **Generation adapter** (`monke/generation/{short_name}.py`)
-4. **Test configuration** (`monke/configs/{short_name}.yaml`)
-
----
-
-## Part 1: Bongo Implementation
-
-The **Bongo** is a class that creates, updates, and deletes test data via the external API.
-
-### File Location
+Default test steps execute in sequence:
 ```
-monke/bongos/{short_name}.py
+1. collection_cleanup       # Clean leftover test collections
+2. cleanup                  # Clean entities in external system
+3. create                   # Create test entities
+4. sync                     # Trigger Airweave sync
+5. verify                   # Verify entities in vector DB
+6. update                   # Update entities
+7. sync → verify            # Verify updates
+8. partial_delete           # Delete subset of entities
+9. sync → verify_partial_deletion
+10. verify_remaining_entities
+11. complete_delete         # Delete all entities
+12. sync → verify_complete_deletion
+13. cleanup                 # Final cleanup
+14. collection_cleanup      # Delete test collection
 ```
 
-### Basic Structure
+Steps are customizable per connector via YAML config.
 
+---
+
+## Bongos
+
+**Bongos** create, update, and delete real test data in external systems.
+
+### Structure
+Each bongo inherits from `BaseBongo` and implements:
+- `create_entities()` - Create test data
+- `update_entities()` - Modify test data
+- `delete_entities()` - Remove all test data
+- `delete_specific_entities(entities)` - Remove specific entities
+- `cleanup()` - Force cleanup remaining artifacts
+
+Bongos are auto-discovered by `BongoRegistry` via the `connector_type` class attribute.
+
+### Example
 ```python
-"""{Connector Name} bongo implementation.
-
-Creates, updates, and deletes test entities via the real {Connector Name} API.
-"""
-
-import asyncio
-import time
-import uuid
-from typing import Any, Dict, List, Optional
-
-import httpx
-from monke.bongos.base_bongo import BaseBongo
-from monke.utils.logging import get_logger
-
-
-class MyConnectorBongo(BaseBongo):
-    """Bongo for {Connector Name} that creates test entities for E2E testing.
-
-    Key responsibilities:
-    - Create test entities (including nested types like comments/files)
-    - Embed verification tokens in content
-    - Update entities to test incremental sync
-    - Delete entities to test deletion detection
-    - Clean up all test data
-    """
-
-    connector_type = "{short_name}"  # Must match source short_name
-
-    API_BASE = "https://api.example.com/v1"
-
-    def __init__(self, credentials: Dict[str, Any], **kwargs):
-        """Initialize the bongo.
-
-        Args:
-            credentials: Dict with "access_token" or other auth
-            **kwargs: Configuration from test config file
-        """
+class GitHubBongo(BaseBongo):
+    def __init__(self, credentials: Dict[str, Any], config: Dict[str, Any]):
         super().__init__(credentials)
-        self.access_token: str = credentials["access_token"]
-
-        # Test configuration
-        self.entity_count: int = int(kwargs.get("entity_count", 3))
-        self.openai_model: str = kwargs.get("openai_model", "gpt-4.1-mini")
-        self.max_concurrency: int = int(kwargs.get("max_concurrency", 3))
-
-        # Simple rate limiting (optional, add if needed)
-        self.last_request_time = 0.0
-        self.min_delay = 0.2  # 200ms between requests
-
-        # Runtime state - track ALL created entities
-        self._workspace_id: Optional[str] = None
-        self._project_id: Optional[str] = None
-        self._tasks: List[Dict[str, Any]] = []
-        self._comments: List[Dict[str, Any]] = []
-        self._files: List[Dict[str, Any]] = []
-
-        self.logger = get_logger(f"{self.connector_type}_bongo")
+        self.repo_name = config["repo_name"]  # Now from config_fields
+        self.token = credentials["personal_access_token"]
 
     async def create_entities(self) -> List[Dict[str, Any]]:
-        """Create ALL types of test entities.
-
-        This is critical: You must create instances of EVERY entity type
-        that your source connector syncs.
-
-        Returns:
-            List of entity descriptors with verification tokens
-        """
-        raise NotImplementedError("Implement in subclass")
+        # Create files in GitHub, return metadata
 
     async def update_entities(self) -> List[Dict[str, Any]]:
-        """Update a subset of entities to test incremental sync.
-
-        Returns:
-            List of updated entity descriptors
-        """
-        raise NotImplementedError("Implement in subclass")
+        # Update files
 
     async def delete_entities(self) -> List[str]:
-        """Delete all created test entities.
+        # Delete all tracked entities
+```
 
-        Returns:
-            List of deleted entity IDs
-        """
-        raise NotImplementedError("Implement in subclass")
+---
 
-    async def delete_specific_entities(self, entities: List[Dict[str, Any]]) -> List[str]:
-        """Delete specific entities by ID.
+## Configuration
 
-        Args:
-            entities: List of entity descriptors to delete
+Configs live in `configs/{connector_type}.yaml`:
 
-        Returns:
-            List of successfully deleted entity IDs
-        """
-        raise NotImplementedError("Implement in subclass")
+```yaml
+name: "GitHub Connector Test"
+description: "End-to-end test of GitHub connector"
 
+connector:
+  name: "github_test"
+  type: "github"
+  auth_mode: direct  # or "provider"
+  auth_fields:
+    personal_access_token: MONKE_GITHUB_PERSONAL_ACCESS_TOKEN
+  config_fields:
+    repo_name: MONKE_GITHUB_REPO_NAME  # Moved from auth_fields
+    branch: "main"
+    post_create_sleep_seconds: 15
+
+test_flow:
+  steps: [cleanup, create, sync, verify, update, sync, verify, complete_delete, sync, verify_complete_deletion, cleanup]
+
+entity_count: 3
+
+deletion:
+  partial_delete_count: 1
+  verify_partial_deletion: true
+
+verification:
+  score_threshold: 0.1
+  max_retries: 3
+  retry_delay_seconds: 5
+```
+
+Environment variables are substituted using `${VAR_NAME}` syntax.
+
+---
+
+## Authentication
+
+### Direct Mode
+Credentials specified via `auth_fields` with env var names:
+```yaml
+auth_mode: direct
+auth_fields:
+  personal_access_token: MONKE_GITHUB_PERSONAL_ACCESS_TOKEN
+```
+
+### Provider Mode
+External auth providers (e.g., Composio) fetch credentials:
+```bash
+DM_AUTH_PROVIDER=composio
+DM_AUTH_PROVIDER_ID=provider_id
+DM_AUTH_PROVIDER_API_KEY=api_key
+GITHUB_AUTH_PROVIDER_AUTH_CONFIG_ID=ac_xxx
+GITHUB_AUTH_PROVIDER_ACCOUNT_ID=ca_xxx
+```
+
+Auth resolution:
+1. `credentials_resolver` determines mode
+2. Direct: resolves env vars from `auth_fields`
+3. Provider: uses `ComposioBroker` to fetch credentials
+4. Credentials passed to bongo and Airweave source connection
+
+---
+
+## Content Generation
+
+Generators in `generation/{connector}.py` create realistic test data with embedded tracking tokens:
+
+```python
+from monke.client.llm import LLMClient
+
+async def generate_github_content(token: str) -> str:
+    llm = LLMClient()
+    prompt = f"Generate Python code. Include '{token}' in a comment."
+    return await llm.generate(prompt)
+```
+
+Pydantic schemas in `generation/schemas/{connector}.py` define entity structures.
+
+---
+
+## Verification
+
+After each sync, verification steps:
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
