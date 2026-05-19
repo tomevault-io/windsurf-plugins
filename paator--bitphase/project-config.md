@@ -3,6 +3,7 @@ trigger: always_on
 description: Bitphase is a chiptune tracker for creating music on retro sound chips. Built with Svelte 5, TypeScript, Vite, and Tailwind 4.
 ---
 
+
 Bitphase is a chiptune tracker for creating music on retro sound chips. Built with Svelte 5, TypeScript, Vite, and Tailwind 4.
 
 ## Architecture
