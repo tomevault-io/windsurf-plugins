@@ -1,167 +1,113 @@
 ---
 trigger: always_on
-description: Unified frontend security rule covering frontend code and AI agent behavior.
+description: This document describes the requirements and design constraints of interactive guides found in this repository.
 ---
 
 
-# Frontend Security Rules
+# Interactive Elements Requirements System
 
-## F1 — Avoid Untrusted SVGs
-Do **not** use dynamically generated or user-supplied SVGs directly, as they can cause XSS vulnerabilities.  
-If you must render a non-static SVG, sanitize it first using **DOMPurify**.
+This document describes the requirements and objectives system for interactive elements in the Grafana Documentation Plugin.
 
-**Do**
-```tsx
-import DOMPurify from 'dompurify';
-const clean = DOMPurify.sanitize(untrustedSvg, { USE_PROFILES: { svg: true } });
-return <div dangerouslySetInnerHTML={{ __html: clean }} />;
-```
+For full reference on interactive guide authoring (JSON format, action types, selectors, guided interactions), see `docs/developer/interactive-examples/`.
 
-**Don't**
-```tsx
-return <div dangerouslySetInnerHTML={{ __html: untrustedSvg }} />;
-```
+## Overview
 
-**Agent behavior**  
-If SVG data originates from user input, remote URLs, or uploads, **always** sanitize with DOMPurify or prefer a React-based icon component instead.
+Interactive elements in documentation content have a system of requirements that must be satisfied before they can be executed, and a potential system of objectives or goals, that the
+guides are trying to accomplish.  This document lays all of that out.
 
----
+1. **Docs Plugin Requirements**: Built-in system rules that govern interactive behavior
+2. **Guide-Specific Requirements**: Declared in the `data-requirements` attribute by content authors
+3. **Guide-Specific Objectives**: Declared in `data-objectives` attribute by content authors.
 
-## F2 — Use Safe React Data Bindings
-React data bindings (`{}`) automatically escape values and prevent XSS.  
-Always prefer these for inserting dynamic text.
+## Docs Plugin Requirements
 
-**Do**
-```tsx
-return <li>{data}</li>;
-```
+Docs plugin requirements are automatically enforced by the system and control interactive behavior.
+The objective of these requirements are as follows:
 
-**Don't**
-```tsx
-return <li dangerouslySetInnerHTML={{ __html: data }} />;
-```
+1. Make it hard for the user to take confusing or nonsense actions (doing steps out of order)
+2. Maximize the chances that the workflow goes smoothly as the user expects
+3. Maximize safety: the docs-plugin should not allow you to take a step which can't succeed, as
+this creates negative surprise.
 
-**Agent behavior**  
-Prefer `{}` over `dangerouslySetInnerHTML`. Only allow `dangerouslySetInnerHTML` when absolutely required **and** when properly sanitized (see F4).
+## Guide-Specific Requirements
 
----
+Guide-specific requirements are declared in the `data-requirements` attribute of interactive elements. Multiple requirements are comma-separated. It is expected that this list will grow 
+over time as we have new kinds of interactive guides. For example, one guide might require
+that you have Alloy set up sending data to Grafana Cloud before you can proceed with learning
+how the Kubernetes product works; for that guide, we'd have to extend data-requirements so that
+the docs-plugin could check that condition was true.
 
-## F3 — Don't Treat URLs as Strings
-Always use a proper URL parsing/handling API — e.g., the native **`URL`** constructor, **`URLSearchParams`**, or safe utilities provided by your framework.  
-Prefer the URL Web API directly instead of string concatenation.
+### Currently Supported Requirements
 
-**Don't**
-```ts
-// Unsafe string concatenation
-const endpoint = apiBase + '/users?id=' + userId;
-fetch(endpoint);
+#### `exists-reftarget`
+- **Purpose**: Ensures the target element exists in the DOM before the interactive action can be executed
+- **Usage**: Most common requirement for interactive elements
+- **Example**: `data-requirements="exists-reftarget"`
 
-const redirectUrl = '/redirect?target=' + location.href;
-window.location.href = redirectUrl;
-```
+#### `has-datasources`
+- **Purpose**: Ensures that at least one data source exists in Grafana
+- **Usage**: For interactive elements that require any data source to be configured
+- **Example**: `data-requirements="has-datasources"`
 
-**Do**
-```ts
-// Safe construction with URL and URLSearchParams
-const url = new URL('/users', apiBase);
-url.searchParams.set('id', userId);
-await fetch(url.toString());
+#### `has-datasource:name`
+- **Purpose**: Ensures that a data source exists with the specified name or type
+- **Usage**: The value is matched against both the data source name AND type (case-insensitive). First match wins.
+- **Example**: `data-requirements="has-datasource:prometheus"` matches a data source named "prometheus" OR of type "prometheus"
 
-// Validate redirects
-const nextUrl = new URL(userInputUrl, window.location.origin);
-if (nextUrl.origin === window.location.origin) {
-  window.location.href = nextUrl.toString();
-} else {
-  console.error('Blocked potential open redirect');
-}
-```
+#### `has-plugin:plugin-id`
+- **Purpose**: Ensures that a given plugin is installed and enabled
+- **Usage**: plugin-id should match Grafana's plugin ID concept, e.g. `volkovlabs-rss-datasource`
+- **Example**: `data-requirements="has-plugin:volkovlabs-rss-datasource"`
 
-**Agent behavior**
-- Never build URLs through string concatenation.  
-- Always use `new URL()` or an equivalent safe API.  
-- For user-supplied URLs:
-  - Validate origin and protocol before using or redirecting.
-  - Reject `javascript:` or `data:` URLs.
-  - Apply `textUtil.sanitizeUrl()` when in doubt.
-- Prefer explicit accessors (`url.hostname`, `url.pathname`, `url.searchParams`) over string slicing or regex.
+#### `has-dashboard-named:name`
+- **Purpose**: Ensures that a dashboard exists with the specified exact title
+- **Usage**: dashboard-name should match the exact dashboard title in Grafana (case-insensitive)
+- **Example**: `data-requirements="has-dashboard-named:Foobar"`
 
----
+#### `has-permission:action`
+- **Purpose**: Ensures the current user has the specified Grafana permission
+- **Usage**: Uses Grafana's permission system to check user access
+- **Example**: `data-requirements="has-permission:dashboards:write"`
 
-## F4 — Sanitize HTML and URLs
-Avoid `dangerouslySetInnerHTML` unless you sanitize first.  
-Always sanitize HTML and URLs before rendering or linking.
+#### `has-role:role`
+- **Purpose**: Ensures the current user has the specified organizational role
+- **Usage**: Supports roles: admin, editor, viewer, or grafana-admin
+- **Example**: `data-requirements="has-role:admin"`
 
-**Do**
-```tsx
-import { textUtil } from '@grafana/data';
+#### `is-admin`
+- **Purpose**: Ensures the current user has Grafana admin privileges
+- **Usage**: For interactive elements that require admin access to function properly
+- **Example**: `data-requirements="is-admin"`
 
-// Sanitize HTML:
-return <div dangerouslySetInnerHTML={{ __html: textUtil.sanitize(data) }} />;
+#### `navmenu-open`
+- **Purpose**: Ensures the Grafana navigation menu is open/visible
+- **Usage**: For interactive elements that need to interact with navigation menu items
+- **Example**: `data-requirements="navmenu-open"`
 
-// Sanitize URLs:
-const safeHref = textUtil.sanitizeUrl(url);
-return <a href={safeHref}>{label}</a>;
-```
+#### `on-page:path`
+- **Purpose**: Ensures the user is currently on a specific page/URL path
+- **Usage**: Supports both partial and exact path matching
+- **Example**: `data-requirements="on-page:/dashboard"`
 
-**Don't**
-```tsx
-return <div dangerouslySetInnerHTML={{ __html: data }} />;
-<a href={url}>{label}</a>;
-```
+#### `has-feature:toggle`
+- **Purpose**: Ensures that a specific Grafana feature toggle is enabled
+- **Usage**: Check if experimental or optional features are available
+- **Example**: `data-requirements="has-feature:alerting"`
 
-**Agent behavior**  
-If suggesting `dangerouslySetInnerHTML`, ensure it is paired with `textUtil.sanitize`.  
-Add a clear comment, for example:
-// SECURITY: sanitized HTML before injection (F4)
+#### `in-environment:env`
+- **Purpose**: Ensures the guide runs in a specific environment
+- **Usage**: Useful for dev vs prod specific guide
+- **Example**: `data-requirements="in-environment:development"`
 
----
+#### `min-version:x.y.z`
+- **Purpose**: Ensures Grafana version meets minimum requirements
+- **Usage**: Uses semantic version comparison (major.minor.patch)
+- **Example**: `data-requirements="min-version:9.0.0"`
 
-## F5 — Avoid Insecure DOM APIs
-Avoid unsafe DOM APIs that can inject malicious content.
+#### `section-completed:sectionId`
+- **Purpose**: Creates dependencies between tutorial sections, ensuring prerequisite sections are completed first
 
-**Forbidden**
-- `element.innerHTML`
-- `element.outerHTML`
-- `insertAdjacentHTML`
-- dynamic `script.src` assignments
-
-**Do**
-```ts
-const el = document.createElement('div');
-el.textContent = userInput; // safe text insertion
-```
-
-**Don't**
-```ts
-el.innerHTML = userInput;
-const script = document.createElement('script');
-script.src = dynamicUrl;
-```
-
-**Agent behavior**  
-Use `document.createElement`, `textContent`, and safe attribute APIs for dynamic content.  
-If HTML is needed, apply F4 sanitization first.
-
----
-
-## F6 — Global URL & Link Validation
-- Reject or sanitize dangerous URL schemes (`javascript:`, `data:`, etc.).  
-- Always pass URLs through `textUtil.sanitizeUrl(url)` before use (this wraps a hardened sanitizer).  
-- Never build anchors or images with unvalidated external input.
-
----
-
-## Agent Conduct
-- When uncertain about sanitization or trust level, **pause and request review**.  
-- Prefer removing unsafe code over leaving TODOs.  
-- Annotate security-relevant changes:
-```tsx
-// SECURITY: sanitized SVG (F1)
-// SECURITY: used safe React binding (F2)
-// SECURITY: constructed URL with URL API (F3)
-// SECURITY: sanitized HTML/URL (F4)
-// SECURITY: avoided unsafe DOM API (F5)
-```
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [grafana/grafana-pathfinder-app](https://github.com/grafana/grafana-pathfinder-app) — distributed by [TomeVault](https://tomevault.io).
