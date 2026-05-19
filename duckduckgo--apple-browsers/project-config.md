@@ -1,212 +1,160 @@
 ---
 trigger: always_on
-description: struct FeatureView: View {
+description: *This guide covers testing practices and patterns for the DuckDuckGo browser on iOS and macOS platforms.*
 ---
 
 
-# SwiftUI Style Guide with Design System Integration for DuckDuckGo Browser
+# Testing Guidelines & Best Practices
 
-## View Structure
+*This guide covers testing practices and patterns for the DuckDuckGo browser on iOS and macOS platforms.*
 
-### View Organization
+## 🚨 MANDATORY: Testing Execution Rules
+
+### NEVER Run Tests Without Permission
+**NEVER execute any test commands without EXPLICIT user permission or unles user explicitly asked to in their prompt.**
+
+#### Required Testing Workflow:
+1. Write or modify test code as requested
+2. if user did not ask to run tests in their prompt, **STOP** before running any test commands:
+   - `swift test`
+   - `npm test` 
+   - `xcodebuild test`
+   - `fastlane test`
+   - Any other test execution commands
+3. **ASK** the user: "Should I run the tests?"
+4. **WAIT** for explicit permission (e.g., "yes", "run tests", "test it")
+5. Only then execute test commands
+
+**This rule applies to ALL test execution - unit tests, integration tests, UI tests, performance tests, etc.**
+
+---
+
+## Future Improvements
+
+This guide is a living document. Consider these areas for future improvements:
+
+- **Tab Extensions Testing**: Expand patterns for testing complex tab extension interactions and lifecycle management
+- **WebKit Integration Testing**: Add comprehensive patterns for testing WKWebView configurations, user scripts, and content blocking integration
+- **Privacy Feature Testing**: Develop specialized testing approaches for tracker protection, HTTPS upgrade, and content blocking rule validation
+- **Cross-Platform Testing**: Create patterns for testing SharedPackages functionality across iOS and macOS with consistent behavior validation
+- **Fire Button Integration Testing**: Add comprehensive testing patterns for data clearing workflows across all browser components
+- **Autofill and Credential Testing**: Expand testing approaches for AutofillCredentialProvider, password management, and form filling scenarios
+- **Sync Testing**: Develop patterns for testing bookmark sync, conflict resolution, and cross-device data consistency
+- **AI Chat Integration Testing**: Add testing patterns for AI chat functionality, context management, and user interaction flows
+- **Feature Flag Testing**: Expand MockFeatureFlagger usage patterns and integration testing with real feature configurations
+
+## Unit Tests
+
+### What to Include
+
+Unit tests should focus on testing individual components, functions, or classes in isolation. They should be:
+
+- **Fast**: Run quickly (< 1 second per test)
+- **Independent**: Not depend on external systems or other tests
+- **Deterministic**: Always produce the same result given the same input
+- **Focused**: Test one specific behavior or functionality
+
+### ✅ When to Write Unit Tests
+
+#### Model Logic
+Testing business logic, data transformations, and model behavior:
+
 ```swift
-struct FeatureView: View {
-    // MARK: - Environment and State
-    @Environment(\.colorScheme) var colorScheme
-    @EnvironmentObject var appSettings: AppSettings
-    
-    // MARK: - State and Binding
-    @State private var localState = false
-    @Binding var externalState: Bool
-    
-    // MARK: - View Model
-    @StateObject private var viewModel: FeatureViewModel
-    
-    // MARK: - Body
-    var body: some View {
-        content
-            .onAppear { viewModel.onAppear() }
-    }
-    
-    // MARK: - Subviews
-    @ViewBuilder
-    private var content: some View {
-        // Main content here
-    }
+func testBookmarkFolderCreation() {
+    let folder = BookmarkFolder(title: "Test Folder")
+    XCTAssertEqual(folder.title, "Test Folder")
+    XCTAssertTrue(folder.children.isEmpty)
 }
 ```
 
-## Design System Integration
-
-### REQUIRED: Use DesignResourcesKit Colors
-ALWAYS use semantic colors from DesignResourcesKit instead of hardcoded or system colors:
+#### Algorithms/Parsers
+Testing parsing logic, URL manipulation, search algorithms:
 
 ```swift
-// ✅ CORRECT - DesignResourcesKit semantic colors
-Text("Title")
-    .foregroundColor(Color(designSystemColor: .textPrimary))
-    .background(Color(designSystemColor: .surface))
-
-VStack {
-    Rectangle()
-        .fill(Color(designSystemColor: .accent))
-    
-    Button("Action") { }
-        .foregroundColor(Color(designSystemColor: .controlsFillPrimary))
-}
-.background(Color(designSystemColor: .background))
-
-// ❌ INCORRECT - Hardcoded or system colors
-Text("Title")
-    .foregroundColor(.black) // Don't use hardcoded colors
-    .background(.gray) // Don't use system colors
-
-// ❌ INCORRECT - Manual dark mode handling
-@Environment(\.colorScheme) var colorScheme
-let textColor = colorScheme == .dark ? Color.white : Color.black // Use semantic colors instead
-```
-
-### REQUIRED: Use DesignResourcesKit Icons
-ALWAYS use icons from DesignResourcesKitIcons package:
-
-```swift
-// ✅ CORRECT - DesignResourcesKit icons
-Button(action: addAction) {
-    Image(uiImage: DesignSystemImages.Glyphs.Size16.add)
-        .foregroundColor(Color(designSystemColor: .accent))
-}
-
-Image(uiImage: DesignSystemImages.Color.Size24.bookmark)
-    .resizable()
-    .frame(width: 24, height: 24)
-
-// ❌ INCORRECT - System or custom icons
-Button(action: addAction) {
-    Image(systemName: "plus") // Use DesignResourcesKit icons
-}
-
-Image("custom_icon") // Use DesignResourcesKit icons instead
-```
-
-### Design System Color Categories
-Use appropriate semantic color categories:
-
-```swift
-// Text colors
-.foregroundColor(Color(designSystemColor: .textPrimary))
-.foregroundColor(Color(designSystemColor: .textSecondary))
-.foregroundColor(Color(designSystemColor: .textLink))
-
-// Background colors
-.background(Color(designSystemColor: .background))
-.background(Color(designSystemColor: .surface))
-.background(Color(designSystemColor: .panel))
-
-// Control colors
-.foregroundColor(Color(designSystemColor: .controlsFillPrimary))
-.foregroundColor(Color(designSystemColor: .controlsFillSecondary))
-
-// Button colors (use specific button color tokens)
-.foregroundColor(Color(designSystemColor: .buttonPrimaryText))
-.background(Color(designSystemColor: .buttonPrimaryBackground))
-```
-
-### Typography with Design System
-Use semantic typography that integrates with the design system:
-
-```swift
-// ✅ CORRECT - Design system typography
-Text("Header")
-    .font(.title2.weight(.semibold))
-    .foregroundColor(Color(designSystemColor: .textPrimary))
-
-Text("Body")
-    .font(.body)
-    .foregroundColor(Color(designSystemColor: .textSecondary))
-
-Text("Caption")
-    .font(.caption)
-    .foregroundColor(Color(designSystemColor: .textSecondary))
-
-// Platform-specific typography (macOS)
-#if os(macOS)
-Text("Preference Title")
-    .font(Fonts.preferencePaneTitle)
-    .foregroundColor(Color(designSystemColor: .textPrimary))
-#endif
-```
-
-### Theme Integration
-Use Theme protocol for complex scenarios:
-
-```swift
-// ✅ CORRECT - Theme integration for advanced scenarios
-struct ComplexView: View {
-    @EnvironmentObject var themeManager: ThemeManager
-    
-    var body: some View {
-        VStack {
-            Text("Content")
-                .foregroundColor(Color(themeManager.currentTheme.textColor))
-        }
-        .background(Color(themeManager.currentTheme.backgroundColor))
-    }
-}
-
-// ✅ PREFERRED - Direct semantic colors for simple cases
-struct SimpleView: View {
-    var body: some View {
-        Text("Content")
-            .foregroundColor(Color(designSystemColor: .textPrimary))
-            .background(Color(designSystemColor: .background))
-    }
+func testURLSchemeDetection() {
+    let detector = URLSchemeDetector()
+    XCTAssertTrue(detector.isValidURL("https://duckduckgo.com"))
+    XCTAssertFalse(detector.isValidURL("invalid-url"))
 }
 ```
 
-## Component Patterns
-
-### Reusable Components
-- Create small, focused components
-- Use ViewModifiers for common styling
-- Leverage ViewBuilder for conditional content
+#### Utility Functions
+Testing helper functions, extensions, formatters:
 
 ```swift
-struct PrimaryButton: View {
-    let title: String
-    let action: () -> Void
-    
-    var body: some View {
-        Button(action: action) {
-            Text(title)
-                .foregroundColor(.white)
-                .padding()
-                .background(Color.accentColor)
-                .cornerRadius(8)
-        }
-    }
+func testDateFormatter() {
+    let formatter = DateFormatter.shortDate
+    let date = Date(timeIntervalSince1970: 1640995200) // 2022-01-01
+    XCTAssertEqual(formatter.string(from: date), "1/1/22")
 }
 ```
 
-### Lists and Navigation
+#### State Management
+Testing ViewModels, state transitions, and data flow:
+
 ```swift
-List {
-    Section {
-        ForEach(items) { item in
-            NavigationLink(destination: DetailView(item: item)) {
-                ItemRow(item: item)
-            }
-        }
-    } header: {
-        Text("Section Title")
-    }
+func testViewModelStateTransition() {
+    let viewModel = SearchViewModel()
+    viewModel.performSearch("test query")
+    XCTAssertEqual(viewModel.state, .loading)
 }
-.listStyle(.insetGrouped)
 ```
 
-## State Management
+### ❌ What to Avoid
 
-### View Model Pattern
+#### Simple Property Toggles
+Testing trivial getters/setters:
+
 ```swift
+// ❌ DON'T test this
+func testIsEnabledToggle() {
+    feature.isEnabled = true
+    XCTAssertTrue(feature.isEnabled)
+}
+```
+
+#### Complex UI Interactions
+Use Integration or UI tests instead.
+
+#### External Dependencies
+File system, network calls, databases.
+
+#### State/Strategy Pattern Switching
+These are better suited for integration tests:
+
+```swift
+// ❌ DON'T test state switching in unit tests
+func testStateSwitching() {
+    stateMachine.transition(to: .loading)
+    stateMachine.transition(to: .loaded)
+    // This is brittle and doesn't test real behavior
+}
+```
+
+## Mocks and Test Helpers
+
+The DuckDuckGo browser project includes multiple mock categories for testing different components and scenarios:
+
+### Mock Categories
+
+#### Unit Tests Mocks
+For testing individual components in isolation:
+- **UI mocks**: MockWindow, MockTabViewItemDelegate
+- **WebView mocks**: WebViewMock, WKSecurityOriginMock
+- **Storage mocks**: FileStoreMock, UserDefaultsMock
+- **Feature-specific mocks**: MockBookmarkManager, MockFireproofDomains, MockAIChatPreferencesStorage
+
+#### Integration Tests Mocks
+For testing component interactions and workflows:
+- Content blocking mocks
+- Tab navigation mocks
+- Fire integration mocks
+- Onboarding flow mocks
+- System integration mocks
+
+#### BSK Tests Mocks
+For testing BrowserServicesKit functionality:
+- **Feature flag mocks**: MockFeatureFlagger
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
