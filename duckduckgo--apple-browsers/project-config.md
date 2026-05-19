@@ -1,156 +1,160 @@
 ---
 trigger: always_on
-description: *This guide covers UI testing practices and patterns specifically for the DuckDuckGo macOS browser.*
+description: Use the KVO pattern with KeyValueStore for all new persistent settings:
 ---
 
 
-# UI Testing Guidelines & Best Practices
+# User Defaults Settings Storage and Reading
 
-*This guide covers UI testing practices and patterns specifically for the DuckDuckGo macOS browser.*
+## ✅ RECOMMENDED - KVO Pattern with KeyValueStore
 
-## Overview
-
-UI Tests verify the end-to-end user experience and interface behavior. They test user workflows, navigation patterns, window management, and complex interactions across the entire application.
-
-## Setting Up UI Tests
-
-### ❗Always Use UITestCase Base Class
+Use the KVO pattern with KeyValueStore for all new persistent settings:
 
 ```swift
-class FeatureUITests: UITestCase {  // ✅ Use UITestCase, not XCTestCase
-    private var app: XCUIApplication!
-    
-    override func setUpWithError() throws {
-        continueAfterFailure = false
-        app = XCUIApplication.setUp()  // ✅ Use setUp(), never launch() directly
-        // app is already launched and configured by setUp()
+// ✅ CORRECT - KVO pattern with KeyValueStore
+struct AppearancePreferencesUserDefaultsPersistor: AppearancePreferencesPersistor {
+
+    enum Key: String {
+        case newTabPageIsOmnibarVisible = "new-tab-page.omnibar.is-visible"
+        case newTabPageIsProtectionsReportVisible = "new-tab-page.protections-report.is-visible"
+        case userPreferences = "user.preferences"
+        case lastUpdateCheck = "last.update.check"
+    }
+
+    private let keyValueStore: KeyValueStoring
+
+    init(keyValueStore: KeyValueStoring) {
+        self.keyValueStore = keyValueStore
+    }
+
+    var isOmnibarVisible: Bool {
+        get { (try? keyValueStore.object(forKey: Key.newTabPageIsOmnibarVisible.rawValue) as? Bool) ?? true }
+        set { try? keyValueStore.set(newValue, forKey: Key.newTabPageIsOmnibarVisible.rawValue) }
+    }
+
+    var isProtectionsReportVisible: Bool {
+        get { (try? keyValueStore.object(forKey: Key.newTabPageIsProtectionsReportVisible.rawValue) as? Bool) ?? false }
+        set { try? keyValueStore.set(newValue, forKey: Key.newTabPageIsProtectionsReportVisible.rawValue) }
+    }
+
+    var userPreferences: [String: String] {
+        get { (try? keyValueStore.object(forKey: Key.userPreferences.rawValue) as? [String: String]) ?? [:] }
+        set { try? keyValueStore.set(newValue, forKey: Key.userPreferences.rawValue) }
+    }
+
+    var lastUpdateCheck: Date {
+        get { (try? keyValueStore.object(forKey: Key.lastUpdateCheck.rawValue) as? Date) ?? Date.distantPast }
+        set { try? keyValueStore.set(newValue, forKey: Key.lastUpdateCheck.rawValue) }
     }
 }
 ```
 
-**Why UITestCase is Required**:
-- Provides proper app lifecycle management
-- Handles feature flag configuration
-- Sets up test server environment
-- Manages window state and cleanup
-- Provides debugging utilities
+## Key Guidelines for KVO Pattern
 
-### Feature Flag Configuration
+1. **Use struct conforming to protocol** - Follow the persistor pattern
+2. **Define keys as enum with String raw values** - Use kebab-case for key names
+3. **Use KeyValueStoring protocol** - Not direct UserDefaults access
+4. **Computed properties with get/set** - Handle storage operations in accessors
+5. **Use try? for error handling** - KeyValueStore operations can throw
+6. **Provide default values** - Use nil coalescing operator (??) for defaults
+7. **Inject KeyValueStore in init** - Enable dependency injection and testing
 
-```swift
-// Configure feature flags during test setup
-override func setUpWithError() throws {
-    app = XCUIApplication.setUp(featureFlags: [
-        "contextualOnboarding": true,
-        "visualUpdates": false,
-        "duckPlayer": true
-    ])
-    // Feature flags are automatically applied via FEATURE_FLAGS environment variable
-}
-
-// Alternative: Custom environment
-app = XCUIApplication.setUp(environment: [
-    "UITEST_MODE_ONBOARDING": "1"
-], featureFlags: [
-    "newTabPageSections": true
-])
-```
-
-#### Privacy Subfeature Configuration
+## Advanced Pattern for Optional Values
 
 ```swift
-// Configure privacy subfeatures (separate from feature flags)
-override func setUpWithError() throws {
-    app = XCUIApplication.setUp(privacySubfeatures: [
-        "autoconsent-filterlist": true,
-        "tracker-allowlist": true
-    ])
-    // Privacy subfeatures are applied via PRIVACY_SUBFEATURES environment variable
-}
+// ✅ CORRECT - Optional values pattern
+struct SettingsUserDefaultsPersistor: SettingsPersistor {
 
-// Combined feature flags and privacy subfeatures
-app = XCUIApplication.setUp(
-    featureFlags: [
-        "contextualOnboarding": true
-    ],
-    privacySubfeatures: [
-        "autoconsent-filterlist": true
-    ]
-)
-```
+    enum Key: String {
+        case optionalUserName = "user.name"
+        case optionalTheme = "app.theme"
+    }
 
-**❗Why Feature Flag and Privacy Subfeature Configuration is Critical**:
-- UI tests run against notarized builds - feature flags can't be changed at runtime
-- MockFeatureFlagger is NOT available in UI tests (only real DefaultFeatureFlagger)
-- Feature flags must be configured via FEATURE_FLAGS environment variable before app launch
-- **Privacy subfeatures are controlled by PrivacyConfiguration, not feature flags**
-- Privacy subfeatures must be configured via PRIVACY_SUBFEATURES environment variable
-- Incorrect feature/subfeature state will cause UI tests to fail when expected UI elements don't appear
+    private let keyValueStore: KeyValueStoring
 
-**Key Differences**:
-- **Feature Flags**: Control app features (e.g., `contextualOnboarding`, `duckPlayer`)
-- **Privacy Subfeatures**: Control privacy functionality (e.g., `autoconsent-filterlist`, `tracker-allowlist`)
-- Both use separate environment variables and configuration systems
+    init(keyValueStore: KeyValueStoring) {
+        self.keyValueStore = keyValueStore
+    }
 
-### File Management in UI Tests
+    var optionalUserName: String? {
+        get { try? keyValueStore.object(forKey: Key.optionalUserName.rawValue) as? String }
+        set { 
+            if let value = newValue {
+                try? keyValueStore.set(value, forKey: Key.optionalUserName.rawValue)
+            } else {
+                try? keyValueStore.removeObject(forKey: Key.optionalUserName.rawValue)
+            }
+        }
+    }
 
-The `UITestCase` base class provides built-in file management capabilities for handling downloads, temporary files, and other file operations during testing.
-
-**Important**: UI tests run in a sandboxed environment and cannot directly read or delete files from user directories using standard FileManager calls. For non-temp directories, use the `filesToCleanup` pattern that's handled in the base class `tearDown()`.
-
-#### Automatic File Cleanup
-
-All UI test classes automatically clean up tracked files after test completion:
-
-```swift
-class DownloadsUITests: UITestCase {
-    func testFileDownload() {
-        let downloadsDir = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask)[0]
-        let fileName = "test-file.json"
-        let filePath = downloadsDir.appendingPathComponent(fileName).path
-        
-        // Track file for automatic cleanup
-        trackForCleanup(filePath)
-        
-        // Perform download test...
-        // File will be automatically cleaned up after test completes
+    var selectedTheme: Theme? {
+        get { 
+            guard let rawValue = try? keyValueStore.object(forKey: Key.optionalTheme.rawValue) as? String else { return nil }
+            return Theme(rawValue: rawValue)
+        }
+        set { 
+            if let value = newValue {
+                try? keyValueStore.set(value.rawValue, forKey: Key.optionalTheme.rawValue)
+            } else {
+                try? keyValueStore.removeObject(forKey: Key.optionalTheme.rawValue)
+            }
+        }
     }
 }
 ```
 
-#### Reading Files via Local Server
-
-Use `readFileViaLocalServer()` to read files that may have permission restrictions:
+## Platform-Specific Storage
 
 ```swift
-func testJSONFileContent() throws {
-    let filePath = "/Users/admin/Downloads/test-results.json"
-    
-    // Read file via local test server (bypasses permission issues)
-    let jsonData = try readFileViaLocalServer(filePath: filePath)
-    let results = try JSONDecoder().decode(TestResults.self, from: jsonData)
-    
-    // Validate file contents
-    XCTAssertFalse(results.items.isEmpty)
+// ✅ CORRECT - Platform-specific KeyValueStore usage
+struct PlatformSettingsUserDefaultsPersistor: PlatformSettingsPersistor {
+
+    enum Key: String {
+        case platformSpecificSetting = "platform.specific.setting"
+    }
+
+    private let keyValueStore: KeyValueStoring
+
+    init(keyValueStore: KeyValueStoring) {
+        self.keyValueStore = keyValueStore
+    }
+
+    var platformSpecificSetting: Bool {
+        get { 
+            #if os(iOS)
+            return (try? keyValueStore.object(forKey: Key.platformSpecificSetting.rawValue) as? Bool) ?? false
+            #elseif os(macOS)
+            return (try? keyValueStore.object(forKey: Key.platformSpecificSetting.rawValue) as? Bool) ?? true
+            #endif
+        }
+        set { 
+            try? keyValueStore.set(newValue, forKey: Key.platformSpecificSetting.rawValue)
+        }
+    }
 }
 ```
 
-#### File Management Best Practices
+## 🚫 DEPRECATED - @UserDefaultsWrapper Pattern
+
+The following pattern is deprecated and should not be used for new code:
 
 ```swift
-class FileBasedUITests: UITestCase {
-    func testCompleteFileWorkflow() throws {
-        // 1. Track all files that will be created
-        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("test-files")
-        trackForCleanup(tempDir.path)
-        
-        let downloadedFile = "/Users/admin/Downloads/results.json"
-        trackForCleanup(downloadedFile)
-        
-        // 2. Perform file operations
-        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
-        
-        // 3. Read files via server if needed
+// ❌ DEPRECATED - Do not use @UserDefaultsWrapper for new code
+extension AppUserDefaults {
+    @UserDefaultsWrapper(key: .newFeatureEnabled, defaultValue: false)
+    var newFeatureEnabled: Bool
+    
+    @UserDefaultsWrapper(key: .lastUpdateCheck, defaultValue: Date.distantPast)
+    var lastUpdateCheck: Date
+}
+```
+
+## Migration from Property Wrappers
+
+When migrating from `@UserDefaultsWrapper` to the KVO pattern:
+
+1. **Create a new persistor struct** - Following the naming convention `*UserDefaultsPersistor`
+2. **Define keys enum** - Convert string keys to enum cases
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
