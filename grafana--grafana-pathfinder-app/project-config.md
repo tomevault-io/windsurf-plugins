@@ -1,134 +1,95 @@
 ---
 trigger: always_on
-description: Guidance for keeping TypeScript types and Zod schemas synchronized
+description: App plugin architecture patterns and critical implementation paths.
 ---
 
 
-# Schema-Type Coupling Rules
+# System Patterns
 
-This project uses **co-located TypeScript types and Zod schemas** for JSON guide validation. The types in `json-guide.types.ts` are the source of truth, and schemas in `json-guide.schema.ts` must mirror them exactly.
+## App Plugin Architecture
 
-## Core Principle
+This Grafana App Plugin integrates as a sidebar panel using **Grafana Scenes** for state management. Key architectural layers:
 
-**TypeScript types define what we expect. Zod schemas enforce it at runtime.**
+- **Extension Layer**: Sidebar components and navigation links registered via plugin.json
+- **Data Layer**: Multi-strategy content fetchers with fallbacks for external docs and recommender service
+- **External Layer**: ML-based recommender service and Grafana.com documentation
 
-Every structural change to a type MUST have a corresponding schema change, and vice versa.
+## Plugin-Specific Decisions
 
-## When Modifying Types
+- **Grafana Scenes over React Router**: Leverages Grafana's native scene-based navigation and state management
+- **localStorage Tab Persistence**: Browser-like multi-tab experience survives page reloads
+- **Context-Aware Recommendations**: Analyzes current Grafana state (page, datasources, dashboard) to suggest relevant content
+- **Interactive Elements System**: Custom `data-targetaction` attributes enable "Show me"/"Do it" automation of Grafana UI actions
+- **@dnd-kit for Drag-and-Drop**: All sortable/draggable interactions should use @dnd-kit library for built-in accessibility, touch device support, smooth animations, and consistency.
 
-If you add, remove, or change a field in `json-guide.types.ts`:
+**Important**: Do NOT implement drag-and-drop using native HTML5 DnD or other libraries. Always use the @dnd-kit components to maintain consistency and accessibility
 
-1. **Update the corresponding Zod schema** in `json-guide.schema.ts`
-2. **Run `npm run typecheck`** - the `satisfies z.ZodType<T>` pattern will catch mismatches
-3. **Run `npm run validate`** - verify bundled guides still pass
-4. **Update the `KNOWN_FIELDS` export** if adding new fields (for unknown field detection)
+## Component Relationships
 
-The file `json-guide.schema.ts` exposes a global schema version. When making changes to schema, 
-always consider advising the user to update the schema version following schema best practices, 
-and providing them guidance on forwards and backwards compatibility issues as appropriate.
+- `App.tsx` → Scene setup and auto-launch logic
+- `CombinedLearningJourneyPanel` → Tab orchestration and content rendering (`docs-panel.tsx`)
+- `ContextPanel` → Recommendations display using `useContextPanel` hook (`context-panel.tsx`)
+- **Interactive Engine** → Business logic in `src/interactive-engine/`
+- **Context Engine** → Context analysis in `src/context-engine/`
+- **Requirements Manager** → Requirements validation in `src/requirements-manager/`
+- **Utils** → General utilities in `src/utils/` (routing, plugin helpers, variable substitution, feature flag tracking, timeout management, experiments)
+- **Package Engine** → Package resolution, loading, and dependency queries in `src/package-engine/`
+- **Styles** → Theme-aware functions in `src/styles/*.styles.ts`
 
-### Example: Adding a New Field
+## Critical Implementation Paths
 
-```typescript
-// 1. Add to type
-export interface JsonGuide {
-  // ... existing fields
-  newField?: string; // NEW
-}
+**Context Analysis → Recommendations**:
+1. `context-engine/context.service.ts` → Extract context tags from Grafana state
+2. `context-engine/context.service.ts` → Call recommender service
+3. `context-engine/context.hook.ts` (useContextPanel) → Process and render recommendations
+4. User interaction → Tab creation with content
 
-// 2. Add to schema
-export const JsonGuideSchema = z.object({
-  // ... existing fields
-  newField: z.string().optional(), // NEW - matches type
-}).passthrough() satisfies z.ZodType<JsonGuide>;
+**Content Loading with Interactive Elements**:
+1. `docs-retrieval/content-fetcher.ts` → Multi-strategy HTML fetching with fallbacks
+2. `docs-retrieval/html-parser.ts` → Parse HTML to React component tree
+3. `docs-retrieval/content-renderer.tsx` → Render React components with interactive elements
+4. `interactive-engine/interactive.hook.ts` (useInteractiveElements) → Handle "show me"/"do it" events, check requirements, highlight/automate UI elements
+5. `requirements-manager/step-checker.hook.ts` → Validate requirements and objectives
+6. Render in tab with progress tracking
 
-// 3. Add to KNOWN_FIELDS
-export const KNOWN_FIELDS = {
-  _guide: ['id', 'title', 'blocks', 'match', 'schemaVersion', 'newField'], // ADD HERE
-  // ...
-};
-```
+## Gamification System Architecture
 
-## When Modifying Schemas
+**Data Flow**:
+- Guide completion → `user-storage.ts:markGuideCompleted()` → Check badges → Update streak → Dispatch events
+- `useLearningPaths` hook → Subscribes to events → Updates React state
+- Badge toasts queued and shown sequentially
 
-If you change validation rules in `json-guide.schema.ts`:
+**Key Components**:
+- `LearningPathCard` → Collapsible card with progress ring, expandable guide list
+- `BadgeUnlockedToast` → Celebratory modal with confetti, auto-dismiss with queue support
+- `ProgressRing` → SVG circular progress indicator with gradient stroke
+- `StreakIndicator` → Fire emoji with day count display
 
-1. **Consider if the type needs updating** - e.g., making a field required
-2. **Update error messages** to be user-friendly
-3. **Run tests** - `npm run test:ci -- --testPathPatterns=validation`
-4. **Run `npm run validate:strict`** - ensure bundled guides comply
+**Badge Triggers**:
+- `guide-completed` → Any/specific guide completion
+- `path-completed` → All guides in a path finished
+- `streak` → Consecutive days of activity (3-day, 7-day milestones)
 
-## Coupling Markers
+**Learning Paths Critical Path**:
+1. `learning-paths/paths.json` / `learning-paths/paths-cloud.json` → OSS and Cloud path definitions; `learning-paths/paths-data.ts:getPathsData()` selects the correct set at runtime based on Grafana edition
+2. `learning-paths/badges.ts` → Badge definitions and trigger conditions
+3. `learning-paths/streak-tracker.ts` → Daily streak calculation logic
+4. `learning-paths/learning-paths.hook.ts` → Main React hook for state management
+5. `lib/user-storage.ts:learningProgressStorage` → Persists progress in localStorage
+6. `components/LearningPaths/MyLearningTab.tsx` → Main UI for gamified experience
+7. Progress events dispatched via `learning-progress-updated` CustomEvent
 
-Look for `@coupling` JSDoc tags that explicitly link types and schemas:
+**Analytics Events**:
+- `learning_path_progress` → Tracks path interaction with completion %
+- `badge_unlocked` → Tracks badge awards with trigger type
 
-```typescript
-/**
- * @coupling JsonGuideSchema in json-guide.schema.ts
- */
-export interface JsonGuide { ... }
+## Frontend tier model
 
-/**
- * @coupling JsonGuide in json-guide.types.ts
- */
-export const JsonGuideSchema = z.object({ ... });
-```
+Imports flow **downward only** through these tiers. Cross-tier rules are enforced by ESLint and `src/validation/architecture.test.ts`; exceptions require an explicit allowlist entry with justification.
 
-When you see a `@coupling` tag, **always check the linked file** before making changes.
+- **Tier 0 — Types & constants**: `types/`, `constants/`. Pure type definitions and configuration constants; no runtime behavior; safe to import from anywhere.
 
-## Forward Compatibility
-
-All schemas use `.passthrough()` to allow unknown fields. This means:
-
-- Newer guides with new fields will still parse successfully
-- Unknown fields generate warnings, not errors (unless `--strict` mode)
-- The `KNOWN_FIELDS` object determines what triggers warnings
-
-## Validation Module Structure
-
-```
-src/validation/
-├── index.ts          # Public exports
-├── validate-guide.ts # Main validateGuide() function
-├── unknown-fields.ts # Forward compatibility warnings
-└── errors.ts         # Error formatting utilities
-
-src/types/
-├── json-guide.types.ts  # TypeScript interfaces for single-file guides (source of truth)
-├── json-guide.schema.ts # Zod schemas for single-file guides (runtime validation)
-├── package.types.ts     # TypeScript interfaces for two-file package model
-└── package.schema.ts    # Zod schemas for packages (ContentJson, ManifestJson, RepositoryJson)
-```
-
-## Two-file Package Model
-
-The package model separates content (`content.json`) from metadata (`manifest.json`):
-
-- **`package.types.ts`** defines `ContentJson`, `ManifestJson`, `RepositoryJson`, `RepositoryEntry`, `GraphNode`, `GraphEdge`, and resolution types
-- **`package.schema.ts`** defines corresponding Zod schemas with defaults and refinements
-- **`json-guide.schema.ts`** retains `JsonGuideSchemaStrict` for backwards-compatible single-file guides
-- `KNOWN_FIELDS._manifest` in `json-guide.schema.ts` lists valid manifest fields for unknown field detection
-- `CURRENT_SCHEMA_VERSION` (currently `"1.1.0"`) is the default for new packages
-
-## Commands
-
-```bash
-npm run typecheck       # Catch type/schema drift at compile time
-npm run validate        # Validate bundled guides (warnings allowed)
-npm run validate:strict # Validate bundled guides (warnings = errors)
-npm run test:ci -- --testPathPatterns=validation  # Run validation tests
-```
-
-## Agent Checklist
-
-When modifying JSON guide types or schemas:
-
-- [ ] Type change has corresponding schema change
-- [ ] Schema change has corresponding type change (if structural)
-- [ ] `KNOWN_FIELDS` updated for new fields
-- [ ] `npm run typecheck` passes
-- [ ] `npm run validate:strict` passes
-- [ ] Validation tests pass
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [grafana/grafana-pathfinder-app](https://github.com/grafana/grafana-pathfinder-app) — distributed by [TomeVault](https://tomevault.io).
