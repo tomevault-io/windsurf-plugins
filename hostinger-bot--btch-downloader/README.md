@@ -7,11 +7,11 @@ A lightweight TypeScript/JavaScript library for downloading videos, images, and 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [hostinger-bot/btch-downloader](https://github.com/hostinger-bot/btch-downloader).
+Original source: `CLAUDE.md` in [hostinger-bot/btch-downloader](https://github.com/hostinger-bot/btch-downloader).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
