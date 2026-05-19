@@ -1,56 +1,57 @@
 ---
 trigger: always_on
-description: - **Core Principle:** When UI behavior doesn't match backend changes, systematically isolate the issue: frontend (caching, request payload), server (CWD, request handling, service initialization), or E2E interaction tools (Playwright state).
+description: Guide for using Task Master to manage task-driven development workflows
 ---
 
-- **Core Principle:** When UI behavior doesn't match backend changes, systematically isolate the issue: frontend (caching, request payload), server (CWD, request handling, service initialization), or E2E interaction tools (Playwright state).
+# Task Master Development Workflow
 
-- **Frontend Caching & Stale Bundles:**
-  - **Symptom:** Backend code is updated, but UI behaves as if using old code. Server logs show correct processing, but UI shows old errors or data.
-  - **High Probability Cause:** Browser or Playwright is serving/using a stale frontend JavaScript bundle.
-  - **Robust Fix Workflow:**
-    1.  **Stop Dev Server(s):** Halt the `mcp-agentify` server and any separate frontend dev server (e.g., Parcel watch mode).
-    2.  **Clear Frontend Caches (Claude Code can do this):**
-        -   `rm -rf .parcel-cache` (if Parcel is used)
-        -   `rm -rf frontend/.parcel-cache` (if Parcel cache is nested)
-    3.  **Delete Old Build Output (Claude Code can do this):**
-        -   `rm -rf frontend/public` (or your configured Parcel `--dist-dir`)
-        -   Alternatively, `rm -rf dist` if that's your main output for frontend assets.
-    4.  **Force Full Rebuild (Claude Code can do this):**
-        -   Execute the clean frontend build script from `package.json` (e.g., `npm run build:ui` which might be `cd frontend && parcel build src/index.html --dist-dir public --public-url ./ --no-cache`).
-    5.  **Verify Build Output:** Check timestamps in the output directory (`frontend/public`) to ensure new files were generated.
-    6.  **Restart Server.**
-    7.  **Test with Playwright:** **CRITICAL:** Use `playwright_close` before `playwright_navigate` to guarantee a completely fresh browser context, devoid of any prior session's cache or state.
-    8.  **Test with Manual Browser:** Use an incognito window or manually clear browser cache for `localhost` to ensure a fresh load.
+This guide outlines the typical process for using Task Master to manage software development projects.
 
-- **Server Current Working Directory (CWD) Issues:**
-  - **Symptom:** Server fails to start with `ERR_MODULE_NOT_FOUND` for relative script paths (e.g., `./src/cli.ts`), or `FrontendServer` fails with `ENOENT` trying to serve static files from an incorrect base path (e.g., user home `~` instead of project root).
-  - **Cause:** The Node.js process CWD is not the project root. This is common when scripts are launched via tools like `npx tsx` from a shell where the CWD wasn't explicitly set for the final command execution environment.
-  - **Fixes & Best Practices:**
-    1.  **Launch Command (`run_terminal_cmd`, iTerm tools):** *Always* prepend `cd /path/to/your/project_root &&` to your `npx tsx ./src/your_script.ts` command. This sets the CWD for the shell that invokes `npx`.
-    2.  **`src/cli.ts` (Entry Point):** Capture `process.cwd()` at the very start. This should reflect the project root due to the `cd` above. Pass this `projectRoot` string via `initialCliOptions` to `startAgentifyServer`.
-        ```typescript
-        // src/cli.ts (in main())
-        const projectRoot = process.cwd();
-        logger.info({ projectRoot }, 'Captured project root in cli.ts');
-        const initialCliOptions = { projectRoot, /* ...other options */ };
-        await startAgentifyServer(initialCliOptions);
-        ```
-    3.  **`src/server.ts` (`startAgentifyServer`):** Receive `projectRoot` from `initialCliOptions`. Pass it to `FrontendServer`'s constructor via its `initialConfig` parameter. Also store it in `internalGatewayOptions`.
-    4.  **`src/frontendServer.ts` (Constructor):**
-        -   Receive `projectRoot` via `initialConfig.projectRoot`.
-        -   **Force CWD (Defensive):** `if (this.projectRoot) { process.chdir(this.projectRoot); }`. Log success/failure of `chdir`. This ensures subsequent relative path operations within `FrontendServer` (like `express.static`) use the correct base.
-        -   **Static Path Resolution:** `const staticPath = path.resolve(this.projectRoot || process.cwd(), 'frontend/public');`. Log all components (`this.projectRoot`, `process.cwd()`, `staticPath`) to confirm.
-    5.  **Verify with Logs:** Add `console.error(\`[SUPER EARLY CLI] CWD: \${process.cwd()}\`);` at the top of `cli.ts` and check server logs. In `FrontendServer` constructor and `setupExpressMiddleware`, log `this.projectRoot` and `process.cwd()` to confirm they align with the intended project root.
+## Primary Interaction: MCP Server vs. CLI
 
-- **Debugging API Request Payloads (UI -> Server):**
-  - **Symptom:** Server returns HTTP 400 Bad Request, or handler complains about missing parameters, even though UI *seems* to send correct data.
-  - **Fix/Debug Workflow:**
-    1.  **Client-Side (`ChatTab.tsx` or similar):**
-        -   `console.log('Request body being sent:', JSON.stringify(bodyObject, null, 2));` right before the `fetch` call.
-    2.  **Server-Side API Handler (`FrontendServer.ts`):**
-        -   At the very start of the handler: `this.logger.info({ rawBody: req.body, headers: req.headers }, 'Raw request received');`
-        -   After attempting to parse/access expected fields: `this.logger.info({ parsedField1: body?.field1, parsedField2: body?.field2 }, 'Parsed fields');`
+Task Master offers two primary ways to interact:
+
+1.  **MCP Server (Recommended for Integrated Tools)**:
+    - For AI agents and integrated development environments (like Cursor), interacting via the **MCP server is the preferred method**.
+    - The MCP server exposes Task Master functionality through a set of tools (e.g., `get_tasks`, `add_subtask`).
+    - This method offers better performance, structured data exchange, and richer error handling compared to CLI parsing.
+    - Refer to [`mcp.mdc`](mdc:.cursor/rules/mcp.mdc) for details on the MCP architecture and available tools.
+    - A comprehensive list and description of MCP tools and their corresponding CLI commands can be found in [`taskmaster.mdc`](mdc:.cursor/rules/taskmaster.mdc).
+    - **Restart the MCP server** if core logic in `scripts/modules` or MCP tool/direct function definitions change.
+
+2.  **`task-master` CLI (For Users & Fallback)**:
+    - The global `task-master` command provides a user-friendly interface for direct terminal interaction.
+    - It can also serve as a fallback if the MCP server is inaccessible or a specific function isn't exposed via MCP.
+    - Install globally with `npm install -g task-master-ai` or use locally via `npx task-master-ai ...`.
+    - The CLI commands often mirror the MCP tools (e.g., `task-master list` corresponds to `get_tasks`).
+    - Refer to [`taskmaster.mdc`](mdc:.cursor/rules/taskmaster.mdc) for a detailed command reference.
+
+## Standard Development Workflow Process
+
+-   Start new projects by running `initialize_project` tool / `task-master init` or `parse_prd` / `task-master parse-prd --input='<prd-file.txt>'` (see [`taskmaster.mdc`](mdc:.cursor/rules/taskmaster.mdc)) to generate initial tasks.json
+-   Begin coding sessions with `get_tasks` / `task-master list` (see [`taskmaster.mdc`](mdc:.cursor/rules/taskmaster.mdc)) to see current tasks, status, and IDs
+-   Determine the next task to work on using `next_task` / `task-master next` (see [`taskmaster.mdc`](mdc:.cursor/rules/taskmaster.mdc)).
+-   Analyze task complexity with `analyze_project_complexity` / `task-master analyze-complexity --research` (see [`taskmaster.mdc`](mdc:.cursor/rules/taskmaster.mdc)) before breaking down tasks
+-   Review complexity report using `complexity_report` / `task-master complexity-report` (see [`taskmaster.mdc`](mdc:.cursor/rules/taskmaster.mdc)).
+-   Select tasks based on dependencies (all marked 'done'), priority level, and ID order
+-   Clarify tasks by checking task files in tasks/ directory or asking for user input
+-   View specific task details using `get_task` / `task-master show <id>` (see [`taskmaster.mdc`](mdc:.cursor/rules/taskmaster.mdc)) to understand implementation requirements
+-   Break down complex tasks using `expand_task` / `task-master expand --id=<id> --force --research` (see [`taskmaster.mdc`](mdc:.cursor/rules/taskmaster.mdc)) with appropriate flags like `--force` (to replace existing subtasks) and `--research`.
+-   Clear existing subtasks if needed using `clear_subtasks` / `task-master clear-subtasks --id=<id>` (see [`taskmaster.mdc`](mdc:.cursor/rules/taskmaster.mdc)) before regenerating
+-   Implement code following task details, dependencies, and project standards
+-   Verify tasks according to test strategies before marking as complete (See [`tests.mdc`](mdc:.cursor/rules/tests.mdc))
+-   Mark completed tasks with `set_task_status` / `task-master set-status --id=<id> --status=done` (see [`taskmaster.mdc`](mdc:.cursor/rules/taskmaster.mdc))
+-   Update dependent tasks when implementation differs from original plan using `update` / `task-master update --from=<id> --prompt="..."` or `update_task` / `task-master update-task --id=<id> --prompt="..."` (see [`taskmaster.mdc`](mdc:.cursor/rules/taskmaster.mdc))
+-   Add new tasks discovered during implementation using `add_task` / `task-master add-task --prompt="..." --research` (see [`taskmaster.mdc`](mdc:.cursor/rules/taskmaster.mdc)).
+-   Add new subtasks as needed using `add_subtask` / `task-master add-subtask --parent=<id> --title="..."` (see [`taskmaster.mdc`](mdc:.cursor/rules/taskmaster.mdc)).
+-   Append notes or details to subtasks using `update_subtask` / `task-master update-subtask --id=<subtaskId> --prompt='Add implementation notes here...\nMore details...'` (see [`taskmaster.mdc`](mdc:.cursor/rules/taskmaster.mdc)).
+-   Generate task files with `generate` / `task-master generate` (see [`taskmaster.mdc`](mdc:.cursor/rules/taskmaster.mdc)) after updating tasks.json
+-   Maintain valid dependency structure with `add_dependency`/`remove_dependency` tools or `task-master add-dependency`/`remove-dependency` commands, `validate_dependencies` / `task-master validate-dependencies`, and `fix_dependencies` / `task-master fix-dependencies` (see [`taskmaster.mdc`](mdc:.cursor/rules/taskmaster.mdc)) when needed
+-   Respect dependency chains and task priorities when selecting work
+-   Report progress regularly using `get_tasks` / `task-master list`
+
+## Task Complexity Analysis
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
