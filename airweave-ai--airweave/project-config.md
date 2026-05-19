@@ -1,123 +1,168 @@
 ---
 trigger: always_on
-description: > **WARNING — PARTIALLY OUTDATED (March 2026)**
+description: A **source connector** in Airweave is a Python module that extracts data from an external service and transforms it into searchable entities. This guide covers everything you need to build a production-ready connector.
 ---
 
-# Airweave Search Rules
+# Building a Source Connector in Airweave
 
-> **WARNING — PARTIALLY OUTDATED (March 2026)**
->
-> This file documents the **legacy V1 search module** (`airweave/search/`), which
-> uses an operation-based pipeline with Qdrant, Cerebras/OpenAI/Groq providers,
-> and structured-output LLM calls.
->
-> The **new V2 search** lives in `airweave/domains/search/` and implements a
-> three-tier architecture:
->
-> - **Instant** — direct vector search, no LLM
-> - **Classic** — vector search + reranking + answer generation (replaces V1)
-> - **Agentic** — multi-turn tool-calling agent loop with search/count/navigate/read/collect/finish tools
->
-> Key differences from V1:
-> - **Vector DB**: Vespa (not Qdrant)
-> - **LLM adapters**: `airweave/adapters/llm/` with Together AI + Anthropic fallback (not Cerebras/Groq)
-> - **Reranker**: `airweave/adapters/reranker/` with Cohere
-> - **Filters**: `domains/search/types/filters.py` — FilterableField/FilterOperator/FilterGroup (not Qdrant native filters)
-> - **Streaming**: SSE events defined in `domains/search/agentic/events.py` (tool_call, thinking, search_results, etc.)
-> - **API**: `POST /collections/{id}/search/{tier}` where tier is `instant`, `classic`, or `agentic`
-> - **Config**: `domains/search/config.py` — model specs, token budgets, tier defaults
->
-> **When working on `domains/search/`**, prefer reading the actual code over this
-> file. The sections below remain accurate for the legacy `airweave/search/` module only.
+## Overview
 
-## Overview (Legacy V1)
+A **source connector** in Airweave is a Python module that extracts data from an external service and transforms it into searchable entities. This guide covers everything you need to build a production-ready connector.
 
-The search module (`@search/`) implements a **modular, pipeline-based architecture** with composable operations.  It aims to maintain search quality and flexibility.
+There are two types of source connectors:
 
-## Core Architecture
+1. **Standard (Sync-Based)**: Extracts and syncs all data from the source to Airweave's vector database
+2. **Federated Search**: Searches the source's API at query time without syncing data
 
-### Operation-Based Pipeline
+## Core Components
 
-```python
-SearchRequest → SearchFactory → SearchContext → SearchOrchestrator → SearchResponse
-                                    ↓
-                            [Operations Pipeline]
+Every source connector requires three main components:
+
+1. **Source implementation** (`backend/airweave/platform/sources/{short_name}.py`)
+2. **Entity schemas** (`backend/airweave/platform/entities/{short_name}.py`)
+3. **OAuth configuration** (`backend/airweave/platform/auth/yaml/dev.integrations.yaml`)
+
+---
+
+## Part 1: Entity Schemas
+
+Start with entities because they define your data model.
+
+### File Location
+```
+backend/airweave/platform/entities/{short_name}.py
 ```
 
-Each operation:
-- Implements `SearchOperation` abstract base class
-- Declares dependencies explicitly
-- Reads/writes to shared state dictionary
-- Can be optional (graceful failure)
-- Executes asynchronously
+### Entity Types
 
-### Request Flow
-1. **Endpoint** (`api/v1/endpoints/search.py`) → Creates/receives `SearchRequest`
-2. **SearchService.search()** → Main entry point
-3. **SearchFactory.build()** → Creates `SearchContext` with enabled operations
-4. **SearchOrchestrator.run()** → Executes operations in dependency order
-5. **Operations** → Execute in topologically sorted order
-6. **Qdrant destination** → Vector search execution
-7. **Data Persistence** → Save search query to `search_queries` table via `CRUDSearchQuery`
+There are two base entity types:
 
-### API Endpoints
+1. **ChunkEntity** - Text-based entities (tasks, messages, documents, etc.)
+2. **FileEntity** - File attachments (PDFs, images, etc.)
 
-Search endpoints are defined in `api/v1/endpoints/search.py` and mounted under `/collections` prefix in `api/v1/api.py`:
+### Basic Structure
 
 ```python
-# In api/v1/api.py
-from airweave.api.v1.endpoints import search
-api_router.include_router(search.router, prefix="/collections", tags=["collections"])
+"""Entity schemas for {Connector Name}."""
+
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+from pydantic import Field
+
+from airweave.platform.entities._airweave_field import AirweaveField
+from airweave.platform.entities._base import ChunkEntity, FileEntity
+
+
+class MyConnectorEntity(ChunkEntity):
+    """Schema for primary entity type."""
+
+    # Required fields
+    name: str = AirweaveField(
+        ...,
+        description="Display name of the entity",
+        embeddable=True  # This field will be embedded for search
+    )
+
+    # Timestamps (critical for incremental sync)
+    created_at: Optional[datetime] = AirweaveField(
+        None,
+        description="When this entity was created",
+        embeddable=True,
+        is_created_at=True  # Marks this as the creation timestamp
+    )
+
+    modified_at: Optional[datetime] = AirweaveField(
+        None,
+        description="When this entity was last modified",
+        embeddable=True,
+        is_updated_at=True  # Marks this as the update timestamp
+    )
+
+    # Content fields
+    content: Optional[str] = AirweaveField(
+        None,
+        description="The main text content",
+        embeddable=True  # Make searchable
+    )
+
+    # Metadata fields (not embeddable)
+    external_id: str = Field(
+        ...,
+        description="Unique ID from the external system"
+    )
+
+    permalink_url: Optional[str] = Field(
+        None,
+        description="Direct link to view in external system"
+    )
 ```
 
-**Available Endpoints:**
+### Key Principles
 
-1. **GET `/collections/{readable_id}/search`** - Legacy endpoint (DEPRECATED)
-   - Maintained for backwards compatibility
-   - Query parameters: `query`, `response_type`, `limit`, `offset`, `recency_bias`
-   - Returns `LegacySearchResponse` with `status` field
-   - Automatically converts to new format internally
-   - Adds deprecation headers
+#### 1. Use AirweaveField for Searchable Content
 
-2. **POST `/collections/{readable_id}/search`** - Main search endpoint (RECOMMENDED)
-   - Accepts both `SearchRequest` (new) and `LegacySearchRequest` (old) schemas
-   - Supports Qdrant native filters via `filter` field
-   - Full control over all search features
-   - Returns `SearchResponse` (new) or `LegacySearchResponse` (legacy) based on input schema
-   - Adds deprecation headers for legacy requests
+**Important: The `embeddable=True` flag is what makes your entities semantically searchable.**
 
-3. **POST `/collections/{readable_id}/search/stream`** - Streaming search with SSE
-   - Accepts both `SearchRequest` and `LegacySearchRequest`
-   - Returns Server-Sent Events (SSE) stream
-   - Real-time progress updates via Redis pubsub
-   - Automatically converts legacy requests
+Without `embeddable=True`, fields are only keyword-searchable, not semantically searchable. This limits the user's ability to find relevant entities.
 
-4. **GET `/collections/internal/filter-schema`** - Filter schema endpoint
-   - Returns Qdrant Filter JSON schema for frontend validation
-   - Public endpoint for building UI filter builders
+**Best Practice: Mark most user-visible, content-rich fields as `embeddable=True`**
 
-All endpoints use the same underlying `SearchService.search()`, ensuring consistent behavior and quality.
+This includes:
+- **Text content**: descriptions, notes, comments, body text
+- **Names and titles**: entity names, display names, titles
+- **People**: assignees, authors, owners, members (as dicts with name/email)
+- **Status and metadata**: status fields, tags, labels, priorities
+- **Structured data**: any dict/list that contains searchable information
+- **Timestamps**: created_at, modified_at, due_dates (helps with recency)
+- **URLs**: permalink_url, web_links (helps users find original content)
 
-### Input/Output Schemas
+**Only exclude from embeddable:**
+- Internal IDs (entity_id, external_id, database IDs)
+- Binary/technical metadata (sizes, checksums, mime_types)
+- System-only fields not relevant to user searches
 
-**SearchRequest** (new schema - `schemas/search.py`):
+**Example - Information-Rich Entity:**
+
 ```python
-query: str                                   # Search text (required)
-retrieval_strategy: Optional[RetrievalStrategy]  # "hybrid", "neural", or "keyword"
-filter: Optional[QdrantFilter]               # Qdrant native filter object
-offset: Optional[int]                        # Pagination offset
-limit: Optional[int]                         # Results per page
-temporal_relevance: Optional[float]          # Recency weight (0-1, default: 0.3)
-expand_query: Optional[bool]                 # Generate query variations
-interpret_filters: Optional[bool]            # Extract filters from natural language
-rerank: Optional[bool]                       # LLM-based reranking
-generate_answer: Optional[bool]              # AI-generated completion
-```
+class MyConnectorTaskEntity(ChunkEntity):
+    """Task entity - NOTE: Most fields are embeddable for rich search."""
 
-**SearchResponse** (new schema - `schemas/search.py`):
-```python
-results: List[Dict]                          # Search results
-completion: Optional[str]                    # AI-generated answer (if generate_answer=True)
+    # Core content - ALWAYS embeddable
+    name: str = AirweaveField(..., description="Task name", embeddable=True)
+    description: Optional[str] = AirweaveField(
+        None,
+        description="Task description",
+        embeddable=True  # ✅ Critical for semantic search
+    )
+    notes: Optional[str] = AirweaveField(
+        None,
+        description="Additional notes",
+        embeddable=True  # ✅ Searchable content
+    )
+
+    # People - embeddable for "find tasks assigned to John" queries
+    assignee: Optional[Dict] = AirweaveField(
+        None,
+        description="User assigned to this task",
+        embeddable=True  # ✅ Enables "who" searches
+    )
+
+    owner: Optional[Dict] = AirweaveField(
+        None,
+        description="Task owner",
+        embeddable=True  # ✅ Enables owner searches
+    )
+
+    # Status and metadata - embeddable for filtering/search
+    status: Optional[str] = AirweaveField(
+        None,
+        description="Task status (open, in_progress, done)",
+        embeddable=True  # ✅ Enables status-based search
+    )
+
+    priority: Optional[str] = AirweaveField(
+        None,
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
