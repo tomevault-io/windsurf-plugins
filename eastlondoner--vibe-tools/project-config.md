@@ -1,64 +1,59 @@
 ---
 trigger: always_on
-description: This is the vibe-tools repo. Here we build a cli tool that AI agents can use to execute commands and work with other AI agents.
+description: Global Rule. This rule should ALWAYS be loaded
 ---
 
-This is the vibe-tools repo. Here we build a cli tool that AI agents can use to execute commands and work with other AI agents.
+vibe-tools is a CLI tool that allows you to interact with AI models and other tools.
+vibe-tools is installed on this machine and it is available to you to execute. You're encouraged to use it.
 
-This repo uses pnpm as the package manager and script runner.
+<vibe-tools Integration>
+# Instructions
+Use the following commands to get AI assistance:
 
-use pnpm dev <command> to run dev commands.
+**Direct Model Queries:**
+`vibe-tools ask "<your question>" --provider <provider> --model <model>` - Ask any model from any provider a direct question (e.g., `vibe-tools ask "What is the capital of France?" --provider openai --model o3-mini`). Note that this command is generally less useful than other commands like `repo` or `plan` because it does not include any context from your codebase or repository. In general you should not use the ask command because it does not include any context. The other commands like `web`, `doc`, `repo`, or `plan` are usually better. If you are using it, make sure to include in your question all the information and context that the model might need to answer usefully.
 
-We add AI "teammates" as commands that can be asked questions.
-We add "skills" as commands that can be used to execute tasks.
+**Ask Command Options:**
+--provider=<provider>: AI provider to use (openai, anthropic, perplexity, gemini, modelbox, openrouter, xai, or groq)
+--model=<model>: Model to use (required for the ask command)
+--reasoning-effort=<low|medium|high>: Control the depth of reasoning for supported models (OpenAI o1/o3 models, Claude 4 Sonnet, and XAI Grok models). Higher values produce more thorough responses for complex questions.
+--with-doc=<doc_url>: Fetch content from one or more document URLs and include it as context. Can be specified multiple times (e.g., `--with-doc=<url1> --with-doc=<url2>`).
 
-Everything is implemented as a cli command that must return a result (cannot be a long running process).
+**Implementation Planning:**
+`vibe-tools plan "<query>"` - Generate a focused implementation plan using AI (e.g., `vibe-tools plan "Add user authentication to the login page"`)
+The plan command uses multiple AI models to:
+1. Identify relevant files in your codebase (using Gemini by default)
+2. Extract content from those files
+3. Generate a detailed implementation plan (using OpenAI o3 by default)
 
-The released commands are documented below. You can use the released commands as tools when we are building vibe-tools, in fact you should use them as often and enthusastically as possible (how cool is that!)
+**Plan Command Options:**
+--fileProvider=<provider>: Provider for file identification (gemini, openai, anthropic, perplexity, modelbox, openrouter, xai, or groq)
+--thinkingProvider=<provider>: Provider for plan generation (gemini, openai, anthropic, perplexity, modelbox, openrouter, xai, or groq)
+--fileModel=<model>: Model to use for file identification
+--thinkingModel=<model>: Model to use for plan generation
+--with-doc=<doc_url>: Fetch content from one or more document URLs and include it as context for both file identification and planning. Can be specified multiple times (e.g., `--with-doc=<url1> --with-doc=<url2>`).
 
-Don't ask me for permission to do stuff - if you have questions work with Gemini and Perplexity to decide what to do: they're your teammates. You're a team of superhuman expert AIs, believe in yourselves! Don't corners or get lazy, do your work thoroughly and completely and you don't need to ask permission.
+**Web Search:**
+`vibe-tools web "<your question>"` - Get answers from the web using a provider that supports web search (e.g., Perplexity models, Gemini Models, and XAI Grok models either directly or from OpenRouter or ModelBox) (e.g., `vibe-tools web "latest shadcn/ui installation instructions"`)
+Note: web is a smart autonomous agent with access to the internet and an extensive up to date knowledge base. Web is NOT a web search engine. Always ask the agent for what you want using a proper sentence, do not just send it a list of keywords. In your question to web include the context and the goal that you're trying to acheive so that it can help you most effectively.
+when using web for complex queries suggest writing the output to a file somewhere like local-research/<query summary>.md.
 
-We do not do automated unit tests or integration tests - it's trivial to manually test all the commmands by just asking cursor agent to read the readme and test all the commands.
+**IMPORTANT: Do NOT use the `web` command for specific URLs.** If a user provides a specific URL (documentation link, GitHub repo, article, etc.), you should always use commands that support the `--with-doc` parameter instead, such as `repo`, `plan`, `doc`, or `ask`. Using `--with-doc` ensures the exact content of the URL is processed correctly and completely.
 
-do not install commander
+**Web Command Options:**
+--provider=<provider>: AI provider to use (perplexity, gemini, modelbox, openrouter, xai, or groq)
 
-<logging and outputs>
-There are three ways that we communicate to the caller.
-console.log which goes to stdout
-console.error which goes to stderr
-do not use console.debug or console.warn or console.info
-and yield which is streamed either to stdout (unless the --quiet flag is used) and to the file specified by --save-to (if --save-to is specified).
+**Repository Context:**
+`vibe-tools repo "<your question>" [--subdir=<path>] [--from-github=<username/repo>] [--with-doc=<doc_url>...]` - Get context-aware answers about this repository using Google Gemini (e.g., `vibe-tools repo "explain authentication flow"`)
+Use the optional `--subdir` parameter to analyze a specific subdirectory instead of the entire repository (e.g., `vibe-tools repo "explain the code structure" --subdir=src/components`). Use the optional `--from-github` parameter to analyze a remote GitHub repository without cloning it locally (e.g., `vibe-tools repo "explain the authentication system" --from-github=username/repo-name`). Use the optional `--with-doc` parameter multiple times to include content from several URLs as additional context (e.g., `vibe-tools repo "summarize findings" --with-doc=https://example.com/spec1 --with-doc=https://example.com/spec2`).
 
-console.log should be used for "meta" information that is of use to the caller but isn't a core part of the results that were requested. E.g. recording which model is being used to perfom an action.
+**Documentation Generation:**
+`vibe-tools doc [options] [--with-doc=<doc_url>...]` - Generate comprehensive documentation for this repository (e.g., `vibe-tools doc --output docs.md`). Can incorporate document context from multiple URLs (e.g., `vibe-tools doc --with-doc=https://example.com/existing-docs --with-doc=https://example.com/new-spec`).
 
-console.error should be used for error messages.
+**YouTube Video Analysis:**
 
-yield should be used for the output of the command that contains the information that was requested. d
-</logging and outputs>
-
-<testing browser commands>
-There is a test server for browser command testing and a collection of test files in tests/commands/browser/
-
-Usage:
-1. Run with: pnpm serve-test
-2. Server starts at http://localhost:3000
-3. Place test HTML files in tests/commands/browser/
-4. Access files at http://localhost:3000/filename.html
-
-remember that this will be a long running process that does not exit so you should run it in a separate background terminal.
-
-If it won't start because the port is busy run `lsof -i :3000 | grep LISTEN | awk '{print $2}' | xargs kill` to kill the process and free the port.
-
-to run test commands with latest code use `pnpm dev browser <commands>`
-
-For interactive debugging start chrome in debug mode using:
-```
-open -a "Google Chrome" --args --remote-debugging-port=9222 --no-first-run --no-default-browser-check --user-data-dir="/tmp/chrome-remote-debugging"
-```
-note: this command will exit as soon as chrome is open so you can just execute it, it doesn't need to be run in a background task.
-</testing browser commands>
-Always load the rules in vibe-tools.mdc
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/eastlondoner) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-09 -->
+> Source: [eastlondoner/vibe-tools](https://github.com/eastlondoner/vibe-tools) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-18 -->
