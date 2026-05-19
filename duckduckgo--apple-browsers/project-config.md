@@ -1,183 +1,123 @@
 ---
 trigger: always_on
-description: Interactive pattern for adding feature flags to iOS and/or macOS with proper configuration
+description: This is the DuckDuckGo browser for iOS and macOS, built with privacy-first principles, modern Swift patterns, and cross-platform architecture.
 ---
 
 
-# Feature Flag Addition Pattern
+# DuckDuckGo Browser Development Rules Overview
 
-## When This Pattern Applies
+## Project Context
+This is the DuckDuckGo browser for iOS and macOS, built with privacy-first principles, modern Swift patterns, and cross-platform architecture.
 
-This pattern is activated when the user explicitly requests to add a feature flag, such as:
-- "Add a feature flag for [feature name]"
-- "Create a feature flag for [feature name] on [platform]"
-- "I need a feature flag to control [feature name]"
+**Key Directories:**
+- `iOS/` - iOS browser app (UIKit + SwiftUI hybrid)
+- `macOS/` - macOS browser app (AppKit + SwiftUI hybrid) 
+- `SharedPackages/` - Cross-platform Swift packages
 
-## Overview
+## Architecture Summary
+- **Pattern**: MVVM + Coordinators + Dependency Injection
+- **UI**: SwiftUI preferred, UIKit/AppKit for legacy
+- **Storage**: Core Data + GRDB + Keychain for sensitive data
+- **Design**: DesignResourcesKit for colors/icons (MANDATORY)
+- **Testing**: >80% coverage required
 
-Adding a feature flag requires careful consideration of several factors:
-1. **Platform** (iOS, macOS, or both)
-2. **Source type** (how the flag is controlled)
-3. **Default value** (fallback behavior)
-4. **Local overriding** (debug menu access)
-5. **Remote configuration** (if applicable)
+## Available Rules (`.cursor/rules/`)
 
-## Step 1: Validate and Check for Duplicates
+Development rules are stored in `.cursor/rules/`.
+You MUST list all the available rules and you MUST consult the appropriate rule file before starting any work!
 
-Before adding a new feature flag, check if a similar flag already exists:
+### Core (Always Apply)
+- `anti-patterns.mdc` - What NOT to do; use with ViewModels, testing, WebView work
+- `code-style.mdc` - Swift style guide
+- `privacy-security.mdc` - Privacy requirements; use with network calls, analytics, credentials
+- `import-hygiene.mdc` - Import management and SwiftUI preview scoping
+- `logging-guidelines.mdc` - Logger usage (never print())
 
-```bash
-# Search for similar flags
-grep -i "case.*[searchTerm]" iOS/Core/FeatureFlag.swift
-grep -i "case.*[searchTerm]" macOS/LocalPackages/FeatureFlags/Sources/FeatureFlags/FeatureFlag.swift
-```
+### Architecture & Patterns
+- `architecture.mdc` - MVVM, DI patterns; use for new ViewModels
+- `project-structure.mdc` - Directory layout
+- `browserserviceskit-integration.mdc` - BSK integration; use for cross-platform code
+- `shared-packages.mdc` - Cross-platform packages; use for cross-platform code
+- `subscription-architecture.mdc` - Privacy Pro subscription
 
-## Step 1.5: Create Asana Task (REQUIRED)
+### Feature Development
+- `feature-flags.mdc` + `feature-flags-addition.mdc` - Feature flags
+- `abn-experiment-framework.mdc` - A/B testing
+- `user-defaults-storage.mdc` - UserDefaults, @UserDefaultsWrapper; use for settings/preferences
 
-**STOP:** Before proceeding with implementation, the user must create an Asana task.
+### UI Development
+- `swiftui-style.mdc` - SwiftUI + DesignResourcesKit; use for new ViewModels, UI work
+- `swiftui-advanced.mdc` - Advanced SwiftUI patterns
+- `design-system-designresourceskit.mdc` - Colors, typography, icons (MANDATORY)
+- `webkit-browser.mdc` - WebView patterns
 
-Instruct the user:
-```
-Please create an Asana task in the Apple Feature Flags Registry:
+### Platform-Specific
+- `ios-architecture.mdc` - iOS AppDependencyProvider, MainCoordinator, UIKit
+- `ios-tracker-blocking-implementation.mdc` - iOS content blocking
+- `macos-window-management.mdc` - macOS windows
+- `macos-system-integration.mdc` - macOS system services
+- `macos-singletons-removal.mdc` - Removing singletons from macOS
 
-1. Open Asana
-2. Navigate to the "Apple Feature Flags Registry" project
-3. Create a new task default feature flag task
-4. Copy the task URL
+### Feature-Specific
+- `duckplayer.mdc` + `duckplayer-userscript-integration.mdc` - DuckPlayer
+- `securevault-guidelines.mdc` - Credentials/vault storage
+- `app-lifecycle-state-machine.mdc` - App state management
+- `network-quality-*.mdc` (4 files) - Network quality assessment
 
-Paste the Asana task URL when ready to continue.
-```
+### Testing & Quality
+- `testing.mdc` - Testing patterns, xcodebuild commands
+- `ui-testing.mdc` - UI testing for macOS browser
+- `maestro-device-selection.mdc` - Maestro test device config
+- `performance-optimization.mdc` - Performance; use with network calls
 
-**This is mandatory** - all feature flags must be tracked in the Apple Feature Flags Registry.
+### Workflow & Process
+- `development-commands.mdc` - Build commands
+- `pull-request.mdc` + `branch-naming-conventions.mdc` - PRs and git workflow
+- `analytics-patterns.mdc` - Pixel analytics
 
-## Step 2: Ask Clarifying Questions
+## Quick Start Checklist
 
-### Question 1: Platform Selection
+### Before Writing Any Code:
+1. ✅ Read `privacy-security.mdc` - Privacy is non-negotiable
+2. ✅ Check platform rules (`ios-architecture.mdc` or `macos-system-integration.mdc`)
+3. ✅ Review `anti-patterns.mdc` - Avoid common mistakes
+4. ✅ REMEMBER: NEVER commit, push, or run tests without explicit user permission or unless explicitly asked to
 
-**Ask the user:**
-```
-Which platform(s) should this feature flag target?
-  a) iOS only
-  b) macOS only
-  c) Both iOS and macOS
-```
+### For UI Development:
+1. ✅ Use `swiftui-style.mdc` for SwiftUI components
+2. ✅ MUST use DesignResourcesKit colors: `Color(designSystemColor: .textPrimary)`
+3. ✅ MUST use DesignResourcesKit icons: `DesignSystemImages.Glyphs.Size16.add`
 
-**Default:** Infer from user's request. If ambiguous, ask.
+### For New Features:
+1. ✅ Follow `architecture.mdc` for MVVM + DI patterns
+2. ✅ Use AppDependencyProvider (iOS) or equivalent (macOS)
+3. ✅ Write tests per `testing.mdc` requirements
 
-### Question 2: Feature Flag Source Type
+## Critical Don'ts (from anti-patterns.mdc)
+- ❌ NEVER commit, push changes, create or delete branches on git or trigger github actions without EXPLICIT user permission
+- ❌ NEVER run tests without EXPLICIT user permission or if user explicitly asked to in their prompt
+- ❌ NEVER use `.shared` singletons - use dependency injection instead
+- ❌ NEVER hardcode colors/icons (use DesignResourcesKit)
+- ❌ NEVER update UI without @MainActor
+- ❌ NEVER ignore privacy implications
+- ❌ NEVER force unwrap without justification
+- ❌ NEVER use `print()` statements - use appropriate Logger extensions instead
 
-**Ask the user:**
-```
-What source type should this feature flag use?
+## Logging Guidelines
 
-  a) .remoteReleasable - Can be controlled remotely in production (RECOMMENDED for most features)
-     • Allows gradual rollout
-     • Can be toggled without app updates
-     • Requires Privacy Config setup
-     
-  b) .remoteDevelopment - Remote control in development environments only
-     • For testing remote config before production
-     • Not visible in production builds
-     
-  c) .internalOnly() - Only enabled for internal users
-     • Always on for internal users
-     • Always off for external users
-     • No remote control
-     
-  d) .disabled - Always off for everyone
-     • Placeholder for future features
-     • Code is present but inactive
+**NEVER use `print()` in production code. ALWAYS use appropriate Logger extensions:**
 
-Which option? (a is recommended for new features)
-```
+**Example:** See [logging-guidelines.swift](general/logging-guidelines.swift)
 
-**Important:** If user selects `a` or `b`, proceed to Question 2b.
+**Available Logger categories:**
+- `Logger.general` - General app functionality
+- `Logger.network` - Network requests and responses  
+- `Logger.ui` - UI updates and user interactions
+- `Logger.tests` - Test-specific logging (import `os.log` in tests)
 
-### Question 2b: Parent Feature Selection (for remote flags)
-
-**Ask the user:**
-```
-For remote feature flags, we need to add a subfeature to PrivacyFeature.swift.
-
-Which parent feature should this belong to?
-
-Platform-specific generic:
-  a) macOSBrowserConfig - Generic macOS browser features
-  b) iOSBrowserConfig - Generic iOS browser features
-
-Domain-specific (if applicable):
-  c) aiChat - AI Chat related features
-  d) sync - Sync related features
-  e) privacyPro - Privacy Pro subscription features
-  f) autofill - Autofill related features
-  g) networkProtection - VPN related features
-  h) duckPlayer - Duck Player features
-  i) dbp - Data Broker Protection features
-  j) htmlNewTabPage - New Tab Page features
-  k) maliciousSiteProtection - Malicious site protection
-  l) Other existing parent feature (specify name)
-  m) Create NEW parent feature (requires additional setup)
-
-Which option?
-```
-
-**Guidance for selection:**
-- Use platform-specific generic (a/b) when feature doesn't fit existing domains
-- Use domain-specific when feature clearly belongs to an existing area
-- Creating a new parent feature (m) requires:
-  1. Adding case to `PrivacyFeature` enum
-  2. Creating new `[FeatureName]Subfeature` enum
-  3. Coordinating with backend team for remote config
-
-### Question 3: Default Value
-
-**Ask the user:**
-```
-What should the default value be?
-
-  a) false - Feature OFF when remote config unavailable (RECOMMENDED)
-     • Safer option
-     • Opt-in behavior
-     • Better for new/experimental features
-     
-  b) true - Feature ON when remote config unavailable
-     • Used when feature should be on by default
-     • Useful for rollback safety (can disable remotely)
-     • Better for stable features being gradually enabled
-
-Which option? (a is recommended for new features)
-```
-
-**Explanation:** The default value is used when:
-- Remote config is unavailable
-- Flag source is local-only (`.internalOnly`, `.disabled`)
-- Network is down or config fetch fails
-
-### Question 4: Local Overriding
-
-**Ask the user:**
-```
-Should this feature flag support local overriding?
-
-  a) true - Allow internal users to toggle in debug menu (RECOMMENDED)
-     • Enables testing both states
-     • Useful during development
-     • No effect on external users
-     
-  b) false - No local override available
-     • Use for production pixels/metrics
-     • Use for security-critical flags
-     • Use when override would break functionality
-
-Which option? (a is recommended unless there's a specific reason)
-```
-
-### Question 5: Asana Task Link
-
-**REQUIRED:** Before proceeding, the user must create an Asana task.
-
-**Instruct the user:**
-```
+**Benefits of Logger extensions:**
+- Structured logging with categories and levels
+- Better performance than print() statements
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
