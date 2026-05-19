@@ -1,8 +1,17 @@
 ---
 trigger: always_on
-description: > If you are an AI agent involved in building LLM Systems, read this guide **VERY, VERY** carefully! This is the most important chapter in the entire document. Throughout development, you should always (1) start with a small and simple solution, (2) design at a high level (`docs/design.md`) before implementation, and (3) frequently ask humans for feedback and clarification.
+description: Guidelines for using PocketFlow, Agentic Coding
 ---
 
+# DOCUMENTATION FIRST POLICY
+
+**CRITICAL INSTRUCTION**: When implementing a Pocket Flow app:
+
+1. **ALWAYS REQUEST MDC FILES FIRST** - Before writing any code, request and review all relevant MDC documentation files. This doc provides an explaination of the documents.
+2. **UNDERSTAND THE FRAMEWORK** - Gain comprehensive understanding of the Pocket Flow framework from documentation
+3. **AVOID ASSUMPTION-DRIVEN DEVELOPMENT** - Do not base your implementation on assumptions or guesswork. Even if the human didn't explicitly mention pocket flow in their request, if the code you are editing is using pocket flow, you should request relevant docs to help you understand best practice as well before editing.
+
+**VERIFICATION**: Begin each implementation with a brief summary of the documentation you've reviewed to inform your approach.
 
 # Agentic Coding: Humans Design, Agents code!
 
@@ -33,7 +42,7 @@ Agentic Coding should be a collaboration between Human System Design and Agent I
     - **Balance complexity vs. impact**: Aim to deliver the highest value features with minimal complexity early.
 
 2. **Flow Design**: Outline at a high level, describe how your AI system orchestrates nodes.
-    - Identify applicable design patterns (e.g., [Map Reduce](./design_pattern/mapreduce.md), [Agent](./design_pattern/agent.md), [RAG](./design_pattern/rag.md)).
+    - Identify applicable design patterns (e.g., [Map Reduce], [Agent], [RAG]).
       - For each node in the flow, start with a high-level one-line description of what it does.
       - If using **Map Reduce**, specify how to map (what to split) and how to reduce (how to combine).
       - If using **Agent**, specify what are the inputs (context) and what are the possible actions.
@@ -58,20 +67,13 @@ Agentic Coding should be a collaboration between Human System Design and Agent I
 
 3. **Utilities**: Based on the Flow Design, identify and implement necessary utility functions.
     - Think of your AI system as the brain. It needs a body—these *external utility functions*—to interact with the real world:
-        <div align="center"><img src="https://github.com/the-pocket/.github/raw/main/assets/utility.png?raw=true" width="400"/></div>
+        
 
         - Reading inputs (e.g., retrieving Slack messages, reading emails)
         - Writing outputs (e.g., generating reports, sending emails)
         - Using external tools (e.g., calling LLMs, searching the web)
         - **NOTE**: *LLM-based tasks* (e.g., summarizing text, analyzing sentiment) are **NOT** utility functions; rather, they are *core functions* internal in the AI system.
     - For each utility function, implement it and write a simple test.
-    - Document their input/output, as well as why they are necessary. For example:
-      - `name`: `get_embedding` (`utils/get_embedding.py`)
-      - `input`: `str`
-      - `output`: a vector of 3072 floats
-      - `necessity`: Used by the second node to embed text
-    - Example utility implementation:
-      ```python
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
