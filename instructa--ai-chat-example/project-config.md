@@ -1,22 +1,10 @@
 ---
 trigger: always_on
-description: - Always use the typed `<Link>` from `@tanstack/react-router`.
+description: src/database/schema/*.ts
 ---
 
 
-## Links and Navigation
-- Always use the typed `<Link>` from `@tanstack/react-router`.
-- Pass `to`, `params`, `activeProps`, and Tailwind classes, mirroring:  
-  ```tsx
-  <Link
-    to="/posts/$postId"
-    params={{ postId: post.id }}
-    activeProps={{ className: 'text-black ...' }}
-    className="block ..."
-  >
-    {post.title}
-  </Link>
-  ```
+- Schema files have always this naming pattern `<name>.schema.ts`
 
 ---
 > Source: [instructa/ai-chat-example](https://github.com/instructa/ai-chat-example) — distributed by [TomeVault](https://tomevault.io).
