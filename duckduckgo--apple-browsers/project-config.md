@@ -1,163 +1,210 @@
 ---
 trigger: always_on
-description: Pattern for abstracting pixel and wide event instrumentation behind domain-specific protocols.
+description: ALWAYS use the centralized dependency provider for all service dependencies:
 ---
 
-# Instrumentation Facades
 
-Feature code often becomes verbose when sending many pixels, or mixing pixel calls and wide event lifecycle management.
+# iOS DuckDuckGo Browser Architecture Rules
 
-Consider a subscription purchase flow that needs to:
-- Fire a daily pixel when purchase starts
-- Start a wide event flow
-- Update the wide event with timing data
-- Fire unique pixels on success
-- Complete the wide event with success/failure/cancelled status
-- Handle multiple error cases with different failing steps
+## Dependency Injection and AppDependencies
 
-This leads to instrumentation code scattered throughout the feature, making it hard to:
-- Understand the feature's core logic
-- Test the feature in isolation
-- Modify instrumentation without touching feature code
-- Ensure all instrumentation points are covered
-
-We can improve this using the facade pattern, abstracting our instrumentation behind a protocol. This is done by defining a protocol with domain-specific hooks that the feature calls, then implementing the protocol in a dedicated object that handles all instrumentation.
-
-### Benefits
-
-1. **Feature code emits domain events only** - Cleaner, more readable feature logic
-2. **Instrumentation logic is centralized** - Easy to audit and modify
-3. **Easy to inject mocks for unit testing** - Test feature behavior without pixel dependencies
-
-## File Organization
-
-Instrumentation facades should be placed in the **same module as the feature** they instrument:
-
-| Component | Location |
-|-----------|----------|
-| Protocol | Feature module (e.g., `Subscription/SubscriptionPurchaseInstrumentation.swift`) |
-| Default Implementation | Same module as protocol |
-| Mock for Testing | Test target or same module |
-
-For features that span iOS and macOS, place the protocol and implementation in a shared package (e.g., `BrowserServicesKit`).
-
-## Pattern Structure
-
-### Step 1: Define the Protocol
-
-Create a protocol with methods for each instrumentation hook your feature needs. Name methods after domain events, not pixels:
+### Use AppDependencyProvider Pattern
+ALWAYS use the centralized dependency provider for all service dependencies:
 
 ```swift
-public protocol SubscriptionPurchaseInstrumentation: AnyObject {
-    func purchaseAttemptStarted(selectionID: String, freeTrialEligible: Bool, ...)
-    func purchaseCancelled()
-    func purchaseFailed(step: FailingStep, error: Error)
-    func activationSucceeded()
-    // ... other domain events
+// ✅ CORRECT - Use the shared dependency provider
+final class FeatureViewModel: ObservableObject {
+    private let networkService: NetworkServiceProtocol
+    
+    init(dependencies: DependencyProvider = AppDependencyProvider.shared) {
+        self.networkService = dependencies.networkService
+    }
+}
+
+// ❌ INCORRECT - Direct singleton access
+final class FeatureViewModel: ObservableObject {
+    private let networkService = NetworkService.shared // Avoid singletons
 }
 ```
 
-### Step 2: Implement the Default Class
-
-Create an implementation that translates domain events to pixels and wide events. The implementation:
-- Fires appropriate pixels (standard, daily, or unique)
-- Manages wide event lifecycle (start, update, complete)
-- Tracks internal state like the current wide event data
+### Protocol-Based Dependencies
+ALWAYS define protocols for dependencies to enable testing:
 
 ```swift
-public final class DefaultSubscriptionPurchaseInstrumentation: SubscriptionPurchaseInstrumentation {
-    private let wideEvent: WideEventManaging
-    private var purchaseWideEventData: SubscriptionPurchaseWideEventData?
+// ✅ CORRECT - Protocol abstraction
+protocol FeatureServiceProtocol {
+    func fetchData() async throws -> [Item]
+}
 
-    public func purchaseAttemptStarted(...) {
-        DailyPixel.fireDailyAndCount(pixel: .subscriptionPurchaseAttempt, ...)
-        purchaseWideEventData = SubscriptionPurchaseWideEventData(...)
-        wideEvent.startFlow(purchaseWideEventData!)
+final class FeatureService: FeatureServiceProtocol {
+    // Implementation
+}
+
+// ❌ INCORRECT - Concrete dependency
+final class ViewModel {
+    private let service: FeatureService // Hard to test
+}
+```
+
+## AppSettings and Configuration
+
+### Use AppSettings Protocol
+ALWAYS access settings through the AppSettings protocol:
+
+```swift
+// ✅ CORRECT - Protocol-based settings access
+final class SettingsViewModel: ObservableObject {
+    private let appSettings: AppSettings
+    
+    init(appSettings: AppSettings) {
+        self.appSettings = appSettings
     }
+    
+    var isFeatureEnabled: Bool {
+        get { appSettings.featureEnabled }
+        set { appSettings.featureEnabled = newValue }
+    }
+}
 
-    public func activationSucceeded() {
-        UniquePixel.fire(pixel: .subscriptionActivated)
-        wideEvent.completeFlow(purchaseWideEventData!, status: .success, ...)
+// ❌ INCORRECT - Direct UserDefaults access
+final class SettingsViewModel: ObservableObject {
+    var isFeatureEnabled: Bool {
+        get { UserDefaults.standard.bool(forKey: "feature_enabled") }
+        set { UserDefaults.standard.set(newValue, forKey: "feature_enabled") }
     }
 }
 ```
 
-### Step 3: Use in Feature Code
-
-Inject the instrumentation protocol and call it at appropriate points in your feature logic:
+### UserDefaults Property Wrapper
+Use the established @UserDefaultsWrapper pattern for new settings:
 
 ```swift
-final class SubscriptionPurchaseFeature {
-    private let instrumentation: SubscriptionPurchaseInstrumentation
+// ✅ CORRECT - Property wrapper usage
+extension AppUserDefaults {
+    @UserDefaultsWrapper(key: .newFeatureEnabled, defaultValue: false)
+    var newFeatureEnabled: Bool
+}
 
-    func subscriptionSelected(...) async {
-        instrumentation.purchaseAttemptStarted(...)
+// ❌ INCORRECT - Manual UserDefaults handling
+extension AppUserDefaults {
+    var newFeatureEnabled: Bool {
+        get { userDefaults.bool(forKey: "new_feature_enabled") }
+        set { userDefaults.set(newValue, forKey: "new_feature_enabled") }
+    }
+}
+```
 
-        switch await performPurchase() {
-        case .success:
-            instrumentation.activationSucceeded()
-        case .failure(let error):
-            instrumentation.purchaseFailed(step: .accountPayment, error: error)
+## Navigation and Coordinators
+
+### Use MainCoordinator for App-Level Navigation
+ALWAYS use MainCoordinator for deep links, URL handling, and app-level navigation:
+
+```swift
+// ✅ CORRECT - MainCoordinator usage
+@MainActor
+final class FeatureCoordinator {
+    private weak var mainCoordinator: MainCoordinator?
+    
+    func handleFeatureAction() {
+        mainCoordinator?.handleURL(featureURL)
+    }
+}
+
+// ❌ INCORRECT - Direct navigation from ViewModels
+final class FeatureViewModel: ObservableObject {
+    func handleAction() {
+        // Don't navigate directly from ViewModels
+        navigationController?.pushViewController(detailVC, animated: true)
+    }
+}
+```
+
+### URL Handling Pattern
+Implement URLHandling protocol for custom URL schemes:
+
+```swift
+// ✅ CORRECT - URLHandling protocol implementation
+extension FeatureCoordinator: URLHandling {
+    func handleURL(_ url: URL) {
+        guard url.scheme == "duckduckgo",
+              url.host == "feature" else { return }
+        
+        presentFeature(with: url.queryParameters)
+    }
+    
+    func shouldProcessDeepLink(_ url: URL) -> Bool {
+        return url.scheme == "duckduckgo" && url.host == "feature"
+    }
+}
+```
+
+## SwiftUI and Design System Integration
+
+### Use DesignResourcesKit Colors
+ALWAYS use semantic colors from DesignResourcesKit:
+
+```swift
+// ✅ CORRECT - Semantic color usage
+struct FeatureView: View {
+    var body: some View {
+        VStack {
+            Text("Title")
+                .foregroundColor(Color(designSystemColor: .textPrimary))
+            
+            Rectangle()
+                .fill(Color(designSystemColor: .surface))
+        }
+        .background(Color(designSystemColor: .background))
+    }
+}
+
+// ❌ INCORRECT - Hardcoded colors
+struct FeatureView: View {
+    var body: some View {
+        VStack {
+            Text("Title")
+                .foregroundColor(.black) // Don't hardcode colors
+            
+            Rectangle()
+                .fill(.gray) // Use semantic colors instead
         }
     }
 }
 ```
 
-## Dependency Injection
-
-### Constructor Injection (Preferred)
-
-Pass the instrumentation as an init parameter:
+### Use DesignResourcesKit Icons
+ALWAYS use icons from DesignResourcesKitIcons:
 
 ```swift
-final class SubscriptionPurchaseFeature {
-    private let instrumentation: SubscriptionPurchaseInstrumentation
+// ✅ CORRECT - Design system icons
+struct IconButton: View {
+    var body: some View {
+        Button(action: action) {
+            Image(uiImage: DesignSystemImages.Glyphs.Size16.add)
+                .foregroundColor(Color(designSystemColor: .accent))
+        }
+    }
+}
 
-    init(instrumentation: SubscriptionPurchaseInstrumentation = DefaultSubscriptionPurchaseInstrumentation()) {
-        self.instrumentation = instrumentation
+// ❌ INCORRECT - System icons or custom images
+struct IconButton: View {
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "plus") // Use design system icons
+        }
     }
 }
 ```
 
-### Property Injection
-
-For cases where the instrumentation is set after initialization (e.g., UserScripts):
-
-```swift
-final class DebugUserScript {
-    weak var instrumentation: TabInstrumentationProtocol?
-}
-
-// In the parent object:
-private let instrumentation = TabInstrumentation()
-
-func configureUserScripts() {
-    userScripts.debugScript.instrumentation = instrumentation
-}
-```
-
-## Testing with Mocks
-
-Create a mock that records method calls for verification:
+### Theme Integration
+Use Theme protocol for complex color requirements:
 
 ```swift
-final class MockSubscriptionPurchaseInstrumentation: SubscriptionPurchaseInstrumentation {
-    private(set) var purchaseAttemptStartedCalls: [...] = []
-    private(set) var activationSucceededCallCount = 0
-
-    func purchaseAttemptStarted(...) {
-        purchaseAttemptStartedCalls.append(...)
-    }
-}
-```
-
-Then verify behavior in tests:
-
-```swift
-func testPurchaseSuccess() async {
-    let mock = MockSubscriptionPurchaseInstrumentation()
-    let feature = SubscriptionPurchaseFeature(instrumentation: mock)
-
+// ✅ CORRECT - Theme integration
+struct ThemedView: View {
+    @EnvironmentObject var themeManager: ThemeManager
+    
+    var body: some View {
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
