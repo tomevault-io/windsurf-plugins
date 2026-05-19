@@ -1,169 +1,129 @@
 ---
 trigger: always_on
-description: Require using Context7 or Web Search to review library documentation before implementation
+description: Task Workflow System for project implementation across multiple task files within the tasks/ directory.
 ---
 
 
-# External Library Documentation Requirements
+# Task Workflow System (Multi-File in `tasks/` Directory)
 
-- **ALWAYS Use Context7 Before Using External Libraries**
+- **Purpose:** Standardize task implementation with proper tracking and status updates across a distributed task list.
+- **Implementation:** Tasks are distributed across `tasks/tasks-N.md` files, indexed by `tasks/tasks-index.md`.
 
-  - The agent MUST retrieve and review documentation via Context7 before implementing any code that uses an external library
-  - This applies to ALL libraries not part of the standard language libraries
-  - No exceptions - even for commonly known libraries like React, Express, or Lodash
+## Overall Task Management Structure
 
-- **Two-Step Documentation Retrieval Process**
+- **Index File (`tasks/tasks-index.md`):**
 
+  - Contains the **Overall Project Task Summary** (Total Tasks, Pending, Complete for the _entire_ project).
+  - Contains the **Task File Index**, mapping Task ID ranges to specific `tasks/tasks-N.md` files.
+
+    ```markdown
+    ## Overall Project Task Summary
+
+    - **Total Tasks**: {Total for project}
+    - **Pending**: {Pending for project}
+    - **Complete**: {Complete for project}
+
+    ## Task File Index
+
+    - `tasks/tasks-1.md`: Contains Tasks {start_id_1} - {end_id_1} ({task_count_1} tasks)
+    - `tasks/tasks-2.md`: Contains Tasks {start_id_2} - {end_id_2} ({task_count_2} tasks)
+    - ...
+    ```
+
+- **Task Files (`tasks/tasks-N.md`):**
+
+  - Each file starts with its own local summary:
+
+    ```markdown
+    ## Summary (tasks-N.md) // Clarify which task file this summary is for
+
+    - **Tasks in this file**: {Count for this file}
+    - **Task IDs**: {start_id_N} - {end_id_N} // e.g., 001 - 030
+    ```
+
+  - Followed by the `## Tasks` section containing individual tasks.
+
+- **Task Structure (within `tasks/tasks-N.md`)**
+
+  - Tasks are defined with:
+
+    ````markdown
+    ### Task ID: {ID}
+
+    - **Title**: Example title
+    - **File**: example/file/path (relative to project root, excluding project root dir)
+    - **Complete**: [ ]
+
+    #### Prompt:
+
+    ```markdown
+    DETAILED PROMPT INCLUDING TARGET FILE PATH AND CONTEXT
+    ```
+    ````
+
+    ```
+
+    ```
+
+## Task Management Workflow
+
+### 1. Locating a Task
+
+- **When user requests "next task":**
+  1. Open and consult `tasks/tasks-index.md` to understand the overall project status and identify the sequence of task files.
+  2. Iterate through `tasks/tasks-1.md`, `tasks/tasks-2.md`, etc., in numerical order as listed in the index.
+  3. Within each `tasks/tasks-N.md` file, find the first task where `Complete: [ ]`. This is the next task.
+  4. Note the `tasks/tasks-N.md` file this task resides in.
+- **When user specifies a Task ID (e.g., "Task 042"):**
+  1. Open and consult `tasks/tasks-index.md`.
+  2. Read the "Task File Index" to determine which `tasks/tasks-N.md` file contains that Task ID.
+  3. Open the identified `tasks/tasks-N.md` file (e.g., if Task 042 is in `tasks-2.md`, open `tasks/tasks-2.md`).
+  4. Locate the task with the specified `### Task ID: {ID}`.
+
+### 2. Task Implementation
+
+- **Always review overall project context as needed:**
   ```javascript
-  // ✅ DO: ALWAYS follow this exact two-step process
-  // Step 1: Resolve the library name to a Context7-compatible ID
-  const libraryIdResponse =
-    await mcp_context7_resolve-library-id({
-      libraryName: "express",
-    });
-
-  // Step 2: Get the documentation using the resolved ID
-  const docsResponse =
-    await mcp_context7_get-library-docs({
-      context7CompatibleLibraryID: libraryIdResponse.libraryId,
-      tokens: 10000, // Adjust based on documentation needs
-      topic: "routing", // Optional: focus on specific area
-    });
-
-  // ❌ DON'T: Skip the resolution step
-  // ❌ DON'T: Use hardcoded library IDs
-  // ❌ DON'T: Proceed with implementation without review
+  // ✅ DO: If architectural context is needed, refer to `docs/architecture.md` and other relevant architecture documents located in the `docs/` directory.
+  // The task prompt itself should be the primary guide for implementation details.
+  ```
+- **Implement each task according to its prompt and specified `File` path.**
+  ```javascript
+  // ✅ DO: Focus implementation *only* on the file specified in the task's "File:" field.
+  // ✅ DO: Follow the detailed instructions, context, and references within the task's "Prompt:" section.
   ```
 
-- **Never Skip Documentation Retrieval**
+### 3. Updating Task Status (Critical)
 
-  - Documentation MUST be retrieved even for seemingly simple APIs
-  - Do not rely on previously cached knowledge for current implementations
-  - Never make assumptions about library interfaces, verify with current documentation
-
-- **Document First, Implement Second**
-
+- After successfully implementing a task:
+  1. **Locate the task** within its specific `tasks/tasks-N.md` file (as identified in Step 1).
+  2. **Change its status:** Modify `Complete: [ ]` to `Complete: [x]` in that specific `tasks/tasks-N.md` file.
+  3. **Update the local summary within that `tasks/tasks-N.md` file (Optional but Recommended):**
+     - If feasible, decrement "Pending" and increment "Complete" counts for _that file's specific summary_. This is secondary to updating the main index.
+  4. **Update the Overall Project Task Summary in `tasks/tasks-index.md`:**
+     - Decrement "Pending" by 1.
+     - Increment "Complete" by 1.
+  5. **Save changes** to both the modified `tasks/tasks-N.md` file and `tasks/tasks-index.md`.
   ```javascript
-  // ✅ DO: Review documentation BEFORE writing implementation code
-  // 1. Identify library need
-  // 2. Retrieve documentation
-  // 3. Review relevant sections
-  // 4. THEN implement solution
-
-  // ❌ DON'T: Implementation without documentation
-  const app = express(); // WRONG - Documentation not retrieved first
-  app.get("/", (req, res) => res.send("Hello"));
+  // ✅ DO: Update "Complete: [ ]" to "Complete: [x]" in the correct `tasks/tasks-N.md` file.
+  // ✅ DO: Update "Pending" and "Complete" counts in `tasks/tasks-index.md`.
+  // ❌ DON'T: Modify task IDs, titles, or prompts unless explicitly instructed for a correction.
   ```
 
-- **Verify API Compatibility**
+### 4. Notification
 
-  - Always check current API version compatibility
-  - Validate method signatures against retrieved documentation
-  - Verify required dependencies and peer dependencies
+- Inform the user of successful task completion.
+- Provide a summary of changes made (files modified).
+- State the Task ID and Title of the completed task and which `tasks/tasks-N.md` file it was in.
 
-- **Handle Documentation Response Properly**
+## Task Creation Guidelines (If AI needs to add/modify tasks)
 
-  ```javascript
-  // ✅ DO: Properly handle the documentation response
-  const docsResponse =
-    await mcp_context7_get-library-docs({
-      context7CompatibleLibraryID: "vercel/nextjs",
-    });
+- **Adding New Tasks Based on User Requests:**
 
-  // Extract relevant information
-  const sections = docsResponse.content.sections;
-  const examples = sections.filter((s) => s.type === "example");
-  const apiDocs = sections.filter((s) => s.type === "api");
-
-  // Use this for implementation guidance
-  // ...
-
-  // ❌ DON'T: Ignore retrieved documentation
-  // ❌ DON'T: Proceed with implementation based on assumptions
-  ```
-
-- **Required Documentation Review Checklist**
-
-  - Core API functions and methods must be verified
-  - Method signatures and parameters must be validated
-  - Return values and types must be confirmed
-  - Required configuration must be identified
-  - Common patterns and examples must be analyzed
-
-- **Example Implementation Flow**
-
-  ```javascript
-  // ✅ DO: Follow this implementation flow
-
-  // 1. Identify need for external library
-  // "I need to implement JWT authentication in Express"
-
-  // 2. Resolve library IDs for ALL needed libraries
-  const expressLibrary =
-    await mcp_context7_resolve-library-id({
-      libraryName: "express",
-    });
-
-  const jwtLibrary =
-    await mcp_context7_resolve-library-id({
-      libraryName: "jsonwebtoken",
-    });
-
-  // 3. Retrieve documentation for ALL libraries
-  const expressDocs =
-    await mcp_context7_get-library-docs({
-      context7CompatibleLibraryID: expressLibrary.libraryId,
-    });
-
-  const jwtDocs =
-    await mcp_context7_get-library -
-    docs({
-      context7CompatibleLibraryID: jwtLibrary.libraryId,
-      topic: "authentication",
-    });
-
-  // 4. Review documentation and extract implementation details
-  // 5. Create implementation with proper reference to documentation
-
-  // ❌ DON'T: Skip any library in multi-library implementations
-  ```
-
-- **Documentation First for Dependency Resolution**
-
-  - All transitive dependencies must be documented
-  - Version compatibility must be verified
-  - Properly handle conflicting dependencies
-
-- **Update Implementation After Documentation Review**
-
-  ```javascript
-  // ✅ DO: Update existing code based on documentation
-  // If reviewing code that uses libraries without proper documentation:
-
-  // 1. Retrieve documentation for used libraries
-  // 2. Verify existing implementation against documentation
-  // 3. Correct any discrepancies found
-
-  // ❌ DON'T: Assume existing implementation is correct
-  // ❌ DON'T: Skip verification of existing library usage
-  ```
-
-- **MUST Use Web Search When Documentation Is Unavailable**
-
-  - If Context7 cannot provide documentation or returns insufficient information, the agent MUST use the web search tool
-  - Always search for the most recent documentation as of mid-2025
-  - Verify the library version against the latest available release
-
-  ```javascript
-  // ✅ DO: Fallback to web search when Context7 fails
-  try {
-    // First attempt to use Context7
-    const libraryIdResponse =
-      (await mcp_context7_resolve-library-id({
-        libraryName: "some-library",
-      });
-
-    const docsResponse =
+  1. **Determine Target Task File:** The user or AI must decide which `tasks/tasks-N.md` file the new task belongs to.
+     - If inserting into an existing sequence, identify the `tasks/tasks-N.md` file.
+     - If adding to the very end of the project and the last `tasks-N.md` is full (e.g., based on line count or task count), a new `tasks/tasks-N+1.md` file might need to be conceptually created (the Task Master agent would typically handle new file creation).
+  2. **ID Assignment:**
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
