@@ -1,188 +1,257 @@
 ---
 trigger: always_on
-description: Comprehensive SCSS styling guidelines for the OpenUI React UI component library
+description: Comprehensive pnpm package manager guidelines for the OpenUI monorepo
 ---
 
 
-# OpenUI Styling System
+# OpenUI Package Management with pnpm
 
 ## Overview
 
-OpenUI uses a comprehensive design system with SCSS utilities, CSS custom properties, and consistent component patterns. All styling must follow these guidelines to maintain design consistency and component reusability.
+OpenUI uses **pnpm** as its package manager instead of npm. pnpm provides better performance, disk efficiency, and strict dependency management. This document covers all pnpm usage patterns for the OpenUI monorepo.
 
-## Core Principles
+## Why pnpm?
 
-### 1. Use cssUtils.scss for All Design Tokens
+### Benefits Over npm
 
-**Always import and use `cssUtils.scss` instead of hardcoded values:**
+- **Faster installs**: Uses hard links for node_modules
+- **Disk efficient**: Single copy of packages across projects
+- **Strict dependency resolution**: No phantom dependencies
+- **Better workspace support**: Native monorepo management
+- **Security**: Prevents dependency confusion attacks
 
-```scss
-@use "../../cssUtils" as cssUtils;
+### Key Differences
 
-// ✅ Correct - Use design tokens
-.my-component {
-  background-color: cssUtils.$foreground;
-  color: cssUtils.$text-neutral-primary;
-  padding: cssUtils.$space-m;
-  border-radius: cssUtils.$radius-m;
-  @include cssUtils.typography(body, default);
-}
+- `node_modules` structure is different (flat with symlinks)
+- Stricter dependency isolation
+- Faster cold installs and updates
 
-// ❌ Incorrect - Hardcoded values
-.my-component {
-  background-color: #ffffff;
-  color: #000000;
-  padding: 16px;
-  border-radius: 8px;
-  font-family: "Inter", sans-serif;
-}
+## Core Commands
+
+### Package Installation
+
+```bash
+# Install all dependencies (equivalent to npm install)
+pnpm install
+
+# Install specific package
+pnpm add <package-name>
+
+# Install dev dependency
+pnpm add -D <package-name>
+
+# Install peer dependency
+pnpm add -P <package-name>
+
+# Remove package
+pnpm remove <package-name>
 ```
 
-### 2. Component Architecture
+### Running Scripts
 
-#### File Structure
+```bash
+# Run script from package.json (equivalent to npm run)
+pnpm run <script-name>
 
-Each component should follow this structure:
+# Run script in specific workspace
+pnpm --filter <package-name> run <script-name>
 
-```FileStructure
-components/ComponentName/
-├── ComponentName.tsx      # Main component
-├── ComponentName.scss     # Component styles
-├── index.ts              # Exports
-├── dependencies.ts       # External dependencies
-└── stories/              # Storybook stories
-    └── ComponentName.stories.tsx
+# Run script in all workspaces
+pnpm --recursive run <script-name>
 ```
 
-#### CSS Class Naming Convention
+## Workspace Management
 
-Use the `.openui-component-name` prefix with BEM-like modifiers:
+OpenUI uses pnpm workspaces for its monorepo structure. Here are the key workspace commands:
 
-```scss
-.openui-button {
-  // Base styles
+### Workspace Structure
 
-  &-primary {
-    // Primary variant styles
-  }
-
-  &-secondary {
-    // Secondary variant styles
-  }
-
-  &-small {
-    // Small size variant
-  }
-
-  &-large {
-    // Large size variant
-  }
-
-  &__icon {
-    // Component element (like icon inside button)
-  }
-
-  &--disabled {
-    // Component state modifier
-  }
-}
+```fileStructure
+js/
+├── packages/
+│   ├── react-core/
+│   ├── react-ui/
+│   └── stream/
+└── pnpm-workspace.yaml
 ```
 
----
+### Common Workspace Commands
 
-## Color System
+```bash
+# Install all dependencies across workspaces
+pnpm install
 
-### Surface / Background Colors
+# Run command in specific package
+pnpm --filter react-ui run build
 
-| Token                  | Usage                           |
-| ---------------------- | ------------------------------- |
-| `$background`          | Main page/app background        |
-| `$foreground`          | Card/container backgrounds      |
-| `$popover-background`  | Popover/dropdown backgrounds    |
-| `$overlay`             | Modal/overlay backdrop          |
-| `$sunk-light`          | Lightly recessed surface        |
-| `$sunk`                | Recessed surface (inputs)       |
-| `$sunk-deep`           | Deeply recessed surface         |
-| `$elevated-light`      | Lightly elevated surface        |
-| `$elevated`            | Elevated surface                |
-| `$elevated-strong`     | Strongly elevated surface       |
-| `$elevated-intense`    | Intensely elevated surface      |
-| `$inverted-background` | Inverted/dark backgrounds       |
-| `$highlight-subtle`    | Subtle highlight (hover states) |
-| `$highlight`           | Default highlight               |
-| `$highlight-strong`    | Strong highlight                |
-| `$highlight-intense`   | Intense highlight (selection)   |
-| `$info-background`     | Informational backgrounds       |
-| `$success-background`  | Success state backgrounds       |
-| `$alert-background`    | Warning/alert backgrounds       |
-| `$danger-background`   | Error/danger state backgrounds  |
-| `$purple-background`   | Purple accent backgrounds       |
-| `$pink-background`     | Pink accent backgrounds         |
+# Run command in all packages
+pnpm --recursive run build
 
-```scss
-.openui-card {
-  background-color: cssUtils.$foreground;
-}
+# Add dependency to specific package
+pnpm --filter react-ui add lodash
 
-.openui-modal-backdrop {
-  background-color: cssUtils.$overlay;
-}
-
-.openui-input {
-  background-color: cssUtils.$sunk;
-}
-
-.openui-error-banner {
-  background-color: cssUtils.$danger-background;
-}
+# Run tests across all packages
+pnpm --recursive run test
 ```
 
-### Interactive Colors
+## Available Scripts by Package
 
-**Accent (Primary Actions):**
+### React UI Package (`js/packages/react-ui/`)
 
-| Token                          | Usage                   |
-| ------------------------------ | ----------------------- |
-| `$interactive-accent-default`  | Primary button default  |
-| `$interactive-accent-hover`    | Primary button hover    |
-| `$interactive-accent-pressed`  | Primary button pressed  |
-| `$interactive-accent-disabled` | Primary button disabled |
+```bash
+# Development
+pnpm storybook              # Start Storybook dev server
+pnpm watch                  # Watch mode with concurrent builds
 
-**Destructive (Danger Actions):**
+# Building
+pnpm build                  # Full build (SCSS + TypeScript + Tailwind)
+pnpm build:tsc              # TypeScript compilation only
+pnpm build:scss             # SCSS compilation only
+pnpm build:plugin           # Tailwind plugin build
+pnpm build:storybook        # Storybook production build
 
-| Token                                      | Usage                       |
-| ------------------------------------------ | --------------------------- |
-| `$interactive-destructive-default`         | Destructive ghost default   |
-| `$interactive-destructive-hover`           | Destructive ghost hover     |
-| `$interactive-destructive-pressed`         | Destructive ghost pressed   |
-| `$interactive-destructive-disabled`        | Destructive ghost disabled  |
-| `$interactive-destructive-accent-default`  | Filled destructive default  |
-| `$interactive-destructive-accent-hover`    | Filled destructive hover    |
-| `$interactive-destructive-accent-pressed`  | Filled destructive pressed  |
-| `$interactive-destructive-accent-disabled` | Filled destructive disabled |
+# Code Quality
+pnpm lint:check             # Run ESLint
+pnpm lint:fix               # Fix ESLint issues
+pnpm format:check           # Check Prettier formatting
+pnpm format:fix             # Fix Prettier formatting
+pnpm ci                     # CI pipeline (lint + format check)
+```
 
-```scss
-// Primary button example
-.openui-button-primary {
-  background-color: cssUtils.$interactive-accent-default;
+### React Core Package (`js/packages/react-core/`)
 
-  &:not(:disabled):hover {
-    background-color: cssUtils.$interactive-accent-hover;
-  }
+```bash
+# Building
+pnpm build                  # TypeScript compilation
+pnpm watch                  # Watch mode
 
-  &:not(:disabled):active {
-    background-color: cssUtils.$interactive-accent-pressed;
-  }
+# Code Quality
+pnpm lint:check
+pnpm lint:fix
+pnpm format:check
+pnpm format:fix
+```
 
-  &:disabled {
-    background-color: cssUtils.$interactive-accent-disabled;
-  }
-}
+### Stream Package (`js/packages/stream/`)
 
-// Destructive button example
-.openui-button-destructive {
-  background-color: cssUtils.$interactive-destructive-accent-default;
+```bash
+# Building
+pnpm build                  # TypeScript compilation
+pnpm watch                  # Watch mode
 
+# Code Quality
+pnpm lint:check
+pnpm lint:fix
+pnpm format:check
+pnpm format:fix
+```
+
+### Python Package (`py/`)
+
+```bash
+# Using Poetry (not pnpm)
+poetry install              # Install dependencies
+poetry run <command>        # Run commands with Poetry
+poetry shell               # Activate virtual environment
+```
+
+## Common Development Workflows
+
+### Setting Up Development Environment
+
+```bash
+# Clone and setup the project
+git clone <repository-url>
+cd openui
+
+# Install all dependencies
+pnpm install
+
+# Start development servers
+pnpm --filter react-ui storybook    # UI development
+```
+
+### Building for Production
+
+```bash
+# Build all packages
+pnpm --recursive run build
+
+# Or build specific packages
+pnpm --filter react-ui run build
+pnpm --filter react-core run build
+```
+
+### Code Quality Checks
+
+```bash
+# Check all packages
+pnpm --recursive run lint:check
+pnpm --recursive run format:check
+
+# Fix issues in all packages
+pnpm --recursive run lint:fix
+pnpm --recursive run format:fix
+```
+
+### Adding New Dependencies
+
+```bash
+# Add to specific package
+pnpm --filter react-ui add <package-name>
+pnpm --filter react-ui add -D <package-name>  # dev dependency
+
+# Add to root (shared tooling)
+pnpm add -D -w <package-name>
+```
+
+## Best Practices
+
+### 1. Always Use pnpm
+
+```bash
+# ✅ Correct
+pnpm install
+pnpm add lodash
+
+# ❌ Incorrect
+npm install
+npm install lodash
+yarn add lodash
+```
+
+### 2. Use Workspace Filters
+
+```bash
+# ✅ Specific package operations
+pnpm --filter react-ui run build
+
+# ✅ All packages
+pnpm --recursive run test
+
+# ❌ Avoid running in wrong context
+cd js/packages/react-ui && pnpm run build  # Less efficient
+```
+
+### 3. Dependency Management
+
+```bash
+# ✅ Add dependencies to correct packages
+pnpm --filter react-ui add react-dom  # Runtime dependency
+pnpm --filter react-ui add -D @types/react  # Dev dependency
+
+# ❌ Don't add to wrong package
+pnpm add react  # Would add to root, not to package
+```
+
+### 4. Script Organization
+
+```bash
+# ✅ Use consistent script names across packages
+"build": "tsc"
+"watch": "tsc --watch"
+"lint:check": "eslint ."
+"lint:fix": "eslint --fix ."
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
