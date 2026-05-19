@@ -1,212 +1,36 @@
 ---
 trigger: always_on
-description: Comments and Defensive Programming Guidelines - Minimize unnecessary comments and defensive code
+description: AI Interaction Guidelines - Communication style and behavior rules for AI assistants
 ---
 
 
-# Comments and Defensive Programming Guidelines
+# AI Interaction Guidelines
 
-## Philosophy
+## Communication Rules
 
-Write code that is self-documenting and robust by design, not through excessive commenting or defensive programming. Code should be clear enough to understand without explanatory comments, and defensive programming should only be used when genuinely necessary.
+- **NEVER create markdown (`.md`) files after you're done.** NEVER!
+- **Never use emojis in your replies**
+- **I know I'm absolutely right. No need to mention it**
 
-## Comments Policy
+## File Creation Policy
 
-### Avoid These Types of Comments
+Do not proactively create documentation files or markdown files after completing tasks. The codebase structure and documentation should be managed intentionally, not automatically generated.
 
-**❌ Obvious Comments** - Comments that simply repeat what the code does:
+## Response Style
 
-```typescript
-// Bad: Comment just repeats the code
-// Create a new user
-const user = new User();
+Keep responses focused and professional. Avoid:
 
-// Bad: Obvious variable assignment
-// Set the user's name to John
-user.name = "John";
+- Unnecessary affirmations or validation
+- Emoji usage
+- Verbose acknowledgments
+- Over-explaining obvious points
 
-// Bad: Obvious function call
-// Call the save method
-await user.save();
-```
+Focus on:
 
-**❌ Redundant Implementation Comments**:
-
-```typescript
-// Bad: Implementation is clear from the code
-// Loop through all users
-for (const user of users) {
-  // Check if user is active
-  if (user.isActive) {
-    // Add to active users array
-    activeUsers.push(user);
-  }
-}
-```
-
-**❌ Empty Defensive Comments**:
-
-```typescript
-// Bad: Generic error handling comment
-try {
-  await processData();
-} catch (error) {
-  // Handle error
-  throw error;
-}
-```
-
-### When Comments ARE Appropriate
-
-**✅ Business Logic Context** - When the code implements complex business rules:
-
-```typescript
-// Apply company-specific tax calculation:
-// Base rate + regional modifier + seasonal adjustment
-const taxRate = baseTaxRate * (1 + regionalModifier) + seasonalAdjustment;
-```
-
-**✅ Non-Obvious Algorithms** - When using specific algorithms or optimizations:
-
-```typescript
-// Using Floyd-Warshall algorithm for shortest path calculation
-// because we need all-pairs shortest paths, not single-source
-for (let k = 0; k < vertices; k++) {
-  // implementation...
-}
-```
-
-**✅ AI Context Hints** - When you need to leave hints for future AI assistance:
-
-```typescript
-// TODO: This validation logic will need to be updated when we migrate
-// to the new authentication system in Q2 2024
-function validateUserToken(token: string) {
-  // Current implementation uses JWT, future will use OAuth2
-  return jwt.verify(token, secret);
-}
-```
-
-**✅ API/Interface Documentation** - For public APIs and complex interfaces:
-
-```typescript
-/**
- * Processes mod files with specific validation requirements
- * @param files - Array of mod files to process
- * @param options - Processing options including validation level
- * @returns Promise resolving to processed mod metadata
- */
-export async function processModFiles(
-  files: ModFile[],
-  options: ProcessingOptions
-): Promise<ModMetadata[]> {
-  // implementation...
-}
-```
-
-## Defensive Programming Guidelines
-
-### Avoid Unnecessary Defensive Code
-
-**❌ Over-validation of Internal APIs**:
-
-```typescript
-// Bad: Excessive validation for internal function
-function calculateTotal(items: Item[]) {
-  if (!items) throw new Error("Items cannot be null");
-  if (!Array.isArray(items)) throw new Error("Items must be an array");
-  if (items.length === 0) throw new Error("Items cannot be empty");
-
-  // The actual logic...
-}
-```
-
-**❌ Catching and Re-throwing Without Value**:
-
-```typescript
-// Bad: Pointless error wrapping
-try {
-  await database.save(user);
-} catch (error) {
-  // Just re-throwing doesn't add value
-  throw new Error(`Failed to save user: ${error.message}`);
-}
-```
-
-**❌ Excessive Null Checks for Known Data**:
-
-```typescript
-// Bad: User is guaranteed to exist at this point
-function updateUserProfile(user: User) {
-  if (!user) throw new Error("User is required");
-  if (!user.id) throw new Error("User ID is required");
-  if (!user.profile) throw new Error("User profile is required");
-
-  // Update logic...
-}
-```
-
-### When Defensive Programming IS Appropriate
-
-**✅ External API Boundaries** - When dealing with external data:
-
-```typescript
-// Good: External API data needs validation
-function processExternalUserData(apiData: unknown) {
-  const userData = UserSchema.parse(apiData); // Zod validation
-  return createUser(userData);
-}
-```
-
-**✅ User Input Validation** - When handling user-provided data:
-
-```typescript
-// Good: User input should always be validated
-function validateModFile(file: File) {
-  if (file.size > MAX_FILE_SIZE) {
-    throw new ValidationError("File too large");
-  }
-  if (!ALLOWED_EXTENSIONS.includes(file.extension)) {
-    throw new ValidationError("Invalid file type");
-  }
-}
-```
-
-**✅ Critical System Operations** - When failure would be catastrophic:
-
-```typescript
-// Good: Critical operations need safety checks
-async function deleteUserData(userId: string) {
-  if (!userId || userId.length < 10) {
-    throw new Error("Invalid user ID for deletion");
-  }
-
-  // Additional safety: Verify user exists and is marked for deletion
-  const user = await getUserById(userId);
-  if (!user.markedForDeletion) {
-    throw new Error("User not marked for deletion");
-  }
-
-  await database.deleteUser(userId);
-}
-```
-
-## Error Handling Philosophy
-
-### Let It Break When Appropriate
-
-**It's OK to let the application break when:**
-
-- The error indicates a programming mistake that should be fixed
-- The failure is due to incorrect internal API usage
-- The error would help identify bugs during development
-- Defensive code would hide underlying issues
-
-**Example - Let it crash:**
-
-```typescript
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- Clear, concise technical communication
+- Direct answers to questions
+- Actionable implementation steps
+- Relevant code examples when needed
 
 ---
 > Source: [deadlock-mod-manager/deadlock-mod-manager](https://github.com/deadlock-mod-manager/deadlock-mod-manager) — distributed by [TomeVault](https://tomevault.io).
