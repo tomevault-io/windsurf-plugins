@@ -1,62 +1,175 @@
 ---
 trigger: always_on
-description: Define a concrete pattern for removing `.shared` singletons in the macOS app by replacing them with app-owned instances and dependency injection. The `AIChatPreferences` and `AboutPreferences` refactors in `AppDelegate` are canonical examples.
+description: Use proper service management for background agents:
 ---
 
 
-## macOS Singleton Removal Rules
+# macOS System Integration Patterns
 
-### Purpose
+## Background Agents and Services
+Use proper service management for background agents:
 
-Define a concrete pattern for removing `.shared` singletons in the macOS app by replacing them with app-owned instances and dependency injection. The `AIChatPreferences` and `AboutPreferences` refactors in `AppDelegate` are canonical examples.
+```swift
+// ✅ CORRECT - Background service management
+final class BackgroundServiceManager {
+    private let agentIdentifier = "com.duckduckgo.agent"
+    private let extensionIdentifier = "com.duckduckgo.extension"
+    
+    func registerBackgroundAgent() throws {
+        let service = SMAppService.agent(plistName: "BackgroundAgent.plist")
+        
+        do {
+            try service.register()
+            print("Background agent registered successfully")
+        } catch {
+            print("Failed to register background agent: \(error)")
+            throw error
+        }
+    }
+    
+    func unregisterBackgroundAgent() throws {
+        let service = SMAppService.agent(plistName: "BackgroundAgent.plist")
+        
+        do {
+            try service.unregister()
+            print("Background agent unregistered successfully")
+        } catch {
+            print("Failed to unregister background agent: \(error)")
+            throw error
+        }
+    }
+    
+    func checkServiceStatus() -> SMAppService.Status {
+        let service = SMAppService.agent(plistName: "BackgroundAgent.plist")
+        return service.status
+    }
+}
 
-### Rules
+// ❌ INCORRECT - Direct background processing in main app
+final class FeatureManager {
+    func startBackgroundWork() {
+        // Don't run continuous background work in main app
+        DispatchQueue.global().async {
+            while true {
+                // This will drain battery and violate sandboxing
+                self.performWork()
+                Thread.sleep(forTimeInterval: 60)
+            }
+        }
+    }
+}
+```
 
-1. **Do not introduce new singletons**
-   - Never add new `static let shared` or similar global singletons.
-   - New dependencies must be passed in via initializers or factory methods, not fetched from global state.
+## System Extensions
+Use proper system extension lifecycle management:
 
-2. **Move ownership to the composition root (AppDelegate)**
-   - Add a stored property on the macOS composition root (currently `AppDelegate`) for the dependency, for example:
-     - `let aiChatPreferences: AIChatPreferences`
-   - Construct the instance during app setup using real dependencies:
-     - Inject storage (e.g. `DefaultAIChatPreferencesStorage`)
-     - Inject configuration objects (e.g. `AIChatMenuVisibilityConfigurable`)
-     - Inject window managers via protocols (e.g. `WindowControllersManagerProtocol`)
-     - Inject feature flaggers and other services as needed
-   - Prefer protocol-typed properties in `AppDelegate` when the dependency has a clear protocol (to keep testing and substitution easy).
+```swift
+// ✅ CORRECT - System extension management
+import SystemExtensions
 
-3. **Thread the dependency through initializers**
-   - For view controllers and models that need the former singleton, add initializer parameters and store them as non-optional properties. Example:
-     - `init(..., aiChatPreferences: AIChatPreferences = NSApp.delegateTyped.aiChatPreferences, ...)`
-   - Avoid using `NSApp.delegateTyped` or `Application.appDelegate` and prefer to pass the dependency down from a parent object.
-     - If a parent object doesn't contain the dependency, it should be updated to have it passed down from its own parent object, observing the exceptions mentioned below.
-   - It is explicitly allowed to use `NSApp.delegateTyped`:
-     - In the `Tab` initializer (following the existing pattern for other dependencies)
-     - In default parameter values for the `MainViewController` initializer (this is the entry point for the dependency chain)
-     - In default parameter values for the `TabCollectionViewModel` initializer (following the existing pattern for other dependencies)
-     - In default parameter values for the `TabViewModel` initializer (temporary exception, will be refactored later)
-     - **Exception**: For `@MainActor` initializers, use optional parameters with `nil` defaults and assign from `NSApp.delegateTyped` in the initializer body.
-   - **Important: Main actor isolation**: If an initializer is marked `@MainActor` and you need to default a parameter from `NSApp.delegateTyped`, use an optional parameter with `nil` default instead of accessing `NSApp.delegateTyped` in the default value. Then assign the value inside the initializer body:
-     - ❌ `init(savedZoomLevelsCoordinating: SavedZoomLevelsCoordinating = NSApp.delegateTyped.accessibilityPreferences)` (causes main actor isolation warning)
-     - ✅ `init(savedZoomLevelsCoordinating: SavedZoomLevelsCoordinating? = nil)` with `self.savedZoomLevelsCoordinating = savedZoomLevelsCoordinating ?? NSApp.delegateTyped.accessibilityPreferences` in the body
-   - When creating child objects from a parent that already has the dependency, pass the property down rather than re-reading from `NSApp.delegateTyped`.
-   - **For preferences models that need to reach SwiftUI views**, thread through the entire chain:
-     - `MainViewController` (with default parameter) → `BrowserTabViewController` → `PreferencesViewController` → `PreferencesSidebarModel` → `PreferencesRootView`
-     - Follow the existing pattern used by other preferences (e.g., `searchPreferences`, `tabsPreferences`, `aiChatPreferences`)
-     - When adding to `PreferencesSidebarModel`, add the property alongside existing preferences and update both the main `init` and convenience `init`
-   - **For dependencies that need to reach UserScripts initialization** (e.g., `DuckPlayerPreferences`), thread through the content blocking infrastructure:
-     - `AppDelegate` → `AppContentBlocking` → `UserContentUpdating` → `ScriptSourceProvider` (via `ScriptSourceProviding` protocol) → `UserScripts`
-     - Add the dependency to `ScriptSourceProviding` protocol as a property
-     - Add it to `ScriptSourceProvider` struct (property and initializer parameter)
-     - Add it to `UserContentUpdating` initializer and pass to `ScriptSourceProvider` in `makeValue` closure
-     - Add it to `AppContentBlocking` initializers (both convenience and main) and pass to `UserContentUpdating`
-     - Pass it from `AppDelegate` to `AppContentBlocking` initialization
-     - In `UserScripts`, access via `sourceProvider.duckPlayerPreferences` instead of using a default parameter
-     - This follows the same pattern as `WebTrackingProtectionPreferences` and `CookiePopupProtectionPreferences`
+final class SystemExtensionManager: NSObject {
+    private let extensionIdentifier = "com.duckduckgo.network-extension"
+    
+    func installExtension() {
+        let request = OSSystemExtensionRequest.activationRequest(
+            forExtensionWithIdentifier: extensionIdentifier,
+            queue: .main
+        )
+        request.delegate = self
+        OSSystemExtensionManager.shared.submitRequest(request)
+    }
+    
+    func uninstallExtension() {
+        let request = OSSystemExtensionRequest.deactivationRequest(
+            forExtensionWithIdentifier: extensionIdentifier,
+            queue: .main
+        )
+        request.delegate = self
+        OSSystemExtensionManager.shared.submitRequest(request)
+    }
+    
+    func checkExtensionStatus() async -> OSSystemExtensionRequest.Result? {
+        // Check if extension is already installed
+        return await withCheckedContinuation { continuation in
+            let request = OSSystemExtensionRequest.propertiesRequest(
+                forExtensionWithIdentifier: extensionIdentifier,
+                queue: .main
+            )
+            
+            // Handle the properties request to determine status
+            // Implementation details...
+            continuation.resume(returning: nil)
+        }
+    }
+}
 
-4. **Update utility code and extensions carefully**
-   - For helpers like `URL` extensions where dependency injection is impractical, read the instance from the composition root instead of a singleton:
+// MARK: - OSSystemExtensionRequestDelegate
+extension SystemExtensionManager: OSSystemExtensionRequestDelegate {
+    func request(
+        _ request: OSSystemExtensionRequest,
+        actionForReplacingExtension existing: OSSystemExtensionProperties,
+        withExtension extension: OSSystemExtensionProperties
+    ) -> OSSystemExtensionRequest.ReplacementAction {
+        return .replace
+    }
+    
+    func requestNeedsUserApproval(_ request: OSSystemExtensionRequest) {
+        print("System extension requires user approval")
+        // Show UI to guide user through approval process
+        showUserApprovalGuidance()
+    }
+    
+    func request(
+        _ request: OSSystemExtensionRequest,
+        didFinishWithResult result: OSSystemExtensionRequest.Result
+    ) {
+        switch result {
+        case .completed:
+            print("System extension request completed successfully")
+            handleExtensionActivated()
+        case .willCompleteAfterReboot:
+            print("System extension will be activated after reboot")
+            showRebootRequiredMessage()
+        @unknown default:
+            print("Unknown system extension result: \(result)")
+        }
+    }
+    
+    func request(_ request: OSSystemExtensionRequest, didFailWithError error: Error) {
+        print("System extension request failed: \(error)")
+        handleExtensionError(error)
+    }
+    
+    private func showUserApprovalGuidance() {
+        // Show UI to guide user through System Preferences
+    }
+    
+    private func handleExtensionActivated() {
+        // Update UI to reflect extension is active
+    }
+    
+    private func showRebootRequiredMessage() {
+        // Show UI indicating reboot is required
+    }
+    
+    private func handleExtensionError(_ error: Error) {
+        // Handle extension installation errors
+    }
+}
+```
+
+## Login Items Management
+Use the modern SMAppService API for login items:
+
+```swift
+// ✅ CORRECT - Modern login items API
+import ServiceManagement
+
+final class LoginItemsManager {
+    func enableLoginItem() throws {
+        do {
+            try SMAppService.mainApp.register()
+            print("Login item enabled successfully")
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
