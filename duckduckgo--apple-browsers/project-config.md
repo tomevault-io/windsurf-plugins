@@ -1,200 +1,142 @@
 ---
 trigger: always_on
-description: *This style guide is based on the [official iOS style guide](iOS/styleguide/STYLEGUIDE.md) and incorporates DuckDuckGo-specific patterns and requirements.*
+description: The DuckDuckGo iOS design system is implemented through **DesignResourcesKit (DRK)**, a shared Swift package that contains our design tokens, type styles, colors, and design system elements.
 ---
 
 
-# Swift Code Style Guide
+# DuckDuckGo iOS Design System & DesignResourcesKit (DRK)
 
-*This style guide is based on the [official iOS style guide](iOS/styleguide/STYLEGUIDE.md) and incorporates DuckDuckGo-specific patterns and requirements.*
+## Overview
 
-## Correctness
+The DuckDuckGo iOS design system is implemented through **DesignResourcesKit (DRK)**, a shared Swift package that contains our design tokens, type styles, colors, and design system elements.
 
-**Strive to make your code compile without warnings.** This rule informs many style decisions such as using `#selector` types instead of string literals.
+**Repository**: [https://github.com/duckduckgo/DesignResourcesKit](https://github.com/duckduckgo/DesignResourcesKit)
 
-## SwiftLint
+**Figma Designs**: [🖱️ iOS & iPadOS Components](https://www.figma.com/file/GzGKD6gR24AHoUqVykX1ah/%F0%9F%93%B1-iOS-%26-iPadOS-Components?type=design&node-id=3938%3A23329&mode=design&t=0fuiNF84nnV5zExC-1)
 
-We use [SwiftLint](https://github.com/realm/SwiftLint) for enforcing Swift style and conventions. See the [SwiftLint configuration](.swiftlint.yml) for specific rules.
+### What DRK Contains
 
-**Key SwiftLint settings**:
-- Line length: 150 characters (not the default 100)
-- Force cast/try: warnings (not errors for pragmatic development)
-- Identifier naming: flexible for single-letter variables in closures
+✅ **Currently Included**:
+- **Type styles and typography** (based on system styles)
+- **Semantic color system** (with light/dark mode support)
+- **Design tokens and foundations**
 
-## Naming Conventions
+🔄 **Future Expansion**:
+- **Reusable components** (when patterns emerge)
+- **Advanced interaction patterns**
 
-Follow the [Swift API Design Guidelines](https://swift.org/documentation/api-design-guidelines/) with these key principles:
+❌ **Not Included**:
+- **Icons** (remain in iOS app directly for now)
 
-### Core Principles
-- **Clarity at the call site** over brevity
-- **Use camelCase** (not snake_case)
-- **UpperCamelCase** for types and protocols
-- **lowerCamelCase** for everything else
-- **Include all needed words** while omitting needless words
-- **Use names based on roles**, not types
+## ⚠️ Critical Rule: Don't Break the Design System
 
-### Type Names
+> **If you take only one thing away from this documentation**: 
+> **Don't add new colors or type styles outside of the design system without reading the guidelines below.**
+
+Breaking the design system:
+- **Undermines consistency** across the app
+- **Creates maintenance debt** with scattered styles
+- **Breaks accessibility** features like dynamic type
+- **Fragments the user experience**
+
+## Typography System
+
+### Philosophy
+
+Our typography system is **based on system styles** rather than hardcoded sizes. This ensures:
+- **Automatic dynamic type support** for accessibility
+- **Consistent scaling** across different user preferences
+- **Platform-appropriate styling** that feels native
+
+### UIKit Usage
+
+DRK defines **static functions on UIFont** for all typography.
+
+**Example:** See [uikit-typography-usage.swift](design-system-designresourceskit/uikit-typography-usage.swift)
+
+#### Available Typography Styles
+
+**Example:** See [uikit-typography-styles.swift](design-system-designresourceskit/uikit-typography-styles.swift)
+
+#### Best Practices for UIKit
+
+**Example:** See [uikit-typography-best-practices.swift](design-system-designresourceskit/uikit-typography-best-practices.swift)
+
+### SwiftUI Usage
+
+DRK provides **view modifiers and extensions** for SwiftUI that should be used instead of direct font access.
+
+**Example:** See [swiftui-typography-usage.swift](design-system-designresourceskit/swiftui-typography-usage.swift)
+
+#### Available SwiftUI Typography Modifiers
+
+**Example:** See [swiftui-typography-modifiers.swift](design-system-designresourceskit/swiftui-typography-modifiers.swift)
+
+#### SwiftUI Code Review Guidelines
+
+**When reviewing PRs**: Look for `.font()` usage as a red flag.
+
+**Example:** See [swiftui-code-review-red-flags.swift](design-system-designresourceskit/swiftui-code-review-red-flags.swift)
+
+### Emergency Escape Hatch (Avoid!)
+
+**For legacy layout fixes only**: If you absolutely must disable dynamic type, there's a deliberately obtusely named function:
+
 ```swift
-// ✅ CORRECT: Descriptive, UpperCamelCase
-class UserAuthenticationManager { }
-struct BookmarkItem { }
-enum NavigationState { }
-protocol DataSourceProtocol { }
-
-// ❌ INCORRECT: Too generic
-class Manager { }
-struct Data { }
+// ❌ LAST RESORT: Only for fixing legacy layouts
+let fixedFont = UIFont.daxFontOutsideOfTheDesignSystemToFixLegacyLayoutBreakage()
 ```
 
-### Variable and Function Names
+**Important Notes**:
+- This function **may not exist** in current DRK versions
+- If you need it, you must **revert the commit** that removed it: [Commit 971979d](https://github.com/duckduckgo/DesignResourcesKit/pull/1/commits/971979d3dcd95567b9812b800eb22ab1611ce3a5)
+- This is **deliberately annoying** to discourage usage
+- **Always prefer** fixing the layout to support dynamic type instead
+
+## Color System
+
+### Semantic Color Approach
+
+Our color system uses **semantic naming** rather than literal colors (e.g., "primary text" instead of "black"). This enables:
+- **Automatic dark mode support**
+- **Future theme flexibility**
+- **Accessibility compliance**
+- **Consistent visual hierarchy**
+
+### Color Categories
+
+#### Text Colors
+**UIKit Example:** See [colors-text-uikit.swift](design-system-designresourceskit/colors-text-uikit.swift)
+
+**SwiftUI Example:** See [colors-text-swiftui.swift](design-system-designresourceskit/colors-text-swiftui.swift)
+
+#### Background Colors
+**Example:** See [colors-background.swift](design-system-designresourceskit/colors-background.swift)
+
+#### Control Colors
 ```swift
-// ✅ CORRECT: Descriptive lowerCamelCase
-let maximumRetryCount = 3
-var isLoading = false
-func fetchUserData() { }
+// UIKit
+button.backgroundColor = UIColor(designSystemColor: .controlsFillPrimary)
+button.backgroundColor = UIColor(designSystemColor: .controlsFillSecondary)
 
-// Boolean properties should read like assertions
-var isEnabled: Bool
-var hasCompleted: Bool
-var canDelete: Bool
-
-// ❌ INCORRECT: Abbreviations and unclear names
-let usrMgr = UserManager()
-func calcTotal() { }
+// SwiftUI
+Button("Action") { }
+    .foregroundColor(Color(designSystemColor: .controlsFillPrimary))
+    .background(Color(designSystemColor: .controlsFillSecondary))
 ```
 
-### Protocol Naming
+#### Button-Specific Colors
 ```swift
-// ✅ CORRECT: Capability protocols end in -able, -ible, -ing
-protocol Loadable { }
-protocol Refreshable { }
-protocol UserAuthenticating { }
+// UIKit
+primaryButton.backgroundColor = UIColor(designSystemColor: .buttonPrimaryBackground)
+primaryButton.setTitleColor(UIColor(designSystemColor: .buttonPrimaryText), for: .normal)
 
-// ✅ CORRECT: Type protocols are nouns
-protocol DataSource { }
-protocol Delegate { }
-```
+secondaryButton.backgroundColor = UIColor(designSystemColor: .buttonSecondaryBackground)
+secondaryButton.setTitleColor(UIColor(designSystemColor: .buttonSecondaryText), for: .normal)
 
-### Method Naming Patterns
-```swift
-// ✅ CORRECT: Method naming patterns
-// Factory methods begin with "make"
-func makeLocationManager() -> CLLocationManager
-
-// Verb methods follow -ed, -ing rule for non-mutating
-func sorted() -> [Element]  // non-mutating
-func sort()                 // mutating
-
-// Boolean methods read like assertions
-func canDelete() -> Bool
-func hasCompleted() -> Bool
-```
-
-### Delegate Methods
-When creating custom delegate methods, the **unnamed first parameter should be the delegate source**:
-
-```swift
-// ✅ CORRECT: Delegate pattern
-func namePickerView(_ namePickerView: NamePickerView, didSelectName name: String)
-func namePickerViewShouldReload(_ namePickerView: NamePickerView) -> Bool
-
-// ❌ INCORRECT: Missing source parameter
-func didSelectName(namePicker: NamePickerViewController, name: String)
-func namePickerShouldReload() -> Bool
-```
-
-### Use Type Inferred Context
-Use compiler inferred context to write shorter, clear code:
-
-```swift
-// ✅ CORRECT: Type inferred context
-let selector = #selector(viewDidLoad)
-view.backgroundColor = .red
-let toView = context.view(forKey: .to)
-let view = UIView(frame: .zero)
-
-// ❌ INCORRECT: Redundant type information
-let selector = #selector(ViewController.viewDidLoad)
-view.backgroundColor = UIColor.red
-let toView = context.view(forKey: UITransitionContextViewKey.to)
-let view = UIView(frame: CGRect.zero)
-```
-
-### Generics
-Generic type parameters should be **descriptive, UpperCamelCase names**:
-
-```swift
-// ✅ CORRECT: Descriptive generic names
-struct Stack<Element> { ... }
-func write<Target: OutputStream>(to target: inout Target)
-func swap<T>(_ a: inout T, _ b: inout T)  // T is acceptable when no meaningful relationship
-
-// ❌ INCORRECT: Non-descriptive or wrong case
-struct Stack<T> { ... }
-func write<target: OutputStream>(to target: inout target)
-```
-
-### Language
-Use **US English spelling** to match Apple's API:
-
-```swift
-// ✅ CORRECT: US English
-let color = "red"
-
-// ❌ INCORRECT: British English
-let colour = "red"
-```
-
-## Code Organization
-
-### File Structure
-```swift
-// 1. Import statements (minimal - only what's needed)
-import UIKit
-import Combine
-
-// 2. Protocol definitions
-protocol FeatureDelegate: AnyObject {
-    func featureDidUpdate()
-}
-
-// 3. Main type declaration
-class FeatureViewController: UIViewController {
-    // Properties first
-    private let viewModel: FeatureViewModel
-    
-    // Lifecycle methods
-    override func viewDidLoad() {
-        super.viewDidLoad()
-        setupUI()
-    }
-    
-    // Private methods
-    private func setupUI() { }
-}
-
-// 4. Extensions for protocol conformance
-// MARK: - UITableViewDataSource
-extension FeatureViewController: UITableViewDataSource {
-    // Protocol methods
-}
-```
-
-### Protocol Conformance
-**Prefer separate extensions** for protocol conformance to keep related methods grouped:
-
-```swift
-// ✅ CORRECT: Separate extensions
-class MyViewController: UIViewController {
-    // class implementation
-}
-
-// MARK: - UITableViewDataSource
-extension MyViewController: UITableViewDataSource {
-    // table view data source methods
-}
-
-// MARK: - UIScrollViewDelegate
+// SwiftUI
+Button("Primary Action") { }
+    .foregroundColor(Color(designSystemColor: .buttonPrimaryText))
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
