@@ -1,142 +1,138 @@
 ---
 trigger: always_on
-description: The DuckDuckGo iOS design system is implemented through **DesignResourcesKit (DRK)**, a shared Swift package that contains our design tokens, type styles, colors, and design system elements.
+description: Use these instructions when you need to:
 ---
 
 
-# DuckDuckGo iOS Design System & DesignResourcesKit (DRK)
+# Development Commands & Build Instructions
 
-## Overview
+## 📋 When to Use This Document
 
-The DuckDuckGo iOS design system is implemented through **DesignResourcesKit (DRK)**, a shared Swift package that contains our design tokens, type styles, colors, and design system elements.
+Use these instructions when you need to:
+- Build the iOS Browser app for testing or development
+- Build the macOS Browser app for testing or development
+- Verify that code changes compile successfully
+- Prepare the app for testing or debugging
+- Understand build failures and how to fix them
 
-**Repository**: [https://github.com/duckduckgo/DesignResourcesKit](https://github.com/duckduckgo/DesignResourcesKit)
+## 🚦 Golden Rules for Building
 
-**Figma Designs**: [🖱️ iOS & iPadOS Components](https://www.figma.com/file/GzGKD6gR24AHoUqVykX1ah/%F0%9F%93%B1-iOS-%26-iPadOS-Components?type=design&node-id=3938%3A23329&mode=design&t=0fuiNF84nnV5zExC-1)
+### ✅ ALWAYS DO THESE
+1. **Use the full shell wrapper**: `/bin/sh -c 'set -e -o pipefail && xcodebuild ... | xcbeautify'`
+2. **Detect environment first**: Never hardcode paths or simulator IDs
+3. **Check exit codes**: Ensure the build succeeded before proceeding
+4. **Use absolute paths**: Always use full paths for workspace files
+5. **Include xcbeautify**: Output is unreadable without it
 
-### What DRK Contains
+### ❌ NEVER DO THESE
+1. **Never use `-jobs` flag**: It's been removed from all commands
+2. **Never skip xcbeautify**: Raw xcodebuild output is nearly impossible to parse
+3. **Never use .xcodeproj files**: Always use .xcworkspace
+4. **Never hardcode simulator IDs**: They change between systems
+5. **Never ignore build failures**: Always check and handle errors
 
-✅ **Currently Included**:
-- **Type styles and typography** (based on system styles)
-- **Semantic color system** (with light/dark mode support)
-- **Design tokens and foundations**
+## 🔍 Phase 1: Environment Detection
 
-🔄 **Future Expansion**:
-- **Reusable components** (when patterns emerge)
-- **Advanced interaction patterns**
+### Pre-Flight Checks
+Before building, validate your environment.
 
-❌ **Not Included**:
-- **Icons** (remain in iOS app directly for now)
+**Example:** See [pre-flight-checks.sh](development-commands/pre-flight-checks.sh)
 
-## ⚠️ Critical Rule: Don't Break the Design System
+### Required Variables to Detect
 
-> **If you take only one thing away from this documentation**: 
-> **Don't add new colors or type styles outside of the design system without reading the guidelines below.**
+| Variable | Purpose | Detection Command | Expected Format |
+|----------|---------|-------------------|-----------------|
+| `WORKSPACE_PATH` | Full path to .xcworkspace | `pwd` + `find . -name "DuckDuckGo.xcworkspace"` | `/Users/.../DuckDuckGo.xcworkspace` |
+| `SIMULATOR_ID` | iOS Simulator UUID | `xcrun simctl list devices \| grep iPhone` | `XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX` |
+| `ARCHITECTURE` | Mac CPU type | `uname -m` | `arm64` or `x86_64` |
 
-Breaking the design system:
-- **Undermines consistency** across the app
-- **Creates maintenance debt** with scattered styles
-- **Breaks accessibility** features like dynamic type
-- **Fragments the user experience**
+### Detection Commands
 
-## Typography System
+**Example:** See [environment-detection.sh](development-commands/environment-detection.sh)
 
-### Philosophy
+## 🏗️ Phase 2: Build Execution
 
-Our typography system is **based on system styles** rather than hardcoded sizes. This ensures:
-- **Automatic dynamic type support** for accessibility
-- **Consistent scaling** across different user preferences
-- **Platform-appropriate styling** that feels native
+### iOS Build Command Template
 
-### UIKit Usage
+Replace the placeholders with your detected values.
 
-DRK defines **static functions on UIFont** for all typography.
+**Example:** See [ios-build-template.sh](development-commands/ios-build-template.sh)
 
-**Example:** See [uikit-typography-usage.swift](design-system-designresourceskit/uikit-typography-usage.swift)
+### macOS Build Command Template
 
-#### Available Typography Styles
+Replace the placeholders with your detected values.
 
-**Example:** See [uikit-typography-styles.swift](design-system-designresourceskit/uikit-typography-styles.swift)
+**Example:** See [macos-build-template.sh](development-commands/macos-build-template.sh)
 
-#### Best Practices for UIKit
+### Complete Working Examples
 
-**Example:** See [uikit-typography-best-practices.swift](design-system-designresourceskit/uikit-typography-best-practices.swift)
+#### iOS Build (Real Values)
+**Example:** See [ios-build-example.sh](development-commands/ios-build-example.sh)
 
-### SwiftUI Usage
+#### macOS Build (Real Values)
+**Example:** See [macos-build-example.sh](development-commands/macos-build-example.sh)
 
-DRK provides **view modifiers and extensions** for SwiftUI that should be used instead of direct font access.
+## ✅ Phase 3: Build Verification
 
-**Example:** See [swiftui-typography-usage.swift](design-system-designresourceskit/swiftui-typography-usage.swift)
+### Signs of Success
+- Command exits with code 0
+- Last line contains "BUILD SUCCEEDED"
+- No error messages in red
+- Build time is within expected range (see performance table below)
 
-#### Available SwiftUI Typography Modifiers
+### Signs of Failure
+- Command exits with non-zero code
+- Output contains "BUILD FAILED"
+- Red error messages appear
+- Build hangs for more than 15 minutes
 
-**Example:** See [swiftui-typography-modifiers.swift](design-system-designresourceskit/swiftui-typography-modifiers.swift)
+### Performance Expectations
 
-#### SwiftUI Code Review Guidelines
+| Build Type | Expected Duration | Action if Exceeded |
+|------------|------------------|-------------------|
+| First build | 5-10 minutes | Normal - downloading dependencies |
+| Subsequent build | 1-3 minutes | Check for errors in output |
+| Clean build | 3-5 minutes | Normal - rebuilding everything |
+| Incremental | 10-30 seconds | Normal for small changes |
+| Hanging >15 min | Abnormal | Cancel and check for issues |
 
-**When reviewing PRs**: Look for `.font()` usage as a red flag.
+## 🔧 Error Recovery
 
-**Example:** See [swiftui-code-review-red-flags.swift](design-system-designresourceskit/swiftui-code-review-red-flags.swift)
+### If Build Fails - Immediate Actions
 
-### Emergency Escape Hatch (Avoid!)
+1. **Check the error message** - Last few red lines usually indicate the issue
+2. **Clean and retry:** See [error-recovery-clean.sh](development-commands/error-recovery-clean.sh)
+3. **If "No such module" errors:** See [error-recovery-derived-data.sh](development-commands/error-recovery-derived-data.sh)
+4. **If simulator issues:** See [error-recovery-simulator.sh](development-commands/error-recovery-simulator.sh)
 
-**For legacy layout fixes only**: If you absolutely must disable dynamic type, there's a deliberately obtusely named function:
+### Common Problems and Solutions
 
-```swift
-// ❌ LAST RESORT: Only for fixing legacy layouts
-let fixedFont = UIFont.daxFontOutsideOfTheDesignSystemToFixLegacyLayoutBreakage()
-```
+| Problem | Diagnosis Command | Solution |
+|---------|------------------|----------|
+| No workspace found | `ls *.xcworkspace` | Ensure you're in project root directory |
+| Simulator not found | `xcrun simctl list devices` | Pick a different simulator ID from the list |
+| "Command not found: xcbeautify" | `which xcbeautify` | Install: `brew install xcbeautify` |
+| Build hangs | Check Activity Monitor | Kill xcodebuild process and retry |
+| "No such module" | Check package resolution | Clean DerivedData and rebuild |
+| Provisioning errors | Check Xcode account | May need manual Xcode intervention |
 
-**Important Notes**:
-- This function **may not exist** in current DRK versions
-- If you need it, you must **revert the commit** that removed it: [Commit 971979d](https://github.com/duckduckgo/DesignResourcesKit/pull/1/commits/971979d3dcd95567b9812b800eb22ab1611ce3a5)
-- This is **deliberately annoying** to discourage usage
-- **Always prefer** fixing the layout to support dynamic type instead
+## 🤖 Complete Automation Script
 
-## Color System
+Use this script for reliable, automated builds.
 
-### Semantic Color Approach
+**Example:** See [complete-automation-script.sh](development-commands/complete-automation-script.sh)
 
-Our color system uses **semantic naming** rather than literal colors (e.g., "primary text" instead of "black"). This enables:
-- **Automatic dark mode support**
-- **Future theme flexibility**
-- **Accessibility compliance**
-- **Consistent visual hierarchy**
+## 📊 Build Flag Reference
 
-### Color Categories
+Understanding what each flag does:
 
-#### Text Colors
-**UIKit Example:** See [colors-text-uikit.swift](design-system-designresourceskit/colors-text-uikit.swift)
-
-**SwiftUI Example:** See [colors-text-swiftui.swift](design-system-designresourceskit/colors-text-swiftui.swift)
-
-#### Background Colors
-**Example:** See [colors-background.swift](design-system-designresourceskit/colors-background.swift)
-
-#### Control Colors
-```swift
-// UIKit
-button.backgroundColor = UIColor(designSystemColor: .controlsFillPrimary)
-button.backgroundColor = UIColor(designSystemColor: .controlsFillSecondary)
-
-// SwiftUI
-Button("Action") { }
-    .foregroundColor(Color(designSystemColor: .controlsFillPrimary))
-    .background(Color(designSystemColor: .controlsFillSecondary))
-```
-
-#### Button-Specific Colors
-```swift
-// UIKit
-primaryButton.backgroundColor = UIColor(designSystemColor: .buttonPrimaryBackground)
-primaryButton.setTitleColor(UIColor(designSystemColor: .buttonPrimaryText), for: .normal)
-
-secondaryButton.backgroundColor = UIColor(designSystemColor: .buttonSecondaryBackground)
-secondaryButton.setTitleColor(UIColor(designSystemColor: .buttonSecondaryText), for: .normal)
-
-// SwiftUI
-Button("Primary Action") { }
-    .foregroundColor(Color(designSystemColor: .buttonPrimaryText))
+| Flag | Purpose | Impact |
+|------|---------|--------|
+| `ONLY_ACTIVE_ARCH=YES` | Build only for current architecture | 50% faster builds |
+| `DEBUG_INFORMATION_FORMAT=dwarf` | Use DWARF debug symbols | Smaller build size |
+| `COMPILER_INDEX_STORE_ENABLE=NO` | Skip code indexing | Faster builds |
+| `-allowProvisioningUpdates` | Auto-update certificates | Prevents signing failures |
+| `-disableAutomaticPackageResolution` | Skip package updates | Faster, more stable |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
