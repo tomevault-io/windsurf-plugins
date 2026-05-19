@@ -1,160 +1,156 @@
 ---
 trigger: always_on
-description: *This guide covers testing practices and patterns for the DuckDuckGo browser on iOS and macOS platforms.*
+description: *This guide covers UI testing practices and patterns specifically for the DuckDuckGo macOS browser.*
 ---
 
 
-# Testing Guidelines & Best Practices
+# UI Testing Guidelines & Best Practices
 
-*This guide covers testing practices and patterns for the DuckDuckGo browser on iOS and macOS platforms.*
+*This guide covers UI testing practices and patterns specifically for the DuckDuckGo macOS browser.*
 
-## 🚨 MANDATORY: Testing Execution Rules
+## Overview
 
-### NEVER Run Tests Without Permission
-**NEVER execute any test commands without EXPLICIT user permission or unles user explicitly asked to in their prompt.**
+UI Tests verify the end-to-end user experience and interface behavior. They test user workflows, navigation patterns, window management, and complex interactions across the entire application.
 
-#### Required Testing Workflow:
-1. Write or modify test code as requested
-2. if user did not ask to run tests in their prompt, **STOP** before running any test commands:
-   - `swift test`
-   - `npm test` 
-   - `xcodebuild test`
-   - `fastlane test`
-   - Any other test execution commands
-3. **ASK** the user: "Should I run the tests?"
-4. **WAIT** for explicit permission (e.g., "yes", "run tests", "test it")
-5. Only then execute test commands
+## Setting Up UI Tests
 
-**This rule applies to ALL test execution - unit tests, integration tests, UI tests, performance tests, etc.**
-
----
-
-## Future Improvements
-
-This guide is a living document. Consider these areas for future improvements:
-
-- **Tab Extensions Testing**: Expand patterns for testing complex tab extension interactions and lifecycle management
-- **WebKit Integration Testing**: Add comprehensive patterns for testing WKWebView configurations, user scripts, and content blocking integration
-- **Privacy Feature Testing**: Develop specialized testing approaches for tracker protection, HTTPS upgrade, and content blocking rule validation
-- **Cross-Platform Testing**: Create patterns for testing SharedPackages functionality across iOS and macOS with consistent behavior validation
-- **Fire Button Integration Testing**: Add comprehensive testing patterns for data clearing workflows across all browser components
-- **Autofill and Credential Testing**: Expand testing approaches for AutofillCredentialProvider, password management, and form filling scenarios
-- **Sync Testing**: Develop patterns for testing bookmark sync, conflict resolution, and cross-device data consistency
-- **AI Chat Integration Testing**: Add testing patterns for AI chat functionality, context management, and user interaction flows
-- **Feature Flag Testing**: Expand MockFeatureFlagger usage patterns and integration testing with real feature configurations
-
-## Unit Tests
-
-### What to Include
-
-Unit tests should focus on testing individual components, functions, or classes in isolation. They should be:
-
-- **Fast**: Run quickly (< 1 second per test)
-- **Independent**: Not depend on external systems or other tests
-- **Deterministic**: Always produce the same result given the same input
-- **Focused**: Test one specific behavior or functionality
-
-### ✅ When to Write Unit Tests
-
-#### Model Logic
-Testing business logic, data transformations, and model behavior:
+### ❗Always Use UITestCase Base Class
 
 ```swift
-func testBookmarkFolderCreation() {
-    let folder = BookmarkFolder(title: "Test Folder")
-    XCTAssertEqual(folder.title, "Test Folder")
-    XCTAssertTrue(folder.children.isEmpty)
+class FeatureUITests: UITestCase {  // ✅ Use UITestCase, not XCTestCase
+    private var app: XCUIApplication!
+    
+    override func setUpWithError() throws {
+        continueAfterFailure = false
+        app = XCUIApplication.setUp()  // ✅ Use setUp(), never launch() directly
+        // app is already launched and configured by setUp()
+    }
 }
 ```
 
-#### Algorithms/Parsers
-Testing parsing logic, URL manipulation, search algorithms:
+**Why UITestCase is Required**:
+- Provides proper app lifecycle management
+- Handles feature flag configuration
+- Sets up test server environment
+- Manages window state and cleanup
+- Provides debugging utilities
+
+### Feature Flag Configuration
 
 ```swift
-func testURLSchemeDetection() {
-    let detector = URLSchemeDetector()
-    XCTAssertTrue(detector.isValidURL("https://duckduckgo.com"))
-    XCTAssertFalse(detector.isValidURL("invalid-url"))
+// Configure feature flags during test setup
+override func setUpWithError() throws {
+    app = XCUIApplication.setUp(featureFlags: [
+        "contextualOnboarding": true,
+        "visualUpdates": false,
+        "duckPlayer": true
+    ])
+    // Feature flags are automatically applied via FEATURE_FLAGS environment variable
+}
+
+// Alternative: Custom environment
+app = XCUIApplication.setUp(environment: [
+    "UITEST_MODE_ONBOARDING": "1"
+], featureFlags: [
+    "newTabPageSections": true
+])
+```
+
+#### Privacy Subfeature Configuration
+
+```swift
+// Configure privacy subfeatures (separate from feature flags)
+override func setUpWithError() throws {
+    app = XCUIApplication.setUp(privacySubfeatures: [
+        "autoconsent-filterlist": true,
+        "tracker-allowlist": true
+    ])
+    // Privacy subfeatures are applied via PRIVACY_SUBFEATURES environment variable
+}
+
+// Combined feature flags and privacy subfeatures
+app = XCUIApplication.setUp(
+    featureFlags: [
+        "contextualOnboarding": true
+    ],
+    privacySubfeatures: [
+        "autoconsent-filterlist": true
+    ]
+)
+```
+
+**❗Why Feature Flag and Privacy Subfeature Configuration is Critical**:
+- UI tests run against notarized builds - feature flags can't be changed at runtime
+- MockFeatureFlagger is NOT available in UI tests (only real DefaultFeatureFlagger)
+- Feature flags must be configured via FEATURE_FLAGS environment variable before app launch
+- **Privacy subfeatures are controlled by PrivacyConfiguration, not feature flags**
+- Privacy subfeatures must be configured via PRIVACY_SUBFEATURES environment variable
+- Incorrect feature/subfeature state will cause UI tests to fail when expected UI elements don't appear
+
+**Key Differences**:
+- **Feature Flags**: Control app features (e.g., `contextualOnboarding`, `duckPlayer`)
+- **Privacy Subfeatures**: Control privacy functionality (e.g., `autoconsent-filterlist`, `tracker-allowlist`)
+- Both use separate environment variables and configuration systems
+
+### File Management in UI Tests
+
+The `UITestCase` base class provides built-in file management capabilities for handling downloads, temporary files, and other file operations during testing.
+
+**Important**: UI tests run in a sandboxed environment and cannot directly read or delete files from user directories using standard FileManager calls. For non-temp directories, use the `filesToCleanup` pattern that's handled in the base class `tearDown()`.
+
+#### Automatic File Cleanup
+
+All UI test classes automatically clean up tracked files after test completion:
+
+```swift
+class DownloadsUITests: UITestCase {
+    func testFileDownload() {
+        let downloadsDir = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask)[0]
+        let fileName = "test-file.json"
+        let filePath = downloadsDir.appendingPathComponent(fileName).path
+        
+        // Track file for automatic cleanup
+        trackForCleanup(filePath)
+        
+        // Perform download test...
+        // File will be automatically cleaned up after test completes
+    }
 }
 ```
 
-#### Utility Functions
-Testing helper functions, extensions, formatters:
+#### Reading Files via Local Server
+
+Use `readFileViaLocalServer()` to read files that may have permission restrictions:
 
 ```swift
-func testDateFormatter() {
-    let formatter = DateFormatter.shortDate
-    let date = Date(timeIntervalSince1970: 1640995200) // 2022-01-01
-    XCTAssertEqual(formatter.string(from: date), "1/1/22")
+func testJSONFileContent() throws {
+    let filePath = "/Users/admin/Downloads/test-results.json"
+    
+    // Read file via local test server (bypasses permission issues)
+    let jsonData = try readFileViaLocalServer(filePath: filePath)
+    let results = try JSONDecoder().decode(TestResults.self, from: jsonData)
+    
+    // Validate file contents
+    XCTAssertFalse(results.items.isEmpty)
 }
 ```
 
-#### State Management
-Testing ViewModels, state transitions, and data flow:
+#### File Management Best Practices
 
 ```swift
-func testViewModelStateTransition() {
-    let viewModel = SearchViewModel()
-    viewModel.performSearch("test query")
-    XCTAssertEqual(viewModel.state, .loading)
-}
-```
-
-### ❌ What to Avoid
-
-#### Simple Property Toggles
-Testing trivial getters/setters:
-
-```swift
-// ❌ DON'T test this
-func testIsEnabledToggle() {
-    feature.isEnabled = true
-    XCTAssertTrue(feature.isEnabled)
-}
-```
-
-#### Complex UI Interactions
-Use Integration or UI tests instead.
-
-#### External Dependencies
-File system, network calls, databases.
-
-#### State/Strategy Pattern Switching
-These are better suited for integration tests:
-
-```swift
-// ❌ DON'T test state switching in unit tests
-func testStateSwitching() {
-    stateMachine.transition(to: .loading)
-    stateMachine.transition(to: .loaded)
-    // This is brittle and doesn't test real behavior
-}
-```
-
-## Mocks and Test Helpers
-
-The DuckDuckGo browser project includes multiple mock categories for testing different components and scenarios:
-
-### Mock Categories
-
-#### Unit Tests Mocks
-For testing individual components in isolation:
-- **UI mocks**: MockWindow, MockTabViewItemDelegate
-- **WebView mocks**: WebViewMock, WKSecurityOriginMock
-- **Storage mocks**: FileStoreMock, UserDefaultsMock
-- **Feature-specific mocks**: MockBookmarkManager, MockFireproofDomains, MockAIChatPreferencesStorage
-
-#### Integration Tests Mocks
-For testing component interactions and workflows:
-- Content blocking mocks
-- Tab navigation mocks
-- Fire integration mocks
-- Onboarding flow mocks
-- System integration mocks
-
-#### BSK Tests Mocks
-For testing BrowserServicesKit functionality:
-- **Feature flag mocks**: MockFeatureFlagger
+class FileBasedUITests: UITestCase {
+    func testCompleteFileWorkflow() throws {
+        // 1. Track all files that will be created
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("test-files")
+        trackForCleanup(tempDir.path)
+        
+        let downloadedFile = "/Users/admin/Downloads/results.json"
+        trackForCleanup(downloadedFile)
+        
+        // 2. Perform file operations
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        
+        // 3. Read files via server if needed
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
