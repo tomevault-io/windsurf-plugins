@@ -1,132 +1,181 @@
 ---
 trigger: always_on
-description: This document provides a comprehensive overview of how content blocking has been implemented on iOS to protect user privacy and block tracking attempts. Our implementation uses a dual-approach strategy that combines the efficiency of WebKit's native content blocking with the flexibility of JavaScript-based protection.
+description: The DuckDuckGo browser apps for iOS and macOS leverage **Apple's Unified Logging System** for capturing telemetry and debugging information. This system enables efficient tracking of app behavior, issue diagnosis, and performance monitoring in a structured and privacy-conscious manner.
 ---
 
 
-# iOS Tracker Blocking Implementation Guide
+# Logging Guidelines & Telemetry Capture
 
 ## Overview
 
-This document provides a comprehensive overview of how content blocking has been implemented on iOS to protect user privacy and block tracking attempts. Our implementation uses a dual-approach strategy that combines the efficiency of WebKit's native content blocking with the flexibility of JavaScript-based protection.
+The DuckDuckGo browser apps for iOS and macOS leverage **Apple's Unified Logging System** for capturing telemetry and debugging information. This system enables efficient tracking of app behavior, issue diagnosis, and performance monitoring in a structured and privacy-conscious manner.
 
-**Implementation Strategy:**
-- **Primary Layer**: Content Blocker Rules (WebKit native, compiled to bytecode)
-- **Secondary Layer**: JavaScript injection with Tracker Radar data (gap coverage + surrogates)
+**Key Benefits**:
+- **Privacy-first**: Built-in privacy controls for sensitive data
+- **Performance**: Optimized for minimal overhead
+- **Integration**: Native Apple ecosystem support
+- **Debugging**: Rich contextual information and filtering
 
-## Content Blocker Rules
+## How to Log
 
-### Architecture Overview
+### Using the Logger Class
 
-Content Blocker Rules form the primary layer of our tracker blocking implementation. These rules are converted from our Tracker Radar dataset into Apple's Content Blocker Rules format and compiled by WebKit into efficient bytecode for optimal performance.
-
-**Key Characteristics:**
-- ✅ **High Performance**: Rules are compiled to bytecode by WebKit
-- ✅ **Low Memory Footprint**: Optimized for mobile devices
-- ✅ **Battery Efficient**: Minimal CPU overhead
-- ❌ **Limited Flexibility**: Cannot support complex logic or surrogates
-- ❌ **No Runtime Modification**: Rules are static once compiled
-
-### Implementation Details
-
-#### ContentBlockerRulesManager
-
-The `ContentBlockerRulesManager` is responsible for converting Tracker Radar data into Apple's Content Blocker format and managing the rule compilation process.
+We utilize the `Logger` class from Apple's `os` framework for all logging activities:
 
 ```swift
-import WebKit
-import BrowserServicesKit
+import os
 
-final class ContentBlockerRulesManager {
-    private let trackerDataManager: TrackerDataManager
-    private let compilationQueue = DispatchQueue(label: "content-blocker-compilation", qos: .utility)
-    
-    init(trackerDataManager: TrackerDataManager) {
-        self.trackerDataManager = trackerDataManager
-    }
-    
-    /// Converts Tracker Radar data to Content Blocker Rules format
-    func generateContentBlockerRules() async throws -> [WKContentRuleList] {
-        return try await withCheckedThrowingContinuation { continuation in
-            compilationQueue.async {
-                do {
-                    let trackerData = self.trackerDataManager.embeddedTrackerData
-                    let rules = self.convertToContentBlockerFormat(trackerData)
-                    let ruleList = try self.compileRules(rules)
-                    continuation.resume(returning: [ruleList])
-                } catch {
-                    continuation.resume(throwing: error)
-                }
-            }
-        }
-    }
-    
-    /// Converts TrackerData to Apple's Content Blocker Rules JSON format
-    private func convertToContentBlockerFormat(_ trackerData: TrackerData) -> [[String: Any]] {
-        var rules: [[String: Any]] = []
-        
-        for (domain, tracker) in trackerData.trackers {
-            for rule in tracker.rules ?? [] {
-                let contentBlockerRule: [String: Any] = [
-                    "trigger": [
-                        "url-filter": rule.rule,
-                        "resource-type": rule.resourceTypes,
-                        "if-domain": rule.whitelist?.compactMap { "*\($0)" }
-                    ].compactMapValues { $0 },
-                    "action": [
-                        "type": "block"
-                    ]
-                ]
-                rules.append(contentBlockerRule)
-            }
-        }
-        
-        return rules
-    }
-    
-    /// Compiles rules using WebKit's WKContentRuleListStore
-    private func compileRules(_ rules: [[String: Any]]) throws -> WKContentRuleList {
-        let jsonData = try JSONSerialization.data(withJSONObject: rules)
-        let jsonString = String(data: jsonData, encoding: .utf8)!
-        
-        return try await withCheckedThrowingContinuation { continuation in
-            WKContentRuleListStore.default().compileContentRuleList(
-                forIdentifier: "DuckDuckGoContentBlocker",
-                encodedContentRuleList: jsonString
-            ) { ruleList, error in
-                if let error = error {
-                    continuation.resume(throwing: error)
-                } else if let ruleList = ruleList {
-                    continuation.resume(returning: ruleList)
-                } else {
-                    continuation.resume(throwing: ContentBlockerError.compilationFailed)
-                }
-            }
-        }
-    }
-}
+// Basic logging examples
+Logger.yourFeatureName.debug("Something to log, with info: \(infoVar)")
+Logger.anotherFeatureName.error("Some error happened: \(error.localizedDescription, privacy: .public)")
+Logger.networking.info("API request completed for endpoint: \(endpoint, privacy: .public)")
+Logger.performance.debug("Operation took \(duration)ms to complete")
+```
 
-enum ContentBlockerError: Error {
-    case compilationFailed
-    case invalidRuleFormat
-    case trackerDataUnavailable
+### Creating Custom Loggers
+
+#### Single Feature Logger
+
+For new features, create a dedicated logger file named `Logger+YourFeatureName.swift`:
+
+```swift
+import os
+
+public extension Logger {
+    static var yourFeatureName: Logger = { 
+        Logger(subsystem: "Your Feature Name", category: "") 
+    }()
+    
+    static var anotherFeatureName: Logger = { 
+        Logger(subsystem: "Another feature name", category: "Subsystem in the feature") 
+    }()
 }
 ```
 
-#### Integration with WKWebView
+#### Multiple Feature Loggers
 
-Content Blocker Rules are applied to WKWebView through the `WKUserContentController`:
+For related features, add to existing logger extensions (e.g., `Logger+Multiple.swift`):
 
 ```swift
-extension BrowserWebView {
-    func applyContentBlockerRules() async {
-        do {
-            let ruleLists = try await contentBlockerManager.generateContentBlockerRules()
-            
-            await MainActor.run {
-                for ruleList in ruleLists {
-                    webView.configuration.userContentController.add(ruleList)
-                }
+import os
+
+public extension Logger {
+    // Networking loggers
+    static var networking: Logger = { 
+        Logger(subsystem: "Networking", category: "API") 
+    }()
+    
+    static var cache: Logger = { 
+        Logger(subsystem: "Networking", category: "Cache") 
+    }()
+    
+    // UI loggers  
+    static var tabManagement: Logger = { 
+        Logger(subsystem: "UI", category: "Tab Management") 
+    }()
+    
+    static var bookmarks: Logger = { 
+        Logger(subsystem: "UI", category: "Bookmarks") 
+    }()
+}
+```
+
+### Logger Placement Strategy
+
+**Framework/Package Level**: For shared functionality across iOS and macOS
+```swift
+// In BrowserServicesKit
+public extension Logger {
+    static var secureVault: Logger = { 
+        Logger(subsystem: "BrowserServicesKit", category: "SecureVault") 
+    }()
+    
+    static var sync: Logger = { 
+        Logger(subsystem: "BrowserServicesKit", category: "Sync") 
+    }()
+}
+```
+
+**App Level**: For platform-specific features
+```swift
+// In iOS app
+public extension Logger {
+    static var widgets: Logger = { 
+        Logger(subsystem: "iOS App", category: "Widgets") 
+    }()
+}
+
+// In macOS app  
+public extension Logger {
+    static var windowManagement: Logger = { 
+        Logger(subsystem: "macOS App", category: "Window Management") 
+    }()
+}
+```
+
+## Subsystem and Category Guidelines
+
+### Subsystem Naming
+
+**Purpose**: Corresponds to large functional areas of your app
+
+**Examples**:
+- `"Networking"` - All network-related functionality
+- `"UI"` - User interface components
+- `"Data Storage"` - Database and persistence
+- `"Security"` - Authentication and encryption
+- `"Performance"` - Performance monitoring and optimization
+
+### Category Naming
+
+**Purpose**: Specific components or features within subsystems
+
+**Examples**:
+```swift
+// Networking subsystem categories
+Logger(subsystem: "Networking", category: "API Calls")
+Logger(subsystem: "Networking", category: "Cache Management")
+Logger(subsystem: "Networking", category: "Request Retry")
+
+// UI subsystem categories  
+Logger(subsystem: "UI", category: "Tab Management")
+Logger(subsystem: "UI", category: "Settings")
+Logger(subsystem: "UI", category: "Bookmarks")
+
+// Data Storage subsystem categories
+Logger(subsystem: "Data Storage", category: "SecureVault")
+Logger(subsystem: "Data Storage", category: "Core Data")
+Logger(subsystem: "Data Storage", category: "User Defaults")
+```
+
+## Log Levels and Privacy
+
+### Choosing Log Levels
+
+#### `debug` - Development and Troubleshooting
+- **Purpose**: Verbose output for development debugging
+- **Retention**: Short-lived in memory
+- **Use cases**: Variable values, execution flow, temporary debugging
+
+```swift
+Logger.networking.debug("Request headers: \(headers)")
+Logger.ui.debug("User tapped button at coordinates: \(point)")
+Logger.performance.debug("Cache hit for key: \(key)")
+```
+
+#### `info` - Important Events
+- **Purpose**: Interesting or important information
+- **Retention**: Longer than debug, available for analysis
+- **Use cases**: User actions, system state changes, feature usage
+
+```swift
+Logger.auth.info("User successfully authenticated")
+Logger.sync.info("Sync operation completed with \(itemCount) items")
+Logger.features.info("Feature flag \(flagName, privacy: .public) enabled")
+```
+
+#### `error` - Handled Errors
+- **Purpose**: Something went wrong but was handled gracefully
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
