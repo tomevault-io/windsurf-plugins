@@ -1,167 +1,178 @@
 ---
 trigger: always_on
-description: Comprehensive knowledge management system for capturing, organizing, and applying project knowledge
+description: Defines custom commands for AI-assisted development workflows
 ---
 
-# Knowledge Management System
+# AI Command System
 
-Rule for capturing, organizing, refining, and applying knowledge throughout the project lifecycle.
+Rule for defining and handling custom commands for AI-assisted development workflows.
 
 <rule>
-name: knowledge_management
+name: ai_command_system
 filters:
-  # Information tracking filters
-  - type: event
-    pattern: "knowledge_capture"
-  - type: event
-    pattern: "file_create"
-  - type: event
-    pattern: "file_change"
   - type: command
-    pattern: "learn"
+    pattern: "Specs"
   - type: command
-    pattern: "document"
-  - type: event
-    pattern: "conversation_insight"
-  - type: file_change
-    pattern: ".cursor/docs/*"
-  
-  # Learning refinement filters
-  - type: event
-    pattern: "learning_create"
-  - type: event
-    pattern: "learning_update"
-  - type: file_change
-    pattern: ".cursor/learnings/*.md"
+    pattern: "Code"
   - type: command
-    pattern: "knowledge"
-  
-  # Actionable insights filters
+    pattern: "Task"
   - type: command
-    pattern: "insight"
-  - type: event
-    pattern: "implementation_complete"
-  - type: event
-    pattern: "task_complete"
-  - type: event
-    pattern: "code_review"
-  - type: file_change
-    pattern: "src/*"
+    pattern: "Learn"
+  - type: command
+    pattern: "Eval"
+  - type: command
+    pattern: "Review"
 
 actions:
-  #
-  # SECTION 1: KNOWLEDGE CAPTURE
-  #
-  
+  # Specs Commands
   - type: react
     conditions:
-      - pattern: "learn add|learning create"
+      - pattern: "Specs.getHtml"
     action: |
-      # Create a new learning entry
+      # Generate an HTML representation of all specifications
+      # This will create a dashboard showing all specs with their completion status
       
-      I'll create a structured learning document with:
-      - Unique ID (format: LEARN-YYYY-MM-DD-NN)
-      - Title and short description
-      - Detailed description of the learning (including context related to **SOLID, TDD, SRP, Calisthenics, resilience** if applicable)
-      - Relevant code files (using `Sources/`, `Tests/` paths), tasks (managed by development_workflow_system), specifications (managed by specification_management), and documents
-      - Date of capture
-      - Keywords for easy retrieval
+      I'll generate an HTML dashboard of all specifications, showing:
+      - Project specifications overview
+      - Completion percentages
+      - Requirements status for each spec
+      - Categories of specifications
+      - A visual indicator of progress
       
-      The learning will be stored in `.cursor/learnings/` 
-      and indexed in `.cursor/LEARNINGS.md`
+      The dashboard will be saved to `.cursor/output/specs_[timestamp].html`
 
   - type: react
     conditions:
-      - pattern: "document add|document create|document detect"
+      - pattern: "Specs.getSummary"
     action: |
-      # Register a document in the knowledge base
+      # Generate a markdown summary of all specifications
       
-      I'll register the document by:
-      - Storing a copy in `.cursor/docs/` if it's not already there
-      - Creating a learning entry about this document
-      - Adding the document to the documents index
-      - Extracting key information from the document
-      - Creating cross-references to related content including specifications (managed by specification_management)
+      I'll create a markdown summary showing:
+      - Total specification files
+      - Total requirements
+      - Completion percentage
+      - Breakdown by category
+      - Details on each individual specification
       
-      This ensures all project documentation is centrally tracked
-      and discoverable.
-
-  - type: react
-    event: "conversation_insight"
-    action: |
-      # Automatically capture important insights from our conversations
-      
-      When I identify valuable insights in our conversation, I'll:
-      - Create a learning entry with the insight
-      - Generate a unique ID for the learning
-      - Categorize and tag the insight appropriately
-      - Add context and relevant connections to tasks (managed by development_workflow_system)
-      - Index the insight for future reference
-      
-      This ensures important information isn't lost.
-
-  - type: react
-    event: "file_change"
-    conditions:
-      - pattern: ".cursor/docs/.*"
-    action: |
-      # Automatically process new documents added to docs directory
-      
-      When a new document is added to `.cursor/docs/`, I'll:
-      - Extract key information from the document
-      - Create a learning entry linked to this document
-      - Update the documents index
-      - Identify related content including specifications (managed by specification_management)
-      - Generate appropriate metadata
-      
-      This ensures all documentation is properly integrated into
-      the knowledge base.
-  
-  #
-  # SECTION 2: KNOWLEDGE ORGANIZATION & REFINEMENT
-  #
-  
-  - type: react
-    conditions:
-      - pattern: "learn categorize|learning categorize"
-    action: |
-      # Categorize and organize learnings
-      
-      I'll organize all learnings into meaningful categories:
-      
-      1. Analyze all learning content to identify topics and themes
-      2. Categorize learnings into domains like:
-         - Architecture, Performance, Security, DevOps
-         - UX, API, Database, Testing
-         - Frontend, Backend, Mobile, Tooling
-         - Process, Bugs, Documentation
-      3. Create category files in `.cursor/learning_categories/`
-      4. Generate a categories index with links to all categorized learnings
-      5. Identify uncategorized learnings for further review
-      
-      This makes knowledge more discoverable by organizing it into logical domains.
+      The summary will be saved to `.cursor/output/specs_summary_[timestamp].md`
 
   - type: react
     conditions:
-      - pattern: "learn refine:(.*)"
+      - pattern: "Specs.verify"
     action: |
-      # Refine a specific learning to enhance its value
+      # Verify implementations match specifications
       
-      I'll refine the specified learning by:
+      I'll analyze the codebase to verify that specifications have been implemented:
+      - Trace each requirement to implementation code
+      - Verify marked items actually exist in the codebase
+      - Identify gaps between specs and implementation
+      - Generate a verification report with findings
       
-      1. Extracting the core learning ID from the command
-      2. Creating an enhanced version with additional sections:
-         - Keywords extracted from content
-         - Key takeaways for quick reference
-         - Potential applications of this knowledge
-         - Related learnings on similar topics
-         - Improved formatting and organization
-      3. Preserving all original content while adding refinements
-      4. Adding a "Last Refined" date
+      The verification report will be saved to `.cursor/output/spec_verification_[timestamp].md`
+
+  # Code Commands
+  - type: react
+    conditions:
+      - pattern: "Code.analyze"
+    action: |
+      # Analyze code structure and quality
+      
+      I'll perform a comprehensive analysis of the codebase:
+      - File types and lines of code
+      - Directory structure
+      - Code complexity metrics
+      - Potential complex functions (>50 lines)
+      - TODOs and FIXMEs
+      - Potential architectural issues
+      - Refactor to follow [object callisthenics](mdc:https:/williamdurand.fr/2013/06/03/object-calisthenics)
+      - Check for code smells 
+      
+      The analysis report will be saved to `.cursor/output/code_analysis_[timestamp].md`
+
+  - type: react
+    conditions:
+      - pattern: "Code.refactor:(.*)"
+    action: |
+      # Extract the code file to refactor from the command
+      # Pattern will capture the file path
+      
+      I'll analyze the specified file and provide refactoring recommendations:
+      - Look for @codes
+      - Identify long functions that could be broken down
+      - Find duplicated code patterns
+      - Review naming conventions
+      - Suggest code structure improvements
+      - Generate refactored code
+      
+      The refactoring report will be saved to `.cursor/output/refactor_[filename]_[timestamp].md`
+
+  # Evaluation Commands
+  - type: react
+    conditions:
+      - pattern: "Eval.project"
+    action: |
+      # Generate a comprehensive project evaluation report
+      
+      I'll evaluate the entire project:
+      - Project overview and statistics
+      - Task completion assessment
+      - Specification coverage
+      - Code quality assessment
+      - Documentation assessment
+      - Recommendations for improvement
+      
+      The evaluation report will be saved to `.cursor/output/project_evaluation_[timestamp].md`
+
+  - type: react
+    conditions:
+      - pattern: "Eval.progress"
+    action: |
+      # Generate a progress report comparing current state to project goals
+      
+      I'll analyze project progress:
+      - Milestone status and completion
+      - Weekly task completion trends
+      - Burndown analysis with completion projections
+      - Risk assessment
+      - Recommendations to maintain momentum
+      
+      The progress report will be saved to `.cursor/output/progress_report_[timestamp].md`
+
+  # Review Commands
+  - type: react
+    conditions:
+      - pattern: "Review.code:(.*)"
+    action: |
+      # Generate a code review for the specified file
+      # Pattern will capture the file path
+      
+      I'll perform a detailed code review:
+      - Style and formatting analysis
+      - Code structure evaluation
+      - Security considerations
+      - Performance considerations
+      - Specific recommendations for improvement
+      
+      The code review will be saved to `.cursor/output/codereview_[filename]_[timestamp].md`
+
+  - type: react
+    conditions:
+      - pattern: "Review.pr"
+    action: |
+      # Generate a pull request review template
+      
+      I'll create a comprehensive PR review template with sections for:
+      - PR overview (title, author, branch)
+      - Changes summary
+      - Specifications addressed
+      - Code review (structure, quality, testing, security, performance)
+      - Reviewer notes
+      - Recommendations
+      - Follow-up tasks
       
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/brunogama) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-09 -->
+> Source: [brunogama/ios-cursor-rules](https://github.com/brunogama/ios-cursor-rules) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-19 -->
