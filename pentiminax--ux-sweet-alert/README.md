@@ -7,11 +7,11 @@ SweetAlert2 integration for Symfony
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [pentiminax/ux-sweet-alert](https://github.com/pentiminax/ux-sweet-alert).
+Original source: `CLAUDE.md` in [pentiminax/ux-sweet-alert](https://github.com/pentiminax/ux-sweet-alert).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
