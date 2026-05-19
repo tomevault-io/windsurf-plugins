@@ -154,5 +154,5 @@ Follow the structured naming pattern: `component_category_specificAction_state`
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/nanobrowser) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-09 -->
+> Source: [nanobrowser/nanobrowser](https://github.com/nanobrowser/nanobrowser) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-18 -->
