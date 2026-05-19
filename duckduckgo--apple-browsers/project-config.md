@@ -1,162 +1,88 @@
 ---
 trigger: always_on
-description: How to define, name, and fire pixels on iOS and macOS.
+description: - Never collect or transmit user data without explicit consent
 ---
 
-# Pixels
 
-Pixels are one-off telemetry events sent via HTTP GET with a name and optional parameters. They are used for:
+# Privacy & Security Guidelines
 
-- Basic feature usage events (e.g., button clicks, screen impressions)
-- Errors (e.g., network failures, parsing errors)
-- Conversion and retention (e.g, subscription purchase and activation)
+## Core Principles
 
-Pixels have the following requirements:
+### Privacy by Design
+- Never collect or transmit user data without explicit consent
+- All features must have privacy implications documented
+- Default to the most private option
+- Implement data minimization - only collect what's absolutely necessary
 
-- Use clear & transparent naming, so it's obvious what the pixel and parameters are for. Pixel names should be self-documenting - avoid cryptic abbreviations or shorthand.
-- Only include information that is essential for the pixel
-- Do not use values that are overly precise, e.g. if using an integer value in a parameter, bucket it into ranges rather than including the value verbatim
-- Never include PII, URLs, or other forms of user-identifiable information in pixel names or parameters
+### Secure Storage
+**Example:** See [secure-storage.swift](privacy-security/secure-storage.swift)
 
-## Types of Pixels
+## Data Handling
 
-### Standard Pixels
+### User Data Classification
+1. **Sensitive Data**: Passwords, credentials, personal information
+   - Must use Keychain or encrypted storage
+   - Never log or transmit in plain text
+   - Clear on app logout/uninstall
 
-Sent every time the event occurs.
+2. **Private Data**: Browsing history, bookmarks, settings
+   - Store locally only
+   - Implement proper data clearing
+   - Respect fireproofing settings
 
-```swift
-Pixel.fire(pixel: .subscriptionRestoreAfterPurchaseAttempt)
+3. **Anonymous Data**: Crash reports, usage statistics
+   - Only collect with user consent
+   - Strip all identifying information
+   - Use differential privacy where applicable
 
-Pixel.fire(pixel: .autofillLoginsSavePromptDisplayed, withAdditionalParameters: [
-    PixelParameters.autofillPromptTrigger: "manual"
-])
-```
+### Network Security
+**Example:** See [network-security.swift](privacy-security/network-security.swift)
 
-### Daily Pixels
+## Content Blocking
 
-Sent once per day per event. Used to determine the number of users affected by a particular error 
+### Tracker Protection
+**Example:** See [tracker-protection.swift](privacy-security/tracker-protection.swift)
 
-```swift
-DailyPixel.fireDailyAndCount(pixel: .subscriptionPurchaseAttempt, pixelNameSuffixes: DailyPixel.Constant.legacyDailyPixelSuffixes)
-```
+### Cookie Management
+**Example:** See [cookie-management.swift](privacy-security/cookie-management.swift)
 
-### Unique Pixels
+## Authentication & Authorization
 
-Sent once per install for the lifetime of the install.
+### Biometric Authentication
+**Example:** See [biometric-authentication.swift](privacy-security/biometric-authentication.swift)
 
-```swift
-UniquePixel.fire(pixel: .subscriptionActivated)
-```
+### Credential Management
+**Example:** See [credential-management.swift](privacy-security/credential-management.swift)
 
-## Pixel Definition Patterns
+## Error Handling
 
-### iOS Pixels
+### Secure Error Messages
+**Example:** See [secure-error-messages.swift](privacy-security/secure-error-messages.swift)
 
-iOS pixels are defined as cases on `Pixel.Event` in `iOS/Core/PixelEvent.swift`. Each enum case maps to an HTTP pixel name string via a computed `name` property.
+## Code Security
 
-#### Adding a New iOS Pixel
+### Input Validation
+**Example:** See [input-validation.swift](privacy-security/input-validation.swift)
 
-1. Add a new enum case to `Pixel.Event` in `iOS/Core/PixelEvent.swift`.
-2. Add a corresponding case to the `name` computed property (also in `PixelEvent.swift`) that returns the pixel's string name.
-3. Fire the pixel using `Pixel.fire`, `DailyPixel.fireDailyAndCount`, or `UniquePixel.fire`.
-4. Add the matching pixel definition in `iOS/PixelDefinitions/pixels/definitions/*.json5` - see the `Pixel Validation` section below for more.
+### Secure Defaults
+**Example:** See [secure-defaults.swift](privacy-security/secure-defaults.swift)
 
-#### Enum Case Definition
+## Testing Security
 
-```swift
-extension Pixel {
-    public enum Event {
-        case appInstall
-        case appLaunch
-        case subscriptionPurchaseAttempt
-        case subscriptionPurchaseSuccess
-        case subscriptionActivated
-        // ...
-    }
-}
-```
+### Security Test Cases
+**Example:** See [security-test-cases.swift](privacy-security/security-test-cases.swift)
 
-#### Enum-to-String Mapping
+## Review Checklist
 
-The `Pixel.Event` enum has a computed `name` property that maps each case to its HTTP pixel name string:
-
-```swift
-extension Pixel.Event {
-    public var name: String {
-        switch self {
-        case .appInstall: return "m_install"
-        case .appLaunch: return "ml"
-        case .subscriptionPurchaseAttempt: return "m_subscribe"
-        // ...
-        }
-    }
-}
-```
-
-#### Naming Convention
-
-iOS pixel names follow these conventions:
-
-- **Prefix**: Always start with `m_` (for "mobile").
-- **Separators**: Use underscores (`_`) or hyphens (`-`) between words.
-- **Format**: Use `m_feature_action` or `m_feature-sub-feature_action`.
-- **Clarity**: Names should be clear and self-documenting. Anyone reading the pixel name should understand what it represents without needing additional context.
-
-**Avoid legacy shorthand naming.** The codebase contains legacy pixels with cryptic names like `ml`, `mp`, `mf`, `m_r`. These are difficult to understand and should not be used as a template for new pixels. New pixels should use descriptive names.
-
-Examples:
-
-| Style | Enum Case | String Name | Notes |
-|-------|-----------|-------------|-------|
-| Good | `.pullToRefresh` | `"m_pull-to-reload"` | Clear and descriptive |
-| Good | `.autofillLoginsSavePromptDisplayed` | `"m_autofill_logins_save_prompt_displayed"` | Self-documenting |
-| Legacy | `.appLaunch` | `"ml"` | Avoid this style for new pixels |
-| Legacy | `.privacyDashboardOpened` | `"mp"` | Avoid this style for new pixels |
-
-#### Parameterized Pixel Cases
-
-Enum cases can have associated values that are interpolated into the pixel name:
-
-```swift
-// Enum definition with associated value
-case networkProtectionLatency(quality: String)
-case syncLocalTimestampResolutionTriggered(Feature)
-
-// In the name property
-case .networkProtectionLatency(let quality):
-    return "m_netp_ev_\(quality)_latency"
-case .syncLocalTimestampResolutionTriggered(let feature):
-    return "m_sync_\(feature.name)_local_timestamp_resolution_triggered"
-```
-
-### macOS Pixels (PixelKit)
-
-macOS uses `PixelKitEvent` protocol, typically in feature-specific files. The implementation of the protocol looks like this:
-
-```swift
-// SharedPackages/BrowserServicesKit/Sources/PixelKit/PixelKitEvent.swift
-public protocol PixelKitEvent {
-    var name: String { get }
-    var standardParameters: [PixelKitStandardParameter]? { get }
-    var parameters: [String: String]? { get }
-    var error: NSError? { get }
-}
-```
-
-An example implementation of this protocol is:
-
-```swift
-// macOS/DuckDuckGo/Statistics/SubscriptionPixel.swift
-enum SubscriptionPixel: PixelKitEvent {
-    case subscriptionActive(AuthVersion)
-    case subscriptionPurchaseAttempt
-    case subscriptionPurchaseSuccess
-    // ...
-
-    var name: String {
-        switch self {
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+Before committing code, ensure:
+- [ ] No hardcoded secrets or API keys
+- [ ] All user data is properly classified and protected
+- [ ] Network requests use HTTPS
+- [ ] Input validation is implemented
+- [ ] Error messages don't leak sensitive information
+- [ ] Logging doesn't include PII
+- [ ] Data clearing mechanisms are tested
+- [ ] Privacy impact has been assessed
 
 ---
 > Source: [duckduckgo/apple-browsers](https://github.com/duckduckgo/apple-browsers) — distributed by [TomeVault](https://tomevault.io).
