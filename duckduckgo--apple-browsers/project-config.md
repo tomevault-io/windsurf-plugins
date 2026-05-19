@@ -1,88 +1,164 @@
 ---
 trigger: always_on
-description: - Never collect or transmit user data without explicit consent
+description: DuckDuckGo.xcworkspace/          # Main workspace (ALWAYS open this)
 ---
 
 
-# Privacy & Security Guidelines
+# Project Structure & Organization
 
-## Core Principles
+## Workspace Structure
 
-### Privacy by Design
-- Never collect or transmit user data without explicit consent
-- All features must have privacy implications documented
-- Default to the most private option
-- Implement data minimization - only collect what's absolutely necessary
+### Root Level
+```
+DuckDuckGo.xcworkspace/          # Main workspace (ALWAYS open this)
+├── iOS/                         # iOS app target
+├── macOS/                       # macOS app target
+├── SharedPackages/              # Cross-platform Swift packages
+├── fastlane/                    # CI/CD automation
+└── README.md                    # Main project documentation
+```
 
-### Secure Storage
-**Example:** See [secure-storage.swift](privacy-security/secure-storage.swift)
+### iOS App Structure
+```
+iOS/
+├── DuckDuckGo/                  # Main iOS app
+│   ├── AppDelegate.swift        # App lifecycle
+│   ├── MainViewController.swift # Primary browser interface
+│   ├── BrowserTab.swift        # Tab state and WebKit integration
+│   ├── AIChat/                 # AI chat integration
+│   ├── AppLifecycle/           # App lifecycle management
+│   ├── Autofill/               # Form autofill features
+│   ├── Bookmarks/              # Bookmark management
+│   ├── BrowsingMenu/           # Browser menu UI
+│   ├── Configuration/          # App configuration
+│   ├── DataImport/             # Data import utilities
+│   ├── HealthKitReporting/     # Health data reporting
+│   ├── MainWindow/             # Main window controllers
+│   ├── Subscription/           # Premium features
+│   ├── SyncPrompt/             # Sync feature prompts
+│   ├── TabSwitcher/            # Tab switching UI
+│   └── WebView/                # Web view management
+├── Core/                       # iOS-specific shared utilities
+├── AutofillCredentialProvider/ # Password autofill extension
+├── PacketTunnelProvider/       # VPN network extension
+├── OpenAction/                 # Share sheet integration
+├── Widgets/                    # Home screen widgets
+└── Configuration/              # Build configurations
+```
 
-## Data Handling
+### macOS App Structure
+```
+macOS/
+├── DuckDuckGo/                 # Main macOS app
+│   ├── AppDelegate.swift       # App lifecycle
+│   ├── MainWindow.swift        # Primary window controller
+│   ├── BrowserTabViewController.swift # Web view management
+│   ├── AIChat/                 # AI chat integration
+│   ├── Autofill/               # Form autofill features
+│   ├── Bookmarks/              # Bookmark management UI
+│   ├── Downloads/              # Download handling
+│   ├── NavigationBar/          # URL bar and navigation
+│   ├── NetworkProtection/      # VPN integration
+│   ├── Preferences/            # Settings and preferences
+│   ├── Subscription/           # Premium features
+│   ├── SyncPrompt/             # Sync feature prompts
+│   ├── TabBar/                 # Tab management UI
+│   └── WebView/                # Web view management
+├── DuckDuckGoVPN/              # Standalone VPN app
+├── NetworkProtectionSystemExtension/ # System-level VPN
+├── DuckDuckGoDBPBackgroundAgent/ # Data Broker Protection
+├── DuckDuckGoNotifications/    # System notifications
+└── Configuration/              # Build configurations
+```
 
-### User Data Classification
-1. **Sensitive Data**: Passwords, credentials, personal information
-   - Must use Keychain or encrypted storage
-   - Never log or transmit in plain text
-   - Clear on app logout/uninstall
+## Dependencies and Packages
 
-2. **Private Data**: Browsing history, bookmarks, settings
-   - Store locally only
-   - Implement proper data clearing
-   - Respect fireproofing settings
+### Primary Dependency: BrowserServicesKit
+```swift
+// ✅ CORRECT - Always use BrowserServicesKit for shared functionality
+import BrowserServicesKit
 
-3. **Anonymous Data**: Crash reports, usage statistics
-   - Only collect with user consent
-   - Strip all identifying information
-   - Use differential privacy where applicable
+// Features provided by BrowserServicesKit:
+// - Content blocking and privacy protection
+// - Bookmarks and history management
+// - Secure credential storage
+// - Autofill functionality
+// - Navigation handling
+// - User script injection
+// - Privacy configuration
+// - Sync functionality
+```
 
-### Network Security
-**Example:** See [network-security.swift](privacy-security/network-security.swift)
+### Shared Packages
+```
+SharedPackages/
+├── AIChat/                     # AI chat functionality
+├── BrowserServicesKit/         # Core browser services
+├── DataBrokerProtectionCore/   # Data broker protection
+├── DesignResourcesKitIcons/    # Shared icon resources
+├── Onboarding/                 # User onboarding experience
+├── UIComponents/               # Reusable UI components
+└── VPN/                        # VPN functionality
+```
 
-## Content Blocking
+### Package Dependencies
+```swift
+// ✅ CORRECT - Use shared packages for cross-platform features
+import DesignResourcesKitIcons
+import UIComponents
+import BrowserServicesKit
 
-### Tracker Protection
-**Example:** See [tracker-protection.swift](privacy-security/tracker-protection.swift)
+// ❌ INCORRECT - Don't duplicate functionality across platforms
+// Keep platform-specific code in iOS/ and macOS/ directories only
+```
 
-### Cookie Management
-**Example:** See [cookie-management.swift](privacy-security/cookie-management.swift)
+## Build Configuration
 
-## Authentication & Authorization
+### Xcode Workspace Setup
+```swift
+// ✅ CORRECT - Always open workspace, not individual projects
+// Open: DuckDuckGo.xcworkspace
+// Don't open: iOS/DuckDuckGo-iOS.xcodeproj or macOS/DuckDuckGo-macOS.xcodeproj
+```
 
-### Biometric Authentication
-**Example:** See [biometric-authentication.swift](privacy-security/biometric-authentication.swift)
+### Build Requirements
+```
+iOS:
+- Xcode 15.0 or later
+- Swift 5.9 or later
+- iOS 15.0+ deployment target
+- Valid Apple Developer account
+- Provisioning profiles for extensions
 
-### Credential Management
-**Example:** See [credential-management.swift](privacy-security/credential-management.swift)
+macOS:
+- Xcode 15.0 or later
+- Swift 5.9 or later
+- macOS 11.4+ deployment target
+- Developer ID certificate (for notarization)
+- System extension entitlements
+```
 
-## Error Handling
+### Configuration Files
+```
+iOS/Configuration/
+├── Configuration.xcconfig         # Base configuration
+├── Configuration-Alpha.xcconfig   # Alpha build settings
+├── Configuration-Debug.xcconfig   # Debug build settings
+└── BuildNumber.xcconfig          # Build number management
 
-### Secure Error Messages
-**Example:** See [secure-error-messages.swift](privacy-security/secure-error-messages.swift)
+macOS/Configuration/
+├── Base.xcconfig                 # Base configuration
+├── Debug.xcconfig                # Debug build settings
+├── Release.xcconfig              # Release build settings
+└── AppStore.xcconfig             # App Store specific
+```
 
-## Code Security
+## Development Setup
 
-### Input Validation
-**Example:** See [input-validation.swift](privacy-security/input-validation.swift)
+### Initial Setup
+```bash
 
-### Secure Defaults
-**Example:** See [secure-defaults.swift](privacy-security/secure-defaults.swift)
-
-## Testing Security
-
-### Security Test Cases
-**Example:** See [security-test-cases.swift](privacy-security/security-test-cases.swift)
-
-## Review Checklist
-
-Before committing code, ensure:
-- [ ] No hardcoded secrets or API keys
-- [ ] All user data is properly classified and protected
-- [ ] Network requests use HTTPS
-- [ ] Input validation is implemented
-- [ ] Error messages don't leak sensitive information
-- [ ] Logging doesn't include PII
-- [ ] Data clearing mechanisms are tested
-- [ ] Privacy impact has been assessed
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [duckduckgo/apple-browsers](https://github.com/duckduckgo/apple-browsers) — distributed by [TomeVault](https://tomevault.io).
