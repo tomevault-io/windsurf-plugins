@@ -7,12 +7,12 @@ A lightweight yet powerful library that provides various useful tools in React e
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `copilot-instructions.md` in [toss/react-simplikit](https://github.com/toss/react-simplikit).
+Original source: `AGENTS.md` in [toss/react-simplikit](https://github.com/toss/react-simplikit).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
+- **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
