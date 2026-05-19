@@ -43,16 +43,6 @@ This project has domain-specific skills available. You MUST activate the relevan
 - Use descriptive names for variables and methods. For example, `isRegisteredForDiscounts`, not `discount()`.
 - Check for existing components to reuse before writing a new one.
 
-## Git Workflow
-
-- Always pull the latest `dev` branch before starting work: `git fetch origin && git checkout dev && git pull origin dev`.
-- Create feature/fix branches from `dev`: `git checkout -b feature/my-feature dev` or `git checkout -b fix/my-fix dev`.
-- Before pushing, ensure the code passes **both** code style checks and tests:
-  1. Run `vendor/bin/pint` to fix formatting (not `--test`, just fix it).
-  2. Run `php artisan test --compact` (or with `--filter` for specific tests) to verify tests pass.
-- Only push when both pint and pest pass locally. This ensures the GitHub CI pipeline also passes.
-- When rebasing a feature branch onto the latest dev, use `git rebase origin/dev` and resolve conflicts carefully.
-
 ## Verification Scripts
 
 - Do not create verification scripts or tinker when tests cover that functionality and prove they work. Unit and feature tests are more important.
@@ -102,6 +92,15 @@ This project has domain-specific skills available. You MUST activate the relevan
 
 - Boost comes with a powerful `search-docs` tool you should use before trying other approaches when working with Laravel or Laravel ecosystem packages. This tool automatically passes a list of installed packages and their versions to the remote Boost API, so it returns only version-specific documentation for the user's circumstance. You should pass an array of packages to filter on if you know you need docs for particular packages.
 - Search the documentation before making code changes to ensure we are taking the correct approach.
+- Use multiple, broad, simple, topic-based queries at once. For example: `['rate limiting', 'routing rate limiting', 'routing']`. The most relevant results will be returned first.
+- Do not add package names to queries; package information is already shared. For example, use `test resource table`, not `filament 4 test resource table`.
+
+### Available Search Syntax
+
+1. Simple Word Searches with auto-stemming - query=authentication - finds 'authenticate' and 'auth'.
+2. Multiple Words (AND Logic) - query=rate limit - finds knowledge containing both "rate" AND "limit".
+3. Quoted Phrases (Exact Position) - query="infinite scroll" - words must be adjacent and in that order.
+4. Mixed Queries - query=middleware "rate limit" - "middleware" AND exact phrase "rate limit".
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
