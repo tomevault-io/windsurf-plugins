@@ -1,131 +1,62 @@
 ---
 trigger: always_on
-description: Task Workflow System for project implementation across multiple task files within the tasks/ directory.
+description: Guidelines for creating and maintaining Cursor rules to ensure consistency and effectiveness.
 ---
 
 
-# Task Workflow System (Multi-File in `tasks/` Directory)
+- **Required Rule Structure:**
 
-- **Purpose:** Standardize task implementation with proper tracking and status updates across a distributed task list.
-- **Implementation:** Tasks are distributed across `tasks/tasks-N.md` files, indexed by `tasks/tasks-index.md`.
+  ```markdown
+  ---
+  description: Clear, one-line description of what the rule enforces
+  globs: path/to/files/*.ext, other/path/**/*
+  alwaysApply: boolean
+  ---
 
-## Overall Task Management Structure
-
-- **Index File (`tasks/tasks-index.md`):**
-
-  - Contains the **Overall Project Task Summary** (Total Tasks, Pending, Complete for the _entire_ project).
-  - Contains the **Task File Index**, mapping Task ID ranges to specific `tasks/tasks-N.md` files.
-
-    ```markdown
-    ## Overall Project Task Summary
-
-    - **Total Tasks**: {Total for project}
-    - **Pending**: {Pending for project}
-    - **Complete**: {Complete for project}
-
-    ## Task File Index
-
-    - `tasks/tasks-1.md`: Contains Tasks {start_id_1} - {end_id_1} ({task_count_1} tasks)
-    - `tasks/tasks-2.md`: Contains Tasks {start_id_2} - {end_id_2} ({task_count_2} tasks)
-    - ...
-    ```
-
-- **Task Files (`tasks/tasks-N.md`):**
-
-  - Each file starts with its own local summary:
-
-    ```markdown
-    ## Summary (tasks-N.md) // Clarify which task file this summary is for
-
-    - **Tasks in this file**: {Count for this file}
-    - **Task IDs**: {start_id_N} - {end_id_N} // e.g., 001 - 030
-    ```
-
-  - Followed by the `## Tasks` section containing individual tasks.
-
-- **Task Structure (within `tasks/tasks-N.md`)**
-
-  - Tasks are defined with:
-
-    ````markdown
-    ### Task ID: {ID}
-
-    - **Title**: Example title
-    - **File**: example/file/path (relative to project root, excluding project root dir)
-    - **Complete**: [ ]
-
-    #### Prompt:
-
-    ```markdown
-    DETAILED PROMPT INCLUDING TARGET FILE PATH AND CONTEXT
-    ```
-    ````
-
-    ```
-
-    ```
-
-## Task Management Workflow
-
-### 1. Locating a Task
-
-- **When user requests "next task":**
-  1. Open and consult `tasks/tasks-index.md` to understand the overall project status and identify the sequence of task files.
-  2. Iterate through `tasks/tasks-1.md`, `tasks/tasks-2.md`, etc., in numerical order as listed in the index.
-  3. Within each `tasks/tasks-N.md` file, find the first task where `Complete: [ ]`. This is the next task.
-  4. Note the `tasks/tasks-N.md` file this task resides in.
-- **When user specifies a Task ID (e.g., "Task 042"):**
-  1. Open and consult `tasks/tasks-index.md`.
-  2. Read the "Task File Index" to determine which `tasks/tasks-N.md` file contains that Task ID.
-  3. Open the identified `tasks/tasks-N.md` file (e.g., if Task 042 is in `tasks-2.md`, open `tasks/tasks-2.md`).
-  4. Locate the task with the specified `### Task ID: {ID}`.
-
-### 2. Task Implementation
-
-- **Always review overall project context as needed:**
-  ```javascript
-  // ✅ DO: If architectural context is needed, refer to `docs/architecture.md` and other relevant architecture documents located in the `docs/` directory.
-  // The task prompt itself should be the primary guide for implementation details.
-  ```
-- **Implement each task according to its prompt and specified `File` path.**
-  ```javascript
-  // ✅ DO: Focus implementation *only* on the file specified in the task's "File:" field.
-  // ✅ DO: Follow the detailed instructions, context, and references within the task's "Prompt:" section.
+  - **Main Points in Bold**
+    - Sub-points with details
+    - Examples and explanations
   ```
 
-### 3. Updating Task Status (Critical)
+- **File References:**
 
-- After successfully implementing a task:
-  1. **Locate the task** within its specific `tasks/tasks-N.md` file (as identified in Step 1).
-  2. **Change its status:** Modify `Complete: [ ]` to `Complete: [x]` in that specific `tasks/tasks-N.md` file.
-  3. **Update the local summary within that `tasks/tasks-N.md` file (Optional but Recommended):**
-     - If feasible, decrement "Pending" and increment "Complete" counts for _that file's specific summary_. This is secondary to updating the main index.
-  4. **Update the Overall Project Task Summary in `tasks/tasks-index.md`:**
-     - Decrement "Pending" by 1.
-     - Increment "Complete" by 1.
-  5. **Save changes** to both the modified `tasks/tasks-N.md` file and `tasks/tasks-index.md`.
-  ```javascript
-  // ✅ DO: Update "Complete: [ ]" to "Complete: [x]" in the correct `tasks/tasks-N.md` file.
-  // ✅ DO: Update "Pending" and "Complete" counts in `tasks/tasks-index.md`.
-  // ❌ DON'T: Modify task IDs, titles, or prompts unless explicitly instructed for a correction.
+  - Use `[filename](mdc:path/to/file)` ([filename](mdc:filename)) to reference files
+  - Example: [prisma.mdc](mdc:.cursor/rules/prisma.mdc) for rule references
+  - Example: [schema.prisma](mdc:prisma/schema.prisma) for code references
+
+- **Code Examples:**
+
+  - Use language-specific code blocks
+
+  ```typescript
+  // ✅ DO: Show good examples
+  const goodExample = true;
+
+  // ❌ DON'T: Show anti-patterns
+  const badExample = false;
   ```
 
-### 4. Notification
+- **Rule Content Guidelines:**
 
-- Inform the user of successful task completion.
-- Provide a summary of changes made (files modified).
-- State the Task ID and Title of the completed task and which `tasks/tasks-N.md` file it was in.
+  - Start with high-level overview
+  - Include specific, actionable requirements
+  - Show examples of correct implementation
+  - Reference existing code when possible
+  - Keep rules DRY by referencing other rules
 
-## Task Creation Guidelines (If AI needs to add/modify tasks)
+- **Rule Maintenance:**
 
-- **Adding New Tasks Based on User Requests:**
+  - Update rules when new patterns emerge
+  - Add examples from actual codebase
+  - Remove outdated patterns
+  - Cross-reference related rules
 
-  1. **Determine Target Task File:** The user or AI must decide which `tasks/tasks-N.md` file the new task belongs to.
-     - If inserting into an existing sequence, identify the `tasks/tasks-N.md` file.
-     - If adding to the very end of the project and the last `tasks-N.md` is full (e.g., based on line count or task count), a new `tasks/tasks-N+1.md` file might need to be conceptually created (the Task Master agent would typically handle new file creation).
-  2. **ID Assignment:**
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- **Best Practices:**
+  - Use bullet points for clarity
+  - Keep descriptions concise
+  - Include both DO and DON'T examples
+  - Reference actual code over theoretical examples
+  - Use consistent formatting across rules
 
 ---
 > Source: [aiurda/devcontext](https://github.com/aiurda/devcontext) — distributed by [TomeVault](https://tomevault.io).
