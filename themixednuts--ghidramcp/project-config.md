@@ -1,63 +1,94 @@
 ---
 trigger: always_on
-description: Provides details like program name, path, architecture, and image base.
+description: Version Bump
 ---
 
-# Creating New Ghidra MCP Tools - Templates & Guidelines
+# Version Bumping Guidelines
 
-This guide provides templates and key patterns for creating new Ghidra MCP tools, implementing [`IGhidraMcpSpecification`](mdc:src/main/java/com/themixednuts/tools/IGhidraMcpSpecification.java).
+This document outlines the process for versioning and releasing new versions of GhidraMCP.
 
-**Core Steps:**
+## 1. Changelog Management
 
-1.  **Implement & Annotate:**
-    *   Implement [`IGhidraMcpSpecification`](mdc:src/main/java/com/themixednuts/tools/IGhidraMcpSpecification.java).
-    *   Add [`@GhidraMcpTool`](mdc:src/main/java/com/themixednuts/annotation/GhidraMcpTool.java) annotation:
-        *   `name`: User-facing name in Ghidra Tool Options (e.g., "List Functions").
-        *   `description`: Hover description in Ghidra Tool Options.
-        *   `category`: Category in Ghidra Tool Options (e.g., [`ToolCategory.FUNCTIONS`](mdc:src/main/java/com/themixednuts/tools/ToolCategory.java)). **Use an existing category or `ToolCategory.UNCATEGORIZED`. Do NOT add new categories to the `ToolCategory` enum.**
-        *   `mcpName`: Name for the MCP tool specification (e.g., "list_functions").
-        *   `mcpDescription`: Detailed description for the MCP tool specification, guiding its usage by AI agents. See "Writing Effective `mcpDescription`" section below for detailed guidance. Use Java's multi-line string literals (`\"\"\"...\"\"\"`) for readability.
-2.  **Register Service:** Add the fully qualified class name to `src/main/resources/META-INF/services/com.themixednuts.tools.IGhidraMcpSpecification`. **This step is mandatory for the tool to be loaded and must be performed automatically when creating a new tool class.**
-3.  **Naming Convention:** Follow standard CRUD naming conventions for both the Java class (`Ghidra<Action><Noun>Tool`) and the `mcpName` (`<action>_<noun>`) where possible:
-    *   **Create:** Use `Create` for adding new items (e.g., `GhidraCreateBookmarkTool`, `create_bookmark`). Avoid synonyms like `Add`.
-    *   **Read:** Use `Get` for single items (e.g., `GhidraGetFunctionByNameTool`), `List` for multiple items (e.g., `GhidraListFunctionsTool`), or `Search` for querying (e.g., `GhidraSearchMemoryTool`).
-    *   **Update:** Use `Update` for modifying existing items (e.g., `GhidraUpdateStructMemberTool`). Avoid synonyms like `Edit`, `Set`, or `Change`.
-    *   **Delete:** Use `Delete` for removing items (e.g., `GhidraDeleteFunctionTool`). Avoid synonyms like `Remove` or `Clear`.
-4.  **Data Models (POJOs):** When a tool needs to return complex data structures (e.g., a list of functions with their details), prefer using or creating Plain Old Java Objects (POJOs) within the [`src/main/java/com/themixednuts/models`](mdc:src/main/java/com/themixednuts/models) directory.
-    *   **Reuse:** Check if an existing model (like [`FunctionInfo`](mdc:src/main/java/com/themixednuts/models/FunctionInfo.java), [`SymbolInfo`](mdc:src/main/java/com/themixednuts/models/SymbolInfo.java), `DataInfo`, etc.) already suits the needs.
-    *   **Create:** If no suitable model exists, create a new, clearly named POJO in the `models` directory to represent the data being returned. This ensures consistent and well-defined output structures for the client.
-    *   Keep POJOs simple, primarily containing fields and a constructor or mapping method to populate them from Ghidra objects.
-    *   **Exception:** For grouped operations, use the nested POJOs `IGroupedTool.OperationResult` and `IGroupedTool.GroupedOperationResult` instead of creating separate files.
-5.  **`specification` Method:**
-    *   **DO NOT override the `specification` method in individual tool classes.**
-    *   The default implementation in `IGhidraMcpSpecification` handles retrieving the `@GhidraMcpTool` annotation, generating the schema string from `schema()`, and constructing the final `AsyncToolSpecification`.
-    *   This default implementation correctly wraps the `Mono<Object>` from `execute` using `.flatMap(this::createSuccessResult).onErrorResume(this::createErrorResult)` to produce the required `Mono<CallToolResult>`.
-5.  **Test Verification:** After implementing one or more tools, run `mvn test` from the project root directory. This verifies that the new tool(s) compile correctly and are properly registered in the service file (via `ServiceRegistrationTest.java`). It's often efficient to create a batch of related tools before running the tests.
-6.  **Code Cleanup:** Ensure code is well-formatted and remove any unused imports before finalizing the tool.
+*   **File:** Maintain a `CHANGELOG.md` file in the root of the project. If it doesn't exist, create one.
+*   **Format:** Follow the "Keep a Changelog" format (see [keepachangelog.com](mdc:https:/keepachangelog.com/en/1.0.0)).
+*   **Process:**
+    *   Before any release, update the `[Unreleased]` section of `CHANGELOG.md`.
+    *   When releasing, rename the `[Unreleased]` section to the new version (e.g., `[1.2.3] - YYYY-MM-DD`).
+    *   Add a new `[Unreleased]` section at the top for future changes.
+    *   Categorize changes under: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`.
 
----
+## 2. Version Numbering (GhidraMCP Custom Scheme)
 
-## Structured Error Handling Guidelines
+We use a `MAJOR.MINOR.PATCH` versioning scheme (e.g., `0.1.0`). This scheme is adapted for the project's needs and differs from strict Semantic Versioning (SemVer).
 
-**CRITICAL:** Always use structured error handling with [`GhidraMcpError.java`](mdc:src/main/java/com/themixednuts/models/GhidraMcpError.java) and [`GhidraMcpException`](mdc:src/main/java/com/themixednuts/exceptions/GhidraMcpException.java) instead of simple `IllegalArgumentException` or other basic exceptions. This provides clients with actionable error information and maintains consistency across all tools.
+*   **MAJOR (`X`.y.z): Project Evolution**
+    *   Increment for fundamental evolutionary changes to the project. This includes:
+        *   Significant shifts in the project's architecture or core philosophy.
+        *   Holistic changes that redefine major parts of GhidraMCP.
+    *   *This is NOT for every breaking API change. A breaking change alone usually falls under a MINOR version bump in our scheme.*
 
-### Required Imports for Error Handling
+*   **MINOR (x.`Y`.z): Significant Changes & Breaking API Updates**
+    *   Increment for:
+        *   **Breaking API changes.** This is our equivalent to a SemVer MAJOR bump. Any change to the HTTP API (tool names, input/output schemas, core server behavior) that is not backward-compatible.
+        *   **New significant features or capabilities** added in a backward-compatible manner.
+        *   Substantial improvements to existing features.
+    *   *All breaking changes MUST be clearly documented in the changelog.*
 
-```java
-import com.themixednuts.exceptions.GhidraMcpException;
-import com.themixednuts.models.GhidraMcpError;
-import com.themixednuts.utils.GhidraMcpErrorUtils;
-import java.util.List;
-import java.util.Map;
-```
+*   **PATCH (x.y.`Z`): Fixes & Minor Enhancements**
+    *   Increment for:
+        *   **Backward-compatible bug fixes.**
+        *   **Smaller backward-compatible new features or enhancements** that don't warrant a MINOR version bump (e.g., adding a new non-critical, optional parameter to a tool, minor UI polishes if applicable).
+        *   Minor performance improvements or refactorings that are backward-compatible.
+        *   Documentation updates or other non-code changes bundled with a release.
 
-### Constants Usage - NO MAGIC STRINGS
+## 3. Updating Version References
 
-**ALWAYS use constants and annotation values instead of string literals:**
+The primary location for the project version is the `pom.xml` file.
 
-```java
+*   **`pom.xml`:**
+    *   Update the `<version>` tag within the main `<project>` section.
+    *   Example: `<version>0.1.0</version>` -> `<version>0.2.0</version>`
+*   **`src/main/java/com/themixednuts/GhidraMcpServer.java`:**
+    *   Update the version string in the `.serverInfo()` call.
+    *   Example: `.serverInfo("ghidra-mcp", "0.1.0")` -> `.serverInfo("ghidra-mcp", "0.2.0")`
+*   **Other locations (if any):**
+    *   Search the codebase for any other hardcoded version strings, especially in:
+        *   Constants files (e.g., `GlobalConstants.java`)
+        *   About dialogs or help information.
+        *   Documentation (`README.md`, etc., if version is mentioned).
+        *   CI/CD configuration files (e.g., `.github/workflows/`).
+    *   Ensure these are updated consistently. A global search for the old version string is recommended.
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+## 4. Release Process
+
+1.  **Ensure Code Stability:**
+    *   All tests must be passing - run `mvn test`.
+    *   The main branch should be stable and reflect the code to be released.
+    *   Build must succeed - run `mvn clean package` to verify.
+2.  **Update Changelog:**
+    *   Finalize `CHANGELOG.md` for the new version as described in Section 1.
+3.  **Determine New Version:**
+    *   Based on the changes and the guidelines in Section 2, decide on the new `MAJOR.MINOR.PATCH` version.
+4.  **Update Version in `pom.xml`:**
+    *   Modify the `<version>` in `pom.xml`.
+5.  **Update Other Version References:**
+    *   Search for and update any other occurrences of the version number.
+6.  **Commit Changes:**
+    *   Commit the `CHANGELOG.md`, `pom.xml`, and any other modified files.
+    *   Commit message example: `chore: Bump version to vX.Y.Z`
+7.  **Tag the Release:**
+    *   Create an annotated Git tag: `git tag -a vX.Y.Z -m "Version X.Y.Z"`
+    *   (Example: `git tag -a v0.2.0 -m "Version 0.2.0"`)
+8.  **Push Changes:**
+    *   Push commits: `git push`
+    *   Push tags: `git push --tags`
+9.  **Create Release (e.g., on GitHub):**
+    *   Draft a new release on the project's repository platform (e.g., GitHub Releases).
+    *   Use the tag you just created.
+    *   Copy the relevant section from `CHANGELOG.md` into the release notes.
+10. **Post-Release (if applicable):**
+    *   Build and publish artifacts (e.g., to Maven Central if it were a library, or update any deployment scripts).
+    *   Announce the new release to users/stakeholders.
 
 ---
 > Source: [themixednuts/GhidraMCP](https://github.com/themixednuts/GhidraMCP) — distributed by [TomeVault](https://tomevault.io).
