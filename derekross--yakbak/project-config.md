@@ -134,5 +134,5 @@ import { useAuthor } from '@/hooks/useAuthor';
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Source: [derekross/yakbak](https://github.com/derekross/yakbak) — distributed by [TomeVault](https://tomevault.io/claim/derekross).
-<!-- tomevault:4.0:windsurf_rules:2026-04-17 -->
+> Source: [derekross/yakbak](https://github.com/derekross/yakbak) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-19 -->
