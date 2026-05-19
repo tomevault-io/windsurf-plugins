@@ -1,93 +1,110 @@
 ---
 trigger: always_on
-description: App plugin architecture patterns and critical implementation paths.
+description: Describes technologies, frameworks, and other tools used in this repository.
 ---
 
+# Tech Context
 
-# System Patterns
+## Technologies Used
 
-## App Plugin Architecture
+- **Frontend**: React 18.3.1 + TypeScript 5.9.3 + Grafana Scenes 7.0.3
+- **Backend**: Go 1.23+ with grafana-plugin-sdk-go v0.290.0
+- **Styling**: Emotion CSS-in-JS with Grafana UI theming system
+- **State Management**: Grafana Scenes for complex scene-based state
+- **Bundling**: Webpack 5.102.1 with custom configuration
+- **Testing**: Jest 30.2.0 + React Testing Library + Playwright 1.56.1 for E2E, Go testing for backend
+- **Runtime**: Node.js 22+ with npm 11.6.2 package management
 
-This Grafana App Plugin integrates as a sidebar panel using **Grafana Scenes** for state management. Key architectural layers:
+## Development Setup
 
-- **Extension Layer**: Sidebar components and navigation links registered via plugin.json
-- **Data Layer**: Multi-strategy content fetchers with fallbacks for external docs and recommender service
-- **External Layer**: ML-based recommender service and Grafana.com documentation
+- **Build System**: Webpack with TypeScript, SWC compilation, and hot reloading (frontend); Mage for Go backend
+- **Dev Environment**: Docker Compose with Grafana OSS for local testing
+- **Scripts**: `npm run dev` (watch mode), `npm run build` (production), `npm run server` (Docker)
+- **Go Build**: `mage build:darwin` (macOS), `mage build:linux` (Linux), `npm run build:backend` (Linux via npm)
+- **Code Quality**: ESLint + Prettier with Grafana configs, TypeScript strict mode; `golangci-lint` for Go
+- **Testing**: `npm run test:ci` (Jest CI mode), `npm run test:go` (Go tests), `npm run e2e` (Playwright), `npm run typecheck`
 
-## Plugin-Specific Decisions
+## Technical Constraints
 
-- **Grafana Scenes over React Router**: Leverages Grafana's native scene-based navigation and state management
-- **localStorage Tab Persistence**: Browser-like multi-tab experience survives page reloads
-- **Context-Aware Recommendations**: Analyzes current Grafana state (page, datasources, dashboard) to suggest relevant content
-- **Interactive Elements System**: Custom `data-targetaction` attributes enable "Show me"/"Do it" automation of Grafana UI actions
-- **@dnd-kit for Drag-and-Drop**: All sortable/draggable interactions should use @dnd-kit library for built-in accessibility, touch device support, smooth animations, and consistency.
+- **Grafana Version**: Requires Grafana >=12.3.0-0 for extension points compatibility
+- **Plugin Architecture**: Must use Grafana's app plugin structure with `plugin.json`
+- **Extension Points**: Limited to `grafana/extension-sidebar/v0-alpha` integration
+- **Browser Support**: Modern browsers only (ES2020+), no IE support
+- **Bundle Size**: Webpack optimization required for performance in Grafana context
 
-**Important**: Do NOT implement drag-and-drop using native HTML5 DnD or other libraries. Always use the @dnd-kit components to maintain consistency and accessibility
+## Dependencies
 
-## Component Relationships
+**Frontend Runtime**:
+- `@grafana/data`, `@grafana/ui`, `@grafana/runtime`, `@grafana/scenes` (12.4.0 / 7.0.3)
+- `react` + `react-dom` (18.3.1), `react-router-dom` (6.28.0)
+- `@emotion/css` (11.13.5) for styling
+- `@dnd-kit/core`, `@dnd-kit/sortable`, `@dnd-kit/utilities` for drag-and-drop
 
-- `App.tsx` → Scene setup and auto-launch logic
-- `CombinedLearningJourneyPanel` → Tab orchestration and content rendering (`docs-panel.tsx`)
-- `ContextPanel` → Recommendations display using `useContextPanel` hook (`context-panel.tsx`)
-- **Interactive Engine** → Business logic in `src/interactive-engine/`
-- **Context Engine** → Context analysis in `src/context-engine/`
-- **Requirements Manager** → Requirements validation in `src/requirements-manager/`
-- **Utils** → General utilities in `src/utils/` (routing, plugin helpers, variable substitution, feature flag tracking, timeout management, experiments)
-- **Package Engine** → Package resolution, loading, and dependency queries in `src/package-engine/`
-- **Styles** → Theme-aware functions in `src/styles/*.styles.ts`
+**Backend Runtime** (Go):
+- `grafana-plugin-sdk-go` (v0.290.0) - Grafana plugin SDK
+- `gorilla/websocket` (v1.5.3) - WebSocket connections
+- `golang.org/x/crypto` - SSH/crypto utilities
 
-## Critical Implementation Paths
+**Development**:
+- `typescript` (5.9.3), `webpack` (5.102.1) + loaders, `jest` (30.2.0) + testing utilities
+- `@grafana/eslint-config`, `@playwright/test` (1.56.1), `@swc/core` (1.15.1) for compilation
+- `sass` (1.94.0), `terser-webpack-plugin` (5.3.14) for asset processing
+- `mage` (v1.15.0) - Go build tool
 
-**Context Analysis → Recommendations**:
-1. `context-engine/context.service.ts` → Extract context tags from Grafana state
-2. `context-engine/context.service.ts` → Call recommender service
-3. `context-engine/context.hook.ts` (useContextPanel) → Process and render recommendations
-4. User interaction → Tab creation with content
+## Project Version & Release Management
 
-**Content Loading with Interactive Elements**:
-1. `docs-retrieval/content-fetcher.ts` → Multi-strategy HTML fetching with fallbacks
-2. `docs-retrieval/html-parser.ts` → Parse HTML to React component tree
-3. `docs-retrieval/content-renderer.tsx` → Render React components with interactive elements
-4. `interactive-engine/interactive.hook.ts` (useInteractiveElements) → Handle "show me"/"do it" events, check requirements, highlight/automate UI elements
-5. `requirements-manager/step-checker.hook.ts` → Validate requirements and objectives
-6. Render in tab with progress tracking
+- **Current Version**: 1.1.71 (see package.json)
+- **License**: Apache-2.0
+- **Package Manager**: npm@11.6.2 with lockfile-based dependency management
+- **Release Strategy**: Semantic versioning with automated plugin signing
 
-## Gamification System Architecture
+## Tool Usage Patterns
 
-**Data Flow**:
-- Guide completion → `user-storage.ts:markGuideCompleted()` → Check badges → Update streak → Dispatch events
-- `useLearningPaths` hook → Subscribes to events → Updates React state
-- Badge toasts queued and shown sequentially
+- **TypeScript**: Strict mode with comprehensive type definitions for all components
+- **Component Architecture**: Functional components with hooks, no class components
+- **Styling**: Emotion CSS-in-JS with `useStyles2` hook and Grafana theme integration
+- **Testing Strategy**: Unit tests with Jest, component tests with RTL, E2E with Playwright
+- **Code Organization**: Engine-based modules with clear separation of concerns (interactive-engine, context-engine, requirements-manager)
+- **Build Pipeline**: Development with watch mode, production with optimization and signing
+- **Drag-and-Drop**: @dnd-kit library for all sortable/draggable interactions (see `src/components/block-editor/dnd/`)
 
-**Key Components**:
-- `LearningPathCard` → Collapsible card with progress ring, expandable guide list
-- `BadgeUnlockedToast` → Celebratory modal with confetti, auto-dismiss with queue support
-- `ProgressRing` → SVG circular progress indicator with gradient stroke
-- `StreakIndicator` → Fire emoji with day count display
+## Current Architecture & Data Flow Overviews
 
-**Badge Triggers**:
-- `guide-completed` → Any/specific guide completion
-- `path-completed` → All guides in a path finished
-- `streak` → Consecutive days of activity (3-day, 7-day milestones)
+Architecture: Layered system with Context System → Documentation Rendering → 
+Interactive Guide System. For detailed architecture and data flows, see `docs/architecture.dot`.
+Do NOT read `architecture.dot` unless you're working on cross-component changes or need to understand system-wide data flows.
 
-**Learning Paths Critical Path**:
-1. `learning-paths/paths.json` / `learning-paths/paths-cloud.json` → OSS and Cloud path definitions; `learning-paths/paths-data.ts:getPathsData()` selects the correct set at runtime based on Grafana edition
-2. `learning-paths/badges.ts` → Badge definitions and trigger conditions
-3. `learning-paths/streak-tracker.ts` → Daily streak calculation logic
-4. `learning-paths/learning-paths.hook.ts` → Main React hook for state management
-5. `lib/user-storage.ts:learningProgressStorage` → Persists progress in localStorage
-6. `components/LearningPaths/MyLearningTab.tsx` → Main UI for gamified experience
-7. Progress events dispatched via `learning-progress-updated` CustomEvent
+## Key Architectural Patterns
 
-**Analytics Events**:
-- `learning_path_progress` → Tracks path interaction with completion %
-- `badge_unlocked` → Tracks badge awards with trigger type
+### 1. Context Detection (Automatic & Continuous)
+- **EchoSrv Integration**: Listens to Grafana analytics events for datasource/viz selection
+- **Location Monitoring**: Tracks URL changes via LocationService and browser events
+- **Debounced Updates**: Centralized timeout manager prevents rapid-fire API calls
+- **Event Buffer**: Handles missed events when plugin is closed/reopened
 
-## Frontend tier model
+### 2. Documentation Processing (2-Phase Pipeline)
+- **Phase 1: Fetching** (content-fetcher.ts)
+  - Multi-strategy fetching with fallbacks
+  - Bundled content support
+  - Unstyled content handling for Grafana docs
+- **Phase 2: Parsing** (html-parser.ts → content-renderer.tsx)
+  - HTML → React component tree conversion
+  - Fail-fast error handling with detailed diagnostics
+  - Interactive element extraction and configuration
 
-Imports flow **downward only** through these tiers. Cross-tier rules are enforced by ESLint and `src/validation/architecture.test.ts`; exceptions require an explicit allowlist entry with justification.
+### 3. Interactive Guide System (Layered Architecture)
+- **Component Layer**: React components (InteractiveSection, InteractiveStep, etc.)
+- **Hook Layer**: Business logic (interactive.hook, step-checker.hook)
+- **Handler Layer**: Action execution (FocusHandler, ButtonHandler, etc.)
+- **Manager Layer**: State coordination (InteractiveStateManager, SequentialRequirementsManager)
+- **Utility Layer**: DOM operations (navigation-manager, element-validator, enhanced-selector)
 
-- **Tier 0 — Types & constants**: `types/`, `constants/`. Pure type definitions and configuration constants; no runtime behavior; safe to import from anywhere.
+### 4. Requirements & Objectives System
+
+**Step Checking Priority** (`step-checker.hook.ts`):
+
+1. **Check Objectives** (`data-objectives`)
+   - If met → Auto-complete (`completionReason: objectives`)
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
