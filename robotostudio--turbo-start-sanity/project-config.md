@@ -1,106 +1,125 @@
 ---
 trigger: always_on
-description: Ultracite Rules - AI-Ready Formatter and Linter
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
+# CLAUDE.md
 
-# Project Context
-Ultracite enforces strict type safety, accessibility standards, and consistent code quality for JavaScript/TypeScript projects using Biome's lightning-fast formatter and linter.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Key Principles
-- Zero configuration required
-- Subsecond performance
-- Maximum type safety
-- AI-friendly code generation
+## Project Overview
 
-## Before Writing Code
-1. Analyze existing patterns in the codebase
-2. Consider edge cases and error scenarios
-3. Follow the rules below strictly
-4. Validate accessibility requirements
+Turbo Start Sanity — a pnpm monorepo (Turborepo) with a Next.js 16 frontend and Sanity v5 CMS Studio. Uses Biome/Ultracite for linting/formatting.
 
-## Rules
+## Commands
 
-### Accessibility (a11y)
-- Don't use `accessKey` attribute on any HTML element.
-- Don't set `aria-hidden="true"` on focusable elements.
-- Don't add ARIA roles, states, and properties to elements that don't support them.
-- Don't use distracting elements like `<marquee>` or `<blink>`.
-- Only use the `scope` prop on `<th>` elements.
-- Don't assign non-interactive ARIA roles to interactive HTML elements.
-- Make sure label elements have text content and are associated with an input.
-- Don't assign interactive ARIA roles to non-interactive HTML elements.
-- Don't assign `tabIndex` to non-interactive HTML elements.
-- Don't use positive integers for `tabIndex` property.
-- Don't include "image", "picture", or "photo" in img alt prop.
-- Don't use explicit role property that's the same as the implicit/default role.
-- Make static elements with click handlers use a valid role attribute.
-- Always include a `title` element for SVG elements.
-- Give all elements requiring alt text meaningful information for screen readers.
-- Make sure anchors have content that's accessible to screen readers.
-- Assign `tabIndex` to non-interactive HTML elements with `aria-activedescendant`.
-- Include all required ARIA attributes for elements with ARIA roles.
-- Make sure ARIA properties are valid for the element's supported roles.
-- Always include a `type` attribute for button elements.
-- Make elements with interactive roles and handlers focusable.
-- Give heading elements content that's accessible to screen readers (not hidden with `aria-hidden`).
-- Always include a `lang` attribute on the html element.
-- Always include a `title` attribute for iframe elements.
-- Accompany `onClick` with at least one of: `onKeyUp`, `onKeyDown`, or `onKeyPress`.
-- Accompany `onMouseOver`/`onMouseOut` with `onFocus`/`onBlur`.
-- Include caption tracks for audio and video elements.
-- Use semantic elements instead of role attributes in JSX.
-- Make sure all anchors are valid and navigable.
-- Ensure all ARIA properties (`aria-*`) are valid.
-- Use valid, non-abstract ARIA roles for elements with ARIA roles.
-- Use valid ARIA state and property values.
-- Use valid values for the `autocomplete` attribute on input elements.
-- Use correct ISO language/country codes for the `lang` attribute.
+```bash
+# Development (both apps)
+pnpm dev
 
-### Code Complexity and Quality
-- Don't use consecutive spaces in regular expression literals.
-- Don't use the `arguments` object.
-- Don't use primitive type aliases or misleading types.
-- Don't use the comma operator.
-- Don't use empty type parameters in type aliases and interfaces.
-- Don't write functions that exceed a given Cognitive Complexity score.
-- Don't nest describe() blocks too deeply in test files.
-- Don't use unnecessary boolean casts.
-- Don't use unnecessary callbacks with flatMap.
-- Use for...of statements instead of Array.forEach.
-- Don't create classes that only have static members (like a static namespace).
-- Don't use this and super in static contexts.
-- Don't use unnecessary catch clauses.
-- Don't use unnecessary constructors.
-- Don't use unnecessary continue statements.
-- Don't export empty modules that don't change anything.
-- Don't use unnecessary escape sequences in regular expression literals.
-- Don't use unnecessary fragments.
-- Don't use unnecessary labels.
-- Don't use unnecessary nested block statements.
-- Don't rename imports, exports, and destructured assignments to the same name.
-- Don't use unnecessary string or template literal concatenation.
-- Don't use String.raw in template literals when there are no escape sequences.
-- Don't use useless case statements in switch statements.
-- Don't use ternary operators when simpler alternatives exist.
-- Don't use useless `this` aliasing.
-- Don't use any or unknown as type constraints.
-- Don't initialize variables to undefined.
-- Don't use the void operators (they're not familiar).
-- Use arrow functions instead of function expressions.
-- Use Date.now() to get milliseconds since the Unix Epoch.
-- Use .flatMap() instead of map().flat() when possible.
-- Use literal property access instead of computed property access.
-- Don't use parseInt() or Number.parseInt() when binary, octal, or hexadecimal literals work.
-- Use concise optional chaining instead of chained logical expressions.
-- Use regular expression literals instead of the RegExp constructor when possible.
-- Don't use number literal object member names that aren't base 10 or use underscore separators.
-- Remove redundant terms from logical expressions.
-- Use while loops instead of for loops when you don't need initializer and update expressions.
-- Don't pass children as props.
-- Don't reassign const variables.
-- Don't use constant expressions in conditions.
-- Don't use `Math.min` and `Math.max` to clamp values when the result is constant.
+# Individual apps
+pnpm dev:web          # Next.js on localhost:3000 (Turbopack)
+pnpm dev:studio       # Sanity Studio on localhost:3333
+
+# Build
+pnpm build            # All packages
+pnpm build:web        # Next.js only
+pnpm build:studio     # Studio only
+
+# Lint & Format (Biome/Ultracite, NOT ESLint/Prettier)
+pnpm lint             # Lint all
+pnpm format           # Format all (auto-fix)
+pnpm format:check     # Check formatting without fixing
+pnpm check-types      # TypeScript type checking
+
+# Per-package lint/format
+cd apps/web && pnpm lint
+cd apps/studio && pnpm format
+
+# Sanity type generation (run from apps/studio after schema changes)
+pnpm type             # Extracts schema + generates types
+pnpm extract          # Schema extract only
+```
+
+## Monorepo Structure
+
+```
+apps/
+  web/         — Next.js 16 (App Router, React 19, React Compiler, Tailwind v4)
+  studio/      — Sanity Studio v5 (Vite, styled-components)
+packages/
+  env/         — @workspace/env — Zod-validated env vars via @t3-oss/env-nextjs
+  sanity/      — @workspace/sanity — Shared Sanity client, GROQ queries, live preview, image utils
+  ui/          — @workspace/ui — Shared UI components (Radix + CVA + Tailwind, shadcn-style)
+  logger/      — @workspace/logger — Structured logger class with context prefixes
+  typescript-config/ — Shared TS configs
+```
+
+## Architecture
+
+### Data Flow: Sanity → Next.js
+
+1. **Schema** defined in `apps/studio/schemaTypes/` (documents, blocks, definitions)
+2. **Type generation**: `pnpm type` in studio extracts schema → generates TS types at `packages/sanity/src/sanity.types.ts`
+3. **GROQ queries** live in `packages/sanity/src/query.ts` using `defineQuery` from `next-sanity`, with reusable fragments
+4. **Data fetching** uses `sanityFetch` from `packages/sanity/src/live.ts` (wraps `defineLive` for automatic revalidation)
+5. **Client** configured in `packages/sanity/src/client.ts` with stega for visual editing
+
+### Page Builder Pattern
+
+The core content model is a **page builder** — an array of typed blocks:
+
+- **Studio side**: `apps/studio/schemaTypes/blocks/` — each block is a `defineType({ type: 'object' })`. Registered in `blocks/index.ts` → fed to `definitions/pagebuilder.ts`
+- **Frontend side**: `apps/web/src/components/pagebuilder.tsx` — maps `_type` to React component via `BLOCK_COMPONENTS` record. Includes Sanity visual editing data attributes and optimistic updates
+- **Block components**: `apps/web/src/components/sections/` — one file per block type (hero, cta, faq-accordion, etc.)
+
+To add a new page builder block:
+1. Create schema in `apps/studio/schemaTypes/blocks/new-block.ts`
+2. Add to `apps/studio/schemaTypes/blocks/index.ts` array
+3. Run `pnpm type` in studio
+4. Add GROQ fragment in `packages/sanity/src/query.ts` and include in `pageBuilderFragment`
+5. Create component in `apps/web/src/components/sections/`
+6. Register in `BLOCK_COMPONENTS` in `apps/web/src/components/pagebuilder.tsx`
+
+### Sanity Document Types
+
+**Singletons** (one instance each): `homePage`, `blogIndex`, `settings`, `footer`, `navbar`
+**Documents**: `blog`, `page`, `faq`, `author`, `redirect`
+**Pages** use nested slug-based structure (`apps/studio/components/nested-pages-structure.tsx`)
+
+### Environment Variables
+
+**`apps/web/.env.local`**: `NEXT_PUBLIC_SANITY_PROJECT_ID`, `NEXT_PUBLIC_SANITY_DATASET`, `NEXT_PUBLIC_SANITY_API_VERSION`, `NEXT_PUBLIC_SANITY_STUDIO_URL`, `SANITY_API_READ_TOKEN`, `SANITY_API_WRITE_TOKEN`
+
+**`apps/studio/.env.local`**: `SANITY_STUDIO_PROJECT_ID`, `SANITY_STUDIO_DATASET`, `SANITY_STUDIO_TITLE`, `SANITY_STUDIO_PRESENTATION_URL`, `SANITY_STUDIO_API_VERSION`
+
+All env vars are Zod-validated at startup via `@workspace/env` (client and server exports).
+
+### Types Strategy
+
+All frontend types derive from generated Sanity types. `apps/web/src/types.ts` extracts narrow types from query results using `Extract`, `NonNullable`, and index access — never manually duplicate Sanity shapes.
+
+### Visual Editing & Live Preview
+
+- Sanity Presentation Tool configured in `sanity.config.ts` with `presentationTool`
+- Next.js uses `VisualEditing` from `next-sanity/visual-editing` in layout (draft mode only)
+- `createDataAttribute` used throughout page builder for click-to-edit in Presentation
+- `SanityLive` component enables automatic content revalidation
+
+## Conventions
+
+### File Naming
+- **kebab-case** for all files: `feature-cards-icon.ts`, `blog-card.tsx`
+- `.tsx` for React components, `.ts` for utilities
+
+### Sanity Schema
+- Always use `defineType`, `defineField`, `defineArrayMember` from `sanity`
+- Include `description` on every field (written for non-technical users)
+- Icons: prefer `@sanity/icons`, fall back to `lucide-react`
+- GROQ: don't expand images unless explicitly needed. Use `defineQuery` from `next-sanity`
+
+### Frontend
+- Prefer `grid` over `flex` unless two sibling elements
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
