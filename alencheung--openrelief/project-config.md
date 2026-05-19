@@ -1,0 +1,165 @@
+---
+trigger: always_on
+description: npm run dev          # Start Next.js dev server
+---
+
+# AGENTS.md - Coding Agent Guidelines for OpenRelief
+
+## Build/Lint/Test Commands
+
+### Development
+
+```bash
+npm run dev          # Start Next.js dev server
+npm run build        # Production build
+npm run start        # Start production server
+npm run lint         # Run ESLint
+npm run lint:fix     # Fix linting issues
+npm run type-check   # TypeScript type check (tsc --noEmit)
+```
+
+### Testing
+
+```bash
+npm run test                          # Run all Jest tests
+npm run test:watch                    # Watch mode
+npm run test:coverage                 # Coverage report
+
+# Single test file
+npx jest path/to/file.test.ts
+
+# Single test with pattern
+npx jest --testNamePattern="should add event"
+
+# Specific test categories
+npm run test:emergency                # Emergency-related tests
+npm run test:trust                    # Trust system tests
+npm run test:consensus                # Consensus engine tests
+npm run test:hooks                    # useTrustSystem hook tests
+npm run test:integration              # Integration tests
+npm run test:spatial                  # Spatial query tests
+npm run test:security                 # Security tests (node script)
+npm run test:pwa                      # PWA tests (node script)
+
+# E2E Tests
+npm run test:e2e                      # Cypress tests
+npm run test:e2e:open                 # Cypress UI mode
+npm run test:e2e:playwright           # Playwright tests
+npm run test:e2e:playwright:open      # Playwright UI mode
+npm run test:e2e:playwright:debug     # Playwright debug mode
+
+# Lighthouse / Performance
+npm run test:lighthouse               # Run Lighthouse CI
+npm run test:lighthouse:mobile        # Mobile Lighthouse
+npm run test:lighthouse:desktop       # Desktop Lighthouse
+npm run test:lighthouse:pwa           # PWA-focused Lighthouse
+```
+
+### Database (Supabase)
+
+```bash
+npm run db:generate   # Generate TypeScript types from schema
+npm run db:migrate    # Push migrations
+npm run db:reset      # Reset local database
+npm run db:seed       # Seed local database
+npm run supabase:start
+npm run supabase:stop
+```
+
+### Formatting
+
+```bash
+npm run format        # Format with Prettier
+npm run format:check  # Check formatting
+```
+
+## Project Architecture
+
+- **Framework**: Next.js 15 (App Router) + React 18
+- **Language**: TypeScript (strict mode, all strict checks enabled)
+- **Database/Auth**: Supabase (Postgres, Auth, RLS, Realtime)
+- **State**: Zustand (with persist + subscribeWithSelector middleware)
+- **Data Fetching**: TanStack Query v5
+- **Styling**: Tailwind CSS + CVA (class-variance-authority) + Radix UI
+- **Maps**: MapLibre GL + Leaflet (dual map support)
+- **Spatial**: Turf.js + geolib
+- **Edge Functions**: Cloudflare Workers (see `src/edge/`)
+- **Monitoring**: Sentry (client/server/edge)
+- **Rate Limiting**: Upstash Redis
+- **Validation**: Zod (runtime) + custom validators (`src/lib/validation.ts`)
+
+## Code Style Guidelines
+
+### Imports
+
+Use path aliases defined in tsconfig: `@/*` maps to `./src/*`. Group: React/Next
+first, external libs second, internal aliases third.
+
+```typescript
+import { useState, useEffect } from 'react'
+import { useQuery, useMutation } from '@tanstack/react-query'
+import { supabase } from '@/lib/supabase'
+import { Database } from '@/types/database'
+```
+
+### Formatting (Prettier + ESLint)
+
+- No semicolons
+- Single quotes, avoid escapes only
+- 2-space indentation
+- No trailing commas (`trailingComma: "none"`)
+- Max line: 100 chars (Prettier), 120 chars (ESLint warning)
+- Curly braces required for all control structures
+- Arrow functions: avoid parens for single param `x => x`
+- Use `import type` for type-only imports
+- `no-console`: warn (allow `console.warn`, `console.error`)
+- `eqeqeq: ["error", "always"]` — always use `===`
+- `prefer-const` is off — `let` is acceptable
+
+### TypeScript
+
+- Strict mode with all strict checks + `noUncheckedIndexedAccess`
+- `noImplicitReturns`, `noFallthroughCasesInSwitch`, `noImplicitOverride`
+- `exactOptionalPropertyTypes: true` — use `?` or `| undefined`, not both
+- Use Database types from `@/types/database` for Supabase tables
+- `@typescript-eslint/no-explicit-any` is off (allowed), but prefer typed
+  alternatives
+- Unused vars: prefix with `_` to suppress warnings
+
+### Naming Conventions
+
+- Components: PascalCase (`TrustBadge.tsx`, `EmergencyMap.tsx`)
+- Hooks: camelCase with `use` prefix (`useEmergencyEvents.ts`)
+- Stores: camelCase with `Store` suffix (`emergencyStore.ts`)
+- Types/Interfaces: PascalCase (`EmergencyEvent`, `EmergencyFilter`)
+- Utility files: kebab-case (`map-utils.ts`, `errorHandling.ts`)
+- App Router: folder-based routing under `src/app/`
+
+### React Components
+
+- Function components with arrow functions
+- Forward refs for UI primitives:
+
+```typescript
+const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
+  ({ className, variant, ...props }, ref) => {
+    return <Comp className={cn(buttonVariants({ variant, className }))} ref={ref} {...props} />
+  }
+)
+Button.displayName = 'Button'
+```
+
+- Use CVA for component variants (see `src/components/ui/Button.tsx`)
+- Merge classNames with `cn()` from `@/lib/utils` (clsx + tailwind-merge)
+- Extract complex logic to custom hooks in `src/hooks/`
+- Wrap pages with `<Providers>` (includes QueryClientProvider, etc.)
+
+### State Management (Zustand)
+
+```typescript
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [alencheung/openrelief](https://github.com/alencheung/openrelief) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-18 -->
