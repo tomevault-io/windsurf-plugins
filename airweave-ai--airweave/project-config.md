@@ -1,180 +1,123 @@
 ---
 trigger: always_on
-description: **End-to-end testing framework for Airweave connectors using real external APIs**
+description: > **WARNING — PARTIALLY OUTDATED (March 2026)**
 ---
 
-# Monke - Airweave Connector Testing Framework
+# Airweave Search Rules
 
-**End-to-end testing framework for Airweave connectors using real external APIs**
+> **WARNING — PARTIALLY OUTDATED (March 2026)**
+>
+> This file documents the **legacy V1 search module** (`airweave/search/`), which
+> uses an operation-based pipeline with Qdrant, Cerebras/OpenAI/Groq providers,
+> and structured-output LLM calls.
+>
+> The **new V2 search** lives in `airweave/domains/search/` and implements a
+> three-tier architecture:
+>
+> - **Instant** — direct vector search, no LLM
+> - **Classic** — vector search + reranking + answer generation (replaces V1)
+> - **Agentic** — multi-turn tool-calling agent loop with search/count/navigate/read/collect/finish tools
+>
+> Key differences from V1:
+> - **Vector DB**: Vespa (not Qdrant)
+> - **LLM adapters**: `airweave/adapters/llm/` with Together AI + Anthropic fallback (not Cerebras/Groq)
+> - **Reranker**: `airweave/adapters/reranker/` with Cohere
+> - **Filters**: `domains/search/types/filters.py` — FilterableField/FilterOperator/FilterGroup (not Qdrant native filters)
+> - **Streaming**: SSE events defined in `domains/search/agentic/events.py` (tool_call, thinking, search_results, etc.)
+> - **API**: `POST /collections/{id}/search/{tier}` where tier is `instant`, `classic`, or `agentic`
+> - **Config**: `domains/search/config.py` — model specs, token budgets, tier defaults
+>
+> **When working on `domains/search/`**, prefer reading the actual code over this
+> file. The sections below remain accurate for the legacy `airweave/search/` module only.
 
-## Overview
+## Overview (Legacy V1)
 
-Monke validates Airweave's data synchronization pipeline by creating real test data in external systems, triggering sync jobs, verifying data in the vector database, and testing update/deletion scenarios. The framework separates configuration from runtime state, uses pluggable authentication, and supports parallel execution.
-
----
+The search module (`@search/`) implements a **modular, pipeline-based architecture** with composable operations.  It aims to maintain search quality and flexibility.
 
 ## Core Architecture
 
-**Test Runner** (`runner.py`) - Entry point that orchestrates parallel test execution across connectors
-
-**Test Flow** (`core/flow.py`) - Executes complete lifecycle for a connector: setup → test steps → cleanup
-
-**Test Steps** (`core/steps.py`) - Individual operations (create, sync, verify, update, delete) with retry logic
-
-**Configuration** (`core/config.py`) - YAML-based config with classes: `TestConfig`, `ConnectorConfig`, `TestFlowConfig`, `DeletionConfig`
-
-**Test Context** (`core/context.py`) - Runtime state separate from config: tracks entities, infrastructure IDs, metrics
-
-**Infrastructure** (`core/infrastructure.py`) - Creates/tears down test collections and source connections
-
-**Authentication** (`auth/`) - Pluggable auth brokers (`BaseAuthBroker`, `ComposioBroker`) for credential resolution
-
----
-
-## Test Flow
-
-Default test steps execute in sequence:
-```
-1. collection_cleanup       # Clean leftover test collections
-2. cleanup                  # Clean entities in external system
-3. create                   # Create test entities
-4. sync                     # Trigger Airweave sync
-5. verify                   # Verify entities in vector DB
-6. update                   # Update entities
-7. sync → verify            # Verify updates
-8. partial_delete           # Delete subset of entities
-9. sync → verify_partial_deletion
-10. verify_remaining_entities
-11. complete_delete         # Delete all entities
-12. sync → verify_complete_deletion
-13. cleanup                 # Final cleanup
-14. collection_cleanup      # Delete test collection
-```
-
-Steps are customizable per connector via YAML config.
-
----
-
-## Bongos
-
-**Bongos** create, update, and delete real test data in external systems.
-
-### Structure
-Each bongo inherits from `BaseBongo` and implements:
-- `create_entities()` - Create test data
-- `update_entities()` - Modify test data
-- `delete_entities()` - Remove all test data
-- `delete_specific_entities(entities)` - Remove specific entities
-- `cleanup()` - Force cleanup remaining artifacts
-
-Bongos are auto-discovered by `BongoRegistry` via the `connector_type` class attribute.
-
-### Example
-```python
-class GitHubBongo(BaseBongo):
-    def __init__(self, credentials: Dict[str, Any], config: Dict[str, Any]):
-        super().__init__(credentials)
-        self.repo_name = config["repo_name"]  # Now from config_fields
-        self.token = credentials["personal_access_token"]
-
-    async def create_entities(self) -> List[Dict[str, Any]]:
-        # Create files in GitHub, return metadata
-
-    async def update_entities(self) -> List[Dict[str, Any]]:
-        # Update files
-
-    async def delete_entities(self) -> List[str]:
-        # Delete all tracked entities
-```
-
----
-
-## Configuration
-
-Configs live in `configs/{connector_type}.yaml`:
-
-```yaml
-name: "GitHub Connector Test"
-description: "End-to-end test of GitHub connector"
-
-connector:
-  name: "github_test"
-  type: "github"
-  auth_mode: direct  # or "provider"
-  auth_fields:
-    personal_access_token: MONKE_GITHUB_PERSONAL_ACCESS_TOKEN
-  config_fields:
-    repo_name: MONKE_GITHUB_REPO_NAME  # Moved from auth_fields
-    branch: "main"
-    post_create_sleep_seconds: 15
-
-test_flow:
-  steps: [cleanup, create, sync, verify, update, sync, verify, complete_delete, sync, verify_complete_deletion, cleanup]
-
-entity_count: 3
-
-deletion:
-  partial_delete_count: 1
-  verify_partial_deletion: true
-
-verification:
-  score_threshold: 0.1
-  max_retries: 3
-  retry_delay_seconds: 5
-```
-
-Environment variables are substituted using `${VAR_NAME}` syntax.
-
----
-
-## Authentication
-
-### Direct Mode
-Credentials specified via `auth_fields` with env var names:
-```yaml
-auth_mode: direct
-auth_fields:
-  personal_access_token: MONKE_GITHUB_PERSONAL_ACCESS_TOKEN
-```
-
-### Provider Mode
-External auth providers (e.g., Composio) fetch credentials:
-```bash
-DM_AUTH_PROVIDER=composio
-DM_AUTH_PROVIDER_ID=provider_id
-DM_AUTH_PROVIDER_API_KEY=api_key
-GITHUB_AUTH_PROVIDER_AUTH_CONFIG_ID=ac_xxx
-GITHUB_AUTH_PROVIDER_ACCOUNT_ID=ca_xxx
-```
-
-Auth resolution:
-1. `credentials_resolver` determines mode
-2. Direct: resolves env vars from `auth_fields`
-3. Provider: uses `ComposioBroker` to fetch credentials
-4. Credentials passed to bongo and Airweave source connection
-
----
-
-## Content Generation
-
-Generators in `generation/{connector}.py` create realistic test data with embedded tracking tokens:
+### Operation-Based Pipeline
 
 ```python
-from monke.client.llm import LLMClient
-
-async def generate_github_content(token: str) -> str:
-    llm = LLMClient()
-    prompt = f"Generate Python code. Include '{token}' in a comment."
-    return await llm.generate(prompt)
+SearchRequest → SearchFactory → SearchContext → SearchOrchestrator → SearchResponse
+                                    ↓
+                            [Operations Pipeline]
 ```
 
-Pydantic schemas in `generation/schemas/{connector}.py` define entity structures.
+Each operation:
+- Implements `SearchOperation` abstract base class
+- Declares dependencies explicitly
+- Reads/writes to shared state dictionary
+- Can be optional (graceful failure)
+- Executes asynchronously
 
----
+### Request Flow
+1. **Endpoint** (`api/v1/endpoints/search.py`) → Creates/receives `SearchRequest`
+2. **SearchService.search()** → Main entry point
+3. **SearchFactory.build()** → Creates `SearchContext` with enabled operations
+4. **SearchOrchestrator.run()** → Executes operations in dependency order
+5. **Operations** → Execute in topologically sorted order
+6. **Qdrant destination** → Vector search execution
+7. **Data Persistence** → Save search query to `search_queries` table via `CRUDSearchQuery`
 
-## Verification
+### API Endpoints
 
-After each sync, verification steps:
+Search endpoints are defined in `api/v1/endpoints/search.py` and mounted under `/collections` prefix in `api/v1/api.py`:
+
+```python
+# In api/v1/api.py
+from airweave.api.v1.endpoints import search
+api_router.include_router(search.router, prefix="/collections", tags=["collections"])
+```
+
+**Available Endpoints:**
+
+1. **GET `/collections/{readable_id}/search`** - Legacy endpoint (DEPRECATED)
+   - Maintained for backwards compatibility
+   - Query parameters: `query`, `response_type`, `limit`, `offset`, `recency_bias`
+   - Returns `LegacySearchResponse` with `status` field
+   - Automatically converts to new format internally
+   - Adds deprecation headers
+
+2. **POST `/collections/{readable_id}/search`** - Main search endpoint (RECOMMENDED)
+   - Accepts both `SearchRequest` (new) and `LegacySearchRequest` (old) schemas
+   - Supports Qdrant native filters via `filter` field
+   - Full control over all search features
+   - Returns `SearchResponse` (new) or `LegacySearchResponse` (legacy) based on input schema
+   - Adds deprecation headers for legacy requests
+
+3. **POST `/collections/{readable_id}/search/stream`** - Streaming search with SSE
+   - Accepts both `SearchRequest` and `LegacySearchRequest`
+   - Returns Server-Sent Events (SSE) stream
+   - Real-time progress updates via Redis pubsub
+   - Automatically converts legacy requests
+
+4. **GET `/collections/internal/filter-schema`** - Filter schema endpoint
+   - Returns Qdrant Filter JSON schema for frontend validation
+   - Public endpoint for building UI filter builders
+
+All endpoints use the same underlying `SearchService.search()`, ensuring consistent behavior and quality.
+
+### Input/Output Schemas
+
+**SearchRequest** (new schema - `schemas/search.py`):
+```python
+query: str                                   # Search text (required)
+retrieval_strategy: Optional[RetrievalStrategy]  # "hybrid", "neural", or "keyword"
+filter: Optional[QdrantFilter]               # Qdrant native filter object
+offset: Optional[int]                        # Pagination offset
+limit: Optional[int]                         # Results per page
+temporal_relevance: Optional[float]          # Recency weight (0-1, default: 0.3)
+expand_query: Optional[bool]                 # Generate query variations
+interpret_filters: Optional[bool]            # Extract filters from natural language
+rerank: Optional[bool]                       # LLM-based reranking
+generate_answer: Optional[bool]              # AI-generated completion
+```
+
+**SearchResponse** (new schema - `schemas/search.py`):
+```python
+results: List[Dict]                          # Search results
+completion: Optional[str]                    # AI-generated answer (if generate_answer=True)
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
