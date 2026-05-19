@@ -1,197 +1,173 @@
 ---
 trigger: always_on
-description: **Example:** See [singleton-antipattern.swift](anti-patterns/singleton-antipattern.swift)
+description: The DuckDuckGo browser has moved away from traditional AppDelegate-based lifecycle handling to a **state machine architecture**. While AppDelegate still exists, it has been significantly thinned out and now delegates responsibility to a structured state machine.
 ---
 
 
-# Anti-patterns and Common Mistakes to Avoid
+# App Lifecycle State Machine Architecture
 
-## Singleton Anti-patterns
+## Overview
 
-### ❌ NEVER: Static Shared Instances Without Dependency Injection (.shared instance pattern)
-**Example:** See [singleton-antipattern.swift](anti-patterns/singleton-antipattern.swift)
+The DuckDuckGo browser has moved away from traditional AppDelegate-based lifecycle handling to a **state machine architecture**. While AppDelegate still exists, it has been significantly thinned out and now delegates responsibility to a structured state machine.
 
-### ❌ NEVER: Global State Access
+This approach ensures that lifecycle handling is **predictable, organized, and easy to maintain**.
+
+## Architecture Components
+
+### Three Core States
+
+The architecture revolves around a state machine with three major states:
+
+#### 1. **Launching** (Transient State)
+- **Associated with**: `application(_:didFinishLaunchingWithOptions:)`
+- **File**: `Launching.swift`
+- **Purpose**: App's initial setup and dependency configuration
+- **Responsibilities**:
+  - Initialize all services and objects
+  - Configure dependencies
+  - Prepare UI components
+  - Create `MainViewController` and set as `rootViewController`
+
+#### 2. **Foreground** (Permanent State)
+- **Associated with**: `applicationDidBecomeActive(_:)`
+- **File**: `Foreground.swift`
+- **Purpose**: App is fully interactive and user can engage with UI
+- **Responsibilities**:
+  - Resume suspended work
+  - Handle user interactions
+  - Manage active UI state
+
+#### 3. **Background** (Permanent State)
+- **Associated with**: `applicationDidEnterBackground(_:)`
+- **File**: `Background.swift`
+- **Purpose**: App is not active and UI is not visible
+- **Responsibilities**:
+  - Suspend ongoing work that doesn't need background execution
+  - Prepare for potential termination
+  - Handle background tasks
+
+## State Machine Methods
+
+### Core Transition Methods
+
+All states implement specific methods for handling transitions:
+
+#### `onTransition()`
+- **When**: Called whenever the app enters that state from another state
+- **Purpose**: Setup or cleanup during state transitions
+- **Available in**: Foreground, Background
+
+#### `willLeave()`
+- **When**: Called before transitioning away from current state
+- **Purpose**: Prepare for potential state change
+- **Note**: Transition may be cancelled, in which case `didReturn()` is called
+- **Available in**: Foreground, Background
+
+#### `didReturn()`
+- **When**: Called after successful transition to destination state OR when transition is cancelled
+- **Purpose**: Finalize state entry or handle cancelled transition
+- **Available in**: Foreground, Background
+
+## Common Lifecycle Scenarios
+
+### Cold App Start
+
 ```swift
-// ❌ AVOID - Global state access
-var globalSettings: [String: Any] = [:]
-
-func someFunction() {
-    globalSettings["key"] = "value" // Global state is hard to test and debug
-}
-
-// ✅ CORRECT - Injected dependencies
-final class SomeService {
-    private let settings: AppSettings
-    
-    init(settings: AppSettings) {
-        self.settings = settings
-    }
-    
-    func someFunction() {
-        settings.setValue("value", for: "key")
-    }
-}
+// Flow: Launching → Foreground
+1. Launching.init()                    // Initial setup
+2. Foreground.onTransition()           // Enter foreground
+3. Foreground.didReturn()              // Finalize foreground entry
 ```
 
-## Async/Await Anti-patterns
+### App Backgrounding
 
-### ❌ NEVER: UI Updates Without @MainActor
-**Example:** See [async-ui-updates.swift](anti-patterns/async-ui-updates.swift)
-
-### ❌ NEVER: Unhandled Async Errors
 ```swift
-// ❌ AVOID - Swallowing async errors
-func fetchData() async {
-    let data = try? await networkService.getData() // Silently ignoring errors
-    // Process data...
-}
-
-// ✅ CORRECT - Proper error handling
-func fetchData() async throws {
-    let data = try await networkService.getData()
-    // Process data...
-}
-
-// Or handle errors appropriately:
-func fetchData() async {
-    do {
-        let data = try await networkService.getData()
-        // Process data...
-    } catch {
-        // Log error and show user-friendly message
-        logger.error("Failed to fetch data: \(error)")
-        await showError(error)
-    }
-}
+// Flow: Foreground → Background
+1. Foreground.willLeave()              // Prepare to leave foreground
+2. Background.onTransition()           // Enter background
+3. Background.didReturn()              // Finalize background entry
 ```
 
-### ❌ NEVER: Blocking Main Thread with Sync Operations
-```swift
-// ❌ AVOID - Blocking main thread
-@MainActor
-func loadData() {
-    let data = NetworkService.fetchDataSynchronously() // Blocks UI
-    updateUI(with: data)
-}
+### App Foregrounding
 
-// ✅ CORRECT - Use async operations
-@MainActor
-func loadData() async {
-    let data = try await NetworkService.fetchData() // Non-blocking
-    updateUI(with: data)
-}
+```swift
+// Flow: Background → Foreground
+1. Background.willLeave()              // Prepare to leave background
+2. Foreground.onTransition()           // Enter foreground
+3. Foreground.didReturn()              // Finalize foreground entry
 ```
 
-## Memory Management Anti-patterns
+### Interrupted Foreground (Alert/App Switcher)
 
-### ❌ NEVER: Strong Reference Cycles in Closures
-**Example:** See [memory-leak-closure.swift](anti-patterns/memory-leak-closure.swift)
-
-### ❌ NEVER: Retaining View Controllers in Cache
 ```swift
-// ❌ AVOID - Caching view controllers without cleanup
-class NavigationManager {
-    private var cachedViewControllers: [String: UIViewController] = [:]
-    
-    func getViewController(for identifier: String) -> UIViewController {
-        if let cached = cachedViewControllers[identifier] {
-            return cached // May contain stale data and strong references
-        }
-        let vc = createViewController(for: identifier)
-        cachedViewControllers[identifier] = vc
-        return vc
-    }
-}
+// User receives alert but dismisses it
+1. Foreground.willLeave()              // Attempt to leave
+2. Foreground.didReturn()              // Cancelled - stay in foreground
 
-// ✅ CORRECT - Cache view models, not view controllers
-class NavigationManager {
-    private var cachedViewModels: [String: ViewModel] = [:]
-    
-    func getViewController(for identifier: String) -> UIViewController {
-        let viewModel = getOrCreateViewModel(for: identifier)
-        return createViewController(with: viewModel)
-    }
-    
-    private func getOrCreateViewModel(for identifier: String) -> ViewModel {
-        if let cached = cachedViewModels[identifier] {
-            return cached
-        }
-        let viewModel = createViewModel(for: identifier)
-        cachedViewModels[identifier] = viewModel
-        return viewModel
-    }
-}
+// User opens App Switcher
+1. Foreground.willLeave()              // Attempt to leave
+// Two possible outcomes:
+// A. User returns directly:
+2. Foreground.didReturn()              // Return to foreground
+// B. User switches to another app:
+2. Background.onTransition()           // Actually transition to background
+3. Background.didReturn()              // Finalize background entry
 ```
 
-## Error Handling Anti-patterns
+## Special iOS 18+ Scenarios
 
-### ❌ NEVER: Force Unwrapping Without Justification
-**Example:** See [force-unwrapping.swift](anti-patterns/force-unwrapping.swift)
+### Face ID Authentication on Cold Start
 
-### ❌ NEVER: Generic Error Messages
+#### Successful Authentication
 ```swift
-// ❌ AVOID - Generic error handling
-func handleError(_ error: Error) {
-    print("Something went wrong") // Not helpful for debugging
-    showAlert("Error occurred")   // Not helpful for users
-}
-
-// ✅ CORRECT - Specific error handling
-enum NetworkError: LocalizedError {
-    case noConnection
-    case timeout
-    case unauthorized
-    case serverError(Int)
-    
-    var errorDescription: String? {
-        switch self {
-        case .noConnection:
-            return "No internet connection. Please check your network settings."
-        case .timeout:
-            return "Request timed out. Please try again."
-        case .unauthorized:
-            return "You are not authorized to access this resource."
-        case .serverError(let code):
-            return "Server error (\(code)). Please try again later."
-        }
-    }
-}
-
-func handleNetworkError(_ error: NetworkError) {
-    logger.error("Network error: \(error)")
-    showAlert(error.localizedDescription)
-}
+1. Launching.init()
+2. Foreground.onTransition()
+3. Foreground.didReturn()
 ```
 
-## SwiftUI Anti-patterns
-
-### ❌ NEVER: Heavy Computation in View Body
+#### Failed Authentication
 ```swift
-// ❌ AVOID - Expensive operations in body
-struct ContentView: View {
-    let items: [Item]
-    
-    var body: some View {
-        List {
-            ForEach(items) { item in
-                Text(expensiveProcessing(item)) // Computed every view update
-            }
-        }
-    }
-    
-    private func expensiveProcessing(_ item: Item) -> String {
-        // Heavy computation
-        return item.data.complexProcessing()
-    }
-}
+1. Launching.init()
+2. Background.onTransition()           // Goes to background on auth failure
+3. Background.didReturn()
+```
 
-// ✅ CORRECT - Pre-compute or use lazy loading
-struct ContentView: View {
-    @StateObject private var viewModel: ContentViewModel
+### DuckDuckGo Face ID Lock
+
+#### Cold Start with DDG Face ID
+```swift
+1. Launching.init()
+2. Foreground.onTransition()
+3. Foreground.didReturn()
+4. Foreground.willLeave()              // DDG auth triggers
+5. Foreground.didReturn()              // User passes auth
+```
+
+### Critical Setup Failure
+
+```swift
+1. Launching.init() throws             // Setup fails (e.g., disk space)
+2. Terminating.init()                  // App terminates
+```
+
+## Code Placement Patterns
+
+### ⚙️ One-time Setup → `AppConfiguration`
+
+**Location**: Inside `Launching.swift`
+
+For setup that happens once and doesn't need ongoing lifecycle management:
+
+```swift
+class AppConfiguration {
+    func start() {
+        // Basic setup that doesn't require dependencies
+        setupGlobalUserAgent()
+        configureLogging()
+    }
     
-    var body: some View {
-        List {
+    func finalize() {
+        // Setup that requires access to services or MainCoordinator
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
