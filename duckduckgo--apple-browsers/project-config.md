@@ -1,109 +1,198 @@
 ---
 trigger: always_on
-description: NetworkQualityMonitor displays variance in **milliseconds** (user-friendly) but scores using **Coefficient of Variation (CV)** internally. This provides fair comparison across different latency ranges.
+description: // Use weak/unowned references appropriately
 ---
 
 
-# Network Quality Variance Scoring Using Coefficient of Variation
+# Performance Optimization Guidelines
 
-## Overview
+## Memory Management
 
-NetworkQualityMonitor displays variance in **milliseconds** (user-friendly) but scores using **Coefficient of Variation (CV)** internally. This provides fair comparison across different latency ranges.
-
-## Display vs Scoring
-
-- **UI Display**: Shows variance in milliseconds (e.g., "5.2 ms (10.4%)")
-- **Internal Scoring**: Uses CV = (stdDev/mean) × 100 for penalties
-- **Quality Labels**: Based on CV percentage thresholds
-
-## Why CV for Scoring?
-
-A 10ms variance means different things at different latencies:
-- 10ms variance on 50ms latency = 20% CV (moderate issue)
-- 10ms variance on 200ms latency = 5% CV (excellent consistency)
-
-Using CV ensures fair scoring regardless of base latency.
-
-## CV Thresholds and Test Iterations
-
-| CV Range | Quality | Penalty | Test Iterations | Testing Impact |
-|----------|---------|---------|-----------------|----------------|
-| <10% | Excellent | 0 pts | ~30 iterations | Quick reliable tests |
-| 10-20% | Good | -20 pts | ~100 iterations | Reasonable test time |
-| 20-40% | Fair | -40 pts | ~400 iterations | Lengthy test cycles |
-| >40% | Poor | -60 to -80 pts | 1000+ iterations | Practically unreliable |
-
-## Implementation
-
+### Avoid Retain Cycles
 ```swift
-// Display shows milliseconds
-value: String(format: "%.1f ms", responseVariance)
-
-// Quality label uses CV internally
-let cv = (variance / avgResponseTime) * 100
-if cv < 10 { return "Excellent" }
-else if cv < 20 { return "Good" }
-else if cv < 40 { return "Fair" }
-else { return "Poor" }
-
-// Scoring penalty based on CV
-switch coefficientOfVariation {
-case ..<10: penalty = 0
-case 10..<20: penalty = 20
-case 20..<40: penalty = 40
-case 40..<60: penalty = 60
-default: penalty = 80
+// Use weak/unowned references appropriately
+class ViewController: UIViewController {
+    private var timer: Timer?
+    
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        
+        // Bad - Creates retain cycle
+        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+            self.updateUI()
+        }
+        
+        // Good - Weak reference prevents retain cycle
+        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            self?.updateUI()
+        }
+    }
+    
+    deinit {
+        timer?.invalidate()
+    }
 }
 ```
 
-## Statistical Analysis
+### Lazy Loading
+```swift
+class DataManager {
+    // Load expensive resources only when needed
+    private lazy var database: Database = {
+        return Database()
+    }()
+    
+    // Use computed properties for lightweight calculations
+    var itemCount: Int {
+        return items.count
+    }
+    
+    // Cache expensive computations
+    private var _processedData: [ProcessedItem]?
+    var processedData: [ProcessedItem] {
+        if let cached = _processedData {
+            return cached
+        }
+        let processed = items.map { ProcessedItem($0) }
+        _processedData = processed
+        return processed
+    }
+}
+```
 
-Smart Warm-up Phase:
-  - Initial "cold" request to each endpoint (DNS resolution, TLS handshake)
-  - These measurements are discarded to eliminate first-request bias
-  - Ensures subsequent measurements reflect warm connection performance
+### Memory-Efficient Collections
+```swift
+// Use appropriate collection types
+struct LargeDataSet {
+    // Bad - Loads all data into memory
+    var allItems: [Item] {
+        return database.fetchAll()
+    }
+    
+    // Good - Use lazy sequences
+    var items: LazySequence<[Item]> {
+        return database.fetchAll().lazy
+    }
+    
+    // Better - Use pagination
+    func items(page: Int, pageSize: Int = 50) -> [Item] {
+        return database.fetch(offset: page * pageSize, limit: pageSize)
+    }
+}
+```
 
-Interleaved Sampling:
-  - Endpoints tested in randomized rounds (not consecutively)
-  - Prevents TCP connection reuse artifacts
-  - 15 samples per endpoint with 50ms delays between measurements
-  - More representative of real browsing patterns
+## UI Performance
 
-Per-Site Calculations:
-  - Calculate median response time (robust to outliers)
-  - Calculate variance and standard deviation
-  - Track individual site consistency
+### Main Thread Protection
+```swift
+class ImageLoader {
+    func loadImage(from url: URL, completion: @escaping (UIImage?) -> Void) {
+        Task {
+            // Perform heavy work on background queue
+            let data = try? await URLSession.shared.data(from: url).0
+            let image = data.flatMap { UIImage(data: $0) }
+            
+            // Always update UI on main thread
+            await MainActor.run {
+                completion(image)
+            }
+        }
+    }
+}
+```
 
-Global Aggregation:
-  adjustedResponseTime = median(all_site_medians)
+### Efficient Table/Collection Views
+```swift
+class OptimizedTableViewController: UITableViewController {
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        
+        // Register reusable cells
+        tableView.register(CustomCell.self, forCellReuseIdentifier: "Cell")
+        
+        // Set estimated heights for better scrolling
+        tableView.estimatedRowHeight = 44.0
+        tableView.rowHeight = UITableView.automaticDimension
+        
+        // Enable prefetching
+        tableView.prefetchDataSource = self
+    }
+    
+    // Reuse cells efficiently
+    override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        let cell = tableView.dequeueReusableCell(withIdentifier: "Cell", for: indexPath) as! CustomCell
+        
+        // Configure cell with minimal work
+        cell.configure(with: items[indexPath.row])
+        
+        // Cancel any ongoing async work
+        cell.prepareForReuse()
+        
+        return cell
+    }
+}
 
-Variance Scoring:
-  - Display: Standard deviation in milliseconds (user-friendly)
-  - Scoring: Coefficient of Variation (CV = stdDev/mean × 100)
-  - CV determines penalties based on relative variance
+extension OptimizedTableViewController: UITableViewDataSourcePrefetching {
+    func tableView(_ tableView: UITableView, prefetchRowsAt indexPaths: [IndexPath]) {
+        // Preload data for upcoming cells
+        let urls = indexPaths.compactMap { items[$0.row].imageURL }
+        ImageCache.shared.preload(urls: urls)
+    }
+}
+```
 
-Dual Penalty System:
-  1. CV-based: Relative variance penalties (up to 80 points)
-  2. P95-P50 Spread: Percentage-based spike penalties (up to 40 points)
+### Image Optimization
+```swift
+extension UIImage {
+    // Resize images to appropriate size
+    func resized(to targetSize: CGSize) -> UIImage? {
+        let renderer = UIGraphicsImageRenderer(size: targetSize)
+        return renderer.image { _ in
+            self.draw(in: CGRect(origin: .zero, size: targetSize))
+        }
+    }
+    
+    // Decode images on background queue
+    func decodedImage() -> UIImage? {
+        guard let cgImage = cgImage else { return nil }
+        
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        let context = CGContext(
+            data: nil,
+            width: cgImage.width,
+            height: cgImage.height,
+            bitsPerComponent: 8,
+            bytesPerRow: cgImage.width * 4,
+            space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        )
+        
+        context?.draw(cgImage, in: CGRect(x: 0, y: 0, width: cgImage.width, height: cgImage.height))
+        
+        guard let decodedImage = context?.makeImage() else { return nil }
+        return UIImage(cgImage: decodedImage)
+    }
+}
+```
 
-## Key Metrics
+## Network Performance
 
-- **averageResponseTime**: Median of all site medians (geographic reality)
-- **responseVariance**: Standard deviation in ms (consistency indicator)
-- **latencySpread**: P95-P50 difference (spike detection)
-- **p50/p95**: Percentiles for typical and worst-case assessment
+### Efficient API Calls
+```swift
+class APIClient {
+    private let session: URLSession
+    private let cache = URLCache(
+        memoryCapacity: 10 * 1024 * 1024,  // 10 MB
+        diskCapacity: 50 * 1024 * 1024,     // 50 MB
+        diskPath: nil
+    )
+    
+    init() {
+        let configuration = URLSessionConfiguration.default
+        configuration.urlCache = cache
+        configuration.requestCachePolicy = .returnCacheDataElseLoad
 
-## Testing Impact
-
-The CV directly determines test reliability:
-- **<10% CV**: Standard test suite (30-50 iterations)
-- **10-20% CV**: Increase to 100-150 iterations
-- **20-40% CV**: Need 400+ iterations for confidence
-- **>40% CV**: Results unreliable even with 1000+ iterations
-
-## Key Principle
-
-**Variance has HUGE impact on performance testing.** High CV connections can turn a 1-hour test into a 10-hour marathon with less reliable results than a 30-minute test on a stable connection.
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [duckduckgo/apple-browsers](https://github.com/duckduckgo/apple-browsers) — distributed by [TomeVault](https://tomevault.io).
