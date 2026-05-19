@@ -1,0 +1,26 @@
+# hyper-mcp
+
+> Tome by [hyper-mcp-rs](https://github.com/hyper-mcp-rs/hyper-mcp) — distributed by [TomeVault](https://tomevault.io)
+
+📦️ A fast, secure MCP server that extends its capabilities through WebAssembly plugins.
+
+## Windsurf Config
+
+The `project-config.md` file in this directory is the project config converted for Windsurf.
+Original source: `.cursor/rules/*.mdc` in [hyper-mcp-rs/hyper-mcp](https://github.com/hyper-mcp-rs/hyper-mcp).
+
+## Also available for
+
+- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
+- **GitHub Copilot** — `copilot-instructions.md`
+- **Gemini CLI** — `GEMINI.md`
+- **Windsurf** — `project-config.md`
+
+Quality verified by TomeVault's automated analysis pipeline. Source: [github.com/hyper-mcp-rs/hyper-mcp](https://github.com/hyper-mcp-rs/hyper-mcp)
+
+---
+
+Explore more instruction files on [TomeVault](https://tomevault.io) — the open index of AI config files for every platform.
+
+<!-- genome:t-e-q -->
