@@ -1,187 +1,223 @@
 ---
 trigger: always_on
-description: Prompt engineering best practices - invoke with @prompt-engineering
+description: Comprehensive rules to help you write advanced Trigger.dev tasks
 ---
 
 
-# Prompt Engineering Best Practices
+# Trigger.dev Advanced Tasks (v4)
 
-Based on [Claude's Prompt Engineering Documentation](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/overview)
+**Advanced patterns and features for writing tasks**
 
-## Core Principles
+## Tags & Organization
 
-### 1. Define Success Criteria First
+```ts
+import { task, tags } from '@trigger.dev/sdk';
 
-Before writing prompts:
+export const processUser = task({
+  id: 'process-user',
+  run: async (payload: { userId: string; orgId: string }, { ctx }) => {
+    // Add tags during execution
+    await tags.add(`user_${payload.userId}`);
+    await tags.add(`org_${payload.orgId}`);
 
-- **Establish clear objectives**: What constitutes a successful response?
-- **Create evaluation metrics**: How will you measure prompt effectiveness?
-- **Draft and iterate**: Start with a first draft and refine based on results
+    return { processed: true };
+  },
+});
 
-### 2. When to Use Prompt Engineering vs Fine-tuning
+// Trigger with tags
+await processUser.trigger(
+  { userId: '123', orgId: 'abc' },
+  { tags: ['priority', 'user_123', 'org_abc'] }, // Max 10 tags per run
+);
 
-Prompt engineering is preferred because:
-
-- **Resource efficient**: Only requires text input, no GPUs
-- **Cost effective**: Uses base model pricing
-- **Maintains updates**: Works across model versions
-- **Time saving**: Instant results vs hours/days for fine-tuning
-- **Minimal data needs**: Works with zero-shot or few-shot
-- **Flexible iteration**: Quick experimentation cycle
-- **Preserves knowledge**: No catastrophic forgetting
-- **Transparent**: Human-readable, easy to debug
-
----
-
-## The 6 Core Techniques
-
-### 1. Be Clear and Direct
-
-**Principle**: Provide explicit, unambiguous instructions.
-
-```
-❌ Bad: "Tell me about it"
-✅ Good: "Summarize the following article in three bullet points, focusing on key findings"
-
-❌ Bad: "Help with code"
-✅ Good: "Debug this Python function that should return the sum of even numbers in a list"
+// Subscribe to tagged runs
+for await (const run of runs.subscribeToRunsWithTag('user_123')) {
+  console.log(`User task ${run.id}: ${run.status}`);
+}
 ```
 
-**Tips**:
+**Tag Best Practices:**
 
-- State the task explicitly at the start
-- Specify the desired output format (bullet points, JSON, paragraphs)
-- Include constraints (word count, tone, audience)
-- Mention what to include AND what to exclude
+- Use prefixes: `user_123`, `org_abc`, `video:456`
+- Max 10 tags per run, 1-128 characters each
+- Tags don't propagate to child tasks automatically
 
-### 2. Use Examples (Multishot Prompting)
+## Concurrency & Queues
 
-**Principle**: Show the model what you want through examples.
+```ts
+import { task, queue } from '@trigger.dev/sdk';
 
-```xml
-<examples>
-  <example>
-    <input>The movie was absolutely terrible, waste of time</input>
-    <output>{"sentiment": "negative", "confidence": 0.95}</output>
-  </example>
-  <example>
-    <input>Decent film, not great but watchable</input>
-    <output>{"sentiment": "neutral", "confidence": 0.7}</output>
-  </example>
-  <example>
-    <input>Best movie I've seen this year!</input>
-    <output>{"sentiment": "positive", "confidence": 0.9}</output>
-  </example>
-</examples>
+// Shared queue for related tasks
+const emailQueue = queue({
+  name: 'email-processing',
+  concurrencyLimit: 5, // Max 5 emails processing simultaneously
+});
 
-Now analyze: "The special effects were amazing but the plot was confusing"
+// Task-level concurrency
+export const oneAtATime = task({
+  id: 'sequential-task',
+  queue: { concurrencyLimit: 1 }, // Process one at a time
+  run: async (payload) => {
+    // Critical section - only one instance runs
+  },
+});
+
+// Per-user concurrency
+export const processUserData = task({
+  id: 'process-user-data',
+  run: async (payload: { userId: string }) => {
+    // Override queue with user-specific concurrency
+    await childTask.trigger(payload, {
+      queue: {
+        name: `user-${payload.userId}`,
+        concurrencyLimit: 2,
+      },
+    });
+  },
+});
+
+export const emailTask = task({
+  id: 'send-email',
+  queue: emailQueue, // Use shared queue
+  run: async (payload: { to: string }) => {
+    // Send email logic
+  },
+});
 ```
 
-**Tips**:
+## Error Handling & Retries
 
-- Include 3-5 diverse examples covering edge cases
-- Show examples of BOTH good and bad outputs
-- Match example complexity to your actual use case
-- Order examples from simple to complex
+```ts
+import { task, retry, AbortTaskRunError } from '@trigger.dev/sdk';
 
-### 3. Let Claude Think (Chain of Thought)
+export const resilientTask = task({
+  id: 'resilient-task',
+  retry: {
+    maxAttempts: 10,
+    factor: 1.8, // Exponential backoff multiplier
+    minTimeoutInMs: 500,
+    maxTimeoutInMs: 30_000,
+    randomize: false,
+  },
+  catchError: async ({ error, ctx }) => {
+    // Custom error handling
+    if (error.code === 'FATAL_ERROR') {
+      throw new AbortTaskRunError('Cannot retry this error');
+    }
 
-**Principle**: Encourage step-by-step reasoning for complex tasks.
+    // Log error details
+    console.error(`Task ${ctx.task.id} failed:`, error);
 
-```xml
-<instruction>
-Solve this problem step by step. Show your reasoning before giving the final answer.
-</instruction>
+    // Allow retry by returning nothing
+    return { retryAt: new Date(Date.now() + 60000) }; // Retry in 1 minute
+  },
+  run: async (payload) => {
+    // Retry specific operations
+    const result = await retry.onThrow(
+      async () => {
+        return await unstableApiCall(payload);
+      },
+      { maxAttempts: 3 },
+    );
 
-<problem>
-A train leaves Station A at 9:00 AM traveling at 60 mph. Another train leaves
-Station B at 10:00 AM traveling at 80 mph toward Station A. The stations are
-280 miles apart. When will the trains meet?
-</problem>
+    // Conditional HTTP retries
+    const response = await retry.fetch('https://api.example.com', {
+      retry: {
+        maxAttempts: 5,
+        condition: (response, error) => {
+          return response?.status === 429 || response?.status >= 500;
+        },
+      },
+    });
 
-<thinking>
-[Let Claude work through the problem here]
-</thinking>
-
-<answer>
-[Final answer after reasoning]
-</answer>
+    return result;
+  },
+});
 ```
 
-**Tips**:
+## Machines & Performance
 
-- Use phrases like "Think step by step" or "Explain your reasoning"
-- For complex tasks, explicitly request a thinking section
-- Chain of thought improves accuracy on math, logic, and multi-step problems
-- Can use `<thinking>` tags to separate reasoning from output
+```ts
+export const heavyTask = task({
+  id: 'heavy-computation',
+  machine: { preset: 'large-2x' }, // 8 vCPU, 16 GB RAM
+  maxDuration: 1800, // 30 minutes timeout
+  run: async (payload, { ctx }) => {
+    // Resource-intensive computation
+    if (ctx.machine.preset === 'large-2x') {
+      // Use all available cores
+      return await parallelProcessing(payload);
+    }
 
-### 4. Use XML Tags
+    return await standardProcessing(payload);
+  },
+});
 
-**Principle**: Structure prompts with clear delimiters for better parsing.
-
-```xml
-<context>
-You are helping debug a penetration testing tool that automates security scans.
-</context>
-
-<task>
-Analyze the following error log and identify the root cause.
-</task>
-
-<error_log>
-[2024-01-15 10:23:45] ERROR: Connection timeout after 30s
-[2024-01-15 10:23:45] DEBUG: Target: 192.168.1.1:443
-[2024-01-15 10:23:45] DEBUG: Retry attempt 3 of 3
-</error_log>
-
-<output_format>
-Provide your analysis in this format:
-- Root cause: [one sentence]
-- Evidence: [relevant log lines]
-- Recommended fix: [actionable steps]
-</output_format>
+// Override machine when triggering
+await heavyTask.trigger(payload, {
+  machine: { preset: 'medium-1x' }, // Override for this run
+});
 ```
 
-**Common XML Tags**:
+**Machine Presets:**
 
-- `<context>` - Background information
-- `<task>` or `<instruction>` - What to do
-- `<examples>` - Sample inputs/outputs
-- `<constraints>` - Limitations or rules
-- `<output_format>` - Expected response structure
-- `<thinking>` - Reasoning section
-- `<answer>` - Final response
+- `micro`: 0.25 vCPU, 0.25 GB RAM
+- `small-1x`: 0.5 vCPU, 0.5 GB RAM (default)
+- `small-2x`: 1 vCPU, 1 GB RAM
+- `medium-1x`: 1 vCPU, 2 GB RAM
+- `medium-2x`: 2 vCPU, 4 GB RAM
+- `large-1x`: 4 vCPU, 8 GB RAM
+- `large-2x`: 8 vCPU, 16 GB RAM
 
-### 5. Give Claude a Role (System Prompts)
+## Idempotency
 
-**Principle**: Assign a persona to influence response style and expertise.
+```ts
+import { task, idempotencyKeys } from '@trigger.dev/sdk';
 
-```xml
-<role>
-You are a senior security researcher with 15 years of experience in penetration
-testing. You specialize in web application security and have discovered multiple
-CVEs. You communicate findings clearly and prioritize actionable recommendations.
-</role>
+export const paymentTask = task({
+  id: 'process-payment',
+  retry: {
+    maxAttempts: 3,
+  },
+  run: async (payload: { orderId: string; amount: number }) => {
+    // Automatically scoped to this task run, so if the task is retried, the idempotency key will be the same
+    const idempotencyKey = await idempotencyKeys.create(`payment-${payload.orderId}`);
 
-<task>
-Review this HTTP response and identify potential security vulnerabilities.
-</task>
+    // Ensure payment is processed only once
+    await chargeCustomer.trigger(payload, {
+      idempotencyKey,
+      idempotencyKeyTTL: '24h', // Key expires in 24 hours
+    });
+  },
+});
+
+// Payload-based idempotency
+import { createHash } from 'node:crypto';
+
+function createPayloadHash(payload: any): string {
+  const hash = createHash('sha256');
+  hash.update(JSON.stringify(payload));
+  return hash.digest('hex');
+}
+
+export const deduplicatedTask = task({
+  id: 'deduplicated-task',
+  run: async (payload) => {
+    const payloadHash = createPayloadHash(payload);
+    const idempotencyKey = await idempotencyKeys.create(payloadHash);
+
+    await processData.trigger(payload, { idempotencyKey });
+  },
+});
 ```
 
-**Effective Role Elements**:
+## Metadata & Progress Tracking
 
-- Expertise level (senior, expert, specialist)
-- Domain knowledge (security, finance, medicine)
-- Communication style (technical, friendly, formal)
-- Priorities (accuracy, brevity, thoroughness)
+```ts
+import { task, metadata } from '@trigger.dev/sdk';
 
-### 6. Prefill Claude's Response
 
-**Principle**: Start the response to guide format and direction.
-
-```
-Human: List the top 3 security vulnerabilities in this code.
-```
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [trycompai/comp](https://github.com/trycompai/comp) — distributed by [TomeVault](https://tomevault.io).
