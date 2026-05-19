@@ -1,148 +1,94 @@
 ---
 trigger: always_on
-description: description: FastAPI endpoints in llm-food, including synchronous and asynchronous file processing
+description: description: llm-food project: LLMFoodClient, an async Python client for server API interaction, parsing responses into Pydantic models.
 ---
 
 ---
-description: FastAPI endpoints in llm-food, including synchronous and asynchronous file processing
-globs: llm_food/app.py
+description: llm-food project: LLMFoodClient, an async Python client for server API interaction, parsing responses into Pydantic models.
+globs: llm_food/client.py
 alwaysApply: false
 ---
-# FastAPI Server Endpoints
+# Chapter 3: LLMFoodClient
 
-The `llm-food` API is built using FastAPI and provides both synchronous and asynchronous endpoints for file conversion. The endpoints are designed to handle different types of document processing needs efficiently.
+In the previous chapter, [APIDataModels (Pydantic)](apidatamodels__pydantic_.mdc), we explored the Pydantic models that define the structure of data exchanged with the `llm-food` server. Now, we will examine the `LLMFoodClient`, an asynchronous Python client library designed to simplify programmatic interaction with the server's API, making direct use of these data models.
 
-## Key Design Principles
+## Motivation and Purpose
 
-1. **Synchronous vs Non-Blocking Operations:**
-   - Synchronous operations for immediate file conversion (`/convert`)
-   - Non-blocking batch processing for multiple files (`/batch`)
-   - Thread pool execution for CPU-intensive operations
+The `LLMFoodClient` solves the problem of **abstracting away the complexities of direct HTTP communication** with the `llm-food` server. Manually constructing HTTP requests, handling authentication, managing asynchronous operations, parsing JSON responses, and implementing robust error handling can be tedious and error-prone for developers wanting to integrate `llm-food` services into their applications.
 
-2. **File Handling:**
-   - Immediate temporary file creation for uploaded files
-   - Proper cleanup of temporary files
-   - Efficient memory usage by avoiding in-memory file storage
+The `LLMFoodClient` acts as a **Facade** for the server's API (defined by [FastAPIServerEndpoints](fastapiserverendpoints.mdc)). It provides a clean, high-level, asynchronous interface with methods that directly correspond to the server's API endpoints. Key responsibilities include:
+- Asynchronous HTTP request construction and execution using `httpx`.
+- Optional API token-based authentication.
+- Deserialization of JSON responses into the Pydantic models defined in [APIDataModels (Pydantic)](apidatamodels__pydantic_.mdc) (e.g., `ConversionResponse`, `BatchJobStatusResponse`).
+- Standardized error handling by raising a custom `LLMFoodClientError` for API or network issues.
+- Providing type-hinted methods for better developer experience and static analysis.
 
-3. **Authentication:**
-   - Optional Bearer token authentication
-   - Configurable via environment variables
+This abstraction significantly simplifies server communication, promotes ease of integration, and serves as the core foundation for the `llm-food` Command Line Interface (CLI).
 
-## Endpoint Overview
+**Central Use Case:** A developer needs to write a Python script to automatically upload a `.docx` file to the `llm-food` server for conversion to Markdown and then process the returned Markdown content. Instead of using a raw HTTP library, they can use `LLMFoodClient` for a more straightforward and type-safe interaction.
 
-### 1. Synchronous Conversion (`/convert`)
-- Handles single file uploads
-- Immediate processing and response
-- Supports various file formats (PDF, DOCX, RTF, PPTX, HTML)
+All client logic is encapsulated within `llm_food/client.py`.
 
-### 2. Batch Processing (`/batch`)
-- Non-async endpoint running in FastAPI's thread pool
-- Immediate temporary file creation
-- Background task processing
-- Progress tracking via status endpoint
-- Efficient memory usage
+## Core Components and Structure
 
-### 3. Status and Results (`/status/{task_id}`, `/batch/{task_id}`)
-- Track batch job progress
-- Retrieve completed results
-- Error reporting and handling
+The `LLMFoodClient` is primarily composed of:
 
-## Implementation Details
+1.  **`LLMFoodClient` Class:** The main class providing all client functionalities.
+    *   **Initialization (`__init__`)**: Takes the `base_url` of the `llm-food` server and an optional `api_token` for authentication.
+2.  **`LLMFoodClientError` Exception:** A custom exception class raised for errors encountered during client operations, such as HTTP errors or request issues. It often includes the HTTP status code and response text from the server for better diagnostics.
+3.  **Private `_request` Method:** An internal helper method responsible for:
+    *   Constructing the full request URL.
+    *   Adding necessary headers (e.g., `Accept: application/json`, `Authorization: Bearer <token>`).
+    *   Making the actual asynchronous HTTP request using `httpx.AsyncClient`.
+    *   Performing initial response validation (e.g., `response.raise_for_status()`).
+    *   Wrapping `httpx` exceptions into `LLMFoodClientError`.
+4.  **Public API Methods:** Asynchronous methods that mirror the server endpoints:
+    *   `convert_file(file_path: str) -> ConversionResponse`
+    *   `convert_url(url_to_convert: str) -> ConversionResponse`
+    *   `create_batch_job(file_paths: List[str], output_gcs_path: str) -> Dict[str, Any]`
+    *   `get_detailed_batch_job_status(task_id: str) -> BatchJobStatusResponse`
+    *   `get_batch_job_results(task_id: str) -> BatchJobOutputResponse`
 
-### Batch Processing Flow
+## How to Use `LLMFoodClient`
+
+Using the `LLMFoodClient` involves instantiating it and then calling its `async` methods.
+
+**1. Initialization:**
 
 ```python
-@app.post("/batch", dependencies=[Depends(authenticate_request)])
-def batch_files_upload(
-    background_tasks: BackgroundTasks,
-    files: List[UploadFile],
-    output_gcs_path: str,
-):
-    # Create temporary files immediately
-    temp_files = []
-    for f in files:
-        temp_file = tempfile.NamedTemporaryFile(suffix=ext, delete=False)
-        temp_files.append(temp_file.name)
-        shutil.copyfileobj(f.file, temp_file)
-        temp_file.close()
+# llm_food/client.py
+from typing import Optional
+# ... other imports
 
-    # Process files in background tasks
-    background_tasks.add_task(
-        _process_single_non_pdf_file_and_upload,
-        temp_file_path,  # Pass file path instead of content
-        ...
+class LLMFoodClient:
+    def __init__(self, base_url: str, api_token: Optional[str] = None):
+        self.base_url = base_url.rstrip("/")
+        self.api_token = api_token
+        self.headers = {"Accept": "application/json"}
+        if self.api_token:
+            self.headers["Authorization"] = f"Bearer {self.api_token}"
+```
+- `base_url`: The root URL of the `llm-food` server (e.g., `http://localhost:8000`).
+- `api_token` (optional): If the server requires authentication, provide the API token here.
+
+**Example Instantiation:**
+```python
+import asyncio
+from llm_food.client import LLMFoodClient, LLMFoodClientError
+from llm_food.models import ConversionResponse # From apidatamodels__pydantic_.mdc
+
+async def run_conversion():
+    client = LLMFoodClient(
+        base_url="http://localhost:8000",
+        api_token="your_secret_api_token" # Optional
     )
-
-    return {"task_id": main_batch_job_id}
+    # ... use client methods
 ```
 
-### Background Processing Functions
+**2. Calling API Methods:**
 
-The background processing functions are designed to be non-async to run efficiently in FastAPI's thread pool:
 
-```python
-def _run_gemini_pdf_batch_conversion(
-    pdf_inputs_list: List[tuple[str, str]],  # (filename, temp_file_path)
-    output_gcs_path_str: str,
-    main_batch_job_id: str,
-    gemini_batch_sub_job_id: str,
-):
-    # Process PDFs using Gemini Batch API
-    # Runs in thread pool, non-blocking
-    ...
-
-def _process_single_non_pdf_file_and_upload(
-    temp_file_path: str,
-    file_ext: str,
-    original_filename: str,
-    ...
-):
-    # Process non-PDF files
-    # Runs in thread pool, non-blocking
-    ...
-```
-
-### Status Management
-
-```python
-def _check_and_finalize_batch_job_status(
-    main_batch_job_id: str,
-    con: duckdb.DuckDBPyConnection,
-):
-    # Non-async status check and update
-    # Called by background tasks
-    ...
-```
-
-## Best Practices
-
-1. **Memory Management:**
-   - Use temporary files instead of in-memory storage
-   - Clean up temporary files after processing
-   - Stream file uploads to disk
-
-2. **Error Handling:**
-   - Proper cleanup in case of errors
-   - Detailed error reporting in database
-   - Status updates for failed operations
-
-3. **Database Operations:**
-   - Consistent transaction handling
-   - Status updates for tracking
-   - Proper connection management
-
-4. **Background Tasks:**
-   - Non-async processing functions for thread pool execution
-   - Progress tracking and status updates
-   - Resource cleanup
-
-## Configuration
-
-The server can be configured through environment variables:
-- `LLM_FOOD_HOST`: Server host (default: "0.0.0.0")
-- `LLM_FOOD_PORT`: Server port (default: 8000)
-- `LLM_FOOD_RELOAD`: Enable/disable reload in development
-- `API_AUTH_TOKEN`: Optional authentication token 
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [altaidevorg/llm-food](https://github.com/altaidevorg/llm-food) — distributed by [TomeVault](https://tomevault.io).
