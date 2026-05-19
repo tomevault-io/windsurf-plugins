@@ -1,236 +1,176 @@
 ---
 trigger: always_on
-description: │   ├── Package.swift
+description: DuckDuckGo's subscription system provides access to premium features including VPN (Network Protection), Personal Information Removal (PIR), Identity Theft Restoration (ITR), and AI Chat. The system supports multiple purchase platforms and cross-platform activation.
 ---
 
 
-# Shared Packages Development Guidelines
+# Subscription Architecture & Implementation
 
-## Package Structure
+## Overview
+DuckDuckGo's subscription system provides access to premium features including VPN (Network Protection), Personal Information Removal (PIR), Identity Theft Restoration (ITR), and AI Chat. The system supports multiple purchase platforms and cross-platform activation.
 
-### Standard Package Layout
-```
-SharedPackages/
-├── FeatureName/
-│   ├── Package.swift
-│   ├── README.md
-│   ├── Sources/
-│   │   └── FeatureName/
-│   │       ├── Public/          # Public API
-│   │       ├── Internal/        # Internal implementation
-│   │       └── Resources/       # Assets and resources
-│   └── Tests/
-│       └── FeatureNameTests/
-│           └── FeatureTests.swift
-```
+## Core Architecture
 
-### Package.swift Configuration
+### Shared Foundation: BrowserServicesKit
+All subscription logic is centralized in `BrowserServicesKit/Sources/Subscription/`:
+
 ```swift
-// swift-tools-version: 5.7
-import PackageDescription
+// ✅ CORRECT - Use BrowserServicesKit for core subscription logic
+import BrowserServicesKit
 
-let package = Package(
-    name: "FeatureName",
-    platforms: [
-        .iOS(.v15),
-        .macOS(.v12)
-    ],
-    products: [
-        .library(
-            name: "FeatureName",
-            targets: ["FeatureName"]
-        )
-    ],
-    dependencies: [
-        // Only include truly necessary dependencies
-        .package(url: "https://github.com/DuckDuckGo/BrowserServicesKit", from: "1.0.0")
-    ],
-    targets: [
-        .target(
-            name: "FeatureName",
-            dependencies: ["BrowserServicesKit"],
-            resources: [
-                .process("Resources")
-            ]
-        ),
-        .testTarget(
-            name: "FeatureNameTests",
-            dependencies: ["FeatureName"]
-        )
-    ]
-)
-```
-
-## Cross-Platform Compatibility
-
-### Platform-Specific Code
-```swift
-#if os(iOS)
-import UIKit
-public typealias PlatformView = UIView
-public typealias PlatformViewController = UIViewController
-public typealias PlatformColor = UIColor
-#elseif os(macOS)
-import AppKit
-public typealias PlatformView = NSView
-public typealias PlatformViewController = NSViewController
-public typealias PlatformColor = NSColor
-#endif
-
-// Use platform-agnostic types
-public protocol CrossPlatformViewProtocol {
-    var backgroundColor: PlatformColor? { get set }
-}
-```
-
-### Conditional Compilation
-```swift
-public class FeatureManager {
-    public func performAction() {
-        #if os(iOS)
-        performIOSAction()
-        #elseif os(macOS)
-        performMacOSAction()
-        #endif
-    }
+final class SubscriptionViewModel: ObservableObject {
+    private let subscriptionManager: SubscriptionManager
     
-    #if os(iOS)
-    private func performIOSAction() {
-        // iOS-specific implementation
+    init(subscriptionManager: SubscriptionManager = SubscriptionManager.shared) {
+        self.subscriptionManager = subscriptionManager
     }
-    #endif
-    
-    #if os(macOS)
-    private func performMacOSAction() {
-        // macOS-specific implementation
-    }
-    #endif
-}
-```
-
-## API Design
-
-### Public API Guidelines
-```swift
-// Mark public APIs clearly
-public protocol FeatureServiceProtocol {
-    func fetchData() async throws -> [Item]
 }
 
-public final class FeatureService: FeatureServiceProtocol {
-    // Use dependency injection
-    private let networkClient: NetworkClientProtocol
-    
-    public init(networkClient: NetworkClientProtocol) {
-        self.networkClient = networkClient
-    }
-    
-    public func fetchData() async throws -> [Item] {
-        // Implementation
+// ❌ INCORRECT - Don't duplicate subscription logic in platform code
+final class SubscriptionViewModel: ObservableObject {
+    func checkSubscriptionStatus() {
+        // Don't reimplement subscription logic
     }
 }
 ```
 
-### Internal Implementation
-```swift
-// Keep implementation details internal
-internal final class FeatureImplementation {
-    // Not exposed to package consumers
-}
+### Platform-Specific Purchase Methods
 
-// Use extensions for internal helpers
-internal extension String {
-    var sanitized: String {
-        // Internal helper method
-    }
-}
-```
+#### iOS
+- **Purchase Method**: App Store only (StoreKit)
+- **Geographic Coverage**: Global
+- **Cross-Platform**: Can activate Stripe subscriptions from other platforms
 
-## Resource Management
+#### macOS App Store Build
+- **Purchase Method**: App Store only (StoreKit)
+- **Geographic Coverage**: Global
+- **Cross-Platform**: Can activate Stripe subscriptions
 
-### Bundled Resources
-```swift
-public enum FeatureResources {
-    private static let bundle = Bundle.module
-    
-    public static var configuration: Data {
-        guard let url = bundle.url(forResource: "config", withExtension: "json"),
-              let data = try? Data(contentsOf: url) else {
-            fatalError("Missing required resource: config.json")
-        }
-        return data
-    }
-    
-    public static func image(named name: String) -> PlatformImage? {
-        #if os(iOS)
-        return UIImage(named: name, in: bundle, with: nil)
-        #elseif os(macOS)
-        return bundle.image(forResource: name)
-        #endif
-    }
-}
-```
-
-## Dependency Management
-
-### Minimal Dependencies
-```swift
-// Avoid unnecessary dependencies
-// Bad: Importing entire framework for one function
-import HeavyFramework
-
-// Good: Implement minimal version or use protocol
-protocol DateFormatterProtocol {
-    func string(from date: Date) -> String
-}
-```
+#### macOS Direct Download Build
+- **US Users**: Stripe web purchases
+- **Non-US Users**: Redirected to iOS App Store
+- **Cross-Platform**: Primary platform for Stripe purchases
 
 ### Version Management
+ALWAYS use V2 implementations for new code:
+
 ```swift
-// Use semantic versioning
-// Package.swift
-dependencies: [
-    .package(url: "https://github.com/example/package", 
-             from: "1.0.0"),  // Allows 1.x.x
-    .package(url: "https://github.com/example/strict", 
-             exact: "2.1.0"), // Exact version
-    .package(url: "https://github.com/example/range", 
-             "1.0.0"..<"2.0.0") // Version range
-]
+// ✅ CORRECT - Use V2 implementations
+let subscriptionManager = SubscriptionManagerV2()
+let purchaseManager = StorePurchaseManagerV2()
+let purchaseFlow = AppStorePurchaseFlowV2()
+
+// ❌ INCORRECT - Don't use V1 implementations
+let subscriptionManager = SubscriptionManager() // Legacy
+let purchaseFlow = AppStorePurchaseFlow() // Legacy
 ```
 
-## Testing Shared Packages
+## Premium Features Implementation
 
-### Cross-Platform Tests
+### Feature Entitlements
 ```swift
-import XCTest
-@testable import FeatureName
-
-final class FeatureTests: XCTestCase {
-    func testCrossPlatformBehavior() {
-        let feature = Feature()
-        
-        #if os(iOS)
-        XCTAssertNotNil(feature.iosSpecificProperty)
-        #elseif os(macOS)
-        XCTAssertNotNil(feature.macOSSpecificProperty)
-        #endif
-        
-        // Test common behavior
-        XCTAssertEqual(feature.commonProperty, expectedValue)
+// ✅ CORRECT - Check entitlements through SubscriptionManager
+final class FeatureViewModel: ObservableObject {
+    private let subscriptionManager: SubscriptionManager
+    
+    var isFeatureEnabled: Bool {
+        subscriptionManager.hasEntitlement(for: .networkProtection)
+    }
+    
+    var availableFeatures: [SubscriptionFeature] {
+        subscriptionManager.entitlements.compactMap { entitlement in
+            switch entitlement {
+            case .networkProtection:
+                return .vpn
+            case .dataBrokerProtection:
+                return .personalInformationRemoval
+            case .identityTheftRestoration:
+                return .identityTheftRestoration
+            default:
+                return nil
+            }
+        }
     }
 }
 ```
 
-### Test Utilities
+### VPN Integration
 ```swift
-// Provide test utilities in a separate target
-public extension XCTestCase {
-    func waitForCondition(
-        _ condition: @autoclosure () -> Bool,
-        timeout: TimeInterval = 1.0,
-        message: String = "Condition not met"
-    ) {
+// ✅ CORRECT - VPN entitlement integration
+final class VPNManager: ObservableObject {
+    private let subscriptionManager: SubscriptionManager
+    
+    func enableVPN() async {
+        guard subscriptionManager.hasEntitlement(for: .networkProtection) else {
+            await showSubscriptionPrompt()
+            return
+        }
+        
+        // Enable VPN functionality
+        await startVPNConnection()
+    }
+}
+```
+
+### Personal Information Removal (PIR)
+```swift
+// ✅ CORRECT - PIR implementation with freemium support
+final class PIRManager: ObservableObject {
+    private let subscriptionManager: SubscriptionManager
+    
+    var isFreemiumEligible: Bool {
+        // Check feature flag and eligibility
+        FeatureFlags.shared.isEnabled(.freemiumPIR) &&
+        !subscriptionManager.isUserSubscribed &&
+        isUSUser
+    }
+    
+    func performScan() async {
+        if subscriptionManager.hasEntitlement(for: .dataBrokerProtection) {
+            await performFullScan()
+        } else if isFreemiumEligible {
+            await performLimitedScan()
+        } else {
+            await showSubscriptionPrompt()
+        }
+    }
+}
+```
+
+## Purchase Flow Implementation
+
+### Free Trial Support
+```swift
+// ✅ CORRECT - Free trial implementation
+final class SubscriptionPurchaseViewModel: ObservableObject {
+    @Published var isTrialEligible = false
+    @Published var trialPeriod: String = ""
+    
+    func checkTrialEligibility() async {
+        guard FeatureFlags.shared.isEnabled(.privacyProFreeTrial) else {
+            isTrialEligible = false
+            return
+        }
+        
+        // Check server-side eligibility
+        let eligible = await subscriptionManager.checkFreshFreeTrialEligibility()
+        await MainActor.run {
+            isTrialEligible = eligible
+            if let product = subscriptionManager.currentProduct,
+               let offer = product.introductoryOffer {
+                trialPeriod = offer.localizedPeriod
+            }
+        }
+    }
+}
+```
+
+### Platform-Specific Purchase
+```swift
+// ✅ CORRECT - Platform-aware purchase flow
+final class PurchaseFlowCoordinator {
+    private let subscriptionManager: SubscriptionManager
+    
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
