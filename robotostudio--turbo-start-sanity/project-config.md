@@ -1,286 +1,106 @@
 ---
 trigger: always_on
-description: Guide for migrating from ESLint/Prettier to Ultracite
+description: Ultracite Rules - AI-Ready Formatter and Linter
 ---
 
 
-# Ultracite Migration Guide
+# Project Context
+Ultracite enforces strict type safety, accessibility standards, and consistent code quality for JavaScript/TypeScript projects using Biome's lightning-fast formatter and linter.
 
-Quick reference for migrating Turbostart monorepo projects from ESLint/Prettier to Ultracite (Biome preset).
+## Key Principles
+- Zero configuration required
+- Subsecond performance
+- Maximum type safety
+- AI-friendly code generation
 
-**Project Structure Assumed:**
-```
-/
-├── apps/
-│   ├── studio/      # Sanity CMS
-│   └── web/         # Next.js app
-├── packages/
-│   ├── eslint-config/  # To be deleted
-│   └── ui/             # Shared components
-├── turbo.json
-└── package.json
-```
+## Before Writing Code
+1. Analyze existing patterns in the codebase
+2. Consider edge cases and error scenarios
+3. Follow the rules below strictly
+4. Validate accessibility requirements
 
-## 1. Install Dependencies
+## Rules
 
-```bash
-pnpm add -D -w ultracite @biomejs/biome@latest
-```
+### Accessibility (a11y)
+- Don't use `accessKey` attribute on any HTML element.
+- Don't set `aria-hidden="true"` on focusable elements.
+- Don't add ARIA roles, states, and properties to elements that don't support them.
+- Don't use distracting elements like `<marquee>` or `<blink>`.
+- Only use the `scope` prop on `<th>` elements.
+- Don't assign non-interactive ARIA roles to interactive HTML elements.
+- Make sure label elements have text content and are associated with an input.
+- Don't assign interactive ARIA roles to non-interactive HTML elements.
+- Don't assign `tabIndex` to non-interactive HTML elements.
+- Don't use positive integers for `tabIndex` property.
+- Don't include "image", "picture", or "photo" in img alt prop.
+- Don't use explicit role property that's the same as the implicit/default role.
+- Make static elements with click handlers use a valid role attribute.
+- Always include a `title` element for SVG elements.
+- Give all elements requiring alt text meaningful information for screen readers.
+- Make sure anchors have content that's accessible to screen readers.
+- Assign `tabIndex` to non-interactive HTML elements with `aria-activedescendant`.
+- Include all required ARIA attributes for elements with ARIA roles.
+- Make sure ARIA properties are valid for the element's supported roles.
+- Always include a `type` attribute for button elements.
+- Make elements with interactive roles and handlers focusable.
+- Give heading elements content that's accessible to screen readers (not hidden with `aria-hidden`).
+- Always include a `lang` attribute on the html element.
+- Always include a `title` attribute for iframe elements.
+- Accompany `onClick` with at least one of: `onKeyUp`, `onKeyDown`, or `onKeyPress`.
+- Accompany `onMouseOver`/`onMouseOut` with `onFocus`/`onBlur`.
+- Include caption tracks for audio and video elements.
+- Use semantic elements instead of role attributes in JSX.
+- Make sure all anchors are valid and navigable.
+- Ensure all ARIA properties (`aria-*`) are valid.
+- Use valid, non-abstract ARIA roles for elements with ARIA roles.
+- Use valid ARIA state and property values.
+- Use valid values for the `autocomplete` attribute on input elements.
+- Use correct ISO language/country codes for the `lang` attribute.
 
-## 2. Create Root Configuration
-
-Create `biome.jsonc`:
-
-```json
-{
-  "$schema": "https://biomejs.dev/schemas/2.2.5/schema.json",
-  "extends": ["ultracite"]
-}
-```
-
-## 3. Configure Cursor
-
-Create/update `.vscode/settings.json`:
-
-```json
-{
-  "editor.defaultFormatter": "biomejs.biome",
-  "editor.formatOnSave": false,
-  "editor.formatOnPaste": false,
-  "editor.codeActionsOnSave": {
-    "source.fixAll.biome": "explicit",
-    "source.organizeImports.biome": "explicit"
-  },
-  "[typescript]": {
-    "editor.defaultFormatter": "biomejs.biome"
-  },
-  "[typescriptreact]": {
-    "editor.defaultFormatter": "biomejs.biome"
-  },
-  "[javascript]": {
-    "editor.defaultFormatter": "biomejs.biome"
-  },
-  "[jsonc]": {
-    "editor.defaultFormatter": "biomejs.biome"
-  },
-  "[json]": {
-    "editor.defaultFormatter": "biomejs.biome"
-  }
-}
-```
-
-**Important:** Set `formatOnSave: false` and use `codeActionsOnSave` to prevent double-formatting issues.
-
-## 4. Update All package.json Scripts
-
-Replace in root and all workspace packages:
-
-```json
-{
-  "scripts": {
-    "lint": "npx ultracite lint",
-    "format": "npx ultracite fix"
-  }
-}
-```
-
-## 5. Remove Old Dependencies & Configs
-
-### Root (`package.json`)
-Remove from `devDependencies`:
-- `@workspace/eslint-config`
-- `prettier`
-
-### `apps/studio/package.json`
-Remove from `devDependencies`:
-- `eslint`
-- `eslint-plugin-import`
-- `eslint-plugin-prettier`
-- `eslint-plugin-simple-import-sort`
-- `prettier`
-- `typescript-eslint`
-
-Delete files:
-- `apps/studio/eslint.config.mjs`
-- `apps/studio/prettier.config.mjs`
-
-### `apps/web/package.json`
-Remove from `devDependencies`:
-- `@workspace/eslint-config`
-- `prettier`
-
-Delete files:
-- `apps/web/eslint.config.js`
-- `apps/web/prettier.config.mjs`
-- `apps/web/.prettierignore` (if exists)
-
-### `packages/ui/package.json`
-Remove from `devDependencies`:
-- `@workspace/eslint-config`
-- `eslint`
-
-Delete files:
-- `packages/ui/eslint.config.js`
-
-### Delete Entire Package
-- Delete entire `packages/eslint-config/` directory
-
-## 6. Update Next.js Config
-
-In `apps/web/next.config.ts`, disable ESLint during builds:
-
-```typescript
-export default {
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-  // ... rest of config
-}
-```
-
-**Important:** If you have redirects from Sanity, ensure they handle `null` values:
-
-```typescript
-async redirects() {
-  const redirects = await client.fetch(queryRedirects);
-  return redirects.map((redirect) => ({
-    ...redirect,
-    permanent: redirect.permanent ?? false,
-  }));
-}
-```
-
-## 7. Update Turborepo Config
-
-In `turbo.json`:
-
-```json
-{
-  "tasks": {
-    "//#format": {},
-    "//#lint": {
-      "cache": false
-    }
-  }
-}
-```
-
-## 8. Common Rule Adjustments
-
-### For Tailwind CSS (apps/web uses this)
-Add to `biome.jsonc`:
-
-```json
-{
-  "linter": {
-    "rules": {
-      "suspicious": {
-        "noUnknownAtRules": "off",
-        "noExplicitAny": "warn"
-      }
-    }
-  }
-}
-```
-
-### If you encounter namespace import issues
-```json
-{
-  "linter": {
-    "rules": {
-      "performance": {
-        "noNamespaceImport": "off"
-      }
-    }
-  }
-}
-```
-
-## 9. Testing Checklist
-
-### Step 1: Install & Format
-```bash
-# Install dependencies
-pnpm install
-
-# Format all code (from root)
-pnpm format
-
-# Review the changes - should reorganize imports and format code
-git diff
-```
-
-### Step 2: Lint
-```bash
-# Run linter (from root)
-pnpm lint
-
-# Fix any auto-fixable issues
-pnpm format
-```
-
-### Step 3: Build All Packages
-```bash
-# From root - build everything
-pnpm build
-```
-
-Should successfully build:
-- `apps/studio` (Sanity Studio)
-- `apps/web` (Next.js)
-- `packages/ui`
-
-### Step 4: Test Individual Packages
-```bash
-# Test studio
-cd apps/studio
-pnpm lint
-pnpm format
-
-# Test web
-cd apps/web
-pnpm lint
-pnpm format
-
-# Test ui
-cd packages/ui
-pnpm lint
-pnpm format
-```
-
-### Step 5: Test Dev Servers
-```bash
-# From root
-pnpm dev
-```
-
-Verify both studio and web start correctly.
-
-### Step 6: Restart Cursor & Test Editor
-1. Restart Cursor: `Cmd/Ctrl + Shift + P` → "Developer: Reload Window"
-2. Open a `.ts` or `.tsx` file
-3. Make a change and hit `Cmd/Ctrl + S`
-4. Verify:
-   - Code formats automatically
-   - Imports organize automatically
-   - No double-formatting or jerking
-   - No ESLint/Prettier errors in problems panel
-
-## Key Differences from ESLint/Prettier
-
-- Use `npx ultracite fix` instead of `prettier --write` (formats + fixes + organizes imports)
-- Use `npx ultracite lint` instead of `eslint`
-- Biome is **much faster** (written in Rust)
-- Zero config by default - trust Ultracite's presets
-- Import sorting is built-in, no extra plugins needed
-
-## Troubleshooting
-
-### Double formatting on save?
-**Symptom:** Code jumps/jerks when pressing Cmd+S
-**Fix:** 
-- Ensure `formatOnSave: false` in `.vscode/settings.json`
-- Check your user settings don't have conflicting formatter settings
+### Code Complexity and Quality
+- Don't use consecutive spaces in regular expression literals.
+- Don't use the `arguments` object.
+- Don't use primitive type aliases or misleading types.
+- Don't use the comma operator.
+- Don't use empty type parameters in type aliases and interfaces.
+- Don't write functions that exceed a given Cognitive Complexity score.
+- Don't nest describe() blocks too deeply in test files.
+- Don't use unnecessary boolean casts.
+- Don't use unnecessary callbacks with flatMap.
+- Use for...of statements instead of Array.forEach.
+- Don't create classes that only have static members (like a static namespace).
+- Don't use this and super in static contexts.
+- Don't use unnecessary catch clauses.
+- Don't use unnecessary constructors.
+- Don't use unnecessary continue statements.
+- Don't export empty modules that don't change anything.
+- Don't use unnecessary escape sequences in regular expression literals.
+- Don't use unnecessary fragments.
+- Don't use unnecessary labels.
+- Don't use unnecessary nested block statements.
+- Don't rename imports, exports, and destructured assignments to the same name.
+- Don't use unnecessary string or template literal concatenation.
+- Don't use String.raw in template literals when there are no escape sequences.
+- Don't use useless case statements in switch statements.
+- Don't use ternary operators when simpler alternatives exist.
+- Don't use useless `this` aliasing.
+- Don't use any or unknown as type constraints.
+- Don't initialize variables to undefined.
+- Don't use the void operators (they're not familiar).
+- Use arrow functions instead of function expressions.
+- Use Date.now() to get milliseconds since the Unix Epoch.
+- Use .flatMap() instead of map().flat() when possible.
+- Use literal property access instead of computed property access.
+- Don't use parseInt() or Number.parseInt() when binary, octal, or hexadecimal literals work.
+- Use concise optional chaining instead of chained logical expressions.
+- Use regular expression literals instead of the RegExp constructor when possible.
+- Don't use number literal object member names that aren't base 10 or use underscore separators.
+- Remove redundant terms from logical expressions.
+- Use while loops instead of for loops when you don't need initializer and update expressions.
+- Don't pass children as props.
+- Don't reassign const variables.
+- Don't use constant expressions in conditions.
+- Don't use `Math.min` and `Math.max` to clamp values when the result is constant.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
