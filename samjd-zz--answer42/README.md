@@ -7,11 +7,11 @@ Answer42 is a sophisticated AI-powered platform for academic researchers, studen
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [samjd-zz/answer42](https://github.com/samjd-zz/answer42).
+Original source: `CLAUDE.md` in [samjd-zz/answer42](https://github.com/samjd-zz/answer42).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
