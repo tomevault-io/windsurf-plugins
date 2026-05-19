@@ -1,110 +1,129 @@
 ---
 trigger: always_on
-description: Documentation for understanding how to use the Swift Composable Architecture's Tree Navigation feature.
+description: This file provides guidance for coding agents working in this repo.
 ---
 
+# Hex – Dev Notes for Agents
 
-Basics
-The tools for this style of navigation include the Presents() macro, PresentationAction, the ifLet(_:action:destination:fileID:filePath:line:column:) operator, and that is all. Once your feature is properly integrated with those tools you can use all of SwiftUI’s normal navigation view modifiers, such as sheet(item:), popover(item:), etc.
+This file provides guidance for coding agents working in this repo.
 
-The process of integrating two features together for navigation largely consists of 2 steps: integrating the features’ domains together and integrating the features’ views together. One typically starts by integrating the features’ domains together. This consists of adding the child’s state and actions to the parent, and then utilizing a reducer operator to compose the child reducer into the parent.
+## Project Overview
 
-For example, suppose you have a list of items and you want to be able to show a sheet to display a form for adding a new item. We can integrate state and actions together by utilizing the Presents() macro and PresentationAction type:
+Hex is a macOS menu bar application for on‑device voice‑to‑text. It supports Whisper (Core ML via WhisperKit) and Parakeet TDT v3 (Core ML via FluidAudio). Users activate transcription with hotkeys; text can be auto‑pasted into the active app.
 
-@Reducer
-struct InventoryFeature {
-  @ObservableState
-  struct State: Equatable {
-    @Presents var addItem: ItemFormFeature.State?
-    var items: IdentifiedArrayOf<Item> = []
-    // ...
-  }
+## Build & Development Commands
 
+```bash
+# Build the app
+xcodebuild -scheme Hex -configuration Release
 
-  enum Action {
-    case addItem(PresentationAction<ItemFormFeature.Action>)
-    // ...
-  }
+# Run tests (must be run from HexCore directory for unit tests)
+cd HexCore && swift test
 
+# Or run all tests via Xcode
+xcodebuild test -scheme Hex
 
-  // ...
-}
-Note
+# Open in Xcode (recommended for development)
+open Hex.xcodeproj
+```
 
-The addItem state is held as an optional. A non-nil value represents that feature is being presented, and nil presents the feature is dismissed.
+## Architecture
 
-Next you can integrate the reducers of the parent and child features by using the ifLet(_:action:destination:fileID:filePath:line:column:) reducer operator, as well as having an action in the parent domain for populating the child’s state to drive navigation:
+The app uses **The Composable Architecture (TCA)** for state management. Key architectural components:
 
-@Reducer
-struct InventoryFeature {
-  @ObservableState
-  struct State: Equatable { /* ... */ }
-  enum Action { /* ... */ }
-  
-  var body: some ReducerOf<Self> {
-    Reduce { state, action in 
-      switch action {
-      case .addButtonTapped:
-        // Populating this state performs the navigation
-        state.addItem = ItemFormFeature.State()
-        return .none
+### Features (TCA Reducers)
+- `AppFeature`: Root feature coordinating the app lifecycle
+- `TranscriptionFeature`: Core recording and transcription logic
+- `SettingsFeature`: User preferences and configuration
+- `HistoryFeature`: Transcription history management
 
+### Dependency Clients
+- `TranscriptionClient`: WhisperKit integration for ML transcription
+- `RecordingClient`: AVAudioRecorder wrapper for audio capture
+- `PasteboardClient`: Clipboard operations
+- `KeyEventMonitorClient`: Global hotkey monitoring via Sauce framework
 
-      // ...
-      }
-    }
-    .ifLet(\.$addItem, action: \.addItem) {
-      ItemFormFeature()
-    }
-  }
-}
-Note
+### Key Dependencies
+- **WhisperKit**: Core ML transcription (tracking main branch)
+- **FluidAudio (Parakeet)**: Core ML ASR (multilingual) default model
+- **Sauce**: Keyboard event monitoring
+- **Sparkle**: Auto-updates (feed: https://hex-updates.s3.amazonaws.com/appcast.xml)
+- **Swift Composable Architecture**: State management
+- **Inject** Hot Reloading for SwiftUI
 
-The key path used with ifLet focuses on the @PresentationState projected value since it uses the $ syntax. Also note that the action uses a case path, which is analogous to key paths but tuned for enums.
+## Important Implementation Details
 
-That’s all that it takes to integrate the domains and logic of the parent and child features. Next we need to integrate the features’ views. This is done by passing a binding of a store to one of SwiftUI’s view modifiers.
+1. **Hotkey Recording Modes**: The app supports both press-and-hold and double-tap recording modes, implemented in `HotKeyProcessor.swift`. See `docs/hotkey-semantics.md` for detailed behavior specifications including:
+   - **Modifier-only hotkeys** (e.g., Option) use a **0.3s threshold** to prevent accidental triggers from OS shortcuts
+   - **Regular hotkeys** (e.g., Cmd+A) use user's `minimumKeyTime` setting (default 0.2s)
+   - Mouse clicks and extra modifiers are discarded within threshold, ignored after
+   - Only ESC cancels recordings after the threshold
 
-For example, to show a sheet from the addItem state in the InventoryFeature, we can hand the sheet(item:) modifier a binding of a Store as an argument that is focused on presentation state and actions:
+2. **Model Management**: Models are managed by `ModelDownloadFeature`. Curated defaults live in `Hex/Resources/Data/models.json`. The Settings UI shows a compact opinionated list (Parakeet + three Whisper sizes). No dropdowns.
 
-struct InventoryView: View {
-  @Bindable var store: StoreOf<InventoryFeature>
+3. **Sound Effects**: Audio feedback is provided via `SoundEffect.swift` using files in `Resources/Audio/`
 
+4. **Window Management**: Uses an `InvisibleWindow` for the transcription indicator overlay
 
-  var body: some View {
-    List {
-      // ...
-    }
-    .sheet(
-      item: $store.scope(state: \.addItem, action: \.addItem)
-    ) { store in
-      ItemFormView(store: store)
-    }
-  }
-}
-Note
+5. **Permissions**: Requires audio input and automation entitlements (see `Hex.entitlements`)
 
-We use SwiftUI’s @Bindable property wrapper to produce a binding to a store, which can be further scoped using SwiftUI/Binding/scope(state:action:fileID:filePath:line:column:).
+6. **Logging**: All diagnostics should use the unified logging helper `HexLog` (`HexCore/Sources/HexCore/Logging.swift`). Pick an existing category (e.g., `.transcription`, `.recording`, `.settings`) or add a new case so Console predicates stay consistent. Avoid `print` and prefer privacy annotations (`, privacy: .private`) for anything potentially sensitive like transcript text or file paths.
 
-With those few steps completed the domains and views of the parent and child features are now integrated together, and when the addItem state flips to a non-nil value the sheet will be presented, and when it is nil’d out it will be dismissed.
+## Models (2025‑11)
 
-In this example we are using the .sheet view modifier, but every view modifier SwiftUI ships can be handed a store in this fashion, including popover(item:), fullScreenCover(item:), navigationDestination(item:)`, and more. This should make it possible to use optional state to drive any kind of navigation in a SwiftUI application.
+- Default: Parakeet TDT v3 (multilingual) via FluidAudio
+- Additional curated: Whisper Small (Tiny), Whisper Medium (Base), Whisper Large v3
+- Note: Distil‑Whisper is English‑only and not shown by default
 
-Enum state
-While driving navigation with optional state can be powerful, it can also lead to less-than-ideal modeled domains. In particular, if a feature can navigate to multiple screens then you may be tempted to model that with multiple optional values:
+### Storage Locations
 
-@ObservableState
-struct State {
-  @Presents var detailItem: DetailFeature.State?
-  @Presents var editItem: EditFeature.State?
-  @Presents var addItem: AddFeature.State?
-  // ...
-}
-However, this can lead to invalid states, such as 2 or more states being non-nil at the same time, and that can cause a lot of problems. First of all, SwiftUI does not support presenting multiple views at the same time from a single view, and so by allowing this in our state we run the risk of putting our application into an inconsistent state with respect to SwiftUI.
+- WhisperKit models
+  - `~/Library/Application Support/com.kitlangton.Hex/models/argmaxinc/whisperkit-coreml/<model>`
+- Parakeet (FluidAudio)
+  - We set `XDG_CACHE_HOME` on launch so Parakeet caches under the app container:
+  - `~/Library/Containers/com.kitlangton.Hex/Data/Library/Application Support/FluidAudio/Models/parakeet-tdt-0.6b-v3-coreml`
+  - Legacy `~/.cache/fluidaudio/Models/…` is not visible to the sandbox; re‑download or import.
 
-Second, it becomes more difficult for us to determine what feature is actually being presented. We must check multiple optionals to figure out which one is non-nil, and then we must figure out how to interpret when multiple pieces of state are non-nil at the same time.
+### Progress + Availability
 
-And the number of invalid states increases exponentially with respect to the number of features that can be navigated to. For example, 3 optionals leads to 4 invalid states, 4 optionals leads to 11 invalid states, and 5 optionals leads to 26 invalid states.
+- WhisperKit: native progress
+- Parakeet: best‑effort progress by polling the model directory size during download
+- Availability detection scans both `Application Support/FluidAudio/Models` and our app cache path
 
+## Building & Running
+
+- macOS 14+, Xcode 15+
+
+### Packages
+
+- WhisperKit: `https://github.com/argmaxinc/WhisperKit`
+- FluidAudio: `https://github.com/FluidInference/FluidAudio.git` (link `FluidAudio` to Hex target)
+
+### Entitlements (Sandbox)
+
+- `com.apple.security.app-sandbox = true`
+- `com.apple.security.network.client = true` (HF downloads)
+- `com.apple.security.files.user-selected.read-write = true` (optional import)
+- `com.apple.security.automation.apple-events = true` (media control)
+
+### Cache root (Parakeet)
+
+Set at app launch and logged:
+
+```
+XDG_CACHE_HOME = ~/Library/Containers/com.kitlangton.Hex/Data/Library/Application Support/com.kitlangton.Hex/cache
+```
+
+FluidAudio models reside under `Application Support/FluidAudio/Models`.
+
+## UI
+
+- Settings → Transcription Model shows a compact list with radio selection, accuracy/speed dots, size on right, and trailing menu / download‑check icon.
+- Context menu offers Show in Finder / Delete.
+
+## Troubleshooting
+
+- Repeated mic prompts during debug: ensure Debug signing uses "Apple Development" so TCC sticks
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
