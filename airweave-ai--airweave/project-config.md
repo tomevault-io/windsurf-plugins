@@ -1,86 +1,112 @@
 ---
 trigger: always_on
-description: Airweave supports two ways to pay for subscription plans while always metering usage monthly:
+description: The sync module orchestrates data flow from sources to destinations using a highly concurrent, pull-based asynchronous architecture with sophisticated backpressure control, real-time progress tracking, and automatic OAuth token management.
 ---
 
-## Airweave Stripe Billing Rules
+# Airweave Sync Architecture - Deep Dive
 
-### Overview
-Airweave supports two ways to pay for subscription plans while always metering usage monthly:
-- Monthly subscription (normal Stripe subscription, monthly billing)
-- Yearly prepay with monthly usage (customer prepays a discounted annual amount, we apply a 20% coupon for 12 months, draw down from Stripe customer balance monthly; after 12 months, coupon expires and subscription defaults to standard monthly pricing of the same plan)
+## Overview
 
-Plans: `developer` (free, $0 subscription), `pro`, `team`, `enterprise` (handled outside Stripe). Only `pro` and `team` support yearly prepay.
+The sync module orchestrates data flow from sources to destinations using a highly concurrent, pull-based asynchronous architecture with sophisticated backpressure control, real-time progress tracking, and automatic OAuth token management.
 
-Key principles:
-- Upgrades apply immediately with proration (never wait), so customers can use higher limits right away
-- Downgrades are scheduled at the end of the billing period (monthly or yearly if on yearly prepay)
-- Yearly prepay is implemented via one-time payment → credit balance + 20% coupon for 12 months → normal monthly after expiry
+## Core Architecture Principles
 
+### 1. Pull-Based Concurrency Model
+- **Worker Pool Pattern**: Uses `AsyncWorkerPool` with semaphore-controlled concurrency (default: 20 workers)
+- **Pull vs Push**: Workers pull entities from the stream only when ready, preventing system overload
+- **Backpressure**: `AsyncSourceStream` uses bounded queues (default: 10000) to naturally throttle producers
 
-### Architecture
-- API endpoints: `airweave/api/v1/endpoints/billing.py`
-- Service orchestrator: `airweave/billing/service.py`
-- Business rules: `airweave/billing/plan_logic.py`
-- DB transactions (periods/usage/records): `airweave/billing/transactions.py`
-- Stripe client (SDK wrapper): `airweave/integrations/stripe_client.py`
-- Webhook processor: `airweave/billing/webhook_handler.py`
-- Frontend flows: `frontend/src/pages/Onboarding.tsx`, `frontend/src/components/settings/BillingSettings.tsx`
+### 2. Separation of Concerns
+- **Producer/Consumer Decoupling**: Source generation runs independently from entity processing
+- **Modular Pipeline**: Each stage (enrich, transform, vectorize, persist) is isolated
+- **Resource Isolation**: Database sessions created only when needed to minimize connection usage
 
-Data model highlights:
-- Organization billing state stored in `OrganizationBilling` with fields like `billing_plan`, `stripe_customer_id`, `stripe_subscription_id`, `has_yearly_prepay`, `pending_plan_change`, `current_period_start/end`, etc.
-- Billing periods tracked in `BillingPeriod` with status transitions (ACTIVE → COMPLETED, GRACE, ENDED_UNPAID) and associated `Usage` rows.
+## Component Deep Dive
 
+### SyncFactory
+**Purpose**: Factory that builds SyncContext (data), SyncRuntime (services), and wires them into the orchestrator
 
-### Endpoints
-- POST `/billing/checkout-session` → Monthly subscription checkout (Stripe Subscription mode). Requires plan and success/cancel URLs.
-- POST `/billing/yearly/checkout-session` → Yearly prepay checkout (Stripe Payment mode). Creates a one-time checkout for the full-year prepaid amount, records intent, and a 12-month 20% coupon to be applied post-payment.
-- POST `/billing/update-plan` → Update plan and optionally the period (`monthly`|`yearly`). Business rules ensure upgrades are immediate and downgrades are scheduled.
-- GET `/billing/subscription` → Returns `SubscriptionInfo`: plan, status, period boundaries, limits, yearly flags, pending plan changes, etc.
-- POST `/billing/cancel` → Cancel at period end.
-- POST `/billing/reactivate` → Clear cancellation.
-- POST `/billing/cancel-plan-change` → Clear a scheduled plan change.
-- POST `/billing/portal-session` → Stripe Customer Portal session.
-- POST `/billing/webhook` → Stripe webhook receiver (signature-verified).
+**Key Responsibilities**:
+- Builds SyncContext (frozen data) via SyncContextBuilder
+- Builds source + cursor directly via `_build_source()` (uses SourceLifecycleService)
+- Builds destinations via DestinationsContextBuilder
+- Builds entity tracker via `_build_entity_tracker()` (inlined, no separate builder)
+- Assembles SyncRuntime from per-sync state
+- Configures contextual logging with sync metadata
+- Wires pipelines, handlers, worker pool, and stream
 
-Auth/Context: Read endpoints (e.g. `GET /billing/subscription`) use `Depends(deps.get_context)`. Write endpoints use `deps.require_org_role(logic.can_manage_billing)` to enforce admin/owner role checks — except `POST /billing/webhook`, which is unauthenticated and instead verified via `stripe_client.verify_webhook_signature` using `STRIPE_WEBHOOK_SECRET`.
+**DI Model**: Instance-based with constructor-injected deps. Stateless app-scoped services (event_bus, usage_checker, processor, arf_service) are held by the factory and injected directly into consumers (SyncOrchestrator, EntityPipeline), not stored in SyncRuntime.
 
+### SyncContext (frozen data)
+**Purpose**: Immutable data describing a sync run. Inherits from `BaseContext` (sibling to `ApiContext`).
 
-### Monthly vs Yearly Prepay
-Monthly:
-- Standard Stripe subscription with the plan’s monthly price
-- On upgrades: switch price immediately with proration; on downgrades: schedule price change for period end
+**Fields** (flat, no sub-contexts):
+- `sync_id`, `sync_job_id`, `collection_id`, `source_connection_id`: Scope IDs
+- `sync`, `sync_job`, `collection`, `connection`: Schema objects
+- `execution_config`, `force_full_sync`, `batch_size`, `max_batch_latency_ms`: Config
+- `entity_map`: Maps entity types to UUIDs
+- `source_short_name`: Derived from source at build time
+- From `BaseContext`: `organization`, `user`, `logger`
 
-Yearly Prepay:
-- One-time payment for 12 months at 20% discount
-- We create/get a 20% coupon (12 months, repeating) and apply it to the subscription
-- We credit the customer balance by the prepaid amount; monthly invoices draw from this credit
-- After 12 months: coupon expires and plan continues as standard monthly at regular price (no coupon). DB yearly flags are cleared on/after renewal following expiry
+Can be passed directly as `ctx` to CRUD operations (it IS a `BaseContext`).
 
-Amounts (cents):
-- PRO yearly prepay: `12 * $20.00 * 0.8 = 19200`
-- TEAM yearly prepay: `12 * $299.00 * 0.8 = 287040`
+### SyncRuntime (live services)
+**Purpose**: Holds per-sync mutable state for a sync run. Separate from SyncContext.
 
+**Fields**:
+- `source`: Source instance with OAuth token management
+- `cursor`: Mutable sync cursor for incremental syncs
+- `destinations`: List of destination instances
+- `entity_tracker`: Centralized entity state tracker
 
-### Core Business Rules
-Defined in `plan_logic.py` and enforced by `service.py`:
+Stateless singletons (event_bus, usage_checker, embedders) are NOT stored here — they are DI'd directly into their consumers via constructor injection.
 
-- Change type: `UPGRADE` (immediate), `DOWNGRADE` (scheduled), `SAME`, `REACTIVATION`
-- Payment method required to move into paid plans; otherwise return a message instructing to use checkout
-- On monthly:
-  - Upgrade: immediate subscription update (proration on Stripe)
-  - Downgrade: schedule by setting `pending_plan_change` and effective date at current period end
-- On yearly prepay:
-  - Upgrades within yearly prepay: immediate price update; coupon retained or updated as needed, and additional credit may be added for plan upgrades to next yearly tier
-  - Downgrades while yearly prepay is active: schedule for yearly expiry (`pending_plan_change` at `yearly_prepay_expires_at`)
-  - Switching from yearly → monthly of same plan: automatic at yearly expiry (we surface as pending change for UI)
-  - Switching from yearly → higher monthly (e.g., pro yearly → team monthly): remove discount and update price immediately
-  - Disallowed: direct cross-year downgrades (e.g., team yearly → pro yearly). UX hints recommend first landing on monthly at expiry, then switching to yearly
+Built by the factory, held by the orchestrator, injected into pipeline/handler constructors.
 
+### Builders
+- **SyncContextBuilder** (`builders/sync.py`): Builds data-only SyncContext
+- **SyncFactory._build_source()**: Builds source + cursor directly (uses SourceLifecycleService), returns `SourceBuildResult`
+- **DestinationsContextBuilder** (`builders/destinations.py`): Builds destination instances
+- **SyncFactory._build_entity_tracker()**: Builds EntityTracker with initial counts (inlined into factory)
 
-### Orchestration Flows
+The factory calls build helpers in sequence, then assembles SyncRuntime.
 
-Organization creation:
+### SyncOrchestrator
+**Purpose**: Coordinates the entire sync workflow with error handling and progress tracking
+
+**Workflow Stages**:
+1. **Start**: Updates job status to IN_PROGRESS
+2. **Process**: Manages entity streaming and concurrent processing
+3. **Complete/Fail**: Updates final status with statistics
+
+**Key Methods**:
+- `run()`: Main entry point with try/catch for proper cleanup
+- `_process_entities()`: Implements pull-based processing loop
+- `_handle_completed_tasks()`: Cleans completed tasks and checks for errors
+- `_wait_for_remaining_tasks()`: Ensures all tasks complete before finishing
+
+**Constructor-Injected Services**: Receives `event_bus`, `usage_checker`, `usage_ledger`, and `sync_cursor_service` directly via constructor — not through SyncRuntime.
+
+**Concurrency Management**:
+```python
+# Workers pull entities only when ready
+async for entity in stream.get_entities():
+    if entity.airweave_system_metadata.should_skip:
+        # Skip without using a worker
+        await sync_context.entity_tracker.record_skipped(1)
+        continue
+
+    # Submit to worker pool (blocks if all workers busy)
+    task = await worker_pool.submit(...)
+```
+
+### AsyncSourceStream
+**Purpose**: Manages async streaming with backpressure between producer and consumer
+
+**Architecture**:
+- **Producer Task**: Runs independently, filling queue from source generator
+- **Bounded Queue**: Implements backpressure (blocks producer when full)
+- **Consumer Interface**: `get_entities()` yields items as they become available
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
