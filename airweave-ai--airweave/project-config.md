@@ -1,127 +1,116 @@
 ---
 trigger: always_on
-description: - **React 18** with TypeScript for type-safe component development
+description: MCP (Model Context Protocol) server architecture and implementation
 ---
 
-# Airweave Frontend Architecture & Guidelines
+# Airweave MCP Server Architecture
 
-## Tech Stack & Core Technologies
-- **React 18** with TypeScript for type-safe component development
-- **Vite** for fast development builds and HMR
-- **TailwindCSS** with **ShadCN UI** components for consistent design
-- **Radix UI** primitives with **Lucide** icons for accessible components
-- **React Router** for client-side routing with file-based organization
-- **Zustand** for state management with persistence
-- **React Query** for server state and data fetching
-- **Auth0** for authentication with custom context wrapper
-- **SSE (Server-Sent Events)** for real-time sync progress
+## Overview
 
-## Project Structure
-```
-frontend/src/
-├── components/         # Reusable UI components
-│   ├── ui/            # ShadCN UI primitives
-│   ├── shared/        # Shared business components
-│   └── [feature]/     # Feature-specific components
-├── pages/             # Route-level components
-├── lib/               # Core utilities and providers
-│   ├── api.ts         # API client with auth integration
-│   ├── stores/        # Zustand state stores
-│   └── auth-context.tsx # Auth provider
-├── hooks/             # Custom React hooks
-├── services/          # Business logic services
-├── config/            # Configuration files
-├── constants/         # App constants
-└── styles/            # Global CSS styles
-    └── toast.css      # Custom toast styling
-```
+The Airweave MCP Server provides search capabilities for AI assistants through the Model Context Protocol (MCP). It supports both local desktop clients and cloud-based AI platforms, with API key and OAuth 2.0 authentication.
 
-## API Layer (`lib/api.ts`)
+## Deployment Modes
 
-The API client is the central hub for all backend communication with sophisticated features:
+### 1. Local Mode (Desktop AI Clients)
+- **Transport**: stdio (standard input/output)
+- **Target**: Claude Desktop, Cursor, VS Code
+- **Entry Point**: `src/index.ts`
+- **Installation**: `npx airweave-mcp-search`
+- **Architecture**: Single-tenant, one server instance per user
+- **Authentication**: API key from environment variables
 
-### Core Features
-- **Token Management**: Automatic token injection via provider pattern
-- **Request Queuing**: Queues requests while auth initializes
-- **Organization Context**: Auto-injects `X-Organization-ID` header
-- **Session Tracking**: Auto-injects `X-Airweave-Session-ID` header with PostHog session ID for session replay linking
-- **Auto-Retry**: Refreshes token on 401/403 and retries
-- **Organization Auto-Switching**: Detects resource org mismatches and switches context
-- **Type-Safe Responses**: Returns typed Response objects
+### 2. Hosted Mode (Cloud AI Platforms)
+- **Transport**: Streamable HTTP (MCP 2025-03-26)
+- **Target**: OpenAI Agent Builder, Cursor (remote), any HTTP MCP client
+- **Entry Point**: `src/index-http.ts`
+- **Deployment**: Azure Kubernetes Service
+- **URL**: `https://mcp.airweave.ai/mcp`
+- **Architecture**: Fully stateless — a fresh McpServer + transport is created per request
+- **Authentication**: API key (via headers) or OAuth 2.0 (via Auth0)
 
-### Usage Pattern
-```typescript
-// Always use relative paths (no /api/v1 prefix)
-const response = await apiClient.get('/collections');
-const response = await apiClient.post('/source-connections', data);
-const response = await apiClient.delete('/api-keys', { id: keyId });
-```
+## Architecture Components
 
-### Token Provider Pattern
-The API client uses a pluggable token provider set up in `main.tsx`:
-```typescript
-setTokenProvider({
-  getToken: async () => await auth.getToken(),
-  clearToken: () => auth.clearToken(),
-  isReady: () => auth.isReady()
-});
-```
+### Core Server (`src/server.ts`)
+- **McpServer**: MCP server factory — `createMcpServer(config)` returns an isolated instance
+- **Tool Registration**: Dynamic tool creation based on collection (`search-{collection}`, `get-config`)
+- **Airweave Client**: API client for search operations (`src/api/airweave-client.ts`)
 
-## State Management Architecture
+### Streamable HTTP Server (`src/index-http.ts`)
+- **Express App**: HTTP server with health checks and info endpoints
+- **Streamable HTTP Transport**: MCP 2025-03-26 transport, stateless (no sessions)
+- **Request Handling**: POST `/mcp` — creates fresh McpServer per request
+- **Dual Auth**: `resolveAuth` middleware resolves API key vs OAuth per request
+- **OAuth Router**: `mcpAuthRouter` from MCP SDK handles OAuth protocol endpoints when enabled
 
-### 1. **Organization Store** (`stores/organizations.ts`)
-- Manages user organizations with persistence
-- Handles organization switching with state cleanup
-- Auto-selects best organization (current → primary → first)
-- Clears org-specific data on switch (collections, API keys)
+### Authentication (`src/auth/`)
 
-### 2. **Collections Store** (`stores/collections.ts`)
-- Caches collections (with API-provided `source_connection_summaries` for list views)
-- Implements event-driven updates via custom event bus
-- Smart caching with force refresh option
-- Handles collection CRUD events automatically
-- Source connection details for list pages come from `GET /collections` response (no per-card fetching)
+#### `resolveAuth` middleware (in `index-http.ts`)
+Priority-based auth resolution per request:
+1. `X-API-Key` header present → API key auth, no JWT check
+2. `Authorization: Bearer <token>` with OAuth enabled → attempt JWT verification via `Auth0OAuthProvider.verifyAccessToken`; if valid → OAuth path (`req.auth` set); if invalid → fallback to API key
+3. No credential → 401
 
-### 3. **Sync State Store** (`stores/syncStateStore.ts`)
-- Real-time sync progress via SSE
-- Manages multiple concurrent subscriptions
-- Session storage for progress persistence
-- Automatic cleanup and health checks
+#### Auth0 OAuth Provider (`src/auth/auth0-provider.ts`)
+- Implements `OAuthServerProvider` from the MCP SDK
+- Handles: `authorize` (redirect to Auth0), `exchangeAuthorizationCode`, `exchangeRefreshToken`, `verifyAccessToken` (JWKS-based JWT verification), `revokeToken`
+- Uses `jose` library for JWT verification with JWKS auto-discovery
+- Config via env vars: `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET`, `AUTH0_AUDIENCE`
 
-### 4. **API Keys Store** (`stores/apiKeys.ts`)
-- Organization-scoped API key management
-- Auto-clears on organization switch
+#### Auth0 Callback (`src/auth/auth0-callback.ts`)
+- Express handler for `/oauth/callback`
+- Receives Auth0 authorization code, exchanges it for a local authorization code via the provider
+- Redirects back to the MCP client's `redirect_uri` with the local code
 
-## Authentication Flow
+#### OAuth Transaction Store (`src/auth/oauth-transaction-store.ts`)
+- Redis-backed store for pending OAuth authorizations and authorization codes
+- TTL-based expiry (10 min for pending auths, 10 min for codes)
+- Atomic code consumption (Redis `GET` + `DEL`)
 
-### Auth0 Integration
-1. **Provider Hierarchy**:
-   ```
-   PostHogProvider → ThemeProvider → BrowserRouter → Auth0Provider → AuthProvider → ApiAuthConnector → App
-   ```
-   - **PostHogProvider**: Initializes PostHog analytics and session tracking (outermost)
-   - **ThemeProvider**: Manages dark/light theme persistence
-   - **BrowserRouter**: React Router client-side routing
-   - **Auth0Provider**: Handles user authentication
-   - **AuthProvider**: Manages token lifecycle and auth state
-   - **ApiAuthConnector**: Connects auth to API client
+#### Registered Clients Store (`src/auth/registered-clients-store.ts`)
+- Redis-backed store for dynamically registered OAuth clients (RFC 7591)
+- 7-day TTL — stateless MCP means clients re-register naturally after expiry
 
-2. **Auth Context** (`lib/auth-context.tsx`):
-   - Manages Auth0 token lifecycle
-   - Provides `getToken()` for API calls
-   - Handles dev mode (auth disabled)
-   - Token initialization tracking
+#### Redis Client (`src/auth/redis.ts`)
+- Singleton Redis client with lazy connect
+- `getRedisClient()`, `ensureRedisReady()`, `disconnectRedis()`
+- URL built from `MCP_REDIS_URL` or `REDIS_HOST`/`REDIS_PORT`/`REDIS_PASSWORD`
 
-3. **Token Caching Strategy** (`lib/auth0-provider.tsx`):
-   - `getCacheLocation()` selects `memory` for custom Auth0 domains and `localstorage` for standard `*.auth0.com` tenants
-   - Custom domains share the app's eTLD+1, so the Auth0 session cookie is first-party — tokens stay in memory only (no XSS surface via localStorage)
-   - Standard tenants use a third-party cookie that Safari ITP / Firefox strict / Chrome incognito block, so tokens must be persisted in localStorage
-   - `useRefreshTokens={true}` — refresh token rotation is always enabled
-   - `useRefreshTokensFallback={true}` — enables iframe-based silent auth as a fallback when the refresh token is unavailable (e.g. after a page refresh with memory cache)
+#### Security Utilities (`src/auth/security.ts`)
+- `redactSensitiveValue`: masks tokens/secrets for logging
+- `hashIdentifier`: SHA-256 hashing for identifiers
+- `safeLogObject`: recursively redacts sensitive keys in objects
 
-4. **Auth Guard** (`components/AuthGuard.tsx`):
-   - Protects routes requiring authentication
-   - Initializes organizations on first load
+### Organization Resolver (`src/api/org-resolver.ts`)
+- Resolves which organization owns a collection for OAuth users
+- Fetches user's orgs, probes each in parallel (`Promise.all`) for the target collection
+- LRU in-memory cache (max 500 entries, 5-min TTL) keyed by `hash(token):collection`
+
+### Tools
+- **Search Tool**: `search-{collection}` — full search with query, filters, pagination, reranking
+- **Config Tool**: `get-config` — server configuration display
+
+## Configuration
+
+### Environment Variables
+
+**Core (both modes):**
+- `AIRWEAVE_COLLECTION`: Default collection readable ID
+- `AIRWEAVE_BASE_URL`: API base URL (default: `https://api.airweave.ai`)
+- `PORT`: Server port (default: 8080)
+
+**Local mode only:**
+- `AIRWEAVE_API_KEY`: API key for authentication
+
+**OAuth (hosted mode, when `MCP_OAUTH_ENABLED=true`):**
+- `MCP_OAUTH_ENABLED`: Set to `true` to enable OAuth 2.0
+- `MCP_BASE_URL`: Public URL of the MCP server (used for OAuth metadata/redirects)
+- `AUTH0_DOMAIN`: Auth0 tenant domain
+- `AUTH0_AUDIENCE`: Auth0 API audience identifier
+- `AUTH0_CLIENT_ID`: Auth0 application client ID
+- `AUTH0_CLIENT_SECRET`: Auth0 application client secret
+- `REDIS_HOST`: Redis host (default: `localhost`)
+- `REDIS_PORT`: Redis port (default: `6379`)
+- `REDIS_PASSWORD`: Redis password (optional)
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
