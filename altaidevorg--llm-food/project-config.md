@@ -1,85 +1,68 @@
 ---
 trigger: always_on
-description: description: llm-food project: SynchronousConversionService for on-demand single document/URL to Markdown conversion.
+description: description: llm-food project: TaskStateRepository (DuckDB) for persistent batch job state management using local DuckDB.
 ---
 
 ---
-description: llm-food project: SynchronousConversionService for on-demand single document/URL to Markdown conversion.
-globs: 
+description: llm-food project: TaskStateRepository (DuckDB) for persistent batch job state management using local DuckDB.
+globs: llm_food/app.py
 alwaysApply: false
 ---
-# Chapter 4: SynchronousConversionService
+# Chapter 7: TaskStateRepository (DuckDB)
 
-In the [LLMFoodClient](llmfoodclient.mdc) chapter, we saw how a client application can make requests to the `llm-food` server for document conversion. This chapter dives into the server-side component responsible for handling these immediate, single-file conversion requests: the `SynchronousConversionService`.
+In Chapter 6, [PDFProcessingStrategy (Synchronous)](pdfprocessingstrategy__synchronous_.mdc), we detailed the synchronous PDF processing strategies. Now, we turn to the persistence layer critical for the asynchronous batch operations discussed in [BatchJobOrchestrator](batchjoborchestrator.mdc): the `TaskStateRepository (DuckDB)`. This repository forms the persistence backbone for managing the state of asynchronous batch jobs within the `llm-food` project.
 
 ## Motivation and Purpose
 
-The `SynchronousConversionService` addresses the need for a centralized, reusable, and testable component that performs on-demand conversion of single documents or URL content to Markdown. When a client sends a file or URL to the `/convert` endpoints (detailed in [FastAPIServerEndpoints](fastapiserverendpoints.mdc)) and expects an immediate Markdown response, this service's logic is invoked.
+The primary technical problem solved by the `TaskStateRepository` is the **reliable tracking of long-running, potentially multi-stage asynchronous operations**. When dealing with batch jobs that might involve processing hundreds of files, interacting with external APIs (like Gemini), and taking significant time to complete, it's crucial to have a durable way to store and manage the state of these operations. Without such a persistence layer, server restarts or unexpected failures could lead to loss of job progress and an inability to report status or retrieve results.
 
-Its key characteristics include:
-- **Synchronous Interaction Model:** Clients make a request and block (wait) until the conversion is complete and the Markdown result is returned. This is suitable for interactive use cases or scenarios where immediate processing is required.
-- **Dynamic Processor Selection:** It intelligently chooses the correct parsing/conversion library based on the input file's extension (e.g., PDF, DOCX, HTML).
-- **Configurable PDF Strategy:** For PDF documents, it employs a specific [PDFProcessingStrategy (Synchronous)](pdfprocessingstrategy__synchronous_.mdc), which can be configured (e.g., Gemini, pymupdf4llm, pypdf2).
-- **File Size Validation:** It incorporates logic to check file sizes against configured limits.
-- **Centralized Logic:** It encapsulates the core single-file transformation logic, making the API endpoints cleaner and the conversion process itself easier to manage and test.
+The `TaskStateRepository` utilizes a local DuckDB database to:
+- Store information about overall batch jobs (`batch_jobs` table).
+- Track details of Gemini API calls for PDF processing (`gemini_pdf_batch_sub_jobs` table).
+- Manage the status of individual file or page-level tasks (`file_tasks` table).
+- Provide functions for schema initialization, record insertion, status updates (e.g., 'pending', 'processing', 'completed', 'failed'), and querying job details.
 
-This service contrasts with the [BatchJobOrchestrator](batchjoborchestrator.mdc), which is designed for asynchronous processing of multiple files.
+DuckDB was chosen for its simplicity (file-based, embedded), SQL interface, and ease of integration into a Python application like `llm-food`. It provides sufficient durability and querying capabilities for the project's needs.
 
-**Central Use Case:** A user uploads a `.docx` file via a web interface that calls the `POST /convert` API endpoint. The `FastAPIServerEndpoints` layer receives the request, validates the file size, and then invokes the `SynchronousConversionService` logic with the file content. The service identifies it as a DOCX file, uses the `mammoth` library to convert it to HTML, then `markdownify` to convert HTML to Markdown, and returns the Markdown text. The client receives this Markdown in the HTTP response.
+**Central Use Case:**
+The [BatchJobOrchestrator](batchjoborchestrator.mdc) receives a request to the `/batch` endpoint with multiple files.
+1.  It immediately creates a record in the `batch_jobs` table with a unique `job_id` and 'pending' status.
+2.  For each PDF file group destined for Gemini, it creates a record in `gemini_pdf_batch_sub_jobs`.
+3.  For each individual file (or PDF page processed by Gemini), it creates a record in the `file_tasks` table.
+4.  As background tasks process these files/pages, they update the `status`, `gcs_output_markdown_uri`, or `error_message` fields in the respective `file_tasks` and `gemini_pdf_batch_sub_jobs` records.
+5.  The overall progress (`overall_processed_count`, `overall_failed_count`) and status of the main job in `batch_jobs` are updated.
+6.  Clients polling the `/status/{task_id}` endpoint trigger queries against these tables to retrieve the current state.
+7.  Once a job is 'completed' or 'completed_with_errors', the `/batch/{task_id}` endpoint queries `file_tasks` for `gcs_output_markdown_uri` to fetch and return results.
 
-While not a standalone class in the current codebase, the logic for the `SynchronousConversionService` is primarily encapsulated within the `_process_file_content` function and its helper processing functions (e.g., `_process_docx_sync`, `_process_pdf_pymupdf4llm_sync`) found in `llm_food/app.py`.
+This durable state management is critical for reliability and for providing informative feedback to users about their batch jobs.
 
-## Key Responsibilities and Mechanisms
+## Core Component: Database Schema
 
-### 1. Content Handling and Initial Processing
-The service logic is typically invoked after the [FastAPIServerEndpoints](fastapiserverendpoints.mdc) layer has received an uploaded file or fetched content from a URL.
+The repository's structure is defined by its database schema, implemented using SQL `CREATE TABLE` statements within DuckDB. The primary logic for schema initialization and interaction resides in `llm_food/app.py`.
 
-For file uploads (`POST /convert`):
-```python
-# llm_food/app.py (Simplified from convert_file_upload)
-# async def convert_file_upload(file: UploadFile = File(...)):
-#     ext = os.path.splitext(file.filename)[1].lower()
-#     content = await file.read() # Read file content into bytes
+### 1. `batch_jobs` Table
+Stores metadata for each overarching batch job.
+- **Purpose:** Tracks the overall status and summary of a batch request initiated via the `/batch` endpoint.
+- **Key Columns:**
+  - `job_id` (VARCHAR, PK): Unique identifier for the batch job.
+  - `output_gcs_path` (VARCHAR): The GCS path where outputs should be stored.
+  - `status` (VARCHAR): Overall status (e.g., 'pending', 'processing', 'completed', 'completed_with_errors', 'failed_catastrophic').
+  - `submitted_at` (TIMESTAMP): When the job was submitted.
+  - `total_input_files` (INTEGER): Total number of files in the batch.
+  - `overall_processed_count` (INTEGER): Count of successfully processed files.
+  - `overall_failed_count` (INTEGER): Count of failed files.
+  - `last_updated_at` (TIMESTAMP): Timestamp of the last update to this job record.
 
-#     # File size validation (see below)
-#     # ...
-
-#     pdf_backend_choice = get_pdf_backend() # Get configured PDF strategy
-
-#     # Invoke the core service logic
-#     texts_list = await _process_file_content(ext, content, pdf_backend_choice)
-
-#     # Return ConversionResponse (see APIDataModels (Pydantic))
-#     # ...
-```
-- The endpoint reads the file content into `bytes`.
-- It determines the file extension and configured PDF backend.
-- It then calls `_process_file_content`, which embodies the core of the `SynchronousConversionService`.
-
-For URL conversions (`GET /convert`):
-```python
-# llm_food/app.py (Simplified from convert_url)
-# async def convert_url(url: str = Query(...)):
-#     # ... (fetch URL content into content_bytes using httpx) ...
-#     # content_bytes = html_content.encode("utf-8")
-
-#     # For HTML, trafilatura is used directly in the endpoint handler
-#     # or _process_file_content could be extended for URLs.
-#     extracted_text = trafilatura.extract(html_content, output_format="markdown")
-#     texts_list = [extracted_text if extracted_text is not None else ""]
-#     # ... return ConversionResponse ...
-```
-- The `/convert` GET endpoint currently handles HTML URL conversion directly using `trafilatura`. The `_process_file_content` function also includes logic for HTML files if they were uploaded.
-
-### 2. File Size Validation
-Before processing, file sizes are validated (primarily for uploads) to prevent resource exhaustion. This check occurs in the API endpoint handler before delegating to the core conversion logic.
-
-```python
-# llm_food/app.py (within convert_file_upload)
-max_size = get_max_file_size_bytes() # From config
-if max_size is not None and len(content) > max_size:
-    raise HTTPException(
-        status_code=413,
+### 2. `gemini_pdf_batch_sub_jobs` Table
+Stores details specific to batch processing of PDFs using the Google Gemini API.
+- **Purpose:** Tracks a single Gemini Batch API operation, which might process images derived from multiple PDF files or many pages.
+- **Key Columns:**
+  - `gemini_batch_sub_job_id` (VARCHAR, PK): Unique ID for this sub-job.
+  - `batch_job_id` (VARCHAR, FK): Links to the main `batch_jobs.job_id`.
+  - `gemini_api_job_name` (VARCHAR): The job name returned by the Gemini API.
+  - `status` (VARCHAR): Status of this sub-job (e.g., 'pending_preparation', 'submitting_to_gemini', 'JOB_STATE_SUCCEEDED', 'failed_gemini_job_JOB_STATE_FAILED').
+  - `payload_gcs_uri` (VARCHAR): GCS URI of the `payload.jsonl` sent to Gemini.
+  - `gemini_output_gcs_uri_prefix` (VARCHAR): GCS prefix where Gemini writes its results.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
