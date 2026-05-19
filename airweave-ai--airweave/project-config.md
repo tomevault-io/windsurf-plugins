@@ -1,116 +1,165 @@
 ---
 trigger: always_on
-description: MCP (Model Context Protocol) server architecture and implementation
+description: Generates realistic test content using LLM.
 ---
 
-# Airweave MCP Server Architecture
+# Building Monke Tests for Source Connectors
 
 ## Overview
 
-The Airweave MCP Server provides search capabilities for AI assistants through the Model Context Protocol (MCP). It supports both local desktop clients and cloud-based AI platforms, with API key and OAuth 2.0 authentication.
+**Monke** is Airweave's end-to-end testing framework for source connectors. It creates real test data in external systems, triggers syncs, and verifies data appears correctly in the search index.
 
-## Deployment Modes
+This guide shows you how to build comprehensive tests that verify **every entity type** your connector supports.
 
-### 1. Local Mode (Desktop AI Clients)
-- **Transport**: stdio (standard input/output)
-- **Target**: Claude Desktop, Cursor, VS Code
-- **Entry Point**: `src/index.ts`
-- **Installation**: `npx airweave-mcp-search`
-- **Architecture**: Single-tenant, one server instance per user
-- **Authentication**: API key from environment variables
+---
 
-### 2. Hosted Mode (Cloud AI Platforms)
-- **Transport**: Streamable HTTP (MCP 2025-03-26)
-- **Target**: OpenAI Agent Builder, Cursor (remote), any HTTP MCP client
-- **Entry Point**: `src/index-http.ts`
-- **Deployment**: Azure Kubernetes Service
-- **URL**: `https://mcp.airweave.ai/mcp`
-- **Architecture**: Fully stateless — a fresh McpServer + transport is created per request
-- **Authentication**: API key (via headers) or OAuth 2.0 (via Auth0)
+## Why Test Every Entity Type?
 
-## Architecture Components
+**Important: Your Monke tests should create and verify all entity types defined in your source connector.**
 
-### Core Server (`src/server.ts`)
-- **McpServer**: MCP server factory — `createMcpServer(config)` returns an isolated instance
-- **Tool Registration**: Dynamic tool creation based on collection (`search-{collection}`, `get-config`)
-- **Airweave Client**: API client for search operations (`src/api/airweave-client.ts`)
+Many connector tests only verify top-level entities (e.g., tasks) but ignore nested entities (e.g., comments, files).
 
-### Streamable HTTP Server (`src/index-http.ts`)
-- **Express App**: HTTP server with health checks and info endpoints
-- **Streamable HTTP Transport**: MCP 2025-03-26 transport, stateless (no sessions)
-- **Request Handling**: POST `/mcp` — creates fresh McpServer per request
-- **Dual Auth**: `resolveAuth` middleware resolves API key vs OAuth per request
-- **OAuth Router**: `mcpAuthRouter` from MCP SDK handles OAuth protocol endpoints when enabled
+**Impact:**
+- Comments might not sync properly → Silent failures in production
+- File attachments might not be indexed → Missing searchable content
+- Entity relationships might be broken → Poor search results
+- Users can't search the full breadth of data they expect
 
-### Authentication (`src/auth/`)
+**Solution:** Create test entities for every entity type your connector syncs, and verify each one appears in Qdrant.
 
-#### `resolveAuth` middleware (in `index-http.ts`)
-Priority-based auth resolution per request:
-1. `X-API-Key` header present → API key auth, no JWT check
-2. `Authorization: Bearer <token>` with OAuth enabled → attempt JWT verification via `Auth0OAuthProvider.verifyAccessToken`; if valid → OAuth path (`req.auth` set); if invalid → fallback to API key
-3. No credential → 401
+**Before Writing Monke Tests:**
+1. Open your source file: `backend/airweave/platform/sources/{short_name}.py`
+2. List all entity types yielded in `generate_entities()`:
+   - Example: WorkspaceEntity, ProjectEntity, TaskEntity, CommentEntity, FileEntity
+3. Your Monke tests should create at least one instance of each type
+4. Verify each instance appears in Qdrant after sync
 
-#### Auth0 OAuth Provider (`src/auth/auth0-provider.ts`)
-- Implements `OAuthServerProvider` from the MCP SDK
-- Handles: `authorize` (redirect to Auth0), `exchangeAuthorizationCode`, `exchangeRefreshToken`, `verifyAccessToken` (JWKS-based JWT verification), `revokeToken`
-- Uses `jose` library for JWT verification with JWKS auto-discovery
-- Config via env vars: `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET`, `AUTH0_AUDIENCE`
+**Validation:**
+- Count entity classes in `entities/{short_name}.py`
+- Count entity types created in `bongos/{short_name}.py::create_entities()`
+- These counts should match (excluding parent/workspace entities that don't get stored)
 
-#### Auth0 Callback (`src/auth/auth0-callback.ts`)
-- Express handler for `/oauth/callback`
-- Receives Auth0 authorization code, exchanges it for a local authorization code via the provider
-- Redirects back to the MCP client's `redirect_uri` with the local code
+---
 
-#### OAuth Transaction Store (`src/auth/oauth-transaction-store.ts`)
-- Redis-backed store for pending OAuth authorizations and authorization codes
-- TTL-based expiry (10 min for pending auths, 10 min for codes)
-- Atomic code consumption (Redis `GET` + `DEL`)
+## Core Components
 
-#### Registered Clients Store (`src/auth/registered-clients-store.ts`)
-- Redis-backed store for dynamically registered OAuth clients (RFC 7591)
-- 7-day TTL — stateless MCP means clients re-register naturally after expiry
+Every Monke test requires four components:
 
-#### Redis Client (`src/auth/redis.ts`)
-- Singleton Redis client with lazy connect
-- `getRedisClient()`, `ensureRedisReady()`, `disconnectRedis()`
-- URL built from `MCP_REDIS_URL` or `REDIS_HOST`/`REDIS_PORT`/`REDIS_PASSWORD`
+1. **Bongo implementation** (`monke/bongos/{short_name}.py`)
+2. **Generation schemas** (`monke/generation/schemas/{short_name}.py`)
+3. **Generation adapter** (`monke/generation/{short_name}.py`)
+4. **Test configuration** (`monke/configs/{short_name}.yaml`)
 
-#### Security Utilities (`src/auth/security.ts`)
-- `redactSensitiveValue`: masks tokens/secrets for logging
-- `hashIdentifier`: SHA-256 hashing for identifiers
-- `safeLogObject`: recursively redacts sensitive keys in objects
+---
 
-### Organization Resolver (`src/api/org-resolver.ts`)
-- Resolves which organization owns a collection for OAuth users
-- Fetches user's orgs, probes each in parallel (`Promise.all`) for the target collection
-- LRU in-memory cache (max 500 entries, 5-min TTL) keyed by `hash(token):collection`
+## Part 1: Bongo Implementation
 
-### Tools
-- **Search Tool**: `search-{collection}` — full search with query, filters, pagination, reranking
-- **Config Tool**: `get-config` — server configuration display
+The **Bongo** is a class that creates, updates, and deletes test data via the external API.
 
-## Configuration
+### File Location
+```
+monke/bongos/{short_name}.py
+```
 
-### Environment Variables
+### Basic Structure
 
-**Core (both modes):**
-- `AIRWEAVE_COLLECTION`: Default collection readable ID
-- `AIRWEAVE_BASE_URL`: API base URL (default: `https://api.airweave.ai`)
-- `PORT`: Server port (default: 8080)
+```python
+"""{Connector Name} bongo implementation.
 
-**Local mode only:**
-- `AIRWEAVE_API_KEY`: API key for authentication
+Creates, updates, and deletes test entities via the real {Connector Name} API.
+"""
 
-**OAuth (hosted mode, when `MCP_OAUTH_ENABLED=true`):**
-- `MCP_OAUTH_ENABLED`: Set to `true` to enable OAuth 2.0
-- `MCP_BASE_URL`: Public URL of the MCP server (used for OAuth metadata/redirects)
-- `AUTH0_DOMAIN`: Auth0 tenant domain
-- `AUTH0_AUDIENCE`: Auth0 API audience identifier
-- `AUTH0_CLIENT_ID`: Auth0 application client ID
-- `AUTH0_CLIENT_SECRET`: Auth0 application client secret
-- `REDIS_HOST`: Redis host (default: `localhost`)
-- `REDIS_PORT`: Redis port (default: `6379`)
-- `REDIS_PASSWORD`: Redis password (optional)
+import asyncio
+import time
+import uuid
+from typing import Any, Dict, List, Optional
+
+import httpx
+from monke.bongos.base_bongo import BaseBongo
+from monke.utils.logging import get_logger
+
+
+class MyConnectorBongo(BaseBongo):
+    """Bongo for {Connector Name} that creates test entities for E2E testing.
+
+    Key responsibilities:
+    - Create test entities (including nested types like comments/files)
+    - Embed verification tokens in content
+    - Update entities to test incremental sync
+    - Delete entities to test deletion detection
+    - Clean up all test data
+    """
+
+    connector_type = "{short_name}"  # Must match source short_name
+
+    API_BASE = "https://api.example.com/v1"
+
+    def __init__(self, credentials: Dict[str, Any], **kwargs):
+        """Initialize the bongo.
+
+        Args:
+            credentials: Dict with "access_token" or other auth
+            **kwargs: Configuration from test config file
+        """
+        super().__init__(credentials)
+        self.access_token: str = credentials["access_token"]
+
+        # Test configuration
+        self.entity_count: int = int(kwargs.get("entity_count", 3))
+        self.openai_model: str = kwargs.get("openai_model", "gpt-4.1-mini")
+        self.max_concurrency: int = int(kwargs.get("max_concurrency", 3))
+
+        # Simple rate limiting (optional, add if needed)
+        self.last_request_time = 0.0
+        self.min_delay = 0.2  # 200ms between requests
+
+        # Runtime state - track ALL created entities
+        self._workspace_id: Optional[str] = None
+        self._project_id: Optional[str] = None
+        self._tasks: List[Dict[str, Any]] = []
+        self._comments: List[Dict[str, Any]] = []
+        self._files: List[Dict[str, Any]] = []
+
+        self.logger = get_logger(f"{self.connector_type}_bongo")
+
+    async def create_entities(self) -> List[Dict[str, Any]]:
+        """Create ALL types of test entities.
+
+        This is critical: You must create instances of EVERY entity type
+        that your source connector syncs.
+
+        Returns:
+            List of entity descriptors with verification tokens
+        """
+        raise NotImplementedError("Implement in subclass")
+
+    async def update_entities(self) -> List[Dict[str, Any]]:
+        """Update a subset of entities to test incremental sync.
+
+        Returns:
+            List of updated entity descriptors
+        """
+        raise NotImplementedError("Implement in subclass")
+
+    async def delete_entities(self) -> List[str]:
+        """Delete all created test entities.
+
+        Returns:
+            List of deleted entity IDs
+        """
+        raise NotImplementedError("Implement in subclass")
+
+    async def delete_specific_entities(self, entities: List[Dict[str, Any]]) -> List[str]:
+        """Delete specific entities by ID.
+
+        Args:
+            entities: List of entity descriptors to delete
+
+        Returns:
+            List of successfully deleted entity IDs
+        """
+        raise NotImplementedError("Implement in subclass")
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
