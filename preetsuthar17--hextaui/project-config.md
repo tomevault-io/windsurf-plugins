@@ -1,132 +1,98 @@
 ---
 trigger: always_on
-description: Ultracite Rules - AI-Ready Formatter and Linter
+description: Web Interface Guidelines
 ---
 
 
-# Ultracite Code Standards
+Web Interface Guidelines
 
-This project uses **Ultracite**, a zero-config Biome preset that enforces strict code quality standards through automated formatting and linting.
+Interfaces succeed because of hundreds of choices. This is a living, non-exhaustive list of those decisions. Most guidelines are framework-agnostic; some are specific to React/Next.js. Feedback is welcome.
 
-## Quick Reference
+## Interactions
 
-- **Format code**: `npx ultracite fix`
-- **Check for issues**: `npx ultracite check`
-- **Diagnose setup**: `npx ultracite doctor`
+- Keyboard
+  - MUST: All flows are keyboard-operable, following [WAI-ARIA APG](https://www.w3.org/WAI/ARIA/apg/patterns/).
+  - MUST: Every focusable element shows a visible focus ring. Prefer `:focus-visible` over `:focus` to avoid distracting pointer users; use `:focus-within` for groups.
+  - MUST: Manage focus (trap, move, and return) per APG patterns or WAI-ARIA guidelines.
 
-Biome (the underlying engine) provides extremely fast Rust-based linting and formatting. Most issues are automatically fixable.
+- Targets & Input
+  - MUST: Match visual and hit target. Visual targets <24px MUST have hit area expanded to ≥24px. On mobile, hit target MUST be ≥44px.
+  - MUST: Mobile `<input>` uses font-size ≥16px or set:
+    ```html
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+    ```
+  - NEVER: Disable browser zoom.
+  - MUST: Set `touch-action: manipulation` to prevent double-tap zoom.
+  - MUST: Set `-webkit-tap-highlight-color` to follow design.
+  - MUST: Design forgiving interactions—generous hit targets, clear affordances, avoid finickiness.
 
----
+- Inputs & Forms (Behavior)
+  - MUST: Hydration-safe inputs (no lost focus or value after hydration).
+  - NEVER: Block paste in `<input>` or `<textarea>`.
+  - MUST: Loading buttons show a spinner and keep original label.
+  - MUST: Enter submits focused text input if possible. In `<textarea>`, ⌘/Ctrl+Enter submits, Enter inserts a newline.
+  - MUST: Keep submit enabled until request starts; then disable, show spinner, and use idempotency key.
+  - MUST: Do not block typing—accept free text, validate after input.
+  - MUST: Allow incomplete forms to submit and surface validation.
+  - MUST: Errors inline next to fields; on submit, focus first error.
+  - MUST: Use `autocomplete` with meaningful `name`, and correct `type` and `inputmode`.
+  - MUST: Every control has a `<label>` or is associated with a label for a11y.
+  - MUST: Clicking a `<label>` focuses corresponding input.
+  - SHOULD: Disable spellcheck for emails, codes, usernames.
+  - SHOULD: Placeholders end with ellipsis and show example pattern (eg, `+1 (123) 456-7890`, `sk-012345…`).
+  - MUST: Warn on unsaved changes before navigation.
+  - MUST: Compatible with password managers and 2FA; do not block one-time code paste.
+  - MUST: Trim values to handle input method expansion/trailing spaces.
+  - MUST: No input dead zones—checkbox or radio label/control share one generous hit target.
+  - SHOULD: Allow submitting incomplete forms for validation feedback.
+  - MUST: Autocomplete and autofill fields appropriately.
+  - MUST: On Windows, set background-color and color for `<select>` to avoid dark-mode system style bugs.
 
-## Core Principles
+- State & Navigation
+  - MUST: URL reflects state (deep-link filters, tabs, pagination, expanded panels). Prefer libs like [nuqs](https://nuqs.dev).
+  - MUST: Back/Forward restores previous scroll.
+  - MUST: Links are semantic—use `<a>`/`<Link>` for navigation (supports Cmd/Ctrl/Right/Middle-click).
+  - MUST: Scroll positions persist.
 
-Write code that is **accessible, performant, type-safe, and maintainable**. Focus on clarity and explicit intent over brevity.
+- Feedback
+  - SHOULD: Optimistic UI—update immediately, reconcile on server, show rollback or undo on errors.
+  - MUST: Confirm destructive actions, or provide an Undo window.
+  - MUST: Use polite `aria-live` on toasts and inline validation.
+  - SHOULD: Use ellipsis (`…`) for options that open follow-ups (e.g., "Rename…") or loading ("Loading…", "Saving…").
+  - MUST: Announce async updates with ARIA live regions.
 
-### Type Safety & Explicitness
+- Touch/Drag/Scroll
+  - MUST: Delay first tooltip in a group; no delay on subsequent tooltips.
+  - MUST: Use intentional `overscroll-behavior: contain` for modals/drawers.
+  - MUST: During drag, disable text selection and set `inert` on dragged element/containers.
+  - MUST: No “dead-looking” zones—if it looks clickable, it is.
+  - MUST: Clean drag interactions—prevent unwanted selection and hover during drag.
 
-- Use explicit types for function parameters and return values when they enhance clarity
-- Prefer `unknown` over `any` when the type is genuinely unknown
-- Use const assertions (`as const`) for immutable values and literal types
-- Leverage TypeScript's type narrowing instead of type assertions
-- Use meaningful variable names instead of magic numbers - extract constants with descriptive names
+- Autofocus
+  - SHOULD: Use autofocus on desktop when there’s a single primary input. Rarely use on mobile to avoid keyboard shift.
 
-### Modern JavaScript/TypeScript
+- Shortcuts
+  - SHOULD: Localize keyboard shortcuts.
+  - SHOULD: Show platform-specific symbols.
 
-- Use arrow functions for callbacks and short functions
-- Prefer `for...of` loops over `.forEach()` and indexed `for` loops
-- Use optional chaining (`?.`) and nullish coalescing (`??`) for safer property access
-- Prefer template literals over string concatenation
-- Use destructuring for object and array assignments
-- Use `const` by default, `let` only when reassignment is needed, never `var`
+## Animation
 
-### Async & Promises
+- MUST: Honor `prefers-reduced-motion`. Provide a reduced-motion variant.
+- SHOULD: Prefer CSS > Web Animations API > JavaScript libraries (eg, motion).
+- MUST: Animate compositor-friendly properties (`transform`, `opacity`). Avoid animating `top`, `left`, `width`, `height`.
+- SHOULD: Animate only to clarify cause/effect or for deliberate delight.
+- SHOULD: Choose easing to match the change (size/distance/trigger).
+- MUST: Animations are interruptible and input-driven—avoid autoplay.
+- MUST: Set correct `transform-origin` (motion starts where it “physically” should).
+- NEVER: `transition: all`—always specify only necessary properties.
+- SHOULD: For SVG, animate `<g>` wrappers and set `transform-box: fill-box; transform-origin: center` for cross-browser correctness.
 
-- Always `await` promises in async functions - don't forget to use the return value
-- Use `async/await` syntax instead of promise chains for better readability
-- Handle errors appropriately in async code with try-catch blocks
-- Don't use async functions as Promise executors
+## Layout
 
-### React & JSX
+- MUST: Use `size-` utilities (eg, `size-4`) instead of `w-`/`h-` for size in Tailwind CSS.
+- NEVER: Use `space-x-`, `space-y-`, or any hardcoded Tailwind utilities like `mb`, `mr`, `ml`, `mt`, etc. for spacing.  
 
-- Use function components over class components
-- Call hooks at the top level only, never conditionally
-- Specify all dependencies in hook dependency arrays correctly
-- Use the `key` prop for elements in iterables (prefer unique IDs over array indices)
-- Nest children between opening and closing tags instead of passing as props
-- Don't define components inside other components
-- Use semantic HTML and ARIA attributes for accessibility:
-  - Provide meaningful alt text for images
-  - Use proper heading hierarchy
-  - Add labels for form inputs
-  - Include keyboard event handlers alongside mouse events
-  - Use semantic elements (`<button>`, `<nav>`, etc.) instead of divs with roles
-
-### Error Handling & Debugging
-
-- Remove `console.log`, `debugger`, and `alert` statements from production code
-- Throw `Error` objects with descriptive messages, not strings or other values
-- Use `try-catch` blocks meaningfully - don't catch errors just to rethrow them
-- Prefer early returns over nested conditionals for error cases
-
-### Code Organization
-
-- Keep functions focused and under reasonable cognitive complexity limits
-- Extract complex conditions into well-named boolean variables
-- Use early returns to reduce nesting
-- Prefer simple conditionals over nested ternary operators
-- Group related code together and separate concerns
-
-### Security
-
-- Add `rel="noopener"` when using `target="_blank"` on links
-- Avoid `dangerouslySetInnerHTML` unless absolutely necessary
-- Don't use `eval()` or assign directly to `document.cookie`
-- Validate and sanitize user input
-
-### Performance
-
-- Avoid spread syntax in accumulators within loops
-- Use top-level regex literals instead of creating them in loops
-- Prefer specific imports over namespace imports
-- Avoid barrel files (index files that re-export everything)
-- Use proper image components (e.g., Next.js `<Image>`) over `<img>` tags
-
-### Framework-Specific Guidance
-
-**Next.js:**
-- Use Next.js `<Image>` component for images
-- Use `next/head` or App Router metadata API for head elements
-- Use Server Components for async data fetching instead of async Client Components
-
-**React 19+:**
-- Use ref as a prop instead of `React.forwardRef`
-
-**Solid/Svelte/Vue/Qwik:**
-- Use `class` and `for` attributes (not `className` or `htmlFor`)
-
----
-
-## Testing
-
-- Write assertions inside `it()` or `test()` blocks
-- Avoid done callbacks in async tests - use async/await instead
-- Don't use `.only` or `.skip` in committed code
-- Keep test suites reasonably flat - avoid excessive `describe` nesting
-
-## When Biome Can't Help
-
-Biome's linter will catch most issues automatically. Focus your attention on:
-
-1. **Business logic correctness** - Biome can't validate your algorithms
-2. **Meaningful naming** - Use descriptive names for functions, variables, and types
-3. **Architecture decisions** - Component structure, data flow, and API design
-4. **Edge cases** - Handle boundary conditions and error states
-5. **User experience** - Accessibility, performance, and usability considerations
-6. **Documentation** - Add comments for complex logic, but prefer self-documenting code
-
----
-
-Most formatting and common issues are automatically fixed by Biome. Run `npx ultracite fix` before committing to ensure compliance.
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [preetsuthar17/HextaUI](https://github.com/preetsuthar17/HextaUI) — distributed by [TomeVault](https://tomevault.io).
