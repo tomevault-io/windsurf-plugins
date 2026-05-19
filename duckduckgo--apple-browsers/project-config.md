@@ -1,123 +1,160 @@
 ---
 trigger: always_on
-description: Rules for creating and maintaining pixel definition JSON5 files that document pixels fired by the iOS and macOS apps
+description: How to define, name, and fire pixels on iOS and macOS.
 ---
 
-# Pixel Registry Definitions
+# Pixels
 
-## Overview
+Pixels are one-off telemetry events sent via HTTP GET with a name and optional parameters. They are used for:
 
-Pixel definitions are JSON5 files that document pixels and wide events fired by the iOS and macOS apps. They live in:
+- Basic feature usage events (e.g., button clicks, screen impressions)
+- Errors (e.g., network failures, parsing errors)
+- Conversion and retention (e.g, subscription purchase and activation)
 
-- **iOS:** `iOS/PixelDefinitions/pixels/definitions/*.json5`
-- **macOS:** `macOS/PixelDefinitions/pixels/definitions/*.json5`
-- **iOS wide events:** `iOS/PixelDefinitions/wide_events/definitions/*.json5`
+Pixels have the following requirements:
 
-Each platform has its own `params_dictionary.json5` and `suffixes_dictionary.json5` for reusable definitions.
+- Use clear & transparent naming, so it's obvious what the pixel and parameters are for. Pixel names should be self-documenting - avoid cryptic abbreviations or shorthand.
+- Only include information that is essential for the pixel
+- Do not use values that are overly precise, e.g. if using an integer value in a parameter, bucket it into ranges rather than including the value verbatim
+- Never include PII, URLs, or other forms of user-identifiable information in pixel names or parameters
 
-**Note:** Each definitions directory contains a `TEMPLATE.json5` file. These are scaffolds for creating new definition files — they are not real pixel definitions. Ignore them when reviewing or auditing existing definitions (their placeholder `expires` dates are intentional examples).
+## Types of Pixels
 
-## Pixel Definition Structure
+### Standard Pixels
 
-Each `.json5` file is a JSON5 object where keys are pixel names and values describe the pixel:
+Sent every time the event occurs.
 
-```json5
-{
-    "pixel_name_here": {
-        "description": "When and why this pixel fires",
-        "owners": ["githubUsername"],
-        "triggers": ["other"],
-        "suffixes": ["first_daily_count", "platform", "form_factor"],
-        "parameters": ["appVersion", "errorCode", "errorDomain"],
-        // Only for temporary pixels — omit for permanent ones
-        "expires": "2025-06-30"
+```swift
+Pixel.fire(pixel: .subscriptionRestoreAfterPurchaseAttempt)
+
+Pixel.fire(pixel: .autofillLoginsSavePromptDisplayed, withAdditionalParameters: [
+    PixelParameters.autofillPromptTrigger: "manual"
+])
+```
+
+### Daily Pixels
+
+Sent once per day per event. Used to determine the number of users affected by a particular error 
+
+```swift
+DailyPixel.fireDailyAndCount(pixel: .subscriptionPurchaseAttempt, pixelNameSuffixes: DailyPixel.Constant.legacyDailyPixelSuffixes)
+```
+
+### Unique Pixels
+
+Sent once per install for the lifetime of the install.
+
+```swift
+UniquePixel.fire(pixel: .subscriptionActivated)
+```
+
+## Pixel Definition Patterns
+
+### iOS Pixels
+
+iOS pixels are defined as cases on `Pixel.Event` in `iOS/Core/PixelEvent.swift`. Each enum case maps to an HTTP pixel name string via a computed `name` property.
+
+#### Adding a New iOS Pixel
+
+1. Add a new enum case to `Pixel.Event` in `iOS/Core/PixelEvent.swift`.
+2. Add a corresponding case to the `name` computed property (also in `PixelEvent.swift`) that returns the pixel's string name.
+3. Fire the pixel using `Pixel.fire`, `DailyPixel.fireDailyAndCount`, or `UniquePixel.fire`.
+4. Add the matching pixel definition in `iOS/PixelDefinitions/pixels/definitions/*.json5` - see the `Pixel Validation` section below for more.
+
+#### Enum Case Definition
+
+```swift
+extension Pixel {
+    public enum Event {
+        case appInstall
+        case appLaunch
+        case subscriptionPurchaseAttempt
+        case subscriptionPurchaseSuccess
+        case subscriptionActivated
+        // ...
     }
 }
 ```
 
-### Required Fields
+#### Enum-to-String Mapping
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `description` | string | When the pixel fires and its purpose |
-| `owners` | string[] | GitHub usernames of responsible people |
-| `triggers` | string[] | What causes the pixel to fire (see trigger values below) |
+The `Pixel.Event` enum has a computed `name` property that maps each case to its HTTP pixel name string:
 
-### Optional Fields
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `suffixes` | array | Dynamic parts appended to the pixel name |
-| `parameters` | array | Query parameters sent with the pixel |
-| `expires` | string | ISO date (`YYYY-MM-DD`) for temporary pixels |
-
-### Trigger Values
-
-Valid trigger values: `"other"`, `"scheduled"`, `"startup"`, `"page_load"`, `"new_tab"`, `"exception"`, `"user_submitted"`, `"search_ddg"`.
-
-Most pixels use `"other"`. Use `"scheduled"` for daily/periodic pixels, `"startup"` for app-launch pixels, and `"page_load"` for navigation-related pixels.
-
-## Determining Parameters from Swift Code
-
-Pixel definitions must document **all** query parameters sent over the wire, including default ones. To determine the correct parameters:
-
-### Always-included Parameters
-
-**`appVersion`** is added by default to every pixel by PixelKit. Include `"appVersion"` in every definition, unless the pixel call disables it.
-
-**`pixelSource`** is automatically added only if the pixel's `standardParameters` property returns `[.pixelSource]`. Check the pixel event's `standardParameters` computed property in Swift — if it returns `[.pixelSource]`, include `"pixelSource"` in the definition.
-
-### Error Parameters
-
-If the pixel event carries an `Error` (via associated value or the `error` property), PixelKit automatically extracts and sends:
-- `errorCode` (key: `"e"`) and `errorDomain` (key: `"d"`)
-- `underlyingErrorCode` (key: `"ue"`) and `underlyingErrorDomain` (key: `"ud"`) if present
-
-Include these dictionary references in the definition when the pixel carries error information.
-
-### Custom Parameters
-
-Check the pixel event's `parameters` computed property in Swift for any additional parameters. Also inspect the call site where the pixel is fired — look for `withAdditionalParameters:` arguments and trace any helper functions that build those parameters. These are pixel-specific and must be included in the definition (either as dictionary references or inline objects).
-
-### Where to Look in Swift
-
-- **iOS:** `iOS/Core/PixelEvent.swift` defines pixel names. `iOS/Core/Pixel.swift` has `PixelParameters` constants. Check the `parameters` and `standardParameters` properties on the pixel event enum.
-- **macOS:** `macOS/DuckDuckGo/Statistics/GeneralPixel.swift` defines many pixel names, parameters, and standard parameters. However, pixel events can also be defined in dedicated files (e.g. `UpdateFlowPixels.swift`, `CrashReportPixels.swift`) — search for types conforming to `PixelKitEvent`.
-- **Shared:** `SharedPackages/BrowserServicesKit/Sources/PixelKit/` contains `PixelKit.swift` (firing logic) and `PixelKitEvent.swift` (protocol).
-
-## Reusing Parameters from the Dictionary
-
-`params_dictionary.json5` defines common parameters. Reference them by key name as a string:
-
-```json5
-"parameters": [
-    "appVersion",       // Reuses definition from params_dictionary.json5
-    "errorCode",        // key: "e", type: integer
-    "errorDomain",      // key: "d", type: string
-    "underlyingErrorCode",
-    "underlyingErrorDomain"
-]
-```
-
-To define a custom inline parameter, use an object instead:
-
-```json5
-"parameters": [
-    "appVersion",
-    {
-        "key": "customParam",
-        "type": "string",
-        "description": "What this parameter represents",
-        "enum": ["value1", "value2"]
+```swift
+extension Pixel.Event {
+    public var name: String {
+        switch self {
+        case .appInstall: return "m_install"
+        case .appLaunch: return "ml"
+        case .subscriptionPurchaseAttempt: return "m_subscribe"
+        // ...
+        }
     }
-]
+}
 ```
 
-### Parameter Object Fields
+#### Naming Convention
 
-- `key` — the actual query parameter key sent in the pixel (use this for fixed keys)
-- `keyPattern` — regex pattern for dynamic keys (e.g. `"^ue[0-9]?$"` for `ue`, `ue0`, `ue1`, etc.)
-- `type` — `"string"`, `"integer"`, `"number"`, or `"boolean"`
+iOS pixel names follow these conventions:
+
+- **Prefix**: Always start with `m_` (for "mobile").
+- **Separators**: Use underscores (`_`) or hyphens (`-`) between words.
+- **Format**: Use `m_feature_action` or `m_feature-sub-feature_action`.
+- **Clarity**: Names should be clear and self-documenting. Anyone reading the pixel name should understand what it represents without needing additional context.
+
+**Avoid legacy shorthand naming.** The codebase contains legacy pixels with cryptic names like `ml`, `mp`, `mf`, `m_r`. These are difficult to understand and should not be used as a template for new pixels. New pixels should use descriptive names.
+
+Examples:
+
+| Style | Enum Case | String Name | Notes |
+|-------|-----------|-------------|-------|
+| Good | `.pullToRefresh` | `"m_pull-to-reload"` | Clear and descriptive |
+| Good | `.autofillLoginsSavePromptDisplayed` | `"m_autofill_logins_save_prompt_displayed"` | Self-documenting |
+| Legacy | `.appLaunch` | `"ml"` | Avoid this style for new pixels |
+| Legacy | `.privacyDashboardOpened` | `"mp"` | Avoid this style for new pixels |
+
+#### Parameterized Pixel Cases
+
+Enum cases can have associated values that are interpolated into the pixel name:
+
+```swift
+// Enum definition with associated value
+case networkProtectionLatency(quality: String)
+case syncLocalTimestampResolutionTriggered(Feature)
+
+// In the name property
+case .networkProtectionLatency(let quality):
+    return "m_netp_ev_\(quality)_latency"
+case .syncLocalTimestampResolutionTriggered(let feature):
+    return "m_sync_\(feature.name)_local_timestamp_resolution_triggered"
+```
+
+### macOS Pixels (PixelKit)
+
+macOS uses `PixelKitEvent` protocol, typically in feature-specific files. The implementation of the protocol looks like this:
+
+```swift
+// SharedPackages/BrowserServicesKit/Sources/PixelKit/PixelKitEvent.swift
+public protocol PixelKitEvent {
+    var name: String { get }
+    var standardParameters: [PixelKitStandardParameter]? { get }
+    var parameters: [String: String]? { get }
+    var error: NSError? { get }
+}
+```
+
+An example implementation of this protocol is:
+
+```swift
+// macOS/DuckDuckGo/Statistics/SubscriptionPixel.swift
+enum SubscriptionPixel: PixelKitEvent {
+    case subscriptionActive(AuthVersion)
+    case subscriptionPurchaseAttempt
+    case subscriptionPurchaseSuccess
+    // ...
+
+    var name: String {
+        switch self {
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
