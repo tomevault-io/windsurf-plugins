@@ -1,143 +1,101 @@
 ---
 trigger: always_on
-description: Dingo is a comprehensive AI data quality evaluation tool for ML practitioners, data engineers, and AI researchers. It systematically assesses training data, fine-tuning datasets, and production AI systems using rule-based, LLM-based, and agent-based evaluation methods.
+description: Guide for developing new evaluators (rules, LLMs, agents)
 ---
 
-# Dingo — Agent Instructions
 
-## Project Overview
+# Evaluator Development Guide
 
-Dingo is a comprehensive AI data quality evaluation tool for ML practitioners, data engineers, and AI researchers. It systematically assesses training data, fine-tuning datasets, and production AI systems using rule-based, LLM-based, and agent-based evaluation methods.
-
-**Repository**: https://github.com/MigoXLab/dingo
-**PyPI**: `pip install dingo-python`
-**License**: Apache 2.0
-
-## Tech Stack
-
-| Layer | Technology |
-|-------|------------|
-| Language | Python 3.10+ |
-| Data Models | Pydantic (BaseModel, extra="allow") |
-| LLM Integration | OpenAI SDK (supports any compatible API) |
-| MCP Server | FastMCP + SSE transport |
-| Distributed | PySpark (optional) |
-
-## Directory Structure
+## Architecture
 
 ```
-dingo/
-├── AGENTS.md                ← this file (agent instructions)
-├── setup.py                 ← package config (extras_require for optional deps)
-├── mcp_server.py            ← MCP server entry point (legacy, use `dingo serve` instead)
-├── requirements/
-│   ├── runtime.txt          ← core dependencies (minimal)
-│   ├── datasource.txt       ← optional datasource deps (S3, SQL, Parquet, etc.)
-│   ├── optional.txt         ← heavy optional deps (torch, pyspark, etc.)
-│   └── agent.txt            ← agent evaluation deps (langchain, tavily)
-│
-├── SKILL.md                 ← AI agent skill definition (symlink → clawhub/SKILL.md)
-├── dingo/                   ← core Python package
-│   ├── config/
-│   │   └── input_args.py    ← InputArgs, EvalPiplineConfig, EvaluatorGroupConfig
-│   ├── io/
-│   │   ├── input/data.py    ← Data model (Pydantic, extra="allow")
-│   │   └── output/          ← ResultInfo, EvalDetail, SummaryModel (+ cross-layer analysis)
-│   ├── data/
-│   │   ├── datasource/      ← LocalDataSource, SQLDataSource, S3DataSource, HFDataSource
-│   │   ├── dataset/         ← Dataset implementations per source
-│   │   └── converter/       ← Format converters (JSON, JSONL, CSV, Parquet, etc.)
-│   ├── model/
-│   │   ├── model.py         ← Model registry (rule_register, llm_register)
-│   │   ├── rule/            ← Rule-based evaluators (80+ built-in)
-│   │   │   ├── base.py      ← BaseRule
-│   │   │   ├── rule_common.py ← Common rules (text quality, format, PII, etc.)
-│   │   │   └── utils/       ← Shared utilities (normalize, ngrams, etc.)
-│   │   └── llm/             ← LLM-based evaluators
-│   │       ├── base_openai.py ← BaseOpenAI (base class for all LLM evaluators)
-│   │       ├── text_quality/  ← Text quality evaluators (V4, V5)
-│   │       ├── rag/          ← RAG metrics (Faithfulness, Precision, Recall, etc.)
-│   │       ├── hhh/          ← 3H evaluators (Honest, Helpful, Harmless)
-│   │       ├── compare/      ← Document comparison evaluators
-│   │       └── agent/        ← Agent-based evaluators
-│   │           ├── base_agent.py  ← BaseAgent
-│   │           ├── tools/         ← Tool registry + implementations
-│   │           ├── agent_fact_check.py
-│   │           └── agent_hallucination.py
-│   ├── exec/
-│   │   ├── local.py         ← LocalExecutor (single machine, cross-layer conflict detection)
-│   │   └── spark.py         ← SparkExecutor (distributed)
-│   └── run/
-│       └── cli.py           ← CLI entry point (subcommands: eval, info)
-│
-├── examples/                ← Usage examples (SDK, CLI, various scenarios)
-├── test/                    ← Test suite
-│   ├── data/                ← Test data files
-│   ├── env/                 ← Test environment configs
-│   └── scripts/             ← Test scripts (pytest)
-└── docs/                    ← Documentation
+Model (registry)
+├── Rule evaluators  → @Model.rule_register(metric_type, groups)
+│   └── BaseRule.eval(input_data) → EvalDetail
+├── LLM evaluators   → @Model.llm_register(name)
+│   └── BaseOpenAI.eval(input_data) → EvalDetail
+└── Agent evaluators → @Model.llm_register(name)
+    └── BaseAgent.eval(input_data) → EvalDetail
 ```
 
-## Core Concepts
+## Key Files
 
-### Data Flow
+| File | Purpose |
+|------|---------|
+| `dingo/model/model.py` | `Model` class with `rule_register`, `llm_register`, `load_model` |
+| `dingo/model/rule/base.py` | `BaseRule` base class |
+| `dingo/model/llm/base_openai.py` | `BaseOpenAI` base class for LLM evaluators |
+| `dingo/model/llm/agent/base_agent.py` | `BaseAgent` base class for agent evaluators |
+| `dingo/io/input/data.py` | `Data` model (input to evaluators) |
+| `dingo/io/output/eval_detail.py` | `EvalDetail` model (output from evaluators) |
 
-```
-Data Input → Interface (SDK/CLI/MCP) → Datasource → Dataset → Converter → Evaluator → Executor → Report
-```
+## Registration Groups
 
-### Registration System
+Rules belong to groups that determine when they run:
 
-All evaluators use decorator-based registration:
+- `default` — runs in default evaluation
+- `pretrain` — pre-training data quality
+- `benchmark` — benchmark evaluation
+- `sft` — supervised fine-tuning data
+- `rag` — RAG system evaluation
+- `hallucination` — hallucination detection
+
+## EvalDetail Contract
+
+Every evaluator must return `EvalDetail` with:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `metric` | str | Evaluator class name (`cls.__name__`) |
+| `status` | bool | `True` = issue found, `False` = no issue |
+| `label` | List[str] | Quality labels (e.g., `['QUALITY_GOOD']` or `['QUALITY_BAD_COMPLETENESS.RuleName']`) |
+| `reason` | List[str] | Human-readable explanation of the finding |
+| `score` | float | Optional numeric score (0.0–1.0) |
+| `extra` | Dict | Optional extra metadata |
+
+## Data Field Access
+
+Since `Data` uses `extra = "allow"`, always access non-standard fields safely:
 
 ```python
-# Rule evaluator
-@Model.rule_register('QUALITY_BAD_COMPLETENESS', ['default', 'pretrain'])
-class MyRule(BaseRule):
-    @classmethod
-    def eval(cls, input_data: Data) -> EvalDetail: ...
+# Safe access patterns
+raw_data = getattr(input_data, 'raw_data', {})
+context = getattr(input_data, 'context', None)
+reference = getattr(input_data, 'reference', '')
 
-# LLM evaluator
-@Model.llm_register('MyLLMEvaluator')
-class MyLLMEvaluator(BaseOpenAI):
-    prompt = "..."
-    @classmethod
-    def build_messages(cls, input_data: Data) -> List: ...
-
-# Agent evaluator
-@Model.llm_register('MyAgent')
-class MyAgent(BaseAgent):
-    available_tools = ["tavily_search"]
-    @classmethod
-    def eval(cls, input_data: Data) -> EvalDetail: ...
+# For RAG evaluators, common field access pattern
+question = input_data.prompt or raw_data.get("question", "")
+answer = input_data.content or raw_data.get("answer", "")
 ```
 
-### Data Model
+## Multi-Field Evaluation
 
-`Data` uses `extra = "allow"` — any field can be set dynamically:
+Evaluators receive data after field mapping. The `fields` config maps source fields to standard Data fields:
 
-```python
-class Data(BaseModel):
-    class Config:
-        extra = "allow"
+```json
+{
+  "fields": {"content": "description", "prompt": "title"},
+  "evals": [{"name": "RuleAbnormalChar"}]
+}
 ```
 
-Common fields: `data_id`, `prompt`, `content`, `image`, `context`, `raw_data`, `reference`, `user_input`, `response`, `retrieved_contexts`.
+The evaluator sees `input_data.content` = value of source field `description`.
 
-### InputArgs Configuration
+## Tool Registration (for Agents)
 
 ```python
-input_data = {
-    "input_path": "data.jsonl",
-    "dataset": {"source": "local", "format": "jsonl"},
-    "executor": {"max_workers": 4, "batch_size": 10, "result_save": {"bad": True, "good": True}},
-    "evaluator": [
-        {
-            "fields": {"content": "text_field", "prompt": "question_field"},
-            "evals": [
-                {"name": "RuleAbnormalChar"},
+from dingo.model.llm.agent.tools.tool_registry import tool_register
+from dingo.model.llm.agent.tools.base_tool import BaseTool
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+@tool_register
+class MyTool(BaseTool):
+    name = "my_tool"
+    description = "What this tool does"
+
+    def execute(self, **kwargs):
+        # tool logic
+        return result
+```
 
 ---
 > Source: [MigoXLab/dingo](https://github.com/MigoXLab/dingo) — distributed by [TomeVault](https://tomevault.io).
