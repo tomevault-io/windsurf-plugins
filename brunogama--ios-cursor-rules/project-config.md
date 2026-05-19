@@ -1,182 +1,83 @@
 ---
 trigger: always_on
-description: This guide outlines Swift testing principles and practices, focusing on creating effective unit tests for Swift code.
+description: Rules for placing and organizing Cursor rule files in the repository.
 ---
 
-# Swift Testing Guide
+---
+description: Cursor Rules Location
+globs: *.mdc
+---
+# Cursor Rules Location
 
-This guide outlines Swift testing principles and practices, focusing on creating effective unit tests for Swift code.
+Rules for placing and organizing Cursor rule files in the repository.
 
 <rule>
-name: swift_testing
+name: cursor_rules_location
+description: Standards for placing Cursor rule files in the correct directory
 filters:
-  - type: file_change
-    pattern: "*Tests.swift"
-  - type: command
-    pattern: "@swift-tests"
+  # Match any .mdc files
+  - type: file_extension
+    pattern: "\\.mdc$"
+  # Match files that look like Cursor rules
+  - type: content
+    pattern: "(?s)<rule>.*?</rule>"
+  # Match file creation events
+  - type: event
+    pattern: "file_create"
 
 actions:
+  - type: reject
+    conditions:
+      - pattern: "^(?!\\.\\/\\.cursor\\/rules\\/.*\\.mdc$)"
+        message: "Cursor rule files (.mdc) must be placed in the .cursor/rules directory"
+
   - type: suggest
     message: |
-      ## Swift Testing Guidelines
-      
-      In this project, every public function must have unit tests. We follow these guidelines:
+      When creating Cursor rules:
 
-      ### Test Structure
-      
-      #### Naming Convention
-      
-      - Test class name: `[ClassUnderTest]Tests`
-      - Test method name: `test_[FunctionUnderTest]_[Scenario]_[ExpectedResult]`
-      
-      **Example:**
-      ```swift
-      class UserAuthenticationTests: XCTestCase {
-          func test_authenticate_withValidCredentials_shouldReturnToken() { ... }
-          func test_authenticate_withInvalidPassword_shouldThrowAuthError() { ... }
-      }
-      ```
-      
-      #### Arrangement
-      
-      Every test should follow the Arrange-Act-Assert (AAA) pattern:
-      
-      ```swift
-      func test_addItem_withValidProduct_shouldAddToCart() {
-          // Arrange
-          let cart = ShoppingCart(id: CartID())
-          let product = Product(id: ProductID(), name: "Test Product", price: Money(amount: 10, currency: .usd))
-          
-          // Act
-          try! cart.addItem(product: product, quantity: 1)
-          
-          // Assert
-          XCTAssertEqual(cart.items.count, 1)
-          XCTAssertEqual(cart.total()?.amount, 10)
-      }
-      ```
-      
-      ### Types of Tests
-      
-      #### 1. Unit Tests
-      
-      - Tests a single unit of code in isolation
-      - Uses mocks/stubs for dependencies
-      - Fast and reliable
-      - Located in target's matching test target (e.g., DomainTests for Domain code)
-      
-      ```swift
-      func test_placeOrder_withValidItems_shouldCreateOrderSuccessfully() {
-          // Arrange
-          let mockOrderRepository = MockOrderRepository()
-          let mockProductRepository = MockProductRepository()
-          let orderService = OrderService(
-              orderRepository: mockOrderRepository,
-              productRepository: mockProductRepository
-          )
-          
-          let items = [OrderItem(productID: ProductID(), quantity: 1, price: Money(amount: 10, currency: .usd))]
-          
-          // Act
-          let result = orderService.placeOrder(items: items, customerID: CustomerID())
-          
-          // Assert
-          XCTAssertTrue(result.isSuccess)
-          XCTAssertEqual(mockOrderRepository.savedOrders.count, 1)
-      }
-      ```
-      
-      #### 2. Integration Tests
-      
-      - Tests interaction between multiple components
-      - Typically involves real implementations rather than mocks
-      - Located in separate test targets
-      
-      ```swift
-      func test_orderFlow_endToEnd_shouldProcessOrderSuccessfully() {
-          // Tests the full order flow from cart to confirmation
-          // Uses real implementations for most components
-      }
-      ```
-      
-      ### Mocking Guidelines
-      
-      - Create mocks for protocols, not for concrete classes
-      - Use protocol-based dependencies to make testing easier
-      - Name mocks clearly with the `Mock` prefix
-      
-      ```swift
-      protocol OrderRepository {
-          func save(_ order: Order) throws
-          func findByID(_ id: OrderID) -> Order?
-      }
-      
-      class MockOrderRepository: OrderRepository {
-          var savedOrders: [Order] = []
-          var ordersToReturn: [OrderID: Order] = [:]
-          
-          func save(_ order: Order) throws {
-              savedOrders.append(order)
-          }
-          
-          func findByID(_ id: OrderID) -> Order? {
-              return ordersToReturn[id]
-          }
-      }
-      ```
-      
-      ### Testing Value Objects
-      
-      Test both valid and invalid initialization:
-      
-      ```swift
-      func test_emailInitialization_withValidEmail_shouldSucceed() {
-          // Arrange & Act
-          let email = Email(value: "user@example.com")
-          
-          // Assert
-          XCTAssertNotNil(email)
-          XCTAssertEqual(email?.value, "user@example.com")
-      }
-      
-      func test_emailInitialization_withInvalidEmail_shouldReturnNil() {
-          // Arrange & Act
-          let email = Email(value: "invalid-email")
-          
-          // Assert
-          XCTAssertNil(email)
-      }
-      ```
-      
-      ### Testing Entities & Aggregates
-      
-      Test business rules and invariants:
-      
-      ```swift
-      func test_order_cannotBeFinalized_whenEmpty() {
-          // Arrange
-          let order = Order(id: OrderID(), customerID: CustomerID())
-          
-          // Act
-          let result = order.finalize()
-          
-          // Assert
-          XCTAssertEqual(result, .failure(.emptyOrder))
-      }
-      ```
-      
-      ### Testing Use Cases
-      
-      Test input/output behavior and interactions:
-      
-      ```swift
-      func test_placeOrderUseCase_shouldCoordinateRepositories() {
-          // Arrange
-          let mockOrderRepository = MockOrderRepository()
-          let mockNotificationService = MockNotificationService()
-          
+      1. Always place rule files in PROJECT_ROOT/.cursor/rules/:
+         ```
+         .cursor/rules/
+         ├── your-rule-name.mdc
+         ├── another-rule.mdc
+         └── ...
+         ```
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+      2. Follow the naming convention:
+         - Use kebab-case for filenames
+         - Always use .mdc extension
+         - Make names descriptive of the rule's purpose
+
+      3. Directory structure:
+         ```
+         PROJECT_ROOT/
+         ├── .cursor/
+         │   └── rules/
+         │       ├── your-rule-name.mdc
+         │       └── ...
+         └── ...
+         ```
+
+      4. Never place rule files:
+         - In the project root
+         - In subdirectories outside .cursor/rules
+         - In any other location
+
+examples:
+  - input: |
+      # Bad: Rule file in wrong location
+      rules/my-rule.mdc
+      my-rule.mdc
+      .rules/my-rule.mdc
+
+      # Good: Rule file in correct location
+      .cursor/rules/my-rule.mdc
+    output: "Correctly placed Cursor rule file"
+
+metadata:
+  priority: high
+  version: 1.0
+</rule>
 
 ---
 > Source: [brunogama/ios-cursor-rules](https://github.com/brunogama/ios-cursor-rules) — distributed by [TomeVault](https://tomevault.io).
