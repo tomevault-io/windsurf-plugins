@@ -1,24 +1,25 @@
 ---
 trigger: always_on
-description: Build a complete standalone app using HailoInfer + OpenCV on Hailo-8/8L/10H.
+description: Build a complete Vision-Language Model application that uses the Hailo-10H VLM for image understanding.
 ---
 
 
-# Skill: Build Standalone Inference Application
+# Skill: Build VLM Application
 
-Build a complete standalone app using HailoInfer + OpenCV on Hailo-8/8L/10H.
+Build a complete Vision-Language Model application that uses the Hailo-10H VLM for image understanding.
 
 ## When This Skill Is Loaded
 
-- User wants **direct inference** without GStreamer
-- User mentions: OpenCV, HailoInfer, standalone, batch processing, custom pipeline
-- User needs **full control** over preprocessing and postprocessing
+- User wants to build an app that **looks at camera images and answers questions**
+- User needs **visual scene understanding** (describe, count, detect, analyze)
+- User wants a variant of the VLM Chat app with different behavior
+- User mentions: VLM, vision, image understanding, camera monitoring, scene analysis
 
-## Reference Implementations
+## Reference Implementation
 
-Study `hailo_apps/python/standalone_apps/object_detection/` — the canonical standalone app:
-- `object_detection.py` — 3-thread architecture, HailoInfer, queue-based
-- Also see: `pose_estimation/`, `instance_segmentation/`, `lane_detection/`
+Study `hailo_apps/python/gen_ai_apps/vlm_chat/` — the canonical VLM app:
+- `vlm_chat.py` — State machine app with camera loop
+- `backend.py` — Multiprocessing VLM inference backend (REUSE this, don't copy)
 
 ## Build Process
 
@@ -28,105 +29,99 @@ Create the app directory:
 
 ```
 hailo_apps/python/<type>/<app_name>/
-├── app.yaml              # App manifest (type: standalone)
-├── run.sh                # Launch wrapper
-├── __init__.py
-├── <app_name>.py         # Main app (3-thread architecture)
-├── <app_name>_post_process.py  # Custom postprocessing
-├── config.json           # Labels, thresholds (optional)
+├── app.yaml              # App manifest (required)
+├── run.sh                # Launch wrapper (sets PYTHONPATH)
+├── __init__.py           # Empty
+├── <app_name>.py         # Main app class + entry point
+├── event_tracker.py      # Optional: event classification (for monitoring apps)
 └── README.md             # Usage documentation (REQUIRED — never skip)
 ```
 
-Create `app.yaml` with `type: standalone` and `run.sh` wrapper.
-Do NOT register in `defines.py` or `resources_config.yaml`.
+**app.yaml** — required manifest:
+```yaml
+name: <app_name>
+title: My VLM App
+description: One-line description
+author: AI Agent (auto-generated)
+date: "YYYY-MM-DD"
+type: gen_ai
+hailo_arch: hailo10h
+model: Qwen2-VL-2B-Instruct
+tags: [vlm, monitoring]
+status: draft
+```
 
-### Step 2: Build Main App (3-Thread Architecture)
+**run.sh** — launch wrapper:
+```bash
+#!/bin/bash
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+PYTHONPATH="$REPO_ROOT" python3 "$SCRIPT_DIR/<app_name>.py" "$@"
+```
 
+**NOTE**: Do NOT register in `defines.py` or `resources_config.yaml`.
+Community apps are run via `run.sh`. Registration happens during promotion
+
+### Step 2: Build the App
+
+The main app file follows this structure:
 ```python
-import threading
-import queue
-import signal
+import os
+import sys
 import cv2
-import numpy as np
+import signal
+import time
+from typing import Optional
 
+os.environ["QT_QPA_PLATFORM"] = 'xcb'
+
+from hailo_apps.python.gen_ai_apps.vlm_chat.backend import Backend
+from hailo_apps.python.core.common.core import (
+    get_standalone_parser, resolve_hef_path, handle_list_models_flag
+)
+from hailo_apps.python.core.common.defines import (
+    HAILO10H_ARCH, USB_CAMERA
+)
+from hailo_apps.python.core.common.camera_utils import get_usb_video_devices
 from hailo_apps.python.core.common.hailo_logger import get_logger
-from hailo_apps.python.core.common.core import resolve_hef_path, handle_and_resolve_args
-from hailo_apps.python.core.common.parser import get_standalone_parser
-from hailo_apps.python.core.common.hailo_inference import HailoInfer
 
 logger = get_logger(__name__)
 
-APP_NAME = "my_standalone_app"
-MAX_INPUT_QUEUE_SIZE = 5
-MAX_OUTPUT_QUEUE_SIZE = 5
-MAX_ASYNC_INFER_JOBS = 3
+APP_NAME = "my_vlm_app"
 
+SYSTEM_PROMPT = "Your system prompt here..."
+MONITOR_PROMPT = "Your per-frame VLM question here..."
 
-def preprocess_thread(cap, input_queue, hailo_infer, stop_event):
-    height, width, _ = hailo_infer.get_input_shape()
-    while not stop_event.is_set():
-        ret, frame = cap.read()
-        if not ret:
-            break
-        resized = cv2.resize(frame, (width, height))
-        input_queue.put((frame, resized))
-    input_queue.put(None)
+class MyVLMApp:
+    def __init__(self, camera, camera_type, args):
+        self.camera = camera
+        self.camera_type = camera_type
+        self.running = True
+        self.backend = None
+        signal.signal(signal.SIGINT, self.signal_handler)
+        # Initialize Backend, EventTracker, etc.
 
+    def signal_handler(self, sig, frame):
+        self.running = False
 
-def infer_thread(hailo_infer, input_queue, output_queue, stop_event):
-    while not stop_event.is_set():
-        item = input_queue.get()
-        if item is None:
-            break
-        frame, preprocessed = item
-        results = hailo_infer.run(preprocessed)
-        output_queue.put((frame, results))
-    output_queue.put(None)
+    def run(self):
+        # Main loop: capture frame, display, analyze periodically
+        pass
 
-
-def postprocess_thread(output_queue, stop_event, no_display):
-    while not stop_event.is_set():
-        item = output_queue.get()
-        if item is None:
-            break
-        frame, results = item
-        # Custom postprocessing here
-        if not no_display:
-            cv2.imshow("Output", frame)
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                stop_event.set()
-
+    def cleanup(self):
+        if self.backend:
+            self.backend.close()
+        cv2.destroyAllWindows()
 
 def main():
     parser = get_standalone_parser()
+    # IMPORTANT: Add ALL custom args BEFORE handle_list_models_flag
+    # so they appear in --help output
+    parser.add_argument("--interval", type=int, default=15, help="Seconds between analyses")
+    handle_list_models_flag(parser, APP_NAME)
     args = parser.parse_args()
-    args = handle_and_resolve_args(args, APP_NAME)
-
-    stop_event = threading.Event()
-    signal.signal(signal.SIGINT, lambda s, f: stop_event.set())
-
-    hailo_infer = HailoInfer(str(args.hef_path), args.batch_size)
-    cap = cv2.VideoCapture(args.input)
-
-    input_q = queue.Queue(maxsize=MAX_INPUT_QUEUE_SIZE)
-    output_q = queue.Queue(maxsize=MAX_OUTPUT_QUEUE_SIZE)
-
-    threads = [
-        threading.Thread(target=preprocess_thread, args=(cap, input_q, hailo_infer, stop_event)),
-        threading.Thread(target=infer_thread, args=(hailo_infer, input_q, output_q, stop_event)),
-        threading.Thread(target=postprocess_thread, args=(output_q, stop_event, args.no_display)),
-    ]
-
-    try:
-        for t in threads:
-            t.start()
-        for t in threads:
-            t.join()
-    finally:
-        hailo_infer.close()
-        cap.release()
-        cv2.destroyAllWindows()
-
+    hef_path = resolve_hef_path(args.hef_path, app_name=APP_NAME, arch=HAILO10H_ARCH)
+    # Camera setup, app.run()
 
 if __name__ == "__main__":
     main()
@@ -134,20 +129,55 @@ if __name__ == "__main__":
 
 ### Step 4: Validate
 
+Run the automated validation script (includes static checks + runtime smoke tests):
 ```bash
-python3 .hailo/scripts/validate_app.py hailo_apps/python/standalone_apps/my_standalone_app --smoke-test
+python3 .hailo/scripts/validate_app.py hailo_apps/python/gen_ai_apps/<app_name> --smoke-test
 ```
 
-## Critical Conventions
+### Step 5: Write README
 
-1. **CLI parser**: `get_standalone_parser()` — includes `--input`, `--hef-path`, `--batch-size`, `--no-display`, `--save-output`
-2. **HEF resolution**: `handle_and_resolve_args(args, APP_NAME)`
-3. **3-thread pattern**: preprocess → infer → postprocess, connected by `queue.Queue`
-4. **Queue sentinel**: `queue.put(None)` to signal thread termination
-5. **Async inference**: Limit concurrent jobs with `MAX_ASYNC_INFER_JOBS`
-6. **Cleanup**: Always `hailo_infer.close()` in finally block
-7. **Stop event**: `threading.Event()` for graceful shutdown
-8. **Signal handler**: Register SIGINT to set stop_event
+Include: description, requirements, usage CLI, architecture, customization notes.
+
+## Key Customization Points
+
+| What to Change | Where |
+|---|---|
+| System prompt | `SYSTEM_PROMPT` constant |
+| Per-frame VLM question | `MONITOR_PROMPT` constant |
+| Image preprocessing | `Backend.convert_resize_image()` |
+| Inference parameters | `MAX_TOKENS`, `TEMPERATURE` |
+| Event classification | `EventTracker.classify_response()` |
+| Display overlay | OpenCV `cv2.putText()` in main loop |
+
+## Display & Output Best Practices
+
+### Window Size
+The VLM crops images to 336×336 but this is too small for a display window.
+Always resize to at least 640×640 for readability:
+```python
+DISPLAY_SIZE = (640, 640)
+display = cv2.resize(frame, DISPLAY_SIZE, interpolation=cv2.INTER_LINEAR)
+```
+
+### Text Wrapping
+VLM responses can be long (100+ chars). Always wrap overlay text to fit the window:
+```python
+@staticmethod
+def _wrap_text(text: str, max_chars: int = 70) -> list[str]:
+    words = text.split()
+    lines, current = [], ""
+    for word in words:
+        if current and len(current) + 1 + len(word) > max_chars:
+            lines.append(current)
+            current = word
+        else:
+            current = f"{current} {word}".strip() if current else word
+    if current:
+        lines.append(current)
+    return lines or [""]
+```
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [hailo-ai/hailo-apps](https://github.com/hailo-ai/hailo-apps) — distributed by [TomeVault](https://tomevault.io).
