@@ -1,138 +1,184 @@
 ---
 trigger: always_on
-description: Use these instructions when you need to:
+description: DuckPlayer uses two primary UserScript components to bridge native iOS functionality with web content:
 ---
 
 
-# Development Commands & Build Instructions
+# DuckPlayer UserScript Integration Guide
 
-## 📋 When to Use This Document
+## Overview
 
-Use these instructions when you need to:
-- Build the iOS Browser app for testing or development
-- Build the macOS Browser app for testing or development
-- Verify that code changes compile successfully
-- Prepare the app for testing or debugging
-- Understand build failures and how to fix them
+DuckPlayer uses two primary UserScript components to bridge native iOS functionality with web content:
+- `DuckPlayerUserScriptYouTube`: Manages communication with YouTube.com pages
+- `DuckPlayerUserScriptPlayer`: Handles communication within the DuckPlayer web view
 
-## 🚦 Golden Rules for Building
+## Architecture Overview
 
-### ✅ ALWAYS DO THESE
-1. **Use the full shell wrapper**: `/bin/sh -c 'set -e -o pipefail && xcodebuild ... | xcbeautify'`
-2. **Detect environment first**: Never hardcode paths or simulator IDs
-3. **Check exit codes**: Ensure the build succeeded before proceeding
-4. **Use absolute paths**: Always use full paths for workspace files
-5. **Include xcbeautify**: Output is unreadable without it
+### UserScript Communication Flow
 
-### ❌ NEVER DO THESE
-1. **Never use `-jobs` flag**: It's been removed from all commands
-2. **Never skip xcbeautify**: Raw xcodebuild output is nearly impossible to parse
-3. **Never use .xcodeproj files**: Always use .xcworkspace
-4. **Never hardcode simulator IDs**: They change between systems
-5. **Never ignore build failures**: Always check and handle errors
+```swift
+// Communication flow:
+// Web Content -> UserScript -> Native Handler -> ViewModel/Presenter
+// Native UI -> Publisher -> UserScript -> Web Content
 
-## 🔍 Phase 1: Environment Detection
+// ✅ CORRECT - Bidirectional communication pattern
+final class DuckPlayerUserScriptYouTube: NSObject, Subfeature {
+    // Incoming: Web -> Native
+    func handler(forMethodNamed methodName: String) -> Subfeature.Handler? {
+        switch methodName {
+        case "onCurrentTimeStamp": return onCurrentTimeStamp
+        case "onYoutubeError": return onYoutubeError
+        default: return nil
+        }
+    }
+    
+    // Outgoing: Native -> Web
+    private func pushToWebView(method: String, params: [String: String]) {
+        broker?.push(method: method, params: params, for: self, into: webView)
+    }
+}
+```
 
-### Pre-Flight Checks
-Before building, validate your environment.
+## DuckPlayerUserScriptYouTube Integration
 
-**Example:** See [pre-flight-checks.sh](development-commands/pre-flight-checks.sh)
+### Component Responsibilities
 
-### Required Variables to Detect
+**Primary Role**: Bridge between YouTube.com pages and native DuckPlayer controls
 
-| Variable | Purpose | Detection Command | Expected Format |
-|----------|---------|-------------------|-----------------|
-| `WORKSPACE_PATH` | Full path to .xcworkspace | `pwd` + `find . -name "DuckDuckGo.xcworkspace"` | `/Users/.../DuckDuckGo.xcworkspace` |
-| `SIMULATOR_ID` | iOS Simulator UUID | `xcrun simctl list devices \| grep iPhone` | `XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX` |
-| `ARCHITECTURE` | Mac CPU type | `uname -m` | `arm64` or `x86_64` |
+**Key Responsibilities**:
+- Manages media control events (play/pause)
+- Handles audio muting state
+- Tracks video timestamp updates
+- Responds to URL changes
+- Manages script readiness state with event queuing
+- Provides initial setup configuration
 
-### Detection Commands
+### Event Queuing System
 
-**Example:** See [environment-detection.sh](development-commands/environment-detection.sh)
+The UserScript implements an event queuing system to handle events before scripts are ready:
 
-## 🏗️ Phase 2: Build Execution
+```swift
+// ✅ CORRECT - Event queuing implementation
+private enum QueuedEvent {
+    case mediaControl(pause: Bool)
+    case muteAudio(mute: Bool)
+    case urlChanged(pageType: String)
+}
 
-### iOS Build Command Template
+private var otherEventsQueue: [QueuedEvent] = []
+private var areScriptsReady = false
 
-Replace the placeholders with your detected values.
+private func handleEvent(_ event: QueuedEvent) {
+    switch event {
+    case .urlChanged:
+        // URL changes are always processed immediately
+        processEvent(event)
+    default:
+        if areScriptsReady {
+            processEvent(event)
+        } else {
+            // Queue events until scripts are ready
+            otherEventsQueue.append(event)
+        }
+    }
+}
 
-**Example:** See [ios-build-template.sh](development-commands/ios-build-template.sh)
+// Process queued events when scripts become ready
+func onDuckPlayerScriptsReady(params: Any, original: WKScriptMessage) -> Encodable? {
+    areScriptsReady = true
+    while !otherEventsQueue.isEmpty {
+        let event = otherEventsQueue.removeFirst()
+        processEvent(event)
+    }
+    return nil
+}
+```
 
-### macOS Build Command Template
+### Publisher Integration Pattern
 
-Replace the placeholders with your detected values.
+```swift
+// ✅ CORRECT - Reactive publisher pattern
+private func setupSubscriptions() {
+    duckPlayer?.mediaControlPublisher
+        .sink { [weak self] pause in
+            self?.handleMediaControl(pause: pause)
+        }
+        .store(in: &cancellables)
+    
+    duckPlayer?.muteAudioPublisher
+        .sink { [weak self] mute in
+            self?.handleMuteAudio(mute: mute)
+        }
+        .store(in: &cancellables)
+    
+    duckPlayer?.urlChangedPublisher
+        .sink { [weak self] url in
+            self?.onUrlChanged(url: url)
+        }
+        .store(in: &cancellables)
+}
+```
 
-**Example:** See [macos-build-template.sh](development-commands/macos-build-template.sh)
+### Message Origin Security
 
-### Complete Working Examples
+```swift
+// ✅ CORRECT - Strict origin validation
+let messageOriginPolicy: MessageOriginPolicy = .only(rules: [
+    .exact(hostname: DuckPlayerSettingsDefault.OriginDomains.duckduckgo),
+    .exact(hostname: DuckPlayerSettingsDefault.OriginDomains.youtube),
+    .exact(hostname: DuckPlayerSettingsDefault.OriginDomains.youtubeMobile),
+    .exact(hostname: DuckPlayerSettingsDefault.OriginDomains.youtubeWWW),
+    .exact(hostname: DuckPlayerSettingsDefault.OriginDomains.youtubeNoCookie),
+    .exact(hostname: DuckPlayerSettingsDefault.OriginDomains.youtubeNoCookieWWW)
+])
+```
 
-#### iOS Build (Real Values)
-**Example:** See [ios-build-example.sh](development-commands/ios-build-example.sh)
+### Page Type Detection
 
-#### macOS Build (Real Values)
-**Example:** See [macos-build-example.sh](development-commands/macos-build-example.sh)
+```swift
+// ✅ CORRECT - URL-based page type detection
+func onUrlChanged(url: URL) {
+    areScriptsReady = false
+    
+    // Determine page type for proper script behavior
+    let pageType = DuckPlayerUserScript.getPageType(url: url)
+    let shouldClearEvents = pageType != DuckPlayerUserScript.PageType.YOUTUBE
+    
+    if shouldClearEvents {
+        // Clear queued events when navigating away from YouTube
+        otherEventsQueue.removeAll()
+    }
+    
+    // Always store the latest URL change event
+    handleEvent(.urlChanged(pageType: pageType))
+}
+```
 
-## ✅ Phase 3: Build Verification
+## DuckPlayerUserScriptPlayer Integration
 
-### Signs of Success
-- Command exits with code 0
-- Last line contains "BUILD SUCCEEDED"
-- No error messages in red
-- Build time is within expected range (see performance table below)
+### Component Responsibilities
 
-### Signs of Failure
-- Command exits with non-zero code
-- Output contains "BUILD FAILED"
-- Red error messages appear
-- Build hangs for more than 15 minutes
+**Primary Role**: Handle communication within the DuckPlayer web view
 
-### Performance Expectations
+**Key Responsibilities**:
+- Provides initial setup configuration
+- Updates video timestamps to the view model
+- Handles YouTube error states
+- Manages locale and page type information
 
-| Build Type | Expected Duration | Action if Exceeded |
-|------------|------------------|-------------------|
-| First build | 5-10 minutes | Normal - downloading dependencies |
-| Subsequent build | 1-3 minutes | Check for errors in output |
-| Clean build | 3-5 minutes | Normal - rebuilding everything |
-| Incremental | 10-30 seconds | Normal for small changes |
-| Hanging >15 min | Abnormal | Cancel and check for issues |
+### ViewModel Communication
 
-## 🔧 Error Recovery
-
-### If Build Fails - Immediate Actions
-
-1. **Check the error message** - Last few red lines usually indicate the issue
-2. **Clean and retry:** See [error-recovery-clean.sh](development-commands/error-recovery-clean.sh)
-3. **If "No such module" errors:** See [error-recovery-derived-data.sh](development-commands/error-recovery-derived-data.sh)
-4. **If simulator issues:** See [error-recovery-simulator.sh](development-commands/error-recovery-simulator.sh)
-
-### Common Problems and Solutions
-
-| Problem | Diagnosis Command | Solution |
-|---------|------------------|----------|
-| No workspace found | `ls *.xcworkspace` | Ensure you're in project root directory |
-| Simulator not found | `xcrun simctl list devices` | Pick a different simulator ID from the list |
-| "Command not found: xcbeautify" | `which xcbeautify` | Install: `brew install xcbeautify` |
-| Build hangs | Check Activity Monitor | Kill xcodebuild process and retry |
-| "No such module" | Check package resolution | Clean DerivedData and rebuild |
-| Provisioning errors | Check Xcode account | May need manual Xcode intervention |
-
-## 🤖 Complete Automation Script
-
-Use this script for reliable, automated builds.
-
-**Example:** See [complete-automation-script.sh](development-commands/complete-automation-script.sh)
-
-## 📊 Build Flag Reference
-
-Understanding what each flag does:
-
-| Flag | Purpose | Impact |
-|------|---------|--------|
-| `ONLY_ACTIVE_ARCH=YES` | Build only for current architecture | 50% faster builds |
-| `DEBUG_INFORMATION_FORMAT=dwarf` | Use DWARF debug symbols | Smaller build size |
-| `COMPILER_INDEX_STORE_ENABLE=NO` | Skip code indexing | Faster builds |
-| `-allowProvisioningUpdates` | Auto-update certificates | Prevents signing failures |
-| `-disableAutomaticPackageResolution` | Skip package updates | Faster, more stable |
+```swift
+// ✅ CORRECT - Direct view model updates
+@MainActor
+private func onCurrentTimeStamp(params: Any, original: WKScriptMessage) -> Encodable? {
+    guard let dict = params as? [String: Any],
+          let timeString = dict["timestamp"] as? String,
+          let timeInterval = Double(timeString) else {
+        return [:] as [String: String]
+    }
+    
+    // Update view model directly
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
