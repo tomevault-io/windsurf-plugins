@@ -1,111 +1,125 @@
 ---
 trigger: always_on
-description: - **FastAPI Application** (`main.py`): Entry point for HTTP requests
+description: The Connect widget is an embeddable component that allows end users to manage their source connections within third-party applications. It runs inside an iframe and communicates with parent applications via `postMessage`.
 ---
 
-# Airweave Backend Architecture
+# Airweave Connect Widget Architecture
 
-## Core Layers
+## What is Connect?
 
-### API Layer
-- **FastAPI Application** (`main.py`): Entry point for HTTP requests
-- **API Routes** (`endpoints/`): RESTful endpoints organized by resource
-- **Dependencies** (`api/deps.py`): Authentication and request validation
+The Connect widget is an embeddable component that allows end users to manage their source connections within third-party applications. It runs inside an iframe and communicates with parent applications via `postMessage`.
 
-### Service Layer
-- **Sync Service**: Orchestrates data synchronization between sources and destinations
-- **DAG Service**: Manages directed acyclic graphs for data transformations
-- **OAuth2 Service**: Handles authentication for integrations
-- **Identity Provider** (protocol): Abstracts user authentication, roles, and organization memberships (Auth0, Null, Fake adapters)
-- **Payment Gateway** (protocol): Abstracts subscription management and billing operations (Stripe adapter)
-- **Resend Service**: Manages transactional email delivery and templates
-- **PostHog Service**: Manages product analytics and user event tracking
+## Tech Stack & Core Technologies
+- **React 19** with TypeScript for type-safe component development
+- **Vite** for fast development builds and HMR
+- **TailwindCSS v4** for styling with CSS-first configuration
+- **Base UI** (`@base-ui/react`) for accessible, unstyled primitives
+- **Lucide** icons for consistent iconography
+- **TanStack Router** for file-based routing with type safety
+- **TanStack Query** for server state and data fetching
+- **marked** for Markdown rendering in form field descriptions (with XSS-safe link renderer)
+- **No authentication** - relies on session tokens passed from parent
 
-### Data Access Layer
-- **CRUD Modules** (`crud/`): Database operations for each entity
-- **Unit of Work**: Transaction management with atomic operations
-- **Database Session**: Async SQLAlchemy session management. This extra care must be applied with lazy objects and sessions.
+## Project Structure
+```
+connect/src/
+├── components/         # UI components
+│   ├── ActionErrorBanner.tsx  # Dismissible inline error banner for action failures
+│   ├── ConnectionItem.tsx     # Single connection display (supports reconnect loading state)
+│   ├── ConnectionsErrorView.tsx
+│   ├── DynamicFormField.tsx   # Dynamic form fields with markdown support
+│   ├── EmptyState.tsx         # Dual-layout empty state (rich hero when showConnect=true, simple manage view otherwise)
+│   ├── ErrorScreen.tsx        # Full-screen error display
+│   ├── FolderSelectionView.tsx # Folder picker wrapper (optional feature)
+│   ├── FolderTree.tsx         # Hierarchical folder checkbox tree
+│   ├── LoadingScreen.tsx      # Loading spinner (legacy, prefer contextual skeletons)
+│   ├── PoweredByAirweave.tsx  # Footer branding
+│   ├── SessionProvider.tsx    # Session context provider
+│   ├── Skeleton.tsx           # Contextual skeleton loaders (ConnectionItemSkeleton, SourceItemSkeleton, SourceConfigSkeleton)
+│   ├── SourceItem.tsx         # Single source in picker
+│   ├── SourcesList.tsx        # Source selection grid
+│   └── SuccessScreen.tsx      # Main connected state
+├── hooks/
+│   └── useParentMessaging.ts  # iframe ↔ parent communication
+├── lib/
+│   ├── api.ts                 # API client with session auth
+│   ├── connection-utils.ts    # Connection status helpers
+│   ├── env.ts                 # Environment configuration
+│   ├── icons.ts               # Icon registry and helpers
+│   ├── oauth.ts               # OAuth popup and message handling
+│   ├── theme-defaults.ts      # Default theme configuration
+│   ├── theme.tsx              # Theme context and CSS variables
+│   ├── types.ts               # TypeScript type definitions
+│   └── useOAuthFlow.ts        # OAuth flow state management hook
+├── routes/
+│   ├── __root.tsx             # Root layout
+│   ├── index.tsx              # Main entry route
+│   └── oauth-callback.tsx     # OAuth callback handler
+├── router.tsx                 # TanStack Router setup
+├── routeTree.gen.ts           # Auto-generated route tree
+└── styles.css                 # Global styles and Tailwind imports
+```
 
-### Domain Layer
-- **Models** (`models/`): Database models (SQLAlchemy ORM)
-- **Schemas** (`schemas/`): API data validation models (Pydantic)
+## Key Architectural Patterns
 
-Detail: `short_name` is a globally unique identifier used throughout the system, e.g. `slack`, `outlook` or `hubspot_crm`
+### 1. Session-Based Authentication
+Connect uses session tokens instead of user authentication:
+```typescript
+interface ConnectSessionContext {
+  sessionToken: string;
+  apiBaseUrl: string;
+}
+```
+Sessions are passed via URL parameters or parent messages.
 
-## Key Components
+### 2. Parent Communication (`useParentMessaging`)
+The widget runs in an iframe and communicates with the parent via `postMessage`.
 
-### Platform Components
-- **Sources** (`platform/sources/`): Connectors to external data sources (APIs, DBs)
-- **Destinations** (`platform/destinations/`): Vector database adapters
-- **Embedding Models** (`platform/embedding_models/`): Text vectorization services
-- **Transformers** (`platform/transformers/`): Data transformation processors
-- **Entities** (`platform/entities/`): Core search objects that flow through the system
+**SECURITY: Origin validation is enforced for postMessage:**
 
-### Sync Architecture
-If necessary (like editing ), refer [sync-architecture.mdc](mdc:.cursor/rules/sync-architecture.mdc).
+The Connect widget captures the parent origin from the first `TOKEN_RESPONSE` message and validates all subsequent messages against it:
 
-### Infrastructure
-- **Config** (`core/config.py`): Environment-based configuration
-- **Logging** (`core/logging.py`): Structured logging system
-- **Exceptions** (`core/exceptions.py`): Centralized error handling
-- **Migrations** (`alembic/`): Database schema versioning
+```typescript
+// In useParentMessaging.ts - parent origin is captured and stored
+const parentOriginRef = useRef<string | null>(null);
 
-## Data Flow
+const handleMessage = (event: MessageEvent) => {
+  // Capture origin from first TOKEN_RESPONSE
+  if (data.type === "TOKEN_RESPONSE" && !parentOriginRef.current) {
+    parentOriginRef.current = event.origin;
+  }
 
-1. **Request Processing**: API request → Authentication → Schema Validation → Handler (often CRUD, otherwise service)
-2. **Sync Flow**: Source → Transformation (DAG) → Embedding → Destination
-3. **Database Operations**: CRUD with Unit of Work pattern for transactions
+  // Validate all messages once origin is established
+  if (parentOriginRef.current && event.origin !== parentOriginRef.current) {
+    return; // Ignore messages from unexpected origins
+  }
+  // Process message...
+};
 
+// SENDING: Uses captured origin (falls back to "*" only for initial CONNECT_READY)
+const sendToParent = (message) => {
+  const targetOrigin = parentOriginRef.current || "*";
+  window.parent.postMessage(message, targetOrigin);
+};
+```
 
-## Rules
+**Available message types:**
+```typescript
+// Notify parent of connection changes
+notifyConnectionCreated(connectionId: string);
+notifyStatusChange(status: SessionStatus);
+requestClose(reason: "success" | "cancel" | "error");
+```
 
-### Style & Structure
-- Python 3.11+, FastAPI, SQLAlchemy async ORM
-- Black (100 char), isort, Ruff with Google docstrings including arg and return type annotation
-- Models → `models/`, Pydantic schemas → `schemas/`
-- Domain modules → `domains/` (protocols, service, repository, operations, fakes, subscribers)
-- Platform connectors → `platform/` modules by function (sources, destinations, transformers, entities)
-- Sync handlers → `platform/sync/`
+### 3. OAuth Flow Security
+OAuth uses same-origin popups with validated messaging and claim-token verification:
+```typescript
+// oauth-callback.tsx posts to same origin
+window.opener.postMessage({ type: "OAUTH_COMPLETE", ...result }, window.location.origin);
 
-### Code Principles
-- Descriptive names over comments
-- Async for all I/O operations
-- Typed parameters and returns
-- Keep functions under 50 lines
-
-### Architecture
-- SQLAlchemy models with UUID primary keys
-- FastAPI dependency injection for services
-- Error responses via custom exceptions
-- Background processing with Redis workers (upcoming)
-
-### API Convention
-- RESTful endpoints in `endpoints/` -> the version is not part of the endpoint. It's just host.com/{endpoint}!
-- Consistent response structures
-- One router per resource type
-- Logger injected via `ctx` dependency for contextual logging
-
-
-### Logging convention
-- Stick to log level standards
-- Always try to use logger from ctx (in case of API) or sync_context (if during sync)
-
-### PostHog Analytics Integration
-- **Module Path**: `airweave.analytics.service` for core analytics and user behavior tracking
-- **Environment Variables**: `POSTHOG_API_KEY`, `POSTHOG_HOST`, `ANALYTICS_ENABLED`, `ENVIRONMENT` in `core/config.py`
-- **Event Tagging**: All events automatically include an `environment` property from `ENVIRONMENT` variable for filtering by deployment environment
-- **Usage Patterns**:
-  - **API Endpoints**: Import `analytics` directly and use `analytics.track_event()` for custom tracking
-  - **Search Operations**: Automatically tracked via `SearchService.search()` - no manual tracking required
-  - **Business Events**: Use `business_events.track_*()` methods for high-level metrics
-- **Direct Import Pattern**: Use `from airweave.analytics.service import analytics` instead of `ApiContext` for direct access
-- **Error Handling**: Analytics errors are logged but never crash the application
-- **Property Guidelines**: Use `.value` for enums, avoid mutating caller's properties dict
-- **Timing**: Use `time.monotonic()` for duration measurements, not `time.time()`
-- **Session Replay Integration**:
-  - **Header Flow**: Frontend sends PostHog session ID via `X-Airweave-Session-ID` header
-  - **Header Extraction**: `deps._extract_headers_from_request()` extracts session ID into `RequestHeaders.session_id`
-  - **PostHog Property**: `ContextualAnalyticsService` automatically adds `$session_id` property to all events
+// oauth.ts validates origin when receiving
+const handler = (event: MessageEvent) => {
+  if (event.origin !== window.location.origin) return;
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
