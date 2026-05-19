@@ -1,114 +1,98 @@
 ---
 trigger: always_on
-description: The sync module orchestrates data flow from sources to destinations using a highly concurrent, pull-based asynchronous architecture with sophisticated backpressure control, real-time progress tracking, and automatic OAuth token management.
+description: Token provider exception design and how it feeds into the source connection domain
 ---
 
-# Airweave Sync Architecture - Deep Dive
 
-## Overview
+# Token Provider Exceptions → Source Connection Actionability
 
-The sync module orchestrates data flow from sources to destinations using a highly concurrent, pull-based asynchronous architecture with sophisticated backpressure control, real-time progress tracking, and automatic OAuth token management.
+## Three exception layers
 
-## Core Architecture Principles
-
-### 1. Pull-Based Concurrency Model
-- **Worker Pool Pattern**: Uses `AsyncWorkerPool` with semaphore-controlled concurrency (default: 20 workers)
-- **Pull vs Push**: Workers pull entities from the stream only when ready, preventing system overload
-- **Backpressure**: `AsyncSourceStream` uses bounded queues (default: 10000) to naturally throttle producers
-
-### 2. Separation of Concerns
-- **Producer/Consumer Decoupling**: Source generation runs independently from entity processing
-- **Modular Pipeline**: Each stage (enrich, transform, vectorize, persist) is isolated
-- **Resource Isolation**: Database sessions created only when needed to minimize connection usage
-
-## Component Deep Dive
-
-### SyncFactory
-**Purpose**: Factory that builds SyncContext (data), SyncRuntime (services), and wires them into the orchestrator
-
-**Key Responsibilities**:
-- Builds SyncContext (frozen data) via SyncContextBuilder
-- Builds source + cursor directly via `_build_source()` (uses SourceLifecycleService)
-- Builds destinations via DestinationsContextBuilder
-- Builds entity tracker via `_build_entity_tracker()` (inlined, no separate builder)
-- Assembles SyncRuntime from per-sync state
-- Configures contextual logging with sync metadata
-- Wires pipelines, handlers, worker pool, and stream
-
-**DI Model**: Instance-based with constructor-injected deps. Stateless app-scoped services (event_bus, usage_checker, processor, arf_service) are held by the factory and injected directly into consumers (SyncOrchestrator, EntityPipeline), not stored in SyncRuntime.
-
-### SyncContext (frozen data)
-**Purpose**: Immutable data describing a sync run. Inherits from `BaseContext` (sibling to `ApiContext`).
-
-**Fields** (flat, no sub-contexts):
-- `sync_id`, `sync_job_id`, `collection_id`, `source_connection_id`: Scope IDs
-- `sync`, `sync_job`, `collection`, `connection`: Schema objects
-- `execution_config`, `force_full_sync`, `batch_size`, `max_batch_latency_ms`: Config
-- `entity_map`: Maps entity types to UUIDs
-- `source_short_name`: Derived from source at build time
-- From `BaseContext`: `organization`, `user`, `logger`
-
-Can be passed directly as `ctx` to CRUD operations (it IS a `BaseContext`).
-
-### SyncRuntime (live services)
-**Purpose**: Holds per-sync mutable state for a sync run. Separate from SyncContext.
-
-**Fields**:
-- `source`: Source instance with OAuth token management
-- `cursor`: Mutable sync cursor for incremental syncs
-- `destinations`: List of destination instances
-- `entity_tracker`: Centralized entity state tracker
-
-Stateless singletons (event_bus, usage_checker, embedders) are NOT stored here — they are DI'd directly into their consumers via constructor injection.
-
-Built by the factory, held by the orchestrator, injected into pipeline/handler constructors.
-
-### Builders
-- **SyncContextBuilder** (`builders/sync.py`): Builds data-only SyncContext
-- **SyncFactory._build_source()**: Builds source + cursor directly (uses SourceLifecycleService), returns `SourceBuildResult`
-- **DestinationsContextBuilder** (`builders/destinations.py`): Builds destination instances
-- **SyncFactory._build_entity_tracker()**: Builds EntityTracker with initial counts (inlined into factory)
-
-The factory calls build helpers in sequence, then assembles SyncRuntime.
-
-### SyncOrchestrator
-**Purpose**: Coordinates the entire sync workflow with error handling and progress tracking
-
-**Workflow Stages**:
-1. **Start**: Updates job status to IN_PROGRESS
-2. **Process**: Manages entity streaming and concurrent processing
-3. **Complete/Fail**: Updates final status with statistics
-
-**Key Methods**:
-- `run()`: Main entry point with try/catch for proper cleanup
-- `_process_entities()`: Implements pull-based processing loop
-- `_handle_completed_tasks()`: Cleans completed tasks and checks for errors
-- `_wait_for_remaining_tasks()`: Ensures all tasks complete before finishing
-
-**Constructor-Injected Services**: Receives `event_bus`, `usage_checker`, `usage_ledger`, and `sync_cursor_service` directly via constructor — not through SyncRuntime.
-
-**Concurrency Management**:
-```python
-# Workers pull entities only when ready
-async for entity in stream.get_entities():
-    if entity.airweave_system_metadata.should_skip:
-        # Skip without using a worker
-        await sync_context.entity_tracker.record_skipped(1)
-        continue
-
-    # Submit to worker pool (blocks if all workers busy)
-    task = await worker_pool.submit(...)
+```
+OAuth2 token endpoint / Auth provider API
+        ↓ raises typed domain exceptions
+OAuthRefreshServerError, OAuthRefreshTokenRevokedError, ...     (domains/oauth/exceptions.py)
+AuthProviderAccountNotFoundError, AuthProviderAuthError, ...    (platform/auth_providers/exceptions.py)
+        ↓ token providers catch + translate
+TokenCredentialsInvalidError, TokenProviderAccountGoneError, ... (domains/sources/token_providers/exceptions.py)
+        ↓ each carries:
+        .provider_kind  ("oauth" | "auth_provider" | "static")
+        .source_short_name
+        .__cause__  (original exception)
 ```
 
-### AsyncSourceStream
-**Purpose**: Manages async streaming with backpressure between producer and consumer
+## Token provider exception hierarchy
 
-**Architecture**:
-- **Producer Task**: Runs independently, filling queue from source generator
-- **Bounded Queue**: Implements backpressure (blocks producer when full)
-- **Consumer Interface**: `get_entities()` yields items as they become available
+```
+TokenProviderError (SourceError)
+├── TokenExpiredError                    — token is known-dead, cannot be refreshed (fast abort)
+├── TokenCredentialsInvalidError         — token/refresh_token expired or revoked
+├── TokenProviderAccountGoneError        — external record deleted (Composio/Pipedream)
+│     .account_id
+├── TokenProviderConfigError             — fundamental misconfiguration
+├── TokenProviderMissingCredsError       — response missing required fields
+│     .missing_fields
+├── TokenProviderRateLimitError          — upstream rate-limiting
+│     .retry_after
+├── TokenProviderServerError             — 5xx / timeout / connection error from credential source
+│     .status_code
+└── TokenRefreshNotSupportedError        — static token / no refresh_token
+```
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+`TokenExpiredError` is raised by `get_token()` when the provider knows the token is dead and refresh is impossible (e.g. the refresh_token itself is revoked). Callers should treat it as a permanent failure and surface `NEEDS_REAUTH` immediately without retrying.
+
+## How the SC domain makes this actionable
+
+### Connection status expansion
+
+```python
+class SourceConnectionStatus(str, Enum):
+    ACTIVE = "active"
+    PENDING_AUTH = "pending_auth"
+    SYNCING = "syncing"
+    PENDING_SYNC = "pending_sync"
+    NEEDS_REAUTH = "needs_reauth"   # ← credentials expired/revoked, user must re-authenticate
+    ERROR = "error"                 # ← config/permanent errors
+    INACTIVE = "inactive"
+```
+
+### Error reason on the connection model
+
+```python
+error_code: Optional[str]     # machine-readable enum value
+error_message: Optional[str]  # human-readable, shown to user
+```
+
+### Error code enum
+
+```python
+class ConnectionErrorCode(str, Enum):
+    CREDENTIALS_EXPIRED = "credentials_expired"
+    ACCOUNT_DELETED = "account_deleted"
+    CONFIG_ERROR = "config_error"
+    MISSING_CREDENTIALS = "missing_credentials"
+    SERVER_ERROR = "server_error"
+    RATE_LIMITED = "rate_limited"
+```
+
+### Exception → (status, code, message) mapping
+
+| Exception | Status | Error code | User-facing message pattern |
+|---|---|---|---|
+| `TokenCredentialsInvalidError` (oauth) | `NEEDS_REAUTH` | `credentials_expired` | "Your {source} token expired. Re-authenticate to continue syncing." |
+| `TokenCredentialsInvalidError` (auth_provider) | `NEEDS_REAUTH` | `credentials_expired` | "Your {provider} connection to {source} expired. Re-connect in {provider}." |
+| `TokenProviderAccountGoneError` | `NEEDS_REAUTH` | `account_deleted` | "Your {provider} account for {source} was deleted. Re-create the connection." |
+| `TokenProviderConfigError` | `ERROR` | `config_error` | "Connection misconfigured. Contact support." |
+| `TokenProviderMissingCredsError` | `ERROR` | `missing_credentials` | "Incomplete credentials from {provider}. Re-authenticate." |
+| `TokenProviderRateLimitError` | *(no change)* | — | Silent retry. Connection stays in current state. |
+| `TokenProviderServerError` | *(no change)* | — | Silent retry. Becomes `ERROR` after N consecutive failures. |
+
+### Key rules
+
+- **Rate limit and server error don't change connection status.** They're operational. Only persistent failures touch the connection state.
+- **`NEEDS_REAUTH` is not `ERROR`.** It's recoverable with a clear user action. The frontend shows a re-auth button, not a scary error banner.
+- **`provider_kind` differentiates the user message**, not the status. OAuth expired = "re-authenticate with us". Auth provider expired = "re-link in Composio/Pipedream."
+- **`error_code` is stored as varchar** but typed as a Python Enum. Flexible in storage, strict in code.
 
 ---
 > Source: [airweave-ai/airweave](https://github.com/airweave-ai/airweave) — distributed by [TomeVault](https://tomevault.io).
