@@ -5,11 +5,11 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [Saik0s/mcp-browser-use](https://github.com/Saik0s/mcp-browser-use).
+Original source: `CLAUDE.md` in [Saik0s/mcp-browser-use](https://github.com/Saik0s/mcp-browser-use).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
