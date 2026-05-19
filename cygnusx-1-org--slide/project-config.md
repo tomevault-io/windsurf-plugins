@@ -1,10 +1,10 @@
 ---
 trigger: always_on
-description: Include new strings
+description: Trailing whitespace cleanup
 ---
 
 
-Be sure to include new strings for strings.xml in the changes.
+Clean up trailing whitespace for all lines
 
 ---
 > Source: [cygnusx-1-org/Slide](https://github.com/cygnusx-1-org/Slide) — distributed by [TomeVault](https://tomevault.io).
