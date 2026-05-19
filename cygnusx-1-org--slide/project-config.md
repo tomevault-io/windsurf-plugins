@@ -1,10 +1,10 @@
 ---
 trigger: always_on
-description: No Glide code
+description: No Kotlin code
 ---
 
 
-Do not try to introduce Glide as a library.
+Do not try to introduce Kotlin code.
 
 ---
 > Source: [cygnusx-1-org/Slide](https://github.com/cygnusx-1-org/Slide) — distributed by [TomeVault](https://tomevault.io).
