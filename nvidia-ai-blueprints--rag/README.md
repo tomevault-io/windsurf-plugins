@@ -7,11 +7,11 @@ This NVIDIA RAG blueprint serves as a reference solution for a foundational Retr
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [NVIDIA-AI-Blueprints/rag](https://github.com/NVIDIA-AI-Blueprints/rag).
+Original source: `CLAUDE.md` in [NVIDIA-AI-Blueprints/rag](https://github.com/NVIDIA-AI-Blueprints/rag).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
