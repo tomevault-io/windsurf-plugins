@@ -1,148 +1,156 @@
 ---
 trigger: always_on
-description: This is the **master guide** for building a complete, production-ready source connector for Airweave. It combines source implementation with comprehensive E2E testing using the Monke framework.
+description: Comprehensive guide for understanding and working with the CRUD layer in Airweave backend
 ---
 
-# Building and Testing a Source Connector: End-to-End Guide
+# Airweave CRUD Layer Architecture
 
 ## Overview
 
-This is the **master guide** for building a complete, production-ready source connector for Airweave. It combines source implementation with comprehensive E2E testing using the Monke framework.
+The CRUD layer provides a consistent interface for database operations across all models in Airweave. It implements a sophisticated inheritance hierarchy that enforces proper access control, transaction management, and audit tracking.
 
-**Use this guide with your AI coding assistant** to build connectors systematically.
+## Inheritance Hierarchy
 
----
+### Base Classes
 
-## Prerequisites
+#### 1. CRUDBaseOrganization (_base_organization.py)
+- **Purpose**: For resources scoped to organizations (most common pattern)
+- **Key Features**:
+  - Enforces organization-level access control via `BaseContext`
+  - Tracks user modifications with `created_by_email` and `modified_by_email`
+  - Validates organization access on every operation
+  - Supports both user and API key authentication contexts
+  - Logger access via `ctx.logger` for contextual logging
 
-**Note:** The human has already completed these setup steps:
-- ✅ OAuth credentials configured in `backend/airweave/platform/auth/yaml/dev.integrations.yaml`
-- ✅ Monke authentication configured in `monke/configs/{short_name}.yaml` (Composio or direct)
-- ✅ API documentation loaded into context
+#### 2. CRUDBaseUser (_base_user.py)
+- **Purpose**: For pure user-level data (e.g., user profiles)
+- **Key Features**:
+  - Enforces strict user-level access (can only access own data)
+  - No organization scoping
+  - Simpler permission model - user can only CRUD their own resources
 
-Your task is to write the code. The human will handle testing and running commands.
+#### 3. CRUDPublic (_base_public.py)
+- **Purpose**: For system-wide public resources (e.g., sources, destinations, embedding models)
+- **Key Features**:
+  - No access control - publicly accessible
+  - Often used for system configuration data
+  - Supports filtering by organization for multi-tenant scenarios
+  - Includes `sync()` method for bulk updates
 
----
+## Core Concepts
 
-## Important Guidelines
-
-These are the most common mistakes when building connectors:
-
-### 1. Make Entities Information-Rich (Embeddable Fields)
-
-**Rule:** Mark ~70% of entity fields as `embeddable=True`
-
-**Why:** Without `embeddable=True`, fields are only keyword-searchable, not semantically searchable. Users won't be able to find relevant data.
-
-**What to mark embeddable:**
-- ✅ All text content (descriptions, notes, comments, body)
-- ✅ All names and titles
-- ✅ All people (assignees, authors, owners, members)
-- ✅ All status/metadata (status, priority, tags, labels)
-- ✅ All timestamps (created_at, modified_at, due_dates)
-
-**What NOT to mark embeddable:**
-- ❌ Internal IDs (entity_id, external_id, database IDs)
-- ❌ Binary metadata (sizes, checksums, mime_types)
-
-**Bad Example:**
+### BaseContext
+The `BaseContext` (from `core.context`) is the universal context type for the CRUD layer. `ApiContext` and `SyncContext` both inherit from it:
 ```python
-# Avoid: Sparse entity - users can't search by anything except name
-class TaskEntity(ChunkEntity):
-    name: str = AirweaveField(..., embeddable=True)
-    description: str = Field(...)  # Should be embeddable
-    assignee: Dict = Field(...)     # Should be embeddable
+@dataclass
+class BaseContext:
+    organization: schemas.Organization  # Always present
+    user: Optional[schemas.User] = None # Present for user auth, None for API keys/system
+    logger: ContextualLogger            # Auto-derived from org/user if not provided
 ```
 
-**Good Example:**
+**Key Properties**:
+- `has_user_context`: True if user is present (Auth0 or system with user)
+- `tracking_email`: Returns user email for audit tracking
+- `user_id`: Returns user UUID if available
+- `has_feature(flag)`: Check organization feature flags
+- `logger`: Contextual logger (auto-derived from identity, overridable)
+
+`ApiContext(BaseContext)` adds HTTP-specific fields (`request_id`, `auth_method`, `analytics`).
+`SyncContext(BaseContext)` adds sync-specific data (`sync_id`, `sync_job`, `collection`, etc.).
+
+### Unit of Work Pattern
+The `UnitOfWork` class manages database transactions:
 ```python
-# Better: Information-rich - users can search everything
-class TaskEntity(ChunkEntity):
-    name: str = AirweaveField(..., embeddable=True)
-    description: str = AirweaveField(..., embeddable=True)
-    assignee: Dict = AirweaveField(..., embeddable=True)
-    status: str = AirweaveField(..., embeddable=True)
-    external_id: str = Field(...)  # ID correctly not embeddable
+# Without UoW - auto-commits
+await crud.create(db, obj_in=data, ctx=ctx)
+
+# With UoW - manual transaction control
+async with UnitOfWork(db) as uow:
+    obj1 = await crud.create(db, obj_in=data1, ctx=ctx, uow=uow)
+    obj2 = await crud.create(db, obj_in=data2, ctx=ctx, uow=uow)
+    # Commits on context exit, rolls back on exception
 ```
 
-### 2. Test Entity Types Your Source Actually Implements
+## Common Patterns
 
-**Rule:** Your Monke tests should create and verify the entity types that your source actually yields
+### 1. Standard CRUD Operations
+All base classes provide:
+- `get(db, id, ctx)` - Get single resource
+- `get_multi(db, ctx, skip, limit)` - Get multiple resources
+- `create(db, obj_in, ctx, uow)` - Create resource
+- `update(db, db_obj, obj_in, ctx, uow)` - Update resource
+- `remove(db, id, ctx, uow)` - Delete resource
 
-**Why:** Untested entity types may break in production without detection.
-
-**Important:** Only test entities that your source implementation yields. You don't need to test every theoretically possible entity type from the API—just the ones your connector actually implements.
-
-**How to verify:**
-1. Open your source: `backend/airweave/platform/sources/{short_name}.py`
-2. Find all `yield` statements in `generate_entities()`
-3. List the entity types your source ACTUALLY yields (e.g., Task, Comment, File)
-4. Your `bongos/{short_name}.py::create_entities()` should create at least one of each yielded type
-5. Your `create_entities()` should return descriptors for all yielded types
-
-**Example:** If your SharePoint source only yields `ListItem`, `Page`, and `DriveItem` entities (not `User`, `Group`, `Site`), then your Monke bongo only needs to create those three types—not the entire SharePoint API surface.
-
-**Bad Example:**
+### 2. Access Control Validation
+Organization-scoped resources validate access via:
 ```python
-# Avoid: Only creates tasks, ignores comments and files
-async def create_entities(self):
-    for i in range(self.entity_count):
-        task = await self._create_task(...)
-        all_entities.append(task)
-    # Source yields comments and files, but we don't test them
-    return all_entities
+async def _validate_organization_access(ctx, organization_id):
+    if ctx.has_user_context:
+        # Check user has access to organization
+    else:
+        # Check API key belongs to organization
 ```
 
-**Good Example:**
+### 3. User Tracking
+For organization-scoped resources with `track_user=True`:
+- `created_by_email` and `modified_by_email` are automatically set
+- API key operations set these to `None` (no user context)
+- User operations set these to the authenticated user's email
+
+### 4. Custom Methods
+CRUD classes often extend base functionality:
 ```python
-# Better: Creates all entity types from source
-async def create_entities(self):
-    for i in range(self.entity_count):
-        # Create parent
-        task = await self._create_task(...)
-        all_entities.append(task)
+class CRUDSync(CRUDBaseOrganization):
+    async def enrich_sync_with_connections(db, sync):
+        # Custom method to load related data
 
-        # Create comments (source yields them)
-        for j in range(2):
-            comment = await self._create_comment(task["id"], ...)
-            all_entities.append(comment)
-
-        # Create file (source yields them)
-        file = await self._upload_file(task["id"], ...)
-        all_entities.append(file)
-
-    return all_entities  # Returns tasks, comments, AND files
+    async def get(db, id, ctx, with_connections=True):
+        # Override to add optional data loading
 ```
 
----
+## Implementation Examples
 
----
+### Simple Public Resource
+```python
+class CRUDEmbeddingModel(CRUDPublic[EmbeddingModel, EmbeddingModelCreate, EmbeddingModelUpdate]):
+    pass
 
-## Phase 1: Research & Planning
+embedding_model = CRUDEmbeddingModel(EmbeddingModel)
+```
 
-### Step 1: Understand the API
+### Organization-Scoped Resource
+```python
+class CRUDCollection(CRUDBaseOrganization[Collection, CollectionCreate, CollectionUpdate]):
+    # Inherits all standard CRUD with org-level access control
+    pass
 
-**Questions to answer:**
+collection = CRUDCollection(Collection)
+```
 
-1. What is the **entity hierarchy**?
-   - Example: Asana has `Workspace → Project → Section → Task → Comment/File`
-   - Example: GitHub has `Repository → Issue → Comment`  and `Repository → Folder1 → Folder2 → codefile.go`
+### Complex Resource with Custom Logic
+```python
+class CRUDAPIKey(CRUDBaseOrganization[APIKey, APIKeyCreate, APIKeyUpdate]):
+    async def create(self, db, *, obj_in, ctx, uow=None):
+        # Generate secure key
+        key = secrets.token_urlsafe(32)
+        encrypted_key = credentials.encrypt({"key": key})
 
-2. What **entities should be searchable**?
-   - Primary entities (tasks, documents, tickets)
-   - Secondary entities (comments, messages, threads)
-   - Attachments (files, images, PDFs)
+        # Use parent create with custom data
+        return await super().create(
+            db=db,
+            obj_in={"encrypted_key": encrypted_key, ...},
+            ctx=ctx,
+            uow=uow
+        )
+```
 
-3. What **authentication** does it use?
-   - OAuth2 with refresh tokens?
-   - OAuth2 without refresh tokens?
-   - API key / Personal Access Token?
-
-4. Does it support **incremental sync**?
-   - Can you filter by `modified_since` or `updated_at`?
-   - Does each entity have `created_at` and `modified_at` timestamps?
-
-5. Does it support **deletion detection**?
+### Special Cases
+```python
+class CRUDOrganization:
+    # Doesn't inherit from base - organizations ARE the scope
+    # Implements custom validation logic
+    # Handles user-organization relationships
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
