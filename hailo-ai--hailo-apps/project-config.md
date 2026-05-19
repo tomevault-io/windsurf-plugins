@@ -1,25 +1,46 @@
 ---
 trigger: always_on
-description: Build a complete Vision-Language Model application that uses the Hailo-10H VLM for image understanding.
+description: Build voice apps for **all Hailo accelerators**: Whisper STT on Hailo-8/8L/10H + optional Piper TTS on CPU.
 ---
 
 
-# Skill: Build VLM Application
+# Skill: Build Voice Application
 
-Build a complete Vision-Language Model application that uses the Hailo-10H VLM for image understanding.
+Build voice apps for **all Hailo accelerators**: Whisper STT on Hailo-8/8L/10H + optional Piper TTS on CPU.
 
 ## When This Skill Is Loaded
 
-- User wants to build an app that **looks at camera images and answers questions**
-- User needs **visual scene understanding** (describe, count, detect, analyze)
-- User wants a variant of the VLM Chat app with different behavior
-- User mentions: VLM, vision, image understanding, camera monitoring, scene analysis
+- User wants **speech input** or **speech output** in a Hailo app
+- User mentions: voice, speech, Whisper, TTS, microphone, STT, speak, listen
+- User wants to add voice to an existing LLM or VLM app
+- User wants speech recognition on Hailo-8 or Hailo-8L
 
-## Reference Implementation
+## Hardware Compatibility
 
-Study `hailo_apps/python/gen_ai_apps/vlm_chat/` — the canonical VLM app:
-- `vlm_chat.py` — State machine app with camera loop
-- `backend.py` — Multiprocessing VLM inference backend (REUSE this, don't copy)
+| Feature | Hailo-8/8L | Hailo-10H |
+|---|---|---|
+| STT (Whisper) | ✓ via `InferModel` (encoder+decoder HEFs) | ✓ via `Speech2Text` (genai API) |
+| LLM on device | ✘ | ✓ via `hailo_platform.genai.LLM` |
+| VLM on device | ✘ | ✓ via `Backend` (VLM chat) |
+| TTS (Piper) | ✓ CPU | ✓ CPU |
+| Full voice assistant | STT + CPU LLM + TTS | STT + on-device LLM + TTS |
+
+## Reference Implementations
+
+Study these:
+- `hailo_apps/python/gen_ai_apps/voice_assistant/` — Full voice + LLM assistant (Hailo-10H)
+- `hailo_apps/python/gen_ai_apps/simple_whisper_chat/` — Simple STT example (Hailo-10H)
+- `hailo_apps/python/standalone_apps/speech_recognition/` — STT for **all Hailo devices** (8/8L/10H) using InferModel API:
+  - `speech_recognition.py` — Main app: mic recording, audio preprocessing, transcription loop
+  - `whisper_pipeline.py` — `WhisperPipeline` class: encoder+decoder inference via `InferModel`
+  - `audio_utils.py` — Audio recording, mel spectrogram, file I/O
+  - `postprocessing.py` — Repetition penalty and token decoding
+- `hailo_apps/python/gen_ai_apps/gen_ai_utils/voice_processing/` — Voice utilities (Hailo-10H):
+  - `speech_to_text.py` — `SpeechToTextProcessor` (Whisper via genai API)
+  - `text_to_speech.py` — `TextToSpeechProcessor` (Piper on CPU)
+  - `audio_recorder.py` — `AudioRecorder` (microphone capture)
+  - `vad.py` — Voice Activity Detection
+  - `interaction.py` — `VoiceInteractionManager` (high-level orchestrator)
 
 ## Build Process
 
@@ -29,153 +50,98 @@ Create the app directory:
 
 ```
 hailo_apps/python/<type>/<app_name>/
-├── app.yaml              # App manifest (required)
-├── run.sh                # Launch wrapper (sets PYTHONPATH)
-├── __init__.py           # Empty
-├── <app_name>.py         # Main app class + entry point
-├── event_tracker.py      # Optional: event classification (for monitoring apps)
+├── app.yaml              # App manifest (type: gen_ai)
+├── run.sh                # Launch wrapper
+├── __init__.py
+├── <app_name>.py         # Main app
 └── README.md             # Usage documentation (REQUIRED — never skip)
 ```
 
-**app.yaml** — required manifest:
-```yaml
-name: <app_name>
-title: My VLM App
-description: One-line description
-author: AI Agent (auto-generated)
-date: "YYYY-MM-DD"
-type: gen_ai
-hailo_arch: hailo10h
-model: Qwen2-VL-2B-Instruct
-tags: [vlm, monitoring]
-status: draft
-```
+Create `app.yaml` with `type: gen_ai` and `run.sh` wrapper.
+Do NOT register in `defines.py` or `resources_config.yaml`.
 
-**run.sh** — launch wrapper:
-```bash
-#!/bin/bash
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
-PYTHONPATH="$REPO_ROOT" python3 "$SCRIPT_DIR/<app_name>.py" "$@"
-```
+### Step 2: Build Main App (Hailo-10H: Voice + LLM)
 
-**NOTE**: Do NOT register in `defines.py` or `resources_config.yaml`.
-Community apps are run via `run.sh`. Registration happens during promotion
-
-### Step 2: Build the App
-
-The main app file follows this structure:
 ```python
-import os
-import sys
-import cv2
 import signal
-import time
-from typing import Optional
+import threading
+from contextlib import redirect_stderr
+from io import StringIO
 
-os.environ["QT_QPA_PLATFORM"] = 'xcb'
+from hailo_platform import VDevice
+from hailo_platform.genai import LLM
 
-from hailo_apps.python.gen_ai_apps.vlm_chat.backend import Backend
-from hailo_apps.python.core.common.core import (
-    get_standalone_parser, resolve_hef_path, handle_list_models_flag
-)
-from hailo_apps.python.core.common.defines import (
-    HAILO10H_ARCH, USB_CAMERA
-)
-from hailo_apps.python.core.common.camera_utils import get_usb_video_devices
 from hailo_apps.python.core.common.hailo_logger import get_logger
+from hailo_apps.python.core.common.core import resolve_hef_path
+from hailo_apps.python.core.common.parser import get_standalone_parser
+from hailo_apps.python.core.common.defines import (
+    SHARED_VDEVICE_GROUP_ID,
+    HAILO10H_ARCH,
+)
 
 logger = get_logger(__name__)
 
-APP_NAME = "my_vlm_app"
+from hailo_apps.python.gen_ai_apps.gen_ai_utils.voice_processing.speech_to_text import SpeechToTextProcessor
+from hailo_apps.python.gen_ai_apps.gen_ai_utils.voice_processing.text_to_speech import TextToSpeechProcessor
+from hailo_apps.python.gen_ai_apps.gen_ai_utils.voice_processing.interaction import VoiceInteractionManager
+from hailo_apps.python.gen_ai_apps.gen_ai_utils.voice_processing.vad import add_vad_args
 
-SYSTEM_PROMPT = "Your system prompt here..."
-MONITOR_PROMPT = "Your per-frame VLM question here..."
+APP_NAME = "my_voice_app"
 
-class MyVLMApp:
-    def __init__(self, camera, camera_type, args):
-        self.camera = camera
-        self.camera_type = camera_type
-        self.running = True
-        self.backend = None
-        signal.signal(signal.SIGINT, self.signal_handler)
-        # Initialize Backend, EventTracker, etc.
+logger = get_logger(__name__)
 
-    def signal_handler(self, sig, frame):
-        self.running = False
+APP_NAME = MY_VOICE_APP
+SYSTEM_PROMPT = "You are a helpful voice assistant. Keep responses concise and natural."
 
-    def run(self):
-        # Main loop: capture frame, display, analyze periodically
-        pass
-
-    def cleanup(self):
-        if self.backend:
-            self.backend.close()
-        cv2.destroyAllWindows()
 
 def main():
     parser = get_standalone_parser()
-    # IMPORTANT: Add ALL custom args BEFORE handle_list_models_flag
-    # so they appear in --help output
-    parser.add_argument("--interval", type=int, default=15, help="Seconds between analyses")
-    handle_list_models_flag(parser, APP_NAME)
+    parser.add_argument("--no-tts", action="store_true", help="Disable TTS (text only)")
+    parser.add_argument("--system-prompt", type=str, default=SYSTEM_PROMPT)
+    add_vad_args(parser)
     args = parser.parse_args()
-    hef_path = resolve_hef_path(args.hef_path, app_name=APP_NAME, arch=HAILO10H_ARCH)
-    # Camera setup, app.run()
 
-if __name__ == "__main__":
-    main()
-```
+    abort_event = threading.Event()
+    signal.signal(signal.SIGINT, lambda s, f: abort_event.set())
 
-### Step 4: Validate
+    # VDevice
+    params = VDevice.create_params()
+    params.group_id = SHARED_VDEVICE_GROUP_ID
+    vdevice = VDevice(params)
 
-Run the automated validation script (includes static checks + runtime smoke tests):
-```bash
-python3 .hailo/scripts/validate_app.py hailo_apps/python/gen_ai_apps/<app_name> --smoke-test
-```
+    # STT (Whisper on Hailo)
+    whisper_hef = resolve_hef_path(None, "whisper", arch=HAILO10H_ARCH)
+    with redirect_stderr(StringIO()):  # Suppress ALSA noise
+        stt = SpeechToTextProcessor(vdevice, str(whisper_hef))
 
-### Step 5: Write README
+    # LLM (on Hailo)
+    llm_hef = resolve_hef_path(args.hef_path, APP_NAME, arch=HAILO10H_ARCH)
+    llm = LLM(vdevice, str(llm_hef))
 
-Include: description, requirements, usage CLI, architecture, customization notes.
+    # TTS (Piper on CPU)
+    tts = None if args.no_tts else TextToSpeechProcessor()
 
-## Key Customization Points
+    # Voice interaction manager
+    vim = VoiceInteractionManager(stt, tts, abort_event)
 
-| What to Change | Where |
-|---|---|
-| System prompt | `SYSTEM_PROMPT` constant |
-| Per-frame VLM question | `MONITOR_PROMPT` constant |
-| Image preprocessing | `Backend.convert_resize_image()` |
-| Inference parameters | `MAX_TOKENS`, `TEMPERATURE` |
-| Event classification | `EventTracker.classify_response()` |
-| Display overlay | OpenCV `cv2.putText()` in main loop |
+    logger.info("Voice assistant ready. Speak into your microphone.")
+    print("Voice assistant ready. Press Ctrl+C to quit.\n")
 
-## Display & Output Best Practices
+    try:
+        while not abort_event.is_set():
+            # Listen for speech
+            user_text = vim.listen()
+            if not user_text or abort_event.is_set():
+                continue
 
-### Window Size
-The VLM crops images to 336×336 but this is too small for a display window.
-Always resize to at least 640×640 for readability:
-```python
-DISPLAY_SIZE = (640, 640)
-display = cv2.resize(frame, DISPLAY_SIZE, interpolation=cv2.INTER_LINEAR)
-```
+            logger.info("User said: %s", user_text)
+            print(f"You: {user_text}")
 
-### Text Wrapping
-VLM responses can be long (100+ chars). Always wrap overlay text to fit the window:
-```python
-@staticmethod
-def _wrap_text(text: str, max_chars: int = 70) -> list[str]:
-    words = text.split()
-    lines, current = [], ""
-    for word in words:
-        if current and len(current) + 1 + len(word) > max_chars:
-            lines.append(current)
-            current = word
-        else:
-            current = f"{current} {word}".strip() if current else word
-    if current:
-        lines.append(current)
-    return lines or [""]
-```
+            # Generate response
+            prompt = [
+                {"role": "system", "content": [{"type": "text", "text": args.system_prompt}]},
+                {"role": "user", "content": [{"type": "text", "text": user_text}]},
+            ]
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
