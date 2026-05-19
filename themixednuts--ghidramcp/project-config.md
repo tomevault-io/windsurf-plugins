@@ -1,213 +1,63 @@
 ---
 trigger: always_on
-description: Commit Guidelines
+description: Provides details like program name, path, architecture, and image base.
 ---
 
+# Creating New Ghidra MCP Tools - Templates & Guidelines
 
-# Commit Guidelines
+This guide provides templates and key patterns for creating new Ghidra MCP tools, implementing [`IGhidraMcpSpecification`](mdc:src/main/java/com/themixednuts/tools/IGhidraMcpSpecification.java).
 
-This document outlines best practices for creating clean, logical commits and
-managing the commit workflow.
+**Core Steps:**
 
-## 1. Commit Quality Principles
+1.  **Implement & Annotate:**
+    *   Implement [`IGhidraMcpSpecification`](mdc:src/main/java/com/themixednuts/tools/IGhidraMcpSpecification.java).
+    *   Add [`@GhidraMcpTool`](mdc:src/main/java/com/themixednuts/annotation/GhidraMcpTool.java) annotation:
+        *   `name`: User-facing name in Ghidra Tool Options (e.g., "List Functions").
+        *   `description`: Hover description in Ghidra Tool Options.
+        *   `category`: Category in Ghidra Tool Options (e.g., [`ToolCategory.FUNCTIONS`](mdc:src/main/java/com/themixednuts/tools/ToolCategory.java)). **Use an existing category or `ToolCategory.UNCATEGORIZED`. Do NOT add new categories to the `ToolCategory` enum.**
+        *   `mcpName`: Name for the MCP tool specification (e.g., "list_functions").
+        *   `mcpDescription`: Detailed description for the MCP tool specification, guiding its usage by AI agents. See "Writing Effective `mcpDescription`" section below for detailed guidance. Use Java's multi-line string literals (`\"\"\"...\"\"\"`) for readability.
+2.  **Register Service:** Add the fully qualified class name to `src/main/resources/META-INF/services/com.themixednuts.tools.IGhidraMcpSpecification`. **This step is mandatory for the tool to be loaded and must be performed automatically when creating a new tool class.**
+3.  **Naming Convention:** Follow standard CRUD naming conventions for both the Java class (`Ghidra<Action><Noun>Tool`) and the `mcpName` (`<action>_<noun>`) where possible:
+    *   **Create:** Use `Create` for adding new items (e.g., `GhidraCreateBookmarkTool`, `create_bookmark`). Avoid synonyms like `Add`.
+    *   **Read:** Use `Get` for single items (e.g., `GhidraGetFunctionByNameTool`), `List` for multiple items (e.g., `GhidraListFunctionsTool`), or `Search` for querying (e.g., `GhidraSearchMemoryTool`).
+    *   **Update:** Use `Update` for modifying existing items (e.g., `GhidraUpdateStructMemberTool`). Avoid synonyms like `Edit`, `Set`, or `Change`.
+    *   **Delete:** Use `Delete` for removing items (e.g., `GhidraDeleteFunctionTool`). Avoid synonyms like `Remove` or `Clear`.
+4.  **Data Models (POJOs):** When a tool needs to return complex data structures (e.g., a list of functions with their details), prefer using or creating Plain Old Java Objects (POJOs) within the [`src/main/java/com/themixednuts/models`](mdc:src/main/java/com/themixednuts/models) directory.
+    *   **Reuse:** Check if an existing model (like [`FunctionInfo`](mdc:src/main/java/com/themixednuts/models/FunctionInfo.java), [`SymbolInfo`](mdc:src/main/java/com/themixednuts/models/SymbolInfo.java), `DataInfo`, etc.) already suits the needs.
+    *   **Create:** If no suitable model exists, create a new, clearly named POJO in the `models` directory to represent the data being returned. This ensures consistent and well-defined output structures for the client.
+    *   Keep POJOs simple, primarily containing fields and a constructor or mapping method to populate them from Ghidra objects.
+    *   **Exception:** For grouped operations, use the nested POJOs `IGroupedTool.OperationResult` and `IGroupedTool.GroupedOperationResult` instead of creating separate files.
+5.  **`specification` Method:**
+    *   **DO NOT override the `specification` method in individual tool classes.**
+    *   The default implementation in `IGhidraMcpSpecification` handles retrieving the `@GhidraMcpTool` annotation, generating the schema string from `schema()`, and constructing the final `AsyncToolSpecification`.
+    *   This default implementation correctly wraps the `Mono<Object>` from `execute` using `.flatMap(this::createSuccessResult).onErrorResume(this::createErrorResult)` to produce the required `Mono<CallToolResult>`.
+5.  **Test Verification:** After implementing one or more tools, run `mvn test` from the project root directory. This verifies that the new tool(s) compile correctly and are properly registered in the service file (via `ServiceRegistrationTest.java`). It's often efficient to create a batch of related tools before running the tests.
+6.  **Code Cleanup:** Ensure code is well-formatted and remove any unused imports before finalizing the tool.
 
-- **Atomic Commits:** Each commit should represent a single logical change or
-  feature.
-- **Clear Messages:** Use conventional commit format: `type: description`
-  - Types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `ci`, `build`
-  - Description should be concise but descriptive
-- **Logical Grouping:** Group related changes together. Separate unrelated
-  changes into different commits.
-- **No Broken States:** Never commit code that breaks the build or tests.
+---
 
-## 2. Pre-Commit Validation
+## Structured Error Handling Guidelines
 
-Before committing, ensure:
+**CRITICAL:** Always use structured error handling with [`GhidraMcpError.java`](mdc:src/main/java/com/themixednuts/models/GhidraMcpError.java) and [`GhidraMcpException`](mdc:src/main/java/com/themixednuts/exceptions/GhidraMcpException.java) instead of simple `IllegalArgumentException` or other basic exceptions. This provides clients with actionable error information and maintains consistency across all tools.
 
-- **Build Success:** Run `mvn clean package` to verify the project compiles and
-  builds successfully.
-- **Tests Pass:** Run `mvn test` to ensure all tests pass.
-- **No Lint Errors:** Check for any linter errors or warnings that should be
-  addressed.
-- **Logical Completeness:** Ensure all related changes for a feature/fix are
-  included together.
-- **No Debug Code:** Remove any debug statements, commented-out code, or
-  temporary files.
+### Required Imports for Error Handling
 
-## 3. Commit Workflow
-
-### Step 1: Stage Changes
-
-```bash
-git add <files>
-# Or use git add -p for interactive staging to review changes
+```java
+import com.themixednuts.exceptions.GhidraMcpException;
+import com.themixednuts.models.GhidraMcpError;
+import com.themixednuts.utils.GhidraMcpErrorUtils;
+import java.util.List;
+import java.util.Map;
 ```
 
-### Step 2: Review Staged Changes
+### Constants Usage - NO MAGIC STRINGS
 
-```bash
-git diff --cached
-# Review what will be committed to ensure it's logical and complete
-```
+**ALWAYS use constants and annotation values instead of string literals:**
 
-### Step 3: Commit
+```java
 
-```bash
-git commit -m "type: clear and descriptive message"
-```
-
-### Step 4: Validate Commit
-
-After committing, validate:
-
-```bash
-# Check the commit looks correct
-git log -1 --stat
-
-# Verify build still works
-mvn clean package
-
-# Verify tests still pass
-mvn test
-```
-
-### Step 5: Amend if Needed
-
-If you discover issues or want to add related changes:
-
-```bash
-# Make additional changes
-git add <files>
-git commit --amend --no-edit  # Keep same message
-# OR
-git commit --amend -m "type: updated message"  # Update message
-```
-
-**When to Amend:**
-
-- Adding forgotten files that are part of the same logical change
-- Fixing typos or small issues in the same commit
-- Improving commit message clarity
-- Adding related changes that should be grouped together
-
-**When NOT to Amend:**
-
-- After pushing to a shared branch (unless you're the only one using it)
-- If the commit is already part of a PR or review
-- If it would rewrite history that others have based work on
-
-### Step 6: Final Validation Before Push
-
-Before pushing, ensure:
-
-- All commits are logical and complete
-- Build succeeds: `mvn clean package`
-- Tests pass: `mvn test`
-- No obvious issues or incomplete work
-- Commit messages are clear and follow conventions
-
-### Step 7: Push
-
-```bash
-git push origin <branch>
-```
-
-## 4. Amending Before Push
-
-**Always amend commits before pushing if:**
-
-- You're still on a local branch (not yet pushed)
-- You discover related changes that belong in the same commit
-- The commit message needs improvement
-- You want to add files that were part of the same logical change
-
-**Amend workflow:**
-
-```bash
-# Make additional changes
-git add <files>
-
-# Amend the last commit (keeps it as one logical unit)
-git commit --amend --no-edit  # If message is fine
-# OR
-git commit --amend -m "type: improved message"  # If updating message
-
-# Validate again
-mvn clean package
-mvn test
-
-# Then push
-git push origin <branch>
-```
-
-## 5. Commit Message Format
-
-Use conventional commit format:
-
-```
-<type>: <description>
-
-[optional body]
-
-[optional footer]
-```
-
-**Types:**
-
-- `feat`: New feature
-- `fix`: Bug fix
-- `docs`: Documentation changes
-- `refactor`: Code refactoring
-- `test`: Adding or updating tests
-- `chore`: Maintenance tasks (version bumps, dependency updates)
-- `ci`: CI/CD changes
-- `build`: Build system changes
-
-**Examples:**
-
-```
-feat: add pagination to FindReferencesTool
-fix: correct error handling in DecompileCodeTool
-docs: update README with latest features
-refactor: migrate tools to use new schema builders
-test: add comprehensive tests for JSON Schema builders
-chore: bump version to v0.5.0
-ci: update workflow to use mvn clean package
-```
-
-## 6. Multiple Related Commits
-
-If you have multiple related commits that should be grouped:
-
-1. Make all commits locally
-2. Review the commit sequence: `git log --oneline`
-3. Use interactive rebase to squash or reorder if needed: `git rebase -i HEAD~N`
-4. Validate the final result
-5. Push once everything is validated
-
-## 7. Checklist Before Pushing
-
-- [ ] All changes are staged and committed
-- [ ] Commit messages follow conventions
-- [ ] Build succeeds (`mvn clean package`)
-- [ ] Tests pass (`mvn test`)
-- [ ] No obvious issues or incomplete work
-- [ ] Related changes are grouped logically
-- [ ] No debug code or temporary files
-- [ ] Ready for review/deployment
-
-## 8. Best Practices
-
-- **Commit Often:** Make small, logical commits rather than large monolithic
-  ones.
-- **Review Before Committing:** Use `git diff` to review changes before staging.
-- **Amend Freely Before Push:** Don't hesitate to amend commits that haven't
-  been pushed yet.
-- **Validate Before Push:** Always run build and tests before pushing.
-- **Keep History Clean:** Use interactive rebase to clean up commit history
-  before pushing.
-- **One Logical Change Per Commit:** If a commit does multiple unrelated things,
-  split it.
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [themixednuts/GhidraMCP](https://github.com/themixednuts/GhidraMCP) — distributed by [TomeVault](https://tomevault.io).
