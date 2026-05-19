@@ -1,84 +1,144 @@
 ---
 trigger: always_on
-description: Python coding conventions for the Dingo SDK
+description: Dingo is a comprehensive AI data quality evaluation tool for ML practitioners, data engineers, and AI researchers. It systematically assesses training data, fine-tuning datasets, and production AI systems using rule-based, LLM-based, and agent-based evaluation methods.
 ---
 
+# Dingo — Agent Instructions
 
-# Python Conventions
+## Project Overview
 
-## Code Style
+Dingo is a comprehensive AI data quality evaluation tool for ML practitioners, data engineers, and AI researchers. It systematically assesses training data, fine-tuning datasets, and production AI systems using rule-based, LLM-based, and agent-based evaluation methods.
 
-- Follow PEP 8 (enforced by pre-commit hooks)
-- Use type hints for function signatures
-- Use `@classmethod` for evaluator `eval()` methods
-- Prefer `getattr(obj, 'field', default)` over direct attribute access for optional Data fields
+**Repository**: https://github.com/MigoXLab/dingo
+**PyPI**: `pip install dingo-python`
+**License**: Apache 2.0
 
-## Import Rules
+## Tech Stack
 
-- **Core deps** (numpy, pydantic, requests, etc.): top-level imports OK
-- **Optional deps** (pyarrow, transformers, boto3, sqlalchemy, cv2, fasttext, etc.): **must** use lazy imports inside methods with clear `ImportError` messages:
+| Layer | Technology |
+|-------|------------|
+| Language | Python 3.10+ |
+| Data Models | Pydantic (BaseModel, extra="allow") |
+| LLM Integration | OpenAI SDK (supports any compatible API) |
+| MCP Server | FastMCP + SSE transport |
+| Distributed | PySpark (optional) |
 
-```python
-# Correct — lazy import with helpful error
-def load_data(self):
-    try:
-        import pyarrow.parquet as pq
-    except ImportError:
-        raise ImportError("pyarrow is required for Parquet support. Install: pip install dingo-python[parquet]")
+## Directory Structure
 
-# Wrong — top-level import of optional dep
-import pyarrow.parquet as pq
+```
+dingo/
+├── AGENTS.md                ← this file (agent instructions)
+├── setup.py                 ← package config (extras_require for optional deps)
+├── mcp_server.py            ← MCP server entry point (legacy, use `dingo serve` instead)
+├── requirements/
+│   ├── runtime.txt          ← core dependencies (minimal)
+│   ├── datasource.txt       ← optional datasource deps (S3, SQL, Parquet, etc.)
+│   ├── optional.txt         ← heavy optional deps (torch, pyspark, etc.)
+│   └── agent.txt            ← agent evaluation deps (langchain, tavily)
+│
+├── SKILL.md                 ← AI agent skill definition (symlink → clawhub/SKILL.md)
+├── dingo/                   ← core Python package
+│   ├── config/
+│   │   └── input_args.py    ← InputArgs, EvalPiplineConfig, EvaluatorGroupConfig
+│   ├── io/
+│   │   ├── input/data.py    ← Data model (Pydantic, extra="allow")
+│   │   └── output/          ← ResultInfo, EvalDetail, SummaryModel (+ cross-layer analysis)
+│   ├── data/
+│   │   ├── datasource/      ← LocalDataSource, SQLDataSource, S3DataSource, HFDataSource
+│   │   ├── dataset/         ← Dataset implementations per source
+│   │   └── converter/       ← Format converters (JSON, JSONL, CSV, Parquet, etc.)
+│   ├── model/
+│   │   ├── model.py         ← Model registry (rule_register, llm_register)
+│   │   ├── rule/            ← Rule-based evaluators (80+ built-in)
+│   │   │   ├── base.py      ← BaseRule
+│   │   │   ├── rule_common.py ← Common rules (text quality, format, PII, etc.)
+│   │   │   └── utils/       ← Shared utilities (normalize, ngrams, etc.)
+│   │   └── llm/             ← LLM-based evaluators
+│   │       ├── base_openai.py ← BaseOpenAI (base class for all LLM evaluators)
+│   │       ├── text_quality/  ← Text quality evaluators (V4, V5)
+│   │       ├── rag/          ← RAG metrics (Faithfulness, Precision, Recall, etc.)
+│   │       ├── hhh/          ← 3H evaluators (Honest, Helpful, Harmless)
+│   │       ├── compare/      ← Document comparison evaluators
+│   │       └── agent/        ← Agent-based evaluators
+│   │           ├── base_agent.py  ← BaseAgent
+│   │           ├── tools/         ← Tool registry + implementations
+│   │           ├── agent_fact_check.py
+│   │           └── agent_hallucination.py
+│   ├── exec/
+│   │   ├── local.py         ← LocalExecutor (single machine, cross-layer conflict detection)
+│   │   └── spark.py         ← SparkExecutor (distributed)
+│   └── run/
+│       └── cli.py           ← CLI entry point (subcommands: eval, info)
+│
+├── examples/                ← Usage examples (SDK, CLI, various scenarios)
+├── test/                    ← Test suite
+│   ├── data/                ← Test data files
+│   ├── env/                 ← Test environment configs
+│   └── scripts/             ← Test scripts (pytest)
+└── docs/                    ← Documentation
 ```
 
-## Evaluator Patterns
+## Core Concepts
 
-### Rule Evaluator
+### Data Flow
+
+```
+Data Input → Interface (SDK/CLI/MCP) → Datasource → Dataset → Converter → Evaluator → Executor → Report
+```
+
+### Registration System
+
+All evaluators use decorator-based registration:
 
 ```python
-@Model.rule_register('QUALITY_BAD_CATEGORY', ['default', 'pretrain'])
-class RuleMyCheck(BaseRule):
-    _required_fields = [RequiredField.CONTENT]
-
+# Rule evaluator
+@Model.rule_register('QUALITY_BAD_COMPLETENESS', ['default', 'pretrain'])
+class MyRule(BaseRule):
     @classmethod
-    def eval(cls, input_data: Data) -> EvalDetail:
-        res = EvalDetail(metric=cls.__name__)
-        # evaluation logic
-        if problem_found:
-            res.status = True
-            res.label = [f"{cls.metric_type}.{cls.__name__}"]
-            res.reason = ["Description of the issue"]
-        else:
-            res.label = [QualityLabel.QUALITY_GOOD]
-        return res
+    def eval(cls, input_data: Data) -> EvalDetail: ...
+
+# LLM evaluator
+@Model.llm_register('MyLLMEvaluator')
+class MyLLMEvaluator(BaseOpenAI):
+    prompt = "..."
+    @classmethod
+    def build_messages(cls, input_data: Data) -> List: ...
+
+# Agent evaluator
+@Model.llm_register('MyAgent')
+class MyAgent(BaseAgent):
+    available_tools = ["tavily_search"]
+    @classmethod
+    def eval(cls, input_data: Data) -> EvalDetail: ...
 ```
 
-### LLM Evaluator
+### Data Model
+
+`Data` uses `extra = "allow"` — any field can be set dynamically:
 
 ```python
-@Model.llm_register('LLMMyEvaluator')
-class LLMMyEvaluator(BaseOpenAI):
-    prompt = """Your evaluation prompt here..."""
-
-    @classmethod
-    def build_messages(cls, input_data: Data) -> List:
-        return [
-            {'role': 'system', 'content': cls.prompt},
-            {'role': 'user', 'content': input_data.content}
-        ]
+class Data(BaseModel):
+    class Config:
+        extra = "allow"
 ```
 
-## Error Handling
+Common fields: `data_id`, `prompt`, `content`, `image`, `context`, `raw_data`, `reference`, `user_input`, `response`, `retrieved_contexts`.
 
-- Evaluators should not raise exceptions for bad input data; return `EvalDetail` with appropriate error label instead
-- Use `log.warning()` / `log.error()` from `dingo.utils` for logging
-- External API calls: always handle timeouts and connection errors
+### InputArgs Configuration
 
-## Testing
+```python
+input_data = {
+    "input_path": "data.jsonl",
+    "dataset": {"source": "local", "format": "jsonl"},
+    "executor": {"max_workers": 4, "batch_size": 10, "result_save": {"bad": True, "good": True}},
+    "evaluator": [
+        {
+            "fields": {"content": "text_field", "prompt": "question_field"},
+            "evals": [
+                {"name": "RuleAbnormalChar"},
 
-- Test files: `test/scripts/` mirroring `dingo/` structure
-- Use pytest fixtures and parametrize for multiple test cases
-- Test data in `test/data/`
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/MigoXLab) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-09 -->
+> Source: [MigoXLab/dingo](https://github.com/MigoXLab/dingo) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-18 -->
