@@ -1,148 +1,111 @@
 ---
 trigger: always_on
-description: You are a cracked engineer who is practical and efficeint while moving at the highest velocity.
+description: when someone asks you to do a PR review of code, pull request review, review this, or check a PR
 ---
 
 
-# General Coding Preferences
+# PR Review Guidelines
 
-You are a cracked engineer who is practical and efficeint while moving at the highest velocity.
+Reviews should be kind, specific, and actionable. Always distinguish severity clearly.
 
-Follow the zen of python
+## Severity Labels
 
-Beautiful is better than ugly.
-Explicit is better than implicit.
-Simple is better than complex.
-Complex is better than complicated.
-Flat is better than nested.
-Sparse is better than dense.
-Readability counts.
-Special cases aren't special enough to break the rules.
-Although practicality beats purity.
-Errors should never pass silently.
-Unless explicitly silenced.
-In the face of ambiguity, refuse the temptation to guess.
-There should be one-- and preferably only one --obvious way to do it.
-Although that way may not be obvious at first unless you're Dutch.
-Now is better than never.
-Although never is often better than *right* now.
-If the implementation is hard to explain, it's a bad idea.
-If the implementation is easy to explain, it may be a good idea.
-Namespaces are one honking great idea -- let's do more of those!
+Prefix every comment with one of:
 
+- **[MUST]** — blocks merge. Correctness bugs, broken tests, API breakage, checkpoint incompatibility, silent behavior changes.
+- **[SHOULD]** — strong preference, easy to fix, reviewer will likely re-request. DRY violations, missing tests for non-trivial logic, unclear naming.
+- **[NIT]** — style/polish, take it or leave it. Don't block on nits.
+- **[QUESTION]** — genuine uncertainty, not a request to change. Ask before flagging as must/should.
 
-## Communication Style
-- Be terse and casual
-- Give actual code/explanations, not "Here's how you can..."
-- Treat user as expert
-- Flag speculation/prediction but don't avoid it
+Always give a concrete example of what you want to see, not just what's wrong.
 
-## Code Style
-- Simple, readable code that solves only the problem described
-- Strongly prefer to use standard library and existing packages as much as possible
-- Prefer `list`, `dict`, `tuple` over `typing.List`, `typing.Dict`, `typing.Tuple`
-- Respect existing formatting and style in the codebase
-- Keep edits brief—show just context lines around changes
-- Do not return None instead of raising an error
-- Write pythonic PEP 8 compliant code
+---
 
-## Setup
-```bash
-# Install uv if not already installed
-pip install uv
+## Code Quality Checklist
 
-# Install dependencies and create venv (recommended)
-uv sync --locked --extra all-no-flash
-source .venv/bin/activate
+### DRY & Modularity
+- If the same logic appears in 2+ places **in library code** (`olmoearth_pretrain/`), flag it.
+- Config dataclasses should compose, not duplicate fields.
+- **Scripts are an exception.** It is fine — and often preferable — to copy config values explicitly in experiment scripts rather than abstracting them. Scripts are meant to be read as self-contained experiment records. A reader should be able to understand an experiment fully without tracing imports across multiple files.
 
-# Install pre-commit hooks
-pre-commit install
+```python
+# fine in a script — explicit is better than a shared helper that hides what changed
+encoder_config = EncoderConfig(
+    embedding_size=768,
+    num_heads=12,
+    depth=12,
+    use_flash_attn=True,
+    use_linear_patch_embed=True,
+)
+
+# bad in library code (olmoearth_pretrain/) — same logic copy-pasted across Loss classes
 ```
 
-Alternative with pip:
-```bash
-python3 -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"
-pre-commit install
+- Flag shared abstractions between scripts that make individual scripts harder to read in isolation. The shared `script.py` builders are a floor, not a ceiling — scripts can and should repeat values when that makes the experiment clearer.
+
+### Explicit > Clever Python
+- Avoid implicit behavior that requires knowing internals to understand.
+- Prefer named args over positional for calls with 3+ args.
+- `if x is not None` over `if x` when `None` vs falsy matters.
+- No list comprehensions that span 3+ logical operations — break into a loop.
+
+```python
+# bad
+result = {k: v for d in [a, b] for k, v in d.items() if v and not k.startswith("_")}
+
+# good
+result = {}
+for d in [a, b]:
+    for k, v in d.items():
+        if v and not k.startswith("_"):
+            result[k] = v
 ```
 
-## Testing & Linting Workflow
-**Focus on functionality first, fix linting at the end.**
-
-1. **During development**: Write code that works, generally following existing style
-2. **Run relevant tests** as you iterate:
-   ```bash
-   # Single test file
-   pytest -vv tests/unit/nn/test_flexi_vit.py
-
-   # Single test function
-   pytest -vv tests/unit/nn/test_flexi_vit.py::test_encoder_forward
-
-   # All unit tests for a module
-   pytest -vv tests/unit/nn/
-
-   # Integration tests
-   pytest -vv tests/integration/
-   pytest -vv tests/integration/test_train_module.py
-   ```
-3. **Before finishing**: Run full test suite and linting
-   ```bash
-   pytest -vv                        # All tests
-   pre-commit run --all-files        # Linting/formatting
-   ```
-
-**Rules:**
-- Run both unit and integration tests for files you modify
-- NEVER comment out existing tests
-- NEVER mock core functionality just to make tests pass
-- NEVER write a separate "reference implementation" to test against. Test the real production classes directly against each other (e.g. compare the sequential loss class vs the parallelized loss class head-to-head, don't rewrite the logic in the test).
-- **Test file naming**: Tests should mirror the module path they test. For `olmoearth_pretrain/nn/foo.py`, the test file goes in `tests/unit/nn/test_foo.py` (not `tests/unit/test_foo.py`)
-
-## Git Workflow
-
-### Branch Naming
-```
-<username>/<descriptive-name>
-Example: henryh/per-modality-output-projection
-```
-
-### Commit Strategy
-1. Create the branch first: `git checkout -b username/experiment-name`
-2. Make incremental commits with descriptive messages
-3. Good commit message format:
-   ```
-   Add per-modality projection experiments
-
-   - Add EncoderWithPerModalityProjection: applies per-modality linear transforms
-   - Add PredictorWithPerModalityOutput: uses per-modality output heads
-   - Create 3 experiment scripts: encoder-only, decoder-only, and both
-   - Add unit tests validating per-modality transforms
-
-   All experiments maintain identical hyperparameters to base.py for comparison.
-   ```
-
-## Domain Context
-- This is a geospatial foundation model project (PyTorch)
-- Expert-level Python, PyTorch, and geospatial ML expected
-
-## Configuration & Experiment Architecture
-
-### Config Pattern
-All configurable components follow a `Config → build()` pattern:
-- Configs are `@dataclass` subclasses of `Config` (from `olmoearth_pretrain/config.py`)
-- `build()` validates then constructs the object
-- Use `as_dict(exclude_none=True, recurse=False)` to pass config fields as kwargs
-- **Always subclass, never modify base config classes**
-- **If a class has a corresponding `*Config` class, changing the class likely requires updating the config too** (and vice versa). They're tightly coupled — always check both.
+### Extensibility
+- New model variants → new `Config` subclass, never modify the base class.
+- New loss / masking strategies → register in the registry, don't branch on strings in forward().
+- Flag any `if experiment_name == "foo":` style branching — it should be a config field.
 
 ### Experiment Scripts
-Scripts live in `scripts/official/`. Each script injects builder functions into `main()`:
-- `build_model_config()` — architecture
-- `build_train_module_config()` — loss/optimizer
-- Common shared builders (dataloader, trainer, etc.) live in `scripts/official/script.py`
-- `scripts/official/base.py` is the canonical template to copy from
+- New experiments go in a **new script file** under `scripts/vnext/<folder>/` or `scripts/official/ablations/`.
+- **Never modify `scripts/official/base.py`** (or other canonical scripts) for an experiment — it's the reference baseline.
+- Scripts are allowed to be verbose and repetitive. A full copy of a builder with one value changed is fine — the goal is that the script reads as a complete, honest description of the experiment. Prefer clarity over cleverness.
+- The only thing that should be shared between scripts is code from `script.py` that represents the stable training infrastructure (dataset, dataloader, trainer callbacks). Model architecture and loss config should be written out explicitly.
 
-### Launch vs Train
+### Config Pattern
+- All configurable components follow `@dataclass Config` → `.build()`. Flag any component that takes raw kwargs instead.
+- `use_X: bool` flags should be in the `Config` dataclass, not in the `__init__` signature only.
+- New fields on existing `Config` classes need a safe default so old checkpoints still deserialize correctly. Flag any field without a default.
+
+---
+
+## Testing Checklist
+
+- Non-trivial logic (new loss, new masking strategy, new model component) needs a unit test.
+- Test files mirror module paths exactly: `olmoearth_pretrain/nn/foo.py` → `tests/unit/nn/test_foo.py`. The directory structure under `tests/unit/` matches the structure under `olmoearth_pretrain/` one-to-one. Never put a test for `nn/foo.py` at `tests/unit/test_foo.py` — it belongs in the `nn/` subdirectory.
+- Integration tests for anything touching checkpoint save/load or the train loop.
+- **Never comment out existing tests.** Flag this as [MUST].
+- If a test uses mocks to avoid running the actual logic, flag as [MUST] unless it's purely I/O.
+
+---
+
+## Documentation Checklist
+
+- Public functions/classes need docstrings with Args/Returns if non-obvious.
+- Docstrings should lead with **what** the function does, not **how**. Implementation details belong in inline comments, not the docstring.
+
+```python
+# bad — describes implementation, not behavior
+def unmask(self, x, indices, mask):
+    """Uses scatter ops and zero-padding to avoid boolean indexing."""
+
+# good — describes what the caller needs to know
+def unmask(self, x, indices, mask):
+    """Restore masked tokens to their original positions in the sequence."""
+```
+
+- If a new config field changes behavior, the docstring on the `Config` class should say so.
+- If the PR adds a new script, check for a README or inline docstring explaining launch usage.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
