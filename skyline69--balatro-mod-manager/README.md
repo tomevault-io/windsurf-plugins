@@ -7,11 +7,11 @@ Balatro Mod Manager by Skyline
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [skyline69/balatro-mod-manager](https://github.com/skyline69/balatro-mod-manager).
+Original source: `CLAUDE.md` in [skyline69/balatro-mod-manager](https://github.com/skyline69/balatro-mod-manager).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
