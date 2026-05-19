@@ -1,201 +1,200 @@
 ---
 trigger: always_on
-description: BrowserServicesKit is the core shared library providing essential browser functionality to both iOS and macOS DuckDuckGo applications. It ensures consistent behavior and code reuse across platforms while maintaining privacy as the primary focus.
+description: *This style guide is based on the [official iOS style guide](iOS/styleguide/STYLEGUIDE.md) and incorporates DuckDuckGo-specific patterns and requirements.*
 ---
 
 
-# BrowserServicesKit Integration Guide
+# Swift Code Style Guide
 
-## Overview
-BrowserServicesKit is the core shared library providing essential browser functionality to both iOS and macOS DuckDuckGo applications. It ensures consistent behavior and code reuse across platforms while maintaining privacy as the primary focus.
+*This style guide is based on the [official iOS style guide](iOS/styleguide/STYLEGUIDE.md) and incorporates DuckDuckGo-specific patterns and requirements.*
 
-## Core Modules and Usage
+## Correctness
 
-### Privacy & Protection
-Always use BrowserServicesKit for privacy-related functionality:
+**Strive to make your code compile without warnings.** This rule informs many style decisions such as using `#selector` types instead of string literals.
 
+## SwiftLint
+
+We use [SwiftLint](https://github.com/realm/SwiftLint) for enforcing Swift style and conventions. See the [SwiftLint configuration](.swiftlint.yml) for specific rules.
+
+**Key SwiftLint settings**:
+- Line length: 150 characters (not the default 100)
+- Force cast/try: warnings (not errors for pragmatic development)
+- Identifier naming: flexible for single-letter variables in closures
+
+## Naming Conventions
+
+Follow the [Swift API Design Guidelines](https://swift.org/documentation/api-design-guidelines/) with these key principles:
+
+### Core Principles
+- **Clarity at the call site** over brevity
+- **Use camelCase** (not snake_case)
+- **UpperCamelCase** for types and protocols
+- **lowerCamelCase** for everything else
+- **Include all needed words** while omitting needless words
+- **Use names based on roles**, not types
+
+### Type Names
 ```swift
-// ✅ CORRECT - Content blocking integration
-import BrowserServicesKit
-import ContentBlocking
+// ✅ CORRECT: Descriptive, UpperCamelCase
+class UserAuthenticationManager { }
+struct BookmarkItem { }
+enum NavigationState { }
+protocol DataSourceProtocol { }
 
-final class PrivacyManager {
-    private let contentBlockingManager = ContentBlockingManager.shared
-    
-    func enableContentBlocking(for webView: WKWebView) {
-        contentBlockingManager.enable(for: webView)
-    }
-    
-    func updateBlockingRules() async {
-        await contentBlockingManager.updateRules()
-    }
-}
-
-// ✅ CORRECT - Privacy configuration
-import PrivacyConfig
-
-final class PrivacyFeatureManager {
-    private let privacyConfig = PrivacyConfiguration.shared
-    
-    func isFeatureEnabled(_ feature: PrivacyFeature) -> Bool {
-        return privacyConfig.isEnabled(feature)
-    }
-}
+// ❌ INCORRECT: Too generic
+class Manager { }
+struct Data { }
 ```
 
-### Data Management
-Use BrowserServicesKit for all data persistence:
-
+### Variable and Function Names
 ```swift
-// ✅ CORRECT - Bookmarks management
-import Bookmarks
+// ✅ CORRECT: Descriptive lowerCamelCase
+let maximumRetryCount = 3
+var isLoading = false
+func fetchUserData() { }
 
-final class BookmarkService {
-    private let bookmarkManager = BookmarkManager.shared
-    
-    func saveBookmark(_ bookmark: Bookmark) async {
-        await bookmarkManager.save(bookmark)
-    }
-    
-    func fetchBookmarks() async -> [Bookmark] {
-        return await bookmarkManager.fetchAll()
-    }
-}
+// Boolean properties should read like assertions
+var isEnabled: Bool
+var hasCompleted: Bool
+var canDelete: Bool
 
-// ✅ CORRECT - Secure credential storage
-import SecureVault
-
-final class CredentialManager {
-    private let secureVault = SecureVault.shared
-    
-    func storeCredential(_ credential: WebsiteCredential) async throws {
-        try await secureVault.store(credential)
-    }
-    
-    func retrieveCredentials(for domain: String) async throws -> [WebsiteCredential] {
-        return try await secureVault.credentials(for: domain)
-    }
-}
+// ❌ INCORRECT: Abbreviations and unclear names
+let usrMgr = UserManager()
+func calcTotal() { }
 ```
 
-### Navigation and URL Handling
-Use BrowserServicesKit for navigation logic:
-
+### Protocol Naming
 ```swift
-// ✅ CORRECT - Navigation handling
-import Navigation
+// ✅ CORRECT: Capability protocols end in -able, -ible, -ing
+protocol Loadable { }
+protocol Refreshable { }
+protocol UserAuthenticating { }
 
-final class NavigationManager {
-    private let navigationController = NavigationController()
-    
-    func navigate(to url: URL) {
-        let request = NavigationRequest(url: url)
-        navigationController.navigate(request)
-    }
-    
-    func canGoBack() -> Bool {
-        return navigationController.canGoBack
-    }
-}
+// ✅ CORRECT: Type protocols are nouns
+protocol DataSource { }
+protocol Delegate { }
 ```
 
-### User Scripts and Content Injection
-Use BrowserServicesKit for JavaScript injection:
-
+### Method Naming Patterns
 ```swift
-// ✅ CORRECT - User script management
-import UserScript
+// ✅ CORRECT: Method naming patterns
+// Factory methods begin with "make"
+func makeLocationManager() -> CLLocationManager
 
-final class ContentScriptManager {
-    private let userScriptManager = UserScriptManager()
-    
-    func injectPrivacyScripts(into webView: WKWebView) {
-        let scripts = userScriptManager.privacyScripts
-        scripts.forEach { script in
-            webView.configuration.userContentController.addUserScript(script)
-        }
-    }
-}
+// Verb methods follow -ed, -ing rule for non-mutating
+func sorted() -> [Element]  // non-mutating
+func sort()                 // mutating
+
+// Boolean methods read like assertions
+func canDelete() -> Bool
+func hasCompleted() -> Bool
 ```
 
-## Platform-Specific Integration
+### Delegate Methods
+When creating custom delegate methods, the **unnamed first parameter should be the delegate source**:
 
-### iOS Integration Pattern
 ```swift
-// ✅ CORRECT - iOS-specific BrowserServicesKit usage
-import BrowserServicesKit
+// ✅ CORRECT: Delegate pattern
+func namePickerView(_ namePickerView: NamePickerView, didSelectName name: String)
+func namePickerViewShouldReload(_ namePickerView: NamePickerView) -> Bool
+
+// ❌ INCORRECT: Missing source parameter
+func didSelectName(namePicker: NamePickerViewController, name: String)
+func namePickerShouldReload() -> Bool
+```
+
+### Use Type Inferred Context
+Use compiler inferred context to write shorter, clear code:
+
+```swift
+// ✅ CORRECT: Type inferred context
+let selector = #selector(viewDidLoad)
+view.backgroundColor = .red
+let toView = context.view(forKey: .to)
+let view = UIView(frame: .zero)
+
+// ❌ INCORRECT: Redundant type information
+let selector = #selector(ViewController.viewDidLoad)
+view.backgroundColor = UIColor.red
+let toView = context.view(forKey: UITransitionContextViewKey.to)
+let view = UIView(frame: CGRect.zero)
+```
+
+### Generics
+Generic type parameters should be **descriptive, UpperCamelCase names**:
+
+```swift
+// ✅ CORRECT: Descriptive generic names
+struct Stack<Element> { ... }
+func write<Target: OutputStream>(to target: inout Target)
+func swap<T>(_ a: inout T, _ b: inout T)  // T is acceptable when no meaningful relationship
+
+// ❌ INCORRECT: Non-descriptive or wrong case
+struct Stack<T> { ... }
+func write<target: OutputStream>(to target: inout target)
+```
+
+### Language
+Use **US English spelling** to match Apple's API:
+
+```swift
+// ✅ CORRECT: US English
+let color = "red"
+
+// ❌ INCORRECT: British English
+let colour = "red"
+```
+
+## Code Organization
+
+### File Structure
+```swift
+// 1. Import statements (minimal - only what's needed)
 import UIKit
+import Combine
 
-final class iOSBrowserViewController: UIViewController {
-    private let contentBlockingManager = ContentBlockingManager.shared
-    private let privacyDashboard = PrivacyDashboard()
+// 2. Protocol definitions
+protocol FeatureDelegate: AnyObject {
+    func featureDidUpdate()
+}
+
+// 3. Main type declaration
+class FeatureViewController: UIViewController {
+    // Properties first
+    private let viewModel: FeatureViewModel
     
+    // Lifecycle methods
     override func viewDidLoad() {
         super.viewDidLoad()
-        setupBrowserServices()
+        setupUI()
     }
     
-    private func setupBrowserServices() {
-        // Configure content blocking for iOS
-        contentBlockingManager.configure(for: .iOS)
-        
-        // Setup privacy dashboard
-        privacyDashboard.delegate = self
-    }
+    // Private methods
+    private func setupUI() { }
+}
+
+// 4. Extensions for protocol conformance
+// MARK: - UITableViewDataSource
+extension FeatureViewController: UITableViewDataSource {
+    // Protocol methods
 }
 ```
 
-### macOS Integration Pattern
+### Protocol Conformance
+**Prefer separate extensions** for protocol conformance to keep related methods grouped:
+
 ```swift
-// ✅ CORRECT - macOS-specific BrowserServicesKit usage
-import BrowserServicesKit
-import AppKit
-
-final class macOSBrowserViewController: NSViewController {
-    private let contentBlockingManager = ContentBlockingManager.shared
-    private let downloadManager = DownloadManager.shared
-    
-    override func viewDidLoad() {
-        super.viewDidLoad()
-        setupBrowserServices()
-    }
-    
-    private func setupBrowserServices() {
-        // Configure content blocking for macOS
-        contentBlockingManager.configure(for: .macOS)
-        
-        // Setup download handling
-        downloadManager.delegate = self
-    }
+// ✅ CORRECT: Separate extensions
+class MyViewController: UIViewController {
+    // class implementation
 }
-```
 
-## Feature-Specific Integration
-
-### Autofill Integration
-```swift
-// ✅ CORRECT - Autofill implementation
-import Autofill
-import BrowserServicesKit
-
-final class AutofillCoordinator {
-    private let autofillManager = AutofillManager.shared
-    
-    func setupAutofill(for webView: WKWebView) {
-        // Configure autofill user scripts
-        let autofillScripts = autofillManager.userScripts
-        autofillScripts.forEach { script in
-            webView.configuration.userContentController.addUserScript(script)
-        }
-        
-        // Setup message handlers
-        autofillManager.setupMessageHandlers(for: webView)
-    }
-    
-    func handleAutofillRequest(_ request: AutofillRequest) async {
-        await autofillManager.handleRequest(request)
-    }
+// MARK: - UITableViewDataSource
+extension MyViewController: UITableViewDataSource {
+    // table view data source methods
 }
+
+// MARK: - UIScrollViewDelegate
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
