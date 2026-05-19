@@ -1,184 +1,180 @@
 ---
 trigger: always_on
-description: DuckPlayer uses two primary UserScript components to bridge native iOS functionality with web content:
+description: DuckPlayer provides video playback within the app, separate from the web view-based player. The architecture separates concerns into distinct components using a presenter pattern, native UI views, and JavaScript integration for seamless video playback experiences.
 ---
 
 
-# DuckPlayer UserScript Integration Guide
+# DuckPlayer Implementation Guide
 
 ## Overview
 
-DuckPlayer uses two primary UserScript components to bridge native iOS functionality with web content:
-- `DuckPlayerUserScriptYouTube`: Manages communication with YouTube.com pages
-- `DuckPlayerUserScriptPlayer`: Handles communication within the DuckPlayer web view
+DuckPlayer provides video playback within the app, separate from the web view-based player. The architecture separates concerns into distinct components using a presenter pattern, native UI views, and JavaScript integration for seamless video playback experiences.
 
-## Architecture Overview
+## Architecture Components
 
-### UserScript Communication Flow
+### Core Architecture Pattern
+
+DuckPlayer follows a presenter-driven architecture with clear separation of concerns:
 
 ```swift
-// Communication flow:
-// Web Content -> UserScript -> Native Handler -> ViewModel/Presenter
-// Native UI -> Publisher -> UserScript -> Web Content
-
-// ✅ CORRECT - Bidirectional communication pattern
-final class DuckPlayerUserScriptYouTube: NSObject, Subfeature {
-    // Incoming: Web -> Native
-    func handler(forMethodNamed methodName: String) -> Subfeature.Handler? {
-        switch methodName {
-        case "onCurrentTimeStamp": return onCurrentTimeStamp
-        case "onYoutubeError": return onYoutubeError
-        default: return nil
-        }
-    }
+// ✅ CORRECT - Presenter coordinates between components
+final class DuckPlayerNativeUIPresenter {
+    private let navigationHandler: NativeDuckPlayerNavigationHandler
+    private let state: DuckPlayerState
+    private let pixelFiring: DuckPlayerPixelFiring
     
-    // Outgoing: Native -> Web
-    private func pushToWebView(method: String, params: [String: String]) {
-        broker?.push(method: method, params: params, for: self, into: webView)
+    func presentPlayer(for videoID: String) {
+        // Coordinates pill presentation, player setup, and analytics
+        updateState(videoID: videoID)
+        configurePillType()
+        firePixels()
     }
+}
+
+// ❌ INCORRECT - Don't manage all responsibilities in one view
+struct DuckPlayerView: View {
+    @State private var videoID: String = ""
+    @State private var isPresented = false
+    // Don't handle navigation, state, and analytics directly in views
 }
 ```
 
-## DuckPlayerUserScriptYouTube Integration
+### State Management Pattern
 
-### Component Responsibilities
+Use `DuckPlayerState` for centralized video state management:
 
-**Primary Role**: Bridge between YouTube.com pages and native DuckPlayer controls
+```swift
+// ✅ CORRECT - Centralized state management
+final class DuckPlayerState {
+    var videoID: String?
+    var hasBeenShown: Bool = false
+    var timestamp: TimeInterval?
+    
+    func reset() {
+        videoID = nil
+        hasBeenShown = false
+        timestamp = nil
+    }
+}
+
+// ❌ INCORRECT - Scattered state across components
+struct DuckPlayerView: View {
+    @State private var videoID: String = ""
+    @State private var timestamp: TimeInterval = 0
+    // Don't duplicate state management
+}
+```
+
+## Component Responsibilities
+
+### DuckPlayerNativeUIPresenter
+
+**Role**: Primary coordinator and state manager for the Native UI
 
 **Key Responsibilities**:
-- Manages media control events (play/pause)
-- Handles audio muting state
-- Tracks video timestamp updates
-- Responds to URL changes
-- Manages script readiness state with event queuing
-- Provides initial setup configuration
-
-### Event Queuing System
-
-The UserScript implements an event queuing system to handle events before scripts are ready:
+- Manages presentation lifecycle of player UI components
+- Coordinates between pill types (welcome, entry, re-entry)
+- Handles user interactions and navigation events
+- Manages constraint updates and visibility state
+- Integrates with app navigation and browser features
+- Handles orientation changes and UI adaptations
+- Manages pixel firing for analytics tracking
+- Controls toast notifications and dismiss count tracking
 
 ```swift
-// ✅ CORRECT - Event queuing implementation
-private enum QueuedEvent {
-    case mediaControl(pause: Bool)
-    case muteAudio(mute: Bool)
-    case urlChanged(pageType: String)
-}
-
-private var otherEventsQueue: [QueuedEvent] = []
-private var areScriptsReady = false
-
-private func handleEvent(_ event: QueuedEvent) {
-    switch event {
-    case .urlChanged:
-        // URL changes are always processed immediately
-        processEvent(event)
-    default:
-        if areScriptsReady {
-            processEvent(event)
-        } else {
-            // Queue events until scripts are ready
-            otherEventsQueue.append(event)
-        }
+// ✅ CORRECT - Presenter pattern implementation
+final class DuckPlayerNativeUIPresenter {
+    private weak var containerView: DuckPlayerContainer?
+    private let navigationHandler: NativeDuckPlayerNavigationHandler
+    private let state: DuckPlayerState
+    private let pixelFiring: DuckPlayerPixelFiring
+    
+    func presentWelcomePill() {
+        // Configure welcome pill for first-time users
+        configureContainerForPill(.welcome)
+        fireWelcomePillPixel()
     }
-}
-
-// Process queued events when scripts become ready
-func onDuckPlayerScriptsReady(params: Any, original: WKScriptMessage) -> Encodable? {
-    areScriptsReady = true
-    while !otherEventsQueue.isEmpty {
-        let event = otherEventsQueue.removeFirst()
-        processEvent(event)
+    
+    func presentEntryPill(for videoID: String) {
+        // Configure entry pill for returning users
+        state.videoID = videoID
+        configureContainerForPill(.entry)
+        fireEntryPillPixel()
     }
-    return nil
+    
+    func presentReEntryPill(for videoID: String) {
+        // Configure re-entry pill for previously watched videos
+        state.videoID = videoID
+        configureContainerForPill(.reEntry)
+        fireReEntryPillPixel()
+    }
 }
 ```
 
-### Publisher Integration Pattern
+### NativeDuckPlayerNavigationHandler
+
+**Role**: Manages video playback navigation and browser integration
 
 ```swift
-// ✅ CORRECT - Reactive publisher pattern
-private func setupSubscriptions() {
-    duckPlayer?.mediaControlPublisher
-        .sink { [weak self] pause in
-            self?.handleMediaControl(pause: pause)
-        }
-        .store(in: &cancellables)
+// ✅ CORRECT - Navigation handler pattern
+final class NativeDuckPlayerNavigationHandler {
+    private let webView: WKWebView
+    private let presenter: DuckPlayerNativeUIPresenter
     
-    duckPlayer?.muteAudioPublisher
-        .sink { [weak self] mute in
-            self?.handleMuteAudio(mute: mute)
-        }
-        .store(in: &cancellables)
+    func handleYouTubeURL(_ url: URL) -> Bool {
+        guard shouldHandleNatively(url) else { return false }
+        
+        let videoID = extractVideoID(from: url)
+        presenter.presentPlayer(for: videoID)
+        return true
+    }
     
-    duckPlayer?.urlChangedPublisher
-        .sink { [weak self] url in
-            self?.onUrlChanged(url: url)
-        }
-        .store(in: &cancellables)
+    private func shouldHandleNatively(_ url: URL) -> Bool {
+        // Check if URL should be handled by native player
+        return isYouTubeURL(url) && isNativeUIEnabled()
+    }
+}
+
+// ❌ INCORRECT - Don't handle navigation directly in views
+struct DuckPlayerView: View {
+    func handleURL(_ url: URL) {
+        // Don't put navigation logic in views
+    }
 }
 ```
 
-### Message Origin Security
+## View Architecture
+
+### Pill Management System
+
+DuckPlayer uses a three-tier pill system based on user interaction history:
 
 ```swift
-// ✅ CORRECT - Strict origin validation
-let messageOriginPolicy: MessageOriginPolicy = .only(rules: [
-    .exact(hostname: DuckPlayerSettingsDefault.OriginDomains.duckduckgo),
-    .exact(hostname: DuckPlayerSettingsDefault.OriginDomains.youtube),
-    .exact(hostname: DuckPlayerSettingsDefault.OriginDomains.youtubeMobile),
-    .exact(hostname: DuckPlayerSettingsDefault.OriginDomains.youtubeWWW),
-    .exact(hostname: DuckPlayerSettingsDefault.OriginDomains.youtubeNoCookie),
-    .exact(hostname: DuckPlayerSettingsDefault.OriginDomains.youtubeNoCookieWWW)
-])
-```
+// ✅ CORRECT - Pill type management
+enum DuckPlayerPillType {
+    case welcome    // First-time users (priming modal not yet presented)
+    case entry      // Returning users viewing new videos
+    case reEntry    // Users returning to previously watched videos
+}
 
-### Page Type Detection
-
-```swift
-// ✅ CORRECT - URL-based page type detection
-func onUrlChanged(url: URL) {
-    areScriptsReady = false
+final class DuckPlayerContainer: UIView {
+    private var currentPillType: DuckPlayerPillType?
     
-    // Determine page type for proper script behavior
-    let pageType = DuckPlayerUserScript.getPageType(url: url)
-    let shouldClearEvents = pageType != DuckPlayerUserScript.PageType.YOUTUBE
-    
-    if shouldClearEvents {
-        // Clear queued events when navigating away from YouTube
-        otherEventsQueue.removeAll()
+    func configurePill(_ type: DuckPlayerPillType, for videoID: String) {
+        switch type {
+        case .welcome:
+            presentWelcomePill()
+        case .entry:
+            presentEntryPill(videoID: videoID)
+        case .reEntry:
+            presentReEntryPill(videoID: videoID)
+        }
     }
-    
-    // Always store the latest URL change event
-    handleEvent(.urlChanged(pageType: pageType))
 }
 ```
 
-## DuckPlayerUserScriptPlayer Integration
+### SwiftUI View Components
 
-### Component Responsibilities
-
-**Primary Role**: Handle communication within the DuckPlayer web view
-
-**Key Responsibilities**:
-- Provides initial setup configuration
-- Updates video timestamps to the view model
-- Handles YouTube error states
-- Manages locale and page type information
-
-### ViewModel Communication
-
-```swift
-// ✅ CORRECT - Direct view model updates
-@MainActor
-private func onCurrentTimeStamp(params: Any, original: WKScriptMessage) -> Encodable? {
-    guard let dict = params as? [String: Any],
-          let timeString = dict["timestamp"] as? String,
-          let timeInterval = Double(timeString) else {
-        return [:] as [String: String]
-    }
-    
-    // Update view model directly
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
