@@ -1,137 +1,236 @@
 ---
 trigger: always_on
-description: PR, pull request, commit, push, git push, gh pr create, open PR, create PR, reviewer, Asana task, merge, GitHub
+description: │   ├── Package.swift
 ---
 
 
-# Pull Request Guidelines & Workflow
+# Shared Packages Development Guidelines
 
-## 🚨 CRITICAL: Required Information and Approval Before Creating PR
+## Package Structure
 
-**MANDATORY**: Before creating any PR, you MUST:
-
-### Step 1: Gather Required Information
-
-### 1. Task/Issue URL
-**Ask**: "What is the Asana task URL for this PR?"
-- **NEVER proceed** with placeholder text like `[TASK_ID]` or `[INSERT_URL]`
-- **NEVER assume** you can skip this step
-- **ONLY proceed** if user explicitly says to omit it or provides the URL
-
-### 2. PR Reviewer Assignment (CRITICAL for Asana Integration)
-**Ask**: "Who should review this PR?"
-- Ask if they want to:
-  - Assign a specific reviewer (get their GitHub username for `--reviewer` flag)
-  - Use auto-assignment (`--reviewer Apple-dev` team)
-  - Handle it themselves after PR creation
-- **NEVER proceed** without understanding the reviewer assignment strategy
-- **ONLY proceed** if user explicitly provides the information or strategy
-
-**WHY THIS MATTERS**: 
-- GitHub Action only creates Asana subtask when reviewer is **assigned via GitHub's reviewer mechanism**
-- Using `--reviewer` flag triggers the `review_requested` event that runs the Asana integration
-- Without reviewer assignment, no Asana subtask is created automatically
-
-### 3. Tech Design URL (For Significant Changes)
-- **Default to "N/A"** for minor changes and bug fixes
-- **ASK for significant changes** (new features, architectural changes)
-- **Can be omitted** if user doesn't explicitly provide one - use "N/A"
-- Unlike Task/Issue URL, this is **optional** and can default to "N/A"
-
-### 4. Exception: User Explicitly Opts Out
-The **ONLY** acceptable reason to skip asking for Task URL and Reviewer is if the user explicitly states:
-- "Skip Asana task" or "No Asana task"
-- "I'll assign reviewer myself" or "Use auto-assignment"
-
-**Failure to ask for Task URL and Reviewer = violation of PR workflow.**
-
----
-
-### Step 2: Get User Approval Before Creating PR
-
-**MANDATORY**: After gathering all information, you MUST:
-
-1. **Present the complete PR body text** to the user for review and approval
-2. **Include the reviewer name** that will be assigned
-3. **Show the exact text** that will be used in the PR body (not the command)
-4. **Wait for explicit approval** before proceeding
-5. **ONLY after approval**: Execute the `gh pr create` command
-
-**Do NOT create the PR without showing the user the exact PR body text first.**
-
-**Format for approval request:**
+### Standard Package Layout
 ```
-Here's the PR I'm about to create:
-**Title:** [PR title]
-
-**Reviewer:** @username
-
-**PR Body:**
-[Show complete PR body text here]
-
-Proceed with creating the PR?
+SharedPackages/
+├── FeatureName/
+│   ├── Package.swift
+│   ├── README.md
+│   ├── Sources/
+│   │   └── FeatureName/
+│   │       ├── Public/          # Public API
+│   │       ├── Internal/        # Internal implementation
+│   │       └── Resources/       # Assets and resources
+│   └── Tests/
+│       └── FeatureNameTests/
+│           └── FeatureTests.swift
 ```
 
-After user approves, then execute the `gh pr create` command.
+### Package.swift Configuration
+```swift
+// swift-tools-version: 5.7
+import PackageDescription
 
-## 🚨 CRITICAL: Always Open PR URL After Creation
-
-**MANDATORY**: After creating or updating a PR, **IMMEDIATELY** run:
-```bash
-open <PR_URL>
+let package = Package(
+    name: "FeatureName",
+    platforms: [
+        .iOS(.v15),
+        .macOS(.v12)
+    ],
+    products: [
+        .library(
+            name: "FeatureName",
+            targets: ["FeatureName"]
+        )
+    ],
+    dependencies: [
+        // Only include truly necessary dependencies
+        .package(url: "https://github.com/DuckDuckGo/BrowserServicesKit", from: "1.0.0")
+    ],
+    targets: [
+        .target(
+            name: "FeatureName",
+            dependencies: ["BrowserServicesKit"],
+            resources: [
+                .process("Resources")
+            ]
+        ),
+        .testTarget(
+            name: "FeatureNameTests",
+            dependencies: ["FeatureName"]
+        )
+    ]
+)
 ```
 
-This ensures the PR is accessible and properly formatted in the browser.
+## Cross-Platform Compatibility
 
-## Objective
+### Platform-Specific Code
+```swift
+#if os(iOS)
+import UIKit
+public typealias PlatformView = UIView
+public typealias PlatformViewController = UIViewController
+public typealias PlatformColor = UIColor
+#elseif os(macOS)
+import AppKit
+public typealias PlatformView = NSView
+public typealias PlatformViewController = NSViewController
+public typealias PlatformColor = NSColor
+#endif
 
-- **Maintain a clear and maintainable list** of open PRs in the Apple repositories
-- **Improve PR review turnaround time** through proper assignment and notification processes
-- **Establish clear rules** for internal (Apple team) and external (FrontEnd, etc.) contributions
-- **Remove PR assignment** as part of the Apple Weekly process
+// Use platform-agnostic types
+public protocol CrossPlatformViewProtocol {
+    var backgroundColor: PlatformColor? { get set }
+}
+```
 
-## PR Types and Assignment Strategy
+### Conditional Compilation
+```swift
+public class FeatureManager {
+    public func performAction() {
+        #if os(iOS)
+        performIOSAction()
+        #elseif os(macOS)
+        performMacOSAction()
+        #endif
+    }
+    
+    #if os(iOS)
+    private func performIOSAction() {
+        // iOS-specific implementation
+    }
+    #endif
+    
+    #if os(macOS)
+    private func performMacOSAction() {
+        // macOS-specific implementation
+    }
+    #endif
+}
+```
 
-We have **two different types** of code contributions:
+## API Design
 
-### **Projects**
-Large features or significant changes with designated technical reviewers.
+### Public API Guidelines
+```swift
+// Mark public APIs clearly
+public protocol FeatureServiceProtocol {
+    func fetchData() async throws -> [Item]
+}
 
-### **Tasks** 
-Small improvements or bug fixes that require flexible reviewer assignment.
+public final class FeatureService: FeatureServiceProtocol {
+    // Use dependency injection
+    private let networkClient: NetworkClientProtocol
+    
+    public init(networkClient: NetworkClientProtocol) {
+        self.networkClient = networkClient
+    }
+    
+    public func fetchData() async throws -> [Item] {
+        // Implementation
+    }
+}
+```
 
-**Key Principle**: A PR **assignee** is the PR author, a PR **reviewer** is whoever will review it.
+### Internal Implementation
+```swift
+// Keep implementation details internal
+internal final class FeatureImplementation {
+    // Not exposed to package consumers
+}
 
-## Assignment Workflows
+// Use extensions for internal helpers
+internal extension String {
+    var sanitized: String {
+        // Internal helper method
+    }
+}
+```
 
-### Projects Workflow
+## Resource Management
 
-For significant features and planned work:
+### Bundled Resources
+```swift
+public enum FeatureResources {
+    private static let bundle = Bundle.module
+    
+    public static var configuration: Data {
+        guard let url = bundle.url(forResource: "config", withExtension: "json"),
+              let data = try? Data(contentsOf: url) else {
+            fatalError("Missing required resource: config.json")
+        }
+        return data
+    }
+    
+    public static func image(named name: String) -> PlatformImage? {
+        #if os(iOS)
+        return UIImage(named: name, in: bundle, with: nil)
+        #elseif os(macOS)
+        return bundle.image(forResource: name)
+        #endif
+    }
+}
+```
 
-1. **Use Technical Reviewer**: The technical reviewer should be the default person to assign the PR review
-2. **No MM Posting**: There's no need to post the PR link on MM (Mattermost)
-3. **Review Assignment Process**:
-   - Create PR with: `gh pr create --reviewer TECHNICAL_REVIEWER_USERNAME`
-   - This automatically creates Asana subtask and assigns it to the reviewer
-   - No need to manually ping on Asana (automation handles it)
-4. **Shared Responsibility**: Both the technical reviewer and developer are responsible for staying in sync
-5. **Fallback**: If the technical reviewer can't review the PR, request different reviewer in GitHub UI (triggers new Asana assignment)
+## Dependency Management
 
-### Tasks Workflow
+### Minimal Dependencies
+```swift
+// Avoid unnecessary dependencies
+// Bad: Importing entire framework for one function
+import HeavyFramework
 
-For bug fixes and small improvements:
+// Good: Implement minimal version or use protocol
+protocol DateFormatterProtocol {
+    func string(from date: Date) -> String
+}
+```
 
-1. **Pre-Agreement**: Think about who's the best person to review this task and **agree with them to be the reviewer even before posting the PR** (similar to choosing technical reviewer for projects)
+### Version Management
+```swift
+// Use semantic versioning
+// Package.swift
+dependencies: [
+    .package(url: "https://github.com/example/package", 
+             from: "1.0.0"),  // Allows 1.x.x
+    .package(url: "https://github.com/example/strict", 
+             exact: "2.1.0"), // Exact version
+    .package(url: "https://github.com/example/range", 
+             "1.0.0"..<"2.0.0") // Version range
+]
+```
 
-2. **When Uncertain**: If you don't know who would be the best person, or the problem is generic and doesn't require domain knowledge, use **GitHub auto assignment** with `--reviewer Apple-dev`
+## Testing Shared Packages
 
-3. **Assignment Process**:
-   - Create PR with: `gh pr create --reviewer USERNAME` (or `--reviewer Apple-dev` for auto)
-   - Asana subtask is automatically created and assigned
-   - No need to manually ping on Asana (automation notifies them)
-   - If reviewer is AFK, request different reviewer in GitHub UI (triggers new assignment)
+### Cross-Platform Tests
+```swift
+import XCTest
+@testable import FeatureName
 
-4. **Availability Management**:
+final class FeatureTests: XCTestCase {
+    func testCrossPlatformBehavior() {
+        let feature = Feature()
+        
+        #if os(iOS)
+        XCTAssertNotNil(feature.iosSpecificProperty)
+        #elseif os(macOS)
+        XCTAssertNotNil(feature.macOSSpecificProperty)
+        #endif
+        
+        // Test common behavior
+        XCTAssertEqual(feature.commonProperty, expectedValue)
+    }
+}
+```
+
+### Test Utilities
+```swift
+// Provide test utilities in a separate target
+public extension XCTestCase {
+    func waitForCondition(
+        _ condition: @autoclosure () -> Bool,
+        timeout: TimeInterval = 1.0,
+        message: String = "Condition not met"
+    ) {
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
