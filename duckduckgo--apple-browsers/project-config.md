@@ -1,187 +1,161 @@
 ---
 trigger: always_on
-description: The DuckDuckGo browser includes a comprehensive A/B/N experiment framework that enables data-driven feature testing across iOS and macOS platforms. This framework allows you to safely experiment with new ideas while maintaining control groups and measuring impact.
+description: Use the existing Pixel.fire pattern with structured event definitions:
 ---
 
 
-# A/B/N Experiment Framework
+# Analytics and Pixel Patterns
 
-## Overview
-
-The DuckDuckGo browser includes a comprehensive A/B/N experiment framework that enables data-driven feature testing across iOS and macOS platforms. This framework allows you to safely experiment with new ideas while maintaining control groups and measuring impact.
-
-**Reference**: Video of knowledge sharing session: ✓ A/B/N Experiment Framework
-
-## What is A/B/N Testing?
-
-An **A/B/N test** is a method of experimenting with multiple variants of a feature (A, B, ... N) to determine which performs better. It's like traditional A/B testing but scaled up to support more than two groups.
-
-### Use Cases
-
-You can use this framework to explore:
-- **UI/UX variations**: Whether blue buttons outperform green buttons
-- **Content experiments**: If showing pictures of cats 🐱 or dogs 🐶 boosts user retention
-- **Feature comparisons**: Different implementations of the same functionality
-- **Performance optimization**: Testing various algorithms or approaches
-
-### When to Use A/B/N Testing
-
-✅ **Use for**:
-- Comparing user behavior between two or more feature variants
-- Validating hypotheses before rolling out changes to all users
-- Safely experimenting with new ideas while maintaining control groups
-- Measurable, impactful decisions with clear success metrics
-
-❌ **Don't use for**:
-- Simple bug fixes or obvious improvements
-- Changes without measurable impact
-- Features that can't be easily reversed
-
-⚠️ **Note**: Not every change needs a test—reserve it for measurable, impactful decisions. This is typically decided in collaboration with ODRIs and Data Science.
-
-## Framework Architecture
-
-### Remote Configuration System
-
-A/B/N experiments are supported via **remote configuration** on both macOS and iOS:
-
-- **Sub-features** are used for experiments
-- **Parent features** group related experiments
-- **Cohorts** define the different variants
-- **Weights** control user distribution
-- **Targets** allow locale-based segmentation
-
-## Configuration Setup
-
-### 1. Privacy Config Structure
-
-Experiments are defined in the Privacy Configuration with this structure:
-
-```json
-"amazingMacroFeature": {
-  "state": "enabled",
-  "features": {
-    "petsPictures": {
-      "state": "enabled",
-      "description": "This feature shows users pictures of cute pets",
-      "targets": [
-        { "localeLanguage": "en", "localeCountry": "US" },
-        { "localeLanguage": "fr", "localeCountry": "CA" }
-      ],
-      "cohorts": [
-        { "name": "cats", "weight": 1 },
-        { "name": "dogs", "weight": 1 }
-      ]
-    }
-  }
-}
-```
-
-### Configuration Elements
-
-#### **State Options**
-- `enabled`: Visible to all users
-- `internal`: Visible only to internal users  
-- `disabled`: Hidden from all users
-
-#### **Description**
-Explains the experiment's purpose for team reference.
-
-#### **Targets** (Optional)
-Specify user segments based on locale:
-```json
-"targets": [
-  { "localeLanguage": "en", "localeCountry": "US" },
-  { "localeLanguage": "fr", "localeCountry": "CA" }
-]
-```
-
-#### **Cohorts**
-Define experiment variants:
-- `name`: Cohort identifier (e.g., "cats", "dogs")
-- `weight`: Probability of assignment (normally 1 or 0)
-
-## Client Implementation
-
-### Step 1: Add Feature to PrivacyFeature (BSK)
-
-#### Check for Existing Features
+## Structured Pixel Events
+Use the existing Pixel.fire pattern with structured event definitions:
 
 ```swift
-// In PrivacyFeature enum, check if parent feature exists
-public enum PrivacyFeature: String, CaseIterable {
-    case amazingMacroFeature
-    // ... other features
+// ✅ CORRECT - Use existing Pixel.fire with proper parameters
+extension PixelEvent {
+    static let featureUsed = "feature_used"
+    static let performanceMetric = "performance_metric"
+    static let errorOccurred = "error_occurred"
+    static let userAction = "user_action"
 }
 
-// Add sub-feature to existing enum or create new one
-public enum AmazingMacroFeatureSubfeatures: String, CaseIterable {
-    case petsPictures
-    // ... other sub-features
-}
+// Usage examples from codebase
+Pixel.fire(pixel: .webKitTerminationDidReloadCurrentTab)
+
+Pixel.fire(pixel: .cachedTabPreviewsExceedsTabCount, withAdditionalParameters: [
+    PixelParameters.tabPreviewCountDelta: "\(storedPreviews - totalTabs)"
+])
+
+Pixel.fire(pixel: .autofillLoginsSavePromptDisplayed, withAdditionalParameters: [
+    PixelParameters.autofillPromptTrigger: "manual"
+])
 ```
 
-#### Add New Features
-
-If the parent feature doesn't exist:
-1. Add it to the `PrivacyFeature` enum
-2. Create a new sub-features enum
-3. Add your sub-feature to the enum
-
-### Step 2: Define Feature Flag
-
-Add your experiment to the local `FeatureFlag` enum:
+## Pixel Parameters
+Use the established PixelParameters constants:
 
 ```swift
-public enum FeatureFlag: String, CaseIterable {
-    case debugMenu
-    case sslCertificatesBypass
-    case maliciousSiteProtection
-    // ... existing flags
-    case petsPictures
+// ✅ CORRECT - Use existing PixelParameters
+extension PixelParameters {
+    static let featureName = "fn"
+    static let errorType = "et"
+    static let performanceValue = "pv"
+    static let userActionSource = "uas"
+}
 
-    public var cohortType: (any FeatureFlagCohortDescribing.Type)? {
-        switch self {
-        case .petsPictures:
-            return PetsPicturesCohort.self
-        default:
-            return nil
-        }
+// Usage
+Pixel.fire(pixel: .newFeatureUsed, withAdditionalParameters: [
+    PixelParameters.featureName: "voice_search",
+    PixelParameters.userActionSource: "keyboard_shortcut"
+])
+```
+
+## Performance Metrics
+Track performance metrics consistently:
+
+```swift
+// ✅ CORRECT - Performance tracking pattern
+final class PerformanceTracker {
+    static func trackPageLoad(duration: TimeInterval, url: URL) {
+        let parameters = [
+            PixelParameters.duration: String(format: "%.3f", duration),
+            PixelParameters.domain: url.host ?? "unknown"
+        ]
+        
+        Pixel.fire(pixel: .pageLoadTime, withAdditionalParameters: parameters)
     }
-
-    public enum PetsPicturesCohort: String, FeatureFlagCohortDescribing {
-        case cats
-        case dogs
-    }
-
-    public var source: FeatureFlagSource {
-        switch self {
-        // ... other cases
-        case .petsPictures:
-            return .remoteReleasable(.subfeature(AmazingMacroFeatureSubfeatures.petsPictures))
-        }
-    }
-
-    public var supportsLocalOverriding: Bool {
-        switch self {
-        // ... other cases
-        case .petsPictures: 
-            return true
-        }
+    
+    static func trackMemoryUsage(bytes: Int, context: String) {
+        let parameters = [
+            PixelParameters.memoryUsage: "\(bytes)",
+            PixelParameters.context: context
+        ]
+        
+        Pixel.fire(pixel: .memoryUsage, withAdditionalParameters: parameters)
     }
 }
 ```
 
-#### Key Properties
+## Error Tracking
+Track errors with context:
 
-**`cohortType`**: Links to experiment cohorts enum
-- Must conform to `String, FeatureFlagCohortDescribing`
-- Defines available variants (cats, dogs)
+```swift
+// ✅ CORRECT - Error tracking
+extension Pixel {
+    static func fireError(_ error: Error, context: String = "") {
+        let parameters = [
+            PixelParameters.errorType: String(describing: type(of: error)),
+            PixelParameters.context: context
+        ]
+        
+        Pixel.fire(pixel: .errorOccurred, withAdditionalParameters: parameters)
+    }
+}
 
-**`source`**: Defines feature flag toggle location
-- `.disabled`: Feature is off
+// Usage
+do {
+    try await networkService.fetchData()
+} catch {
+    Pixel.fireError(error, context: "data_fetch")
+    throw error
+}
+```
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+## Feature Usage Tracking
+Track feature adoption and usage:
+
+```swift
+// ✅ CORRECT - Feature usage tracking
+final class FeatureTracker {
+    static func trackFeatureUsage(_ feature: String, source: String = "") {
+        let parameters = [
+            PixelParameters.featureName: feature,
+            PixelParameters.userActionSource: source
+        ]
+        
+        Pixel.fire(pixel: .featureUsed, withAdditionalParameters: parameters)
+    }
+    
+    static func trackFeatureEnabled(_ feature: String, enabled: Bool) {
+        let parameters = [
+            PixelParameters.featureName: feature,
+            PixelParameters.enabled: enabled ? "true" : "false"
+        ]
+        
+        Pixel.fire(pixel: .featureToggled, withAdditionalParameters: parameters)
+    }
+}
+```
+
+## Privacy-Safe Analytics
+Ensure all analytics respect privacy:
+
+```swift
+// ✅ CORRECT - Privacy-safe analytics
+final class PrivacyAnalytics {
+    static func trackWithPrivacy(event: String, value: String) {
+        // Hash sensitive values
+        let hashedValue = value.sha256Hash
+        
+        let parameters = [
+            PixelParameters.hashedValue: hashedValue
+        ]
+        
+        Pixel.fire(pixel: event, withAdditionalParameters: parameters)
+    }
+    
+    static func trackAggregateMetric(metric: String, count: Int) {
+        // Only send aggregate data, never individual events
+        let parameters = [
+            PixelParameters.metric: metric,
+            PixelParameters.count: "\(count)"
+        ]
+        
+        Pixel.fire(pixel: .aggregateMetric, withAdditionalParameters: parameters)
+    }
+}
+```
+
+See `feature-flags.md` for A/B test analytics and `privacy-security.md` for privacy requirements.
 
 ---
 > Source: [duckduckgo/apple-browsers](https://github.com/duckduckgo/apple-browsers) — distributed by [TomeVault](https://tomevault.io).
