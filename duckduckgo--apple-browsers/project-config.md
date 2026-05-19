@@ -1,160 +1,211 @@
 ---
 trigger: always_on
-description: Use the KVO pattern with KeyValueStore for all new persistent settings:
+description: class BrowserWebView {
 ---
 
 
-# User Defaults Settings Storage and Reading
+# WebKit & Browser Development Guidelines
 
-## ✅ RECOMMENDED - KVO Pattern with KeyValueStore
+## WebView Configuration
 
-Use the KVO pattern with KeyValueStore for all new persistent settings:
-
+### Basic WebView Setup
 ```swift
-// ✅ CORRECT - KVO pattern with KeyValueStore
-struct AppearancePreferencesUserDefaultsPersistor: AppearancePreferencesPersistor {
+import WebKit
 
-    enum Key: String {
-        case newTabPageIsOmnibarVisible = "new-tab-page.omnibar.is-visible"
-        case newTabPageIsProtectionsReportVisible = "new-tab-page.protections-report.is-visible"
-        case userPreferences = "user.preferences"
-        case lastUpdateCheck = "last.update.check"
-    }
-
-    private let keyValueStore: KeyValueStoring
-
-    init(keyValueStore: KeyValueStoring) {
-        self.keyValueStore = keyValueStore
-    }
-
-    var isOmnibarVisible: Bool {
-        get { (try? keyValueStore.object(forKey: Key.newTabPageIsOmnibarVisible.rawValue) as? Bool) ?? true }
-        set { try? keyValueStore.set(newValue, forKey: Key.newTabPageIsOmnibarVisible.rawValue) }
-    }
-
-    var isProtectionsReportVisible: Bool {
-        get { (try? keyValueStore.object(forKey: Key.newTabPageIsProtectionsReportVisible.rawValue) as? Bool) ?? false }
-        set { try? keyValueStore.set(newValue, forKey: Key.newTabPageIsProtectionsReportVisible.rawValue) }
-    }
-
-    var userPreferences: [String: String] {
-        get { (try? keyValueStore.object(forKey: Key.userPreferences.rawValue) as? [String: String]) ?? [:] }
-        set { try? keyValueStore.set(newValue, forKey: Key.userPreferences.rawValue) }
-    }
-
-    var lastUpdateCheck: Date {
-        get { (try? keyValueStore.object(forKey: Key.lastUpdateCheck.rawValue) as? Date) ?? Date.distantPast }
-        set { try? keyValueStore.set(newValue, forKey: Key.lastUpdateCheck.rawValue) }
-    }
+class BrowserWebView {
+    private lazy var webView: WKWebView = {
+        let configuration = WKWebViewConfiguration()
+        
+        // Enable JavaScript
+        configuration.preferences.javaScriptEnabled = true
+        
+        // Set user agent
+        configuration.applicationNameForUserAgent = UserAgentManager.shared.userAgent
+        
+        // Configure content blockers
+        configuration.userContentController = makeUserContentController()
+        
+        // Enable developer extras in debug
+        #if DEBUG
+        configuration.preferences.setValue(true, forKey: "developerExtrasEnabled")
+        #endif
+        
+        let webView = WKWebView(frame: .zero, configuration: configuration)
+        webView.allowsBackForwardNavigationGestures = true
+        webView.allowsLinkPreview = true
+        
+        return webView
+    }()
 }
 ```
 
-## Key Guidelines for KVO Pattern
-
-1. **Use struct conforming to protocol** - Follow the persistor pattern
-2. **Define keys as enum with String raw values** - Use kebab-case for key names
-3. **Use KeyValueStoring protocol** - Not direct UserDefaults access
-4. **Computed properties with get/set** - Handle storage operations in accessors
-5. **Use try? for error handling** - KeyValueStore operations can throw
-6. **Provide default values** - Use nil coalescing operator (??) for defaults
-7. **Inject KeyValueStore in init** - Enable dependency injection and testing
-
-## Advanced Pattern for Optional Values
-
+### User Scripts Management
 ```swift
-// ✅ CORRECT - Optional values pattern
-struct SettingsUserDefaultsPersistor: SettingsPersistor {
-
-    enum Key: String {
-        case optionalUserName = "user.name"
-        case optionalTheme = "app.theme"
-    }
-
-    private let keyValueStore: KeyValueStoring
-
-    init(keyValueStore: KeyValueStoring) {
-        self.keyValueStore = keyValueStore
-    }
-
-    var optionalUserName: String? {
-        get { try? keyValueStore.object(forKey: Key.optionalUserName.rawValue) as? String }
-        set { 
-            if let value = newValue {
-                try? keyValueStore.set(value, forKey: Key.optionalUserName.rawValue)
-            } else {
-                try? keyValueStore.removeObject(forKey: Key.optionalUserName.rawValue)
-            }
-        }
-    }
-
-    var selectedTheme: Theme? {
-        get { 
-            guard let rawValue = try? keyValueStore.object(forKey: Key.optionalTheme.rawValue) as? String else { return nil }
-            return Theme(rawValue: rawValue)
-        }
-        set { 
-            if let value = newValue {
-                try? keyValueStore.set(value.rawValue, forKey: Key.optionalTheme.rawValue)
-            } else {
-                try? keyValueStore.removeObject(forKey: Key.optionalTheme.rawValue)
-            }
-        }
-    }
-}
-```
-
-## Platform-Specific Storage
-
-```swift
-// ✅ CORRECT - Platform-specific KeyValueStore usage
-struct PlatformSettingsUserDefaultsPersistor: PlatformSettingsPersistor {
-
-    enum Key: String {
-        case platformSpecificSetting = "platform.specific.setting"
-    }
-
-    private let keyValueStore: KeyValueStoring
-
-    init(keyValueStore: KeyValueStoring) {
-        self.keyValueStore = keyValueStore
-    }
-
-    var platformSpecificSetting: Bool {
-        get { 
-            #if os(iOS)
-            return (try? keyValueStore.object(forKey: Key.platformSpecificSetting.rawValue) as? Bool) ?? false
-            #elseif os(macOS)
-            return (try? keyValueStore.object(forKey: Key.platformSpecificSetting.rawValue) as? Bool) ?? true
-            #endif
-        }
-        set { 
-            try? keyValueStore.set(newValue, forKey: Key.platformSpecificSetting.rawValue)
-        }
-    }
-}
-```
-
-## 🚫 DEPRECATED - @UserDefaultsWrapper Pattern
-
-The following pattern is deprecated and should not be used for new code:
-
-```swift
-// ❌ DEPRECATED - Do not use @UserDefaultsWrapper for new code
-extension AppUserDefaults {
-    @UserDefaultsWrapper(key: .newFeatureEnabled, defaultValue: false)
-    var newFeatureEnabled: Bool
+private func makeUserContentController() -> WKUserContentController {
+    let controller = WKUserContentController()
     
-    @UserDefaultsWrapper(key: .lastUpdateCheck, defaultValue: Date.distantPast)
-    var lastUpdateCheck: Date
+    // Add content blocking scripts
+    let contentBlockingScript = WKUserScript(
+        source: ContentBlockingUserScript.source,
+        injectionTime: .atDocumentStart,
+        forMainFrameOnly: false
+    )
+    controller.addUserScript(contentBlockingScript)
+    
+    // Add message handlers
+    controller.add(self, name: "duckduckgo")
+    
+    return controller
 }
 ```
 
-## Migration from Property Wrappers
+## Tab Management
 
-When migrating from `@UserDefaultsWrapper` to the KVO pattern:
+### Tab Model
+```swift
+class Tab: NSObject {
+    let id = UUID()
+    private(set) var url: URL?
+    private(set) var title: String?
+    private(set) var favicon: UIImage?
+    
+    weak var webView: WKWebView?
+    weak var delegate: TabDelegate?
+    
+    private var observations: Set<NSKeyValueObservation> = []
+    
+    init(url: URL? = nil) {
+        self.url = url
+        super.init()
+        setupWebView()
+    }
+    
+    private func setupWebView() {
+        let webView = WKWebView(frame: .zero, configuration: TabManager.shared.configuration)
+        self.webView = webView
+        
+        // Observe properties
+        observations.insert(
+            webView.observe(\.url) { [weak self] _, _ in
+                self?.urlDidChange()
+            }
+        )
+        
+        observations.insert(
+            webView.observe(\.title) { [weak self] webView, _ in
+                self?.title = webView.title
+                self?.delegate?.tab(self!, didUpdateTitle: webView.title)
+            }
+        )
+        
+        observations.insert(
+            webView.observe(\.estimatedProgress) { [weak self] webView, _ in
+                self?.delegate?.tab(self!, didUpdateProgress: webView.estimatedProgress)
+            }
+        )
+    }
+}
+```
 
-1. **Create a new persistor struct** - Following the naming convention `*UserDefaultsPersistor`
-2. **Define keys enum** - Convert string keys to enum cases
+### Tab Lifecycle
+```swift
+extension Tab {
+    func load(url: URL) {
+        let request = URLRequest(url: url)
+        webView?.load(request)
+    }
+    
+    func reload() {
+        webView?.reload()
+    }
+    
+    func stop() {
+        webView?.stopLoading()
+    }
+    
+    func goBack() {
+        webView?.goBack()
+    }
+    
+    func goForward() {
+        webView?.goForward()
+    }
+    
+    func close() {
+        observations.forEach { $0.invalidate() }
+        observations.removeAll()
+        webView?.stopLoading()
+        webView?.removeFromSuperview()
+        webView = nil
+    }
+}
+```
+
+## Navigation Handling
+
+### Navigation Delegate
+```swift
+extension BrowserViewController: WKNavigationDelegate {
+    func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction) async -> WKNavigationActionPolicy {
+        let url = navigationAction.request.url
+        
+        // Handle special URLs
+        if let url = url, URLSchemeHandler.shared.canHandle(url) {
+            URLSchemeHandler.shared.handle(url)
+            return .cancel
+        }
+        
+        // Apply content blocking
+        if contentBlocker.shouldBlock(url) {
+            return .cancel
+        }
+        
+        // Check for downloads
+        if shouldDownload(navigationAction) {
+            startDownload(from: navigationAction.request)
+            return .cancel
+        }
+        
+        return .allow
+    }
+    
+    func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+        updateProgressBar(animated: true)
+        updateNavigationButtons()
+    }
+    
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        hideProgressBar()
+        captureHistory()
+        updateFavicon()
+    }
+    
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        handleNavigationError(error)
+    }
+}
+```
+
+## JavaScript Bridge
+
+### Message Handling
+```swift
+extension BrowserViewController: WKScriptMessageHandler {
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        guard let dict = message.body as? [String: Any] else { return }
+        
+        switch message.name {
+        case "duckduckgo":
+            handleDuckDuckGoMessage(dict)
+        case "autofill":
+            handleAutofillMessage(dict)
+        case "tracker":
+            handleTrackerMessage(dict)
+        default:
+            break
+        }
+    }
+    
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
