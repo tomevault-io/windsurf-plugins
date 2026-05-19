@@ -1,170 +1,286 @@
 ---
 trigger: always_on
-description: When creating sanity schema make sure to include an appropriate icon for the schema using lucide-react or sanity icons as a fallback. Make sure it's always a named export, make sure you're always using the Sanity typescript definitions if it's a ts file.
+description: Guide for migrating from ESLint/Prettier to Ultracite
 ---
 
-# Sanity Development Guidelines
 
-## Sanity Schema Rules
+# Ultracite Migration Guide
 
-When creating sanity schema make sure to include an appropriate icon for the schema using lucide-react or sanity icons as a fallback. Make sure it's always a named export, make sure you're always using the Sanity typescript definitions if it's a ts file.
+Quick reference for migrating Turbostart monorepo projects from ESLint/Prettier to Ultracite (Biome preset).
 
-### Basic Schema Structure
-
-For TypeScript files, always import the necessary Sanity types:
-
-```typescript
-import {defineField, defineType, defineArrayMember} from 'sanity'
+**Project Structure Assumed:**
+```
+/
+├── apps/
+│   ├── studio/      # Sanity CMS
+│   └── web/         # Next.js app
+├── packages/
+│   ├── eslint-config/  # To be deleted
+│   └── ui/             # Shared components
+├── turbo.json
+└── package.json
 ```
 
-Always use `defineField` on every field and `defineType` throughout the whole type. Only import `defineArrayMember` if needed:
+## 1. Install Dependencies
 
-```typescript
-defineType({
-  type: 'object',
-  name: 'custom-object',
-  fields: [
-    defineField({
-      type: 'array',
-      name: 'arrayField',
-      title: 'Things',
-      of: [
-        defineArrayMember({
-          type: 'object',
-          name: 'type-name-in-array',
-          fields: [defineField({type: 'string', name: 'title', title: 'Title'})],
-        }),
-      ],
-    }),
-  ],
-})
+```bash
+pnpm add -D -w ultracite @biomejs/biome@latest
 ```
 
-### Adding icons
+## 2. Create Root Configuration
 
-When adding icons to a schema, make sure you use the default sanity/icons first, and then if no icon is relevant, refer to any other iconset the user has installed - e.g lucide-react.
+Create `biome.jsonc`:
 
-### Structuring files and folders
-
-This is a rough idea of how to structure folders and files, ensuring you always have an index within the folder to create an array of documents/blocks. Do not use these as exact names, it's used purely for layout purposes.
-
-    │   ├── studio/
-    │   │   ├── README.md
-    │   │   ├── eslint.config.mjs
-    │   │   ├── location.ts
-    │   │   ├── package.json
-    │   │   ├── prettier.config.mjs
-    │   │   ├── sanity-typegen.json
-    │   │   ├── sanity.cli.ts
-    │   │   ├── sanity.config.ts
-    │   │   ├── schema.json
-    │   │   ├── structure.ts
-    │   │   ├── tsconfig.json
-    │   │   ├── .env.example
-    │   │   ├── .gitignore
-    │   │   ├── components/
-    │   │   │   ├── logo.tsx
-    │   │   │   └── slug-field-component.tsx
-    │   │   ├── plugins/
-    │   │   │   └── presentation-url.ts
-    │   │   ├── schemaTypes/
-    │   │   │   ├── common.ts
-    │   │   │   ├── index.ts
-    │   │   │   ├── blocks/
-    │   │   │   │   ├── cta.ts
-    │   │   │   │   ├── faq-accordion.ts
-    │   │   │   │   ├── feature-cards-icon.ts
-    │   │   │   │   ├── hero.ts
-    │   │   │   │   ├── image-link-cards.ts
-    │   │   │   │   ├── index.ts
-    │   │   │   │   └── subscribe-newsletter.ts
-    │   │   │   ├── definitions/
-    │   │   │   │   ├── button.ts
-    │   │   │   │   ├── custom-url.ts
-    │   │   │   │   ├── index.ts
-    │   │   │   │   ├── pagebuilder.ts
-    │   │   │   │   └── rich-text.ts
-    │   │   │   └── documents/
-    │   │   │       ├── author.ts
-    │   │   │       ├── blog.ts
-    │   │   │       ├── faq.ts
-    │   │   │       └── page.ts
-    │   │   └── utils/
-    │   │       ├── const-mock-data.ts
-    │   │       ├── constant.ts
-    │   │       ├── helper.ts
-    │   │       ├── mock-data.ts
-    │   │       ├── og-fields.ts
-    │   │       ├── parse-body.ts
-    │   │       ├── seo-fields.ts
-    │   │       ├── slug.ts
-    │   │       └── types.ts
-
-### Layout of page builder index example
-
-This is an example of how the blocks index file would be structured, you would create multiple of these on multiple nested routes to make it easier to create an array of files at each level, rather than bundling a large number of imports in a singular index.ts on the root
-
-```typescript
-import { callToAction } from './call-to-action';
-import { exploreHero } from './explore-hero';
-import { faqList } from './faq-list';
-import { htmlEmbed } from './html-embed';
-import { iconGrid } from './icon-grid';
-import { latestDocs } from './latest-docs';
-import { calculator } from './calculator';
-import { navigationCards } from './navigation-cards';
-import { quinstreetEmbed } from './quinstreet-embed';
-import { quote } from './quote';
-import { richTextBlock } from './rich-text-block';
-import { socialProof } from './social-proof';
-import { splitForm } from './split-form';
-import { statsCard } from './stats-card';
-import { trustCard } from './trust-card';
-import { rvEmbed } from './rv-embed';
-
-export const pagebuilderBlocks = [
-  navigationCards,
-  socialProof,
-  quote,
-  latestDocs,
-  faqList,
-  callToAction,
-  trustCard,
-  quinstreetEmbed,
-  statsCard,
-  iconGrid,
-  exploreHero,
-  splitForm,
-  richTextBlock,
-  calculator,
-  htmlEmbed,
-  rvEmbed,
-];
-
-export const blocks = [...pagebuilderBlocks];
+```json
+{
+  "$schema": "https://biomejs.dev/schemas/2.2.5/schema.json",
+  "extends": ["ultracite"]
+}
 ```
 
-### Common Field Templates
+## 3. Configure Cursor
 
-When writing any Sanity schema, always include a description, name, title, and type. The description should explain functionality in simple terms for non-technical users. Place description above type.
+Create/update `.vscode/settings.json`:
 
-Use these templates when implementing common fields:
-
-#### Eyebrow
-```typescript
-defineField({
-  name: 'eyebrow',
-  title: 'Eyebrow',
-  description: 'The smaller text that sits above the title to provide context',
-  type: 'string',
-})
+```json
+{
+  "editor.defaultFormatter": "biomejs.biome",
+  "editor.formatOnSave": false,
+  "editor.formatOnPaste": false,
+  "editor.codeActionsOnSave": {
+    "source.fixAll.biome": "explicit",
+    "source.organizeImports.biome": "explicit"
+  },
+  "[typescript]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "[typescriptreact]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "[javascript]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "[jsonc]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "[json]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  }
+}
 ```
 
-#### Title
+**Important:** Set `formatOnSave: false` and use `codeActionsOnSave` to prevent double-formatting issues.
+
+## 4. Update All package.json Scripts
+
+Replace in root and all workspace packages:
+
+```json
+{
+  "scripts": {
+    "lint": "npx ultracite lint",
+    "format": "npx ultracite fix"
+  }
+}
+```
+
+## 5. Remove Old Dependencies & Configs
+
+### Root (`package.json`)
+Remove from `devDependencies`:
+- `@workspace/eslint-config`
+- `prettier`
+
+### `apps/studio/package.json`
+Remove from `devDependencies`:
+- `eslint`
+- `eslint-plugin-import`
+- `eslint-plugin-prettier`
+- `eslint-plugin-simple-import-sort`
+- `prettier`
+- `typescript-eslint`
+
+Delete files:
+- `apps/studio/eslint.config.mjs`
+- `apps/studio/prettier.config.mjs`
+
+### `apps/web/package.json`
+Remove from `devDependencies`:
+- `@workspace/eslint-config`
+- `prettier`
+
+Delete files:
+- `apps/web/eslint.config.js`
+- `apps/web/prettier.config.mjs`
+- `apps/web/.prettierignore` (if exists)
+
+### `packages/ui/package.json`
+Remove from `devDependencies`:
+- `@workspace/eslint-config`
+- `eslint`
+
+Delete files:
+- `packages/ui/eslint.config.js`
+
+### Delete Entire Package
+- Delete entire `packages/eslint-config/` directory
+
+## 6. Update Next.js Config
+
+In `apps/web/next.config.ts`, disable ESLint during builds:
+
 ```typescript
-defineField({
-  name: 'title',
-  title: 'Title',
+export default {
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  // ... rest of config
+}
+```
+
+**Important:** If you have redirects from Sanity, ensure they handle `null` values:
+
+```typescript
+async redirects() {
+  const redirects = await client.fetch(queryRedirects);
+  return redirects.map((redirect) => ({
+    ...redirect,
+    permanent: redirect.permanent ?? false,
+  }));
+}
+```
+
+## 7. Update Turborepo Config
+
+In `turbo.json`:
+
+```json
+{
+  "tasks": {
+    "//#format": {},
+    "//#lint": {
+      "cache": false
+    }
+  }
+}
+```
+
+## 8. Common Rule Adjustments
+
+### For Tailwind CSS (apps/web uses this)
+Add to `biome.jsonc`:
+
+```json
+{
+  "linter": {
+    "rules": {
+      "suspicious": {
+        "noUnknownAtRules": "off",
+        "noExplicitAny": "warn"
+      }
+    }
+  }
+}
+```
+
+### If you encounter namespace import issues
+```json
+{
+  "linter": {
+    "rules": {
+      "performance": {
+        "noNamespaceImport": "off"
+      }
+    }
+  }
+}
+```
+
+## 9. Testing Checklist
+
+### Step 1: Install & Format
+```bash
+# Install dependencies
+pnpm install
+
+# Format all code (from root)
+pnpm format
+
+# Review the changes - should reorganize imports and format code
+git diff
+```
+
+### Step 2: Lint
+```bash
+# Run linter (from root)
+pnpm lint
+
+# Fix any auto-fixable issues
+pnpm format
+```
+
+### Step 3: Build All Packages
+```bash
+# From root - build everything
+pnpm build
+```
+
+Should successfully build:
+- `apps/studio` (Sanity Studio)
+- `apps/web` (Next.js)
+- `packages/ui`
+
+### Step 4: Test Individual Packages
+```bash
+# Test studio
+cd apps/studio
+pnpm lint
+pnpm format
+
+# Test web
+cd apps/web
+pnpm lint
+pnpm format
+
+# Test ui
+cd packages/ui
+pnpm lint
+pnpm format
+```
+
+### Step 5: Test Dev Servers
+```bash
+# From root
+pnpm dev
+```
+
+Verify both studio and web start correctly.
+
+### Step 6: Restart Cursor & Test Editor
+1. Restart Cursor: `Cmd/Ctrl + Shift + P` → "Developer: Reload Window"
+2. Open a `.ts` or `.tsx` file
+3. Make a change and hit `Cmd/Ctrl + S`
+4. Verify:
+   - Code formats automatically
+   - Imports organize automatically
+   - No double-formatting or jerking
+   - No ESLint/Prettier errors in problems panel
+
+## Key Differences from ESLint/Prettier
+
+- Use `npx ultracite fix` instead of `prettier --write` (formats + fixes + organizes imports)
+- Use `npx ultracite lint` instead of `eslint`
+- Biome is **much faster** (written in Rust)
+- Zero config by default - trust Ultracite's presets
+- Import sorting is built-in, no extra plugins needed
+
+## Troubleshooting
+
+### Double formatting on save?
+**Symptom:** Code jumps/jerks when pressing Cmd+S
+**Fix:** 
+- Ensure `formatOnSave: false` in `.vscode/settings.json`
+- Check your user settings don't have conflicting formatter settings
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
