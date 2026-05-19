@@ -7,11 +7,11 @@ Blorp – a Threadiverse client for Lemmy and PieFed. Web, iOS & macOS, and more
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [Blorp-Labs/blorp](https://github.com/Blorp-Labs/blorp).
+Original source: `CLAUDE.md` in [Blorp-Labs/blorp](https://github.com/Blorp-Labs/blorp).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
