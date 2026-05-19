@@ -1,0 +1,20 @@
+---
+trigger: always_on
+description: * fix errors without prompting
+---
+
+This is a monorepo.
+
+* fix errors without prompting
+* don't ask to proceed, just go
+* fix all warnings along the way without prompting
+* ONLY when making changes to /packages/dofs-rust-client:
+    * run `cargo build` after each change to be sure it compiles
+    * run `cargo test` after each change to be sure it passes tests
+* when making changes to /packages/dofs:
+    * do not automatically build
+    * do not automatically install packages
+
+---
+> Source: [benallfree/dofs](https://github.com/benallfree/dofs) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-19 -->
