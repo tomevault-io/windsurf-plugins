@@ -1,188 +1,134 @@
 ---
 trigger: always_on
-description: Detailed Do/Don't examples and fix guidance for React anti-patterns R1-R21 (hooks, effects, state, performance, SRE reliability). Load when a PR review flags a pattern, when implementing features that touch hooks/effects/state, or for the /attack SRE audit command.
+description: Guidance for keeping TypeScript types and Zod schemas synchronized
 ---
 
 
-# React Anti-Patterns and Code Quality Rules
+# Schema-Type Coupling Rules
 
-These rules cover the most critical code-level issues in React applications. During `/review` or when implementing features, the agent MUST check for these patterns.
+This project uses **co-located TypeScript types and Zod schemas** for JSON guide validation. The types in `json-guide.types.ts` are the source of truth, and schemas in `json-guide.schema.ts` must mirror them exactly.
 
----
+## Core Principle
 
-## R1 — Missing useEffect Cleanup
-Subscriptions, event listeners, and timers created in `useEffect` must be cleaned up to prevent memory leaks.
+**TypeScript types define what we expect. Zod schemas enforce it at runtime.**
 
-**Don't**
-```tsx
-useEffect(() => {
-  const subscription = dataSource.subscribe(handleData);
-  window.addEventListener('resize', handleResize);
-  const timer = setInterval(pollData, 5000);
-  // No cleanup - resources persist after unmount
-}, []);
-```
+Every structural change to a type MUST have a corresponding schema change, and vice versa.
 
-**Do**
-```tsx
-useEffect(() => {
-  const subscription = dataSource.subscribe(handleData);
-  window.addEventListener('resize', handleResize);
-  const timer = setInterval(pollData, 5000);
+## When Modifying Types
 
-  // REACT: cleanup subscriptions, listeners, timers (R1)
-  return () => {
-    subscription.unsubscribe();
-    window.removeEventListener('resize', handleResize);
-    clearInterval(timer);
-  };
-}, []);
-```
+If you add, remove, or change a field in `json-guide.types.ts`:
 
-**Agent behavior**
-- Flag any `useEffect` with `addEventListener`, `subscribe`, `setInterval`, or `setTimeout` that lacks a cleanup return.
-- Ensure WebSocket connections, MutationObservers, and ResizeObservers are disconnected on cleanup.
-- When reviewing, check that every resource acquisition has a corresponding release.
+1. **Update the corresponding Zod schema** in `json-guide.schema.ts`
+2. **Run `npm run typecheck`** - the `satisfies z.ZodType<T>` pattern will catch mismatches
+3. **Run `npm run validate`** - verify bundled guides still pass
+4. **Update the `KNOWN_FIELDS` export** if adding new fields (for unknown field detection)
 
----
+The file `json-guide.schema.ts` exposes a global schema version. When making changes to schema, 
+always consider advising the user to update the schema version following schema best practices, 
+and providing them guidance on forwards and backwards compatibility issues as appropriate.
 
-## R2 — Stale Closure in Callbacks
-Closures in `useEffect` or callbacks capture variable values at creation time. Without proper handling, they reference stale data.
+### Example: Adding a New Field
 
-**Don't**
-```tsx
-const [count, setCount] = useState(0);
-
-useEffect(() => {
-  const timer = setInterval(() => {
-    setCount(count + 1); // Always reads initial count (0)
-  }, 1000);
-  return () => clearInterval(timer);
-}, []); // count not in deps - stale closure
-```
-
-**Do**
-```tsx
-const [count, setCount] = useState(0);
-
-useEffect(() => {
-  const timer = setInterval(() => {
-    // REACT: functional update avoids stale closure (R2)
-    setCount(prev => prev + 1);
-  }, 1000);
-  return () => clearInterval(timer);
-}, []);
-
-// Alternative: useRef for latest value
-const countRef = useRef(count);
-useEffect(() => {
-  countRef.current = count;
-}, [count]);
-```
-
-**Agent behavior**
-- When state is used inside `setInterval`, `setTimeout`, or event callbacks, prefer functional updates (`setState(prev => ...)`) over direct state references.
-- If a callback needs the latest value but can't use functional updates, use a ref to track current state.
-- Flag any `useEffect` where state variables are used but not in the dependency array without functional updates.
-
----
-
-## R3 — Object/Array Dependencies Causing Infinite Loops
-Objects and arrays are compared by reference. Creating new objects in render causes `useEffect` to see them as "changed" every time.
-
-**Don't**
-```tsx
-function UserProfile({ userId }) {
-  const [user, setUser] = useState(null);
-  
-  // New object every render
-  const options = { userId, includeDetails: true };
-  
-  useEffect(() => {
-    fetchUser(options).then(setUser);
-  }, [options]); // Infinite loop - options is always "new"
-}
-```
-
-**Do**
-```tsx
-function UserProfile({ userId }) {
-  const [user, setUser] = useState(null);
-  
-  // REACT: memoize object dependencies (R3)
-  const options = useMemo(
-    () => ({ userId, includeDetails: true }),
-    [userId]
-  );
-  
-  useEffect(() => {
-    fetchUser(options).then(setUser);
-  }, [options]);
+```typescript
+// 1. Add to type
+export interface JsonGuide {
+  // ... existing fields
+  newField?: string; // NEW
 }
 
-// Better: use primitive dependencies directly
-useEffect(() => {
-  fetchUser({ userId, includeDetails: true }).then(setUser);
-}, [userId]); // Primitives compare by value
+// 2. Add to schema
+export const JsonGuideSchema = z.object({
+  // ... existing fields
+  newField: z.string().optional(), // NEW - matches type
+}).passthrough() satisfies z.ZodType<JsonGuide>;
+
+// 3. Add to KNOWN_FIELDS
+export const KNOWN_FIELDS = {
+  _guide: ['id', 'title', 'blocks', 'match', 'schemaVersion', 'newField'], // ADD HERE
+  // ...
+};
 ```
 
-**Agent behavior**
-- Flag any object or array literal in a `useEffect` dependency array.
-- Recommend `useMemo` for complex objects or extracting primitive values as dependencies.
-- When reviewing, trace dependency array items to their definitions—if defined inline during render, they will cause re-runs.
+## When Modifying Schemas
 
----
+If you change validation rules in `json-guide.schema.ts`:
 
-## R4 — State Update on Unmounted Component
-Async operations may complete after component unmounts. Attempting to `setState` on unmounted components causes memory leaks.
+1. **Consider if the type needs updating** - e.g., making a field required
+2. **Update error messages** to be user-friendly
+3. **Run tests** - `npm run test:ci -- --testPathPatterns=validation`
+4. **Run `npm run validate:strict`** - ensure bundled guides comply
 
-**Don't**
-```tsx
-useEffect(() => {
-  fetch(`/api/users/${userId}`)
-    .then(res => res.json())
-    .then(setData); // May run after unmount
-}, [userId]);
+## Coupling Markers
+
+Look for `@coupling` JSDoc tags that explicitly link types and schemas:
+
+```typescript
+/**
+ * @coupling JsonGuideSchema in json-guide.schema.ts
+ */
+export interface JsonGuide { ... }
+
+/**
+ * @coupling JsonGuide in json-guide.types.ts
+ */
+export const JsonGuideSchema = z.object({ ... });
 ```
 
-**Do**
-```tsx
-useEffect(() => {
-  const controller = new AbortController();
-  
-  fetch(`/api/users/${userId}`, { signal: controller.signal })
-    .then(res => res.json())
-    .then(setData)
-    .catch(err => {
-      // REACT: ignore abort errors (R4)
-      if (err.name !== 'AbortError') throw err;
-    });
-  
-  return () => controller.abort();
-}, [userId]);
+When you see a `@coupling` tag, **always check the linked file** before making changes.
 
-// Alternative: mounted flag
-useEffect(() => {
-  let isMounted = true;
-  
-  fetchData().then(result => {
-    if (isMounted) setData(result);
-  });
-  
-  return () => { isMounted = false; };
-}, []);
+## Forward Compatibility
+
+All schemas use `.passthrough()` to allow unknown fields. This means:
+
+- Newer guides with new fields will still parse successfully
+- Unknown fields generate warnings, not errors (unless `--strict` mode)
+- The `KNOWN_FIELDS` object determines what triggers warnings
+
+## Validation Module Structure
+
+```
+src/validation/
+├── index.ts          # Public exports
+├── validate-guide.ts # Main validateGuide() function
+├── unknown-fields.ts # Forward compatibility warnings
+└── errors.ts         # Error formatting utilities
+
+src/types/
+├── json-guide.types.ts  # TypeScript interfaces for single-file guides (source of truth)
+├── json-guide.schema.ts # Zod schemas for single-file guides (runtime validation)
+├── package.types.ts     # TypeScript interfaces for two-file package model
+└── package.schema.ts    # Zod schemas for packages (ContentJson, ManifestJson, RepositoryJson)
 ```
 
-**Agent behavior**
-- For any `fetch` or async operation in `useEffect`, require either `AbortController` or a mounted flag.
-- Prefer `AbortController` as it actually cancels the network request.
-- Flag async callbacks that call `setState` without cancellation handling.
+## Two-file Package Model
 
----
+The package model separates content (`content.json`) from metadata (`manifest.json`):
 
-## R5 — Direct State Mutation
+- **`package.types.ts`** defines `ContentJson`, `ManifestJson`, `RepositoryJson`, `RepositoryEntry`, `GraphNode`, `GraphEdge`, and resolution types
+- **`package.schema.ts`** defines corresponding Zod schemas with defaults and refinements
+- **`json-guide.schema.ts`** retains `JsonGuideSchemaStrict` for backwards-compatible single-file guides
+- `KNOWN_FIELDS._manifest` in `json-guide.schema.ts` lists valid manifest fields for unknown field detection
+- `CURRENT_SCHEMA_VERSION` (currently `"1.1.0"`) is the default for new packages
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+## Commands
+
+```bash
+npm run typecheck       # Catch type/schema drift at compile time
+npm run validate        # Validate bundled guides (warnings allowed)
+npm run validate:strict # Validate bundled guides (warnings = errors)
+npm run test:ci -- --testPathPatterns=validation  # Run validation tests
+```
+
+## Agent Checklist
+
+When modifying JSON guide types or schemas:
+
+- [ ] Type change has corresponding schema change
+- [ ] Schema change has corresponding type change (if structural)
+- [ ] `KNOWN_FIELDS` updated for new fields
+- [ ] `npm run typecheck` passes
+- [ ] `npm run validate:strict` passes
+- [ ] Validation tests pass
 
 ---
 > Source: [grafana/grafana-pathfinder-app](https://github.com/grafana/grafana-pathfinder-app) — distributed by [TomeVault](https://tomevault.io).
