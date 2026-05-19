@@ -1,93 +1,59 @@
 ---
 trigger: always_on
-description: - All database schemas must be placed in `packages/db/src/schemas/` with appropriate subdirectories (`core/`, `auth/`, etc.)
+description: General coding practices and agent interaction rules applicable across the organization, regardless of language.
 ---
 
-# API Engineering Standards (apps/api)
+# Organization General Practices
 
-## Database & Schema Management
+## Core Coding Philosophy
+– **Simplicity:** Always prefer simple, understandable solutions.
+– **DRY (Don't Repeat Yourself):** Avoid duplication. Check for existing similar code/functionality before writing new code.
+– **Cleanliness:** Keep the codebase clean, well-organized, and maintainable.
+– **Environment Awareness:** Write code that correctly handles different environments (e.g., dev, test, prod).
+– **Focused Changes:** Only make changes that are requested or clearly understood and directly related to the task. Avoid implementing unrelated improvements or refactors without explicit instruction (see Agent Task Scope below).
+– **Incremental Improvement:** When fixing bugs, avoid introducing new patterns/technologies unless necessary after exhausting existing options. If a new pattern replaces an old one, remove the old implementation.
+– **File Size:** Avoid overly long files. Consider refactoring files exceeding 200–300 lines
+- **Function Size:** Avoid overly long functions.  Break up large functions using helper functions that encapsulate related functionality into smaller and more focused pieces.
+– **Script Usage:** Avoid writing one-off scripts if a more integrated solution is feasible.
 
-### Database Schema Organization
-- All database schemas must be placed in `packages/db/src/schemas/` with appropriate subdirectories (`core/`, `auth/`, etc.)
-- Schema files must export table definitions and be properly imported in `core/defs.ts`
-- Always generate migrations using `pnpm db:gen-migrations` after schema changes which will automatically create the sql migration files
-- Repository classes must be placed in `apps/api/src/database/repositories/` and follow the naming pattern `*-repository.ts`
-- Use the established repository pattern with dependency injection into manager services
-- Include proper indexes for foreign keys and frequently queried columns
+## Function Design & Complexity Management
+- **Extract Helper Methods:** When a function exceeds ~30-40 lines or has distinct logical sections (e.g., validation, processing, output), extract helper methods. If you have numbered steps in comments (Step 1, Step 2, etc.), consider if each step should be its own function.
+- **Single Responsibility:** Each function should do ONE thing well. A function should either answer one question OR perform one action, not both.
+- **Fail-Fast Pattern:** Check error conditions early and return/throw immediately. Don't carry invalid state through the entire function. This makes the happy path clearer and reduces nesting.
+- **Avoid Redundant Checking:** Don't check the same condition multiple times across different functions. Check once at the boundary, then pass validated data to inner functions.
+- **Clear Method Contracts:** Helper methods should clearly indicate via their name and signature what they assume (e.g., `calculateValueWithValidPrices` assumes prices are already validated).
 
-### Database Computation Patterns
-- **SQL-First Philosophy**: Always prefer database aggregations over in-memory processing
-  - Use SQL `SUM()`, `AVG()`, `COUNT()` instead of fetching all rows and calculating in JavaScript
-  - Use `DISTINCT ON` with proper indexes for latest-record queries
-  - Use database-level `GROUP BY` for grouping operations
-  - Use CTEs (Common Table Expressions) for complex multi-step queries
-  - Use `ORDER BY` in SQL instead of JavaScript `.sort()`
-  - For complex sorts (like `DISTINCT ON` + different `ORDER BY`), use subqueries with `.as()` in Drizzle
-  - Example: Getting latest summaries should use `DISTINCT ON (agent_id)` not fetch all and filter in memory
-- **Response Size Management**:
-  - Never return unbounded result sets for in-memory processing
-  - Always aggregate at database level when only totals are needed
-  - Example: Use `SUM(total_volume)` in SQL vs fetching 1000+ records to sum in JavaScript
-  - Set reasonable LIMIT clauses for safety even on internal queries
-  - Monitor query response sizes in production
-- **Composite Indexes**: Always add indexes for:
-  - Foreign key relationships
-  - Columns used in `WHERE` clauses
-  - Columns used in `ORDER BY` with `DISTINCT ON`
-  - Multi-column patterns that match query patterns (e.g., `(agent_id, competition_id, timestamp DESC)`)
-- **Query Optimization Principles**:
-  - Prevent the linear query scaling problem: Instead of fetching a list then making separate queries per item, use joins or batch fetching
-  - Use database cursors for large result sets
-  - Leverage database window functions for ranking and analytics
-  - Use `EXPLAIN ANALYZE` to verify query performance
-  - Batch operations should process in chunks (e.g., 100 records at a time)
+## Efficient Code Patterns
+- **Don't Compute What You Don't Need:** Avoid building intermediate data structures (arrays, objects) just to check a property. For example, don't build an array just to check if it's empty - use a boolean check directly.
+- **Choose Appropriate Loops:** Use `for` loops when iteration count is known upfront, `while` for conditional iteration. Modern `for` loops are often cleaner than `while` with manual increment.
+- **Early Exit Strategies:** Prefer methods that can exit early (`.some()`, `.every()`, `.find()`) over methods that process everything (`.filter().length`, `.map()`) when you just need a boolean or single result.
+- **Separation of Concerns:** Separate "what failed" (detailed logging) from "should we continue" (control flow) logic. Log details where the failure is detected, make decisions based on simple booleans.
+- **Push Computation to Data Layer:** When working with databases or external services:
+  - Prefer aggregating/sorting/filtering at the source over fetching-then-processing
+  - Example: SQL `SUM()` instead of fetching all rows to sum in JavaScript
+  - Example: API filtering parameters instead of fetching all then filtering
+  - This reduces memory usage, network transfer, and processing time
 
-### Migration Best Practices
-- **Migration Generation**: Always use `pnpm --filter api db:gen-migrations` after schema changes
-- **Migration Naming**: Let Drizzle auto-generate names (e.g., `0041_mighty_wolverine.sql`)
-- **Migration Review**: Always review generated SQL before committing
-- **Backward Compatibility**: Migrations must be backward compatible for zero-downtime deployments
-- **Data Migrations**: Use separate scripts in `apps/api/scripts/` for data migrations, never mix schema and data migrations
-- **Rollback Strategy**: Document rollback SQL for destructive changes in PR description
-- **Testing Migrations**: Test migrations on a copy of production data when possible
-- **Index Creation**: Create indexes `CONCURRENTLY` in production to avoid table locks
+## Data Handling
+– **Mocking:** Mock data *only* for automated tests. Never use mocked or stubbed data in development or production environments.
+– **Secrets:** Ensure secrets, API keys, or passwords are *never* committed to the repository. Use environment variables or secure secret management solutions.
 
-### Database Type Safety
-- **Function Return Types**: All functions must have explicit return types
-  - Never rely on TypeScript inference for return types
-  - Be especially explicit for async functions (e.g., `Promise<User[]>`)
-- **Named Types**: Prefer named types/interfaces over inline definitions
-  - Extract complex return types into named interfaces
-  - Reuse types when the same shape appears multiple times
-- **JSON Fields**: Never use `any` for jsonb columns
-  - Create type guard functions for runtime validation
-  - Use Zod schemas for complex JSON structures
-  - Example: `isValidPerpsConfig(data): data is PerpsConfig`
-- **Numeric Types**: Always parse database numerics to numbers
-  - Use `Number()` or `parseFloat()` for numeric columns
-  - Never pass numeric strings to frontend
-  - Be explicit about precision requirements
-- **Enum Safety**: Use TypeScript enums or literal unions for database enums
-- **Null Handling**: Explicitly handle nullable columns with proper types
-  - Use `| null` not `| undefined` for nullable database fields
-  - Consider using Result types for operations that may fail
+## Tooling Interaction
+– **Non-Interactive Execution:** When using command-line tools or scripts, ensure they run in non-interactive mode to prevent hangs (e.g., append `| cat` to commands like `git log` if needed, use appropriate flags).
 
-## Atomic Operations & Race Condition Prevention
+## Documentation
+– **Inline Documentation:** Maintain excellent, thorough inline documentation (e.g., comments for functions, methods, types, classes, and complex logic).
+– **READMEs:** When editing README files, conform to the [standard-readme](mdc:https:/github.com/RichardLitt/standard-readme) specification.
+– **CRITICAL - No Temporal or Comparative Comments:** 
+  - **NEVER** use words like "new", "optimized", "efficient", "replaces", "improved", "better", "faster", "atomic" in comments or TSDoc
+  - **NEVER** reference what the code replaces or how it compares to previous versions
+  - **NEVER** mention implementation optimizations (e.g., "avoids N+1", "uses atomic operations", "parallelized")
+  - **DO** describe WHAT the method does and its contract/behavior
+  - **DO** focus on the current functionality without historical context
+  - Example: ❌ BAD: "Optimized method that efficiently fetches users avoiding N+1 queries"
+  - Example: ✅ GOOD: "Fetches users with their associated posts in a single query"
 
-### Service Layer Atomicity
-- **TOCTOU Prevention**: Avoid Time-Of-Check-Time-Of-Use patterns where state can change between check and action
-  - ❌ Bad: Check participant limit separately from adding agent (race condition):
-    ```typescript
-    // Multiple agents could pass this check simultaneously!
-    const competition = await getCompetition(competitionId);
-    if (competition.registeredParticipants < competition.maxParticipants) {
-      await addAgentToCompetition(competitionId, agentId);  // ⚠️ Limit could be exceeded!
-      await incrementParticipantCount(competitionId);
-    }
-    ```
-  - ✅ Good: Use transactions with row locks (from `competition-repository.ts`):
-    ```typescript
-    await db.transaction(async (tx) => {
+## Security
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
