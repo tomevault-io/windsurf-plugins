@@ -1,208 +1,117 @@
 ---
 trigger: always_on
-description: Ensures React components correctly handle auth state before calling admin-protected Convex queries with Clerk authentication.
+description: description: Guidelines and best practices for building Convex projects, including database schema design, queries, mutations, and real-world examples
 ---
 
 
-# Clerk + Convex Authentication Pattern
+---
 
-This rule ensures React components using Convex queries with Clerk authentication correctly handle loading and authentication states before attempting to fetch data, especially for admin-protected queries.
+description: Guidelines and best practices for building Convex projects, including database schema design, queries, mutations, and real-world examples
+globs: **/\*.ts,**/_.tsx,\*\*/_.js,\*_/_.jsx
 
-## Current Implementation Pattern
+---
 
-### 1. Clerk JWT Claims Configuration
+# Convex guidelines
 
-**Important:** This project uses Clerk as the identity source with custom JWT claims forwarded to Convex.
+## Function guidelines
 
-Clerk JWT Template Configuration (in Clerk Dashboard):
+### New function syntax
 
-```json
-{
-  "role": "{{user.public_metadata.role}}",
-  "organizerGroupIds": "{{user.public_metadata.organizerGroupIds}}"
-}
-```
+- always create type-safe code
+- ALWAYS use the new function syntax for Convex functions. For example:
+  `typescript
+    import { query } from "./_generated/server";
+    import { v } from "convex/values";
+    export const f = query({
+        args: {},
+        returns: v.null(),
+        handler: async (ctx, args) => {
+        // Function body
+        },
+    });
+    `
 
-This forwards:
+### Http endpoint syntax
 
-- `public_metadata.role` as top-level `role` claim in JWT
-- `public_metadata.organizerGroupIds` as top-level `organizerGroupIds` claim in JWT
+- HTTP endpoints are defined in `convex/http.ts` and require an `httpAction` decorator. For example:
+  `typescript
+    import { httpRouter } from "convex/server";
+    import { httpAction } from "./_generated/server";
+    const http = httpRouter();
+    http.route({
+        path: "/echo",
+        method: "POST",
+        handler: httpAction(async (ctx, req) => {
+        const body = await req.bytes();
+        return new Response(body, { status: 200 });
+        }),
+    });
+    `
+- HTTP endpoints are always registered at the exact path you specify in the `path` field. For example, if you specify `/api/someRoute`, the endpoint will be registered at `/api/someRoute`.
 
-### 2. Backend: Convex Authorization Helpers
+### Validators
 
-**Location:** `convex/users.ts`
+- Below is an example of an array validator:
+  ```typescript
+  import { mutation } from "./\_generated/server";
+  import { v } from "convex/values";
 
-#### Type-Safe Identity Access
+                            export default mutation({
+                            args: {
+                                simpleArray: v.array(v.union(v.string(), v.number())),
+                            },
+                            handler: async (ctx, args) => {
+                                //...
+                            },
+                            });
+                            ```
 
-```typescript
-// Define custom identity type for type safety
-type ClerkIdentity = {
-  subject: string;
-  email?: string;
-  emailVerified?: boolean;
-  username?: string;
-  role?: "admin" | "manager" | "organizer";
-  organizerGroupIds?: string[];
-  // ... other Clerk fields
-};
+- Below is an example of a schema with validators that codify a discriminated union type:
+  ```typescript
+  import { defineSchema, defineTable } from "convex/server";
+  import { v } from "convex/values";
 
-// Helper to get typed identity
-async function getIdentityOrThrow(
-  ctx: QueryCtx | MutationCtx,
-): Promise<ClerkIdentity> {
-  const identity = await ctx.auth.getUserIdentity();
-  if (!identity) {
-    throw new Error("No identity found. User not authenticated.");
-  }
-  return identity as ClerkIdentity;
-}
-```
+                            export default defineSchema({
+                                results: defineTable(
+                                    v.union(
+                                        v.object({
+                                            kind: v.literal("error"),
+                                            errorMessage: v.string(),
+                                        }),
+                                        v.object({
+                                            kind: v.literal("success"),
+                                            value: v.number(),
+                                        }),
+                                    ),
+                                )
+                            });
+                            ```
 
-#### Current Admin Check (Single Role)
+- Always use the `v.null()` validator when returning a null value. Below is an example query that returns a null value:
+  ```typescript
+  import { query } from "./\_generated/server";
+  import { v } from "convex/values";
 
-```typescript
-// Check if user is admin (boolean return)
-export async function isUserAdmin(
-  ctx: QueryCtx | MutationCtx,
-): Promise<boolean> {
-  try {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return false;
+                                  export const exampleQuery = query({
+                                    args: {},
+                                    returns: v.null(),
+                                    handler: async (ctx, args) => {
+                                        console.log("This query returns a null value");
+                                        return null;
+                                    },
+                                  });
+                                  ```
 
-    // Access role from top-level claim
-    const clerkTokenRole = (identity as any).role;
-    return clerkTokenRole === "admin";
-  } catch (error) {
-    return false;
-  }
-}
-
-// Require admin role (throws if not admin)
-export async function requireAdminRole(
-  ctx: QueryCtx | MutationCtx,
-): Promise<void> {
-  const identity = await ctx.auth.getUserIdentity();
-  if (!identity) {
-    throw new Error("Authentication required for admin action.");
-  }
-
-  const clerkTokenRole = (identity as any).role;
-  if (clerkTokenRole !== "admin") {
-    throw new Error(
-      "Admin privileges required. Role 'admin' not found in Clerk token.",
-    );
-  }
-}
-
-// Query for frontend to check admin status
-export const checkIsUserAdmin = query({
-  args: {},
-  returns: v.boolean(),
-  handler: async (ctx) => {
-    return await isUserAdmin(ctx);
-  },
-});
-```
-
-#### Future Multi-Role Helpers (from adminroles.md)
-
-```typescript
-// Admin or Manager access
-export async function requireAdminOrManager(
-  ctx: QueryCtx | MutationCtx,
-): Promise<void> {
-  const identity = await getIdentityOrThrow(ctx);
-  const role = identity.role;
-
-  if (role !== "admin" && role !== "manager") {
-    throw new Error("Admin or Manager privileges required.");
-  }
-}
-
-// Admin or Organizer for specific group
-export async function requireAdminOrOrganizerForGroup(
-  ctx: QueryCtx | MutationCtx,
-  groupId: Id<"judgingGroups">,
-): Promise<void> {
-  const identity = await getIdentityOrThrow(ctx);
-  const role = identity.role;
-
-  if (role === "admin") return; // Admin has access to all groups
-
-  if (role === "organizer") {
-    const organizerGroupIds = identity.organizerGroupIds || [];
-    if (organizerGroupIds.includes(groupId)) return;
-  }
-
-  throw new Error(
-    "Access denied. You do not have permission for this judging group.",
-  );
-}
-```
-
-### 3. Frontend: React Component Auth Pattern
-
-#### Required Pattern for Admin-Protected Components
-
-```typescript
-import { useConvexAuth, useQuery } from "convex/react";
-import { api } from "../../convex/_generated/api";
-import { NotFoundPage } from "../pages/NotFoundPage";
-
-export function AdminComponent() {
-  // 1. Get Convex auth state
-  const { isLoading: authIsLoading, isAuthenticated } = useConvexAuth();
-
-  // 2. Check if user is admin (skip if not authenticated)
-  const isUserAdmin = useQuery(
-    api.users.checkIsUserAdmin,
-    isAuthenticated ? {} : "skip"
-  );
-
-  // 3. Conditionally skip admin queries
-  const adminData = useQuery(
-    api.adminQueries.getTotalSubmissions,
-    (authIsLoading || !isAuthenticated) ? "skip" : {}
-  );
-
-  // 4. Handle auth loading state FIRST
-  if (authIsLoading || (isAuthenticated && isUserAdmin === undefined)) {
-    return <div>Loading authentication...</div>;
-  }
-
-  // 5. Handle unauthorized access
-  if (!isAuthenticated || isUserAdmin === false) {
-    return <NotFoundPage />;
-  }
-
-  // 6. Render authorized content
-  return <div>Admin content: {adminData}</div>;
-}
-```
-
-#### Loading State Priority Order
-
-```typescript
-// 1. Auth loading or admin check loading
-if (authIsLoading || (isAuthenticated && isUserAdmin === undefined)) {
-  return <div>Loading authentication...</div>;
-}
-
-// 2. Not authenticated or not admin
-if (!isAuthenticated || isUserAdmin === false) {
-  return <NotFoundPage />;
-}
-
-// 3. Data loading (only after auth is confirmed)
-if (isAuthenticated && adminData === undefined) {
-  return <div>Loading data...</div>;
-}
-
-// 4. Render content
-```
-
-### 4. Common Patterns by Component Type
-
+- Here are the valid Convex types along with their respective validators:
+  Convex Type | TS/JS type | Example Usage | Validator for argument validation and schemas | Notes |
+  | ----------- | ------------| -----------------------| -----------------------------------------------| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+  | Id | string | `doc._id` | `v.id(tableName)` | |
+  | Null | null | `null` | `v.null()` | JavaScript's `undefined` is not a valid Convex value. Functions the return `undefined` or do not return will return `null` when called from a client. Use `null` instead. |
+  | Int64 | bigint | `3n` | `v.int64()` | Int64s only support BigInts between -2^63 and 2^63-1. Convex supports `bigint`s in most modern browsers. |
+  | Float64 | number | `3.1` | `v.number()` | Convex supports all IEEE-754 double-precision floating point numbers (such as NaNs). Inf and NaN are JSON serialized as strings. |
+  | Boolean | boolean | `true` | `v.boolean()` |
+  | String | string | `"abc"` | `v.string()` | Strings are stored as UTF-8 and must be valid Unicode sequences. Strings must be smaller than the 1MB total size limit when encoded as UTF-8. |
+  | Bytes | ArrayBuffer | `new ArrayBuffer(8)` | `v.bytes()` | Convex supports first class bytestrings, passed in as `ArrayBuffer`s. Bytestrings must be smaller than the 1MB total size limit for Convex types. |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
