@@ -1,146 +1,146 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: > Target docs: **ratatui 0.30.0** (docs.rs “latest” at time of writing).
 ---
 
-# CLAUDE.md
+# Ratatui (Rust) — TUI “field guide” for building a full-featured CLI
+> Target docs: **ratatui 0.30.0** (docs.rs “latest” at time of writing).  
+> This file is meant to be a **practical, complete map** of Ratatui’s public surface area: *what exists, what it’s for, how it fits together, and where to read the authoritative docs / examples.*
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+---
 
-## Documentation
+## 0) What Ratatui is (and what it is not)
 
-- **[docs/architecture.md](docs/architecture.md)** - Complete system architecture, module structure, data flow, and design patterns.
-- **[docs/adding-executors.md](docs/adding-executors.md)** - Step-by-step guide for adding new AI CLI tool support.
+**Ratatui** is an *immediate-mode* terminal UI library: each frame, your app renders the entire UI into an off-screen **Buffer**, and Ratatui diff-renders only changes to the terminal via a **Backend**.
 
-## Extended Guidelines
+**Key implications of “immediate mode”:**
+- Your “UI tree” is not persisted by the framework.
+- **Your app owns the state** (selection index, scroll offset, input text, toggles).
+- Each `Terminal::draw` call must fully repaint the UI for the current state (even if nothing changed).
 
-For comprehensive best practices, reference these files in `.cursor/rules/`:
+---
 
-- **`ratatui.mdc`** - Complete Ratatui 0.30.0 field guide covering widgets, layouts, styling, testing, and immediate-mode architecture. Read this when working on UI components, layouts, or widget implementations.
+## 1) Crate architecture & “components” at a glance
 
-- **`rust.mdc`** - Comprehensive Rust 2024 edition best practices covering code organization, error handling, performance, security, and testing. Read this when making architectural decisions, handling errors, or optimizing code.
+Ratatui is modular (a workspace of crates) and the top-level `ratatui` crate re-exports what you usually need:
 
-## Project Overview
+### 1.1 Core building blocks
+- **Terminal + Frame** (render loop entry points)
+- **Backend** (how bytes reach a real terminal)
+- **Buffer + Cell** (the “canvas” widgets draw to)
+- **Layout** (splitting areas with constraints)
+- **Text** (`Span`, `Line`, `Text`)
+- **Style** (`Color`, `Style`, `Modifier`, `Stylize`)
+- **Widgets** (Block, Paragraph, Table, …)
+- **Symbols** (box drawing, markers, sets)
+- **Init utilities** (`run`, `init`, `restore`, viewports)
 
-**McGravity** is a TUI-based interface for orchestrating AI-assisted coding tools (Claude Code, OpenAI Codex CLI, Gemini CLI, etc.). It provides a unified workflow called "McGravity Flow" that helps software engineers:
+### 1.2 “Where things live” (major modules)
+- `ratatui::backend` — the `Backend` trait, backend implementations (Crossterm/Termion/Termwiz/TestBackend), and backend-related traits.
+- `ratatui::buffer` — `Buffer`, `Cell`.
+- `ratatui::layout` — `Rect`, `Layout`, `Constraint`, `Direction`, `Flex`, `Margin`, alignment types, etc.
+- `ratatui::style` — `Style`, `Color`, `Modifier`, and convenience styling (`Stylize`).
+- `ratatui::text` — `Span`, `Line`, `Text`, and helpers.
+- `ratatui::symbols` — line/box characters, border sets, markers.
+- `ratatui::widgets` — all built-in widgets, widget traits, widget states.
+- `ratatui::init` — documentation & helpers around init/restore and panic hooks (also see the root-level functions).
+- `ratatui::prelude` — a convenience glob-import set (still available, but not universally recommended).
 
-- Compose better-structured tasks for AI coding assistants
-- Execute tasks across multiple AI CLI tools with consistent patterns
-- Track completed tasks and provide context for planning next steps
-- Manage file system operations with proper sandboxing and approval flows
-- Review and approve AI-generated changes before application
+### 1.3 Feature flags (important!)
+Ratatui uses feature flags to control:
+- which backend(s) are included (e.g. `crossterm`, `termion`, `termwiz`)
+- whether “all widgets” are built (default is typically “all”)
+- macros, layout cache, underline color support, serde, palette integration, etc.
 
-The project is inspired by OpenAI's Codex CLI architecture, which uses a modular Rust workspace design with separated concerns for core logic, TUI presentation, and file system operations.
-
-## Build Commands
-
-```bash
-cargo build          # Build the project
-cargo run            # Run the application
-cargo test           # Run tests
-cargo test <name>    # Run a specific test
-cargo clippy         # Run linter
-cargo fmt            # Format code
+**Authoritative list (always check your exact version):**
+```text
+https://docs.rs/crate/ratatui/latest/features
 ```
 
-## Local Installation
+---
 
-To install mcgravity locally to `~/.cargo/bin/` (making it available system-wide):
+## 2) “Hello World” mental model: the rendering pipeline
 
-```bash
-cargo install --path . --force
+### 2.1 The minimal moving parts
+1. **Backend** talks to the terminal emulator (stdout, raw mode, alternate screen, cursor).
+2. **Terminal<B>** owns:
+   - double buffers (previous + current)
+   - viewport configuration
+   - cursor state
+3. Each frame:
+   - `Terminal::draw(|f| { ... })`
+   - you use the `Frame` to render widgets into the current `Buffer`
+   - Ratatui diffs current vs previous buffer
+   - backend writes only changed cells
+
+### 2.2 Key types you’ll touch daily
+- `Terminal<B>`
+- `Frame`
+- `Rect`
+- `Buffer`
+- `Layout`, `Constraint`
+- `Style`, `Color`, `Modifier`
+- `Span`, `Line`, `Text`
+- widget types (`Block`, `Paragraph`, `Table`, …)
+
+### 2.3 Immediate-mode best practice (non-negotiable)
+**Always fully render the frame.**  
+Do not “skip” rendering unchanged areas. Diffing happens *after* your closure returns.
+
+---
+
+## 3) Terminal initialization & teardown (the “right” way in 0.30)
+
+Ratatui now provides convenience helpers so you don’t need boilerplate raw-mode / alternate-screen / panic hook setup in every project.
+
+### 3.1 `run()` — simplest “just do the right thing”
+Use this for most CLIs:
+
+```rust
+fn main() -> std::io::Result<()> {
+    ratatui::run(|terminal| {
+        loop {
+            terminal.draw(|f| f.render_widget("Hello", f.area()))?;
+            // read events, update state, maybe exit...
+        }
+    })
+}
 ```
 
-- The `--force` (`-f`) flag ensures the binary is rebuilt and replaced even if already installed
-- After installation, run from anywhere with: `mcgravity`
-- To uninstall: `cargo uninstall mcgravity`
-
-**When the user asks to "install mcgravity locally" or "install this package", run:**
-
-```bash
-cargo install --path . --force
+Docs:
+```text
+https://docs.rs/ratatui/latest/ratatui/fn.run.html
 ```
 
-## Mandatory Quality Checks
+### 3.2 `init()` / `restore()` — explicit control
+If you want the terminal value and to control shutdown:
+- `init()` initializes a default terminal (Crossterm-based).
+- `restore()` returns terminal settings to normal (disable raw mode, leave alt-screen).
 
-**IMPORTANT: After every code change, run the full validation pipeline:**
-
-```bash
-cargo fmt && cargo clippy && cargo build && cargo test
+Docs:
+```text
+https://docs.rs/ratatui/latest/ratatui/fn.init.html
+https://docs.rs/ratatui/latest/ratatui/fn.restore.html
 ```
 
-This ensures:
+### 3.3 Viewports (`Viewport`) & `TerminalOptions`
+Ratatui supports different ways to “own” the terminal:
+- **Fullscreen**: typical TUI (entire screen)
+- **Inline(height)**: persistent TUI area while normal output scrolls above it (status panels, progress, logs)
+- **Fixed(Rect)**: render into a fixed region
 
-1. **Formatting** (`cargo fmt`) - Consistent code style
-2. **Linting** (`cargo clippy`) - Catches common mistakes and enforces best practices
-3. **Build** (`cargo build`) - Verifies compilation succeeds
-4. **Tests** (`cargo test`) - Ensures no regressions
-
-### CI Pipeline Compliance
-
-**CRITICAL: All changes must pass the CI pipeline defined in [`.github/workflows/ci.yaml`](.github/workflows/ci.yaml).**
-
-Before considering any change complete, verify it will pass CI by running the exact checks from the workflow:
-
-```bash
-# Format check (must pass with no changes needed)
-cargo fmt --all -- --check
-
-# Clippy with strict warnings-as-errors
-cargo clippy --all-targets --all-features -- -D warnings
-
-# Build and test with all features and locked dependencies
-cargo build --locked --all-features
-cargo test --locked --all-features
+Docs:
+```text
+https://docs.rs/ratatui/latest/ratatui/enum.Viewport.html
+https://docs.rs/ratatui/latest/ratatui/struct.TerminalOptions.html
+https://docs.rs/ratatui/latest/ratatui/fn.init_with_options.html
 ```
 
-The CI runs on every PR and push to main. A change is not complete until it passes all CI checks.
-
-### Clippy Guidelines
-
-Run clippy with strict settings for maximum code quality:
-
-```bash
-# Standard check
-cargo clippy
-
-# Strict mode - treat warnings as errors
-cargo clippy -- -D warnings
-
-# With additional lints for pedantic checks
-cargo clippy -- -W clippy::pedantic -W clippy::nursery
+Examples (inline viewport):
+```text
+https://ratatui.rs/examples/apps/inline/
 ```
 
-#### Clippy Best Practices
-
-- **Fix all warnings**: Never ignore clippy warnings; they often indicate real issues
-- **Use `#[allow(...)]` sparingly**: Only suppress warnings with a comment explaining why
-- **Common lints to watch for**:
-  - `clippy::unwrap_used` - Prefer `expect()` with context or proper error handling
-  - `clippy::clone_on_ref_ptr` - Avoid unnecessary clones
-  - `clippy::large_enum_variant` - Box large enum variants
-  - `clippy::needless_pass_by_value` - Use references when ownership isn't needed
-  - `clippy::missing_errors_doc` - Document error conditions in public APIs
-  - `clippy::missing_panics_doc` - Document panic conditions
-
-## Project Structure
-
-```
-mcgravity/
-├── CLAUDE.md                    # This file - AI assistant guidance
-├── Cargo.toml                   # Project manifest
-├── Cargo.lock                   # Dependency lock file
-│
-├── docs/                        # Project documentation
-│   ├── architecture.md          # System architecture and design patterns
-│   └── adding-executors.md      # Guide for adding new AI CLI tools
-│
-├── .cursor/rules/               # IDE-specific guidelines
-│   ├── ratatui.mdc              # Ratatui 0.30.0 best practices
-│   └── rust.mdc                 # Rust 2024 edition best practices
-│
-├── src/
-│   ├── main.rs                  # Entry point, terminal setup, event loop
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
