@@ -1,12 +1,12 @@
 ---
 trigger: always_on
-description: Enforce conventional commit message format
+description: Writing unit tests and snapshot tests for UI component rendering
 ---
 
 
-# Commit Message Rules
+# Component Testing Rules
 
-@docs/commit-message.md
+@docs/component-testing.md
 
 ---
 > Source: [pubky/pubky-app](https://github.com/pubky/pubky-app) — distributed by [TomeVault](https://tomevault.io).
