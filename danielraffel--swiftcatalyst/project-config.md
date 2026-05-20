@@ -1,134 +1,185 @@
 ---
 trigger: always_on
-description: Guidelines for automatically committing changes made by CursorAI using conventional commits format for Swift projects and all related assets
+description: Guidelines for implementing the VIPER architecture pattern in SwiftUI applications with hot reloading support
 ---
 
 
-# Git Conventional Commits for Swift Projects
+@file ../Sources/Configuration/Configuration.swift
+@file ../Sources/Modules/Home/View/HomeView.swift
 
-This rule establishes a framework for automatically generating Git commits in the conventional commits format for Swift projects, including all configuration files and asset types.
+# Swift VIPER Architecture Guidelines
 
-## Conventional Commits Format
+## General Guidelines
+1. Use the latest SwiftUI APIs and features whenever possible.
+2. Implement `async/await` for asynchronous operations.
+3. Write clean, readable, and well-structured code.
+4. Follow the VIPER architecture to ensure modularity and scalability.
 
-All commits should follow the conventional commits format:
+## Project Structure
+All code should follow the established project structure:
+- Base directory: SwiftCatalyst
+- Main code in: Sources
+- VIPER modules in: Sources/Modules/[ModuleName]/[ComponentType]/[ModuleName][ComponentType].swift
 
+## File Naming Convention
+- Module components should be named with the pattern [ModuleName][ComponentType].swift
+- For example:
+  - HomeView.swift
+  - HomePresenter.swift
+  - HomeInteractor.swift
+  - HomeEntity.swift
+  - HomeRouter.swift
+
+## Project Configuration
+
+### Environment Variables
+To make the project more configurable, use a `.env` file for environment-specific settings.
+
+1. Create a `.env` file in the project root (add it to your `.gitignore`)
+2. Use the `.env.example` file as a template for required variables
+3. Run `./generate-project.sh` to create your project.yml from the template
+
+The Configuration.swift file provides centralized access to all environment variables:
+
+```swift
+// Example usage:
+let appName = Configuration.appName
+let bundleId = Configuration.bundleIdPrefix + "." + Configuration.appName
 ```
-<type>(<scope>): <description>
+
+This pattern allows for easy customization of:
+- App name and bundle identifiers
+- Team ID and app group ID
+- API endpoints
+- Feature flags
+- Other environment-specific configuration
+
+## VIPER Architecture Overview
+Each module in your SwiftUI app should follow the VIPER structure:
+
+### 1. **View**
+   - The SwiftUI `View` handles user interface (UI) rendering and user interactions.
+   - Import the `Inject` framework to enable hot reloading.
+   - Use `@ObserveInjection` to monitor changes for hot reloading.
+   - Use the `.enableInjection()` modifier in the view body.
+
+   ```swift
+   import SwiftUI
+   import Inject
+
+   struct YourViewName: View {
+       @ObserveInjection var inject
+       let presenter: YourPresenterProtocol
+
+       var body: some View {
+           VStack {
+               // UI elements here
+           }
+           .enableInjection()
+       }
+   }
+   ```
+
+### 2. **Interactor**
+   - The `Interactor` handles business logic and communicates with external data sources (e.g., APIs, databases).
+   - Use protocols to define the interaction between the `Presenter` and `Interactor`.
+
+   ```swift
+   protocol YourInteractorProtocol {
+       func fetchData() async throws -> [YourEntity]
+   }
+
+   final class YourInteractor: YourInteractorProtocol {
+       func fetchData() async throws -> [YourEntity] {
+           // Fetch or compute data
+       }
+   }
+   ```
+
+### 3. **Presenter**
+   - The `Presenter` prepares data for the `View` and handles communication between the `View` and `Interactor`.
+   - Use protocols to abstract the `Presenter` logic.
+
+   ```swift
+   protocol YourPresenterProtocol: ObservableObject {
+       var data: [YourEntity] { get }
+       func loadData() async
+   }
+
+   final class YourPresenter: YourPresenterProtocol {
+       @Published private(set) var data: [YourEntity] = []
+       private let interactor: YourInteractorProtocol
+
+       init(interactor: YourInteractorProtocol) {
+           self.interactor = interactor
+       }
+
+       func loadData() async {
+           do {
+               data = try await interactor.fetchData()
+           } catch {
+               // Handle error
+           }
+       }
+   }
+   ```
+
+### 4. **Entity**
+   - Define simple data models used by the `Interactor` and `Presenter`.
+
+   ```swift
+   struct YourEntity: Identifiable {
+       let id: UUID
+       let name: String
+   }
+   ```
+
+### 5. **Router**
+   - The `Router` handles navigation logic and module creation.
+
+   ```swift
+   protocol YourRouterProtocol {
+       func createModule() -> YourViewName
+   }
+
+   final class YourRouter: YourRouterProtocol {
+       func createModule() -> YourViewName {
+           let interactor = YourInteractor()
+           let presenter = YourPresenter(interactor: interactor)
+           return YourViewName(presenter: presenter)
+       }
+   }
+   ```
+
+## Hot Reloading Setup
+To enable hot reloading in all SwiftUI views:
+1. **Import the Inject framework** in the `View`.
+2. **Add the `@ObserveInjection` property wrapper**.
+3. **Use the `.enableInjection()` modifier** in the main body of the view.
+
+Example:
+```swift
+import SwiftUI
+import Inject
+
+struct ExampleView: View {
+    @ObserveInjection var inject
+    var body: some View {
+        Text("Hello, VIPER!")
+            .enableInjection()
+    }
+}
 ```
 
-Where:
-- **type**: Indicates the kind of change being made
-- **scope**: Optional field indicating the section of the codebase affected
-- **description**: Brief description of the change in imperative mood
+## State Management
+1. Use `@Published` properties in the `Presenter` to manage and update state.
+2. Avoid using `@State` or `@StateObject` directly in the `View`. Instead, rely on the `Presenter` for state.
+3. Pass dependencies via initializers to ensure clear and testable code.
 
-## Swift-Specific Types and Scopes
+## Performance Optimization
+1. Use `LazyVStack`, `LazyHStack`, or `LazyVGrid` for large lists or grids to improve performance.
+2. Optimize `ForEach` loops by providing stable and unique identifiers.
 
-### Commit Types
-
-- **feat**: A new feature or functionality
-- **fix**: A bug fix
-- **refactor**: Code change that neither fixes a bug nor adds a feature
-- **docs**: Documentation only changes
-- **style**: Changes that do not affect code logic (whitespace, formatting, etc.)
-- **test**: Adding or correcting tests
-- **perf**: Performance improvements
-- **chore**: Changes to build process or auxiliary tools
-- **ui**: UI/UX improvements (specific to Swift UI components)
-- **config**: Changes to configuration files
-- **build**: Changes to Xcode build settings, project files, or build scripts
-- **i18n**: Internationalization and localization changes
-- **assets**: Adding or updating media and other resource files
-
-### Scope Conventions for Swift Projects
-
-- **app**: App-level changes (e.g., AppDelegate, SceneDelegate)
-- **view**: View layer changes (UIView, SwiftUI View components)
-- **controller**: View controller changes
-- **presenter**: Presenter layer (VIPER/MVP)
-- **interactor**: Interactor layer (VIPER)
-- **entity**: Model/entity changes
-- **router**: Navigation/routing logic
-- **networking**: API/networking code
-- **persistence**: CoreData or other persistence mechanisms
-- **utils**: Utility functions
-- **extensions**: Swift extensions
-- **config**: Configuration changes
-- **project**: Xcode project settings
-- **assets**: Images, colors, and other resources
-- **i18n**: Localization files
-- **deps**: Dependencies and packages
-- **media**: Audio, video, and other media files
-- **fonts**: Typography assets
-- **docs**: Documentation files
-
-## Automated Commit Rule
-
-<rule>
-name: swift_conventional_commits
-description: Automatically commit changes made by CursorAI using conventional commits format for Swift projects and all related assets
-filters:
-  - type: event
-    pattern: "build_success"
-  - type: file_change
-    pattern: "*"
-actions:
-  - type: execute
-    command: |
-      # Extract the change type and scope from the changes and description
-      CHANGE_TYPE=""
-      
-      # Determine type based on what was changed
-      case "$CHANGE_DESCRIPTION" in
-        *"add"*|*"create"*|*"implement"*|*"new feature"*)
-          CHANGE_TYPE="feat";;
-        *"fix"*|*"correct"*|*"resolve"*|*"bug"*)
-          CHANGE_TYPE="fix";;
-        *"refactor"*|*"restructure"*|*"reorganize"*)
-          CHANGE_TYPE="refactor";;
-        *"test"*|*"unit test"*|*"ui test"*)
-          CHANGE_TYPE="test";;
-        *"doc"*|*"comment"*|*"documentation"*|*"readme"*)
-          CHANGE_TYPE="docs";;
-        *"style"*|*"format"*|*"whitespace"*|*"indent"*)
-          CHANGE_TYPE="style";;
-        *"perf"*|*"optimize"*|*"performance"*)
-          CHANGE_TYPE="perf";;
-        *"ui"*|*"interface"*|*"visual"*)
-          CHANGE_TYPE="ui";;
-        *"localize"*|*"translate"*|*"i18n"*)
-          CHANGE_TYPE="i18n";;
-        *"image"*|*"icon"*|*"graphic"*|*"asset"*)
-          CHANGE_TYPE="assets";;
-        *"audio"*|*"sound"*|*"music"*|*"video"*)
-          CHANGE_TYPE="assets";;
-        *)
-          # Look at file extension to determine type for non-keyword cases
-          if [[ "$FILE" == *".xcodeproj"* || "$FILE" == *".pbxproj"* || "$FILE" == *".xcworkspace"* ]]; then
-            CHANGE_TYPE="build"
-          elif [[ "$FILE" == *".plist"* || "$FILE" == *".xcconfig"* || "$FILE" == *".yml"* || "$FILE" == *".yaml"* || "$FILE" == *".json"* ]]; then
-            CHANGE_TYPE="config"
-          elif [[ "$FILE" == *".strings"* || "$FILE" == *".stringsdict"* ]]; then
-            CHANGE_TYPE="i18n"
-          elif [[ "$FILE" == *".png"* || "$FILE" == *".jpg"* || "$FILE" == *".jpeg"* || "$FILE" == *".gif"* || "$FILE" == *".svg"* || "$FILE" == *".pdf"* ]]; then
-            CHANGE_TYPE="assets"
-          elif [[ "$FILE" == *".mp3"* || "$FILE" == *".mp4"* || "$FILE" == *".mov"* || "$FILE" == *".wav"* ]]; then
-            CHANGE_TYPE="assets"
-          elif [[ "$FILE" == *".otf"* || "$FILE" == *".ttf"* || "$FILE" == *".woff"* ]]; then
-            CHANGE_TYPE="assets"
-          elif [[ "$FILE" == *".md"* || "$FILE" == *".txt"* || "$FILE" == *"README"* || "$FILE" == *"LICENSE"* ]]; then
-            CHANGE_TYPE="docs"
-          else
-            CHANGE_TYPE="chore"
-          fi
-          ;;
-      esac
-      
-      # Extract scope based on file type and location
-      if [[ "$FILE" == *".swift" ]]; then
-        # Swift files follow the standard Swift scoping
-        if [[ "$FILE" == *"View.swift" || "$FILE" == *"/Views/"* || "$FILE" == *"/View/"* ]]; then
-          SCOPE="view"
-        elif [[ "$FILE" == *"ViewController.swift" || "$FILE" == *"/ViewControllers/"* ]]; then
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
