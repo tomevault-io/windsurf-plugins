@@ -1,12 +1,12 @@
 ---
 trigger: always_on
-description: Skeleton component architecture and consistency rules
+description: Z-index layering conventions for consistent stacking
 ---
 
 
-# Skeleton Architecture Rules
+# Z-Index Rules
 
-@docs/skeleton-architecture.md
+@docs/z-index.md
 
 ---
 > Source: [pubky/pubky-app](https://github.com/pubky/pubky-app) — distributed by [TomeVault](https://tomevault.io).
