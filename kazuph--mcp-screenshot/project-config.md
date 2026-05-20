@@ -1,0 +1,126 @@
+---
+trigger: always_on
+description: A list of applications that support MCP integrations
+---
+
+# Clients
+
+A list of applications that support MCP integrations
+
+This page provides an overview of applications that support the Model Context Protocol (MCP). Each client may support different MCP features, allowing for varying levels of integration with MCP servers.
+
+## Feature support matrix
+
+| Client                       | [Resources] | [Prompts] | [Tools] | [Sampling] | Roots | Notes                                            |
+| ---------------------------- | ----------- | --------- | ------- | ---------- | ----- | ------------------------------------------------ |
+| [Claude Desktop App][Claude] | ✅           | ✅         | ✅       | ❌          | ❌     | Full support for all MCP features                |
+| [Zed][Zed]                   | ❌           | ✅         | ❌       | ❌          | ❌     | Prompts appear as slash commands                 |
+| [Sourcegraph Cody][Cody]     | ✅           | ❌         | ❌       | ❌          | ❌     | Supports resources through OpenCTX               |
+| [Firebase Genkit][Genkit]    | ⚠️          | ✅         | ✅       | ❌          | ❌     | Supports resource list and lookup through tools. |
+| [Continue][Continue]         | ✅           | ✅         | ✅       | ❌          | ❌     | Full support for all MCP features                |
+
+[Claude]: https://claude.ai/download
+
+[Zed]: https://zed.dev
+
+[Cody]: https://sourcegraph.com/cody
+
+[Genkit]: https://github.com/firebase/genkit
+
+[Continue]: https://github.com/continuedev/continue
+
+[Resources]: https://modelcontextprotocol.io/docs/concepts/resources
+
+[Prompts]: https://modelcontextprotocol.io/docs/concepts/prompts
+
+[Tools]: https://modelcontextprotocol.io/docs/concepts/tools
+
+[Sampling]: https://modelcontextprotocol.io/docs/concepts/sampling
+
+## Client details
+
+### Claude Desktop App
+
+The Claude desktop application provides comprehensive support for MCP, enabling deep integration with local tools and data sources.
+
+**Key features:**
+
+*   Full support for resources, allowing attachment of local files and data
+*   Support for prompt templates
+*   Tool integration for executing commands and scripts
+*   Local server connections for enhanced privacy and security
+
+> ⓘ Note: The Claude.ai web application does not currently support MCP. MCP features are only available in the desktop application.
+
+### Zed
+
+[Zed](https://zed.dev/docs/assistant/model-context-protocol) is a high-performance code editor with built-in MCP support, focusing on prompt templates and tool integration.
+
+**Key features:**
+
+*   Prompt templates surface as slash commands in the editor
+*   Tool integration for enhanced coding workflows
+*   Tight integration with editor features and workspace context
+*   Does not support MCP resources
+
+### Sourcegraph Cody
+
+[Cody](https://openctx.org/docs/providers/modelcontextprotocol) is Sourcegraph's AI coding assistant, which implements MCP through OpenCTX.
+
+**Key features:**
+
+*   Support for MCP resources
+*   Integration with Sourcegraph's code intelligence
+*   Uses OpenCTX as an abstraction layer
+*   Future support planned for additional MCP features
+
+### Firebase Genkit
+
+[Genkit](https://github.com/firebase/genkit) is Firebase's SDK for building and integrating GenAI features into applications. The [genkitx-mcp](https://github.com/firebase/genkit/tree/main/js/plugins/mcp) plugin enables consuming MCP servers as a client or creating MCP servers from Genkit tools and prompts.
+
+**Key features:**
+
+*   Client support for tools and prompts (resources partially supported)
+*   Rich discovery with support in Genkit's Dev UI playground
+*   Seamless interoperability with Genkit's existing tools and prompts
+*   Works across a wide variety of GenAI models from top providers
+
+### Continue
+
+[Continue](https://github.com/continuedev/continue) is an open-source AI code assistant, with built-in support for all MCP features.
+
+**Key features**
+
+*   Type "@" to mention MCP resources
+*   Prompt templates surface as slash commands
+*   Use both built-in and MCP tools directly in chat
+*   Supports VS Code and JetBrains IDEs, with any LLM
+
+## Adding MCP support to your application
+
+If you've added MCP support to your application, we encourage you to submit a pull request to add it to this list. MCP integration can provide your users with powerful contextual AI capabilities and make your application part of the growing MCP ecosystem.
+
+Benefits of adding MCP support:
+
+*   Enable users to bring their own context and tools
+*   Join a growing ecosystem of interoperable AI applications
+*   Provide users with flexible integration options
+*   Support local-first AI workflows
+
+To get started with implementing MCP in your application, check out our [Python](https://github.com/modelcontextprotocol/python-sdk) or [TypeScript SDK Documentation](https://github.com/modelcontextprotocol/typescript-sdk)
+
+## Updates and corrections
+
+This list is maintained by the community. If you notice any inaccuracies or would like to update information about MCP support in your application, please submit a pull request or [open an issue in our documentation repository](https://github.com/modelcontextprotocol/docs/issues).
+
+
+# Core architecture
+
+Understand how MCP connects clients, servers, and LLMs
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [kazuph/mcp-screenshot](https://github.com/kazuph/mcp-screenshot) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-20 -->
