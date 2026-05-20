@@ -1,221 +1,128 @@
 ---
 trigger: always_on
-description: Makefile best practices for developer workflows: Apply when working with Makefiles or build automation
+description: Mermaid.js Best Practices: Guidelines for creating robust, maintainable, and error-free Mermaid diagrams. Apply when working with `.mmd` files or creating Mermaid diagrams in Markdown.
 ---
 
-# Makefile Best Practices for Developer Workflows
 
-## Overview
+# Mermaid.js Best Practices
 
-When working with Makefiles, follow these best practices to create maintainable, reliable, and developer-friendly build automation. Makefiles should be structured for clarity, correctness, and ease of use.
+This guide provides best practices for creating clear, maintainable, and error-free diagrams using Mermaid.js. Following these guidelines will help prevent common parsing errors and ensure diagrams are accessible and easy to understand.
 
-## Core Principles
+## 1. Core Principles
 
-1. **Embrace the Filesystem**: `make` is fundamentally a tool for building files. Rules should correspond to actual files on the filesystem to leverage dependency tracking.
-2. **Be Explicit and Predictable**: Configure Makefiles to have consistent behavior and avoid built-in rules that can cause surprises.
-3. **Prioritize Clarity**: Use namespacing, includes, and self-documenting targets.
-4. **Write Small, Focused Recipes**: Delegate complex logic to external scripts.
-5. **Ensure Compatibility**: Write Makefiles that work across different Make versions and platforms.
-6. **Test Thoroughly**: Always test your Makefile targets on the actual target platforms.
+- **Clarity Over Complexity**: Prioritize conveying information clearly. Mermaid is for creating understandable diagrams, not for intricate graphic design.
+- **Use the Live Editor**: Always use the [Mermaid Live Editor](https://mermaid.live/) for creating, testing, and debugging diagrams. It provides real-time feedback and helps catch syntax errors instantly.
+- **Commit Text, Not Images**: The primary benefit of Mermaid is its text-based format. Always commit the `.mmd` or Markdown source file to version control, not the rendered images. Images should be generated from the source as part of a build or documentation process.
 
-## Compatibility Considerations
+## 2. Avoiding Common Parsing Errors
 
-### Make Version Compatibility
+Parsing errors, like the ones we encountered, are often caused by special characters in node text or edge labels.
 
-**CRITICAL**: Always ensure your Makefile works with commonly available Make versions:
+### Node and Edge Text
 
-- **macOS**: Ships with GNU Make 3.81 (from 2006) by default
-- **Linux**: Usually has GNU Make 4.0+ 
-- **Windows**: Varies widely depending on installation
+- **Avoid Special Characters in Text**: To prevent parsing issues, avoid using the following special characters in node descriptions or edge labels: `|`, `(`, `)`, `[`, `]`.
+  - **Good**: `NodeA --> |sends data to| NodeB`
+  - **Bad (risky)**: `NodeA --> |sends data (and other items)| NodeB`
+- **Use Alternatives**: If you need a separator, use a hyphen `-` or slash `/` instead of a pipe `|`.
+  - **Good**: `Replica: 1 (Team) / N (Prod)`
+  - **Bad**: `Replica: 1 (Team) | N (Prod)`
+- **Quoting Text**: If you must use special characters, try enclosing the text in quotes. This can sometimes help the parser correctly interpret the string.
+  - **Example**: `A["Node A with (special) characters"]`
 
-### Checking Make Version
+### Node IDs
 
-Before using advanced features, check the Make version:
+- **Use Simple Alphanumeric IDs**: Node IDs should be simple and contain no spaces or special characters.
+  - **Good**: `authService`, `databaseNode`, `userGateway`
+  - **Bad**: `auth-service`, `(database)`, `user gateway`
 
-```bash
-make --version
+## 3. Structure and Readability
+
+### Layout
+
+- **Choose the Right Direction**: Use `graph TD` (Top-Down) for hierarchical flows or `graph LR` (Left-to-Right) for process flows. `LR` is often more readable on wide screens.
+- **Use Subgraphs**: Group related nodes into subgraphs to create logical boundaries and improve clarity.
+
+```mermaid
+subgraph "Authentication Service"
+    authDB[(Database)]
+    authAPI[API]
+end
 ```
 
-For GNU Make 4.0+ features, consider providing fallbacks or clear error messages.
+### Node Shapes
 
-### Common Compatibility Issues
+- Use distinct node shapes to represent different types of entities. This adds an extra layer of visual information.
+  - `id[text]`: Rectangle
+  - `id(text)`: Rounded rectangle
+  - `id([text])`: Stadium-shaped
+  - `id{text}`: Diamond (for decisions)
+  - `id((text))`: Circle
+  - `id>text]`: Asymmetric (for flags or tags)
 
-1. **`.RECIPEPREFIX` Support**: Only available in GNU Make 4.0+
-2. **Some built-in functions**: Newer versions have more features
-3. **Shell behavior**: Different platforms may have different default shells
+### Line Breaks
 
-## Required Preamble
+- Use the `<br>` tag inside node text to create multi-line labels. This is essential for keeping nodes tidy and readable.
 
-Every Makefile MUST start with this compatibility-focused preamble:
-
-```makefile
-# Use bash as the shell with strict mode
-SHELL := bash
-.SHELLFLAGS := -eu -o pipefail -c
-
-# Run all recipe lines in a single shell instance
-.ONESHELL:
-
-# If a rule fails, delete its target file
-.DELETE_ON_ERROR:
-
-# Disable make's built-in rules and suffix rules
-MAKEFLAGS += --no-builtin-rules
-.SUFFIXES:
+```mermaid
+A[This is a long description<br>that has been broken<br>into multiple lines.]
 ```
 
-### Advanced Features (Optional)
+## 4. Icons and Visuals
 
-For teams using modern Make versions, you can optionally add:
+- **Use FontAwesome Icons**: Add visual cues to your diagrams using FontAwesome icons. This makes them more intuitive.
+- **Syntax**: Use the `fa:fa-icon-name` prefix for regular icons and `fab:fa-brand-name` for brand icons.
 
-```makefile
-# Optional: Set custom recipe prefix (requires GNU Make 4.0+)
-# Only use if your team standardizes on modern Make versions
-ifeq ($(shell make --version 2>/dev/null | head -1 | cut -d' ' -f3 | cut -d'.' -f1),4)
-  .RECIPEPREFIX = >
-endif
+```mermaid
+flowchart LR
+    user(fa:fa-user User) --> api(fa:fa-cogs API)
+    api --> db(fa:fa-database Database)
 ```
 
-**Recommendation**: Use traditional tabs for maximum compatibility unless you have specific requirements for alternative prefixes.
+- **Troubleshooting**: If an icon doesn't appear, check the [FontAwesome website](https://fontawesome.com/icons) for its official name or aliases.
 
-## Recipe Formatting Guidelines
+## 5. Accessibility
 
-### Use Traditional Tabs (Recommended)
+- **Problem**: Screen readers cannot easily interpret the visual relationships in a rendered SVG diagram.
+- **Solution**: Always include accessibility information.
 
-For maximum compatibility, use traditional tab characters for recipe indentation:
+### Title and Description
 
-```makefile
-clean:
-	@echo "🧹 Cleaning up..."
-	rm -rf build/ tmp/
-.PHONY: clean
+- **`title`**: Provide a descriptive title using frontmatter. This gives the diagram an accessible name.
+- **`accDescr`**: Provide a detailed text description of the diagram's structure and flow. This is crucial for screen reader users.
 
-test:
-	@echo "🧪 Running tests..."
-	pytest
-.PHONY: test
+```mermaid
+---
+title: User Authentication Flow
+---
+graph TD
+    accTitle: User Authentication Flow
+    accDescr {
+        A user starts at the login page. They submit their credentials to the API, which validates them against the database.
+    }
+
+    A[Login Page] --> B{API Validation}
+    B --> C[(Database)]
 ```
 
-### Alternative: Custom Recipe Prefix (Advanced)
+### Themes and Colors
 
-Only use custom recipe prefixes if you're certain all team members use GNU Make 4.0+:
+- **Avoid Hardcoded Themes**: In environments like GitHub that support automatic light/dark mode, do not use the `%%{init}: {'theme': 'dark'}%%` directive. It will override the platform's theme switching and can make the diagram unreadable.
+- **High Contrast**: If using custom colors, ensure they have sufficient contrast in both light and dark modes.
+
+## 6. Makefile for Rendering (Example)
+
+For projects with multiple diagrams, use a `Makefile` to automate rendering.
 
 ```makefile
-# Only if you've verified Make 4.0+ usage across your team
-.RECIPEPREFIX = >
-
-clean:
-> @echo "🧹 Cleaning up..."
-> rm -rf build/ tmp/
-.PHONY: clean
+## charts/render: Render all Mermaid diagrams to PNG.
+charts/render:
+	@echo "🎨 Rendering architecture charts..."
+	mmdc -i docs/charts/architecture.mmd -o docs/charts/architecture.png
+	@echo "✅ Charts rendered!"
+.PHONY: charts/render
 ```
 
-## Structure and Organization
-
-### Target Namespacing
-
-- Use `/` as namespace delimiter for clarity
-- Organize related targets under common namespaces
-
-```makefile
-# Good: Namespaced structure
-lint/python:
-	@echo "Linting Python code..."
-	ruff check .
-
-format/python:
-	@echo "Formatting Python code..."
-	ruff format .
-
-docker/build:
-	docker build -t myapp .
-
-docker/run:
-	docker run -p 8080:8080 myapp
-
-test/unit:
-	pytest tests/unit/
-
-test/integration:
-	pytest tests/integration/
-```
-
-### File Organization
-
-For larger projects, split Makefiles using includes:
-
-```makefile
-# In root Makefile
--include make/*.mk
-```
-
-Create separate files like:
-- `make/lint.mk` - Linting and formatting targets
-- `make/docker.mk` - Container-related targets
-- `make/test.mk` - Testing targets
-
-### Standard Target Names
-
-Always provide these conventional targets:
-- `all`: Default target that builds main artifacts
-- `install`: Install the application
-- `test`: Run all tests
-- `clean`: Remove build artifacts and temporary files
-- `help`: Display available targets and descriptions
-
-## Rule Writing Guidelines
-
-### Use .PHONY Correctly
-
-- Mark targets as `.PHONY` if they don't create a file with the target name
-- Place `.PHONY` declarations immediately after the target definition
-
-```makefile
-clean:
-	rm -rf build/ tmp/
-.PHONY: clean
-
-test:
-	pytest
-.PHONY: test
-```
-
-### File Targets Must Create Exact Files
-
-When a rule creates a file, the target name must be the exact file path:
-
-```makefile
-build/app: main.c utils.c
-	mkdir -p $(@D)
-	gcc -o $@ $^
-```
-
-### Use Sentinel Files for Abstract Outputs
-
-For tasks that don't produce a single obvious file, use sentinel files:
-
-```makefile
-# Track when tests last passed
-SRC_FILES := $(shell find src -type f -name "*.py")
-
-tmp/.tests-passed: $(SRC_FILES)
-	mkdir -p $(@D)
-	pytest
-	touch $@
-
-test: tmp/.tests-passed
-.PHONY: test
-```
-
-### Delegate Complex Logic to Scripts
-
-Keep Makefile recipes simple. Move complex logic to external scripts:
-
-```makefile
-# Bad: Complex inline script
-deploy/staging:
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+This ensures consistency and saves time. If rendering fails, it's a signal that a diagram has a syntax error that needs to be fixed.
 
 ---
 > Source: [biokraft/my-cursor-framework](https://github.com/biokraft/my-cursor-framework) — distributed by [TomeVault](https://tomevault.io).
