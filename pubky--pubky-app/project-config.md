@@ -1,12 +1,12 @@
 ---
 trigger: always_on
-description: Writing unit tests and snapshot tests for UI component rendering
+description: Component development patterns - Shadcn first, atomic design, Figma parity
 ---
 
 
-# Component Testing Rules
+# Component Rules
 
-@docs/component-testing.md
+@docs/components.md
 
 ---
 > Source: [pubky/pubky-app](https://github.com/pubky/pubky-app) — distributed by [TomeVault](https://tomevault.io).
