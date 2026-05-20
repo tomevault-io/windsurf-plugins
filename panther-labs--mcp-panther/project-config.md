@@ -1,10 +1,9 @@
 ---
 trigger: always_on
-description: 1. ALWAYS ENSURE COMPLIANCE WITH [panther.graphql](mdc:.prd/resources/panther.graphql) WHEN IMPLEMENTING GRAPHQL ENDPOINTS
+description: UPDATE THE README.md AFTER ADDING new user-facing functionality.
 ---
 
-1. ALWAYS ENSURE COMPLIANCE WITH [panther.graphql](mdc:.prd/resources/panther.graphql) WHEN IMPLEMENTING GRAPHQL ENDPOINTS
-2. OR ALWAYS ENSURE COMPLIANCE WITH [panther_open_api_v3_spec.yaml](mdc:.prd/resources/panther_open_api_v3_spec.yaml) WHEN IMPLEMENTING REST ENDPOINTS
+UPDATE THE README.md AFTER ADDING new user-facing functionality.
 
 ---
 > Source: [panther-labs/mcp-panther](https://github.com/panther-labs/mcp-panther) — distributed by [TomeVault](https://tomevault.io).
