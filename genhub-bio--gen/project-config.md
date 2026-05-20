@@ -1,0 +1,124 @@
+---
+trigger: always_on
+description: Rust Coding Style
+---
+
+# Rust Coding Style
+
+## Project-Specific Patterns
+
+- Use the 2025 edition of Rust
+- Feature flags in this codebase use the `#[cfg(feature = "...")]` pattern
+- Invoke `cargo clippy` with `--all-features`, `--all-targets`, and `--no-deps` from the root
+- Use `cargo doc --no-deps --all-features` for checking documentation
+- Use `cargo fmt` to format the code
+- Use `#[expect(lint, reason = "...")]` over `#[allow(lint)]`
+
+## Type System
+
+- Create strong types with newtype patterns for domain entities
+- Consider visibility carefully (avoid unnecessary `pub`)
+
+```rust
+#[derive(Debug, Copy, Clone, Eq, Hash, PartialEq)]
+pub struct UserId(Uuid);
+```
+
+## Async Patterns
+
+- Use `impl Future<Output = T> + Send` in trait definitions:
+
+```rust
+fn get_data(
+    &self,
+    id: String,
+) -> impl Future<Output = Result<Data, Report<DataError>>> + Send {
+    async move {
+        // Implementation
+    }
+}
+```
+
+## Function Arguments
+
+- Functions should **never** take more than 7 arguments. If a function requires more than 7 arguments, encapsulate related parameters in a struct.
+- Functions that use data immutably should take a reference to the data, while functions that modify data should take a mutable reference. Never take ownership of data unless the function explicitly consumes it.
+- Make functions `const` whenever possible.
+- Prefer the following argument types when applicable, but only if this does not reduce performance:
+  - `impl AsRef<str>` instead of `&str` or `&String`
+  - `impl AsRef<Path>` instead of `&Path` or `&PathBuf`
+  - `impl IntoIterator<Item = &T>` when only iterating over the data
+  - `&[T]` instead of `&Vec<T>`
+  - `&mut [T]` instead of `&mut Vec<T>` when the function doesn't need to resize the vector
+  - `impl Into<Cow<T>>` instead of `Cow<T>`
+  - `impl Into<Arc<T>>` instead of `Arc<T>`
+  - `impl Into<Rc<T>>` instead of `Rc<T>`
+  - `impl Into<Box<T>>` instead of `Box<T>`
+- Never use `impl Into<Option<_>>` as from reading the caller site, it's not visible that `None` could potentially be passed
+
+## `From` and `Into`
+
+- Generally prefer `From` implementations over `Into` implementations. The Rust compiler will automatically derive `Into` from `From`, but not vice versa.
+- When converting between types, prefer using the `from` method over `into` for clarity. The `from` method makes the target type explicit in the code, while `into` requires type inference.
+- For wrapper types like `Cow`, `Arc`, `Rc`, `Report`, and `Box`, prefer using explicit constructors (e.g., `Cow::from`, `Arc::new`) instead of `.into()`. This improves readability by clearly indicating the target type.
+
+## Smart Pointers
+
+- When cloning smart pointers such as `Arc` and `Rc`, **always** use `Arc::clone(&pointer)` and `Rc::clone(&pointer)` instead of `pointer.clone()`. This explicitly indicates you're cloning the reference, not the underlying data.
+
+## Instrumentation
+
+- Annotate functions that perform significant work with `#[tracing::instrument]`
+- Use `tracing` macros (e.g., `trace!`, `debug!`, `info!`, `warn!`, `error!`) instead of `println!` or `eprintln!` for logging
+
+## Allocations
+
+- Minimize allocations when possible. For example, reuse a `Vec` in a loop instead of creating a new one in each iteration.
+- Prefer borrowed data over owned data where appropriate.
+- Balance performance and readability—if an allocation makes code significantly more readable or maintainable, the trade-off may be worthwhile.
+
+## Types
+
+- Use newtypes when a value should carry specific semantics beyond its underlying type. This improves type safety and code clarity.
+
+For example:
+
+```rust
+struct UserId(u64);  // instead of `type UserId = u64;` or `u64`
+```
+
+## Naming Conventions
+
+When suggesting names for variables, functions, or types:
+
+- Do not prefix test-function names with `test_`, this would otherwise result in `test::test_<name>` names.
+- Provide a concise list of naming options with brief explanations of why each fits the context
+- Choose names of appropriate length—avoid names that are too long or too short
+- Avoid abbreviations unless they are widely recognized in the domain (e.g., `Http` or `Json` is acceptable, but `Ctx` instead of `Context` is not)
+- Do not suffix names with their types (e.g., use `users` instead of `usersList`)
+- Do not repeat the type name in variable names (e.g., use `user` instead of `userUser`)
+
+## Crate Preferences
+
+- Use `similar_asserts` for test assertions
+- Use `insta` for snapshot tests
+- Use `test_log` for better test output (`#[test_log::test]`)
+- Use `tracing` macros, not `log` macros
+- Prefer `tracing::instrument` for function instrumentation
+
+## Import Style
+
+- Don't use local imports within functions, or blocks
+- Avoid wildcard imports like `use super::*;`, or `use crate::module::*;`
+- Never use a prelude `use crate::prelude::*`
+- Prefer explicit imports to make dependencies clear and improve code readability
+- We prefer `core` over `alloc` over `std` for imports to minimize dependencies
+  - Use `core` for functionality that doesn't require allocation
+  - Use `alloc` when you need allocation but not OS-specific features
+  - Only use `std` when necessary for OS interactions or when using `core`/`alloc` would be unnecessarily complex
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [genhub-bio/gen](https://github.com/genhub-bio/gen) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-19 -->
