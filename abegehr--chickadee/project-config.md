@@ -1,101 +1,214 @@
 ---
 trigger: always_on
-description: daisyUI 5 is a CSS library for Tailwind CSS 4
+description: meta framework
 ---
 
-# daisyUI 5
-daisyUI 5 is a CSS library for Tailwind CSS 4
-daisyUI 5 provides class names for common UI componentsdaisyUI 5 docs](http://daisyue: How to use this file in LLMs and code editors](https://daisyui.com/docs/editor/)
-- [daisyUI 5 release notes](https://daisyui.com/docs/v5/)
-- [daisyUI 4 to 5 upgrade guide](https://daisyui.com/docs/upgrade/)
+# HonoX
 
-## daisyUI 5 install notes
-[install guide](https://daisyui.com/docs/install/)
-1. daisyUI 5 requires Tailwind CSS 4
-2. `tailwind.config.js` file is deprecated in Tailwind CSS v4. do not use `tailwind.config.js`. Tailwind CSS v4 only needs `@import "tailwindcss";` in the CSS file if it's a node dependency.
-3. daisyUI 5 can be installed using `npm i -D daisyui@latest` and then adding `@plugin "daisyui";` to the CSS file
-4. daisyUI is suggested to be installed as a dependency but if you really want to use it from CDN, you can use Tailwind CSS and daisyUI CDN files:
-```html
-<link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
-<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+**HonoX** is a simple and fast meta-framework for creating full-stack websites or Web APIs - (formerly _[Sonik](mdc:https:/github.com/sonikjs/sonik)_). It stands on the shoulders of giants; built on [Hono](mdc:https:/hono.dev), [Vite](mdc:https:/vitejs.dev), and UI libraries.
+
+**Note**: _HonoX is currently in the "alpha stage". Breaking changes are introduced without following semantic versioning._
+
+## Features
+
+- **File-based routing** - You can create a large application like Next.js.
+- **Fast SSR** - Rendering is ultra-fast thanks to Hono.
+- **BYOR** - You can bring your own renderer, not only one using hono/jsx.
+- **Islands hydration** - If you want interactions, create an island. JavaScript is hydrated only for it.
+- **Middleware** - It works as Hono, so you can use a lot of Hono's middleware.
+
+## Installing
+
+You can install the `honox` package from the npm.
+
+```txt
+npm install hono honox
 ```
-5. A CSS file with Tailwind CSS and daisyUI looks like this (if it's a node dependency)
-```css
-@import "tailwindcss";
-@plugin "daisyui";
+
+## Starter template
+
+If you are starting a new HonoX project, use the `hono-create` command. Run the following and choose `x-basic` (use the arrow keys to find the option).
+
+```txt
+npm create hono@latest
 ```
 
-## daisyUI 5 usage rules
-1. We can give styles to a HTML element by adding daisyUI class names to it. By adding a component class name, part class names (if there's any available for that component), and modifier class names (if there's any available for that component)
-2. Components can be customized using Tailwind CSS utility classes if the customization is not possible using the existing daisyUI classes. For example `btn px-10` sets a custom horizontal padding to a `btn`
-3. If customization of daisyUI styles using Tailwind CSS utility classes didn't work because of CSS specificity issues, you can use the `!` at the end of the Tailwind CSS utility class to override the existing styles. For example `btn bg-red-500!` sets a custom background color to a `btn` forcefully. This is a last resort solution and should be used sparingly
-4. If a specific component or something similar to it doesn't exist in daisyUI, you can create your own component using Tailwind CSS utility
-5. when using Tailwind CSS `flex` and `grid` for layout, it should be responsive using Tailwind CSS responsive utility prefixes.
-6. Only allowed class names are existing daisyUI class names or Tailwind CSS utility classes.
-7. Ideally, you won't need to write any custom CSS. Using daisyUI class names or Tailwind CSS utility classes is preferred.
-8. suggested - if you need placeholder images, use https://picsum.photos/200/300 with the size you want
-9. suggested - when designing , don't add a custom font unless it's necessary
-10. don't add `bg-base-100 text-base-content` to body unless it's necessary
-11. For design decisions, use Refactoring UI book best practices
+## Get Started - Basic
 
-daisyUI 5 class names are one of the following categories. these type names are only for reference and are not used in the actual code
-- `component`: the required component class
-- `part`: a child part of a component
-- `style`: sets a specific style to component or part
-- `behavior`: changes the behavior of component or part
-- `color`: sets a specific color to component or part
-- `size`: sets a specific size to component or part
-- `placement`: sets a specific placement to component or part
-- `direction`: sets a specific direction to component or part
-- `modifier`: modifies the component or part in a specific way
+Let's create a basic HonoX application using hono/jsx as a renderer. This application has no client JavaScript and renders JSX on the server side.
 
-## Config
-daisyUI 5 config docs: https://daisyui.com/docs/config/
-daisyUI without config:
-```css
-@plugin "daisyui";
+### Project Structure
+
+Below is a typical project structure for a HonoX application.
+
+```txt
+.
+├── app
+│   ├── global.d.ts // global type definitions
+│   ├── routes
+│   │   ├── _404.tsx // not found page
+│   │   ├── _error.tsx // error page
+│   │   ├── _renderer.tsx // renderer definition
+│   │   ├── merch
+│   │   │   └── [...slug].tsx // matches `/merch/:category`, `/merch/:category/:item`, `/merch/:category/:item/:variant`
+│   │   ├── about
+│   │   │   └── [name].tsx // matches `/about/:name`
+│   │   ├── blog
+│   │   │   ├── index.tsx // matches /blog
+│   │   │   └── (content)
+│   │   │       ├── _renderer.tsx // renderer definition for routes inside this directory
+│   │   │       └── [name].tsx    // matches `/blog/:name`
+│   │   └── index.tsx // matches `/`
+│   └── server.ts // server entry file
+├── package.json
+├── tsconfig.json
+└── vite.config.ts
 ```
-daisyUI config with `light` theme only:
-```css
-@plugin "daisyui" {
-  themes: light --default;
+
+### `vite.config.ts`
+
+The minimum Vite setup for development is as follows:
+
+```ts
+import { defineConfig } from 'vite'
+import honox from 'honox/vite'
+
+export default defineConfig({
+  plugins: [honox()],
+})
+```
+
+### Server Entry File
+
+A server entry file is required. The file should be placed at `app/server.ts`. This file is first called by the Vite during the development or build phase.
+
+In the entry file, simply initialize your app using the `createApp()` function. `app` will be an instance of Hono, so you can use Hono's middleware and the `showRoutes()` in `hono/dev`.
+
+```ts
+// app/server.ts
+import { createApp } from 'honox/server'
+import { showRoutes } from 'hono/dev'
+
+const app = createApp()
+
+showRoutes(app)
+
+export default app
+```
+
+### Routes
+
+There are three ways to define routes.
+
+#### 1. `createRoute()`
+
+Each route should return an array of `Handler | MiddlewareHandler`. `createRoute()` is a helper function to return it. You can write a route for a GET request with `default export`.
+
+```tsx
+// app/routes/index.tsx
+// `createRoute()` helps you create handlers
+import { createRoute } from 'honox/factory'
+
+export default createRoute((c) => {
+  return c.render(
+    <div>
+      <h1>Hello!</h1>
+    </div>
+  )
+})
+```
+
+You can also handle methods other than GET by `export` `POST`, `PUT`, and `DELETE`.
+
+```tsx
+// app/routes/index.tsx
+import { createRoute } from 'honox/factory'
+import { getCookie, setCookie } from 'hono/cookie'
+
+export const POST = createRoute(async (c) => {
+  const { name } = await c.req.parseBody<{ name: string }>()
+  setCookie(c, 'name', name)
+  return c.redirect('/')
+})
+
+export default createRoute((c) => {
+  const name = getCookie(c, 'name') ?? 'no name'
+  return c.render(
+    <div>
+      <h1>Hello, {name}!</h1>
+      <form method='POST'>
+        <input type='text' name='name' placeholder='name' />
+        <input type='submit' />
+      </form>
+    </div>
+  )
+})
+```
+
+#### 2. Using a Hono instance
+
+You can create API endpoints by exporting an instance of the Hono object.
+
+```ts
+// app/routes/about/index.ts
+import { Hono } from 'hono'
+
+const app = new Hono()
+
+// matches `/about/:name`
+app.get('/:name', (c) => {
+  const name = c.req.param('name')
+  return c.json({
+    'your name is': name,
+  })
+})
+
+export default app
+```
+
+#### 3. Just return JSX
+
+Or simply, you can just return JSX.
+
+```tsx
+// app/routes/index.tsx
+export default function Home(_c: Context) {
+  return <h1>Welcome!</h1>
 }
 ```
-daisyUI with all the default configs:
-```css
-@plugin "daisyui" {
-  themes: light --default, dark --prefersdark;
-  root: ":root";
-  include: ;
-  exclude: ;
-  prefix: ;
-  logs: true;
-}
-```
-An example config:
-In below config, all the built-in themes are enabled while bumblebee is the default theme and synthwave is the prefersdark theme (default dark mode)
-All the other themes are enabled and can be used by adding `data-theme="THEME_NAME"` to the `<html>` element
-root scrollbar gutter is excluded. `daisy-` prefix is used for all daisyUI classes and console.log is disabled
-```css
-@plugin "daisyui" {
-  themes: light, dark, cupcake, bumblebee --default, emerald, corporate, synthwave --prefersdark, retro, cyberpunk, valentine, halloween, garden, forest, aqua, lofi, pastel, fantasy, wireframe, black, luxury, dracula, cmyk, autumn, business, acid, lemonade, night, coffee, winter, dim, nord, sunset, caramellatte, abyss, silk;
-  root: ":root";
-  include: ;
-  exclude: rootscrollgutter, checkbox;
-  prefix: daisy-;
-  logs: false;
-}
-```
-## daisyUI 5 colors
 
-### daisyUI color names
-- `primary`: Primary brand color, The main color of your brand
-- `primary-content`: Foreground content color to use on primary color
-- `secondary`: Secondary brand color, The optional, secondary color of your brand
-- `secondary-content`: Foreground content color to use on secondary color
-- `accent`: Accent brand color, The optional, accent color of your brand
-- `accent-content`: Foreground content color to use on accent color
-- `neutral`: Neutral dark color, For not-saturated parts of UI
+### Renderer
+
+Define your renderer - the middleware that does `c.setRender()` - by writing it in `_renderer.tsx`.
+
+Before writing `_renderer.tsx`, write the Renderer type definition in `global.d.ts`.
+
+```ts
+// app/global.d.ts
+import type {} from 'hono'
+
+type Head = {
+  title?: string
+}
+
+declare module 'hono' {
+  interface ContextRenderer {
+    (content: string | Promise<string>, head?: Head): Response | Promise<Response>
+  }
+}
+```
+
+The JSX Renderer middleware allows you to create a Renderer as follows:
+
+```tsx
+// app/routes/_renderer.tsx
+import { jsxRenderer } from 'hono/jsx-renderer'
+
+export default jsxRenderer(({ children, title }) => {
+  return (
+    <html lang='en'>
+      <head>
+        <meta charset='UTF-8' />
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
