@@ -1,145 +1,122 @@
 ---
 trigger: always_on
-description: > Target docs: **ratatui 0.30.0** (docs.rs “latest” at time of writing).
+description: Comprehensive best practices for Rust development (Edition 2024)
 ---
 
-# Ratatui (Rust) — TUI “field guide” for building a full-featured CLI
-> Target docs: **ratatui 0.30.0** (docs.rs “latest” at time of writing).  
-> This file is meant to be a **practical, complete map** of Ratatui’s public surface area: *what exists, what it’s for, how it fits together, and where to read the authoritative docs / examples.*
+# Rust Best Practices (2024-2025)
 
----
+This document outlines a comprehensive set of best practices for Rust development, covering various aspects from code organization to security and tooling. Adhering to these guidelines will help you write idiomatic, efficient, secure, and maintainable Rust code.
 
-## 0) What Ratatui is (and what it is not)
+**Note:** This project uses **Rust Edition 2024** (released Feb 2025 with Rust 1.85).
 
-**Ratatui** is an *immediate-mode* terminal UI library: each frame, your app renders the entire UI into an off-screen **Buffer**, and Ratatui diff-renders only changes to the terminal via a **Backend**.
+## 1. Code Organization and Structure
 
-**Key implications of “immediate mode”:**
-- Your “UI tree” is not persisted by the framework.
-- **Your app owns the state** (selection index, scroll offset, input text, toggles).
-- Each `Terminal::draw` call must fully repaint the UI for the current state (even if nothing changed).
+### 1.1. Directory Structure
 
----
+-   **`src/`**: Contains all the Rust source code.
+    -   **`main.rs`**: The entry point for binary crates.
+    -   **`lib.rs`**: The entry point for library crates.
+    -   **`bin/`**:  Contains source files for multiple binary executables within the same project.  Each file in `bin/` will be compiled into a separate executable.
+    -   **`modules/` or `components/`**: (Optional)  For larger projects, group related modules or components into subdirectories. Use descriptive names.
+    -   **`tests/`**:  Integration tests. (See Testing section below for more details.)
+    -   **`examples/`**: Example code that demonstrates how to use the library.
+-   **`benches/`**: Benchmark tests (using `criterion` or similar).
+-   **`Cargo.toml`**: Project manifest file.
+-   **`Cargo.lock`**: Records the exact versions of dependencies used. **Do not manually edit.**
+-   **`.gitignore`**: Specifies intentionally untracked files that Git should ignore.
+-   **`README.md`**: Project documentation, including usage instructions, build instructions, and license information.
 
-## 1) Crate architecture & “components” at a glance
 
-Ratatui is modular (a workspace of crates) and the top-level `ratatui` crate re-exports what you usually need:
+sayna/
+├── Cargo.toml
+├── Cargo.lock
+├── src/
+│   ├── main.rs         # Entry point for a binary crate
+│   ├── lib.rs          # Entry point for a library crate
+│   ├── modules/
+│   │   ├── module_a.rs # A module within the crate
+│   │   └── module_b.rs # Another module
+│   └── bin/
+│       ├── cli_tool.rs # A separate binary executable
+│       └── worker.rs   # Another binary executable
+├── tests/
+│   └── integration_test.rs # Integration tests
+├── benches/
+│   └── my_benchmark.rs # Benchmark tests using Criterion
+├── examples/
+│   └── example_usage.rs # Example code using the library
+├── README.md
 
-### 1.1 Core building blocks
-- **Terminal + Frame** (render loop entry points)
-- **Backend** (how bytes reach a real terminal)
-- **Buffer + Cell** (the “canvas” widgets draw to)
-- **Layout** (splitting areas with constraints)
-- **Text** (`Span`, `Line`, `Text`)
-- **Style** (`Color`, `Style`, `Modifier`, `Stylize`)
-- **Widgets** (Block, Paragraph, Table, …)
-- **Symbols** (box drawing, markers, sets)
-- **Init utilities** (`run`, `init`, `restore`, viewports)
 
-### 1.2 “Where things live” (major modules)
-- `ratatui::backend` — the `Backend` trait, backend implementations (Crossterm/Termion/Termwiz/TestBackend), and backend-related traits.
-- `ratatui::buffer` — `Buffer`, `Cell`.
-- `ratatui::layout` — `Rect`, `Layout`, `Constraint`, `Direction`, `Flex`, `Margin`, alignment types, etc.
-- `ratatui::style` — `Style`, `Color`, `Modifier`, and convenience styling (`Stylize`).
-- `ratatui::text` — `Span`, `Line`, `Text`, and helpers.
-- `ratatui::symbols` — line/box characters, border sets, markers.
-- `ratatui::widgets` — all built-in widgets, widget traits, widget states.
-- `ratatui::init` — documentation & helpers around init/restore and panic hooks (also see the root-level functions).
-- `ratatui::prelude` — a convenience glob-import set (still available, but not universally recommended).
+### 1.2. File Naming Conventions
 
-### 1.3 Feature flags (important!)
-Ratatui uses feature flags to control:
-- which backend(s) are included (e.g. `crossterm`, `termion`, `termwiz`)
-- whether “all widgets” are built (default is typically “all”)
-- macros, layout cache, underline color support, serde, palette integration, etc.
+-   Rust source files use the `.rs` extension.
+-   Module files (e.g., `module_a.rs`) should be named after the module they define.
+-   Use snake_case for file names (e.g., `my_module.rs`).
 
-**Authoritative list (always check your exact version):**
-```text
-https://docs.rs/crate/ratatui/latest/features
-```
+### 1.3. Module Organization
 
----
-
-## 2) “Hello World” mental model: the rendering pipeline
-
-### 2.1 The minimal moving parts
-1. **Backend** talks to the terminal emulator (stdout, raw mode, alternate screen, cursor).
-2. **Terminal<B>** owns:
-   - double buffers (previous + current)
-   - viewport configuration
-   - cursor state
-3. Each frame:
-   - `Terminal::draw(|f| { ... })`
-   - you use the `Frame` to render widgets into the current `Buffer`
-   - Ratatui diffs current vs previous buffer
-   - backend writes only changed cells
-
-### 2.2 Key types you’ll touch daily
-- `Terminal<B>`
-- `Frame`
-- `Rect`
-- `Buffer`
-- `Layout`, `Constraint`
-- `Style`, `Color`, `Modifier`
-- `Span`, `Line`, `Text`
-- widget types (`Block`, `Paragraph`, `Table`, …)
-
-### 2.3 Immediate-mode best practice (non-negotiable)
-**Always fully render the frame.**  
-Do not “skip” rendering unchanged areas. Diffing happens *after* your closure returns.
-
----
-
-## 3) Terminal initialization & teardown (the “right” way in 0.30)
-
-Ratatui now provides convenience helpers so you don’t need boilerplate raw-mode / alternate-screen / panic hook setup in every project.
-
-### 3.1 `run()` — simplest “just do the right thing”
-Use this for most CLIs:
+-   Use modules to organize code into logical units.
+-   Declare modules in `lib.rs` or `main.rs` using the `mod` keyword.
+-   Use `pub mod` to make modules public.
+-   Create separate files for each module to improve readability and maintainability.
+-   Use `use` statements to bring items from other modules into scope.
 
 ```rust
-fn main() -> std::io::Result<()> {
-    ratatui::run(|terminal| {
-        loop {
-            terminal.draw(|f| f.render_widget("Hello", f.area()))?;
-            // read events, update state, maybe exit...
-        }
-    })
+// lib.rs
+
+pub mod my_module;
+
+mod internal_module; // Not public
+
+
+rust
+// my_module.rs
+
+pub fn my_function() {
+    //...
 }
 ```
 
-Docs:
-```text
-https://docs.rs/ratatui/latest/ratatui/fn.run.html
-```
+### 1.4. Component Architecture
 
-### 3.2 `init()` / `restore()` — explicit control
-If you want the terminal value and to control shutdown:
-- `init()` initializes a default terminal (Crossterm-based).
-- `restore()` returns terminal settings to normal (disable raw mode, leave alt-screen).
+-   For larger applications, consider using a component-based architecture.
+-   Each component should be responsible for a specific part of the application's functionality.
+-   Components should communicate with each other through well-defined interfaces (traits).
+-   Consider using dependency injection to decouple components and improve testability.
 
-Docs:
-```text
-https://docs.rs/ratatui/latest/ratatui/fn.init.html
-https://docs.rs/ratatui/latest/ratatui/fn.restore.html
-```
+### 1.5. Code Splitting Strategies
 
-### 3.3 Viewports (`Viewport`) & `TerminalOptions`
-Ratatui supports different ways to “own” the terminal:
-- **Fullscreen**: typical TUI (entire screen)
-- **Inline(height)**: persistent TUI area while normal output scrolls above it (status panels, progress, logs)
-- **Fixed(Rect)**: render into a fixed region
+-   Split code into smaller, reusable modules.
+-   Use feature flags to conditionally compile code for different platforms or features.
+-   Consider using dynamic linking (if supported by your target platform) to reduce binary size.
 
-Docs:
-```text
-https://docs.rs/ratatui/latest/ratatui/enum.Viewport.html
-https://docs.rs/ratatui/latest/ratatui/struct.TerminalOptions.html
-https://docs.rs/ratatui/latest/ratatui/fn.init_with_options.html
-```
+## 2. Common Patterns and Anti-patterns
 
-Examples (inline viewport):
-```text
-https://ratatui.rs/examples/apps/inline/
-```
+### 2.1. Design Patterns
+
+-   **Builder Pattern**: For constructing complex objects with many optional parameters.
+-   **Factory Pattern**: For creating objects without specifying their concrete types.
+-   **Observer Pattern**: For implementing event-driven systems.
+-   **Strategy Pattern**: For selecting algorithms at runtime.
+-   **Visitor Pattern**: For adding new operations to existing data structures without modifying them.
+
+### 2.2. Recommended Approaches for Common Tasks
+
+-   **Data Structures**: Use `Vec` for dynamic arrays, `HashMap` for key-value pairs, `HashSet` for unique elements, `BTreeMap` and `BTreeSet` for sorted collections.
+-   **Concurrency**: Use `Arc` and `Mutex` for shared mutable state, channels for message passing, and the `rayon` crate for data parallelism.
+-   **Asynchronous Programming**: Use `async` and `await` for writing asynchronous code.
+-   **Error Handling**: Use the `Result` type for recoverable errors and `panic!` for unrecoverable errors.
+
+### 2.3. Anti-patterns and Code Smells
+
+-   **Unnecessary Cloning**: Avoid cloning data unless it is absolutely necessary. Use references instead.
+-   **Excessive `unwrap()` Calls**: Handle errors properly instead of using `unwrap()`, which can cause the program to panic.
+-   **Overuse of `unsafe`**: Minimize the use of `unsafe` code and carefully review any unsafe code to ensure it is correct.
+-   **Ignoring Compiler Warnings**: Treat compiler warnings as errors and fix them.
+-   **Premature Optimization**: Focus on writing clear, correct code first, and then optimize only if necessary.
+
+### 2.4. State Management
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
