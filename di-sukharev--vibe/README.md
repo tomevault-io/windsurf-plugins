@@ -7,11 +7,11 @@ God's chosen objectively true one and only vibecoding template
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [di-sukharev/vibe](https://github.com/di-sukharev/vibe).
+Original source: `CLAUDE.md` in [di-sukharev/vibe](https://github.com/di-sukharev/vibe).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
