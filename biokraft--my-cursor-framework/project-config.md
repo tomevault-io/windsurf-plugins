@@ -1,178 +1,221 @@
 ---
 trigger: always_on
-description: Use when user asks to create or update *.mdc files
+description: Makefile best practices for developer workflows: Apply when working with Makefiles or build automation
 ---
 
+# Makefile Best Practices for Developer Workflows
 
-# Cursor MDC File Definitive Guide
+## Overview
 
-MDC (Markdown Configuration) files are Cursor rules that instruct AI assistants on context-specific behaviors. This guide explains how to create, format, and place MDC files correctly.
+When working with Makefiles, follow these best practices to create maintainable, reliable, and developer-friendly build automation. Makefiles should be structured for clarity, correctness, and ease of use.
 
-## MDC File Structure
+## Core Principles
 
-Every MDC file must have two clear sections:
+1. **Embrace the Filesystem**: `make` is fundamentally a tool for building files. Rules should correspond to actual files on the filesystem to leverage dependency tracking.
+2. **Be Explicit and Predictable**: Configure Makefiles to have consistent behavior and avoid built-in rules that can cause surprises.
+3. **Prioritize Clarity**: Use namespacing, includes, and self-documenting targets.
+4. **Write Small, Focused Recipes**: Delegate complex logic to external scripts.
+5. **Ensure Compatibility**: Write Makefiles that work across different Make versions and platforms.
+6. **Test Thoroughly**: Always test your Makefile targets on the actual target platforms.
 
-1. **Frontmatter**: Configuration metadata enclosed by triple-dash (`---`) lines at the file's top.
-2. **Markdown Content**: Detailed instructions in Markdown format following the frontmatter.
+## Compatibility Considerations
 
-### Frontmatter Guidelines
+### Make Version Compatibility
 
-The frontmatter must be the first thing in the file and must be enclosed between triple-dash lines (`---`). Configuration should be based on the intended behavior:
+**CRITICAL**: Always ensure your Makefile works with commonly available Make versions:
 
-```
----
-# Configure your rule based on desired behavior:
+- **macOS**: Ships with GNU Make 3.81 (from 2006) by default
+- **Linux**: Usually has GNU Make 4.0+ 
+- **Windows**: Varies widely depending on installation
 
-description: Brief description of what the rule does
-globs: **/*.py, **/*.txt  # Optional: Comma-separated list, not an array
-alwaysApply: false       # Set to true for global rules
----
-```
+### Checking Make Version
 
-> **Important**: Despite the appearance, the frontmatter is not strictly YAML formatted. The `globs` field is a comma-separated list and should NOT include brackets `[]` or quotes `"`.
+Before using advanced features, check the Make version:
 
-#### Valid Frontmatter Properties
-
-Cursor MDC files only support these three specific properties:
-
-- **description**: Required field for describing the rule's purpose and relevance
-- **globs**: Optional patterns for automatic attachment to matching files
-- **alwaysApply**: Optional boolean to make a rule globally applied
-
-No other properties (such as `agentAttached`) are valid or supported in the frontmatter.
-
-#### Frontmatter Guidelines for Setting Fields
-
-- **description**: Should be agent-friendly and clearly describe when the rule is relevant. Format as `<topic>: <details>` for best results.
-  - For rules that should be automatically attached by the agent for specific topics, include clear trigger keywords in the description (e.g., "Python dependency management with UV: Attaches when dealing with Python dependencies or package management")
-- **globs**:
-  - Format must be a simple comma-separated list without brackets or quotes
-  - If a rule is only relevant in very specific situations, leave globs empty so it's loaded only when applicable to the user request.
-  - If both globs are empty and alwaysApply is set to false, the rule will be attached by the agent only when it determines the rule is relevant to the user's query.
-  - If the only glob would match all files (like `**/*`), leave it empty and set `alwaysApply: true` instead.
-  - Otherwise, be as specific as possible with glob patterns to ensure rules are only applied with relevant files.
-- **alwaysApply**: Use sparingly for truly global guidelines.
-
-#### Examples of Valid Frontmatter
-
-```
----
-description: Python style guidelines: Apply when working with Python code
-globs: **/*.py
-alwaysApply: false
----
+```bash
+make --version
 ```
 
-```
----
-description: Project-wide documentation standards: Always apply these guidelines
-globs:
-alwaysApply: true
----
-```
+For GNU Make 4.0+ features, consider providing fallbacks or clear error messages.
 
-```
----
-description: Dependency management with UV: Attaches when dealing with dependencies
-globs:
-alwaysApply: false
----
-```
+### Common Compatibility Issues
 
-#### Glob Pattern Examples
+1. **`.RECIPEPREFIX` Support**: Only available in GNU Make 4.0+
+2. **Some built-in functions**: Newer versions have more features
+3. **Shell behavior**: Different platforms may have different default shells
 
-- `**/*.py` - All Python files
-- `src/**/*.py` - All Python files within `src`
-- `**/tests/**/*.py` - All Python test files in any tests directory
+## Required Preamble
 
-### Markdown Content Formatting
+Every Makefile MUST start with this compatibility-focused preamble:
 
-After frontmatter, the body should use clear Markdown:
+```makefile
+# Use bash as the shell with strict mode
+SHELL := bash
+.SHELLFLAGS := -eu -o pipefail -c
 
-````markdown
-# Rule Title
+# Run all recipe lines in a single shell instance
+.ONESHELL:
 
-## Introduction
-Brief overview of rule purpose.
+# If a rule fails, delete its target file
+.DELETE_ON_ERROR:
 
-## Guidelines
-- Clearly formatted actionable steps
-- Logical structure
-
-## Examples
-```python
-# Good example
-def my_function():
-    pass
+# Disable make's built-in rules and suffix rules
+MAKEFLAGS += --no-builtin-rules
+.SUFFIXES:
 ```
 
-## Special Features
+### Advanced Features (Optional)
 
-### File References
+For teams using modern Make versions, you can optionally add:
 
-Reference other MDC files using markdown links:
-
-```markdown
-[related-rule.mdc](mdc:.cursor/rules/related-rule.mdc)
+```makefile
+# Optional: Set custom recipe prefix (requires GNU Make 4.0+)
+# Only use if your team standardizes on modern Make versions
+ifeq ($(shell make --version 2>/dev/null | head -1 | cut -d' ' -f3 | cut -d'.' -f1),4)
+  .RECIPEPREFIX = >
+endif
 ```
 
-This includes the referenced rule in context when activated.
+**Recommendation**: Use traditional tabs for maximum compatibility unless you have specific requirements for alternative prefixes.
 
-### Code Blocks
+## Recipe Formatting Guidelines
 
-Always use fenced code blocks with language identifiers:
+### Use Traditional Tabs (Recommended)
 
-````markdown
-```python
-# Example Python code
-def greet(name):
-    return f"Hello, {name}!"
-```
-````
+For maximum compatibility, use traditional tab characters for recipe indentation:
 
-## Rule File Placement
+```makefile
+clean:
+	@echo "🧹 Cleaning up..."
+	rm -rf build/ tmp/
+.PHONY: clean
 
-### Location
-
-All MDC files MUST be located in the dedicated rules directory:
-
-```
-PROJECT_ROOT/
-├── .cursor/
-│   └── rules/
-│       ├── your-rule-name.mdc
-│       ├── another-rule.mdc
-│       └── tasks/
-│           └── specific-task-rule.mdc
-└── ...
+test:
+	@echo "🧪 Running tests..."
+	pytest
+.PHONY: test
 ```
 
-### Naming Convention
+### Alternative: Custom Recipe Prefix (Advanced)
 
-- Use **kebab-case** for filenames
-- Always end filenames with `.mdc`
-- Clearly indicate rule purpose in filename
+Only use custom recipe prefixes if you're certain all team members use GNU Make 4.0+:
 
-### Logical Organization
+```makefile
+# Only if you've verified Make 4.0+ usage across your team
+.RECIPEPREFIX = >
 
-- Prefix filenames with numbers for sorting if logical order is beneficial (e.g., `01-setup.mdc`).
-- Place task-specific rules in subdirectories (`tasks/`).
+clean:
+> @echo "🧹 Cleaning up..."
+> rm -rf build/ tmp/
+.PHONY: clean
+```
 
-## Best Practices for MDC Management
+## Structure and Organization
 
-- Regularly review rules for accuracy and relevance
-- Keep each MDC file focused on a single or closely related topics
-- Aim for concise, easily understandable content (ideally < 300 lines per file)
-- Link related rules clearly
+### Target Namespacing
 
-## Updating Rules
+- Use `/` as namespace delimiter for clarity
+- Organize related targets under common namespaces
 
-When modifying MDC files:
+```makefile
+# Good: Namespaced structure
+lint/python:
+	@echo "Linting Python code..."
+	ruff check .
 
-- Preserve frontmatter format consistency
-- Only change globs intentionally to adjust the scope
-- Update descriptions to reflect changed purposes
-- Consider updates to related rules to maintain consistency
+format/python:
+	@echo "Formatting Python code..."
+	ruff format .
+
+docker/build:
+	docker build -t myapp .
+
+docker/run:
+	docker run -p 8080:8080 myapp
+
+test/unit:
+	pytest tests/unit/
+
+test/integration:
+	pytest tests/integration/
+```
+
+### File Organization
+
+For larger projects, split Makefiles using includes:
+
+```makefile
+# In root Makefile
+-include make/*.mk
+```
+
+Create separate files like:
+- `make/lint.mk` - Linting and formatting targets
+- `make/docker.mk` - Container-related targets
+- `make/test.mk` - Testing targets
+
+### Standard Target Names
+
+Always provide these conventional targets:
+- `all`: Default target that builds main artifacts
+- `install`: Install the application
+- `test`: Run all tests
+- `clean`: Remove build artifacts and temporary files
+- `help`: Display available targets and descriptions
+
+## Rule Writing Guidelines
+
+### Use .PHONY Correctly
+
+- Mark targets as `.PHONY` if they don't create a file with the target name
+- Place `.PHONY` declarations immediately after the target definition
+
+```makefile
+clean:
+	rm -rf build/ tmp/
+.PHONY: clean
+
+test:
+	pytest
+.PHONY: test
+```
+
+### File Targets Must Create Exact Files
+
+When a rule creates a file, the target name must be the exact file path:
+
+```makefile
+build/app: main.c utils.c
+	mkdir -p $(@D)
+	gcc -o $@ $^
+```
+
+### Use Sentinel Files for Abstract Outputs
+
+For tasks that don't produce a single obvious file, use sentinel files:
+
+```makefile
+# Track when tests last passed
+SRC_FILES := $(shell find src -type f -name "*.py")
+
+tmp/.tests-passed: $(SRC_FILES)
+	mkdir -p $(@D)
+	pytest
+	touch $@
+
+test: tmp/.tests-passed
+.PHONY: test
+```
+
+### Delegate Complex Logic to Scripts
+
+Keep Makefile recipes simple. Move complex logic to external scripts:
+
+```makefile
+# Bad: Complex inline script
+deploy/staging:
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [biokraft/my-cursor-framework](https://github.com/biokraft/my-cursor-framework) — distributed by [TomeVault](https://tomevault.io).
