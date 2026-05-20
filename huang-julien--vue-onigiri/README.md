@@ -7,11 +7,11 @@ Vue server components. Take away your vnodes. Also works client to client
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [huang-julien/vue-onigiri](https://github.com/huang-julien/vue-onigiri).
+Original source: `CLAUDE.md` in [huang-julien/vue-onigiri](https://github.com/huang-julien/vue-onigiri).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
