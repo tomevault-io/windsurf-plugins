@@ -1,12 +1,12 @@
 ---
 trigger: always_on
-description: Core architecture rules - layer separation, dependencies, and anti-patterns
+description: Enforce conventional commit message format
 ---
 
 
-# Architecture Rules
+# Commit Message Rules
 
-@docs/architecture.md
+@docs/commit-message.md
 
 ---
 > Source: [pubky/pubky-app](https://github.com/pubky/pubky-app) — distributed by [TomeVault](https://tomevault.io).
