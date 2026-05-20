@@ -1,222 +1,159 @@
 ---
 trigger: always_on
-description: Patterns for integrating external services (APIs, OCR, TTS)
+description: Translation workflow and OCR processing pipeline
 ---
 
 
-# Service Integration Patterns
+# Translation Workflow and API Integration Guide
 
-## Translation Service Interface
+## Translation Pipeline Overview
 
-### ITranslationService Pattern
-All translation services implement a common interface:
+The translation process in UGTLive follows this pipeline:
+1. **Screen Capture** → 2. **OCR Processing** → 3. **Block Detection** → 4. **Translation** → 5. **Display**
 
+## Screen Capture
+
+### Monitor Window ([src/MonitorWindow.xaml.cs](mdc:src/MonitorWindow.xaml.cs))
+- Captures screen region at configurable FPS
+- Uses `System.Drawing` for bitmap operations
+- Sends captured images to OCR services
+- Provides visual feedback of capture area
+
+### Capture Methods
+```csharp
+// Main capture triggered by timer
+private void Timer_Tick(object sender, EventArgs e)
+// Captures bitmap from screen region
+private Bitmap CaptureScreen(int x, int y, int width, int height)
+```
+
+## OCR Processing
+
+### OCR Service Selection
+UGTLive supports six OCR backends configured in [src/ConfigManager.cs](mdc:src/ConfigManager.cs):
+
+1. **Windows OCR** ([src/WindowsOCRManager.cs](mdc:src/WindowsOCRManager.cs))
+   - Uses Windows.Media.Ocr API
+   - Faster but less accurate for some languages
+   - No external dependencies
+
+2. **EasyOCR** (via PythonServicesManager)
+   - Python server running locally
+   - Better accuracy for Asian languages
+   - Requires conda environment setup
+
+3. **MangaOCR** (via PythonServicesManager)
+   - Specialized for vertical Japanese manga text
+   - YOLO-based text detection
+   - Configurable region size and overlap settings
+
+4. **PaddleOCR** (via PythonServicesManager)
+   - Multi-language OCR with 100+ language support
+   - Optional angle classification for rotated text
+   - GPU acceleration support
+
+5. **docTR** (via PythonServicesManager)
+   - Great for non-Asian languages
+   - Document-oriented OCR
+   - High accuracy for printed text
+
+6. **Google Vision** ([src/GoogleVisionOCRService.cs](mdc:src/GoogleVisionOCRService.cs))
+   - Cloud-based OCR service
+   - Requires API key and costs money
+   - High accuracy but not local
+
+### OCR Data Flow
+```
+Bitmap → OCR Service → List<TextObject> → UniversalBlockDetector
+```
+
+### Python OCR Services
+All Python OCR services are managed by `PythonServicesManager`:
+- Services discovered automatically on startup
+- Each service runs on its own port
+- Services can be installed/uninstalled via UI
+- Health checks and diagnostics available
+
+## Block Detection ([src/UniversalBlockDetector.cs](mdc:src/UniversalBlockDetector.cs))
+
+The UniversalBlockDetector groups individual characters/words/lines into meaningful text blocks:
+
+### Key Features
+- **Universal Detection**: Handles mixed input types (Words, Lines, Characters)
+- **Intelligent Grouping**: Groups based on proximity, alignment, and reading order
+- **Configurable Thresholds**: Per-OCR method settings for glue distances
+- **Height Similarity**: Prevents merging text with very different sizes
+- **Large Gap Detection**: Splits text at large horizontal gaps
+
+### Key Parameters
+- **Block Detection Scale**: Controls grouping aggressiveness (0.0 - 1.0)
+- **Horizontal/Vertical Glue**: Per-OCR method glue distances
+- **Height Similarity Threshold**: Percentage for height matching
+- **Settle Time**: Time to wait before processing blocks
+
+### Grouping Algorithm
+1. Sorts text objects by position
+2. Groups based on proximity and alignment
+3. Merges overlapping blocks
+4. Filters by minimum size
+5. Handles mixed input types intelligently
+
+## Translation Services
+
+### Service Interface ([src/ITranslationService.cs](mdc:src/ITranslationService.cs))
 ```csharp
 public interface ITranslationService
 {
     Task<TranslationResult?> TranslateAsync(
-        string sourceText,
-        string targetLanguage,
+        string sourceText, 
+        string targetLanguage, 
         string context);
 }
 ```
 
-### TranslationResult Structure
-```csharp
-public class TranslationResult
-{
-    public string TranslatedText { get; set; } = "";
-    public string SourceLanguage { get; set; } = "";
-    public double Confidence { get; set; } = 1.0;
-}
-```
+### Available Services
 
-## HTTP Client Usage
+#### Gemini ([src/GeminiTranslationService.cs](mdc:src/GeminiTranslationService.cs))
+- Endpoint: `https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent`
+- Models: gemini-1.5-flash, gemini-1.5-pro, gemini-2.0-flash
+- Supports custom prompts and context
 
-### Service HTTP Client Pattern
-Each service creates its own HttpClient:
+#### ChatGPT ([src/ChatGptTranslationService.cs](mdc:src/ChatGptTranslationService.cs))
+- Endpoint: `https://api.openai.com/v1/chat/completions`
+- Models: gpt-4o, gpt-4o-mini, o1-preview, o1-mini
+- Supports streaming responses
+- Configurable max completion tokens
 
-```csharp
-public class GeminiTranslationService : ITranslationService
-{
-    private static readonly HttpClient _httpClient = new HttpClient();
-    private readonly string _apiKey;
-    
-    public GeminiTranslationService()
-    {
-        _apiKey = ConfigManager.Instance.GetGeminiApiKey();
-    }
-    
-    public async Task<TranslationResult?> TranslateAsync(string text, string lang, string context)
-    {
-        // Implementation
-    }
-}
-```
+#### Ollama ([src/OllamaTranslationService.cs](mdc:src/OllamaTranslationService.cs))
+- Local endpoint: `http://localhost:11434/api/generate`
+- Models: Various local models (llama, gemma, etc.)
+- Privacy-focused, no cloud dependency
+- Configurable URL and port
 
-### Request Building
-```csharp
-var requestBody = new
-{
-    contents = new[]
-    {
-        new
-        {
-            parts = new[]
-            {
-                new { text = prompt }
-            }
-        }
-    }
-};
+#### Google Translate ([src/GoogleTranslateService.cs](mdc:src/GoogleTranslateService.cs))
+- Can use Cloud API or free web API
+- Auto language mapping support
+- Fast translation for simple use cases
 
-var json = JsonSerializer.Serialize(requestBody);
-var content = new StringContent(json, Encoding.UTF8, "application/json");
-var response = await _httpClient.PostAsync(url, content);
-```
+#### llama.cpp ([src/LlamaCppTranslationService.cs](mdc:src/LlamaCppTranslationService.cs))
+- Local llama.cpp server endpoint
+- Configurable URL and port
+- Privacy-focused local translation
 
-## Error Handling in Services
+### Translation Request Format
+All services receive:
+- Source text with position data
+- Target language
+- Previous context (configurable length)
+- Game name for context
+- Custom prompt template
 
-### HTTP Error Handling Pattern
-```csharp
-if (response.IsSuccessStatusCode)
-{
-    var result = await response.Content.ReadAsStringAsync();
-    return ParseResult(result);
-}
-else
-{
-    string errorMessage = await response.Content.ReadAsStringAsync();
-    Console.WriteLine($"API error: {response.StatusCode}, {errorMessage}");
-    
-    // Try to parse JSON error
-    try
-    {
-        using JsonDocument errorDoc = JsonDocument.Parse(errorMessage);
-        if (errorDoc.RootElement.TryGetProperty("error", out JsonElement errorElement))
-        {
-            // Extract detailed error
-            return null;
-        }
-    }
-    catch (JsonException)
-    {
-        // Fallback to raw message
-    }
-    
-    // Show user-friendly error
-    ErrorPopupManager.ShowError("Translation Error", errorMessage);
-    
-    return null;
-}
-```
+## Display Systems
 
-### Exception Handling
-```csharp
-try
-{
-    var response = await _httpClient.PostAsync(url, content);
-    // Process response
-}
-catch (Exception ex)
-{
-    Console.WriteLine($"Service error: {ex.Message}");
-    LogManager.Instance.LogError("Translation failed", ex);
-    
-    ErrorPopupManager.ShowError("Translation Error", ex.Message);
-    
-    return null;
-}
-```
-
-## Service Factory Pattern
-
-### TranslationServiceFactory
-```csharp
-public static class TranslationServiceFactory
-{
-    public static ITranslationService CreateService(string serviceName)
-    {
-        return serviceName switch
-        {
-            "Gemini" => new GeminiTranslationService(),
-            "ChatGPT" => new ChatGptTranslationService(),
-            "Ollama" => new OllamaTranslationService(),
-            "Google Translate" => new GoogleTranslateService(),
-            "llama.cpp" => new LlamaCppTranslationService(),
-            _ => throw new ArgumentException($"Unknown service: {serviceName}")
-        };
-    }
-}
-```
-
-## OCR Service Integration
-
-### Windows OCR Pattern
-```csharp
-public class WindowsOCRManager
-{
-    public async Task<List<TextObject>> ProcessImageAsync(Bitmap bitmap)
-    {
-        return await Task.Run(() =>
-        {
-            // Convert bitmap to Windows bitmap
-            // Process with Windows OCR API
-            // Return TextObject list
-        });
-    }
-}
-```
-
-### Google Vision OCR Pattern
-```csharp
-public class GoogleVisionOCRService
-{
-    public async Task<List<TextObject>> ProcessImageAsync(Bitmap bitmap)
-    {
-        // Convert bitmap to base64
-        // Send to Google Vision API
-        // Parse response and return TextObject list
-    }
-}
-```
-
-### Python OCR Service Pattern (HTTP-based)
-```csharp
-// Services are managed via PythonServicesManager
-// Discover services on startup
-PythonServicesManager.Instance.DiscoverServices();
-
-// Get service by name
-var service = PythonServicesManager.Instance.GetServiceByName("EasyOCR");
-
-// Check if service is running
-if (!service.IsRunning)
-{
-    bool isRunning = await service.CheckIsRunningAsync();
-    if (!isRunning)
-    {
-        // Show error dialog or start service
-        await service.StartAsync(showWindow: false);
-    }
-}
-
-// Process image with HTTP service
-private async Task<string?> ProcessImageWithHttpServiceAsync(byte[] imageBytes, string serviceName, string language)
-{
-    var service = PythonServicesManager.Instance.GetServiceByName(serviceName);
-    if (service == null) return null;
-    
-    // Build URL with query parameters
-    string langParam = MapLanguageForService(language);
-    string url = $"{service.ServerUrl}:{service.Port}/process?lang={langParam}&char_level=true";
-    
-    // Add service-specific parameters (e.g., MangaOCR)
-    if (serviceName == "MangaOCR")
-    {
-        url += $"&min_region_width={minWidth}&min_region_height={minHeight}&overlap_allowed_percent={overlapPercent}";
-    }
-    
+### ChatBox Window ([src/ChatBoxWindow.xaml.cs](mdc:src/ChatBoxWindow.xaml.cs))
+- Overlay window for displaying translations
+- Customizable appearance (color, transparency, font)
+- Auto-scroll and history management
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
