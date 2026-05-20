@@ -3,6 +3,7 @@ trigger: always_on
 description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
+
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
@@ -90,7 +91,7 @@ If a component has unexpected behavior after compilation:
 ### Service-Oriented Main Process
 The main process uses dependency injection (Inversify) with 16 services:
 - `ChatService` - AI conversation management
-- `AttachmentService` - File upload and processing  
+- `AttachmentService` - File upload and processing
 - `MessageService` - Message CRUD operations
 - `ThreadService` - Conversation thread management
 - `ModelService` - AI model provider management
