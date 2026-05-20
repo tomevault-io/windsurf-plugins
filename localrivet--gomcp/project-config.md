@@ -1,173 +1,69 @@
 ---
 trigger: always_on
-description: Writing Svelte code with Go backend and adapter-static using Tailwind CSS, DaisyUI, and Soul AST-generated API endpoints
+description: Comprehensive reference for Taskmaster MCP tools and CLI commands.
 ---
 
+# Taskmaster Tool & Command Reference
 
-# SvelteKit with Go Backend and Adapter-Static
+This document provides a detailed reference for interacting with Taskmaster, covering both the recommended MCP tools, suitable for integrations like Cursor, and the corresponding `task-master` CLI commands, designed for direct user interaction or fallback.
 
-In this project, we use **Tailwind CSS** for utility-first styling and **DaisyUI** as a component library built on top of Tailwind CSS, providing a lightweight and customizable UI framework. The frontend is built with SvelteKit and paired with a Go backend using the **Soul AST system**, which generates API endpoints found in `./src/lib/api`. The `adapter-static` package is used to generate static files, served by the Go backend alongside the dynamic API routes.
+**Note:** For interacting with Taskmaster programmatically or via integrated tools, using the **MCP tools is strongly recommended** due to better performance, structured data, and error handling. The CLI commands serve as a user-friendly alternative and fallback. 
 
-## Go Backend Integration with Soul AST
+**Important:** Several MCP tools involve AI processing... The AI-powered tools include `parse_prd`, `analyze_project_complexity`, `update_subtask`, `update_task`, `update`, `expand_all`, `expand_task`, and `add_task`.
 
-The Go backend is powered by the **Soul AST system**, which generates API endpoints automatically. These endpoints are exposed via TypeScript clients in `./src/lib/api`, including functions like `RegisterPost`, `LoginPost`, and others, as defined in `endpoints.ts`. The SvelteKit frontend is configured with `adapter-static` to produce static files, which the Go server delivers alongside the Soul-generated API.
+---
 
-### Setup Instructions
+## Initialization & Setup
 
-1. **Install dependencies using pnpm**:
-   Initialize your SvelteKit project and install required packages:
-   ```bash
-   pnpm init
-   pnpm create svelte@latest my-svelte-go-app
-   cd my-svelte-go-app
-   pnpm install
-   pnpm add -D @sveltejs/adapter-static tailwindcss postcss autoprefixer daisyui
-   ```
+### 1. Initialize Project (`init`)
 
-2. **Set up Tailwind CSS and DaisyUI**:
-   - Generate Tailwind configuration:
-     ```bash
-     pnpm dlx tailwindcss init -p
-     ```
-   - Update `tailwind.config.js`:
-     ```javascript
-     /** @type {import('tailwindcss').Config} */
-     export default {
-       content: ['./src/**/*.{html,js,svelte,ts}'],
-       theme: {
-         extend: {},
-       },
-       plugins: [require('daisyui')],
-       daisyui: {
-         themes: ["light", "dark", "cupcake"], // Customize as needed
-       },
-     };
-     ```
-   - Create `src/app.css`:
-     ```css
-     @tailwind base;
-     @tailwind components;
-     @tailwind utilities;
-     ```
-   - Import it in `src/routes/+layout.svelte`:
-     ```svelte
-     <script>
-       import '../app.css';
-     </script>
-     <slot />
-     ```
+*   **MCP Tool:** `initialize_project`
+*   **CLI Command:** `task-master init [options]`
+*   **Description:** `Set up the basic Taskmaster file structure and configuration in the current directory for a new project.`
+*   **Key CLI Options:**
+    *   `--name <name>`: `Set the name for your project in Taskmaster's configuration.`
+    *   `--description <text>`: `Provide a brief description for your project.`
+    *   `--version <version>`: `Set the initial version for your project, e.g., '0.1.0'.`
+    *   `-y, --yes`: `Initialize Taskmaster quickly using default settings without interactive prompts.`
+*   **Usage:** Run this once at the beginning of a new project.
+*   **MCP Variant Description:** `Set up the basic Taskmaster file structure and configuration in the current directory for a new project by running the 'task-master init' command.`
+*   **Key MCP Parameters/Options:**
+    *   `projectName`: `Set the name for your project.` (CLI: `--name <name>`)
+    *   `projectDescription`: `Provide a brief description for your project.` (CLI: `--description <text>`)
+    *   `projectVersion`: `Set the initial version for your project, e.g., '0.1.0'.` (CLI: `--version <version>`)
+    *   `authorName`: `Author name.` (CLI: `--author <author>`)
+    *   `skipInstall`: `Skip installing dependencies. Default is false.` (CLI: `--skip-install`)
+    *   `addAliases`: `Add shell aliases tm and taskmaster. Default is false.` (CLI: `--aliases`)
+    *   `yes`: `Skip prompts and use defaults/provided arguments. Default is false.` (CLI: `-y, --yes`)
+*   **Usage:** Run this once at the beginning of a new project, typically via an integrated tool like Cursor. Operates on the current working directory of the MCP server. 
+*   **Important:** Once complete, you *MUST* parse a prd in order to generate tasks. There will be no tasks files until then. The next step after initializing should be to create a PRD using the example PRD in scripts/example_prd.txt. 
 
-3. **Configure adapter-static in `svelte.config.js`**:
-   ```javascript
-   import adapter from '@sveltejs/adapter-static';
-   import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
+### 2. Parse PRD (`parse_prd`)
 
-   /** @type {import('@sveltejs/kit').Config} */
-   const config = {
-     preprocess: vitePreprocess(),
-     kit: {
-       adapter: adapter({
-         fallback: 'index.html', // Fallback for SPA routing
-         pages: 'build',         // Output directory
-         assets: 'build',        // Output directory
-       }),
-       paths: {
-         base: '', // Adjust if deploying to a subdirectory
-       },
-     },
-   };
+*   **MCP Tool:** `parse_prd`
+*   **CLI Command:** `task-master parse-prd [file] [options]`
+*   **Description:** `Parse a Product Requirements Document, PRD, or text file with Taskmaster to automatically generate an initial set of tasks in tasks.json.`
+*   **Key Parameters/Options:**
+    *   `input`: `Path to your PRD or requirements text file that Taskmaster should parse for tasks.` (CLI: `[file]` positional or `-i, --input <file>`)
+    *   `output`: `Specify where Taskmaster should save the generated 'tasks.json' file. Defaults to 'tasks/tasks.json'.` (CLI: `-o, --output <file>`)
+    *   `numTasks`: `Approximate number of top-level tasks Taskmaster should aim to generate from the document.` (CLI: `-n, --num-tasks <number>`)
+    *   `force`: `Use this to allow Taskmaster to overwrite an existing 'tasks.json' without asking for confirmation.` (CLI: `-f, --force`)
+*   **Usage:** Useful for bootstrapping a project from an existing requirements document.
+*   **Notes:** Task Master will strictly adhere to any specific requirements mentioned in the PRD, such as libraries, database schemas, frameworks, tech stacks, etc., while filling in any gaps where the PRD isn't fully specified. Tasks are designed to provide the most direct implementation path while avoiding over-engineering.
+*   **Important:** This MCP tool makes AI calls and can take up to a minute to complete. Please inform users to hang tight while the operation is in progress. If the user does not have a PRD, suggest discussing their idea and then use the example PRD in `scripts/example_prd.txt` as a template for creating the PRD based on their idea, for use with `parse-prd`.
 
-   export default config;
-   ```
+---
 
-4. **Configure the Go backend**:
-   - The Soul AST system has already generated the backend handlers in `internal/handler/`. Use them in `main.go`:
-     ```go
-     package main
+## AI Model Configuration
 
-     import (
-       "net/http"
-       "github.com/gin-gonic/gin"
-       "your-app/internal/handler" // Adjust to your module path
-     )
-
-     func main() {
-       router := gin.Default()
-
-       // Serve static files from the SvelteKit build directory
-       router.Static("/", "./build")
-
-       // Register Soul-generated API handlers
-       handler.RegisterHandlers(router)
-
-       // SPA fallback for client-side routing
-       router.NoRoute(func(c *gin.Context) {
-         c.File("./build/index.html")
-       })
-
-       router.Run(":8080")
-     }
-     ```
-   - Ensure `ast/` files (e.g., `main.api`, `api/handlers.api`) are defined and `make gen` has been run to generate the API.
-
-5. **Build and Run**:
-   - Build the SvelteKit frontend:
-     ```bash
-     pnpm build
-     ```
-   - Run the Go backend:
-     ```bash
-     go run main.go
-     ```
-   - Access the app at `http://localhost:8080`.
-
-## Accessing Soul-Generated API Endpoints
-
-The Soul AST system generates TypeScript API clients in `./src/lib/api`. Import and use these endpoints directly in your Svelte components. Below are examples using the provided endpoints:
-
-### Example: User Authentication
-
-```svelte
-/// file: src/routes/login/+page.svelte
-<script lang="ts">
-  import { api } from '@api'; // Soul-generated API endpoints
-  let email = $state('');
-  let password = $state('');
-  let error = $state<string | null>(null);
-  let success = $state(false);
-
-  async function handleLogin() {
-    try {
-      const response = await api.LoginPost({ email, password });
-      if (response.success) {
-        success = true;
-      }
-    } catch (e) {
-      error = e.message;
-    }
-  }
-</script>
-
-<div class="container p-4 mx-auto">
-  <h1 class="mb-4 text-2xl font-bold">Login</h1>
-  {#if success}
-    <p class="text-success">Logged in successfully!</p>
-  {:else}
-    <form onsubmit|preventDefault={handleLogin} class="space-y-4">
-      <input type="email" bind:value={email} placeholder="Email" class="w-full input input-bordered" />
-      <input type="password" bind:value={password} placeholder="Password" class="w-full input input-bordered" />
-      {#if error}
-        <p class="text-error">{error}</p>
-      {/if}
-      <button type="submit" class="btn btn-primary">Login</button>
-    </form>
-  {/if}
-</div>
-```
-
-### Example: Fetching User Profile
-
-```svelte
+### 2. Manage Models (`models`)
+*   **MCP Tool:** `models`
+*   **CLI Command:** `task-master models [options]`
+*   **Description:** `View the current AI model configuration or set specific models for different roles (main, research, fallback). Allows setting custom model IDs for Ollama and OpenRouter.`
+*   **Key MCP Parameters/Options:**
+    *   `setMain <model_id>`: `Set the primary model ID for task generation/updates.` (CLI: `--set-main <model_id>`)
+    *   `setResearch <model_id>`: `Set the model ID for research-backed operations.` (CLI: `--set-research <model_id>`)
+    *   `setFallback <model_id>`: `Set the model ID to use if the primary fails.` (CLI: `--set-fallback <model_id>`)
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
