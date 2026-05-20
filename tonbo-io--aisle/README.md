@@ -7,11 +7,11 @@ A fine push-down parquet scanner in Rust.
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [tonbo-io/aisle](https://github.com/tonbo-io/aisle).
+Original source: `CLAUDE.md` in [tonbo-io/aisle](https://github.com/tonbo-io/aisle).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
