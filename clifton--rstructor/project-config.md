@@ -1,94 +1,48 @@
 ---
 trigger: always_on
-description: - Always make sure there are relevant tests created and that they pass before finishing each task.
+description: - **Files:** Any file containing model definitions, enums, or provider configurations (e.g., `models.py`, `providers.ts`, `llm_config.json`).
 ---
 
-# CLAUDE.md - Agent Guidelines for rstructor
+# LLM Provider & Model Updates
 
-## Rules
-- Always make sure there are relevant tests created and that they pass before finishing each task.
-- Ensure the generated rustdocs are high quality with examples.
-- Doctests should not be ignored and should always be checked.
-- Do not add logic into examples that should be library features. Make the library feature instead.
-- Always assume that test environment has valid LLM provider api keys.
-- **Temporary Files**: Place all ad-hoc scripts, temporary markdown files, and other ephemeral files in the `tmp/` directory. This directory is excluded from both git and cargo packaging.
+## Triggers
+- **Files:** Any file containing model definitions, enums, or provider configurations (e.g., `models.py`, `providers.ts`, `llm_config.json`).
+- **User Intent:** Requests to "update models", "check for new models", or "add [Provider] support".
 
-## Build & Test Commands
-- Build: `cargo build`
-- Run all tests: `cargo test`
-- Run specific test: `cargo test test_name`
-- Run examples: `cargo run --example example_name`
-- Format code: `cargo fmt`
-- Lint: `cargo clippy`
+## Mandatory Workflow
+When these triggers are active, you **MUST** follow this protocol before writing code:
 
-## Code Style Guidelines
-- Use Rust 2024 edition features
-- Follow Rust naming conventions: snake_case for functions/variables, PascalCase for types
-- Use clear, descriptive variable and function names
-- Document all public API items with rustdoc comments
-- Organize imports in order: std, external crates, local modules
-- Prefer returning Result over unwrap/expect in public APIs
-- Use tracing for logging instead of println
-- Use async/await for all network operations
-- Follow the builder pattern for configuration objects
-- Use thiserror for custom error types
-- Test all new functionality with unit tests
-- Format code with rustfmt and address clippy warnings before committing
-- Use feature flags for optional dependencies (e.g., specific LLM backends)
+1.  **Search First:** Do not rely on your training data for model names. You must use the `search` tool.
+2.  **Query Pattern:** Search specifically for:
+    - "latest [Provider Name] API model names list [Current Month] [Current Year]"
+    - "[Provider Name] model deprecation schedule"
+    - **"[Provider Name] API model ID string"** ← Add this query
+3.  **Verification:**
+    - Identify the specific API string (e.g., `gpt-4o-2024-08-06` vs `gpt-4o`). Use "-latest" suffix if explicitly available.
+    - **CRITICAL: Web search often returns marketing names, not API strings. When in doubt, ask the user to confirm the exact model ID.**
+4.  **Implementation:**
+    - Update the constants/enums.
+    - Add comments with the "Last Verified" date next to the model ID.
 
-## Macro Attribute Implementation Guidelines
-- Always implement attribute parsing directly within the macro system, not with JSON strings
-- Use native Rust syntax for attribute values and complex data structures
-- For example, array literals should be parsed directly as `#[llm(examples = ["one", "two", "three"])]`
-- Never use JSON serialized strings for attribute values (e.g., do not use `examples = r#"["value1"]"#`)
-- Parse container attributes individually without relying on JSON parsing
-- Support multiple attribute specification styles that feel natural in Rust
-- For multi-value attributes, support both parentheses and array syntax
+## Known Model ID Patterns (Ground Truth)
+**CRITICAL: These patterns OVERRIDE web search results. Web search returns marketing names like "Claude Sonnet 4" but the actual API string is `claude-sonnet-4-5-20250929`. ALWAYS match the pattern format below, not the search result wording.**
 
-## Model List Maintenance Guidelines
+- **Anthropic:** `claude-{tier}-{version}-{date}` (e.g., `claude-sonnet-4-5-20250929`, `claude-opus-4-20250514`)
+  - **NOTE:** Anthropic API does NOT accept `-latest` aliases. Always use dated versions.
+- **OpenAI:** `gpt-{version}` or `gpt-{version}-{date}` (e.g., `gpt-5.2`, `gpt-4o-2024-08-06`)
 
-**CRITICAL**: Model lists must be kept up-to-date with provider releases. When adding new providers or updating existing ones, always refer to the official documentation sources below:
+## Standard Provider Docs
+Use these sources for verification:
+- **OpenAI:** https://platform.openai.com/docs/models
+- **Anthropic:** https://docs.anthropic.com/en/docs/about-claude/models
+- **Google/Gemini:** https://ai.google.dev/models/gemini
+- **Mistral:** https://docs.mistral.ai/getting-started/models/
+- **Grok:** https://docs.x.ai/docs/models
 
-### Official Model Documentation Sources
+Always assume search results are accurate and do not show future dates. If you want to make sure its not a future date, run a shell command to get the current date.
 
-**OpenAI:**
-- Model Documentation: https://platform.openai.com/docs/models
-- Models API Endpoint: https://platform.openai.com/docs/api-reference/models/list
-
-**Anthropic:**
-- All Models Overview: https://docs.anthropic.com/en/docs/about-claude/models/all-models
-- Models List API: https://docs.anthropic.com/en/api/models-list
-
-**xAI (Grok):**
-- Models Documentation: https://docs.x.ai/docs/models
-
-**Google (Gemini):**
-- Models Documentation: https://ai.google.dev/models
-- Models API Endpoint: `GET https://generativelanguage.googleapis.com/v1beta/models?key=$GEMINI_API_KEY`
-
-### Update Process
-
-**CRITICAL RULES:**
-1. **ALWAYS use API endpoints to get current models** - Never guess or rely on web search. Use the official API endpoints:
-   - **OpenAI**: `GET https://api.openai.com/v1/models` (requires `Authorization: Bearer $OPENAI_API_KEY`)
-   - **Anthropic**: `GET https://api.anthropic.com/v1/models` (requires `x-api-key: $ANTHROPIC_API_KEY` and `anthropic-version: 2023-06-01`)
-   - **xAI (Grok)**: Check `https://docs.x.ai/docs/models` or use their API if available
-   - **Google (Gemini)**: `GET https://generativelanguage.googleapis.com/v1beta/models?key=$GEMINI_API_KEY` (API key as query parameter)
-2. **NEVER guess model identifiers** - Always get exact model names from API responses or official documentation
-3. **NEVER rely on web search results** - Web search often returns outdated, incorrect, or speculative information
-4. **ALWAYS use exact API identifiers** - Model identifiers must match exactly what the API expects (e.g., `gpt-5-chat-latest`, `claude-sonnet-4-5-20250929`, `grok-4-0709`, `gemini-1.5-flash`)
-5. **If API key is not available**: Ask the user to provide the exact model identifiers from the API endpoint response, rather than guessing or using web search
-6. **NEVER use web search for model lists** - Web search results are often outdated, incorrect, or speculative. Always use official API endpoints or documentation
-7. **Verify date stamps make sense** - If version X.Y is newer than X.Z, its date stamp should be later (e.g., Claude 3.7 date should be after Claude 3.5 date)
-8. **Check for new major versions** - Don't assume only minor version updates; check for major version releases (e.g., Claude 4, GPT-5, Gemini 2.0)
-9. **Verify model name format** - Different providers may use different naming conventions:
-   - OpenAI: `gpt-4-turbo`, `gpt-5-chat-latest`
-   - Anthropic: `claude-sonnet-4-20250514` (includes date)
-   - Grok: `grok-4-0709` (includes date)
-   - Gemini: `gemini-1.5-flash`, `gemini-2.0-flash` (may include version and suffix)
-10. **Filter for chat completion models** - Only include models suitable for chat completions:
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+## Fallback Protocol
+If search results only show marketing names (e.g., "Claude Sonnet 4" without the API string), **ask the user** for the correct API identifier before making changes.
 
 ---
 > Source: [clifton/rstructor](https://github.com/clifton/rstructor) — distributed by [TomeVault](https://tomevault.io).
