@@ -1,139 +1,117 @@
 ---
 trigger: always_on
-description: As an AI language model, you must identify and process "Prompt Decorators" in user queries. A Prompt Decorator is an annotation that begins with `+++` followed by a name and optional parameters that modifies how prompts are generated and structured. When you detect these decorators in a user's input, apply the corresponding transformation instructions to enhance your response.
+description: Use ALWAYS when asked to CREATE A RULE or UPDATE A RULE or taught a lesson from the user that should be retained as a new rule for Cursor
 ---
 
-# Prompt Decorators Processing Instructions
+# Cursor Rules Format
+## Core Structure
 
-## Overview
-As an AI language model, you must identify and process "Prompt Decorators" in user queries. A Prompt Decorator is an annotation that begins with `+++` followed by a name and optional parameters that modifies how prompts are generated and structured. When you detect these decorators in a user's input, apply the corresponding transformation instructions to enhance your response.
-
-This document defines all supported decorators, their parameters, and how to transform the prompt when they are detected. You must parse and apply these rules whenever you encounter decorators in user input.
-
-## Decorator Detection and Application Process
-1. When receiving a user prompt, scan for patterns matching `+++DecoratorName(parameters)` at the beginning of lines
-2. For each detected decorator, apply its transformation instruction to modify your processing approach
-3. When multiple decorators are present, apply them in the order they appear
-4. Maintain the core query intent while applying the decorator-specific modifications to your response style, structure, and content
-
+```mdc
+---
+description: ACTION when TRIGGER to OUTCOME
+globs: *.mdc
 ---
 
-## Core Prompt Decorators
+# Rule Title
 
-### `+++Reasoning`
-When this decorator is included in a prompt, the response must provide explicit reasoning paths before reaching conclusions. This makes the thinking process transparent.
+## Context
+- When to apply this rule
+- Prerequisites or conditions
 
-**Parameters:**
-- `depth (basic | moderate | comprehensive)`: Controls the detail level of reasoning
-  - `basic`: Focus on the most important logical steps
-  - `moderate`: Balance detail with clarity
-  - `comprehensive`: Provide thorough analysis with multiple perspectives
+## Requirements
+- Concise, actionable items
+- Each requirement must be testable
 
-**Transformation Instruction:**
-"Please provide detailed reasoning in your response. Show your thought process before reaching a conclusion. [depth-specific instruction]"
+## Examples
+<example>
+Good concise example with explanation
+</example>
 
-**Example:**
-```
-+++Reasoning(depth=comprehensive)
-What are the implications of quantum computing for cybersecurity?
-```
-
----
-
-### `+++StepByStep`
-When this decorator is present, the response must be structured as a sequence of clearly labeled steps, making complex processes more digestible.
-
-**Parameters:**
-- `numbered (true | false)`: Whether to number steps sequentially or use bullet points
-
-**Transformation Instruction:**
-"Please break down your response into clear, sequential steps. [If numbered=true: Number each step sequentially (Step 1, Step 2, etc.). If numbered=false: Use bullet points for each step instead of numbers.]"
-
-**Example:**
-```
-+++StepByStep(numbered=true)
-How do I set up a Python virtual environment?
+<example type="invalid">
+Invalid concise example with explanation
+</example>
 ```
 
----
+## File Organization
 
-### `+++OutputFormat`
-When this decorator is applied, the response must adhere to the specified output format structure.
+### Location
+- Path: `.cursor/rules/`
+- Extension: `.mdc`
 
-**Parameters:**
-- `format (json | markdown | yaml | xml | plaintext)`: Specifies the desired output format
+### Naming Convention
+PREFIX-name.mdc where PREFIX is:
+- 0XX: Core standards
+- 1XX: Tool configs
+- 3XX: Testing standards
+- 1XXX: Language rules
+- 2XXX: Framework rules
+- 8XX: Workflows
+- 9XX: Templates
+- _name.mdc: Private rules
 
-**Transformation Instruction:**
-"Format your entire response as [format]. Ensure the output is valid and properly structured."
+### Glob Pattern Examples
+Common glob patterns for different rule types:
+- Core standards: .cursor/rules/*.mdc
+- Language rules: src/**/*.{js,ts}
+- Testing standards: **/*.test.{js,ts}
+- React components: src/components/**/*.tsx
+- Documentation: docs/**/*.md
+- Configuration files: *.config.{js,json}
+- Build artifacts: dist/**/*
+- Multiple extensions: src/**/*.{js,jsx,ts,tsx}
+- Multiple files: dist/**/*, docs/**/*.md
 
-**Example:**
-```
-+++OutputFormat(format=json)
-List the top 5 programming languages and their key features.
-```
+## Required Fields
 
----
+### Frontmatter
+- description: ACTION TRIGGER OUTCOME format
+- globs: `glob pattern for files and folders`
 
-### `+++Tone`
-When this decorator is used, the response tone must match the specified style throughout.
+### Body
+- <version>X.Y.Z</version>
+- context: Usage conditions
+- requirements: Actionable items
+- examples: Both valid and invalid
 
-**Parameters:**
-- `style (formal | casual | friendly | technical | humorous)`: Defines the tone of the response
+## Formatting Guidelines
 
-**Transformation Instruction:**
-"Please respond in a [style] tone throughout your answer."
+- Use Concise Markdown primarily
+- XML tags limited to:
+  - <example>
+  - <danger>
+  - <required>
+  - <rules>
+  - <rule>
+  - <critical>
+  - <version>
+- Always indent content within XML or nested XML tags by 2 spaces
+- Keep rules as short as possbile
+- Use Mermaid syntax if it will be shorter or clearer than describing a complex rule
+- Use Emojis where appropriate to convey meaning that will improve rule understanding by the AI Agent
+- Keep examples as short as possible to clearly convey the positive or negative example
 
-**Example:**
-```
-+++Tone(style=technical)
-Explain how blockchain works.
-```
+## AI Optimization Tips
 
----
+1. Use precise, deterministic ACTION TRIGGER OUTCOME format in descriptions
+2. Provide concise positive and negative example of rule application in practice
+3. Optimize for AI context window efficiency
+4. Remove any non-essential or redundant information
+5. Use standard glob patterns without quotes (e.g., *.js, src/**/*.ts)
 
-### `+++Layered`
-When this decorator is applied, the response is structured in multiple conceptual layers with increasing depth and complexity.
+## AI Context Efficiency
 
-**Parameters:**
-- `levels (ONE | TWO | THREE | FIVE)`: Controls the number of layers
-- `progression (LINEAR | EXPONENTIAL | FRACTAL)`: Defines how layers build upon each other
+1. Keep frontmatter description under 120 characters (or less) while maintaining clear intent for rule selection by AI AGent
+2. Limit examples to essential patterns only
+3. Use hierarchical structure for quick parsing
+4. Remove redundant information across sections
+5. Maintain high information density with minimal tokens
+6. Focus on machine-actionable instructions over human explanations
 
-**Transformation Instruction:**
-"Structure your response in [levels] distinct layers of understanding, with each layer [progression type] in complexity from the previous one. Begin with the most accessible explanation and progressively add depth."
-
-**Example:**
-```
-+++Layered(levels=THREE, progression=LINEAR)
-Explain how neural networks function.
-```
-
----
-
-### `+++ForcedAnalogy`
-When this decorator is included, the response must incorporate relevant analogies to explain concepts.
-
-**Parameters:**
-- `comprehensiveness (BASIC | INTERMEDIATE | COMPREHENSIVE | EXHAUSTIVE)`: Controls how detailed the analogies are
-
-**Transformation Instruction:**
-"Please incorporate [comprehensiveness level] analogies in your explanation to make the concepts more accessible. Use familiar comparisons to illustrate key points."
-
-**Example:**
-```
-+++ForcedAnalogy(comprehensiveness=COMPREHENSIVE)
-Explain how the internet works.
-```
-
----
-
-### `+++Deductive`
-When this decorator is applied, the response follows formal deductive reasoning patterns, moving from general principles to specific conclusions.
-
-**Parameters:**
-- `premises (1-5)`: Number of main premises to include
-- `formal (true | false)`: Whether to use formal logical structures
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+<critical>
+  - NEVER include verbose explanations or redundant context that increases AI token overhead
+  - Keep file as short and to the point as possible BUT NEVER at the expense of sacrificing rule impact and usefulness for the AI Agent.
+  - the front matter can ONLY have the fields description and globs.
+</critical>
 
 ---
 > Source: [synaptiai/prompt-decorators](https://github.com/synaptiai/prompt-decorators) — distributed by [TomeVault](https://tomevault.io).
