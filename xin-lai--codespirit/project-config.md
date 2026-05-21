@@ -1,244 +1,244 @@
 ---
 trigger: always_on
-description: CodeSpirit 统一启动框架规范 - API项目配置标准化
+description: CodeSpirit 测试开发规范 - 单元测试、集成测试、测试项目结构和Mock使用
 ---
 
 
-# 统一启动框架规范
+# 测试开发规范
 
-## 快速开始
+## 测试项目结构
 
-### Program.cs（标准模板）
-```csharp
-using CodeSpirit.ExamApi.Configuration;
-using CodeSpirit.Shared.Startup;
-using System.Text;
-
-Console.OutputEncoding = Encoding.UTF8;
-
-var builder = WebApplication.CreateBuilder(args);
-
-// 1. 注册服务
-builder.AddCodeSpiritApi<ExamApiConfiguration>();
-
-var app = builder.Build();
-
-try
-{
-    // 2. 配置中间件和初始化数据库
-    await app.UseCodeSpiritApiAsync<ExamApiConfiguration>();
-    app.Run();
-}
-catch (Exception ex)
-{
-    var logger = app.Services.GetRequiredService<ILogger<Program>>();
-    logger.LogError(ex, "服务启动过程中发生错误");
-}
+```
+Tests/
+├── ApiServices/              # API服务测试
+│   ├── CodeSpirit.ExamApi.Tests/
+│   └── CodeSpirit.IdentityApi.Tests/
+├── Components/               # 组件测试
+│   ├── CodeSpirit.Amis.Tests/
+│   └── CodeSpirit.LLM.Tests/
+├── Infrastructure/           # 基础设施测试
+└── Shared/                   # 共享测试工具
 ```
 
-> ⚠️ **规范**：不要在 `Program.cs` 中添加额外配置，所有配置放在 API 配置类中。
+## 测试命名约定
 
----
+### 测试类命名
+- 格式：`{被测试类名}Tests`
+- 示例：`UserServiceTests`、`QuestionsControllerTests`
 
-## API 配置类
+### 测试方法命名
+- 格式：`{方法名}_{场景}_{预期结果}`
+- 使用 `[Fact]` 或 `[Theory]` 特性
+- 示例：
+  ```csharp
+  [Fact]
+  public async Task GetByIdAsync_ValidId_ReturnsUserDto()
+  {
+      // Arrange
+      // Act
+      // Assert
+  }
+  
+  [Theory]
+  [InlineData(1)]
+  [InlineData(2)]
+  public async Task GetByIdAsync_InvalidId_ThrowsNotFoundException(long id)
+  {
+      // Arrange
+      // Act & Assert
+  }
+  ```
 
-### 位置和命名
-- **位置**：`{ProjectName}/Configuration/` 文件夹
-- **命名**：`{ApiName}Configuration`（如 `ExamApiConfiguration`）
-- **继承**：`BaseApiConfiguration`
+## 测试框架
 
-### 最小配置类
+- **单元测试**: xUnit
+- **Mock框架**: Moq 或 NSubstitute
+- **断言**: FluentAssertions（推荐）或 xUnit 内置断言
+
+## 单元测试示例
+
 ```csharp
-namespace CodeSpirit.ExamApi.Configuration;
+using Xunit;
+using FluentAssertions;
+using Moq;
+using CodeSpirit.ExamApi.Services;
+using CodeSpirit.ExamApi.Services.Interfaces;
 
-public class ExamApiConfiguration : BaseApiConfiguration
+namespace CodeSpirit.ExamApi.Tests.Services;
+
+/// <summary>
+/// 题目服务测试
+/// </summary>
+public class QuestionServiceTests
 {
-    /// <summary>服务名称，用于 Aspire 服务发现</summary>
-    public override string ServiceName => "exam";
+    private readonly Mock<IRepository<Question>> _repositoryMock;
+    private readonly Mock<IMapper> _mapperMock;
+    private readonly QuestionService _service;
     
-    /// <summary>数据库连接字符串键名</summary>
-    public override string ConnectionStringKey => "exam-api";
-}
-```
-
----
-
-## 核心方法
-
-### ConfigureServices - 服务注册
-
-#### 简化配置方式（推荐）
-
-使用扩展方法简化配置，减少重复代码：
-
-```csharp
-public override void ConfigureServices(IServiceCollection services, IConfiguration configuration)
-{
-    // ⚠️ 必须调用基类方法（初始化路径前缀配置）
-    base.ConfigureServices(services, configuration);
-    
-    // 配置标准数据库服务（多数据库支持、仓储模式）
-    this.ConfigureStandardDatabaseServices<ExamDbContext, MySqlExamDbContext, SqlServerExamDbContext>(
-        services, configuration);
-    
-    // 配置标准基础设施服务（事件总线、HTTP客户端）+ 可选组件（多租户、设置管理）
-    this.ConfigureStandardInfrastructureServices(services, configuration, (s, c) =>
+    public QuestionServiceTests()
     {
-        s.AddCodeSpiritMultiTenant(c);
-        s.AddSettingsManagerWithDatabase(c);
-    });
+        _repositoryMock = new Mock<IRepository<Question>>();
+        _mapperMock = new Mock<IMapper>();
+        _service = new QuestionService(_repositoryMock.Object, _mapperMock.Object);
+    }
     
-    // 只配置特定业务服务
-    services.AddLLMServices();
-    AddExamSpecificServices(services);
-}
-```
-
-#### 传统配置方式
-
-如果需要更多控制，可以使用传统方式：
-
-```csharp
-public override void ConfigureServices(IServiceCollection services, IConfiguration configuration)
-{
-    // ⚠️ 必须调用基类方法（初始化路径前缀配置）
-    base.ConfigureServices(services, configuration);
-    
-    // 配置多数据库支持（推荐方式）
-    DatabaseMigrationHelper.ConfigureMultiDatabaseDbContext<
-        ExamDbContext, MySqlExamDbContext, SqlServerExamDbContext>(
-        services, configuration, ConnectionStringKey);
-    
-    // 注册仓储模式
-    services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
-    
-    // 添加多租户支持
-    services.AddCodeSpiritMultiTenant(configuration);
-    
-    // 其他服务注册...
-}
-```
-
-#### 常用服务注册方法
-| 方法 | 说明 |
-|------|------|
-| `services.AddCodeSpiritMultiTenant(configuration)` | 多租户支持 |
-| `services.AddEventBus()` | 事件总线 |
-| `services.AddCodeSpiritCaching(configuration)` | 统一缓存服务 |
-| `services.AddLLMServices()` | LLM 服务 |
-| `services.AddAiFormFillEndpoints()` | AI 表单填充端点 |
-| `services.AddSettingsManagerWithDatabase(configuration)` | 设置管理 |
-| `services.AddScheduledTasks()` | 定时任务 |
-| `services.AddChartServices()` | 图表服务 |
-
-#### 线程池配置（可选）
-```csharp
-// 高并发服务
-ThreadPoolConfiguration.ConfigureThreadPool(
-    ThreadPoolConfiguration.ServiceTier.High, 
-    expectedInstances: 3, 
-    logger);
-
-// 服务等级：Low, Medium, High
-```
-
----
-
-### 中间件配置
-
-#### 1. ConfigurePreAuthenticationMiddlewareAsync - 认证前
-在认证之前执行，用于租户解析等：
-```csharp
-public override Task ConfigurePreAuthenticationMiddlewareAsync(WebApplication app)
-{
-    app.UseCodeSpiritMultiTenant();
-    return Task.CompletedTask;
-}
-```
-
-#### 2. ConfigurePreControllerMiddlewareAsync - 控制器前
-在控制器映射之前执行：
-```csharp
-public override Task ConfigurePreControllerMiddlewareAsync(WebApplication app)
-{
-    // 通常审计由网关处理，API 服务不需要
-    return Task.CompletedTask;
-}
-```
-
-#### 3. ConfigureMiddlewareAsync - 自定义中间件
-在通用中间件之后执行：
-
-**简化配置方式（推荐）：**
-
-```csharp
-public override async Task ConfigureMiddlewareAsync(WebApplication app)
-{
-    // 配置标准中间件（聚合器）+ 可选组件（多租户、AI表单填充）
-    await this.ConfigureStandardMiddlewareAsync(app, a =>
+    [Fact]
+    public async Task GetQuestionAsync_ValidId_ReturnsQuestionDto()
     {
-        a.UseCodeSpiritMultiTenant();
-        a.UseAiFormFillEndpoints();
-    });
+        // Arrange
+        var questionId = 1L;
+        var question = new Question { Id = questionId, Content = "测试题目" };
+        var questionDto = new QuestionDto { Id = questionId, Content = "测试题目" };
+        
+        _repositoryMock.Setup(r => r.GetByIdAsync(questionId))
+            .ReturnsAsync(question);
+        _mapperMock.Setup(m => m.Map<QuestionDto>(question))
+            .Returns(questionDto);
+        
+        // Act
+        var result = await _service.GetQuestionAsync(questionId);
+        
+        // Assert
+        result.Should().NotBeNull();
+        result.Id.Should().Be(questionId);
+        result.Content.Should().Be("测试题目");
+        _repositoryMock.Verify(r => r.GetByIdAsync(questionId), Times.Once);
+    }
     
-    // 只配置特定中间件
-    app.MapHub<ExamHub>("/exam-hub");
-}
-```
-
-**传统配置方式：**
-
-```csharp
-public override async Task ConfigureMiddlewareAsync(WebApplication app)
-{
-    // 多租户中间件
-    app.UseCodeSpiritMultiTenant();
-    
-    // 聚合器中间件
-    app.UseCodeSpiritAggregator();
-    
-    // AI 表单填充端点
-    app.UseAiFormFillEndpoints();
-    
-    // SignalR Hub 映射
-    app.MapHub<ExamHub>("/exam-hub");
-    
-    await Task.CompletedTask;
-}
-```
-
----
-
-### InitializeDatabaseAsync - 数据库初始化
-
-**简化配置方式（推荐）：**
-
-```csharp
-public override async Task InitializeDatabaseAsync(WebApplication app)
-{
-    // 使用标准数据库初始化方法
-    // 自动应用迁移和初始化种子数据（如果 DbContext 实现了 IInitializableDbContext）
-    await this.InitializeStandardDatabaseAsync<ExamDbContext, MySqlExamDbContext, SqlServerExamDbContext>(
-        app, "ExamApi");
-}
-```
-
-**传统配置方式：**
-
-```csharp
-public override async Task InitializeDatabaseAsync(WebApplication app)
-{
-    using var scope = app.Services.CreateScope();
-    var services = scope.ServiceProvider;
-    var logger = services.GetRequiredService<ILogger<ExamApiConfiguration>>();
-    var configuration = services.GetRequiredService<IConfiguration>();
-    
-    try
+    [Fact]
+    public async Task GetQuestionAsync_InvalidId_ThrowsNotFoundException()
     {
-        // 1. 自动应用数据库迁移
-        await DatabaseMigrationHelper.ApplyDatabaseMigrationsAsync<
-            MySqlExamDbContext, 
-            SqlServerExamDbContext>(
+        // Arrange
+        var questionId = 999L;
+        _repositoryMock.Setup(r => r.GetByIdAsync(questionId))
+            .ReturnsAsync((Question?)null);
+        
+        // Act & Assert
+        await Assert.ThrowsAsync<BusinessException>(() => 
+            _service.GetQuestionAsync(questionId));
+    }
+}
+```
+
+## 集成测试示例
+
+```csharp
+using Xunit;
+using Microsoft.AspNetCore.Mvc.Testing;
+using CodeSpirit.ExamApi;
+using System.Net.Http;
+using System.Threading.Tasks;
+
+namespace CodeSpirit.ExamApi.Tests.Integration;
+
+/// <summary>
+/// 题目API集成测试
+/// </summary>
+public class QuestionsControllerIntegrationTests : IClassFixture<WebApplicationFactory<Program>>
+{
+    private readonly HttpClient _client;
+    
+    public QuestionsControllerIntegrationTests(WebApplicationFactory<Program> factory)
+    {
+        _client = factory.CreateClient();
+    }
+    
+    [Fact]
+    public async Task GetQuestions_ReturnsSuccessStatusCode()
+    {
+        // Arrange
+        var request = new HttpRequestMessage(HttpMethod.Get, "/exam/api/Questions");
+        
+        // Act
+        var response = await _client.SendAsync(request);
+        
+        // Assert
+        response.EnsureSuccessStatusCode();
+        var content = await response.Content.ReadAsStringAsync();
+        content.Should().NotBeNullOrEmpty();
+    }
+}
+```
+
+## Mock 使用规范
+
+### 使用 Moq
+
+```csharp
+// 设置返回值
+_mockService.Setup(s => s.GetByIdAsync(It.IsAny<long>()))
+    .ReturnsAsync(new UserDto { Id = 1 });
+
+// 验证调用
+_mockService.Verify(s => s.GetByIdAsync(1), Times.Once);
+
+// 设置异常
+_mockService.Setup(s => s.GetByIdAsync(It.IsAny<long>()))
+    .ThrowsAsync(new BusinessException("用户不存在"));
+```
+
+### 使用 NSubstitute
+
+```csharp
+// 设置返回值
+_substituteService.GetByIdAsync(Arg.Any<long>())
+    .Returns(new UserDto { Id = 1 });
+
+// 验证调用
+_substituteService.Received(1).GetByIdAsync(1);
+
+// 设置异常
+_substituteService.GetByIdAsync(Arg.Any<long>())
+    .ThrowsAsync(new BusinessException("用户不存在"));
+```
+
+## 测试数据准备
+
+### 使用 Fixture
+
+```csharp
+public class QuestionFixture
+{
+    public static Question CreateValidQuestion()
+    {
+        return new Question
+        {
+            Id = 1,
+            Content = "测试题目",
+            Type = QuestionType.SingleChoice,
+            CreatedAt = DateTime.UtcNow
+        };
+    }
+    
+    public static CreateQuestionDto CreateValidCreateDto()
+    {
+        return new CreateQuestionDto
+        {
+            Content = "测试题目",
+            Type = QuestionType.SingleChoice
+        };
+    }
+}
+```
+
+## 异步测试
+
+```csharp
+[Fact]
+public async Task CreateQuestionAsync_ValidDto_ReturnsQuestionDto()
+{
+    // Arrange
+    var dto = QuestionFixture.CreateValidCreateDto();
+    
+    // Act
+    var result = await _service.CreateQuestionAsync(dto);
+    
+    // Assert
+    result.Should().NotBeNull();
+    result.Content.Should().Be(dto.Content);
+}
+```
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
