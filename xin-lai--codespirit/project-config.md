@@ -1,217 +1,142 @@
 ---
 trigger: always_on
-description: CodeSpirit AI功能开发规范 - AI表单填充、长任务处理、LLM集成
+description: description: CodeSpirit 全局开发规范概览 - 核心原则和规范索引
 ---
 
-
-# AI 功能开发规范
-
-## 📋 目录
-
-1. [架构概览](#架构概览)
-2. [AI 表单填充](#ai-表单填充)
-3. [AI 长任务处理](#ai-长任务处理)
-4. [LLM 集成](#llm-集成)
-5. [提示词管理](#提示词管理)
-6. [错误处理](#错误处理)
-7. [性能优化](#性能优化)
-8. [安全最佳实践](#安全最佳实践)
-
+﻿---
+description: CodeSpirit 全局开发规范概览 - 核心原则和规范索引
+globs: 
+alwaysApply: true
 ---
 
-## 架构概览
+# 通用要求
+
+- 严格遵守项目结构规范，保持代码组织一致性
+- EF 迁移按数据库目录创建（SqlServer/MySql）
+- 分布式程序优先考虑：高可用、容错、降级、最终一致性
+- 所有面向用户的文本必须支持多语言（中文/英文）
+- 异步编程：所有 I/O 操作使用 `async/await`，禁止 `Task.Result` 和 `Task.Wait()`
+
+> 💡 **详细规范**: 本文件是全局概览，详细规范请参考专项文档
+
+# 技术栈
+
+- **框架**: .NET 10 + Aspire 13.0
+- **数据库**: MySQL 8.0 / SQL Server 2022 + GreptimeDB（审计）
+- **缓存/消息**: Redis + RabbitMQ
+- **前端**: React + AMIS (AntD 主题)
+- **AI**: OpenAI、通义千问、DeepSeek
+
+# 核心规范
+
+## 统一启动框架
+- Program.cs 仅需 2 行代码 + 配置类继承 `BaseApiConfiguration`
+- 📖 [详细规范](mdc:.cursor/rules/startup-framework.mdc)
+
+## 依赖注入
+- 自动注册：`IScopedDependency` / `ITransientDependency` / `ISingletonDependency`
+- 📖 [详细规范](mdc:.cursor/rules/dependency-injection.mdc)
+
+## 命名约定
+- 实体：`User`、DTO：`CreateUserDto`、服务：`UserService`、控制器：`UsersController`
+- 📖 [详细规范](mdc:.cursor/rules/naming-conventions.mdc)
+
+## API 设计
+- RESTful 标准 + 统一响应格式 `ApiResponse<T>` + 操作特性标记
+- 📖 [详细规范](mdc:.cursor/rules/api-design.mdc)
+
+## 多语言国际化
+- 支持中英文 + 资源文件 + DTO 验证特性多语言
+- 📖 [详细规范](mdc:.cursor/rules/i18n.mdc)
+
+## AI 功能开发
+- AI 表单填充（`[AiFormFill]`）+ AI 长任务（`aiForm`）+ LLM 集成
+- 📖 [详细规范](mdc:.cursor/rules/ai-development.mdc)
+
+## 性能优化
+- 异步编程 + 多级缓存（L1+L2）+ EF Core 查询优化
+- 📖 [详细规范](mdc:.cursor/rules/performance.mdc)
+
+## 安全规范
+- 权限控制（`[Authorize]` + `[RequirePermission]`）+ 审计追踪 + 数据加密
+- 📖 [详细规范](mdc:.cursor/rules/security.mdc)
+
+## 包管理规范
+- 集中式包管理：所有包版本在 `Directory.Packages.props` 中统一管理
+- 项目文件中只引用包名，不指定版本
+- 避免冗余引用：通过传递依赖可用的包不需要显式引用
+- 📖 [详细规范](mdc:.cursor/rules/package-management.mdc)
+
+# 数据访问
+
+- **多数据库支持**: 使用数据库特定 DbContext（`SqlServer{Service}DbContext` / `MySql{Service}DbContext`）
+- **Code First 迁移**: 按数据库创建独立迁移（SqlServer/MySql），**必须使用数据库特定 DbContext**
+- **雪花 ID 配置**: 使用 `IIdGenerator` 的实体必须配置 `ValueGeneratedNever()`
+- **实体配置**: `IEntityTypeConfiguration<T>`
+- **只读查询**: `AsNoTracking()`，避免 N+1 用 `Include` + `AsSplitQuery()`
+- **多租户**: 实体实现 `IMultiTenant`，自动应用租户过滤器
+- 📖 [详细规范](mdc:.cursor/rules/database.mdc)
+
+# 代码质量
+
+- 一个 .cs 文件一个顶级类型
+- XML 文档注释：`<summary>`, `<param>`, `<returns>`, `<exception>`
+- 时间使用 UTC 格式
+
+# 组件使用
+
+- **AMIS**: `antd` 主题，CSS 类用 `antd-` 前缀，特性驱动
+- **LLM**: 使用 `ILLMClientFactory`，提示词指定 JSON 输出
+
+# 调试运行
+
+- **启动**: `CodeSpirit.AppHost` (Aspire 协调) → `aspire run` 或 F5
+- **Dashboard**: Aspire 管理面板
+- **健康检查**: `/health`
+
+# 项目结构
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                              前端                                        │
-│  ┌─────────────────┐    ┌──────────────────┐    ┌──────────────────┐   │
-│  │   表单组件       │───▶│   AI填充按钮     │───▶│  自动生成UI      │   │
-│  └─────────────────┘    └──────────────────┘    └──────────────────┘   │
-└───────────────────────────────────┬─────────────────────────────────────┘
-                                    │ POST /api/{controller}/ai-fill
-                                    ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                              后端                                        │
-│  ┌─────────────────────────────────────────────────────────────────┐   │
-│  │  AiFormFill中间件（自动拦截 ai-fill 请求）                        │   │
-│  └────────────────────────────────┬────────────────────────────────┘   │
-│                                   ▼                                     │
-│  ┌─────────────────────────────────────────────────────────────────┐   │
-│  │  AiFormFillService → AiFormPromptBuilder → LLM客户端            │   │
-│  └────────────────────────────────┬────────────────────────────────┘   │
-└───────────────────────────────────┼─────────────────────────────────────┘
-                                    ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│              LLM服务（OpenAI / 通义千问 / DeepSeek）                     │
-└─────────────────────────────────────────────────────────────────────────┘
+Src/
+├── ApiServices/        # 14个API服务（Identity, Exam, Survey, AI等）
+├── Components/         # 多个核心组件（Amis, LLM, Caching等）
+├── CodeSpirit.AppHost/ # Aspire应用宿主
+├── CodeSpirit.Core/    # 核心框架
+└── CodeSpirit.Web/     # Web前端
 ```
 
-### 模式选择决策树
+📖 [完整项目结构](mdc:.cursor/rules/project-structure.mdc)
 
-```
-使用哪种AI填充模式？
-├── 需要基于单个字段触发填充？
-│   └── 是 → 字段触发模式 (TriggerField = "FieldName")
-│
-├── 需要用户输入自定义需求一次性填充整个表单？
-│   └── 是 → 全局填充模式 (GlobalFillPrompt = "提示词")
-│
-└── 需要复杂的AI长任务处理（批量生成、进度跟踪）？
-    └── 是 → AI长任务模式 (HeaderOperation + aiForm)
-```
+# 规范文档索引
 
----
+## 通用规范
+- [C#通用规范](mdc:.cursor/rules/cs.mdc) - XML注释、时间格式、序列化
+- [命名约定](mdc:.cursor/rules/naming-conventions.mdc) - 实体、DTO、服务、控制器命名
 
-## AI 表单填充
+## 按文件类型
+- [DTO规范](mdc:.cursor/rules/dto.mdc) - DTO特性、验证、映射
+- [控制器规范](mdc:.cursor/rules/controller.mdc) - API控制器、操作特性
+- [服务类规范](mdc:.cursor/rules/service.mdc) - 服务接口、实现、生命周期
+- [枚举规范](mdc:.cursor/rules/enum.mdc) - 枚举定义、多语言支持
 
-### 快速开始（零代码方案）
+## 专项规范
+- [API设计](mdc:.cursor/rules/api-design.mdc) - RESTful、路由、响应格式
+- [依赖注入](mdc:.cursor/rules/dependency-injection.mdc) - Scrutor自动注册
+- [启动框架](mdc:.cursor/rules/startup-framework.mdc) - Program.cs配置
+- [数据库迁移](mdc:.cursor/rules/database.mdc) - 多数据库、DbContext、迁移命令
+- [多语言](mdc:.cursor/rules/i18n.mdc) - 资源文件、本地化
+- [AI开发](mdc:.cursor/rules/ai-development.mdc) - AI表单、长任务、LLM
+- [性能优化](mdc:.cursor/rules/performance.mdc) - 异步、缓存、查询
+- [安全规范](mdc:.cursor/rules/security.mdc) - 权限、审计、加密
+- [测试规范](mdc:.cursor/rules/testing.mdc) - 单元测试、集成测试、Mock使用
 
-#### 1. 服务注册
-```csharp
-// Program.cs 或 ApiConfiguration
+## 项目结构
+- [项目结构](mdc:.cursor/rules/project-structure.mdc) - 完整目录树
 
-// 注册 LLM 服务（必需）
-builder.Services.AddLLMServices();
+## 包管理
+- [包管理规范](mdc:.cursor/rules/package-management.mdc) - 集中式包管理、版本统一、传递依赖处理
 
-// 注册 AI 表单填充自动端点（推荐）
-builder.Services.AddAiFormFillEndpoints();
-
-var app = builder.Build();
-
-// 启用 AI 填充中间件
-app.UseAiFormFillEndpoints();
-```
-
-#### 2. DTO 配置
-```csharp
-[AiFormFill(TriggerField = nameof(Topic))]
-public class CreateQuestionDto
-{
-    [Required]
-    [DisplayName("主题")]
-    public string Topic { get; set; } = string.Empty;
-    
-    [DisplayName("题目内容")]
-    [AiFieldFill(Priority = 1, CustomDescription = "根据主题生成的题目内容")]
-    public string? Content { get; set; }
-    
-    [DisplayName("选项A")]
-    [AiFieldFill(Priority = 2)]
-    public string? OptionA { get; set; }
-}
-```
-
-**完成！** 系统自动生成 `POST /api/questions/ai-fill` 端点，无需编写任何控制器代码。
-
-### AiFormFillAttribute 完整参数
-
-| 属性 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| `TriggerField` | string | "" | 触发字段名称，为空时启用全局模式 |
-| `IgnoreFields` | string[] | [] | 需要忽略的字段列表 |
-| `CustomPromptTemplate` | string | "" | 自定义提示词模板 |
-| `ApiEndpoint` | string | "ai-fill" | API端点路径 |
-| `MaxTokens` | int | 1000 | 最大Token数量 |
-| `EnableCache` | bool | true | 是否启用缓存 |
-| `CacheExpirationMinutes` | int | 30 | 缓存过期时间（分钟） |
-| `GlobalFillPrompt` | string | "使用AI智能优化表单" | 全局模式提示文本 |
-| `UseIndependentLLM` | bool | false | 是否使用独立的LLM配置 |
-| `LLMSettingsKey` | string | "AiFormFillLLM" | 独立LLM配置的设置键名 |
-| `DisableThinking` | bool | true | 是否禁用思考模式 |
-| `ResponseFormatType` | string | "json_object" | 响应格式类型 |
-| `Temperature` | double | 0.1 | 温度参数，控制随机性 |
-| `TopP` | double | 0.9 | Top-p参数，控制多样性 |
-
-### AiFieldFillAttribute 参数
-
-| 属性 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| `Enabled` | bool | true | 是否参与AI填充 |
-| `Weight` | int | 1 | 字段权重（影响提示词中的重要性） |
-| `Priority` | int | 0 | 字段填充优先级 |
-| `CustomDescription` | string | "" | 自定义字段描述（自动添加到JSON注释） |
-
-### 使用模式
-
-#### 字段触发模式
-用户输入触发字段后，AI 智能填充其他相关字段：
-
-```csharp
-[AiFormFill(TriggerField = nameof(Topic))]
-public class CreateSurveyDto
-{
-    [Required]
-    [DisplayName("问卷主题")]
-    public string Topic { get; set; } = string.Empty;
-    
-    [DisplayName("问卷描述")]
-    [AiFieldFill(Priority = 1, CustomDescription = "基于主题生成的详细描述")]
-    public string? Description { get; set; }
-    
-    [DisplayName("目标受众")]
-    [AiFieldFill(Priority = 2)]
-    public string? TargetAudience { get; set; }
-}
-```
-
-#### 全局填充模式
-用户在表单顶部输入自定义需求，AI 一次性填充整个表单：
-
-```csharp
-[AiFormFill(GlobalFillPrompt = "描述您想创建的内容")]
-public class CreateContentDto
-{
-    [DisplayName("标题")]
-    public string? Title { get; set; }
-    
-    [DisplayName("内容")]
-    public string? Content { get; set; }
-    
-    [DisplayName("标签")]
-    public List<string>? Tags { get; set; }
-}
-```
-
-### 自定义提示词模板
-
-#### 基础模板（自动追加JSON结构）
-```csharp
-[AiFormFill(
-    TriggerField = nameof(Topic),
-    CustomPromptTemplate = "基于主题 '{Topic}' 生成相关内容，要求专业准确")]
-public class CustomPromptDto { }
-```
-
-#### 完整模板（包含JSON结构，不会重复追加）
-```csharp
-[AiFormFill(
-    TriggerField = nameof(Description),
-    CustomPromptTemplate = @"你是一个目标管理专家。
-
-用户输入：{Description}
-请优化目标描述，并提取关键信息。
-
-**返回JSON结构说明：**
-```json
-{
-  ""description"": ""string, 必填。优化后的目标描述"",
-  ""title"": ""string, 必填。提取的简短标题""
-}
-```
-
-请严格按照上述JSON结构返回。")]
-public class GoalDto { }
-```
-
-> 💡 系统会智能检测模板中是否已包含 JSON 结构说明（关键词：` ```json `），不会重复追加。
-
-### 独立 LLM 配置
-
-为 AI 表单填充配置专用的 LLM 设置：
-
-```csharp
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+> 💡 专项规范会根据文件类型自动应用
 
 ---
 > Source: [xin-lai/CodeSpirit](https://github.com/xin-lai/CodeSpirit) — distributed by [TomeVault](https://tomevault.io).
