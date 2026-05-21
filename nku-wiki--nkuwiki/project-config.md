@@ -1,306 +1,165 @@
 ---
 trigger: always_on
-description: ├── components/        # 自定义组件
+description: 本文档为 `nkuwiki` 项目的 Python 后端开发提供统一的编码和设计规范。
 ---
 
-# 微信小程序开发规范
+# Python 编码规范
 
-## 项目结构规范
+本文档为 `nkuwiki` 项目的 Python 后端开发提供统一的编码和设计规范。
 
-### 标准目录结构
-```
-services/app/
-├── components/        # 自定义组件
-│   ├── common/       # 通用组件
-│   ├── business/     # 业务组件
-│   └── ui/          # UI组件
-├── pages/            # 页面文件
-├── utils/           # 工具函数
-├── api/             # API接口封装
-├── styles/          # 公共样式
-├── behaviors/       # 组件行为
-├── app.js           # 小程序入口文件
-├── app.json         # 全局配置
-└── app.wxss         # 全局样式
-```
+## 1. 基础规范
 
-### 文件命名规范
-```
-# ✅ 推荐的文件命名
-search-bar/           # 组件目录：小写连字符
-user-profile.js       # JS文件：小写连字符
-api-client.js         # 工具文件：小写连字符
-post-detail.wxml      # 页面文件：小写连字符
+### 1.1. 代码风格
+- **PEP 8**: 严格遵循 [PEP 8](mdc:https:/www.python.org/dev/peps/pep-0008) 代码风格指南。
+- **格式化工具**: 使用 **Ruff** 进行代码的自动化格式化与检查，以统一风格并替代 `black`, `isort`, `flake8`。
+- **行长度**: 最大行长度限制为 **88个字符**。
+- **缩进**: 使用 **4个空格** 进行缩进，禁止使用Tab。
 
-# ❌ 避免的命名
-SearchBar/            # 避免大驼峰目录名
-userProfile.js        # 避免小驼峰文件名
-api_client.js         # 避免下划线（除特殊情况）
+### 1.2. 类型提示 (强制)
+- 所有函数、方法的参数和返回值都**必须**有明确的类型提示。
+- 使用 `from typing import ...` 导入所有类型。
+
+```python
+from typing import List, Dict, Optional, Any
+from pathlib import Path
+
+def process_data(items: List[Dict[str, Any]]) -> Optional[Path]:
+    # ...
+    return Path("/path/to/result")
 ```
 
-## JavaScript 编码规范
+### 1.3. 命名规范
+- **变量和函数**: 小写字母和下划线 (`snake_case`)。示例: `user_name`, `get_user_profile`。
+- **类名**: 大驼峰式 (`CamelCase`)。示例: `DocumentProcessor`, `QdrantIndexer`。
+- **常量**: 大写字母和下划线 (`SCREAMING_SNAKE_CASE`)。示例: `MAX_RETRIES`, `DEFAULT_TIMEOUT`。
+- **私有成员**: 以单个下划线开头 (`_internal_method`)。
+- **单数优先**: 优先使用单数形式命名。例如，使用 `/user` 而不是 `/users`。即使是返回列表的端点，也遵循此约定，如 `GET /insight` 返回洞察列表。
 
-### 1. 基础语法规范
-```javascript
-// ✅ 推荐的代码风格
-const userInfo = {
-  openid: '',
-  nickname: '',
-  avatar: ''
-}
+## 2. 模块与导入
 
-// 使用const/let，避免var
-const API_BASE_URL = 'https://api.nkuwiki.com'
-let searchResults = []
+### 2.1. 导入顺序
+不同来源的模块导入应按以下顺序分组，并用空行隔开：
+1.  **标准库**: `os`, `sys`, `datetime`, `asyncio`, `typing`
+2.  **第三方库**: `fastapi`, `llama_index`, `aiofiles`
+3.  **项目内模块**: `config`, `core.utils`, `etl.load`
 
-// 函数命名：动词开头，小驼峰
-function getUserInfo() {
-  return wx.getStorageSync('userInfo')
-}
+```python
+# 1. 标准库
+import json
+from pathlib import Path
+from typing import List
 
-// 异步函数优先使用async/await
-async function searchKnowledge(query) {
-  try {
-    const result = await apiClient.post('/knowledge/search', { query })
-    return result.data
-  } catch (error) {
-    console.error('搜索失败:', error)
-    throw error
-  }
-}
+# 2. 第三方库
+from fastapi import APIRouter, Query
+
+# 3. 项目内模块
+from config import Config
+from core.utils.logger import register_logger
+from etl.load import db_core
 ```
 
-### 2. 页面/组件生命周期
-```javascript
-// 页面生命周期标准模板
-Page({
-  data: {
-    // 页面数据
-    query: '',
-    searchResults: [],
-    loading: false,
-    hasMore: true
-  },
-  
-  // 页面加载
-  onLoad(options) {
-    console.log('页面加载:', options)
-    this.initPage(options)
-  },
-  
-  // 页面显示
-  onShow() {
-    this.refreshUserInfo()
-  },
-  
-  // 页面卸载
-  onUnload() {
-    this.cleanup()
-  },
-  
-  // 自定义方法
-  async initPage(options) {
-    const { query } = options
-    if (query) {
-      this.setData({ query })
-      await this.performSearch(query)
-    }
-  },
-  
-  async performSearch(query) {
-    if (!query.trim()) {
-      wx.showToast({ title: '请输入搜索内容', icon: 'none' })
-      return
-    }
-    
-    this.setData({ loading: true })
-    
-    try {
-      const results = await searchKnowledge(query)
-      this.setData({ 
-        searchResults: results,
-        loading: false 
-      })
-    } catch (error) {
-      this.setData({ loading: false })
-      this.showError('搜索失败，请重试')
-    }
-  },
-  
-  // 错误处理
-  showError(message) {
-    wx.showToast({
-      title: message,
-      icon: 'none',
-      duration: 2000
-    })
-  },
-  
-  // 清理资源
-  cleanup() {
-    // 清理定时器、取消请求等
-  }
-})
+### 2.2. 导入方式
+- **推荐**: 明确导入需要的模块或函数。`from core.utils.logger import register_logger`。
+- **禁止**: 禁止使用通配符导入 (`from module import *`)。
+
+## 3. 日志规范 (强制)
+
+### 3.1. 日志器创建
+- 每个模块都必须创建自己独立的日志记录器。
+- **必须**使用项目提供的 `register_logger` 工具函数。
+- 推荐使用模块的 `__name__` 作为日志记录器的名称。
+
+```python
+from core.utils.logger import register_logger
+
+# api/routes/knowledge/insight.py
+logger = register_logger('api.routes.knowledge.insight')
+
+# etl/daily_pipeline.py
+logger = register_logger('etl.daily_pipeline')
 ```
 
-### 3. 组件定义规范
-```javascript
-// 自定义组件标准模板
-Component({
-  // 组件属性
-  properties: {
-    placeholder: {
-      type: String,
-      value: '请输入搜索内容'
-    },
-    disabled: {
-      type: Boolean,
-      value: false
-    }
-  },
-  
-  // 组件数据
-  data: {
-    inputValue: '',
-    focused: false
-  },
-  
-  // 组件生命周期
-  lifetimes: {
-    attached() {
-      // 组件实例进入页面节点树时执行
-      console.log('SearchBar组件已挂载')
-    },
-    
-    detached() {
-      // 组件实例被从页面节点树移除时执行
-      this.cleanup()
-    }
-  },
-  
-  // 页面生命周期
-  pageLifetimes: {
-    show() {
-      // 页面显示时执行
-    },
-    hide() {
-      // 页面隐藏时执行
-    }
-  },
-  
-  // 组件方法
-  methods: {
-    onInput(e) {
-      const value = e.detail.value
-      this.setData({ inputValue: value })
-      
-      // 触发自定义事件
-      this.triggerEvent('input', { value })
-    },
-    
-    onConfirm(e) {
-      const value = e.detail.value.trim()
-      if (!value) {
-        wx.showToast({ title: '请输入搜索内容', icon: 'none' })
-        return
-      }
-      
-      this.triggerEvent('search', { query: value })
-    },
-    
-    onFocus() {
-      this.setData({ focused: true })
-      this.triggerEvent('focus')
-    },
-    
-    onBlur() {
-      this.setData({ focused: false })
-      this.triggerEvent('blur')
-    },
-    
-    // 清理方法
-    cleanup() {
-      // 清理定时器等资源
-    }
-  }
-})
+### 3.2. 日志级别
+- `logger.debug()`: 用于记录详细的调试信息，如变量值、函数入口/出口。
+- `logger.info()`: 用于记录关键的业务流程节点，如服务启动、任务完成。
+- `logger.warning()`: 用于记录可预期的、非致命的异常情况，如配置缺失但有默认值。
+- `logger.error()`: 用于记录导致操作失败的错误，应包含异常信息。
+- `logger.exception()`: 在 `except` 块中使用，它会自动附加当前的异常堆栈信息。
+
+## 4. 项目核心实践
+
+### 4.1. 配置管理
+- 所有配置项（如数据库凭据、API密钥、路径等）都**必须**通过全局 `Config` 对象（`config.py`）进行管理。
+- **禁止**在代码中硬编码任何配置值。
+- **ETL模块特例**：为了集中管理和方便复用，ETL相关的配置常量在 `etl/__init__.py` 中统一定义。在ETL模块内部，应直接 `from etl import DB_HOST, RAW_PATH` 来使用这些常量。
+
+```python
+# 通用配置获取
+from config import Config
+config = Config()
+api_key = config.get("core.agent.coze.api_key")
+
+# ETL模块内配置使用
+from etl import DB_HOST, EMBEDDING_MODEL_PATH
+print(f"数据库地址: {DB_HOST}, 模型路径: {EMBEDDING_MODEL_PATH}")
 ```
 
-## API 调用规范
+### 4.2. 数据库操作 (强制)
+- 所有数据库交互都**必须**通过 `etl.load.db_core` 中的异步函数进行。
+- `db_core` 基于 `aiomysql` 封装了数据库连接池管理和异步执行，能有效防止阻塞事件循环。
+- **严禁**在其他模块中直接创建数据库连接或执行原生SQL查询。
+- 更详细的规范请参考 `.cursor/rules/database-operations.mdc`。
 
-### 1. API客户端封装
-```javascript
-// utils/api-client.js
-class ApiClient {
-  constructor() {
-    this.baseURL = 'https://api.nkuwiki.com'
-    this.timeout = 10000
-  }
-  
-  // 通用请求方法
-  async request(options) {
-    const { url, method = 'GET', data, header = {} } = options
-    
-    // 添加通用请求头
-    const defaultHeader = {
-      'Content-Type': 'application/json',
-      'Authorization': this.getAuthToken()
-    }
-    
-    const requestHeader = { ...defaultHeader, ...header }
-    
-    return new Promise((resolve, reject) => {
-      wx.request({
-        url: `${this.baseURL}${url}`,
-        method,
-        data,
-        header: requestHeader,
-        timeout: this.timeout,
-        success: (res) => {
-          this.handleResponse(res, resolve, reject)
-        },
-        fail: (error) => {
-          this.handleError(error, reject)
-        }
-      })
-    })
-  }
-  
-  // 响应处理
-  handleResponse(res, resolve, reject) {
-    const { statusCode, data } = res
-    
-    if (statusCode === 200) {
-      if (data.code === 200) {
-        resolve(data)
-      } else {
-        reject(new Error(data.message || '请求失败'))
-      }
-    } else {
-      reject(new Error(`HTTP ${statusCode}: ${this.getErrorMessage(statusCode)}`))
-    }
-  }
-  
-  // 错误处理
-  handleError(error, reject) {
-    let message = '网络请求失败'
-    
-    if (error.errMsg) {
-      if (error.errMsg.includes('timeout')) {
-        message = '请求超时，请检查网络连接'
-      } else if (error.errMsg.includes('fail')) {
-        message = '网络连接失败'
-      }
-    }
-    
-    reject(new Error(message))
-  }
-  
-  // 获取认证token
-  getAuthToken() {
-    const userInfo = wx.getStorageSync('userInfo')
+```python
+# 正确用法
+from etl.load import db_core
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+async def get_user(user_id: int):
+    result = await db_core.query_records(
+        "wxapp_users",
+        conditions={"id": user_id},
+        limit=1
+    )
+    return result.get("data")[0] if result.get("data") else None
+```
+
+### 4.3. 异步编程
+- 对于所有I/O密集型操作（文件读写、网络请求、数据库访问），**必须**使用 `async/await` 范式。
+- 使用 `aiofiles` 进行异步文件操作，使用 `httpx` 或 `aiohttp` 进行异步网络请求。
+
+### 4.4. 异常处理
+- 倾向于捕获**具体的异常类型** (`ValueError`, `ConnectionError`)，而不是宽泛的 `Exception`。
+- 在 `except` 块中记录详细的错误日志，最好使用 `logger.exception()`。
+- 考虑为项目定义一些自定义异常类，以更好地区分不同类型的业务错误。
+
+```python
+# 自定义异常示例
+class InsightGenerationError(Exception):
+    """当生成洞察失败时抛出"""
+    pass
+```
+
+## 5. 文档字符串
+
+- 推荐使用 Google 风格的文档字符串，它清晰、可读，并能被 `Sphinx` 等工具良好地解析。
+
+```python
+def retrieve_documents(query: str, top_k: int = 10) -> List[Dict]:
+    """根据查询检索相关文档。
+
+    Args:
+        query (str): 用户的查询语句。
+        top_k (int): 需要返回的文档数量。
+
+    Returns:
+        List[Dict]: 包含文档内容和元数据的字典列表。
+
+    Raises:
+        ConnectionError: 如果无法连接到向量数据库。
+    """
+    # ... 实现 ...
+    pass
+```
 
 ---
 > Source: [NKU-WIKI/nkuwiki](https://github.com/NKU-WIKI/nkuwiki) — distributed by [TomeVault](https://tomevault.io).
