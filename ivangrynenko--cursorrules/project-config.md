@@ -1,101 +1,97 @@
 ---
 trigger: always_on
-description: Detect and prevent identification and authentication failures in Python applications as defined in OWASP Top 10:2021-A07
+description: Detect and prevent broken access control vulnerabilities in Python applications as defined in OWASP Top 10:2021-A01
 ---
 
- # Python Identification and Authentication Failures Standards (OWASP A07:2021)
+# Python Broken Access Control Security Standards (OWASP A01:2021)
 
-This rule enforces security best practices to prevent identification and authentication failures in Python applications, as defined in OWASP Top 10:2021-A07.
+This rule enforces security best practices to prevent broken access control vulnerabilities in Python applications, as defined in OWASP Top 10:2021-A01.
 
 <rule>
-name: python_authentication_failures
-description: Detect and prevent identification and authentication failures in Python applications as defined in OWASP Top 10:2021-A07
+name: python_broken_access_control
+description: Detect and prevent broken access control vulnerabilities in Python applications as defined in OWASP Top 10:2021-A01
 filters:
   - type: file_extension
-    pattern: "\\.(py|ini|cfg|yml|yaml|json|toml)$"
+    pattern: "\\.(py)$"
   - type: file_path
     pattern: ".*"
 
 actions:
   - type: enforce
     conditions:
-      # Pattern 1: Weak password validation
-      - pattern: "password\\s*=\\s*['\"][^'\"]{1,7}['\"]|min_length\\s*=\\s*[1-7]"
-        message: "Weak password policy detected. Passwords should be at least 8 characters long and include complexity requirements."
+      # Pattern 1: Missing access control in Flask routes
+      - pattern: "@(app|blueprint)\\.route\\([^)]*\\)\\s*\\n\\s*def\\s+[a-zA-Z0-9_]+\\([^)]*\\):\\s*(?![^#]*@login_required|[^#]*current_user\\.|[^#]*session\\[)"
+        message: "Flask route lacks access control. Consider using @login_required or checking user permissions within the function."
         
-      # Pattern 2: Hardcoded credentials
-      - pattern: "(username|user|login|password|passwd|pwd|secret|api_key|apikey|token)\\s*=\\s*['\"][^'\"]+['\"]"
-        message: "Hardcoded credentials detected. Store sensitive credentials in environment variables or a secure vault."
+      # Pattern 2: Missing access control in Django views
+      - pattern: "class\\s+[A-Za-z0-9_]+View\\((?!LoginRequiredMixin|PermissionRequiredMixin|UserPassesTestMixin)[^)]*\\):"
+        message: "Django class-based view lacks access control mixins. Consider using LoginRequiredMixin, PermissionRequiredMixin, or UserPassesTestMixin."
         
-      # Pattern 3: Missing password hashing
-      - pattern: "password\\s*=\\s*request\\.form\\[\\'password\\'\\]|password\\s*=\\s*request\\.POST\\.get\\(\\'password\\'\\)"
-        message: "Storing or comparing plain text passwords detected. Always hash passwords before storage or comparison."
+      # Pattern 3: Insecure direct object reference
+      - pattern: "(get|filter|find)_by_id\\(\\s*request\\.(GET|POST|args|form|json)\\[['\"][^'\"]+['\"]\\]\\s*\\)"
+        message: "Potential insecure direct object reference (IDOR). Validate that the current user has permission to access this object."
         
-      # Pattern 4: Insecure password hashing
-      - pattern: "hashlib\\.md5\\(|hashlib\\.sha1\\(|hashlib\\.sha224\\("
-        message: "Insecure hashing algorithm detected. Use strong hashing algorithms like bcrypt, Argon2, or PBKDF2."
+      # Pattern 4: Hardcoded role checks
+      - pattern: "if\\s+user\\.role\\s*==\\s*['\"]admin['\"]|if\\s+user\\.(is_staff|is_superuser)\\s*:"
+        message: "Hardcoded role checks can be fragile. Consider using a permission system or role-based access control framework."
         
-      # Pattern 5: Missing brute force protection
-      - pattern: "@app\\.route\\(['\"]\\/(login|signin|authenticate)['\"]"
-        message: "Authentication endpoint detected without rate limiting or brute force protection. Implement account lockout or rate limiting."
+      # Pattern 5: Missing authorization in FastAPI
+      - pattern: "@(app|router)\\.([a-z]+)\\([^)]*\\)\\s*\\n\\s*(?:async\\s+)?def\\s+[a-zA-Z0-9_]+\\([^)]*\\):\\s*(?![^#]*Depends\\(|[^#]*Security\\(|[^#]*HTTPBearer\\()"
+        message: "FastAPI endpoint lacks security dependencies. Consider using Depends(get_current_user) or similar security dependencies."
         
-      # Pattern 6: Insecure session management
-      - pattern: "session\\[\\'user_id\\'\\]\\s*=|session\\[\\'authenticated\\'\\]\\s*=\\s*True"
-        message: "Session management detected. Ensure proper session security with secure cookies, proper expiration, and rotation."
+      # Pattern 6: Bypassing access control with admin flags
+      - pattern: "if\\s+request\\.(GET|POST|args|form|json)\\[['\"]admin['\"]\\]|if\\s+request\\.(GET|POST|args|form|json)\\[['\"]debug['\"]\\]"
+        message: "Dangerous admin/debug flags in request parameters could bypass access control. Remove or secure these backdoors."
         
-      # Pattern 7: Missing CSRF protection in authentication
-      - pattern: "form\\s*=\\s*FlaskForm|class\\s+\\w+Form\\(\\s*FlaskForm\\s*\\)|class\\s+\\w+Form\\(\\s*Form\\s*\\)"
-        message: "Form handling detected. Ensure CSRF protection is enabled for all authentication forms."
+      # Pattern 7: Insecure use of eval or exec with user input
+      - pattern: "eval\\(|exec\\(.*request\\."
+        message: "Extremely dangerous use of eval() or exec() with user input can lead to code execution. Avoid these functions entirely."
         
-      # Pattern 8: Insecure remember me functionality
-      - pattern: "remember_me|remember_token|stay_logged_in"
-        message: "Remember me functionality detected. Ensure secure implementation with proper expiration and refresh mechanisms."
+      # Pattern 8: Missing access control in API endpoints
+      - pattern: "@api_view\\(|@api\\.route\\(|@app\\.api_route\\("
+        message: "API endpoint may lack access control. Ensure proper authentication and authorization checks are implemented."
         
-      # Pattern 9: Insecure password reset
-      - pattern: "@app\\.route\\(['\"]\\/(reset-password|forgot-password|recover)['\"]"
-        message: "Password reset functionality detected. Ensure secure implementation with time-limited tokens and proper user verification."
+      # Pattern 9: Insecure Flask session usage
+      - pattern: "session\\[['\"][^'\"]+['\"]\\]\\s*=\\s*request\\."
+        message: "Setting session variables directly from request data without validation can lead to session-based access control bypasses."
         
-      # Pattern 10: Missing multi-factor authentication
-      - pattern: "def\\s+login|def\\s+authenticate|def\\s+signin"
-        message: "Authentication function detected. Consider implementing multi-factor authentication for sensitive operations."
-        
-      # Pattern 11: Insecure direct object reference in user management
-      - pattern: "User\\.objects\\.get\\(id=|User\\.query\\.get\\(|get_user_by_id\\("
-        message: "Direct user lookup detected. Ensure proper authorization checks before accessing user data."
-        
-      # Pattern 12: Insecure JWT implementation
-      - pattern: "jwt\\.encode\\(|jwt\\.decode\\("
-        message: "JWT usage detected. Ensure proper signing, validation, expiration, and refresh mechanisms for JWTs."
-        
-      # Pattern 13: Missing secure flag in cookies
-      - pattern: "set_cookie\\([^,]+,[^,]+,[^,]*secure=False|set_cookie\\([^,]+,[^,]+(?!,\\s*secure=True)"
-        message: "Cookie setting without secure flag detected. Set secure=True for all authentication cookies."
-        
-      # Pattern 14: Missing HTTP-only flag in cookies
-      - pattern: "set_cookie\\([^,]+,[^,]+,[^,]*httponly=False|set_cookie\\([^,]+,[^,]+(?!,\\s*httponly=True)"
-        message: "Cookie setting without httponly flag detected. Set httponly=True for all authentication cookies."
-        
-      # Pattern 15: Insecure default credentials
-      - pattern: "DEFAULT_USERNAME|DEFAULT_PASSWORD|ADMIN_USERNAME|ADMIN_PASSWORD"
-        message: "Default credential configuration detected. Remove default credentials from production code."
+      # Pattern 10: Missing CSRF protection
+      - pattern: "class\\s+[A-Za-z0-9_]+Form\\((?!.*csrf).*\\):|@csrf_exempt"
+        message: "Form or view appears to be missing CSRF protection. Ensure CSRF tokens are properly implemented."
 
   - type: suggest
     message: |
-      **Python Authentication Security Best Practices:**
+      **Python Access Control Best Practices:**
       
-      1. **Password Storage:**
-         - Use strong hashing algorithms with salting
-         - Implement proper work factors
-         - Example with passlib:
-           ```python
-           from passlib.hash import argon2
-           
-           # Hash a password
-           hashed_password = argon2.hash("user_password")
-           
-           # Verify a password
-           is_valid = argon2.verify("user_password", hashed_password)
-           ```
+      1. **Framework-Specific Controls:**
+         - **Django**: Use built-in authentication and permission decorators/mixins
+           - `@login_required`, `LoginRequiredMixin`
+           - `@permission_required`, `PermissionRequiredMixin`
+           - `UserPassesTestMixin` for custom permission logic
+         - **Flask**: Use Flask-Login or similar extensions
+           - `@login_required` decorator
+           - `current_user.is_authenticated` checks
+           - Role-based access control with Flask-Principal
+         - **FastAPI**: Use dependency injection for security
+           - `Depends(get_current_user)` pattern
+           - OAuth2 with `Security(oauth2_scheme)`
+           - JWT validation middleware
+      
+      2. **General Access Control Principles:**
+         - Implement access control at the server side, never rely on client-side checks
+         - Use deny-by-default approach (whitelist vs blacklist)
+         - Implement proper session management
+         - Apply principle of least privilege
+         - Use contextual access control (time, location, device-based restrictions when appropriate)
+      
+      3. **Object-Level Authorization:**
+         - Validate user has permission to access specific resources
+         - Implement row-level security for database access
+         - Use UUIDs instead of sequential IDs when possible
+         - Always verify ownership or permission before allowing operations on objects
+      
+      4. **API Security:**
+         - Implement proper authentication for all API endpoints
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
