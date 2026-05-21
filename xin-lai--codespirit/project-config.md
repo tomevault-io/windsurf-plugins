@@ -1,207 +1,269 @@
 ---
 trigger: always_on
-description: CodeSpirit 数据库与 EF Core 迁移规范 - 多数据库支持、DbContext 设计、迁移命令
+description: CodeSpirit 依赖注入规范 - Scrutor自动注册、生命周期管理
 ---
 
 
-# 数据库与 EF Core 迁移规范
+# 依赖注入规范（Scrutor 自动注册）
 
-## 📋 目录
+## 概述
 
-1. [多数据库架构](#多数据库架构)
-2. [DbContext 设计模式](#dbcontext-设计模式)
-3. [迁移命令规范](#迁移命令规范)
-4. [实体 ID 配置](#实体-id-配置)
-5. [实体配置规范](#实体配置规范)
+项目使用 Scrutor 库实现基于标记接口的自动依赖注入，无需手动注册服务。
 
----
+## 标记接口
 
-## 多数据库架构
+位于 `CodeSpirit.Core.DependencyInjection` 命名空间：
 
-CodeSpirit 支持多数据库（SQL Server / MySQL），每个 API 服务需要定义：
+| 接口 | 生命周期 | 适用场景 |
+|-----|---------|---------|
+| `IScopedDependency` | Scoped | 业务服务、数据库操作、请求相关 |
+| `ITransientDependency` | Transient | 无状态工具类、轻量操作 |
+| `ISingletonDependency` | Singleton | 配置服务、缓存、ID生成器 |
 
-```
-Data/
-├── {Service}DbContext.cs              # 基础 DbContext（运行时使用）
-├── SqlServer{Service}DbContext.cs     # SQL Server 专用 DbContext
-├── SqlServer{Service}DbContextFactory.cs  # SQL Server 设计时工厂
-├── MySql{Service}DbContext.cs         # MySQL 专用 DbContext
-├── MySql{Service}DbContextFactory.cs  # MySQL 设计时工厂
-├── DatabaseSpecificConfigurations.cs  # 数据库特定配置
-├── Configurations/                    # 实体配置
-│   └── {Entity}Configuration.cs
-└── Migrations/
-    ├── SqlServer/                     # SQL Server 迁移
-    │   └── {timestamp}_{MigrationName}.cs
-    └── MySql/                         # MySQL 迁移
-        └── {timestamp}_{MigrationName}.cs
-```
-
----
-
-## DbContext 设计模式
-
-### 基础 DbContext
-
-运行时使用的 DbContext，继承自 `MultiDatabaseDbContextBase`：
+### 生命周期说明
 
 ```csharp
-public class MallDbContext : MultiDatabaseDbContextBase
+// IScopedDependency - 作用域注入
+// 同一个请求中是同一个实例，不同请求是不同实例
+// 推荐：大多数业务服务、DbContext 相关操作
+
+// ITransientDependency - 瞬时注入  
+// 每次注入都创建新实例
+// 推荐：无状态工具类、不持有资源的服务
+
+// ISingletonDependency - 单例注入
+// 整个应用生命周期只有一个实例
+// 推荐：配置服务、缓存管理、ID生成器
+```
+
+## 标记方式
+
+### 方式一：接口继承标记接口（推荐）
+
+接口继承标记接口，实现类无需再次标记：
+
+```csharp
+// 接口定义 - 继承 IScopedDependency
+public interface IAuthService : IScopedDependency
 {
-    public MallDbContext(
-        DbContextOptions options,
-        IServiceProvider serviceProvider,
-        ICurrentUser currentUser,
-        IHttpContextAccessor httpContextAccessor) 
-        : base(options, serviceProvider, currentUser, httpContextAccessor)
+    Task<AuthResultDto> LoginAsync(LoginDto input);
+    Task<bool> LogoutAsync(long userId);
+}
+
+// 实现类 - 无需标记接口
+public class AuthService : IAuthService
+{
+    private readonly IRepository<User> _userRepository;
+    
+    public AuthService(IRepository<User> userRepository)
     {
+        _userRepository = userRepository;
     }
-
-    // DbSet 属性
-    public DbSet<Product> Products => Set<Product>();
-    public DbSet<Order> Orders => Set<Order>();
-
-    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    
+    public async Task<AuthResultDto> LoginAsync(LoginDto input)
     {
-        base.OnModelCreating(modelBuilder);
-        modelBuilder.ApplyConfigurationsFromAssembly(typeof(MallDbContext).Assembly);
+        // 实现逻辑
     }
 }
 ```
 
-### 数据库特定 DbContext
+### 方式二：实现类标记接口
 
-**SQL Server 版本**：
+适用于无业务接口的服务类：
 
 ```csharp
-/// <summary>
-/// SQL Server 特定的数据库上下文（用于迁移）
-/// </summary>
-public class SqlServerMallDbContext : MallDbContext
+// 无接口的服务类，直接实现标记接口
+public class SeederService : IScopedDependency
 {
-    public SqlServerMallDbContext(
-        DbContextOptions<SqlServerMallDbContext> options,
-        IServiceProvider serviceProvider,
-        ICurrentUser currentUser,
-        IHttpContextAccessor httpContextAccessor) 
-        : base((DbContextOptions)options, serviceProvider, currentUser, httpContextAccessor)
+    private readonly IServiceProvider _serviceProvider;
+    private readonly ILogger<SeederService> _logger;
+
+    public SeederService(IServiceProvider serviceProvider, ILogger<SeederService> logger)
     {
+        _serviceProvider = serviceProvider;
+        _logger = logger;
     }
 
-    protected override void ApplyDatabaseSpecificConfigurations(ModelBuilder modelBuilder)
+    public async Task SeedAsync()
     {
-        DatabaseSpecificConfigurations.ApplySqlServerConfigurations(modelBuilder);
+        // 初始化种子数据
     }
 }
 ```
 
-**MySQL 版本**：
+### 方式三：同时实现业务接口和标记接口
+
+适用于需要明确指定生命周期的服务：
 
 ```csharp
-/// <summary>
-/// MySQL 特定的数据库上下文（用于迁移）
-/// </summary>
-public class MySqlMallDbContext : MallDbContext
+public interface IUserService : IBaseCRUDService<User, long, CreateUserDto, UpdateUserDto, UserQueryDto>
 {
-    public MySqlMallDbContext(
-        DbContextOptions<MySqlMallDbContext> options,
-        IServiceProvider serviceProvider,
-        ICurrentUser currentUser,
-        IHttpContextAccessor httpContextAccessor) 
-        : base((DbContextOptions)options, serviceProvider, currentUser, httpContextAccessor)
-    {
-    }
+    Task<UserDto> GetByUsernameAsync(string username);
+}
 
-    protected override void ApplyDatabaseSpecificConfigurations(ModelBuilder modelBuilder)
+public class UserService : BaseCRUDService<User, long, CreateUserDto, UpdateUserDto, UserQueryDto>, 
+    IUserService, IScopedDependency
+{
+    public async Task<UserDto> GetByUsernameAsync(string username)
     {
-        DatabaseSpecificConfigurations.ApplyMySqlConfigurations(modelBuilder);
+        // 实现逻辑
     }
 }
 ```
 
-### 设计时工厂
+## 生命周期选择指南
 
-用于 `dotnet ef` 命令的设计时 DbContext 创建：
-
-**SQL Server**:
+### IScopedDependency（作用域 - 最常用）
 
 ```csharp
-public class SqlServerMallDbContextFactory : IDesignTimeDbContextFactory<SqlServerMallDbContext>
+// ✅ 业务服务
+public interface IQuestionService : IScopedDependency
 {
-    public SqlServerMallDbContext CreateDbContext(string[] args)
+    Task<QuestionDto> GetByIdAsync(long id);
+    Task CreateAsync(CreateQuestionDto dto);
+}
+
+// ✅ 数据访问服务
+public interface IExamRepository : IScopedDependency
+{
+    Task<Exam> GetWithQuestionsAsync(long examId);
+}
+
+// ✅ 种子数据服务
+public class TenantSeeder : IScopedDependency
+{
+    public async Task SeedAsync() { }
+}
+```
+
+### ISingletonDependency（单例）
+
+```csharp
+// ✅ ID 生成器
+public interface IIdGenerator : ISingletonDependency
+{
+    long NewId();
+}
+
+// ✅ 缓存服务
+public interface IConfigCacheService : ISingletonDependency
+{
+    Task<string> GetAsync(string key);
+    Task SetAsync(string key, string value, TimeSpan? expiry = null);
+}
+
+// ✅ 端点扫描器（应用启动时扫描一次）
+public class AiFormFillEndpointScanner : ISingletonDependency
+{
+    public void ScanAssemblies(params Assembly[] assemblies) { }
+}
+
+// ✅ 本地化设置初始化器
+public class LocalizationSettingsInitializer : ISingletonDependency
+{
+    public void Initialize() { }
+}
+```
+
+### ITransientDependency（瞬时）
+
+```csharp
+// ✅ 无状态工具类
+public interface IPasswordHasher : ITransientDependency
+{
+    string HashPassword(string password);
+    bool VerifyPassword(string password, string hash);
+}
+
+// ✅ 存储提供器工厂（每次创建新实例）
+public interface IStorageProviderFactory : ITransientDependency
+{
+    IStorageProvider CreateProvider(string providerType);
+}
+
+// ✅ 配置变更通知器
+public interface IConfigChangeNotifier : ITransientDependency
+{
+    Task NotifyChangeAsync(string configKey);
+}
+```
+
+## Scrutor 自动注册扩展方法
+
+### 基础注册方法
+
+```csharp
+// 位于 CodeSpirit.Shared.DependencyInjection.ServiceCollectionExtensions
+
+// 自动扫描并注册标记接口的服务
+services.AddDependencyInjectionWithScrutor(Assembly.GetExecutingAssembly());
+
+// 可同时扫描多个程序集
+services.AddDependencyInjectionWithScrutor(
+    Assembly.GetExecutingAssembly(),
+    typeof(SharedService).Assembly);
+```
+
+### 高级注册方法
+
+```csharp
+// 按命名约定自动注册（Service、Repository 后缀）
+services.AddAdvancedDependencyInjection(Assembly.GetExecutingAssembly());
+```
+
+### 装饰器模式
+
+```csharp
+// 使用装饰器包装现有服务
+services.AddDecorator<IUserService, CachingUserServiceDecorator>();
+services.AddDecorator<ILogger<UserService>, AuditLoggerDecorator<UserService>>();
+```
+
+## 注册行为
+
+Scrutor 自动完成以下注册：
+
+1. **接口注册**：服务注册为其实现的业务接口
+2. **自身注册**：服务同时注册为自身类型（可直接注入具体类）
+
+```csharp
+// 给定服务类
+public class UserService : IUserService, IScopedDependency { }
+
+// Scrutor 自动注册：
+// services.AddScoped<IUserService, UserService>();  // 接口注册
+// services.AddScoped<UserService>();                 // 自身注册
+
+// 两种方式都可以注入：
+public class UserController
+{
+    public UserController(
+        IUserService userService,      // ✅ 接口注入
+        UserService userServiceImpl)   // ✅ 具体类注入
+    { }
+}
+```
+
+## API 配置类中的服务注册
+
+### 自动注册（BaseApiConfiguration 已处理）
+
+```csharp
+public class ExamApiConfiguration : BaseApiConfiguration
+{
+    public override void ConfigureServices(IServiceCollection services, IConfiguration configuration)
     {
-        var optionsBuilder = new DbContextOptionsBuilder<SqlServerMallDbContext>();
+        base.ConfigureServices(services, configuration);
         
-        optionsBuilder.UseSqlServer(
-            "Server=localhost;Database=Mall;User Id=sa;Password=Password123!;TrustServerCertificate=True;",
-            options => options.MigrationsHistoryTable("__EFMigrationsHistory", "mall")
-        );
-
-        var services = new ServiceCollection();
-        var serviceProvider = services.BuildServiceProvider();
-        var currentUser = new DesignTimeCurrentUser();
-        var httpContextAccessor = new HttpContextAccessor();
-
-        return new SqlServerMallDbContext(optionsBuilder.Options, serviceProvider, currentUser, httpContextAccessor);
+        // Scrutor 自动注册已在 BaseApiConfiguration 中完成
+        // 无需再调用 AddDependencyInjectionWithScrutor
     }
 }
 ```
 
-**MySQL**:
+### 手动注册特殊服务
 
 ```csharp
-public class MySqlMallDbContextFactory : IDesignTimeDbContextFactory<MySqlMallDbContext>
-{
-    public MySqlMallDbContext CreateDbContext(string[] args)
-    {
-        var optionsBuilder = new DbContextOptionsBuilder<MySqlMallDbContext>();
-        
-        optionsBuilder.UseMySql(
-            "Server=localhost;Database=Mall;User=root;Password=password;",
-            new MySqlServerVersion(new Version(8, 0, 21)),
-            options => options.MigrationsHistoryTable("__EFMigrationsHistory")
-        );
-
-        var services = new ServiceCollection();
-        var serviceProvider = services.BuildServiceProvider();
-        var currentUser = new DesignTimeCurrentUser();
-        var httpContextAccessor = new HttpContextAccessor();
-
-        return new MySqlMallDbContext(optionsBuilder.Options, serviceProvider, currentUser, httpContextAccessor);
-    }
-}
-```
-
----
-
-## 迁移命令规范
-
-### ⚠️ 重要：必须使用数据库特定的 DbContext
-
-**❌ 错误**：使用基础 DbContext
-```bash
-dotnet ef migrations add InitialCreate --context MallDbContext
-```
-
-**✅ 正确**：使用数据库特定的 DbContext
-
-#### SQL Server 迁移
-
-```bash
-# 创建迁移
-dotnet ef migrations add InitialCreate --context SqlServerMallDbContext --output-dir Data/Migrations/SqlServer
-
-# 更新数据库
-dotnet ef database update --context SqlServerMallDbContext
-
-# 删除最后一次迁移
-dotnet ef migrations remove --context SqlServerMallDbContext
-```
-
-#### MySQL 迁移
-
-```bash
-# 创建迁移
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
