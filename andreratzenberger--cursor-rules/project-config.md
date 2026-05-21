@@ -1,157 +1,163 @@
 ---
 trigger: always_on
-description: Automatically onboards existing projects into the AI-driven development workflow
+description: Comprehensive specification management system for creating, validating, and tracking requirements
 ---
 
+# Specification Management System
 
-# Project Onboarding System
-
-Rule for automatically analyzing existing projects and integrating them into the AI-driven development workflow.
+Rule for creating, validating, and managing specifications throughout the development lifecycle.
 
 <rule>
-name: project_onboarding
+name: specification_management
 filters:
+  # Request specs filters
   - type: event
-    pattern: "project_onboard"
-  - type: event
-    pattern: "rules_setup"
+    pattern: "user_request"
   - type: command
-    pattern: "onboard"
+    pattern: "spec"
   - type: command
-    pattern: "analyze"
+    pattern: "requirement"
+  
+  # Validation filters
   - type: event
-    pattern: "cursor_start"
+    pattern: "spec_create"
+  - type: event
+    pattern: "spec_update"
+  - type: file_change
+    pattern: ".cursor/specs/*.md"
+  - type: command
+    pattern: "validate"
 
 actions:
+  #
+  # SECTION 1: SPECIFICATION CREATION
+  #
+  
   - type: react
+    event: "user_request"
     conditions:
-      - pattern: "onboard project|project onboard"
+      - pattern: "implement|create|build|develop"
     action: |
-      # Comprehensive onboarding of an existing project
+      # Create specifications before implementation
       
-      I'll perform a complete project onboarding by:
+      When you ask me to implement something, I'll:
       
-      1. Creating the required directory structure:
-         - `.cursor/specs/` - Requirements and specifications (managed by specification_management rule)
-         - `.cursor/tasks/` - Task tracking (managed by development_workflow_system rule)
-         - `.cursor/learnings/` - Knowledge capture (managed by knowledge_management rule)
-         - `.cursor/docs/` - Documentation (managed by knowledge_management rule)
-         - `.cursor/rules/` - Cursor rule files
-         - `.cursor/output/` - Generated reports
+      1. Check if specifications exist for the requested feature
+      2. If specifications don't exist:
+         - Create a new specification file in `.cursor/specs/`
+         - Organize specs by domain/component
+         - Define clear requirements as checkable items
+         - Add acceptance criteria
+         - Link to related specifications if applicable
+      3. Update the specifications index `SPECS.md`
+      4. Trigger task creation (via development_workflow_system) after specs are created
       
-      2. Analyzing project structure:
-         - Directory structure
-         - File types and counts
-         - Lines of code statistics
-      
-      3. Discovering existing documentation:
-         - Finding README, CONTRIBUTING, CHANGELOG files
-         - Cataloging documentation into `.cursor/docs/existing/`
-         - Creating a documentation index
-      
-      4. Extracting core components:
-         - Identifying main modules and components
-         - Analyzing component relationships
-         - Documenting component purposes
-      
-      5. Creating initial specifications:
-         - Architecture overview specs
-         - Component specifications
-         - Feature specifications based on existing code
-      
-      6. Generating knowledge base:
-         - Project structure learning
-         - Component identification learning
-         - Documentation assessment learning
-      
-      7. Setting up task tracking:
-         - Initial onboarding completion task
-         - Task index creation
-      
-      This process integrates an existing project into the AI-driven workflow
-      without requiring changes to the original codebase.
+      This ensures all implemented features have proper specifications 
+      before development begins.
 
   - type: react
     conditions:
-      - pattern: "analyze existing|existing analyze"
+      - pattern: "spec create|create spec"
     action: |
-      # Analyze an existing codebase without full onboarding
+      # Explicitly create a new specification
       
-      I'll analyze the existing codebase by:
+      I'll create a new specification file:
       
-      1. Examining project overview:
-         - Project type detection
-         - Repository structure analysis
-         - File type distribution
+      1. Identify the appropriate domain for the specification
+      2. Create the spec file in `.cursor/specs/[domain]/[name].md`
+      3. Structure the spec with:
+         - Clear title and description
+         - Numbered requirements as checkable items
+         - Acceptance criteria
+         - Notes or context
+      4. Update the specifications index `SPECS.md`
+      5. Capture any learnings about the specification process (via knowledge_management rule)
       
-      2. Calculating code statistics:
-         - Lines of code by language
-         - File counts by type
-         - Directory structure
-      
-      3. Identifying key components:
-         - Main modules and structure
-         - Component relationships
-         - Entry points
-      
-      4. Analyzing test structure:
-         - Test directory organization
-         - Test coverage assessment
-         - Testing approach
-      
-      5. Reviewing documentation:
-         - Available documentation files
-         - Documentation completeness
-         - Documentation types
-      
-      6. Providing integration recommendations:
-         - Suggestions for specification creation (via specification_management rule)
-         - Test coverage improvements (via development_workflow_system rule)
-         - Documentation enhancements (via knowledge_management rule)
-      
-      The analysis report will be saved to `.cursor/output/codebase_analysis_[timestamp].md`
+      This creates a formal specification that can be referenced during development.
 
   - type: react
     conditions:
-      - pattern: "setup rules|rules setup"
+      - pattern: "spec update|update spec"
     action: |
-      # Set up default rules for a project
+      # Update an existing specification
       
-      I'll set up the AI-driven development workflow rules:
+      I'll update the specified specification:
       
-      1. Creating the rules directory `.cursor/rules/`
-      2. Setting up the following rule files:
-         - `development-workflow-rule.mdc` - Task tracking, testing, and version control
-         - `specification-management-rule.mdc` - Specification creation and validation
-         - `knowledge-management-rule.mdc` - Knowledge capture and application
-         - `location-rule.mdc` - Rules for organizing rule files
-         - `command-rules.mdc` - AI command system
-         - `project-onboarding-rule.mdc` - Project onboarding
-         - `on-load-rule.mdc` - Critical development principles
-      3. Creating required directory structure
+      1. Find the existing specification file
+      2. Add or modify requirements as needed
+      3. Update the completion status of requirements
+      4. Refresh any related information
+      5. Update the specifications index if necessary
+      6. Notify the development workflow system of changes (via development_workflow_system)
       
-      This provides the foundation for AI-driven development without
-      analyzing or modifying the existing codebase.
+      This ensures specifications stay current as requirements evolve.
+  
+  #
+  # SECTION 2: SPECIFICATION VALIDATION
+  #
+  
+  - type: react
+    conditions:
+      - pattern: "spec validate|validate spec"
+    action: |
+      # Validate a specification against quality standards and implementation
+      
+      I'll perform a comprehensive validation of the specification:
+      
+      1. Analyze specification quality:
+         - Check for vague terms (should, would, could, etc.)
+         - Identify non-atomic requirements (multiple requirements in one)
+         - Verify all required sections exist (description, requirements, acceptance criteria)
+         - Assess overall specification clarity and completeness
+      
+      2. Validate implementation status:
+         - Trace requirements to actual code
+         - Check if completed requirements have corresponding implementations
+         - Identify discrepancies between spec completion status and actual code
+         - Calculate implementation coverage percentage
+      
+      3. Review test coverage:
+         - Look for test files related to this specification
+         - Verify test existence for key requirements
+         - Identify gaps in test coverage
+      
+      4. Provide actionable recommendations:
+         - Suggest quality improvements
+         - Highlight missing implementations
+         - Recommend test additions
+      
+      5. Capture validation learnings (via knowledge_management rule)
+      
+      The validation report will be saved to `.cursor/output/spec_validation_[filename]_[timestamp].md`
 
   - type: react
-    event: "cursor_start"
+    conditions:
+      - pattern: "spec format|format spec"
     action: |
-      # When Cursor starts with the project, check onboarding status
+      # Format a specification to improve its quality
       
-      When starting with this project, I'll:
+      I'll improve the specification format:
       
-      1. Check if the project has been onboarded (has `.cursor` directory)
-      2. If not onboarded, suggest running `setup rules` or `onboard project`
-      3. If partially onboarded, suggest running `analyze existing`
+      1. Ensure proper structure:
+         - Add title if missing
+         - Create standard sections (Description, Requirements, Acceptance Criteria, Notes)
+         - Format requirements as proper checkboxes
       
-      This ensures you're aware of the available onboarding options.
+      2. Improve requirement quality:
+         - Split non-atomic requirements (containing "and")
+         - Convert vague requirements to specific ones
+         - Ensure consistent formatting
+      
+      3. Backup the original specification
+      
+      This improves specification quality while preserving all original content.
 
-  - type: suggest
-    message: |
-      ### AI-Driven Project Onboarding
-
-      I can help adapt existing projects to the AI-driven workflow:
-
+  - type: react
+    conditions:
+      - pattern: "spec completeness|completeness check"
+    action: |
+      # Check specification completeness across the project
+      
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
