@@ -1,15 +1,15 @@
 ---
 trigger: always_on
-description: Detect and prevent software and data integrity failures in Python applications as defined in OWASP Top 10:2021-A08
+description: Detect and prevent security logging and monitoring failures in Python applications as defined in OWASP Top 10:2021-A09
 ---
 
-# Python Software and Data Integrity Failures Standards (OWASP A08:2021)
+ # Python Security Logging and Monitoring Failures Standards (OWASP A09:2021)
 
-This rule enforces security best practices to prevent software and data integrity failures in Python applications, as defined in OWASP Top 10:2021-A08.
+This rule enforces security best practices to prevent security logging and monitoring failures in Python applications, as defined in OWASP Top 10:2021-A09.
 
 <rule>
-name: python_integrity_failures
-description: Detect and prevent software and data integrity failures in Python applications as defined in OWASP Top 10:2021-A08
+name: python_logging_monitoring_failures
+description: Detect and prevent security logging and monitoring failures in Python applications as defined in OWASP Top 10:2021-A09
 filters:
   - type: file_extension
     pattern: "\\.(py|ini|cfg|yml|yaml|json|toml)$"
@@ -19,72 +19,64 @@ filters:
 actions:
   - type: enforce
     conditions:
-      # Pattern 1: Insecure deserialization with pickle
-      - pattern: "pickle\\.loads\\(|pickle\\.load\\(|cPickle\\.loads\\(|cPickle\\.load\\("
-        message: "Insecure deserialization detected with pickle. Pickle is not secure against maliciously constructed data and should not be used with untrusted input."
+      # Pattern 1: Missing logging in authentication functions
+      - pattern: "def\\s+(login|authenticate|signin|logout|signout).*?:[^\\n]*?(?!.*logging\\.(info|warning|error|critical))"
+        message: "Authentication function without logging detected. Always log authentication events, especially failures, for security monitoring."
         
-      # Pattern 2: Insecure deserialization with yaml.load
-      - pattern: "yaml\\.load\\([^,)]+\\)|yaml\\.load\\([^,)]+,\\s*Loader=yaml\\.Loader\\)"
-        message: "Insecure deserialization detected with yaml.load(). Use yaml.safe_load() instead for untrusted input."
+      # Pattern 2: Missing logging in authorization functions
+      - pattern: "def\\s+(authorize|check_permission|has_permission|is_authorized|require_permission).*?:[^\\n]*?(?!.*logging\\.(info|warning|error|critical))"
+        message: "Authorization function without logging detected. Always log authorization decisions, especially denials, for security monitoring."
         
-      # Pattern 3: Insecure deserialization with marshal
-      - pattern: "marshal\\.loads\\(|marshal\\.load\\("
-        message: "Insecure deserialization detected with marshal. Marshal is not secure against maliciously constructed data."
+      # Pattern 3: Missing logging in security-sensitive operations
+      - pattern: "def\\s+(create_user|update_user|delete_user|reset_password|change_password).*?:[^\\n]*?(?!.*logging\\.(info|warning|error|critical))"
+        message: "Security-sensitive user operation without logging detected. Always log security-sensitive operations for audit trails."
         
-      # Pattern 4: Insecure deserialization with shelve
-      - pattern: "shelve\\.open\\("
-        message: "Potentially insecure deserialization with shelve detected. Shelve uses pickle internally and is not secure against malicious data."
+      # Pattern 4: Missing logging in exception handlers
+      - pattern: "except\\s+[^:]+:[^\\n]*?(?!.*logging\\.(warning|error|critical|exception))"
+        message: "Exception handler without logging detected. Always log exceptions, especially in security-sensitive code, for monitoring and debugging."
         
-      # Pattern 5: Insecure use of eval or exec
-      - pattern: "eval\\(|exec\\(|compile\\([^,]+,\\s*['\"][^'\"]+['\"]\\s*,\\s*['\"]exec['\"]\\)"
-        message: "Insecure use of eval() or exec() detected. These functions can execute arbitrary code and should never be used with untrusted input."
+      # Pattern 5: Logging sensitive data
+      - pattern: "logging\\.(debug|info|warning|error|critical)\\([^)]*?(password|token|secret|key|credential|auth)"
+        message: "Potential sensitive data logging detected. Avoid logging sensitive information like passwords, tokens, or keys."
         
-      # Pattern 6: Missing integrity verification for downloads
-      - pattern: "urllib\\.request\\.urlretrieve\\(|requests\\.get\\([^)]*\\.exe['\"]\\)|requests\\.get\\([^)]*\\.zip['\"]\\)|requests\\.get\\([^)]*\\.tar\\.gz['\"]\\)"
-        message: "File download without integrity verification detected. Always verify the integrity of downloaded files using checksums or digital signatures."
+      # Pattern 6: Insufficient log level in security context
+      - pattern: "logging\\.debug\\([^)]*?(auth|login|permission|security|attack|hack|exploit|vulnerability)"
+        message: "Debug-level logging for security events detected. Use appropriate log levels (INFO, WARNING, ERROR) for security events."
         
-      # Pattern 7: Insecure package installation
-      - pattern: "pip\\s+install\\s+[^-]|subprocess\\.(?:call|run|Popen)\\(['\"]pip\\s+install"
-        message: "Insecure package installation detected. Specify package versions and consider using hash verification for pip installations."
+      # Pattern 7: Missing logging configuration
+      - pattern: "import\\s+logging(?!.*logging\\.basicConfig|.*logging\\.config)"
+        message: "Logging import without configuration detected. Configure logging properly with appropriate handlers, formatters, and levels."
         
-      # Pattern 8: Missing integrity checks for configuration
-      - pattern: "config\\.read\\(|json\\.loads?\\(|yaml\\.safe_load\\(|toml\\.loads?\\("
-        message: "Configuration loading detected. Ensure integrity verification for configuration files, especially in production environments."
+      # Pattern 8: Insecure logging configuration
+      - pattern: "logging\\.basicConfig\\([^)]*?level\\s*=\\s*logging\\.DEBUG"
+        message: "Debug-level logging configuration detected. Use appropriate log levels in production to avoid excessive logging."
         
-      # Pattern 9: Insecure temporary file creation
-      - pattern: "tempfile\\.mktemp\\(|os\\.tempnam\\(|os\\.tmpnam\\("
-        message: "Insecure temporary file creation detected. Use tempfile.mkstemp() or tempfile.TemporaryFile() instead to avoid race conditions."
+      # Pattern 9: Missing request/response logging in web frameworks
+      - pattern: "@app\\.route\\(['\"][^'\"]+['\"]|@api_view\\(|class\\s+\\w+\\(APIView\\)|class\\s+\\w+\\(View\\)"
+        message: "Web endpoint without request logging detected. Consider logging requests and responses for security monitoring."
         
-      # Pattern 10: Insecure file operations with untrusted paths
-      - pattern: "open\\([^,)]+\\+\\s*request\\.|open\\([^,)]+\\+\\s*user_|open\\([^,)]+\\+\\s*input\\("
-        message: "Potentially insecure file operation with user-controlled path detected. Validate and sanitize file paths from untrusted sources."
+      # Pattern 10: Missing correlation IDs in logs
+      - pattern: "logging\\.(debug|info|warning|error|critical)\\([^)]*?(?!.*request_id|.*correlation_id|.*trace_id)"
+        message: "Logging without correlation ID detected. Include correlation IDs in logs to trace requests across systems."
         
-      # Pattern 11: Missing integrity checks for updates
-      - pattern: "auto_update|self_update|check_for_updates"
-        message: "Update mechanism detected. Ensure proper integrity verification for software updates using digital signatures or secure checksums."
+      # Pattern 11: Missing error handling for logging failures
+      - pattern: "logging\\.(debug|info|warning|error|critical)\\([^)]*?\\)"
+        message: "Logging without error handling detected. Handle potential logging failures to ensure critical events are not missed."
         
-      # Pattern 12: Insecure plugin or extension loading
-      - pattern: "importlib\\.import_module\\(|__import__\\(|load_plugin|load_extension|load_module"
-        message: "Dynamic module loading detected. Implement integrity checks and validation before loading external modules or plugins."
+      # Pattern 12: Missing logging for database operations
+      - pattern: "(execute|executemany|cursor\\.execute|session\\.execute|query)\\([^)]*?(?!.*logging\\.(debug|info|warning|error|critical))"
+        message: "Database operation without logging detected. Consider logging database operations for audit trails and security monitoring."
         
-      # Pattern 13: Insecure use of subprocess with shell=True
-      - pattern: "subprocess\\.(?:call|run|Popen)\\([^,)]*shell\\s*=\\s*True"
-        message: "Insecure subprocess execution with shell=True detected. This can lead to command injection if user input is involved."
+      # Pattern 13: Missing logging for file operations
+      - pattern: "open\\([^)]+,\\s*['\"]w['\"]|open\\([^)]+,\\s*['\"]a['\"]|write\\(|writelines\\("
+        message: "File write operation without logging detected. Consider logging file operations for audit trails."
         
-      # Pattern 14: Missing integrity verification for serialized data
-      - pattern: "json\\.loads?\\([^,)]*request\\.|json\\.loads?\\([^,)]*user_|json\\.loads?\\([^,)]*input\\("
-        message: "Deserialization of user-controlled data detected. Implement schema validation or integrity checks before processing."
+      # Pattern 14: Missing logging for subprocess execution
+      - pattern: "subprocess\\.(call|run|Popen)\\([^)]*?(?!.*logging\\.(debug|info|warning|error|critical))"
+        message: "Subprocess execution without logging detected. Always log command execution for security monitoring."
         
-      # Pattern 15: Insecure use of globals or locals
-      - pattern: "globals\\(\\)\\[|locals\\(\\)\\["
-        message: "Potentially insecure modification of globals or locals detected. This can lead to unexpected behavior or security issues."
-
-  - type: suggest
-    message: |
-      **Python Software and Data Integrity Best Practices:**
-      
-      1. **Secure Deserialization:**
-         - Avoid using pickle, marshal, or shelve with untrusted data
+      # Pattern 15: Missing centralized logging configuration
+      - pattern: "logging\\.basicConfig\\([^)]*?(?!.*filename|.*handlers)"
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
