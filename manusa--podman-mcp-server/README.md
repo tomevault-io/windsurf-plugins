@@ -7,11 +7,11 @@ Model Context Protocol (MCP) server for container runtimes (Podman and Docker)
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [manusa/podman-mcp-server](https://github.com/manusa/podman-mcp-server).
+Original source: `CLAUDE.md` in [manusa/podman-mcp-server](https://github.com/manusa/podman-mcp-server).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
