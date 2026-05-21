@@ -1,229 +1,195 @@
 ---
 trigger: always_on
-description: Add or modify a new datamodel in supabase
+description: Instructions for implementing Admin API protection
 ---
 
 ---
-description: Add or modify a new datamodel in supabase
-globs: *.sql, /supabase/*
+description: Instructions for implementing Admin API protection
+globs: /app/api/*/*.ts
 ---
+# Admin API Implementation Pattern
 
+## Context
+In web applications, certain operations need to be restricted to admin users only. This pattern provides a complete implementation guide for admin-only APIs in a Next.js application using Supabase authentication.
 
-# Data Model Security Patterns
+## Implementation Guide
 
-This document describes the security patterns and policies for different types of resources in our Next.js application using Supabase Row Level Security (RLS).
+### 1. Database Setup
 
-Generic instructions on adding a new datamodel:
-1. Always read [datamodel.md](mdc:docs/datamodel.md) for existing datamodel description and [description.md](mdc:docs/description.md) for overall description of the app
-2. Implement a new migration file using supabase cli
-3. Construct the datamodel using guidance in this file
-4. Run the data migration locally using supabase db push in cli
+1. **Admin Flag in Profiles Table**
+   ```sql
+   create table public.profiles (
+     id uuid references auth.users primary key,
+     is_admin boolean default false,
+     -- other fields...
+   );
+   ```
 
-If you need to reset the whole database, always ask before doing it.
-Reset by: supabase db reset
-After reset run all db inilisations as described in [README.md](mdc:README.md)
+2. **Row Level Security (RLS) Policies**
+   ```sql
+   -- Only admins can view all profiles
+   create policy "Admins can view all profiles"
+   on public.profiles for select
+   to authenticated
+   using (
+     auth.uid() in (
+       select id from public.profiles
+       where is_admin = true
+     )
+   );
+   ```
 
-## Access Levels
+### 2. Server-Side Implementation
 
-### 1. Public Access
-Resources that are accessible to all users without authentication.
+1. **Create Admin API Route**
+   ```typescript
+   // app/api/[admin-route]/route.ts
+   import { NextResponse } from 'next/server'
+   import { createClient } from '@/utils/supabase/server'
 
-```sql
--- Basic public read access
-create policy "Public read access"
-  on table_name for select
-  using ( true );
+   export async function POST(request: Request) {
+     try {
+       // 1. Token Verification Layer
+       const authHeader = request.headers.get('Authorization')
+       if (!authHeader?.startsWith('Bearer ')) {
+         return NextResponse.json(
+           { error: 'Missing or invalid authorization header' },
+           { status: 401 }
+         )
+       }
 
--- Public read access with conditions
-create policy "Public read access with conditions"
-  on table_name for select
-  using ( 
-    published = true and 
-    expires_at > now() 
-  );
+       // Create regular client to verify the token
+       const authClient = createClient()
+       const { data: { user }, error: authError } = await authClient.auth.getUser(authHeader.split(' ')[1])
+       
+       if (authError || !user) {
+         return NextResponse.json(
+           { error: 'Unauthorized' },
+           { status: 401 }
+         )
+       }
 
--- Public create access with validation
-create policy "Public create access"
-  on table_name for insert
-  with check (
-    char_length(name) >= 2 and
-    email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'
-  );
-```
+       // 2. Admin Role Verification Layer
+       const { data: profile } = await authClient
+         .from('profiles')
+         .select('is_admin')
+         .eq('id', user.id)
+         .single()
 
-### 2. Authenticated Access
-Resources that require user authentication but not specific roles.
+       if (!profile?.is_admin) {
+         return NextResponse.json(
+           { error: 'Forbidden - Admin access required' },
+           { status: 403 }
+         )
+       }
 
-```sql
--- Basic authenticated access
-create policy "Authenticated read access"
-  on table_name for select
-  using ( auth.role() = 'authenticated' );
+       // 3. Service Role Operations Layer
+       const supabase = createClient(undefined, true) // Create service role client
+       
+       // Get request data
+       const data = await request.json()
+       
+       // Perform admin operations with service role client
+       const { data: result, error: operationError } = await supabase
+         .from('your_table')
+         .insert(data)
+         .select()
+         .single()
 
--- Owner-based access
-create policy "Owner access"
-  on table_name for all
-  using ( auth.uid() = user_id );
+       if (operationError) throw operationError
+       
+       return NextResponse.json({ data: result })
+     } catch (err) {
+       console.error('Error:', err)
+       return NextResponse.json(
+         { error: err instanceof Error ? err.message : 'Internal server error' },
+         { status: 500 }
+       )
+     }
+   }
+   ```
 
--- Team-based access
-create policy "Team access"
-  on table_name for all
-  using (
-    auth.uid() in (
-      select member_id 
-      from team_members 
-      where team_id = table_name.team_id
-    )
-  );
-```
+### 3. Client-Side Implementation
 
-### 3. Admin Access
-Resources that require admin privileges.
+1. **Admin Component with Auth Check**
+   ```typescript
+   // components/admin/AdminComponent.tsx
+   'use client'
+   
+   import { useEffect, useState } from 'react'
+   import { createClient } from '@/utils/supabase/client'
+   import { useRouter } from 'next/navigation'
 
-```sql
--- Admin-only access
-create policy "Admin access"
-  on table_name for all
-  using (
-    exists (
-      select 1 from profiles
-      where id = auth.uid()
-      and is_admin = true
-    )
-  );
+   export default function AdminComponent() {
+     const [isAdmin, setIsAdmin] = useState<boolean>(false)
+     const [loading, setLoading] = useState(true)
+     const supabase = createClient()
+     const router = useRouter()
 
--- Admin or owner access
-create policy "Admin or owner access"
-  on table_name for all
-  using (
-    auth.uid() = user_id or
-    exists (
-      select 1 from profiles
-      where id = auth.uid()
-      and is_admin = true
-    )
-  );
-```
+     useEffect(() => {
+       async function checkAdminStatus() {
+         try {
+           const { data: { session } } = await supabase.auth.getSession()
+           if (!session) {
+             router.push('/login')
+             return
+           }
 
-## Policy Patterns
+           const { data: profile } = await supabase
+             .from('profiles')
+             .select('is_admin')
+             .eq('id', session.user.id)
+             .single()
 
-### 1. Content Management
-```sql
--- Published content visible to all
-create policy "Public can view published content"
-  on content for select
-  using ( published = true );
+           if (!profile?.is_admin) {
+             router.push('/unauthorized')
+             return
+           }
 
--- Draft content visible to authors and admins
-create policy "Authors and admins can view drafts"
-  on content for select
-  using (
-    auth.uid() = author_id or
-    exists (
-      select 1 from profiles
-      where id = auth.uid()
-      and is_admin = true
-    )
-  );
+           setIsAdmin(true)
+         } catch (error) {
+           console.error('Error checking admin status:', error)
+           router.push('/error')
+         } finally {
+           setLoading(false)
+         }
+       }
 
--- Only authors can create content
-create policy "Authors can create content"
-  on content for insert
-  with check ( auth.role() = 'authenticated' );
+       checkAdminStatus()
+     }, [supabase, router])
 
--- Only authors can update their content
-create policy "Authors can update own content"
-  on content for update
-  using ( auth.uid() = author_id );
-```
+     if (loading) return <div>Loading...</div>
+     if (!isAdmin) return null
 
-### 2. User Data Management
-```sql
--- Users can view own data
-create policy "Users can view own data"
-  on user_data for select
-  using ( auth.uid() = user_id );
+     return (
+       // Your admin UI here
+     )
+   }
+   ```
 
--- Users can update own data
-create policy "Users can update own data"
-  on user_data for update
-  using ( auth.uid() = user_id )
-  with check (
-    case
-      when auth.uid() = user_id then true
-      else false
-    end
-  );
+2. **Admin API Client**
+   ```typescript
+   // utils/adminApi.ts
+   import { createClient } from '@/utils/supabase/client'
 
--- Admins can view all user data
-create policy "Admins can view all user data"
-  on user_data for select
-  using (
-    exists (
-      select 1 from profiles
-      where id = auth.uid()
-      and is_admin = true
-    )
-  );
-```
+   export class AdminApi {
+     private static async getAuthHeader() {
+       const supabase = createClient()
+       const { data: { session } } = await supabase.auth.getSession()
+       if (!session?.access_token) throw new Error('Not authenticated')
+       return `Bearer ${session.access_token}`
+     }
 
-### 3. Media Management
-```sql
--- Public can view media
-create policy "Public can view media"
-  on media_assets for select
-  using ( true );
-
--- Users can upload media
-create policy "Users can upload media"
-  on media_assets for insert
-  with check (
-    auth.uid() = user_id and
-    file_size <= 10485760 and  -- 10MB limit
-    mime_type in ('image/jpeg', 'image/png', 'image/webp')
-  );
-
--- Users can manage own media
-create policy "Users can manage own media"
-  on media_assets for all
-  using ( auth.uid() = user_id );
-```
-
-### 4. Analytics and Logging
-```sql
--- Anyone can create analytics events
-create policy "Public can create analytics"
-  on analytics_events for insert
-  with check ( true );
-
--- Only admins can view analytics
-create policy "Admins can view analytics"
-  on analytics_events for select
-  using (
-    exists (
-      select 1 from profiles
-      where id = auth.uid()
-      and is_admin = true
-    )
-  );
-```
-
-## Implementation Examples
-
-### 1. Blog System
-```sql
--- Posts table policies
-create policy "Public can view published posts"
-  on posts for select using ( published = true );
-
-create policy "Authors can view all own posts"
-  on posts for select using ( auth.uid() = author_id );
-
-create policy "Authors can create posts"
-  on posts for insert
-  with check ( auth.role() = 'authenticated' );
-
-create policy "Authors can update own posts"
+     static async callAdminApi(endpoint: string, data: any) {
+       try {
+         const authHeader = await this.getAuthHeader()
+         
+         const response = await fetch(`/api/${endpoint}`, {
+           method: 'POST',
+           headers: {
+             'Authorization': authHeader,
+             'Content-Type': 'application/json'
+           },
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
