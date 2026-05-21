@@ -1,67 +1,85 @@
 ---
 trigger: always_on
-description: Detect and prevent broken access control patterns in JavaScript applications as defined in OWASP Top 10:2021-A01
+description: Detect and prevent cryptographic failures in JavaScript applications as defined in OWASP Top 10:2021-A02
 ---
 
-# JavaScript Broken Access Control (OWASP A01:2021)
-
-This rule identifies and prevents broken access control vulnerabilities in JavaScript applications, focusing on both browser and Node.js environments, as defined in OWASP Top 10:2021-A01.
+# JavaScript Cryptographic Failures (OWASP A02:2021)
 
 <rule>
-name: javascript_broken_access_control
-description: Detect and prevent broken access control patterns in JavaScript applications as defined in OWASP Top 10:2021-A01
+name: javascript_cryptographic_failures
+description: Detect and prevent cryptographic failures in JavaScript applications as defined in OWASP Top 10:2021-A02
 
 actions:
   - type: enforce
     conditions:
-      # Pattern 1: Detect Direct Reference to User-Supplied IDs (IDOR vulnerability)
-      - pattern: "(?:req|request)\\.(?:params|query|body)\\.(?:id|userId|recordId)[^\\n]*?(?:findById|getById|find\\(|get\\()"
-        message: "Potential Insecure Direct Object Reference (IDOR) vulnerability. User-supplied IDs should be validated against user permissions before database access."
+      # Pattern 1: Weak or insecure cryptographic algorithms
+      - pattern: "(?:createHash|crypto\\.createHash)\\(['\"](?:md5|sha1)['\"]\\)|(?:crypto|require\\(['\"]crypto['\"]\\))\\.(?:createHash|Hash)\\(['\"](?:md5|sha1)['\"]\\)|new (?:MD5|SHA1)\\(|CryptoJS\\.(?:MD5|SHA1)\\("
+        message: "Using weak hashing algorithms (MD5/SHA1). Use SHA-256 or stronger algorithms."
         
-      # Pattern 2: Detect Missing Authorization Checks in Route Handlers
-      - pattern: "(?:app|router)\\.(?:get|post|put|delete|patch)\\(['\"][^'\"]+['\"],\\s*(?:async)?\\s*\\(?(?:req|request),\\s*(?:res|response)(?:,[^\\)]+)?\\)?\\s*=>\\s*\\{[^\\}]*?\\}\\)"
-        negative_pattern: "(?:isAuthenticated|isAuthorized|checkPermission|verifyAccess|auth\\.check|authenticate|authorize|userHasAccess|checkAuth|permissions\\.|requireAuth|requiresAuth|ensureAuth|\\bauth\\b|\\broles?\\b|\\bpermission\\b|\\baccess\\b)"
-        message: "Route handler appears to be missing authorization checks. Implement proper access control to verify user permissions before processing requests."
+      # Pattern 2: Hardcoded secrets/credentials
+      - pattern: "(?:const|let|var)\\s+(?:password|secret|key|token|auth|apiKey|api_key)\\s*=\\s*['\"][^'\"]+['\"]"
+        message: "Potential hardcoded credentials detected. Store secrets in environment variables or a secure vault."
         
-      # Pattern 3: Detect JWT Token Validation Issues
-      - pattern: "(?:jwt|jsonwebtoken)\\.verify\\((?:[^,]+),\\s*['\"]((?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?)['\"]"
-        message: "Hardcoded JWT secret detected. Store JWT secrets securely in environment variables or a configuration manager."
+      # Pattern 3: Insecure random number generation
+      - pattern: "Math\\.random\\(\\)|Math\\.floor\\(\\s*Math\\.random\\(\\)\\s*\\*"
+        message: "Using Math.random() for security purposes. Use crypto.randomBytes() or Web Crypto API for cryptographic operations."
         
-      # Pattern 4: Detect Client-Side Authorization Checks
-      - pattern: "if\\s*\\((?:user|currentUser)\\.(?:role|isAdmin|hasPermission|can[A-Z][a-zA-Z]+|is[A-Z][a-zA-Z]+)\\)\\s*\\{[^\\}]*?(?:fetch|axios|\\$\\.ajax|http\\.get|http\\.post)\\([^\\)]*?\\)"
-        message: "Authorization logic implemented on client-side. Client-side authorization checks can be bypassed. Always enforce authorization on the server."
+      # Pattern 4: Weak SSL/TLS configuration
+      - pattern: "(?:tls|https|require\\(['\"]https['\"]\\)|require\\(['\"]tls['\"]\\))\\.(?:createServer|request|get)\\([^\\)]*?{[^}]*?secureProtocol\\s*:\\s*['\"](?:SSLv2_method|SSLv3_method|TLSv1_method|TLSv1_1_method)['\"]"
+        message: "Using deprecated/insecure SSL/TLS protocol versions. Use TLS 1.2+ for secure communications."
         
-      # Pattern 5: Detect Improper CORS Configuration
-      - pattern: "(?:app\\.use\\(cors\\(\\{[^\\}]*?origin:\\s*['\"]\\*['\"])|Access-Control-Allow-Origin:\\s*['\"]\\*['\"]"
-        message: "Wildcard CORS policy detected. This allows any domain to make cross-origin requests. Restrict CORS to specific trusted domains."
+      # Pattern 5: Missing certificate validation
+      - pattern: "(?:rejectUnauthorized|strictSSL)\\s*:\\s*false"
+        message: "SSL certificate validation is disabled. Always validate certificates in production environments."
         
-      # Pattern 6: Detect Lack of Role Checks in Admin Functions
-      - pattern: "(?:function|const)\\s+(?:admin|updateUser|deleteUser|createUser|updateRole|manageUsers|setPermission)[^\\{]*?\\{[^\\}]*?\\}"
-        negative_pattern: "(?:role|permission|isAdmin|hasAccess|authorize|authenticate|auth\\.check|checkPermission|checkRole|verifyRole|ensureAdmin|adminOnly|adminRequired|requirePermission)"
-        message: "Administrative function appears to be missing role or permission checks. Implement proper authorization checks to restrict access to administrative functions."
+      # Pattern 6: Insecure cipher usage
+      - pattern: "(?:createCipheriv|crypto\\.createCipheriv)\\(['\"](?:des|des3|rc4|bf|blowfish|aes-\\d+-ecb)['\"]"
+        message: "Using insecure encryption cipher or mode. Use AES with GCM or CBC mode with proper padding."
         
-      # Pattern 7: Detect Missing Login Rate Limiting
-      - pattern: "(?:function|const)\\s+(?:login|signin|authenticate|auth)[^\\{]*?\\{[^\\}]*?(?:compare(?:Sync)?|check(?:Password)?|match(?:Password)?|verify(?:Password)?)[^\\}]*?\\}"
-        negative_pattern: "(?:rate(?:Limit)?|throttle|limit|delay|cooldown|attempt|counter|maxTries|maxAttempts|lockout|timeout)"
-        message: "Login function appears to be missing rate limiting. Implement rate limiting to prevent brute force attacks."
+      # Pattern 7: Insufficient key length
+      - pattern: "(?:generateKeyPair|generateKeyPairSync)\\([^,]*?['\"]rsa['\"][^,]*?{[^}]*?modulusLength\\s*:\\s*(\\d{1,3}|1[0-9]{3}|20[0-3][0-9]|204[0-7])\\s*}"
+        message: "Using insufficient key length for asymmetric encryption. RSA keys should be at least 2048 bits, preferably 4096 bits."
         
-      # Pattern 8: Detect Horizontal Privilege Escalation Vulnerability
-      - pattern: "(?:findById|findOne|findByPk|get)\\((?:req|request)\\.(?:params|query|body)\\.(?:id|userId|accountId)\\)"
-        negative_pattern: "(?:!=|!==|===|==)\\s*(?:req\\.user\\.id|req\\.userId|currentUser\\.id|user\\.id|session\\.userId)"
-        message: "Potential horizontal privilege escalation vulnerability. Ensure the requested resource belongs to the authenticated user."
+      # Pattern 8: Insecure password hashing
+      - pattern: "(?:createHash|crypto\\.createHash)\\([^)]*?\\)\\.(?:update|digest)\\([^)]*?\\)|CryptoJS\\.(?:SHA256|SHA512|SHA3)\\([^)]*?\\)"
+        negative_pattern: "(?:bcrypt|scrypt|pbkdf2|argon2)"
+        message: "Using plain hashing for passwords. Use dedicated password hashing functions like bcrypt, scrypt, or PBKDF2."
         
-      # Pattern 9: Detect Missing CSRF Protection
-      - pattern: "(?:app|router)\\.(?:post|put|delete|patch)\\(['\"][^'\"]+['\"]"
-        negative_pattern: "(?:csrf|xsrf|csurf|csrfProtection|antiForgery|csrfToken|csrfMiddleware)"
-        message: "Route may be missing CSRF protection. Implement CSRF tokens for state-changing operations to prevent cross-site request forgery attacks."
+      # Pattern 9: Missing salt in password hashing
+      - pattern: "(?:pbkdf2|pbkdf2Sync)\\([^,]+,[^,]+,[^,]+,\\s*\\d+\\s*,[^,]+\\)"
+        negative_pattern: "(?:salt|crypto\\.randomBytes)"
+        message: "Ensure you're using a proper random salt with password hashing functions."
         
-      # Pattern 10: Detect Bypassing Access Control with Path Traversal
-      - pattern: "(?:fs|require)(?:\\.promises)?\\.(read|open|access|stat)(?:File|Sync)?\\([^\\)]*?(?:req|request)\\.(?:params|query|body|path)\\.[^\\)]*?\\)"
-        negative_pattern: "(?:normalize|resolve|sanitize|validate|pathValidation|checkPath)"
-        message: "Potential path traversal vulnerability in file access. Validate and sanitize user-supplied paths to prevent directory traversal attacks."
+      # Pattern 10: Insecure cookie settings
+      - pattern: "(?:document\\.cookie|cookies\\.set|res\\.cookie|cookie\\.serialize)\\([^)]*?\\)"
+        negative_pattern: "(?:secure\\s*:|httpOnly\\s*:|sameSite\\s*:)"
+        message: "Cookies with sensitive data should have secure and httpOnly flags enabled."
         
-      # Pattern 11: Detect Missing Authentication Middleware
-      - pattern: "(?:new\\s+)?express\\(\\)|(?:import|require)\\(['\"]express['\"]\\)"
+      # Pattern 11: Client-side encryption
+      - pattern: "(?:encrypt|decrypt|createCipher|createDecipher)\\([^)]*?\\)"
+        location: "(?:frontend|client|browser|react|vue|angular)"
+        message: "Performing sensitive cryptographic operations on the client side. Move encryption/decryption logic to the server."
+        
+      # Pattern 12: Insecure JWT implementation
+      - pattern: "(?:jwt\\.sign|jsonwebtoken\\.sign)\\([^,]*?,[^,]*?,[^\\)]*?\\)"
+        negative_pattern: "(?:expiresIn|algorithm\\s*:\\s*['\"](?:HS256|HS384|HS512|RS256|RS384|RS512|ES256|ES384|ES512)['\"])"
+        message: "JWT implementation missing expiration or using weak algorithm. Set expiresIn and use a strong algorithm."
+        
+      # Pattern 13: Weak PRNG in Node.js
+      - pattern: "(?:crypto\\.pseudoRandomBytes|crypto\\.rng|crypto\\.randomInt)\\("
+        message: "Using potentially weak pseudorandom number generator. Use crypto.randomBytes() for cryptographic security."
+        
+      # Pattern 14: Insecure local storage usage for sensitive data
+      - pattern: "(?:localStorage\\.setItem|sessionStorage\\.setItem)\\(['\"](?:token|auth|jwt|password|secret|key|credential)['\"]"
+        message: "Storing sensitive data in browser storage. Use secure HttpOnly cookies for authentication tokens."
+        
+      # Pattern 15: Weak password validation
+      - pattern: "(?:password\\.length\\s*>=?\\s*\\d|password\\.match\\(['\"][^'\"]+['\"]\\))"
+        negative_pattern: "(?:password\\.length\\s*>=?\\s*(?:8|9|10|11|12)|[A-Z]|[a-z]|[0-9]|[^A-Za-z0-9])"
+        message: "Weak password validation. Require at least 12 characters with a mix of uppercase, lowercase, numbers, and special characters."
+
+  - type: suggest
+    message: |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
