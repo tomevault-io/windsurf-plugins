@@ -1,52 +1,154 @@
 ---
 trigger: always_on
-description: RESTful API design and documentation standards
+description: This rule provides comprehensive guidance for AI assistants writing Behat tests for Drupal projects using the drevops/behat-steps package. It emphasizes reusing existing traits and steps rather than creating custom implementations. Contains the full STEPS.md reference embedded for easy access.
 ---
 
-# Enhanced API Standards
 
-Ensures consistent API design, documentation, and implementation best practices across PHP, JavaScript, and TypeScript files.
+# AI Behat Test Writing Guide for Drupal Projects
 
-## Rule Details
+## 🎯 Primary Directive
 
-- **Name:** enhanced_api_standards
+**ALWAYS prioritize using drevops/behat-steps traits and step definitions over writing custom steps.** The drevops/behat-steps package provides comprehensive test coverage for most Drupal testing scenarios.
 
-- **Description:** Enforce enhanced API design, implementation, and documentation standards
+## 📦 Essential Resources
 
-## Filters
-- file extension pattern: `\\.(php|js|ts)$`
+Before writing ANY Behat test:
+1. Check available steps in the [drevops/behat-steps STEPS.md](https://github.com/drevops/behat-steps/blob/main/STEPS.md) file or refer to the embedded reference below
+2. Review trait source code in `vendor/drevops/behat-steps/src/` directory
+3. Only create custom steps when absolutely necessary (functionality not covered by existing traits)
 
-## Enforcement Checks
-- Conditions:
-  - pattern `@api\\s+(?!GET|POST|PUT|DELETE|PATCH|OPTIONS|HEAD)` – Use standard HTTP methods (GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD) for API endpoints.
-  - pattern `function\\s+[a-zA-Z]+Api\\s*\\([^)]*\\)\\s*\\{[^}]*\\}` – negated `(?s)(throw new \\w+Exception|return\\s+(?:\\d{3}|4\\d\\d|5\\d\\d))` – Ensure API functions handle or return errors appropriately using exceptions or HTTP status codes.
-  - pattern `(?<!@api\\s+)(?<!\\s+returns\\s+)(?<!\\s+throws\\s+)[A-Z]{3,}(?!\\s+)` – HTTP methods should be prefixed with '@api' for documentation purposes.
-  - pattern `\\bresponse\\b(?![^;]*\\.json\\()` – Ensure all API responses are properly formatted, preferably as JSON.
+## 🔧 Setting Up FeatureContext
 
-## Suggestions
-- Guidance:
-**API Best Practices:**
-- **HTTP Methods:** Use proper HTTP methods for operations (GET for retrieval, POST for creation, etc.).
-- **Status Codes:** Use appropriate HTTP status codes to communicate the result of the request.
-- **Versioning:** Implement API versioning to manage changes without breaking existing integrations.
-- **Documentation:** 
-  - **Swagger/OpenAPI:** Use tools like Swagger for comprehensive API documentation.
-  - **Endpoint Descriptions:** Clearly document all endpoints including path, methods, parameters, and possible responses.
-- **Authentication & Security:**
-  - Implement OAuth, JWT, or similar secure authentication methods.
-  - Use HTTPS for all API communications.
-- **Rate Limiting:** Implement rate limiting to prevent abuse and ensure fair usage.
-- **Error Handling:** 
-  - Provide clear, human-readable error messages with corresponding status codes.
-  - Implement error logging for debugging purposes.
-- **Pagination:** For list endpoints, implement pagination to manage large datasets.
-- **Validation:** Validate input data at the API level to ensure data integrity.
-- **CORS:** Configure CORS headers if your API is meant to be consumed by web applications from different domains.
-- **Monitoring:** Set up monitoring for API performance and usage statistics.
+When creating or modifying FeatureContext.php, include the necessary traits from drevops/behat-steps. The traits are located in `vendor/drevops/behat-steps/src/`:
 
-## Metadata
-- Priority: high
-- Version: 1.2
+```php
+<?php
+
+namespace DrupalProject\Tests\Behat;
+
+use Drupal\DrupalExtension\Context\DrupalContext;
+// Generic traits from vendor/drevops/behat-steps/src/
+use DrevOps\BehatSteps\CookieTrait;
+use DrevOps\BehatSteps\DateTrait;
+use DrevOps\BehatSteps\ElementTrait;
+use DrevOps\BehatSteps\FieldTrait;
+use DrevOps\BehatSteps\FileDownloadTrait;
+use DrevOps\BehatSteps\KeyboardTrait;
+use DrevOps\BehatSteps\LinkTrait;
+use DrevOps\BehatSteps\PathTrait;
+use DrevOps\BehatSteps\ResponseTrait;
+use DrevOps\BehatSteps\WaitTrait;
+
+// Drupal-specific traits from vendor/drevops/behat-steps/src/Drupal/
+use DrevOps\BehatSteps\Drupal\BigPipeTrait;
+use DrevOps\BehatSteps\Drupal\BlockTrait;
+use DrevOps\BehatSteps\Drupal\ContentBlockTrait;
+use DrevOps\BehatSteps\Drupal\ContentTrait;
+use DrevOps\BehatSteps\Drupal\DraggableviewsTrait;
+use DrevOps\BehatSteps\Drupal\EckTrait;
+use DrevOps\BehatSteps\Drupal\EmailTrait;
+use DrevOps\BehatSteps\Drupal\FieldTrait as DrupalFieldTrait;
+use DrevOps\BehatSteps\Drupal\FileTrait;
+use DrevOps\BehatSteps\Drupal\MediaTrait;
+use DrevOps\BehatSteps\Drupal\MenuTrait;
+use DrevOps\BehatSteps\Drupal\MetatagTrait;
+use DrevOps\BehatSteps\Drupal\OverrideTrait;
+use DrevOps\BehatSteps\Drupal\ParagraphsTrait;
+use DrevOps\BehatSteps\Drupal\SearchApiTrait;
+use DrevOps\BehatSteps\Drupal\TaxonomyTrait;
+use DrevOps\BehatSteps\Drupal\TestmodeTrait;
+use DrevOps\BehatSteps\Drupal\UserTrait;
+use DrevOps\BehatSteps\Drupal\WatchdogTrait;
+
+class FeatureContext extends DrupalContext {
+    // Include only the traits you need for your tests
+    // Generic traits
+    use CookieTrait;
+    use DateTrait;
+    use ElementTrait;
+    use FieldTrait;
+    use FileDownloadTrait;
+    use KeyboardTrait;
+    use LinkTrait;
+    use PathTrait;
+    use ResponseTrait;
+    use WaitTrait;
+    
+    // Drupal-specific traits
+    use BlockTrait;
+    use ContentTrait;
+    use EmailTrait;
+    use FileTrait;
+    use MediaTrait;
+    use TaxonomyTrait;
+    use UserTrait;
+    
+    // Only add custom methods when drevops/behat-steps doesn't provide the functionality
+}
+```
+
+## 🚫 When NOT to Create Custom Steps
+
+Before creating ANY custom step, verify that drevops/behat-steps doesn't already provide it. Check the full reference below.
+
+### Common Mistakes to Avoid:
+
+1. **Creating custom user login steps**
+   - ❌ Don't create: `Given I log in as an administrator`
+   - ✅ Use UserTrait: `Given I am logged in as a user with the "administrator" role`
+
+2. **Creating custom content creation steps**
+   - ❌ Don't create: `Given I create an article titled :title`
+   - ✅ Use ContentTrait: `Given "article" content:` with a table
+
+3. **Creating custom field interaction steps**
+   - ❌ Don't create: `When I fill in the body field with :text`
+   - ✅ Use FieldTrait: `When I fill in "Body" with :text`
+
+4. **Creating custom email verification steps**
+   - ❌ Don't create: `Then I should receive an email`
+   - ✅ Use EmailTrait: `Then an email is sent to :address`
+
+5. **Creating custom element interaction steps**
+   - ❌ Don't create: `When I click the submit button`
+   - ✅ Use ElementTrait: `When I click on the element ".submit-button"`
+
+## ✅ When to Create Custom Steps
+
+Only create custom steps when:
+
+1. **Business-specific logic** that wouldn't be reusable across projects
+2. **Complex multi-step operations** that are repeated frequently in your tests
+3. **Integration with third-party services** not covered by drevops/behat-steps
+4. **Custom Drupal modules** with unique functionality
+
+Example of a valid custom step:
+
+```php
+/**
+ * @When I process the payment gateway response for order :order_id
+ */
+public function iProcessPaymentGatewayResponse($order_id) {
+    // Custom implementation for your specific payment gateway
+}
+```
+
+---
+
+# Complete DrevOps Behat Steps Reference
+
+The following is the complete reference from [drevops/behat-steps STEPS.md](https://github.com/drevops/behat-steps/blob/main/STEPS.md):
+
+## Available steps
+
+### Index of Generic steps
+
+| Class | Description |
+| --- | --- |
+| [CookieTrait](#cookietrait) | Verify and inspect browser cookies. |
+| [DateTrait](#datetrait) | Convert relative date expressions into timestamps or formatted dates. |
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [ivangrynenko/cursorrules](https://github.com/ivangrynenko/cursorrules) — distributed by [TomeVault](https://tomevault.io).
