@@ -1,134 +1,66 @@
 ---
 trigger: always_on
-description: This document outlines the comprehensive standards and conventions for writing documentation in the SignalWire docs codebase.
+description: description: TypeScript coding standards and best practices for modern web development
 ---
 
-# SignalWire documentation project rules
-
-This document outlines the comprehensive standards and conventions for writing documentation in the SignalWire docs codebase.
-
-## Documentation structure and organization rules
-
-### Directory structure
-- Use kebab-case for all directory and file names
-- Each major section must have a `_category_.yaml` file defining metadata. Don't use `_category_.json`.
-- Use `index.mdx` for section overview/landing pages
-- Prefix component/partial files with underscore (`_`) when they're imported by other files
-- Organize content hierarchically: `/home/{product}/{feature}/{topic}`
-
-### Category configuration
-```yaml
-# _category_.yaml format
-label: "Section Name"
-position: number  # 0 for overview, 1-3 for main sections
-collapsible: false
-className: menu-category
-```
-
-### File extensions and types
-- Use `.mdx` for all content files (enables React components)
-- Use `.yaml` for configuration files
-- Use `.md` only for pure markdown without component needs
-
-## Content standards
-
-### Frontmatter requirements
-Every content file must include:
-```yaml
 ---
-title: "Page Title"
-sidebar_label: "Menu Label" # if different from title
-slug: "/custom-url" # required by our style guide
-description: "Brief page description" # for SEO
+description: TypeScript coding standards and best practices for modern web development
+globs: **/*.ts, **/*.tsx, **/*.d.ts
 ---
-```
 
-### Content structure pattern
-1. **Import statements** (components, icons, partials)
-2. **Main heading** (H1) with page title
-3. **Subtitle component** with compelling description
-4. **Introduction paragraph** explaining the content
-5. **Action sections** ("Get started", "Try it out", "Choose an API")
-6. **Card-based navigation** using CardGroup components
-7. **Popular/Featured content** sections
+# TypeScript Best Practices
 
-### Writing style guide
-- **Tone**: Developer-focused, clear, and actionable
-- **Voice**: Use active voice and action-oriented language ("Build", "Create", "Deploy")
-- **Length**: Keep descriptions concise (1-2 sentences per card)
-- **Technical level**: Assume intermediate technical knowledge
-- **Calls-to-action**: Every section should guide users to next steps
-- **Titles**: Avoid gerunds in titles when practical ('Install package' rather than 'Installing the package')
-- **Sentence case**: Apply sentence case to card titles, tab titles, and pseudo-headers
-- **Pseudo-headers**: Titles made with simple bolded text (either on their own line or in lists with colons) should use sentence case
-- **Semantic line breaks**: Follow the SemBr specification by putting line breaks before and after major clauses. Links should occupy their own complete line. 
+## Type System
+- Prefer interfaces over types for object definitions
+- Use type for unions, intersections, and mapped types
+- Avoid using `any`, prefer `unknown` for unknown types
+  - Utilize `satisfies` instead of `as` where possible for better Type checking.
+- Use strict TypeScript configuration
+- Leverage TypeScript's built-in utility types
+- Use generics for reusable type patterns
 
-### Header formatting
-- Use sentence case for all headers (capitalize only the first word and proper nouns)
-- Examples: "Getting started", "API reference", "Content structure pattern"  
-- Avoid title case: ~~"Getting Started"~~, ~~"API Reference"~~, ~~"Content Structure Pattern"~~
-- Use only header levels 1-4 (H1, H2, H3, H4)
-- Avoid H5 and H6 headers for better document structure
+## Naming Conventions
+- Use PascalCase for type names and interfaces
+- Use camelCase for variables and functions
+- Use UPPER_CASE for constants
+- Use descriptive names with auxiliary verbs (e.g., isLoading, hasError)
+- Prefix interfaces for React props with 'Props' (e.g., ButtonProps)
 
-## Component usage standards
+## Code Organization
+- Keep type definitions close to where they're used
+- Export types and interfaces from dedicated type files when shared
+- Use barrel exports (index.ts) for organizing exports
+- Place shared types in a `types` directory
+- Co-locate component props with their components
 
-### Card components
-```jsx
-// Standard card usage for navigation
-<CardGroup cols={3}>
-  <Card 
-    title="Feature Name"
-    icon={<IconComponent />}
-    href="/link/path"
-  >
-    Brief description of what this leads to
-  </Card>
-</CardGroup>
-```
+## Functions
+- Use explicit return types for public functions
+- Use arrow functions for callbacks and methods
+- Implement proper error handling with custom error types
+- Use function overloads for complex type scenarios
+- Prefer async/await over Promises
 
-#### Card content guidelines
-- Don't put links in card context/description text
-- Don't create bolded "pseudo-headers" within card content
-- Keep card descriptions as plain text for better readability
+## Best Practices
+- Enable strict mode in tsconfig.json
+- Use readonly for immutable properties
+- Leverage discriminated unions for type safety
+- Use type guards for runtime type checking
+- Implement proper null checking
+- Avoid type assertions unless necessary
 
-### Icon standards
-- Use consistent icon libraries: `react-icons/md`, `react-icons/fa`, `react-icons/lia`
-- Choose semantically appropriate icons
-- Import only needed icons to avoid bundle bloat
-- Use custom icons from `@site/src/icons` when available
+## Error Handling
+- Create custom error types for domain-specific errors
+- Use Result types for operations that can fail
+- Implement proper error boundaries
+- Use try-catch blocks with typed catch clauses
+- Handle Promise rejections properly
 
-### Component organization
-```jsx
-// Import order:
-import Subtitle from "@site/src/components/typography/Subtitle";
-import ComponentName from "./_partials/_componentName.mdx";
-import { Card, CardGroup } from "@site/src/components/Extras/Card";
-import { IconName } from "react-icons/md";
-```
-
-#### Component import exemptions
-- You don't need to import components that are already available from `@site/src/theme/MDXComponents/index.js`
-- These components are automatically available in all MDX files without explicit imports
-- Available components include: Language, LangItem, LangSwitch, Tabs, TabItem, Accordion, AccordionGroup, AlphaBadge, BetaBadge, APITable, APITableRow, Card, CardGroup, DocCard, DocCardList, Frame, PreviewCardGroup, PreviewCard, Slideshow, Steps, Subtitle, UseCaseLinks, UseCaseView, Tooltips, GuidesList, GuidesListMirror, ReleaseCard, Tables
-
-## Navigation and user experience
-
-### Information architecture
-- **Overview first**: Always start with high-level concepts
-- **Progressive disclosure**: Move from general to specific
-- **Multiple pathways**: Provide different entry points (beginner, migration, specific use case)
-- **Cross-linking**: Reference related sections consistently
-
-### Section types
-Each major section should include:
-- **"Get started"** - Quick entry points for new users
-- **"Choose an API/Tool"** - Decision-making guidance
-- **"Popular guides"** - Most commonly needed content
-- **"Try it out"** - Hands-on examples or demos
-
-### Link formatting
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+## Patterns
+- Use the Builder pattern for complex object creation
+- Implement the Repository pattern for data access
+- Use the Factory pattern for object creation
+- Leverage dependency injection
+- Use the Module pattern for encapsulation 
 
 ---
 > Source: [signalwire/docs-legacy](https://github.com/signalwire/docs-legacy) — distributed by [TomeVault](https://tomevault.io).
