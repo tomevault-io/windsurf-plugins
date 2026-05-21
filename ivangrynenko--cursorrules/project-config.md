@@ -1,122 +1,103 @@
 ---
 trigger: always_on
-description: Guidelines for creating consistent pull request changelists in markdown format with proper code block formatting
+description: Detect and prevent identification and authentication failures in Python applications as defined in OWASP Top 10:2021-A07
 ---
 
----
-description: Updated guidelines for creating consistent pull request changelists in markdown format, ensuring strict raw markdown code block formatting and proper structure.
-globs: "*.md"
-alwaysApply: false
----
-# Pull Request Changelist Format
+ # Python Identification and Authentication Failures Standards (OWASP A07:2021)
 
-This document outlines strict standards for creating and formatting pull request changelists in markdown. Following these guidelines ensures that the output remains as raw markdown (unrendered) and prevents any issues with Cursor’s markdown rendering.
+This rule enforces security best practices to prevent identification and authentication failures in Python applications, as defined in OWASP Top 10:2021-A07.
 
 <rule>
-name: pull_request_changelist_format
-description: Updated guidelines for creating consistent pull request changelists in markdown with strict code block handling and structured formatting.
+name: python_authentication_failures
+description: Detect and prevent identification and authentication failures in Python applications as defined in OWASP Top 10:2021-A07
 filters:
   - type: file_extension
-    pattern: "\\.md$"
-  - type: content
-    pattern: "(?i)(pull request|pr|changelist|changelog)"
+    pattern: "\\.(py|ini|cfg|yml|yaml|json|toml)$"
+  - type: file_path
+    pattern: ".*"
 
 actions:
+  - type: enforce
+    conditions:
+      # Pattern 1: Weak password validation
+      - pattern: "password\\s*=\\s*['\"][^'\"]{1,7}['\"]|min_length\\s*=\\s*[1-7]"
+        message: "Weak password policy detected. Passwords should be at least 8 characters long and include complexity requirements."
+        
+      # Pattern 2: Hardcoded credentials
+      - pattern: "(username|user|login|password|passwd|pwd|secret|api_key|apikey|token)\\s*=\\s*['\"][^'\"]+['\"]"
+        message: "Hardcoded credentials detected. Store sensitive credentials in environment variables or a secure vault."
+        
+      # Pattern 3: Missing password hashing
+      - pattern: "password\\s*=\\s*request\\.form\\[\\'password\\'\\]|password\\s*=\\s*request\\.POST\\.get\\(\\'password\\'\\)"
+        message: "Storing or comparing plain text passwords detected. Always hash passwords before storage or comparison."
+        
+      # Pattern 4: Insecure password hashing
+      - pattern: "hashlib\\.md5\\(|hashlib\\.sha1\\(|hashlib\\.sha224\\("
+        message: "Insecure hashing algorithm detected. Use strong hashing algorithms like bcrypt, Argon2, or PBKDF2."
+        
+      # Pattern 5: Missing brute force protection
+      - pattern: "@app\\.route\\(['\"]\\/(login|signin|authenticate)['\"]"
+        message: "Authentication endpoint detected without rate limiting or brute force protection. Implement account lockout or rate limiting."
+        
+      # Pattern 6: Insecure session management
+      - pattern: "session\\[\\'user_id\\'\\]\\s*=|session\\[\\'authenticated\\'\\]\\s*=\\s*True"
+        message: "Session management detected. Ensure proper session security with secure cookies, proper expiration, and rotation."
+        
+      # Pattern 7: Missing CSRF protection in authentication
+      - pattern: "form\\s*=\\s*FlaskForm|class\\s+\\w+Form\\(\\s*FlaskForm\\s*\\)|class\\s+\\w+Form\\(\\s*Form\\s*\\)"
+        message: "Form handling detected. Ensure CSRF protection is enabled for all authentication forms."
+        
+      # Pattern 8: Insecure remember me functionality
+      - pattern: "remember_me|remember_token|stay_logged_in"
+        message: "Remember me functionality detected. Ensure secure implementation with proper expiration and refresh mechanisms."
+        
+      # Pattern 9: Insecure password reset
+      - pattern: "@app\\.route\\(['\"]\\/(reset-password|forgot-password|recover)['\"]"
+        message: "Password reset functionality detected. Ensure secure implementation with time-limited tokens and proper user verification."
+        
+      # Pattern 10: Missing multi-factor authentication
+      - pattern: "def\\s+login|def\\s+authenticate|def\\s+signin"
+        message: "Authentication function detected. Consider implementing multi-factor authentication for sensitive operations."
+        
+      # Pattern 11: Insecure direct object reference in user management
+      - pattern: "User\\.objects\\.get\\(id=|User\\.query\\.get\\(|get_user_by_id\\("
+        message: "Direct user lookup detected. Ensure proper authorization checks before accessing user data."
+        
+      # Pattern 12: Insecure JWT implementation
+      - pattern: "jwt\\.encode\\(|jwt\\.decode\\("
+        message: "JWT usage detected. Ensure proper signing, validation, expiration, and refresh mechanisms for JWTs."
+        
+      # Pattern 13: Missing secure flag in cookies
+      - pattern: "set_cookie\\([^,]+,[^,]+,[^,]*secure=False|set_cookie\\([^,]+,[^,]+(?!,\\s*secure=True)"
+        message: "Cookie setting without secure flag detected. Set secure=True for all authentication cookies."
+        
+      # Pattern 14: Missing HTTP-only flag in cookies
+      - pattern: "set_cookie\\([^,]+,[^,]+,[^,]*httponly=False|set_cookie\\([^,]+,[^,]+(?!,\\s*httponly=True)"
+        message: "Cookie setting without httponly flag detected. Set httponly=True for all authentication cookies."
+        
+      # Pattern 15: Insecure default credentials
+      - pattern: "DEFAULT_USERNAME|DEFAULT_PASSWORD|ADMIN_USERNAME|ADMIN_PASSWORD"
+        message: "Default credential configuration detected. Remove default credentials from production code."
+
   - type: suggest
     message: |
-      ## Updated Pull Request Changelist Guidelines
-
-      To guarantee clarity and consistency, please adhere to the following time-tested, unambiguous guidelines when requesting a PR changelist from Cursor:
-
-      ### 1. Request Format
-      **Always explicitly request raw markdown output in a code block** using one of these exact phrases:
-      - "Return markdown as code"
-      - "Return as code inside markdown as code (one block)"
-      - "Provide the markdown in a code block"
-      - "Return the content as a markdown code block, not as formatted text"
-      - "Generate the PR changelist in a markdown code block"
-
-      Avoid ambiguous wording that could lead to a rendered (formatted) output.
-
-      ### 2. Expected Response Format
-      Cursor should always respond with a raw markdown code block that looks like:
-      ```
-      ```markdown
-      # Summary of Changes
-
-      ## Category Name
-      - Change item
-      ```
-      ```
-
-      ### 3. Handling Incorrect Format
-      If the response is rendered markdown rather than a raw code block, prompt with one of the following:
-      - "Please provide the exact markdown in a code block using triple backticks, not as formatted text."
-      - "I require the raw markdown syntax; reformat your response with triple backticks."
-      - "Reformat your output as a code block enclosed in triple backticks."
-
-      ### 4. Changelist Structure
-      - **Main Heading:** Must begin with `# Summary of Changes`
-      - **Categories:** Use `##` headings to group related changes.
-      - **Changes:** List each change with a bullet (`-`), starting with a past tense verb (e.g., Added, Updated, Removed).
-      - **Code/Variables:** Enclose module names or configuration settings in backticks (e.g., `module_name`).
-
-      ### 5. Content Requirements
-      - Be specific about what changed and why.
-      - Group similar changes under the appropriate category headings.
-      - For configuration changes, include both the setting name and its new value.
-      - Keep each entry concise but descriptive.
-
-      ### 6. Example Command
-      To request a changelist from Cursor, try:
-      ```
-      Prepare a PR changelist based on these changes. Return the markdown in a code block with triple backticks.
-      ```
-
-      Adhering to these traditional, time-tested formatting guidelines not only prevents ambiguity but also paves the way for future improvements in automated changelist generation.
+      **Python Authentication Security Best Practices:**
       
-  - type: validate
-    conditions:
-      - pattern: "^```\\s*markdown\\s*\\n#\\s+Summary\\s+of\\s+Changes"
-        message: "The changelist must be a raw markdown code block starting with '# Summary of Changes'. Ensure the use of triple backticks and correct heading structure."
-      - pattern: "-\\s+(Added|Updated|Removed)\\b"
-        message: "Each bullet point must begin with a past tense verb: 'Added', 'Updated', or 'Removed'."
-      
-examples:
-  - input: |
-      Request: "Create a PR changelist for my changes. Return markdown code as code."
-      
-      Good Response from Cursor:
-      ```markdown
-      # Summary of Changes
+      1. **Password Storage:**
+         - Use strong hashing algorithms with salting
+         - Implement proper work factors
+         - Example with passlib:
+           ```python
+           from passlib.hash import argon2
+           
+           # Hash a password
+           hashed_password = argon2.hash("user_password")
+           
+           # Verify a password
+           is_valid = argon2.verify("user_password", hashed_password)
+           ```
 
-      ## Environment Configuration
-      - Updated `STAGE_FILE_PROXY_URL` to data.safeworkaustralia.gov.au
-      - Updated `LOCALDEV_URL` to dataswa.docker.amazee.io
-
-      ## Module Changes
-      - Removed `page_cache` module
-      - Added `stage_file_proxy` module
-      ```
-    output: |
-      This is the correct format for Cursor to return a changelist – as a raw markdown code block enclosed in triple backticks.
-      
-  - input: |
-      Request: "Create a PR changelist for my changes."
-      
-      Bad Response from Cursor (rendered markdown instead of a code block):
-      # Summary of Changes
-
-      ## Environment Configuration
-      - Updated `STAGE_FILE_PROXY_URL` to data.safeworkaustralia.gov.au
-      - Updated `LOCALDEV_URL` to dataswa.docker.amazee.io
-    output: |
-      This response is incorrectly formatted as rendered markdown. Please ask Cursor to provide the output as a raw markdown code block with triple backticks.
-
-metadata:
-  priority: medium
-  version: 1.2
-</rule>
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [ivangrynenko/cursorrules](https://github.com/ivangrynenko/cursorrules) — distributed by [TomeVault](https://tomevault.io).
