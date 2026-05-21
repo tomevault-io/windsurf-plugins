@@ -7,11 +7,11 @@ PerfEdge 集Web性能优化学习、体验为主的开源知识库。
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [minorcell/perfedge](https://github.com/minorcell/perfedge).
+Original source: `CLAUDE.md` in [minorcell/perfedge](https://github.com/minorcell/perfedge).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
