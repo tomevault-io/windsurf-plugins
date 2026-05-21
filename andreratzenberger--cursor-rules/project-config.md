@@ -1,180 +1,184 @@
 ---
 trigger: always_on
-description: Defines custom commands for AI-assisted development workflows
+description: Comprehensive development workflow system for task tracking, testing, and version control
 ---
 
+# Development Workflow System
 
-# AI Command System
-
-Rule for defining and handling custom commands for AI-assisted development workflows.
+Rule for managing the complete development lifecycle including task tracking, testing, and version control.
 
 <rule>
-name: ai_command_system
+name: development_workflow_system
 filters:
+  # Task management filters
+  - type: event
+    pattern: "task_start"
+  - type: event
+    pattern: "task_complete"
   - type: command
-    pattern: "Specs"
+    pattern: "task"
+  - type: event
+    pattern: "user_request"
+  - type: event 
+    pattern: "implementation_complete"
+  
+  # Testing filters
+  - type: event
+    pattern: "implementation_start"
   - type: command
-    pattern: "Code"
+    pattern: "test"
+  - type: file_change
+    pattern: "src/*"
+  - type: file_change
+    pattern: "tests/*"
+  - type: event
+    pattern: "test_failure"
+  
+  # Git commit filters
+  - type: event
+    pattern: "build_success"
+  - type: event
+    pattern: "test_success"
+  - type: event
+    pattern: "file_save"
+  - type: file_change
+    pattern: "*"
+  
+  # README management filters
   - type: command
-    pattern: "Task"
-  - type: command
-    pattern: "Learn"
-  - type: command
-    pattern: "Eval"
-  - type: command
-    pattern: "Review"
+    pattern: "readme"
+  - type: file_change
+    pattern: "README.md"
 
 actions:
-  # Specs Commands
+  #
+  # SECTION 1: TASK MANAGEMENT
+  #
+  
   - type: react
     conditions:
-      - pattern: "Specs.getHtml"
+      - pattern: "task create|task_start"
     action: |
-      # Generate an HTML representation of all specifications
-      # This will create a dashboard showing all specs with their completion status
+      # Create a new development task
       
-      I'll generate an HTML dashboard of all specifications, showing:
-      - Project specifications overview
-      - Completion percentages
-      - Requirements status for each spec
-      - Categories of specifications
-      - A visual indicator of progress
+      I'll create a new task with:
+      - Unique task ID (TASK-YYYY-MM-DD-NN format)
+      - Description section
+      - Relevant specifications section (linked to `.cursor/specs/` managed by the specification_management rule)
+      - Acceptance criteria section
+      - Metadata (ID, start date, end date, state)
+      - Learnings section for capturing implementation insights
       
-      The dashboard will be saved to `.cursor/output/specs_[timestamp].html`
+      The task will be stored in `.cursor/tasks/` with an Open (📝) status
+      and added to the task index in `.cursor/TASKS.md`
 
   - type: react
     conditions:
-      - pattern: "Specs.getSummary"
+      - pattern: "task done|task complete|task_complete"
     action: |
-      # Generate a markdown summary of all specifications
+      # Mark a task as complete
       
-      I'll create a markdown summary showing:
-      - Total specification files
-      - Total requirements
-      - Completion percentage
-      - Breakdown by category
-      - Details on each individual specification
+      I'll update the specified task:
+      - Change state to Done (✅)
+      - Set end date to current date
+      - Extract learnings to a separate file if any exist
+      - Mark associated specs as completed
+      - Update the task index in `.cursor/TASKS.md`
       
-      The summary will be saved to `.cursor/output/specs_summary_[timestamp].md`
+      If the task contains valuable learnings, they'll be saved to 
+      `.cursor/learnings/` with proper cross-references and managed by the knowledge_management rule
 
   - type: react
     conditions:
-      - pattern: "Specs.verify"
+      - pattern: "task list|task_status"
     action: |
-      # Verify implementations match specifications
+      # List all tasks with their status
       
-      I'll analyze the codebase to verify that specifications have been implemented:
-      - Trace each requirement to implementation code
-      - Verify marked items actually exist in the codebase
-      - Identify gaps between specs and implementation
-      - Generate a verification report with findings
+      I'll generate a table showing:
+      - Task ID
+      - Current state (Open 📝, Active 🔄, or Done ✅)
+      - Task description
+      - Start date
+      - End date (if completed)
       
-      The verification report will be saved to `.cursor/output/spec_verification_[timestamp].md`
-
-  # Code Commands
-  - type: react
-    conditions:
-      - pattern: "Code.analyze"
-    action: |
-      # Analyze code structure and quality
-      
-      I'll perform a comprehensive analysis of the codebase:
-      - File types and lines of code
-      - Directory structure
-      - Code complexity metrics
-      - Potential complex functions (>50 lines)
-      - TODOs and FIXMEs
-      - Potential architectural issues
-      
-      The analysis report will be saved to `.cursor/output/code_analysis_[timestamp].md`
+      This provides a quick overview of all project tasks and their progress
 
   - type: react
     conditions:
-      - pattern: "Code.refactor:(.*)"
+      - pattern: "task start|task_active"
     action: |
-      # Extract the code file to refactor from the command
-      # Pattern will capture the file path
+      # Mark a task as active
       
-      I'll analyze the specified file and provide refactoring recommendations:
-      - Identify long functions that could be broken down
-      - Find duplicated code patterns
-      - Review naming conventions
-      - Suggest code structure improvements
-      - Generate refactored code
+      I'll update the specified task:
+      - Change state from Open (📝) to Active (🔄)
+      - Update the task index in `.cursor/TASKS.md`
       
-      The refactoring report will be saved to `.cursor/output/refactor_[filename]_[timestamp].md`
-
-  # Evaluation Commands
-  - type: react
-    conditions:
-      - pattern: "Eval.project"
-    action: |
-      # Generate a comprehensive project evaluation report
-      
-      I'll evaluate the entire project:
-      - Project overview and statistics
-      - Task completion assessment
-      - Specification coverage
-      - Code quality assessment
-      - Documentation assessment
-      - Recommendations for improvement
-      
-      The evaluation report will be saved to `.cursor/output/project_evaluation_[timestamp].md`
+      This indicates work has started on this task
 
   - type: react
+    event: "user_request"
     conditions:
-      - pattern: "Eval.progress"
+      - pattern: "implement|create|build|develop"
     action: |
-      # Generate a progress report comparing current state to project goals
+      # Auto-create task when user requests implementation
       
-      I'll analyze project progress:
-      - Milestone status and completion
-      - Weekly task completion trends
-      - Burndown analysis with completion projections
-      - Risk assessment
-      - Recommendations to maintain momentum
+      When you ask me to implement something, I'll automatically:
+      - Create a new task with the implementation request as description
+      - Look for related specifications to link to the task (using the specification_management rule)
+      - Set the task state to Active (🔄)
+      - Add acceptance criteria
+      - Create a unique task ID
+      - Add the task to the task index
       
-      The progress report will be saved to `.cursor/output/progress_report_[timestamp].md`
-
-  # Review Commands
+      This ensures all implementation work is properly tracked
+  
+  #
+  # SECTION 2: TESTING MANAGEMENT
+  #
+  
   - type: react
-    conditions:
-      - pattern: "Review.code:(.*)"
+    event: "implementation_start"
     action: |
-      # Generate a code review for the specified file
-      # Pattern will capture the file path
+      # Create test files when implementation begins
       
-      I'll perform a detailed code review:
-      - Style and formatting analysis
-      - Code structure evaluation
-      - Security considerations
-      - Performance considerations
-      - Specific recommendations for improvement
+      When implementation starts, I'll:
       
-      The code review will be saved to `.cursor/output/codereview_[filename]_[timestamp].md`
+      1. Find the active task and its associated specifications
+      2. For each specification, create appropriate test files:
+         - Detect the project type (Node.js, Python, Rust, etc.)
+         - Create test files in the proper location and format
+         - Link tests to the specification requirements
+         - Add placeholder tests for each requirement
+         - Include references to the specs and task
+      
+      3. Consider project-specific testing patterns:
+         - Use Jest for JavaScript/TypeScript
+         - Use pytest for Python
+         - Use Cargo test for Rust
+         - Use JUnit for Java
+      
+      This ensures tests are created before implementation, supporting 
+      test-driven development.
 
   - type: react
     conditions:
-      - pattern: "Review.pr"
+      - pattern: "test run|test execute"
     action: |
-      # Generate a pull request review template
+      # Run tests based on project type
       
-      I'll create a comprehensive PR review template with sections for:
-      - PR overview (title, author, branch)
-      - Changes summary
-      - Specifications addressed
-      - Code review (structure, quality, testing, security, performance)
-      - Reviewer notes
-      - Recommendations
-      - Follow-up tasks
+      I'll execute tests for the project:
       
-      The template will be saved to `.cursor/output/pr_review_template_[timestamp].md`
-
-  # Task Commands
-  - type: react
-    conditions:
-      - pattern: "Task.summary"
-    action: |
+      1. Detect the project type:
+         - Node.js (package.json) → npm test
+         - Rust (Cargo.toml) → cargo test
+         - Java (pom.xml) → mvn test
+         - Python (requirements.txt/setup.py) → pytest or unittest
+      
+      2. Process test results:
+         - If tests pass, update active task to reflect passing tests
+         - If tests fail, create detailed failure report
+         - Trigger appropriate success/failure events
+      
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
