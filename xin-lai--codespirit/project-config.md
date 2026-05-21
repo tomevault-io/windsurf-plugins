@@ -1,111 +1,246 @@
 ---
 trigger: always_on
-description: CodeSpirit 服务类开发规范 - 服务接口、实现、生命周期和依赖注入
+description: CodeSpirit 统一启动框架规范 - API项目配置标准化
 ---
 
 
-# 服务（Service）类规则
+# 统一启动框架规范
 
-## 基本要求
+## 快速开始
 
-1. 确保服务类实现正确的接口和基类
-2. 添加构造函数注释和 XML 文档注释
-3. 服务类必须实现 [BaseCRUDIService.cs](mdc:Src/CodeSpirit.Shared/Services/BaseCRUDIService.cs) 或 [BaseCRUDService.cs](mdc:Src/CodeSpirit.Shared/Services/BaseCRUDService.cs)，应实现常见的查询逻辑
-4. 服务接口必须实现 [IBaseCRUDIService.cs](mdc:Src/CodeSpirit.Shared/Services/IBaseCRUDIService.cs) 或 [IBaseCRUDService.cs](mdc:Src/CodeSpirit.Shared/Services/IBaseCRUDService.cs)
-5. 服务类必须实现生命周期标记接口（IScopedDependency / ITransientDependency / ISingletonDependency）
-
-## 服务类示例
-
+### Program.cs（标准模板）
 ```csharp
-/// <summary>
-/// 用户服务接口
-/// </summary>
-public interface IUserService : IBaseCRUDService<User, long, CreateUserDto, UpdateUserDto, UserQueryDto>
-{
-    /// <summary>
-    /// 根据用户名获取用户
-    /// </summary>
-    /// <param name="username">用户名</param>
-    /// <returns>用户信息</returns>
-    Task<UserDto> GetByUsernameAsync(string username);
-}
+using CodeSpirit.ExamApi.Configuration;
+using CodeSpirit.Shared.Startup;
+using System.Text;
 
-/// <summary>
-/// 用户服务实现
-/// </summary>
-public class UserService : BaseCRUDService<User, long, CreateUserDto, UpdateUserDto, UserQueryDto>, 
-    IUserService, IScopedDependency
+Console.OutputEncoding = Encoding.UTF8;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// 1. 注册服务
+builder.AddCodeSpiritApi<ExamApiConfiguration>();
+
+var app = builder.Build();
+
+try
 {
-    /// <summary>
-    /// 初始化用户服务
-    /// </summary>
-    /// <param name="repository">用户仓储</param>
-    /// <param name="mapper">对象映射器</param>
-    public UserService(IRepository<User> repository, IMapper mapper) 
-        : base(repository, mapper)
-    {
-    }
-    
-    public async Task<UserDto> GetByUsernameAsync(string username)
-    {
-        // 实现逻辑
-    }
+    // 2. 配置中间件和初始化数据库
+    await app.UseCodeSpiritApiAsync<ExamApiConfiguration>();
+    app.Run();
+}
+catch (Exception ex)
+{
+    var logger = app.Services.GetRequiredService<ILogger<Program>>();
+    logger.LogError(ex, "服务启动过程中发生错误");
 }
 ```
 
-## 生命周期选择
+> ⚠️ **规范**：不要在 `Program.cs` 中添加额外配置，所有配置放在 API 配置类中。
 
-- **IScopedDependency**: Scoped 生命周期（推荐大多数业务服务）
-- **ITransientDependency**: Transient 生命周期（推荐无状态工具类）
-- **ISingletonDependency**: Singleton 生命周期（推荐配置和缓存服务）
+---
 
-## 设置服务最佳实践
+## API 配置类
 
-使用 `ISettingsService` 时，推荐使用 `[SettingsDto]` 特性简化 API 调用：
+### 位置和命名
+- **位置**：`{ProjectName}/Configuration/` 文件夹
+- **命名**：`{ApiName}Configuration`（如 `ExamApiConfiguration`）
+- **继承**：`BaseApiConfiguration`
 
+### 最小配置类
 ```csharp
-// 1. 定义设置 DTO 并添加特性
-using CodeSpirit.Settings.Attributes;
+namespace CodeSpirit.ExamApi.Configuration;
 
-[SettingsDto("ThirdPartyLogin", "WeChat")]
-public class WeChatLoginSettingsDto
+public class ExamApiConfiguration : BaseApiConfiguration
 {
-    public string AppId { get; set; } = string.Empty;
-    public string AppSecret { get; set; } = string.Empty;
-}
-
-// 2. 在服务中使用简化 API（无需手动传入 module/key）
-public class AuthService : IScopedDependency
-{
-    private readonly ISettingsService _settingsService;
+    /// <summary>服务名称，用于 Aspire 服务发现</summary>
+    public override string ServiceName => "exam";
     
-    public async Task<WeChatLoginSettingsDto> GetWeChatConfigAsync(string tenantId)
-    {
-        // 简化版 API：自动从 DTO 特性获取 module/key
-        return await _settingsService.GetTenantSettingAsync<WeChatLoginSettingsDto>(tenantId) 
-            ?? new WeChatLoginSettingsDto();
-    }
-    
-    public async Task SaveWeChatConfigAsync(WeChatLoginSettingsDto dto, string tenantId)
-    {
-        // 简化版 API：自动从 DTO 特性获取 module/key
-        await _settingsService.SetTenantSettingAsync(dto, tenantId, "更新微信配置");
-    }
+    /// <summary>数据库连接字符串键名</summary>
+    public override string ConnectionStringKey => "exam-api";
 }
 ```
 
-**优势：**
-- 类型安全，编译时检查
-- 避免模块名/配置键字符串不一致
-- 配置键集中管理，修改只需改一处
-- 反射结果自动缓存，性能优化
+---
 
-## 参考文件
+## 核心方法
 
-- 服务基类: [BaseCRUDService.cs](mdc:Src/CodeSpirit.Shared/Services/BaseCRUDService.cs)
-- 服务接口: [IBaseCRUDService.cs](mdc:Src/CodeSpirit.Shared/Services/IBaseCRUDService.cs)
-- 依赖注入规范: [dependency-injection.mdc](mdc:.cursor/rules/dependency-injection.mdc)
-- 设置组件文档: [codespirit-settings-guide-zh-CN.md](mdc:Docs/03-Core-Components/codespirit-settings-guide-zh-CN.md)
+### ConfigureServices - 服务注册
+
+#### 简化配置方式（推荐）
+
+使用扩展方法简化配置，减少重复代码：
+
+```csharp
+public override void ConfigureServices(IServiceCollection services, IConfiguration configuration)
+{
+    // ⚠️ 必须调用基类方法（初始化路径前缀配置）
+    base.ConfigureServices(services, configuration);
+    
+    // 配置标准数据库服务（多数据库支持、仓储模式）
+    this.ConfigureStandardDatabaseServices<ExamDbContext, MySqlExamDbContext, SqlServerExamDbContext>(
+        services, configuration);
+    
+    // 配置标准基础设施服务（事件总线、HTTP客户端）+ 可选组件（多租户、设置管理）
+    this.ConfigureStandardInfrastructureServices(services, configuration, (s, c) =>
+    {
+        s.AddCodeSpiritMultiTenant(c);
+        s.AddSettingsManagerWithDatabase(c);
+    });
+    
+    // 只配置特定业务服务
+    services.AddLLMServices();
+    AddExamSpecificServices(services);
+}
+```
+
+#### 传统配置方式
+
+如果需要更多控制，可以使用传统方式：
+
+```csharp
+public override void ConfigureServices(IServiceCollection services, IConfiguration configuration)
+{
+    // ⚠️ 必须调用基类方法（初始化路径前缀配置）
+    base.ConfigureServices(services, configuration);
+    
+    // 配置多数据库支持（推荐方式）
+    DatabaseMigrationHelper.ConfigureMultiDatabaseDbContext<
+        ExamDbContext, MySqlExamDbContext, SqlServerExamDbContext>(
+        services, configuration, ConnectionStringKey);
+    
+    // 注册仓储模式
+    services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
+    
+    // 添加多租户支持
+    services.AddCodeSpiritMultiTenant(configuration);
+    
+    // 其他服务注册...
+}
+```
+
+#### 常用服务注册方法
+| 方法 | 说明 |
+|------|------|
+| `services.AddCodeSpiritMultiTenant(configuration)` | 多租户支持 |
+| `services.AddEventBus()` | 事件总线 |
+| `services.AddCodeSpiritCaching(configuration)` | 统一缓存服务 |
+| `services.AddLLMServices()` | LLM 服务 |
+| `services.AddAiFormFillEndpoints()` | AI 表单填充端点 |
+| `services.AddSettingsManagerWithDatabase(configuration)` | 设置管理 |
+| `services.AddScheduledTasks()` | 定时任务 |
+| `services.AddChartServices()` | 图表服务 |
+
+#### 线程池配置（可选）
+```csharp
+// 高并发服务
+ThreadPoolConfiguration.ConfigureThreadPool(
+    ThreadPoolConfiguration.ServiceTier.High, 
+    expectedInstances: 3, 
+    logger);
+
+// 服务等级：Low, Medium, High
+```
+
+---
+
+### 中间件配置
+
+#### 1. ConfigurePreAuthenticationMiddlewareAsync - 认证前
+在认证之前执行，用于租户解析等：
+```csharp
+public override Task ConfigurePreAuthenticationMiddlewareAsync(WebApplication app)
+{
+    app.UseCodeSpiritMultiTenant();
+    return Task.CompletedTask;
+}
+```
+
+#### 2. ConfigurePreControllerMiddlewareAsync - 控制器前
+在控制器映射之前执行：
+```csharp
+public override Task ConfigurePreControllerMiddlewareAsync(WebApplication app)
+{
+    // 通常审计由网关处理，API 服务不需要
+    return Task.CompletedTask;
+}
+```
+
+#### 3. ConfigureMiddlewareAsync - 自定义中间件
+在通用中间件之后执行：
+
+**简化配置方式（推荐）：**
+
+```csharp
+public override async Task ConfigureMiddlewareAsync(WebApplication app)
+{
+    // 配置标准中间件（聚合器）+ 可选组件（多租户、AI表单填充）
+    await this.ConfigureStandardMiddlewareAsync(app, a =>
+    {
+        a.UseCodeSpiritMultiTenant();
+        a.UseAiFormFillEndpoints();
+    });
+    
+    // 只配置特定中间件
+    app.MapHub<ExamHub>("/exam-hub");
+}
+```
+
+**传统配置方式：**
+
+```csharp
+public override async Task ConfigureMiddlewareAsync(WebApplication app)
+{
+    // 多租户中间件
+    app.UseCodeSpiritMultiTenant();
+    
+    // 聚合器中间件
+    app.UseCodeSpiritAggregator();
+    
+    // AI 表单填充端点
+    app.UseAiFormFillEndpoints();
+    
+    // SignalR Hub 映射
+    app.MapHub<ExamHub>("/exam-hub");
+    
+    await Task.CompletedTask;
+}
+```
+
+---
+
+### InitializeDatabaseAsync - 数据库初始化
+
+**简化配置方式（推荐）：**
+
+```csharp
+public override async Task InitializeDatabaseAsync(WebApplication app)
+{
+    // 使用标准数据库初始化方法
+    // 自动应用迁移和初始化种子数据（如果 DbContext 实现了 IInitializableDbContext）
+    await this.InitializeStandardDatabaseAsync<ExamDbContext, MySqlExamDbContext, SqlServerExamDbContext>(
+        app, "ExamApi");
+}
+```
+
+**传统配置方式：**
+
+```csharp
+public override async Task InitializeDatabaseAsync(WebApplication app)
+{
+    using var scope = app.Services.CreateScope();
+    var services = scope.ServiceProvider;
+    var logger = services.GetRequiredService<ILogger<ExamApiConfiguration>>();
+    var configuration = services.GetRequiredService<IConfiguration>();
+    
+    try
+    {
+        // 1. 自动应用数据库迁移
+        await DatabaseMigrationHelper.ApplyDatabaseMigrationsAsync<
+            MySqlExamDbContext, 
+            SqlServerExamDbContext>(
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [xin-lai/CodeSpirit](https://github.com/xin-lai/CodeSpirit) — distributed by [TomeVault](https://tomevault.io).
