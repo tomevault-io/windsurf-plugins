@@ -1,112 +1,69 @@
 ---
 trigger: always_on
-description: Code style rules — naming, guard clauses, dispatch, variable reassignment, mutation, strings, truncation, imports.
+description: Type hints, the Any ban, Optional/Union scrutiny, and variable annotation rules.
 ---
 
-# Code Style
-- Follow PEP 8 style guidelines (enforced by Ruff)
-- Use descriptive variable names: `timeout_seconds` not `t`, `worker_count` not `n`
-- Boolean variables and functions: prefix with `is_`, `has_`, `can_`, `should_`
-- Keep functions focused and single-purpose (Single Responsibility Principle)
-- Add comprehensive docstrings for all public APIs (Google style with Args/Returns/Raises)
-- Include usage examples in docstrings for complex functionality
+# Type Hints and Typing Rules
 
-## Guard Clauses and Early Returns
+## Type Hints
+- **Always include type hints** for all function parameters and return values
+- **Always use capitalized `typing` imports**: `List`, `Dict`, `Set`, `Tuple`, `Optional`, `Union`, `FrozenSet`
+- Do NOT use lowercase built-in generics (`list[str]`, `dict[str, int]`) or pipe unions (`str | None`) even though Python 3.10+ supports them
+- **Rationale:** Capitalized typing imports are visually distinct and grep-able. `List` is unambiguously a type annotation; `list` could be a variable name, a builtin call, or a type hint. This makes bulk find-and-replace across files reliable, and makes it immediately clear when reading code that a line involves type annotations.
+- Use `-> None` for functions that return no value (side-effect functions, lifecycle hooks like `post_initialize`, `on_start`, `on_stop`)
+- Use `-> NoReturn` ONLY for functions that genuinely never return (unconditional `raise`, `sys.exit()`, infinite loops)
+- Include type hints for class attributes and instance variables
+- **Prefer `morphic.Typed` over `TypedDict`** for structured data. `TypedDict` is a fallback for cases where `Typed` cannot be used (e.g., dicts that must remain plain `dict` for JSON serialization to a third-party API, or when the consuming code expects a raw dict, not a model). When you control both producer and consumer, use `Typed`.
+- **`Protocol` is for function parameters and call-site typing, NOT for Pydantic/Typed field types.** Pydantic v2 validates Protocol fields with `isinstance()` at construction time, which (a) rejects `None` for non-Optional fields even in tests that don't exercise the field, and (b) fails on proxy objects that use `__getattr__`-based dynamic dispatch (e.g., Concurry `Worker` proxies) because Python's `isinstance` Protocol check inspects the type's `__dict__` and MRO, not dynamic attributes. Declare such fields as `Any` and document the duck-typed contract in a comment referencing the Protocol class. The Protocol provides type safety at *call sites* (IDE autocomplete, static analysis); Pydantic field validation is the wrong enforcement point.
 
-Reduce nesting by checking preconditions first and returning/raising early. This keeps the happy path at low indentation and makes control flow obvious.
+### Strict `Any` Ban (CRITICAL)
 
-❌ Bad (deeply nested):
+**`Any` is as good as no typing.** Using `Any` removes the entire reason to use Morphic Typed, Pydantic, and type hints. It tells neither the reader nor the type checker what the value actually is. LLM coding assistants produce `Any` reflexively because it silences type errors without solving them.
+
+**`Any` is ONLY acceptable in these specific situations:**
+
+| Situation | Why `Any` is acceptable | Example |
+|---|---|---|
+| **Pydantic/Typed fields for duck-typed workers** | Pydantic's `isinstance()` validation rejects Concurry `WorkerProxy` proxy objects; the Protocol cannot be used as a field type. | `worker: Any  # WorkerProtocol; see types.py` |
+| **`_serialize_value`-style functions** | Serialization functions that genuinely accept any Python object. | `def serialize(value: Any) -> Any:` |
+| **`Dict[str, Any]` for genuinely heterogeneous dicts** | When the dict's values are mixed types by design (JSON payloads, config dicts, serialized output). | `metadata: Dict[str, Any]` |
+| **`**kwargs: Any`** | Catch-all for pass-through kwargs to parent classes or third-party libraries. | `**kwargs: Any` |
+| **`PrivateAttr` for opaque runtime handles** | Locks, queues, processes, event loops — objects from external libraries whose type is complex or private. | `_lock: Any = PrivateAttr()` |
+
+**`Any` is NEVER acceptable in these situations:**
+
+| Situation | What to use instead | Example fix |
+|---|---|---|
+| **Function parameters where you know the type** | Use the actual type. | `task: Task` not `task: Any` |
+| **Return types where you know the type** | Use the actual type. | `-> List[Future]` not `-> List[Any]` |
+| **List/Dict generic parameters** | Spell out the element type. | `List[WorkerProxy]` not `List[Any]` |
+| **Forward references within the same package** | Use string annotations or fix import ordering. See the Forward References rule below. | `result: "WorkerResult"` not `result: Any` |
+
+**The test is simple:** when you write `Any`, ask: **"Do I know what type this actually is at runtime?"** If yes, write that type. If you are writing `Any` to avoid an import or to silence a type error, fix the import or the type error instead.
+
+❌ Bad (known types hidden behind `Any`):
 ```python
-def process_task(self, task: Task) -> Result:
-    if task is not None:
-        if task.is_valid():
-            if self._is_running:
-                return self._execute(task)
-            else:
-                raise WorkerStoppedError()
-        else:
-            raise InvalidTaskError()
-    else:
-        raise ValueError("task is None")
+def submit_batch(
+    self,
+    tasks: List[Any],              # ❌ These are Task objects
+    callback: Optional[Any] = None,  # ❌ This is Callable[[Result], None]
+) -> List[Any]:                    # ❌ These are Future objects
 ```
 
-✅ Good (guard clauses):
+✅ Good (actual types everywhere they are known):
 ```python
-def process_task(self, task: Task) -> Result:
-    if task is None:
-        raise ValueError("task is None")
-    if not task.is_valid():
-        raise InvalidTaskError()
-    if not self._is_running:
-        raise WorkerStoppedError()
-    return self._execute(task)
+def submit_batch(
+    self,
+    tasks: List[Task],
+    callback: Optional[Callable[[Result], None]] = None,
+) -> List[Future]:
 ```
 
-## Exhaustive Dispatch: `if-elif-else` with a Raising `else`
+### No `Any` for Forward References (CRITICAL)
 
-When a variable has a **closed set of valid values** and you are dispatching behavior based on it, always use a full `if-elif-else` ladder where the `else` branch raises an exception. This makes two things immediately clear to the reader: (a) exactly which values are handled, and (b) that no value falls through silently.
+**Never use `Any` as a workaround for forward references.** This defeats the entire purpose of Morphic Typed — if the field is typed `Any`, Pydantic cannot validate it, the IDE cannot autocomplete it, and the reader does not know what it holds.
 
-Contrast this with a **feature flag** (a boolean or optional condition that enables/disables a behavior). Feature flags correctly use a bare `if` with no `else`, because the "else" case is "do nothing, proceed normally" — not an error.
-
-**Closed-set dispatch — ALWAYS use `if-elif-else` with raising `else`:**
-
-❌ Bad (validate-then-dispatch — reader must remember the set of valid values):
-```python
-algorithm: str = config.get("load_balancing", "round_robin")
-if algorithm not in ("round_robin", "least_loaded", "random"):
-    raise ValueError(f"Unknown algorithm={algorithm!r}")
-
-if algorithm == "round_robin":
-    return RoundRobinBalancer(...)
-if algorithm == "least_loaded":
-    return LeastLoadedBalancer(...)
-return RandomBalancer(...)  # ← reader must infer this is the "random" case
-```
-
-✅ Good (exhaustive dispatch — every case is explicit, invalid values caught):
-```python
-if algorithm == "round_robin":
-    return RoundRobinBalancer(...)
-elif algorithm == "least_loaded":
-    return LeastLoadedBalancer(...)
-elif algorithm == "random":
-    return RandomBalancer(...)
-else:
-    raise ValueError(
-        f"Unknown load_balancing algorithm={algorithm!r}. "
-        f"Must be 'round_robin', 'least_loaded', or 'random'."
-    )
-```
-
-**Why the `else` matters:** Without it, adding a fourth algorithm value later silently falls through to the last branch. With `else: raise`, the new value is caught immediately. This is the textual equivalent of a `match/case` with exhaustiveness checking.
-
-**Feature flag — bare `if` is correct:**
-
-✅ Good (optional behavior, not a dispatch):
-```python
-if self.enable_metrics:
-    self._metrics_collector.record(elapsed_ms)
-```
-
-Here, the `if` block enables an optional feature. There is no `else` because the alternative is "don't record metrics" — that is a valid default, not an error. An `else` branch would be empty noise.
-
-**Decision rule:** Ask "is the `else` case an error, or is it 'do nothing'?"
-- **Error** (closed set dispatch) → `if-elif-else` with raising `else`
-- **Do nothing** (feature flag) → bare `if`, no `else`
-
-## Naming Conventions
-
-- `snake_case` for functions, methods, variables, modules
-- `CamelCase` for classes
-- `UPPER_SNAKE_CASE` for module-level constants
-- Prefix private attributes with `_`: `self._internal_state`
-- Name by intent, not implementation: `failed_futures` not `bad_list`
-- Include units where ambiguous: `timeout_seconds`, `max_retries`, `delay_ms`
-- Avoid abbreviations: `configuration` not `cfg`, `response` not `resp`, `message` not `msg`
-
-## Never Rename Variables Just to Shorten Them (Namespace Pollution)
-
-**Never create a new local variable that is just a shorter or abbreviated alias for an existing parameter, attribute, or variable.** This is namespace pollution: it forces the reader to hold two names for the same value in their head, and the shorter name invariably loses the meaning that the original name carried.
+**Forward references within the same file:** Use a string annotation (`"ClassName"`) or add `from __future__ import annotations` at the top of the file.
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
