@@ -1,208 +1,171 @@
 ---
 trigger: always_on
-description: **NEVER create standalone summary `.md` files** documenting implementation changes, fixes, refactorings, or feature additions. These waste tokens and are never read.
+description: Execution mode testing — fixtures, worker_mode/pool_mode, mode-specific behavior, never skip failing tests.
 ---
 
-# Documentation Practices: NO SUMMARY DOCUMENTS
+# Execution Mode Testing
 
-## ⚠️ CRITICAL RULE: NEVER CREATE SUMMARY DOCUMENTS
+## Pytest Fixtures from conftest.py
 
-**NEVER create standalone summary `.md` files** documenting implementation changes, fixes, refactorings, or feature additions. These waste tokens and are never read.
+The [tests/conftest.py](mdc:tests/conftest.py) file provides essential fixtures for testing across all execution modes. **Always use these fixtures** when writing tests.
 
-❌ **DO NOT CREATE FILES LIKE**:
-- `FIX_SUMMARY.md`
-- `IMPLEMENTATION_SUMMARY.md`
-- `REFACTORING_COMPLETE.md`
-- `FEATURE_IMPLEMENTATION.md`
-- `CHANGES_SUMMARY.md`
-- Any other standalone documentation of completed work
+### Available Fixtures
 
-## Instead: Four-Part Documentation Strategy
+#### 1. `worker_mode` Fixture
 
-All information from implementation sessions must flow into these four locations:
+**Purpose**: Parametrize tests across ALL execution modes (sync, thread, process, asyncio, ray)
 
-### 1. **Chat Summary** (Immediate Communication)
-
-At the end of each implementation session, provide a **structured summary in the chat** with these sections:
-
-```markdown
-## Implementation Summary
-
-### What Was Changed
-- Brief list of files modified and their changes
-- High-level description of the fix/feature
-
-### Why These Changes Were Needed
-- Root cause of the issue (if a fix)
-- Rationale for the design decision (if a feature)
-- Problems with previous implementation (if a refactoring)
-
-### Alternatives Considered
-- What other approaches were evaluated
-- Why they were rejected
-- Trade-offs of the chosen approach
-
-### Testing
-- New testcases added (with file paths)
-- Existing testcases updated (with file paths)
-- Edge cases now covered
-
-### Documentation Updates
-- Architecture docs updated (with file paths)
-- User guide sections updated (with file paths)
-- API docstrings updated (with file/class/method references)
-
-### Other Changes
-- Configuration changes
-- Dependencies added/removed
-- Breaking changes (if any)
-```
-
-**This chat summary is the ONLY place for quick, session-level documentation.**
-
----
-
-### 2. **Architecture Documentation** (Historical + Technical)
-
-Location: `concurry/docs/architecture/`
-
-**When to Update**: For ANY architectural change, design decision, or significant refactoring.
-
-**What to Include**:
-1. **Current Implementation**: How the system works now
-2. **Historical Context**: Previous implementations and their issues
-3. **Why the Change**: What problems were encountered
-4. **Example Code**: For each approach (previous and current)
-5. **Trade-offs**: Pros and cons of the design
-
-**Format Example**:
-
-```markdown
-## Feature: Worker Submission Queue
-
-### Current Implementation (Version 3 - October 2025)
-
-[Detailed explanation of current approach]
-
-**Example:**
+**Usage**:
 ```python
-# Current implementation code
+def test_my_feature(self, worker_mode):
+    """Test feature across all execution modes."""
+    w = MyWorker.options(mode=worker_mode).init(param=value)
+    
+    # Your test logic
+    result = w.method().result()
+    assert result == expected
+    
+    w.stop()
 ```
 
-**Why This Works:**
-- Reason 1
-- Reason 2
+**Important**: This fixture automatically runs your test 5 times (once per mode). If Ray is not installed, it runs 4 times.
+
+#### 2. `pool_mode` Fixture
+
+**Purpose**: Parametrize tests across pool-supporting modes (thread, process, ray)
+
+**Usage**:
+```python
+def test_pool_feature(self, pool_mode):
+    """Test feature that requires multiple workers."""
+    w = MyWorker.options(mode=pool_mode, max_workers=3).init()
+    
+    # Your test logic for pools
+    futures = [w.task(i) for i in range(10)]
+    results = [f.result() for f in futures]
+    
+    w.stop()
+```
+
+**Why separate from worker_mode?**: Sync and asyncio modes only support `max_workers=1`, so pool-specific features cannot be tested with them.
+
+#### 3. `initialize_ray` Fixture
+
+**Purpose**: Session-level fixture that initializes Ray once before all tests
+
+**Usage**: Automatic - no need to explicitly use this fixture. Ray is initialized at session start if available.
+
+**Important**: Always include the runtime_env when manually initializing Ray in tests:
+```python
+import ray
+import morphic
+import concurry
+
+ray.init(
+    ignore_reinit_error=True,
+    num_cpus=4,
+    runtime_env={"py_modules": [concurry, morphic]},
+)
+```
+
+### Explicit `max_workers` Requirement (**CRITICAL**)
+
+- Every test must call `.options()` with an explicit `max_workers` argument for any execution mode that allows more than a single worker (`thread`, `process`, `ray`).
+- Always order the call as `Worker.options(mode=..., max_workers=..., ...)` so the requirement stays obvious in code review.
+- Hard-code the current defaults whenever the test depends on them: `thread → 30`, `process → 4`, `ray → 0`. (These values may change later; tests must keep declaring what they expect.)
+- Sync and asyncio workers must **omit** `max_workers` (they only support `1` and enforce it automatically).
+- Pools, decorated workers, task helpers, and any other helper that wraps `.options()` have to follow the same rule—if the mode supports multiple workers, pass `max_workers` explicitly in the helper.
+
+### WORKER_MODES and POOL_MODES Constants
+
+Available for direct use when needed:
+```python
+from tests.conftest import WORKER_MODES, POOL_MODES
+
+# WORKER_MODES = ["sync", "thread", "process", "asyncio", "ray"]  # if Ray installed
+# POOL_MODES = ["thread", "process", "ray"]  # if Ray installed
+```
 
 ---
 
-### Previous Implementation (Version 2 - September 2025)
+## Comprehensive Execution Mode Testing
 
-**Approach:**
-[Description of previous approach]
+### Golden Rule: Test ALL Execution Modes
 
-**Example:**
+**Every test must run across all applicable execution modes using the `worker_mode` or `pool_mode` fixture.**
+
+❌ **NEVER write tests like this:**
 ```python
-# Previous implementation code
+def test_feature(self):
+    """Bad: Only tests sync mode."""
+    worker = MyWorker.options(mode="sync").init()
+    # ...
 ```
 
-**Issues Encountered:**
-1. Race condition when stop() called during submission
-2. Semaphore not released if worker stopped
-3. Futures could be returned after pool stopped
+✅ **ALWAYS write tests like this:**
+```python
+def test_feature(self, worker_mode):
+    """Good: Tests all execution modes."""
+    worker = MyWorker.options(mode=worker_mode).init()
+    # ...
+```
 
-**Why It Failed:**
-[Detailed explanation]
+### Example: Basic Test Structure
+
+```python
+def test_basic_computation(self, worker_mode):
+    """Test basic computation across all execution modes."""
+    w = ComputeWorker.options(mode=worker_mode).init(multiplier=2)
+    result = w.compute(5).result(timeout=5.0)
+    assert result == 10
+    w.stop()
+```
+
+### Example: Pool-Specific Test
+
+```python
+def test_pool_feature(self, pool_mode):
+    """Test feature requiring multiple workers."""
+    if pool_mode in ("sync", "asyncio"):
+        pytest.skip("Sync and asyncio only support max_workers=1")
+    
+    w = MyWorker.options(mode=pool_mode, max_workers=3).init()
+    # Test pool-specific functionality
+    w.stop()
+```
 
 ---
 
-### Initial Implementation (Version 1 - August 2025)
+## Handling Mode-Specific Behavior
+### NEVER Skip Tests Due to Failures in a certain execution mode
+**Critical Rule**: If a test fails for certain execution modes, **DO NOT skip it**. These are important edge cases that must be handled.
 
-[Similar structure]
-```
-
-**Key Files**:
-- `docs/architecture/workers.md` - Worker system architecture
-- `docs/architecture/synchronization.md` - wait()/gather() and futures
-- `docs/architecture/limits.md` - Rate limiting and resource limits
-- `docs/architecture/retries.md` - Retry logic and configuration
-- `docs/architecture/configuration.md` - Global config system
-- `docs/architecture/task-worker.md` - TaskWorker specifics
-
-**Create NEW architecture docs** when implementing completely new subsystems.
-
----
-
-### 3. **User Guide + API Docstrings** (User-Facing Behavior)
-
-Location: `concurry/docs/user-guide/` and module docstrings
-
-**When to Update**: ONLY when user-facing behavior changes.
-
-**DO Update When**:
-- ✅ New public API added
-- ✅ Public API signature changed
-- ✅ New parameters or options available
-- ✅ Default behavior changed
-- ✅ New execution mode added
-- ✅ New feature users can interact with
-
-**DO NOT Update When**:
-- ❌ Backend implementation fixed (no behavior change)
-- ❌ Internal refactoring (same external API)
-- ❌ Performance optimization (no API change)
-- ❌ Bug fix that restores expected behavior
-
-**User Guide Structure**:
-```markdown
-## Feature Name
-
-### Overview
-Brief description of what the feature does and when to use it.
-
-### Basic Usage
+❌ **WRONG Approach:**
 ```python
-# Minimal working example
+def test_feature(self, worker_mode):
+    if worker_mode == "ray":
+        pytest.skip("Fails on Ray, skipping")  # ❌ NEVER DO THIS
+    
+    # test logic
 ```
 
-### Common Patterns
+✅ **CORRECT Approach - Handle the Edge Case:**
 ```python
-# Pattern 1: Common use case
+def test_feature(self, worker_mode):
+    """Test feature with mode-specific behavior."""
+    w = MyWorker.options(mode=worker_mode).init()
+    
+    if worker_mode == "ray":
+        # Ray has different behavior - test it explicitly
+        with pytest.raises(SpecificException, match="expected message"):
+            w.problematic_method()
+    else:
+        # Other modes work normally
+        result = w.problematic_method().result()
+        assert result == expected
+    
+    w.stop()
 ```
-
-```python
-# Pattern 2: Another common use case
-```
-
-### Advanced Usage
-```python
-# Complex example with all options
-```
-
-### Configuration
-- List of relevant config keys (reference, not full docs)
-- Link to API docs for details
-
-### Troubleshooting
-Common issues and solutions.
-```
-
-**API Docstrings**:
-- Include parameter descriptions
-- Reference config keys for defaults (e.g., "Defaults to `global_config.defaults.worker_timeout`")
-- Provide usage examples
-- Document exceptions raised
-- **NEVER hardcode default values in docstrings**
-
-**Global Config Defaults**:
-- ❌ DO NOT document all config keys in user guide
-- ✅ DO mention relevant config keys in context
-- ✅ Full config documentation belongs in API reference
-
----
-
-### 4. **Testcases** (Executable Edge Case Documentation)
-
-Location: `concurry/tests/` (in appropriate subdirectories)
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
