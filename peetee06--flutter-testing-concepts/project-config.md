@@ -1,119 +1,60 @@
 ---
 trigger: always_on
-description: Follow these rules when writing Flutter or Dart code
+description: Follow these rules closely when working with git and GitHub.
 ---
 
-# Effective Dart Rules
 
-<!-- Source: https://github.com/evanca/flutter-ai-rules/blob/1cc9bf82daaf65cb3291f82c661bb82f24c641df/combined/flutter_dart_riverpod_mockito.md -->
+# Git and GitHub rules
 
-### Naming Conventions
-1. Use terms consistently throughout your code.
-2. Follow existing mnemonic conventions when naming type parameters (e.g., `E` for element, `K`/`V` for key/value, `T`/`S`/`U` for generic types).
-3. Name types (classes, enums, typedefs, type parameters) using `UpperCamelCase` (also known as `PascalCase`, especially for classes).
-4. Name extensions using `UpperCamelCase`.
-5. Name packages, directories, and source files using `lowercase_with_underscores`.
-6. Name import prefixes using `lowercase_with_underscores`.
-7. Name other identifiers (variables, parameters, named parameters) using `lowerCamelCase`.
-8. Capitalize acronyms and abbreviations longer than two letters like words.
-9. Avoid abbreviations unless the abbreviation is more common than the unabbreviated term.
-10. Prefer putting the most descriptive noun last in names.
-11. Consider making code read like a sentence when designing APIs.
-12. Prefer a noun phrase for non-boolean properties or variables.
-13. Prefer a non-imperative verb phrase for boolean properties or variables.
-14. Prefer the positive form for boolean property and variable names.
-15. Consider omitting the verb for named boolean parameters.
-16. Use `lowerCamelCase` for function names.
-17. Use `snake_case` for file names.
+Follow these rules closely when working with git and GitHub.
 
-### Types and Functions
-1. Use class modifiers to control if your class can be extended or used as an interface.
-2. Type annotate variables without initializers.
-3. Type annotate fields and top-level variables if the type isn't obvious.
-4. Annotate return types on function declarations.
-5. Annotate parameter types on function declarations.
-6. Write type arguments on generic invocations that aren't inferred.
-7. Annotate with `dynamic` instead of letting inference fail.
-8. Use `Future<void>` as the return type of asynchronous members that do not produce values.
-9. Use getters for operations that conceptually access properties.
-10. Use setters for operations that conceptually change properties.
-11. Use a function declaration to bind a function to a name.
-12. Use inclusive start and exclusive end parameters to accept a range.
+## General Rules
 
-### Style
-1. Format your code using `dart format`.
-2. Use curly braces for all flow control statements.
-3. Prefer `final` over `var` when variable values won't change.
-4. Use `const` for compile-time constants.
+### Before committing
 
-### Imports & Files
-1. Don't import libraries inside the `src` directory of another package.
-2. Don't allow import paths to reach into or out of `lib`.
-3. Prefer relative import paths within a package.
-4. Don't use `/lib/` or `../` in import paths.
-5. Consider writing a library-level doc comment for library files.
+1. Run `dart format` and `dart analyze` if there are any `*.dart` files to be committed
+   - You can check for staged `.dart` files using this command:
 
-### Structure
-1. Keep files focused on a single responsibility.
-2. Limit file length to maintain readability.
-3. Group related functionality together.
-4. Prefer making fields and top-level variables `final`.
-5. Consider making your constructor `const` if the class supports it.
-6. Prefer making declarations private.
+     ```bash
+     git diff --name-only --staged | grep '\.dart$'
+     ```
 
-### Usage
-1. Use strings in `part of` directives.
-2. Use adjacent strings to concatenate string literals.
-3. Use collection literals when possible.
-4. Use `whereType()` to filter a collection by type.
-5. Test for `Future<T>` when disambiguating a `FutureOr<T>` whose type argument could be `Object`.
-6. Follow a consistent rule for `var` and `final` on local variables.
-7. Initialize fields at their declaration when possible.
-8. Use initializing formals when possible.
-9. Use `;` instead of `{}` for empty constructor bodies.
-10. Use `rethrow` to rethrow a caught exception.
-11. Override `hashCode` if you override `==`.
-12. Make your `==` operator obey the mathematical rules of equality.
+2. Fix all infos, warnings issues and errors the commands surface
+3. Repeat step 1. and 2. until all issues are resolved
+4. Stage any files that were changed in this process
+5. Proceed with the commit
 
-### Documentation
-1. Format comments like sentences.
-2. Use `///` doc comments to document members and types; don't use block comments for documentation.
-3. Prefer writing doc comments for public APIs.
-4. Consider writing doc comments for private APIs.
-5. Consider including explanations of terminology, links, and references in library-level docs.
-6. Start doc comments with a single-sentence summary.
-7. Separate the first sentence of a doc comment into its own paragraph.
-8. Use square brackets in doc comments to refer to in-scope identifiers.
-9. Use prose to explain parameters, return values, and exceptions.
-10. Put doc comments before metadata annotations.
-11. Document why code exists or how it should be used, not just what it does.
+### GitHub
 
-### Testing
-1. Write unit tests for business logic.
-2. Write widget tests for UI components.
-3. Aim for good test coverage.
+- The owner of this repository is `Peetee06`
+- The repository is called `flutter-testing-concepts`
+- The default branch is `main` - use it as the base branch when creating new branches if not otherwise specified
 
-### Widgets
-1. Extract reusable widgets into separate components.
-2. Use `StatelessWidget` when possible.
-3. Keep build methods simple and focused.
+### Commit messages
 
-### State Management
-1. Choose appropriate state management based on complexity.
-2. Avoid unnecessary `StatefulWidget`s.
-3. Keep state as local as possible.
+Prefix commit messages depending on the changes
 
-### Performance
-1. Use `const` constructors when possible.
-2. Avoid expensive operations in build methods.
-3. Implement pagination for large lists.
+- features: `feat:`
+- refactorings: `refactor:`
+- bug fixes: `fix:`
+- only tests: `test:` - if tests are part of a feature addition, use `feat:`
+- everything in the `.github` directory as well as configuration files related to continuous integration like `.coderabbit.yaml` or `codecov.yml`: `ci:`
+- documentation: `docs:`
+- cleanups, dependency updates, SDK updates, etc.: `chore:`
 
-# Dart 3 Updates
+## Pull Request creation
 
-### Branches
-1. Use `if` statements for conditional branching. The condition must evaluate to a boolean.
+When asked to open a Pull Request follow these steps
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+1. Verify if you are on the `main` branch using `git rev-parse --abbrev-ref HEAD | cat` command
+   1. If you are on `main`:
+      1. create a new branch with a fitting name and using a prefix like for commit messages
+      2. checkout the new branch you created
+      3. publish the new branch
+   2. If you are on another branch, continue with the next step
+2. Stage all files if the user did not specify any specific files to commit
+3. Follow the instructions in section "Before committing" and commit with a meaningful message describing the changes
+4. Create the Pull Request with a meaningful title using the same prefix as for commit messages and use the [PULL_REQUEST_TEMPLATE.md](mdc:.github/PULL_REQUEST_TEMPLATE.md) for the description containing a concise summary of the changes
 
 ---
 > Source: [Peetee06/flutter-testing-concepts](https://github.com/Peetee06/flutter-testing-concepts) — distributed by [TomeVault](https://tomevault.io).
