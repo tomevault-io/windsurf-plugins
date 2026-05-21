@@ -7,11 +7,11 @@ The Arkade SDK is a TypeScript library for building Bitcoin wallets with the Ark
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [arkade-os/ts-sdk](https://github.com/arkade-os/ts-sdk).
+Original source: `CLAUDE.md` in [arkade-os/ts-sdk](https://github.com/arkade-os/ts-sdk).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
