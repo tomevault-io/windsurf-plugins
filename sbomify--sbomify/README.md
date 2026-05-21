@@ -7,11 +7,11 @@ sbomify is a product security artifact hub and a trust center.
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [sbomify/sbomify](https://github.com/sbomify/sbomify).
+Original source: `CLAUDE.md` in [sbomify/sbomify](https://github.com/sbomify/sbomify).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
