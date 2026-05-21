@@ -1,184 +1,170 @@
 ---
 trigger: always_on
-description: Comprehensive development workflow system for task tracking, testing, and version control
+description: Comprehensive knowledge management system for capturing, organizing, and applying project knowledge
 ---
 
-# Development Workflow System
+# Knowledge Management System
 
-Rule for managing the complete development lifecycle including task tracking, testing, and version control.
+Rule for capturing, organizing, refining, and applying knowledge throughout the project lifecycle.
 
 <rule>
-name: development_workflow_system
+name: knowledge_management
 filters:
-  # Task management filters
+  # Information tracking filters
   - type: event
-    pattern: "task_start"
+    pattern: "knowledge_capture"
+  - type: event
+    pattern: "file_create"
+  - type: event
+    pattern: "file_change"
+  - type: command
+    pattern: "learn"
+  - type: command
+    pattern: "document"
+  - type: event
+    pattern: "conversation_insight"
+  - type: file_change
+    pattern: ".cursor/docs/*"
+  
+  # Learning refinement filters
+  - type: event
+    pattern: "learning_create"
+  - type: event
+    pattern: "learning_update"
+  - type: file_change
+    pattern: ".cursor/learnings/*.md"
+  - type: command
+    pattern: "knowledge"
+  
+  # Actionable insights filters
+  - type: command
+    pattern: "insight"
+  - type: event
+    pattern: "implementation_complete"
   - type: event
     pattern: "task_complete"
-  - type: command
-    pattern: "task"
   - type: event
-    pattern: "user_request"
-  - type: event 
-    pattern: "implementation_complete"
-  
-  # Testing filters
-  - type: event
-    pattern: "implementation_start"
-  - type: command
-    pattern: "test"
+    pattern: "code_review"
   - type: file_change
     pattern: "src/*"
-  - type: file_change
-    pattern: "tests/*"
-  - type: event
-    pattern: "test_failure"
-  
-  # Git commit filters
-  - type: event
-    pattern: "build_success"
-  - type: event
-    pattern: "test_success"
-  - type: event
-    pattern: "file_save"
-  - type: file_change
-    pattern: "*"
-  
-  # README management filters
-  - type: command
-    pattern: "readme"
-  - type: file_change
-    pattern: "README.md"
 
 actions:
   #
-  # SECTION 1: TASK MANAGEMENT
+  # SECTION 1: KNOWLEDGE CAPTURE
   #
   
   - type: react
     conditions:
-      - pattern: "task create|task_start"
+      - pattern: "learn add|learning create"
     action: |
-      # Create a new development task
+      # Create a new learning entry
       
-      I'll create a new task with:
-      - Unique task ID (TASK-YYYY-MM-DD-NN format)
-      - Description section
-      - Relevant specifications section (linked to `.cursor/specs/` managed by the specification_management rule)
-      - Acceptance criteria section
-      - Metadata (ID, start date, end date, state)
-      - Learnings section for capturing implementation insights
+      I'll create a structured learning document with:
+      - Unique ID (format: LEARN-YYYY-MM-DD-NN)
+      - Title and short description
+      - Detailed description of the learning
+      - Relevant code files, tasks (managed by development_workflow_system), specifications (managed by specification_management), and documents
+      - Date of capture
+      - Keywords for easy retrieval
       
-      The task will be stored in `.cursor/tasks/` with an Open (📝) status
-      and added to the task index in `.cursor/TASKS.md`
+      The learning will be stored in `.cursor/learnings/` 
+      and indexed in `.cursor/LEARNINGS.md`
 
   - type: react
     conditions:
-      - pattern: "task done|task complete|task_complete"
+      - pattern: "document add|document create|document detect"
     action: |
-      # Mark a task as complete
+      # Register a document in the knowledge base
       
-      I'll update the specified task:
-      - Change state to Done (✅)
-      - Set end date to current date
-      - Extract learnings to a separate file if any exist
-      - Mark associated specs as completed
-      - Update the task index in `.cursor/TASKS.md`
+      I'll register the document by:
+      - Storing a copy in `.cursor/docs/` if it's not already there
+      - Creating a learning entry about this document
+      - Adding the document to the documents index
+      - Extracting key information from the document
+      - Creating cross-references to related content including specifications (managed by specification_management)
       
-      If the task contains valuable learnings, they'll be saved to 
-      `.cursor/learnings/` with proper cross-references and managed by the knowledge_management rule
+      This ensures all project documentation is centrally tracked
+      and discoverable.
 
   - type: react
-    conditions:
-      - pattern: "task list|task_status"
+    event: "conversation_insight"
     action: |
-      # List all tasks with their status
+      # Automatically capture important insights from our conversations
       
-      I'll generate a table showing:
-      - Task ID
-      - Current state (Open 📝, Active 🔄, or Done ✅)
-      - Task description
-      - Start date
-      - End date (if completed)
+      When I identify valuable insights in our conversation, I'll:
+      - Create a learning entry with the insight
+      - Generate a unique ID for the learning
+      - Categorize and tag the insight appropriately
+      - Add context and relevant connections to tasks (managed by development_workflow_system)
+      - Index the insight for future reference
       
-      This provides a quick overview of all project tasks and their progress
+      This ensures important information isn't lost.
 
   - type: react
+    event: "file_change"
     conditions:
-      - pattern: "task start|task_active"
+      - pattern: ".cursor/docs/.*"
     action: |
-      # Mark a task as active
+      # Automatically process new documents added to docs directory
       
-      I'll update the specified task:
-      - Change state from Open (📝) to Active (🔄)
-      - Update the task index in `.cursor/TASKS.md`
+      When a new document is added to `.cursor/docs/`, I'll:
+      - Extract key information from the document
+      - Create a learning entry linked to this document
+      - Update the documents index
+      - Identify related content including specifications (managed by specification_management)
+      - Generate appropriate metadata
       
-      This indicates work has started on this task
-
-  - type: react
-    event: "user_request"
-    conditions:
-      - pattern: "implement|create|build|develop"
-    action: |
-      # Auto-create task when user requests implementation
-      
-      When you ask me to implement something, I'll automatically:
-      - Create a new task with the implementation request as description
-      - Look for related specifications to link to the task (using the specification_management rule)
-      - Set the task state to Active (🔄)
-      - Add acceptance criteria
-      - Create a unique task ID
-      - Add the task to the task index
-      
-      This ensures all implementation work is properly tracked
+      This ensures all documentation is properly integrated into
+      the knowledge base.
   
   #
-  # SECTION 2: TESTING MANAGEMENT
+  # SECTION 2: KNOWLEDGE ORGANIZATION & REFINEMENT
   #
   
   - type: react
-    event: "implementation_start"
+    conditions:
+      - pattern: "learn categorize|learning categorize"
     action: |
-      # Create test files when implementation begins
+      # Categorize and organize learnings
       
-      When implementation starts, I'll:
+      I'll organize all learnings into meaningful categories:
       
-      1. Find the active task and its associated specifications
-      2. For each specification, create appropriate test files:
-         - Detect the project type (Node.js, Python, Rust, etc.)
-         - Create test files in the proper location and format
-         - Link tests to the specification requirements
-         - Add placeholder tests for each requirement
-         - Include references to the specs and task
+      1. Analyze all learning content to identify topics and themes
+      2. Categorize learnings into domains like:
+         - Architecture, Performance, Security, DevOps
+         - UX, API, Database, Testing
+         - Frontend, Backend, Mobile, Tooling
+         - Process, Bugs, Documentation
+      3. Create category files in `.cursor/learning_categories/`
+      4. Generate a categories index with links to all categorized learnings
+      5. Identify uncategorized learnings for further review
       
-      3. Consider project-specific testing patterns:
-         - Use Jest for JavaScript/TypeScript
-         - Use pytest for Python
-         - Use Cargo test for Rust
-         - Use JUnit for Java
-      
-      This ensures tests are created before implementation, supporting 
-      test-driven development.
+      This makes knowledge more discoverable by organizing it into logical domains.
 
   - type: react
     conditions:
-      - pattern: "test run|test execute"
+      - pattern: "learn refine:(.*)"
     action: |
-      # Run tests based on project type
+      # Refine a specific learning to enhance its value
       
-      I'll execute tests for the project:
+      I'll refine the specified learning by:
       
-      1. Detect the project type:
-         - Node.js (package.json) → npm test
-         - Rust (Cargo.toml) → cargo test
-         - Java (pom.xml) → mvn test
-         - Python (requirements.txt/setup.py) → pytest or unittest
+      1. Extracting the core learning ID from the command
+      2. Creating an enhanced version with additional sections:
+         - Keywords extracted from content
+         - Key takeaways for quick reference
+         - Potential applications of this knowledge
+         - Related learnings on similar topics
+         - Improved formatting and organization
+      3. Preserving all original content while adding refinements
+      4. Adding a "Last Refined" date
       
-      2. Process test results:
-         - If tests pass, update active task to reflect passing tests
-         - If tests fail, create detailed failure report
-         - Trigger appropriate success/failure events
-      
+      This refinement process transforms basic learnings into comprehensive 
+      knowledge assets.
+
+  - type: react
+    conditions:
+      - pattern: "learn extract|knowledge extract"
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
