@@ -1,99 +1,208 @@
 ---
 trigger: always_on
-description: How to add new cursor rules to the project
+description: Git conventions and workflow guidelines using Conventional Commits
 ---
 
-# Cursor Rules Location
+# Git Conventions and Workflow Guidelines 🔄
 
-How to add new cursor rules to the project
+## Language Requirements
 
-1. Always place rule files in PROJECT_ROOT/.cursor/rules/:
-    ```
-    .cursor/rules/
-    ├── your-rule-name.mdc
-    ├── another-rule.mdc
-    └── ...
-    ```
+All git-related text MUST be written in English:
+- Commit messages
+- Branch names
+- Pull request titles and descriptions
+- Code review comments
+- Issue titles and descriptions
 
-2. Follow the naming convention:
-    - Use kebab-case for filenames
-    - Always use .mdc extension
-    - Make names descriptive of the rule's purpose
+## Commit Message Format
 
-3. Directory structure:
-    ```
-    PROJECT_ROOT/
-    ├── .cursor/
-    │   └── rules/
-    │       ├── your-rule-name.mdc
-    │       └── ...
-    └── ...
-    ```
-
-4. Never place rule files:
-    - In the project root
-    - In subdirectories outside .cursor/rules
-    - In any other location
-
-5. Cursor rules have the following structure:
+All commit messages MUST follow the [Conventional Commits](mdc:https:/www.conventionalcommits.org) specification:
 
 ```
----
-description: Short description of the rule's purpose
-globs: optional/path/pattern/**/* 
-alwaysApply: false
----
-# Rule Title
+<type>[optional scope]: <description>
 
-Main content explaining the rule with markdown formatting.
+[optional body]
 
-1. Step-by-step instructions
-2. Code examples
-3. Guidelines
-
-Example:
-```typescript
-// Good example
-function goodExample() {
-  // Implementation following guidelines
-}
-
-// Bad example
-function badExample() {
-  // Implementation not following guidelines
-}
+[optional footer(s)]
 ```
 
-6. Rule Types and Properties:
+### Types
 
-The rule properties (description, globs, alwaysApply) must be filled according to how the rule will be added to the chat context. Only one of these properties should have a valid/defined value at a time (note that false in alwaysApply is considered empty as it's the default value).
+- `feat`: A new feature
+- `fix`: A bug fix
+- `docs`: Documentation only changes
+- `style`: Changes that do not affect the meaning of the code (formatting, etc)
+- `refactor`: A code change that neither fixes a bug nor adds a feature
+- `perf`: A code change that improves performance
+- `test`: Adding missing tests or correcting existing tests
+- `chore`: Changes to the build process or auxiliary tools
+- `ci`: Changes to CI configuration files and scripts
 
-Types of rules:
+### Scope
+The scope should be the name of the component affected (as perceived by the person reading the changelog).
 
-a) Always Rules:
-   - Set `alwaysApply: true`
-   - Leave `description` and `globs` empty
-   - These rules are automatically added to every chat context
+Examples:
+- `feat(auth): add login with Google`
+- `fix(api): handle null response from server`
+- `docs(readme): update installation steps`
 
-b) Auto Attached Rules:
-   - Set `globs` with a pattern matching the files to be modified
-   - Leave `description` and `alwaysApply` with default values
-   - These rules are automatically added when working with files matching the glob pattern
+### Description
+- Use the imperative, present tense: "change" not "changed" nor "changes"
+- Don't capitalize first letter
+- No dot (.) at the end
+- Write in english
 
-c) Agent Requested Rules:
-   - Set `description` with a clear purpose of the rule
-   - Leave `globs` and `alwaysApply` with default values
-   - These rules are added when the AI agent recognizes their relevance based on the description
+## Branch Naming Convention
 
-d) Manual Rules:
-   - Leave all properties with default values
-   - These rules are only added when manually requested by the user
-   - Properties should be:
-     ```
-     description: 
-     globs: 
-     alwaysApply: false
-     ```
+Branches should follow this pattern:
+```
+<type>/<short-description>
+```
+
+For features and fixes that are tracked in a project management system, include the ticket number:
+```
+<type>/<ticket-number>-<short-description>
+```
+
+Examples:
+- `feat/add-google-auth`
+- `fix/handle-null-responses`
+- `docs/update-readme`
+- `feat/PROJ-123-add-google-auth`
+- `fix/PROJ-456-handle-null-responses`
+
+## Workflow Guidelines
+
+1. **Protected Branches**
+   - `main` (or `master`): Production-ready code, protected branch
+   - Direct commits to protected branches are NOT allowed
+   - All changes must come through Pull Requests
+
+2. **Feature Development**
+   ```bash
+   # First, check if you're on a protected branch
+   git branch --show-current
+   
+   # If on main/master, create and checkout a new feature branch
+   git checkout -b feat/my-new-feature main
+   
+   # Make changes and commit
+   git add .
+   git commit -m "feat(scope): add new feature"
+   
+   # Keep branch updated with main
+   git fetch origin main
+   git rebase origin/main
+   
+   # Push changes
+   git push origin feat/my-new-feature
+   ```
+
+3. **Pull Request Process**
+   - Create PR from feature branch to main/master
+   - Use PR template if available
+   - Request at least 2 code reviews
+   - All tests must pass
+   - No merge conflicts
+   - Squash commits when merging
+
+4. **Release Process**
+   ```bash
+   # Create release branch from main
+   git checkout main
+   git pull origin main
+   git checkout -b release/v1.0.0
+   
+   # After testing, merge back to main via PR
+   # After PR is approved and merged:
+   git checkout main
+   git pull origin main
+   git tag -a v1.0.0 -m "version 1.0.0"
+   git push origin main --tags
+   ```
+
+## Examples
+
+✅ Good Commits:
+```bash
+feat(auth): implement JWT authentication
+fix(api): handle edge case in user validation
+docs(api): update API documentation
+style(components): format according to style guide
+refactor(database): optimize query performance
+test(auth): add unit tests for login flow
+```
+
+❌ Bad Commits:
+```bash
+Fixed stuff
+Updated code
+WIP
+Quick fix
+```
+
+## Pre-commit Hooks
+
+Consider using pre-commit hooks to enforce these conventions:
+- Commit message format validation
+- Code linting
+- Test execution
+- Branch naming validation
+- Protected branch validation
+
+## Using MCP Git in Cursor 🤖
+
+The Model Context Protocol (MCP) Git integration allows you to perform Git operations directly from Cursor while following our commit conventions.
+
+> **Important**: For proper path handling in MCP Git operations, please refer to the `mcp-git-path-encoding.mdc` rule file. This ensures consistent path handling across different platforms and prevents encoding issues.
+
+### Basic MCP Git Commands
+
+1. **Check Current Branch and Create Feature Branch if Needed**
+   ```python
+   # First check current branch
+   mcp_git_git_status(repo_path=".")
+   
+   # If on main/master, create and switch to feature branch
+   mcp_git_git_create_branch(
+       repo_path=".",
+       branch_name="feat/my-new-feature",
+       base_branch="main"
+   )
+   mcp_git_git_checkout(
+       repo_path=".",
+       branch_name="feat/my-new-feature"
+   )
+   ```
+
+2. **Viewing Changes**
+   ```python
+   # View unstaged changes
+   mcp_git_git_diff_unstaged(repo_path=".")
+   
+   # View staged changes
+   mcp_git_git_diff_staged(repo_path=".")
+   ```
+
+3. **Making Commits**
+   ```python
+   # First ensure you're not on a protected branch
+   status = mcp_git_git_status(repo_path=".")
+   if "main" in status or "master" in status:
+       # Create feature branch first
+       branch_name = "feat/my-feature"
+       mcp_git_git_create_branch(
+           repo_path=".",
+           branch_name=branch_name,
+           base_branch="main"
+       )
+       mcp_git_git_checkout(repo_path=".", branch_name=branch_name)
+   
+   # Then stage and commit
+   mcp_git_git_add(repo_path=".", files=["path/to/file"])
+   mcp_git_git_commit(
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [gifflet/cursor-like-pro](https://github.com/gifflet/cursor-like-pro) — distributed by [TomeVault](https://tomevault.io).
