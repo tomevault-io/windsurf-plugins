@@ -1,254 +1,111 @@
 ---
 trigger: always_on
-description: CodeSpirit 安全规范 - 权限系统、审计实体、多租户隔离、数据保护
+description: CodeSpirit 服务类开发规范 - 服务接口、实现、生命周期和依赖注入
 ---
 
 
-# 安全规范
+# 服务（Service）类规则
 
-> 📖 控制器级别的安全特性（`[Authorize]`、`[AllowAnonymous]`、`[NoAudit]`、`[Audit]`）参见 [controller.mdc](mdc:.cursor/rules/controller.mdc)
+## 基本要求
 
-## 权限系统架构
+1. 确保服务类实现正确的接口和基类
+2. 添加构造函数注释和 XML 文档注释
+3. 服务类必须实现 [BaseCRUDIService.cs](mdc:Src/CodeSpirit.Shared/Services/BaseCRUDIService.cs) 或 [BaseCRUDService.cs](mdc:Src/CodeSpirit.Shared/Services/BaseCRUDService.cs)，应实现常见的查询逻辑
+4. 服务接口必须实现 [IBaseCRUDIService.cs](mdc:Src/CodeSpirit.Shared/Services/IBaseCRUDIService.cs) 或 [IBaseCRUDService.cs](mdc:Src/CodeSpirit.Shared/Services/IBaseCRUDService.cs)
+5. 服务类必须实现生命周期标记接口（IScopedDependency / ITransientDependency / ISingletonDependency）
 
-### 权限代码格式
-
-权限代码由系统自动生成，格式为：`{module}_{controller}_{action}`
-
-```
-exam_questions_getList         // 考试模块-题目控制器-获取列表
-identity_users_create          // 身份模块-用户控制器-创建
-```
-
-### PermissionAttribute 特性
-
-用于自定义权限名称、描述和继承关系：
+## 服务类示例
 
 ```csharp
-using CodeSpirit.Core.Attributes;
-
-[HttpPut("{id}")]
-[Permission(
-    Name = "exam_questions_update",        // 自定义权限代码
-    DisplayName = "更新题目",               // 显示名称
-    Description = "允许更新题目内容",        // 权限描述
-    Parent = "exam_questions",              // 父级权限
-    AllowInheritedPermissions = new[] { "exam_questions_manage" }  // 继承权限
-)]
-[DisplayName("更新题目")]
-public async Task<ActionResult<ApiResponse<QuestionDto>>> Update(
-    long id, [FromBody] UpdateQuestionDto dto)
+/// <summary>
+/// 用户服务接口
+/// </summary>
+public interface IUserService : IBaseCRUDService<User, long, CreateUserDto, UpdateUserDto, UserQueryDto>
 {
-    // 拥有 exam_questions_manage 权限的用户也可以执行此操作
+    /// <summary>
+    /// 根据用户名获取用户
+    /// </summary>
+    /// <param name="username">用户名</param>
+    /// <returns>用户信息</returns>
+    Task<UserDto> GetByUsernameAsync(string username);
 }
-```
 
-### 权限继承机制
-
-`AllowInheritedPermissions` 允许配置权限继承，用户拥有任一继承权限时可访问当前接口：
-
-```csharp
-// 方法级别继承
-[Permission(AllowInheritedPermissions = new[] { "Question.Manage", "Question.Admin" })]
-public async Task<ActionResult> UpdateQuestion(long id) { }
-```
-
-### IHasPermissionService
-
-服务层权限检查：
-
-```csharp
-public class QuestionService : IScopedDependency
+/// <summary>
+/// 用户服务实现
+/// </summary>
+public class UserService : BaseCRUDService<User, long, CreateUserDto, UpdateUserDto, UserQueryDto>, 
+    IUserService, IScopedDependency
 {
-    private readonly IHasPermissionService _permissionService;
-
-    public QuestionService(IHasPermissionService permissionService)
+    /// <summary>
+    /// 初始化用户服务
+    /// </summary>
+    /// <param name="repository">用户仓储</param>
+    /// <param name="mapper">对象映射器</param>
+    public UserService(IRepository<User> repository, IMapper mapper) 
+        : base(repository, mapper)
     {
-        _permissionService = permissionService;
-    }
-
-    public async Task<bool> CanManageQuestionAsync()
-    {
-        // 检查用户是否拥有指定权限
-        return _permissionService.HasPermission("exam_questions_manage");
     }
     
-    public async Task<bool> CanAccessModuleAsync()
+    public async Task<UserDto> GetByUsernameAsync(string username)
     {
-        // 检查导航权限（仅检查一二级权限）
-        return _permissionService.HasNavigationPermission("exam_questions");
+        // 实现逻辑
     }
 }
 ```
 
-## 审计实体
+## 生命周期选择
 
-### AuditableEntityBase
+- **IScopedDependency**: Scoped 生命周期（推荐大多数业务服务）
+- **ITransientDependency**: Transient 生命周期（推荐无状态工具类）
+- **ISingletonDependency**: Singleton 生命周期（推荐配置和缓存服务）
 
-实体继承 `AuditableEntityBase<TKey>` 自动记录审计信息：
+## 设置服务最佳实践
+
+使用 `ISettingsService` 时，推荐使用 `[SettingsDto]` 特性简化 API 调用：
 
 ```csharp
-using CodeSpirit.Shared.Entities;
+// 1. 定义设置 DTO 并添加特性
+using CodeSpirit.Settings.Attributes;
 
-public class Question : AuditableEntityBase<long>, IMultiTenant
+[SettingsDto("ThirdPartyLogin", "WeChat")]
+public class WeChatLoginSettingsDto
 {
-    // 自动记录以下字段（由框架自动填充）：
-    // - CreatedBy (long)      创建人ID
-    // - CreatedAt (DateTime)  创建时间
-    // - UpdatedBy (long?)     更新人ID
-    // - UpdatedAt (DateTime?) 更新时间
-    // - IsDeleted (bool)      软删除标记
-    // - DeletedBy (long?)     删除人ID
-    // - DeletedAt (DateTime?) 删除时间
+    public string AppId { get; set; } = string.Empty;
+    public string AppSecret { get; set; } = string.Empty;
+}
+
+// 2. 在服务中使用简化 API（无需手动传入 module/key）
+public class AuthService : IScopedDependency
+{
+    private readonly ISettingsService _settingsService;
     
-    public string Content { get; set; } = string.Empty;
-    public string TenantId { get; set; } = string.Empty;  // 多租户支持
-}
-```
-
-### 实体审计接口
-
-| 接口 | 说明 | 包含字段 |
-|-----|------|---------|
-| `ICreatable` | 创建审计 | `CreatedBy`, `CreatedAt` |
-| `IUpdatable` | 更新审计 | `UpdatedBy`, `UpdatedAt` |
-| `ISoftDelete` | 软删除 | `IsDeleted`, `DeletedBy`, `DeletedAt` |
-| `IFullAuditable` | 完整审计 | 以上全部 |
-
-## 多租户数据隔离
-
-### IMultiTenant 接口
-
-实体实现 `IMultiTenant` 接口，自动应用租户数据过滤：
-
-```csharp
-using CodeSpirit.Core;
-
-public class Question : AuditableEntityBase<long>, IMultiTenant
-{
-    public string TenantId { get; set; } = string.Empty;  // 注意：类型为 string
-    public string Content { get; set; } = string.Empty;
-}
-```
-
-### 租户过滤行为
-
-```csharp
-// 查询时自动应用租户过滤器，无需手动添加 Where 条件
-public async Task<List<QuestionDto>> GetListAsync()
-{
-    var entities = await _dbContext.Questions
-        .ToListAsync();  // ✅ 自动过滤当前租户的数据
-    return _mapper.Map<List<QuestionDto>>(entities);
-}
-
-// ❌ 禁止：手动添加租户过滤（除非明确需要跨租户查询）
-public async Task<List<QuestionDto>> GetListAsync()
-{
-    var entities = await _dbContext.Questions
-        .Where(q => q.TenantId == _currentTenant.Id)  // 不需要
-        .ToListAsync();
-}
-```
-
-## 数据保护
-
-### 排除敏感字段
-
-DTO 中排除不应返回给客户端的字段：
-
-```csharp
-using Newtonsoft.Json;
-using CodeSpirit.Amis.Attributes.Columns;
-
-public class UserDto
-{
-    public long Id { get; set; }
-    public string Username { get; set; } = string.Empty;
+    public async Task<WeChatLoginSettingsDto> GetWeChatConfigAsync(string tenantId)
+    {
+        // 简化版 API：自动从 DTO 特性获取 module/key
+        return await _settingsService.GetTenantSettingAsync<WeChatLoginSettingsDto>(tenantId) 
+            ?? new WeChatLoginSettingsDto();
+    }
     
-    [JsonIgnore]  // 不在 API 响应中返回
-    public string PasswordHash { get; set; } = string.Empty;
-    
-    [IgnoreColumn]  // 不在列表表格中显示
-    public string InternalNote { get; set; } = string.Empty;
+    public async Task SaveWeChatConfigAsync(WeChatLoginSettingsDto dto, string tenantId)
+    {
+        // 简化版 API：自动从 DTO 特性获取 module/key
+        await _settingsService.SetTenantSettingAsync(dto, tenantId, "更新微信配置");
+    }
 }
 ```
 
-### 密码安全存储
+**优势：**
+- 类型安全，编译时检查
+- 避免模块名/配置键字符串不一致
+- 配置键集中管理，修改只需改一处
+- 反射结果自动缓存，性能优化
 
-密码必须使用哈希存储，禁止明文：
+## 参考文件
 
-```csharp
-// ✅ 正确：存储密码哈希
-user.PasswordHash = _passwordHasher.HashPassword(user, password);
-
-// ❌ 禁止：明文存储密码
-user.Password = password;
-```
-
-## SQL 注入防护
-
-使用 EF Core 参数化查询（默认安全）：
-
-```csharp
-// ✅ 安全：EF Core 自动参数化
-public async Task<Question?> GetByCodeAsync(string code)
-{
-    return await _dbContext.Questions
-        .FirstOrDefaultAsync(q => q.Code == code);
-}
-
-// ✅ 安全：使用参数化 SQL
-public async Task<List<Question>> SearchAsync(string keyword)
-{
-    return await _dbContext.Questions
-        .FromSqlInterpolated($"SELECT * FROM Questions WHERE Content LIKE {$"%{keyword}%"}")
-        .ToListAsync();
-}
-
-// ❌ 危险：字符串拼接（禁止）
-public async Task<Question?> GetByCodeAsync(string code)
-{
-    var sql = $"SELECT * FROM Questions WHERE Code = '{code}'";  // SQL 注入风险！
-    return await _dbContext.Questions.FromSqlRaw(sql).FirstOrDefaultAsync();
-}
-```
-
-## 日志安全
-
-### 敏感信息脱敏
-
-日志中禁止记录敏感信息：
-
-```csharp
-// ✅ 安全：只记录必要信息
-_logger.LogInformation("用户登录: {Username}, IP: {IpAddress}", 
-    username, 
-    ipAddress);
-
-// ✅ 安全：使用脱敏字符串
-_logger.LogInformation("API密钥验证: {MaskedKey}", 
-    $"{apiKey[..4]}****{apiKey[^4..]}");
-
-// ❌ 危险：记录密码（禁止）
-_logger.LogInformation("用户登录: {Username}, Password: {Password}", 
-    username, password);
-
-// ❌ 危险：记录完整 Token（禁止）
-_logger.LogInformation("Token: {Token}", token);
-```
-
-### 异常日志处理
-
-```csharp
-try
-{
-    await _service.ProcessAsync(data);
-}
-catch (Exception ex)
-{
-    // ✅ 记录异常但不暴露敏感上下文
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- 服务基类: [BaseCRUDService.cs](mdc:Src/CodeSpirit.Shared/Services/BaseCRUDService.cs)
+- 服务接口: [IBaseCRUDService.cs](mdc:Src/CodeSpirit.Shared/Services/IBaseCRUDService.cs)
+- 依赖注入规范: [dependency-injection.mdc](mdc:.cursor/rules/dependency-injection.mdc)
+- 设置组件文档: [codespirit-settings-guide-zh-CN.md](mdc:Docs/03-Core-Components/codespirit-settings-guide-zh-CN.md)
 
 ---
 > Source: [xin-lai/CodeSpirit](https://github.com/xin-lai/CodeSpirit) — distributed by [TomeVault](https://tomevault.io).
