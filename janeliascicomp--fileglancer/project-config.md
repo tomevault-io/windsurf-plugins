@@ -1,0 +1,193 @@
+---
+trigger: always_on
+description: This file provides guidance for working with the Fileglancer codebase.
+---
+
+# CLAUDE.md - Fileglancer Development Guide
+
+This file provides guidance for working with the Fileglancer codebase.
+
+## Critical Rule: Always Use Pixi
+
+**NEVER use system tools directly.** Always run commands through pixi:
+
+```bash
+# WRONG - Never do this
+npm install
+pytest
+npx playwright install
+
+# CORRECT - Always use pixi
+pixi run node-install
+pixi run test-backend
+cd frontend/ui-tests && pixi run npx playwright install
+```
+
+Pixi manages all dependencies (Python, Node.js, npm packages) in isolated environments. Using system tools bypasses this and can cause version conflicts.
+
+## Project Overview
+
+Fileglancer is a web application for browsing, sharing, and managing scientific imaging data using OME-NGFF (OME-Zarr). It has:
+
+- **Backend**: FastAPI (Python) - located in `fileglancer/`
+- **Frontend**: React/TypeScript with Vite - located in `frontend/`
+- **UI Tests**: Playwright E2E tests - located in `frontend/ui-tests/`
+
+## Quick Start
+
+```bash
+# Initial setup (builds frontend, installs Python package)
+pixi run dev-install
+
+# Start development server (port 7878, auto-reloads on backend changes)
+pixi run dev-launch
+
+# In another terminal, watch frontend for changes
+pixi run dev-watch
+```
+
+View the app at http://localhost:7878
+
+## Available Pixi Tasks
+
+### Development
+
+| Command | Description |
+|---------|-------------|
+| `pixi run dev-install` | Build frontend and install Python package |
+| `pixi run dev-launch` | Start dev server on port 7878 with auto-reload |
+| `pixi run dev-watch` | Watch frontend for changes and rebuild |
+| `pixi run node-install` | Install frontend npm dependencies |
+| `pixi run node-build` | Build frontend |
+| `pixi run pip-install` | Reinstall Python package |
+
+### Testing
+
+| Command | Description |
+|---------|-------------|
+| `pixi run -e test test-backend` | Run backend tests with pytest and coverage |
+| `pixi run test-frontend` | Run frontend unit tests with Vitest |
+| `pixi run test-ui` | Run Playwright E2E tests |
+| `pixi run test-ui -- --ui --debug` | Run E2E tests in debug UI mode |
+| `pixi run test-ui -- tests/specific.spec.ts` | Run specific E2E test file |
+| `pixi run test-ui -- -g "test description"` | Run E2E tests matching description |
+
+### Code Quality
+
+| Command | Description |
+|---------|-------------|
+| `pixi run node-check` | TypeScript type checking |
+| `pixi run node-eslint-check` | Check ESLint rules |
+| `pixi run node-eslint-write` | Fix ESLint issues |
+| `pixi run node-prettier-check` | Check Prettier formatting |
+| `pixi run node-prettier-write` | Fix Prettier formatting |
+
+### Database
+
+| Command | Description |
+|---------|-------------|
+| `pixi run migrate` | Run database migrations |
+| `pixi run migrate-create` | Create new migration |
+
+### Storybook
+
+| Command | Description |
+|---------|-------------|
+| `pixi run storybook` | Start Storybook dev server on port 6006 |
+| `pixi run storybook-build` | Build static Storybook site |
+
+### Container Development
+
+| Command | Description |
+|---------|-------------|
+| `pixi run container-rebuild` | Build/rebuild devcontainer |
+| `pixi run container-shell` | Open shell in container |
+| `pixi run container-claude` | Run Claude Code in container |
+
+## Testing
+
+### Backend Tests
+
+```bash
+pixi run -e test test-backend
+```
+
+Tests are in `tests/` directory. Uses pytest with coverage reporting.
+
+### Frontend Unit Tests
+
+```bash
+pixi run test-frontend
+```
+
+Tests are in `frontend/src/__tests__/`. Uses Vitest with React Testing Library.
+
+### UI Integration Tests (Playwright)
+
+First-time setup - install Playwright browsers:
+
+```bash
+pixi run node-install-ui-tests
+cd frontend/ui-tests && pixi run npx playwright install
+```
+
+Run tests:
+
+```bash
+pixi run test-ui
+```
+
+Tests are in `frontend/ui-tests/tests/`. The test server runs on port 7879.
+
+## Project Structure
+
+```
+fileglancer/
+├── fileglancer/           # Backend Python package
+│   ├── app.py            # FastAPI application
+│   ├── database.py       # SQLAlchemy models and queries
+│   ├── filestore.py      # File system operations
+│   ├── settings.py       # Configuration via pydantic-settings
+│   ├── model.py          # Pydantic models
+│   ├── auth.py           # Authentication
+│   ├── cli.py            # CLI commands
+│   └── alembic/          # Database migrations
+├── frontend/              # React/TypeScript frontend
+│   ├── src/
+│   │   ├── components/   # React components
+│   │   ├── contexts/     # React Context providers
+│   │   ├── queries/      # TanStack Query hooks
+│   │   ├── hooks/        # Custom React hooks
+│   │   ├── utils/        # Utility functions
+│   │   └── __tests__/    # Unit tests
+│   ├── ui-tests/         # Playwright E2E tests
+│   └── package.json
+├── tests/                 # Backend tests
+├── docs/                  # Documentation
+├── pyproject.toml         # Python config and pixi tasks
+└── pixi.lock             # Pixi lockfile
+```
+
+## Configuration
+
+Copy the template and customize:
+
+```bash
+cp docs/config.yaml.template config.yaml
+```
+
+Key settings:
+- `file_share_mounts`: Directories to expose (default: `~/`)
+- `db_url`: Database connection string
+- SSL certificates for HTTPS mode
+
+## Pixi Environments
+
+- `default`: Standard development
+- `test`: Includes test dependencies (pytest, coverage)
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [JaneliaSciComp/fileglancer](https://github.com/JaneliaSciComp/fileglancer) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-20 -->
