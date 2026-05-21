@@ -1,10 +1,10 @@
 ---
 trigger: always_on
-description: Keep files below 420 lines.
+description: No need to write tests.
 ---
 
 
-Keep files below 420 lines.
+No need to write tests.
 
 ---
 > Source: [dergigi/ants](https://github.com/dergigi/ants) — distributed by [TomeVault](https://tomevault.io).
