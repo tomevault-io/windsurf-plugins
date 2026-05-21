@@ -1,237 +1,168 @@
 ---
 trigger: always_on
-description: Core implementation rules and guidelines for Model Context Protocol
+description: Standards for implementing Mermaid diagram generation tools
 ---
 
 
-# MCP Core Implementation Rules
+# Mermaid Diagram Generator Standards
 
-## Client Implementation
+## Core Principles
 
-### Client Configuration
+### Diagram Architecture
+- Support multiple diagram types
+- Implement proper syntax validation
+- Enable customizable styling
+
+### Generation Flow
+- Validate input specifications
+- Support incremental generation
+- Implement proper error handling
+
+### Output Management
+- Generate valid Mermaid syntax
+- Support multiple output formats
+- Implement proper formatting
+
+## Code Standards
+
+### Generator Implementation
 ```typescript
-interface MCPClientConfig {
-  name: string;                 // Client identifier
-  version: string;             // Client version
-  capabilities?: Capabilities; // Optional capabilities
-  options?: {
-    timeout?: number;         // Default request timeout
-    retryPolicy?: RetryPolicy; // Retry configuration
-    maxConcurrent?: number;   // Max concurrent requests
-    logLevel?: LogLevel;      // Logging configuration
-  };
+// Good: Structured diagram generator
+class MermaidGenerator implements DiagramGenerator {
+    private validators: Map<DiagramType, Validator>;
+    private formatters: Map<DiagramType, Formatter>;
+
+    async generate(spec: DiagramSpec): Promise<string> {
+        await this.validateSpec(spec);
+        const diagram = await this.createDiagram(spec);
+        return this.formatOutput(diagram);
+    }
+
+    private async validateSpec(spec: DiagramSpec): Promise<void> {
+        const validator = this.validators.get(spec.type);
+        if (!validator) {
+            throw new ValidationError(`No validator for type: ${spec.type}`);
+        }
+        await validator.validate(spec);
+    }
 }
 
-interface RetryPolicy {
-  maxAttempts: number;
-  initialDelay: number;
-  maxDelay: number;
-  backoffFactor: number;
-  jitter?: boolean;
-}
-
-enum LogLevel {
-  DEBUG = 'debug',
-  INFO = 'info',
-  WARN = 'warn',
-  ERROR = 'error'
+// Bad: Unstructured generator
+class BadGenerator {
+    generate(input: any) { // ❌ No validation or typing
+        return this.createDiagram(input);
+    }
 }
 ```
 
-### Client Implementation
+### Syntax Management
 ```typescript
-class MCPClient {
-  private transport: Transport;
-  private handlers: Map<string, Handler>;
-  private capabilities: Capabilities;
-  private requestQueue: RequestQueue;
-  private logger: Logger;
-
-  constructor(config: MCPClientConfig) {
-    this.validateConfig(config);
-    this.setupCapabilities(config.capabilities);
-    this.initializeHandlers();
-    this.setupRequestQueue(config.options);
-    this.configureLogging(config.options?.logLevel);
-  }
-
-  private validateConfig(config: MCPClientConfig): void {
-    if (!config.name || !config.version) {
-      throw new Error('Client name and version are required');
+// Good: Proper syntax handling
+class SyntaxManager {
+    async validateSyntax(diagram: Diagram): Promise<void> {
+        const parser = this.getParser(diagram.type);
+        const ast = await parser.parse(diagram.content);
+        await this.validateAst(ast);
     }
-    if (config.capabilities) {
-      this.validateCapabilities(config.capabilities);
+
+    private async validateAst(ast: DiagramAST): Promise<void> {
+        const validator = new AstValidator(this.rules);
+        const issues = await validator.validate(ast);
+        if (issues.length > 0) {
+            throw new SyntaxError(this.formatIssues(issues));
+        }
     }
-  }
+}
 
-  private setupRequestQueue(options?: ClientOptions): void {
-    this.requestQueue = new RequestQueue({
-      maxConcurrent: options?.maxConcurrent ?? 10,
-      timeout: options?.timeout ?? 30000
-    });
-  }
-
-  async request<T>(
-    method: string,
-    params?: unknown,
-    options?: RequestOptions
-  ): Promise<T> {
-    const message = this.createRequestMessage(method, params);
-    return this.requestQueue.enqueue(
-      () => this.sendRequest<T>(message, options)
-    );
-  }
-
-  async notify(
-    method: string,
-    params?: unknown
-  ): Promise<void> {
-    const message = this.createNotificationMessage(method, params);
-    await this.transport.send(message);
-  }
+// Bad: Simple syntax check
+class BadSyntax {
+    check(content: string) { // ❌ No proper parsing
+        return content.includes('graph');
+    }
 }
 ```
 
-### Connection Management
+### Style Management
 ```typescript
-interface ConnectionOptions {
-  timeout?: number;
-  retryPolicy?: RetryPolicy;
-  onError?: (error: Error) => void;
-  onClose?: () => void;
-  heartbeat?: {
-    interval: number;
-    timeout: number;
-  };
+// Good: Structured style handling
+class StyleManager {
+    async applyStyles(diagram: Diagram, styles: Styles): Promise<Diagram> {
+        const validated = await this.validateStyles(styles);
+        const themed = await this.applyTheme(diagram, validated);
+        return this.optimizeStyles(themed);
+    }
+
+    private async validateStyles(styles: Styles): Promise<ValidatedStyles> {
+        const validator = new StyleValidator(this.themeRules);
+        return validator.validate(styles);
+    }
 }
 
-class ConnectionManager {
-  private retryCount: number = 0;
-  private heartbeatTimer?: NodeJS.Timer;
-  private reconnectTimer?: NodeJS.Timer;
-
-  async connect(
-    transport: Transport,
-    options?: ConnectionOptions
-  ): Promise<void> {
-    try {
-      await this.negotiateCapabilities();
-      await this.initializeConnection();
-      this.setupHeartbeat(options?.heartbeat);
-      this.resetRetryCount();
-    } catch (error) {
-      await this.handleConnectionError(error, options);
+// Bad: Direct style application
+class BadStyles {
+    apply(diagram: string, styles: any) { // ❌ No validation
+        return diagram + styles;
     }
-  }
+}
+```
 
-  private async handleConnectionError(
-    error: Error,
-    options?: ConnectionOptions
-  ): Promise<void> {
-    this.logger.error('Connection error:', error);
+## Validation Rules
+
+```typescript
+const MermaidRules = {
+    // Ensure proper diagram validation
+    diagramValidation: {
+        pattern: /validate.*Spec|validate.*Diagram/,
+        message: "Implement proper diagram validation"
+    },
     
-    if (this.shouldRetry(options?.retryPolicy)) {
-      await this.retryConnection(options);
-    } else {
-      this.handleFatalError(error);
+    // Check syntax handling
+    syntaxHandling: {
+        pattern: /class.*Syntax.*{.*parse|validate/,
+        message: "Implement proper syntax parsing and validation"
+    },
+    
+    // Verify style management
+    styleManagement: {
+        pattern: /validate.*Styles|apply.*Theme/,
+        message: "Implement proper style validation and theming"
     }
-  }
-
-  private setupHeartbeat(
-    config?: { interval: number; timeout: number }
-  ): void {
-    if (!config) return;
-
-    this.heartbeatTimer = setInterval(async () => {
-      try {
-        await this.sendHeartbeat();
-      } catch (error) {
-        this.handleHeartbeatFailure();
-      }
-    }, config.interval);
-  }
-}
+};
 ```
 
-## Message Handling
+## Best Practices
 
-### Message Format
-```typescript
-interface Message {
-  jsonrpc: "2.0";
-  id?: string | number;
-  method?: string;
-  params?: unknown;
-  result?: unknown;
-  error?: {
-    code: number;
-    message: string;
-    data?: unknown;
-  };
-}
+1. Diagram Design
+   - Clear structure definition
+   - Proper syntax validation
+   - Style consistency
 
-class MessageValidator {
-  static validate(message: unknown): message is Message {
-    if (!this.hasJsonRpcVersion(message)) {
-      return false;
-    }
+2. Generation Process
+   - Input validation
+   - Incremental building
+   - Error handling
 
-    if (this.isRequest(message)) {
-      return this.validateRequest(message);
-    }
+3. Output Management
+   - Format validation
+   - Style optimization
+   - Error reporting
 
-    if (this.isResponse(message)) {
-      return this.validateResponse(message);
-    }
+## Security Considerations
 
-    if (this.isNotification(message)) {
-      return this.validateNotification(message);
-    }
+1. Input Validation
+   - Syntax validation
+   - Size limits
+   - Content sanitization
 
-    return false;
-  }
-}
-```
+2. Processing Security
+   - Resource limits
+   - Timeout handling
+   - Memory management
 
-### Message Processing
-```typescript
-class MessageProcessor {
-  private handlers: Map<string, Handler>;
-  private pendingRequests: Map<string | number, PendingRequest>;
-
-  async processMessage(message: Message): Promise<void> {
-    try {
-      MessageValidator.validate(message);
-      
-      if (MessageValidator.isRequest(message)) {
-        await this.processRequest(message);
-      } else if (MessageValidator.isResponse(message)) {
-        await this.processResponse(message);
-      } else if (MessageValidator.isNotification(message)) {
-        await this.processNotification(message);
-      }
-    } catch (error) {
-      this.handleProcessingError(error, message);
-    }
-  }
-}
-```
-
-## Error Handling
-
-### Error Categories
-```typescript
-enum MCPErrorCode {
-  // Protocol Errors (-32768 to -32000)
-  ParseError = -32700,
-  InvalidRequest = -32600,
-  MethodNotFound = -32601,
-  InvalidParams = -32602,
-  InternalError = -32603,
-
-  // Implementation Errors (-32000 to -31000)
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+3. Output Protection
+   - Format validation
+   - Size verification
+   - Content escaping 
 
 ---
 > Source: [sparesparrow/cursor-rules](https://github.com/sparesparrow/cursor-rules) — distributed by [TomeVault](https://tomevault.io).
