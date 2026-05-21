@@ -1,120 +1,99 @@
 ---
 trigger: always_on
-description: Prefer to use shadcn/ui components rather creating your own.
+description: Guidelines and best practices for building Convex projects, including database schema design, queries, mutations, and real-world examples
 ---
 
- # shadcn Component Usage Guidelines
 
-## Description
-Prefer to use shadcn/ui components rather creating your own.
+# Convex guidelines
+## Function guidelines
+### New function syntax
+- ALWAYS use the new function syntax for Convex functions. For example:
+      ```typescript
+      import { query } from "./_generated/server";
+      import { v } from "convex/values";
+      export const f = query({
+          args: {},
+          returns: v.null(),
+          handler: async (ctx, args) => {
+          // Function body
+          },
+      });
+      ```
 
-This rule documents our standard patterns for using shadcn/ui components and finding additional components built on top of shadcn.
+### Http endpoint syntax
+- HTTP endpoints are defined in `convex/http.ts` and require an `httpAction` decorator. For example:
+      ```typescript
+      import { httpRouter } from "convex/server";
+      import { httpAction } from "./_generated/server";
+      const http = httpRouter();
+      http.route({
+          path: "/echo",
+          method: "POST",
+          handler: httpAction(async (ctx, req) => {
+          const body = await req.bytes();
+          return new Response(body, { status: 200 });
+          }),
+      });
+      ```
+- HTTP endpoints are always registered at the exact path you specify in the `path` field. For example, if you specify `/api/someRoute`, the endpoint will be registered at `/api/someRoute`.
 
-## Installation & Setup
+### Validators
+- Below is an example of an array validator:
+                            ```typescript
+                            import { mutation } from "./_generated/server";
+                            import { v } from "convex/values";
 
-### Installing Components
-Always use the shadcn CLI to add new components. This ensures proper installation with all dependencies:
+                            export default mutation({
+                            args: {
+                                simpleArray: v.array(v.union(v.string(), v.number())),
+                            },
+                            handler: async (ctx, args) => {
+                                //...
+                            },
+                            });
+                            ```
+- Below is an example of a schema with validators that codify a discriminated union type:
+                            ```typescript
+                            import { defineSchema, defineTable } from "convex/server";
+                            import { v } from "convex/values";
 
-```bash
-# Install a new component
-pnpm dlx shadcn@latest add <component-name>
+                            export default defineSchema({
+                                results: defineTable(
+                                    v.union(
+                                        v.object({
+                                            kind: v.literal("error"),
+                                            errorMessage: v.string(),
+                                        }),
+                                        v.object({
+                                            kind: v.literal("success"),
+                                            value: v.number(),
+                                        }),
+                                    ),
+                                )
+                            });
+                            ```
+- Always use the `v.null()` validator when returning a null value. Below is an example query that returns a null value:
+                                  ```typescript
+                                  import { query } from "./_generated/server";
+                                  import { v } from "convex/values";
 
-# Examples:
-pnpm dlx shadcn@latest add button
-pnpm dlx shadcn@latest add alert-dialog
-```
+                                  export const exampleQuery = query({
+                                    args: {},
+                                    returns: v.null(),
+                                    handler: async (ctx, args) => {
+                                        console.log("This query returns a null value");
+                                        return null;
+                                    },
+                                  });
+                                  ```
+- Here are the valid Convex types along with their respective validators:
+ Convex Type  | TS/JS type  |  Example Usage         | Validator for argument validation and schemas  | Notes                                                                                                                                                                                                 |
+| ----------- | ------------| -----------------------| -----------------------------------------------| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Id          | string      | `doc._id`              | `v.id(tableName)`                              |                                                                                                                                                                                                       |
+| Null        | null        | `null`                 | `v.null()`                                     | JavaScript's `undefined` is not a valid Convex value. Functions the return `undefined` or do not return will return `null` when called from a client. Use `null` instead.                             |
 
-## Core Components
-
-### Using shadcn/ui
-We use shadcn/ui as our primary component library. All basic UI components should come from shadcn/ui first.
-
-```typescript
-// Example of importing and using shadcn components
-import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-
-// Use them in your components
-<Card>
-  <Input placeholder="Enter text" />
-  <Button>Submit</Button>
-</Card>
-```
-
-## Extended Components
-
-### Finding Additional Components
-When we need more specialized components that aren't in the core shadcn/ui library:
-
-1. First check the [awesome-shadcn-ui repository](mdc:https:/github.com/birobirobiro/awesome-shadcn-ui) for existing solutions
-2. Look for components that:
-   - Are well-maintained
-   - Follow shadcn/ui patterns
-   - Have TypeScript support
-   - Are compatible with our tech stack
-
-### Popular Extended Components
-Some recommended extended components from the ecosystem:
-
-- For date/time: `date-time-picker-shadcn` or `date-range-picker-for-shadcn`
-- For forms: `auto-form` for zod-based form generation
-- For search: `async-select` with debounce search
-- For calendars: `big-calendar` or the basic calendar component
-
-## Best Practices
-
-1. **Installation & Updates**
-   - Always use `pnpm dlx shadcn@latest add` for installing components
-   - Check documentation for the latest installation commands
-   - Keep track of installed components in your project documentation
-
-2. **Consistency First**
-   - Always use shadcn/ui components when available
-   - Keep styling consistent with shadcn/ui patterns
-   - Use the same theming approach
-
-3. **Custom Components**
-   - When building custom components, follow shadcn/ui patterns
-   - Use the same styling variables and classes
-   - Maintain accessibility standards
-
-4. **Extended Components**
-   - Document any third-party components used
-   - Test thoroughly before integration
-   - Keep track of dependencies
-
-## Examples
-
-### Basic Usage
-```typescript
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-
-export function SearchForm() {
-  return (
-    <div className="flex gap-2">
-      <Input placeholder="Search..." />
-      <Button>Search</Button>
-    </div>
-  )
-}
-```
-
-### Extended Component Integration
-```typescript
-import { DatePicker } from "@/components/ui/date-picker"
-import { Button } from "@/components/ui/button"
-
-export function DateSelection() {
-  return (
-    <div className="space-y-2">
-      <DatePicker />
-      <Button>Confirm Date</Button>
-    </div>
-  )
-}
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/johnpolacek) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-10 -->
+> Source: [johnpolacek/vibecode.party.starter](https://github.com/johnpolacek/vibecode.party.starter) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-20 -->
