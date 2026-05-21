@@ -7,11 +7,11 @@ ARCHIVED: packages moved to https://github.com/jahands/workers-packages
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [monorepo-rocks/monorepo-rocks](https://github.com/monorepo-rocks/monorepo-rocks).
+Original source: `CLAUDE.md` in [monorepo-rocks/monorepo-rocks](https://github.com/monorepo-rocks/monorepo-rocks).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
