@@ -1,138 +1,133 @@
 ---
 trigger: always_on
-description: Master control file for Adaptive Memory Bank System
+description: High-level overview of the Adaptive Memory Bank System
 ---
 
-# 🔍 ADAPTIVE MEMORY-BASED ASSISTANT SYSTEM
+# ADAPTIVE MEMORY BANK SYSTEM OVERVIEW
 
-> **TL;DR:** I am an AI with memory that resets between sessions. I use a structured Memory Bank to maintain context. The system scales across four complexity levels from quick bug fixes to complex systems, adapting the process to match task requirements while maintaining essential documentation.
+> **TL;DR:** This system uses structured documentation as AI memory across sessions. It offers four complexity levels that scale from quick bug fixes to complex systems, adapting the process while maintaining documentation quality. Tasks.md serves as the single source of truth for task tracking.
 
-## 🚨 PLATFORM IDENTIFICATION - FIRST STEP
+## 🎯 SYSTEM PURPOSE
 
-Before proceeding with any task, identify the operating system:
+The Adaptive Memory Bank System creates persistent memory for AI assistants through structured documentation that scales based on task complexity. It addresses the fundamental limitation of LLMs forgetting context between interactions.
+
+## 🧠 CORE PRINCIPLES
+
+1. **Documentation as Memory** - Documentation is mission-critical infrastructure
+2. **Adaptive Process Scaling** - Process complexity matches task requirements
+3. **Single Source of Truth** - Tasks.md is the only place for task status tracking
+4. **Strategic Content Organization** - Balance between core files and detailed examples
+5. **Verification Steps** - Explicit checks prevent steps from being skipped
+6. **Reference Triggers** - Force documentation consultation at critical points
+7. **Processing Efficiency** - Optimized structure for LLM comprehension
+8. **Structured Creative Thinking** - Creative phases as dedicated thinking spaces for complex problem-solving
+
+## 📏 ADAPTIVE PROCESS LEVELS
+
+### Level 1: Quick Bug Fix
+- **Focus**: Simple errors, UI glitches, minor issues
+- **Process**: Streamlined with minimal documentation
+- **Task Updates**: 2-3 updates (start/end)
+- **Memory Bank Impact**: Targeted updates to relevant files
+
+### Level 2: Simple Enhancement
+- **Focus**: Small features, minor improvements
+- **Process**: Basic with essential documentation
+- **Task Updates**: 4-6 updates at key milestones
+- **Memory Bank Impact**: Updates to related files
+
+### Level 3: Intermediate Feature
+- **Focus**: Complete features, significant changes
+- **Process**: Standard with full section tracking
+- **Task Updates**: 8-12 updates at defined points
+- **Memory Bank Impact**: Comprehensive updates to most files
+
+### Level 4: Complex System
+- **Focus**: Major systems, architectural changes
+- **Process**: Full formal process with detailed checkpoints
+- **Task Updates**: 15+ updates with formal verification
+- **Memory Bank Impact**: Extensive updates to all files with cross-linking
+
+## 🎨 CREATIVE PHASE HANDLING
+
+For complex problem-solving, creative phases act as dedicated thinking spaces:
+
+1. **Problem Breakdown** - Break complex problems into component parts for systematic analysis
+2. **Option Exploration** - Consider multiple approaches with explicit pros/cons
+3. **Systematic Verification** - Verify each option against specific requirements and constraints
+4. **Checkpoint Process** - Use structured checkpoints to verify progress and compliance
+5. **Comprehensive Verification** - Perform explicit verification before concluding creative work
+
+Creative phase documentation scales with task complexity:
+- **Level 1**: Minimal creative exploration markers
+- **Level 2**: Basic creative phase structure
+- **Level 3-4**: Full structured thinking with verification checkpoints
+
+### Creative Phase Applications
+- **Algorithm Design**: Analyze complexity requirements, alternative approaches, edge cases
+- **UI/UX Design**: Explore layout options, information architecture, accessibility
+- **Architecture Planning**: Design component boundaries, communication patterns, security models
+
+See [creative-phase-examples.mdc](mdc:.cursor/rules/Extended%20Details/creative-phase-examples.mdc) for detailed examples.
+
+## 📏 RULE TYPES
+
+### 1️⃣ Always-Applied Rules
 ```
-### Platform Detection
-Current environment: [Windows/Mac/Linux]
-Command adaptations required: [Yes/No]
+---
+description: 
+globs: 
+alwaysApply: true
+---
 ```
+- Applied to every command regardless of context
+- Used for critical rules that must always be followed
+- Kept concise to minimize context window usage
+- Examples: main.mdc, verification-checklist-simplified.mdc
 
-## 🚨 CRITICAL FILE VERIFICATION - SECOND STEP
-
-Verify critical file types (NOT directories):
+### 2️⃣ Auto-Attached Rules
 ```
-### File Type Verification
-.cursorrules: [File exists/File missing/ERROR: Is a directory]
-memory-bank: [Directory exists/Directory missing]
-docs/archive: [Directory exists/Directory missing]
-tasks.md: [File exists/File missing]
-
-Creating any missing files (NOT directories):
+---
+description: 
+globs: "**/memory-bank/**", "**/.cursorrules"
+alwaysApply: false
+---
 ```
+- Applied when working with matching file patterns
+- Used for context-specific rules
+- Can be more detailed since only loaded when relevant
+- Examples: memory-bank.mdc, task-tracking.mdc
 
-## 🚨 ADAPTIVE COMPLEXITY LEVELS
+### 3️⃣ Agent-Requested Rules
+```
+---
+description: CRITICAL: Contains mandatory examples. DO NOT assume patterns without consulting.
+globs: "**/src/**"
+alwaysApply: false
+---
+```
+- Agent explicitly instructed to read these files
+- Used for detailed examples and verbose content
+- Helps manage context window by moving details out of main files
+- Examples: workflow-examples.mdc, command-examples.mdc, creative-phase-examples.mdc
 
-Match process complexity to task requirements:
+## 📁 DIRECTORY STRUCTURE
 
-1. **Level 1: Quick Bug Fix**
-   - Simple errors, UI glitches, minor issues
-   - Streamlined process with targeted documentation
-   - 2-3 task updates (start/fix/end)
-   - Focus: Fix the specific issue
+```
+.cursor/rules/
+├── main.mdc                      # Master file with references
+├── system-overview.mdc           # High-level system overview
+├── Core Implementation/          # Core protocol files
+├── Extended Details/             # Detailed examples
+└── Templates/                    # File templates
 
-2. **Level 2: Simple Enhancement**
-   - Small features, minor improvements
-   - Basic process with essential documentation
-   - 4-6 task updates at key milestones
-   - Focus: Clean implementation with clear documentation
-
-3. **Level 3: Intermediate Feature**
-   - Complete features, significant changes
-   - Standard process with full section tracking
-   - 8-12 task updates at defined points
-   - Focus: Comprehensive planning and documentation
-
-4. **Level 4: Complex System**
-   - Major systems, architectural changes
-   - Full formal process with detailed checkpoints
-   - 15+ task updates with formal verification
-   - Focus: Architectural integrity and complete documentation
-
-## 🚨 MISSION-CRITICAL ESSENTIALS
-
-1. **Memory Bank Files** - Create/update based on task complexity:
-   - `projectbrief.md` - Core requirements
-   - `productContext.md` - Project purpose
-   - `activeContext.md` - Current focus
-   - `systemPatterns.md` - Architecture
-   - `techContext.md` - Tech stack
-   - `progress.md` - Status & reflections
-   - `tasks.md` - SINGLE SOURCE OF TRUTH for all task tracking
-
-2. **Required Workflow** - Scales by complexity level:
-   ```
-   Level 1: INITIALIZATION → IMPLEMENTATION → DOCUMENTATION
-   
-   Level 2: INITIALIZATION → DOCUMENTATION SETUP → PLANNING → 
-           IMPLEMENTATION → REFLECTION → SIMPLE ARCHIVING
-   
-   Level 3-4: INITIALIZATION → DOCUMENTATION SETUP → TASK PLANNING → 
-             IMPLEMENTATION → REFLECTION → ARCHIVING
-   ```
-
-3. **Command Safety** - Execute commands ONE AT A TIME with platform awareness
-4. **Reference Consulting** - Scale depth based on task complexity
-5. **Real-Time Updates** - Update documentation at frequency appropriate to level
-
-## ⚡ QUICK REFERENCES
-
-| Critical Process | Reference Link | When to Consult |
-|------------------|----------------|-----------------|
-| Adaptive Workflow | [workflow.mdc](mdc:.cursor/rules/Core%20Implementation/workflow.mdc) | Start of any task |
-| Task Tracking | [task-tracking.mdc](mdc:.cursor/rules/Core%20Implementation/task-tracking.mdc) | When updating task status |
-| Memory Structure | [memory-bank.mdc](mdc:.cursor/rules/Core%20Implementation/memory-bank.mdc) | Before updating docs |
-| Command Safety | [command-execution.mdc](mdc:.cursor/rules/Core%20Implementation/command-execution.mdc) | Before running commands |
-| VAN Protocol | [van-protocol.mdc](mdc:.cursor/rules/Core%20Implementation/van-protocol.mdc) | When processing VAN command |
-| Complex Tasks | [verification-checklist.mdc](mdc:.cursor/rules/Core%20Implementation/verification-checklist.mdc) | For Level 3-4 tasks |
-| Creative Phases | [creative-phase-guidelines.mdc](mdc:.cursor/rules/Core%20Implementation/creative-phase-guidelines.mdc) | For creative work |
-| Creative Triggers | [creative-phase-triggers.mdc](mdc:.cursor/rules/Core%20Implementation/creative-phase-triggers.mdc) | When to enter creative phases |
-
-## 📝 LEVEL 1: QUICK BUG FIX WORKFLOW
-
-1. **STREAMLINED INITIALIZATION**
-   - Review directly relevant Memory Bank files
-   - State bug description and objective
-   - Identify platform (Windows/Mac/Linux)
-   ✓ Checkpoint: Is the issue clearly defined?
-
-2. **RAPID IMPLEMENTATION**
-   - Identify root cause through targeted investigation
-   - Execute commands one at a time
-   - Implement fix with minimal changes
-   - Verify the fix resolves the issue
-   ✓ Checkpoint: Does the fix work?
-
-3. **QUICK DOCUMENTATION**
-   - Document the issue and solution
-   - Update tasks.md with completion status
-   - Add brief implementation note to activeContext.md
-   ✓ Checkpoint: Is the solution documented?
-
-## 📝 LEVEL 2: SIMPLE ENHANCEMENT WORKFLOW
-
-1. **BASIC INITIALIZATION**
-   - Review relevant Memory Bank files
-   - State enhancement objective
-   - Identify platform
-   ✓ Checkpoint: Is the enhancement clear?
-
-2. **SIMPLE DOCUMENTATION SETUP**
-   - Update relevant Memory Bank files
-   - Create task entry in tasks.md
-   ✓ Checkpoint: Is the plan documented?
-
-3. **BASIC PLANNING**
-   - Create 3-5 step implementation plan
-   - Document in tasks.md with [ ] markers
+Project Root:
+├── memory-bank/                  # Documentation directory
+│   ├── projectbrief.md           # Requirements and goals
+│   ├── productContext.md         # Why this project exists
+│   ├── activeContext.md          # Current work focus
+│   ├── systemPatterns.md         # Architecture patterns
+│   ├── techContext.md            # Technologies used
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
