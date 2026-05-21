@@ -1,173 +1,274 @@
 ---
 trigger: always_on
-description: CodeSpirit 多语言国际化规范 - 资源文件、本地化、前后端多语言支持
+description: CodeSpirit JavaScript 开发规范 - AMIS集成、模块模式、API请求、Token管理
 ---
 
 
-# 多语言国际化规范
+# JavaScript 开发规范
 
-## 支持语言
-- **简体中文** (zh-CN) - 默认语言
-- **英文** (en)
+## 模块模式
 
-## 资源文件命名规范
+### IIFE 包装
 
-### 共享资源
-```
-CodeSpirit.Localization/Resources/
-  ├── SharedResources.cs              # 资源类
-  ├── Shared.resx                     # 中文（默认）
-  ├── Shared.en.resx                  # 英文
-  ├── Display.resx / Display.en.resx  # 显示文本资源
-  ├── Validation.resx / Validation.en.resx  # 验证消息资源
-```
+所有 JS 文件使用立即调用函数表达式（IIFE）包装，启用严格模式：
 
-### 服务特定资源
-```
-CodeSpirit.ExamApi/Resources/
-  ├── ExamDisplayResources.cs         # 资源类
-  ├── ExamDisplay.resx                # 中文（默认）
-  └── ExamDisplay.en.resx             # 英文
-```
-
-## 资源键命名规范
-- **通用**: `Common.{Key}` (如 `Common.Save`, `Common.Delete`)
-- **错误**: `Errors.{Key}` (如 `Errors.NotFound`, `Errors.InvalidInput`)
-- **验证**: `Validation.{Rule}` (如 `Validation.Required`, `Validation.StringLengthMax`)
-- **DTO描述**: `{EntityName}.{PropertyName}.Description` (如 `Question.Content.Description`)
-
-示例资源文件（Display.resx）：
-```xml
-<data name="Common.Save" xml:space="preserve">
-  <value>保存</value>
-</data>
-<data name="Common.Delete" xml:space="preserve">
-  <value>删除</value>
-</data>
-<data name="Question.Content.Description" xml:space="preserve">
-  <value>请输入题目的具体内容</value>
-</data>
-```
-
-## Controller 中使用本地化
-
-```csharp
-using CodeSpirit.Localization.Resources;
-using Microsoft.Extensions.Localization;
-
-public class QuestionsController : ApiControllerBase
-{
-    private readonly IStringLocalizer<SharedResources> _localizer;
+```javascript
+/**
+ * 模块说明
+ * @module ModuleName
+ */
+(function() {
+    'use strict';
     
-    public QuestionsController(IStringLocalizer<SharedResources> localizer)
-    {
-        _localizer = localizer;
-    }
+    // 模块代码
     
-    [HttpPost]
-    public async Task<ActionResult<ApiResponse>> Create(CreateQuestionDto dto)
-    {
-        await _service.CreateAsync(dto);
-        return SuccessResponse(message: _localizer["Common.Save"].Value);
+    // 导出到全局
+    window.ModuleName = {
+        // 公共 API
+    };
+})();
+```
+
+### 命名空间导出
+
+全局对象使用 `window` 命名空间导出：
+
+```javascript
+// ✅ 正确：使用 window 命名空间
+window.TokenManager = (function() {
+    'use strict';
+    
+    function getToken() { /* ... */ }
+    
+    return {
+        getToken,
+        setToken,
+        clearToken
+    };
+})();
+
+// ✅ 正确：使用 CodeSpirit 命名空间
+window.CodeSpirit = window.CodeSpirit || {};
+window.CodeSpirit.i18n = {
+    t: function(key, params) { /* ... */ }
+};
+
+// ✅ 正确：ES6 类导出
+class NotificationClient {
+    constructor(hubUrl = '/notification-hub') {
+        this.hubUrl = hubUrl;
     }
 }
+window.NotificationClient = NotificationClient;
 ```
 
-## DTO 验证特性多语言
+## 文档注释规范
 
-### Display 特性
-```csharp
-using CodeSpirit.Localization.Resources;
+### 文件头注释
 
-public class CreateQuestionDto
-{
-    [Display(Name = "Content", ResourceType = typeof(DisplayResources))]
-    [Required(ErrorMessageResourceType = typeof(ValidationResources), 
-             ErrorMessageResourceName = "Required")]
-    [StringLength(2000, 
-        ErrorMessageResourceType = typeof(ValidationResources),
-        ErrorMessageResourceName = "StringLengthMax")]
-    public string Content { get; set; } = string.Empty;
-    
-    [Display(Name = "Score", ResourceType = typeof(DisplayResources))]
-    [Range(0, 100, 
-        ErrorMessageResourceType = typeof(ValidationResources),
-        ErrorMessageResourceName = "Range")]
-    public decimal Score { get; set; }
+```javascript
+/**
+ * 考试系统API请求管理器
+ * 负责处理API地址转换和统一的请求处理
+ * @module ExamApiManager
+ * @version 2.0.0
+ * @author CodeSpirit Team
+ */
+```
+
+### 函数注释（JSDoc）
+
+```javascript
+/**
+ * 设置认证token
+ * @param {string} token - 访问token
+ * @param {number} [expiryInHours=24] - 过期时间（小时）
+ * @returns {void}
+ * @throws {Error} 当token为空时抛出错误
+ */
+function setToken(token, expiryInHours = 24) {
+    if (!token || typeof token !== 'string') {
+        throw new Error('Token must be a non-empty string');
+    }
+    // ...
+}
+
+/**
+ * 统一的API请求函数
+ * @param {string} url - API路径
+ * @param {Object} [options={}] - fetch选项
+ * @returns {Promise<Object>} API响应数据
+ * @example
+ * const data = await ExamApiManager.request('/exam/api/questions', { method: 'GET' });
+ */
+async function request(url, options = {}) {
+    // ...
 }
 ```
 
-### 描述信息多语言
-```csharp
-using CodeSpirit.Localization.Attributes;
+## AMIS 框架集成
 
-public class CreateQuestionDto
+### 主题配置
+
+项目使用 **antd** 主题 [[memory:8912919]]：
+
+```javascript
+// 初始化 AMIS
+let amisScoped = amis.embed('#root', amisJSON, {
+    location: history.location,
+    data: {},
+    context: {
+        WEB_HOST: webHost
+    }
+}, { 
+    theme: 'antd'  // 必须使用 antd 主题
+});
+```
+
+### 事件系统
+
+使用 `onEvent` 配置事件监听：
+
+```javascript
 {
-    [Display(Name = "Content", ResourceType = typeof(DisplayResources))]
-    [LocalizedDescription("Question.Content.Description", typeof(ExamDisplayResources))]
-    public string Content { get; set; } = string.Empty;
+    type: 'form',
+    api: '/identity/api/identity/auth/login',
+    onEvent: {
+        // 表单提交成功事件
+        submitSucc: {
+            actions: [
+                {
+                    actionType: 'custom',
+                    script: `
+                        const token = event.data.token;
+                        TokenManager.setToken(token, 24);
+                        window.location.href = '/';
+                    `
+                }
+            ]
+        },
+        // 数据初始化完成事件
+        fetchInited: {
+            actions: [
+                {
+                    actionType: 'custom',
+                    script: 'window.fetchUnreadNotificationCount();'
+                }
+            ]
+        }
+    }
 }
 ```
 
-## 本地化异常
+### 行为类型
 
-```csharp
-// 使用资源键
-throw new BusinessException("Errors.InvalidStartTime");
+优先使用 AMIS 内置行为类型（actionType）：
 
-// 带参数（使用占位符 {0}, {1}）
-throw new ValidationException("Errors.NotFound", resourceId);
-```
+```javascript
+// ✅ 核心行为
+{ actionType: 'ajax', api: 'POST:/api/submit' }
+{ actionType: 'link', link: '/dashboard' }
+{ actionType: 'dialog', dialog: { /* ... */ } }
+{ actionType: 'reload', target: 'crud' }
+{ actionType: 'copy', content: '${text}' }
 
-资源文件定义：
-```xml
-<data name="Errors.NotFound" xml:space="preserve">
-  <value>资源 {0} 未找到</value>
-</data>
-```
+// ✅ 表单行为
+{ actionType: 'submit' }
+{ actionType: 'reset' }
+{ actionType: 'clear' }
 
-## 枚举多语言
-```csharp
-public enum QuestionType
+// ✅ 自定义脚本（仅在必要时使用）
 {
-    [Display(Name = "SingleChoice", ResourceType = typeof(DisplayResources))]
-    SingleChoice = 1,
-    
-    [Display(Name = "MultipleChoice", ResourceType = typeof(DisplayResources))]
-    MultipleChoice = 2,
-    
-    [Display(Name = "TrueFalse", ResourceType = typeof(DisplayResources))]
-    TrueFalse = 3
+    actionType: 'custom',
+    script: `
+        const tenantId = event.data.tenantId;
+        window.location.href = '/' + tenantId + '/login';
+    `
 }
 ```
 
-资源文件：
-```xml
-<data name="SingleChoice" xml:space="preserve">
-  <value>单选题</value>
-</data>
-<data name="MultipleChoice" xml:space="preserve">
-  <value>多选题</value>
-</data>
+### 请求适配器
+
+使用 `requestAdaptor` 和 `adaptor` 处理请求和响应：
+
+```javascript
+api: {
+    method: 'post',
+    url: '/identity/api/identity/auth/login',
+    
+    // 请求适配器 - 添加认证头
+    requestAdaptor: function(api) {
+        const token = TokenManager.getToken();
+        api.headers = api.headers || {};
+        api.headers['Authorization'] = token ? 'Bearer ' + token : '';
+        api.headers['X-Forwarded-With'] = 'CodeSpirit';
+        api.headers['X-Tenant-Id'] = window.tenantId || 'system';
+        return api;
+    },
+    
+    // 响应适配器 - 处理响应数据
+    adaptor: function(payload, response, api) {
+        if (response.status === 401) {
+            window.location.href = '/login';
+            return { msg: '登录过期！' };
+        }
+        
+        if (payload.status === 0 && payload.data) {
+            TokenManager.setToken(payload.data.token, 24);
+        }
+        
+        return payload;
+    }
+}
 ```
 
-## 注意事项
+## Token 管理
 
-### 强制要求（必须遵守）
-- ✅ 所有面向用户的文本必须支持多语言
-- ✅ 资源文件必须同时提供中文和英文版本
-- ✅ 验证消息、异常消息全部使用本地化
+### TokenManager 使用
 
-### 最佳实践（推荐遵守）
-- 💡 新开发的 DTO、枚举、控制器应使用多语言写法
-- 💡 逐步迁移现有硬编码文本到资源文件
-- 💡 定期检查资源文件是否有缺失的翻译
+使用 `TokenManager` 统一管理认证状态：
 
-### 迁移指南
-对于现有代码，建议采用渐进式迁移：
-1. 新功能必须使用多语言写法
-2. 修改现有功能时，同步迁移为多语言写法
-3. 定期批量迁移高频使用的文本
+```javascript
+// 初始化模式
+TokenManager.initSystemMode();           // 系统平台
+TokenManager.initTenantMode('tenant-id'); // 租户平台
+TokenManager.initClientMode('tenant-id', 'exam'); // 客户端平台
+
+// Token 操作
+TokenManager.setToken('access-token', 24);     // 设置 token（24小时过期）
+const token = TokenManager.getToken();          // 获取 token
+TokenManager.clearToken();                      // 清除 token
+TokenManager.hasToken();                        // 检查是否有 token
+TokenManager.isTokenExpired();                  // 检查是否过期
+TokenManager.isAuthenticated();                 // 检查是否已认证
+
+// 扩展功能
+TokenManager.setTokenExtended(accessToken, refreshToken, expiresIn, tenantId);
+TokenManager.getRefreshToken();
+TokenManager.getAuthHeaders();                  // 获取认证请求头
+TokenManager.setUserInfo(userInfo);
+TokenManager.getUserInfo();
+```
+
+### 认证请求头
+
+所有 API 请求必须携带认证头：
+
+```javascript
+const headers = {
+    'Authorization': token ? 'Bearer ' + token : '',
+    'X-Forwarded-With': 'CodeSpirit',
+    'X-Tenant-Id': tenantId || 'system',
+    'Content-Type': 'application/json'
+};
+```
+
+## API 请求规范
+
+### 服务发现路径
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [xin-lai/CodeSpirit](https://github.com/xin-lai/CodeSpirit) — distributed by [TomeVault](https://tomevault.io).
