@@ -1,127 +1,89 @@
 ---
 trigger: always_on
-description: 1. **NEVER mark a feature as done until `task ci` is passing**
+description: Working with Sorbet and Rails constants
 ---
 
-# LogStruct Development Guide
+- `T::Sig` is not available globally, we must extend it whenever we need it (we're building a library, not an application.)
+- You are FORBIDDEN from removing `T.absurd` calls. FIX the error, don't loosen the case statement.
+- We use `sorbet-runtime` for runtime type checking. This is a hard dependency for the gem.
+- You do need to `extend T::Helpers` in modules if they use other Sorbet features (e.g `requires_ancestor`)
+- Never use `LogStruct::` when you're inside the `module LogStruct` scope (same for nested modules/classes.)
 
-## 🚨 CRITICAL RULES - MUST ALWAYS BE FOLLOWED 🚨
+### Type Safety
 
-1. **NEVER mark a feature as done until `task ci` is passing**
-2. **ALWAYS run `task ci` before claiming completion**
-3. **NO EXCEPTIONS to the above rules - features are NOT complete until all checks pass**
-4. **This rule must ALWAYS be followed no matter what**
-5. **`additional_data` is ONLY for unknown and dynamic fields that a user or integration might send. IF YOU KNOW THE NAME OF A FIELD, IT GOES IN THE SCHEMA. NEVER use `additional_data` for known fields.**
-6. **NEVER run `git tag` without `-m` flag** - it opens an interactive editor and freezes. Always use: `git tag -a v0.1.7 -m "Release v0.1.7"`
+- Use Sorbet type annotations for all methods
+- Ensure all files have the appropriate `# typed:` annotation
+- **NEVER use `T.unsafe` calls**. Instead, properly type your code or use appropriate type assertions with `T.let` or `T.cast` when absolutely necessary.
+- `T.untyped` is generally ok for Hash values when they come from unknown sources.
+- When dealing with external libraries, create proper type signatures or use extension methods rather than resorting to `T.unsafe`.
+- **NEVER use `class.name`** anywhere - this is a Sorbet quirk that hides the `name` method from all base classes. Prefer just using Classes themselves as the type. `"#{class}"` will automatically call `.to_s`. Similarly, `to_json` will automatically call `.to_s` - but you can call `.to_s` manually if you really need it.
+- **REMEMBER:** Taking shortcuts with Sorbet defeats the purpose of having static type checking. Always invest the time to properly type your code. If you get stuck, search the internet or ask the developer. There is almost always a clean, type-safe solution.
 
-## Commands
+#### Block Context Typing
 
-All commands use [Task](https://taskfile.dev) - run `task --list` to see all available tasks.
+When working with blocks where methods are called on `self` that belong to a different class (like in configuration blocks), always use `T.bind`:
 
-### Core Commands
+```ruby
+# GOOD
+SomeGem.configure do
+  T.bind(self, SomeGem::Configuration)
+  add_option "value"  # Now Sorbet knows this method exists
+end
 
-- Setup: `scripts/setup.sh`
-- Run full CI validation: `task ci` (typecheck, lint, spellcheck, tests, etc.)
-- Auto-fix lint issues then run CI: `task fix`
-- Interactive console: `scripts/console.rb`
+# BAD
+SomeGem.configure do
+  T.unsafe(self).add_option "value"  # NEVER do this!
+end
+```
 
-### Testing Commands
+#### Handling External Libraries
 
-- Run all tests (unit + Rails integration): `task test`
-- Run Ruby unit tests only: `task ruby:test`
-- Run Rails integration tests: `task rails:test`
-- Run Rails tests for all supported versions: `task rails:test:matrix`
-- Run frontend tests: `task docs:test`
-- Run single test file: `bundle exec ruby scripts/test.rb test/path_to_test.rb`
-- Run test at specific line: `bundle exec ruby scripts/test.rb test/path_to_test.rb:LINE_NUMBER`
-- Run test by name: `bundle exec ruby scripts/test.rb -n=test_method_name`
-- Debug a specific test: Add `debugger` statements (developer only)
-- Merge coverage reports: `task ruby:coverage:merge`
+1. **Always check the RBI files first**: Before resorting to `T.unsafe` or other workarounds, check the generated RBI files to understand the proper types. Run tapioca commands to fetch gem RBIs and annotations.
 
-**Rails Integration Tests**: Located in `rails_test_app/templates/test/integration/`. The script automatically copies template files to the test app when you run `scripts/rails_tests.sh`.
+2. **Use proper binding for DSLs**: Many Ruby libraries use DSLs where the context (`self`) inside a block is an instance of a specific class. Always use `T.bind(self, CorrectClass)` to inform Sorbet about this.
 
-**FORCE_RECREATE**: Do NOT use `FORCE_RECREATE=true` unless absolutely necessary. It deletes the entire test app and recreates from scratch, which is slow. Only needed when:
-- Gemfile changes require reinstalling gems
-- Something is fundamentally broken with the cached app
-- Rails version changes (but the script auto-detects this anyway)
+3. **Add missing type signatures**: If a gem lacks proper type definitions, contribute by adding them to your project's `sorbet/rbi/overrides/` directory.
 
-For template file changes (tests, rake tasks, etc.), just run `scripts/rails_tests.sh` - it copies templates automatically.
+# Core Dependencies
 
-### Quality Commands
+This gem doesn't work without Rails, so it will always have access to any core Rails modules:
 
-- Run all typechecking: `task typecheck`
-- Run all linting: `task lint`
-- Auto-fix all lint issues: `task lint:fix`
-- Spellcheck: `task spellcheck`
+- `::Rails`
+- `::ActiveSupport`
+- `::ActionDispatch`
+- `::ActionController`
 
-#### Ruby Commands
+You never need to check if these are defined with `defined?` - they are guaranteed to be available.
 
-- Ruby typecheck: `task ruby:typecheck`
-- Lint Ruby: `task ruby:lint`
-- Format Ruby: `task ruby:lint:fix`
+You DO always need to check for any optional third-party gems that are not part of Rails:
 
-#### Frontend Commands
+- `defined?(::Sentry)`
+- `defined?(::Shrine)`
+- etc.
 
-- Next.js typecheck: `task docs:typecheck`
-- Lint frontend: `task docs:lint`
-- Auto-fix frontend lint: `task docs:lint:fix`
+## Code Style and Conventions
 
-#### Formatting Commands
+### Module References
 
-- Format all files (JS/TS/JSON/YAML/MD): `task prettier:write`
-- Check formatting: `task prettier:check`
+- **Always use `::` prefixes for external modules**: All references to Rails modules and third-party gems (`ActiveSupport`, `ActionMailer`, `ActiveJob`, `Sidekiq`, `Bugsnag`, etc.) MUST use the `::` prefix, even at the top-level. This is because we define our own nested modules with similar names, so we must follow this convention for clarity, maintainability, and to avoid conflicts.
 
-### Development Commands
+  ```ruby
+  # GOOD
+  if defined?(::Sidekiq)
+    # ...
+  end
 
-- Generate all (structs + catalog): `task generate`
-- Generate Sorbet RBI files: `task ruby:tapioca`
-- Generate spellcheck dictionary: `scripts/generate_lockfile_words.sh`
-- Check generated files are up to date: `task ruby:check-generated`
+  # BAD
+  if defined?(Sidekiq)
+    # ...
+  end
+  ```
 
-### Documentation Commands
-
-- Generate YARD docs: `task yard:generate`
-- Clean YARD docs: `task yard:clean`
-- Regenerate YARD docs: `task yard:regen`
-- Open YARD docs in browser: `task yard:open`
-
-### Gem Commands
-
-- Build gem: `task gem:build`
-- Install gem locally: `task gem:install`
-- Install gem without network: `task gem:install:local`
-- Release gem to RubyGems: `task gem:release`
-
-## Terraform Provider repo in this workspace
-
-- The Terraform provider lives in a separate GitHub repo: `DocSpring/terraform-provider-logstruct`.
-- For convenience, the provider repo is checked out as a plain directory at `./terraform-provider-logstruct/` in this repo. It is NOT a Git submodule and is ignored by this repo’s `.gitignore`.
-- You can inspect/build it locally:
-  - `cd terraform-provider-logstruct`
-  - `go build ./...`
-  - Changes you make here are not committed by this repo. To contribute to the provider, commit from inside its directory and push to its own remote.
-
-## Automated releases (gem + provider)
-
-- Workflow: `.github/workflows/release.yml` ("Release Gem + Sync Terraform Provider").
-- Triggers:
-  - Push tag matching `v*` (e.g., `v0.0.1-rc1`, `v0.2.0`).
-  - GitHub Release published.
-  - Manual run (workflow_dispatch) with `dry_run` input.
-- Behavior:
-  - Builds and publishes the Ruby gem to RubyGems (requires `RUBYGEMS_API_KEY`).
-  - Regenerates the provider’s embedded catalog (`scripts/export_provider_catalog.rb`), builds the provider, commits catalog changes, and tags the provider repo with the same version.
-  - Enforces version alignment: the tag `vX.Y.Z` (or RC) must match `lib/log_struct/version.rb` unless run in dry-run.
-
-## Dry-run mode
-
-- CI dry-run lets you smoke-test the workflow without publishing anything:
-  - Actions → "Release Gem + Sync Terraform Provider" → Run workflow → `dry_run=true`.
-  - The workflow builds the gem and provider, shows diffs, and skips pushes/tags/uploads.
-- Local dry-run for the GitHub Actions workflow isn’t practical without a runner like `act`. You can still sanity-check pieces locally:
-  - `gem build logstruct.gemspec`
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- This applies to all external modules including but not limited to:
+  - Rails modules: `::ActiveSupport`, `::ActionMailer`, `::ActiveJob`, `::ActionDispatch`, `::ActionController`
+  - Error reporting: `::Sentry`, `::Bugsnag`, `::Rollbar`, `::Honeybadger`
+  - Background jobs: `::Sidekiq`
+  - File uploads: `::Shrine`
 
 ---
 > Source: [DocSpring/logstruct](https://github.com/DocSpring/logstruct) — distributed by [TomeVault](https://tomevault.io).
