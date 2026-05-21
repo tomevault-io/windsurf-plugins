@@ -1,0 +1,176 @@
+---
+trigger: always_on
+description: > **See also:** [docs/REFERENCE.md](docs/REFERENCE.md) for comprehensive QML, Quickshell, and Noctalia API documentation.
+---
+
+# Plugin Development Guidelines
+
+> **See also:** [docs/REFERENCE.md](docs/REFERENCE.md) for comprehensive QML, Quickshell, and Noctalia API documentation.
+
+## Commit Discipline
+
+- **NEVER push before I tell you to** - wait for explicit approval
+- Keep commits tight and manageable for verification
+- Never mention which agent is being used in commit messages
+- One logical change per commit
+- Test before commit to avoid rapid-fire fix commits
+- If fixing a fix within minutes, squash or amend instead
+
+## Version Bumping
+
+Version numbers follow semantic versioning:
+- **Patch (0.0.x)**: Bug fixes, UI/alignment fixes, typos
+- **Minor (0.x.0)**: New features, new settings, behavior changes
+- **Major (x.0.0)**: Breaking API changes
+
+**Critical Rules:**
+- **Only bump versions when pushing** - not during development
+- Commits get squashed before release, so bump once at the end
+- Never skip version numbers (0.1.0 → 0.1.1, not 0.1.2)
+- Always update `registry.json` when bumping manifest version
+- Version bump should be part of the final squashed commit
+
+## Pre-Commit Checklist
+
+Before committing any plugin changes:
+1. Visual test the UI in Noctalia Shell
+2. Verify manifest has all required fields (see below)
+3. Check `registry.json` is updated if version was bumped
+4. Run through all affected user flows
+5. Test settings persistence and defaults
+
+## Manifest Requirements
+
+Every `manifest.json` must include these fields:
+
+```json
+{
+  "id": "plugin-id",
+  "name": "Plugin Display Name",
+  "version": "0.1.0",
+  "minNoctaliaVersion": "3.6.0",
+  "author": "habibe",
+  "license": "MIT",
+  "repository": "https://github.com/anthonyhab/noctalia-plugins",
+  "description": "Brief explanation of functionality.",
+  "tags": ["Bar", "System"],
+  "entryPoints": {
+    "main": "Main.qml",
+    "panel": "Panel.qml",
+    "barWidget": "BarWidget.qml",
+    "settings": "Settings.qml"
+  },
+  "dependencies": {
+    "plugins": []
+  },
+  "metadata": {
+    "defaultSettings": {
+      "settingKey": "defaultValue"
+    }
+  }
+}
+```
+
+### Required Fields
+| Field | Description |
+|-------|-------------|
+| `id` | Unique plugin identifier (lowercase, hyphens) |
+| `name` | Human-readable display name |
+| `version` | Semantic version (x.y.z) |
+| `minNoctaliaVersion` | Minimum compatible Noctalia version |
+| `author` | Creator name |
+| `license` | License type (MIT) |
+| `repository` | Source repository URL |
+| `description` | Brief explanation of functionality |
+| `tags` | Array of category tags |
+| `entryPoints` | Map of component file paths |
+| `dependencies` | Plugin dependencies object |
+| `metadata.defaultSettings` | All user settings with defaults |
+
+### Tag Categories
+
+**Widget Types:** Bar, Desktop, Panel, Launcher
+
+**Functional:** Productivity, System, Audio, Network, Privacy, Development, Fun, Gaming, Indicator
+
+## Plugin File Structure
+
+Each plugin directory must include:
+- `manifest.json` (required)
+- `Main.qml` (optional) - Primary component or IPC logic
+- `BarWidget.qml` (optional) - Bar display component
+- `Panel.qml` (optional) - Panel component
+- `Settings.qml` (optional) - Settings interface
+- `preview.png` (required for official repo) - Preview image
+- `README.md` (required for official repo) - Plugin documentation
+
+## Code Patterns
+
+### Settings Access
+Always use the fallback pattern:
+```qml
+property var pluginApi: null
+
+function getSetting(key, fallback) {
+    if (!pluginApi) return fallback
+    var val = pluginApi.getSetting(key)
+    return (val === undefined || val === null) ? fallback : val
+}
+```
+
+### Entry Point Structure
+Always declare `pluginApi` first in entry points:
+```qml
+import QtQuick
+import QtQuick.Controls
+
+Item {
+    property var pluginApi: null
+
+    // Component code...
+}
+```
+
+### Logging
+Use the Logger with plugin ID prefix:
+```qml
+Logger.d("PluginId", "Debug message")
+Logger.i("PluginId", "Info message")
+Logger.w("PluginId", "Warning message")
+Logger.e("PluginId", "Error message")
+```
+
+### Translations
+Use optional chaining for translations:
+```qml
+text: pluginApi?.tr("translationKey") ?? "Fallback"
+```
+
+## QML Syntax & Safety
+
+### Strict Syntax Rules
+- **NO SEMICOLONS**: Do not use semicolons (`;`) to terminate properties or between sibling objects. Only use them within JavaScript blocks (functions/handlers) if absolutely necessary.
+- **NO CONVERSION ONE-LINERS**: Avoid collapsing multiple properties or complex objects into a single line. QML parsers in this environment are strict.
+- **VIRTUAL LINTING**: Always run `qmllint` and `qmlformat -i` on any modified QML files before committing.
+
+### Defensive Code
+- Always wrap complex property lookups in `root` or `pluginApi` properties to avoid `undefined` warnings.
+- Use `!!value` for boolean properties to ensure strict type matching.
+- Use `(val && val.prop) || fallback` for string/color properties to prevent `undefined` assignment errors.
+
+## Common Pitfalls (from Official Repo)
+
+Lessons from bugs fixed in `noctalia-dev/noctalia-plugins`:
+
+### Race Conditions
+- **Settings loading**: Don't assume settings are available immediately
+- Use proper initialization checks before accessing `pluginApi.getSetting()`
+- Avoid arbitrary delays (100ms timers) - use proper signals instead
+
+### Parser Edge Cases
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [anthonyhab/noctalia-plugins](https://github.com/anthonyhab/noctalia-plugins) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-21 -->
