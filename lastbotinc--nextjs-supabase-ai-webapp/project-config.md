@@ -1,182 +1,208 @@
 ---
 trigger: always_on
-description: Description of unit testing design patterns and instructions
+description: Whwn ever user wants to perform localisations or translations
 ---
 
----
-description: implementation pattern for unit tests with vitest
-globs:
----
+# Next.js Internationalization Implementation
 
-# Unit Testing Implementation Patterns (Vitest)
+This guide explains how to use translations in Next.js with next-intl and the namespace-based JSON structure.
 
-This document describes the patterns and best practices for implementing unit tests in our Next.js application using **Vitest**, covering both component testing and API route testing.
+## Translation File Structure
 
-## Test Setup
+The project uses a namespace-based organization:
 
-### Directory Structure
-(Remains the same)
 ```
-app/
-  components/
-    Button/
-      Button.tsx
-      __tests__/
-        Button.test.tsx
-  api/
-    languages/
-      route.ts
-      __tests__/
-        route.test.ts
+messages/
+├── en/                   # English translations
+│   ├── Index.json        # Home page translations
+│   ├── Blog.json         # Blog-related translations
+│   └── ...               # Other feature namespaces
+├── fi/                   # Finnish translations (same structure)
+├── sv/                   # Swedish translations (same structure)
+└── ...
 ```
 
-### Required Dependencies
-Update your `package.json` devDependencies:
-```json
-{
-  "devDependencies": {
-    "@testing-library/jest-dom": "^6.4.0", // For DOM matchers
-    "@testing-library/react": "^15.0.0",
-    "@testing-library/user-event": "^14.5.0",
-    "@vitejs/plugin-react": "^4.2.0", // For Vite + React
-    "jsdom": "^24.0.0", // Test environment
-    "vitest": "^1.5.0", // Test runner
-    "vite-tsconfig-paths": "^4.3.0", // For resolving tsconfig paths
-    "resize-observer-polyfill": "^1.5.1" // Polyfill for JSDOM
-  }
+## Using Translations in Code
+
+### Client Components
+
+Use the `useTranslations` hook:
+
+```tsx
+'use client';
+import { useTranslations } from 'next-intl';
+
+export default function MyComponent() {
+  // Specify the namespace to use
+  const t = useTranslations('Blog');
+  
+  return (
+    <div>
+      <h1>{t('title')}</h1>
+      <p>{t('description')}</p>
+      
+      {/* Accessing nested keys */}
+      <button>{t('actions.save')}</button>
+      
+      {/* With placeholders */}
+      <p>{t('welcome', { name: 'User', count: 5 })}</p>
+    </div>
+  );
 }
 ```
 
-### Vitest Configuration (`vitest.config.ts`)
-```typescript
-import { defineConfig } from 'vitest/config'
-import react from '@vitejs/plugin-react'
-import tsconfigPaths from 'vite-tsconfig-paths'
+### Server Components
 
-export default defineConfig({
-  plugins: [react(), tsconfigPaths()],
-  test: {
-    environment: 'jsdom', // Use JSDOM for browser-like environment
-    setupFiles: ['./vitest.setup.ts'], // Setup file for global configurations
-    include: ['**/*.test.{ts,tsx}'], // Test file pattern
-    globals: true, // Optional: Makes vi, expect, etc. globally available
-  },
-})
-```
+Use the `getTranslations` function:
 
-### Vitest Setup (`vitest.setup.ts`)
-This file configures testing-library matchers and adds necessary polyfills.
-```typescript
-import '@testing-library/jest-dom'
-import { expect, afterEach } from 'vitest'
-import { cleanup } from '@testing-library/react'
-import * as matchers from '@testing-library/jest-dom/matchers'
-import 'resize-observer-polyfill' // Polyfill for ResizeObserver in JSDOM
+```tsx
+import { getTranslations } from 'next-intl/server';
 
-// Extend Vitest's expect method with testing-library matchers
-expect.extend(matchers)
-
-// Cleanup after each test case
-afterEach(() => {
-  cleanup()
-})
-```
-
-## Component Testing
-
-### 1. Basic Component Test Structure
-```typescript
-// No environment pragma needed with vitest.config.ts
-import { render, screen, fireEvent } from '@testing-library/react'
-import '@testing-library/jest-dom' // Matchers are extended in setup
-import { describe, it, expect, beforeEach, vi } from 'vitest' // Import from vitest
-import { ComponentToTest } from '../ComponentToTest'
-
-describe('ComponentToTest', () => {
-  // Setup default props and mocks
-  const defaultProps = {
-    onAction: vi.fn() // Use vi.fn()
-  }
-
-  beforeEach(() => {
-    vi.clearAllMocks() // Use vi.clearAllMocks()
-  })
-
-  it('renders correctly', () => {
-    render(<ComponentToTest {...defaultProps} />)
-    // Add assertions using expect() extended with jest-dom matchers
-    expect(screen.getByText('Some Text')).toBeInTheDocument()
-  })
-})
-```
-
-### 2. Testing with Internationalization
-(Pattern remains largely the same, ensure `vi.mock` is used if mocking `next-intl`)
-```typescript
-import { render, screen } from '@testing-library/react'
-import { describe, it, expect, vi } from 'vitest'
-import { NextIntlClientProvider } from 'next-intl'
-import Component from '../Component' // Assume this is the component using translations
-
-// Mock translations
-const mockTranslations = {
-  namespace: {
-    key: 'Translated text'
-  }
+export default async function MyServerComponent() {
+  // Specify the namespace to use
+  const t = await getTranslations('Blog');
+  
+  return (
+    <div>
+      <h1>{t('title')}</h1>
+      <p>{t('description')}</p>
+    </div>
+  );
 }
+```
 
-// Mock next-intl if needed (using vi.mock)
-vi.mock('next-intl', async (importOriginal) => {
-  const mod = await importOriginal<typeof import('next-intl')>()
+### Page Metadata
+
+For page metadata (title, description), use `getTranslations` in `generateMetadata`:
+
+```tsx
+import { getTranslations } from 'next-intl/server';
+import type { Metadata } from 'next';
+
+export async function generateMetadata(
+  { params }: { params: { locale: string } }
+): Promise<Metadata> {
+  const t = await getTranslations('Blog');
+  
   return {
-    ...mod,
-    useTranslations: () => (key: string) => mockTranslations.namespace[key] || key,
-    // Mock other exports like NextIntlClientProvider if necessary,
-    // but often letting the real provider work is fine for client components.
-  }
-})
-
-
-// Helper function to render with translations
-const renderWithTranslations = (component: React.ReactNode) => {
-  return render(
-    <NextIntlClientProvider messages={mockTranslations} locale="en">
-      {component}
-    </NextIntlClientProvider>
-  )
+    title: t('meta.title'),
+    description: t('meta.description')
+  };
 }
-
-it('renders translated content', () => {
-  renderWithTranslations(<Component />)
-  expect(screen.getByText('Translated text')).toBeInTheDocument()
-})
 ```
 
-### 3. Testing UI Components
-Example from Button component tests (using `vi.fn`):
-```typescript
-import { render, screen, fireEvent } from '@testing-library/react'
-import { describe, it, expect, vi } from 'vitest'
-import { Button } from '../Button'
+## Rich Text Formatting
 
-describe('Button', () => {
-  it('applies correct size classes', () => {
-    const { rerender } = render(<Button size="sm">Small</Button>)
-    expect(screen.getByRole('button', { name: 'Small' }))
-      .toHaveClass('text-sm h-8 px-3') // jest-dom matcher
+For rich text with HTML:
 
-    rerender(<Button size="md">Medium</Button>)
-    expect(screen.getByRole('button', { name: 'Medium' }))
-      .toHaveClass('text-base h-10 px-4') // jest-dom matcher
-  })
+```tsx
+// In your component
+<div dangerouslySetInnerHTML={{ __html: t('richTextContent') }} />
 
-  it('handles click events', () => {
-    const handleClick = vi.fn() // Use vi.fn()
-    render(<Button onClick={handleClick}>Click me</Button>)
+// In your JSON
+{
+  "richTextContent": "This is <strong>bold</strong> and this is <em>italic</em>"
+}
+```
 
-    fireEvent.click(screen.getByRole('button', { name: 'Click me' }))
+## Handling Pluralization
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+For pluralization, use ICU message format:
+
+```tsx
+// In your component
+<p>{t('itemCount', { count: items.length })}</p>
+
+// In your JSON
+{
+  "itemCount": "{count, plural, =0{No items} one{# item} other{# items}}"
+}
+```
+
+## Translation Format Best Practices
+
+1. **Structured Organization**:
+   ```json
+   {
+     "section": {
+       "subsection": {
+         "key": "Value"
+       }
+     }
+   }
+   ```
+
+2. **Consistent Naming**:
+   - Use camelCase for all keys
+   - Group related items under common parents
+   - Keep hierarchy no more than 3-4 levels deep for readability
+
+3. **Common Patterns**:
+   - Use "title", "description", "label", "placeholder", "button" consistently
+   - Group form fields under a "fields" key
+   - Group error messages under "errors"
+   - Group UI actions under "actions"
+
+4. **Metadata Pattern**:
+   ```json
+   {
+     "meta": {
+       "title": "Page Title for SEO",
+       "description": "Page description for SEO"
+     },
+     "content": {
+       // Actual page content
+     }
+   }
+   ```
+
+## Special Characters and Encoding
+
+1. Handle special characters correctly:
+   - Use Unicode directly (e.g., "ä", "ö", "å")
+   - Escape quotes: `"quote": "They said \"hello\""`
+   - Escape backticks: `"code": "Use the \`npm\` command"`
+
+2. Use proper line breaks with `\n`:
+   ```json
+   {
+     "multiline": "First line\nSecond line"
+   }
+   ```
+
+## Troubleshooting
+
+1. **Missing Translation Key**:
+   - Check if key exists in all locale files
+   - Verify correct namespace is being used
+   - Check capitalization (keys are case-sensitive)
+
+2. **Placeholder Not Working**:
+   - Ensure the same placeholder is in all translations
+   - Check formatting `{name}` vs `{{name}}`
+
+3. **Date/Number Formatting**:
+   Use built-in formatters:
+   ```tsx
+   const t = useTranslations('Common');
+   const format = useFormatter();
+   
+   // Format date according to the current locale
+   format.dateTime(new Date(), { dateStyle: 'full' });
+   
+   // Format number according to the current locale
+   format.number(1000, { style: 'currency', currency: 'EUR' });
+   ```
+
+## Adding New Translations
+
+1. When adding a new key:
+   - Add to all locale files to maintain consistency
+   - Run `npm run check-translations` to verify completeness
+
+2. When adding a new namespace:
+   - Create parallel files in all locale directories
+   - Follow the established naming patterns
 
 ---
 > Source: [LastBotInc/nextjs-supabase-ai-webapp](https://github.com/LastBotInc/nextjs-supabase-ai-webapp) — distributed by [TomeVault](https://tomevault.io).
