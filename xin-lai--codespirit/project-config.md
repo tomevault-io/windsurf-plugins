@@ -1,97 +1,215 @@
 ---
 trigger: always_on
-description: This repository is set up to use Aspire. Aspire is an orchestrator for the entire application and will take care of configuring dependencies, building, and running the application. The resources that make up the application are defined in `apphost.cs` including application code and external dependencies.
+description: CodeSpirit AI功能开发规范 - AI表单填充、长任务处理、LLM集成
 ---
 
-# Copilot instructions
 
-This repository is set up to use Aspire. Aspire is an orchestrator for the entire application and will take care of configuring dependencies, building, and running the application. The resources that make up the application are defined in `apphost.cs` including application code and external dependencies.
+# AI 功能开发规范
 
-## General recommendations for working with Aspire
-1. Before making any changes always run the apphost using `aspire run` and inspect the state of resources to make sure you are building from a known state.
-1. Changes to the _apphost.cs_ file will require a restart of the application to take effect.
-2. Make changes incrementally and run the aspire application using the `aspire run` command to validate changes.
-3. Use the Aspire MCP tools to check the status of resources and debug issues.
+## 📋 目录
 
-## Running the application
-To run the application run the following command:
+1. [架构概览](#架构概览)
+2. [AI 表单填充](#ai-表单填充)
+3. [AI 长任务处理](#ai-长任务处理)
+4. [LLM 集成](#llm-集成)
+5. [提示词管理](#提示词管理)
+6. [错误处理](#错误处理)
+7. [性能优化](#性能优化)
+8. [安全最佳实践](#安全最佳实践)
 
-```
-aspire run
-```
+---
 
-If there is already an instance of the application running it will prompt to stop the existing instance. You only need to restart the application if code in `apphost.cs` is changed, but if you experience problems it can be useful to reset everything to the starting state.
-
-## Checking resources
-To check the status of resources defined in the app model use the _list resources_ tool. This will show you the current state of each resource and if there are any issues. If a resource is not running as expected you can use the _execute resource command_ tool to restart it or perform other actions.
-
-## Listing integrations
-IMPORTANT! When a user asks you to add a resource to the app model you should first use the _list integrations_ tool to get a list of the current versions of all the available integrations. You should try to use the version of the integration which aligns with the version of the Aspire.AppHost.Sdk. Some integration versions may have a preview suffix. Once you have identified the correct integration you should always use the _get integration docs_ tool to fetch the latest documentation for the integration and follow the links to get additional guidance.
-
-## Debugging issues
-IMPORTANT! Aspire is designed to capture rich logs and telemetry for all resources defined in the app model. Use the following diagnostic tools when debugging issues with the application before making changes to make sure you are focusing on the right things.
-
-1. _list structured logs_; use this tool to get details about structured logs.
-2. _list console logs_; use this tool to get details about console logs.
-3. _list traces_; use this tool to get details about traces.
-4. _list trace structured logs_; use this tool to get logs related to a trace
-
-## Other Aspire MCP tools
-
-1. _select apphost_; use this tool if working with multiple app hosts within a workspace.
-2. _list apphosts_; use this tool to get details about active app hosts.
-
-## Playwright MCP server
-
-The playwright MCP server has also been configured in this repository and you should use it to perform functional investigations of the resources defined in the app model as you work on the codebase. To get endpoints that can be used for navigation using the playwright MCP server use the list resources tool.
-
-## Updating the app host
-The user may request that you update the Aspire apphost. You can do this using the `aspire update` command. This will update the apphost to the latest version and some of the Aspire specific packages in referenced projects, however you may need to manually update other packages in the solution to ensure compatibility. You can consider using the `dotnet-outdated` with the users consent. To install the `dotnet-outdated` tool use the following command:
+## 架构概览
 
 ```
-dotnet tool install --global dotnet-outdated-tool
+┌─────────────────────────────────────────────────────────────────────────┐
+│                              前端                                        │
+│  ┌─────────────────┐    ┌──────────────────┐    ┌──────────────────┐   │
+│  │   表单组件       │───▶│   AI填充按钮     │───▶│  自动生成UI      │   │
+│  └─────────────────┘    └──────────────────┘    └──────────────────┘   │
+└───────────────────────────────────┬─────────────────────────────────────┘
+                                    │ POST /api/{controller}/ai-fill
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                              后端                                        │
+│  ┌─────────────────────────────────────────────────────────────────┐   │
+│  │  AiFormFill中间件（自动拦截 ai-fill 请求）                        │   │
+│  └────────────────────────────────┬────────────────────────────────┘   │
+│                                   ▼                                     │
+│  ┌─────────────────────────────────────────────────────────────────┐   │
+│  │  AiFormFillService → AiFormPromptBuilder → LLM客户端            │   │
+│  └────────────────────────────────┬────────────────────────────────┘   │
+└───────────────────────────────────┼─────────────────────────────────────┘
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│              LLM服务（OpenAI / 通义千问 / DeepSeek）                     │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
-## Persistent containers
-IMPORTANT! Consider avoiding persistent containers early during development to avoid creating state management issues when restarting the app.
+### 模式选择决策树
 
-## Aspire workload
-IMPORTANT! The aspire workload is obsolete. You should never attempt to install or use the Aspire workload.
+```
+使用哪种AI填充模式？
+├── 需要基于单个字段触发填充？
+│   └── 是 → 字段触发模式 (TriggerField = "FieldName")
+│
+├── 需要用户输入自定义需求一次性填充整个表单？
+│   └── 是 → 全局填充模式 (GlobalFillPrompt = "提示词")
+│
+└── 需要复杂的AI长任务处理（批量生成、进度跟踪）？
+    └── 是 → AI长任务模式 (HeaderOperation + aiForm)
+```
 
-## Official documentation
-IMPORTANT! Always prefer official documentation when available. The following sites contain the official documentation for Aspire and related components
+---
 
-1. https://aspire.dev
-2. https://learn.microsoft.com/dotnet/aspire
-3. https://nuget.org (for specific integration package details)
+## AI 表单填充
 
-## BMAD AI 工作流
+### 快速开始（零代码方案）
 
-本项目已集成 BMAD (Breakthrough Method of Agile AI-Driven Development) 完整工作流，用于结构化的软件开发生命周期管理。
+#### 1. 服务注册
+```csharp
+// Program.cs 或 ApiConfiguration
 
-### 快速开始
+// 注册 LLM 服务（必需）
+builder.Services.AddLLMServices();
 
-1. **小型任务/Bug 修复** (Quick Flow):
-   - `/quick-spec` - 创建技术规范
-   - `/quick-dev` - 实现变更
-   - `/code-review` - 代码审查
+// 注册 AI 表单填充自动端点（推荐）
+builder.Services.AddAiFormFillEndpoints();
 
-2. **完整功能开发** (Full Flow):
-   - `/product-brief` - 产品需求简报
-   - `/create-prd` - 创建 PRD
-   - `/create-architecture` - 架构设计
-   - `/create-epics-and-stories` - 拆分为 Epic 和 Story
-   - `/sprint-planning` - Sprint 规划
-   - `/dev-story` - 实现 Story
-   - `/code-review` - 代码审查
-   - `/retrospective` - 复盘
+var app = builder.Build();
 
-### 与 CodeSpirit 规范集成
+// 启用 AI 填充中间件
+app.UseAiFormFillEndpoints();
+```
 
-BMAD 工作流已配置为自动遵循 CodeSpirit 的所有开发规范（位于 `.cursor/rules/`）。在使用 BMAD 时：
+#### 2. DTO 配置
+```csharp
+[AiFormFill(TriggerField = nameof(Topic))]
+public class CreateQuestionDto
+{
+    [Required]
+    [DisplayName("主题")]
+    public string Topic { get; set; } = string.Empty;
+    
+    [DisplayName("题目内容")]
+    [AiFieldFill(Priority = 1, CustomDescription = "根据主题生成的题目内容")]
+    public string? Content { get; set; }
+    
+    [DisplayName("选项A")]
+    [AiFieldFill(Priority = 2)]
+    public string? OptionA { get; set; }
+}
+```
 
-- PRD 会自动考虑多租户、多数据库、AI 功能等项目特性
-- 架构设计会遵循依赖注入、缓存策略等规范
+**完成！** 系统自动生成 `POST /api/questions/ai-fill` 端点，无需编写任何控制器代码。
+
+### AiFormFillAttribute 完整参数
+
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `TriggerField` | string | "" | 触发字段名称，为空时启用全局模式 |
+| `IgnoreFields` | string[] | [] | 需要忽略的字段列表 |
+| `CustomPromptTemplate` | string | "" | 自定义提示词模板 |
+| `ApiEndpoint` | string | "ai-fill" | API端点路径 |
+| `MaxTokens` | int | 1000 | 最大Token数量 |
+| `EnableCache` | bool | true | 是否启用缓存 |
+| `CacheExpirationMinutes` | int | 30 | 缓存过期时间（分钟） |
+| `GlobalFillPrompt` | string | "使用AI智能优化表单" | 全局模式提示文本 |
+| `UseIndependentLLM` | bool | false | 是否使用独立的LLM配置 |
+| `LLMSettingsKey` | string | "AiFormFillLLM" | 独立LLM配置的设置键名 |
+| `DisableThinking` | bool | true | 是否禁用思考模式 |
+| `ResponseFormatType` | string | "json_object" | 响应格式类型 |
+| `Temperature` | double | 0.1 | 温度参数，控制随机性 |
+| `TopP` | double | 0.9 | Top-p参数，控制多样性 |
+
+### AiFieldFillAttribute 参数
+
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `Enabled` | bool | true | 是否参与AI填充 |
+| `Weight` | int | 1 | 字段权重（影响提示词中的重要性） |
+| `Priority` | int | 0 | 字段填充优先级 |
+| `CustomDescription` | string | "" | 自定义字段描述（自动添加到JSON注释） |
+
+### 使用模式
+
+#### 字段触发模式
+用户输入触发字段后，AI 智能填充其他相关字段：
+
+```csharp
+[AiFormFill(TriggerField = nameof(Topic))]
+public class CreateSurveyDto
+{
+    [Required]
+    [DisplayName("问卷主题")]
+    public string Topic { get; set; } = string.Empty;
+    
+    [DisplayName("问卷描述")]
+    [AiFieldFill(Priority = 1, CustomDescription = "基于主题生成的详细描述")]
+    public string? Description { get; set; }
+    
+    [DisplayName("目标受众")]
+    [AiFieldFill(Priority = 2)]
+    public string? TargetAudience { get; set; }
+}
+```
+
+#### 全局填充模式
+用户在表单顶部输入自定义需求，AI 一次性填充整个表单：
+
+```csharp
+[AiFormFill(GlobalFillPrompt = "描述您想创建的内容")]
+public class CreateContentDto
+{
+    [DisplayName("标题")]
+    public string? Title { get; set; }
+    
+    [DisplayName("内容")]
+    public string? Content { get; set; }
+    
+    [DisplayName("标签")]
+    public List<string>? Tags { get; set; }
+}
+```
+
+### 自定义提示词模板
+
+#### 基础模板（自动追加JSON结构）
+```csharp
+[AiFormFill(
+    TriggerField = nameof(Topic),
+    CustomPromptTemplate = "基于主题 '{Topic}' 生成相关内容，要求专业准确")]
+public class CustomPromptDto { }
+```
+
+#### 完整模板（包含JSON结构，不会重复追加）
+```csharp
+[AiFormFill(
+    TriggerField = nameof(Description),
+    CustomPromptTemplate = @"你是一个目标管理专家。
+
+用户输入：{Description}
+请优化目标描述，并提取关键信息。
+
+**返回JSON结构说明：**
+```json
+{
+  ""description"": ""string, 必填。优化后的目标描述"",
+  ""title"": ""string, 必填。提取的简短标题""
+}
+```
+
+请严格按照上述JSON结构返回。")]
+public class GoalDto { }
+```
+
+> 💡 系统会智能检测模板中是否已包含 JSON 结构说明（关键词：` ```json `），不会重复追加。
+
+### 独立 LLM 配置
+
+为 AI 表单填充配置专用的 LLM 设置：
+
+```csharp
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
