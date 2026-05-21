@@ -7,11 +7,11 @@ Web dApp examples implementing Reown AppKit
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [reown-com/appkit-web-examples](https://github.com/reown-com/appkit-web-examples).
+Original source: `CLAUDE.md` in [reown-com/appkit-web-examples](https://github.com/reown-com/appkit-web-examples).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
