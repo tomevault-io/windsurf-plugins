@@ -7,11 +7,11 @@ Spreadsheet viewer, in Rust using GPUI
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [samuelcolvin/spread](https://github.com/samuelcolvin/spread).
+Original source: `CLAUDE.md` in [samuelcolvin/spread](https://github.com/samuelcolvin/spread).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
