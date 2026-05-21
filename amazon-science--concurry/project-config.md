@@ -1,163 +1,209 @@
 ---
 trigger: always_on
-description: These architecture details are useful when designing, integrating or refactoring major components of concurry, when debugging challenging errors and race conditions, and when testing cross-feature functionality. Also refer to the respective files in docs/architecture/ for comprehensive details.
+description: **NEVER create standalone summary `.md` files** documenting implementation changes, fixes, refactorings, or feature additions. These waste tokens and are never read.
 ---
 
-# Cursor Rules: Concurry Architecture
+# Documentation Practices: NO SUMMARY DOCUMENTS
 
-## Synchronization Architecture and Rules
+## ⚠️ CRITICAL RULE: NEVER CREATE SUMMARY DOCUMENTS
 
-**CRITICAL**: Follow these rules when working with `wait()`, `gather()`, or future implementations.
+**NEVER create standalone summary `.md` files** documenting implementation changes, fixes, refactorings, or feature additions. These waste tokens and are never read.
 
-For comprehensive architecture details, see [docs/architecture/synchronization.md](../../docs/architecture/synchronization.md)
+❌ **DO NOT CREATE FILES LIKE**:
+- `FIX_SUMMARY.md`
+- `IMPLEMENTATION_SUMMARY.md`
+- `REFACTORING_COMPLETE.md`
+- `FEATURE_IMPLEMENTATION.md`
+- `CHANGES_SUMMARY.md`
+- Any other standalone documentation of completed work
 
-### BaseFuture Implementations
+## Instead: Four-Part Documentation Strategy
 
-**Rule 1**: Each future type has a specific state management strategy:
-- `SyncFuture`: Caches everything (immutable at creation)
-- `ConcurrentFuture`: Pure delegation wrapper (NO caching of `_result`, `_exception`, `_done`, `_cancelled`)
-- `AsyncioFuture`: Pure delegation wrapper (NO caching of `_result`, `_exception`, `_done`)
-- `RayFuture`: Caches state after fetching (stores `_result`, `_exception`, `_done`, `_cancelled`)
+All information from implementation sessions must flow into these four locations:
 
-**Rule 2**: NEVER set `_done=True` without fetching the result:
-```python
-# ❌ WRONG - RayFuture bug
-def done(self) -> bool:
-    ready, _ = ray.wait([self._object_ref], timeout=0)
-    if len(ready) > 0:
-        self._done = True  # ❌ BUG: _result is still None!
-        return True
+### 1. **Chat Summary** (Immediate Communication)
 
-# ✅ CORRECT
-def done(self) -> bool:
-    if self._done:
-        return True
-    ready, _ = ray.wait([self._object_ref], timeout=0)
-    return len(ready) > 0  # Don't set _done here
+At the end of each implementation session, provide a **structured summary in the chat** with these sections:
+
+```markdown
+## Implementation Summary
+
+### What Was Changed
+- Brief list of files modified and their changes
+- High-level description of the fix/feature
+
+### Why These Changes Were Needed
+- Root cause of the issue (if a fix)
+- Rationale for the design decision (if a feature)
+- Problems with previous implementation (if a refactoring)
+
+### Alternatives Considered
+- What other approaches were evaluated
+- Why they were rejected
+- Trade-offs of the chosen approach
+
+### Testing
+- New testcases added (with file paths)
+- Existing testcases updated (with file paths)
+- Edge cases now covered
+
+### Documentation Updates
+- Architecture docs updated (with file paths)
+- User guide sections updated (with file paths)
+- API docstrings updated (with file/class/method references)
+
+### Other Changes
+- Configuration changes
+- Dependencies added/removed
+- Breaking changes (if any)
 ```
 
-**Rule 3**: All futures must raise consistent exception types:
-- Raise `concurrent.futures.CancelledError`, NOT `asyncio.CancelledError`
-- Raise `TimeoutError`, NOT `ray.exceptions.GetTimeoutError`
+**This chat summary is the ONLY place for quick, session-level documentation.**
 
-**Rule 4**: Callbacks must receive the wrapper (BaseFuture), not the underlying future:
+---
+
+### 2. **Architecture Documentation** (Historical + Technical)
+
+Location: `concurry/docs/architecture/`
+
+**When to Update**: For ANY architectural change, design decision, or significant refactoring.
+
+**What to Include**:
+1. **Current Implementation**: How the system works now
+2. **Historical Context**: Previous implementations and their issues
+3. **Why the Change**: What problems were encountered
+4. **Example Code**: For each approach (previous and current)
+5. **Trade-offs**: Pros and cons of the design
+
+**Format Example**:
+
+```markdown
+## Feature: Worker Submission Queue
+
+### Current Implementation (Version 3 - October 2025)
+
+[Detailed explanation of current approach]
+
+**Example:**
 ```python
-# ✅ CORRECT
-def add_done_callback(self, fn: Callable) -> None:
-    self._future.add_done_callback(lambda _: fn(self))  # Pass self, not _
+# Current implementation code
 ```
 
-**Rule 5**: Always use `wrap_future()` when accepting external futures:
-```python
-# ✅ CORRECT
-from concurry.core.future import wrap_future
+**Why This Works:**
+- Reason 1
+- Reason 2
 
-futures_list = [wrap_future(f) for f in external_futures]
+---
+
+### Previous Implementation (Version 2 - September 2025)
+
+**Approach:**
+[Description of previous approach]
+
+**Example:**
+```python
+# Previous implementation code
 ```
 
-### wait() and gather() Functions
+**Issues Encountered:**
+1. Race condition when stop() called during submission
+2. Semaphore not released if worker stopped
+3. Futures could be returned after pool stopped
 
-**Rule 6**: Cannot mix structure and variadic arguments:
-```python
-# ❌ WRONG
-futures = [f1, f2, f3]
-wait(futures, f4, f5)  # Raises ValueError
+**Why It Failed:**
+[Detailed explanation]
 
-# ✅ CORRECT
-wait([f1, f2, f3, f4, f5])  # Pass as list
-wait(f1, f2, f3, f4, f5)     # Pass individually
+---
+
+### Initial Implementation (Version 1 - August 2025)
+
+[Similar structure]
 ```
 
-**Rule 7**: Dict inputs must return dicts with preserved keys:
+**Key Files**:
+- `docs/architecture/workers.md` - Worker system architecture
+- `docs/architecture/synchronization.md` - wait()/gather() and futures
+- `docs/architecture/limits.md` - Rate limiting and resource limits
+- `docs/architecture/retries.md` - Retry logic and configuration
+- `docs/architecture/configuration.md` - Global config system
+- `docs/architecture/task-worker.md` - TaskWorker specifics
+
+**Create NEW architecture docs** when implementing completely new subsystems.
+
+---
+
+### 3. **User Guide + API Docstrings** (User-Facing Behavior)
+
+Location: `concurry/docs/user-guide/` and module docstrings
+
+**When to Update**: ONLY when user-facing behavior changes.
+
+**DO Update When**:
+- ✅ New public API added
+- ✅ Public API signature changed
+- ✅ New parameters or options available
+- ✅ Default behavior changed
+- ✅ New execution mode added
+- ✅ New feature users can interact with
+
+**DO NOT Update When**:
+- ❌ Backend implementation fixed (no behavior change)
+- ❌ Internal refactoring (same external API)
+- ❌ Performance optimization (no API change)
+- ❌ Bug fix that restores expected behavior
+
+**User Guide Structure**:
+```markdown
+## Feature Name
+
+### Overview
+Brief description of what the feature does and when to use it.
+
+### Basic Usage
 ```python
-tasks = {"task1": f1, "task2": f2}
-results = gather(tasks)
-# Must return: {"task1": r1, "task2": r2}
+# Minimal working example
 ```
 
-**Rule 8**: Always call `fut.result(timeout=0)` after `wait()` completes:
+### Common Patterns
 ```python
-# ✅ CORRECT
-done, not_done = wait(futures_list, ...)
-for fut in done:
-    result = fut.result(timeout=0)  # timeout=0 is safe, future is done
+# Pattern 1: Common use case
 ```
 
-**Rule 9**: Ray batch checking must use single `ray.wait()` call:
 ```python
-# ✅ CORRECT - batch all Ray futures
-ready, not_ready = ray.wait(
-    ray_futures, 
-    num_returns=len(ray_futures),  # Check all at once
-    timeout=0
-)
+# Pattern 2: Another common use case
 ```
 
-### Polling Strategies
-
-**Rule 10**: All polling intervals must come from `global_config`:
+### Advanced Usage
 ```python
-# ❌ WRONG
-strategy = FixedPollingStrategy(interval=0.01)  # Hardcoded!
-
-# ✅ CORRECT
-from concurry.config import global_config
-defaults = global_config.defaults
-strategy = FixedPollingStrategy(interval=defaults.polling_fixed_interval)
+# Complex example with all options
 ```
 
-**Rule 11**: New polling strategies must inherit from `BasePollingStrategy`:
-```python
-class CustomStrategy(BasePollingStrategy):
-    aliases = ["custom", PollingAlgorithm.Custom]
-    
-    def get_next_interval(self) -> float: ...
-    def record_completion(self) -> None: ...
-    def record_no_completion(self) -> None: ...
-    def reset(self) -> None: ...
+### Configuration
+- List of relevant config keys (reference, not full docs)
+- Link to API docs for details
+
+### Troubleshooting
+Common issues and solutions.
 ```
 
-### Extension Guidelines
+**API Docstrings**:
+- Include parameter descriptions
+- Reference config keys for defaults (e.g., "Defaults to `global_config.defaults.worker_timeout`")
+- Provide usage examples
+- Document exceptions raised
+- **NEVER hardcode default values in docstrings**
 
-**Adding New Future Type**:
-1. Inherit from `BaseFuture` and implement all abstract methods
-2. Define `__slots__` with minimal fields (delegate when possible)
-3. Use `FUTURE_UUID_PREFIX` class variable
-4. Update `wrap_future()` function to detect new type
-5. Update `_check_futures_batch()` for batch optimization (if applicable)
+**Global Config Defaults**:
+- ❌ DO NOT document all config keys in user guide
+- ✅ DO mention relevant config keys in context
+- ✅ Full config documentation belongs in API reference
 
-**Adding New Polling Strategy**:
-1. Inherit from `BasePollingStrategy` (Registry + MutableTyped)
-2. Define `aliases` for factory creation
-3. Add to `PollingAlgorithm` enum
-4. Add configuration defaults to `GlobalDefaults`
-5. Update strategy creation in `wait()` and `gather()`
+---
 
-## Core Design Principle: No Silent Fallbacks
+### 4. **Testcases** (Executable Edge Case Documentation)
 
-**CRITICAL**: Concurry must **fail noisily** rather than silently degrade performance.
+Location: `concurry/tests/` (in appropriate subdirectories)
 
-### The Rule
-
-❌ **NEVER** auto-fallback to slower implementations when configured implementation fails
-✅ **ALWAYS** fail loudly with actionable error messages
-✅ **DO** have multiple implementations (flexibility is good)
-✅ **DO** select implementation via explicit configuration
-❌ **DON'T** downgrade silently (causes mysterious slowdowns)
-
-### Why This Matters
-
-Silent fallbacks are the **bane of concurrency frameworks**. They cause:
-- **Mysterious slowdowns** that are hard to diagnose
-- **Production surprises** when code suddenly runs 10-100x slower
-- **False confidence** in development that breaks in production
-- **Debugging nightmares** trying to find why "the same code" performs differently
-
-### Real-World Example
-
-```python
-# ❌ WRONG: Silent fallback
-try:
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
