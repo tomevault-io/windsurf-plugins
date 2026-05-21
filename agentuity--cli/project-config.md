@@ -1,133 +1,144 @@
 ---
 trigger: always_on
-description: Code Generation Development Rules for CLI and SDK
+description: https://stackoverflow.com/questions/19230971/how-do-i-jsdoc-a-nested-objects-methods
 ---
 
+# Prompt JSDoc Docstrings and Multi-File Support
 
-# Code Generation Development Rules
+https://stackoverflow.com/questions/19230971/how-do-i-jsdoc-a-nested-objects-methods
 
-> **⚠️ IMPORTANT**: These rules apply to both CLI and SDK development. Keep both codebases in sync when making changes.
+## Goal
+Add JSDoc-style docstrings to generated prompt functions and support scanning multiple YAML files in the prompts directory for better IDE support and organization.
 
-## Core Principles
+## Features Implemented
 
-### Never Modify Generated Content in Source Files
-- ❌ NEVER edit files in `sdk-js/src/` that contain generated content
-- ❌ NEVER hardcode generated content like `copyWriter` prompts in source files
-- ✅ ALWAYS generate content into `node_modules/@agentuity/sdk/dist/` or `src/` directories
-- ✅ Use dynamic loading patterns for generated content
-
-### Code Generation Workflow
-1. **Modify CLI generation logic** (e.g., `internal/bundler/prompts.go`)
-2. **Update SDK to handle generated content dynamically** (e.g., `src/apis/prompt/index.ts`)
-3. **Build and test the full pipeline**: CLI generation → SDK loading → Agent usage
-
-### Multi-File Support
-- **Directory Scanning**: CLI scans `src/prompts/` and `prompts/` directories for all YAML files
-- **File Processing**: Processes all `.yaml` and `.yml` files found in the prompts directory
-- **Combined Output**: Merges prompts from multiple files into a single generated output
+### 1. Multi-File Support
+The CLI now scans the entire `prompts` directory and processes all YAML files:
+- **Directory Locations**: Checks `src/prompts/` and `prompts/` directories
+- **File Types**: Processes all `.yaml` and `.yml` files
+- **Combined Output**: Merges all prompts from multiple files into a single generated output
 - **Legacy Support**: Still supports single `prompts.yaml` file in various locations
 
-### JSDoc Documentation
-- **Function Comments**: Generated `system` and `prompt` functions include JSDoc comments with actual prompt content
-- **IDE Support**: JSDoc comments provide better IDE hover tooltips and documentation
-- **Content Preservation**: Original prompt templates are preserved exactly as written in YAML
-- **Line Wrapping**: Long lines are automatically wrapped at 80 characters for readability
+### 2. JSDoc Comments on Functions and Types
+Generate JSDoc comments on both JavaScript functions and TypeScript type definitions:
 
-### Optional Field Handling
-- ✅ Generated code should NEVER require optional chaining (`?.`)
-- ✅ Always generate both `system` and `prompt` fields, even if empty
-- ✅ Empty fields should return empty strings, not undefined
-- ❌ Never generate partial objects that require optional chaining
+**JavaScript Functions:**
+```javascript
+system: /**
+ * System prompt:
+ * You are a {role:senior} code reviewer specializing in {language:JavaScript}.
+ * Your experience level is {experience:expert}
+ * 
+ */
+({ role, language, experience } = {}) => {
+    return interpolateTemplate("...", { role, language, experience })
+},
+```
 
-## Architecture Overview
+**TypeScript Type Definitions:**
+```typescript
+export type Assistant = {
+  slug: string;
+  /**
+   * System prompt:
+   * You are a {role:helpful assistant} specializing in {domain:programming}.  
+   * Your experience level is {experience:intermediate}
+   * 
+   */
+  system: (variables?: {
+    role?: string | "helpful assistant";
+    domain?: string | "programming";
+    experience?: string | "intermediate"
+  }) => string;
+  /**
+   * User prompt:
+   * Help the user with: {task:their question}
+   * Use a {!tone} approach.
+   */
+  prompt: (variables: {
+    task?: string | "their question";
+    tone: string
+  }) => string
+};
+```
+
+### 3. Content Inclusion
+- **System Prompts**: Include the actual system prompt content in JSDoc
+- **User Prompts**: Include the actual user prompt content in JSDoc
+- **Template Preservation**: Show original templates exactly as written in YAML
+- **Variable Syntax**: Preserve `{variable:default}`, `{!variable}`, `{{variable}}` syntax
+- **Line Wrapping**: Automatically wrap long lines at 80 characters for readability
+
+### 4. Template Preservation
+- Show original templates exactly as written in YAML
+- Preserve variable syntax: `{variable:default}`, `{!variable}`, `{{variable}}`
+- Maintain line breaks and formatting
+- Escape JSDoc special characters (`*/` becomes `*\/`)
+- Escape JSDoc comment characters (`*/` → `* /`)
+
+### 4. IDE Integration
+- Docstrings should be visible in IDE hover tooltips when accessing `prompts.promptName`
+- Should work with "Go to Definition" functionality
+- Provide IntelliSense documentation
+- Show original prompt template for reference
+
+## Implementation
+
+### Code Generator Updates
+1. **PromptsCollection JSDoc**: Add JSDoc comments to each property in the `PromptsCollection` type
+2. **Template Escaping**: Handle JSDoc comment characters in templates
+3. **Line Break Handling**: Split templates by newlines and add proper JSDoc formatting
+4. **Prompt-Only Focus**: Only include `@prompt` section, not `@system`
 
 ### File Structure
-```
-sdk-js/src/apis/prompt/
-├── generic_types.ts          # Simple utility types for CLI to use
-├── generated/
-│   ├── index.d.ts           # Shell TypeScript definitions (replaced by CLI)
-│   ├── index.js             # Shell JavaScript (replaced by CLI)
-│   └── _index.js            # Actual generated JavaScript (created by CLI)
-├── index.ts                 # Main API with dynamic loading
-└── signature.ts             # Signature function factory
-```
+- **`_index.js`**: Contains actual prompt objects (no JSDoc on individual objects)
+- **`index.d.ts`**: Contains TypeScript types with JSDoc comments on `PromptsCollection` properties
 
-### Key Learnings from Implementation
+## Example Output
 
-#### 1. Simplified Architecture
-- **Use shell files**: `index.d.ts` and `index.js` are placeholders that get completely replaced
-- **Less complex generics**: Avoid overly complex TypeScript generics that cause compilation issues
-- **Rely on code generation**: Let the CLI do the heavy lifting instead of complex type manipulation
-
-#### 2. Slug-Based Naming
-- **Use slugs directly**: Generate code using the original slug names (e.g., `'simple-helper'`)
-- **Quote property names**: Use `'slug-name'` syntax in TypeScript interfaces
-- **Bracket notation**: Use `prompts['slug-name']` in JavaScript for property access
-- **CamelCase variables**: Use `strcase.ToLowerCamel(slug)` for JavaScript variable names
-
-#### 3. Type Safety Without Complexity
 ```typescript
-// ✅ Simple, working approach
-export type PromptsCollection = Record<string, any>;
-export type PromptSignature<T> = (params: any) => string;
-
-// ❌ Avoid overly complex generics that cause compilation issues
-export type ComplexGeneric<T extends Prompt<infer A, infer B, infer C, infer D, infer E>> = ...
+export type PromptsCollection = {
+  /**
+   * Optional Variables with Defaults - Test optional variables that have default values
+   *
+   * @prompt
+   * Help the user with: {task:their question}
+   * Use a {tone:friendly} approach.
+   */
+  optionalWithDefaults: OptionalWithDefaults;
+  /**
+   * Required Variables Test - Test required variables that must be provided
+   *
+   * @prompt
+   * Complete this {!task} for the user.
+   * The task must be specified.
+   */
+  requiredVariables: RequiredVariables;
+};
 ```
 
-## CLI-Specific Rules
+## Key Decisions
 
-### Generation Target Locations
-```go
-// ✅ Correct: Generate into installed SDK
-sdkPath := filepath.Join(root, "node_modules", "@agentuity", "sdk", "dist", "generated")
+### Why PromptsCollection Only
+- Individual prompt objects are not directly accessible to users
+- IDE hover works on `prompts.promptName` which maps to `PromptsCollection` properties
+- Avoids redundant JSDoc comments that don't provide value
 
-// ❌ Wrong: Generate into source SDK
-sdkPath := filepath.Join(root, "src", "generated")
-```
+### Why Prompt Template Only
+- Users primarily care about what the prompt does, not the system instructions
+- Keeps JSDoc comments focused and concise
+- System templates are implementation details
 
-### Slug Handling in Code Generation
-```go
-// ✅ Correct: Use slugs directly with proper quoting
-const %s = {
-    slug: "%s",
-    // ... fields
-};`, strcase.ToLowerCamel(prompt.Slug), prompt.Slug
+### Why No Individual Type JSDoc
+- Individual prompt types are not directly used by developers
+- JSDoc on `PromptsCollection` properties provides the IDE support needed
+- Keeps generated code clean and focused
 
-// In TypeScript interfaces
-exports = append(exports, fmt.Sprintf("  '%s': %s;", prompt.Slug, strcase.ToCamel(prompt.Slug)))
-
-// In JavaScript property access
-bodyParts = append(bodyParts, fmt.Sprintf("const result = prompts['%s'].system(params)", prompt.Slug))
-```
-
-### File Generation Pattern
-```go
-func FindSDKGeneratedDir(ctx BundleContext, projectDir string) (string, error) {
-    possibleRoots := []string{
-        findWorkspaceInstallDir(ctx.Logger, projectDir),
-        projectDir,
-    }
-
-    for _, root := range possibleRoots {
-        // Try dist directory first (production)
-        sdkPath := filepath.Join(root, "node_modules", "@agentuity", "sdk", "dist", "generated")
-        if _, err := os.Stat(filepath.Join(root, "node_modules", "@agentuity", "sdk")); err == nil {
-            if err := os.MkdirAll(sdkPath, 0755); err == nil {
-                return sdkPath, nil
-            }
-        }
-        // Fallback to src directory (development)
-        sdkPath = filepath.Join(root, "node_modules", "@agentuity", "sdk", "src", "generated")
-        if _, err := os.Stat(filepath.Join(root, "node_modules", "@agentuity", "sdk", "src")); err == nil {
-            if err := os.MkdirAll(sdkPath, 0755); err == nil {
-                return sdkPath, nil
-            }
-        }
-    }
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+## Benefits
+- **IDE Support**: Better IntelliSense and hover information on `prompts.promptName`
+- **Focused Documentation**: Shows only the prompt template that users will see
+- **Clean Code**: No redundant JSDoc comments on unused objects
+- **Self-Documenting**: Developers can understand prompts without looking at YAML
 
 ---
 > Source: [agentuity/cli](https://github.com/agentuity/cli) — distributed by [TomeVault](https://tomevault.io).
