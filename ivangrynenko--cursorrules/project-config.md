@@ -1,118 +1,69 @@
 ---
 trigger: always_on
-description: AI Query Efficiency & Auto-Optimization
+description: Detect and prevent broken access control patterns in JavaScript applications as defined in OWASP Top 10:2021-A01
 ---
 
-# AI Query Efficiency & Auto-Optimization
+# JavaScript Broken Access Control (OWASP A01:2021)
 
-Ensures Cursor analyzes AI query efficiency, detects repeated requests, and automatically updates relevant rules to improve response quality and reduce redundancy.
+This rule identifies and prevents broken access control vulnerabilities in JavaScript applications, focusing on both browser and Node.js environments, as defined in OWASP Top 10:2021-A01.
 
 <rule>
-name: ai_query_efficiency_optimization
-description: Analyze AI query efficiency, optimize rules, and prevent repeated requests.
-filters:
-  # Match AI query interactions in supported files
-  - type: file_extension
-    pattern: "\\.(md|mdc|txt|json|py|js|ts|php|yaml|yml|cursorrules)$"
-  # Match AI communication patterns indicating inefficiency or repetition
-  - type: content
-    pattern: "(?i)(retry|again|didn't work|not what I expected|try another way|improve|fix this|optimize|rewrite|regenerate)"
+name: javascript_broken_access_control
+description: Detect and prevent broken access control patterns in JavaScript applications as defined in OWASP Top 10:2021-A01
 
 actions:
-  - type: analyze
+  - type: enforce
     conditions:
-      - pattern: "(?i)(retry|again|fix this|not what I expected|didn't work|rewrite|regenerate)"
-        message: "Detected inefficiencies or repeated requests. Initiating efficiency analysis..."
-    execute: |
-      - **Identify inefficiencies** in AI responses by comparing previous queries and results.
-      - **Suggest improvements** in query structure or Cursor usage based on analysis:
-        - Use more specific or detailed prompts.
-        - Implement structured queries for complex tasks.
-        - Provide feedback on past responses for better contextual understanding.
-        - Break down complex tasks into smaller, more manageable steps.
-        - Use specific technical terminology for clearer communication.
-      - **Automatically update** relevant Cursor rules:
-        - Enhance pattern recognition for similar future queries.
-        - Adjust rule priorities or conditions to prevent repeat inefficiencies.
-        - Update rule suggestions to guide users towards more effective interactions.
-        - Create new rules for frequently encountered patterns.
+      # Pattern 1: Detect Direct Reference to User-Supplied IDs (IDOR vulnerability)
+      - pattern: "(?:req|request)\\.(?:params|query|body)\\.(?:id|userId|recordId)[^\\n]*?(?:findById|getById|find\\(|get\\()"
+        message: "Potential Insecure Direct Object Reference (IDOR) vulnerability. User-supplied IDs should be validated against user permissions before database access."
+        
+      # Pattern 2: Detect Missing Authorization Checks in Route Handlers
+      - pattern: "(?:app|router)\\.(?:get|post|put|delete|patch)\\(['\"][^'\"]+['\"],\\s*(?:async)?\\s*\\(?(?:req|request),\\s*(?:res|response)(?:,[^\\)]+)?\\)?\\s*=>\\s*\\{[^\\}]*?\\}\\)"
+        negative_pattern: "(?:isAuthenticated|isAuthorized|checkPermission|verifyAccess|auth\\.check|authenticate|authorize|userHasAccess|checkAuth|permissions\\.|requireAuth|requiresAuth|ensureAuth|\\bauth\\b|\\broles?\\b|\\bpermission\\b|\\baccess\\b)"
+        message: "Route handler appears to be missing authorization checks. Implement proper access control to verify user permissions before processing requests."
+        
+      # Pattern 3: Detect JWT Token Validation Issues
+      - pattern: "(?:jwt|jsonwebtoken)\\.verify\\((?:[^,]+),\\s*['\"]((?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?)['\"]"
+        message: "Hardcoded JWT secret detected. Store JWT secrets securely in environment variables or a configuration manager."
+        
+      # Pattern 4: Detect Client-Side Authorization Checks
+      - pattern: "if\\s*\\((?:user|currentUser)\\.(?:role|isAdmin|hasPermission|can[A-Z][a-zA-Z]+|is[A-Z][a-zA-Z]+)\\)\\s*\\{[^\\}]*?(?:fetch|axios|\\$\\.ajax|http\\.get|http\\.post)\\([^\\)]*?\\)"
+        message: "Authorization logic implemented on client-side. Client-side authorization checks can be bypassed. Always enforce authorization on the server."
+        
+      # Pattern 5: Detect Improper CORS Configuration
+      - pattern: "(?:app\\.use\\(cors\\(\\{[^\\}]*?origin:\\s*['\"]\\*['\"])|Access-Control-Allow-Origin:\\s*['\"]\\*['\"]"
+        message: "Wildcard CORS policy detected. This allows any domain to make cross-origin requests. Restrict CORS to specific trusted domains."
+        
+      # Pattern 6: Detect Lack of Role Checks in Admin Functions
+      - pattern: "(?:function|const)\\s+(?:admin|updateUser|deleteUser|createUser|updateRole|manageUsers|setPermission)[^\\{]*?\\{[^\\}]*?\\}"
+        negative_pattern: "(?:role|permission|isAdmin|hasAccess|authorize|authenticate|auth\\.check|checkPermission|checkRole|verifyRole|ensureAdmin|adminOnly|adminRequired|requirePermission)"
+        message: "Administrative function appears to be missing role or permission checks. Implement proper authorization checks to restrict access to administrative functions."
+        
+      # Pattern 7: Detect Missing Login Rate Limiting
+      - pattern: "(?:function|const)\\s+(?:login|signin|authenticate|auth)[^\\{]*?\\{[^\\}]*?(?:compare(?:Sync)?|check(?:Password)?|match(?:Password)?|verify(?:Password)?)[^\\}]*?\\}"
+        negative_pattern: "(?:rate(?:Limit)?|throttle|limit|delay|cooldown|attempt|counter|maxTries|maxAttempts|lockout|timeout)"
+        message: "Login function appears to be missing rate limiting. Implement rate limiting to prevent brute force attacks."
+        
+      # Pattern 8: Detect Horizontal Privilege Escalation Vulnerability
+      - pattern: "(?:findById|findOne|findByPk|get)\\((?:req|request)\\.(?:params|query|body)\\.(?:id|userId|accountId)\\)"
+        negative_pattern: "(?:!=|!==|===|==)\\s*(?:req\\.user\\.id|req\\.userId|currentUser\\.id|user\\.id|session\\.userId)"
+        message: "Potential horizontal privilege escalation vulnerability. Ensure the requested resource belongs to the authenticated user."
+        
+      # Pattern 9: Detect Missing CSRF Protection
+      - pattern: "(?:app|router)\\.(?:post|put|delete|patch)\\(['\"][^'\"]+['\"]"
+        negative_pattern: "(?:csrf|xsrf|csurf|csrfProtection|antiForgery|csrfToken|csrfMiddleware)"
+        message: "Route may be missing CSRF protection. Implement CSRF tokens for state-changing operations to prevent cross-site request forgery attacks."
+        
+      # Pattern 10: Detect Bypassing Access Control with Path Traversal
+      - pattern: "(?:fs|require)(?:\\.promises)?\\.(read|open|access|stat)(?:File|Sync)?\\([^\\)]*?(?:req|request)\\.(?:params|query|body|path)\\.[^\\)]*?\\)"
+        negative_pattern: "(?:normalize|resolve|sanitize|validate|pathValidation|checkPath)"
+        message: "Potential path traversal vulnerability in file access. Validate and sanitize user-supplied paths to prevent directory traversal attacks."
+        
+      # Pattern 11: Detect Missing Authentication Middleware
+      - pattern: "(?:new\\s+)?express\\(\\)|(?:import|require)\\(['\"]express['\"]\\)"
 
-  - type: suggest
-    message: |
-      ## Query Optimization Recommendations
-
-      I notice you're making multiple requests for similar tasks. Here's how to optimize your AI interactions:
-
-      ### 1. Refine Your Prompts
-      - **Be more specific:** Include technical details, file paths, and exact requirements
-      - **Use structured formats:** For complex requests, use bullet points or numbered lists
-      - **Include context:** Mention relevant technologies, frameworks, or standards
-      - **Set clear expectations:** Specify the format and level of detail you need
-
-      ### 2. Break Down Complex Tasks
-      - Split large tasks into smaller, focused requests
-      - Ask for step-by-step approaches for complex problems
-      - Request specific examples for unclear concepts
-
-      ### 3. Provide Feedback
-      - Tell the AI what worked and what didn't in previous responses
-      - Clarify misunderstandings explicitly
-      - Highlight successful parts of previous responses
-
-      ### 4. Use Technical Terminology
-      - Use precise technical terms for your domain (Drupal, Lagoon, etc.)
-      - Reference specific functions, methods, or patterns
-      - Mention relevant standards or best practices
-
-      ### 5. Leverage Cursor Features
-      - Use file references when discussing specific code
-      - Reference line numbers for targeted changes
-      - Utilize code blocks for examples
-
-      The system will now optimize rules based on this interaction pattern to improve future responses.
-
-  - type: auto_update
-    target: ".cursor/rules/ai-optimization.mdc"
-    conditions:
-      - pattern: "(?i)(retry|again|fix this|not what I expected|not what I meant|didn't work|rewrite|regenerate)"
-    message: "Updating AI efficiency rules based on detected inefficiencies or repeated queries."
-
-  - type: log
-    message: "AI Query Efficiency Analysis: [{{query_count}} queries in {{time_period}} detected inefficiency.]"
-    conditions:
-      - pattern: "(?i)(retry|again|fix this|not what I expected|didn't work|rewrite|regenerate)"
-
-examples:
-  - input: |
-      "This Drupal module is not working, let's try again."
-      "That didn't work, let's refine the approach."
-      "Please rewrite this code to be more efficient."
-    output: |
-      Cursor detects inefficiency in queries and suggests:
-      
-      "I notice you're making multiple attempts. To get better results:
-      1. Specify which part of the module isn't working
-      2. Include any error messages you're seeing
-      3. Mention the Drupal version and relevant modules
-      4. Describe what you've already tried"
-
-  - input: |
-      "Generate a Lagoon configuration file."
-      "This doesn't look right, regenerate it."
-      "Try again with better practices."
-    output: |
-      Cursor detects repetition and suggests:
-      
-      "For better Lagoon configuration results:
-      1. Specify which services you need (nginx, php, mariadb, etc.)
-      2. Mention your project type (Drupal, WordPress, etc.)
-      3. Include any specific environment requirements
-      4. Reference any existing configuration you want to maintain"
-
-metadata:
-  priority: critical
-  version: 1.2
-</rule>
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [ivangrynenko/cursorrules](https://github.com/ivangrynenko/cursorrules) — distributed by [TomeVault](https://tomevault.io).
