@@ -1,208 +1,136 @@
 ---
 trigger: always_on
-description: Git conventions and workflow guidelines using Conventional Commits
+description: The project's README.md follows specific conventions to maintain consistency and clarity. The documentation is split between README.md (project overview) and CURSOR_TIPS.md (Cursor-specific documentation).
 ---
 
-# Git Conventions and Workflow Guidelines 🔄
+# README Conventions and Guidelines 📚
+
+The project's README.md follows specific conventions to maintain consistency and clarity. The documentation is split between README.md (project overview) and CURSOR_TIPS.md (Cursor-specific documentation).
 
 ## Language Requirements
 
-All git-related text MUST be written in English:
-- Commit messages
-- Branch names
-- Pull request titles and descriptions
-- Code review comments
-- Issue titles and descriptions
+All documentation MUST be written in English. This includes:
+- Main content
+- Comments
+- Examples
+- Section headers
+- File names and paths
 
-## Commit Message Format
+## README.md Structure
 
-All commit messages MUST follow the [Conventional Commits](mdc:https:/www.conventionalcommits.org) specification:
+1. **Title and Introduction**
+   ```markdown
+   # Project Title 🚀
 
-```
-<type>[optional scope]: <description>
-
-[optional body]
-
-[optional footer(s)]
-```
-
-### Types
-
-- `feat`: A new feature
-- `fix`: A bug fix
-- `docs`: Documentation only changes
-- `style`: Changes that do not affect the meaning of the code (formatting, etc)
-- `refactor`: A code change that neither fixes a bug nor adds a feature
-- `perf`: A code change that improves performance
-- `test`: Adding missing tests or correcting existing tests
-- `chore`: Changes to the build process or auxiliary tools
-- `ci`: Changes to CI configuration files and scripts
-
-### Scope
-The scope should be the name of the component affected (as perceived by the person reading the changelog).
-
-Examples:
-- `feat(auth): add login with Google`
-- `fix(api): handle null response from server`
-- `docs(readme): update installation steps`
-
-### Description
-- Use the imperative, present tense: "change" not "changed" nor "changes"
-- Don't capitalize first letter
-- No dot (.) at the end
-- Write in english
-
-## Branch Naming Convention
-
-Branches should follow this pattern:
-```
-<type>/<short-description>
-```
-
-For features and fixes that are tracked in a project management system, include the ticket number:
-```
-<type>/<ticket-number>-<short-description>
-```
-
-Examples:
-- `feat/add-google-auth`
-- `fix/handle-null-responses`
-- `docs/update-readme`
-- `feat/PROJ-123-add-google-auth`
-- `fix/PROJ-456-handle-null-responses`
-
-## Workflow Guidelines
-
-1. **Protected Branches**
-   - `main` (or `master`): Production-ready code, protected branch
-   - Direct commits to protected branches are NOT allowed
-   - All changes must come through Pull Requests
-
-2. **Feature Development**
-   ```bash
-   # First, check if you're on a protected branch
-   git branch --show-current
-   
-   # If on main/master, create and checkout a new feature branch
-   git checkout -b feat/my-new-feature main
-   
-   # Make changes and commit
-   git add .
-   git commit -m "feat(scope): add new feature"
-   
-   # Keep branch updated with main
-   git fetch origin main
-   git rebase origin/main
-   
-   # Push changes
-   git push origin feat/my-new-feature
+   Brief description of what the project does and its main benefits.
    ```
 
-3. **Pull Request Process**
-   - Create PR from feature branch to main/master
-   - Use PR template if available
-   - Request at least 2 code reviews
-   - All tests must pass
-   - No merge conflicts
-   - Squash commits when merging
+2. **Content Overview**
+   ```markdown
+   ## 📚 What You'll Find Here
 
-4. **Release Process**
-   ```bash
-   # Create release branch from main
-   git checkout main
-   git pull origin main
-   git checkout -b release/v1.0.0
-   
-   # After testing, merge back to main via PR
-   # After PR is approved and merged:
-   git checkout main
-   git pull origin main
-   git tag -a v1.0.0 -m "version 1.0.0"
-   git push origin main --tags
+   ### [CURSOR_TIPS.md](mdc:CURSOR_TIPS.md)
+   Brief description of what's in CURSOR_TIPS.md
+   ```
+
+3. **Rules Section**
+   ```markdown
+   ## 📋 Rules
+
+   Brief explanation of Cursor rules and their purpose.
+
+   | Rule Name | Purpose | Description |
+   |-----------|---------|-------------|
+   | [rule-name](mdc:.cursor/rules/rule-name.mdc) | Category | Description |
+   ```
+
+4. **Contributing Section**
+   ```markdown
+   ## 🤝 Contributing
+
+   How others can contribute to the project
+   ```
+
+5. **License Section**
+   ```markdown
+   ## 📝 License
+
+   License information and terms
+   ```
+
+## Content Guidelines
+
+1. **General Principles**
+   - Keep README.md focused on project overview
+   - Move Cursor-specific content to CURSOR_TIPS.md
+   - Use clear, professional English
+   - Be concise and direct
+
+2. **Formatting**
+   - Use **bold** for emphasis
+   - Use `code` for technical terms
+   - Use emojis frgaUse horizontal rules (---) between main sections
+
+3. **Links and References**
+   - Link to CURSOR_TIPS.md for Cursor-specific details
+   - Link to rule files in .cursor/rules/
+   - Use descriptive link text
+   - Example:
+   ```markdown
+   [Cursor Usage Guide](mdc:CURSOR_TIPS.md) | [Git Conventions](mdc:.cursor/rules/git-conventions.mdc)
    ```
 
 ## Examples
 
-✅ Good Commits:
-```bash
-feat(auth): implement JWT authentication
-fix(api): handle edge case in user validation
-docs(api): update API documentation
-style(components): format according to style guide
-refactor(database): optimize query performance
-test(auth): add unit tests for login flow
+✅ Good README Structure:
+```markdown
+# Project Name 🚀
+
+This project helps developers maximize productivity with Cursor IDE.
+
+## 📚 What You'll Find Here
+
+### [CURSOR_TIPS.md](mdc:CURSOR_TIPS.md)
+Comprehensive guide for professional Cursor usage, including:
+- Initial setup
+- Project customization
+- Advanced features
+
+## 📋 Rules
+
+Rules help maintain consistency across the project...
+
+| Rule Name | Purpose | Description |
+|-----------|---------|-------------|
+| [git-conventions](mdc:.cursor/rules/git-conventions.mdc) | Git Standards | Enforces commit format... |
 ```
 
-❌ Bad Commits:
-```bash
-Fixed stuff
-Updated code
-WIP
-Quick fix
+❌ Bad README Structure:
+```markdown
+# Project
+
+Setup:
+1. Install cursor
+2. Configure stuff
+3. Do things
+
+Rules:
+- git stuff
+- readme stuff
 ```
 
-## Pre-commit Hooks
+## Maintenance
 
-Consider using pre-commit hooks to enforce these conventions:
-- Commit message format validation
-- Code linting
-- Test execution
-- Branch naming validation
-- Protected branch validation
+1. **Regular Updates**
+   - Keep both README.md and CURSOR_TIPS.md synchronized
+   - Ensure all links between documents work
+   - Update rule references when rules change
 
-## Using MCP Git in Cursor 🤖
-
-The Model Context Protocol (MCP) Git integration allows you to perform Git operations directly from Cursor while following our commit conventions.
-
-> **Important**: For proper path handling in MCP Git operations, please refer to the `mcp-git-path-encoding.mdc` rule file. This ensures consistent path handling across different platforms and prevents encoding issues.
-
-### Basic MCP Git Commands
-
-1. **Check Current Branch and Create Feature Branch if Needed**
-   ```python
-   # First check current branch
-   mcp_git_git_status(repo_path=".")
-   
-   # If on main/master, create and switch to feature branch
-   mcp_git_git_create_branch(
-       repo_path=".",
-       branch_name="feat/my-new-feature",
-       base_branch="main"
-   )
-   mcp_git_git_checkout(
-       repo_path=".",
-       branch_name="feat/my-new-feature"
-   )
-   ```
-
-2. **Viewing Changes**
-   ```python
-   # View unstaged changes
-   mcp_git_git_diff_unstaged(repo_path=".")
-   
-   # View staged changes
-   mcp_git_git_diff_staged(repo_path=".")
-   ```
-
-3. **Making Commits**
-   ```python
-   # First ensure you're not on a protected branch
-   status = mcp_git_git_status(repo_path=".")
-   if "main" in status or "master" in status:
-       # Create feature branch first
-       branch_name = "feat/my-feature"
-       mcp_git_git_create_branch(
-           repo_path=".",
-           branch_name=branch_name,
-           base_branch="main"
-       )
-       mcp_git_git_checkout(repo_path=".", branch_name=branch_name)
-   
-   # Then stage and commit
-   mcp_git_git_add(repo_path=".", files=["path/to/file"])
-   mcp_git_git_commit(
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+2. **Review Process**
+   - Verify English language usage
+   - Check links to rule files
+   - Validate table formatting
+   - Ensure proper separation of concerns between files
 
 ---
 > Source: [gifflet/cursor-like-pro](https://github.com/gifflet/cursor-like-pro) — distributed by [TomeVault](https://tomevault.io).
