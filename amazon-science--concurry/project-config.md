@@ -1,55 +1,163 @@
 ---
 trigger: always_on
-description: Runtime type enforcement with @validate — when to use, performance and serialization exemptions.
+description: These architecture details are useful when designing, integrating or refactoring major components of concurry, when debugging challenging errors and race conditions, and when testing cross-feature functionality. Also refer to the respective files in docs/architecture/ for comprehensive details.
 ---
 
-# Runtime Type Enforcement with `@validate` (CRITICAL)
+# Cursor Rules: Concurry Architecture
 
-## What `@validate` Does and Why It Matters
+## Synchronization Architecture and Rules
 
-`morphic.validate` is a decorator built on Pydantic's `validate_call` that brings full Pydantic validation to regular functions and methods. When you decorate a function with `@validate`, every call validates and coerces its arguments against the declared type hints at runtime — not just at type-check time, not just in tests, but on every single invocation.
+**CRITICAL**: Follow these rules when working with `wait()`, `gather()`, or future implementations.
 
-This is the bridge between "type hints as documentation" and "type hints as enforcement." Without `@validate`, a function annotated `def submit(task: Task)` will happily accept a string, a number, or `None` at runtime — Python ignores annotations by default. With `@validate`, the same function rejects invalid inputs immediately with a clear `ValidationError`, and automatically coerces compatible types (e.g., a dict into a `Task` object via Pydantic's model coercion).
+For comprehensive architecture details, see [docs/architecture/synchronization.md](../../docs/architecture/synchronization.md)
 
-The interaction with the Strict `Any` Ban is direct: `@validate` can only enforce types that are declared. If a parameter is typed `Any`, `@validate` passes it through without checking. Every `Any` in a `@validate`-decorated function is a parameter that bypasses runtime validation entirely. The two rules reinforce each other: the `Any` ban ensures types are declared precisely, and `@validate` ensures those precise declarations are enforced at runtime.
+### BaseFuture Implementations
 
-For LLM coding agents, `@validate` is a critical safety net. When an agent generates a call like `worker.submit(task=some_variable)`, the agent may have constructed `some_variable` incorrectly — wrong type, wrong structure, missing fields. Without `@validate`, this error propagates silently. With `@validate`, the error is caught at the function boundary with a clear `ValidationError` at the call site.
+**Rule 1**: Each future type has a specific state management strategy:
+- `SyncFuture`: Caches everything (immutable at creation)
+- `ConcurrentFuture`: Pure delegation wrapper (NO caching of `_result`, `_exception`, `_done`, `_cancelled`)
+- `AsyncioFuture`: Pure delegation wrapper (NO caching of `_result`, `_exception`, `_done`)
+- `RayFuture`: Caches state after fetching (stores `_result`, `_exception`, `_done`, `_cancelled`)
 
-`@validate` works with Morphic `Typed` classes, `Typed + Registry` subclasses, standalone functions, and class methods. Dict arguments are automatically coerced into `Typed` instances. String arguments are coerced into ints, floats, and bools. `AutoEnum` values are resolved by fuzzy matching. This coercion means `@validate` is not just a gate — it is a normalizer that converts loosely-typed data into strongly-typed objects at the function boundary.
+**Rule 2**: NEVER set `_done=True` without fetching the result:
+```python
+# ❌ WRONG - RayFuture bug
+def done(self) -> bool:
+    ready, _ = ray.wait([self._object_ref], timeout=0)
+    if len(ready) > 0:
+        self._done = True  # ❌ BUG: _result is still None!
+        return True
 
-The latency cost is real but small: a few hundred microseconds per call. For Concurry's user-facing API (`.options()`, `.init()`, `gather()`, `wait()` called with a list) this is invisible — the actual work (thread/process/Ray dispatch) dwarfs the validation cost by orders of magnitude. The only places where `@validate` must be omitted are **tight inner loops in concurrency primitives** where microseconds compound into seconds.
+# ✅ CORRECT
+def done(self) -> bool:
+    if self._done:
+        return True
+    ready, _ = ray.wait([self._object_ref], timeout=0)
+    return len(ready) > 0  # Don't set _done here
+```
 
-### When to Use `@validate` in Concurry
+**Rule 3**: All futures must raise consistent exception types:
+- Raise `concurrent.futures.CancelledError`, NOT `asyncio.CancelledError`
+- Raise `TimeoutError`, NOT `ray.exceptions.GetTimeoutError`
 
-**Default: use `@validate` on every public function and method.** The decorator should be present unless a specific exception applies.
+**Rule 4**: Callbacks must receive the wrapper (BaseFuture), not the underlying future:
+```python
+# ✅ CORRECT
+def add_done_callback(self, fn: Callable) -> None:
+    self._future.add_done_callback(lambda _: fn(self))  # Pass self, not _
+```
 
-| Category | Use `@validate`? | Rationale |
-|---|---|---|
-| **All public module-level functions** (`wait`, `gather`, `wrap_future`) | **YES** | User-facing entry points. |
-| **All public methods of user-facing classes** (`Worker.options`, `LimitSet.acquire`) | **YES** | `Worker.options()` already uses `@validate`. Extend to all public methods. |
-| **Factory functions** | **YES** | Construct objects from user config; coercion is essential. |
-| **Private methods** (`_create_retry_configs`, `_dispatch_to_worker`) | **No** (type hints required, `@validate` optional) | Called from validated public methods. Double-validating wastes cycles. |
-| **Morphic lifecycle hooks** (`pre_initialize`, `post_initialize`, `pre_validate`) | **No** | The Morphic framework calls these with already-validated data. |
-| **Pydantic `@field_validator` methods** | **No** | Already part of Pydantic's validation pipeline. |
-| **`AutoEnum` methods, `__getattr__`, `__getitem__`** | **No** | Input types guaranteed by the Python language or Morphic framework. |
-| **Hot-path concurrency primitives** (see below) | **No** (with documented justification) | Called thousands/millions of times per second. |
-| **Worker methods serialized across Ray** (see below) | **Case-by-case** | `@validate` closure may not be picklable. |
+**Rule 5**: Always use `wrap_future()` when accepting external futures:
+```python
+# ✅ CORRECT
+from concurry.core.future import wrap_future
 
-### Performance Exemption (CRITICAL for Concurry)
+futures_list = [wrap_future(f) for f in external_futures]
+```
 
-Concurry's core primitives are called in tight loops at very high frequency. The following components are **explicitly exempt** from `@validate` because the validation overhead compounds into visible latency:
+### wait() and gather() Functions
 
-| Component | Call frequency | Why exempt |
-|---|---|---|
-| `BaseFuture.result()`, `.done()`, `.cancel()`, `.exception()` | Once per future in `wait()`/`gather()` loops (50,000+/sec) | 200µs × 50k = 10s added to a 2s gather |
-| `async_wait()`, `async_gather()` inner loops | Same as above | Async hot path |
-| `Acquisition.__init__()`, `.update()`, `.release()` | Once per limit acquisition per task submission | Thousands/sec in rate-limited workers |
-| `LimitSet` internal synchronization methods | Called under lock on every task dispatch | Microseconds matter under contention |
+**Rule 6**: Cannot mix structure and variadic arguments:
+```python
+# ❌ WRONG
+futures = [f1, f2, f3]
+wait(futures, f4, f5)  # Raises ValueError
 
-When `@validate` is omitted from a public function for performance, the omission **MUST** be documented with a comment:
+# ✅ CORRECT
+wait([f1, f2, f3, f4, f5])  # Pass as list
+wait(f1, f2, f3, f4, f5)     # Pass individually
+```
+
+**Rule 7**: Dict inputs must return dicts with preserved keys:
+```python
+tasks = {"task1": f1, "task2": f2}
+results = gather(tasks)
+# Must return: {"task1": r1, "task2": r2}
+```
+
+**Rule 8**: Always call `fut.result(timeout=0)` after `wait()` completes:
+```python
+# ✅ CORRECT
+done, not_done = wait(futures_list, ...)
+for fut in done:
+    result = fut.result(timeout=0)  # timeout=0 is safe, future is done
+```
+
+**Rule 9**: Ray batch checking must use single `ray.wait()` call:
+```python
+# ✅ CORRECT - batch all Ray futures
+ready, not_ready = ray.wait(
+    ray_futures, 
+    num_returns=len(ray_futures),  # Check all at once
+    timeout=0
+)
+```
+
+### Polling Strategies
+
+**Rule 10**: All polling intervals must come from `global_config`:
+```python
+# ❌ WRONG
+strategy = FixedPollingStrategy(interval=0.01)  # Hardcoded!
+
+# ✅ CORRECT
+from concurry.config import global_config
+defaults = global_config.defaults
+strategy = FixedPollingStrategy(interval=defaults.polling_fixed_interval)
+```
+
+**Rule 11**: New polling strategies must inherit from `BasePollingStrategy`:
+```python
+class CustomStrategy(BasePollingStrategy):
+    aliases = ["custom", PollingAlgorithm.Custom]
+    
+    def get_next_interval(self) -> float: ...
+    def record_completion(self) -> None: ...
+    def record_no_completion(self) -> None: ...
+    def reset(self) -> None: ...
+```
+
+### Extension Guidelines
+
+**Adding New Future Type**:
+1. Inherit from `BaseFuture` and implement all abstract methods
+2. Define `__slots__` with minimal fields (delegate when possible)
+3. Use `FUTURE_UUID_PREFIX` class variable
+4. Update `wrap_future()` function to detect new type
+5. Update `_check_futures_batch()` for batch optimization (if applicable)
+
+**Adding New Polling Strategy**:
+1. Inherit from `BasePollingStrategy` (Registry + MutableTyped)
+2. Define `aliases` for factory creation
+3. Add to `PollingAlgorithm` enum
+4. Add configuration defaults to `GlobalDefaults`
+5. Update strategy creation in `wait()` and `gather()`
+
+## Core Design Principle: No Silent Fallbacks
+
+**CRITICAL**: Concurry must **fail noisily** rather than silently degrade performance.
+
+### The Rule
+
+❌ **NEVER** auto-fallback to slower implementations when configured implementation fails
+✅ **ALWAYS** fail loudly with actionable error messages
+✅ **DO** have multiple implementations (flexibility is good)
+✅ **DO** select implementation via explicit configuration
+❌ **DON'T** downgrade silently (causes mysterious slowdowns)
+
+### Why This Matters
+
+Silent fallbacks are the **bane of concurrency frameworks**. They cause:
+- **Mysterious slowdowns** that are hard to diagnose
+- **Production surprises** when code suddenly runs 10-100x slower
+- **False confidence** in development that breaks in production
+- **Debugging nightmares** trying to find why "the same code" performs differently
+
+### Real-World Example
 
 ```python
-# @validate omitted: hot path — called once per future in wait()/gather() loops.
+# ❌ WRONG: Silent fallback
+try:
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
