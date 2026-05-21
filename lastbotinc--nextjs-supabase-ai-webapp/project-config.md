@@ -1,217 +1,230 @@
 ---
 trigger: always_on
-description: This describes the design pattern and implementation guidance for implementing nextjs page.
+description: This described desing patterns and implementation guidance for APIs
 ---
 
 ---
-description: This describes the design pattern and implementation guidance for implementing nextjs page.
-globs: *.tsx, /app/[locale]
+description: This described desing patterns and implementation guidance for APIs
+globs: *.ts
+---
+---
+description:
+globs:
 ---
 
-# NextJS Frontend Page Implementation Patterns
+# NextJS API Implementation Patterns
 
-This document describes the patterns for implementing different types of pages in a NextJS application with authentication, localization, and server communication.
+This document describes the patterns for implementing different types of API routes in a NextJS application with authentication levels and external service integration.
 
 ## Common Setup
 
-- Always read [frontend.md](mdc:docs/frontend.md) for instructions on the styles, [brand-info.ts](mdc:lib/brand-info.ts) for constructing text and [architecture.md](mdc:docs/architecture.md) for overall architecture
+- Always read [backend.md](mdc:docs/backend.md) for instructions on the backend details and [architecture.md](mdc:docs/architecture.md) for overall architecture
 
-### Directory Structure
+### Directory Structure with examples
+```
 app/
-  [locale]/
-    page.tsx                 # Public page
-    about/
-      page.tsx              # Public page
-    account/
-      settings/
-        page.tsx           # Account page (authenticated)
-      security/
-        page.tsx          # Account page (authenticated)
-    admin/
-      contacts/
-        page.tsx         # Admin page (authenticated + admin)
-      analytics/
-        page.tsx        # Admin page (authenticated + admin)
-      AdminLayoutClient.tsx  # Admin layout wrapper
-    layout.tsx  # Root layout with locale provider
-    page.tsx    # Home page
-  i18n/
-    server-utils.ts  # Server utilities for localization
-    client-utils.ts  # Client utilities for localization
-  messages/
-    en.json     # English translations
-    fi.json     # Finnish translations
-    sv.json     # Swedish translations
+  api/
+    # Public Routes
+    languages/
+      route.ts        # Public GET, authenticated POST/PATCH/DELETE
+    
+    # Authenticated Routes
+    upload/
+      route.ts        # File upload with authentication
+    
+    # Admin Routes
+    translations/
+      route.ts        # Admin-only translation management
+      generate/
+        route.ts      # AI-powered translation generation
+    
+    # AI-Enhanced Routes
+    research-enhance/
+      route.ts        # AI analysis with Gemini and Tavily
+    tavily-search/
+      route.ts        # Advanced search functionality
+```
 
 ### Required Dependencies
 ```json
 {
   "dependencies": {
     "next": "^14.0.0",
-    "next-intl": "^3.0.0",
-    "@supabase/supabase-js": "^2.0.0"
+    "@supabase/supabase-js": "^2.0.0",
+    "@google/generative-ai": "^0.1.0",
+    "@tavily/core": "^1.0.0"
   }
 }
 ```
 
-### Localisation Configuration
+## Authentication Levels
 
-1. **Root Layout Setup** (`app/[locale]/layout.tsx`):
+### 1. Public Routes
 ```typescript
-import { NextIntlClientProvider } from 'next-intl'
-import { getMessages } from '@/app/i18n/server-utils'
+// Example: GET /api/languages
+export async function GET() {
+  try {
+    const supabase = createClient(undefined, true) // Public client
+    
+    const { data, error } = await supabase
+      .from('table')
+      .select('*')
+      .eq('enabled', true)
 
-interface Props {
-  children: React.ReactNode
-  params: { locale: string }
-}
+    if (error) throw error
 
-export default async function LocaleLayout({ children, params: { locale } }: Props) {
-  const messages = await getMessages(locale)
-
-  return (
-    <NextIntlClientProvider locale={locale} messages={messages}>
-      {children}
-    </NextIntlClientProvider>
-  )
-}
-```
-
-2. **Server Utilities** (`app/i18n/server-utils.ts`):
-```typescript
-import { createSharedPathnamesNavigation } from 'next-intl/navigation'
-import { getRequestConfig } from 'next-intl/server'
-
-export const locales = ['en', 'fi', 'sv']
-export const defaultLocale = 'en'
-
-// For server components
-export async function getMessages(locale: string) {
-  return (await import(`@/messages/${locale}.json`)).default
-}
-
-// Setup locale for server components
-export async function setupServerLocale(locale: string) {
-  const messages = await getMessages(locale)
-  return { locale, messages }
-}
-
-// Navigation utilities
-export const { Link, redirect, usePathname, useRouter } = 
-  createSharedPathnamesNavigation({ locales })
-```
-
-3. **Client Utilities** (`app/i18n/client-utils.ts`):
-```typescript
-'use client'
-
-import { useTranslations } from 'next-intl'
-import { createSharedPathnamesNavigation } from 'next-intl/navigation'
-
-export const locales = ['en', 'fi', 'sv']
-
-// Navigation utilities for client components
-export const { Link, usePathname, useRouter } = 
-  createSharedPathnamesNavigation({ locales })
-
-// Hook for switching locales
-export function useLocale() {
-  const router = useRouter()
-  const pathname = usePathname()
-  
-  const switchLocale = (newLocale: string) => {
-    router.replace(pathname, { locale: newLocale })
+    return NextResponse.json({ data })
+  } catch (error) {
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
   }
-
-  return { switchLocale }
-}
-```
-### Usage Examples
-
-1. **Server Components**:
-```typescript
-import { getTranslations } from 'next-intl/server'
-
-export default async function Page() {
-  const t = await getTranslations('Namespace')
-  return <h1>{t('title')}</h1>
 }
 ```
 
-2. **Client Components**:
+### 2. Authenticated Routes
 ```typescript
-'use client'
+// Example: Protected route requiring authentication
+export async function POST(request: Request) {
+  try {
+    // 1. Verify authentication
+    const authHeader = request.headers.get('Authorization')
+    if (!authHeader?.startsWith('Bearer ')) {
+      return NextResponse.json(
+        { error: 'Missing or invalid authorization header' },
+        { status: 401 }
+      )
+    }
 
-import { useTranslations } from 'next-intl'
+    // 2. Create authenticated client
+    const supabase = createClient()
+    
+    // 3. Verify token and get user
+    const { data: { user }, error: authError } = await supabase.auth.getUser(
+      authHeader.split(' ')[1]
+    )
 
-export default function Component() {
-  const t = useTranslations('Namespace')
-  return <button>{t('buttons.submit')}</button>
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+
+    // 4. Process authenticated request
+    const { data } = await request.json()
+    
+    // 5. Perform operation with user context
+    const result = await supabase
+      .from('table')
+      .insert({ ...data, user_id: user.id })
+
+    return NextResponse.json({ result })
+  } catch (error) {
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
 }
 ```
 
-3. **Locale Switcher Component**:
+### 3. Admin Routes
 ```typescript
-'use client'
+// Example: Admin-only route
+export async function PUT(request: Request) {
+  try {
+    // 1. Verify authentication
+    const authHeader = request.headers.get('Authorization')
+    if (!authHeader?.startsWith('Bearer ')) {
+      return NextResponse.json(
+        { error: 'Missing or invalid authorization header' },
+        { status: 401 }
+      )
+    }
 
-import { useLocale, locales } from '@/app/i18n/client-utils'
+    // 2. Create authenticated client
+    const authClient = createClient()
+    
+    // 3. Verify token and get user
+    const { data: { user }, error: authError } = await authClient.auth.getUser(
+      authHeader.split(' ')[1]
+    )
 
-export default function LocaleSwitcher() {
-  const { switchLocale } = useLocale()
-  
-  return (
-    <select onChange={(e) => switchLocale(e.target.value)}>
-      {locales.map((locale) => (
-        <option key={locale} value={locale}>
-          {locale.toUpperCase()}
-        </option>
-      ))}
-    </select>
-  )
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+
+    // 4. Verify admin status
+    const { data: profile } = await authClient
+      .from('profiles')
+      .select('is_admin')
+      .eq('id', user.id)
+      .single()
+
+    if (!profile?.is_admin) {
+      return NextResponse.json(
+        { error: 'Forbidden - Admin access required' },
+        { status: 403 }
+      )
+    }
+
+    // 5. Use service role client for admin operations
+    const supabase = createClient(undefined, true)
+    
+    // 6. Process admin request
+    const { data } = await request.json()
+    const result = await supabase
+      .from('table')
+      .upsert(data)
+
+    return NextResponse.json({ result })
+  } catch (error) {
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
 }
 ```
 
-4. **Localized Links**:
-```typescript
-import { Link } from '@/app/i18n/client-utils'
+## API Route Patterns
 
-export default function Navigation() {
-  return (
-    <nav>
-      <Link href="/">Home</Link>
-      <Link href="/about">About</Link>
-    </nav>
-  )
+### 1. CRUD Operations
+```typescript
+// GET - List/Read
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url)
+  // ... handle query parameters
+}
+
+// POST - Create
+export async function POST(request: Request) {
+  const body = await request.json()
+  // ... handle creation
+}
+
+// PUT/PATCH - Update
+export async function PUT(request: Request) {
+  const body = await request.json()
+  // ... handle update
+}
+
+// DELETE - Remove
+export async function DELETE(request: Request) {
+  const { searchParams } = new URL(request.url)
+  // ... handle deletion
 }
 ```
 
-### Best Practices
-
-1. **Translation Keys**:
-- Use nested structures for better organization
-- Use consistent naming conventions
-- Keep keys descriptive and hierarchical
-- Group common translations under shared namespaces
-
-2. **Dynamic Values**:
+### 2. File Upload
 ```typescript
-// Using variables
-t('welcome', { name: user.name })
-
-// Using plurals
-t('items', { count: items.length })
-
-// Using rich text
-t.rich('terms', {
-  link: (chunks) => <a href="/terms">{chunks}</a>
-})
-```
-
-3. **Date and Number Formatting**:
-```typescript
-import { useFormatter } from 'next-intl'
-
-export default function Component() {
+export async function POST(request: NextRequest) {
+  try {
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
