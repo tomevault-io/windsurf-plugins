@@ -1,15 +1,15 @@
 ---
 trigger: always_on
-description: Detect and prevent cryptographic failures in Python applications as defined in OWASP Top 10:2021-A02
+description: Detect and prevent injection vulnerabilities in Python applications as defined in OWASP Top 10:2021-A03
 ---
 
-# Python Cryptographic Failures Security Standards (OWASP A02:2021)
+ # Python Injection Security Standards (OWASP A03:2021)
 
-This rule enforces security best practices to prevent cryptographic failures in Python applications, as defined in OWASP Top 10:2021-A02.
+This rule enforces security best practices to prevent injection vulnerabilities in Python applications, as defined in OWASP Top 10:2021-A03.
 
 <rule>
-name: python_cryptographic_failures
-description: Detect and prevent cryptographic failures in Python applications as defined in OWASP Top 10:2021-A02
+name: python_injection
+description: Detect and prevent injection vulnerabilities in Python applications as defined in OWASP Top 10:2021-A03
 filters:
   - type: file_extension
     pattern: "\\.(py)$"
@@ -19,101 +19,73 @@ filters:
 actions:
   - type: enforce
     conditions:
-      # Pattern 1: Weak or insecure cryptographic algorithms
-      - pattern: "import\\s+(md5|sha1)|hashlib\\.(md5|sha1)\\(|Crypto\\.Hash\\.(MD5|SHA1)|cryptography\\.hazmat\\.primitives\\.hashes\\.(MD5|SHA1)"
-        message: "Using weak hashing algorithms (MD5/SHA1). Use SHA-256 or stronger algorithms from the hashlib or cryptography packages."
+      # Pattern 1: SQL Injection - String concatenation in SQL queries
+      - pattern: "cursor\\.(execute|executemany)\\([\"'][^\"']*\\s*[\\+%]|cursor\\.(execute|executemany)\\([^,]+\\+\\s*[a-zA-Z_][a-zA-Z0-9_]*"
+        message: "Potential SQL injection vulnerability. Use parameterized queries with placeholders instead of string concatenation."
         
-      # Pattern 2: Hardcoded secrets/credentials
-      - pattern: "(password|secret|key|token|auth)\\s*=\\s*['\"][^'\"]+['\"]"
-        message: "Potential hardcoded credentials detected. Store secrets in environment variables or a secure vault."
+      # Pattern 2: SQL Injection - String formatting in SQL queries
+      - pattern: "cursor\\.(execute|executemany)\\([\"'][^\"']*%[^\"']*[\"']\\s*%\\s*|cursor\\.(execute|executemany)\\([\"'][^\"']*{[^\"']*}[\"']\\.format"
+        message: "Potential SQL injection vulnerability. Use parameterized queries with placeholders instead of string formatting."
         
-      # Pattern 3: Insecure random number generation
-      - pattern: "random\\.(random|randint|choice|sample)|import random"
-        message: "Using Python's standard random module for security purposes. Use secrets module or cryptography.hazmat.primitives.asymmetric for cryptographic operations."
+      # Pattern 3: Command Injection - Shell command execution with user input
+      - pattern: "(os\\.system|os\\.popen|subprocess\\.Popen|subprocess\\.call|subprocess\\.run|subprocess\\.check_output)\\([^)]*\\+\\s*[a-zA-Z_][a-zA-Z0-9_]*|\\b(os\\.system|os\\.popen|subprocess\\.Popen|subprocess\\.call|subprocess\\.run|subprocess\\.check_output)\\([^)]*format\\(|\\b(os\\.system|os\\.popen|subprocess\\.Popen|subprocess\\.call|subprocess\\.run|subprocess\\.check_output)\\([^)]*f['\"]"
+        message: "Potential command injection vulnerability. Never use string concatenation or formatting with shell commands. Use subprocess with shell=False and pass arguments as a list."
         
-      # Pattern 4: Weak SSL/TLS configuration
-      - pattern: "ssl\\.PROTOCOL_(SSLv2|SSLv3|TLSv1|TLSv1_1)|SSLContext\\(\\s*ssl\\.PROTOCOL_(SSLv2|SSLv3|TLSv1|TLSv1_1)\\)"
-        message: "Using deprecated/insecure SSL/TLS protocol versions. Use TLS 1.2+ (ssl.PROTOCOL_TLS_CLIENT with minimum version set)."
+      # Pattern 4: Command Injection - Shell=True in subprocess
+      - pattern: "(subprocess\\.Popen|subprocess\\.call|subprocess\\.run|subprocess\\.check_output)\\([^)]*shell\\s*=\\s*True"
+        message: "Using shell=True with subprocess functions is dangerous and can lead to command injection. Use shell=False (default) and pass arguments as a list."
         
-      # Pattern 5: Missing certificate validation
-      - pattern: "verify\\s*=\\s*False|check_hostname\\s*=\\s*False|CERT_NONE"
-        message: "SSL certificate validation is disabled. Always validate certificates in production environments."
+      # Pattern 5: XSS - Unescaped template variables
+      - pattern: "\\{\\{\\s*[^|]*\\s*\\}\\}|\\{\\%\\s*autoescape\\s+off\\s*\\%\\}"
+        message: "Potential XSS vulnerability. Ensure all template variables are properly escaped. Avoid using 'autoescape off' in templates."
         
-      # Pattern 6: Insecure cipher usage
-      - pattern: "DES|RC4|Blowfish|ECB"
-        message: "Using insecure encryption cipher or mode. Use AES with GCM or CBC mode with proper padding."
+      # Pattern 6: XSS - Unsafe HTML rendering in Flask/Django
+      - pattern: "render_template\\([^)]*\\)|render\\([^)]*\\)|mark_safe\\([^)]*\\)|safe\\s*\\|"
+        message: "Potential XSS vulnerability. Ensure all user-supplied data is properly escaped before rendering in templates."
         
-      # Pattern 7: Insufficient key length
-      - pattern: "RSA\\([^,]+,\\s*[0-9]+\\s*\\)|key_size\\s*=\\s*([0-9]|10[0-9][0-9]|11[0-9][0-9]|12[0-4][0-9])"
-        message: "Using insufficient key length for asymmetric encryption. RSA keys should be at least 2048 bits, preferably 4096 bits."
+      # Pattern 7: Path Traversal - Unsafe file operations
+      - pattern: "open\\([^)]*\\+|open\\([^)]*format\\(|open\\([^)]*f['\"]"
+        message: "Potential path traversal vulnerability. Validate and sanitize file paths before opening files. Consider using os.path.abspath and os.path.normpath."
         
-      # Pattern 8: Insecure password hashing
-      - pattern: "\\.encode\\(['\"]utf-?8['\"]\\)\\.(digest|hexdigest)\\(\\)|hashlib\\.[a-zA-Z0-9]+\\([^)]*\\)\\.(digest|hexdigest)\\(\\)"
-        message: "Using plain hashing for passwords. Use dedicated password hashing functions like bcrypt, Argon2, or PBKDF2."
+      # Pattern 8: LDAP Injection - Unsafe LDAP queries
+      - pattern: "ldap\\.search\\([^)]*\\+|ldap\\.search\\([^)]*format\\(|ldap\\.search\\([^)]*f['\"]"
+        message: "Potential LDAP injection vulnerability. Use proper LDAP escaping for user-supplied input in LDAP queries."
         
-      # Pattern 9: Missing salt in password hashing
-      - pattern: "pbkdf2_hmac\\([^,]+,[^,]+,[^,]+,\\s*[0-9]+\\s*\\)"
-        message: "Ensure you're using a proper random salt with password hashing functions."
+      # Pattern 9: NoSQL Injection - Unsafe MongoDB queries
+      - pattern: "find\\(\\{[^}]*\\+|find\\(\\{[^}]*format\\(|find\\(\\{[^}]*f['\"]"
+        message: "Potential NoSQL injection vulnerability. Use parameterized queries or proper escaping for MongoDB queries."
         
-      # Pattern 10: Insecure cookie settings
-      - pattern: "set_cookie\\([^)]*secure\\s*=\\s*False|set_cookie\\([^)]*httponly\\s*=\\s*False"
-        message: "Cookies with sensitive data should have secure and httponly flags enabled."
+      # Pattern 10: Template Injection - Unsafe template rendering
+      - pattern: "Template\\([^)]*\\)\\.(render|substitute)\\(|eval\\([^)]*\\)|exec\\([^)]*\\)"
+        message: "Potential template injection or code injection vulnerability. Avoid using eval() or exec() with user input, and ensure template variables are properly validated."
 
   - type: suggest
     message: |
-      **Python Cryptography Best Practices:**
+      **Python Injection Prevention Best Practices:**
       
-      1. **Secure Password Storage:**
-         - Use dedicated password hashing algorithms:
+      1. **SQL Injection Prevention:**
+         - Use parameterized queries (prepared statements) with placeholders:
            ```python
-           import bcrypt
-           hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt(rounds=12))
+           # Safe SQL query with parameters
+           cursor.execute("SELECT * FROM users WHERE username = %s AND password = %s", (username, password))
+           
+           # Django ORM (safe by default)
+           User.objects.filter(username=username, password=password)
+           
+           # SQLAlchemy (safe by default)
+           session.query(User).filter(User.username == username, User.password == password)
            ```
-         - Or use Argon2 (preferred) or PBKDF2 with sufficient iterations:
-           ```python
-           from argon2 import PasswordHasher
-           ph = PasswordHasher()
-           hash = ph.hash(password)
-           ```
+         - Use ORM frameworks when possible (Django ORM, SQLAlchemy)
+         - Apply proper input validation and sanitization
       
-      2. **Secure Random Number Generation:**
-         - Use the `secrets` module for cryptographic operations:
+      2. **Command Injection Prevention:**
+         - Never use shell=True with subprocess functions
+         - Pass command arguments as a list, not a string:
            ```python
-           import secrets
-           token = secrets.token_hex(32)  # 256 bits of randomness
+           # Safe command execution
+           subprocess.run(["ls", "-l", user_dir], shell=False)
            ```
-         - For cryptographic keys, use proper key generation functions:
-           ```python
-           from cryptography.hazmat.primitives.asymmetric import rsa
-           private_key = rsa.generate_private_key(public_exponent=65537, key_size=4096)
-           ```
-      
-      3. **Secure Communications:**
-         - Use TLS 1.2+ for all communications:
-           ```python
-           import ssl
-           context = ssl.create_default_context()
-           context.minimum_version = ssl.TLSVersion.TLSv1_2
-           ```
-         - Always validate certificates:
-           ```python
-           import requests
-           response = requests.get('https://example.com', verify=True)
-           ```
-      
-      4. **Proper Key Management:**
-         - Never hardcode secrets in source code
-         - Use environment variables or secure vaults:
-           ```python
-           import os
-           api_key = os.environ.get('API_KEY')
-           ```
-         - Consider using dedicated key management services
-      
-      5. **Secure Encryption:**
-         - Use high-level libraries like `cryptography`:
-           ```python
-           from cryptography.fernet import Fernet
+         - Use shlex.quote() if you must include user input in shell commands
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
