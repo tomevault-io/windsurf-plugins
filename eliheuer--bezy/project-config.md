@@ -1,0 +1,140 @@
+---
+trigger: always_on
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+---
+
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project Overview
+
+Bezy is a font editor built with Rust and the Bevy game engine. It's designed as a modern, user-empowerable font editing tool that follows modernist design principles. The codebase is intentionally simple and readable for education purposes.
+
+## Key Technologies
+
+- **Bevy**: ECS-based game engine for the UI framework
+- **Norad**: UFO font format parsing and manipulation
+- **Kurbo**: 2D curve mathematics
+- **Rust**: Core programming language
+
+## Development Commands
+
+### Basic Development
+```bash
+# Run the application (default: Bezy Grotesk font, glyph 'a')
+cargo run
+
+# Run with specific UFO font
+cargo run -- --load-ufo <path_to_ufo>
+
+# Run with specific Unicode character
+cargo run -- --test-unicode <hex_codepoint>
+
+# Debug mode with verbose logging
+cargo run -- --debug --log-level debug
+```
+
+### Code Quality
+```bash
+# Format code (max width: 80 characters per rustfmt.toml)
+cargo fmt
+
+# Run linter
+cargo clippy
+
+# Run tests
+cargo test
+```
+
+### Build Variants
+```bash
+# Development build with dynamic linking (faster compilation)
+cargo run --features dev
+
+# WASM build for web deployment
+./build-wasm.sh
+# or manually:
+cargo run --target wasm32-unknown-unknown
+
+# Release build
+cargo build --release
+```
+
+## Architecture Overview
+
+### Module Structure
+- **`core/`**: Application initialization, CLI, settings, state management
+- **`data/`**: UFO font data handling, Unicode utilities, workspace management
+- **`editing/`**: Edit operations, selection system, undo/redo, text editing
+- **`geometry/`**: Geometric primitives, paths, points, design space coordinates
+- **`rendering/`**: Drawing systems, glyph outlines, visual feedback
+- **`systems/`**: Bevy systems for input handling, UI interaction, commands
+- **`ui/`**: User interface components, toolbars, panes, themes
+
+### Key Architectural Patterns
+
+#### ECS-Based Design
+The application uses Bevy's Entity-Component-System pattern. Major systems include:
+- **Selection System**: Manages point/component selection state
+- **Edit System**: Handles glyph modifications and undo operations
+- **Input System**: Processes keyboard/mouse events
+- **Rendering System**: Draws glyphs, UI elements, and visual feedback
+
+#### State Management
+- **AppState**: Main application state resource
+- **GlyphNavigation**: Current glyph and font navigation
+- **BezySettings**: Configuration and preferences
+
+#### Plugin Architecture
+The application is composed of plugins:
+- **Core plugins**: Input, pointer management, settings
+- **UI plugins**: HUD, panes, toolbars
+- **Editing plugins**: Selection, undo, text editing
+- **Rendering plugins**: Cameras, drawing systems
+
+### Design Philosophy
+
+#### Visual Theming
+All visual styling constants MUST be declared in `src/ui/theme.rs`. No visual constants should exist outside this file to enable complete theme swapping.
+
+#### Code Style
+- Max line width: 80 characters (enforced by rustfmt.toml)
+- Simple, readable code suitable for educational purposes
+- Modernist "less is more" approach
+- Game-like feel with fast, engaging interactions
+
+#### Rendering Architecture - Unified System
+The application uses a **single unified rendering system** located in `src/rendering/unified_glyph_editing.rs` that handles ALL glyph visualization:
+
+##### Core Principles
+- **NEVER use Bevy Gizmos**: All world-space visual elements MUST use mesh-based rendering for proper z-ordering, camera-responsive scaling, and visual consistency
+- **Single rendering system**: The unified system eliminates coordination complexity and ensures reliable cleanup
+- **Camera-responsive scaling**: All visual elements work with the zoom-aware scaling system
+- **Mesh-based only**: Gizmos cause problems with layering, scaling, and maintainability
+
+##### Unified Rendering Behavior
+- **Active sorts**: Show editable points, handles, and outlines for interactive editing
+- **Inactive sorts**: Render as filled shapes using Lyon tessellation with proper winding rules (EvenOdd fill rule)
+- **Zero visual lag**: All components (points, handles, outlines) render together using live Transform data
+- **Proper vector rendering**: Handles font counters/holes correctly (e.g., the hole in letter 'a')
+
+##### Technical Implementation
+- **Lyon tessellation**: Converts vector paths to filled meshes for inactive sorts
+- **Combined contours**: All contours processed as single path for correct winding rule handling  
+- **EvenOdd fill rule**: Standard font rendering approach that properly handles counters
+- **Camera-responsive scaling**: Uses `CameraResponsiveScale` for zoom-appropriate visual sizing
+- **Entity tracking**: `UnifiedGlyphEntities` resource tracks all rendered elements for reliable cleanup
+
+### Font Data Model
+
+The application uses FontIR as the primary runtime data structure:
+- **FontIR**: The single source of truth for font data that gets modified during editing
+- **Data Flow**: Load font sources (UFO, TTF, OTF, etc.) → FontIR runtime structure → Edit FontIR data → Save back to disk
+- **Transform Components**: Only for visual positioning in UI, NOT the source of truth
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [eliheuer/bezy](https://github.com/eliheuer/bezy) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-20 -->
