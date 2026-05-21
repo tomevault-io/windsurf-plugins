@@ -7,11 +7,11 @@ Historical Kubernetes evidence for humans and agents.
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [nowakeai/kube-insight](https://github.com/nowakeai/kube-insight).
+Original source: `CLAUDE.md` in [nowakeai/kube-insight](https://github.com/nowakeai/kube-insight).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
