@@ -1,85 +1,80 @@
 ---
 trigger: always_on
-description: Detect and prevent cryptographic failures in JavaScript applications as defined in OWASP Top 10:2021-A02
+description: Detect and prevent insecure design patterns in JavaScript applications as defined in OWASP Top 10:2021-A04
 ---
 
-# JavaScript Cryptographic Failures (OWASP A02:2021)
+# JavaScript Insecure Design (OWASP A04:2021)
 
 <rule>
-name: javascript_cryptographic_failures
-description: Detect and prevent cryptographic failures in JavaScript applications as defined in OWASP Top 10:2021-A02
+name: javascript_insecure_design
+description: Detect and prevent insecure design patterns in JavaScript applications as defined in OWASP Top 10:2021-A04
 
 actions:
   - type: enforce
     conditions:
-      # Pattern 1: Weak or insecure cryptographic algorithms
-      - pattern: "(?:createHash|crypto\\.createHash)\\(['\"](?:md5|sha1)['\"]\\)|(?:crypto|require\\(['\"]crypto['\"]\\))\\.(?:createHash|Hash)\\(['\"](?:md5|sha1)['\"]\\)|new (?:MD5|SHA1)\\(|CryptoJS\\.(?:MD5|SHA1)\\("
-        message: "Using weak hashing algorithms (MD5/SHA1). Use SHA-256 or stronger algorithms."
+      # Pattern 1: Lack of Rate Limiting
+      - pattern: "app\\.(?:get|post|put|delete|patch)\\([^)]*?\\)\\s*(?!.*(?:rateLimiter|limiter|throttle|rateLimit))"
+        location: "(?:routes|api|controllers)"
+        message: "Potential lack of rate limiting in API endpoint. Consider implementing rate limiting to prevent abuse."
         
-      # Pattern 2: Hardcoded secrets/credentials
-      - pattern: "(?:const|let|var)\\s+(?:password|secret|key|token|auth|apiKey|api_key)\\s*=\\s*['\"][^'\"]+['\"]"
-        message: "Potential hardcoded credentials detected. Store secrets in environment variables or a secure vault."
+      # Pattern 2: Insecure Direct Object Reference (IDOR)
+      - pattern: "(?:findById|getById|findOne)\\([^)]*?(?:req\\.|request\\.|params\\.|query\\.|body\\.|user\\.|input\\.|form\\.)[^)]*?\\)\\s*(?!.*(?:authorization|permission|access|canAccess|isAuthorized|checkPermission))"
+        location: "(?:routes|api|controllers)"
+        message: "Potential Insecure Direct Object Reference (IDOR) vulnerability. Implement proper authorization checks before accessing objects by ID."
         
-      # Pattern 3: Insecure random number generation
-      - pattern: "Math\\.random\\(\\)|Math\\.floor\\(\\s*Math\\.random\\(\\)\\s*\\*"
-        message: "Using Math.random() for security purposes. Use crypto.randomBytes() or Web Crypto API for cryptographic operations."
+      # Pattern 3: Lack of Input Validation
+      - pattern: "(?:req\\.|request\\.|params\\.|query\\.|body\\.|user\\.|input\\.|form\\.)[a-zA-Z0-9_]+\\s*(?!.*(?:validate|sanitize|check|schema|joi|yup|zod|validator|isValid))"
+        location: "(?:routes|api|controllers)"
+        message: "Potential lack of input validation. Implement proper validation for all user inputs."
         
-      # Pattern 4: Weak SSL/TLS configuration
-      - pattern: "(?:tls|https|require\\(['\"]https['\"]\\)|require\\(['\"]tls['\"]\\))\\.(?:createServer|request|get)\\([^\\)]*?{[^}]*?secureProtocol\\s*:\\s*['\"](?:SSLv2_method|SSLv3_method|TLSv1_method|TLSv1_1_method)['\"]"
-        message: "Using deprecated/insecure SSL/TLS protocol versions. Use TLS 1.2+ for secure communications."
+      # Pattern 4: Hardcoded Business Logic
+      - pattern: "if\\s*\\([^)]*?(?:role\\s*===\\s*['\"]admin['\"]|isAdmin\\s*===\\s*true|user\\.role\\s*===\\s*['\"]admin['\"])\\s*\\)"
+        message: "Hardcoded business logic for authorization. Consider using a more flexible role-based access control system."
         
-      # Pattern 5: Missing certificate validation
-      - pattern: "(?:rejectUnauthorized|strictSSL)\\s*:\\s*false"
-        message: "SSL certificate validation is disabled. Always validate certificates in production environments."
+      # Pattern 5: Lack of Proper Error Handling
+      - pattern: "catch\\s*\\([^)]*?\\)\\s*\\{[^}]*?(?:console\\.(?:log|error))[^}]*?\\}"
+        negative_pattern: "(?:res\\.status|next\\(err|next\\(error|errorHandler)"
+        message: "Improper error handling. Avoid only logging errors without proper handling or user feedback."
         
-      # Pattern 6: Insecure cipher usage
-      - pattern: "(?:createCipheriv|crypto\\.createCipheriv)\\(['\"](?:des|des3|rc4|bf|blowfish|aes-\\d+-ecb)['\"]"
-        message: "Using insecure encryption cipher or mode. Use AES with GCM or CBC mode with proper padding."
+      # Pattern 6: Insecure Authentication Design
+      - pattern: "(?:password|token|secret|key)\\s*===\\s*(?:req\\.|request\\.|params\\.|query\\.|body\\.|user\\.|input\\.|form\\.)"
+        message: "Insecure authentication design. Avoid direct string comparison for passwords or tokens."
         
-      # Pattern 7: Insufficient key length
-      - pattern: "(?:generateKeyPair|generateKeyPairSync)\\([^,]*?['\"]rsa['\"][^,]*?{[^}]*?modulusLength\\s*:\\s*(\\d{1,3}|1[0-9]{3}|20[0-3][0-9]|204[0-7])\\s*}"
-        message: "Using insufficient key length for asymmetric encryption. RSA keys should be at least 2048 bits, preferably 4096 bits."
+      # Pattern 7: Lack of Proper Logging
+      - pattern: "app\\.(?:get|post|put|delete|patch)\\([^)]*?\\)\\s*(?!.*(?:log|logger|winston|bunyan|morgan|audit))"
+        location: "(?:routes|api|controllers)"
+        message: "Lack of proper logging in API endpoint. Implement logging for security-relevant events."
         
-      # Pattern 8: Insecure password hashing
-      - pattern: "(?:createHash|crypto\\.createHash)\\([^)]*?\\)\\.(?:update|digest)\\([^)]*?\\)|CryptoJS\\.(?:SHA256|SHA512|SHA3)\\([^)]*?\\)"
-        negative_pattern: "(?:bcrypt|scrypt|pbkdf2|argon2)"
-        message: "Using plain hashing for passwords. Use dedicated password hashing functions like bcrypt, scrypt, or PBKDF2."
+      # Pattern 8: Insecure Defaults
+      - pattern: "new\\s+(?:Session|Cookie|JWT)\\([^)]*?\\{[^}]*?(?:secure\\s*:\\s*false|httpOnly\\s*:\\s*false|sameSite\\s*:\\s*['\"]none['\"])"
+        message: "Insecure default configuration. Avoid setting secure:false, httpOnly:false, or sameSite:'none' for cookies or sessions."
         
-      # Pattern 9: Missing salt in password hashing
-      - pattern: "(?:pbkdf2|pbkdf2Sync)\\([^,]+,[^,]+,[^,]+,\\s*\\d+\\s*,[^,]+\\)"
-        negative_pattern: "(?:salt|crypto\\.randomBytes)"
-        message: "Ensure you're using a proper random salt with password hashing functions."
+      # Pattern 9: Lack of Proper Access Control
+      - pattern: "router\\.(?:get|post|put|delete|patch)\\([^)]*?\\)\\s*(?!.*(?:authenticate|authorize|requireAuth|isAuthenticated|checkAuth|verifyToken|passport\\.authenticate))"
+        location: "(?:routes|api|controllers)"
+        message: "Potential lack of access control in route definition. Implement proper authentication and authorization middleware."
         
-      # Pattern 10: Insecure cookie settings
-      - pattern: "(?:document\\.cookie|cookies\\.set|res\\.cookie|cookie\\.serialize)\\([^)]*?\\)"
-        negative_pattern: "(?:secure\\s*:|httpOnly\\s*:|sameSite\\s*:)"
-        message: "Cookies with sensitive data should have secure and httpOnly flags enabled."
+      # Pattern 10: Insecure File Operations
+      - pattern: "(?:fs\\.(?:readFile|writeFile|appendFile|readdir|stat|access|open|unlink)|require)\\([^)]*?(?:(?:\\+|\\$\\{|\\`)[^)]*?(?:__dirname|__filename|process\\.cwd\\(\\)|path\\.(?:resolve|join)))"
+        negative_pattern: "path\\.normalize|path\\.resolve|path\\.join"
+        message: "Insecure file operations. Use path.normalize() and validate file paths to prevent directory traversal attacks."
         
-      # Pattern 11: Client-side encryption
-      - pattern: "(?:encrypt|decrypt|createCipher|createDecipher)\\([^)]*?\\)"
-        location: "(?:frontend|client|browser|react|vue|angular)"
-        message: "Performing sensitive cryptographic operations on the client side. Move encryption/decryption logic to the server."
+      # Pattern 11: Lack of Proper Secrets Management
+      - pattern: "(?:apiKey|secret|password|token|credentials)\\s*=\\s*(?:process\\.env\\.[A-Z_]+|config\\.[a-zA-Z0-9_]+|['\"][^'\"]+['\"])"
+        negative_pattern: "(?:vault|secretsManager|keyVault|secretClient)"
+        message: "Insecure secrets management. Consider using a dedicated secrets management solution instead of environment variables or configuration files."
         
-      # Pattern 12: Insecure JWT implementation
-      - pattern: "(?:jwt\\.sign|jsonwebtoken\\.sign)\\([^,]*?,[^,]*?,[^\\)]*?\\)"
-        negative_pattern: "(?:expiresIn|algorithm\\s*:\\s*['\"](?:HS256|HS384|HS512|RS256|RS384|RS512|ES256|ES384|ES512)['\"])"
-        message: "JWT implementation missing expiration or using weak algorithm. Set expiresIn and use a strong algorithm."
+      # Pattern 12: Insecure Randomness
+      - pattern: "Math\\.random\\(\\)"
+        location: "(?:auth|security|token|password|key|iv|nonce|salt)"
+        message: "Insecure randomness. Use crypto.randomBytes() or a similar cryptographically secure random number generator for security-sensitive operations."
         
-      # Pattern 13: Weak PRNG in Node.js
-      - pattern: "(?:crypto\\.pseudoRandomBytes|crypto\\.rng|crypto\\.randomInt)\\("
-        message: "Using potentially weak pseudorandom number generator. Use crypto.randomBytes() for cryptographic security."
+      # Pattern 13: Lack of Proper Input Sanitization for Templates
+      - pattern: "(?:template|render|compile|ejs\\.render|handlebars\\.compile|pug\\.render)\\([^)]*?(?:(?:\\+|\\$\\{|\\`)[^)]*?(?:req\\.|request\\.|params\\.|query\\.|body\\.|user\\.|input\\.|form\\.))"
+        message: "Potential template injection vulnerability. Sanitize user input before using in templates."
         
-      # Pattern 14: Insecure local storage usage for sensitive data
-      - pattern: "(?:localStorage\\.setItem|sessionStorage\\.setItem)\\(['\"](?:token|auth|jwt|password|secret|key|credential)['\"]"
-        message: "Storing sensitive data in browser storage. Use secure HttpOnly cookies for authentication tokens."
-        
-      # Pattern 15: Weak password validation
-      - pattern: "(?:password\\.length\\s*>=?\\s*\\d|password\\.match\\(['\"][^'\"]+['\"]\\))"
-        negative_pattern: "(?:password\\.length\\s*>=?\\s*(?:8|9|10|11|12)|[A-Z]|[a-z]|[0-9]|[^A-Za-z0-9])"
-        message: "Weak password validation. Require at least 12 characters with a mix of uppercase, lowercase, numbers, and special characters."
-
-  - type: suggest
-    message: |
+      # Pattern 14: Insecure WebSocket Implementation
+      - pattern: "new\\s+WebSocket\\([^)]*?\\)|io\\.on\\(['\"]connection['\"]"
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
