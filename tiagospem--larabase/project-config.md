@@ -1,106 +1,124 @@
 ---
 trigger: always_on
-description: daisyUI 5 is a CSS library for Tailwind CSS 4
+description: This document provides a comprehensive overview of the Larabase project, an opinionated database GUI for Laravel developers.
 ---
 
-# daisyUI 5
-daisyUI 5 is a CSS library for Tailwind CSS 4
-daisyUI 5 provides class names for common UI components
+# Gemini Project Description
 
-- [daisyUI 5 docs](http://daisyui.com)
-- [Guide: How to use this file in LLMs and code editors](https://daisyui.com/docs/editor/)
-- [daisyUI 5 release notes](https://daisyui.com/docs/v5/)
-- [daisyUI 4 to 5 upgrade guide](https://daisyui.com/docs/upgrade/)
+This document provides a comprehensive overview of the Larabase project, an opinionated database GUI for Laravel developers.
 
-## daisyUI 5 install notes
-[install guide](https://daisyui.com/docs/install/)
-1. daisyUI 5 requires Tailwind CSS 4
-2. `tailwind.config.js` file is deprecated in Tailwind CSS v4. do not use `tailwind.config.js`. Tailwind CSS v4 only needs `@import "tailwindcss";` in the CSS file if it's a node dependency.
-3. daisyUI 5 can be installed using `npm i -D daisyui@latest` and then adding `@plugin "daisyui";` to the CSS file
-4. daisyUI is suggested to be installed as a dependency but if you really want to use it from CDN, you can use Tailwind CSS and daisyUI CDN files:
-```html
-<link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
-<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+## Project Overview
+
+Larabase is a desktop application built with Electron and Vue.js, designed to streamline the workflow of Laravel developers. It offers a suite of tools for database management, SQL editing, and seamless integration with Laravel-specific features.
+
+### Key Features
+
+- **Database Management**: Manage connections, browse tables, and view schemas.
+- **SQL Editor**: Advanced editor with syntax highlighting and query execution.
+- **Laravel Integration**: Run Artisan commands, manage migrations, and edit `.env` files.
+- **Development Tools**: Integrated terminal, Redis manager, and real-time database monitoring.
+- **SSH Tunneling**: Securely connect to remote databases via SSH.
+
+## Technology Stack
+
+- **Frameworks**: Electron, Vue.js 3
+- **Languages**: TypeScript
+- **Styling**: Tailwind CSS, DaisyUI
+- **State Management**: Pinia
+- **Database**: MySQL2
+- **Code Editor**: Monaco Editor
+- **AI Integration**: OpenAI, Google Generative AI
+
+## Project Structure
+
+The project is organized into the following main directories:
+
+- `electron/`: Contains the main process code for the Electron application.
+- `src/`: Contains the renderer process code, including Vue components, services, and assets.
+- `public/`: Static assets that are copied directly to the build output.
+- `dist/`: Build output for the renderer process.
+- `dist-electron/`: Build output for the main process.
+
+## Development Scripts
+
+- `npm run dev`: Starts the development server.
+- `npm run build`: Builds the application for production.
+- `npm run lint`: Lints the codebase.
+- `npm run format`: Formats the code.
+
+## Build and Deployment
+
+The application is built using `electron-builder` and can be packaged for macOS, Windows, and Linux. The build configuration is defined in `package.json`.
+
+## SSH Tunneling
+
+The application supports SSH tunneling to connect to remote databases. This is implemented using the `ssh2` library for creating secure connections and port forwarding.
+
+## AI Integration
+
+Larabase integrates with OpenAI and Google Generative AI to provide SQL assistance and other AI-powered features. This is managed through the `aiService.ts` service.
+
+## Project Guidance
+
+This section provides guidance for contributing to the Larabase project.
+
+### Coding Style
+
+The project follows a strict coding style enforced by Prettier and ESLint.
+
+- **Formatting**: Code is automatically formatted using Prettier. Key style points include:
+    - Single quotes are used for strings.
+    - Lines have a maximum width of 80 characters.
+    - Tabs are used for indentation, with a width of 4 spaces.
+    - Trailing commas are not used.
+    - Brackets have spaces around them.
+    - Each attribute is on a single line.
+    - Semicolons are required at the end of statements.
+- **Linting**: ESLint is used to catch code quality issues. The configuration is based on `eslint:recommended` and includes plugins for TypeScript, Vue, and unused imports.
+
+Before committing any code, please run the following commands to ensure your code adheres to the project's style:
+
+```bash
+npm run format
+npm run lint
 ```
-5. A CSS file with Tailwind CSS and daisyUI looks like this (if it's a node dependency)
-```css
-@import "tailwindcss";
-@plugin "daisyui";
+
+### Commit Message Conventions
+
+Commit messages should follow the Conventional Commits specification. This provides a clear and consistent history of the project.
+
+The format is as follows:
+
+```
+<type>[optional scope]: <description>
+
+[optional body]
+
+[optional footer]
 ```
 
-## daisyUI 5 usage rules
-1. We can give styles to a HTML element by adding daisyUI class names to it. By adding a component class name, part class names (if there's any available for that component), and modifier class names (if there's any available for that component)
-2. Components can be customized using Tailwind CSS utility classes if the customization is not possible using the existing daisyUI classes. For example `btn px-10` sets a custom horizontal padding to a `btn`
-3. If customization of daisyUI styles using Tailwind CSS utility classes didn't work because of CSS specificity issues, you can use the `!` at the end of the Tailwind CSS utility class to override the existing styles. For example `btn bg-red-500!` sets a custom background color to a `btn` forcefully. This is a last resort solution and should be used sparingly
-4. If a specific component or something similar to it doesn't exist in daisyUI, you can create your own component using Tailwind CSS utility
-5. when using Tailwind CSS `flex` and `grid` for layout, it should be responsive using Tailwind CSS responsive utility prefixes.
-6. Only allowed class names are existing daisyUI class names or Tailwind CSS utility classes.
-7. Ideally, you won't need to write any custom CSS. Using daisyUI class names or Tailwind CSS utility classes is preferred.
-8. suggested - if you need placeholder images, use https://picsum.photos/200/300 with the size you want
-9. suggested - when designing , don't add a custom font unless it's necessary
-10. don't add `bg-base-100 text-base-content` to body unless it's necessary
-11. For design decisions, use Refactoring UI book best practices
+- **type**: Must be one of the following:
+    - `feat`: A new feature
+    - `fix`: A bug fix
+    - `docs`: Documentation only changes
+    - `style`: Changes that do not affect the meaning of the code (white-space, formatting, missing semi-colons, etc)
+    - `refactor`: A code change that neither fixes a bug nor adds a feature
+    - `perf`: A code change that improves performance
+    - `test`: Adding missing tests or correcting existing tests
+    - `chore`: Changes to the build process or auxiliary tools and libraries such as documentation generation
+- **scope**: An optional, parenthesized scope to provide additional contextual information.
+- **description**: A short, imperative-tense description of the change.
 
-daisyUI 5 class names are one of the following categories. these type names are only for reference and are not used in the actual code
-- `component`: the required component class
-- `part`: a child part of a component
-- `style`: sets a specific style to component or part
-- `behavior`: changes the behavior of component or part
-- `color`: sets a specific color to component or part
-- `size`: sets a specific size to component or part
-- `placement`: sets a specific placement to component or part
-- `direction`: sets a specific direction to component or part
-- `modifier`: modifies the component or part in a specific way
+**Examples from the project's history:**
 
-## Config
-daisyUI 5 config docs: https://daisyui.com/docs/config/
-daisyUI without config:
-```css
-@plugin "daisyui";
-```
-daisyUI config with `light` theme only:
-```css
-@plugin "daisyui" {
-  themes: light --default;
-}
-```
-daisyUI with all the default configs:
-```css
-@plugin "daisyui" {
-  themes: light --default, dark --prefersdark;
-  root: ":root";
-  include: ;
-  exclude: ;
-  prefix: ;
-  logs: true;
-}
-```
-An example config:
-In below config, all the built-in themes are enabled while bumblebee is the default theme and synthwave is the prefersdark theme (default dark mode)
-All the other themes are enabled and can be used by adding `data-theme="THEME_NAME"` to the `<html>` element
-root scrollbar gutter is excluded. `daisy-` prefix is used for all daisyUI classes and console.log is disabled
-```css
-@plugin "daisyui" {
-  themes: light, dark, cupcake, bumblebee --default, emerald, corporate, synthwave --prefersdark, retro, cyberpunk, valentine, halloween, garden, forest, aqua, lofi, pastel, fantasy, wireframe, black, luxury, dracula, cmyk, autumn, business, acid, lemonade, night, coffee, winter, dim, nord, sunset, caramellatte, abyss, silk;
-  root: ":root";
-  include: ;
-  exclude: rootscrollgutter, checkbox;
-  prefix: daisy-;
-  logs: false;
-}
-```
-## daisyUI 5 colors
+- `chore: update macOS version in CI workflow from 'macos-latest' to 'macos-13'`
+- `fix: correct record ID reference and enable input fields in EditRecordModal`
+- `feat: add functionality to save and load column widths in DataTable component`
 
-### daisyUI color names
-- `primary`: Primary brand color, The main color of your brand
-- `primary-content`: Foreground content color to use on primary color
-- `secondary`: Secondary brand color, The optional, secondary color of your brand
-- `secondary-content`: Foreground content color to use on secondary color
-- `accent`: Accent brand color, The optional, accent color of your brand
-- `accent-content`: Foreground content color to use on accent color
+### Testing
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+While the project currently lacks a dedicated test suite, we encourage the addition of tests for new features and bug fixes. When adding tests, please use a testing framework that is compatible with the existing technology stack (e.g., Vitest for Vue components).
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/Tiagospem) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-10 -->
+> Source: [Tiagospem/larabase](https://github.com/Tiagospem/larabase) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-21 -->
