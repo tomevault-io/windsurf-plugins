@@ -7,11 +7,11 @@ Zoneless Angular Components, that you Copy-and-Paste Integration. No Installatio
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [lukonik/ngverse](https://github.com/lukonik/ngverse).
+Original source: `CLAUDE.md` in [lukonik/ngverse](https://github.com/lukonik/ngverse).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
