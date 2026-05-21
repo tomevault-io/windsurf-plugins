@@ -1,143 +1,9 @@
 ---
 trigger: always_on
-description: This rule provides comprehensive guidance for AI assistants writing Behat tests for Drupal projects using the drevops/behat-steps package. It emphasizes reusing existing traits and steps rather than creating custom implementations. Contains the full STEPS.md reference embedded for easy access.
+description: | Class | Description |
 ---
 
-
-# AI Behat Test Writing Guide for Drupal Projects
-
-## 🎯 Primary Directive
-
-**ALWAYS prioritize using drevops/behat-steps traits and step definitions over writing custom steps.** The drevops/behat-steps package provides comprehensive test coverage for most Drupal testing scenarios.
-
-## 📦 Essential Resources
-
-Before writing ANY Behat test:
-1. Check available steps in the [drevops/behat-steps STEPS.md](https://github.com/drevops/behat-steps/blob/main/STEPS.md) file or refer to the embedded reference below
-2. Review trait source code in `vendor/drevops/behat-steps/src/` directory
-3. Only create custom steps when absolutely necessary (functionality not covered by existing traits)
-
-## 🔧 Setting Up FeatureContext
-
-When creating or modifying FeatureContext.php, include the necessary traits from drevops/behat-steps. The traits are located in `vendor/drevops/behat-steps/src/`:
-
-```php
-<?php
-
-namespace DrupalProject\Tests\Behat;
-
-use Drupal\DrupalExtension\Context\DrupalContext;
-// Generic traits from vendor/drevops/behat-steps/src/
-use DrevOps\BehatSteps\CookieTrait;
-use DrevOps\BehatSteps\DateTrait;
-use DrevOps\BehatSteps\ElementTrait;
-use DrevOps\BehatSteps\FieldTrait;
-use DrevOps\BehatSteps\FileDownloadTrait;
-use DrevOps\BehatSteps\KeyboardTrait;
-use DrevOps\BehatSteps\LinkTrait;
-use DrevOps\BehatSteps\PathTrait;
-use DrevOps\BehatSteps\ResponseTrait;
-use DrevOps\BehatSteps\WaitTrait;
-
-// Drupal-specific traits from vendor/drevops/behat-steps/src/Drupal/
-use DrevOps\BehatSteps\Drupal\BigPipeTrait;
-use DrevOps\BehatSteps\Drupal\BlockTrait;
-use DrevOps\BehatSteps\Drupal\ContentBlockTrait;
-use DrevOps\BehatSteps\Drupal\ContentTrait;
-use DrevOps\BehatSteps\Drupal\DraggableviewsTrait;
-use DrevOps\BehatSteps\Drupal\EckTrait;
-use DrevOps\BehatSteps\Drupal\EmailTrait;
-use DrevOps\BehatSteps\Drupal\FieldTrait as DrupalFieldTrait;
-use DrevOps\BehatSteps\Drupal\FileTrait;
-use DrevOps\BehatSteps\Drupal\MediaTrait;
-use DrevOps\BehatSteps\Drupal\MenuTrait;
-use DrevOps\BehatSteps\Drupal\MetatagTrait;
-use DrevOps\BehatSteps\Drupal\OverrideTrait;
-use DrevOps\BehatSteps\Drupal\ParagraphsTrait;
-use DrevOps\BehatSteps\Drupal\SearchApiTrait;
-use DrevOps\BehatSteps\Drupal\TaxonomyTrait;
-use DrevOps\BehatSteps\Drupal\TestmodeTrait;
-use DrevOps\BehatSteps\Drupal\UserTrait;
-use DrevOps\BehatSteps\Drupal\WatchdogTrait;
-
-class FeatureContext extends DrupalContext {
-    // Include only the traits you need for your tests
-    // Generic traits
-    use CookieTrait;
-    use DateTrait;
-    use ElementTrait;
-    use FieldTrait;
-    use FileDownloadTrait;
-    use KeyboardTrait;
-    use LinkTrait;
-    use PathTrait;
-    use ResponseTrait;
-    use WaitTrait;
-    
-    // Drupal-specific traits
-    use BlockTrait;
-    use ContentTrait;
-    use EmailTrait;
-    use FileTrait;
-    use MediaTrait;
-    use TaxonomyTrait;
-    use UserTrait;
-    
-    // Only add custom methods when drevops/behat-steps doesn't provide the functionality
-}
-```
-
-## 🚫 When NOT to Create Custom Steps
-
-Before creating ANY custom step, verify that drevops/behat-steps doesn't already provide it. Check the full reference below.
-
-### Common Mistakes to Avoid:
-
-1. **Creating custom user login steps**
-   - ❌ Don't create: `Given I log in as an administrator`
-   - ✅ Use UserTrait: `Given I am logged in as a user with the "administrator" role`
-
-2. **Creating custom content creation steps**
-   - ❌ Don't create: `Given I create an article titled :title`
-   - ✅ Use ContentTrait: `Given "article" content:` with a table
-
-3. **Creating custom field interaction steps**
-   - ❌ Don't create: `When I fill in the body field with :text`
-   - ✅ Use FieldTrait: `When I fill in "Body" with :text`
-
-4. **Creating custom email verification steps**
-   - ❌ Don't create: `Then I should receive an email`
-   - ✅ Use EmailTrait: `Then an email is sent to :address`
-
-5. **Creating custom element interaction steps**
-   - ❌ Don't create: `When I click the submit button`
-   - ✅ Use ElementTrait: `When I click on the element ".submit-button"`
-
-## ✅ When to Create Custom Steps
-
-Only create custom steps when:
-
-1. **Business-specific logic** that wouldn't be reusable across projects
-2. **Complex multi-step operations** that are repeated frequently in your tests
-3. **Integration with third-party services** not covered by drevops/behat-steps
-4. **Custom Drupal modules** with unique functionality
-
-Example of a valid custom step:
-
-```php
-/**
- * @When I process the payment gateway response for order :order_id
- */
-public function iProcessPaymentGatewayResponse($order_id) {
-    // Custom implementation for your specific payment gateway
-}
-```
-
----
-
-# Complete DrevOps Behat Steps Reference
-
-The following is the complete reference from [drevops/behat-steps STEPS.md](https://github.com/drevops/behat-steps/blob/main/STEPS.md):
+# Behat Steps - Claude Memory
 
 ## Available steps
 
@@ -145,8 +11,144 @@ The following is the complete reference from [drevops/behat-steps STEPS.md](http
 
 | Class | Description |
 | --- | --- |
-| [CookieTrait](#cookietrait) | Verify and inspect browser cookies. |
-| [DateTrait](#datetrait) | Convert relative date expressions into timestamps or formatted dates. |
+| [CookieTrait](mdc:#cookietrait) | Verify and inspect browser cookies. |
+| [DateTrait](mdc:#datetrait) | Convert relative date expressions into timestamps or formatted dates. |
+| [ElementTrait](mdc:#elementtrait) | Interact with HTML elements using CSS selectors and DOM attributes. |
+| [FileDownloadTrait](mdc:#filedownloadtrait) | Test file download functionality with content verification. |
+| [KeyboardTrait](mdc:#keyboardtrait) | Simulate keyboard interactions in Drupal browser testing. |
+| [LinkTrait](mdc:#linktrait) | Verify link elements with attribute and content assertions. |
+| [PathTrait](mdc:#pathtrait) | Navigate and verify paths with URL validation. |
+| [ResponseTrait](mdc:#responsetrait) | Verify HTTP responses with status code and header checks. |
+| [WaitTrait](mdc:#waittrait) | Wait for a period of time or for AJAX to finish. |
+
+### Index of Drupal steps
+
+| Class | Description |
+| --- | --- |
+| [Drupal\BigPipeTrait](mdc:#drupalbigpipetrait) | Bypass Drupal BigPipe when rendering pages. |
+| [Drupal\BlockTrait](mdc:#drupalblocktrait) | Manage Drupal blocks. |
+| [Drupal\ContentBlockTrait](mdc:#drupalcontentblocktrait) | Manage Drupal content blocks. |
+| [Drupal\ContentTrait](mdc:#drupalcontenttrait) | Manage Drupal content with workflow and moderation support. |
+| [Drupal\DraggableviewsTrait](mdc:#drupaldraggableviewstrait) | Order items in the Drupal Draggable Views. |
+| [Drupal\EckTrait](mdc:#drupalecktrait) | Manage Drupal ECK entities with custom type and bundle creation. |
+| [Drupal\EmailTrait](mdc:#drupalemailtrait) | Test Drupal email functionality with content verification. |
+| [Drupal\FieldTrait](mdc:#drupalfieldtrait) | Manipulate Drupal form fields and verify widget functionality. |
+| [Drupal\FileTrait](mdc:#drupalfiletrait) | Manage Drupal file entities with upload and storage operations. |
+| [Drupal\MediaTrait](mdc:#drupalmediatrait) | Manage Drupal media entities with type-specific field handling. |
+| [Drupal\MenuTrait](mdc:#drupalmenutrait) | Manage Drupal menu systems and menu link rendering. |
+| [Drupal\MetatagTrait](mdc:#drupalmetatagtrait) | Assert `<meta>` tags in page markup. |
+| [Drupal\OverrideTrait](mdc:#drupaloverridetrait) | Override Drupal Extension behaviors. |
+| [Drupal\ParagraphsTrait](mdc:#drupalparagraphstrait) | Manage Drupal paragraphs entities with structured field data. |
+| [Drupal\SearchApiTrait](mdc:#drupalsearchapitrait) | Assert Drupal Search API with index and query operations. |
+| [Drupal\TaxonomyTrait](mdc:#drupaltaxonomytrait) | Manage Drupal taxonomy terms with vocabulary organization. |
+| [Drupal\TestmodeTrait](mdc:#drupaltestmodetrait) | Configure Drupal Testmode module for controlled testing scenarios. |
+| [Drupal\UserTrait](mdc:#drupalusertrait) | Manage Drupal users with role and permission assignments. |
+| [Drupal\WatchdogTrait](mdc:#drupalwatchdogtrait) | Assert Drupal does not trigger PHP errors during scenarios using Watchdog. |
+
+
+---
+
+## CookieTrait
+
+[Source](mdc:src/CookieTrait.php), [Example](mdc:tests/behat/features/cookie.feature)
+
+>  Verify and inspect browser cookies.
+>  - Assert cookie existence and values with exact or partial matching.
+>  - Support both WebDriver and BrowserKit drivers for test compatibility.
+
+
+<details>
+  <summary><code>@Then a cookie with the name :name should exist</code></summary>
+
+<br/>
+Assert that a cookie exists
+<br/><br/>
+
+```gherkin
+Then a cookie with the name "session_id" should exist
+
+```
+
+</details>
+
+<details>
+  <summary><code>@Then a cookie with the name :name and the value :value should exist</code></summary>
+
+<br/>
+Assert that a cookie exists with a specific value
+<br/><br/>
+
+```gherkin
+Then a cookie with the name "language" and the value "en" should exist
+
+```
+
+</details>
+
+<details>
+  <summary><code>@Then a cookie with the name :name and a value containing :partial_value should exist</code></summary>
+
+<br/>
+Assert that a cookie exists with a value containing a partial value
+<br/><br/>
+
+```gherkin
+Then a cookie with the name "preferences" and a value containing "darkmode" should exist
+
+```
+
+</details>
+
+<details>
+  <summary><code>@Then a cookie with a name containing :partial_name should exist</code></summary>
+
+<br/>
+Assert that a cookie with a partial name exists
+<br/><br/>
+
+```gherkin
+Then a cookie with a name containing "session" should exist
+
+```
+
+</details>
+
+<details>
+  <summary><code>@Then a cookie with a name containing :partial_name and the value :value should exist</code></summary>
+
+<br/>
+Assert that a cookie with a partial name and value exists
+<br/><br/>
+
+```gherkin
+Then a cookie with a name containing "user" and the value "admin" should exist
+
+```
+
+</details>
+
+<details>
+  <summary><code>@Then a cookie with a name containing :partial_name and a value containing :partial_value should exist</code></summary>
+
+<br/>
+Assert that a cookie with a partial name and partial value exists
+<br/><br/>
+
+```gherkin
+Then a cookie with a name containing "user" and a value containing "admin" should exist
+
+```
+
+</details>
+
+<details>
+  <summary><code>@Then a cookie with the name :name should not exist</code></summary>
+
+<br/>
+Assert that a cookie does not exist
+<br/><br/>
+
+```gherkin
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
