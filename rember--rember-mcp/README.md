@@ -2,6 +2,8 @@
 
 > Tome by [rember](https://github.com/rember/rember-mcp) — distributed by [TomeVault](https://tomevault.io)
 
+A Model Context Protocol (MCP) server for Rember.
+
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
