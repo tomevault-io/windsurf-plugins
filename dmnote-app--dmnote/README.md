@@ -7,11 +7,11 @@ A Fully Customizable Key Viewer Optimized for DJMAX RESPECT V, Ready for Any Gam
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [DmNote-App/DmNote](https://github.com/DmNote-App/DmNote).
+Original source: `CLAUDE.md` in [DmNote-App/DmNote](https://github.com/DmNote-App/DmNote).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
