@@ -1,9 +1,9 @@
 ---
 trigger: always_on
-description: Dependency injection for cleaner testing
+description: How to express parameters
 ---
 
-Make sure classes have their side-effecting functionality passed in as a parameter so that mocking these results is easier when testing.
+For constructors and functions with more than 2 parameters, instead of positional parameters, use a `…Params` object as the parameter so it's clearer what is happening at the function/constructor callsite.
 
 ---
 > Source: [SentinelTeam/grim](https://github.com/SentinelTeam/grim) — distributed by [TomeVault](https://tomevault.io).
