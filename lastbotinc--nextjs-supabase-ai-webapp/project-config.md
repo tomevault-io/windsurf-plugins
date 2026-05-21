@@ -1,230 +1,180 @@
 ---
 trigger: always_on
-description: This described desing patterns and implementation guidance for APIs
+description: Description of unit testing design patterns and instructions
 ---
 
 ---
-description: This described desing patterns and implementation guidance for APIs
-globs: *.ts
----
----
-description:
+description: implementation pattern for unit tests with vitest
 globs:
 ---
 
-# NextJS API Implementation Patterns
+# Unit Testing Implementation Patterns (Vitest)
 
-This document describes the patterns for implementing different types of API routes in a NextJS application with authentication levels and external service integration.
+This document describes the patterns and best practices for implementing unit tests in our Next.js application using **Vitest**, covering both component testing and API route testing.
 
-## Common Setup
+## Test Setup
 
-- Always read [backend.md](mdc:docs/backend.md) for instructions on the backend details and [architecture.md](mdc:docs/architecture.md) for overall architecture
-
-### Directory Structure with examples
+### Directory Structure
+(Remains the same)
 ```
 app/
+  components/
+    Button/
+      Button.tsx
+      __tests__/
+        Button.test.tsx
   api/
-    # Public Routes
     languages/
-      route.ts        # Public GET, authenticated POST/PATCH/DELETE
-    
-    # Authenticated Routes
-    upload/
-      route.ts        # File upload with authentication
-    
-    # Admin Routes
-    translations/
-      route.ts        # Admin-only translation management
-      generate/
-        route.ts      # AI-powered translation generation
-    
-    # AI-Enhanced Routes
-    research-enhance/
-      route.ts        # AI analysis with Gemini and Tavily
-    tavily-search/
-      route.ts        # Advanced search functionality
+      route.ts
+      __tests__/
+        route.test.ts
 ```
 
 ### Required Dependencies
+Update your `package.json` devDependencies:
 ```json
 {
-  "dependencies": {
-    "next": "^14.0.0",
-    "@supabase/supabase-js": "^2.0.0",
-    "@google/generative-ai": "^0.1.0",
-    "@tavily/core": "^1.0.0"
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.4.0", // For DOM matchers
+    "@testing-library/react": "^15.0.0",
+    "@testing-library/user-event": "^14.5.0",
+    "@vitejs/plugin-react": "^4.2.0", // For Vite + React
+    "jsdom": "^24.0.0", // Test environment
+    "vitest": "^1.5.0", // Test runner
+    "vite-tsconfig-paths": "^4.3.0", // For resolving tsconfig paths
+    "resize-observer-polyfill": "^1.5.1" // Polyfill for JSDOM
   }
 }
 ```
 
-## Authentication Levels
-
-### 1. Public Routes
+### Vitest Configuration (`vitest.config.ts`)
 ```typescript
-// Example: GET /api/languages
-export async function GET() {
-  try {
-    const supabase = createClient(undefined, true) // Public client
-    
-    const { data, error } = await supabase
-      .from('table')
-      .select('*')
-      .eq('enabled', true)
+import { defineConfig } from 'vitest/config'
+import react from '@vitejs/plugin-react'
+import tsconfigPaths from 'vite-tsconfig-paths'
 
-    if (error) throw error
+export default defineConfig({
+  plugins: [react(), tsconfigPaths()],
+  test: {
+    environment: 'jsdom', // Use JSDOM for browser-like environment
+    setupFiles: ['./vitest.setup.ts'], // Setup file for global configurations
+    include: ['**/*.test.{ts,tsx}'], // Test file pattern
+    globals: true, // Optional: Makes vi, expect, etc. globally available
+  },
+})
+```
 
-    return NextResponse.json({ data })
-  } catch (error) {
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+### Vitest Setup (`vitest.setup.ts`)
+This file configures testing-library matchers and adds necessary polyfills.
+```typescript
+import '@testing-library/jest-dom'
+import { expect, afterEach } from 'vitest'
+import { cleanup } from '@testing-library/react'
+import * as matchers from '@testing-library/jest-dom/matchers'
+import 'resize-observer-polyfill' // Polyfill for ResizeObserver in JSDOM
+
+// Extend Vitest's expect method with testing-library matchers
+expect.extend(matchers)
+
+// Cleanup after each test case
+afterEach(() => {
+  cleanup()
+})
+```
+
+## Component Testing
+
+### 1. Basic Component Test Structure
+```typescript
+// No environment pragma needed with vitest.config.ts
+import { render, screen, fireEvent } from '@testing-library/react'
+import '@testing-library/jest-dom' // Matchers are extended in setup
+import { describe, it, expect, beforeEach, vi } from 'vitest' // Import from vitest
+import { ComponentToTest } from '../ComponentToTest'
+
+describe('ComponentToTest', () => {
+  // Setup default props and mocks
+  const defaultProps = {
+    onAction: vi.fn() // Use vi.fn()
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks() // Use vi.clearAllMocks()
+  })
+
+  it('renders correctly', () => {
+    render(<ComponentToTest {...defaultProps} />)
+    // Add assertions using expect() extended with jest-dom matchers
+    expect(screen.getByText('Some Text')).toBeInTheDocument()
+  })
+})
+```
+
+### 2. Testing with Internationalization
+(Pattern remains largely the same, ensure `vi.mock` is used if mocking `next-intl`)
+```typescript
+import { render, screen } from '@testing-library/react'
+import { describe, it, expect, vi } from 'vitest'
+import { NextIntlClientProvider } from 'next-intl'
+import Component from '../Component' // Assume this is the component using translations
+
+// Mock translations
+const mockTranslations = {
+  namespace: {
+    key: 'Translated text'
   }
 }
-```
 
-### 2. Authenticated Routes
-```typescript
-// Example: Protected route requiring authentication
-export async function POST(request: Request) {
-  try {
-    // 1. Verify authentication
-    const authHeader = request.headers.get('Authorization')
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { error: 'Missing or invalid authorization header' },
-        { status: 401 }
-      )
-    }
-
-    // 2. Create authenticated client
-    const supabase = createClient()
-    
-    // 3. Verify token and get user
-    const { data: { user }, error: authError } = await supabase.auth.getUser(
-      authHeader.split(' ')[1]
-    )
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
-
-    // 4. Process authenticated request
-    const { data } = await request.json()
-    
-    // 5. Perform operation with user context
-    const result = await supabase
-      .from('table')
-      .insert({ ...data, user_id: user.id })
-
-    return NextResponse.json({ result })
-  } catch (error) {
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+// Mock next-intl if needed (using vi.mock)
+vi.mock('next-intl', async (importOriginal) => {
+  const mod = await importOriginal<typeof import('next-intl')>()
+  return {
+    ...mod,
+    useTranslations: () => (key: string) => mockTranslations.namespace[key] || key,
+    // Mock other exports like NextIntlClientProvider if necessary,
+    // but often letting the real provider work is fine for client components.
   }
+})
+
+
+// Helper function to render with translations
+const renderWithTranslations = (component: React.ReactNode) => {
+  return render(
+    <NextIntlClientProvider messages={mockTranslations} locale="en">
+      {component}
+    </NextIntlClientProvider>
+  )
 }
+
+it('renders translated content', () => {
+  renderWithTranslations(<Component />)
+  expect(screen.getByText('Translated text')).toBeInTheDocument()
+})
 ```
 
-### 3. Admin Routes
+### 3. Testing UI Components
+Example from Button component tests (using `vi.fn`):
 ```typescript
-// Example: Admin-only route
-export async function PUT(request: Request) {
-  try {
-    // 1. Verify authentication
-    const authHeader = request.headers.get('Authorization')
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { error: 'Missing or invalid authorization header' },
-        { status: 401 }
-      )
-    }
+import { render, screen, fireEvent } from '@testing-library/react'
+import { describe, it, expect, vi } from 'vitest'
+import { Button } from '../Button'
 
-    // 2. Create authenticated client
-    const authClient = createClient()
-    
-    // 3. Verify token and get user
-    const { data: { user }, error: authError } = await authClient.auth.getUser(
-      authHeader.split(' ')[1]
-    )
+describe('Button', () => {
+  it('applies correct size classes', () => {
+    const { rerender } = render(<Button size="sm">Small</Button>)
+    expect(screen.getByRole('button', { name: 'Small' }))
+      .toHaveClass('text-sm h-8 px-3') // jest-dom matcher
 
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
+    rerender(<Button size="md">Medium</Button>)
+    expect(screen.getByRole('button', { name: 'Medium' }))
+      .toHaveClass('text-base h-10 px-4') // jest-dom matcher
+  })
 
-    // 4. Verify admin status
-    const { data: profile } = await authClient
-      .from('profiles')
-      .select('is_admin')
-      .eq('id', user.id)
-      .single()
+  it('handles click events', () => {
+    const handleClick = vi.fn() // Use vi.fn()
+    render(<Button onClick={handleClick}>Click me</Button>)
 
-    if (!profile?.is_admin) {
-      return NextResponse.json(
-        { error: 'Forbidden - Admin access required' },
-        { status: 403 }
-      )
-    }
-
-    // 5. Use service role client for admin operations
-    const supabase = createClient(undefined, true)
-    
-    // 6. Process admin request
-    const { data } = await request.json()
-    const result = await supabase
-      .from('table')
-      .upsert(data)
-
-    return NextResponse.json({ result })
-  } catch (error) {
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
-  }
-}
-```
-
-## API Route Patterns
-
-### 1. CRUD Operations
-```typescript
-// GET - List/Read
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url)
-  // ... handle query parameters
-}
-
-// POST - Create
-export async function POST(request: Request) {
-  const body = await request.json()
-  // ... handle creation
-}
-
-// PUT/PATCH - Update
-export async function PUT(request: Request) {
-  const body = await request.json()
-  // ... handle update
-}
-
-// DELETE - Remove
-export async function DELETE(request: Request) {
-  const { searchParams } = new URL(request.url)
-  // ... handle deletion
-}
-```
-
-### 2. File Upload
-```typescript
-export async function POST(request: NextRequest) {
-  try {
+    fireEvent.click(screen.getByRole('button', { name: 'Click me' }))
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
