@@ -1,70 +1,55 @@
 ---
 trigger: always_on
-description: Type hints, the Any ban, Optional/Union scrutiny, and variable annotation rules.
+description: Runtime type enforcement with @validate — when to use, performance and serialization exemptions.
 ---
 
-# Type Hints and Typing Rules
+# Runtime Type Enforcement with `@validate` (CRITICAL)
 
-## Type Hints
-- **Always include type hints** for all function parameters and return values
-- **Always use capitalized `typing` imports**: `List`, `Dict`, `Set`, `Tuple`, `Optional`, `Union`, `FrozenSet`
-- Do NOT use lowercase built-in generics (`list[str]`, `dict[str, int]`) or pipe unions (`str | None`) even though Python 3.10+ supports them
-- **Rationale:** Capitalized typing imports are visually distinct and grep-able. `List` is unambiguously a type annotation; `list` could be a variable name, a builtin call, or a type hint. This makes bulk find-and-replace across files reliable, and makes it immediately clear when reading code that a line involves type annotations.
-- Use `-> None` for functions that return no value (side-effect functions, lifecycle hooks like `post_initialize`, `on_start`, `on_stop`)
-- Use `-> NoReturn` ONLY for functions that genuinely never return (unconditional `raise`, `sys.exit()`, infinite loops)
-- Include type hints for class attributes and instance variables
-- **Prefer `morphic.Typed` over `TypedDict`** for structured data. `TypedDict` is a fallback for cases where `Typed` cannot be used (e.g., dicts that must remain plain `dict` for JSON serialization to a third-party API, or when the consuming code expects a raw dict, not a model). When you control both producer and consumer, use `Typed`.
-- **`Protocol` is for function parameters and call-site typing, NOT for Pydantic/Typed field types.** Pydantic v2 validates Protocol fields with `isinstance()` at construction time, which (a) rejects `None` for non-Optional fields even in tests that don't exercise the field, and (b) fails on proxy objects that use `__getattr__`-based dynamic dispatch (e.g., Concurry `Worker` proxies) because Python's `isinstance` Protocol check inspects the type's `__dict__` and MRO, not dynamic attributes. Declare such fields as `Any` and document the duck-typed contract in a comment referencing the Protocol class. The Protocol provides type safety at *call sites* (IDE autocomplete, static analysis); Pydantic field validation is the wrong enforcement point.
+## What `@validate` Does and Why It Matters
 
-### Strict `Any` Ban (CRITICAL)
+`morphic.validate` is a decorator built on Pydantic's `validate_call` that brings full Pydantic validation to regular functions and methods. When you decorate a function with `@validate`, every call validates and coerces its arguments against the declared type hints at runtime — not just at type-check time, not just in tests, but on every single invocation.
 
-**`Any` is as good as no typing.** Using `Any` removes the entire reason to use Morphic Typed, Pydantic, and type hints. It tells neither the reader nor the type checker what the value actually is. LLM coding assistants produce `Any` reflexively because it silences type errors without solving them.
+This is the bridge between "type hints as documentation" and "type hints as enforcement." Without `@validate`, a function annotated `def submit(task: Task)` will happily accept a string, a number, or `None` at runtime — Python ignores annotations by default. With `@validate`, the same function rejects invalid inputs immediately with a clear `ValidationError`, and automatically coerces compatible types (e.g., a dict into a `Task` object via Pydantic's model coercion).
 
-**`Any` is ONLY acceptable in these specific situations:**
+The interaction with the Strict `Any` Ban is direct: `@validate` can only enforce types that are declared. If a parameter is typed `Any`, `@validate` passes it through without checking. Every `Any` in a `@validate`-decorated function is a parameter that bypasses runtime validation entirely. The two rules reinforce each other: the `Any` ban ensures types are declared precisely, and `@validate` ensures those precise declarations are enforced at runtime.
 
-| Situation | Why `Any` is acceptable | Example |
+For LLM coding agents, `@validate` is a critical safety net. When an agent generates a call like `worker.submit(task=some_variable)`, the agent may have constructed `some_variable` incorrectly — wrong type, wrong structure, missing fields. Without `@validate`, this error propagates silently. With `@validate`, the error is caught at the function boundary with a clear `ValidationError` at the call site.
+
+`@validate` works with Morphic `Typed` classes, `Typed + Registry` subclasses, standalone functions, and class methods. Dict arguments are automatically coerced into `Typed` instances. String arguments are coerced into ints, floats, and bools. `AutoEnum` values are resolved by fuzzy matching. This coercion means `@validate` is not just a gate — it is a normalizer that converts loosely-typed data into strongly-typed objects at the function boundary.
+
+The latency cost is real but small: a few hundred microseconds per call. For Concurry's user-facing API (`.options()`, `.init()`, `gather()`, `wait()` called with a list) this is invisible — the actual work (thread/process/Ray dispatch) dwarfs the validation cost by orders of magnitude. The only places where `@validate` must be omitted are **tight inner loops in concurrency primitives** where microseconds compound into seconds.
+
+### When to Use `@validate` in Concurry
+
+**Default: use `@validate` on every public function and method.** The decorator should be present unless a specific exception applies.
+
+| Category | Use `@validate`? | Rationale |
 |---|---|---|
-| **Pydantic/Typed fields for duck-typed workers** | Pydantic's `isinstance()` validation rejects Concurry `WorkerProxy` proxy objects; the Protocol cannot be used as a field type. | `worker: Any  # WorkerProtocol; see types.py` |
-| **`_serialize_value`-style functions** | Serialization functions that genuinely accept any Python object. | `def serialize(value: Any) -> Any:` |
-| **`Dict[str, Any]` for genuinely heterogeneous dicts** | When the dict's values are mixed types by design (JSON payloads, config dicts, serialized output). | `metadata: Dict[str, Any]` |
-| **`**kwargs: Any`** | Catch-all for pass-through kwargs to parent classes or third-party libraries. | `**kwargs: Any` |
-| **`PrivateAttr` for opaque runtime handles** | Locks, queues, processes, event loops — objects from external libraries whose type is complex or private. | `_lock: Any = PrivateAttr()` |
+| **All public module-level functions** (`wait`, `gather`, `wrap_future`) | **YES** | User-facing entry points. |
+| **All public methods of user-facing classes** (`Worker.options`, `LimitSet.acquire`) | **YES** | `Worker.options()` already uses `@validate`. Extend to all public methods. |
+| **Factory functions** | **YES** | Construct objects from user config; coercion is essential. |
+| **Private methods** (`_create_retry_configs`, `_dispatch_to_worker`) | **No** (type hints required, `@validate` optional) | Called from validated public methods. Double-validating wastes cycles. |
+| **Morphic lifecycle hooks** (`pre_initialize`, `post_initialize`, `pre_validate`) | **No** | The Morphic framework calls these with already-validated data. |
+| **Pydantic `@field_validator` methods** | **No** | Already part of Pydantic's validation pipeline. |
+| **`AutoEnum` methods, `__getattr__`, `__getitem__`** | **No** | Input types guaranteed by the Python language or Morphic framework. |
+| **Hot-path concurrency primitives** (see below) | **No** (with documented justification) | Called thousands/millions of times per second. |
+| **Worker methods serialized across Ray** (see below) | **Case-by-case** | `@validate` closure may not be picklable. |
 
-**`Any` is NEVER acceptable in these situations:**
+### Performance Exemption (CRITICAL for Concurry)
 
-| Situation | What to use instead | Example fix |
+Concurry's core primitives are called in tight loops at very high frequency. The following components are **explicitly exempt** from `@validate` because the validation overhead compounds into visible latency:
+
+| Component | Call frequency | Why exempt |
 |---|---|---|
-| **Function parameters where you know the type** | Use the actual type. | `task: Task` not `task: Any` |
-| **Return types where you know the type** | Use the actual type. | `-> List[Future]` not `-> List[Any]` |
-| **List/Dict generic parameters** | Spell out the element type. | `List[WorkerProxy]` not `List[Any]` |
-| **Forward references within the same package** | Use string annotations or fix import ordering. See the Forward References rule below. | `result: "WorkerResult"` not `result: Any` |
+| `BaseFuture.result()`, `.done()`, `.cancel()`, `.exception()` | Once per future in `wait()`/`gather()` loops (50,000+/sec) | 200µs × 50k = 10s added to a 2s gather |
+| `async_wait()`, `async_gather()` inner loops | Same as above | Async hot path |
+| `Acquisition.__init__()`, `.update()`, `.release()` | Once per limit acquisition per task submission | Thousands/sec in rate-limited workers |
+| `LimitSet` internal synchronization methods | Called under lock on every task dispatch | Microseconds matter under contention |
 
-**The test is simple:** when you write `Any`, ask: **"Do I know what type this actually is at runtime?"** If yes, write that type. If you are writing `Any` to avoid an import or to silence a type error, fix the import or the type error instead.
+When `@validate` is omitted from a public function for performance, the omission **MUST** be documented with a comment:
 
-❌ Bad (known types hidden behind `Any`):
 ```python
-def submit_batch(
-    self,
-    tasks: List[Any],              # ❌ These are Task objects
-    callback: Optional[Any] = None,  # ❌ This is Callable[[Result], None]
-) -> List[Any]:                    # ❌ These are Future objects
-```
-
-✅ Good (actual types everywhere they are known):
-```python
-def submit_batch(
-    self,
-    tasks: List[Task],
-    callback: Optional[Callable[[Result], None]] = None,
-) -> List[Future]:
-```
-
-### No `Any` for Forward References (CRITICAL)
-
-**Never use `Any` as a workaround for forward references.** This defeats the entire purpose of Morphic Typed — if the field is typed `Any`, Pydantic cannot validate it, the IDE cannot autocomplete it, and the reader does not know what it holds.
-
-**Forward references within the same file:** Use a string annotation (`"ClassName"`) or add `from __future__ import annotations` at the top of the file.
-
+# @validate omitted: hot path — called once per future in wait()/gather() loops.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
