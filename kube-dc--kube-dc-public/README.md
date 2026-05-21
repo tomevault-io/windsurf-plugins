@@ -7,11 +7,11 @@ Installers, Helm charts, Deployments and other resources
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [kube-dc/kube-dc-public](https://github.com/kube-dc/kube-dc-public).
+Original source: `CLAUDE.md` in [kube-dc/kube-dc-public](https://github.com/kube-dc/kube-dc-public).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
