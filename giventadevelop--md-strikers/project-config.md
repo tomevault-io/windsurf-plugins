@@ -1,180 +1,131 @@
 ---
 trigger: always_on
-description: Standards for displaying numerical and currency values with consistent decimal places
+description: Standard pagination footer styling pattern with Previous/Next buttons and page information display
 ---
 
 
-# Numerical & Currency Value Display Standards
+# Pagination Footer Styling Pattern
 
 ## **Overview**
-This rule defines the standard pattern for displaying numerical and currency values across the application, ensuring consistent decimal place formatting (e.g., `$0.80` instead of `$0.8`, `$10.00` instead of `$10`).
+This rule defines the standard pattern for pagination footer controls used across admin pages and list components. The pattern includes Previous/Next navigation buttons, page information display, and item count text, all styled consistently with the admin interface design system.
 
 ## **Problem Solved**
-- **Consistent Currency Display**: Ensures all currency values display with exactly 2 decimal places
-- **Professional Presentation**: Prevents confusion from inconsistent decimal formatting
-- **User Experience**: Users see consistent, professional monetary values throughout the application
+- **Consistent Pagination UI**: Ensures all pagination footers use the same visual pattern
+- **Button Styling**: Standardized Previous/Next button appearance with hover effects
+- **Page Information Display**: Consistent page number and item count presentation
+- **Accessibility**: Proper ARIA labels and disabled states
+- **Responsive Design**: Works across different screen sizes
 
-## **Core Rule**
+## **Core Pattern**
 
-### **Currency Display Standard**
-- **Rule:** Always display currency values with exactly 2 decimal places.
-- **Purpose:** Ensures consistent and professional presentation of monetary values.
-- **Implementation:** Use `Intl.NumberFormat` with `minimumFractionDigits: 2` and `maximumFractionDigits: 2`.
-
-## **Currency Formatting Function**
-
-### **Standard Implementation**
-```typescript
-// ✅ DO: Format currency to 2 decimal places
-const formatCurrency = (amount: number, currency: string = 'USD') => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 2,  // Always show 2 decimal places
-    maximumFractionDigits: 2,  // Never show more than 2
-  }).format(amount);
-};
-
-// Examples:
-formatCurrency(0.8, 'USD');   // Returns: "$0.80"
-formatCurrency(10, 'USD');     // Returns: "$10.00"
-formatCurrency(99.9, 'USD');   // Returns: "$99.90"
-formatCurrency(100.5, 'USD');  // Returns: "$100.50"
-```
-
-### **Common Usage Patterns**
-
-#### **Display Price in Cards/Tables**
+### **Pagination Container**
 ```tsx
-// ✅ DO: Use formatCurrency for all price displays
-<span className="text-4xl font-bold">
-  {formatCurrency(plan.price, plan.currency)}
-</span>
-
-// ❌ DON'T: Display raw price value
-<span className="text-4xl font-bold">
-  ${plan.price}  // May show "$0.8" instead of "$0.80"
-</span>
+// ✅ DO: Use the standard pagination footer container
+<div className="mt-8">
+  <div className="flex justify-between items-center">
+    {/* Previous Button */}
+    {/* Page Info */}
+    {/* Next Button */}
+  </div>
+  <div className="text-center mt-3">
+    {/* Item Count Text */}
+  </div>
+</div>
 ```
 
-#### **Price Input Field Formatting**
+### **Previous/Next Button Structure**
 ```tsx
-// ✅ DO: Format price input display value
-const [displayPrice, setDisplayPrice] = useState<string>('');
-
-useEffect(() => {
-  if (formData.price !== undefined && formData.price !== null) {
-    setDisplayPrice(formData.price.toFixed(2));
-  }
-}, [formData.price]);
-
-<input
-  type="number"
-  name="price"
-  value={displayPrice}
-  onChange={(e) => {
-    const numValue = parseFloat(e.target.value) || 0;
-    handleChange({ target: { name: 'price', value: numValue } });
-  }}
-  onBlur={(e) => {
-    const numValue = parseFloat(e.target.value) || 0;
-    setDisplayPrice(numValue.toFixed(2)); // Format to 2 decimal places on blur
-  }}
-  step="0.01"
-  placeholder="0.00"
-/>
+// ✅ DO: Use the standard pagination button pattern
+<button
+  onClick={onPrevPage}
+  disabled={isPrevDisabled}
+  className="px-5 py-2.5 bg-blue-100 hover:bg-blue-200 text-blue-700 font-semibold rounded-lg shadow-sm border-2 border-blue-400 hover:border-blue-500 disabled:bg-blue-100 disabled:border-blue-300 disabled:text-blue-500 disabled:cursor-not-allowed flex items-center gap-2 transition-all duration-300 hover:scale-105 hover:shadow-md"
+  title="Previous Page"
+  aria-label="Previous Page"
+  type="button"
+>
+  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
+  </svg>
+  <span>Previous</span>
+</button>
 ```
 
-#### **Display Price Values in Tables**
+## **Key CSS Properties**
+
+### **Pagination Container Requirements**
+- **`mt-8`**: Top margin (32px) for spacing above pagination
+- **`flex justify-between items-center`**: Horizontal layout with buttons on sides, page info in center
+- **`text-center mt-3`**: Centered item count text with spacing (12px)
+
+### **Button Requirements**
+- **`px-5 py-2.5`**: Padding (20px horizontal, 10px vertical)
+- **`bg-blue-100`**: Light blue background
+- **`hover:bg-blue-200`**: Darker blue on hover
+- **`text-blue-700`**: Dark blue text color
+- **`font-semibold`**: Bold text weight
+- **`rounded-lg`**: Large border radius (8px)
+- **`shadow-sm`**: Small shadow for depth
+- **`border-2 border-blue-400`**: 2px border with medium blue color
+- **`hover:border-blue-500`**: Darker border on hover
+- **`disabled:bg-blue-100 disabled:border-blue-300 disabled:text-blue-500 disabled:cursor-not-allowed`**: Disabled state styling
+- **`flex items-center gap-2`**: Flex layout with icon and text, 8px gap
+- **`transition-all duration-300`**: Smooth transitions
+- **`hover:scale-105`**: 5% scale increase on hover
+- **`hover:shadow-md`**: Medium shadow on hover
+
+### **Page Info Display Requirements**
+- **`px-4 py-2`**: Padding (16px horizontal, 8px vertical)
+- **`bg-blue-50`**: Very light blue background
+- **`border-2 border-blue-300`**: 2px border with light blue color
+- **`rounded-lg`**: Large border radius (8px)
+- **`shadow-sm`**: Small shadow
+- **`text-sm font-bold text-blue-700`**: Small, bold, dark blue text
+- **`text-blue-600`**: Medium blue for page numbers
+
+### **Item Count Text Requirements**
+- **`inline-flex items-center`**: Inline flex layout
+- **`px-4 py-2`**: Padding (16px horizontal, 8px vertical)
+- **`bg-blue-50`**: Very light blue background
+- **`border-2 border-blue-300`**: 2px border with light blue color
+- **`rounded-lg`**: Large border radius (8px)
+- **`shadow-sm`**: Small shadow
+- **`text-sm text-gray-700`**: Small, gray text
+- **`font-bold text-blue-600`**: Bold, medium blue for numbers
+
+## **Icon Specifications**
+
+### **Previous Button Icon (Left Arrow)**
 ```tsx
-// ✅ DO: Format price for display in tables
-<td>
-  {new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: plan.currency,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(plan.price)}
-</td>
-
-// ❌ DON'T: Display raw price value
-<td>${plan.price}</td>  // May show "$0.8" instead of "$0.80"
+<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
+</svg>
 ```
+- **Size**: `w-5 h-5` (20px × 20px)
+- **Stroke Width**: `2.5` (thicker for visibility)
+- **Color**: Inherits from button text color (`text-blue-700`)
 
-## **Non-Currency Numerical Values**
-
-### **Decimal Numbers (Percentages, Rates, etc.)**
-For non-currency numerical values that require decimal precision:
-
-```typescript
-// ✅ DO: Use appropriate decimal places for context
-const formatPercentage = (value: number) => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'percent',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value / 100);
-};
-
-// Examples:
-formatPercentage(85.5);  // Returns: "85.50%"
-formatPercentage(100);   // Returns: "100.00%"
-```
-
-### **Whole Numbers (Counts, Quantities)**
-For whole numbers that don't require decimal places:
-
-```typescript
-// ✅ DO: Use no decimal places for counts
-const formatCount = (count: number) => {
-  return new Intl.NumberFormat('en-US', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(count);
-};
-
-// Examples:
-formatCount(10);   // Returns: "10"
-formatCount(1000); // Returns: "1,000"
-```
-
-## **Input Field Best Practices**
-
-### **Price Input Fields**
-- **Display Value**: Use string state to allow free typing (e.g., `displayPrice: "0.80"`)
-- **Numeric Value**: Store actual numeric value separately (e.g., `formData.price: 0.8`)
-- **On Blur Formatting**: Format to 2 decimal places when user leaves the field
-- **Step Attribute**: Use `step="0.01"` for price inputs
-- **Zero Prefix Validation**: Automatically prefix decimal values starting with `.` with `0` (e.g., `.70` becomes `0.70`)
-
+### **Next Button Icon (Right Arrow)**
 ```tsx
-// ✅ DO: Format price input with 2 decimal places and zero prefix validation
-const [displayPrice, setDisplayPrice] = useState<string>('');
+<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+</svg>
+```
+- **Size**: `w-5 h-5` (20px × 20px)
+- **Stroke Width**: `2.5` (thicker for visibility)
+- **Color**: Inherits from button text color (`text-blue-700`)
 
-useEffect(() => {
-  if (editingItem) {
-    setDisplayPrice(editingItem.price ? editingItem.price.toFixed(2) : '0.00');
-  } else {
-    setDisplayPrice('');
-  }
-}, [editingItem]);
+## **Complete Example**
 
-<input
-  type="text"
-  name="price"
-  inputMode="decimal"
-  value={displayPrice}
-  onChange={(e) => {
-    const inputValue = e.target.value;
-
-    // Update display value immediately to allow free typing
-    setDisplayPrice(inputValue);
-
-    // CRITICAL: If value starts with a decimal point (e.g., ".70"), prefix with "0"
-    let processedValue = inputValue;
-    if (inputValue.startsWith('.')) {
-      processedValue = '0' + inputValue;
-      setDisplayPrice(processedValue);
+### **Full Pagination Footer**
+```tsx
+{/* Pagination Controls - Always visible, matching admin page style */}
+<div className="mt-8">
+  <div className="flex justify-between items-center">
+    {/* Previous Button */}
+    <button
+      onClick={onPrevPage}
+      disabled={isPrevDisabled}
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
