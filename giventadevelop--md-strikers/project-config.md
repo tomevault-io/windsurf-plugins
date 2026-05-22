@@ -1,134 +1,142 @@
 ---
 trigger: always_on
-description: MOSC Redesign Project - Comprehensive Styling Standards and Guidelines
+description: Rules for Next.js API route structure and security
 ---
 
 
-# MOSC Redesign Project - Styling Standards
+- **All API routes must...**
+  - Use authentication middleware
+  - Return JSON responses
+  - etc.
+- **No local DTO/interface declarations**
+  - All DTOs should be imported from `@/types` if needed (none should be declared locally)
+  - No DTO redeclaration: All DTOs should be imported from `@/types` (none needed in this handler)
+  - Example:
+    ```typescript
+    // ✅ DO: Import DTOs
+    import type { UserProfileDTO } from '@/types';
+    // ❌ DON'T: Redeclare DTOs
+    // interface UserProfileDTO { ... }
+    ```
 
-## **Design System Overview**
-This project uses a **sacred, reverent design system** inspired by Orthodox Christian traditions with warm earth tones, elegant typography, and thoughtful spacing. All new pages and components must follow these established patterns.
+- **Consistent environment variable**
+  - Use `process.env.NEXT_PUBLIC_API_BASE_URL` for the backend API base URL, matching the rest of your proxy routes
+  - Do not use hardcoded URLs or other env vars for backend base URL
+  - Example:
+    ```typescript
+    const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+    ```
 
-## **Color Palette & CSS Variables**
+- **Query string handling**
+  - Use a `buildQueryString` helper to forward all query params, just like in the user profile proxy
+  - Ensures all filters, pagination, and sorts are preserved
+  - Example:
+    ```typescript
+    function buildQueryString(query: Record<string, any>) {
+      const params = new URLSearchParams();
+      for (const key in query) {
+        const value = query[key];
+        if (Array.isArray(value)) {
+          value.forEach(v => params.append(key, v));
+        } else if (typeof value !== 'undefined') {
+          params.append(key, value);
+        }
+      }
+      return params.toString();
+    }
+    ```
 
-### **Core System Colors**
-- **Background**: `#F5F1E8` (soft cream) - `bg-background`
-- **Foreground**: `#2D2A26` (near-black with warm undertones) - `text-foreground`
-- **Border**: `rgba(139, 125, 107, 0.2)` (warm earth tone with transparency) - `border-border`
-- **Input**: `#FFFFFF` (pure white) - `bg-input`
-- **Ring**: `#8B7D6B` (warm earth tone) - `ring-ring`
+- **Do NOT add tenantId.equals in your client/server code when calling the proxy**
+  - The proxy handler will always inject tenantId.equals automatically.
+  - Only add tenantId.equals if you are calling the backend API directly (not via /api/proxy/...).
+  - This prevents duplicate tenantId.equals parameters and backend criteria errors.
+  - Example:
+    ```typescript
+    // ✅ DO: Only add email.equals or userId.equals
+    const params = new URLSearchParams({ 'email.equals': email });
+    await fetch('/api/proxy/user-profiles?' + params.toString());
+    // ❌ DON'T: Add tenantId.equals when calling the proxy
+    const params = new URLSearchParams({ 'email.equals': email, 'tenantId.equals': tenantId });
+    await fetch('/api/proxy/user-profiles?' + params.toString()); // Will result in duplicate tenantId
+    ```
 
-### **Semantic Colors**
-- **Primary**: `#8B7D6B` (warm earth tone) - `bg-primary text-primary-foreground`
-- **Secondary**: `#A0926B` (lighter complement) - `bg-secondary text-secondary-foreground`
-- **Accent**: `#6B4E3D` (rich brown) - `bg-accent text-accent-foreground`
-- **Success**: `#4A6741` (muted sage green) - `bg-success text-success-foreground`
-- **Warning**: `#A67C52` (warm amber) - `bg-warning text-warning-foreground`
-- **Error/Destructive**: `#8B4A42` (subdued terracotta) - `bg-destructive text-destructive-foreground`
-- **Muted**: `#EDE7D3` (lighter complement) - `bg-muted text-muted-foreground`
+- **JWT handling**
+  - Use `fetchWithJwtRetry` **from `@/lib/proxyHandler`** for all backend calls (it adds **`Authorization`** and **`X-Tenant-ID`**; see **X-Tenant-ID for tenant-scoped backend APIs** below). Older inline examples may omit `X-Tenant-ID` — do not copy them for direct backend URLs.
+  - Do not call backend APIs directly with fetch; always use the helper
+  - Example:
+    ```typescript
+    import { getCachedApiJwt, generateApiJwt } from '@/lib/api/jwt';
+    async function fetchWithJwtRetry(apiUrl: string, options: any = {}, debugLabel = '') {
+      let token = await getCachedApiJwt();
+      let response = await fetch(apiUrl, {
+        ...options,
+        headers: {
+          ...options.headers,
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      if (response.status === 401) {
+        token = await generateApiJwt();
+        response = await fetch(apiUrl, {
+          ...options,
+          headers: {
+            ...options.headers,
+            Authorization: `Bearer ${token}`,
+          },
+        });
+      }
+      return response;
+    }
+    ```
 
-### **Card & Surface Colors**
-- **Card**: `#FFFFFF` (pure white) - `bg-card text-card-foreground`
-- **Popover**: `#FFFFFF` (pure white) - `bg-popover text-popover-foreground`
+- **Error handling**
+  - Catch and log errors, returning a 500 with a clear message if something goes wrong
+  - Example:
+    ```typescript
+    try {
+      // ...
+    } catch (err) {
+      console.error('Proxy error:', err);
+      res.status(500).json({ error: 'Internal server error', details: String(err) });
+    }
+    ```
 
-## **Typography System**
+- **Method handling**
+  - Only allow GET and POST (or appropriate methods), with proper 405 responses for others
+  - Example:
+    ```typescript
+    if (req.method === 'GET') { /* ... */ }
+    else if (req.method === 'POST') { /* ... */ }
+    else {
+      res.setHeader('Allow', ['GET', 'POST']);
+      res.status(405).end(`Method ${req.method} Not Allowed`);
+    }
+    ```
 
-### **Font Families**
-- **Headings**: `font-heading` (Crimson Text, serif) - For titles, headings, and important text
-- **Body**: `font-body` (Source Sans Pro, sans-serif) - For paragraphs and general content
-- **Caption**: `font-caption` (Lato, sans-serif) - For small text, labels, and captions
-- **Monospace**: `font-mono` (JetBrains Mono, monospace) - For code and technical content
+- **Required backend fields for create operations**
+  - When creating resources via proxy API routes, all fields required by the backend (including timestamps like `createdAt` and `updatedAt`) must be included in the payload, even if not set by the client.
+  - The proxy or client must ensure these fields are present to avoid backend validation errors (e.g., Spring Boot will reject null `createdAt`/`updatedAt`).
+  - Example for ticket type creation:
+    ```typescript
+    // ✅ DO: Include all required fields
+    const payload = {
+      ...form,
+      eventId,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    await fetch('/api/proxy/ticket-types', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    ```
 
-### **Font Usage Patterns**
-```jsx
-// ✅ DO: Use appropriate font families
-<h1 className="font-heading font-semibold text-3xl text-foreground">Main Title</h1>
-<p className="font-body text-lg text-muted-foreground">Body text content</p>
-<small className="font-caption text-xs text-muted-foreground">Caption text</small>
-
-// ❌ DON'T: Mix font families inappropriately
-<h1 className="font-body font-semibold text-3xl">Main Title</h1> // Wrong font for heading
-```
-
-## **Spacing & Layout Standards**
-
-### **Container Patterns**
-- **Max Width**: `max-w-7xl mx-auto` for main content containers
-- **Padding**: `px-4 sm:px-6 lg:px-8` for responsive horizontal padding
-- **Sacred Spacing**: `space-sacred` (2rem) for consistent vertical spacing
-
-### **Grid Systems**
-- **Cards Grid**: `grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8`
-- **Feature Grid**: `grid grid-cols-1 md:grid-cols-3 gap-8 lg:gap-12`
-- **Stats Grid**: `grid grid-cols-2 gap-4` for statistics
-
-### **Section Spacing**
-- **Large Sections**: `py-16` for major content sections
-- **Medium Sections**: `py-12` for secondary sections
-- **Small Sections**: `py-8` for compact sections
-
-## **Component Styling Patterns**
-
-### **Cards & Panels**
-```jsx
-// ✅ DO: Use consistent card styling
-<div className="bg-card rounded-lg sacred-shadow p-6">
-  <div className="flex items-center space-x-3 mb-6">
-    <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-      <Icon name="IconName" size={16} color="white" />
-    </div>
-    <h3 className="text-lg font-heading font-semibold text-foreground">Card Title</h3>
-  </div>
-  {/* Card content */}
-</div>
-```
-
-### **Buttons**
-- Use the `Button` component with proper variants:
-  - `default`, `destructive`, `outline`, `secondary`, `ghost`, `link`
-  - `success`, `warning`, `danger` for semantic actions
-- Sizes: `xs`, `sm`, `default`, `lg`, `xl`, `icon`
-
-### **Form Elements**
-- Use the `Input` component for all form fields
-- Include proper labels, descriptions, and error states
-- Use semantic colors for validation states
-
-### **Icons**
-- Always use the `AppIcon` component with consistent sizing
-- Standard sizes: `16px` (small), `20px` (medium), `24px` (large), `32px` (extra large)
-- Use semantic colors: `text-primary`, `text-muted-foreground`, etc.
-
-## **Custom CSS Classes & Utilities**
-
-### **Sacred Design Elements**
-- **Shadows**: `sacred-shadow`, `sacred-shadow-sm`, `sacred-shadow-lg`
-- **Gradients**: `sacred-gradient` (background gradient)
-- **Border Radius**: `rounded-sacred` (8px)
-- **Transitions**: `reverent-transition` (200ms ease-out)
-- **Hover Effects**: `reverent-hover` (subtle scale transform)
-
-### **Circular Elements**
-- **Frames**: `circular-frame` for profile images and icons
-- **Medallions**: Use `bg-primary rounded-full` with `sacred-shadow-lg`
-
-## **Layout Patterns**
-
-### **Hero Sections**
-```jsx
-<section className="relative bg-gradient-to-br from-background to-muted min-h-[600px] flex items-center">
-  <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
-    {/* Hero content */}
-  </div>
-</section>
-```
-
-### **Content Sections**
-```jsx
-<section className="py-16 bg-card">
-  <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-    <div className="text-center mb-12">
-      <h2 className="font-heading font-semibold text-3xl text-foreground mb-4">Section Title</h2>
+- **ID field handling for create operations**
+  - For POST (create) operations, do not include the 'id' field in the payload (or set it to null if required by the backend).
+  - Only include 'id' for update (PUT/PATCH) operations.
+  - This matches backend expectations and avoids sending unnecessary or misleading ids during creation.
+  - Example for ticket type creation:
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
