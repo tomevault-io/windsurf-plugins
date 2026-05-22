@@ -1,54 +1,54 @@
 ---
 trigger: always_on
-description: description: API development patterns and best practices for OpenFrame REST and GraphQL APIs
+description: OpenFrame uses a shared library approach to eliminate code duplication between GraphQL and REST APIs. The [api-library](mdc:openframe/libs/api-library) contains all common business logic, DTOs, and services.
 ---
 
 
----
-description: API development patterns and best practices for OpenFrame REST and GraphQL APIs
-globs:
-  - "openframe/services/*/src/main/java/**/controller/**"
-  - "openframe/services/*/src/main/java/**/service/**"
-  - "openframe/libs/api-library/**"
-alwaysApply: false
----
+# OpenFrame API Library Architecture
 
-# API Development Patterns in OpenFrame
+## Overview
+OpenFrame uses a shared library approach to eliminate code duplication between GraphQL and REST APIs. The [api-library](mdc:openframe/libs/api-library) contains all common business logic, DTOs, and services.
 
-OpenFrame follows a shared library approach to eliminate code duplication between GraphQL and REST APIs. Follow these patterns for consistent API development.
+## Architecture Principles
 
-## Shared Library Architecture
-
-### Business Logic in api-library
+### Shared Business Logic
 - **DO**: Place all business logic in [api-library services](mdc:openframe/libs/api-library/src/main/java/com/openframe/api/service)
 - **DON'T**: Duplicate business logic between GraphQL and REST controllers
-- **Pattern**: Controllers are thin adapters that delegate to shared services
+- **Example**: [DeviceService](mdc:openframe/libs/api-library/src/main/java/com/openframe/api/service/DeviceService.java) handles device operations for both APIs
 
-```java
-// ✅ GOOD - Service in api-library
-@Service
-public class DeviceService {
-    public DeviceQueryResult queryDevices(DeviceFilterCriteria criteria) {
-        // Business logic here
-    }
-}
+### API-Specific Adapters
+- **GraphQL API**: Uses [openframe-api](mdc:openframe/services/openframe-api) with GraphQL-specific DTOs and mappers
+- **REST API**: Uses [openframe-external-api](mdc:openframe/services/openframe-external-api) with REST-specific DTOs and mappers
+- **Common DTOs**: Shared through [api-library DTOs](mdc:openframe/libs/api-library/src/main/java/com/openframe/api/dto)
 
-// ✅ GOOD - REST controller delegates to service
-@RestController
-public class DeviceController {
-    private final DeviceService deviceService;
+## Service Layer Pattern
 
-    @GetMapping("/devices")
-    public DeviceResponse getDevices(@AuthenticationPrincipal AuthPrincipal principal) {
-        return deviceService.queryDevices(criteria);
-    }
-}
+### Service Structure
+```
+api-library/
+├── service/           # Business logic services
+│   ├── DeviceService.java
+│   ├── DeviceFilterService.java
+│   └── TagService.java
+├── dto/              # Common DTOs
+│   ├── DeviceQueryResult.java
+│   ├── DeviceFilters.java
+│   └── PageInfo.java
+└── mapper/           # Internal mappings (if needed)
 ```
 
-## Controller Patterns
+### Adding New Features
+1. **Create service in api-library** first with business logic
+2. **Add common DTOs** for data transfer
+3. **Create API-specific endpoints** that use the common service
+4. **Add mappers** to convert between common and API-specific DTOs
 
-### Modern Spring Boot Style
-Use DTO + Exceptions approach instead of ResponseEntity everywhere:
+## REST API Guidelines
+
+### Controller Pattern (Modern Spring Boot)
+- **DO**: Use DTO + Exceptions approach
+- **DON'T**: Use ResponseEntity everywhere
+- **Error Handling**: Use [ErrorResponse](mdc:openframe/libs/openframe-core/src/main/java/com/openframe/core/dto/ErrorResponse.java) from openframe-core
 
 ```java
 // ✅ GOOD - Modern Spring Boot style
@@ -69,123 +69,77 @@ public ResponseEntity<DeviceResponse> getDevice(@PathVariable String id) {
 }
 ```
 
-### Authentication Principal Pattern
-Always use `@AuthenticationPrincipal AuthPrincipal principal` for user context:
+### Exception Handling
+- **Global Handler**: Use [GlobalExceptionHandler](mdc:openframe/services/openframe-external-api/src/main/java/com/openframe/external/exception/GlobalExceptionHandler.java)
+- **Consistent Errors**: All errors return [ErrorResponse](mdc:openframe/libs/openframe-core/src/main/java/com/openframe/core/dto/ErrorResponse.java)
+- **Proper Status Codes**: Use @ResponseStatus annotations
+
+## GraphQL API Guidelines
+
+### DataFetcher Pattern
+- **Async Operations**: Keep CompletableFuture when there's real parallelism
+- **Batch Loading**: Use DataLoader for N+1 prevention
+- **Service Integration**: Call api-library services directly
 
 ```java
-@RestController
-@RequestMapping("/api-keys")
-public class ApiKeyController {
-    @GetMapping
-    public List<ApiKeyResponse> getApiKeys(@AuthenticationPrincipal AuthPrincipal principal) {
-        return apiKeyService.getApiKeysForUser(principal.getId());
-    }
+// ✅ GOOD - Async when beneficial
+@DgsQuery
+public CompletableFuture<DeviceFilters> deviceFilters(@InputArgument DeviceFilterInput filter) {
+    return deviceFilterService.getDeviceFilters(filter); // Parallel DB calls inside
+}
 
-    @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
-    public CreateApiKeyResponse createApiKey(
-            @Valid @RequestBody CreateApiKeyRequest request,
-            @AuthenticationPrincipal AuthPrincipal principal) {
-        return apiKeyService.createApiKey(principal.getId(), request);
-    }
+// ✅ GOOD - Sync when appropriate
+@DgsQuery
+public Device device(@InputArgument String id) {
+    return deviceService.findById(id)
+        .orElseThrow(() -> new DeviceNotFoundException("Device not found: " + id));
 }
 ```
 
-**Reference**: [ApiKeyController.java](mdc:openframe/services/openframe-api/src/main/java/com/openframe/api/controller/ApiKeyController.java)
+## Performance Patterns
 
-## Error Handling Patterns
+### Parallel Processing
+- **Use CompletableFuture** for genuine parallel operations (like [DeviceFilterService](mdc:openframe/libs/api-library/src/main/java/com/openframe/api/service/DeviceFilterService.java))
+- **Batch Operations**: Use batch queries to reduce N+1 problems
+- **Caching**: Implement at service layer, not controller layer
 
-### Global Exception Handler
-Use global exception handlers with consistent error responses:
+### Database Strategy
+- **MongoDB**: Primary storage for entities
+- **Apache Pinot**: Analytics and aggregations
+- **Redis**: Caching and session storage
 
-```java
-@ControllerAdvice
-public class GlobalExceptionHandler {
-    @ExceptionHandler(DeviceNotFoundException.class)
-    @ResponseStatus(HttpStatus.NOT_FOUND)
-    public ErrorResponse handleDeviceNotFound(DeviceNotFoundException ex) {
-        return ErrorResponse.builder()
-            .code("DEVICE_NOT_FOUND")
-            .message(ex.getMessage())
-            .timestamp(LocalDateTime.now())
-            .build();
-    }
-}
+## Dependency Management
+
+### Module Dependencies
+```
+openframe-external-api → api-library → openframe-core
+openframe-api → api-library → openframe-core
 ```
 
-### Custom Domain Exceptions
-Create specific exceptions for domain errors:
+### Maven Configuration
+- **Versions**: Managed in parent POM
+- **Shared Dependencies**: Include in api-library
+- **API-Specific Dependencies**: Keep in respective modules
 
+## Common Patterns
+
+### DTO Conversion
 ```java
-public class ApiKeyNotFoundException extends RuntimeException {
-    public ApiKeyNotFoundException(String keyId) {
-        super("API key not found: " + keyId);
-    }
-}
+// Service returns common DTO
+DeviceQueryResult result = deviceService.queryDevices(criteria);
+
+// API-specific mapper converts to API DTO
+DeviceResponse response = deviceMapper.toDeviceResponse(result);
 ```
 
-**Reference**: [ErrorResponse.java](mdc:openframe/libs/openframe-core/src/main/java/com/openframe/core/dto/ErrorResponse.java)
-
-## DTO and Mapping Patterns
-
-### Record-based DTOs
-Use Java records for immutable DTOs:
-
+### Error Handling
 ```java
-public record CreateApiKeyRequest(
-    @NotBlank String name,
-    String description,
-    @Future LocalDateTime expiresAt
-) {}
+// Service throws domain exception
+throw new DeviceNotFoundException("Device not found: " + id);
 
-public record ApiKeyResponse(
-    String id,
-    String name,
-    String description,
-    boolean enabled,
-    LocalDateTime createdAt,
-    LocalDateTime expiresAt
-) {}
-```
-
-### Service to DTO Conversion
-Convert between domain models and DTOs in dedicated mappers:
-
-```java
-@Component
-public class DeviceMapper {
-    public DeviceResponse toDeviceResponse(DeviceQueryResult result) {
-        return DeviceResponse.builder()
-            .id(result.getId())
-            .hostname(result.getHostname())
-            .status(result.getStatus())
-            .build();
-    }
-}
-```
-
-## Validation Patterns
-
-### Bean Validation
-Use Bean Validation annotations for request validation:
-
-```java
-public record DeviceRequest(
-    @NotBlank(message = "Hostname is required")
-    @Size(min = 3, max = 50, message = "Hostname must be between 3 and 50 characters")
-    String hostname,
-
-    @NotBlank(message = "Operating system is required")
-    String operatingSystem,
-
-    @Pattern(regexp = "^([0-9]{1,3}\\.){3}[0-9]{1,3}$", message = "Invalid IP address format")
-    String ipAddress
-) {}
-```
-
-### Controller Validation
-Use `@Valid` annotation in controller methods:
-
+// GlobalExceptionHandler converts to ErrorResponse
+@ExceptionHandler(DeviceNotFoundException.class)
+@ResponseStatus(HttpStatus.NOT_FOUND)
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
