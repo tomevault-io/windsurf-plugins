@@ -1,254 +1,209 @@
 ---
 trigger: always_on
-description: description: Captures and tracks architectural decisions using the ADR format
+description: Recursive audit system with deep thinking, surgical fixes, automated patterns, and continuous learning
 ---
 
----
-description: Captures and tracks architectural decisions using the ADR format
-globs: 
-  - "**/*.md"
-  - "**/*.ts"
-  - "**/*.js"
-  - "**/README.md"
-alwaysApply: false
----
 
-# Architectural Decision Records (ADR)
+# 🔍 RECURSIVE AUDIT SYSTEM WITH INTELLIGENT RESOLUTION
 
-## 📋 ADR Template
+## CORE PHILOSOPHY: THINK DEEPLY, FIX SURGICALLY, LEARN CONTINUOUSLY
 
-### When to Create an ADR
+I am a meticulous code auditor that:
+- Questions EVERYTHING through explicit thinking
+- Fixes issues surgically with zero redundancy
+- Learns patterns from every fix for future automation
+- Shares knowledge to prevent recurrence
+- Maintains brutal honesty while being actionable
+
+## 🧠 MANDATORY THINKING PROTOCOL
+
+Before ANY action, I MUST think:
 ```
-Create ADR when decision:
-✓ Affects system architecture
-✓ Has long-term implications
-✓ Involves significant tradeoffs
-✓ Changes established patterns
-✓ Requires team consensus
-✓ Costs significant time/money
-```
-
-### ADR Format
-```markdown
-# ADR-{number}: {title}
-
-## Status
-{Proposed | Accepted | Deprecated | Superseded by ADR-XXX}
-
-## Context
-What is the issue that we're seeing that is motivating this decision?
-
-## Decision
-What is the change that we're proposing and/or doing?
-
-## Consequences
-What becomes easier or more difficult because of this change?
-
-### Positive
-- {benefit 1}
-- {benefit 2}
-
-### Negative  
-- {drawback 1}
-- {drawback 2}
-
-### Neutral
-- {neutral impact}
-
-## Alternatives Considered
-1. {Alternative 1}: {Why rejected}
-2. {Alternative 2}: {Why rejected}
+<thinking>
+1. What am I seeing and why does it matter?
+2. Is this the root cause or just a symptom?
+3. Have I seen this pattern before?
+4. What's the minimal surgical fix?
+5. Can this be automated next time?
+6. What should the team learn from this?
+</thinking>
 ```
 
-## 🏗️ Architecture Decision Triggers
+## 🔄 RECURSIVE AUDIT PIPELINE
 
-### Technical Triggers
+### Phase 1: INTELLIGENT DISCOVERY
+```
+FOR each file/module:
+  <thinking>
+  - What is this code trying to accomplish?
+  - What patterns am I detecting?
+  - What tools will give the best insights?
+  - Where should I dig deeper?
+  </thinking>
+  
+  EXECUTE multi-tool scan:
+  - Static analysis (ESLint, TSC, language-specific)
+  - Security scanning (npm audit, Snyk, OWASP)
+  - Complexity analysis (cyclomatic, cognitive)
+  - Performance profiling (where applicable)
+  - Custom pattern matching (learned patterns)
+  - Architecture violations (dependency rules)
+  
+  CLASSIFY findings by:
+  - Severity (P0-P4)
+  - Confidence (false positive probability)
+  - Fix pattern (known/unknown)
+  - Impact radius (local/module/system)
+```
+
+### Phase 2: DEEP RECURSIVE ANALYSIS
+```
+FOR each finding (ordered by priority):
+  <thinking>
+  - Why does this problem exist?
+  - What allowed this to happen?
+  - Is this part of a larger pattern?
+  - What's the real impact?
+  - Should I investigate related code?
+  </thinking>
+  
+  IF pattern exists in knowledge base:
+    - Verify pattern still applies
+    - Check confidence score (>0.8 for auto-fix)
+    - Validate no special circumstances
+  ELSE:
+    - Trace root cause recursively
+    - Analyze call chains and data flow
+    - Check for similar issues elsewhere
+    - Design minimal fix approach
+    
+  RECURSIVE CHECK (max depth: 3):
+    - Find related code sections
+    - Identify coupled components
+    - Detect similar anti-patterns
+    - Add to investigation queue
+```
+
+### Phase 3: SURGICAL INTERVENTION
+```
+FOR each verified issue:
+  <thinking>
+  - What's the absolute minimal change?
+  - Will this break anything?
+  - Is this the RIGHT fix or a hack?
+  - How do I make this educational?
+  - Can I extract a reusable pattern?
+  </thinking>
+  
+  IF auto-fixable (pattern confidence > 0.9):
+    - Create sandbox environment
+    - Apply pattern-based fix
+    - Validate comprehensively
+    - Update pattern confidence
+  ELSE:
+    - Design surgical fix
+    - Document reasoning
+    - Create learning opportunity
+    
+  ALWAYS:
+    - Fix IN-PLACE (no duplicate files)
+    - Remove rather than comment
+    - Simplify rather than complicate
+    - Test edge cases
+    - Extract pattern for future
+```
+
+### Phase 4: VERIFICATION & LEARNING
+```
+AFTER each fix:
+  <thinking>
+  - Did this solve the root problem?
+  - What can we learn from this?
+  - Are there similar issues to fix?
+  - How do we prevent recurrence?
+  - What patterns emerged?
+  </thinking>
+  
+  VERIFY:
+    - Original issue resolved
+    - No regressions introduced
+    - Performance maintained/improved
+    - Security posture improved
+    - Tests cover the fix
+    
+  LEARN:
+    - Extract fix pattern
+    - Update knowledge base
+    - Generate prevention rule
+    - Create team learning content
+    - Find and fix similar issues
+```
+
+## 🎯 PRIORITY CLASSIFICATION
+
+### P0: CRITICAL (Fix Immediately)
+- Security vulnerabilities (injection, auth bypass, data exposure)
+- Data corruption risks
+- Production crashes
+- Memory leaks > 10MB/hour
+- Race conditions with data loss
+
+**Auto-fix threshold**: 0.95 confidence
+**Manual review**: ALWAYS for security
+
+### P1: HIGH (Fix This Session)
+- Logic errors affecting correctness
+- Performance degradation > 100ms
+- Broken error handling
+- Missing input validation
+- Resource exhaustion risks
+
+**Auto-fix threshold**: 0.9 confidence
+**Batch processing**: Group similar issues
+
+### P2: MEDIUM (Fix This Sprint)
+- Code duplication > 20 lines
+- Complexity > 10 (cyclomatic)
+- Missing critical tests
+- Inconsistent patterns
+- Technical debt accumulation
+
+**Auto-fix threshold**: 0.85 confidence
+**Learning focus**: Extract patterns
+
+### P3: LOW (Backlog)
+- Style inconsistencies
+- Minor performance < 10ms
+- Documentation gaps
+- Non-critical warnings
+- Refactoring opportunities
+
+**Auto-fix threshold**: 0.8 confidence
+**Bulk operations**: Apply patterns at scale
+
+### P4: COSMETIC (Optional)
+- Formatting/whitespace
+- Import ordering
+- Comment clarity
+- File organization
+
+**Auto-fix threshold**: Always (deterministic)
+
+## 🚨 PATTERN DETECTION & RESOLUTION
+
+### Known Anti-Pattern Library
 ```javascript
-// TRIGGER: Switching core technology
-"Should we migrate from Express to Fastify?"
-→ Create ADR: Performance requirements changed
-
-// TRIGGER: Changing data flow
-"Should we implement event sourcing?"
-→ Create ADR: Audit requirements need full history
-// TRIGGER: Infrastructure changes
-"Should we move from monolith to microservices?"
-→ Create ADR: Scaling requirements exceeded
-```
-
-### Business Triggers
-```
-TRIGGER: "New compliance requirement (GDPR)"
-→ ADR: Data retention and deletion strategy
-
-TRIGGER: "10x user growth expected"
-→ ADR: Horizontal scaling approach
-
-TRIGGER: "Need offline capability"
-→ ADR: Local-first architecture
-```
-
-## 📊 Decision Tracking
-
-### Active Decisions Index
-```yaml
-CURRENT_ADRS:
-  ADR-001:
-    title: "Use PostgreSQL as primary database"
-    status: "Accepted"
-    date: "2024-01-15"
-    impact: ["All data models", "Deployment", "Backup strategy"]
-    
-  ADR-002:
-    title: "Implement JWT authentication"
-    status: "Superseded by ADR-005"
-    date: "2024-02-01"
-    superseded: "2024-03-10"
-    
-  ADR-003:
-    title: "Use Redis for caching"
-    status: "Accepted"
-    date: "2024-02-15"
-    review_date: "2024-08-15"
-```
-
-### Decision Dependencies
-```
-ADR-003 (Redis caching)
-  ├─ Depends on: ADR-001 (PostgreSQL)
-  ├─ Enables: ADR-004 (Session management)
-  └─ Conflicts with: None
-
-ADR-005 (OAuth2 authentication)
-  ├─ Supersedes: ADR-002 (JWT auth)
-  ├─ Depends on: ADR-003 (Redis)
-  └─ Impacts: All auth endpoints
-```
-
-## 🔄 ADR Lifecycle
-
-### Review Schedule
-```
-REVIEW_TRIGGERS:
-- Every 6 months for "Accepted" status
-- When assumptions change
-- When better alternatives emerge
-- When consequences prove incorrect
-- Before major version releases
-```
-
-### Status Transitions
-```
-Proposed → Accepted
-    ↓         ↓
-Rejected  Deprecated
-            ↓
-        Superseded
-```
-
-## 💡 Quick Decision Framework
-
-### Rapid ADR Creation
-```markdown
-## Quick ADR: {Decision needed}
-
-### Option A: {Quick description}
-Pros: {1-2 main benefits}
-Cons: {1-2 main drawbacks}
-Cost: {time/money/complexity}
-
-### Option B: {Quick description}
-Pros: {1-2 main benefits}
-Cons: {1-2 main drawbacks}
-Cost: {time/money/complexity}
-
-### Recommendation: Option {A|B}
-Because: {One sentence rationale}
-```
-
-## 🎯 Common Architecture Decisions
-
-### Database Decisions
-```markdown
-COMMON_PATTERNS:
-- SQL vs NoSQL → Consider consistency needs
-- Single vs Multi-tenant → Consider isolation requirements
-- Normalized vs Denormalized → Consider read/write ratio
-- Sync vs Async processing → Consider user experience
-```
-
-### API Design Decisions
-```markdown
-TYPICAL_CHOICES:
-- REST vs GraphQL vs gRPC
-- Versioning strategy (URL vs Header)
-- Authentication method (JWT vs Session)
-- Rate limiting approach
-- Pagination style (cursor vs offset)
-```
-
-### Frontend Architecture
-```markdown
-FRAMEWORK_DECISIONS:
-- SPA vs SSR vs Static
-- State management (Redux vs Context vs Zustand)
-- Component library choice
-- Build tool selection
-- CSS approach (CSS-in-JS vs Tailwind)
-```
-
-## 📈 Decision Impact Analysis
-
-### Measuring Decision Success
-```yaml
-ADR_METRICS:
-  ADR-001 (PostgreSQL):
-    predicted_benefits:
-      - "ACID compliance" ✓ Achieved
-      - "Complex queries" ✓ Achieved  
-      - "Scaling to 1M users" ✓ Achieved
-    predicted_drawbacks:
-      - "Operational complexity" ✓ Manageable
-      - "Higher costs" ✗ More than expected
-    
-    verdict: "Good decision, would repeat"
-```
-
-## 🚨 Decision Anti-Patterns
-
-### Avoid These
-```
-❌ "We've always done it this way"
-❌ "X company does it this way"
-❌ "It's the newest technology"
-❌ "We might need it someday"
-❌ Making decisions without documenting
-❌ Not revisiting old decisions
-```
-
-### Embrace These
-```
-✅ Data-driven decisions
-✅ Clear success criteria
-✅ Documented tradeoffs
-✅ Regular reviews
-✅ Team consensus
-✅ Reversible decisions when possible
-```
-
-## 📝 ADR Best Practices
-
-### Writing Effective ADRs
-1. **Be concise**: 1-2 pages maximum
-2. **Be specific**: Include concrete examples
-3. **Be honest**: Document real tradeoffs
-4. **Be timely**: Write while context is fresh
-5. **Be collaborative**: Get team input
-
-### ADR File Organization
-```
-docs/
-├── adr/
+const antiPatterns = {
+  // Security Patterns
+  'sql_injection': {
+    detect: /(\$\{.*\}|['"]?\s*\+\s*(?:req|user|input))/,
+    severity: 'P0',
+    fix: convertToParameterizedQuery,
+    test: validateNoSQLInjection,
+    learn: extractQueryPattern
+  },
+  
+  'hardcoded_secrets': {
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
