@@ -1,145 +1,102 @@
 ---
 trigger: always_on
-description: Hero section mobile image containment using aspect-ratio matching — the definitive technique for containing images of varying dimensions (portrait, landscape, ultra-wide) inside responsive containers without cropping or gaps
+description: This rule defines the standard pattern for hero section image rotation on the home page. The pattern provides automatic rotation through event flyer images with synchronized overlay buttons, interactive navigation controls (Previous/Next/Play/Pause), default image display, and proper event selection criteria.
 ---
 
+# Hero Section Image Rotation Pattern
 
-# Hero Section Mobile: Aspect-Ratio Image Containment (March 2026)
+## **Overview**
+This rule defines the standard pattern for hero section image rotation on the home page. The pattern provides automatic rotation through event flyer images with synchronized overlay buttons, interactive navigation controls (Previous/Next/Play/Pause), default image display, and proper event selection criteria.
 
-## Overview
+## **Problem Solved**
+- **Automatic Image Rotation**: Rotates through event hero images automatically every 8 seconds
+- **Interactive Controls**: Provides Previous/Next/Play/Pause buttons for manual navigation (shown on hover/touch)
+- **Overlay Synchronization**: Keeps overlay buttons (Buy Tickets Click Here images) synchronized with current event image
+- **Event Selection**: Only shows events that meet specific criteria (future dates, isHomePageHeroImage flag)
+- **Recurring Event Handling**: Shows only the next occurrence for recurring events
+- **Default Image Display**: Shows default image for first 2 seconds before rotation begins
+- **User Experience**: Smooth transitions between event images with proper navigation links and manual control
+- **Homepage cache**: Hero section images and data are cached in sessionStorage under `homepage_hero_section_cache` (see `src/lib/homepageCacheKeys.ts` and `documentation/cloud_front_amplify_cache/HOMEPAGE_CACHE_IMPLEMENTATION_PLAN.html`). On refresh or repeat visit, a `useLayoutEffect` reads the cache before paint so the hero shows immediately without waiting for `useFilteredEvents('hero')` or standalone media fetch.
 
-The homepage hero section (`src/components/HeroSection.tsx`) has a 4-section split layout. Each section contains an image with **different dimensions and aspect ratios**. On mobile (`@media (max-width: 767px)`), we need every image fully visible (zero crop) AND filling its container (zero gaps). This rule documents the **aspect-ratio matching technique** that solved this across all three image sections.
+## **Hero Image Display Dimensions (Upload Spec)**
 
-All mobile overrides live in `src/app/globals.css` inside the `@media (max-width: 767px)` block.
+The rotating hero uses **object-contain** in a wide container (~65% viewport width, min-height 280–480px). The `<Image>` component uses **width={1200} height={800}** (3:2 landscape). **Recommended upload dimensions** so the hero section does not become excessively tall:
 
-## The Problem
+- **Desktop**: **1200×800px (3:2 landscape)**
+- **Mobile**: **900×600px (3:2)** or same file scales down
+- **Do not use portrait 800×1200 (2:3)** — portrait images make the hero block too tall.
 
-Each hero section image has a different aspect ratio:
+Keep admin/upload copy and docs (e.g. `HERO_SECTION_IMAGE_SPECIFICATIONS.md`, MediaClientPage hero tip) aligned with 1200×800 (3:2).
 
-| Section | Image | Recommended Size | Aspect Ratio | Shape |
-|---------|-------|-----------------|--------------|-------|
-| 1 | Kerala portrait | 1000 x 1200 px | **5:6** | Tall portrait |
-| 2 | Event slideshow | 2000 x 800 px | **5:2** | Wide landscape |
-| 3 | Unite India banner | 1000 x 200 px | **5:1** | Ultra-wide strip |
+## **Core Pattern**
 
-Naive approaches fail:
-- **`object-cover`** fills the container but **crops** the image (top/bottom or left/right)
-- **`object-contain`** shows the full image but leaves **letterbox gaps** (purple/background bars)
-- **Fixed `height` / `min-height`** either crops tall images or leaves empty space below short ones
+### **Component Structure**
+```tsx
+// ✅ DO: Use DynamicHeroImage component for hero section rotation
+const DynamicHeroImage: React.FC = () => {
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [isShowingDefault, setIsShowingDefault] = useState(true);
+  const [dynamicImages, setDynamicImages] = useState<string[]>([]);
+  const [currentEvent, setCurrentEvent] = useState<EventWithMediaExtended | null>(null);
+  const [upcomingEvents, setUpcomingEvents] = useState<EventWithMediaExtended[]>([]);
 
-## The Core Technique: Aspect-Ratio Matching
+  // Use shared data hook for consistent date parsing
+  const { filteredEvents, isLoading: eventsLoading, error } = useFilteredEvents('hero');
 
-**The solution**: Set the CSS `aspect-ratio` on the container to match the image's native proportions. When container and image have the same ratio, `object-contain` fills the container exactly — zero crop AND zero gaps.
+  // Default image path
+  const defaultImage = "/images/hero_section/default_hero_section_second_column_poster.jpeg";
 
-```
-Container aspect-ratio  ===  Image aspect-ratio
-         +
-    object-contain
-         =
-  Zero crop + Zero gaps
-```
+  // Rotation logic with useEffect
+  useEffect(() => {
+    // Start with default image for 2 seconds
+    const defaultTimer = setTimeout(() => {
+      setIsShowingDefault(false);
+    }, 2000);
 
-### Why This Works
+    // If we have dynamic images, start rotating them
+    if (dynamicImages.length > 0) {
+      const dynamicTimer = setTimeout(() => {
+        const interval = setInterval(() => {
+          setCurrentImageIndex((prev) => {
+            const newIndex = (prev + 1) % dynamicImages.length;
+            // Update current event when image changes
+            if (newIndex < dynamicImages.length - 1 && newIndex < upcomingEvents.length) {
+              setCurrentEvent(upcomingEvents[newIndex]);
+            } else {
+              setCurrentEvent(null);
+            }
+            return newIndex;
+          });
+        }, 15000); // Change every 15 seconds
 
-- `aspect-ratio: 5 / 2` on a `width: 100%` container → browser auto-calculates height proportionally
-- Image with `object-contain` scales to fit → since ratios match, it fills 100% of the container
-- `height: auto` lets the container shrink/grow with viewport width → fully responsive
-- `background: #1a0a2e` (dark purple matching hero bg) hides any sub-pixel rounding gaps
+        return () => clearInterval(interval);
+      }, 2000); // Start after 2 seconds
 
-## Section-by-Section Implementation
+      return () => {
+        clearTimeout(defaultTimer);
+        clearTimeout(dynamicTimer);
+      };
+    }
 
-### Section 1 — Kerala Portrait (5:6, `object-contain` + `max-height` cap)
+    return () => clearTimeout(defaultTimer);
+  }, [dynamicImages.length, upcomingEvents]);
 
-Section 1 is a **tall portrait** image. Using `aspect-ratio: 5/6` on mobile would make the container extremely tall (taller than the viewport). Instead, we use `object-contain` with a `max-height` viewport cap so the image is fully visible but doesn't dominate the screen.
-
-**Why not `aspect-ratio` here**: A 5:6 portrait on a 390px-wide phone → 468px tall container, which is too much. The `max-height: 22vh` cap keeps it proportional.
-
-**Why not `object-cover`**: Cover fills width but crops top/bottom. The Kerala image has text/content at the edges that gets cut off.
-
-```css
-@media (max-width: 767px) {
-  /* Container: full-bleed, no decorations */
-  .hero-left-panel {
-    width: 100%;
-    flex: 0 0 auto;
-    min-height: 0;
-    padding: 0;
-    margin: 0;
-  }
-
-  .hero-left-image {
-    width: 100%;
-    max-width: 100%;
-    height: auto;
-    min-height: 0;
-    aspect-ratio: auto;       /* NOT locked — height driven by max-height cap */
-    padding: 0;
-    border-radius: 0;
-    box-shadow: none;
-    border: none;
-    background: #1a0a2e;      /* Blends side letterbox bars with hero bg */
-  }
-
-  /* Kill decorative pseudo-elements */
-  .hero-left-image::before,
-  .hero-left-image::after {
-    display: none;
-  }
-
-  .hero-left-image img {
-    border-radius: 0 !important;
-    object-fit: contain !important;          /* Full image — no crop */
-    object-position: center center !important;
-    width: 100% !important;
-    height: auto !important;
-    max-height: 22vh !important;             /* Cap prevents portrait from being too tall */
-    display: block !important;
-  }
-}
+  // Render logic...
+};
 ```
 
-**Trade-off**: `object-contain` on a portrait image in a landscape container creates **side gaps**. The `background: #1a0a2e` makes these gaps blend with the hero's dark purple background, making them invisible.
+## **Interactive Slider Controls (Play/Pause/Previous/Next)**
 
-**Tuning**: Increase `max-height` to show more of the image (e.g., `28vh`), decrease to show less (e.g., `18vh`).
+### **Feature Overview**
+The hero section slider includes interactive controls that allow users to manually navigate through images and control auto-rotation. These controls appear on hover (desktop) or touch (mobile) and provide:
+- **Previous/Next Navigation**: Manual browsing through event images
+- **Play/Pause Control**: Toggle auto-rotation on/off
+- **Event Synchronization**: Current event state updates when navigating manually
 
----
-
-### Section 2 — Event Slideshow (5:2, `aspect-ratio` match)
-
-Section 2 is a **wide landscape** image. This is the canonical use of the aspect-ratio technique.
-
-```css
-@media (max-width: 767px) {
-  /* Panel: strip all spacing, content-driven height */
-  .hero-right-panel {
-    width: 100%;
-    flex: 0 0 auto;
-    min-height: 0;          /* Was 54vh — caused massive gap below image */
-    padding: 0;
-    margin-top: 0.125rem;   /* Tiny gap between Section 1 and 2 */
-    align-items: stretch;
-    justify-content: stretch;
-  }
-
-  /* Wrapper: aspect-ratio locks to image proportions */
-  .hero-slideshow-wrapper {
-    padding: 0;
-    border-radius: 0;
-    box-shadow: none;
-    border: none;
-    background: #1a0a2e;
-    aspect-ratio: 5 / 2;    /* Matches 2000x800 image → zero crop, zero gaps */
-    width: 100%;
-    height: auto;
-  }
-
-  /* Kill decorative top-edge highlight */
-  .hero-slideshow-wrapper::before {
-    display: none;
-  }
-
-  .hero-slideshow-wrapper img {
-    border-radius: 0 !important;
+### **Control Visibility**
+- **Show on Hover**: Controls appear when mouse hovers over hero image
+- **Show on Touch**: Controls appear when user touches the hero image on mobile devices
+- **Auto-Hide on Touch**: Controls automatically hide after 3 seconds of no interaction on touch devices
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
