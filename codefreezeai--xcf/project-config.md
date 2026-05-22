@@ -1,199 +1,139 @@
 ---
 trigger: always_on
-description: xcf Xcode MCP Server - AI Guide
+description: xcf Xcode MCP Server - Quick Reference
 ---
 
-# XCF - AI Assistant Integration Guide
-
-## 🤖 Overview for AI Assistants
-
-XCF (Xcode MCP Server) is a powerful Swift-based automation tool designed to streamline Xcode project management for AI assistants. This guide provides comprehensive instructions for integrating XCF into AI-powered development workflows.
-
-## 🔧 Configuration
-
-### MCP Server Setup
-
-Add XCF to your MCP configuration file with the following JSON:
-
-```json
-{
-  "mcpServers": {
-    "xcf": {
-      "type": "stdio",
-      "command": "/Applications/xcf.app/Contents/MacOS/xcf server"
-    }
-  }
-}
-```
-
-#### Configuration Locations
-- **Cursor**: `~/.cursor/mcp.json`
-- **Claude Desktop**: `~/Library/Application Support/Claude/claude_desktop_config.json`
-
-### Advanced Project Configuration
-
-For project-specific control, use environment variables:
-
-```json
-{
-  "mcpServers": {
-    "xcf": {
-      "type": "stdio",
-      "command": "/Applications/xcf.app/Contents/MacOS/xcf server",
-      "env": {
-          "XCODE_PROJECT_FOLDER": "/path/to/project/",
-          "XCODE_PROJECT": "/path/to/project/project.xcodeproj"
-      }
-    }
-  }
-}
-```
-
-## 🛠️ AI-Powered Workflow Tools
-
-### MCP Function Tools
-
-XCF provides a rich set of tools for AI assistants:
-
-| Tool | Purpose | Example Usage |
-|------|---------|---------------|
-| `mcp_xcf_xcf` | Execute XCF actions | `mcp_xcf_xcf(action="build")` |
-| `mcp_xcf_snippet` | Extract code snippets | `mcp_xcf_snippet(filePath="main.swift", entireFile=true)` |
-| `mcp_xcf_analyzer` | Analyze Swift code | `mcp_xcf_analyzer(filePath="main.swift", entireFile=true)` |
-| `mcp_xcf_read_file` | Read file contents | `mcp_xcf_read_file(filePath="main.swift")` |
-| `mcp_xcf_write_file` | Write file contents | `mcp_xcf_write_file(filePath="test.txt", content="Hello World")` |
-
-### Standalone Action Tools
-
-In addition to the general-purpose tools, XCF now provides dedicated tools for each action:
-
-| Tool | Purpose | Example Usage |
-|------|---------|---------------|
-| `mcp_xcf_show_help` | Display help information | `mcp_xcf_show_help()` |
-| `mcp_xcf_grant_permission` | Grant Xcode permissions | `mcp_xcf_grant_permission()` |
-| `mcp_xcf_run_project` | Run the current project | `mcp_xcf_run_project()` |
-| `mcp_xcf_build_project` | Build the current project | `mcp_xcf_build_project()` |
-| `mcp_xcf_show_current_project` | Show selected project | `mcp_xcf_show_current_project()` |
-| `mcp_xcf_show_env` | Display environment variables | `mcp_xcf_show_env()` |
-| `mcp_xcf_show_folder` | Show current directory | `mcp_xcf_show_folder()` |
-| `mcp_xcf_list_projects` | List all Xcode projects | `mcp_xcf_list_projects()` |
-| `mcp_xcf_select_project` | Select a project by number | `mcp_xcf_select_project(projectNumber=1)` |
-| `mcp_xcf_analyze_swift_code` | Analyze Swift code | `mcp_xcf_analyze_swift_code(filePath="main.swift")` |
-
-### Workflow Patterns
-
-#### Basic Project Management
-
-```
-# Activate XCF
-use_xcf
-
-# List and select project
-show
-open 1
-
-# Build and run
-build
-run
-```
-
-#### Code Analysis Workflow
-
-```
-# Activate XCF
-use_xcf
-
-# Get current project
-current
-
-# Extract and analyze code
-snippet main.swift
-analyzer main.swift
-
-# Implement fixes
-edit_file main.swift 10 20 "# Improved implementation"
-
-# Rebuild
-build
-```
-
-## 🔍 Smart Path Resolution
-
-XCF uses intelligent path resolution for file operations:
-
-1. Exact path provided
-2. Relative path from current directory
-3. Current project directory
-4. Workspace folder
-5. Recursive workspace search
-6. Fuzzy filename matching
-
-### File Access Examples
-
-```python
-# These are equivalent
-mcp_xcf_snippet(filePath="/full/path/to/file.swift")
-mcp_xcf_snippet(filePath="file.swift")  # Smart resolution
-```
-
-## 📊 Code Analysis Capabilities
-
-The Swift code analyzer provides:
-- Code style checks
-- Complexity analysis
-- Unused variable detection
-- Magic number identification
-- Refactoring suggestions
-- Method length evaluation
-
-### Analysis Example
-
-```python
-# Analyze entire file
-mcp_xcf_analyzer(filePath="main.swift", entireFile=true)
-
-# Analyze specific line range
-mcp_xcf_analyzer(
-    filePath="main.swift", 
-    startLine=10, 
-    endLine=50
-)
-```
-
-## 🔒 Security Considerations
-
-- Workspace-bound operations
-- Automatic access prevention outside workspace
-- Environment variable-based security
-- Safe redirection of potentially unsafe actions
-
-## 🚀 Performance Tips
-
-- Use specific file paths when possible
-- Leverage smart path resolution
-- Utilize line-range analysis for large files
-- Prefer MCP function tools for programmatic interactions
-
-## 🤝 Integration Best Practices
-
-1. Always activate XCF before operations
-2. Use environment variables for project configuration
-3. Leverage smart path resolution
-4. Implement error handling
-5. Use code analysis before major changes
-
-## 📋 Comprehensive Tool List
-
-Refer to the User Guide for a complete list of available tools and their detailed usage.
+# XCF Quick Reference Guide 🚀
 
 ## 🎛️ XCF Core Actions
 
-### Available Actions
+### Permissions & Project Management
+| Action | Description | Example | Output |
+|--------|-------------|---------|--------|
+| `grant` | Grant Xcode automation | `grant` | Permissions granted |
+| `show` | List open projects | `show` | 1. /path/to/project.xcodeproj |
+| `open #` | Select project | `open 1` | Project selected |
+| `current` | Show selected project | `current` | /path/to/current/project |
 
-| Action | Description | Example | Purpose |
-|--------|-------------|---------|---------|
-| `grant` | Grant Xcode automation permissions | `mcp_xcf_xcf(action="grant")` | Authorize XCF to interact with Xcode |
-| `show` | List open projects | `mcp_xcf_xcf(action="show")` | Display available Xcode projects |
+### Build & Execute
+| Action | Description | Example | Output |
+|--------|-------------|---------|--------|
+| `build` | Build project | `build` | 🐦📜 Built successfully |
+| `run` | Run project | `run` | 🐦📜 Ran successfully |
+
+### System & Analysis
+| Action | Description | Example | Output |
+|--------|-------------|---------|--------|
+| `env` | Show environment | `env` | [Environment variables] |
+| `pwd` | Show current folder | `pwd` | /current/directory |
+| `analyze <file>` | Analyze Swift code | `analyze main.swift` | Code analysis report |
+| `lz <file>` | Quick code analysis | `lz main.swift` | Condensed analysis |
+
+### Aliases
+- `pwd` = `dir` = `path`
+- `lz` = shorthand for `analyze`
+
+### Quick Workflow
+```bash
+grant       # Authorize XCF
+show        # List projects
+open 1      # Select project
+build       # Compile project
+run         # Execute project
+```
+
+### Code Analysis Workflow
+```bash
+analyze main.swift   # Detailed analysis
+lz main.swift        # Quick analysis
+```
+
+## 📋 Core Commands
+
+### Activation & Project Management
+| Command | Description | Example | Output |
+|---------|-------------|---------|--------|
+| `show` | List open Xcode projects | `show` | 1. /path/to/project.xcodeproj |
+| `open #` | Select project by number | `open 1` | [Selects project] |
+| `current` | Show current project | `current` | Current project: /path/to/project.xcodeproj |
+
+### Build & Run
+| Command | Description | Example | Output |
+|---------|-------------|---------|--------|
+| `build` | Build current project | `build` | 🐦📜 Built successfully |
+| `run` | Run current project | `run` | 🐦📜 Ran successfully |
+
+### System Information
+| Command | Description | Example | Output |
+|---------|-------------|---------|--------|
+| `env` | Show environment variables | `env` | [List of environment variables] |
+| `pwd` | Show current folder | `pwd` | Current folder: /path/to/folder |
+| `help` | Display all commands | `help` | [List of available commands] |
+
+## 🔍 Path Resolution & Quoting
+
+### Supported Path Types
+- Current directory: `file.swift`
+- Child directories: `src/file.swift`
+- Parent directory: `../file.swift`
+- Multiple directories up: `../../file.swift`
+- Full system paths: `/Users/username/project/file.swift`
+
+### Quoting Rules
+- Use quotes for content with spaces
+- Single `'` or double `"` quotes work
+- Recommended for complex content
+
+### Path Resolution Examples
+```bash
+read_file main.swift                   # Current directory
+read_file src/utils.swift               # Child directory
+read_file ../shared/config.swift        # Parent directory
+write_file test.txt "Hello World"       # Simple content
+write_file config.json '{"key": "value"}'  # JSON content
+```
+
+## 🗂️ File Operations
+| Command | Description | Example |
+|---------|-------------|---------|
+| `read_file <file>` | Read file contents | `read_file main.swift` |
+| `write_file <file> <content>` | Write to file | `write_file test.txt "Hello World"` |
+| `edit_file <file> <start> <end> <content>` | Edit file lines | `edit_file main.swift 10 20 "Updated code"` |
+| `delete_file <file>` | Delete file | `delete_file temp.txt` |
+| `move_file <source> <destination>` | Move file | `move_file old.swift new.swift` |
+
+## 📂 Directory Operations
+| Command | Description | Example |
+|---------|-------------|---------|
+| `cd_dir <path>` | Change directory | `cd_dir /path/to/project` |
+| `read_dir [path] [ext]` | List directory contents | `read_dir . swift` |
+| `add_dir <path>` | Create directory | `add_dir new_folder` |
+| `rm_dir <path>` | Remove directory | `rm_dir old_folder` |
+| `move_dir <source> <destination>` | Move directory | `move_dir old_dir new_dir` |
+
+## 📄 Xcode Document Operations
+| Command | Description | Example |
+|---------|-------------|---------|
+| `open_doc <file>` | Open in Xcode | `open_doc main.swift` |
+| `create_doc <file> [content]` | Create new document | `create_doc new.swift "import Foundation"` |
+| `read_doc <file>` | Read Xcode document | `read_doc main.swift` |
+| `save_doc <file>` | Save Xcode document | `save_doc main.swift` |
+
+| `close_doc <file> <saving>` | Close document | `close_doc main.swift true` |
+
+## 🔍 Code Analysis
+| Command | Description | Example |
+|---------|-------------|---------|
+| `snippet <file> [start] [end]` | Extract code snippets | `snippet main.swift 10 20` |
+| `analyzer <file> [start] [end]` | Analyze Swift code | `analyzer main.swift 10 50` |
+| `lz <file>` | Shorthand analyzer | `lz main.swift` |
+
+## 🤖 AI Assistant MCP Tools
+| Tool | Purpose | Example |
+|------|---------|---------|
+| `mcp_xcf_xcf` | Execute XCF actions | `mcp_xcf_xcf(action="build")` |
+| `mcp_xcf_snippet` | Extract code snippets | `mcp_xcf_snippet(filePath="main.swift", entireFile=true)` |
+| `mcp_xcf_analyzer` | Analyze Swift code | `mcp_xcf_analyzer(filePath="main.swift", entireFile=true)` |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
