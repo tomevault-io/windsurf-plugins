@@ -1,127 +1,84 @@
 ---
 trigger: always_on
-description: - The `scripts/` directory contains Bash scripts for managing Sui multisig wallets and transactions.
+description: Sui supports multi-signature (multisig) transactions, which require multiple keys for authorization rather than a single, one-key signature. In technical terms, Sui supports k out of n multisig transactions, where k is the threshold and n is the total weights of all participating parties. The maximum number of parties is 10. To learn more about the single key signatures that Sui supports, see Signatures.
 ---
 
-# Sui Multisig CLI Scripts & Helpers
+# Sui Multisig Documentation
 
-## Overview
+## Multisig Overview (from Sui Docs)
 
-- The `scripts/` directory contains Bash scripts for managing Sui multisig wallets and transactions.
-- These scripts are **for Sui**, not IOTA, and are the authoritative source for Sui multisig CLI operations.
-- The web client in `multisig-web-client/` is currently IOTA-specific and **not for Sui**.
+Sui supports multi-signature (multisig) transactions, which require multiple keys for authorization rather than a single, one-key signature. In technical terms, Sui supports k out of n multisig transactions, where k is the threshold and n is the total weights of all participating parties. The maximum number of parties is 10. To learn more about the single key signatures that Sui supports, see Signatures.
 
----
+Valid participating keys for multisig are Pure Ed25519, ECDSA Secp256k1, and ECDSA Secp256r1. A (u8) weight is set for each participating keys and the threshold can be set as u16. If the serialized multisig contains enough valid signatures of which the sum of weights passes the threshold, Sui considers the multisig valid and the transaction executes.
 
-## Main Workflow Scripts
+### Applications of multisig
+Sui allows you to mix and match key schemes in a single multisig account. For example, you can pick a single Ed25519 mnemonic-based key and two ECDSA secp256r1 keys to create a multisig account that always requires the Ed25519 key, but also one of the ECDSA secp256r1 keys to sign. You could use this structure for mobile secure enclave stored keys as two-factor authentication.
 
-- **[0_setup_multisig.sh](mdc:scripts/0_setup_multisig.sh)**  
-  Interactive script to create a new Sui multisig wallet.  
-  - Lets you select addresses, assign weights, set a threshold.
-  - Uses `sui keytool multi-sig-address` to generate the multisig address.
-  - Saves config as JSON in `multisigs/`.
-  - Optionally funds the new address from the faucet.
+**Info:** Currently, iPhone and high-end Android devices support only ECDSA secp256r1 enclave-stored keys.
 
-- **[1_create_tx.sh](mdc:scripts/1_create_tx.sh)**  
-  Entry point for creating a new unsigned transaction for a multisig wallet.  
-  - Lets you pick the transaction type: `publish`, `upgrade`, `call`, or `transfer`.
-  - Delegates to the corresponding script in `scripts/types/`.
+Compared to threshold signatures, a multisig account is generally more flexible and straightforward to implement and use, without requiring complex multi-party computation (MPC) account setup ceremonies and related software, and any dependency in threshold crypto providers. Additionally, apart from the ability to mix and match key schemes and setting different weights for each key (which is complex in threshold cryptography), multisig accounts are "accountable" and "transparent" by design because both participating parties and observers can see who signed each transaction. On the other hand, threshold signatures provide the benefits of hiding the threshold policy, but also resulting in a single signature payload, making it indistinguishable from a single-key account.
 
-- **[2_approve_tx.sh](mdc:scripts/2_approve_tx.sh)**  
-  Used by signers to approve/sign a pending transaction.  
-  - Lets you pick a transaction, select a signer address, and signs the transaction bytes.
-  - Stores signatures in the transaction directory.
+Supported structures in Sui multisig Multisig structures supported in Sui.
 
-- **[3_execute_tx.sh](mdc:scripts/3_execute_tx.sh)**  
-  Combines collected signatures and submits the transaction to the Sui network.  
-  - Checks if the signature threshold is met.
-  - Uses `sui keytool multi-sig-combine-partial-sig` and `sui client execute-signed-tx`.
+### Related links
+Multisig Authentication: Guide on how to create a multisig transaction.
 
----
+## Multisig Authentication (CLI Guide - Excerpt)
 
-## Transaction Type Scripts
+The following steps demonstrate how to create a multisig transaction and then submit it against a network using the Sui CLI.
 
-Located in `scripts/types/`:
+To learn more about how to create multisig addresses and create multisig transactions using the TypeScript SDK, see the SDK documentation for details.
 
-- **[transfer.sh](mdc:scripts/types/transfer.sh)**  
-  Prepares a transfer transaction (object transfer) for a multisig wallet.
+### Prerequisites
+This topic assumes you are somewhat familiar with the Sui CLI, specifically the `sui client` and `sui keytool` commands.
+You need an existing address on the network you are working on to receive an object.
+The topic also assumes that your active environment is Testnet (`sui client active-env`).
 
-- **[call.sh](mdc:scripts/types/call.sh)**  
-  Prepares a Move contract call transaction for a multisig wallet.
+### Executing multisig transactions
+To demonstrate multisig, this topic guides you through setting up and executing a multisig transaction using the Sui CLI.
 
-- **[publish.sh](mdc:scripts/types/publish.sh)**  
-  Prepares a package publish transaction for a multisig wallet.
+#### Create addresses with different schemes
+Use the `sui client new-address` command to generate a Sui address and public key for three supported key schemes.
+`$ sui client new-address ed25519`
+`$ sui client new-address secp256k1`
+`$ sui client new-address secp256r1`
 
-- **[upgrade.sh](mdc:scripts/types/upgrade.sh)**  
-  Prepares a package upgrade transaction for a multisig wallet.
+Set shell variables for these addresses:
+`$ ADDRESS1=<SUI-ADDRESS-ED25519>`
+`$ ADDRESS2=<SUI-ADDRESS-SECP256K1>`
+`$ ADDRESS3=<SUI-ADDRESS-SECP256R1>`
+`$ ACTIVE=<ACTIVE-ADDRESS>`
 
----
+#### Verify addresses
+Use `sui keytool list`. The output includes public key data. Create shell variables for public keys:
+`$ PKEY_1=<PUBLIC-KEY-ED25519>`
+`$ PKEY_2=<PUBLIC-KEY-SECP256K1>`
+`$ PKEY_3=<PUBLIC-KEY-SECP256R1>`
 
-## Utility Scripts
+#### Create a multisig address
+Use `sui keytool multi-sig-address`. Each address is assigned a weight. The sum of weights of included signatures must be >= threshold.
+`$ sui keytool multi-sig-address --pks $PKEY_1 $PKEY_2 $PKEY_3 --weights 1 2 3 --threshold 3`
+Response includes `<MULTISIG-ADDRESS>`.
 
-- **[util/transaction_helpers.sh](mdc:scripts/util/transaction_helpers.sh)**  
-  Common Bash functions for address selection, validation, transaction decoding, and more.  
-  Used by all main scripts.
+#### Add SUI to the multisig address
+Set `$ MULTISIG=<MULTISIG-ADDRESS>`.
+Use `sui client faucet --address $MULTISIG`.
+Verify with `sui client gas $MULTISIG`.
 
-- **[util/a_create_keys.sh](mdc:scripts/util/a_create_keys.sh)**  
-  Simple script to generate new Sui addresses for all supported key schemes.
+#### Transfer SUI to your active address
+Set `$ COIN=<COIN-OBJECT-ID>`.
+Use `sui client transfer --to $ACTIVE --object-id $COIN --serialize-unsigned-transaction`.
+Response is `<TX-BYTES-RESULT>`. Set `$ TXBYTES=<TX-BYTES-RESULT>`.
 
----
+#### Sign the transaction with two public keys
+Use `sui keytool sign --address $ADDRESS1 --data $TXBYTES`.
+Repeat for `$ADDRESS2`.
+Response includes `<SIGNATURE-HASH>`. Set `$ SIG_1=<SIGNATURE-HASH-ED25519>` and `$ SIG_2=<SIGNATURE-HASH-SECP256K1>`.
 
-## Directory Structure
+#### Combine individual signatures into a multisig
+Use `sui keytool multi-sig-combine-partial-sig --pks $PKEY_1 $PKEY_2 $PKEY_3 --weights 1 2 3 --threshold 3 --sigs $SIG_1 $SIG_2`.
+Response includes `<MULTISIG-SERIALIZED-HASH>`.
 
-- `multisigs/` — Stores multisig wallet config JSON files.
-- `transactions/` — Stores unsigned transaction bytes and collected signatures.
-
----
-
-## Usage Flow
-
-1. **Create multisig wallet:**  
-   Run `scripts/0_setup_multisig.sh` and follow prompts.
-
-2. **Create transaction:**  
-   Run `scripts/1_create_tx.sh` and select the type.
-
-3. **Approve transaction:**  
-   Each signer runs `scripts/2_approve_tx.sh` to sign.
-
-4. **Execute transaction:**  
-   Run `scripts/3_execute_tx.sh` to combine signatures and submit.
-
----
-
-## Note
-
-- The web client (`multisig-web-client/`) is currently for IOTA and **not compatible with Sui**.  
-  All Sui multisig operations should use the CLI scripts above.
-
-# Sui Keytool CLI
-
-The Sui CLI `keytool` command provides several command-level access for the management and generation of addresses, as well as working with private keys, signatures, or zkLogin. For example, a user could export a private key from the Sui Wallet and import it into the local Sui CLI wallet using the `sui keytool import [...]` command.
-
-## Check Sui CLI installation
-
-Before you can use the Sui CLI, you must install it. To check if the CLI exists on your system, open a terminal or console and type the following command:
-
-```bash
-$ sui --version
-```
-
-If the terminal or console responds with a version number, you already have the Sui CLI installed.
-
-If the command is not found, follow the instructions in Install Sui to get the Sui CLI on your system.
-
-## Commands
-
-Usage: `sui keytool [OPTIONS] <COMMAND>`
-
-Commands:
-*   `convert`: Convert private key from legacy formats (e.g. Hex or Base64) to Bech32 encoded 33 byte `flag || private key` begins with `suiprivkey`
-*   `decode-or-verify-tx`: Given a Base64 encoded transaction bytes, decode its components. If a signature is provided, verify the signature against the transaction and output the result.
-*   `decode-multi-sig`: Given a Base64 encoded MultiSig signature, decode its components. If tx_bytes is passed in, verify the multisig
-*   `generate`: Generate a new keypair with key scheme flag {ed25519 | secp256k1 | secp256r1} with optional derivation path, default to m/44'/784'/0'/0'/0' for ed25519 or m/54'/784'/0'/0/0 for secp256k1 or m/74'/784'/0'/0/0 for secp256r1. Word length can be { word12 | word15 | word18 | word21 | word24} default to word12 if not specified
-*   `import`: Add a new key to sui.keystore using either the input mnemonic phrase or a private key (from the Wallet), the key scheme flag {ed25519 | secp256k1 | secp256r1} and an optional derivation path, default to m/44'/784'/0'/0'/0' for ed25519 or m/54'/784'/0'/0/0 for secp256k1 or m/74'/784'/0'/0/0 for secp256r1. Supports mnemonic phrase of word length 12, 15, 18, 21, 24
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
