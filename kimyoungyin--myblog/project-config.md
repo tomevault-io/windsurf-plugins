@@ -1,186 +1,72 @@
 ---
 trigger: always_on
-description: - **ALWAYS** use functional components with hooks
+description: - **ALWAYS** use Zod schemas for all user input validation
 ---
 
-# React Patterns & Functional Programming (MANDATORY)
+# Security & Data Validation (CRITICAL)
 
-## ⚛️ **Component Structure (MUST FOLLOW)**
+## 🔒 **Data Validation (MUST ENFORCE)**
 
-- **ALWAYS** use functional components with hooks
-- **NEVER** use class components
-- **MUST** use `React.FC<Props>` type annotation for components
-- **ALWAYS** destructure props in function parameters
+- **ALWAYS** use Zod schemas for all user input validation
+- **NEVER** trust client-side data without server-side validation
+- **MUST** validate data in Server Actions before database operations
+- **ALWAYS** use the validation schemas from [src/lib/schemas.ts](mdc:src/lib/schemas.ts)
 
-```typescript
-// ✅ CORRECT - Functional component with proper typing
-export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
-    initialTitle = '',
-    initialContent = '',
-    action,
-    ...props
-}) => {
-    // Component logic
-};
-
-// ❌ WRONG - Class component or improper typing
-export class MarkdownEditor extends React.Component { ... }
-```
-
-## 🎯 **State Management (CRITICAL)**
-
-- **ALWAYS** use `useState` for local component state
-- **ALWAYS** use `useCallback` for functions passed as props
-- **ALWAYS** use `useMemo` for expensive calculations
-- **NEVER** mutate state directly - always use setter functions
+## 🛡️ **Input Validation Examples**
 
 ```typescript
-// ✅ CORRECT - Proper state management
-const [title, setTitle] = useState(initialTitle);
-const handleTitleChange = useCallback((value: string) => {
-    setTitle(value);
-}, []);
+// ✅ CORRECT - Using Zod validation
+export const CreatePostSchema = z.object({
+    title: z
+        .string()
+        .min(1, '제목을 입력해주세요.')
+        .max(100, '제목은 100글자 이하여야 합니다.')
+        .transform((val) => val.trim()),
+    content: z
+        .string()
+        .min(1, '내용을 입력해주세요.')
+        .max(50000, '내용은 50,000글자 이하여야 합니다.'),
+    hashtags: z
+        .array(z.string().min(2).max(20))
+        .min(1, '최소 하나의 해시태그가 필요합니다.')
+        .max(10, '해시태그는 최대 10개까지 입력할 수 있습니다.'),
+});
 
-// ❌ WRONG - Direct mutation or missing dependencies
-const handleTitleChange = (value: string) => {
-    title = value; // Direct mutation
+// ❌ WRONG - No validation or weak validation
+export const createPost = async (data: any) => {
+    // Direct database operation without validation
+    return await supabase.from('posts').insert(data);
 };
 ```
 
-## 🚫 **FORBIDDEN React Practices**
+## 🚫 **FORBIDDEN Security Practices**
 
-- **NEVER** use class components
-- **NEVER** mutate state or props directly
-- **NEVER** create functions inside render without useCallback
-- **NEVER** use useEffect without proper dependency arrays
-- **NEVER** use refs for imperative DOM manipulation unless absolutely necessary
+- **NEVER** use `any` type for user input
+- **NEVER** bypass validation for "admin" users
+- **NEVER** store sensitive data in client-side state
+- **NEVER** use `eval()` or `innerHTML` with user input
+- **NEVER** expose database credentials or API keys
 
-## ✅ **REQUIRED Functional Programming Practices**
+## ✅ **REQUIRED Security Practices**
 
-- **ALWAYS** use pure functions when possible
-- **ALWAYS** prefer `map`, `filter`, `reduce` over loops
-- **ALWAYS** use immutable data patterns
-- **ALWAYS** handle side effects in useEffect or event handlers only
+- **ALWAYS** validate all form inputs with Zod schemas
+- **ALWAYS** use Server Actions for data mutations
+- **ALWAYS** implement proper authentication checks
+- **ALWAYS** sanitize user input before rendering
+- **ALWAYS** use HTTPS in production
+- **ALWAYS** implement rate limiting for API endpoints
 
-## 🖥️ **Server/Client Component Patterns (CRITICAL)**
+## 🔐 **Authentication & Authorization**
 
-- **ALWAYS** prefer server components by default
-- **ONLY** use client components when absolutely necessary (interactivity, browser APIs, state management)
-- **ALWAYS** isolate client-side logic to the smallest possible component
-- **NEVER** make entire pages client components unless required
+- **ALWAYS** check `is_admin` field for admin operations
+- **ALWAYS** validate user sessions on the server side
+- **NEVER** rely solely on client-side authentication
+- **MUST** implement proper session management with Supabase
+  description:
+  globs:
+  alwaysApply: true
 
-### **Server Component Best Practices**
-
-```typescript
-// ✅ CORRECT - Server component with async data fetching
-export default async function PostPage({ params }: PostPageProps) {
-    const post = await getPostAction(postId);
-    
-    return (
-        <div>
-            <h1>{post.title}</h1>
-            <MarkdownRenderer content={post.content} />
-            <ToEditButton postId={postId} /> {/* Client component */}
-        </div>
-    );
-}
-```
-
-### **Client Component Isolation**
-
-```typescript
-// ✅ CORRECT - Minimal client component for interactive features only
-'use client';
-
-export default function ToEditButton({ postId }: { postId: number }) {
-    const { user } = useAuthStore(); // Client-side state only
-    
-    if (!user?.is_admin) return null;
-    
-    return (
-        <Button asChild>
-            <Link href={`/admin/posts/${postId}/edit`}>
-                <Edit className="h-4 w-4" />
-                수정
-            </Link>
-        </Button>
-    );
-}
-```
-
-### **When to Use Client Components**
-
-- **✅ USE** for interactive elements (buttons, forms, dropdowns)
-- **✅ USE** for browser APIs (localStorage, window, document)
-- **✅ USE** for state management (useState, useReducer)
-- **✅ USE** for event handlers (onClick, onChange)
-- **❌ DON'T USE** for static content rendering
-- **❌ DON'T USE** for data fetching (use server actions instead)
-
-### **Component Composition Pattern**
-
-```typescript
-// ✅ CORRECT - Server component with embedded client components
-export default function PostPage() {
-    return (
-        <div>
-            {/* Server-rendered content */}
-            <PostContent post={post} />
-            
-            {/* Client-side interactivity only */}
-            <LikeButton postId={post.id} />
-            <CommentSection postId={post.id} />
-        </div>
-    );
-}
-```
-
-## 🏗️ **HTML Structure & Hydration Prevention (CRITICAL)**
-
-### **1. Block vs Inline Element Rules**
-
-- **NEVER** put block-level elements inside inline elements
-- **NEVER** put `<div>`, `<section>`, `<article>` inside `<p>`, `<span>`, `<a>`
-- **ALWAYS** ensure proper HTML nesting hierarchy
-
-```typescript
-// ✅ CORRECT - Proper HTML structure
-<span className="block">
-  <div className="relative">
-    <Image src={src} alt={alt} />
-  </div>
-</span>
-
-// ❌ WRONG - Block element inside inline element
-<p>
-  <div>  {/* This causes hydration error */}
-    <Image src={src} alt={alt} />
-  </div>
-</p>
-```
-
-### **2. Markdown Rendering Safety**
-
-- **ALWAYS** override default markdown component behavior
-- **ALWAYS** prevent invalid HTML nesting
-- **ALWAYS** use custom components for images
-
-```typescript
-// ✅ CORRECT - Safe markdown rendering
-export const SafeMarkdownRenderer = ({ content }: { content: string }) => {
-  return (
-    <ReactMarkdown
-      components={{
-        // Prevent p tag wrapping for images
-        img: ({ src, alt }) => (
-          <span className="block my-4">
-            <Image src={src} alt={alt} width={800} height={600} />
-          </span>
-        ),
-        // Override p tag for image-only content
-        p: ({ children, ...props }) => {
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+---
 
 ---
 > Source: [kimyoungyin/myblog](https://github.com/kimyoungyin/myblog) — distributed by [TomeVault](https://tomevault.io).
