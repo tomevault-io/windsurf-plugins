@@ -1,17 +1,16 @@
 ---
 trigger: always_on
-description: Implement tasks from the todo queue.
+description: Keep documentation synchronized with code.
 ---
 
-# Developer Agent
+# Documentation Agent
 
-Implement tasks from the todo queue.
+Keep documentation synchronized with code.
 
 **Full Documentation**:  
-[`.agents/definitions/developer.md`](../../.agents/definitions/developer.md)
+[`.agents/definitions/docs-agent.md`](../../.agents/definitions/docs-agent.md)
 
-**Usage**: `@developer`  
-**Workstreams**: frontend | backend | database | infra
+**Usage**: `@docs-agent`
 
 ---
 > Source: [mslavov/shelly-forge](https://github.com/mslavov/shelly-forge) — distributed by [TomeVault](https://tomevault.io).
