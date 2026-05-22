@@ -1,127 +1,174 @@
 ---
 trigger: always_on
-description: Icon styling standards and patterns for consistent iconography across the application
+description: CSS rules and patterns for displaying images without cropping or truncation
 ---
 
 
-# Icon Standards and Styling Guide
+# Image Containment Prevention Pattern
 
-This guide defines the standard patterns for displaying icons across the application, ensuring visual consistency and proper sizing.
+## **Overview**
+This rule defines the correct CSS patterns for displaying banner, hero, and sponsor images that must be fully visible without cropping or truncation on any side. This pattern ensures images maintain their aspect ratio and are contained within their containers.
 
----
+## **Problem Solved**
+- **Image Cropping**: Prevents images from being cut off on left, right, top, or bottom edges
+- **Aspect Ratio Preservation**: Maintains original image proportions
+- **Consistent Display**: Ensures images display the same way across different screen sizes
+- **User Experience**: Users can see complete images without important content being hidden
 
-## **Icon Library**
+## **Core Pattern**
 
-- **Primary Library:** Inline SVG icons using Heroicons pattern (Tailwind CSS compatible)
-- **ViewBox:** Always use `viewBox="0 0 24 24"` for consistent scaling
-- **Stroke Style:** Use `fill="none" stroke="currentColor"` with `strokeWidth={2}` for outline icons
-- **Fill Style:** Use `fill="currentColor"` for solid icons when needed
-
----
-
-## **Standard Icon Sizes**
-
-### **Large Feature Icons (Event Cards, Feature Sections)**
-- **Container:** `w-14 h-14` (56px × 56px)
-- **Icon:** `w-10 h-10` (40px × 40px)
-- **Container Style:** `rounded-xl` (12px border radius)
-- **Background:** Colored backgrounds (e.g., `bg-blue-100`, `bg-green-100`, `bg-purple-100`)
-- **Icon Color:** Matching colored text (e.g., `text-blue-500`, `text-green-500`, `text-purple-500`)
-- **Hover Effect:** `group-hover:scale-110 transition-transform duration-300`
-
-**Example:**
+### **Container Styling**
 ```tsx
-// ✅ DO: Use large feature icon pattern
-<div className="flex-shrink-0 w-14 h-14 rounded-xl bg-blue-100 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-  <svg className="w-10 h-10 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-  </svg>
+// ✅ DO: Use flexible height container
+<div className="relative w-full h-auto rounded-t-2xl overflow-hidden">
+  {/* Image content */}
+</div>
+
+// ❌ DON'T: Use fixed height container
+<div className="relative w-full h-[448px] rounded-t-2xl overflow-hidden">
+  {/* This causes cropping */}
 </div>
 ```
 
-### **Medium Action Icons (Buttons, Action Items)**
-- **Container:** `w-10 h-10` (40px × 40px)
-- **Icon:** `w-6 h-6` (24px × 24px) - **CRITICAL: Always use inline SVG, never react-icons**
-- **Container Style:** `rounded-lg` (8px border radius)
-- **Background:** Colored backgrounds with hover states
-- **Icon Color:** Matching colored text (e.g., `text-blue-600` for edit, `text-red-600` for delete)
-- **SVG Attributes:** `fill="none" stroke="currentColor" viewBox="0 0 24 24"` with `strokeWidth={2}`
-- **Hover Effect:** `hover:scale-110 transition-all duration-300`
-
-**Example:**
+### **Image Styling**
 ```tsx
-// ✅ DO: Use medium action icon pattern with inline SVG
-<button
-  className="flex-shrink-0 w-10 h-10 rounded-lg bg-blue-100 hover:bg-blue-200 flex items-center justify-center transition-all duration-300 hover:scale-110"
-  title="Edit Item"
-  aria-label="Edit Item"
-  type="button"
->
-  <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-  </svg>
-</button>
+// ✅ DO: Use object-contain with flexible dimensions
+<Image
+  src={imageUrl}
+  alt="Description"
+  width={800}
+  height={600}
+  className="w-full h-auto object-contain group-hover:scale-105 transition-transform duration-300"
+  style={{
+    backgroundColor: 'transparent',
+    borderRadius: '1rem 1rem 0 0'
+  }}
+/>
+
+// ❌ DON'T: Use object-cover with fixed dimensions
+<Image
+  src={imageUrl}
+  alt="Description"
+  width={800}
+  height={600}
+  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+  style={{
+    borderRadius: '1rem 1rem 0 0'
+  }}
+/>
 ```
 
-**Media Gallery Grid Buttons (Medium Action Icons):**
+## **Key CSS Properties**
+
+### **Container Requirements**
+- **`relative`**: Enables absolute positioning of child elements (badges, overlays)
+- **`w-full`**: Full width of parent container
+- **`h-auto`**: **CRITICAL**: Flexible height allows image to maintain aspect ratio
+- **`rounded-t-2xl`**: Rounded top corners (1rem radius)
+- **`overflow-hidden`**: Clips content to rounded corners
+
+### **Image Requirements**
+- **`w-full`**: Full width of container
+- **`h-auto`**: **CRITICAL**: Flexible height maintains aspect ratio
+- **`object-contain`**: **CRITICAL**: Shows complete image without cropping (alternative to `object-cover`)
+- **`group-hover:scale-105`**: Optional hover effect for interactivity
+- **`transition-transform duration-300`**: Smooth hover animation
+- **`backgroundColor: 'transparent'`**: Allows card gradient to show through
+- **`borderRadius: '1rem 1rem 0 0'`**: Matches container's rounded corners
+
+## **When to Use This Pattern**
+
+### **Use `object-contain` When:**
+- ✅ Banner images (sponsor banners, event banners)
+- ✅ Hero images that must show complete content
+- ✅ Logo images that need full visibility
+- ✅ Images where cropping would hide important content
+- ✅ Images in cards or containers where aspect ratio matters
+
+### **Use `object-cover` When:**
+- ✅ Background images where cropping is acceptable
+- ✅ Thumbnail images where partial visibility is fine
+- ✅ Decorative images where content isn't critical
+- ✅ Images in fixed-size containers where filling space is priority
+
+## **Complete Example Pattern**
+
 ```tsx
-// ✅ DO: Use inline SVG icons in media gallery grid tiles
-<div className="p-4 pt-0 flex justify-end gap-2">
-  {/* Edit Button */}
-  <button
-    onClick={() => handleEditClick(item)}
-    className="flex-shrink-0 w-10 h-10 rounded-lg bg-blue-100 hover:bg-blue-200 flex items-center justify-center transition-all duration-300 hover:scale-110"
-    title="Edit Media"
-    aria-label="Edit Media"
-    type="button"
-  >
-    <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-    </svg>
-  </button>
-  {/* Delete Button */}
-  <button
-    onClick={() => handleDelete(item)}
-    className="flex-shrink-0 w-10 h-10 rounded-lg bg-red-100 hover:bg-red-200 flex items-center justify-center transition-all duration-300 hover:scale-110"
-    title="Delete Media"
-    aria-label="Delete Media"
-    type="button"
-  >
-    <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-    </svg>
-  </button>
+{/* Image Container - Matching events page style */}
+<div className="relative w-full h-auto rounded-t-2xl overflow-hidden">
+  {imageUrl ? (
+    <Image
+      src={imageUrl}
+      alt="Image description"
+      width={800}
+      height={600}
+      className="w-full h-auto object-contain group-hover:scale-105 transition-transform duration-300"
+      style={{
+        backgroundColor: 'transparent',
+        borderRadius: '1rem 1rem 0 0'
+      }}
+    />
+  ) : (
+    <div
+      className="w-full h-80 flex items-center justify-center"
+      style={{
+        backgroundColor: 'transparent',
+        borderRadius: '1rem 1rem 0 0'
+      }}
+    >
+      <span className="text-gray-400 text-5xl">🏢</span>
+    </div>
+  )}
 </div>
 ```
 
-### **Small Inline Icons (Text, Lists)**
-- **Icon:** `w-4 h-4` (16px × 16px) or `w-5 h-5` (20px × 20px)
-- **No container needed** - inline with text
-- **Color:** Inherit text color or use semantic colors
+## **Reference Implementations**
 
-**Example:**
+### **Events Page Pattern**
+See [`src/app/events/page.tsx`](mdc:src/app/events/page.tsx) lines 771-783 for the canonical implementation:
 ```tsx
-// ✅ DO: Use small inline icon pattern
-<button className="flex items-center gap-2">
-  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-  </svg>
-  <span>Read More</span>
-</button>
+<div className="relative w-full h-auto rounded-t-2xl overflow-hidden">
+  {event.thumbnailUrl ? (
+    <Image
+      src={event.thumbnailUrl}
+      alt={event.title}
+      width={800}
+      height={600}
+      className="w-full h-auto object-contain group-hover:scale-105 transition-transform duration-300"
+      style={{
+        backgroundColor: 'transparent',
+        borderRadius: '1rem 1rem 0 0'
+      }}
+    />
+  ) : (
+    {/* Placeholder */}
+  )}
+</div>
 ```
 
----
+### **Sponsor Images Pattern**
+See [`src/app/events/[id]/page.tsx`](mdc:src/app/events/[id]/page.tsx) lines 964-991 for sponsor banner images:
+```tsx
+<div className="relative w-full h-auto rounded-t-2xl overflow-hidden">
+  {displayImageUrl ? (
+    <Image
+      src={displayImageUrl}
+      alt={sponsor.name}
+      width={800}
+      height={600}
+      className="w-full h-auto object-contain group-hover:scale-105 transition-transform duration-300"
+      style={{
+        backgroundColor: 'transparent',
+        borderRadius: '1rem 1rem 0 0'
+      }}
+    />
+  ) : (
+    {/* Placeholder */}
+  )}
+</div>
+```
 
-## **Color Palette for Icons**
-
-### **Semantic Colors**
-- **Date/Calendar:** `bg-blue-100` / `text-blue-500`
-- **Time/Clock:** `bg-green-100` / `text-green-500`
-- **Location/Map:** `bg-purple-100` / `text-purple-500`
-- **Calendar/Add to Calendar:** `bg-orange-100` / `text-orange-500`
-- **View/Details:** `bg-green-100` / `text-green-700` (table buttons) or `bg-white/20` / `text-white` (on colored backgrounds)
-- **Copy:** `bg-blue-100` / `text-blue-700`
-- **Navigate/External Link:** `bg-green-100` / `text-green-700`
+### **OurSponsorsSection Pattern**
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
