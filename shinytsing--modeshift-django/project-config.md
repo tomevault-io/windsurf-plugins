@@ -1,155 +1,263 @@
 ---
 trigger: always_on
-description: Python语言特定规则和最佳实践
+description: Shell脚本语言特定规则
 ---
 
 
-# Python语言特定规则
+# Shell脚本语言特定规则
 
-基于awesome-cursorrules的Python最佳实践，专门针对Django项目优化。
+基于awesome-cursorrules的Shell脚本最佳实践。
 
-## 核心原则
+## 基本规范
 
-- **类型注解**: 为所有函数和类添加类型注解，包括明确的返回类型
-- **文档字符串**: 遵循PEP 257规范，为所有函数和类添加详细文档字符串
-- **模块化设计**: 清晰的目录结构，分离模型、服务、控制器和工具函数
-- **错误处理**: 健壮的错误处理和日志记录，包括上下文捕获
-- **测试覆盖**: 使用pytest进行综合测试
-- **代码风格**: 使用Ruff保持代码风格一致性
+### Shebang和编码
+```bash
+#!/bin/bash
+# 使用bash作为解释器
+# 设置UTF-8编码
 
-## 类型注解要求
+set -euo pipefail
+# -e: 遇到错误立即退出
+# -u: 使用未定义变量时报错
+# -o pipefail: 管道中任何命令失败都会导致整个管道失败
+```
 
-```python
-from typing import List, Dict, Optional, Union, Any
-from django.db.models import QuerySet
-from django.http import HttpRequest, HttpResponse
+### 变量定义和使用
+```bash
+# 使用大写字母定义常量
+readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly SCRIPT_NAME="$(basename "$0")"
+readonly LOG_FILE="/var/log/${SCRIPT_NAME}.log"
 
-def example_function(
-    param1: str, 
-    param2: Optional[int] = None
-) -> Dict[str, Any]:
-    """
-    示例函数的文档字符串。
+# 使用小写字母定义变量
+local_variable="value"
+another_variable="${local_variable}_suffix"
+
+# 使用引号包围变量
+echo "Hello, ${USER}!"
+echo "Current directory: ${PWD}"
+```
+
+## 函数定义
+
+### 函数结构
+```bash
+# 函数定义
+function log_info() {
+    local message="$1"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    echo "[${timestamp}] INFO: ${message}" | tee -a "${LOG_FILE}"
+}
+
+function log_error() {
+    local message="$1"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    echo "[${timestamp}] ERROR: ${message}" >&2
+    echo "[${timestamp}] ERROR: ${message}" >> "${LOG_FILE}"
+}
+
+# 带返回值的函数
+function check_file_exists() {
+    local file_path="$1"
+    if [[ -f "${file_path}" ]]; then
+        return 0
+    else
+        return 1
+    fi
+}
+```
+
+### 参数处理
+```bash
+function process_arguments() {
+    local help_flag=false
+    local verbose_flag=false
+    local input_file=""
+    local output_file=""
     
-    Args:
-        param1: 字符串参数描述
-        param2: 可选的整数参数描述
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -h|--help)
+                help_flag=true
+                shift
+                ;;
+            -v|--verbose)
+                verbose_flag=true
+                shift
+                ;;
+            -i|--input)
+                input_file="$2"
+                shift 2
+                ;;
+            -o|--output)
+                output_file="$2"
+                shift 2
+                ;;
+            *)
+                echo "Unknown option: $1" >&2
+                exit 1
+                ;;
+        esac
+    done
+    
+    # 验证必需参数
+    if [[ -z "${input_file}" ]]; then
+        echo "Error: Input file is required" >&2
+        exit 1
+    fi
+}
+```
+
+## 错误处理
+
+### 错误捕获和处理
+```bash
+function cleanup() {
+    local exit_code=$?
+    log_info "Cleaning up..."
+    
+    # 清理临时文件
+    if [[ -n "${TEMP_DIR:-}" && -d "${TEMP_DIR}" ]]; then
+        rm -rf "${TEMP_DIR}"
+        log_info "Temporary directory removed: ${TEMP_DIR}"
+    fi
+    
+    # 停止后台进程
+    if [[ -n "${BACKGROUND_PID:-}" ]]; then
+        kill "${BACKGROUND_PID}" 2>/dev/null || true
+        log_info "Background process stopped: ${BACKGROUND_PID}"
+    fi
+    
+    exit "${exit_code}"
+}
+
+# 设置清理陷阱
+trap cleanup EXIT INT TERM
+
+# 错误处理函数
+function handle_error() {
+    local line_number="$1"
+    local error_code="$2"
+    log_error "Error on line ${line_number}: exit code ${error_code}"
+    exit "${error_code}"
+}
+
+trap 'handle_error ${LINENO} $?' ERR
+```
+
+### 重试机制
+```bash
+function retry_command() {
+    local max_attempts="$1"
+    local delay="$2"
+    shift 2
+    local command=("$@")
+    
+    local attempt=1
+    while [[ ${attempt} -le ${max_attempts} ]]; do
+        log_info "Attempt ${attempt}/${max_attempts}: ${command[*]}"
         
-    Returns:
-        包含结果的字典
+        if "${command[@]}"; then
+            log_info "Command succeeded on attempt ${attempt}"
+            return 0
+        else
+            log_error "Command failed on attempt ${attempt}"
+            if [[ ${attempt} -lt ${max_attempts} ]]; then
+                log_info "Waiting ${delay} seconds before retry..."
+                sleep "${delay}"
+            fi
+        fi
         
-    Raises:
-        ValueError: 当参数无效时
-    """
-    pass
+        ((attempt++))
+    done
+    
+    log_error "Command failed after ${max_attempts} attempts"
+    return 1
+}
 ```
 
-## 测试要求
+## 文件操作
 
-- 使用pytest或pytest插件（不使用unittest）
-- 所有测试必须有类型注解
-- 测试文件放在`./tests`目录下
-- 测试函数必须包含文档字符串
+### 安全的文件操作
+```bash
+function create_backup() {
+    local source_file="$1"
+    local backup_dir="${2:-./backups}"
+    
+    if [[ ! -f "${source_file}" ]]; then
+        log_error "Source file does not exist: ${source_file}"
+        return 1
+    fi
+    
+    # 创建备份目录
+    mkdir -p "${backup_dir}"
+    
+    # 生成备份文件名
+    local timestamp=$(date '+%Y%m%d_%H%M%S')
+    local backup_file="${backup_dir}/$(basename "${source_file}").${timestamp}.bak"
+    
+    # 创建备份
+    if cp "${source_file}" "${backup_file}"; then
+        log_info "Backup created: ${backup_file}"
+        echo "${backup_file}"
+    else
+        log_error "Failed to create backup"
+        return 1
+    fi
+}
 
-```python
-from typing import TYPE_CHECKING
-import pytest
-from django.test import TestCase
-
-if TYPE_CHECKING:
-    from _pytest.capture import CaptureFixture
-    from _pytest.fixtures import FixtureRequest
-    from _pytest.logging import LogCaptureFixture
-    from _pytest.monkeypatch import MonkeyPatch
-    from pytest_mock.plugin import MockerFixture
-
-def test_example_function() -> None:
-    """测试示例函数的功能。"""
-    pass
+function safe_file_operation() {
+    local source="$1"
+    local destination="$2"
+    
+    # 检查源文件
+    if [[ ! -f "${source}" ]]; then
+        log_error "Source file not found: ${source}"
+        return 1
+    fi
+    
+    # 创建目标目录
+    local dest_dir=$(dirname "${destination}")
+    mkdir -p "${dest_dir}"
+    
+    # 创建临时文件
+    local temp_file=$(mktemp)
+    
+    # 执行操作
+    if cp "${source}" "${temp_file}" && mv "${temp_file}" "${destination}"; then
+        log_info "File operation successful: ${source} -> ${destination}"
+        return 0
+    else
+        log_error "File operation failed"
+        rm -f "${temp_file}"
+        return 1
+    fi
+}
 ```
 
-## Django特定规则
+## 进程管理
 
-- 使用Django的最新稳定版本
-- 遵循Django的最佳实践和约定
-- 使用Django的ORM进行数据库操作
-- 实现适当的权限检查和认证
-- 使用Django的中间件和信号系统
+### 后台进程管理
+```bash
+function start_background_process() {
+    local command="$1"
+    local log_file="${2:-/dev/null}"
+    
+    log_info "Starting background process: ${command}"
+    
+    # 启动后台进程
+    nohup bash -c "${command}" > "${log_file}" 2>&1 &
+    BACKGROUND_PID=$!
+    
+    log_info "Background process started with PID: ${BACKGROUND_PID}"
+    
+    # 等待进程启动
+    sleep 2
+    
+    # 检查进程是否仍在运行
+    if kill -0 "${BACKGROUND_PID}" 2>/dev/null; then
 
-## 代码组织
-
-```
-apps/
-  tools/
-    models/
-      __init__.py
-      base_models.py
-      chat_models.py
-      # ... 其他模型文件
-    views/
-      __init__.py
-      # ... 视图文件
-    services/
-      __init__.py
-      # ... 服务文件
-    utils/
-      __init__.py
-      # ... 工具文件
-tests/
-  unit/
-  integration/
-  e2e/
-```
-
-## 环境变量管理
-
-```python
-import os
-from typing import Optional
-
-def get_env_variable(key: str, default: Optional[str] = None) -> Optional[str]:
-    """安全获取环境变量。"""
-    value = os.getenv(key, default)
-    if not value and default is None:
-        raise ValueError(f"环境变量 {key} 未设置")
-    return value
-```
-
-## 错误处理模式
-
-```python
-import logging
-from typing import Optional
-
-logger = logging.getLogger(__name__)
-
-def safe_operation() -> Optional[Dict[str, Any]]:
-    """安全执行操作的示例。"""
-    try:
-        # 执行操作
-        result = perform_operation()
-        return result
-    except SpecificException as e:
-        logger.error(f"操作失败: {e}", exc_info=True)
-        return None
-    except Exception as e:
-        logger.critical(f"意外错误: {e}", exc_info=True)
-        raise
-```
-
-## 性能优化
-
-- 使用`select_related`和`prefetch_related`优化数据库查询
-- 实现适当的缓存策略
-- 使用异步操作处理长时间运行的任务
-- 监控和记录性能指标
-
-## 安全最佳实践
-
-- 使用环境变量管理敏感信息
-- 实现适当的输入验证和清理
-- 使用Django的安全中间件
-- 定期更新依赖包
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [shinytsing/modeshift_django](https://github.com/shinytsing/modeshift_django) — distributed by [TomeVault](https://tomevault.io).
