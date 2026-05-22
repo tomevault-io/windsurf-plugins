@@ -1,110 +1,134 @@
 ---
 trigger: always_on
-description: Media gallery grid styling pattern with medium dark gradient backgrounds for admin pages and conservative gradients for public pages
+description: MOSC Redesign Project - Comprehensive Styling Standards and Guidelines
 ---
 
 
-# Media Gallery Grid Styling Pattern
+# MOSC Redesign Project - Styling Standards
 
-## **Overview**
-This rule defines the standard pattern for displaying media/image grids with gradient backgrounds, matching the design aesthetic of both admin pages (medium dark gradients) and public-facing gallery pages (conservative warm tones). The pattern provides consistent styling, subtle visual depth, and proper icon presentation.
+## **Design System Overview**
+This project uses a **sacred, reverent design system** inspired by Orthodox Christian traditions with warm earth tones, elegant typography, and thoughtful spacing. All new pages and components must follow these established patterns.
 
-## **Problem Solved**
-- **Consistent Grid Styling**: Ensures all media grids use the same visual pattern across admin and public pages
-- **Medium Dark Gradient Backgrounds**: Provides professional medium dark gradient backgrounds for admin pages that enhance without overwhelming
-- **Conservative Gradient Backgrounds**: Provides subtle, professional gradient backgrounds for public pages
-- **Icon Standardization**: Provides consistent icon container and sizing for action buttons (references Icon Standards and Admin Action Buttons rules)
-- **Visual Hierarchy**: Creates clear separation between grid container and individual media items
-- **Responsive Design**: Works consistently across different screen sizes
+## **Color Palette & CSS Variables**
 
-## **Core Pattern**
+### **Core System Colors**
+- **Background**: `#F5F1E8` (soft cream) - `bg-background`
+- **Foreground**: `#2D2A26` (near-black with warm undertones) - `text-foreground`
+- **Border**: `rgba(139, 125, 107, 0.2)` (warm earth tone with transparency) - `border-border`
+- **Input**: `#FFFFFF` (pure white) - `bg-input`
+- **Ring**: `#8B7D6B` (warm earth tone) - `ring-ring`
 
-### **Grid Container Structure**
-```tsx
-// ✅ DO: Use the standard media grid container pattern
-// Admin Pages (Medium Dark Gradient)
-<div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-gray-700 via-gray-800 to-gray-700 border border-gray-600/30 shadow-2xl mb-8">
-  {/* Medium Dark Radial Gradient Overlay */}
-  <div className="absolute inset-0 pointer-events-none opacity-60" style={{ backgroundImage: 'radial-gradient(circle at top left, rgba(255, 255, 255, 0.12), transparent 55%)' }} />
+### **Semantic Colors**
+- **Primary**: `#8B7D6B` (warm earth tone) - `bg-primary text-primary-foreground`
+- **Secondary**: `#A0926B` (lighter complement) - `bg-secondary text-secondary-foreground`
+- **Accent**: `#6B4E3D` (rich brown) - `bg-accent text-accent-foreground`
+- **Success**: `#4A6741` (muted sage green) - `bg-success text-success-foreground`
+- **Warning**: `#A67C52` (warm amber) - `bg-warning text-warning-foreground`
+- **Error/Destructive**: `#8B4A42` (subdued terracotta) - `bg-destructive text-destructive-foreground`
+- **Muted**: `#EDE7D3` (lighter complement) - `bg-muted text-muted-foreground`
 
-  {/* Grid Content */}
-  <div className="relative px-6 py-10 sm:px-10 lg:px-14">
-    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-      {/* Media items */}
+### **Card & Surface Colors**
+- **Card**: `#FFFFFF` (pure white) - `bg-card text-card-foreground`
+- **Popover**: `#FFFFFF` (pure white) - `bg-popover text-popover-foreground`
+
+## **Typography System**
+
+### **Font Families**
+- **Headings**: `font-heading` (Crimson Text, serif) - For titles, headings, and important text
+- **Body**: `font-body` (Source Sans Pro, sans-serif) - For paragraphs and general content
+- **Caption**: `font-caption` (Lato, sans-serif) - For small text, labels, and captions
+- **Monospace**: `font-mono` (JetBrains Mono, monospace) - For code and technical content
+
+### **Font Usage Patterns**
+```jsx
+// ✅ DO: Use appropriate font families
+<h1 className="font-heading font-semibold text-3xl text-foreground">Main Title</h1>
+<p className="font-body text-lg text-muted-foreground">Body text content</p>
+<small className="font-caption text-xs text-muted-foreground">Caption text</small>
+
+// ❌ DON'T: Mix font families inappropriately
+<h1 className="font-body font-semibold text-3xl">Main Title</h1> // Wrong font for heading
+```
+
+## **Spacing & Layout Standards**
+
+### **Container Patterns**
+- **Max Width**: `max-w-7xl mx-auto` for main content containers
+- **Padding**: `px-4 sm:px-6 lg:px-8` for responsive horizontal padding
+- **Sacred Spacing**: `space-sacred` (2rem) for consistent vertical spacing
+
+### **Grid Systems**
+- **Cards Grid**: `grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8`
+- **Feature Grid**: `grid grid-cols-1 md:grid-cols-3 gap-8 lg:gap-12`
+- **Stats Grid**: `grid grid-cols-2 gap-4` for statistics
+
+### **Section Spacing**
+- **Large Sections**: `py-16` for major content sections
+- **Medium Sections**: `py-12` for secondary sections
+- **Small Sections**: `py-8` for compact sections
+
+## **Component Styling Patterns**
+
+### **Cards & Panels**
+```jsx
+// ✅ DO: Use consistent card styling
+<div className="bg-card rounded-lg sacred-shadow p-6">
+  <div className="flex items-center space-x-3 mb-6">
+    <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
+      <Icon name="IconName" size={16} color="white" />
     </div>
+    <h3 className="text-lg font-heading font-semibold text-foreground">Card Title</h3>
   </div>
+  {/* Card content */}
 </div>
 ```
 
-## **Key CSS Properties**
+### **Buttons**
+- Use the `Button` component with proper variants:
+  - `default`, `destructive`, `outline`, `secondary`, `ghost`, `link`
+  - `success`, `warning`, `danger` for semantic actions
+- Sizes: `xs`, `sm`, `default`, `lg`, `xl`, `icon`
 
-### **Container Requirements**
-- **`relative`**: Enables absolute positioning of overlay
-- **`overflow-hidden`**: Clips content to rounded corners
-- **`rounded-3xl`**: Large border radius (24px) for modern appearance
-- **`bg-gradient-to-br`**: Diagonal gradient from top-left to bottom-right
-- **Admin Pages**: `from-gray-700 via-gray-800 to-gray-700` (medium dark gradient)
-- **Public Pages**: `from-background via-muted to-background` (conservative warm tones)
-- **Event Pages**: `from-gray-900 via-purple-900 to-indigo-900` (bold dark gradient)
-- **Border**:
-  - Admin: `border-gray-600/30` (medium dark border)
-  - Public: `border-border/30` (subtle border)
-  - Event: `border-white/10` (light border on dark)
-- **Shadow**:
-  - Admin: `shadow-2xl` (large shadow for depth)
-  - Public: `sacred-shadow-lg` (MOSC shadow)
-  - Event: `shadow-2xl` (large shadow)
-- **`mb-8`**: Bottom margin (32px) for spacing
+### **Form Elements**
+- Use the `Input` component for all form fields
+- Include proper labels, descriptions, and error states
+- Use semantic colors for validation states
 
-### **Radial Gradient Overlay Requirements**
-- **`absolute inset-0`**: Covers entire container
-- **`pointer-events-none`**: Doesn't interfere with interactions
-- **Opacity**:
-  - **Admin Pages (Medium Dark)**: `opacity-60` (60% for medium dark backgrounds)
-  - **Public Pages (Conservative)**: `opacity-30` (30% for subtlety)
-  - **Event Pages (Bold Dark)**: `opacity-70` (70% for bold dark backgrounds)
-- **Radial Gradient**:
-  - **Admin Pages**: `radial-gradient(circle at top left, rgba(255, 255, 255, 0.12), transparent 55%)` (white at 12% opacity)
-  - **Public Pages**: `radial-gradient(circle at top left, rgba(139, 125, 107, 0.08), transparent 55%)` (primary color at 8% opacity)
-  - **Event Pages**: `radial-gradient(circle at top left, rgba(255,255,255,0.18), transparent 55%)` (white at 18% opacity)
-  - Starts at top-left corner
-  - Fades to transparent at 55% radius
+### **Icons**
+- Always use the `AppIcon` component with consistent sizing
+- Standard sizes: `16px` (small), `20px` (medium), `24px` (large), `32px` (extra large)
+- Use semantic colors: `text-primary`, `text-muted-foreground`, etc.
 
-### **Grid Content Requirements**
-- **`relative`**: Positions content above overlay
-- **`px-6 py-10 sm:px-10 lg:px-14`**: Responsive padding
-  - Mobile: 24px horizontal, 40px vertical
-  - Small screens: 40px horizontal
-  - Large screens: 56px horizontal
+## **Custom CSS Classes & Utilities**
 
-### **Grid Requirements**
-- **`grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4`**: Responsive grid
-  - Mobile: 1 column
-  - Small screens (640px+): 2 columns
-  - Medium screens (768px+): 3 columns
-  - Large screens (1024px+): 4 columns
-- **`gap-6`**: Consistent gap between items (24px)
+### **Sacred Design Elements**
+- **Shadows**: `sacred-shadow`, `sacred-shadow-sm`, `sacred-shadow-lg`
+- **Gradients**: `sacred-gradient` (background gradient)
+- **Border Radius**: `rounded-sacred` (8px)
+- **Transitions**: `reverent-transition` (200ms ease-out)
+- **Hover Effects**: `reverent-hover` (subtle scale transform)
 
-## **Color Coding System**
+### **Circular Elements**
+- **Frames**: `circular-frame` for profile images and icons
+- **Medallions**: Use `bg-primary rounded-full` with `sacred-shadow-lg`
 
-### **Admin Pages** (Medium Dark Gradient)
-- **Background**: `from-gray-700 via-gray-800 to-gray-700`
-- **Border**: `border-gray-600/30`
-- **Radial Gradient**: `rgba(255, 255, 255, 0.12)` (white at 12% opacity)
-- **Overlay Opacity**: `opacity-60` (60% for medium dark backgrounds)
+## **Layout Patterns**
 
-### **Public Pages** (MOSC Warm Earth Tones)
-- **Background**: `from-background via-muted to-background`
-- **Border**: `border-border/30`
-- **Radial Gradient**: `rgba(139, 125, 107, 0.08)` (primary color at 8% opacity)
+### **Hero Sections**
+```jsx
+<section className="relative bg-gradient-to-br from-background to-muted min-h-[600px] flex items-center">
+  <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
+    {/* Hero content */}
+  </div>
+</section>
+```
 
-### **Event Pages** (Bold Dark Gradient)
-- **Background**: `from-gray-900 via-purple-900 to-indigo-900`
-- **Border**: `border-white/10` (light border on dark background)
-- **Radial Gradient**: `rgba(255,255,255,0.18)` (white at 18% opacity)
-- **Overlay Opacity**: `opacity-70` (70% for bold dark backgrounds)
-- **Inner Thumbnail Container**: `bg-white/10 backdrop-blur-sm rounded-2xl border border-white/20 p-6 shadow-inner` (glassmorphism effect)
-
+### **Content Sections**
+```jsx
+<section className="py-16 bg-card">
+  <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="text-center mb-12">
+      <h2 className="font-heading font-semibold text-3xl text-foreground mb-4">Section Title</h2>
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
