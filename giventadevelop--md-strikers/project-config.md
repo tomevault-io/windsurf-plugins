@@ -1,128 +1,170 @@
 ---
 trigger: always_on
-description: Strapi 5 REST API patterns for published state, populate parameters, and list-endpoint fallbacks
+description: This rule documents the complete implementation of visible, colorful horizontal scrollbars with rainbow gradient styling for tables and scrollable containers. The implementation ensures proper scrollbar visibility, centering of rightmost content, and responsive behavior across all screen sizes.
 ---
 
+# Horizontal Scrollbar with Rainbow Gradient - Implementation Guide
 
-# Strapi 5 REST API Patterns
+## Overview
+This rule documents the complete implementation of visible, colorful horizontal scrollbars with rainbow gradient styling for tables and scrollable containers. The implementation ensures proper scrollbar visibility, centering of rightmost content, and responsive behavior across all screen sizes.
 
-## **Overview**
+## Problem Solved
+- Horizontal scrollbar thumb was invisible or missing on tables
+- Rightmost table content couldn't be centered when scrolled
+- Tables forced horizontal scrolling even on large screens
+- No visual distinction for scrollable areas
 
-This rule defines correct patterns for Strapi 5 Content API calls, particularly for published-state filtering and populate parameters. Incorrect syntax causes 400 Bad Request errors.
+## Complete Implementation
 
-## **Problem Solved**
+### 1. CSS Styling for Scrollbar
 
-- **status=published** – Can cause validation errors in Strapi 5 setups; use `filters[publishedAt][$notNull]=true` instead
-- **Comma-separated populate** – `populate=cover,category,author` triggers 400s; Strapi 5 expects array-style populate
-- **Category slug case mismatch** – Strapi may store slugs as `Main-News` while the filter uses `main-news`; use `$eqi` for case-insensitive match
+Add this CSS styling using `dangerouslySetInnerHTML` in the component:
 
-## **Tenant Filtering (Required — No Fallback)**
+```tsx
+<style dangerouslySetInnerHTML={{
+  __html: `
+    .table-scroll-container {
+      overflow-x: scroll !important;
+      overflow-y: visible !important;
+      scrollbar-width: thin !important;
+      scrollbar-color: #EC4899 #FCE7F3 !important; /* Pink thumb, pink track (Firefox) */
+      -ms-overflow-style: -ms-autohiding-scrollbar !important;
+    }
 
-All directory and news list/detail requests **must** use the tenant filter. Display only data scoped to the current tenant.
+    /* WebKit browsers (Chrome, Safari, Edge) */
+    .table-scroll-container::-webkit-scrollbar {
+      height: 20px !important; /* Larger for visibility */
+      display: block !important;
+      -webkit-appearance: none !important;
+      appearance: none !important;
+    }
 
-### **DO: Always filter by tenant**
+    .table-scroll-container::-webkit-scrollbar-track {
+      background: linear-gradient(90deg, #DBEAFE, #E9D5FF, #FCE7F3, #FED7AA) !important;
+      border-radius: 10px !important;
+      -webkit-box-shadow: inset 0 0 6px rgba(0,0,0,0.15) !important;
+      box-shadow: inset 0 0 6px rgba(0,0,0,0.15) !important;
+    }
 
-- **Directory** (e.g. bishops, parishes): `filters[tenant][tenantId][$eq]=${tenantId}` — no fallback. If the API returns 200 with 0 items, show 0 items.
-- **News** (articles, flash-news-items, advertisement-slots): Same. Always include `filters[tenant][tenantId][$eq]=${tenantId}`. Do **not** retry without the tenant filter when the response is 200 with empty data.
+    .table-scroll-container::-webkit-scrollbar-thumb {
+      background: linear-gradient(90deg, #3B82F6, #8B5CF6, #EC4899, #F97316) !important;
+      border-radius: 10px !important;
+      border: 4px solid #F3F4F6 !important;
+      -webkit-box-shadow: inset 0 0 6px rgba(0,0,0,0.4) !important;
+      box-shadow: inset 0 0 6px rgba(0,0,0,0.4) !important;
+      min-width: 50px !important; /* CRITICAL: Ensures thumb is always visible */
+      background-clip: padding-box !important;
+    }
 
-### **DON'T: Fall back to no-tenant when response is 200 with 0 items**
+    .table-scroll-container::-webkit-scrollbar-thumb:hover {
+      background: linear-gradient(90deg, #2563EB, #7C3AED, #DB2777, #EA580C) !important;
+      border-color: #E5E7EB !important;
+    }
 
-```typescript
-// ❌ DON'T: Retry without tenant when tenant filter returns 0 items
-if (list.length === 0) {
-  const noTenant = await fetch('/articles?filters[publishedAt][$notNull]=true&...');
-  list = noTenant.data; // Wrong — shows other tenants' data
-}
+    .table-scroll-container::-webkit-scrollbar-thumb:active {
+      background: linear-gradient(90deg, #1D4ED8, #6D28D9, #BE185D, #C2410C) !important;
+      border-color: #D1D5DB !important;
+    }
+
+    .table-scroll-container::-webkit-scrollbar-button {
+      display: none !important;
+    }
+
+    .table-scroll-container::-webkit-scrollbar-corner {
+      background: #E0E7FF !important;
+    }
+
+    /* Flexbox spacer for right-side centering */
+    .table-scroll-container::after {
+      content: '';
+      display: block;
+      width: 100vw; /* Full viewport width of scrollable space */
+      height: 1px;
+      flex-shrink: 0;
+    }
+
+    .table-scroll-container {
+      display: flex !important;
+    }
+  `
+}} />
 ```
 
-When the API returns **200** with an empty list, the correct behavior is to show no items (and ensure entries in Strapi have the tenant relation set). The only exception is the **400 Bad Request** fallback below (different endpoints, different reason).
+### 2. HTML Structure with Rainbow Gradient Background
 
-## **Published State Filter**
-
-### **DO: Use filters[publishedAt][$notNull]=true**
-
-```typescript
-// ✅ DO: Filter for published documents
-const query = `filters[publishedAt][$notNull]=true`;
+```tsx
+{/* Outer wrapper with gradient border */}
+<div className="rounded-lg shadow w-full overflow-hidden" style={{
+  background: 'linear-gradient(to right, #3B82F6, #8B5CF6, #EC4899, #F97316)',
+  padding: '4px'
+}}>
+  {/* Inner scroll container with gradient background */}
+  <div
+    className="w-full table-scroll-container"
+    style={{
+      overflowX: 'scroll',
+      overflowY: 'visible',
+      WebkitOverflowScrolling: 'touch',
+      maxWidth: '100%',
+      display: 'flex',
+      position: 'relative',
+      width: '100%',
+      minHeight: '1px',
+      scrollbarGutter: 'stable',
+      background: 'linear-gradient(to right, #3B82F6, #8B5CF6, #EC4899, #F97316)',
+      borderRadius: '8px',
+      padding: '20px'
+    }}
+  >
+    {/* Table with semi-transparent white background */}
+    <table
+      className="divide-y divide-gray-200"
+      style={{
+        width: 'max-content',
+        minWidth: 'fit-content', /* Responsive: fits content naturally */
+        flexShrink: 0,
+        background: 'rgba(255, 255, 255, 0.95)', /* Semi-transparent white */
+        borderRadius: '8px',
+        overflow: 'hidden'
+      }}
+    >
+      {/* Table content */}
+    </table>
+  </div>
+</div>
 ```
 
-### **DON'T: Use status=published**
+### 3. Color Palette
 
-```typescript
-// ❌ DON'T: Can cause validation errors in Strapi 5
-const query = `status=published`;
-```
+**Rainbow Gradient Colors:**
+- Blue-500: `#3B82F6`
+- Purple-600: `#8B5CF6`
+- Pink-500: `#EC4899`
+- Orange-500: `#F97316`
 
-## **Populate Parameter (Array-Style)**
+**Pastel Track Colors:**
+- Light Blue: `#DBEAFE`
+- Light Purple: `#E9D5FF`
+- Light Pink: `#FCE7F3`
+- Light Orange: `#FED7AA`
 
-### **DO: Use array-style populate**
+**Hover States (Darker):**
+- Blue-600: `#2563EB`
+- Purple-700: `#7C3AED`
+- Pink-600: `#DB2777`
+- Orange-600: `#EA580C`
 
-```typescript
-// ✅ DO: Array-style populate for Strapi 5
-const POPULATE = 'populate[0]=cover&populate[1]=category&populate[2]=author';
+**Active States (Darkest):**
+- Blue-700: `#1D4ED8`
+- Purple-800: `#6D28D9`
+- Pink-700: `#BE185D`
+- Orange-700: `#C2410C`
 
-// Full example
-const path = `/articles?filters[tenant][tenantId][$eq]=${tenantId}&filters[publishedAt][$notNull]=true&populate[0]=cover&populate[1]=category&populate[2]=author&sort=publishedAt:desc&pagination[limit]=10`;
-```
+## Key Features
 
-### **DON'T: Use comma-separated populate**
-
-```typescript
-// ❌ DON'T: Triggers 400 Bad Request in Strapi 5
-const POPULATE = 'populate=cover,category,author';
-```
-
-## **Example Article Query URLs**
-
-### **Featured News**
-
-```
-GET /api/articles?filters[isFeatured][$eq]=true&filters[tenant][tenantId][$eq]=tenant_demo_002&filters[publishedAt][$notNull]=true&populate[0]=cover&populate[1]=category&populate[2]=author&sort=publishedAt:desc&pagination[limit]=6
-```
-
-### **Featured News** (use category slug like Main News, not isFeatured)
-
-```
-GET /api/articles?filters[category][slug][$eqi]=featured-news&filters[tenant][tenantId][$eq]=tenant_demo_002&filters[publishedAt][$notNull]=true&populate[0]=cover&populate[1]=category&populate[2]=author&sort=publishedAt:desc&pagination[limit]=6
-```
-
-If you have a "Featured News" category in Strapi (slug `Featured-News`), filter by category slug. The `isFeatured` boolean is an alternative; use category when articles are assigned to the Featured News category.
-
-### **Main News** (use `$eqi` for case-insensitive slug)
-
-```
-GET /api/articles?filters[category][slug][$eqi]=main-news&filters[tenant][tenantId][$eq]=tenant_demo_002&filters[publishedAt][$notNull]=true&populate[0]=cover&populate[1]=category&populate[2]=author&sort=publishedAt:desc&pagination[limit]=10
-```
-
-### **Press Release / Most Read**
-
-Same pattern: use `filters[publishedAt][$notNull]=true` and `populate[0]=...&populate[1]=...&populate[2]=...`
-
-## **Category Slug Filter (Case-Insensitive)**
-
-### **DO: Use $eqi for case-insensitive slug match**
-
-Strapi may store category slugs with different casing (e.g. `Main-News`, `Press-Release`) from the UI. Slug filters are case-sensitive; use `$eqi` to match regardless of case:
-
-```typescript
-// ✅ DO: Case-insensitive category slug filter
-'filters[category][slug][$eqi]=main-news'
-'filters[category][slug][$eqi]=press-release'
-```
-
-### **DON'T: Use $eq for slugs (case-sensitive)**
-
-```typescript
-// ❌ DON'T: May not match "Main-News" when stored with different casing
-'filters[category][slug][$eq]=main-news'
-```
-
-## **Article Detail Page (slug or id)**
-
-The detail route `/mosc/news/[slug]` and `/syro/news/[slug]` accept slug, numeric id, or documentId:
-
-1. **documentId** (Strapi 5, first when param looks like documentId): `filters[documentId][$eq]=<documentId>` — alphanumeric 15–35 chars (e.g. `o42fs0slvzzj9os0g9xtc11d`). Try documentId first when param matches `/^[a-z0-9]{15,35}$/` so URLs from Strapi admin or links using documentId work even when slug differs.
-2. **Slug** (text): `filters[slug][$eqi]=<slug>` — preferred for SEO
+### 1. Visible Scrollbar Thumb
+- **Height**: 20px (larger than default for visibility)
+- **Minimum Width**: 50px (CRITICAL - ensures thumb is always visible)
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
