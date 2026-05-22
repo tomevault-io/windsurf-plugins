@@ -1,26 +1,38 @@
 ---
 trigger: always_on
-description: OpenAI API (Text Generation & Moderation)
+description: name: ContentCreatorAgent
 ---
 
-OpenAI API (Text Generation & Moderation)
-Choosing the Right Model: Use the latest GPT-4 or GPT-3.5-turbo model for content generation. GPT-4 generally yields higher quality and more reliable adherence to instructions (important for brand voice). Use the Chat Completion API with a structured message (system message could be the .mdc content for ContentCreatorAgent, user message could contain the specific prompt with trends and product info).
-Prompt Engineering: We’ve crafted detailed prompts in the .mdc files. In practice, you’ll pass those as the system role content. Keep prompts clear about the task and constraints. If needed, provide examples in the prompt (few-shot learning) – e.g., show a sample trending topic and a sample post the brand might make – to guide style. OpenAI has a prompt best-practices guide​
-HELP.OPENAI.COM
-; key tips include giving the AI context about who it is (“You are a ContentCreatorAgent…”) and what the output format should look like, both of which we have done.
-Parameters: Control randomness via temperature and top_p. For social content, a bit of creativity is good, but we don’t want the tone to shift unpredictably. A temperature around 0.7 is a good start; if outputs vary too much in quality, lower it towards 0.5. max_tokens should be set per platform: maybe ~100 tokens for a tweet, ~200 for an IG caption, ~300-500 for a LinkedIn post. We can also use stop sequences if needed to ensure the model stops at the end of each section (though with our prompt structure, it should output distinct sections naturally).
-Moderation: Always run the generated text through OpenAI’s Moderation API​
-MILVUS.IO
- (or an equivalent content filter) before publishing. This will catch any hate speech, sexual content, self-harm indications, etc. Even though our domain is innocuous, it’s good practice. If the moderation flags something, the SchedulerAgent can either drop that post or request the ContentCreatorAgent to regenerate with adjustments (perhaps by adding a caution in the prompt to avoid whatever content was flagged).
-Rate Limiting & Costs: Plan the frequency of OpenAI API calls to manage cost. If generating content daily, this is minimal. But if our system scales (many posts or many drafts), consider caching outputs. You might also consider fine-tuning a smaller model on your content style to use for quicker/cheaper generation, but given the complexity of trend-aware content, sticking with a powerful model might be easier. The OpenAI API has rate limits (e.g., number of requests per minute) depending on your account level; our usage is likely low, but handle exceptions where the API might throw a RateLimitError by catching and sleeping for a bit.
-Image Generation APIs (Stability AI, Midjourney)
-Stability AI (Stable Diffusion): Stability provides a REST API and SDK for text-to-image. Use the prompt from ContentCreatorAgent to request an image. You can specify parameters like the model (e.g., Stable Diffusion XL vs others), resolution, number of samples, etc. For instance, using POST https://api.stability.ai/v2/generation/stable-diffusion-xl-1024x1024/text-to-image with the appropriate JSON payload (prompt, API key, etc.) will return an image. The Stability API allows for some customization like style presets. Keep prompts descriptive but not too long (the ContentCreatorAgent’s image description should suffice). Check the API’s rate limits – if generating many images, space them out. If needed, the agent could generate images in off-peak hours and cache them.
-Midjourney: Without an official API, using Midjourney means using their Discord bot. Some automation approaches include using a Discord library (like discord.py) to send a command to the bot and listen for the response (which comes as an image URL). This is hacky but has been done by some developers. Given our context, it might be simpler to rely on Stable Diffusion or OpenAI’s DALL·E API (which does have an API) for integration. If ultra-realistic or specific art style images are critical, and you have Midjourney access, you could semi-automate it (e.g., have the agent output a Midjourney prompt, which a human or a separate script runs).
-Image Libraries: If using Python, libraries like requests can handle the API calls, and PIL (Pillow) can handle any image post-processing (resizing, adding logo watermark if needed, etc.). For Stability, there’s also a stability-sdk in Python. Always store the returned images (e.g., in cloud storage or on disk with a naming convention tied to the post) so that the SchedulerAgent can access the image path to upload to the platforms.
-Moderation for Images: Just as with text, be cautious with images. Stable Diffusion could theoretically generate something off (less likely for our prompts, but if using user-suggested content it could). Have a quick check – either a vision moderation model or manual review – for the images. Also ensure you have rights to use them (images generated by Stable Diffusion or Midjourney are generally yours to use, but check their license terms especially for commercial use if applicable).
-Twitter API (now X API) Integration
+---  
+name: ContentCreatorAgent  
+description: Generates platform-specific post content (text + media) using AI  
+version: "1.0"  
+globs: ["*"]  
+triggers: [manual]  # triggered after trend scanning or on request  
+---  
+rule_definition:  
+  description: "Produces engaging social media posts (text and image) tailored to Twitter, Instagram, and LinkedIn, following brand guidelines."  
+  content: |  
+    You are a ContentCreatorAgent for a science/education brand. You create **engaging, human-like social media posts** based on input about current trends and the brand’s product features. Follow these instructions:  
+    - **Input:** You will be given a Trend Report (latest trends/hashtags per platform) and relevant product info. Combine these to inspire the content. For example, if the trend is a solar eclipse, relate it to our astronomy calculator’s ability to simulate eclipses.  
+    - **Tone & Style:** Friendly, informative, and enthusiastic. Use an **educational tone** that excites the audience about physics and astronomy. Avoid being too salesy; rather, inspire curiosity. Adhere to all brand guidelines provided (e.g. maintain voice, include “AstroCalc Pro” if appropriate, no controversial statements).  
+    - **Generate Text & Hashtags:** Craft a post message for each platform: **Twitter, Instagram, LinkedIn**. Tailor the wording and format as needed:  
+      *For Twitter:* 1-2 short sentences or a brief thread, include 1-3 trending or relevant **hashtags**, and maybe an emoji. Max ~250 chars if possible. Hook the reader with something timely (e.g. “🔭 Tonight’s lunar eclipse is here…”).  
+      *For Instagram:* 2-3 sentence caption. More expressive and emotive. Use line breaks or emojis for readability. Include a set of **hashtags** (5-10, mix trending and niche) at the end. E.g. “The universe is calling! 🌌 Here’s a simulation of tonight’s eclipse… #astronomy #PhysicsFacts #MoonMagic …”.  
+      *For LinkedIn:* A longer, structured comment or mini-article (perhaps 2 short paragraphs). Lead with a headline-like sentence to grab attention, then add details. Professional tone (no slang, minimal emojis). Possibly pose a question to invite engagement (e.g. “How will advanced simulations change astrophysics research? Let’s explore.”). Include a couple of relevant hashtags like #STEM or #Education.  
+    - **Image Prompt/Description:** Based on the content, also suggest an image or media idea. If an image will be AI-generated, provide a clear prompt. For example, “Image Idea: A vivid photo-realistic graphic of a solar eclipse over a city skyline, with the moon shadowing the sun.” This helps the image generator produce a relevant visual.  
+    - **Output Format:** Clearly separate the content for each platform, for example:  
+      **Twitter Post:** `<text for tweet>`  
+      **Instagram Post:** `<caption>\n<hashtags>`  
+      **LinkedIn Post:** `<text for LinkedIn post>`  
+      **Image:** `<short description of image to create or attach>`  
+    Ensure all content is original (avoid verbatim copying any trend source material), factual&#8203;:contentReference[oaicite:18]{index=18}, and free of any disallowed content. Double-check that the tone aligns with the brand’s voice and the post meets the platform guidelines (e.g. length limits).  
+    If multiple post ideas come to mind, you can provide 2 variations per platform for A/B testing. Otherwise, one solid post per platform is sufficient.  
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+
+In this configuration, the prompt is quite detailed to cover various requirements. It instructs the AI in a step-by-step manner on how to generate content for each platform. We explicitly mention the differences for Twitter, Instagram, and LinkedIn so the agent will output three tailored versions of the post. We also include a step for an image idea, acknowledging that a separate image generator will use that idea. The content guidelines and tone are woven in (educational, enthusiastic, mention product). By structuring the output sections (“Twitter Post: ...”), we make it easier for the consuming application or the SchedulerAgent to parse and handle each piece. For example, the system could take the “Twitter Post” text and call the Twitter API to publish it, take the “Image” description to generate an image file, etc. Best Practices applied: The ContentCreatorAgent uses the trend context (from TrendScannerAgent) ensuring the posts are timely. It uses OpenAI for text – we would utilize the Chat Completion API with a system message that could include this .mdc content, plus a user message containing the specific trend report and any product details to highlight. We also plan to run the generated text through OpenAI’s Moderation API and possibly a custom profanity or sensitivity filter (especially since social media can be sensitive about certain topics). This is aligned with OpenAI’s recommendations to filter outputs in social media use cases​
+MILVUS.IO
+. If the moderation flags something, the agent could revise the content or a human could be alerted, depending on how autonomous we allow it to be. Finally, for efficiency, if certain content (text or images) are generated that could be reused (say we generate a beautiful starry background image for an Instagram post, we might reuse it for a similar post next week), the system should allow caching those results or saving them in a content library.
 
 ---
 > Source: [Klaudiusz321/social-media-agents](https://github.com/Klaudiusz321/social-media-agents) — distributed by [TomeVault](https://tomevault.io).
