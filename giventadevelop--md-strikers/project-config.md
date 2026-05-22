@@ -1,139 +1,136 @@
 ---
 trigger: always_on
-description: Playwright testing setup, middleware fixes, and error handling patterns for public and admin tests
+description: Standard patterns for displaying portrait and member images without cropping, with proper centering and aspect ratio preservation
 ---
 
 
-# Playwright Testing Setup and Middleware Fixes
+# Portrait Image Display Pattern
 
 ## **Overview**
-This rule documents the fixes applied to enable Playwright automated testing for both public pages and admin pages, including middleware configuration changes, error handling patterns, and authentication workarounds.
+This rule defines the correct patterns for displaying portrait and member images (people photos) that must be fully visible without cropping heads or other important parts. This pattern ensures images are properly centered, maintain their aspect ratio, and display consistently across all screen sizes.
 
 ## **Problem Solved**
-- **Public Page 401 Errors**: Playwright tests failing with 401 Unauthorized for public pages
-- **Admin Test Authentication**: Admin tests failing due to Clerk authentication and admin role checks
-- **Middleware Interference**: Clerk middleware blocking Playwright requests without session cookies
-- **Strict Error Detection**: Tests failing on false positives (401/403 text in HTML/JS, not actual errors)
+- **Head Cropping**: Prevents portrait images from cutting off people's heads or faces
+- **Improper Centering**: Ensures images are centered both horizontally and vertically
+- **Aspect Ratio Issues**: Maintains original image proportions without distortion
+- **Inconsistent Display**: Provides uniform display across different portrait orientations
+- **User Experience**: Shows complete portraits so viewers can see the full person
 
----
+## **When to Use This Pattern**
 
-## **Core Pattern: Middleware Wrapper for Playwright Compatibility**
+### **Use for:**
+- ✅ Team member profiles and portraits
+- ✅ Leadership/executive team displays
+- ✅ Clergy and religious leader portraits
+- ✅ Board member and staff photos
+- ✅ Speaker or guest profiles
+- ✅ Any people-centric imagery where the full person must be visible
 
-### **Custom Middleware Wrapper in `src/middleware.ts`**
+### **Don't Use for:**
+- ❌ Banner/hero images (use image_containment_prevention.mdc instead)
+- ❌ Background images where cropping is acceptable
+- ❌ Decorative images where partial visibility is fine
+- ❌ Product or object photos that can be cropped
 
-**CRITICAL**: We wrap Clerk's `authMiddleware` with a custom middleware function that intercepts 401/redirect responses for public routes. This allows Playwright tests to work while maintaining `auth()` functionality.
+## **Core Pattern: Portrait Grid Cards**
 
-**Pattern**:
-```typescript
-// Create Clerk middleware (still called for all routes)
-const clerkMiddleware = authMiddleware({
-  publicRoutes: [
-    '/',              // Homepage - needs auth() for admin lookup
-    '/events(.*)',    // Public pages
-    '/api/proxy(.*)', // API proxy routes
-    // ... other public routes
-  ],
-  ignoredRoutes: [
-    '/api/proxy/(.*)',  // Completely bypass Clerk for API proxy (mobile browser compatibility)
-    '/api/webhooks/(.*)',
-    // ... other ignored routes
-  ],
-});
+### **Container Setup**
+```tsx
+// ✅ DO: Use aspect ratio container with flexible height
+<div className="relative w-full h-auto aspect-[3/4] mx-auto mb-4 rounded-lg overflow-hidden sacred-shadow-sm group-hover:sacred-shadow reverent-transition bg-muted/20">
+  <div className="relative w-full h-full flex items-center justify-center p-2">
+    {/* Image goes here */}
+  </div>
+</div>
 
-// Custom wrapper that intercepts 401/redirects for public routes
-export default async function middleware(req: NextRequest) {
-  const pathname = req.nextUrl.pathname;
-  const isPublic = isPublicRoute(pathname);
-
-  // Always call Clerk middleware (even for public routes) so auth() works in layout.tsx
-  let response = clerkMiddleware(req);
-  if (response instanceof Promise) {
-    response = await response;
-  }
-
-  // CRITICAL: If Clerk returned 401 or redirected to sign-in for a public route, override it
-  if (isPublic && response instanceof NextResponse) {
-    const location = response.headers.get('location');
-    const isRedirectToSignIn = location && (location.includes('/sign-in') || location.includes('sign-in'));
-    const isUnauthorized = response.status === 401 || response.status === 307 || response.status === 308;
-
-    if (isUnauthorized || isRedirectToSignIn) {
-      // Override to 200 - allow access for Playwright tests
-      const publicResponse = NextResponse.next();
-      publicResponse.headers.set('x-pathname', pathname);
-      // Copy headers from Clerk's response (except location)
-      response.headers.forEach((value, key) => {
-        if ((key.startsWith('x-') || key === 'set-cookie') && key !== 'location') {
-          publicResponse.headers.set(key, value);
-        }
-      });
-      return publicResponse;
-    }
-  }
-
-  return response;
-}
+// ❌ DON'T: Use fixed height that crops images
+<div className="w-full h-48 mx-auto mb-4 rounded-lg overflow-hidden">
+  {/* This will crop images */}
+</div>
 ```
 
-### **Key Requirements**:
-1. ✅ **Call `clerkMiddleware` for all routes** - Ensures `auth()` works in `layout.tsx`
-2. ✅ **Intercept 401/redirects for public routes** - Allows Playwright tests without session cookies
-3. ✅ **Preserve Clerk headers** - Copy `x-*` and `set-cookie` headers from Clerk's response
-4. ✅ **Don't break Clerk detection** - Clerk detects `authMiddleware()` by checking file contents, not export
+### **Image Configuration**
+```tsx
+// ✅ DO: Use object-contain with fill and proper sizing
+<Image
+  src={member.image}
+  alt={member.name}
+  fill
+  sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+  className="object-contain group-hover:scale-105 reverent-transition"
+  style={{
+    objectPosition: 'center center'
+  }}
+/>
 
----
-
-## **Public Routes Configuration**
-
-### **Routes That Call `auth()` MUST Be in `publicRoutes`**
-
-**CRITICAL**: Routes that call `auth()` or `currentUser()` in server components **MUST** be in `publicRoutes` (NOT `ignoredRoutes`) so Clerk middleware runs.
-
-**Example**:
-```typescript
-publicRoutes: [
-  '/',              // ✅ Homepage - layout.tsx calls auth() for admin lookup
-  '/polls(.*)',     // ✅ Poll pages call auth() to check user participation
-  '/pricing(.*)',   // ✅ Pricing page calls auth() to check subscription status
-  '/events(.*)',    // ✅ Public pages (may call auth() for user-specific content)
-  '/api/proxy(.*)', // ✅ API proxy routes (public access, backend handles auth)
-],
+// ❌ DON'T: Use object-cover which crops images
+<Image
+  src={member.image}
+  alt={member.name}
+  width={242}
+  height={156}
+  className="w-full h-full object-cover"
+/>
 ```
 
-### **Routes That DON'T Call `auth()` Can Be in `ignoredRoutes`**
+## **Pattern Variations**
 
-**Example**:
-```typescript
-ignoredRoutes: [
-  '/api/proxy/(.*)',  // ✅ API routes handle their own auth (JWT)
-  '/api/webhooks/(.*)', // ✅ Webhook routes use service JWT, not Clerk
-  // NOTE: Public page routes like /events, /gallery are NOT in ignoredRoutes
-  // because layout.tsx calls auth() to check admin status for header menu visibility
-],
+### **1. Grid Layout (Team Members, Synod Members)**
+
+**Use Case**: Multiple portraits in a responsive grid (3-4 columns)
+
+**Important**: Use **flexbox with `justify-content: center`** instead of CSS Grid to automatically center the last row when there are fewer cards than columns. This ensures cards expand from the center outward, and the last row is always centered.
+
+```tsx
+// ✅ DO: Use flexbox for automatic last-row centering
+<div className="flex flex-wrap gap-6 justify-center items-start max-w-7xl mx-auto">
+  {members.map((member) => (
+    <Link
+      key={member.id}
+      href={member.href}
+      className="bg-card rounded-lg sacred-shadow p-6 hover:sacred-shadow-lg reverent-transition group w-full sm:w-[calc(50%-0.75rem)] lg:w-[calc(33.333%-1rem)] flex-shrink-0"
+      style={{ maxWidth: '400px' }}
+    >
+      <div className="text-center">
+        {/* Image Container */}
+        <div className="relative w-full h-auto aspect-[3/4] mx-auto mb-4 rounded-lg overflow-hidden sacred-shadow-sm group-hover:sacred-shadow reverent-transition bg-muted/20">
+          <div className="relative w-full h-full flex items-center justify-center p-2">
+            <Image
+              src={member.image}
+              alt={member.name}
+              fill
+              sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+              className="object-contain group-hover:scale-105 reverent-transition"
+              style={{ objectPosition: 'center center' }}
+            />
+          </div>
+        </div>
+        
+        {/* Member Info */}
+        <h3 className="font-heading font-semibold text-lg text-foreground mb-2">
+          {member.name}
+        </h3>
+        <p className="font-body text-sm text-primary font-medium mb-3">
+          {member.title}
+        </p>
+      </div>
+    </Link>
+  ))}
+</div>
+
+// ❌ DON'T: Use CSS Grid - last row won't center with fewer items
+<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+  {/* Last row items will align left, not center */}
+</div>
 ```
 
----
-
-## **Relaxed Error Detection Pattern**
-
-### **Problem: False Positives from 401/403 Text in HTML/JS**
-
-Playwright tests were failing when they found "401" or "403" text in HTML comments, JavaScript code, or hidden elements, even though the page loaded successfully.
-
-### **Solution: Only Check Visible Error Elements**
-
-**Pattern**:
-```javascript
-// ❌ DON'T: Check for any "401" or "403" text in page content
-const pageContent = await page.content();
-if (pageContent.includes('401') || pageContent.includes('403')) {
-  throw new Error('401/403 error detected');
-}
-
-// ✅ DO: Only check for visible error elements with specific selectors
-const errorSelectors = [
-  '[role="alert"]',
-  '[class*="error"][class*="message"]',
+**Key Implementation Details**:
+- **Flexbox Container**: `flex flex-wrap justify-center` - automatically centers all rows, including the last row
+- **Card Widths**: `w-full sm:w-[calc(50%-0.75rem)] lg:w-[calc(33.333%-1rem)]` - responsive widths with gap compensation
+- **Prevent Shrinking**: `flex-shrink-0` - maintains card size, prevents compression
+- **Max Width**: `style={{ maxWidth: '400px' }}` - consistent card size limit across screen sizes
+- **Gap**: `gap-6` - consistent spacing between cards (1.5rem / 24px)
+- **Center Alignment**: `justify-center items-start` - centers cards horizontally, aligns tops
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
