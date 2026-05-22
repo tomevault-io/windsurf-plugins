@@ -1,222 +1,51 @@
 ---
 trigger: always_on
-description: Cursor rule guidelines (ALWAYS read before adding/updating rules)
+description: Useful when needing to determine repo structure or commands to run
 ---
 
-<cursor-rules-guide>
+# Project Overview: Cloudflare Workers Monorepo Template
 
-<title>Cursor Rules - Organization and Format</title>
+This project is a template for managing Cloudflare Workers in a monorepo setting.
 
-<location>
-<description>All cursor rules should be placed in the `.cursor/rules/` directory with the `.mdc` extension.</description>
+**Core Technologies:**
 
-<requirements type="dont">
-- `.cursorrules` file in the root (deprecated)
-- Rules in other locations
-- Rules with other extensions
-</requirements>
+*   **Package Manager:** pnpm (configured via [pnpm-workspace.yaml](mdc:pnpm-workspace.yaml))
+*   **Build System:** Turborepo (configured via [turbo.json](mdc:turbo.json))
+*   **Command Runner:** Just (commands defined in [Justfile](mdc:Justfile))
+*   **Dependency Sync:** syncpack (configured via [.syncpackrc.cjs](mdc:.syncpackrc.cjs))
+*   **CI/CD:** GitHub Actions (workflows in [.github/workflows/](mdc:.github/workflows))
+*   **Versioning:** Changesets
 
-<requirements type="do">
-- `.cursor/rules/{descriptive-name}.mdc`
-- One rule per file
-- Clear, focused rules
-</requirements>
-</location>
+**Repository Structure:**
 
-<file-naming>
-<requirements>
-- Use kebab-case: `my-rule-name.mdc`
-- Be descriptive but concise
-- Group related rules with common prefixes
-</requirements>
+*   `apps/`: Individual Worker applications (e.g., [apps/example-worker-echoback/](mdc:apps/example-worker-echoback)).
+*   `packages/`: Shared libraries and utilities.
+*   `packages/tools/`: Shared development scripts/CLI, referenced in individual worker `package.json` files.
+*   `turbo/generators/`: Templates for the `just new-worker` command.
+*   [Justfile](mdc:Justfile): Primary command definitions.
+*   [.github/workflows/](mdc:.github/workflows): Contains CI/CD workflows:
+    *   [branches.yml](mdc:.github/workflows/branches.yml): Checks and tests on feature branches.
+    *   [release.yml](mdc:.github/workflows/release.yml): Checks, tests, deployment (requires `CLOUDFLARE_API_TOKEN` secret), and Changeset release PR creation on `main` branch.
 
-<examples>
-- `github-actions-runners.mdc`
-- `docker-compose.mdc`
-- `development-workflow.mdc`
-</examples>
-</file-naming>
+**Key Commands (via Justfile):**
 
-<frontmatter-requirement>
-<critical>EVERY .mdc file MUST start with frontmatter - files without it won't work</critical>
+*   `just install`: Install dependencies.
+*   `just dev`: Run development servers.
+*   `just build`: Build applications.
+*   `just test`: Run tests.
+*   `just check`: Run linters/formatters/type checks.
+*   `just fix`: Auto-fix lint/format issues.
+*   `just deploy`: Deploy workers (see [release.yml](mdc:.github/workflows/release.yml)).
+*   `just cs`: Create a Changeset.
+*   `just update-deps`: Update dependencies using syncpack.
+*   `just new-worker`: Generate a new worker application using templates from `turbo/generators/`.
 
-<template>
-```yaml
----
-description: What this rule does (LLMs read this to decide relevance)
-globs:
-alwaysApply: false
----
-```
-</template>
+**Prerequisites:**
 
-<notes>
-- description: Required - determines when LLMs read the rule
-- globs: Keep empty for new rules
-- alwaysApply: Keep false for new rules
-</notes>
-</frontmatter-requirement>
+*   Node.js v22+
+*   pnpm v10+
 
-<rule-format>
-<description>Rules must be written for LLM optimization. Prioritize machine readability over human readability.</description>
-
-<critical>START WITH THE SIMPLEST STRUCTURE THAT CLEARLY CONVEYS YOUR RULE</critical>
-
-<decision-tree>
-Ask yourself:
-1. Can I express this rule as a simple list of do's and don'ts? → Use simple template
-2. Does this rule involve multiple interconnected concepts? → Consider complex template
-3. Am I adding sections just because the template has them? → Remove those sections
-4. Am I about to add a second example? → Stop. One is usually enough.
-
-Remember: Empty sections add tokens but no value. Less structure often communicates more clearly.
-</decision-tree>
-
-<simplicity-first>
-<principle>Start with the absolute minimum. You can always add more if truly needed.</principle>
-<warning>If you're thinking "maybe I should add..." - DON'T. Only add what's essential.</warning>
-<rule-of-thumb>If your simple rule exceeds 50 lines, you're probably over-structuring it.</rule-of-thumb>
-</simplicity-first>
-
-<rule-complexity-principle>
-Use the minimum XML structure needed for clarity. Most rules only need:
-- A title
-- A list of requirements
-- Maybe some examples
-
-That's it. Don't add sections unless they add real value.
-</rule-complexity-principle>
-
-<simple-template>
-<description>Use this template for 90% of rules - formatting, naming conventions, simple behaviors</description>
-```yaml
----
-description: Brief description for LLM rule selection
-globs:
-alwaysApply: false
----
-```
-
-```xml
-<rule-name>
-
-<title>Rule Title</title>
-
-<rules>
-- First requirement
-- Second requirement  
-- Third requirement
-</rules>
-
-<examples>
-<example type="good">
-```typescript
-// Good code example
-```
-</example>
-</examples>
-
-</rule-name>
-```
-
-<stop-here>For most rules, you're done. Only add more sections if the rule is genuinely complex.</stop-here>
-
-<example-guidelines>
-<critical>ONE EXAMPLE IS USUALLY ENOUGH - Don't add more unless each shows a fundamentally different pattern</critical>
-- Simple formatting rules: ONE concise example (<15 lines)
-- If you're thinking "I should also show..." - DON'T
-- Only add bad examples if the mistake is non-obvious
-- Never show variations of the same concept
-- Trust the LLM to generalize from one clear example
-- Multiple examples are ONLY for rules with distinct subcategories
-</example-guidelines>
-</simple-template>
-
-<complex-template>
-<description>ONLY use this template for complex architectural patterns, multi-faceted systems, or rules requiring extensive context</description>
-```yaml
----
-description: Brief description for LLM rule selection
-globs:
-alwaysApply: false
----
-```
-
-```xml
-<rule-name>
-
-<title>Rule Title</title>
-
-<context>
-<applies-to>Where this rule applies</applies-to>
-</context>
-
-<overview>High-level explanation</overview>
-
-<key-concepts>
-- Important concept
-- Another concept
-</key-concepts>
-
-<rules>
-<rule>
-<name>Rule name</name>
-<requirements>
-- Requirement
-- Another requirement
-</requirements>
-</rule>
-</rules>
-
-<examples>
-<example type="good">
-```typescript
-// Code
-```
-</example>
-</examples>
-
-</rule-name>
-```
-</complex-template>
-
-<xml-tag-guidelines>
-
-<formatting-rules>
-- No markdown headers (#, ##, ###)
-- No text formatting (**bold**, *italic*)
-- No emojis or Unicode symbols
-- No redundant labels
-- Use attributes for categorization
-- Consistent patterns throughout
-- Exception: Use markdown code blocks (```)
-- Exception: Use markdown tables for comparisons
-- Exception: Use backticks for inline code, commands, and technical terms
-- XML tags only
-- Every section needs an XML tag
-- Use dash lists within tags
-- Consistent nesting
-- Semantic names
-- Lowercase with hyphens
-- Attributes for metadata
-- Specific over generic
-- No redundant text
-- No markdown formatting inside XML
-- No visual elements
-- No generic tags like section, div, content
-- No human-oriented formatting
-</formatting-rules>
-
-<xml-benefits>
-- Unambiguous parsing
-- Explicit hierarchy
-- Consistent extraction
-- No formatting ambiguity
-</xml-benefits>
-
-<common-mistakes>
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+See the main [README.md](mdc:README.md) for a user-facing guide.
 
 ---
 > Source: [monorepo-rocks/monorepo-rocks](https://github.com/monorepo-rocks/monorepo-rocks) — distributed by [TomeVault](https://tomevault.io).
