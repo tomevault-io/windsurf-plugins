@@ -1,159 +1,124 @@
 ---
 trigger: always_on
-description: This document outlines the correct patterns for implementing email functionality in the Next.js application, based on the working QR code endpoint pattern and successful send-ticket-email implementation.
+description: This rule defines the filtering logic, display rules, and "Buy Tickets" button/image display logic for the events listing page (`/events`). It ensures consistent event filtering, recurring event handling, and proper routing for ticket purchases.
 ---
 
-# Email Endpoint Implementation Rules
+# Events Page Filtering and Display Rules
 
-## Overview
-This document outlines the correct patterns for implementing email functionality in the Next.js application, based on the working QR code endpoint pattern and successful send-ticket-email implementation.
+## **Overview**
+This rule defines the filtering logic, display rules, and "Buy Tickets" button/image display logic for the events listing page (`/events`). It ensures consistent event filtering, recurring event handling, and proper routing for ticket purchases.
 
-## Key Principles
+## **Problem Solved**
+- **Consistent Event Filtering**: Ensures all events displayed meet specific criteria (active, date-based, recurring event handling)
+- **Buy Tickets Display Logic**: Determines when and how to show the "Buy Tickets" image/button
+- **Payment Flow Routing**: Routes users to the correct checkout page based on event payment configuration
+- **Recurring Event Handling**: Properly filters and displays recurring events showing only the next occurrence
 
-### 1. Base64 Encoding for emailHostUrlPrefix
-**CRITICAL:** Always use Base64 encoding for `emailHostUrlPrefix` in URL paths, NOT URL encoding.
+---
 
+## **Event Filtering Rules**
+
+### **1. Active Events Only**
+- **Rule**: Only events with `isActive === true` are displayed
+- **Backend Query**: `isActive.equals=true`
+- **Rationale**: Inactive events should not appear in public listings
+
+### **2. Date-Based Filtering**
+
+#### **Future Events (Default View)**
+- **Rule**: Show events where `startDate >= today` (including today)
+- **Backend Query**: `startDate.greaterThanOrEqual=today` (YYYY-MM-DD format)
+- **Sort Order**: `sort=startDate,asc` (earliest first)
+- **Display Logic**: Events happening today or in the future
+
+#### **Past Events (Toggle View)**
+- **Rule**: Show events where `endDate < today`
+- **Backend Query**: `endDate.lessThan=today` (YYYY-MM-DD format)
+- **Sort Order**: `sort=startDate,desc` (most recent first)
+- **Display Logic**: Events that have already ended
+
+#### **Date Range Search (Overrides Toggle)**
+- **Rule**: If user specifies date range, it overrides Future/Past toggle
+- **Backend Query**:
+  - `startDate.greaterThanOrEqual=searchDateFrom` (if provided)
+  - `startDate.lessThanOrEqual=searchDateTo` (if provided)
+- **Priority**: Date range search takes precedence over Future/Past toggle
+
+### **3. Title Search Filter**
+- **Rule**: Filter events by title containing search term (case-insensitive)
+- **Backend Query**: `title.contains=searchTitle` (trimmed, case-insensitive)
+- **Combines With**: Date filtering (both filters apply simultaneously)
+
+### **4. Recurring Event Handling**
+
+#### **Recurring Event Detection**
+- **Rule**: Event is considered recurring if `isRecurring === true`
+- **Series Identification**: Uses `recurrenceSeriesId` or `parentEventId` or `event.id` as series identifier
+
+#### **Next Occurrence Calculation**
+- **Rule**: Calculate next occurrence date using `getNextOccurrenceDate(event, todayDate)`
+- **Time Window**: Only show next occurrence if it's within 1 year from today
+- **Date Update**: Update event's `startDate` to next occurrence date for display purposes
+
+#### **Series Deduplication**
+- **Rule**: Only show one event per recurring series (the one with earliest next occurrence)
+- **Logic**:
+  - First event from series: Add to map
+  - Subsequent events from same series: Compare dates, keep earlier occurrence
+- **Skip Child Events**: Skip events with `parentEventId` or `recurrenceSeriesId` but `isRecurring === false`
+
+#### **Recurring Event Filtering Flow**
 ```typescript
-// ✅ CORRECT - Base64 encoding like working QR code endpoint
-const encodedEmailHostUrlPrefix = Buffer.from(emailHostUrlPrefix).toString('base64');
+// Process events and filter recurring events to show only next occurrence
+eventList.forEach((event) => {
+  if (isRecurringEvent(event)) {
+    const seriesId = event.recurrenceSeriesId || event.parentEventId || event.id;
+    const nextOccurrence = getNextOccurrenceDate(event, todayDate);
 
-// ❌ WRONG - URL encoding (causes backend issues)
-const encodedEmailHostUrlPrefix = encodeURIComponent(emailHostUrlPrefix);
-```
-
-### 2. URL Pattern Structure
-Follow the exact same URL structure as the working QR code endpoint:
-
-```
-/api/events/{eventId}/transactions/{transactionId}/emailHostUrlPrefix/{base64EncodedUrlPrefix}/{action}
-```
-
-**Working Examples:**
-- QR Code: `/api/events/3/transactions/5652/emailHostUrlPrefix/aHR0cDovL2xvY2FsaG9zdDozMDAw/qrcode`
-- Email: `/api/events/1/transactions/4956/emailHostUrlPrefix/aHR0cDovL2xvY2FsaG9zdDozMDAw/send-ticket-email`
-
-Where `aHR0cDovL2xvY2FsaG9zdDozMDAw` is Base64 for `http://localhost:3000`
-
-## Implementation Patterns
-
-### 1. Custom Proxy Handler Pattern
-Use the shared `createProxyHandler` with custom backend path construction:
-
-```typescript
-import { createProxyHandler } from '@/lib/proxyHandler';
-import { getEmailHostUrlPrefix } from '@/lib/env';
-
-export default async function handler(req: any, res: any) {
-  const { id, transactionId } = req.query;
-
-  // Get emailHostUrlPrefix from request headers or use default
-  const emailHostUrlPrefix = req.headers['x-email-host-url-prefix'] as string ||
-                           getEmailHostUrlPrefix();
-
-  // CRITICAL: Use Base64 encoding like the working QR code endpoint
-  const encodedEmailHostUrlPrefix = Buffer.from(emailHostUrlPrefix).toString('base64');
-
-  // Create custom backend path with Base64-encoded emailHostUrlPrefix
-  const customBackendPath = `/api/events/${id}/transactions/${transactionId}/emailHostUrlPrefix/${encodedEmailHostUrlPrefix}/send-ticket-email`;
-
-  // Use shared proxy handler
-  const proxyHandler = createProxyHandler({
-    backendPath: customBackendPath,
-    allowedMethods: ['POST', 'GET'],
-    injectTenantId: false
-  });
-
-  return proxyHandler(req, res);
-}
-```
-
-### 2. Server Action Pattern
-For server-side API calls (like in ApiServerActions.ts):
-
-```typescript
-export async function sendTicketEmail(eventId: number, transactionId: number): Promise<boolean> {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-  const emailHostUrlPrefix = getEmailHostUrlPrefix();
-  
-  // CRITICAL: Use Base64 encoding
-  const encodedEmailHostUrlPrefix = Buffer.from(emailHostUrlPrefix).toString('base64');
-
-  const response = await fetchWithJwtRetry(
-    `${baseUrl}/api/proxy/events/${eventId}/transactions/${transactionId}/emailHostUrlPrefix/${encodedEmailHostUrlPrefix}/send-ticket-email`,
-    {
-      method: 'GET', // or 'POST' depending on backend
-      headers: {
-        'Content-Type': 'application/json',
-      }
+    if (!nextOccurrence || nextOccurrence > oneYearFromNow) {
+      return; // Skip if no next occurrence or beyond 1 year
     }
-  );
 
-  return response.ok;
-}
+    // Update event startDate to next occurrence
+    const eventWithNextOccurrence = { ...event, startDate: nextOccurrenceStr };
+
+    // Keep only earliest occurrence per series
+    const existingSeriesEvent = recurringSeriesMap.get(seriesId);
+    if (!existingSeriesEvent || nextOccurrence < new Date(existingSeriesEvent.startDate!)) {
+      recurringSeriesMap.set(seriesId, eventWithNextOccurrence);
+    }
+  } else {
+    // Skip child events (have parentEventId/recurrenceSeriesId but not recurring)
+    const seriesId = event.recurrenceSeriesId || event.parentEventId;
+    if (seriesId) {
+      return; // Skip child event
+    }
+    // Non-recurring event - add directly
+    processedEvents.push(event);
+  }
+});
 ```
 
-### 3. Client-Side Pattern
-For frontend API calls:
+### **5. Pagination**
+- **Backend Fetch Size**: `BACKEND_FETCH_SIZE = 50` (fetch more to account for filtering)
+- **Display Size**: `EVENTS_PAGE_SIZE = 20` (display 20 events per page after filtering)
+- **Rationale**: Fetch more events than displayed because recurring event filtering reduces count
 
-```typescript
-// In client components, pass emailHostUrlPrefix via headers
-const handleResendEmail = async (email: string) => {
-  const response = await fetch(`/api/proxy/events/${eventId}/transactions/${transactionId}/send-ticket-email?to=${encodeURIComponent(email)}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-email-host-url-prefix': window.location.origin, // Will be Base64 encoded by proxy
-    },
-  });
-  
-  return response.ok;
-};
-```
+---
 
-## Email Host URL Prefix Handling
+## **Buy Tickets Image/Button Display Rules**
 
-### 1. Header-Based Approach (Recommended)
-Pass `emailHostUrlPrefix` via request headers and let the proxy handler encode it:
+### **Display Conditions**
 
-```typescript
-// Client side - pass in header
-headers: {
-  'x-email-host-url-prefix': 'http://localhost:3000'
-}
+#### **1. Event Must Be Ticketed**
+- **Rule**: `event.admissionType?.toUpperCase() === 'TICKETED'`
+- **Case Handling**: Case-insensitive check (handles 'TICKETED', 'ticketed', etc.)
+- **Rationale**: Only ticketed events should show Buy Tickets option
 
-// Proxy handler - get from header and encode
-const emailHostUrlPrefix = req.headers['x-email-host-url-prefix'] as string ||
-                         getEmailHostUrlPrefix();
-const encoded = Buffer.from(emailHostUrlPrefix).toString('base64');
-```
-
-### 2. Direct Encoding (For Server Actions)
-When calling from server actions, encode directly:
-
-```typescript
-const emailHostUrlPrefix = getEmailHostUrlPrefix();
-const encoded = Buffer.from(emailHostUrlPrefix).toString('base64');
-```
-
-## Backend API Endpoint Patterns
-
-Based on working examples, the backend likely expects these patterns:
-
-### Working Endpoints
-- **QR Code Generation:** `GET /api/events/{eventId}/transactions/{transactionId}/emailHostUrlPrefix/{base64}/qrcode`
-- **Email Sending:** `GET|POST /api/events/{eventId}/transactions/{transactionId}/emailHostUrlPrefix/{base64}/send-ticket-email`
-
-### Query Parameters
-Additional parameters can be passed as query strings:
-```
-/send-ticket-email?to=user@example.com&subject=Custom Subject
-```
-
-## Common Mistakes to Avoid
-
-### ❌ Wrong Encoding
-```typescript
-// NEVER use URL encoding for emailHostUrlPrefix in paths
+#### **2. Event Must Be Upcoming**
+- **Rule**: Event date must be today or in the future
+- **Date Calculation**:
+  ```typescript
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
