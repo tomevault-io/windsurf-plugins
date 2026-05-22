@@ -1,178 +1,68 @@
 ---
 trigger: always_on
-description: This file provides instructions for GitHub Copilot when working with the ArtificialU codebase.
+description: - code is linted according to eslint (./eslint.config.js)
 ---
 
-# GitHub Copilot Instructions for ArtificialU
+## Code Style for JS, TS, JSX, TSX
 
-This file provides instructions for GitHub Copilot when working with the ArtificialU codebase.
+- code is linted according to eslint (./eslint.config.js)
+- code is formatted according to BiomeJS (./biome.json)
+- Semicolons are only used "as-needed"
+- Default "tab" spacing is 2 spaces
+- single quotes '' preferred
+- trailing commas use 'es5' conditions
+- run `pnpm format` to re-format
+- run `pnpm lint` to lint
+- validate the build with `pnpm build`
+- local imports should use `.js` or `.jsx` suffix (even for .ts & .tsx files)
 
-## Project Overview
+## Libraries in use
 
-ArtificialU is an AI-powered educational content platform that generates university lectures with distinct professor personalities and converts them to audio using text-to-speech.
+- pnpm for packages and scripts
+- TypeScript
+- ESM style modules
+- Vite
+- SolidJS framework
+- SolidJS router
+- Kobalte component library
+- TailwindCSS (v4) style utilities
+- PostCSS Preset Env for modern CSS syntax
 
-### Technology Stack
+## Architecture & Styling
 
-**Backend:**
+**Reference: See STYLE_GUIDE.md for comprehensive UI, styling, and theming documentation**
 
-- Python 3.13+ with FastAPI
-- PostgreSQL with SQLAlchemy ORM
-- Hatch for environment management
-- AI: Anthropic Claude, Google Gemini, OpenAI
-- TTS: ElevenLabs
-- Storage: MinIO (dev) / S3 (prod)
-- Background jobs: Custom async worker with PostgreSQL-backed queue
+- **Theming System**: Multiple themes (dark-academia, vaporwave, wabi-sabi, biophilia) defined in `src/utils/theme.ts`
+- **Color Sync**: Colors defined in TWO places that must be kept in sync:
+  - `src/utils/theme.ts`: HSL strings for JS access
+  - `src/index.css`: HSL component values for CSS custom properties
+- **Semantic Colors**: Uses semantic color names (primary, secondary, accent, background, foreground, muted, border, surface) plus status colors (info, success, warning, danger)
+- **Component Library**: Custom UI components in `src/components/ui/` built on Kobalte UI
+- **Fonts**: Libre Baskerville (body), Cinzel (headings), Inter (UI elements)
+- **Testing**: Use `src/pages/Stylebook.tsx` to test UI components across themes
 
-**Frontend:**
+## Key Files & Directories
 
-- SolidJS with TypeScript
-- TailwindCSS v4
-- Auth0 for authentication
-- Kobalte UI for components
-- Vite for build tooling
+- `src/index.css`: Master CSS file with themes, custom properties, global styles
+- `src/utils/theme.ts`: Theme management logic
+- `src/components/ui/`: Reusable UI components
+- `src/pages/Stylebook.tsx`: Component showcase and testing
+- `tailwind.config.js`: Tailwind configuration with semantic color mappings
+- `postcss.config.mjs`: PostCSS plugin configuration
 
-## Architecture
+## Development Best Practices
 
-### Three-Tier Backend Architecture
+- Prefer Tailwind utility classes for styling
+- Use semantic color system (e.g., `bg-primary`, `text-foreground`) rather than hardcoded colors
+- Test components in Stylebook across different themes
+- Follow "greenfield" philosophy: move fast, refactor aggressively, prioritize iteration speed
+- When adding new themes/colors, update both `theme.ts` and `index.css`
 
-1. **API Layer** (`artificial_u/api/routers/`)
-   - FastAPI routers define REST endpoints
-   - Handle HTTP concerns (request/response, validation)
-   - Delegate business logic to service layer
+## Web Server
 
-2. **Service Layer**
-   - **API Services** (`artificial_u/api/services/`): HTTP-aware, coordinate multiple core services
-   - **Core Services** (`artificial_u/services/`): Pure domain logic, no HTTP dependencies
-   - **Generator Services**: AI content generation workflows
-
-3. **Repository Layer** (`artificial_u/models/`)
-   - SQLAlchemy models and repository pattern
-   - Repository factory for dependency injection
-   - All database access goes through repositories
-
-### Key Directory Structure
-
-```
-artificial_u/
-├── api/                 # FastAPI application
-│   ├── app.py          # Application factory
-│   ├── dependencies.py # Dependency injection
-│   ├── routers/        # API endpoints
-│   ├── services/       # API-layer services
-│   ├── models/         # Pydantic request/response models
-│   ├── middlewares/    # CORS, logging, error handling
-│   └── security/       # Auth0 JWT validation
-├── models/             # SQLAlchemy models & repositories
-├── services/           # Core business logic
-├── audio/              # TTS processing
-├── integrations/       # External API clients
-├── prompts/            # AI prompt templates
-└── config/             # Configuration management
-
-web/src/
-├── api/                # API client & service calls
-├── auth/               # Auth0 integration
-├── components/         # Reusable UI components
-├── pages/              # Route page components
-└── utils/              # Utilities (theme, SSE, etc.)
-```
-
-## Development Commands
-
-### Python Backend
-
-All Python commands use `hatch` for environment management:
-
-```bash
-# Run CLI commands
-hatch run artificial_u --help
-hatch run artificial_u list-courses
-
-# Testing
-hatch run pytest                    # All tests
-hatch run pytest -m unit            # Unit tests only
-hatch run pytest -m integration     # Integration tests only
-hatch run pytest --cov=artificial_u # Coverage report
-
-# Code quality
-hatch run black artificial_u        # Format code
-hatch run isort artificial_u        # Sort imports
-hatch run flake8 artificial_u       # Lint
-hatch run mypy artificial_u         # Type check
-
-# Database
-hatch run python scripts/initialize_db.py       # Setup dev database
-hatch run python scripts/setup_test_db.py      # Setup test database
-hatch run python scripts/run_alembic.py upgrade head  # Run migrations
-
-# API server
-hatch run uvicorn artificial_u.api.app:app --reload --host 0.0.0.0 --port 8000
-
-# Background worker
-hatch run python -m artificial_u.api.worker
-```
-
-### Frontend (SolidJS)
-
-All frontend commands run from the `web/` directory using `pnpm`:
-
-```bash
-cd web
-
-pnpm dev              # Start dev server (http://localhost:5173)
-pnpm build            # Production build
-pnpm preview          # Preview production build
-
-pnpm lint             # ESLint
-pnpm lint:fix         # Auto-fix ESLint issues
-pnpm format           # Format with BiomeJS
-
-pnpm test             # Run tests
-pnpm test:watch       # Watch mode
-pnpm test:coverage    # Coverage report
-```
-
-### Docker & Services
-
-```bash
-docker compose up -d     # Start postgres, minio
-docker compose down      # Stop services
-docker compose logs -f   # View logs
-
-# Makefile shortcuts
-make dev-setup          # Complete setup (services + database)
-make check              # Run linting + tests
-make test               # Run all tests
-make lint               # All linting checks
-make format             # Format code
-make run-api            # Start FastAPI server
-```
-
-## Code Quality Standards
-
-### Python
-
-- **Line length**: 100 characters (enforced by black, isort, flake8)
-- **Formatting**: Use Black formatter with isort for imports
-- **Type hints**: Encouraged and checked with mypy on `artificial_u/` directory
-- **Import order**: Use isort profile "black" for consistency
-- **Linting**: Must pass flake8 checks
-- **Pre-commit hooks**: Run black, isort, flake8 automatically
-
-### TypeScript
-
-- **Linting**: ESLint with TypeScript parser
-- **Formatting**: BiomeJS for code formatting
-- **Styling**: Stylelint for CSS
-- **Type coverage**: Full TypeScript coverage expected
-- **Components**: Use Kobalte UI primitives
-- **State**: SolidJS signals for reactivity
-- **Styling**: TailwindCSS v4 utilities
-
-## Testing Guidelines
-
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- Usually vite is serving this app at my <http://localhost:5173>
+- Possibly visible from docker-hosted MCP services at <http://host.docker.internal:5173>
+- Usually proxied to a public domain by zrok at <https://aliencyborg.share.zrok.io>
 
 ---
 > Source: [ballPointPenguin/artificial-u](https://github.com/ballPointPenguin/artificial-u) — distributed by [TomeVault](https://tomevault.io).
