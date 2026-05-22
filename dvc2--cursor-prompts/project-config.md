@@ -1,261 +1,241 @@
 ---
 trigger: always_on
-description: description: Minimizes tool calls and maximizes AI agent efficiency
+description: JavaScript best practices, ES2022+ features, and modern patterns for scalable applications
 ---
 
----
-description: Minimizes tool calls and maximizes AI agent efficiency
-globs: ["**/*"]
-alwaysApply: true
----
+# JavaScript Best Practices
 
-# Efficiency Optimization Rules
+Modern JavaScript development guide focusing on ES2022+ features, performance, and clean code patterns.
 
-## 🎯 Core Principle: Every Tool Call Counts
+## 1. Modern JavaScript Fundamentals
 
-### Tool Call Hierarchy
-```
-1. NO CALL > Think first, can you answer without tools?
-2. ONE CALL > Batch operations into single calls
-3. FEW CALLS > Strategic sequence when necessary
-4. MANY CALLS > Only for complex research tasks
-```
+### 1.1 Variable Declarations and Scope
 
-## 📊 Efficiency Metrics
-
-### Track Your Performance
-```
-EFFICIENCY_SCORE:
-- 0 tool calls for knowledge-based answers = 100%
-- 1 tool call for simple lookups = 90%
-- 2-3 calls for standard tasks = 80%
-- 4-5 calls for complex tasks = 70%
-- 6+ calls = Review if necessary
-```
-
-## 🚀 Zero-Call Strategies
-
-### Answer Directly When Possible
 ```javascript
-// USER: "How do I create a React component?"
-// ❌ BAD: Search for React component syntax
-// ✅ GOOD: Provide answer from knowledge
+// Use const for immutable bindings
+const API_KEY = process.env.API_KEY;
+const config = Object.freeze({
+  timeout: 5000,
+  retries: 3
+});
 
-// USER: "What's the syntax for Python list comprehension?"
-// ❌ BAD: Search Python documentation
-// ✅ GOOD: Show syntax directly with examples
-```
-
-### Knowledge-First Approach
-```
-Before ANY tool call, ask:
-1. Do I already know this?
-2. Is this stable information?
-3. Can I provide value without searching?
-
-If YES to all → Answer directly
-```
-
-## 💡 Single-Call Patterns
-
-### File Operations
-```bash
-# ❌ BAD: Multiple calls
-cat package.json
-ls src/
-grep -r "TODO" .
-
-# ✅ GOOD: Single call
-cat package.json && echo "---" && ls -la src/ && echo "---" && grep -r "TODO" . | head -20
-```
-
-### Code Analysis
-```javascript
-// ❌ BAD: Separate reads
-// Read file1.js
-// Read file2.js  
-// Read file3.js
-
-// ✅ GOOD: Batch read
-const files = ['file1.js', 'file2.js', 'file3.js'];
-const contents = await Promise.all(
-  files.map(f => fs.readFile(f, 'utf8'))
-);
-```
-
-### Information Gathering
-```bash
-# ❌ BAD: Sequential discovery
-pwd
-git status
-git branch
-npm list
-
-# ✅ GOOD: Combined context
-echo "=== Project Status ===" && \
-pwd && \
-git status -sb && \
-git branch --show-current && \
-npm list --depth=0 2>/dev/null | grep -E "^(├|└)" | head -10
-```
-
-## 🎪 Batching Strategies
-
-### File Creation
-```bash
-# ❌ BAD: Individual creates
-touch src/index.js
-touch src/utils.js
-touch src/config.js
-
-# ✅ GOOD: Batch creation
-mkdir -p src && touch src/{index,utils,config}.js
-```
-
-### Multi-File Updates
-```javascript
-// ❌ BAD: Update files one by one
-updateFile('config.js', configContent);
-updateFile('index.js', indexContent);
-updateFile('utils.js', utilsContent);
-
-// ✅ GOOD: Batch update
-const updates = [
-  { file: 'config.js', content: configContent },
-  { file: 'index.js', content: indexContent },
-  { file: 'utils.js', content: utilsContent }
-];
-await Promise.all(updates.map(u => 
-  fs.writeFile(u.file, u.content)
-));
-```
-
-## 🔄 Smart Caching
-
-### Remember Previous Results
-```javascript
-// Store expensive computations
-CACHED_RESULTS = {
-  projectStructure: null,
-  dependencies: null,
-  configuration: null
-};
-
-// Use cache when available
-if (!CACHED_RESULTS.projectStructure) {
-  CACHED_RESULTS.projectStructure = await analyzeProject();
+// Use let only when reassignment is needed
+let retryCount = 0;
+while (retryCount < MAX_RETRIES) {
+  retryCount++;
 }
-return CACHED_RESULTS.projectStructure;
+
+// Block scope with const/let
+{
+  const temp = calculateTemp();
+  // temp is only available in this block
+}
 ```
 
-### Context Preservation
-```
-PRESERVE_BETWEEN_CALLS:
-- File contents already read
-- Command outputs already seen
-- Discovered patterns
-- Validated information
-```
+### 1.2 Destructuring Patterns
 
-## 📉 Tool Call Reduction Patterns
-
-### Search Optimization
-```
-# ❌ BAD: Multiple searches
-search: "React hooks"
-search: "React useState"
-search: "React useEffect"
-
-# ✅ GOOD: Comprehensive search
-search: "React hooks useState useEffect patterns"
-```
-
-### Progressive Enhancement
 ```javascript
-// Start simple, enhance only if needed
-// Level 1: Try with existing knowledge
-// Level 2: Single targeted search
-// Level 3: Deep dive only if critical
+// Advanced destructuring with defaults and renaming
+const { 
+  data: users = [], 
+  meta: { total = 0, page = 1 } = {},
+  ...rest 
+} = response;
+
+// Array destructuring with rest
+const [first, second, ...remaining] = items;
+
+// Destructuring in function parameters
+function createUser({ 
+  name, 
+  email, 
+  role = 'user',
+  metadata: { source = 'web' } = {}
+} = {}) {
+  return { id: generateId(), name, email, role, source };
+}
+
+// Dynamic property destructuring
+const key = 'name';
+const { [key]: value } = object;
 ```
 
-## ⚡ Performance Patterns
+### 1.3 Object and Array Operations
 
-### Lazy Loading
 ```javascript
-// ❌ BAD: Load everything upfront
-const allFiles = await loadAllProjectFiles();
-
-// ✅ GOOD: Load only what's needed
-const getFile = async (path) => {
-  if (!cache[path]) {
-    cache[path] = await loadFile(path);
+// Object property shorthand and computed properties
+const name = 'John';
+const age = 30;
+const user = {
+  name,
+  age,
+  [`is${age}YearsOld`]: true,
+  // Method shorthand
+  greet() {
+    return `Hello, I'm ${this.name}`;
   }
-  return cache[path];
+};
+
+// Array methods for immutability
+const doubled = numbers.map(n => n * 2);
+const filtered = users.filter(u => u.active);
+const sum = numbers.reduce((acc, n) => acc + n, 0);
+const found = users.find(u => u.id === targetId);
+const hasAdmin = users.some(u => u.role === 'admin');
+const allActive = users.every(u => u.active);
+
+// Object transformation
+const transformed = Object.entries(data)
+  .filter(([key, value]) => value != null)
+  .reduce((acc, [key, value]) => ({ ...acc, [key]: transform(value) }), {});
+```
+
+## 2. Advanced Functions and Closures
+
+### 2.1 Function Patterns
+
+```javascript
+// Default parameters with destructuring
+function fetchData(url, { 
+  method = 'GET', 
+  headers = {}, 
+  timeout = 5000 
+} = {}) {
+  return fetch(url, { method, headers, signal: AbortSignal.timeout(timeout) });
+}
+
+// Rest parameters and spread
+function combine(separator, ...parts) {
+  return parts.filter(Boolean).join(separator);
+}
+
+// Immediately Invoked Function Expression (IIFE)
+const module = (() => {
+  let privateVar = 0;
+  
+  return {
+    increment() { privateVar++; },
+    getCount() { return privateVar; }
+  };
+})();
+
+// Function composition
+const compose = (...fns) => x => fns.reduceRight((acc, fn) => fn(acc), x);
+const pipe = (...fns) => x => fns.reduce((acc, fn) => fn(acc), x);
+
+// Currying
+const curry = (fn) => {
+  return function curried(...args) {
+    if (args.length >= fn.length) {
+      return fn.apply(this, args);
+    }
+    return (...nextArgs) => curried(...args, ...nextArgs);
+  };
 };
 ```
 
-### Early Termination
-```bash
-# ❌ BAD: Process everything
-find . -name "*.js" | xargs grep "pattern"
+### 2.2 Closures and Private State
 
-# ✅ GOOD: Stop when found
-find . -name "*.js" -exec grep -l "pattern" {} \; | head -1
-```
-
-## 🎯 Decision Trees
-
-### Should I Use a Tool?
-```
-Is it a fact question?
-├─ YES → Is it current/changing info?
-│   ├─ YES → Use tool (1 call)
-│   └─ NO → Answer from knowledge
-└─ NO → Is it a task?
-    ├─ YES → Can I batch operations?
-    │   ├─ YES → Single batched call
-    │   └─ NO → Minimize calls
-    └─ NO → Provide guidance
-```
-
-### Tool Selection
-```
-Need information?
-├─ Web search → Current events, prices, news
-├─ Read file → Specific file content
-├─ Terminal → System state, file operations
-└─ Analysis → Complex calculations only
-```
-
-## 📊 Efficiency Anti-Patterns
-
-### Avoid These
-```
-❌ Searching for basic syntax
-❌ Multiple calls for related info
-❌ Reading files already in context
-❌ Unnecessary state checks
-❌ Redundant validations
-❌ Over-verification
-```
-
-### Embrace These
-```
-✅ Batch related operations
-✅ Cache expensive results
-✅ Use knowledge first
-✅ Combine commands
-✅ Trust previous results
-✅ Fail fast
-```
-
-## 💾 Resource Conservation
-
-### API Token Optimization
 ```javascript
-// ❌ BAD: Wasteful
-for (const item of items) {
-  await processItem(item); // API call each
+// Module pattern with private state
+function createCounter(initial = 0) {
+  let count = initial;
+  
+  return {
+    increment() { return ++count; },
+    decrement() { return --count; },
+    reset() { count = initial; return count; },
+    valueOf() { return count; }
+  };
+}
+
+// Memoization with closure
+function memoize(fn, keyFn = JSON.stringify) {
+  const cache = new Map();
+  
+  return function memoized(...args) {
+    const key = keyFn(args);
+    
+    if (cache.has(key)) {
+      return cache.get(key);
+    }
+    
+    const result = fn.apply(this, args);
+    cache.set(key, result);
+    return result;
+  };
+}
+```
+
+## 3. Asynchronous JavaScript
+
+### 3.1 Promises and Async Patterns
+
+```javascript
+// Promise creation and chaining
+const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Promise combinators
+async function fetchAllData(urls) {
+  // Parallel execution
+  const results = await Promise.all(urls.map(url => fetch(url)));
+  
+  // Handle partial failures
+  const settledResults = await Promise.allSettled(urls.map(url => fetch(url)));
+  
+  // Race condition
+  const fastest = await Promise.race([
+    fetch('/api/primary'),
+    fetch('/api/backup')
+  ]);
+  
+  // First successful result
+  const firstSuccess = await Promise.any([
+    fetch('/api/server1'),
+    fetch('/api/server2'),
+    fetch('/api/server3')
+  ]);
+}
+
+// Async iteration
+async function* fetchPages(baseUrl) {
+  let page = 1;
+  let hasMore = true;
+  
+  while (hasMore) {
+    const response = await fetch(`${baseUrl}?page=${page}`);
+    const data = await response.json();
+    yield data.items;
+    hasMore = data.hasNextPage;
+    page++;
+  }
+}
+
+// Using async generators
+for await (const items of fetchPages('/api/users')) {
+  processItems(items);
+}
+```
+
+### 3.2 Advanced Error Handling
+
+```javascript
+// Retry mechanism with exponential backoff
+async function retryWithBackoff(fn, maxRetries = 3, baseDelay = 1000) {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await fn();
+    } catch (error) {
+      if (i === maxRetries - 1) throw error;
+      
+      const delay = baseDelay * Math.pow(2, i);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+}
+
+// Circuit breaker pattern
+class CircuitBreaker {
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
