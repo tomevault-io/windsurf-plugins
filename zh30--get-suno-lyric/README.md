@@ -7,11 +7,11 @@ Get suno ai song lyrics
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [zh30/get-suno-lyric](https://github.com/zh30/get-suno-lyric).
+Original source: `CLAUDE.md` in [zh30/get-suno-lyric](https://github.com/zh30/get-suno-lyric).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
