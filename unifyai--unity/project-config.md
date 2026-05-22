@@ -1,18 +1,64 @@
 ---
 trigger: always_on
-description: State Manager Interface Design (Base APIs, Prompts, and Tool Docstrings)
+description: State Manager Roles and Boundaries (Routing Guide)
 ---
 
 
-# State Manager Interface Design
+Use this to decide which manager to call, what each owns, and where its jurisdiction ends. Keep manager docstrings implementation‑agnostic; this guide is only for high‑level routing and composition.
 
-## Base Class Public APIs
+### ConversationManager
+- **Role**: Live chat orchestrator. Routes user requests to `Actor` for code-first execution and wires steering (pause/resume/interject/stop) during conversations.
+- **Scope**: Conversation‑level control and message flow; returns/relays steerable handles from inner tools.
+- **Connections**:
+  - **Steered by**: Top-level UI/controller (outside managers).
+  - **Steers**: `Actor.act` (central intelligence); relays in‑flight handles from `Actor.act` and `TaskScheduler.execute`.
 
-The public API for all state managers (`ContactManager`, `TranscriptManager`, `TaskScheduler`, `WebSearcher` etc.) is fully contained in the docstrings of the abstract methods defined on the base class `Base{SomeManager}` in `base.py`. All high level usage instructions should be fully encapsulated in these docstrings. These docstrings are then attached to the public methods of any derived class via `@functools.wraps(Base{StateManager}.{public_method}, updated=())`. These docstrings should not make **any** reference to **other managers** (we don't want to lock in any brittle cross-references, as other managers may change) and should also not make any reference to their **internal implementation**, including the private tools used for any particular instantiation of this abstract base class, with a consistent implementation agnostic public API.
+### Actor
+- **Role**: Central intelligence that orchestrates all state managers through code-first plans. Generates and executes Python plans that call primitives directly.
+- **Scope**: Code-first execution via `act()` method. Generates Python plans that orchestrate `primitives.contacts.*`, `primitives.knowledge.*`, `primitives.tasks.*`, etc. Wires in‑flight handles to `ConversationManager` for real‑time steering.
+- **Connections**:
+  - **Steered by**: `ConversationManager` (primary caller of `act()`).
+  - **Steers**: All state manager primitives (`primitives.contacts.*`, `primitives.knowledge.*`, `primitives.tasks.*`, etc.), `TaskScheduler`, and the `ConversationManager` handle (`ask`/`interject`/`get_full_transcript`). Uses `FunctionManager` for function discovery and execution.
 
-## Prompts vs Tool Docstrings
+### Actor routing playbook
+- **Read‑only questions**
+  - Tasks → `primitives.tasks.ask` or `TaskScheduler.ask`
+  - Contacts → `primitives.contacts.ask`
+  - Transcripts → `primitives.transcripts.ask` (may call `primitives.contacts.ask` for participants)
+  - Knowledge → `primitives.knowledge.ask`
+  - Secrets (metadata/placeholders only) → `primitives.secrets.ask`
+  - Time‑sensitive/web ("today/latest/now") → `primitives.web.ask`
+  - About a specific received file (filename known) → `primitives.files.ask`
+- **Mutations (create/edit/delete/merge)**
+  - Tasks/queues/ordering → `primitives.tasks.update` or `TaskScheduler.update`
+  - Contacts → `primitives.contacts.update`
+  - Knowledge/schema changes or ingestion → `primitives.knowledge.update` / `primitives.knowledge.refactor`
+  - Guidance → `GuidanceManager_add_guidance` / `GuidanceManager_update_guidance` / `GuidanceManager_delete_guidance` (top-level JSON tool calls)
+  - Secrets → `primitives.secrets.update`
+- **Execution vs. interaction**
+  - Ephemeral live action (UI control/one‑off interaction) → `Actor.act` (called via ConversationManager)
+  - Durable, tracked work → `TaskScheduler.execute` (via `primitives.tasks.execute`)
+  - Never use `TaskScheduler.update` to start work; always use `execute`.
+- **File ingestion pipeline**
+  - `primitives.files.parse` → `primitives.knowledge.update` (to persist structured facts)
+- **Images**
+  - Images are referenced **by filesystem path** across the entire stack. Screenshot directories (`Screenshots/User/`, `Screenshots/Assistant/`) and other workspace paths serve as the universal cross‑manager pointer for visual content. Managers and plans reference images via their relative filepath — no special `images` parameter or structured ref types are needed at the public API boundary.
 
-The prompts in each prompt builder file should focus on the high level usage patterns, general guidance to the LLM, and specifically how to reason about the **composition** of tools, which tool to use in which scenario with contrastive explanations etc. However, in order to have a fully modular design and maximise our separation of concerns, it's very important that we do **not** bloat these prompts with any purely tool-specific information. This belongs exclusively in the tool's unique docstring (which the LLM gets access to). If the guidance is about deciding between two tools or using these tools together for complex composite behaviour, then it belongs in the prompt for the high-level public method in `prompt_builders.py`. If it's purely tool-specific, then it belongs in the tools own docstring.
+### ImageManager
+- **Role**: Persistent image store and metadata registry. Provides durable `image_id`‑keyed storage in the `Images` context, backing filesystem images with cloud persistence and queryable metadata.
+- **Data model & identity**:
+  - Every stored image has a unique numeric `image_id` (stable within the active assistant context).
+  - Image rows store base64 bytes or a cloud object URL, plus metadata (caption, timestamp, mime/type).
+  - Each image row carries an optional `filepath` field that records the local filesystem path the image was saved to. This is the bridge between the filesystem‑based reference convention and the persistent `Images` context.
+- **ImageHandle wrapper**:
+  - Internal code operates on an `ImageHandle` abstraction that wraps an image row and exposes:
+    - `image_id`, optional `caption`/metadata, `filepath`
+    - `raw()` → returns image bytes (resolves base64 vs signed URL transparently)
+    - `ask(question)` → sends the image to a vision‑capable model and returns a text answer
+- **Cross‑manager image convention**:
+  - **Filesystem paths are the universal image reference.** When images need to flow between managers (e.g., from `Actor` plans into `GuidanceManager.update`), they are referenced by their workspace‑relative filepath (e.g., `Screenshots/User/2026-02-16T14-30-45.jpg`). The receiving manager or its internal tools can resolve filepaths to `image_id`s via `ImageManager.filter_images(filter="filepath == '...'")` when persistent storage linkage is needed.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [unifyai/unity](https://github.com/unifyai/unity) — distributed by [TomeVault](https://tomevault.io).
