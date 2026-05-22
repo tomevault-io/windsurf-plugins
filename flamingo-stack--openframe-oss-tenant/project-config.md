@@ -1,199 +1,107 @@
 ---
 trigger: always_on
-description: This document outlines the CI/CD pipeline configuration and best practices for the OpenFrame project.
+description: This document outlines the general coding standards that apply across all technologies in the OpenFrame project.
 ---
 
-# CI/CD Pipeline
+# Coding Standards
 
-This document outlines the CI/CD pipeline configuration and best practices for the OpenFrame project.
+This document outlines the general coding standards that apply across all technologies in the OpenFrame project.
 
-## Pipeline Overview
+## Code Formatting
 
-OpenFrame uses GitHub Actions for continuous integration and deployment, following these stages:
+- Use consistent indentation (4 spaces for Java, 2 spaces for TypeScript/Vue)
+- Limit line length to 120 characters
+- Use UTF-8 encoding for all files
+- End files with a newline
+- Remove trailing whitespace
+- Use consistent spacing around operators and keywords
+- Use consistent brace placement (same line for Java, new line for TypeScript)
 
-1. **Build**: Compile code and build artifacts
-2. **Test**: Run unit and integration tests
-3. **Analyze**: Perform static code analysis and security scanning
-4. **Package**: Create Docker images
-5. **Deploy**: Deploy to staging and production environments
+## Documentation
 
-```
-┌─────────┐     ┌─────────┐     ┌─────────┐     ┌─────────┐     ┌─────────┐
-│         │     │         │     │         │     │         │     │         │
-│  Build  │────▶│  Test   │────▶│ Analyze │────▶│ Package │────▶│ Deploy  │
-│         │     │         │     │         │     │         │     │         │
-└─────────┘     └─────────┘     └─────────┘     └─────────┘     └─────────┘
-```
+- Document all public classes, interfaces, methods, and fields
+- Use JavaDoc for Java code and JSDoc for TypeScript/JavaScript
+- Include parameter descriptions, return values, and exceptions
+- Document complex algorithms and business logic
+- Keep documentation up-to-date with code changes
+- Use meaningful comments that explain "why" not "what"
 
-## GitHub Actions Workflow
+## Naming Conventions
 
-The main workflow is defined in `.github/workflows/deploy.yml`:
+- Use descriptive, meaningful names
+- Follow language-specific conventions (camelCase, PascalCase, etc.)
+- Use consistent abbreviations and acronyms
+- Avoid generic names like "data", "manager", "util", etc.
+- Prefix interfaces with "I" in Java (e.g., IUserService)
+- Use verb prefixes for methods (get, set, is, has, etc.)
 
-```yaml
-name: Build and Deploy
+## Code Organization
 
-on:
-  push:
-    branches: [ main, develop ]
-  pull_request:
-    branches: [ main, develop ]
+- One class per file
+- Group related functionality together
+- Separate concerns appropriately
+- Keep methods and classes focused on a single responsibility
+- Limit method length (aim for < 30 lines)
+- Limit class length (aim for < 500 lines)
+- Order methods logically (public before private, etc.)
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v3
-    
-    - name: Set up JDK
-      uses: actions/setup-java@v3
-      with:
-        java-version: '21'
-        distribution: 'temurin'
-        cache: 'maven'
-        
-    - name: Build with Maven
-      run: mvn -B clean package -DskipTests
-      
-    - name: Cache Maven packages
-      uses: actions/cache@v3
-      with:
-        path: ~/.m2
-        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
-        restore-keys: ${{ runner.os }}-m2
-        
-    - name: Upload build artifacts
-      uses: actions/upload-artifact@v3
-      with:
-        name: build-artifacts
-        path: |
-          **/target/*.jar
-          !**/target/classes
-          !**/target/test-classes
+## Error Handling
 
-  test:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v3
-    
-    - name: Set up JDK
-      uses: actions/setup-java@v3
-      with:
-        java-version: '21'
-        distribution: 'temurin'
-        cache: 'maven'
-        
-    - name: Download build artifacts
-      uses: actions/download-artifact@v3
-      with:
-        name: build-artifacts
-        
-    - name: Run Tests
-      run: mvn -B test
-      
-    - name: Upload test results
-      uses: actions/upload-artifact@v3
-      with:
-        name: test-results
-        path: |
-          **/target/surefire-reports
-          **/target/site/jacoco
+- Use exceptions for exceptional conditions only
+- Handle exceptions at the appropriate level
+- Log exceptions with context information
+- Don't swallow exceptions without logging
+- Use custom exceptions for domain-specific errors
+- Include appropriate stack traces in logs
 
-  analyze:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v3
-    
-    - name: Set up JDK
-      uses: actions/setup-java@v3
-      with:
-        java-version: '21'
-        distribution: 'temurin'
-        cache: 'maven'
-        
-    - name: SonarQube Scan
-      run: mvn -B sonar:sonar
-      env:
-        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-        
-    - name: OWASP Dependency Check
-      run: mvn -B org.owasp:dependency-check-maven:check
-      
-    - name: Upload analysis results
-      uses: actions/upload-artifact@v3
-      with:
-        name: analysis-results
-        path: |
-          **/target/dependency-check-report.html
-          **/target/sonar
+## Testing
 
-  package:
-    needs: [test, analyze]
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v3
-    
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v2
-      
-    - name: Login to DockerHub
-      uses: docker/login-action@v2
-      with:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
-        
-    - name: Download build artifacts
-      uses: actions/download-artifact@v3
-      with:
-        name: build-artifacts
-        
-    - name: Build and push API image
-      uses: docker/build-push-action@v4
-      with:
-        context: ./services/openframe-api
-        push: ${{ github.event_name != 'pull_request' }}
-        tags: openframe/api:latest,openframe/api:${{ github.sha }}
-        
-    - name: Build and push Gateway image
-      uses: docker/build-push-action@v4
-      with:
-        context: ./services/openframe-gateway
-        push: ${{ github.event_name != 'pull_request' }}
-        tags: openframe/gateway:latest,openframe/gateway:${{ github.sha }}
-        
-    # Additional services...
+- Write unit tests for all business logic
+- Aim for high test coverage (>80%)
+- Use meaningful test names that describe the scenario
+- Follow the Arrange-Act-Assert pattern
+- Mock external dependencies
+- Keep tests independent and idempotent
+- Test both success and failure scenarios
 
-  deploy-staging:
-    if: github.event_name != 'pull_request'
-    needs: package
-    runs-on: ubuntu-latest
-    environment: staging
-    steps:
-    - uses: actions/checkout@v3
-    
-    - name: Set Kubernetes context
-      uses: azure/k8s-set-context@v3
-      with:
-        kubeconfig: ${{ secrets.KUBE_CONFIG_STAGING }}
-        
-    - name: Deploy to Kubernetes
-      run: |
-        # Update image tags
-        sed -i "s|image: openframe/api:.*|image: openframe/api:${{ github.sha }}|g" kubernetes/staging/*.yaml
-        sed -i "s|image: openframe/gateway:.*|image: openframe/gateway:${{ github.sha }}|g" kubernetes/staging/*.yaml
-        
-        # Apply Kubernetes manifests
-        kubectl apply -f kubernetes/staging/
-        
-    - name: Verify deployment
-      run: |
-        kubectl rollout status deployment/openframe-api -n openframe
-        kubectl rollout status deployment/openframe-gateway -n openframe
+## Version Control
 
+- Write clear, descriptive commit messages
+- Use the imperative mood in commit messages (e.g., "Add feature" not "Added feature")
+- Keep commits focused on a single change
+- Reference issue numbers in commit messages
+- Squash commits before merging
+- Follow the branching strategy (feature branches, etc.)
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+## Code Review
+
+- Review all code before merging
+- Check for adherence to coding standards
+- Verify test coverage
+- Look for security vulnerabilities
+- Ensure proper error handling
+- Validate performance considerations
+- Provide constructive feedback
+
+## Security Practices
+
+- Validate all user input
+- Use parameterized queries for database access
+- Sanitize output to prevent XSS
+- Use secure communication (HTTPS, TLS)
+- Don't hardcode sensitive information
+- Follow the principle of least privilege
+- Implement proper authentication and authorization
+
+## Performance Considerations
+
+- Use efficient algorithms and data structures
+- Minimize database queries
+- Use caching where appropriate
+- Optimize resource usage
+- Consider pagination for large result sets
+- Profile and benchmark critical code paths
+- Avoid premature optimization
 
 ---
 > Source: [flamingo-stack/openframe-oss-tenant](https://github.com/flamingo-stack/openframe-oss-tenant) — distributed by [TomeVault](https://tomevault.io).
