@@ -1,174 +1,145 @@
 ---
 trigger: always_on
-description: This document outlines the monitoring and observability best practices for the OpenFrame project.
+description: OpenFrame follows a microservices architecture with these core components:
 ---
 
-# Monitoring and Observability
+# Project Structure
 
-This document outlines the monitoring and observability best practices for the OpenFrame project.
+## Main Structure
 
-## Monitoring Stack
-
-OpenFrame uses a comprehensive monitoring stack:
-
-- **Prometheus**: Metrics collection and storage
-- **Grafana**: Visualization and dashboards
-- **Loki**: Log aggregation
-- **Tempo**: Distributed tracing
-- **Alertmanager**: Alert management and notifications
+OpenFrame follows a microservices architecture with these core components:
 
 ```
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│             │     │             │     │             │
-│  Prometheus │     │    Loki     │     │   Tempo     │
-│             │     │             │     │             │
-└──────┬──────┘     └──────┬──────┘     └──────┬──────┘
-       │                   │                   │
-       │                   │                   │
-       ▼                   ▼                   ▼
-┌─────────────────────────────────────────────────────┐
-│                                                     │
-│                      Grafana                        │
-│                                                     │
-└─────────────────────────────────────────────────────┘
-                          │
-                          │
-                          ▼
-┌─────────────────────────────────────────────────────┐
-│                                                     │
-│                   Alertmanager                      │
-│                                                     │
-└─────────────────────────────────────────────────────┘
+.
+├── services/                # Microservices
+│   ├── openframe-gateway/   # API Gateway
+│   ├── openframe-api/       # GraphQL API service
+│   ├── openframe-management/# Management interface
+│   ├── openframe-stream/    # Stream processing service
+│   └── openframe-config/    # Configuration service
+├── libs/                    # Shared libraries
+│   ├── openframe-data/      # Data access libraries
+│   └── openframe-security/  # Security libraries
+├── config/                  # Configuration files
+│   ├── application.yml      # Base configuration
+│   ├── application-local.yml# Local development overrides
+│   └── application-docker.yml# Docker deployment overrides
+├── docker-compose.*.yml     # Docker compose files for services
+├── scripts/                 # Utility scripts
+│   ├── build-and-run.sh     # Main build script
+│   └── test-public-endpoints.sh # Test script
+└── infrastructure/          # Docker configurations for tools
 ```
 
-## Metrics Collection
+## Service Layer
 
-### Application Metrics
+Each service follows this structure:
 
-Spring Boot applications expose metrics through Micrometer and Actuator:
-
-```java
-@Configuration
-public class MetricsConfig {
-    @Bean
-    public MeterRegistryCustomizer<MeterRegistry> metricsCommonTags(
-            @Value("${spring.application.name}") String applicationName) {
-        return registry -> registry.config()
-            .commonTags("application", applicationName);
-    }
-    
-    @Bean
-    public TimedAspect timedAspect(MeterRegistry registry) {
-        return new TimedAspect(registry);
-    }
-}
+```
+openframe-service/
+├── src/
+│   ├── main/
+│   │   ├── java/
+│   │   │   └── com/openframe/service/
+│   │   │       ├── config/      # Configuration classes
+│   │   │       ├── controller/  # REST controllers
+│   │   │       ├── service/     # Business logic
+│   │   │       ├── repository/  # Data access
+│   │   │       ├── model/       # Domain models
+│   │   │       ├── exception/   # Custom exceptions
+│   │   │       └── Application.java # Main class
+│   │   └── resources/
+│   │       ├── application.yml  # Service configuration
+│   │       └── ...
+│   └── test/
+│       └── java/
+│           └── com/openframe/service/
+│               ├── controller/  # Controller tests
+│               ├── service/     # Service tests
+│               └── ...
+├── pom.xml                      # Maven configuration
+└── README.md                    # Service documentation
 ```
 
-Example usage in code:
-```java
-@Service
-public class DeviceService {
-    private final MeterRegistry meterRegistry;
-    private final DeviceRepository deviceRepository;
-    
-    @Timed(value = "device.service.get.time", description = "Time taken to get device")
-    public Mono<Device> getDeviceById(String id) {
-        return deviceRepository.findById(id)
-            .doOnSuccess(device -> {
-                if (device != null) {
-                    meterRegistry.counter("device.service.get.success").increment();
-                } else {
-                    meterRegistry.counter("device.service.get.notfound").increment();
-                }
-            })
-            .doOnError(e -> meterRegistry.counter("device.service.get.error").increment());
-    }
-    
-    @Timed(value = "device.service.create.time", description = "Time taken to create device")
-    public Mono<Device> createDevice(Device device) {
-        return deviceRepository.save(device)
-            .doOnSuccess(d -> meterRegistry.counter("device.service.create.success").increment())
-            .doOnError(e -> meterRegistry.counter("device.service.create.error").increment());
-    }
-}
+## Library Layer
+
+Shared libraries follow this structure:
+
+```
+openframe-library/
+├── src/
+│   ├── main/
+│   │   ├── java/
+│   │   │   └── com/openframe/library/
+│   │   │       ├── model/       # Shared models
+│   │   │       ├── util/        # Utility classes
+│   │   │       └── ...
+│   │   └── resources/
+│   └── test/
+│       └── java/
+│           └── com/openframe/library/
+│               └── ...
+└── pom.xml                      # Maven configuration
 ```
 
-### Custom Metrics
+## UI Layer
 
-Define custom metrics for business-specific monitoring:
+The UI service follows this structure:
 
-```java
-@Component
-public class DeviceMetrics {
-    private final MeterRegistry meterRegistry;
-    
-    @Scheduled(fixedRate = 60000)
-    public void recordDeviceMetrics() {
-        // Record device count by status
-        Map<String, Long> deviceCountByStatus = deviceRepository.countByStatus().block();
-        deviceCountByStatus.forEach((status, count) -> {
-            meterRegistry.gauge("device.count.by.status", 
-                Tags.of("status", status), count);
-        });
-        
-        // Record device count by OS
-        Map<String, Long> deviceCountByOs = deviceRepository.countByOperatingSystem().block();
-        deviceCountByOs.forEach((os, count) -> {
-            meterRegistry.gauge("device.count.by.os", 
-                Tags.of("os", os), count);
-        });
-    }
-}
+```
+openframe-frontend/
+├── src/
+│   ├── assets/                  # Static assets
+│   ├── components/              # Vue components
+│   │   ├── ui/                  # Shared UI components
+│   │   └── ...                  # Feature-specific components
+│   ├── views/                   # Vue views/pages
+│   ├── services/                # API client services
+│   ├── store/                   # State management
+│   ├── router/                  # Vue Router configuration
+│   ├── types/                   # TypeScript types
+│   └── main.ts                  # Entry point
+├── public/                      # Public assets
+├── package.json                 # NPM configuration
+└── vite.config.ts               # Vite configuration
 ```
 
-### Prometheus Configuration
+## Docker Compose Files
 
-Configure Prometheus to scrape metrics from OpenFrame services:
+OpenFrame uses multiple Docker Compose files:
 
-```yaml
-# prometheus.yml
-global:
-  scrape_interval: 15s
-  evaluation_interval: 15s
+- `docker-compose.openframe-infrastructure.yml`: Infrastructure services (MongoDB, Redis, etc.)
+- `docker-compose.openframe-tactical-rmm.yml`: Tactical RMM configuration
+- `docker-compose.openframe-fleet-mdm.yml`: Fleet MDM configuration
+- `docker-compose.openframe-authentik.yml`: Authentik SSO configuration
+- `docker-compose.openframe-meshcentral.yml`: MeshCentral configuration
 
-scrape_configs:
-  - job_name: 'openframe-api'
-    metrics_path: '/actuator/prometheus'
-    static_configs:
-      - targets: ['openframe-api:8080']
-    
-  - job_name: 'openframe-gateway'
-    metrics_path: '/actuator/prometheus'
-    static_configs:
-      - targets: ['openframe-gateway:8100']
-    
-  - job_name: 'openframe-management'
-    metrics_path: '/actuator/prometheus'
-    static_configs:
-      - targets: ['openframe-management:8081']
-    
-  # Additional services...
-```
+## Configuration Files
 
-## Logging
+Configuration follows this hierarchy:
 
-### Structured Logging
+1. `application.yml`: Base configuration for all environments
+2. `application-{profile}.yml`: Environment-specific overrides
+   - `application-local.yml`: Local development
+   - `application-docker.yml`: Docker environment
+   - `application-prod.yml`: Production environment
 
-Use structured logging with JSON format:
+## Build Scripts
 
-```xml
-<!-- logback-spring.xml -->
-<configuration>
-    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
-        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
-            <includeMdc>true</includeMdc>
-            <includeContext>true</includeContext>
-            <customFields>{"application":"${spring.application.name}"}</customFields>
-        </encoder>
-    </appender>
-    
+The main build script is `scripts/build-and-run.sh`, which:
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+1. Builds all services with Maven
+2. Starts infrastructure services with Docker Compose
+3. Starts application services with Docker Compose
+4. Registers integrated tools with the OpenFrame API
+
+## Naming Conventions
+
+- Java packages: `com.openframe.{service|library}.{component}`
+- Service names: `openframe-{service}`
+- Library names: `openframe-{library}`
+- Docker Compose files: `docker-compose.openframe-{component}.yml`
+- Configuration files: `application-{profile}.yml`
 
 ---
 > Source: [flamingo-stack/openframe-oss-tenant](https://github.com/flamingo-stack/openframe-oss-tenant) — distributed by [TomeVault](https://tomevault.io).
