@@ -1,124 +1,167 @@
 ---
 trigger: always_on
-description: This rule defines the filtering logic, display rules, and "Buy Tickets" button/image display logic for the events listing page (`/events`). It ensures consistent event filtering, recurring event handling, and proper routing for ticket purchases.
+description: Standard pattern for form validation styling, error display, and scroll-to-error functionality across all forms (ProfileForm, EventForm, etc.)
 ---
 
-# Events Page Filtering and Display Rules
+
+# Form Validation Styling Pattern
 
 ## **Overview**
-This rule defines the filtering logic, display rules, and "Buy Tickets" button/image display logic for the events listing page (`/events`). It ensures consistent event filtering, recurring event handling, and proper routing for ticket purchases.
+This rule defines the standard pattern for form validation styling, error display, and scroll-to-error functionality used across all forms in the application (ProfileForm, EventForm, etc.). This ensures consistent validation UX, error styling, and user feedback patterns.
 
 ## **Problem Solved**
-- **Consistent Event Filtering**: Ensures all events displayed meet specific criteria (active, date-based, recurring event handling)
-- **Buy Tickets Display Logic**: Determines when and how to show the "Buy Tickets" image/button
-- **Payment Flow Routing**: Routes users to the correct checkout page based on event payment configuration
-- **Recurring Event Handling**: Properly filters and displays recurring events showing only the next occurrence
+- **Consistent Validation UX**: Ensures all forms use the same validation styling and error display patterns
+- **Error Visibility**: Red borders, inline error messages, and error summary boxes provide clear feedback
+- **Scroll-to-Error**: Automatically navigates users to the first error field on validation failure
+- **Real-time Error Clearing**: Errors clear as users type, providing immediate feedback
+- **Immediate Field Validation**: Required fields validate on blur (when user clicks outside), showing errors immediately without waiting for form submission
+- **Professional Presentation**: Consistent error styling (red borders, red text, error icons) across all forms
 
----
+## **Core Pattern**
 
-## **Event Filtering Rules**
+### **1. State Management**
 
-### **1. Active Events Only**
-- **Rule**: Only events with `isActive === true` are displayed
-- **Backend Query**: `isActive.equals=true`
-- **Rationale**: Inactive events should not appear in public listings
+```tsx
+// ✅ DO: Add validation state and field refs
+import { useState, useRef } from "react";
+import { flushSync } from "react-dom";
 
-### **2. Date-Based Filtering**
+export default function FormComponent() {
+  // Error state management
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [showErrors, setShowErrors] = useState(false);
 
-#### **Future Events (Default View)**
-- **Rule**: Show events where `startDate >= today` (including today)
-- **Backend Query**: `startDate.greaterThanOrEqual=today` (YYYY-MM-DD format)
-- **Sort Order**: `sort=startDate,asc` (earliest first)
-- **Display Logic**: Events happening today or in the future
+  // Refs for form fields to enable scroll-to-error functionality
+  const fieldRefs = useRef<Record<string, HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>>({});
 
-#### **Past Events (Toggle View)**
-- **Rule**: Show events where `endDate < today`
-- **Backend Query**: `endDate.lessThan=today` (YYYY-MM-DD format)
-- **Sort Order**: `sort=startDate,desc` (most recent first)
-- **Display Logic**: Events that have already ended
-
-#### **Date Range Search (Overrides Toggle)**
-- **Rule**: If user specifies date range, it overrides Future/Past toggle
-- **Backend Query**:
-  - `startDate.greaterThanOrEqual=searchDateFrom` (if provided)
-  - `startDate.lessThanOrEqual=searchDateTo` (if provided)
-- **Priority**: Date range search takes precedence over Future/Past toggle
-
-### **3. Title Search Filter**
-- **Rule**: Filter events by title containing search term (case-insensitive)
-- **Backend Query**: `title.contains=searchTitle` (trimmed, case-insensitive)
-- **Combines With**: Date filtering (both filters apply simultaneously)
-
-### **4. Recurring Event Handling**
-
-#### **Recurring Event Detection**
-- **Rule**: Event is considered recurring if `isRecurring === true`
-- **Series Identification**: Uses `recurrenceSeriesId` or `parentEventId` or `event.id` as series identifier
-
-#### **Next Occurrence Calculation**
-- **Rule**: Calculate next occurrence date using `getNextOccurrenceDate(event, todayDate)`
-- **Time Window**: Only show next occurrence if it's within 1 year from today
-- **Date Update**: Update event's `startDate` to next occurrence date for display purposes
-
-#### **Series Deduplication**
-- **Rule**: Only show one event per recurring series (the one with earliest next occurrence)
-- **Logic**:
-  - First event from series: Add to map
-  - Subsequent events from same series: Compare dates, keep earlier occurrence
-- **Skip Child Events**: Skip events with `parentEventId` or `recurrenceSeriesId` but `isRecurring === false`
-
-#### **Recurring Event Filtering Flow**
-```typescript
-// Process events and filter recurring events to show only next occurrence
-eventList.forEach((event) => {
-  if (isRecurringEvent(event)) {
-    const seriesId = event.recurrenceSeriesId || event.parentEventId || event.id;
-    const nextOccurrence = getNextOccurrenceDate(event, todayDate);
-
-    if (!nextOccurrence || nextOccurrence > oneYearFromNow) {
-      return; // Skip if no next occurrence or beyond 1 year
-    }
-
-    // Update event startDate to next occurrence
-    const eventWithNextOccurrence = { ...event, startDate: nextOccurrenceStr };
-
-    // Keep only earliest occurrence per series
-    const existingSeriesEvent = recurringSeriesMap.get(seriesId);
-    if (!existingSeriesEvent || nextOccurrence < new Date(existingSeriesEvent.startDate!)) {
-      recurringSeriesMap.set(seriesId, eventWithNextOccurrence);
-    }
-  } else {
-    // Skip child events (have parentEventId/recurrenceSeriesId but not recurring)
-    const seriesId = event.recurrenceSeriesId || event.parentEventId;
-    if (seriesId) {
-      return; // Skip child event
-    }
-    // Non-recurring event - add directly
-    processedEvents.push(event);
-  }
-});
+  // ... rest of component
+}
 ```
 
-### **5. Pagination**
-- **Backend Fetch Size**: `BACKEND_FETCH_SIZE = 50` (fetch more to account for filtering)
-- **Display Size**: `EVENTS_PAGE_SIZE = 20` (display 20 events per page after filtering)
-- **Rationale**: Fetch more events than displayed because recurring event filtering reduces count
+### **2. Scroll-to-Error Function**
 
----
+```tsx
+// ✅ DO: Add scroll-to-first-error function
+const scrollToFirstError = (errorObj?: Record<string, string>) => {
+  // Use provided errors or fall back to state
+  const errorsToUse = errorObj || errors;
+  const firstErrorField = Object.keys(errorsToUse)[0];
+  if (firstErrorField && fieldRefs.current[firstErrorField]) {
+    const field = fieldRefs.current[firstErrorField];
+    // Scroll to field but DON'T focus it immediately
+    // This allows all fields to show red borders before focusing
+    field.scrollIntoView({
+      behavior: 'smooth',
+      block: 'center',
+      inline: 'nearest'
+    });
+    // Delay focus slightly to ensure all fields have rendered with red borders
+    setTimeout(() => {
+      if (fieldRefs.current[firstErrorField]) {
+        fieldRefs.current[firstErrorField]?.focus();
+      }
+    }, 100);
+  }
+};
+```
 
-## **Buy Tickets Image/Button Display Rules**
+### **3. Error Count Helper**
 
-### **Display Conditions**
+```tsx
+// ✅ DO: Add helper function to get error count
+const getErrorCount = () => Object.keys(errors).length;
+```
 
-#### **1. Event Must Be Ticketed**
-- **Rule**: `event.admissionType?.toUpperCase() === 'TICKETED'`
-- **Case Handling**: Case-insensitive check (handles 'TICKETED', 'ticketed', etc.)
-- **Rationale**: Only ticketed events should show Buy Tickets option
+### **4. Validation Function**
 
-#### **2. Event Must Be Upcoming**
-- **Rule**: Event date must be today or in the future
-- **Date Calculation**:
-  ```typescript
+```tsx
+// ✅ DO: Add validate() function with flushSync for immediate state updates
+function validate(): boolean {
+  const errs: Record<string, string> = {};
+
+  // Required field validations
+  if (!formData.firstName || formData.firstName.trim() === '') {
+    errs.firstName = 'First name is required';
+  }
+  if (!formData.lastName || formData.lastName.trim() === '') {
+    errs.lastName = 'Last name is required';
+  }
+  if (!formData.email || formData.email.trim() === '') {
+    errs.email = 'Email is required';
+  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+    errs.email = 'Please enter a valid email address';
+  }
+
+  // Additional validations (length, format, etc.)
+  if (formData.title && formData.title.length > 250) {
+    errs.title = 'Title must not exceed 250 characters';
+  }
+
+  // CRITICAL: Use flushSync to force immediate state update so red borders appear instantly
+  const hasErrors = Object.keys(errs).length > 0;
+
+  if (hasErrors) {
+    // Force synchronous state updates so fields show red borders immediately
+    flushSync(() => {
+      setErrors(errs);
+      setShowErrors(true);
+    });
+
+    // Scroll to first error field
+    scrollToFirstError(errs);
+  } else {
+    setErrors({});
+    setShowErrors(false);
+  }
+
+  return !hasErrors;
+}
+```
+
+### **5. HandleChange Pattern (Error Clearing)**
+
+```tsx
+// ✅ DO: Clear errors when user starts typing
+const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+  const { name, value, type } = e.target;
+  const checked = (e.target as HTMLInputElement).checked;
+
+  // Clear error for this field when user starts typing
+  if (errors[name]) {
+    setErrors(prev => {
+      const newErrors = { ...prev };
+      delete newErrors[name];
+      return newErrors;
+    });
+  }
+
+  // Update form data
+  setFormData((prev) => ({
+    ...prev,
+    [name]: type === 'checkbox' ? checked : (value || ''),
+  }));
+};
+```
+
+### **6. Individual Field Validation (onBlur Pattern)**
+
+```tsx
+// ✅ DO: Create validateField function for individual field validation on blur
+const validateField = (fieldName: keyof ValidationErrors) => {
+  const newErrors: ValidationErrors = { ...errors };
+
+  switch (fieldName) {
+    case 'fieldName': {
+      if (!formData.fieldName?.trim()) {
+        newErrors.fieldName = 'Field name is required.';
+      } else {
+        delete newErrors.fieldName;
+      }
+      break;
+    }
+
+    case 'description': {
+      if (!formData.description?.trim()) {
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
