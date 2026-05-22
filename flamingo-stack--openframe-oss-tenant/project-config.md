@@ -1,145 +1,191 @@
 ---
 trigger: always_on
-description: OpenFrame follows a microservices architecture with these core components:
+description: This document outlines the security best practices for the OpenFrame project.
 ---
 
-# Project Structure
+# Security Practices
 
-## Main Structure
+This document outlines the security best practices for the OpenFrame project.
 
-OpenFrame follows a microservices architecture with these core components:
+## Authentication and Authorization
 
-```
-.
-├── services/                # Microservices
-│   ├── openframe-gateway/   # API Gateway
-│   ├── openframe-api/       # GraphQL API service
-│   ├── openframe-management/# Management interface
-│   ├── openframe-stream/    # Stream processing service
-│   └── openframe-config/    # Configuration service
-├── libs/                    # Shared libraries
-│   ├── openframe-data/      # Data access libraries
-│   └── openframe-security/  # Security libraries
-├── config/                  # Configuration files
-│   ├── application.yml      # Base configuration
-│   ├── application-local.yml# Local development overrides
-│   └── application-docker.yml# Docker deployment overrides
-├── docker-compose.*.yml     # Docker compose files for services
-├── scripts/                 # Utility scripts
-│   ├── build-and-run.sh     # Main build script
-│   └── test-public-endpoints.sh # Test script
-└── infrastructure/          # Docker configurations for tools
-```
+### JWT Authentication
 
-## Service Layer
+OpenFrame uses JWT (JSON Web Tokens) for authentication:
 
-Each service follows this structure:
-
-```
-openframe-service/
-├── src/
-│   ├── main/
-│   │   ├── java/
-│   │   │   └── com/openframe/service/
-│   │   │       ├── config/      # Configuration classes
-│   │   │       ├── controller/  # REST controllers
-│   │   │       ├── service/     # Business logic
-│   │   │       ├── repository/  # Data access
-│   │   │       ├── model/       # Domain models
-│   │   │       ├── exception/   # Custom exceptions
-│   │   │       └── Application.java # Main class
-│   │   └── resources/
-│   │       ├── application.yml  # Service configuration
-│   │       └── ...
-│   └── test/
-│       └── java/
-│           └── com/openframe/service/
-│               ├── controller/  # Controller tests
-│               ├── service/     # Service tests
-│               └── ...
-├── pom.xml                      # Maven configuration
-└── README.md                    # Service documentation
+```java
+@Configuration
+@EnableWebFluxSecurity
+public class SecurityConfig {
+    @Bean
+    public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http) {
+        return http
+            .csrf().disable()
+            .authorizeExchange()
+                .pathMatchers("/auth/**").permitAll()
+                .pathMatchers("/actuator/health").permitAll()
+                .pathMatchers("/actuator/**").hasRole("ADMIN")
+                .anyExchange().authenticated()
+            .and()
+            .addFilterAt(jwtAuthenticationFilter, SecurityWebFiltersOrder.AUTHENTICATION)
+            .build();
+    }
+    
+    @Bean
+    public ReactiveJwtDecoder jwtDecoder(@Value("${openframe.security.jwt.public-key}") RSAPublicKey publicKey) {
+        return NimbusReactiveJwtDecoder.withPublicKey(publicKey).build();
+    }
+}
 ```
 
-## Library Layer
+### Role-Based Access Control
 
-Shared libraries follow this structure:
+Implement role-based access control (RBAC):
 
-```
-openframe-library/
-├── src/
-│   ├── main/
-│   │   ├── java/
-│   │   │   └── com/openframe/library/
-│   │   │       ├── model/       # Shared models
-│   │   │       ├── util/        # Utility classes
-│   │   │       └── ...
-│   │   └── resources/
-│   └── test/
-│       └── java/
-│           └── com/openframe/library/
-│               └── ...
-└── pom.xml                      # Maven configuration
-```
-
-## UI Layer
-
-The UI service follows this structure:
-
-```
-openframe-frontend/
-├── src/
-│   ├── assets/                  # Static assets
-│   ├── components/              # Vue components
-│   │   ├── ui/                  # Shared UI components
-│   │   └── ...                  # Feature-specific components
-│   ├── views/                   # Vue views/pages
-│   ├── services/                # API client services
-│   ├── store/                   # State management
-│   ├── router/                  # Vue Router configuration
-│   ├── types/                   # TypeScript types
-│   └── main.ts                  # Entry point
-├── public/                      # Public assets
-├── package.json                 # NPM configuration
-└── vite.config.ts               # Vite configuration
+```java
+@RestController
+@RequestMapping("/api/admin")
+public class AdminController {
+    private final AdminService adminService;
+    
+    @GetMapping("/users")
+    @PreAuthorize("hasRole('ADMIN')")
+    public Flux<User> getAllUsers() {
+        return adminService.getAllUsers();
+    }
+    
+    @PostMapping("/users/{id}/roles")
+    @PreAuthorize("hasRole('ADMIN')")
+    public Mono<User> updateUserRoles(@PathVariable String id, @RequestBody List<String> roles) {
+        return adminService.updateUserRoles(id, roles);
+    }
+}
 ```
 
-## Docker Compose Files
+### Permission Checks
 
-OpenFrame uses multiple Docker Compose files:
+Implement fine-grained permission checks:
 
-- `docker-compose.openframe-infrastructure.yml`: Infrastructure services (MongoDB, Redis, etc.)
-- `docker-compose.openframe-tactical-rmm.yml`: Tactical RMM configuration
-- `docker-compose.openframe-fleet-mdm.yml`: Fleet MDM configuration
-- `docker-compose.openframe-authentik.yml`: Authentik SSO configuration
-- `docker-compose.openframe-meshcentral.yml`: MeshCentral configuration
+```java
+@Service
+public class DeviceService {
+    private final DeviceRepository deviceRepository;
+    private final SecurityService securityService;
+    
+    public Mono<Device> getDeviceById(String id) {
+        return deviceRepository.findById(id)
+            .filterWhen(device -> securityService.hasPermission("READ", "DEVICE", device.getId()));
+    }
+    
+    public Mono<Device> updateDevice(String id, Device device) {
+        return deviceRepository.findById(id)
+            .filterWhen(existingDevice -> securityService.hasPermission("WRITE", "DEVICE", id))
+            .flatMap(existingDevice -> {
+                // Update device
+                return deviceRepository.save(device);
+            });
+    }
+}
+```
 
-## Configuration Files
+## Input Validation
 
-Configuration follows this hierarchy:
+### Request Validation
 
-1. `application.yml`: Base configuration for all environments
-2. `application-{profile}.yml`: Environment-specific overrides
-   - `application-local.yml`: Local development
-   - `application-docker.yml`: Docker environment
-   - `application-prod.yml`: Production environment
+Validate all incoming requests:
 
-## Build Scripts
+```java
+@RestController
+@RequestMapping("/api/devices")
+public class DeviceController {
+    private final DeviceService deviceService;
+    private final Validator validator;
+    
+    @PostMapping
+    public Mono<ResponseEntity<Device>> createDevice(@RequestBody @Valid DeviceRequest request) {
+        return deviceService.createDevice(request.toDevice())
+            .map(device -> ResponseEntity.status(HttpStatus.CREATED).body(device));
+    }
+    
+    @Data
+    public static class DeviceRequest {
+        @NotBlank(message = "Hostname is required")
+        @Size(min = 3, max = 50, message = "Hostname must be between 3 and 50 characters")
+        private String hostname;
+        
+        @NotBlank(message = "Operating system is required")
+        private String operatingSystem;
+        
+        @Pattern(regexp = "^([0-9]{1,3}\\.){3}[0-9]{1,3}$", message = "Invalid IP address format")
+        private String ipAddress;
+        
+        public Device toDevice() {
+            Device device = new Device();
+            device.setHostname(hostname);
+            device.setOperatingSystem(operatingSystem);
+            device.setIpAddress(ipAddress);
+            return device;
+        }
+    }
+}
+```
 
-The main build script is `scripts/build-and-run.sh`, which:
+### Input Sanitization
 
-1. Builds all services with Maven
-2. Starts infrastructure services with Docker Compose
-3. Starts application services with Docker Compose
-4. Registers integrated tools with the OpenFrame API
+Sanitize user input to prevent XSS:
 
-## Naming Conventions
+```java
+@Component
+public class InputSanitizer {
+    private final PolicyFactory policy = new HtmlPolicyBuilder()
+        .allowElements("b", "i", "u", "strong", "em")
+        .allowUrlProtocols("https")
+        .allowAttributes("href").onElements("a")
+        .requireRelNofollowOnLinks()
+        .toFactory();
+    
+    public String sanitize(String input) {
+        if (input == null) {
+            return null;
+        }
+        return policy.sanitize(input);
+    }
+}
 
-- Java packages: `com.openframe.{service|library}.{component}`
-- Service names: `openframe-{service}`
-- Library names: `openframe-{library}`
-- Docker Compose files: `docker-compose.openframe-{component}.yml`
-- Configuration files: `application-{profile}.yml`
+@Service
+public class NoteService {
+    private final NoteRepository noteRepository;
+    private final InputSanitizer inputSanitizer;
+    
+    public Mono<Note> createNote(Note note) {
+        note.setTitle(inputSanitizer.sanitize(note.getTitle()));
+        note.setContent(inputSanitizer.sanitize(note.getContent()));
+        return noteRepository.save(note);
+    }
+}
+```
+
+## Secure Communication
+
+### TLS Configuration
+
+Configure TLS for secure communication:
+
+```java
+@Configuration
+public class TlsConfig {
+    @Bean
+    public NettyServerCustomizer nettyServerCustomizer(
+            @Value("${server.ssl.key-store}") String keyStore,
+            @Value("${server.ssl.key-store-password}") String keyStorePassword) {
+        return httpServer -> {
+            SslContext sslContext = SslContextBuilder.forServer(
+                    new File(keyStore),
+                    keyStorePassword)
+                .protocols("TLSv1.2", "TLSv1.3")
+                .ciphers(List.of(
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [flamingo-stack/openframe-oss-tenant](https://github.com/flamingo-stack/openframe-oss-tenant) — distributed by [TomeVault](https://tomevault.io).
