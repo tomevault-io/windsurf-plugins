@@ -1,83 +1,173 @@
 ---
 trigger: always_on
-description: You are an expert in Java programming, Spring Boot, Spring Framework, Maven, JUnit, and related Java technologies.
+description: This document outlines the messaging and event-driven architecture patterns used in the OpenFrame project.
 ---
 
-You are an expert in Java programming, Spring Boot, Spring Framework, Maven, JUnit, and related Java technologies.
+# Messaging Patterns
 
-Code Style and Structure
-- Write clean, efficient, and well-documented Java code with accurate Spring Boot examples.
-- Use Spring Boot best practices and conventions throughout your code.
-- Implement RESTful API design patterns when creating web services.
-- Use descriptive method and variable names following camelCase convention.
-- Structure Spring Boot applications: controllers, services, repositories, models, configurations.
+This document outlines the messaging and event-driven architecture patterns used in the OpenFrame project.
 
-Spring Boot Specifics
-- Use Spring Boot starters for quick project setup and dependency management.
-- Implement proper use of annotations (e.g., @SpringBootApplication, @RestController, @Service).
-- Utilize Spring Boot's auto-configuration features effectively.
-- Implement proper exception handling using @ControllerAdvice and @ExceptionHandler.
+## Kafka Usage Patterns
 
-Naming Conventions
-- Use PascalCase for class names (e.g., UserController, OrderService).
-- Use camelCase for method and variable names (e.g., findUserById, isOrderValid).
-- Use ALL_CAPS for constants (e.g., MAX_RETRY_ATTEMPTS, DEFAULT_PAGE_SIZE).
+### Topic Naming Conventions
 
-Java and Spring Boot Usage
-- Use Java 17 or later features when applicable (e.g., records, sealed classes, pattern matching).
-- Leverage Spring Boot 3.x features and best practices.
-- Use Spring Data JPA for database operations when applicable.
-- Implement proper validation using Bean Validation (e.g., @Valid, custom validators).
+- Use kebab-case for topic names
+- Follow the pattern `{domain}-{entity}-{action}`
+- Use plural for entity collections
+- Use past tense for actions
 
-Configuration and Properties
-- Use application.properties or application.yml for configuration.
-- Implement environment-specific configurations using Spring Profiles.
-- Use @ConfigurationProperties for type-safe configuration properties.
+Examples:
+```
+devices-created
+devices-updated
+devices-deleted
+alerts-triggered
+metrics-collected
+```
 
-Dependency Injection and IoC
-- Use constructor injection over field injection for better testability.
-- Leverage Spring's IoC container for managing bean lifecycles.
+### Producer Patterns
 
-Testing
-- Write unit tests using JUnit 5 and Spring Boot Test.
-- Use MockMvc for testing web layers.
-- Implement integration tests using @SpringBootTest.
-- Use @DataJpaTest for repository layer tests.
+- Use the KafkaTemplate for producing messages
+- Set appropriate key for message partitioning
+- Include metadata in message headers
+- Handle production errors gracefully
+- Use asynchronous sending for non-blocking operations
 
-Performance and Scalability
-- Implement caching strategies using Spring Cache abstraction.
-- Use async processing with @Async for non-blocking operations.
-- Implement proper database indexing and query optimization.
+Example producer:
+```java
+@Service
+public class DeviceEventProducer {
+    private final KafkaTemplate<String, DeviceEvent> kafkaTemplate;
+    
+    public CompletableFuture<SendResult<String, DeviceEvent>> publishDeviceCreated(Device device) {
+        DeviceEvent event = new DeviceEvent(
+            UUID.randomUUID().toString(),
+            "DEVICE_CREATED",
+            LocalDateTime.now(),
+            device
+        );
+        
+        return kafkaTemplate.send("devices-created", device.getId(), event)
+            .handle((result, ex) -> {
+                if (ex != null) {
+                    log.error("Failed to send device created event: {}", ex.getMessage());
+                    throw new EventPublishingException("Failed to publish device created event", ex);
+                }
+                return result;
+            });
+    }
+}
+```
 
-Security
-- Implement Spring Security for authentication and authorization.
-- Use proper password encoding (e.g., BCrypt).
-- Implement CORS configuration when necessary.
+### Consumer Patterns
 
-Logging and Monitoring
-- Use SLF4J with Logback for logging.
-- Implement proper log levels (ERROR, WARN, INFO, DEBUG).
-- Use Spring Boot Actuator for application monitoring and metrics.
+- Use the @KafkaListener annotation for consuming messages
+- Group consumers by functionality
+- Handle deserialization errors
+- Implement idempotent processing
+- Use manual acknowledgment for critical processing
+- Implement proper error handling and retries
 
-API Documentation
-- Use Springdoc OpenAPI (formerly Swagger) for API documentation.
+Example consumer:
+```java
+@Service
+public class DeviceEventConsumer {
+    private final DeviceService deviceService;
+    
+    @KafkaListener(
+        topics = "devices-created",
+        groupId = "device-processor",
+        containerFactory = "kafkaListenerContainerFactory"
+    )
+    public void consumeDeviceCreatedEvent(
+            @Payload DeviceEvent event,
+            @Header(KafkaHeaders.RECEIVED_KEY) String key,
+            @Header(KafkaHeaders.RECEIVED_PARTITION) int partition,
+            @Header(KafkaHeaders.OFFSET) long offset,
+            Acknowledgment acknowledgment) {
+        
+        try {
+            log.info("Processing device created event: {}, partition: {}, offset: {}", 
+                    event.getId(), partition, offset);
+            
+            deviceService.processDeviceCreated(event.getDevice());
+            
+            acknowledgment.acknowledge();
+        } catch (Exception e) {
+            log.error("Error processing device created event: {}", e.getMessage());
+            // Implement retry or dead letter queue logic
+        }
+    }
+}
+```
 
-Data Access and ORM
-- Use Spring Data JPA for database operations.
-- Implement proper entity relationships and cascading.
-- Use database migrations with tools like Flyway or Liquibase.
+### Serialization
 
-Build and Deployment
-- Use Maven for dependency management and build processes.
-- Implement proper profiles for different environments (dev, test, prod).
-- Use Docker for containerization if applicable.
+- Use JSON for message serialization
+- Define clear schema for each message type
+- Include version information in the schema
+- Handle schema evolution gracefully
+- Consider using Avro for complex schemas
 
-Follow best practices for:
-- RESTful API design (proper use of HTTP methods, status codes, etc.).
-- Microservices architecture (if applicable).
-- Asynchronous processing using Spring's @Async or reactive programming with Spring WebFlux.
+Example serialization configuration:
+```java
+@Configuration
+public class KafkaConfig {
+    @Bean
+    public KafkaTemplate<String, Object> kafkaTemplate(
+            ProducerFactory<String, Object> producerFactory) {
+        return new KafkaTemplate<>(producerFactory);
+    }
+    
+    @Bean
+    public ProducerFactory<String, Object> producerFactory() {
+        Map<String, Object> configProps = new HashMap<>();
+        configProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        configProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        configProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonSerializer.class);
+        return new DefaultKafkaProducerFactory<>(configProps);
+    }
+    
+    @Bean
+    public ConsumerFactory<String, Object> consumerFactory() {
+        Map<String, Object> configProps = new HashMap<>();
+        configProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        configProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+        configProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JsonDeserializer.class);
+        configProps.put(JsonDeserializer.TRUSTED_PACKAGES, "com.openframe.*");
+        return new DefaultKafkaConsumerFactory<>(configProps);
+    }
+    
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, Object> kafkaListenerContainerFactory() {
+        ConcurrentKafkaListenerContainerFactory<String, Object> factory =
+            new ConcurrentKafkaListenerContainerFactory<>();
+        factory.setConsumerFactory(consumerFactory());
+        factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL_IMMEDIATE);
+        return factory;
+    }
+}
+```
 
-Adhere to SOLID principles and maintain high cohesion and low coupling in your Spring Boot application design.
+## Event Schema Design
+
+### Event Structure
+
+- Use a consistent structure for all events
+- Include common metadata fields
+- Use strong typing for event payloads
+- Version your event schemas
+
+Example event structure:
+```java
+@Data
+public class Event<T> {
+    private String id;
+    private String type;
+    private String source;
+    private LocalDateTime timestamp;
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [flamingo-stack/openframe-oss-tenant](https://github.com/flamingo-stack/openframe-oss-tenant) — distributed by [TomeVault](https://tomevault.io).
