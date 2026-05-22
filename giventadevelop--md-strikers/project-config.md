@@ -1,102 +1,128 @@
 ---
 trigger: always_on
-description: This rule defines the standard pattern for hero section image rotation on the home page. The pattern provides automatic rotation through event flyer images with synchronized overlay buttons, interactive navigation controls (Previous/Next/Play/Pause), default image display, and proper event selection criteria.
+description: This rule defines the **mandatory** pattern for data fetching on the home page (and any public-facing landing page). All API / database calls MUST be deferred until **after** the browser has completed the initial paint of static content. This eliminates network request bursts that compete with rendering during hydration, producing a significantly faster perceived load — especially critical for AWS Amplify Lambda deployments where cold starts already add latency.
 ---
 
-# Hero Section Image Rotation Pattern
+# Homepage Deferred Loading Pattern — Faster Initial Page Load on AWS Amplify
 
-## **Overview**
-This rule defines the standard pattern for hero section image rotation on the home page. The pattern provides automatic rotation through event flyer images with synchronized overlay buttons, interactive navigation controls (Previous/Next/Play/Pause), default image display, and proper event selection criteria.
+## Overview
 
-## **Problem Solved**
-- **Automatic Image Rotation**: Rotates through event hero images automatically every 8 seconds
-- **Interactive Controls**: Provides Previous/Next/Play/Pause buttons for manual navigation (shown on hover/touch)
-- **Overlay Synchronization**: Keeps overlay buttons (Buy Tickets Click Here images) synchronized with current event image
-- **Event Selection**: Only shows events that meet specific criteria (future dates, isHomePageHeroImage flag)
-- **Recurring Event Handling**: Shows only the next occurrence for recurring events
-- **Default Image Display**: Shows default image for first 2 seconds before rotation begins
-- **User Experience**: Smooth transitions between event images with proper navigation links and manual control
-- **Homepage cache**: Hero section images and data are cached in sessionStorage under `homepage_hero_section_cache` (see `src/lib/homepageCacheKeys.ts` and `documentation/cloud_front_amplify_cache/HOMEPAGE_CACHE_IMPLEMENTATION_PLAN.html`). On refresh or repeat visit, a `useLayoutEffect` reads the cache before paint so the hero shows immediately without waiting for `useFilteredEvents('hero')` or standalone media fetch.
+This rule defines the **mandatory** pattern for data fetching on the home page (and any public-facing landing page). All API / database calls MUST be deferred until **after** the browser has completed the initial paint of static content. This eliminates network request bursts that compete with rendering during hydration, producing a significantly faster perceived load — especially critical for AWS Amplify Lambda deployments where cold starts already add latency.
 
-## **Hero Image Display Dimensions (Upload Spec)**
+## Problem Solved
 
-The rotating hero uses **object-contain** in a wide container (~65% viewport width, min-height 280–480px). The `<Image>` component uses **width={1200} height={800}** (3:2 landscape). **Recommended upload dimensions** so the hero section does not become excessively tall:
+- **Slow initial page load**: On first visit (cold start), multiple API calls fire simultaneously during React hydration, competing with the browser's paint and blocking the main thread with JSON parsing and state updates.
+- **Network request burst**: 7+ concurrent API calls overwhelm the backend and the browser's connection limit (6 per origin in HTTP/1.1), queueing requests and delaying everything.
+- **Static content blocked**: Users see a blank/loading page instead of immediately visible static sections (Services, About, Causes, etc.) because the main thread is busy processing API responses.
 
-- **Desktop**: **1200×800px (3:2 landscape)**
-- **Mobile**: **900×600px (3:2)** or same file scales down
-- **Do not use portrait 800×1200 (2:3)** — portrait images make the hero block too tall.
+## Core Architecture
 
-Keep admin/upload copy and docs (e.g. `HERO_SECTION_IMAGE_SPECIFICATIONS.md`, MediaClientPage hero tip) aligned with 1200×800 (3:2).
+### Hook: `usePageReady` (`src/hooks/usePageReady.ts`)
 
-## **Core Pattern**
+Returns `true` after the browser has completed the initial paint cycle using nested `requestAnimationFrame`. This is the foundation for all deferred loading.
 
-### **Component Structure**
+### Hook: `useDeferredFetch(delayMs)` (`src/hooks/usePageReady.ts`)
+
+Returns `true` after `usePageReady()` + an additional configurable delay. Different delays stagger API calls so they don't fire simultaneously.
+
+### Staggered Delay Tiers
+
+| Priority | Delay | Component | Reason |
+|----------|-------|-----------|--------|
+| 0 (gate) | Page ready (~30ms) | `TenantSettingsProvider` | Determines section visibility; other sections depend on it |
+| 1 (above fold) | 500ms | `HeroSection`, `LiveEventsSection`, `FeaturedEventsSection` | Above the fold, visible early but static fallback works |
+| 2 (mid page) | 300ms after mount | `UpcomingEventsSection` | Mounts after TenantSettings loads (natural extra delay) |
+| 3 (lower) | 800ms after mount | `TeamSection` | Further down page, mounts after TenantSettings |
+| 4 (bottom) | 1500ms | `OurSponsorsSection` | Bottom of page, lowest priority |
+
+### Timeline (First Visit, Cold Start)
+
+```
+0ms     — Server-side layout runs (auth checks on Amplify Lambda)
+~500ms  — HTML arrives at browser, JS bundles start loading
+~800ms  — React hydrates, static sections paint immediately
+~830ms  — usePageReady fires → TenantSettingsProvider starts fetch
+~1000ms — TenantSettings response → UpcomingEvents + Team mount
+~1300ms — Hero/Live/Featured events data starts fetching
+~1300ms — UpcomingEventsSection starts fetching (300ms after mount)
+~1800ms — TeamSection starts fetching (800ms after mount)
+~2330ms — OurSponsorsSection starts fetching
+```
+
+### Timeline (Repeat Visit, Cached)
+
+```
+0ms     — Page hydrates, static sections paint
+~30ms   — Cache checks fire instantly → all cached data loads
+          No network requests needed!
+```
+
+## Mandatory Pattern
+
+### For Components That Fetch Data on the Home Page
+
 ```tsx
-// ✅ DO: Use DynamicHeroImage component for hero section rotation
-const DynamicHeroImage: React.FC = () => {
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [isShowingDefault, setIsShowingDefault] = useState(true);
-  const [dynamicImages, setDynamicImages] = useState<string[]>([]);
-  const [currentEvent, setCurrentEvent] = useState<EventWithMediaExtended | null>(null);
-  const [upcomingEvents, setUpcomingEvents] = useState<EventWithMediaExtended[]>([]);
+// ✅ DO: Always use deferred fetch pattern
+import { useDeferredFetch } from '@/hooks/usePageReady';
 
-  // Use shared data hook for consistent date parsing
-  const { filteredEvents, isLoading: eventsLoading, error } = useFilteredEvents('hero');
+const MySection: React.FC = () => {
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Default image path
-  const defaultImage = "/images/hero_section/default_hero_section_second_column_poster.jpeg";
+  // Choose delay based on section position (see tier table above)
+  const shouldFetch = useDeferredFetch(800);
 
-  // Rotation logic with useEffect
   useEffect(() => {
-    // Start with default image for 2 seconds
-    const defaultTimer = setTimeout(() => {
-      setIsShowingDefault(false);
-    }, 2000);
+    async function loadData() {
+      // 1. ALWAYS check sessionStorage cache first (instant, no delay)
+      try {
+        const cached = sessionStorage.getItem(CACHE_KEY);
+        if (cached) {
+          const { data, timestamp } = JSON.parse(cached);
+          if (Date.now() - timestamp < CACHE_DURATION) {
+            setData(data);
+            setLoading(false);
+            return; // Cache hit — no network request needed
+          }
+        }
+      } catch { /* ignore */ }
 
-    // If we have dynamic images, start rotating them
-    if (dynamicImages.length > 0) {
-      const dynamicTimer = setTimeout(() => {
-        const interval = setInterval(() => {
-          setCurrentImageIndex((prev) => {
-            const newIndex = (prev + 1) % dynamicImages.length;
-            // Update current event when image changes
-            if (newIndex < dynamicImages.length - 1 && newIndex < upcomingEvents.length) {
-              setCurrentEvent(upcomingEvents[newIndex]);
-            } else {
-              setCurrentEvent(null);
-            }
-            return newIndex;
-          });
-        }, 15000); // Change every 15 seconds
+      // 2. Gate network request behind deferred flag
+      if (!shouldFetch) return;
 
-        return () => clearInterval(interval);
-      }, 2000); // Start after 2 seconds
-
-      return () => {
-        clearTimeout(defaultTimer);
-        clearTimeout(dynamicTimer);
-      };
+      // 3. Now safe to make API call
+      const response = await fetch('/api/proxy/...');
+      // ...
     }
 
-    return () => clearTimeout(defaultTimer);
-  }, [dynamicImages.length, upcomingEvents]);
-
-  // Render logic...
+    loadData();
+  }, [shouldFetch]); // Re-run when shouldFetch becomes true
 };
 ```
 
-## **Interactive Slider Controls (Play/Pause/Previous/Next)**
+```tsx
+// ❌ DON'T: Fetch immediately on mount
+useEffect(() => {
+  fetch('/api/proxy/...');
+}, []); // Fires during hydration — blocks static content!
+```
 
-### **Feature Overview**
-The hero section slider includes interactive controls that allow users to manually navigate through images and control auto-rotation. These controls appear on hover (desktop) or touch (mobile) and provide:
-- **Previous/Next Navigation**: Manual browsing through event images
-- **Play/Pause Control**: Toggle auto-rotation on/off
-- **Event Synchronization**: Current event state updates when navigating manually
+### For Shared Hooks (useEventsData)
 
-### **Control Visibility**
-- **Show on Hover**: Controls appear when mouse hovers over hero image
-- **Show on Touch**: Controls appear when user touches the hero image on mobile devices
-- **Auto-Hide on Touch**: Controls automatically hide after 3 seconds of no interaction on touch devices
+```tsx
+// ✅ DO: Accept `enabled` parameter to defer
+export const useEventsData = (enabled: boolean = true) => {
+  useEffect(() => {
+    if (!enabled) return; // Don't fetch until enabled
+    fetchEventsData();
+  }, [enabled]);
+};
+
+// In the component:
+const shouldFetch = useDeferredFetch(500);
+const { filteredEvents } = useFilteredEvents('hero', shouldFetch);
+```
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
