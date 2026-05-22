@@ -1,209 +1,261 @@
 ---
 trigger: always_on
-description: Automated development journal combining progress tracking, todo management, and intelligent documentation
+description: description: Minimizes tool calls and maximizes AI agent efficiency
 ---
 
+---
+description: Minimizes tool calls and maximizes AI agent efficiency
+globs: ["**/*"]
+alwaysApply: true
+---
 
-# Development Progress Journal
+# Efficiency Optimization Rules
 
-You are an intelligent progress tracker that automatically captures work completed, maintains todo lists, and documents the development journey with minimal manual effort.
+## 🎯 Core Principle: Every Tool Call Counts
 
-@progress-journal.md
-@.git/
-@package.json
-@TODO.md
-
-## Core Journal Structure
-
-### Daily Progress View
-```markdown
-# 📊 Development Progress Journal
-*Last Updated: {TIMESTAMP} | Active Branch: {GIT_BRANCH} | Session: {SESSION_NUMBER}*
-
-## 🎯 Current Focus: {SPRINT_GOAL}
-**Progress**: ████████░░ {PERCENTAGE}% Complete
-**Days Remaining**: {DAYS_LEFT} | **Velocity**: {ITEMS_PER_DAY} items/day
-
-## ✅ Today's Progress ({DATE})
-### Completed ({COMPLETED_COUNT})
-- [x] {COMPLETED_TASK_1} `{COMMIT_HASH}` 
-  - Files: {MODIFIED_FILES}
-  - Impact: {BRIEF_DESCRIPTION}
-  - Time: {TIME_SPENT}
-- [x] {COMPLETED_TASK_2} `{COMMIT_HASH}`
-  - Resolved: {ISSUE_REFERENCE}
-  - Learning: {KEY_TAKEAWAY}
-
-### In Progress ({ACTIVE_COUNT})
-- [ ] {ACTIVE_TASK_1} ⏱️ {TIME_ELAPSED}
-  - Status: {COMPLETION_PERCENTAGE}%
-  - Blocker: {BLOCKER_IF_ANY}
-  - Next: {NEXT_SUBTASK}
-
-### Discoveries & Decisions
-- 💡 {KEY_INSIGHT_FROM_TODAY}
-- 🔧 {TECHNICAL_DECISION}: {BRIEF_RATIONALE}
-- ⚠️ {WARNING_OR_CONCERN}: {MITIGATION_PLAN}
-
-## 📋 Active Todo List
-### High Priority 🔴
-- [ ] {P1_TASK} - Due: {DUE_DATE}
-  - Why critical: {REASON}
-  - Estimated: {TIME_ESTIMATE}
-- [ ] {P1_TASK_2}
-
-### Normal Priority 🟡  
-- [ ] {P2_TASK}
-  - Dependencies: {DEPENDENT_ON}
-- [ ] {P2_TASK_2}
-
-### Low Priority 🟢
-- [ ] {P3_TASK} - Nice to have
-- [ ] {P3_TASK_2}
-
-### Backlog 📝
-- {BACKLOG_ITEM_1}
-- {BACKLOG_ITEM_2}
-
-## 📈 Week Summary
-**Completed**: {WEEKLY_COMPLETED} items | **Added**: {WEEKLY_ADDED} items
-**Productivity Trend**: {TREND_INDICATOR} {PERCENTAGE_CHANGE}%
-**Focus Time**: {TOTAL_FOCUS_HOURS}h | **Context Switches**: {SWITCH_COUNT}
+### Tool Call Hierarchy
+```
+1. NO CALL > Think first, can you answer without tools?
+2. ONE CALL > Batch operations into single calls
+3. FEW CALLS > Strategic sequence when necessary
+4. MANY CALLS > Only for complex research tasks
 ```
 
-## Intelligent Automation Rules
+## 📊 Efficiency Metrics
 
-### Auto-Progress Detection
-```yaml
-progress_triggers:
-  # Commit-based completion
-  commit_patterns:
-    - pattern: "^(feat|fix|refactor)\\(.*\\): (.+)"
-      action: mark_task_complete
-      extract:
-        - task_type: $1
-        - task_description: $2
-        - auto_link_to_active_task: true
-    
-    - pattern: "^(close|closes|fixed|fixes|resolve|resolves) #(\\d+)"
-      action: complete_issue_task
-      extract:
-        - issue_number: $2
-        - fetch_issue_details: true
-
-  # File-based progress
-  file_changes:
-    - pattern: "**/*.test.{js,ts,py}"
-      condition: "tests_passing"
-      action: update_task_progress
-      progress_increment: 20
-      note: "Tests implemented"
-    
-    - pattern: "**/README.md"
-      action: mark_documentation_complete
-      task_tag: "docs"
-
-  # PR/Issue activity
-  pull_requests:
-    - event: "opened"
-      action: add_task_if_not_exists
-      priority: "based_on_labels"
-    
-    - event: "merged"
-      action: complete_related_tasks
-      update_journal: true
-
-# Smart task extraction from natural language
-natural_language_triggers:
-  - pattern: "TODO: (.+)"
-    action: add_to_backlog
-    
-  - pattern: "FIXME: (.+)"
-    action: add_high_priority_task
-    
-  - pattern: "NOTE: (.+)"
-    action: add_to_discoveries
+### Track Your Performance
+```
+EFFICIENCY_SCORE:
+- 0 tool calls for knowledge-based answers = 100%
+- 1 tool call for simple lookups = 90%
+- 2-3 calls for standard tasks = 80%
+- 4-5 calls for complex tasks = 70%
+- 6+ calls = Review if necessary
 ```
 
-### Progress Intelligence
+## 🚀 Zero-Call Strategies
+
+### Answer Directly When Possible
 ```javascript
-// Automatic progress calculation
-const progressAnalyzer = {
-  // Infer task completion from code changes
-  detectProgress: (gitDiff) => {
-    return {
-      completedTasks: extractCompletedFromCommits(gitDiff),
-      partialProgress: calculatePartialProgress(gitDiff),
-      newTasks: extractTodosFromCode(gitDiff),
-      timeSpent: estimateTimeFromCommitFrequency(gitDiff)
-    };
-  },
-  
-  // Smart task association
-  linkCommitsToTasks: (commit, activeTasks) => {
-    // Use NLP to match commit messages to tasks
-    const scores = activeTasks.map(task => ({
-      task,
-      score: calculateSimilarity(commit.message, task.description)
-    }));
-    return scores.filter(s => s.score > 0.7);
-  },
-  
-  // Velocity tracking
-  updateVelocity: (completedTasks, timeframe) => {
-    return {
-      current: completedTasks.length / timeframe,
-      trend: calculateTrend(historicalVelocity),
-      prediction: estimateCompletionDate(remainingTasks)
-    };
+// USER: "How do I create a React component?"
+// ❌ BAD: Search for React component syntax
+// ✅ GOOD: Provide answer from knowledge
+
+// USER: "What's the syntax for Python list comprehension?"
+// ❌ BAD: Search Python documentation
+// ✅ GOOD: Show syntax directly with examples
+```
+
+### Knowledge-First Approach
+```
+Before ANY tool call, ask:
+1. Do I already know this?
+2. Is this stable information?
+3. Can I provide value without searching?
+
+If YES to all → Answer directly
+```
+
+## 💡 Single-Call Patterns
+
+### File Operations
+```bash
+# ❌ BAD: Multiple calls
+cat package.json
+ls src/
+grep -r "TODO" .
+
+# ✅ GOOD: Single call
+cat package.json && echo "---" && ls -la src/ && echo "---" && grep -r "TODO" . | head -20
+```
+
+### Code Analysis
+```javascript
+// ❌ BAD: Separate reads
+// Read file1.js
+// Read file2.js  
+// Read file3.js
+
+// ✅ GOOD: Batch read
+const files = ['file1.js', 'file2.js', 'file3.js'];
+const contents = await Promise.all(
+  files.map(f => fs.readFile(f, 'utf8'))
+);
+```
+
+### Information Gathering
+```bash
+# ❌ BAD: Sequential discovery
+pwd
+git status
+git branch
+npm list
+
+# ✅ GOOD: Combined context
+echo "=== Project Status ===" && \
+pwd && \
+git status -sb && \
+git branch --show-current && \
+npm list --depth=0 2>/dev/null | grep -E "^(├|└)" | head -10
+```
+
+## 🎪 Batching Strategies
+
+### File Creation
+```bash
+# ❌ BAD: Individual creates
+touch src/index.js
+touch src/utils.js
+touch src/config.js
+
+# ✅ GOOD: Batch creation
+mkdir -p src && touch src/{index,utils,config}.js
+```
+
+### Multi-File Updates
+```javascript
+// ❌ BAD: Update files one by one
+updateFile('config.js', configContent);
+updateFile('index.js', indexContent);
+updateFile('utils.js', utilsContent);
+
+// ✅ GOOD: Batch update
+const updates = [
+  { file: 'config.js', content: configContent },
+  { file: 'index.js', content: indexContent },
+  { file: 'utils.js', content: utilsContent }
+];
+await Promise.all(updates.map(u => 
+  fs.writeFile(u.file, u.content)
+));
+```
+
+## 🔄 Smart Caching
+
+### Remember Previous Results
+```javascript
+// Store expensive computations
+CACHED_RESULTS = {
+  projectStructure: null,
+  dependencies: null,
+  configuration: null
+};
+
+// Use cache when available
+if (!CACHED_RESULTS.projectStructure) {
+  CACHED_RESULTS.projectStructure = await analyzeProject();
+}
+return CACHED_RESULTS.projectStructure;
+```
+
+### Context Preservation
+```
+PRESERVE_BETWEEN_CALLS:
+- File contents already read
+- Command outputs already seen
+- Discovered patterns
+- Validated information
+```
+
+## 📉 Tool Call Reduction Patterns
+
+### Search Optimization
+```
+# ❌ BAD: Multiple searches
+search: "React hooks"
+search: "React useState"
+search: "React useEffect"
+
+# ✅ GOOD: Comprehensive search
+search: "React hooks useState useEffect patterns"
+```
+
+### Progressive Enhancement
+```javascript
+// Start simple, enhance only if needed
+// Level 1: Try with existing knowledge
+// Level 2: Single targeted search
+// Level 3: Deep dive only if critical
+```
+
+## ⚡ Performance Patterns
+
+### Lazy Loading
+```javascript
+// ❌ BAD: Load everything upfront
+const allFiles = await loadAllProjectFiles();
+
+// ✅ GOOD: Load only what's needed
+const getFile = async (path) => {
+  if (!cache[path]) {
+    cache[path] = await loadFile(path);
   }
+  return cache[path];
 };
 ```
 
-## Task Management System
+### Early Termination
+```bash
+# ❌ BAD: Process everything
+find . -name "*.js" | xargs grep "pattern"
 
-### Task Structure
-```markdown
-## Task Format
-- [ ] {TASK_ID} | {TASK_TITLE}
-  - Status: {NOT_STARTED|IN_PROGRESS|BLOCKED|COMPLETE}
-  - Priority: {P0|P1|P2|P3}
-  - Estimate: {TIME_ESTIMATE}
-  - Actual: {TIME_ACTUAL}
-  - Branch: {FEATURE_BRANCH}
-  - PR: {PULL_REQUEST_LINK}
-  - Notes: {ADDITIONAL_CONTEXT}
-  
-  ### Subtasks
-  - [x] Research approach
-  - [x] Implement core logic
-  - [ ] Add tests
-  - [ ] Update documentation
-  
-  ### Progress Log
-  - {TIMESTAMP}: Started implementation
-  - {TIMESTAMP}: Hit blocker with {ISSUE}
-  - {TIMESTAMP}: Found solution using {APPROACH}
-  - {TIMESTAMP}: Completed, took {TOTAL_TIME}
+# ✅ GOOD: Stop when found
+find . -name "*.js" -exec grep -l "pattern" {} \; | head -1
 ```
 
-### Automated Task Workflows
-```yaml
-task_workflows:
-  # Auto-create tasks from issues
-  issue_to_task:
-    trigger: "issue_labeled"
-    condition: "has_label('todo')"
-    action:
-      - create_task:
-          title: "${issue.title}"
-          priority: "${label_to_priority(issue.labels)}"
-          description: "${issue.body}"
-      - add_to_sprint_if_current: true
-      - notify_in_journal: true
-  
-  # Smart task breakdown
-  large_task_detection:
+## 🎯 Decision Trees
+
+### Should I Use a Tool?
+```
+Is it a fact question?
+├─ YES → Is it current/changing info?
+│   ├─ YES → Use tool (1 call)
+│   └─ NO → Answer from knowledge
+└─ NO → Is it a task?
+    ├─ YES → Can I batch operations?
+    │   ├─ YES → Single batched call
+    │   └─ NO → Minimize calls
+    └─ NO → Provide guidance
+```
+
+### Tool Selection
+```
+Need information?
+├─ Web search → Current events, prices, news
+├─ Read file → Specific file content
+├─ Terminal → System state, file operations
+└─ Analysis → Complex calculations only
+```
+
+## 📊 Efficiency Anti-Patterns
+
+### Avoid These
+```
+❌ Searching for basic syntax
+❌ Multiple calls for related info
+❌ Reading files already in context
+❌ Unnecessary state checks
+❌ Redundant validations
+❌ Over-verification
+```
+
+### Embrace These
+```
+✅ Batch related operations
+✅ Cache expensive results
+✅ Use knowledge first
+✅ Combine commands
+✅ Trust previous results
+✅ Fail fast
+```
+
+## 💾 Resource Conservation
+
+### API Token Optimization
+```javascript
+// ❌ BAD: Wasteful
+for (const item of items) {
+  await processItem(item); // API call each
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
