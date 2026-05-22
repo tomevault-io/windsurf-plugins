@@ -1,147 +1,176 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code when working with the Nynaeve theme.
+description: This file provides GitHub Copilot with context about the Nynaeve WordPress theme development practices and conventions.
 ---
 
-# CLAUDE.md - Nynaeve Theme
+# GitHub Copilot Instructions - Nynaeve Theme
 
-This file provides guidance to Claude Code when working with the Nynaeve theme.
+This file provides GitHub Copilot with context about the Nynaeve WordPress theme development practices and conventions.
 
-## Table of Contents
+## Project Overview
 
-1. [Development Commands](#development-commands)
-2. [Block Development Philosophy](#block-development-philosophy)
-3. [Creating Blocks](#creating-blocks)
-4. [SVG Icons in Block Templates](#svg-icons-in-block-templates-block-bindings-pattern)
-5. [Block Standards](#block-standards)
-6. [Acorn Commands (Trellis VM)](#acorn-commands-trellis-vm)
-7. [Architecture](#architecture)
-8. [Code Standards](#code-standards)
-9. [Common Tasks](#common-tasks)
+**Nynaeve** is a modern WordPress theme built on:
+- **Sage 11** framework with Laravel Blade templating
+- **Tailwind CSS 4** with custom design system
+- **Acorn** (Laravel for WordPress) for advanced PHP features
+- **Vite** for fast development and HMR
+- **WooCommerce** integration with custom quote-based system
+- **imagewize/sage-native-block** package for custom block development
 
----
-
-## Efficiency
-- Avoid reading entire files when only a specific section is needed
-- Use `Grep` to locate relevant code before reading
-- Prefer targeted reads with `offset` and `limit` parameters over full file reads
-
-## Development Commands
-
-```bash
-cd site/web/app/themes/nynaeve
-npm run dev        # Start dev server with HMR
-npm run build      # Build for production
-composer install && npm install
-composer pint      # PHP code quality (Laravel Pint)
-```
-
-**HMR:** Use `http://imagewize.test/` (not HTTPS) — HTTPS breaks WebSocket to Vite.
-**WP-CLI:** Run all `wp` / `wp acorn` commands inside Trellis VM (local DB conflicts with VM).
-
-## Block Development Philosophy
+## Block Development Philosophy (CRITICAL)
 
 **PREFERRED APPROACH**: Build blocks using **InnerBlocks** with native WordPress blocks whenever possible.
 
-**Key Principles:**
-- **Maximum User Control**: Users select styles, fonts, colors via block toolbar/inspector
-- **Avoid Hardcoded Classes**: Never hardcode styling classes (e.g., `is-style-*`, `has-*-font-size`)
+### Key Principles
+- **Maximum User Control**: Let users select styles, font sizes, and formatting via block toolbar/inspector
+- **Avoid Hardcoded Classes**: Never hardcode styling classes in templates (e.g., `is-style-*`, `has-*-font-size`)
 - **Native WordPress Blocks**: Use core blocks (Button, Heading, Paragraph, Image) within custom containers
+- **Block Toolbar First**: Users should access all styling options via WordPress native controls
 - **Minimal Inspector Controls**: Only add custom controls when absolutely necessary
 
-### When to Use Each Approach
+### Block Development Options (In Order of Preference)
 
-**1. InnerBlocks (MOST PREFERRED)** — content blocks, full typography control, user-selectable styles
-**2. Sage Native Blocks with Custom Controls** — dynamic JS interactivity, complex data structures
-**3. ACF Composer Blocks** — repeater fields, server-side rendering, rigid brand control. See [docs/ACF-BLOCKS.md](docs/ACF-BLOCKS.md)
+1. **Sage Native Blocks with InnerBlocks (MOST PREFERRED)**
+   - Content-focused blocks with images, headings, text, buttons
+   - Users need full typography control
+   - Want clean sidebar with no custom inspector controls
 
-### InnerBlocks Best Practices
+2. **Sage Native Blocks with Custom Controls (Use Sparingly)**
+   - Need dynamic frontend JavaScript interactivity
+   - Complex data structures that don't map to core blocks
 
-**Always use real, publishable content** in block templates — never `placeholder: 'Text goes here...'` (placeholder text only shows in the editor, not on the frontend).
+3. **ACF Composer Blocks (Special Cases Only)**
+   - Need complex custom field types (repeaters, relationships)
+   - Server-side rendering is critical
+   - Editing must be rigid/controlled
 
-**Example:**
+## Development Commands
+
+### Local Development
+```bash
+# Start development with HMR (use HTTP not HTTPS for HMR)
+npm run dev
+
+# Build for production
+npm run build
+
+# Code quality
+composer pint
+```
+
+### Acorn Commands (Trellis VM Required)
+```bash
+# Enter Trellis VM
+trellis vm shell
+
+# Create Sage Native Block (InnerBlocks approach)
+wp acorn sage-native-block:create
+
+# Create ACF Composer Block (when InnerBlocks won't work)
+wp acorn acf:block MyBlock
+
+# Clear ACF cache
+wp acorn acf:clear
+```
+
+**Note on Config Publishing (v2.0.1+):**
+- As of `imagewize/sage-native-block` v2.0.1, config publishing is **no longer required**
+- Package now works out-of-the-box without manual setup
+- Projects with previously published configs will continue to work (package uses published config if present)
+
+## Code Standards
+
+### Block Standards (block.json)
+```json
+{
+  "name": "imagewize/block-name",
+  "category": "imagewize",
+  "textdomain": "imagewize"
+}
+```
+
+### InnerBlocks Template Patterns
+Always use **real, publishable content** in templates (not placeholders):
+
 ```jsx
 const TEMPLATE = [
-  ['core/heading', { level: 3, content: 'Professional WordPress Development' }],
-  ['core/paragraph', { content: 'Transform your website with modern development practices.' }],
+  ['core/image', { className: 'card__image' }],
+  ['core/heading', {
+    level: 3,
+    content: 'Professional WordPress Development'  // Real content!
+  }],
+  ['core/paragraph', {
+    content: 'Transform your website with modern development practices.'
+  }],
   ['core/buttons', { className: 'card__buttons', layout: { type: 'flex' } }, [
     ['core/button', { text: 'Get Started' }],
-    ['core/button', { text: 'Learn More' }],
-  ]],
+    ['core/button', { text: 'Learn More' }]
+  ]]
 ];
 ```
 
-### Flex + Pseudo-element on contenteditable Elements (CRITICAL)
-
-**Never apply `display: flex/inline-flex` with `::before`/`::after` pseudo-elements to elements WordPress uses as `contenteditable` RichText targets.**
-
-`style.css` loads in both the frontend and the editor. Pseudo-elements on flex containers break cursor placement and make blocks impossible to click-to-edit.
-
-**contenteditable targets (do NOT apply flex + pseudo-elements via style.css):**
-- `core/paragraph` → `<p>`
-- `core/heading` → `<h1>`–`<h6>`
-- `core/button` → `.wp-block-button__link`
-- `core/list` → `<li>`
-
-**Fix: override in `editor.css`:**
-```css
-.my-block .my-styled-paragraph { display: block !important; }
-.my-block .my-styled-paragraph::before { display: none !important; }
-.my-block .wp-block-button__link { display: block !important; }
-.my-block .wp-block-button__link::after { display: none !important; }
-```
-
-**Affected blocks (fixed):** `related-links`, `service-hero`, `trust-bar`.
-
----
-
 ### Button Styling (CRITICAL)
-
-WordPress **does not reliably apply className to button links** in InnerBlocks templates. Apply className to the **parent `core/buttons` container**.
+WordPress doesn't reliably apply className to individual buttons. Use container approach:
 
 ```jsx
-// ❌ WRONG
-['core/button', { text: 'Click Me', className: 'my-button' }]
-
-// ✅ CORRECT
-['core/buttons', { className: 'my-buttons-container', layout: { type: 'flex' } }, [
-  ['core/button', { text: 'Click Me' }],
+// ✅ CORRECT - className on buttons container
+['core/buttons', {
+  className: 'my-buttons-container',
+  layout: { type: 'flex' }
+}, [
+  ['core/button', { text: 'Click Me' }]
 ]]
 ```
 
-### Block Padding (CRITICAL)
-
-**Blocks must NOT add horizontal padding.** The WordPress layout system handles it automatically via `theme.json` root padding + `app.css` rules.
-
 ```css
-/* ✅ CORRECT */
-.wp-block-imagewize-my-block { padding: 5rem 0; }
-
-/* ❌ WRONG — creates double padding */
-.wp-block-imagewize-my-block { padding: 5rem 1.25rem; }
+/* Target buttons via container */
+.my-block .my-buttons-container .wp-block-button .wp-block-button__link {
+  background-color: black;
+}
 ```
 
-See [docs/CONTENT-WIDTH-AND-LAYOUT.md](docs/CONTENT-WIDTH-AND-LAYOUT.md) for full details.
+## File Structure
 
-### `.wp-block-paragraph` Does Not Exist on the Frontend (CRITICAL)
+```
+nynaeve/
+├── app/                    # PHP application code
+│   ├── Blocks/            # ACF Composer blocks
+│   └── Providers/         # Service providers
+├── resources/
+│   ├── css/               # Tailwind CSS styles
+│   ├── js/
+│   │   └── blocks/        # Sage Native blocks
+│   └── views/             # Blade templates
+├── config/                # Configuration files
+└── public/build/          # Built assets
+```
 
-WordPress does **not** add the `.wp-block-paragraph` class to `<p>` elements rendered by InnerBlocks on the frontend. The class only exists in the editor. On the frontend, paragraphs render as plain `<p>` with no class (unless a custom `className` was set in the template).
+## Theme Configuration
 
-**Always target `p` in block `style.css`, never `.wp-block-paragraph`:**
+### Colors (Tailwind)
+Theme uses custom color palette defined in `tailwind.config.js` and exposed via `theme.json`:
+- `primary` - Primary brand color (blue)
+- `main` - Main text/dark color (dark gray/black)
+- `base` - Base/background white
+- `secondary` - Secondary gray
+- `tertiary` - Tertiary background (light gray)
 
-```css
-/* ✅ CORRECT — works on both frontend and editor */
-.wp-block-imagewize-my-block p {
-    margin-top: 0.75rem;
-    margin-bottom: 0.75rem;
-}
+**Reference:** See `resources/css/app.css` for CSS custom properties or `config/theme.json` for WordPress block editor colors.
 
-/* ❌ WRONG — matches in editor only, invisible on frontend */
-.wp-block-imagewize-my-block .wp-block-paragraph {
-    margin-top: 0.75rem;
+### Typography
+- **Headings**: Montserrat font family
+- **Body**: Open Sans font family
+
+## Layout Conventions (WordPress-Native Approach)
+
+We use the **Twenty Twenty-Five** layout system - WordPress's modern native layout with **minimal custom CSS**.
+
+### How It Works
+1. `theme.json` sets `"useRootPaddingAwareAlignments": true`
+2. `theme.json` sets root padding via `styles.spacing.padding`
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/imagewize) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-09 -->
+> Source: [imagewize/nynaeve](https://github.com/imagewize/nynaeve) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-22 -->
