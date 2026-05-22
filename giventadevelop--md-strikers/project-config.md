@@ -1,87 +1,130 @@
 ---
 trigger: always_on
-description: description: How to split MD Strikers squad collage images into per-member JPEGs via Sharp script
+description: Strapi 5 REST API patterns for published state, populate parameters, and list-endpoint fallbacks
 ---
 
----
-description: How to split MD Strikers squad collage images into per-member JPEGs via Sharp script
-globs: scripts/split-squad-collage.mjs, public/images/md_strikers_media/squad/**/*
-alwaysApply: false
----
 
-# Squad Collage → Individual Member Images
+# Strapi 5 REST API Patterns
 
-## When to use
+## **Overview**
 
-- A **single source image** contains a **uniform grid** of squad headshots (this project: **4×4**, **15** filled cells, **1 empty**).
-- Goal: export per-cell JPEGs for the Squad UI or `public/` assets—**no AI splitter required** for a regular grid.
+This rule defines correct patterns for Strapi 5 Content API calls, particularly for published-state filtering and populate parameters. Incorrect syntax causes 400 Bad Request errors.
 
-## Canonical paths
+## **Problem Solved**
 
-| Role | Path |
-|------|------|
-| **Inputs** | `public/images/md_strikers_media/squad/squad-N.jpg` (e.g. `squad-1.jpg`, `squad-2.jpg`) |
-| **Output dir** | `public/images/md_strikers_media/squad/members/` |
-| **Naming** | `squad-1` → `member-01.jpg` … `member-15.jpg`; `squad-N` (N≥2) → `member-N-01.jpg` … `member-N-15.jpg` |
-| **Script** | [`scripts/split-squad-collage.mjs`](mdc:scripts/split-squad-collage.mjs) |
+- **status=published** – Can cause validation errors in Strapi 5 setups; use `filters[publishedAt][$notNull]=true` instead
+- **Comma-separated populate** – `populate=cover,category,author` triggers 400s; Strapi 5 expects array-style populate
+- **Category slug case mismatch** – Strapi may store slugs as `Main-News` while the filter uses `main-news`; use `$eqi` for case-insensitive match
 
-## Grid layouts (critical)
+## **Tenant Filtering (Required — No Fallback)**
 
-- **`squad-1.jpg`** (portrait sheet): **4×4** with one empty bottom-right cell → **15** crops.
-- **`squad-2.jpg` / `squad-3.jpg`** (landscape contact sheet): **5×3** → 15 crops (`member-2-*`, `member-3-*`).
-- **`squad-4.jpg`**: **3×1** (three portraits in one row) → **only** `member-4-01` … `member-4-03`. Older `member-4-04` … `15` are removed when you re-run split for squad 4.
+All directory and news list/detail requests **must** use the tenant filter. Display only data scoped to the current tenant.
 
-Auto: **4×4** = `squad-1.jpg`; **5×3** = `squad-2`, `squad-3`; **3×1** = `squad-4`. Override: `npm run split-squad -- --grid 5x3 1`.
+### **DO: Always filter by tenant**
 
-## Run
+- **Directory** (e.g. bishops, parishes): `filters[tenant][tenantId][$eq]=${tenantId}` — no fallback. If the API returns 200 with 0 items, show 0 items.
+- **News** (articles, flash-news-items, advertisement-slots): Same. Always include `filters[tenant][tenantId][$eq]=${tenantId}`. Do **not** retry without the tenant filter when the response is 200 with empty data.
 
-**Squad 1 only** (legacy names `member-01` … `member-15`):
+### **DON'T: Fall back to no-tenant when response is 200 with 0 items**
 
-```bash
-npm run split-squad
+```typescript
+// ❌ DON'T: Retry without tenant when tenant filter returns 0 items
+if (list.length === 0) {
+  const noTenant = await fetch('/articles?filters[publishedAt][$notNull]=true&...');
+  list = noTenant.data; // Wrong — shows other tenants' data
+}
 ```
 
-**Squad 2 and 3** (outputs `member-2-NN` and `member-3-NN`):
+When the API returns **200** with an empty list, the correct behavior is to show no items (and ensure entries in Strapi have the tenant relation set). The only exception is the **400 Bad Request** fallback below (different endpoints, different reason).
 
-```bash
-npm run split-squad-2-3
+## **Published State Filter**
+
+### **DO: Use filters[publishedAt][$notNull]=true**
+
+```typescript
+// ✅ DO: Filter for published documents
+const query = `filters[publishedAt][$notNull]=true`;
 ```
 
-**Squad 4** (`member-4-01.jpg` … `member-4-15.jpg`):
+### **DON'T: Use status=published**
 
-```bash
-npm run split-squad-4
+```typescript
+// ❌ DON'T: Can cause validation errors in Strapi 5
+const query = `status=published`;
 ```
 
-**Any squad numbers** (space-separated):
+## **Populate Parameter (Array-Style)**
 
-```bash
-npm run split-squad -- 2 3
-node scripts/split-squad-collage.mjs 1 2 3
+### **DO: Use array-style populate**
+
+```typescript
+// ✅ DO: Array-style populate for Strapi 5
+const POPULATE = 'populate[0]=cover&populate[1]=category&populate[2]=author';
+
+// Full example
+const path = `/articles?filters[tenant][tenantId][$eq]=${tenantId}&filters[publishedAt][$notNull]=true&populate[0]=cover&populate[1]=category&populate[2]=author&sort=publishedAt:desc&pagination[limit]=10`;
 ```
 
-**Dependency:** `sharp` (already in `package.json`).
+### **DON'T: Use comma-separated populate**
 
-## Grid logic (do not guess in chat—read the script)
+```typescript
+// ❌ DON'T: Triggers 400 Bad Request in Strapi 5
+const POPULATE = 'populate=cover,category,author';
+```
 
-- **4 columns × 4 rows** → 16 cells in **row-major** order (left→right, top→bottom).
-- **Skip index 15** (`SKIP_INDEX = 15`): **bottom-right** cell is treated as **empty** and not exported.
-- **Cell bounds:** `left/top/width/height` from **rounded** fractional splits so the full image width/height is covered without gaps (`cellBounds` in script).
+## **Example Article Query URLs**
 
-## If the layout changes
+### **Featured News**
 
-1. **Empty cell elsewhere:** change `SKIP_INDEX` (0–15) to match **row-major** index of the empty slot.
-2. **Different grid (e.g. 3×5):** update `COLS`, `ROWS`, loop bounds, and skip logic in `scripts/split-squad-collage.mjs`.
-3. **Visible white gutters / half-cutoff faces in crops:** the script applies **outer margin** (`outerPct`) on the full sheet and **per-cell inset** (`cellInsetRatio`) so cuts stay inside each portrait. Defaults are in `LAYOUTS` in `scripts/split-squad-collage.mjs`. Tune per run, e.g. `npm run split-squad -- --outer-pct 0.03 --cell-inset-ratio 0.045 4`.
+```
+GET /api/articles?filters[isFeatured][$eq]=true&filters[tenant][tenantId][$eq]=tenant_demo_002&filters[publishedAt][$notNull]=true&populate[0]=cover&populate[1]=category&populate[2]=author&sort=publishedAt:desc&pagination[limit]=6
+```
 
-## Anti-patterns
+### **Featured News** (use category slug like Main News, not isFeatured)
 
-- **❌** One-shot generative image tools to “split” a grid—use this **Sharp** script instead.
-- **❌** Hardcoding pixel cell sizes—always derive from **source image dimensions** unless the asset is fixed forever.
+```
+GET /api/articles?filters[category][slug][$eqi]=featured-news&filters[tenant][tenantId][$eq]=tenant_demo_002&filters[publishedAt][$notNull]=true&populate[0]=cover&populate[1]=category&populate[2]=author&sort=publishedAt:desc&pagination[limit]=6
+```
 
-## Related
+If you have a "Featured News" category in Strapi (slug `Featured-News`), filter by category slug. The `isFeatured` boolean is an alternative; use category when articles are assigned to the Featured News category.
 
-- [`package.json`](mdc:package.json) — `split-squad`, `split-squad-2-3`, `split-squad-4`.
+### **Main News** (use `$eqi` for case-insensitive slug)
+
+```
+GET /api/articles?filters[category][slug][$eqi]=main-news&filters[tenant][tenantId][$eq]=tenant_demo_002&filters[publishedAt][$notNull]=true&populate[0]=cover&populate[1]=category&populate[2]=author&sort=publishedAt:desc&pagination[limit]=10
+```
+
+### **Press Release / Most Read**
+
+Same pattern: use `filters[publishedAt][$notNull]=true` and `populate[0]=...&populate[1]=...&populate[2]=...`
+
+## **Category Slug Filter (Case-Insensitive)**
+
+### **DO: Use $eqi for case-insensitive slug match**
+
+Strapi may store category slugs with different casing (e.g. `Main-News`, `Press-Release`) from the UI. Slug filters are case-sensitive; use `$eqi` to match regardless of case:
+
+```typescript
+// ✅ DO: Case-insensitive category slug filter
+'filters[category][slug][$eqi]=main-news'
+'filters[category][slug][$eqi]=press-release'
+```
+
+### **DON'T: Use $eq for slugs (case-sensitive)**
+
+```typescript
+// ❌ DON'T: May not match "Main-News" when stored with different casing
+'filters[category][slug][$eq]=main-news'
+```
+
+## **Article Detail Page (slug or id)**
+
+The detail route `/mosc/news/[slug]` and `/syro/news/[slug]` accept slug, numeric id, or documentId:
+
+1. **documentId** (Strapi 5, first when param looks like documentId): `filters[documentId][$eq]=<documentId>` — alphanumeric 15–35 chars (e.g. `o42fs0slvzzj9os0g9xtc11d`). Try documentId first when param matches `/^[a-z0-9]{15,35}$/` so URLs from Strapi admin or links using documentId work even when slug differs.
+2. **Slug** (text): `filters[slug][$eqi]=<slug>` — preferred for SEO
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [giventadevelop/md-strikers](https://github.com/giventadevelop/md-strikers) — distributed by [TomeVault](https://tomevault.io).
