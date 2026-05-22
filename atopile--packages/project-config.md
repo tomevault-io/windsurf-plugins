@@ -1,81 +1,126 @@
 ---
 trigger: always_on
-description: A package is a special atopile project that is intended to be shared and reused in other designs. A package is denoted by a `package` section in the ato.yaml file. A package aims to design a basic implementation of a given integrated circuit component. The requirement is for this package to include all the necessary components to get the core device working, such as decoupling capacitors, pullup/pulldown resistors, and more. Most importantly, since this package will be reused in a different desi
+description: 1. Research available packages relevant to the user requests using 'find_packages'
 ---
 
 
-# 0 Context
-A package is a special atopile project that is intended to be shared and reused in other designs. A package is denoted by a `package` section in the ato.yaml file. A package aims to design a basic implementation of a given integrated circuit component. The requirement is for this package to include all the necessary components to get the core device working, such as decoupling capacitors, pullup/pulldown resistors, and more. Most importantly, since this package will be reused in a different design, it is critical to correctly create, expose, and connect all the external interfaces properly. External interfaces should be created using the proper object type (ElectricPower/ElectricLogic/etc.) and clearly defined with docstrings.
-Some examples of critical interfaces to expose for users include but are not limited to:
-  - ElectricPower for the power rails - `add electricpower.required = true` for required power rails
-  - SPI/I2C/I2S/etc. - communication interfaces should be defined and connected to the pins of the physical package
-  - EnablePins - `enable_pin.line.required = true` so users don't ignore or forget to connect the enable line somewhere
+# How LLMs can design electronics:
 
-The purpose of the usage build is to show users how to use the package. This means this example should show the preferred method of use, and is most helpful if it shows the user how to use many of the interfaces.
+#1 Rule: (repeat after me) we dont fuck around with hacky shit, we use the tools. If the tools dont work, dont freak out, you are probably using them wrong. Ask for help if you get stuck.
 
-# 1 Building a new package
+Top level design
 
-## 1.1 File Structure
+1. Research available packages relevant to the user requests using 'find_packages'
+2. Inspect promising packages using 'inspect_package'
+3. Propose packages to use for project and architucture to user, revise if needed
+4. Install needed packages using 'install_package'
+5. Import packages into main file
+6. Create instances of packages in main module
 
-```
-packages/
-  packages/
-    <package_name>/
-        layouts/
-        parts/
-        ato.yaml
-        <package_name>.ato
-        README.md
-        usage.ato
-```
+## Power
 
-## 1.2 Steps to create a new package
+1. Review for each package the required voltage and current (current may not be provided, use judement if nessesary)
+2. Determine the power rails that need to be generated and a suitable tollerance (typically ~3-5% is acceptable)
+3. Determine the input power source, typically a battery, USB connector or other power connector (eg XT30) and install relevant package
+4. Find suitable regulators:
+   a) if input voltage > required voltage and current is low, use an LDO package
+   b) if input voltage > required voltage and current is high, use buck converter
+   c) if input votlage < required voltage, use a boost converter
+   d) if input voltage can be both less than or greater than input voltage, use buck boost (eg battery powered device that needs 3v3)
+5. If battery powered, add charger package
 
-1. Create a new directory `<package_name>` as stated in the file structure.
-2. Create ato.yaml, `<package_name>.ato`, README.md, usage.ato
-3. Look through other packages for inspiration
-4. Create part using tool call 'search_and_install_jlcpcb_part'
-   4.1 Inspect the part ato file in the parts/ directory
-5. Import the part into the main ato file
-6. Read the datasheet for the device
-7. Populate the files with the correct information (see below)
-   7.1 Create interfaces and connect them
-   7.2 Add decoupling caps where needed
-   7.3 Add i2c addressor if device has configurable address
-   If format is: <n x fixed address bits><m x pin configured address bits>
-   use addressor module:
+Typical power architucture example with LDO:
 
-- Use `Addressor<address_bits=N>` where **N = number of address pins**.
-- Connect each `address_lines[i].line` to the corresponding pin, and its `.reference` to a local power rail.
-- Set `addressor.base` to the lowest possible address and `assert addressor.address is i2c.address`.
+- USB input power
+- Low current output (eg microcontroller)
 
-  7.4 Other configuration etc
+from "atopile/ti-tlv75901/ti-tlv75901.ato" import TLV75901_driver
+from "atopile/usb-connectors/usb-connectors.ato" import USBCConn
 
-8. Review the content wholistically again
-9. Build the main build target using CLI `ato build`
-10. Make sure to make use of the LSP and build errors
+module App:
 
-## 1.3 Additional Notes & Gotchas (generic)
+    # Rails
+    power_5v = new Power
+    power_3v3 = new Power
 
-- Multi-rail devices (VDD / VDDIO, AVDD / DVDD, etc.)
+    # Components
+    ldo = new TLV75901_driver
+    usb_connector = new USBCConn
 
-  - Model separate `ElectricPower` interfaces for each rail (e.g. `power_core`, `power_io`).
-  - Mark each `.required = True` if the device cannot function without it, and add voltage assertions per datasheet.
+    # Connections
+    usb_connector.power ~ power_vbus
+    power_vbus ~> ldo ~> power_3v3
 
-- Using the right type of signal: Eletrical, ElectricLogic, ElectricSignal, DifferentialPair, I2C, SPI, ...
+## Communicaions
 
-  - Electrical: Represents a basic electrical object, does not have a voltage reference.
-  - ElectricSignal: Represents an electric signal with a voltage domain reference (electricsignla.reference) which should be connected to the appropriate ElectricPower object. The electricsignal.line can represent any voltage between the hv and lv of the reference. Useful for things like analog signals, voltage divider outputs, etc.
-  - ElectricLogic: Represents an electric logic, which is a special type of electric signal that should only take the discrete values of reference.hv and reference.lv. electriclogic.line  will often be soft pulled up or down to its reference rails.
-  - DifferentialPair: Represents a pair of ElectricLogics that share a reference ground (still need to connect the reference ElectricPower to something) and carry a signal differentially between the p.line and n.line
-  - I2C, SPI, etc: Represent interfaces of common communication protocols. Investigate the files in the standard library to find which signals are available for each interface. Interfaces should be used wherever possible as a layer of abstraction. Instead of connecting sensor.sda_pin~micro.sda_pin and sensor.scl_pin~micro.scl_pin, I2C interfaces should be described in the definition of the sensor and the micro such that at application level they can be connected via sensor.i2c ~ micro.i2c
+1. Review packages required interfaces, typically i2c, spi or ElectricLogics
+2. Find suitable pins on the controller, typically a microcontroller or Linux SOC
+3. Connect interfaces eg micro.i2c[0] ~ sensor.i2c
 
-- Use arrays for multiple channels or repetitve signals/modules
-  e.g `vouts = new ElectricLogic[4]` and access them with for-loops
-  e.g `gpios = new ElectricLogic[10]` and access them with a for-loop such as
-      for gpio in gpios:
+## Development process notes
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- After making changes, be sure to use 'build_project' to update the PCB
+- Builds will often generate errors/warnings, these should be reviewed and fixed
+- Prioritize pacakges from 'atopile' over other packages
+
+# How LLMs can design electronics:
+
+#1 Rule: (repeat after me) we dont fuck around with hacky shit, we use the tools. If the tools dont work, dont freak out, you are probably using them wrong. Ask for help if you get stuck.
+
+Top level design
+
+1. Research available packages relevant to the user requests using 'find_packages'
+2. Inspect promising packages using 'inspect_package'
+3. Propose packages to use for project and architucture to user, revise if needed
+4. Install needed packages using 'install_package'
+5. Import packages into main file
+6. Create instances of packages in main module
+
+## Power
+
+1. Review for each package the required voltage and current (current may not be provided, use judement if nessesary)
+2. Determine the power rails that need to be generated and a suitable tollerance (typically ~3-5% is acceptable)
+3. Determine the input power source, typically a battery, USB connector or other power connector (eg XT30) and install relevant package
+4. Find suitable regulators:
+   a) if input voltage > required voltage and current is low, use an LDO package
+   b) if input voltage > required voltage and current is high, use buck converter
+   c) if input votlage < required voltage, use a boost converter
+   d) if input voltage can be both less than or greater than input voltage, use buck boost (eg battery powered device that needs 3v3)
+5. If battery powered, add charger package
+
+Typical power architucture example with LDO:
+
+- USB input power
+- Low current output (eg microcontroller)
+
+from "atopile/ti-tlv75901/ti-tlv75901.ato" import TLV75901_driver
+from "atopile/usb-connectors/usb-connectors.ato" import USBCConn
+
+module App:
+
+    # Rails
+    power_5v = new Power
+    power_3v3 = new Power
+
+    # Components
+    ldo = new TLV75901_driver
+    usb_connector = new USBCConn
+
+    # Connections
+    usb_connector.power ~ power_vbus
+    power_vbus ~> ldo ~> power_3v3
+
+## Communicaions
+
+1. Review packages required interfaces, typically i2c, spi or ElectricLogics
+2. Find suitable pins on the controller, typically a microcontroller or Linux SOC
+3. Connect interfaces eg micro.i2c[0] ~ sensor.i2c
+
+## Development process notes
+
+- After making changes, be sure to use 'build_project' to update the PCB
+- Builds will often generate errors/warnings, these should be reviewed and fixed
+- Prioritize pacakges from 'atopile' over other packages
 
 ---
 > Source: [atopile/packages](https://github.com/atopile/packages) — distributed by [TomeVault](https://tomevault.io).
