@@ -1,132 +1,127 @@
 ---
 trigger: always_on
-description: Guidelines for creating and maintaining Cursor rules to ensure consistency and effectiveness.
+description: Rules for implementing desktop browser payment flow (Stripe Checkout), transaction persistence, and success page handling separate from mobile workflow
 ---
 
-- **Required Rule Structure:**
-  ```markdown
-  ---
-  description: Clear, one-line description of what the rule enforces
-  globs: path/to/files/*.ext, other/path/**/*
-  alwaysApply: boolean
-  ---
 
-  - **Main Points in Bold**
-    - Sub-points with details
-    - Examples and explanations
-  ```
+- **Main Points in Bold**
+  - Desktop flow uses Stripe Checkout Sessions (`cs_`) OR Stripe Elements inline (ExpressCheckoutElement + PaymentElement) for payment processing
+  - **Stripe Elements Inline Option**: Desktop can use Stripe Elements (`StripeDesktopCheckout` component) to show Apple Pay, Google Pay, Link, and card form directly on the page (no redirect)
+  - **Stripe Checkout Session Option**: Desktop can also use Stripe Checkout Sessions (hosted payment page) via redirect
+  - Desktop flow persists transactions immediately when payment succeeds via GET endpoint fallback
+  - Desktop flow is completely separate from mobile workflow - uses different entry points and detection methods
+  - Desktop flow must include both `tenantId` and `paymentMethodDomainId` in all backend requests
+  - Desktop flow creates both transaction and transaction items via `createTransactionFromPaymentIntent`
+  - Mobile workflow (`/event/ticket-qr` page) remains completely untouched
 
-- **File References:**
-  - Use `[filename](mdc:path/to/file)` ([filename](mdc:filename)) to reference files
-  - Example: [prisma.mdc](mdc:.cursor/rules/prisma.mdc) for rule references
-  - Example: [schema.prisma](mdc:prisma/schema.prisma) for code references
+# Desktop Browser Payment Flow Architecture
 
-- **Code Examples:**
-  - Use language-specific code blocks
-  ```typescript
-  // ✅ DO: Show good examples
-  const goodExample = true;
+This document outlines the comprehensive desktop browser payment flow architecture for the MCEFEE event management application, detailing how desktop payments differ from mobile payments and how transactions are persisted.
 
-  // ❌ DON'T: Show anti-patterns
-  const badExample = false;
-  ```
+## Overview
 
-- **Rule Content Guidelines:**
-  - Start with high-level overview
-  - Include specific, actionable requirements
-  - Show examples of correct implementation
-  - Reference existing code when possible
-  - Keep rules DRY by referencing other rules
+The desktop payment flow is fundamentally different from the mobile flow due to:
+- Different payment methods (Stripe Checkout vs Payment Request Button)
+- Different user experience (hosted payment page vs native wallet)
+- Different transaction persistence strategy (immediate creation vs polling with fallback)
+- Different success page handling (inline display vs redirect to QR page)
 
-- **Rule Maintenance:**
-  - Update rules when new patterns emerge
-  - Add examples from actual codebase
-  - Remove outdated patterns
-  - Cross-reference related rules
+## Desktop vs Mobile Flow Comparison
 
-- **Best Practices:**
-  - Use bullet points for clarity
-  - Keep descriptions concise
-  - Include both DO and DON'T examples
-  - Reference actual code over theoretical examples
-  - Use consistent formatting across rules
+### Desktop Flow (Two Options)
 
-- **Environment Variable Loading (Production & Amplify/AWS Lambda Ready)**
-  - Lazily load environment variables inside functions, not at module top-level
-  - Use a helper function to check for multiple prefixes (e.g., `AMPLIFY_`, `AWS_AMPLIFY_`, and no prefix)
-  - Support both server and client contexts (Next.js config and `process.env`)
-  - Example: See `getStripeEnvVar` in [`src/lib/stripe/init.ts`](mdc:src/lib/stripe/init.ts)
+#### Option 1: Stripe Elements Inline (Preferred for Registered Users)
+```
+User fills form →
+Payment Intent created via /api/stripe/payment-intent →
+Stripe Elements rendered inline (ExpressCheckoutElement + PaymentElement) →
+Apple Pay/Google Pay/Link/Card form shown on same page →
+Payment completion →
+Redirect to /event/success?pi=pi_xxx →
+SuccessClient detects desktop →
+Stays on success page →
+GET /api/event/success/process?pi=pi_xxx →
+If transaction not found (webhook delayed) →
+Create transaction immediately via createTransactionFromPaymentIntent →
+Create transaction items via createTransactionItemsBulk →
+Fetch QR code →
+Display success page with QR inline
+```
 
-- **Next.js Environment Variables in Production (AWS Amplify)**
-  - **CRITICAL**: All environment variables must be declared in the `env` section of [`next.config.mjs`](mdc:next.config.mjs) to be available at runtime in production
-  - Environment variables set in AWS Amplify console are not automatically available unless explicitly declared in Next.js config
-  - **AWS Amplify Environment Variable Pattern**: AWS Amplify prefixes environment variables with `AMPLIFY_` in the runtime, even if you set them without the prefix in the console
-  - **NEXT_PUBLIC_ Variables in AWS Amplify**: `NEXT_PUBLIC_` prefixed variables may not be available in server-side contexts (API routes, server components) in AWS Amplify production environment
-  - ✅ DO: Use `AMPLIFY_` prefixed variables for AWS Amplify deployments with fallbacks for local development
-  ```javascript
-  // next.config.mjs
-  env: {
-    // API JWT credentials - prioritize AMPLIFY_ prefix for AWS Amplify
-    API_JWT_USER: process.env.AMPLIFY_API_JWT_USER || process.env.API_JWT_USER,
-    API_JWT_PASS: process.env.AMPLIFY_API_JWT_PASS || process.env.API_JWT_PASS,
-    AMPLIFY_API_JWT_USER: process.env.AMPLIFY_API_JWT_USER,
-    AMPLIFY_API_JWT_PASS: process.env.AMPLIFY_API_JWT_PASS,
-    // Keep fallbacks for local development
-    NEXT_PUBLIC_API_JWT_USER: process.env.NEXT_PUBLIC_API_JWT_USER,
-    NEXT_PUBLIC_API_JWT_PASS: process.env.NEXT_PUBLIC_API_JWT_PASS,
-  }
-  ```
-  ```typescript
-  // Helper functions should prioritize AMPLIFY_ prefix
-  export function getApiJwtUser() {
-    return (
-      process.env.AMPLIFY_API_JWT_USER ||
-      process.env.API_JWT_USER ||
-      process.env.NEXT_PUBLIC_API_JWT_USER
-    );
-  }
-  ```
-  - ❌ DON'T: Rely only on `NEXT_PUBLIC_` prefixed variables for server-side authentication in AWS Amplify
-  - ❌ DON'T: Only set environment variables in AWS Amplify console without declaring them in Next.js config
-  - **Rationale**: AWS Amplify's runtime environment behavior differs from standard Next.js deployments. `AMPLIFY_` prefixed variables are reliable in production while `NEXT_PUBLIC_` variables may be unavailable in server contexts
-  - **Debugging**: Variables will show as `UNDEFINED` in production logs if not declared in config or using wrong prefix pattern
+#### Option 2: Stripe Checkout Session (Fallback for Visitors)
+```
+User fills form →
+Stripe Checkout Session created →
+Hosted payment page →
+Payment completion →
+Redirect to /event/success?session_id=cs_xxx or ?pi=pi_xxx →
+SuccessClient detects desktop →
+Stays on success page →
+GET /api/event/success/process?pi=pi_xxx →
+If transaction not found (webhook delayed) →
+Create transaction immediately via createTransactionFromPaymentIntent →
+Create transaction items via createTransactionItemsBulk →
+Fetch QR code →
+Display success page with QR inline
+```
 
-- **DTO (Data Transfer Object) Setup and Usage**
-  - **Centralize DTO Definitions**
-    - Define all DTOs in `src/types/index.ts` (or submodules if the file grows large)
-    - Use TypeScript `interface` or `type` for DTOs, matching backend API schema
-    ```typescript
-    // ✅ DO: Centralize DTOs
-    export interface UserProfileDTO {
-      id: number | null;
-      userId: string;
-      firstName: string;
-      lastName: string;
-      email: string;
-      // ...other fields
-    }
-    ```
-  - **Keep DTOs Flat and Serializable**
-    - Avoid methods or computed properties; use only serializable types
-    ```typescript
-    // ✅ DO: Use only serializable fields
-    export interface SubscriptionDTO {
-      id: number | null;
-      userId: string;
-      plan: string;
-      status: 'active' | 'inactive' | 'canceled';
-      // ...other fields
-    }
-    ```
-  - **Match Backend Schema**
-    - Align DTO fields/types with backend API (OpenAPI/Swagger, Prisma, REST docs)
-    - Document intentional differences
-    ```typescript
-    // ✅ DO: Match backend schema
-    export interface EventDTO {
-      id: number;
-      name: string;
-      date: string; // ISO string
+### Mobile Flow (Separate - Unchanged)
+```
+User taps PRB →
+Native wallet sheet opens →
+Payment Intent created →
+Payment confirmed with PI →
+Redirect to /event/success?pi=pi_xxx →
+SuccessClient detects mobile →
+Shows brief success (2 seconds) →
+Redirect to /event/ticket-qr?pi=pi_xxx →
+Dedicated QR page with POST fallback →
+Transaction created via POST endpoint
+```
+
+**CRITICAL**: Desktop and mobile flows are completely separate:
+- **Desktop**: Uses GET endpoint with transaction creation fallback
+- **Mobile**: Uses POST endpoint (via `/event/ticket-qr` page)
+- **Entry Points**: Different API routes and client components
+- **Mobile workflow files remain untouched**: `/event/ticket-qr` page and related mobile components are not modified
+
+## Desktop Browser Detection Methods
+
+### Client-Side Detection (`SuccessClient.tsx`)
+
+The application uses multiple methods to reliably detect desktop browsers:
+
+#### 1. User Agent Detection (Primary)
+```typescript
+const mobileRegexMatch = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|mobile|CriOS|FxiOS|EdgiOS/i.test(userAgent);
+const platformMatch = /iPhone|iPad|iPod|Android|BlackBerry|Windows Phone/i.test(platform);
+```
+
+#### 2. Screen Width Detection (Secondary)
+```typescript
+const narrowScreenMatch = window.innerWidth <= 768;
+const hasMobileUserAgent = mobileRegexMatch || platformMatch;
+```
+
+#### 3. Combined Detection Logic
+```typescript
+// CRITICAL: Desktop detection - Only consider mobile if:
+// 1. User agent indicates mobile (primary method), OR
+// 2. User agent data API says mobile, OR
+// 3. Narrow screen AND mobile user agent (not just narrow screen alone)
+// This prevents desktop browsers with narrow windows from being detected as mobile
+const isMobile = mobileRegexMatch || platformMatch || isMobileFromUA || (hasMobileUserAgent && narrowScreenMatch);
+const isDesktop = !isMobile; // Desktop is the inverse of mobile detection
+```
+
+**Key Points**:
+- Desktop detection is the inverse of mobile detection
+- Desktop browsers with narrow windows are NOT detected as mobile
+- Multiple detection methods prevent false positives
+- Detection happens immediately on component mount
+
+### Server-Side Detection (`/api/event/success/process/route.ts`)
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
