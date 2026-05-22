@@ -1,109 +1,37 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: Always-On Linter Policy
 ---
 
-# CLAUDE.md
+---
+alwaysApply: true
+---
+Always-On Linter Policy
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+- Before completing any task, check @Linter Errors for the active file and all files you edited.
+- Fix all violations relevant to your edits. Do not proceed with unresolved errors unless explicitly acknowledged with rationale.
+- If a lint cannot be fixed immediately, surface the exact messages and file paths and propose a minimal, compliant fix.
+- Prioritize strict AHK v2 syntax and patterns:
+  - `Map()` for key→value storage; arrays are 1‑based
+  - `.Bind(this)` for callbacks; `__Delete` cleanup
+  - Deterministic GUI layout and validation
+  - Backtick escaping; PCRE `i/m/s/x`; strict commas/colons
+  - Fat arrows single‑line only
+---
+description: Always enforce AHK v2 LSP linter review via @Linter Errors
+alwaysApply: true
+---
 
-## Project Overview
+Linter policy (always on)
+- Before finalizing any change, review @Linter Errors for the active file and all recently edited files.
+- Fix all violations relevant to your edits. Do not proceed with unresolved errors unless explicitly acknowledged with rationale.
+- If a lint cannot be fixed immediately, surface the exact messages and file paths, and propose a minimal, compliant fix.
+- Prioritize strict AHK v2 syntax (commas/colons, backtick escapes), class-based design, `.Bind(this)`, `Map()` for storage, and `__Delete` cleanup to avoid lints.
 
-ClautoHotkey is a comprehensive AutoHotkey v2 (AHK v2) development environment with structured prompts, modules, and scripts for AI-assisted AutoHotkey development. This repository contains hundreds of scripts demonstrating AHK v2 features including GUI applications, automation tools, and system utilities.
-
-## Core Architecture
-
-**Language**: AutoHotkey v2 only (no v1 support)
-**Primary Focus**: Object-oriented GUI applications and system automation
-**Structure**: Modular design with extensive library support and structured instruction system
-
-## Common Commands
-
-### Running AutoHotkey Scripts
-```bash
-# Preferred execution method with UTF-8 error output
-& "C:\Users\uphol\Documents\Design\Coding\AutoHotkey\bin\AutoHotkey64.exe" /ErrorStdOut=utf-8 "<script_path>"
-
-# Quick test targets
-& "C:\Users\uphol\Documents\Design\Coding\AutoHotkey\bin\AutoHotkey64.exe" /ErrorStdOut=utf-8 "Tests\Test_Basic.ahk"
-& "C:\Users\uphol\Documents\Design\Coding\AutoHotkey\bin\AutoHotkey64.exe" /ErrorStdOut=utf-8 "Tests\Other_TestingSystem.ahk"
-```
-
-### User-facing Tools
-- `_UltiLog.ahk` - Ultimate Logger for AI interaction logs and testing
-- `_Lists.ahk` - JSON List Editor with dark theme
-- `Scripts\Clip_SearchCode.ahk` - Code search and replacement tool
-- `Scripts\ClipboardHistoryCombiner.ahk` - Clipboard history management
-- `_Context_Creator.ahk` - Module combination tool for LLM context
-
-## High-Level Architecture
-
-### Module System
-The project uses a sophisticated structured instruction system organized in `/Modules/`:
-
-**PRIMARY MODULE**:
-- `Module_Instructions.md` - **ALWAYS START HERE** - Contains the foundational AHK v2 instruction framework, cognitive tier system, and structured development methodology
-
-**KEYWORD-TRIGGERED MODULES** (reference only when specific keywords appear in requests):
-- `Module_Classes.md` - Class design, inheritance, meta-functions, factory patterns, resource lifecycle, observer patterns
-- `Module_Objects.md` - Object hierarchy, property descriptors, method binding, type introspection
-- `Module_Arrays.md` - 1-based indexing, Array mutation, functional patterns (Map/Filter/Reduce), sorting
-- `Module_GUI.md` - GUI construction, ListView/TreeView CRUD, responsive resize, mathematical positioning
-- `Module_Errors.md` - Error class hierarchy, try/catch patterns, custom exceptions, diagnostic checklist
-- `Module_DataStructures.md` - Array vs Map selection, iteration patterns, nested structures, safe access
-- `Module_TextProcessing.md` - String operations, regex, escape sequences, continuation sections
-- `Module_DynamicProperties.md` - DefineProp descriptors, closures, computed properties, meta-functions
-- `Module_ClassPrototyping.md` - Runtime class creation, prototype extension, decorator patterns
-- `Module_Escapes.md` - Escaping rules for quotes, regex, paths
-
-Each module includes: V1→V2 breaking changes table, API quick-reference, AHK v2 constraints, anti-patterns table, and cross-module SEE ALSO references.
-
-### Cursor/IDE Integration
-- **Rules**: Modern project rules in `.cursor/rules/` as MDC files
-- **Core Rules**: 
-  - `00-always-linter.mdc` - Always-on linter enforcement
-  - `10-core-ahk-system.mdc` - Core AHK v2 system constraints
-  - Additional rules for objects, GUI layout, text processing
-- **Legacy**: `.cursorrules.md` references modern rule locations
-
-### Directory Structure
-
-```
-/Modules/           - Core instruction modules for AI agents
-/AHK_Notes/         - Extensive documentation and examples
-  /Classes/         - Class-specific examples and patterns
-  /Concepts/        - Advanced programming concepts
-  /Methods/         - Method implementations and techniques
-  /Patterns/        - Design patterns in AHK v2
-  /Snippets/        - Code snippets and examples
-/Scripts/           - User-facing utility applications
-/Tests/             - Test scripts and validation tools
-/Lib/               - Shared libraries and utility functions
-```
-
-## AHK v2 Coding Standards
-
-This project enforces strict AutoHotkey v2 coding standards:
-
-### Core Requirements
-- **Pure AHK v2 OOP**: Instantiate classes without `new` keyword
-- **Data Storage**: Use `Map()` for all key-value storage (no object literals)
-- **Event Binding**: All callbacks must use `.Bind(this)`
-- **Resource Cleanup**: Implement `__Delete()` methods for proper cleanup
-- **Variable Scoping**: Explicit variable declarations required
-- **Fat Arrow Functions**: Single-line expressions only (no `{}` blocks)
-
-### GUI Standards
-- Class-based GUI construction only
-- Deterministic layout with mathematical positioning
-- Proper event handling with `OnEvent()`
-- Input validation and error reporting
-- Clean close/escape behaviors
-- **Dark Mode**: Always use `Lib/DarkModeModular.ahk` for dark-themed GUIs. Include via relative path (e.g. `#Include ..\Lib\DarkModeModular.ahk`). Use `DarkGui()` instead of `Gui()` — all controls added via `DarkGui.Add("Type", ...)` are automatically dark-styled. Use `+Accent` on buttons for blue accent color.
-
-### Data Handling
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+Checklist
+- Open Problems pane or reference @Linter Errors.
+- Address errors first, then warnings that impact correctness/style.
+- Re-check @Linter Errors after edits.
 
 ---
 > Source: [TrueCrimeDev/ClautoHotkey](https://github.com/TrueCrimeDev/ClautoHotkey) — distributed by [TomeVault](https://tomevault.io).
