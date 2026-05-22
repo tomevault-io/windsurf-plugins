@@ -1,121 +1,110 @@
 ---
 trigger: always_on
-description: Standard pattern for admin action buttons with icons in admin pages and sub-pages
+description: Standard pattern for admin home button groups with grid layout for navigation buttons in admin pages and sub-pages
 ---
 
 
-# Admin Action Buttons Pattern
+# Admin Home Button Groups Pattern
 
 ## **Overview**
-This rule defines the standard pattern for action buttons with icons used in admin pages and sub-pages. These buttons provide consistent styling, hover effects, and icon presentation across all admin interfaces.
+This rule defines the standard pattern for navigation button groups displayed in a grid layout across admin pages and sub-pages. These button groups provide consistent styling, responsive grid layout, and hover effects matching the admin home page design.
 
 ## **Problem Solved**
-- **Consistent Styling**: Ensures all admin action buttons follow the same visual pattern
-- **Icon Standardization**: Provides consistent icon container and sizing
-- **Hover Effects**: Standardized hover states and transitions
-- **Color Coding**: Semantic color usage for different action types
+- **Consistent Grid Layout**: Ensures all admin navigation button groups use the same responsive grid system
+- **Card-Style Buttons**: Provides consistent card appearance with shadows and rounded corners
+- **Icon Standardization**: Provides consistent icon container and sizing (14x14 container, 10x10 icon)
+- **Hover Effects**: Standardized hover states with scale transforms and background color changes
+- **Responsive Design**: Ensures buttons adapt properly across mobile, tablet, and desktop breakpoints
 - **Accessibility**: Proper ARIA labels and titles for screen readers
 
 ## **Core Pattern**
 
-### **Button Structure**
+### **Grid Container**
 ```tsx
-// ✅ DO: Use the standard admin action button pattern
+// ✅ DO: Use responsive grid layout matching admin home page
+<div className="w-full mb-8">
+  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+    {/* Button cards */}
+  </div>
+</div>
+```
+
+### **Button Card Structure**
+```tsx
+// ✅ DO: Use card-style button pattern
 <Link
   href="/admin/path/to/resource"
-  className="w-full flex-shrink-0 h-14 rounded-xl bg-{color}-100 hover:bg-{color}-200 flex items-center justify-center gap-3 transition-all duration-300 hover:scale-105"
+  className="flex flex-col items-center justify-center bg-{color}-50 hover:bg-{color}-100 text-{color}-800 rounded-lg shadow-md p-4 text-xs transition-all group"
   title="Button Label"
   aria-label="Button Label"
 >
-  <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-{color}-200 flex items-center justify-center">
-    <svg className="w-6 h-6 text-{color}-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="..." />
-    </svg>
+  <div className="flex-shrink-0 w-14 h-14 rounded-xl bg-{color}-100 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform duration-300">
+    <IconComponent className="w-10 h-10 text-{color}-500" />
   </div>
-  <span className="font-semibold text-{color}-700">Button Label</span>
+  <span className="font-semibold text-center leading-tight">Button Label</span>
 </Link>
 ```
 
 ## **Key CSS Properties**
 
-### **Button Container Requirements**
+### **Grid Container Requirements**
 - **`w-full`**: Full width of parent container
-- **`flex-shrink-0`**: Prevents button from shrinking
-- **`h-14`**: Fixed height (56px) for consistent button size
-- **`rounded-xl`**: Large border radius (12px) for modern appearance
-- **`bg-{color}-100`**: Light background color matching action type
-- **`hover:bg-{color}-200`**: Darker background on hover
-- **`flex items-center justify-center`**: Centers content horizontally and vertically
-- **`gap-3`**: Spacing between icon and text (12px)
-- **`transition-all duration-300`**: Smooth transitions for all properties
-- **`hover:scale-105`**: Subtle scale effect on hover (5% increase)
+- **`mb-8`**: Standard margin bottom (32px) for spacing
+- **`grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4`**: Responsive grid
+  - Mobile: 1 column
+  - Small screens (640px+): 2 columns
+  - Medium screens (768px+): 3 columns
+  - Large screens (1024px+): 4 columns
+- **`gap-4`**: Consistent gap between grid items (16px)
+
+### **Button Card Requirements**
+- **`flex flex-col items-center justify-center`**: Centers content vertically and horizontally
+- **`bg-{color}-50`**: Light background color matching action type
+- **`hover:bg-{color}-100`**: Darker background on hover
+- **`text-{color}-800`**: Text color matching action type
+- **`rounded-lg`**: Medium border radius (8px) for card appearance
+- **`shadow-md`**: Medium shadow for depth
+- **`p-3`**: Padding (12px) for card content - reduced by 25% from original p-4
+- **`text-xs`**: Small text size for labels
+- **`transition-all`**: Smooth transitions for all properties
+- **`group`**: Enables group hover effects on child elements
 
 ### **Icon Container Requirements**
 - **`flex-shrink-0`**: Prevents icon container from shrinking
-- **`w-10 h-10`**: Fixed icon container size (40px × 40px)
-- **`rounded-lg`**: Medium border radius (8px) for icon container
-- **`bg-{color}-200`**: Darker background than button (creates depth)
+- **`w-11 h-11`**: Fixed icon container size (44px × 44px) - reduced by 25% from original w-14 h-14
+- **`rounded-xl`**: Large border radius (12px) for icon container
+- **`bg-{color}-100`**: Background color matching button hover state
 - **`flex items-center justify-center`**: Centers icon within container
+- **`mb-2`**: Margin bottom (8px) for spacing between icon and text - reduced by 25% from original mb-3
+- **`group-hover:scale-110`**: Scales up 10% when parent card is hovered
+- **`transition-transform duration-300`**: Smooth scale animation
 
 ### **Icon Requirements**
-- **`w-6 h-6`**: Icon size (24px × 24px)
-- **`text-{color}-600`**: Icon color matching action type
-- **`fill="none" stroke="currentColor"`**: Standard SVG styling
-- **`viewBox="0 0 24 24"`**: Standard viewBox for Heroicons
-- **`strokeWidth={2}`**: Standard stroke width
+- **`w-8 h-8`**: Icon size (32px × 32px) - reduced by 25% from original w-10 h-10
+- **`text-{color}-500`**: Icon color matching action type (medium shade)
 
 ### **Text Requirements**
 - **`font-semibold`**: Bold text for emphasis
-- **`text-{color}-700`**: Text color matching action type (darker than icon)
+- **`text-center`**: Centers text horizontally
+- **`leading-tight`**: Tighter line height for compact display
 
 ## **Color Coding System**
 
-### **Semantic Colors for Actions**
-- **Blue** (`blue-100/200/600/700`): Edit, Update, Modify actions
-- **Green** (`green-100/200/600/700`): View, View Details, View Organization actions
-- **Gray** (`gray-100/200/600/700`): Settings, Configuration actions
-- **Purple** (`purple-100/200/600/700`): Special, Advanced actions
-- **Orange** (`orange-100/200/600/700`): Warning, Attention actions
-- **Red** (`red-100/200/600/700`): Delete, Remove, Destructive actions
-- **Indigo** (`indigo-100/200/600/700`): Navigation, Link actions
-- **Teal** (`teal-100/200/600/700`): Analytics, Reports actions
+### **CRITICAL: Unique Color Requirement**
+- **NO TWO BUTTONS IN THE SAME BUTTON GROUP CAN HAVE THE SAME BACKGROUND COLOR**
+- **ALL GRAY COLORS ARE PROHIBITED** - Never use `gray`, `slate`, `stone`, `zinc`, or `neutral` colors for button backgrounds
+- Each button in a button group must have a unique, vibrant color to ensure visual distinction
+- This requirement applies to all admin pages and subpages that display button groups
+- When adding new buttons to a group, ensure the color is not already used by another button in that group
+- Standard color assignments:
+  - **Admin Home**: Always use `blue` (not gray)
+  - **Manage Usage**: Always use `indigo` (not blue, to differentiate from Admin Home)
+  - All other buttons: Use unique colors from available palette (green, teal, purple, violet, orange, pink, rose, lime, yellow, fuchsia, cyan, amber, emerald, sky, red, or custom colors)
 
-## **Complete Examples**
-
-### **View Organization Button (Green)**
-```tsx
-<Link
-  href={`/admin/tenant-management/organizations/${organization.id}`}
-  className="w-full flex-shrink-0 h-14 rounded-xl bg-green-100 hover:bg-green-200 flex items-center justify-center gap-3 transition-all duration-300 hover:scale-105"
-  title="View Organization"
-  aria-label="View Organization"
->
-  <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-green-200 flex items-center justify-center">
-    <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-    </svg>
-  </div>
-  <span className="font-semibold text-green-700">View Organization</span>
-</Link>
-```
-
-### **Edit Settings Button (Blue)**
-```tsx
-<Link
-  href={`/admin/tenant-management/settings/${id}/edit`}
-  className="w-full flex-shrink-0 h-14 rounded-xl bg-blue-100 hover:bg-blue-200 flex items-center justify-center gap-3 transition-all duration-300 hover:scale-105"
-  title="Edit Settings"
-  aria-label="Edit Settings"
->
-  <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-blue-200 flex items-center justify-center">
-    <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-    </svg>
-  </div>
-  <span className="font-semibold text-blue-700">Edit Settings</span>
-</Link>
-```
-
+### **Semantic Colors for Navigation**
+- **Blue** (`blue-50/100/500/800`): Admin Home (standard - replaces gray)
+- **Indigo** (`indigo-50/100/500/800`): Manage Usage, User Management (standard - replaces blue for Manage Usage)
+- **Green** (`green-50/100/500/800`): Manage Events, Calendar Actions
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
