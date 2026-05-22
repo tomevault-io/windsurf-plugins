@@ -1,128 +1,111 @@
 ---
 trigger: always_on
-description: This rule defines the **mandatory** pattern for data fetching on the home page (and any public-facing landing page). All API / database calls MUST be deferred until **after** the browser has completed the initial paint of static content. This eliminates network request bursts that compete with rendering during hydration, producing a significantly faster perceived load — especially critical for AWS Amplify Lambda deployments where cold starts already add latency.
+description: HTML documentation styling guide — design system, code highlighting, command blocks, section containers, and accessibility for project HTML docs.
 ---
 
-# Homepage Deferred Loading Pattern — Faster Initial Page Load on AWS Amplify
+
+# HTML Documentation Styling Guide and Design System
 
 ## Overview
-
-This rule defines the **mandatory** pattern for data fetching on the home page (and any public-facing landing page). All API / database calls MUST be deferred until **after** the browser has completed the initial paint of static content. This eliminates network request bursts that compete with rendering during hydration, producing a significantly faster perceived load — especially critical for AWS Amplify Lambda deployments where cold starts already add latency.
+This rule defines the standard styling patterns, design system, and best practices for creating HTML documentation files in the project. It ensures consistency, accessibility, and user-friendly presentation across all documentation.
 
 ## Problem Solved
+- **Consistent Documentation Styling**: Ensures all HTML documentation follows the same visual patterns
+- **Code Highlighting**: Standardizes code syntax highlighting with light blue background and dark blue text
+- **Copy Button Functionality**: Provides consistent copy-to-clipboard functionality for commands **and for copy-paste prompts** (see [Copyable prompt blocks](#copyable-prompt-blocks))
+- **Windows Compatibility**: Ensures commands are provided in single-line format for Windows users
+- **Visual Hierarchy**: Creates clear visual distinction between different types of content
+- **Accessibility**: Ensures proper contrast and readable text
 
-- **Slow initial page load**: On first visit (cold start), multiple API calls fire simultaneously during React hydration, competing with the browser's paint and blocking the main thread with JSON parsing and state updates.
-- **Network request burst**: 7+ concurrent API calls overwhelm the backend and the browser's connection limit (6 per origin in HTTP/1.1), queueing requests and delaying everything.
-- **Static content blocked**: Users see a blank/loading page instead of immediately visible static sections (Services, About, Causes, etc.) because the main thread is busy processing API responses.
+## Core Design Principles
 
-## Core Architecture
+### Color Scheme
+- **Code/Command Blocks**: Light blue background (`#e8f4f8`) with dark blue text (`#0d3b66`) and border (`#b8d4e3`)
+- **Info Boxes**: Light blue background (`#d1ecf1`) with dark blue border (`#0c5460`)
+- **Warning Boxes**: Light yellow background (`#fff3cd`) with yellow border (`#ffc107`)
+- **Success Boxes**: Light green background (`#d4edda`) with green border (`#28a745`)
+- **Error Boxes**: Light red background (`#f8d7da`) with red border (`#dc3545`)
+- **Command Blocks**: Color-coded gradients based on script type (setup=blue, expedite=purple, etc.)
 
-### Hook: `usePageReady` (`src/hooks/usePageReady.ts`)
+### Code Highlighting in Boxes
+- **All code references** within info/warning/success/error boxes must use light blue background (`#e8f4f8`) with dark blue text (`#0d3b66`) and border (`#b8d4e3`)
+- Use `<code class="code-highlight">` for inline code that needs highlighting
+- Standard `<code>` tags inherit box background (use `code-highlight` class for light blue/dark blue styling)
 
-Returns `true` after the browser has completed the initial paint cycle using nested `requestAnimationFrame`. This is the foundation for all deferred loading.
+### Script Name Highlighting
+- **All script file names** (e.g., `setup-test-clock.js`, `expedite-stripe-renewal-test-clock.js`) must use the `script-name` class
+- Script names should be visually distinct with purple gradient background
+- Use `<code class="script-name">script-name.js</code>` for all script file references
 
-### Hook: `useDeferredFetch(delayMs)` (`src/hooks/usePageReady.ts`)
+### Section Introduction Containers
+- **Major section introductions** (like "Using the Setup Test Clock Script") should use `section-intro` class
+- Provides light blue gradient background with blue left border
+- Wraps introductory paragraphs that explain what a script or section does
 
-Returns `true` after `usePageReady()` + an additional configurable delay. Different delays stagger API calls so they don't fire simultaneously.
+### Parameters List Styling
+- **Parameters sections** must use `parameters-list` class
+- Orange gradient background with orange left border
+- All parameter names in code tags should use light blue background (`#e8f4f8`) with dark blue text (`#0d3b66`)
 
-### Staggered Delay Tiers
+## Command Block Styling
 
-| Priority | Delay | Component | Reason |
-|----------|-------|-----------|--------|
-| 0 (gate) | Page ready (~30ms) | `TenantSettingsProvider` | Determines section visibility; other sections depend on it |
-| 1 (above fold) | 500ms | `HeroSection`, `LiveEventsSection`, `FeaturedEventsSection` | Above the fold, visible early but static fallback works |
-| 2 (mid page) | 300ms after mount | `UpcomingEventsSection` | Mounts after TenantSettings loads (natural extra delay) |
-| 3 (lower) | 800ms after mount | `TeamSection` | Further down page, mounts after TenantSettings |
-| 4 (bottom) | 1500ms | `OurSponsorsSection` | Bottom of page, lowest priority |
+### Color-Coded Command Blocks
+Each script type has a distinct color scheme:
 
-### Timeline (First Visit, Cold Start)
+```css
+/* Setup Scripts - Blue Gradient */
+.command-block.setup {
+    background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+    border-color: #2196f3;
+}
 
-```
-0ms     — Server-side layout runs (auth checks on Amplify Lambda)
-~500ms  — HTML arrives at browser, JS bundles start loading
-~800ms  — React hydrates, static sections paint immediately
-~830ms  — usePageReady fires → TenantSettingsProvider starts fetch
-~1000ms — TenantSettings response → UpcomingEvents + Team mount
-~1300ms — Hero/Live/Featured events data starts fetching
-~1300ms — UpcomingEventsSection starts fetching (300ms after mount)
-~1800ms — TeamSection starts fetching (800ms after mount)
-~2330ms — OurSponsorsSection starts fetching
-```
+/* Expedite Scripts - Purple Gradient */
+.command-block.expedite {
+    background: linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%);
+    border-color: #9c27b0;
+}
 
-### Timeline (Repeat Visit, Cached)
+/* Advance Scripts - Orange Gradient */
+.command-block.advance {
+    background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
+    border-color: #ff9800;
+}
 
-```
-0ms     — Page hydrates, static sections paint
-~30ms   — Cache checks fire instantly → all cached data loads
-          No network requests needed!
-```
-
-## Mandatory Pattern
-
-### For Components That Fetch Data on the Home Page
-
-```tsx
-// ✅ DO: Always use deferred fetch pattern
-import { useDeferredFetch } from '@/hooks/usePageReady';
-
-const MySection: React.FC = () => {
-  const [data, setData] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  // Choose delay based on section position (see tier table above)
-  const shouldFetch = useDeferredFetch(800);
-
-  useEffect(() => {
-    async function loadData() {
-      // 1. ALWAYS check sessionStorage cache first (instant, no delay)
-      try {
-        const cached = sessionStorage.getItem(CACHE_KEY);
-        if (cached) {
-          const { data, timestamp } = JSON.parse(cached);
-          if (Date.now() - timestamp < CACHE_DURATION) {
-            setData(data);
-            setLoading(false);
-            return; // Cache hit — no network request needed
-          }
-        }
-      } catch { /* ignore */ }
-
-      // 2. Gate network request behind deferred flag
-      if (!shouldFetch) return;
-
-      // 3. Now safe to make API call
-      const response = await fetch('/api/proxy/...');
-      // ...
-    }
-
-    loadData();
-  }, [shouldFetch]); // Re-run when shouldFetch becomes true
-};
+/* Verify Scripts - Green Gradient */
+.command-block.verify {
+    background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+    border-color: #4caf50;
+}
 ```
 
-```tsx
-// ❌ DON'T: Fetch immediately on mount
-useEffect(() => {
-  fetch('/api/proxy/...');
-}, []); // Fires during hydration — blocks static content!
-```
-
-### For Shared Hooks (useEventsData)
-
-```tsx
-// ✅ DO: Accept `enabled` parameter to defer
-export const useEventsData = (enabled: boolean = true) => {
-  useEffect(() => {
-    if (!enabled) return; // Don't fetch until enabled
-    fetchEventsData();
-  }, [enabled]);
-};
-
-// In the component:
-const shouldFetch = useDeferredFetch(500);
-const { filteredEvents } = useFilteredEvents('hero', shouldFetch);
-```
-
+### Command Block Structure with Parameter Customization
+```html
+<div class="command-block setup"
+     data-command-type="setup"
+     data-command-base="node scripts/path/to/script.js"
+     data-template-command="node scripts/path/to/script.js --param1=value1 --param2=&quot;value2&quot;">
+    <div class="command-header">
+        <span class="command-type">Setup Script</span>
+        <div class="command-header-buttons">
+            <button class="copy-button-template" onclick="copyTemplateCommand(this, 'command-id')" title="Copy template command">📄 Template</button>
+            <button class="copy-button" onclick="copyCommand(this, 'command-id')" title="Copy customized command">📋 Copy</button>
+        </div>
+    </div>
+    <div class="command-parameters">
+        <h5>🔧 Customize Parameters:</h5>
+        <div class="parameter-group">
+            <div class="parameter-input">
+                <label for="command-id-param1">Parameter 1:</label>
+                <input type="text" id="command-id-param1" placeholder="value1" value="default1" oninput="updateCommand('command-id', 'param1', this.value)">
+            </div>
+            <div class="parameter-input">
+                <label for="command-id-param2">Parameter 2:</label>
+                <input type="text" id="command-id-param2" placeholder="value2" value="default2" oninput="updateCommand('command-id', 'param2', this.value)">
+            </div>
+        </div>
+        <div class="parameter-group single">
+            <div class="parameter-input">
+                <label for="command-id-param3">Parameter 3:</label>
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
