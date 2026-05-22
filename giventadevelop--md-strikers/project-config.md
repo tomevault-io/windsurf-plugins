@@ -1,111 +1,159 @@
 ---
 trigger: always_on
-description: Standard pattern for dialog buttons (AlertDialog Action/Cancel) matching admin action buttons styling
+description: This document outlines the correct patterns for implementing email functionality in the Next.js application, based on the working QR code endpoint pattern and successful send-ticket-email implementation.
 ---
 
+# Email Endpoint Implementation Rules
 
-# Dialog Button Styling Pattern
+## Overview
+This document outlines the correct patterns for implementing email functionality in the Next.js application, based on the working QR code endpoint pattern and successful send-ticket-email implementation.
 
-## **Overview**
-This rule defines the standard pattern for dialog buttons (AlertDialog Action and Cancel buttons) that match the admin action buttons styling pattern. These buttons provide consistent styling, hover effects, and icon presentation across all dialogs in the application.
+## Key Principles
 
-## **Problem Solved**
-- **Consistent Dialog Button Styling**: Ensures all dialog buttons follow the same visual pattern as admin action buttons
-- **Icon Standardization**: Provides consistent icon container and sizing for dialog buttons
-- **Hover Effects**: Standardized hover states and transitions matching admin buttons
-- **Color Coding**: Semantic color usage for different action types (blue for cancel/keep, red for destructive actions)
-- **Accessibility**: Proper styling and visual feedback for user interactions
+### 1. Base64 Encoding for emailHostUrlPrefix
+**CRITICAL:** Always use Base64 encoding for `emailHostUrlPrefix` in URL paths, NOT URL encoding.
 
-## **Core Pattern**
+```typescript
+// ✅ CORRECT - Base64 encoding like working QR code endpoint
+const encodedEmailHostUrlPrefix = Buffer.from(emailHostUrlPrefix).toString('base64');
 
-### **Dialog Footer Structure**
-```tsx
-// ✅ DO: Use the standard dialog button pattern
-<AlertDialogFooter className="flex flex-row gap-3 sm:gap-4">
-  {/* Cancel/Secondary Button */}
-  <AlertDialogCancel
-    onClick={handleClose}
-    className="flex-1 flex-shrink-0 h-14 rounded-xl bg-blue-100 hover:bg-blue-200 flex items-center justify-center gap-3 transition-all duration-300 hover:scale-105"
-  >
-    <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-blue-200 flex items-center justify-center">
-      <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-      </svg>
-    </div>
-    <span className="font-semibold text-blue-700">Cancel/Keep</span>
-  </AlertDialogCancel>
-
-  {/* Confirm/Primary Button */}
-  <AlertDialogAction
-    onClick={handleConfirm}
-    disabled={isLoading}
-    className="flex-1 flex-shrink-0 h-14 rounded-xl bg-red-100 hover:bg-red-200 flex items-center justify-center gap-3 transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-  >
-    <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-red-200 flex items-center justify-center">
-      {isLoading ? (
-        <svg className="animate-spin w-6 h-6 text-red-600" fill="none" viewBox="0 0 24 24">
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-        </svg>
-      ) : (
-        <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-        </svg>
-      )}
-    </div>
-    <span className="font-semibold text-red-700">{isLoading ? 'Processing...' : 'Confirm'}</span>
-  </AlertDialogAction>
-</AlertDialogFooter>
+// ❌ WRONG - URL encoding (causes backend issues)
+const encodedEmailHostUrlPrefix = encodeURIComponent(emailHostUrlPrefix);
 ```
 
-## **Key CSS Properties**
+### 2. URL Pattern Structure
+Follow the exact same URL structure as the working QR code endpoint:
 
-### **Dialog Footer Requirements**
-- **`flex flex-row`**: Horizontal layout for buttons
-- **`gap-3 sm:gap-4`**: Spacing between buttons (12px on mobile, 16px on desktop)
+```
+/api/events/{eventId}/transactions/{transactionId}/emailHostUrlPrefix/{base64EncodedUrlPrefix}/{action}
+```
 
-### **Button Container Requirements**
-- **`flex-1`**: Equal width buttons
-- **`flex-shrink-0`**: Prevents button from shrinking
-- **`h-14`**: Fixed height (56px) for consistent button size
-- **`rounded-xl`**: Large border radius (12px) for modern appearance
-- **`bg-{color}-100`**: Light background color matching action type
-- **`hover:bg-{color}-200`**: Darker background on hover
-- **`flex items-center justify-center`**: Centers content horizontally and vertically
-- **`gap-3`**: Spacing between icon and text (12px)
-- **`transition-all duration-300`**: Smooth transitions for all properties
-- **`hover:scale-105`**: Subtle scale effect on hover (5% increase)
-- **`disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100`**: Disabled state styling
+**Working Examples:**
+- QR Code: `/api/events/3/transactions/5652/emailHostUrlPrefix/aHR0cDovL2xvY2FsaG9zdDozMDAw/qrcode`
+- Email: `/api/events/1/transactions/4956/emailHostUrlPrefix/aHR0cDovL2xvY2FsaG9zdDozMDAw/send-ticket-email`
 
-### **Icon Container Requirements**
-- **`flex-shrink-0`**: Prevents icon container from shrinking
-- **`w-10 h-10`**: Fixed icon container size (40px × 40px)
-- **`rounded-lg`**: Medium border radius (8px) for icon container
-- **`bg-{color}-200`**: Darker background than button (creates depth)
-- **`flex items-center justify-center`**: Centers icon within container
+Where `aHR0cDovL2xvY2FsaG9zdDozMDAw` is Base64 for `http://localhost:3000`
 
-### **Icon Requirements**
-- **`w-6 h-6`**: Icon size (24px × 24px)
-- **`text-{color}-600`**: Icon color matching action type
-- **`fill="none" stroke="currentColor"`**: Standard SVG styling
-- **`viewBox="0 0 24 24"`**: Standard viewBox for Heroicons
-- **`strokeWidth={2}`**: Standard stroke width
-- **`animate-spin`**: For loading state icons
+## Implementation Patterns
 
-### **Text Requirements**
-- **`font-semibold`**: Bold text for emphasis
-- **`text-{color}-700`**: Text color matching action type (darker than icon)
+### 1. Custom Proxy Handler Pattern
+Use the shared `createProxyHandler` with custom backend path construction:
 
-## **Color Coding System**
+```typescript
+import { createProxyHandler } from '@/lib/proxyHandler';
+import { getEmailHostUrlPrefix } from '@/lib/env';
 
-### **Semantic Colors for Dialog Actions**
-- **Blue** (`blue-100/200/600/700`): Cancel, Keep, Secondary actions
-- **Red** (`red-100/200/600/700`): Confirm Delete, Destructive actions
-- **Green** (`green-100/200/600/700`): Confirm Save, Positive actions
-- **Gray** (`gray-100/200/600/700`): Neutral actions
+export default async function handler(req: any, res: any) {
+  const { id, transactionId } = req.query;
 
-## **Complete Examples**
+  // Get emailHostUrlPrefix from request headers or use default
+  const emailHostUrlPrefix = req.headers['x-email-host-url-prefix'] as string ||
+                           getEmailHostUrlPrefix();
 
+  // CRITICAL: Use Base64 encoding like the working QR code endpoint
+  const encodedEmailHostUrlPrefix = Buffer.from(emailHostUrlPrefix).toString('base64');
+
+  // Create custom backend path with Base64-encoded emailHostUrlPrefix
+  const customBackendPath = `/api/events/${id}/transactions/${transactionId}/emailHostUrlPrefix/${encodedEmailHostUrlPrefix}/send-ticket-email`;
+
+  // Use shared proxy handler
+  const proxyHandler = createProxyHandler({
+    backendPath: customBackendPath,
+    allowedMethods: ['POST', 'GET'],
+    injectTenantId: false
+  });
+
+  return proxyHandler(req, res);
+}
+```
+
+### 2. Server Action Pattern
+For server-side API calls (like in ApiServerActions.ts):
+
+```typescript
+export async function sendTicketEmail(eventId: number, transactionId: number): Promise<boolean> {
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+  const emailHostUrlPrefix = getEmailHostUrlPrefix();
+  
+  // CRITICAL: Use Base64 encoding
+  const encodedEmailHostUrlPrefix = Buffer.from(emailHostUrlPrefix).toString('base64');
+
+  const response = await fetchWithJwtRetry(
+    `${baseUrl}/api/proxy/events/${eventId}/transactions/${transactionId}/emailHostUrlPrefix/${encodedEmailHostUrlPrefix}/send-ticket-email`,
+    {
+      method: 'GET', // or 'POST' depending on backend
+      headers: {
+        'Content-Type': 'application/json',
+      }
+    }
+  );
+
+  return response.ok;
+}
+```
+
+### 3. Client-Side Pattern
+For frontend API calls:
+
+```typescript
+// In client components, pass emailHostUrlPrefix via headers
+const handleResendEmail = async (email: string) => {
+  const response = await fetch(`/api/proxy/events/${eventId}/transactions/${transactionId}/send-ticket-email?to=${encodeURIComponent(email)}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-email-host-url-prefix': window.location.origin, // Will be Base64 encoded by proxy
+    },
+  });
+  
+  return response.ok;
+};
+```
+
+## Email Host URL Prefix Handling
+
+### 1. Header-Based Approach (Recommended)
+Pass `emailHostUrlPrefix` via request headers and let the proxy handler encode it:
+
+```typescript
+// Client side - pass in header
+headers: {
+  'x-email-host-url-prefix': 'http://localhost:3000'
+}
+
+// Proxy handler - get from header and encode
+const emailHostUrlPrefix = req.headers['x-email-host-url-prefix'] as string ||
+                         getEmailHostUrlPrefix();
+const encoded = Buffer.from(emailHostUrlPrefix).toString('base64');
+```
+
+### 2. Direct Encoding (For Server Actions)
+When calling from server actions, encode directly:
+
+```typescript
+const emailHostUrlPrefix = getEmailHostUrlPrefix();
+const encoded = Buffer.from(emailHostUrlPrefix).toString('base64');
+```
+
+## Backend API Endpoint Patterns
+
+Based on working examples, the backend likely expects these patterns:
+
+### Working Endpoints
+- **QR Code Generation:** `GET /api/events/{eventId}/transactions/{transactionId}/emailHostUrlPrefix/{base64}/qrcode`
+- **Email Sending:** `GET|POST /api/events/{eventId}/transactions/{transactionId}/emailHostUrlPrefix/{base64}/send-ticket-email`
+
+### Query Parameters
+Additional parameters can be passed as query strings:
+```
+/send-ticket-email?to=user@example.com&subject=Custom Subject
+```
+
+## Common Mistakes to Avoid
+
+### ❌ Wrong Encoding
+```typescript
+// NEVER use URL encoding for emailHostUrlPrefix in paths
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
