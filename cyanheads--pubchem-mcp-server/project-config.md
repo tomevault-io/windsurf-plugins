@@ -1,0 +1,139 @@
+---
+trigger: always_on
+description: **Server:** pubchem-mcp-server
+---
+
+# Agent Protocol
+
+**Server:** pubchem-mcp-server
+**Version:** 0.1.19
+**Framework:** [@cyanheads/mcp-ts-core](https://www.npmjs.com/package/@cyanheads/mcp-ts-core)
+
+> **Read the framework docs first:** `node_modules/@cyanheads/mcp-ts-core/CLAUDE.md` contains the full API reference — builders, Context, error codes, exports, patterns. This file covers server-specific conventions only.
+
+---
+
+## Core Rules
+
+- **Logic throws, framework catches.** Tool/resource handlers are pure — throw on failure, no `try/catch`. Plain `Error` is fine; the framework catches, classifies, and formats. Use error factories (`notFound()`, `validationError()`, etc.) when the error code matters.
+- **Use `ctx.log`** for request-scoped logging. No `console` calls.
+- **Secrets in env vars only** — never hardcoded.
+- **No API keys required** — PubChem's API is freely accessible. No server config schema exists.
+
+---
+
+## Patterns
+
+### Tool
+
+```ts
+import { tool, z } from '@cyanheads/mcp-ts-core';
+import { getPubChemClient } from '@/services/pubchem/pubchem-client.js';
+
+export const searchAssays = tool('pubchem_search_assays', {
+  title: 'Search Assays',
+  description:
+    'Find PubChem bioassays associated with a biological target. Search by gene symbol ' +
+    '(e.g. "EGFR"), protein name, NCBI Gene ID, or UniProt accession.',
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  input: z.object({
+    targetType: z.enum(['genesymbol', 'proteinname', 'geneid', 'proteinaccession'])
+      .describe('Target identifier type.'),
+    targetQuery: z.string().describe('Target identifier.'),
+    maxResults: z.number().min(1).max(200).default(50)
+      .describe('Max AIDs to return (1-200). Default: 50.'),
+  }),
+  output: z.object({
+    targetType: z.string().describe('Target identifier type used.'),
+    targetQuery: z.string().describe('Target identifier searched.'),
+    totalFound: z.number().describe('Total AIDs found.'),
+    aids: z.array(z.number()).describe('PubChem Assay IDs.'),
+  }),
+
+  async handler(input, ctx) {
+    const client = getPubChemClient();
+    const allAids = await client.searchAssaysByTarget(input.targetType, input.targetQuery);
+    const aids = allAids.slice(0, input.maxResults);
+
+    ctx.log.info('Assay search completed', {
+      targetType: input.targetType,
+      totalFound: allAids.length,
+      returned: aids.length,
+    });
+
+    return { targetType: input.targetType, targetQuery: input.targetQuery, totalFound: allAids.length, aids };
+  },
+
+  // format() populates content[] — the markdown twin of structuredContent.
+  // Different clients read different surfaces (Claude Code → structuredContent,
+  // Claude Desktop → content[]); both must carry the same data.
+  // Enforced at lint time: every field in `output` must appear in the rendered text.
+  format(result) {
+    const truncated =
+      result.totalFound > result.aids.length
+        ? ` (showing ${result.aids.length} of ${result.totalFound})`
+        : '';
+    const lines = [
+      `Found ${result.totalFound} assay${result.totalFound !== 1 ? 's' : ''} for "${result.targetQuery}" (${result.targetType})${truncated}`,
+      '',
+    ];
+    if (result.aids.length > 0) {
+      lines.push(`AIDs: ${result.aids.join(', ')}`);
+    } else {
+      lines.push('No assays found.');
+    }
+    return [{ type: 'text', text: lines.join('\\n') }];
+  },
+});
+```
+
+### Service (init/accessor pattern)
+
+```ts
+import { PubChemClient } from './pubchem-client.js';
+
+let _client: PubChemClient | undefined;
+
+export function initPubChemClient(): void {
+  _client = new PubChemClient();
+}
+
+export function getPubChemClient(): PubChemClient {
+  if (!_client) throw new Error('PubChemClient not initialized — call initPubChemClient() in setup()');
+  return _client;
+}
+```
+
+---
+
+## Context
+
+Handlers receive a unified `ctx` object. Properties used by this server:
+
+| Property | Description |
+|:---------|:------------|
+| `ctx.log` | Request-scoped logger — `.debug()`, `.info()`, `.notice()`, `.warning()`, `.error()`. Auto-correlates requestId, traceId, tenantId. |
+| `ctx.signal` | `AbortSignal` for cancellation. |
+| `ctx.requestId` | Unique request ID. |
+
+---
+
+## Errors
+
+Handlers throw — the framework catches, classifies, and formats.
+
+**Recommended: typed error contract.** Declare `errors: [{ reason, code, when, recovery, retryable? }]` on `tool()` to receive a typed `ctx.fail(reason, …)` keyed by the declared reason union. TypeScript catches `ctx.fail('typo')` at compile time, `data.reason` is auto-populated for observability, and the linter enforces conformance. The `recovery` field is required descriptive metadata (≥ 5 words, lint-validated). Spread `ctx.recoveryFor('reason')` into `data` to opt the contract recovery onto the wire (the framework mirrors `data.recovery.hint` into `content[]` text). Override with explicit `{ recovery: { hint: '...' } }` when runtime context matters. Baseline codes (`InternalError`, `ServiceUnavailable`, `Timeout`, `ValidationError`, `SerializationError`) bubble freely without declaration.
+
+```ts
+errors: [
+  { reason: 'cid_not_found', code: JsonRpcErrorCode.NotFound,
+    when: 'PubChem returned 404 for the requested CID',
+    recovery: 'Verify the CID via pubchem_search_compounds before retrying.' },
+],
+async handler(input, ctx) {
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [cyanheads/pubchem-mcp-server](https://github.com/cyanheads/pubchem-mcp-server) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-22 -->
