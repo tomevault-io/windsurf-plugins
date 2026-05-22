@@ -1,121 +1,125 @@
 ---
 trigger: always_on
-description: These are the rules for all of the project.
+description: How to use tanstack-query with our NextJS setup
 ---
 
-# Cursor Rules
+# Tanstack Query and Next.js Patterns
 
-You are a senior TypeScript programmer with experience in Turborepo, Express, Node, React, Next 15 framework and a preference for clean programming and design patterns.
+## Hydration and Server/Client Data Flow
 
-Generate code, corrections, and refactorings that comply with the basic principles and nomenclature.
+The data flow from server to client involves three key steps:
 
-## TypeScript General Guidelines
+1. **Server Prefetching**: Server components prefetch data using static query keys
+2. **Dehydration**: The query cache is serialized into the HTML/JSON response
+3. **Client Hydration**: The client rehydrates the prefetched data using matching query keys
 
-### Basic Principles
+### Example Implementation:
 
-- Use English for all code and documentation to maintain consistency and enable global collaboration.
-- Always declare the type of each variable and function (parameters and return value) for better type safety and code maintainability.
-  - Avoid using any as it defeats TypeScript's type checking benefits.
-  - Create necessary types to model your domain accurately and improve code readability.
-  - We're working in a turborepo with PNPM for optimal monorepo management and dependency handling.
-- Use JSDoc to document public classes and methods. Include examples to demonstrate proper usage and edge cases.
-- Don't leave blank lines within a function to maintain code density and readability.
-- One export per file to ensure clear module boundaries and improve code organization.
-- Use Fat Arrow Functions and named object params for consistent function declarations and better parameter handling.
-  - Fat arrow functions provide lexical this binding and shorter syntax.
-  - Named object params improve code readability and maintainability.
-- When styling with Tailwind:
-  - Favor flex and gap instead of margin bumps and space-\* for more maintainable layouts.
-  - This approach reduces specificity issues and provides more consistent spacing.
-  - Flex layouts are more responsive and adaptable to different screen sizes.
+```typescript
+// Server Component (page.tsx)
+export default async function Page() {
+  const queryClient = createQueryClient();
+  const supabase = await createClient();
 
-### Nomenclature
+  // 1. Prefetch data on server
+  await queryClient.prefetchQuery({
+    queryKey: ["teams", "list"],
+    queryFn: () => getTeams({ supabase }),
+  });
 
-- Use PascalCase for classes.
-- Use camelCase for variables, functions, and methods.
-- Use kebab-case for file and directory names.
-- Use UPPERCASE for environment variables.
-  - Avoid magic numbers and define constants.
-- Start each function with a verb.
-- Use verbs for boolean variables. Example: isLoading, hasError, canDelete, etc.
-- Use complete words instead of abbreviations and correct spelling.
-  - Except for standard abbreviations like API, URL, etc.
-  - Except for well-known abbreviations:
-    - i, j for loops
-    - err for errors
-    - ctx for contexts
-    - req, res, next for middleware function parameters
+  // 2. Dehydrate the cache
+  const dehydratedState = dehydrate(queryClient);
 
-### Functions
+  // 3. Pass to client component
+  return (
+    <ClientComponent state={dehydratedState} />
+  );
+}
 
-- In this context, what is understood as a function will also apply to a method.
-- Write short functions with a single purpose. Less than 20 instructions.
-- Name functions with a verb and something else.
-  - If it returns a boolean, use isX or hasX, canX, etc.
-  - If it doesn't return anything, use executeX or saveX, etc.
-- Avoid nesting blocks by:
-  - Early checks and returns.
-  - Extraction to utility functions.
-- Use higher-order functions (map, filter, reduce, etc.) to avoid function nesting.
-  - Use arrow functions for simple functions (less than 3 instructions).
-  - Use named functions for non-simple functions.
-- Use default parameter values instead of checking for null or undefined.
-- Reduce function parameters using RO-RO - THIS IS IMPORTANT. WE ARE A RO-RO HOUSEHOLD.
-  - Use an object to pass multiple parameters.
-  - Use an object to return results.
-  - Declare necessary types for input arguments and output.
-- Use a single level of abstraction.
+// Client Component
+function ClientComponent({ state }: { state: DehydratedState }) {
+  return (
+    // 4. Hydrate the cache on client
+    <HydrationBoundary state={state}>
+      <YourComponent />
+    </HydrationBoundary>
+  );
+}
 
-### Data
+// Child component automatically gets access to prefetched data
+function YourComponent() {
+  // Uses the same data prefetched on server
+  const { data } = useQuery({
+    queryKey: teamKeys.lists(),
+    queryFn: () => getTeams({ supabase }),
+  });
+}
+```
 
-- Don't abuse primitive types and encapsulate data in composite types.
-- Avoid data validations in functions and use classes with internal validation.
-- Prefer immutability for data.
-  - Use readonly for data that doesn't change.
-  - Use as const for literals that don't change.
+### Best Practices:
 
-### Classes
+1. **Always wrap client components** with `HydrationBoundary` when using prefetched data
+2. **Match query keys** between server and client to ensure data is found
+3. **Handle loading states** while hydration is occurring
+4. **Use Suspense boundaries** around hydrated components for better loading UX
 
-- Follow SOLID principles.
-- Prefer composition over inheritance.
-- Declare interfaces to define contracts.
-- Write small classes with a single purpose.
-  - Less than 200 instructions.
-  - Less than 10 public methods.
-  - Less than 10 properties.
+## Why Static Query Keys for Server Components?
 
-### Prompting and LLM Generation
+Server components in Next.js cannot execute functions during rendering because:
 
-- Follow XML Format
+1. Server components are rendered once on the server
+2. The output is static HTML/JSON
+3. Function calls could be unpredictable or have side effects
 
-### Feature Development Workflow
+This means we need two patterns for query keys:
 
-- Follow the Red-Green-Refactor cycle for all new features to ensure code quality and maintainability.
-- Start with a todo.md file in the feature directory to plan development.
+```typescript
+// ❌ Won't work in server components (function call)
+queryKey: teamKeys.lists();
 
-  - Break down features into testable units for focused development.
-  - Prioritize test cases based on business value and dependencies.
-  - Document dependencies and setup needed for clear implementation path.
-  - Define type requirements and interfaces for type safety.
+// ✅ Works in server components (static value)
+queryKey: ["teams", "list"];
+// or
+queryKey: teamQueryKeys.lists;
+```
 
-- Type Check First:
-  - Run `npx tsc --noEmit` before making changes to establish baseline.
-  - Document existing type errors for tracking.
-  - Plan type fixes based on error messages and dependencies.
-  - Fix types in dependency order:
-    1. Interfaces and type definitions first
-    2. Implementation code second
-    3. Usage in components last
-  - Never modify business logic while fixing types to maintain stability.
-  - Verify type fixes with another type check before proceeding.
-- Write failing tests first (Red phase) to define expected behavior.
-  - One test at a time to maintain focus and simplicity.
-  - Verify test failure message clarity for better debugging.
-  - Commit failing tests to track development progress.
-- Write minimal code to pass tests (Green phase) to avoid over-engineering.
-  - Focus on making tests pass with the simplest solution.
+### Example Implementation:
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+```typescript
+// Client-side: Functions for dynamic values
+export const teamKeys = {
+  lists: () => ["teams", "list"] as QueryKey, // Function for client components
+  list: (filters) => ["teams", "list", filters],
+};
+
+// Server-side: Static arrays
+export const teamQueryKeys = {
+  lists: ["teams", "list"], // Static array for server components
+  list: (filters) => ["teams", "list", filters],
+};
+
+// Usage in server component (page.tsx)
+await queryClient.prefetchQuery({
+  queryKey: teamQueryKeys.lists,
+  queryFn: () => getTeams({ supabase }),
+});
+
+// Usage in client component
+const { data } = useQuery({
+  queryKey: teamKeys.lists(),
+  queryFn: () => getTeams({ supabase }),
+});
+```
+
+Both patterns generate the same array structure, allowing React Query to match prefetched data between server and client.
+
+We have CRUD layer and custom hooks like this:
+[teams.react.ts](mdc:packages/supabase/src/module/teams.react.ts)
+[teams.ts](mdc:packages/supabase/src/module/teams.ts)
+
+Each postgres table has custom hooks within the packages/supabase/module folder.
+
+You should avoid adding react-hot-toast for within React components as this should always be handled at the CRUD layer (albeit for the most part, unless otherwise told).
 
 ---
 > Source: [Just-Understanding-Data-Ltd/supabase-tdd-boilerplate](https://github.com/Just-Understanding-Data-Ltd/supabase-tdd-boilerplate) — distributed by [TomeVault](https://tomevault.io).
