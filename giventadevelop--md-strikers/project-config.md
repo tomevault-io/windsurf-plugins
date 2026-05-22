@@ -1,29 +1,27 @@
 ---
 trigger: always_on
-description: Standard pattern for admin home button groups with grid layout for navigation buttons in admin pages and sub-pages
+description: This rule defines the standard pattern for responsive button groups displayed in a grid layout across admin pages. The pattern ensures consistent 2-column layout on mobile devices, proper spacing, and responsive sizing for icons, text, and containers.
 ---
 
-
-# Admin Home Button Groups Pattern
+# Admin Page Responsive Button Group Pattern
 
 ## **Overview**
-This rule defines the standard pattern for navigation button groups displayed in a grid layout across admin pages and sub-pages. These button groups provide consistent styling, responsive grid layout, and hover effects matching the admin home page design.
+This rule defines the standard pattern for responsive button groups displayed in a grid layout across admin pages. The pattern ensures consistent 2-column layout on mobile devices, proper spacing, and responsive sizing for icons, text, and containers.
 
 ## **Problem Solved**
-- **Consistent Grid Layout**: Ensures all admin navigation button groups use the same responsive grid system
-- **Card-Style Buttons**: Provides consistent card appearance with shadows and rounded corners
-- **Icon Standardization**: Provides consistent icon container and sizing (14x14 container, 10x10 icon)
-- **Hover Effects**: Standardized hover states with scale transforms and background color changes
-- **Responsive Design**: Ensures buttons adapt properly across mobile, tablet, and desktop breakpoints
-- **Accessibility**: Proper ARIA labels and titles for screen readers
+- **Mobile Layout**: Ensures 2 items per row on mobile instead of 1 (better space utilization)
+- **Responsive Alignment**: Proper spacing and padding across all screen sizes
+- **Icon & Text Scaling**: Icons and text scale appropriately for mobile, tablet, and desktop
+- **Consistent Spacing**: Standardized gaps and padding that work across breakpoints
+- **Touch-Friendly**: Adequate button sizes for mobile touch interactions
 
 ## **Core Pattern**
 
 ### **Grid Container**
 ```tsx
-// ✅ DO: Use responsive grid layout matching admin home page
-<div className="w-full mb-8">
-  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+// ✅ DO: Use responsive grid layout with 2 columns on mobile
+<div className="bg-white rounded-xl shadow-lg p-4 sm:p-6 lg:p-8">
+  <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
     {/* Button cards */}
   </div>
 </div>
@@ -31,80 +29,111 @@ This rule defines the standard pattern for navigation button groups displayed in
 
 ### **Button Card Structure**
 ```tsx
-// ✅ DO: Use card-style button pattern
+// ✅ DO: Use responsive button card pattern
 <Link
   href="/admin/path/to/resource"
-  className="flex flex-col items-center justify-center bg-{color}-50 hover:bg-{color}-100 text-{color}-800 rounded-lg shadow-md p-4 text-xs transition-all group"
+  className={`flex flex-col items-center justify-center rounded-lg border-2 p-2.5 sm:p-3 lg:p-4 transition-all duration-300 hover:scale-105 hover:shadow-md group ${colorClasses}`}
   title="Button Label"
   aria-label="Button Label"
 >
-  <div className="flex-shrink-0 w-14 h-14 rounded-xl bg-{color}-100 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform duration-300">
-    <IconComponent className="w-10 h-10 text-{color}-500" />
+  <div className={`flex-shrink-0 w-10 h-10 sm:w-11 sm:h-11 rounded-xl ${iconBgColor} flex items-center justify-center mb-1.5 sm:mb-2 group-hover:scale-110 transition-transform duration-300`}>
+    <IconComponent className={`w-6 h-6 sm:w-8 sm:h-8 ${iconTextColor}`} />
   </div>
-  <span className="font-semibold text-center leading-tight">Button Label</span>
+  <span className="font-semibold text-center text-xs sm:text-sm lg:text-base leading-tight px-1">
+    Button Label
+  </span>
 </Link>
 ```
 
 ## **Key CSS Properties**
 
 ### **Grid Container Requirements**
-- **`w-full`**: Full width of parent container
-- **`mb-8`**: Standard margin bottom (32px) for spacing
-- **`grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4`**: Responsive grid
-  - Mobile: 1 column
-  - Small screens (640px+): 2 columns
-  - Medium screens (768px+): 3 columns
-  - Large screens (1024px+): 4 columns
-- **`gap-4`**: Consistent gap between grid items (16px)
+- **`grid grid-cols-2`**: **CRITICAL**: 2 columns on mobile (not 1)
+- **`sm:grid-cols-2`**: 2 columns on small screens (640px+)
+- **`md:grid-cols-3`**: 3 columns on medium screens (768px+)
+- **`lg:grid-cols-4`**: 4 columns on large screens (1024px+)
+- **`gap-3 sm:gap-4 lg:gap-6`**: Responsive gaps
+  - Mobile: 12px (0.75rem)
+  - Small screens: 16px (1rem)
+  - Large screens: 24px (1.5rem)
+
+### **Card Container Requirements**
+- **`p-4 sm:p-6 lg:p-8`**: Responsive padding
+  - Mobile: 16px (1rem)
+  - Small screens: 24px (1.5rem)
+  - Large screens: 32px (2rem)
 
 ### **Button Card Requirements**
 - **`flex flex-col items-center justify-center`**: Centers content vertically and horizontally
-- **`bg-{color}-50`**: Light background color matching action type
-- **`hover:bg-{color}-100`**: Darker background on hover
-- **`text-{color}-800`**: Text color matching action type
 - **`rounded-lg`**: Medium border radius (8px) for card appearance
-- **`shadow-md`**: Medium shadow for depth
-- **`p-3`**: Padding (12px) for card content - reduced by 25% from original p-4
-- **`text-xs`**: Small text size for labels
-- **`transition-all`**: Smooth transitions for all properties
+- **`border-2`**: 2px border for definition
+- **`p-2.5 sm:p-3 lg:p-4`**: Responsive padding
+  - Mobile: 10px (0.625rem)
+  - Small screens: 12px (0.75rem)
+  - Large screens: 16px (1rem)
+- **`transition-all duration-300`**: Smooth transitions
+- **`hover:scale-105`**: 5% scale increase on hover
+- **`hover:shadow-md`**: Medium shadow on hover
 - **`group`**: Enables group hover effects on child elements
 
 ### **Icon Container Requirements**
 - **`flex-shrink-0`**: Prevents icon container from shrinking
-- **`w-11 h-11`**: Fixed icon container size (44px × 44px) - reduced by 25% from original w-14 h-14
+- **`w-10 h-10 sm:w-11 sm:h-11`**: Responsive icon container size
+  - Mobile: 40px × 40px
+  - Small screens+: 44px × 44px
 - **`rounded-xl`**: Large border radius (12px) for icon container
-- **`bg-{color}-100`**: Background color matching button hover state
 - **`flex items-center justify-center`**: Centers icon within container
-- **`mb-2`**: Margin bottom (8px) for spacing between icon and text - reduced by 25% from original mb-3
+- **`mb-1.5 sm:mb-2`**: Responsive margin bottom
+  - Mobile: 6px (0.375rem)
+  - Small screens+: 8px (0.5rem)
 - **`group-hover:scale-110`**: Scales up 10% when parent card is hovered
 - **`transition-transform duration-300`**: Smooth scale animation
 
 ### **Icon Requirements**
-- **`w-8 h-8`**: Icon size (32px × 32px) - reduced by 25% from original w-10 h-10
-- **`text-{color}-500`**: Icon color matching action type (medium shade)
+- **`w-6 h-6 sm:w-8 sm:h-8`**: Responsive icon size
+  - Mobile: 24px × 24px
+  - Small screens+: 32px × 32px
+- **Color**: Use semantic color matching action type (e.g., `text-blue-600`)
 
 ### **Text Requirements**
 - **`font-semibold`**: Bold text for emphasis
 - **`text-center`**: Centers text horizontally
+- **`text-xs sm:text-sm lg:text-base`**: Responsive text size
+  - Mobile: 12px (0.75rem)
+  - Small screens: 14px (0.875rem)
+  - Large screens: 16px (1rem)
 - **`leading-tight`**: Tighter line height for compact display
+- **`px-1`**: **CRITICAL**: Small horizontal padding prevents text overflow on mobile
 
-## **Color Coding System**
+## **Complete Example**
 
-### **CRITICAL: Unique Color Requirement**
-- **NO TWO BUTTONS IN THE SAME BUTTON GROUP CAN HAVE THE SAME BACKGROUND COLOR**
-- **ALL GRAY COLORS ARE PROHIBITED** - Never use `gray`, `slate`, `stone`, `zinc`, or `neutral` colors for button backgrounds
-- Each button in a button group must have a unique, vibrant color to ensure visual distinction
-- This requirement applies to all admin pages and subpages that display button groups
-- When adding new buttons to a group, ensure the color is not already used by another button in that group
-- Standard color assignments:
-  - **Admin Home**: Always use `blue` (not gray)
-  - **Manage Usage**: Always use `indigo` (not blue, to differentiate from Admin Home)
-  - All other buttons: Use unique colors from available palette (green, teal, purple, violet, orange, pink, rose, lime, yellow, fuchsia, cyan, amber, emerald, sky, red, or custom colors)
+### **Full Responsive Button Group**
+```tsx
+export default function AdminPage() {
+  const adminButtons = [
+    {
+      href: '/admin',
+      icon: 'home',
+      label: 'Admin Home',
+      color: 'blue',
+      key: 'admin-home'
+    },
+    // ... more buttons
+  ];
 
-### **Semantic Colors for Navigation**
-- **Blue** (`blue-50/100/500/800`): Admin Home (standard - replaces gray)
-- **Indigo** (`indigo-50/100/500/800`): Manage Usage, User Management (standard - replaces blue for Manage Usage)
-- **Green** (`green-50/100/500/800`): Manage Events, Calendar Actions
+  const getColorClasses = (color: string) => {
+    const colorMap: Record<string, string> = {
+      blue: 'bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200',
+      green: 'bg-green-50 hover:bg-green-100 text-green-700 border-green-200',
+      // ... other colors
+    };
+    return colorMap[color] || colorMap.blue;
+  };
+
+  const getIconBgColor = (color: string) => {
+    const colorMap: Record<string, string> = {
+      blue: 'bg-blue-100',
+      green: 'bg-green-100',
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
