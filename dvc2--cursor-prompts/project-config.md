@@ -1,249 +1,218 @@
 ---
 trigger: always_on
-description: description: Maintains continuity and context across multiple work sessions
+description: TypeScript best practices, patterns, and type system mastery for modern applications
 ---
 
----
-description: Maintains continuity and context across multiple work sessions
-globs: ["**/*"]
-alwaysApply: false
----
+# TypeScript Best Practices
 
-# Session Coordination & Continuity
+Comprehensive guide for TypeScript development with focus on type safety, performance, and maintainability.
 
-## 🔄 Session State Tracking
+## 1. Type System Mastery
 
-### Active Session Format
-```yaml
-SESSION_STATE:
-  id: "2024-03-14-auth-implementation"
-  feature: "User Authentication"
-  branch: "feature/auth-jwt"
-  status: "IN_PROGRESS"
-  
-PROGRESS:
-  completed:
-    - JWT token generation
-    - User login endpoint
-    - Password hashing
-  in_progress:
-    - Refresh token logic
-  blocked:
-    - Need decision on token expiry
-  next:
-    - Implement logout
-    - Add rate limiting
+### 1.1 Type Inference and Annotations
+
+```typescript
+// Let TypeScript infer when obvious
+const numbers = [1, 2, 3]; // number[]
+const config = { host: 'localhost', port: 3000 }; // inferred shape
+
+// Annotate when inference isn't sufficient
+const processValue = <T extends { id: string }>(value: T): T & { processed: true } => {
+  return { ...value, processed: true };
+};
+
+// Use satisfies for type checking without widening
+const routes = {
+  home: '/',
+  users: '/users',
+  profile: '/users/:id'
+} satisfies Record<string, string>;
 ```
 
-## 📍 Checkpoint System
+### 1.2 Discriminated Unions and Type Narrowing
 
-### Create Checkpoint Before:
-- Major refactoring
-- Switching to different feature
-- End of work session
-- Complex debugging starts
+```typescript
+// Discriminated unions for state management
+type AsyncState<T> = 
+  | { status: 'idle' }
+  | { status: 'loading' }
+  | { status: 'success'; data: T }
+  | { status: 'error'; error: Error };
 
-### Checkpoint Format:
-```javascript
-CHECKPOINT: "Before refactoring auth service"
-STATE: {
-  working_files: ["auth.service.ts", "user.controller.ts"],
-  last_test_status: "PASSING",
-  git_status: "2 files modified, 0 staged",
-  key_decisions: ["Using JWT", "15min token expiry"],
-  rollback_point: "commit:a3f4b5c"
+// Type guards for narrowing
+function isSuccess<T>(state: AsyncState<T>): state is Extract<AsyncState<T>, { status: 'success' }> {
+  return state.status === 'success';
+}
+
+// Pattern matching with exhaustive checks
+function handleState<T>(state: AsyncState<T>): string {
+  switch (state.status) {
+    case 'idle': return 'Ready';
+    case 'loading': return 'Loading...';
+    case 'success': return `Data: ${JSON.stringify(state.data)}`;
+    case 'error': return `Error: ${state.error.message}`;
+    default: {
+      const _exhaustive: never = state;
+      return _exhaustive;
+    }
+  }
 }
 ```
 
-## 🎯 Context Handoff
+### 1.3 Advanced Type Patterns
 
-### End of Session Protocol
-```markdown
-## Session Summary [Date/Time]
+```typescript
+// Conditional types
+type IsArray<T> = T extends readonly any[] ? true : false;
+type UnwrapPromise<T> = T extends Promise<infer U> ? U : T;
 
-### Completed ✓
-- Implemented user registration with validation
-- Added password hashing with bcrypt
-- Created JWT token generation
+// Mapped types with modifiers
+type DeepReadonly<T> = {
+  readonly [P in keyof T]: T[P] extends object ? DeepReadonly<T[P]> : T[P];
+};
 
-### In Progress 🔄
-- Working on refresh token endpoint
-- File: `auth.controller.ts` line 47
+// Template literal types
+type HTTPMethod = 'GET' | 'POST' | 'PUT' | 'DELETE';
+type APIEndpoint<M extends HTTPMethod> = `/api/${Lowercase<M>}/${string}`;
 
-### Blocked ⚠️
-- Waiting for: Decision on refresh token storage
-- Options considered: Redis vs Database
+// Branded types for nominal typing
+type UserId = string & { __brand: 'UserId' };
+type PostId = string & { __brand: 'PostId' };
 
-### Next Session 📋
-1. Complete refresh token implementation
-2. Add logout functionality
-3. Test edge cases
-
-### Key Context
-- Using @nestjs/jwt package
-- Tokens expire in 15 minutes
-- Refresh tokens last 7 days
+const createUserId = (id: string): UserId => id as UserId;
 ```
 
-## 🔗 Dependency Tracking
+### 1.4 Utility Type Cookbook
 
-### Track What Affects What
-```
-DEPENDENCY_MAP:
-  auth.service.ts:
-    imports: ["jwt.service", "user.service"]
-    affects: ["auth.controller", "auth.guard"]
-    tests: ["auth.service.test.ts"]
-    
-  user.model.ts:
-    affects: ["*user*", "auth.service"]
-    migration: "20240314_add_user_table.sql"
+```typescript
+// Deep partial with arrays
+type DeepPartial<T> = T extends readonly any[] ? T : {
+  [P in keyof T]?: T[P] extends object ? DeepPartial<T[P]> : T[P];
+};
+
+// Type-safe object paths
+type Path<T> = T extends object ? {
+  [K in keyof T]: K extends string 
+    ? T[K] extends object 
+      ? K | `${K}.${Path<T[K]>}`
+      : K
+    : never;
+}[keyof T] : never;
+
+// Type-safe event emitter
+type EventMap = Record<string, any>;
+type EventKey<T extends EventMap> = string & keyof T;
+type EventReceiver<T> = (params: T) => void;
+
+interface Emitter<T extends EventMap> {
+  on<K extends EventKey<T>>(eventName: K, fn: EventReceiver<T[K]>): void;
+  emit<K extends EventKey<T>>(eventName: K, params: T[K]): void;
+}
 ```
 
-### Change Impact Analysis
-```
-CHANGE: Modified User model email validation
-IMPACTS:
-  - user.service.ts: Update createUser validation
-  - auth.service.ts: Check login email handling
-  - user.test.ts: Update test cases
-  - API docs: Reflect new validation rules
-```
+## 2. Strict Mode Best Practices
 
-## 💭 Decision Memory
+### 2.1 Null Safety
 
-### Record Key Decisions
-```markdown
-DECISION_LOG:
+```typescript
+// Handle null/undefined explicitly
+interface User {
+  id: string;
+  name: string;
+  email?: string; // Optional
+  metadata: Record<string, unknown> | null; // Nullable
+}
+
+// Non-null assertion when you're certain
+function processUser(user: User | null) {
+  if (!user) throw new Error('User required');
   
-2024-03-14 14:30
-- DECISION: Use JWT instead of sessions
-- REASON: Stateless, scalable, mobile-friendly
-- TRADEOFFS: Can't revoke easily, need refresh strategy
-- ALTERNATIVE: Considered Redis sessions
-
-2024-03-14 15:45  
-- DECISION: 15-minute access token expiry
-- REASON: Balance security vs UX
-- REFERENCE: OWASP recommends 5-30 minutes
-```
-
-### Pattern Recognition
-```
-LEARNED_PATTERNS:
-- This project prefers async/await over promises
-- Error handling uses custom AppError class
-- All endpoints return { success, data, error } format
-- Testing uses jest with supertest for endpoints
-```
-
-## 🚦 Work State Indicators
-
-### Current Focus
-```javascript
-// WORKING_ON: Adding validation to refresh token endpoint
-// CONTEXT: User reported tokens not refreshing properly
-// HYPOTHESIS: Race condition when token expires during refresh
-// TESTING: Adding concurrent request tests
-```
-
-### Mental Stack
-```
-STACK:
-1. [CURRENT] Fixing refresh token race condition
-2. [PAUSED] Implement logout endpoint
-3. [TODO] Add rate limiting
-4. [BACKLOG] OAuth integration
-```
-
-## 📊 Progress Tracking
-
-### Feature Progress
-```
-Authentication Module: ████████░░ 80%
-  ├─ Login: ██████████ 100% ✓
-  ├─ Register: ██████████ 100% ✓
-  ├─ JWT Generation: ██████████ 100% ✓
-  ├─ Refresh Token: ████████░░ 80% 
-  ├─ Logout: ░░░░░░░░░░ 0%
-  └─ Rate Limiting: ░░░░░░░░░░ 0%
-```
-
-### Time Investment
-```
-FEATURE_TIME:
-  research: 2h (JWT best practices)
-  implementation: 6h
-  debugging: 1.5h
-  testing: 2h
-  refactoring: 1h
+  // TypeScript knows user is non-null here
+  console.log(user.name.toUpperCase());
   
-BLOCKERS_TIME:
-  waiting_for_decisions: 1h
-  environment_issues: 0.5h
+  // Optional chaining for safety
+  const domain = user.email?.split('@')[1];
+}
+
+// Nullish coalescing
+const getDisplayName = (user: User) => {
+  return user.name ?? user.email ?? 'Anonymous';
+};
 ```
 
-## 🔍 Quick Context Recovery
+### 2.2 Type Assertions and Guards
 
-### Session Resume Commands
-```
-"Continue from last session" →
-  1. Load last checkpoint
-  2. Show progress summary
-  3. Display current task
-  4. List immediate next steps
+```typescript
+// Avoid type assertions, prefer type guards
+function isUser(value: unknown): value is User {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'id' in value &&
+    'name' in value &&
+    typeof value.id === 'string' &&
+    typeof value.name === 'string'
+  );
+}
 
-"What was I working on?" →
-  - Feature: [Name]
-  - File: [Current file + line]
-  - Task: [Specific task]
-  - Context: [Why doing this]
-```
-
-## 🎪 Collaboration Context
-
-### Team Handoff Format
-```markdown
-HANDOFF TO: @teammate
-
-CONTEXT:
-- Working on: JWT refresh token implementation
-- Branch: feature/auth-jwt
-- PR: #123 (draft)
-
-CURRENT STATE:
-- Login works perfectly
-- Refresh endpoint 80% done
-- Need to handle concurrent refresh
-
-WATCH OUT:
-- Token expiry edge case at exactly 15 min
-- Database connection pool gets exhausted under load
-
-NEXT STEPS:
-1. Complete refresh token error handling
-2. Add integration tests
-3. Update API documentation
+// When assertions are necessary, be explicit
+const config = JSON.parse(configString) as unknown;
+if (!isValidConfig(config)) {
+  throw new Error('Invalid configuration');
+}
 ```
 
-## 💾 Session Persistence
+## 3. Architecture Patterns
 
-### Auto-Save Triggers
-- Every significant completion
-- Before major changes
-- On error occurrence
-- At regular intervals (30 min)
+### 3.1 Dependency Injection
 
-### Recovery Protocol
+```typescript
+// Token-based DI
+const TOKENS = {
+  Logger: Symbol('Logger'),
+  Database: Symbol('Database'),
+  Cache: Symbol('Cache'),
+} as const;
+
+interface Logger {
+  log(message: string): void;
+}
+
+interface Container {
+  get<T>(token: symbol): T;
+  bind<T>(token: symbol, factory: () => T): void;
+}
+
+// Usage with decorators
+class UserService {
+  constructor(
+    @inject(TOKENS.Logger) private logger: Logger,
+    @inject(TOKENS.Database) private db: Database
+  ) {}
+}
 ```
-IF session_crashed:
-  1. Load last checkpoint
-  2. Check git status
-  3. Verify test status
-  4. Resume from safe state
-```
 
-Remember: Good coordination means never losing context or repeating work!
+### 3.2 Repository Pattern
+
+```typescript
+// Generic repository interface
+interface Repository<T, ID = string> {
+  findById(id: ID): Promise<T | null>;
+  findAll(filter?: Partial<T>): Promise<T[]>;
+  save(entity: T): Promise<T>;
+  delete(id: ID): Promise<void>;
+}
+
+// Type-safe implementation
+class UserRepository implements Repository<User, string> {
+  async findById(id: string): Promise<User | null> {
+    const result = await db.query<User>('SELECT * FROM users WHERE id = ?', [id]);
+    return result[0] || null;
+  }
+  
+  async findAll(filter?: Partial<User>): Promise<User[]> {
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [DVC2/cursor_prompts](https://github.com/DVC2/cursor_prompts) — distributed by [TomeVault](https://tomevault.io).
