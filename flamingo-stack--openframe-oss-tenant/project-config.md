@@ -1,156 +1,196 @@
 ---
 trigger: always_on
-description: description: Authentication patterns and security practices for OpenFrame JWT cookie-based system
+description: This document outlines the CI/CD pipeline configuration and best practices for the OpenFrame project.
 ---
 
+# CI/CD Pipeline
 
----
-description: Authentication patterns and security practices for OpenFrame JWT cookie-based system
-globs:
-  - "openframe/services/*/src/main/java/**/security/**"
-  - "openframe/services/*/src/main/java/**/controller/**"
-  - "openframe/services/*/src/main/java/**/service/**"
-  - "openframe/libs/openframe-jwt/**"
-  - "openframe/services/openframe-frontend/src/stores/auth.ts"
-alwaysApply: false
----
+This document outlines the CI/CD pipeline configuration and best practices for the OpenFrame project.
 
-# Authentication Patterns in OpenFrame
+## Pipeline Overview
 
-OpenFrame uses a secure, cookie-based JWT authentication system with Spring Security OAuth2 Resource Server. Follow these patterns for consistent authentication implementation.
+OpenFrame uses GitHub Actions for continuous integration and deployment, following these stages:
 
-## Core Architecture Components
+1. **Build**: Compile code and build artifacts
+2. **Test**: Run unit and integration tests
+3. **Analyze**: Perform static code analysis and security scanning
+4. **Package**: Create Docker images
+5. **Deploy**: Deploy to staging and production environments
 
-### JWT + HttpOnly Cookies Pattern
-- **Access tokens**: Stored in `access_token` HttpOnly cookie with `Path=/`
-- **Refresh tokens**: Stored in `refresh_token` HttpOnly cookie with `Path=/api/oauth/token`
-- **Security**: Tokens are never exposed to client-side JavaScript
-- **Reference**: [CookieService.java](mdc:openframe/libs/openframe-jwt/src/main/java/com/openframe/security/cookie/CookieService.java)
-
-### Spring Security Configuration
-Always use Spring Security OAuth2 Resource Server in API services:
-
-```java
-@Configuration
-@EnableWebSecurity
-public class SecurityConfig {
-    @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtDecoder jwtDecoder) {
-        return http
-            .csrf(AbstractHttpConfigurer::disable)
-            .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/oauth/token", "/oauth/register", "/.well-known/**").permitAll()
-                .anyRequest().authenticated()
-            )
-            .oauth2ResourceServer(oauth2 -> oauth2
-                .jwt(jwt -> jwt.decoder(jwtDecoder))
-            )
-            .build();
-    }
-}
+```
+┌─────────┐     ┌─────────┐     ┌─────────┐     ┌─────────┐     ┌─────────┐
+│         │     │         │     │         │     │         │     │         │
+│  Build  │────▶│  Test   │────▶│ Analyze │────▶│ Package │────▶│ Deploy  │
+│         │     │         │     │         │     │         │     │         │
+└─────────┘     └─────────┘     └─────────┘     └─────────┘     └─────────┘
 ```
 
-**Reference**: [SecurityConfig.java](mdc:openframe/services/openframe-api/src/main/java/com/openframe/api/config/SecurityConfig.java)
+## GitHub Actions Workflow
 
-## Controller Patterns
+The main workflow is defined in `.github/workflows/deploy.yml`:
 
-### Use AuthPrincipal Instead of Raw JWT
-Always use `@AuthenticationPrincipal AuthPrincipal principal` in controllers:
+```yaml
+name: Build and Deploy
 
-```java
-@RestController
-public class ApiController {
-    @GetMapping("/api-keys")
-    public List<ApiKeyResponse> getApiKeys(@AuthenticationPrincipal AuthPrincipal principal) {
-        return apiKeyService.getApiKeysForUser(principal.getId());
-    }
-}
-```
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
 
-**Never use**:
-- `@RequestHeader("X-User-Id") String userId`
-- `@AuthenticationPrincipal Jwt jwt` directly
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up JDK
+      uses: actions/setup-java@v3
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+        cache: 'maven'
+        
+    - name: Build with Maven
+      run: mvn -B clean package -DskipTests
+      
+    - name: Cache Maven packages
+      uses: actions/cache@v3
+      with:
+        path: ~/.m2
+        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+        restore-keys: ${{ runner.os }}-m2
+        
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: build-artifacts
+        path: |
+          **/target/*.jar
+          !**/target/classes
+          !**/target/test-classes
 
-**Reference**: [AuthPrincipal.java](mdc:openframe/libs/openframe-jwt/src/main/java/com/openframe/security/authentication/AuthPrincipal.java)
+  test:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up JDK
+      uses: actions/setup-java@v3
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+        cache: 'maven'
+        
+    - name: Download build artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: build-artifacts
+        
+    - name: Run Tests
+      run: mvn -B test
+      
+    - name: Upload test results
+      uses: actions/upload-artifact@v3
+      with:
+        name: test-results
+        path: |
+          **/target/surefire-reports
+          **/target/site/jacoco
 
-### OAuth Controller Pattern
-OAuth controllers should delegate cookie management to services:
+  analyze:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up JDK
+      uses: actions/setup-java@v3
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+        cache: 'maven'
+        
+    - name: SonarQube Scan
+      run: mvn -B sonar:sonar
+      env:
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        
+    - name: OWASP Dependency Check
+      run: mvn -B org.owasp:dependency-check-maven:check
+      
+    - name: Upload analysis results
+      uses: actions/upload-artifact@v3
+      with:
+        name: analysis-results
+        path: |
+          **/target/dependency-check-report.html
+          **/target/sonar
 
-```java
-@PostMapping("/token")
-public ResponseEntity<?> token(
-        @RequestParam String grant_type,
-        @RequestParam(required = false) String code,
-        @RequestHeader(value = X_REFRESH_TOKEN, required = false) String refreshToken,
-        HttpServletRequest httpRequest,
-        HttpServletResponse httpResponse) {
+  package:
+    needs: [test, analyze]
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+      
+    - name: Login to DockerHub
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+        
+    - name: Download build artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: build-artifacts
+        
+    - name: Build and push API image
+      uses: docker/build-push-action@v4
+      with:
+        context: ./services/openframe-api
+        push: ${{ github.event_name != 'pull_request' }}
+        tags: openframe/api:latest,openframe/api:${{ github.sha }}
+        
+    - name: Build and push Gateway image
+      uses: docker/build-push-action@v4
+      with:
+        context: ./services/openframe-gateway
+        push: ${{ github.event_name != 'pull_request' }}
+        tags: openframe/gateway:latest,openframe/gateway:${{ github.sha }}
+        
+    # Additional services...
 
-    TokenResponse response = oauthService.processTokenRequest(
-        grant_type, code, username, password, client_id, client_secret, refreshToken, httpRequest);
-
-    oauthService.setAuthenticationCookies(response, httpResponse);
-    return ResponseEntity.ok(response);
-}
-```
-
-**Reference**: [OAuthController.java](mdc:openframe/services/openframe-api/src/main/java/com/openframe/api/controller/OAuthController.java)
-
-## Service Layer Patterns
-
-### Cookie Management
-Always delegate cookie operations to `CookieService`:
-
-```java
-@Service
-public class OAuthService {
-    private final CookieService cookieService;
-
-    public void setAuthenticationCookies(TokenResponse tokens, HttpServletResponse response) {
-        cookieService.setAccessTokenCookie(tokens.getAccess_token(), response);
-        cookieService.setRefreshTokenCookie(tokens.getRefresh_token(), response);
-    }
-}
-```
-
-**Reference**: [OAuthService.java](mdc:openframe/services/openframe-api/src/main/java/com/openframe/api/service/OAuthService.java)
-
-### Token Processing Pattern
-Separate refresh token handling from other grant types:
-
-```java
-public TokenResponse processTokenRequest(String grantType, String refreshToken, ...) {
-    if ("refresh_token".equals(grantType)) {
-        if (refreshToken == null) {
-            throw new IllegalArgumentException("Refresh token not found");
-        }
-        return handleRefreshToken(refreshToken, clientId, clientSecret);
-    }
-
-    return token(grantType, code, username, password, clientId, clientSecret);
-}
-```
-
-## Gateway Security Patterns
-
-### Cookie-to-Header Filter
-Use `CookieToHeaderFilter` to convert cookies to headers for Spring Security:
-
-```java
-@Component
-public class CookieToHeaderFilter implements WebFilter {
-    @Override
-    public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
-        String accessToken = cookieService.getAccessTokenFromCookies(exchange);
-        if (accessToken != null) {
-            ServerHttpRequest request = exchange.getRequest().mutate()
-                .header(AUTHORIZATION, "Bearer " + accessToken)
-                .build();
-            return chain.filter(exchange.mutate().request(request).build());
-        }
-        return chain.filter(exchange);
-    }
-}
-```
+  deploy-staging:
+    if: github.event_name != 'pull_request'
+    needs: package
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set Kubernetes context
+      uses: azure/k8s-set-context@v3
+      with:
+        kubeconfig: ${{ secrets.KUBE_CONFIG_STAGING }}
+        
+    - name: Deploy to Kubernetes
+      run: |
+        # Update image tags
+        sed -i "s|image: openframe/api:.*|image: openframe/api:${{ github.sha }}|g" kubernetes/staging/*.yaml
+        sed -i "s|image: openframe/gateway:.*|image: openframe/gateway:${{ github.sha }}|g" kubernetes/staging/*.yaml
+        
+        # Apply Kubernetes manifests
+        kubectl apply -f kubernetes/staging/
+        
+    - name: Verify deployment
+      run: |
+        kubectl rollout status deployment/openframe-api -n openframe
+        kubectl rollout status deployment/openframe-gateway -n openframe
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
