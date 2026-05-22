@@ -1,175 +1,110 @@
 ---
 trigger: always_on
-description: This rule defines the standard pattern for loading animations used across admin pages and success pages. The pattern provides consistent visual feedback with animated loading images and wavy overlay effects, matching the design aesthetic used in EventList and manage-events pages.
+description: Media gallery grid styling pattern with medium dark gradient backgrounds for admin pages and conservative gradients for public pages
 ---
 
-# Loading Animation Pattern
+
+# Media Gallery Grid Styling Pattern
 
 ## **Overview**
-This rule defines the standard pattern for loading animations used across admin pages and success pages. The pattern provides consistent visual feedback with animated loading images and wavy overlay effects, matching the design aesthetic used in EventList and manage-events pages.
+This rule defines the standard pattern for displaying media/image grids with gradient backgrounds, matching the design aesthetic of both admin pages (medium dark gradients) and public-facing gallery pages (conservative warm tones). The pattern provides consistent styling, subtle visual depth, and proper icon presentation.
 
 ## **Problem Solved**
-- **Consistent Loading UI**: Ensures all loading states use the same visual pattern across admin and success pages
-- **Visual Feedback**: Provides engaging animations (pulse, zoom, wavy overlay) to indicate processing
-- **Professional Appearance**: Uses high-quality loading images with smooth animations
-- **User Experience**: Clear visual indication that content is being loaded
+- **Consistent Grid Styling**: Ensures all media grids use the same visual pattern across admin and public pages
+- **Medium Dark Gradient Backgrounds**: Provides professional medium dark gradient backgrounds for admin pages that enhance without overwhelming
+- **Conservative Gradient Backgrounds**: Provides subtle, professional gradient backgrounds for public pages
+- **Icon Standardization**: Provides consistent icon container and sizing for action buttons (references Icon Standards and Admin Action Buttons rules)
+- **Visual Hierarchy**: Creates clear separation between grid container and individual media items
+- **Responsive Design**: Works consistently across different screen sizes
 
 ## **Core Pattern**
 
-### **Loading Container Structure**
+### **Grid Container Structure**
 ```tsx
-// ✅ DO: Use the standard loading animation pattern
-if (loading) {
-  return (
-    <div className="flex justify-center items-center min-h-[600px] w-full">
-      <div className="relative w-full max-w-6xl">
-        <Image
-          src="/images/loading_events.jpg"
-          alt="Loading..."
-          width={800}
-          height={600}
-          className="w-full h-auto rounded-lg shadow-2xl animate-pulse zoom-loading"
-          priority
-        />
-        <div className="absolute inset-0 rounded-lg overflow-hidden">
-          <div className="wavy-animation"></div>
-        </div>
-      </div>
+// ✅ DO: Use the standard media grid container pattern
+// Admin Pages (Medium Dark Gradient)
+<div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-gray-700 via-gray-800 to-gray-700 border border-gray-600/30 shadow-2xl mb-8">
+  {/* Medium Dark Radial Gradient Overlay */}
+  <div className="absolute inset-0 pointer-events-none opacity-60" style={{ backgroundImage: 'radial-gradient(circle at top left, rgba(255, 255, 255, 0.12), transparent 55%)' }} />
+
+  {/* Grid Content */}
+  <div className="relative px-6 py-10 sm:px-10 lg:px-14">
+    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+      {/* Media items */}
     </div>
-  );
-}
+  </div>
+</div>
 ```
 
 ## **Key CSS Properties**
 
 ### **Container Requirements**
-- **`flex justify-center items-center`**: Centers loading content horizontally and vertically
-- **`min-h-[600px]`**: Minimum height (600px) for consistent loading area
-- **`w-full`**: Full width of parent container
 - **`relative`**: Enables absolute positioning of overlay
-- **`w-full max-w-6xl`**: Full width with maximum width constraint (1152px)
+- **`overflow-hidden`**: Clips content to rounded corners
+- **`rounded-3xl`**: Large border radius (24px) for modern appearance
+- **`bg-gradient-to-br`**: Diagonal gradient from top-left to bottom-right
+- **Admin Pages**: `from-gray-700 via-gray-800 to-gray-700` (medium dark gradient)
+- **Public Pages**: `from-background via-muted to-background` (conservative warm tones)
+- **Event Pages**: `from-gray-900 via-purple-900 to-indigo-900` (bold dark gradient)
+- **Border**:
+  - Admin: `border-gray-600/30` (medium dark border)
+  - Public: `border-border/30` (subtle border)
+  - Event: `border-white/10` (light border on dark)
+- **Shadow**:
+  - Admin: `shadow-2xl` (large shadow for depth)
+  - Public: `sacred-shadow-lg` (MOSC shadow)
+  - Event: `shadow-2xl` (large shadow)
+- **`mb-8`**: Bottom margin (32px) for spacing
 
-### **Image Requirements**
-- **`src="/images/loading_events.jpg"`**: Standard loading image path
-- **`width={800} height={600}`**: Image dimensions for Next.js Image optimization
-- **`w-full h-auto`**: Full width with automatic height (maintains aspect ratio)
-- **`rounded-lg`**: Medium border radius (8px) for rounded corners
-- **`shadow-2xl`**: Large shadow for depth
-- **`animate-pulse`**: Tailwind pulse animation (opacity fade in/out)
-- **`zoom-loading`**: Custom zoom animation (scale 0.8 → 1.1 → 1.0)
-- **`priority`**: Next.js Image priority loading (loads immediately)
+### **Radial Gradient Overlay Requirements**
+- **`absolute inset-0`**: Covers entire container
+- **`pointer-events-none`**: Doesn't interfere with interactions
+- **Opacity**:
+  - **Admin Pages (Medium Dark)**: `opacity-60` (60% for medium dark backgrounds)
+  - **Public Pages (Conservative)**: `opacity-30` (30% for subtlety)
+  - **Event Pages (Bold Dark)**: `opacity-70` (70% for bold dark backgrounds)
+- **Radial Gradient**:
+  - **Admin Pages**: `radial-gradient(circle at top left, rgba(255, 255, 255, 0.12), transparent 55%)` (white at 12% opacity)
+  - **Public Pages**: `radial-gradient(circle at top left, rgba(139, 125, 107, 0.08), transparent 55%)` (primary color at 8% opacity)
+  - **Event Pages**: `radial-gradient(circle at top left, rgba(255,255,255,0.18), transparent 55%)` (white at 18% opacity)
+  - Starts at top-left corner
+  - Fades to transparent at 55% radius
 
-### **Wavy Overlay Requirements**
-- **`absolute inset-0`**: Covers entire container (absolute positioned, all sides at 0)
-- **`rounded-lg overflow-hidden`**: Matches container border radius, clips overlay
-- **`wavy-animation`**: Custom CSS class for wavy shimmer effect
+### **Grid Content Requirements**
+- **`relative`**: Positions content above overlay
+- **`px-6 py-10 sm:px-10 lg:px-14`**: Responsive padding
+  - Mobile: 24px horizontal, 40px vertical
+  - Small screens: 40px horizontal
+  - Large screens: 56px horizontal
 
-## **CSS Animation Definitions**
+### **Grid Requirements**
+- **`grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4`**: Responsive grid
+  - Mobile: 1 column
+  - Small screens (640px+): 2 columns
+  - Medium screens (768px+): 3 columns
+  - Large screens (1024px+): 4 columns
+- **`gap-6`**: Consistent gap between items (24px)
 
-### **Zoom Loading Animation** (defined in `src/app/globals.css`)
-```css
-@keyframes zoomInOut {
-  0% {
-    transform: scale(0.8);
-    opacity: 0.7;
-  }
-  50% {
-    transform: scale(1.1);
-    opacity: 1;
-  }
-  100% {
-    transform: scale(1);
-    opacity: 0.9;
-  }
-}
+## **Color Coding System**
 
-.zoom-loading {
-  animation: zoomInOut 2s ease-in-out infinite;
-}
-```
+### **Admin Pages** (Medium Dark Gradient)
+- **Background**: `from-gray-700 via-gray-800 to-gray-700`
+- **Border**: `border-gray-600/30`
+- **Radial Gradient**: `rgba(255, 255, 255, 0.12)` (white at 12% opacity)
+- **Overlay Opacity**: `opacity-60` (60% for medium dark backgrounds)
 
-### **Wavy Animation** (defined in `src/app/globals.css`)
-```css
-@keyframes wavy {
-  0%, 100% {
-    transform: translateY(0px) scale(1);
-    opacity: 0.3;
-  }
-  50% {
-    transform: translateY(-15px) scale(1.05);
-    opacity: 0.7;
-  }
-}
+### **Public Pages** (MOSC Warm Earth Tones)
+- **Background**: `from-background via-muted to-background`
+- **Border**: `border-border/30`
+- **Radial Gradient**: `rgba(139, 125, 107, 0.08)` (primary color at 8% opacity)
 
-@keyframes shimmer {
-  0% {
-    background-position: -200% 0;
-  }
-  100% {
-    background-position: 200% 0;
-  }
-}
+### **Event Pages** (Bold Dark Gradient)
+- **Background**: `from-gray-900 via-purple-900 to-indigo-900`
+- **Border**: `border-white/10` (light border on dark background)
+- **Radial Gradient**: `rgba(255,255,255,0.18)` (white at 18% opacity)
+- **Overlay Opacity**: `opacity-70` (70% for bold dark backgrounds)
+- **Inner Thumbnail Container**: `bg-white/10 backdrop-blur-sm rounded-2xl border border-white/20 p-6 shadow-inner` (glassmorphism effect)
 
-.wavy-animation {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(90deg,
-    transparent 0%,
-    rgba(255, 193, 7, 0.2) 25%,
-    rgba(255, 193, 7, 0.4) 50%,
-    rgba(255, 193, 7, 0.2) 75%,
-    transparent 100%);
-  background-size: 200% 100%;
-  animation:
-    wavy 3s ease-in-out infinite,
-    shimmer 2s ease-in-out infinite;
-  border-radius: inherit;
-  pointer-events: none;
-}
-```
-
-## **Complete Example**
-
-### **EventList Loading Pattern**
-```tsx
-// ✅ DO: Use the standard loading animation pattern (EventList component)
-if (loading) {
-  return (
-    <div className="flex justify-center items-center min-h-[600px] w-full">
-      <div className="relative w-full max-w-6xl">
-        <Image
-          src="/images/loading_events.jpg"
-          alt="Loading events..."
-          width={800}
-          height={600}
-          className="w-full h-auto rounded-lg shadow-2xl animate-pulse zoom-loading"
-          priority
-        />
-        <div className="absolute inset-0 rounded-lg overflow-hidden">
-          <div className="wavy-animation"></div>
-        </div>
-      </div>
-    </div>
-  );
-}
-```
-
-### **Membership Success Loading Pattern**
-```tsx
-// ✅ DO: Use the standard loading animation pattern (MembershipSuccessClient component)
-if (loading) {
-  return (
-    <div className="flex justify-center items-center min-h-[600px] w-full">
-      <div className="relative w-full max-w-6xl">
-        <Image
-          src="/images/loading_events.jpg"
-          alt="Loading membership subscription..."
-          width={800}
-          height={600}
-          className="w-full h-auto rounded-lg shadow-2xl animate-pulse zoom-loading"
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
