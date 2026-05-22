@@ -1,78 +1,78 @@
 ---
 trigger: always_on
-description: Guide for using meta-development script (scripts/dev.js) to manage task-driven development workflows
+description: description: Guidelines and best practices for developing the ZK Mixer frontend application.
 ---
 
----
-description: Guide for using meta-development script (scripts/dev.js) to manage task-driven development workflows
-globs: ["tasks/tasks.json", "tasks/*.md", "scripts/dev.{js,cjs}"]
+ ---
+description: Guidelines and best practices for developing the ZK Mixer frontend application.
+globs: ["frontend/**/*.js", "frontend/**/*.jsx", "frontend/**/*.css"]
 alwaysApply: true
 ---
 
-- **Global CLI Commands**
-  - Task Master now provides a global CLI through the `task-master` command
-  - All functionality from `scripts/dev.js` is available through this interface
-  - Install globally with `npm install -g claude-task-master` or use locally via `npx`
-  - Use `task-master <command>` instead of `node scripts/dev.js <command>`
-  - Examples:
-    - `task-master list` instead of `node scripts/dev.js list`
-    - `task-master next` instead of `node scripts/dev.js next`
-    - `task-master expand --id=3` instead of `node scripts/dev.js expand --id=3`
-  - All commands accept the same options as their script equivalents
-  - The CLI provides additional commands like `task-master init` for project setup
+- **General Architecture**
+    - **Component Structure**: Organize components in a logical, hierarchical manner. Use the following directory structure:
+        - `/components`: For reusable UI components
+        - `/contexts`: For React contexts and providers
+        - `/utils`: For utility functions
+        - `/abis`: For contract ABIs
+    - **Component Size**: Keep components focused on a single responsibility. Components exceeding 250 lines should be considered for splitting.
+    - **State Management**: Use React Context API for global state management. Avoid prop drilling beyond 2 levels.
 
-- **Development Workflow Process**
-  - Start new projects by running `task-master init` or `node scripts/dev.js parse-prd --input=<prd-file.txt>` to generate initial tasks.json
-  - Begin coding sessions with `task-master list` to see current tasks, status, and IDs
-  - Analyze task complexity with `task-master analyze-complexity --research` before breaking down tasks
-  - Select tasks based on dependencies (all marked 'done'), priority level, and ID order
-  - Clarify tasks by checking task files in tasks/ directory or asking for user input
-  - View specific task details using `task-master show <id>` to understand implementation requirements
-  - Break down complex tasks using `task-master expand --id=<id>` with appropriate flags
-  - Clear existing subtasks if needed using `task-master clear-subtasks --id=<id>` before regenerating
-  - Implement code following task details, dependencies, and project standards
-  - **Maintain Analysis Documentation**: Whencomplex areas like circuits ([analysis.md](mdc:docs/analysis.md)), smart contracts, or core architecture, frequently update the relevant analysis/documentation file (e.g., `docs/analysis.md`) with findings, decisions, and current understanding. This ensures documentation stays synchronized with development progress.
-  - **Run Tests After Edits**: After making significant code changes, especially to core components like smart contracts (`*.sol`), circuits (`*.circom`), or critical frontend logic, **run the relevant test suite** (e.g., `npx hardhat test`) to catch regressions early. Address any test failures before proceeding or committing changes.
-  - Verify tasks according to test strategies before marking as complete
-  - Mark completed tasks with `task-master set-status --id=<id> --status=done`
-  - Update dependent tasks when implementation differs from original plan
-  - Generate task files with `task-master generate` after updating tasks.json
-  - Maintain valid dependency structure with `task-master fix-dependencies` when needed
-  - Respect dependency chains and task priorities when selecting work
-  - Report progress regularly using the list command
+- **React Best Practices**
+    - **Functional Components**: Use functional components with hooks for all new components.
+    - **Hook Organization**: Ensure custom hooks follow the "use-" naming convention. Keep hooks focused on a specific piece of functionality.
+    - **useEffect Usage**: Be explicit about dependencies in useEffect. Avoid unnecessary re-renders by properly memoizing functions and values with useCallback and useMemo.
+    - **Error Handling**: Implement proper error boundaries and error states for API calls and blockchain interactions.
+    - **Code Splitting**: Use React.lazy() and Suspense for code splitting in larger applications to optimize load times.
 
+- **User Experience (UX) Guidelines**
+    - **Loading States**: Always provide loading indicators during blockchain interactions.
+    - **Error Messages**: Display clear, user-friendly error messages. Translate technical errors into understandable language.
+    - **Confirmation Steps**: Implement confirmation steps for actions with permanent consequences (e.g., deposits, withdrawals).
+    - **Mobile Responsiveness**: Ensure all components work on mobile devices. Use responsive design principles.
+    - **Accessibility**: Follow WCAG guidelines. Include proper alt text, aria labels, and ensure keyboard navigation.
 
-- **Post-Task Integration & Review (After Completing All Subtasks of a Parent Task ID)**
-    - **Mark Parent Task Done**: Once all subtasks for a parent task ID are marked 'done', mark the parent task itself as 'done'.
-        ```bash
-        # Example: Mark parent task 1 as done
-        task-master set-status --id=1 --status=done
-        ```
-    - **Integration Testing**:
-        - **Goal**: Verify that the functionalities implemented across all subtasks of the completed parent task work together correctly.
-        - **Process**:
-            - Identify or create integration tests relevant to the completed parent task (e.g., testing deposit, proof generation, and withdrawal flow together for the ZK Mixer core).
-            - Run these tests (e.g., `npx hardhat test test/integration/Task1Integration.test.js` or a relevant script).
-            - Address any failures before proceeding.
-        - **AI Assistance**: Ask the AI to help identify, generate, or run relevant integration tests for the completed task ID.
-            ```
-            Task 1 and all its subtasks are complete. Can you help create or run integration tests for the ZK Mixer core architecture?
-            ```
-    - **Final Rule Review & Adaptation**:
-        - **Goal**: Re-evaluate project rules based on the learnings and patterns from the *entire* completed parent task.
-        - **Process**:
-            - Review relevant rule files (e.g., `solidity_rules.mdc`, `dev_workflow.mdc`) considering the overall implementation of the completed task.
-            - Identify any new patterns, necessary adjustments, or potential new rules based on the completed feature set.
-        - **AI Assistance**: Prompt the AI to assist in this review.
-            ```
-            Task 1 (Setup Core Architecture) is fully complete. Let's review solidity_rules.mdc and dev_workflow.mdc to see if any adaptations are needed based on this phase.
-            ```
-        - This complements the subtask-specific rule review (which should still be done per subtask) by providing a holistic perspective after a major feature/phase is complete.
+- **Web3/Ethereum Integration**
+    - **Wallet Connection**: Use a consistent pattern for wallet connections. Implement proper error handling for common wallet issues.
+    - **Transaction Flow**: Follow this pattern for blockchain transactions:
+        1. Show loading state
+        2. Execute transaction
+        3. Wait for confirmation
+        4. Update UI
+        5. Handle errors gracefully
+    - **Gas Estimation**: Provide gas estimates before transactions when possible.
+    - **Network Detection**: Check for correct network and guide users to switch if needed.
+    - **Chain ID Handling**: Always verify chain ID before transactions to prevent incorrect network submissions.
 
+- **Privacy and Security**
+    - **Information Disclosure**: Be careful about what data is logged or stored. Never log or store user's private notes or keys.
+    - **Local Storage**: Use local storage only for non-sensitive data. Encrypt any sensitive data that needs to be stored.
+    - **Input Validation**: Validate all inputs, especially addresses and amounts.
+    - **Link Protection**: Use rel="noopener noreferrer" for external links.
 
-- **Task Complexity Analysis**
+- **ZK Mixer Specific**
+    - **Note Management**: Provide clear instructions about the importance of storing notes safely.
+    - **Educational Content**: Include educational elements to help users understand the privacy features.
+    - **Denomination Handling**: Clearly display denomination options and current selection.
+    - **Nullifier/Commitment Display**: Use truncated displays for lengthy cryptographic values with options to view/copy full values.
+    - **Withdrawal Flow**: Implement a clear, step-by-step flow for withdrawals to ensure users understand the process.
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- **CSS Guidelines**
+    - **CSS Organization**: Use CSS modules or styled-components for component-specific styling.
+    - **Variable Usage**: Use CSS variables for colors, spacing, and typography to maintain consistency.
+    - **Mobile-First**: Follow mobile-first approach for responsive design.
+    - **Dark Mode Support**: Consider supporting dark mode for better user experience.
+
+- **Testing**
+    - **Component Testing**: Write tests for all critical components.
+    - **Integration Testing**: Test critical user flows like connecting wallet, depositing, and withdrawing.
+    - **Mocking**: Mock blockchain interactions for faster and more reliable tests.
+    - **Test Coverage**: Aim for at least 70% test coverage for critical components.
+
+- **Documentation**
+    - **Component Documentation**: Document component props and behavior.
+    - **Code Comments**: Add meaningful comments for complex logic.
+    - **README**: Maintain an up-to-date README with setup instructions and architecture overview.
 
 ---
 > Source: [Zyra-V21/ZKUzumaki](https://github.com/Zyra-V21/ZKUzumaki) — distributed by [TomeVault](https://tomevault.io).
