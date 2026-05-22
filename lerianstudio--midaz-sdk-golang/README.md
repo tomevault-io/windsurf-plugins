@@ -7,11 +7,11 @@ A Go client library for the Midaz financial ledger APIs. This SDK provides a fle
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [LerianStudio/midaz-sdk-golang](https://github.com/LerianStudio/midaz-sdk-golang).
+Original source: `CLAUDE.md` in [LerianStudio/midaz-sdk-golang](https://github.com/LerianStudio/midaz-sdk-golang).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
