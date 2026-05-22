@@ -1,245 +1,209 @@
 ---
 trigger: always_on
-description: description: Systematic debugging approaches with minimal tool calls
+description: Automated development journal combining progress tracking, todo management, and intelligent documentation
 ---
 
----
-description: Systematic debugging approaches with minimal tool calls
-globs: 
-  - "**/*.ts"
-  - "**/*.js"
-  - "**/*.py"
-  - "**/*.java"
-  - "**/*.go"
-  - "**/*.rb"
-  - "**/*.php"
-  - "**/*.cs"
-  - "**/*.cpp"
-alwaysApply: false
----
 
-# Efficient Debugging Strategies
+# Development Progress Journal
 
-## 🎯 Debugging Philosophy
+You are an intelligent progress tracker that automatically captures work completed, maintains todo lists, and documents the development journey with minimal manual effort.
 
-### The 5-Step Debug Protocol
+@progress-journal.md
+@.git/
+@package.json
+@TODO.md
+
+## Core Journal Structure
+
+### Daily Progress View
+```markdown
+# 📊 Development Progress Journal
+*Last Updated: {TIMESTAMP} | Active Branch: {GIT_BRANCH} | Session: {SESSION_NUMBER}*
+
+## 🎯 Current Focus: {SPRINT_GOAL}
+**Progress**: ████████░░ {PERCENTAGE}% Complete
+**Days Remaining**: {DAYS_LEFT} | **Velocity**: {ITEMS_PER_DAY} items/day
+
+## ✅ Today's Progress ({DATE})
+### Completed ({COMPLETED_COUNT})
+- [x] {COMPLETED_TASK_1} `{COMMIT_HASH}` 
+  - Files: {MODIFIED_FILES}
+  - Impact: {BRIEF_DESCRIPTION}
+  - Time: {TIME_SPENT}
+- [x] {COMPLETED_TASK_2} `{COMMIT_HASH}`
+  - Resolved: {ISSUE_REFERENCE}
+  - Learning: {KEY_TAKEAWAY}
+
+### In Progress ({ACTIVE_COUNT})
+- [ ] {ACTIVE_TASK_1} ⏱️ {TIME_ELAPSED}
+  - Status: {COMPLETION_PERCENTAGE}%
+  - Blocker: {BLOCKER_IF_ANY}
+  - Next: {NEXT_SUBTASK}
+
+### Discoveries & Decisions
+- 💡 {KEY_INSIGHT_FROM_TODAY}
+- 🔧 {TECHNICAL_DECISION}: {BRIEF_RATIONALE}
+- ⚠️ {WARNING_OR_CONCERN}: {MITIGATION_PLAN}
+
+## 📋 Active Todo List
+### High Priority 🔴
+- [ ] {P1_TASK} - Due: {DUE_DATE}
+  - Why critical: {REASON}
+  - Estimated: {TIME_ESTIMATE}
+- [ ] {P1_TASK_2}
+
+### Normal Priority 🟡  
+- [ ] {P2_TASK}
+  - Dependencies: {DEPENDENT_ON}
+- [ ] {P2_TASK_2}
+
+### Low Priority 🟢
+- [ ] {P3_TASK} - Nice to have
+- [ ] {P3_TASK_2}
+
+### Backlog 📝
+- {BACKLOG_ITEM_1}
+- {BACKLOG_ITEM_2}
+
+## 📈 Week Summary
+**Completed**: {WEEKLY_COMPLETED} items | **Added**: {WEEKLY_ADDED} items
+**Productivity Trend**: {TREND_INDICATOR} {PERCENTAGE_CHANGE}%
+**Focus Time**: {TOTAL_FOCUS_HOURS}h | **Context Switches**: {SWITCH_COUNT}
 ```
-1. REPRODUCE → Confirm the issue exists
-2. ISOLATE → Find the smallest failing case
-3. DIAGNOSE → Identify root cause
-4. FIX → Apply minimal solution
-5. VERIFY → Ensure fix works
+
+## Intelligent Automation Rules
+
+### Auto-Progress Detection
+```yaml
+progress_triggers:
+  # Commit-based completion
+  commit_patterns:
+    - pattern: "^(feat|fix|refactor)\\(.*\\): (.+)"
+      action: mark_task_complete
+      extract:
+        - task_type: $1
+        - task_description: $2
+        - auto_link_to_active_task: true
+    
+    - pattern: "^(close|closes|fixed|fixes|resolve|resolves) #(\\d+)"
+      action: complete_issue_task
+      extract:
+        - issue_number: $2
+        - fetch_issue_details: true
+
+  # File-based progress
+  file_changes:
+    - pattern: "**/*.test.{js,ts,py}"
+      condition: "tests_passing"
+      action: update_task_progress
+      progress_increment: 20
+      note: "Tests implemented"
+    
+    - pattern: "**/README.md"
+      action: mark_documentation_complete
+      task_tag: "docs"
+
+  # PR/Issue activity
+  pull_requests:
+    - event: "opened"
+      action: add_task_if_not_exists
+      priority: "based_on_labels"
+    
+    - event: "merged"
+      action: complete_related_tasks
+      update_journal: true
+
+# Smart task extraction from natural language
+natural_language_triggers:
+  - pattern: "TODO: (.+)"
+    action: add_to_backlog
+    
+  - pattern: "FIXME: (.+)"
+    action: add_high_priority_task
+    
+  - pattern: "NOTE: (.+)"
+    action: add_to_discoveries
 ```
 
-## 🔍 Initial Assessment
-
-### Quick Triage (1 Tool Call)
-```bash
-# Get complete context in one call
-echo "=== Debug Context ===" && \
-pwd && \
-echo -e "\n--- Error State ---" && \
-tail -50 error.log 2>/dev/null || echo "No error log" && \
-echo -e "\n--- Recent Changes ---" && \
-git diff --stat HEAD~1 2>/dev/null || echo "No git" && \
-echo -e "\n--- Running Processes ---" && \
-ps aux | grep -E "(node|python|java)" | grep -v grep | head -5 && \
-echo -e "\n--- Test Status ---" && \
-npm test -- --no-coverage 2>&1 | tail -20 || echo "No tests"
-```
-
-## 🐛 Common Bug Patterns
-
-### Type 1: Null/Undefined Errors
+### Progress Intelligence
 ```javascript
-// SYMPTOM: "Cannot read property 'x' of undefined"
-
-// ❌ BAD DEBUG: Random changes
-console.log(user);
-console.log(user.profile);
-console.log(user.profile.name);
-
-// ✅ GOOD DEBUG: Systematic check
-console.log({
-  hasUser: !!user,
-  hasProfile: !!user?.profile,
-  profileKeys: user?.profile ? Object.keys(user.profile) : 'none',
-  nameValue: user?.profile?.name
-});
-
-// FIX PATTERN:
-const name = user?.profile?.name ?? 'Default';
-```
-
-### Type 2: Async/Promise Issues
-```javascript
-// SYMPTOM: "Promise pending" or race conditions
-
-// ✅ DIAGNOSTIC PATTERN:
-console.log({
-  stage: 'before-await',
-  timestamp: Date.now()
-});
-
-const result = await operation();
-
-console.log({
-  stage: 'after-await',
-  timestamp: Date.now(),
-  hasResult: !!result,
-  resultType: typeof result
-});
-
-// FIX PATTERNS:
-// 1. Missing await
-const data = await fetchData();
-
-// 2. Race condition
-const [result1, result2] = await Promise.all([op1(), op2()]);
-
-// 3. Error handling
-try {
-  const data = await riskyOperation();
-} catch (error) {
-  console.error('Operation failed:', error.message);
-}
-```
-
-### Type 3: State Management Issues
-```javascript
-// SYMPTOM: "State not updating" or "Stale values"
-
-// ✅ STATE DEBUG HELPER:
-function debugState(label, state) {
-  console.log(`[${label}]`, {
-    state: JSON.stringify(state, null, 2),
-    type: typeof state,
-    isArray: Array.isArray(state),
-    timestamp: new Date().toISOString()
-  });
-}
-
-// USE:
-debugState('Before update', currentState);
-updateState(newValue);
-debugState('After update', currentState);
-```
-
-## 🔧 Debugging Tools
-
-### Universal Debug Logger
-```javascript
-// Add to any file for instant debugging
-const DEBUG = {
-  log: (label, data) => {
-    console.log(`\n🔍 [${label}]`, {
-      data,
-      stack: new Error().stack.split('\n')[2],
-      time: new Date().toISOString()
-    });
+// Automatic progress calculation
+const progressAnalyzer = {
+  // Infer task completion from code changes
+  detectProgress: (gitDiff) => {
+    return {
+      completedTasks: extractCompletedFromCommits(gitDiff),
+      partialProgress: calculatePartialProgress(gitDiff),
+      newTasks: extractTodosFromCode(gitDiff),
+      timeSpent: estimateTimeFromCommitFrequency(gitDiff)
+    };
   },
   
-  checkpoint: (name) => {
-    console.log(`✓ Checkpoint: ${name} at ${new Date().toISOString()}`);
+  // Smart task association
+  linkCommitsToTasks: (commit, activeTasks) => {
+    // Use NLP to match commit messages to tasks
+    const scores = activeTasks.map(task => ({
+      task,
+      score: calculateSimilarity(commit.message, task.description)
+    }));
+    return scores.filter(s => s.score > 0.7);
   },
   
-  measure: async (label, fn) => {
-    const start = performance.now();
-    try {
-      const result = await fn();
-      console.log(`⏱️ ${label}: ${(performance.now() - start).toFixed(2)}ms`);
-      return result;
-    } catch (error) {
-      console.log(`❌ ${label} failed after ${(performance.now() - start).toFixed(2)}ms`);
-      throw error;
-    }
+  // Velocity tracking
+  updateVelocity: (completedTasks, timeframe) => {
+    return {
+      current: completedTasks.length / timeframe,
+      trend: calculateTrend(historicalVelocity),
+      prediction: estimateCompletionDate(remainingTasks)
+    };
   }
 };
-
-// Usage:
-DEBUG.checkpoint('Starting process');
-const data = await DEBUG.measure('Database query', () => db.query(sql));
-DEBUG.log('Query result', data);
 ```
 
-### Error Boundary Pattern
-```javascript
-// Wrap suspicious code
-function safeTry(operation, fallback = null) {
-  try {
-    return operation();
-  } catch (error) {
-    console.error('Safe operation failed:', {
-      error: error.message,
-      stack: error.stack,
-      operation: operation.toString()
-    });
-    return fallback;
-  }
-}
+## Task Management System
 
-// Usage:
-const config = safeTry(() => JSON.parse(configString), {});
-```
-
-## 📊 Systematic Debugging
-
-### Binary Search Debug
-```javascript
-// For "worked before, broken now" issues
-// 1. Find last working commit
-git bisect start
-git bisect bad HEAD
-git bisect good abc123  // last known good
-
-// 2. Test each commit
-npm test || git bisect bad
-npm test && git bisect good
-
-// 3. Find exact breaking change
-git bisect reset
-git show <bad-commit>
-```
-
-### Divide & Conquer
-```javascript
-// For complex flows
-function debugFlow() {
-  console.log('Step 1: Input validation');
-  // If fails here, input issue
+### Task Structure
+```markdown
+## Task Format
+- [ ] {TASK_ID} | {TASK_TITLE}
+  - Status: {NOT_STARTED|IN_PROGRESS|BLOCKED|COMPLETE}
+  - Priority: {P0|P1|P2|P3}
+  - Estimate: {TIME_ESTIMATE}
+  - Actual: {TIME_ACTUAL}
+  - Branch: {FEATURE_BRANCH}
+  - PR: {PULL_REQUEST_LINK}
+  - Notes: {ADDITIONAL_CONTEXT}
   
-  console.log('Step 2: Data transformation');
-  // If fails here, transformation issue
+  ### Subtasks
+  - [x] Research approach
+  - [x] Implement core logic
+  - [ ] Add tests
+  - [ ] Update documentation
   
-  console.log('Step 3: Business logic');
-  // If fails here, logic issue
-  
-  console.log('Step 4: Output formatting');
-  // If fails here, formatting issue
-}
+  ### Progress Log
+  - {TIMESTAMP}: Started implementation
+  - {TIMESTAMP}: Hit blocker with {ISSUE}
+  - {TIMESTAMP}: Found solution using {APPROACH}
+  - {TIMESTAMP}: Completed, took {TOTAL_TIME}
 ```
 
-## 🎪 Performance Debugging
-
-### Quick Performance Check
-```javascript
-// One-liner performance wrapper
-const perf = (fn, label = 'Operation') => {
-  const start = Date.now();
-  const result = fn();
-  console.log(`${label}: ${Date.now() - start}ms`);
-  return result;
-};
-
-// Usage:
-const data = perf(() => processLargeDataset(), 'Dataset processing');
-```
-
-### Memory Leak Detection
-```javascript
-// Memory snapshot helper
-const memorySnapshot = (label) => {
-  if (global.gc) global.gc();
+### Automated Task Workflows
+```yaml
+task_workflows:
+  # Auto-create tasks from issues
+  issue_to_task:
+    trigger: "issue_labeled"
+    condition: "has_label('todo')"
+    action:
+      - create_task:
+          title: "${issue.title}"
+          priority: "${label_to_priority(issue.labels)}"
+          description: "${issue.body}"
+      - add_to_sprint_if_current: true
+      - notify_in_journal: true
+  
+  # Smart task breakdown
+  large_task_detection:
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
