@@ -1,202 +1,132 @@
 ---
 trigger: always_on
-description: Pattern for creating separate layouts for different sections/routes in Next.js App Router
+description: Guidelines for creating and maintaining Cursor rules to ensure consistency and effectiveness.
 ---
 
+- **Required Rule Structure:**
+  ```markdown
+  ---
+  description: Clear, one-line description of what the rule enforces
+  globs: path/to/files/*.ext, other/path/**/*
+  alwaysApply: boolean
+  ---
 
-# Conditional Layout Separation Pattern
+  - **Main Points in Bold**
+    - Sub-points with details
+    - Examples and explanations
+  ```
 
-## **Overview**
-This pattern enables creating completely separate layouts for different sections of a Next.js application while maintaining a single root layout. Useful for creating public sections (like marketing sites, documentation, or church websites) that need different styling and navigation from the main authenticated application.
+- **File References:**
+  - Use `[filename](mdc:path/to/file)` ([filename](mdc:filename)) to reference files
+  - Example: [prisma.mdc](mdc:.cursor/rules/prisma.mdc) for rule references
+  - Example: [schema.prisma](mdc:prisma/schema.prisma) for code references
 
-## **Problem Solved**
-- **Layout Duplication**: Prevents main app header/footer from showing alongside section-specific headers/footers
-- **Authentication Separation**: Allows public sections to work without authentication requirements
-- **Styling Isolation**: Enables completely different design systems for different sections
-- **Hydration Issues**: Avoids Next.js App Router hydration errors from nested HTML tags
+- **Code Examples:**
+  - Use language-specific code blocks
+  ```typescript
+  // ✅ DO: Show good examples
+  const goodExample = true;
 
-## **Implementation Pattern**
+  // ❌ DON'T: Show anti-patterns
+  const badExample = false;
+  ```
 
-### **1. Create ConditionalLayout Component**
+- **Rule Content Guidelines:**
+  - Start with high-level overview
+  - Include specific, actionable requirements
+  - Show examples of correct implementation
+  - Reference existing code when possible
+  - Keep rules DRY by referencing other rules
 
-```typescript
-// src/components/ConditionalLayout.tsx
-'use client';
+- **Rule Maintenance:**
+  - Update rules when new patterns emerge
+  - Add examples from actual codebase
+  - Remove outdated patterns
+  - Cross-reference related rules
 
-import React from 'react';
-import { usePathname } from 'next/navigation';
+- **Best Practices:**
+  - Use bullet points for clarity
+  - Keep descriptions concise
+  - Include both DO and DON'T examples
+  - Reference actual code over theoretical examples
+  - Use consistent formatting across rules
 
-interface ConditionalLayoutProps {
-  children: React.ReactNode;
-  header: React.ReactNode;
-  footer: React.ReactNode;
-}
+- **Environment Variable Loading (Production & Amplify/AWS Lambda Ready)**
+  - Lazily load environment variables inside functions, not at module top-level
+  - Use a helper function to check for multiple prefixes (e.g., `AMPLIFY_`, `AWS_AMPLIFY_`, and no prefix)
+  - Support both server and client contexts (Next.js config and `process.env`)
+  - Example: See `getStripeEnvVar` in [`src/lib/stripe/init.ts`](mdc:src/lib/stripe/init.ts)
 
-export default function ConditionalLayout({ children, header, footer }: ConditionalLayoutProps) {
-  const pathname = usePathname();
-
-  // Define which routes should use separate layout
-  const isSeparateLayoutRoute = pathname?.startsWith("/section-prefix") ?? false;
-
-  // For separate layout routes, just render children (section handles its own header/footer)
-  if (isSeparateLayoutRoute) {
-    return <>{children}</>;
+- **Next.js Environment Variables in Production (AWS Amplify)**
+  - **CRITICAL**: All environment variables must be declared in the `env` section of [`next.config.mjs`](mdc:next.config.mjs) to be available at runtime in production
+  - Environment variables set in AWS Amplify console are not automatically available unless explicitly declared in Next.js config
+  - **AWS Amplify Environment Variable Pattern**: AWS Amplify prefixes environment variables with `AMPLIFY_` in the runtime, even if you set them without the prefix in the console
+  - **NEXT_PUBLIC_ Variables in AWS Amplify**: `NEXT_PUBLIC_` prefixed variables may not be available in server-side contexts (API routes, server components) in AWS Amplify production environment
+  - ✅ DO: Use `AMPLIFY_` prefixed variables for AWS Amplify deployments with fallbacks for local development
+  ```javascript
+  // next.config.mjs
+  env: {
+    // API JWT credentials - prioritize AMPLIFY_ prefix for AWS Amplify
+    API_JWT_USER: process.env.AMPLIFY_API_JWT_USER || process.env.API_JWT_USER,
+    API_JWT_PASS: process.env.AMPLIFY_API_JWT_PASS || process.env.API_JWT_PASS,
+    AMPLIFY_API_JWT_USER: process.env.AMPLIFY_API_JWT_USER,
+    AMPLIFY_API_JWT_PASS: process.env.AMPLIFY_API_JWT_PASS,
+    // Keep fallbacks for local development
+    NEXT_PUBLIC_API_JWT_USER: process.env.NEXT_PUBLIC_API_JWT_USER,
+    NEXT_PUBLIC_API_JWT_PASS: process.env.NEXT_PUBLIC_API_JWT_PASS,
   }
+  ```
+  ```typescript
+  // Helper functions should prioritize AMPLIFY_ prefix
+  export function getApiJwtUser() {
+    return (
+      process.env.AMPLIFY_API_JWT_USER ||
+      process.env.API_JWT_USER ||
+      process.env.NEXT_PUBLIC_API_JWT_USER
+    );
+  }
+  ```
+  - ❌ DON'T: Rely only on `NEXT_PUBLIC_` prefixed variables for server-side authentication in AWS Amplify
+  - ❌ DON'T: Only set environment variables in AWS Amplify console without declaring them in Next.js config
+  - **Rationale**: AWS Amplify's runtime environment behavior differs from standard Next.js deployments. `AMPLIFY_` prefixed variables are reliable in production while `NEXT_PUBLIC_` variables may be unavailable in server contexts
+  - **Debugging**: Variables will show as `UNDEFINED` in production logs if not declared in config or using wrong prefix pattern
 
-  // For main app routes, render the full layout with header and footer
-  return (
-    <>
-      {header}
-      <div className="flex-1 flex flex-col">
-        {children}
-      </div>
-      {footer}
-    </>
-  );
-}
-```
-
-### **2. Update Root Layout**
-
-```typescript
-// src/app/layout.tsx
-import ConditionalLayout from "../components/ConditionalLayout";
-import Header from "../components/Header";
-import Footer from "../components/Footer";
-
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <html lang="en">
-      <body>
-        <ClerkProvider>
-          <TrpcProvider>
-            <ConditionalLayout
-              header={<Header hideMenuItems={false} />}
-              footer={<Footer />}
-            >
-              {children}
-            </ConditionalLayout>
-          </TrpcProvider>
-        </ClerkProvider>
-      </body>
-    </html>
-  );
-}
-```
-
-### **3. Create Section-Specific Layout**
-
-```typescript
-// src/app/section-prefix/layout.tsx
-import React from 'react';
-import { Metadata } from 'next';
-import SectionHeader from './components/SectionHeader';
-import SectionFooter from './components/SectionFooter';
-import './section-globals.css'; // Section-specific styles
-
-export const metadata: Metadata = {
-  title: {
-    template: '%s | Section Name',
-    default: 'Section Name',
-  },
-  description: 'Section-specific description',
-};
-
-interface SectionLayoutProps {
-  children: React.ReactNode;
-}
-
-export default function SectionLayout({ children }: SectionLayoutProps) {
-  return (
-    <div className="section-layout min-h-screen bg-section-background flex flex-col">
-      <SectionHeader />
-
-      <main className="section-main flex-1">
-        {children}
-      </main>
-
-      <SectionFooter />
-    </div>
-  );
-}
-```
-
-### **4. Create Section-Specific Styling**
-
-```css
-/* src/app/section-prefix/section-globals.css */
-@import '../globals.css';
-
-/* Override main app styles for section */
-body {
-  background-color: var(--section-background) !important;
-  color: var(--section-foreground) !important;
-  font-family: 'SectionFont', sans-serif !important;
-}
-
-/* Section-specific CSS variables */
-:root {
-  --section-background: #F5F1E8;
-  --section-foreground: #2D2A26;
-  --section-primary: #8B7D6B;
-  /* ... other section-specific variables */
-}
-
-/* Section layout isolation */
-.section-layout {
-  background-color: var(--section-background) !important;
-  color: var(--section-foreground) !important;
-}
-
-/* Override any conflicting main app styles */
-.section-layout * {
-  box-sizing: border-box;
-}
-```
-
-### **5. Update Middleware for Public Routes**
-
-```typescript
-// src/middleware.ts
-export default authMiddleware({
-  publicRoutes: [
-    "/",
-    "/section-prefix",
-    "/section-prefix/(.*)",
-    // ... other public routes
-  ],
-  // ... rest of middleware config
-});
-```
-
-## **Key Implementation Details**
-
-### **Route Detection Logic**
-```typescript
-// Single section
-const isSeparateLayoutRoute = pathname?.startsWith("/mosc") ?? false;
-
-// Multiple sections
-const separateLayoutSections = ["/mosc", "/docs", "/marketing"];
-const isSeparateLayoutRoute = separateLayoutSections.some(section =>
-  pathname?.startsWith(section)
-) ?? false;
-
-// Regex pattern matching
-const isSeparateLayoutRoute = pathname?.match(/^\/(mosc|docs|marketing)/) !== null;
-```
-
-### **Null Safety**
-```typescript
-// Always handle potential null pathname
-const pathname = usePathname();
-const isSeparateLayoutRoute = pathname?.startsWith("/section") ?? false;
-```
-
-### **Conditional Provider Wrapping**
-```typescript
-// For sections that don't need authentication
-export default function ConditionalLayout({ children, header, footer }: ConditionalLayoutProps) {
+- **DTO (Data Transfer Object) Setup and Usage**
+  - **Centralize DTO Definitions**
+    - Define all DTOs in `src/types/index.ts` (or submodules if the file grows large)
+    - Use TypeScript `interface` or `type` for DTOs, matching backend API schema
+    ```typescript
+    // ✅ DO: Centralize DTOs
+    export interface UserProfileDTO {
+      id: number | null;
+      userId: string;
+      firstName: string;
+      lastName: string;
+      email: string;
+      // ...other fields
+    }
+    ```
+  - **Keep DTOs Flat and Serializable**
+    - Avoid methods or computed properties; use only serializable types
+    ```typescript
+    // ✅ DO: Use only serializable fields
+    export interface SubscriptionDTO {
+      id: number | null;
+      userId: string;
+      plan: string;
+      status: 'active' | 'inactive' | 'canceled';
+      // ...other fields
+    }
+    ```
+  - **Match Backend Schema**
+    - Align DTO fields/types with backend API (OpenAPI/Swagger, Prisma, REST docs)
+    - Document intentional differences
+    ```typescript
+    // ✅ DO: Match backend schema
+    export interface EventDTO {
+      id: number;
+      name: string;
+      date: string; // ISO string
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
