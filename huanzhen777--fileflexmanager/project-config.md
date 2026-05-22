@@ -1,158 +1,159 @@
 ---
 trigger: always_on
-description: name: "FileFlexManager",
+description: **FileFlexManager** is a web-based file manager designed for Linux NAS systems with a mobile-first approach.
 ---
 
-PROJECT: {
-  name: "FileFlexManager",
-  type: "web_file_manager",
-  target: "linux_nas",
-  features: [
-    "file_operations",
-    "web_ui",
-    "mobile_first",
-    "multi_user",
-    "permission_control"
-  ]
-}
+# FileFlexManager - Project Context
 
-TECH_STACK:
-backend: {jdk:21, spring_boot:3, gradle:multi-module, mybatis_plus, mapstruct, db:h2/sqlite, arch:ddd, deploy:docker}
-frontend: {vue:3, typescript, ui:vant, mobile_first:true, unified_api:config.ts}
+## Project Overview
 
-STRUCTURE:
+**FileFlexManager** is a web-based file manager designed for Linux NAS systems with a mobile-first approach.
+
+### Key Features
+- File operations (browse, upload, download, delete, move, copy)
+- Web-based user interface optimized for mobile devices
+- Multi-user support with permission control
+- Docker deployment for Linux environments
+
+---
+
+## Technology Stack
+
+### Backend
+- **Java**: JDK 21
+- **Framework**: Spring Boot 3
+- **Build Tool**: Gradle (multi-module project)
+- **ORM**: MyBatis Plus
+- **Object Mapping**: MapStruct
+- **Database**: H2 / SQLite (embedded)
+- **Architecture**: Domain-Driven Design (DDD)
+- **Deployment**: Docker
+
+### Frontend
+- **Framework**: Vue 3 with Composition API
+- **Language**: TypeScript
+- **UI Library**: Vant (mobile-first components)
+- **API Integration**: Unified configuration via `config.ts`
+
+---
+
+## Project Structure
+
+### Backend Modules
+
+```
 backend/
-  domain/ {event, model, repository, service, utils}
-  application/ {assembler, config, dto, event, scheduler, service}
-  infrastructure/ {
-    config, external, 
-    persistence/ {converter, entity, mapper, po, repository},
-    security, util,
-    task/ {handler},
-  }
-  interfaces/ {
-    src/main/
-      java/com.huanzhen.fileflexmanager.interfaces/ {
-        api/ {
-          advice/,
-          assembler/,
-          controller/
-        },
-        config/,
-        controller/,
-        convert/,
-        converter/,
-        exception/,
-        facade/,
-        model/ {
-          dto/,
-          req/,
-          resp/,
-          vo/
-        }
-      }
-      resources/ {
-        data/,
-        db.migration/,
-        static/,
-        application*.yml
-      }
-  }
+├── domain/                    # Domain layer (core business logic)
+│   ├── event/                # Domain events
+│   ├── model/                # Domain models
+│   ├── repository/           # Repository interfaces
+│   ├── service/              # Domain services
+│   └── utils/                # Domain utilities
+│
+├── application/              # Application layer (use cases)
+│   ├── assembler/           # Application assemblers
+│   ├── config/              # Application configuration
+│   ├── dto/                 # Data Transfer Objects
+│   ├── event/               # Application events
+│   ├── scheduler/           # Scheduled tasks
+│   └── service/             # Application services
+│
+├── infrastructure/           # Infrastructure layer
+│   ├── config/              # Infrastructure configuration
+│   ├── external/            # External service integrations
+│   ├── persistence/         # Data persistence
+│   │   ├── converter/       # Data converters
+│   │   ├── entity/          # JPA entities
+│   │   ├── mapper/          # MyBatis mappers
+│   │   ├── po/              # Persistent objects
+│   │   └── repository/      # Repository implementations
+│   ├── security/            # Security implementations
+│   ├── util/                # Infrastructure utilities
+│   └── task/                # Task handlers
+│       └── handler/
+│
+└── interfaces/              # Interface layer (API endpoints)
+    └── src/main/
+        ├── java/com.huanzhen.fileflexmanager.interfaces/
+        │   ├── api/
+        │   │   ├── advice/         # Global exception handlers
+        │   │   ├── assembler/      # API assemblers
+        │   │   └── controller/     # REST controllers
+        │   ├── config/             # Interface configuration
+        │   ├── controller/         # Legacy controllers
+        │   ├── convert/            # Converters
+        │   ├── converter/          # Additional converters
+        │   ├── exception/          # Custom exceptions
+        │   ├── facade/             # Facade patterns
+        │   └── model/
+        │       ├── dto/            # DTOs
+        │       ├── req/            # Request models
+        │       ├── resp/           # Response models
+        │       └── vo/             # View objects
+        └── resources/
+            ├── data/               # Static data
+            ├── db.migration/       # Database migrations
+            ├── static/             # Static resources
+            └── application*.yml    # Configuration files
+```
 
+### Frontend Structure
+
+```
 frontend/
-  src/ {
-    api/,
-    assets/,
-    components/,
-    router/,
-    stores/,
-    utils/,
-    views/
-  }
-  public/
-  dist/
-  config/ {
-    env/,
-    typescript/,
-    build/
-  }
-
-CORE_FEATURES:
-1. ddd: {
-  layers: [interfaces -> application -> domain <- infrastructure],
-  strict_boundaries: true,
-  domain_logic_isolation: true
-}
-
-2. mapstruct: {
-  type_safe: true,
-  auto_generated: true,
-  custom_rules: true,
-  mapping_layers: {
-    interfaces: "DTO <-> Domain",
-    infrastructure: "Domain <-> PO/Entity"
-  }
-}
-
-3. data_handling: {
-  models: [DTO, Domain, PO],
-  response: BaseResponse,
-  global_exception: true,
-  validation: unified
-}
-
-4. frontend_features: {
-  mobile_first: true,
-  component_based: vant,
-  type_safe: typescript,
-  api_handling: unified,
-  base_response: config.ts
-}
-
-5. deployment: {
-  container: docker,
-  os: linux,
-  persistence: h2/sqlite
-}
-
-CODE_STANDARDS:
-backend: {
-  exception: global_handler,
-  response: BaseResponse,
-  domain_events: true,
-  data_access: repository_pattern
-}
-frontend: {
-  api: composition,
-  types: typescript,
-  request: unified_handler,
-  response: config.ts,
-  import_paths: alias_only
-}
-
-TEST_SPECS:
-framework: junit5
-naming: "*Test.java"
-location: "src/test/java/{package}"
-coverage: {
-  core_logic: required,
-  mock_external: true,
-  scenarios: [success, failure]
-}
-structure: {
-  format: "@Test methods",
-  naming: "camelCase",
-  setup: "@BeforeEach"
-}
-
-integration_tests: {
-  location: "backend/interfaces/src/test/java",
-  naming: "*IntegrationTest.java",
-  config: "TestConfig.java",
-}
-
-ENV: {docker: true, gradle: true, git: true}
+├── src/
+│   ├── api/              # API service layer
+│   ├── assets/           # Static assets
+│   ├── components/       # Reusable Vue components
+│   ├── router/           # Vue Router configuration
+│   ├── stores/           # Pinia stores (state management)
+│   ├── utils/            # Utility functions
+│   └── views/            # Page components
+├── public/               # Public static files
+├── dist/                 # Build output
+└── config/
+    ├── env/              # Environment configurations
+    ├── typescript/       # TypeScript configurations
+    └── build/            # Build configurations
+```
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/huanzhen777) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-09 -->
+
+## Architecture Principles
+
+### 1. Domain-Driven Design (DDD)
+
+**Layer Dependencies:**
+```
+interfaces → application → domain ← infrastructure
+```
+
+**Rules:**
+- ✅ Strict layer boundaries - each layer only depends on the domain layer and the layer directly below it
+- ✅ Domain logic isolation - business logic stays in the domain layer
+- ✅ Domain models are technology-agnostic
+- ❌ Never let infrastructure concerns leak into domain layer
+
+### 2. Object Mapping with MapStruct
+
+**Mapping Strategy:**
+- **Interface Layer**: `DTO ↔ Domain Model` (using converters in `interfaces/converter/`)
+- **Infrastructure Layer**: `Domain Model ↔ PO/Entity` (using converters in `infrastructure/persistence/converter/`)
+
+**Rules:**
+- ✅ Always use MapStruct for object conversions
+- ✅ Define mapping interfaces with `@Mapper` annotation
+- ✅ Use compile-time generation (no reflection)
+- ✅ Add custom mapping rules when needed
+- ❌ Never manually map objects in service layer
+
+### 3. Data Model Layers
+
+- **DTO (Data Transfer Object)**: Used in API layer for client communication
+- **Domain Model**: Core business entities in domain layer
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [huanzhen777/FileFlexManager](https://github.com/huanzhen777/FileFlexManager) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-21 -->
