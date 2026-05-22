@@ -1,127 +1,141 @@
 ---
 trigger: always_on
-description: Standard pattern for toggle switch components used in admin pages for filtering and state toggling
+description: Clerk authentication middleware configuration, admin role lookup, and satellite/primary sign-in and sign-out patterns for Next.js App Router
 ---
 
 
-# Admin Toggle Switch Styling Pattern
+# Clerk Authentication and Admin Role Lookup Pattern
 
 ## **Overview**
-This rule defines the standard pattern for toggle switch components used in admin pages for filtering and state toggling. The pattern provides consistent styling, smooth animations, and clear visual feedback for binary state changes.
+This rule defines the correct pattern for configuring Clerk middleware to enable `auth()` calls in server components, particularly for admin role lookup in the root layout. It explains when routes should be in `ignoredRoutes` vs `publicRoutes`, how to properly check admin status after user login, and **why the admin check must run on all routes (including public pages)** so the Admin menu appears in the Header on every page—not only on `/admin` and sub-pages.
 
 ## **Problem Solved**
-- **Consistent Toggle UI**: Ensures all toggle switches use the same visual pattern across admin pages
-- **Smooth Animations**: Standardized transition effects and state changes
-- **Clear Visual Feedback**: Color-coded states and icons for immediate understanding
-- **Accessibility**: Proper ARIA labels and focus states
-- **Responsive Design**: Works consistently across different screen sizes
+- **Admin Menu Not Appearing**: Ensures admin role lookup works correctly after user login
+- **Admin Menu on Public Pages**: Ensures the Admin menu appears when a logged-in admin visits **any** page (homepage, events, gallery, pricing, etc.), not only `/admin` and sub-pages
+- **Clerk auth() Errors**: Prevents "Clerk can't detect usage of authMiddleware()" errors
+- **Next.js 15+ Compatibility**: Properly handles async `headers()` calls
+- **Route Configuration**: Clarifies when routes need Clerk middleware vs when they can be ignored
 
-## **Core Pattern**
+---
 
-### **Toggle Switch Container**
-```tsx
-// ✅ DO: Use the standard toggle switch container pattern
-<div className="flex justify-center items-center gap-4 mt-6">
-  {/* Left Label */}
-  {/* Toggle Switch Button */}
-  {/* Right Label */}
-</div>
+## **Core Pattern: Middleware Configuration**
+
+### **Routes That Call `auth()` MUST NOT Be in `ignoredRoutes`**
+
+**CRITICAL**: Any route that calls `auth()` or `currentUser()` in server components **MUST** have Clerk middleware running. This means:
+
+- ✅ **DO**: Keep route in `publicRoutes` (if it should be accessible without auth)
+- ❌ **DON'T**: Put route in `ignoredRoutes` (this bypasses Clerk middleware completely)
+
+**Example - Homepage Admin Lookup**:
+```typescript
+// ✅ DO: Homepage in publicRoutes but NOT in ignoredRoutes
+export default authMiddleware({
+  publicRoutes: [
+    '/',  // Homepage - accessible without auth, but middleware runs for auth() calls
+    // ... other public routes
+  ],
+
+  ignoredRoutes: [
+    // ❌ DON'T: '/',  // This would break auth() calls in layout.tsx
+    '/events(.*)',  // OK - these pages don't call auth()
+    '/gallery(.*)',  // OK - these pages don't call auth()
+    // ... other routes that don't need auth()
+  ],
+});
 ```
 
-### **Toggle Switch Button Structure**
-```tsx
-// ✅ DO: Use the standard toggle switch button pattern
-<button
-  onClick={() => setState(!state)}
-  className={`relative inline-flex h-10 w-16 items-center rounded-full transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 hover:scale-105 ${
-    state
-      ? 'bg-blue-500 focus:ring-blue-500'
-      : 'bg-purple-500 focus:ring-purple-500'
-    }`}
-  title={state ? 'Switch to Off State' : 'Switch to On State'}
-  aria-label={state ? 'Switch to Off State' : 'Switch to On State'}
->
-  <span
-    className={`inline-flex items-center justify-center h-8 w-8 transform rounded-full bg-white transition-transform duration-300 shadow-md ${
-      state ? 'translate-x-7' : 'translate-x-1'
-    }`}
-  >
-    {/* Icon based on state */}
-  </span>
-</button>
+---
+
+## **When to Use `ignoredRoutes` vs `publicRoutes`**
+
+### **Use `ignoredRoutes` When:**
+- ✅ Route **does NOT** call `auth()` or `currentUser()` in server components
+- ✅ Route is a static page with no authentication needs
+- ✅ Route is an API endpoint that handles its own authentication
+- ✅ Route is for automated testing (Playwright, etc.) that needs no Clerk middleware
+
+**Examples**:
+```typescript
+ignoredRoutes: [
+  '/events(.*)',      // Static public pages, no auth() calls
+  '/gallery(.*)',     // Static public pages, no auth() calls
+  '/api/proxy/(.*)',  // API routes handle their own auth
+  '/api/webhooks/(.*)', // Webhook routes use service JWT, not Clerk
+],
 ```
 
-## **Key CSS Properties**
+### **Use `publicRoutes` (NOT `ignoredRoutes`) When:**
+- ✅ Route **DOES** call `auth()` or `currentUser()` in server components
+- ✅ Route needs to check user authentication status (even if login not required)
+- ✅ Route needs to look up user profile or admin status
+- ✅ Route should be accessible without login, but needs Clerk middleware for `auth()` calls
 
-### **Container Requirements**
-- **`flex justify-center items-center`**: Centers toggle switch horizontally and vertically
-- **`gap-4`**: Spacing between labels and switch (16px)
-- **`mt-6`**: Top margin (24px) for spacing above toggle
+**Examples**:
+```typescript
+publicRoutes: [
+  '/',              // Homepage - layout.tsx calls auth() for admin lookup
+  '/polls(.*)',     // Poll pages call auth() to check user participation
+  '/pricing(.*)',   // Pricing page calls auth() to check subscription status
+  '/profile(.*)',   // Profile pages need auth() to get user data
+],
+```
 
-### **Button Requirements**
-- **`relative`**: Enables absolute positioning of thumb
-- **`inline-flex`**: Inline flex layout
-- **`h-10`**: Fixed height (40px) for toggle track
-- **`w-16`**: Fixed width (64px) for toggle track
-- **`items-center`**: Centers thumb vertically
-- **`rounded-full`**: Fully rounded track (pill shape)
-- **`transition-all duration-300`**: Smooth transitions for all properties
-- **`focus:outline-none focus:ring-2 focus:ring-offset-2`**: Focus ring for accessibility
-- **`hover:scale-105`**: Subtle scale effect on hover (5% increase)
-- **State Colors**:
-  - **Active/On State**: `bg-blue-500 focus:ring-blue-500`
-  - **Inactive/Off State**: `bg-purple-500 focus:ring-purple-500`
+---
 
-### **Thumb (Slider) Requirements**
-- **`inline-flex items-center justify-center`**: Centers icon within thumb
-- **`h-8 w-8`**: Fixed thumb size (32px × 32px)
-- **`transform rounded-full`**: Fully rounded thumb
-- **`bg-white`**: White background for thumb
-- **`transition-transform duration-300`**: Smooth slide animation
-- **`shadow-md`**: Medium shadow for depth
-- **Position**:
-  - **Active/On State**: `translate-x-7` (moves to right, 28px)
-  - **Inactive/Off State**: `translate-x-1` (moves to left, 4px)
+## **Admin Role Lookup Pattern in Root Layout**
 
-### **Label Requirements**
-- **`text-lg font-semibold`**: Large, bold text
-- **`transition-colors duration-300`**: Smooth color transitions
-- **Active State**: `text-purple-600` or `text-blue-600` (vibrant color)
-- **Inactive State**: `text-purple-300` or `text-blue-300` (muted color)
+### **Server-Side Admin Check in `src/app/layout.tsx`**
 
-### **Icon Requirements**
-- **`w-5 h-5`**: Icon size (20px × 20px)
-- **Color**: Matches button state color (`text-blue-600` or `text-purple-600`)
-- **SVG**: Use Heroicons pattern with `fill="none" stroke="currentColor"`
+**Pattern**:
+```typescript
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // CRITICAL: Next.js 15+ requires headers() to be awaited first
+  const headersList = await headers();
+  const hostname = headersList.get('host') || '';
 
-## **Complete Example**
+  // ... other setup code ...
 
-### **Future/Past Events Toggle**
-```tsx
-{/* Event Filter Toggle */}
-<div className="flex justify-center items-center gap-4 mt-6">
-  <span className={`text-lg font-semibold transition-colors duration-300 ${!showPastEvents ? 'text-purple-600' : 'text-purple-300'}`}>
-    Future Events
-  </span>
-  <button
-    onClick={() => setShowPastEvents(!showPastEvents)}
-    className={`relative inline-flex h-10 w-16 items-center rounded-full transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 hover:scale-105 ${
-      showPastEvents
-        ? 'bg-blue-500 focus:ring-blue-500'
-        : 'bg-purple-500 focus:ring-purple-500'
-    }`}
-    title={showPastEvents ? 'Show Future Events' : 'Show Past Events'}
-    aria-label={showPastEvents ? 'Show Future Events' : 'Show Past Events'}
-  >
-    <span
-      className={`inline-flex items-center justify-center h-8 w-8 transform rounded-full bg-white transition-transform duration-300 shadow-md ${showPastEvents ? 'translate-x-7' : 'translate-x-1'}`}
-    >
-      {showPastEvents ? (
-        <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      ) : (
-        <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+  // Determine tenant-scoped admin flag on the server
+  let isTenantAdmin = false;
+  try {
+    // CRITICAL: Call auth() AFTER headers() is awaited
+    const authResult = await auth();
+    const userId = authResult?.userId || null;
+
+    if (userId) {
+      const tenantId = getTenantId();
+
+      // Fetch user profile to check admin role
+      const url = `${baseUrl}/api/proxy/user-profiles?userId.equals=${userId}&tenantId.equals=${tenantId}&size=1`;
+      const resp = await fetch(url, { cache: 'no-store' });
+
+      if (resp.ok) {
+        const data = await resp.json();
+        const profile = Array.isArray(data) ? data[0] : data;
+        isTenantAdmin = profile?.userRole === 'ADMIN';
+      }
+    }
+  } catch (error) {
+    // Fail closed (no admin) on error
+    console.error('[Layout] Error determining admin status:', error);
+    isTenantAdmin = false;
+  }
+
+  return (
+    <ClerkProvider {...clerkProps}>
+      {/* ... */}
+      <Header isTenantAdmin={isTenantAdmin} />
+      {/* ... */}
+    </ClerkProvider>
+  );
+}
+```
+
+### **Admin Check on ALL Routes (Including Public Pages)**
+
+**CRITICAL**: Run the admin check on **every route** where the root layout renders (i.e., whenever `pathname` is present). Do **not** limit the admin lookup to `/admin` or protected routes only.
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
