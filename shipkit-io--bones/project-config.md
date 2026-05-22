@@ -1,234 +1,139 @@
 ---
 trigger: always_on
-description: Shipkit uses browser local storage as a fallback when no database is configured. This provides a zero-config development experience while maintaining feature parity with database mode.
+description: You are an expert in TypeScript, Node.js, Next.js App Router, React, Shadcn UI, Radix UI and Tailwind.
 ---
 
-# Local Storage Implementation Patterns
+# ShipKit Rules
 
-## Overview
+You are an expert in TypeScript, Node.js, Next.js App Router, React, Shadcn UI, Radix UI and Tailwind.
 
-Shipkit uses browser local storage as a fallback when no database is configured. This provides a zero-config development experience while maintaining feature parity with database mode.
+This is a Next.js project using App Router, Shadcn/UI, Tailwind, Resend, Builder.io, Payload CMS 3, NextAuth/AuthJS@v5, TypeScript, using PNPM as the package manager.
 
-## Core Principles
+Be aware of the latest versions of all libraries.
+Your plans should be documented into a ai.mdx file. Check to see if it exists. If it does, pick up where you left off. Mark completed steps with a checkbox. Update the file as you work, so another AI can continue from where you left off.
 
-### 1. API Consistency
-Local storage services mirror database service APIs exactly:
+## Key Principles
 
-```typescript
-// Database service method
-async createProject(teamId: string, name: string, userId: string): Promise<Project>
+- Write concise, technical TypeScript code with accurate examples.
+- Use functional and declarative programming patterns; avoid classes.
+- Prefer iteration and modularization over code duplication.
+- Use descriptive variable names with auxiliary verbs (e.g., isLoading, hasError).
+- Structure files: exported component, subcomponents, helpers, static content, types.
 
-// Local storage service method
-createProject(teamId: string, name: string, userId: string): LocalProject
+## Naming Conventions
+
+- Use lowercase with dashes for directories (e.g., components/auth-wizard).
+- Favor named exports for components.
+
+## TypeScript Usage
+
+- Use TypeScript for all code; prefer interfaces over types.
+- Avoid enums; use maps instead.
+- Use functional components with TypeScript interfaces.
+
+## Syntax and Formatting
+
+- Use the "function" keyword for pure functions.
+- Avoid unnecessary curly braces in conditionals; use concise syntax for simple statements.
+- Use declarative JSX.
+
+## UI and Styling
+
+- Use Shadcn UI, Radix, and Tailwind for components and styling.
+- Implement responsive design with Tailwind CSS; use a mobile-first approach.
+
+## Performance Optimization
+
+- Minimize 'use client', 'useEffect', and 'setState'; favor React Server Components (RSC).
+- Wrap client components in Suspense with fallback.
+- Use dynamic loading for non-critical components.
+- Optimize images: use WebP format, include size data, implement lazy loading.
+
+## Key Conventions
+
+- Use 'nuqs' for URL search parameter state management.
+- Optimize Web Vitals (LCP, CLS, FID).
+- Limit 'use client':
+- Favor server components and Next.js SSR.
+- Use only for Web API access in small components.
+- Avoid for data fetching or state management.
+
+Follow Next.js docs for Data Fetching, Rendering, and Routing.
+
+## Don't
+
+Don't delete environment variables.
+Don't nest server components in client components unless passed through props.
+Don't forget to add `use client` to the top of the file if you are using client-side code like hooks.
+Don't use `use client` in server components.
+Don't fetch data with server actions. AGAIN, DO NOT FETCH DATA WITH SERVER ACTIONS.
+
+## Comments
+
+pre-emptively add comments to explain "why" behind the code.
+do not modify comments or functionality unrelated to the prompt unless you have a very good reason.
+You will preserve all existing comments unless specifically asked to modify them
+When showing code changes, use comments like // ... to indicate unchanged sections of code
+We like comments with callouts and examples, like:
+
+```
+/*
+ * Logging configuration
+ * @see https://nextjs.org/docs/app/api-reference/next-config-js/logging
+ */
 ```
 
-### 2. Data Validation
-All local storage operations include validation:
+## File structure
 
-```typescript
-if (!projectName?.trim()) {
-  throw new Error("Project name is required");
-}
-```
+Prefer `hyphen-case.ext` over `CamelCase.ext`.
+Use `@/server/actions` for all server actions.
+Use `@/server/services` for all internal services.
 
-### 3. Referential Integrity
-Local storage maintains relationships between entities:
+## Coding conventions
 
-```typescript
-// When deleting a team, remove all associated projects
-const teamProjects = this.getTeamProjects(teamId);
-teamProjects.forEach(project => this.deleteProject(project.id));
-```
+pre-emptively ask questions if you are unsure about the requirements.
+pre-emptively optimize code for production.
+pre-emptively add types to all functions and variables.
+pre-emptively fix any typescript errors or warnings.
 
-## Storage Keys
+Use open-source libraries when they would enhance the user/developer experience.
+Use best practices, write production-ready code.
+Fix bugs and improve performance.
+Comment any complex or hard-to-read code.
+fix all typescript errors and warnings.
 
-Use consistent, namespaced keys for local storage:
+## React
 
-```typescript
-const STORAGE_KEYS = {
-  projects: "shipkit-projects",
-  projectMembers: "shipkit-project-members",
-  teams: "shipkit-teams",
-  teamMembers: "shipkit-team-members",
-  users: "shipkit-users"
-} as const;
-```
+Use functional components and hooks for state management.
+Ensure components are reusable and maintainable.
+Prefer server actions for internal API requests.
+Maintain a separation of concerns between client and server components.
 
-## Utility Functions
+Prefer arrow functions for React components:
+✅ export const Component = () => { ... }
+❌ export function Component() { ... }
+❌ export default function Component() { ... }
 
-### Safe Storage Access
-Always check if we're in a browser environment:
+## Next.js
 
-```typescript
-function isClient(): boolean {
-  return typeof window !== "undefined";
-}
+Next config is in `src/config/next-config.ts`
 
-function getFromStorage<T>(key: string): T[] {
-  if (!isClient()) return [];
+Don't use server actions to fetch data. Use Server Components instead.
+Server code belongs in services, server action code belongs in actions if an action needs server-side code it should call services. So, a server component may load data using a service, then manipulate data using a server action, which then calls a service.
 
-  try {
-    const item = localStorage.getItem(key);
-    return item ? JSON.parse(item) : [];
-  } catch (error) {
-    console.warn(`Failed to parse ${key} from localStorage:`, error);
-    return [];
-  }
-}
-```
+## When interacting with the database
 
-### Date Handling
-Convert date strings back to Date objects:
-
-```typescript
-function parseStoredData<T>(data: any[]): T[] {
-  return data.map(item => ({
-    ...item,
-    createdAt: new Date(item.createdAt),
-    updatedAt: new Date(item.updatedAt),
-    deletedAt: item.deletedAt ? new Date(item.deletedAt) : null
-  }));
-}
-```
-
-## Demo Data Initialization
-
-Provide realistic demo data for first-time users:
-
-```typescript
-function initializeDemoData(): void {
-  if (this.getAllProjects().length === 0) {
-    this.createDemoProjects();
-  }
-}
-
-private createDemoProjects(): void {
-  const demoProjects = [
-    { name: "Marketing Website", description: "Company landing page" },
-    { name: "Mobile App", description: "iOS and Android application" },
-    { name: "API Gateway", description: "Microservices backend" }
-  ];
-
-  demoProjects.forEach(project => {
-    this.createProject(demoTeamId, project.name, demoUserId);
-  });
-}
-```
-
-## Error Handling
-
-### Graceful Fallbacks
-Never throw errors that would break the application:
-
-```typescript
-getUserProjects(userId: string): LocalProject[] {
-  try {
-    const projects = this.getAllProjects();
-    return projects.filter(p => this.userHasAccess(userId, p.id));
-  } catch (error) {
-    console.warn("Failed to get user projects:", error);
-    return [];
-  }
-}
-```
-
-### Storage Quota Management
-Handle storage quota exceeded errors:
-
-```typescript
-function saveToStorage<T>(key: string, data: T[]): void {
-  try {
-    localStorage.setItem(key, JSON.stringify(data));
-  } catch (error) {
-    if (error.name === 'QuotaExceededError') {
-      console.warn("Storage quota exceeded, clearing old data");
-      this.clearOldData();
-      localStorage.setItem(key, JSON.stringify(data));
-    } else {
-      throw error;
-    }
-  }
-}
-```
-
-## CRUD Operations
-
-### Create Pattern
-```typescript
-createEntity(data: CreateEntityData): LocalEntity {
-  const entity: LocalEntity = {
-    id: generateId(),
-    ...data,
-    createdAt: new Date(),
-    updatedAt: new Date()
-  };
-
-  const entities = this.getAllEntities();
-  entities.push(entity);
-  this.saveEntities(entities);
-
-  return entity;
-}
-```
-
-### Update Pattern
-```typescript
-updateEntity(id: string, updates: Partial<LocalEntity>): LocalEntity {
-  const entities = this.getAllEntities();
-  const index = entities.findIndex(e => e.id === id);
-
-  if (index === -1) {
-    throw new Error("Entity not found");
-  }
-
-  entities[index] = {
-    ...entities[index],
-    ...updates,
-    updatedAt: new Date()
-  };
-
-  this.saveEntities(entities);
-  return entities[index];
-}
-```
-
-### Delete Pattern (Soft Delete)
-```typescript
-deleteEntity(id: string): void {
-  const entities = this.getAllEntities();
-  const index = entities.findIndex(e => e.id === id);
-
-  if (index !== -1) {
-    entities[index].deletedAt = new Date();
-    this.saveEntities(entities);
-  }
-}
-```
-
-## Integration with Services
-
-Services should check for database availability and fallback to local storage:
-
-```typescript
-// In service files like project-service.ts
-import { LocalProjectStorage } from "@/lib/local-storage/project-storage";
-
-async createProject(teamId: string, name: string, userId: string) {
-  if (!db) {
-    return LocalProjectStorage.createProject(teamId, name, userId);
-  }
-
-  // Database implementation
-  return await this.database.createProject(teamId, name, userId);
-}
-```
-
-## Testing Local Storage
-
-### Unit Tests
+1. Ensure all required fields are provided when interacting with the database.
+2. Check for potential undefined values and handle them appropriately.
+3. Use TypeScript's type system to enforce correct data structures.
+4. Implement error handling for database operations and API requests.
+5. Validate input data to prevent runtime errors and ensure data integrity.
+6. Add comments to explain complex logic or important decisions in the code.
+7. Regularly review and test code to catch and fix errors early.
+8. Use the `db.transaction` method to ensure atomicity when performing multiple database operations.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/shipkit-io) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-09 -->
+> Source: [shipkit-io/bones](https://github.com/shipkit-io/bones) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-21 -->
