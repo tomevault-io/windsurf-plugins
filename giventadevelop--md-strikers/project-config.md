@@ -1,107 +1,117 @@
 ---
 trigger: always_on
-description: This rule defines the validation patterns and error handling for the `FromEmailSelect` component used in event forms and other admin pages. The component provides a searchable dropdown for selecting tenant email addresses with comprehensive validation.
+description: This rule defines the business logic and UI patterns for the future/past events toggle switch implemented on both admin and public events pages. The toggle allows users to switch between viewing future events (upcoming) and past events (historical), with intelligent auto-switching and informative messaging.
 ---
 
-# From Email Select Component - Validation Rules
+# Future / Past Events Toggle Switch Business Rules
 
 ## **Overview**
-This rule defines the validation patterns and error handling for the `FromEmailSelect` component used in event forms and other admin pages. The component provides a searchable dropdown for selecting tenant email addresses with comprehensive validation.
+This rule defines the business logic and UI patterns for the future/past events toggle switch implemented on both admin and public events pages. The toggle allows users to switch between viewing future events (upcoming) and past events (historical), with intelligent auto-switching and informative messaging.
 
 ## **Problem Solved**
-- **Database Value Validation**: Validates that `fromEmail` from database matches an email in the tenant email addresses list, clearing invalid values
-- **Empty List Validation**: Detects when no email addresses are configured and shows appropriate error message
-- **Empty Field Validation**: Validates that user has selected an email address before form submission
-- **Custom Error Messages**: Provides user-friendly error messages instead of browser default validation
-- **Parent Component Integration**: Notifies parent components about validation state for form-level validation
+- **User Experience**: Automatically shows past events when no future events exist, preventing empty "No events found" messages
+- **Information Clarity**: Provides clear messaging about event availability and how to use the toggle switch
+- **Consistent Behavior**: Ensures the same logic works on both admin and public pages (with appropriate customization)
+- **Empty State Handling**: Gracefully handles all scenarios (no events, no future events, no past events)
 
-## **Component Location**
-- **Component**: `src/components/FromEmailSelect.tsx`
-- **Usage**: `src/components/EventForm.tsx` and other admin forms
+## **Core Business Rules**
 
-## **Validation Rules**
+### **1. Auto-Switch on Page Load**
+- **Rule**: On initial page load, if there are no future events but past events exist, automatically switch to showing past events
+- **When**: Only on initial load (page 0, no search filters applied)
+- **Purpose**: Prevents showing "No events found" when past events are available
+- **Implementation**: Check both future and past event counts on initial load, then auto-switch if needed
 
-### **1. Database Value Validation (Event Loading)**
+### **2. Event Count Tracking**
+- **Rule**: Track both future and past event counts separately to determine appropriate messaging
+- **State Variables**: 
+  - `futureEventCount`: Number of future events (events with `startDate >= today`)
+  - `pastEventCount`: Number of past events (events with `endDate < today`)
+  - `hasCheckedInitialLoad`: Flag to ensure initial check happens only once
+  - `isAutoSwitching`: Flag to prevent double-loading when auto-switching
 
-**CRITICAL**: When loading event data from the database, the `fromEmail` value must be validated against the tenant email addresses list. If the database value doesn't exist in the list, it must be cleared so validation will catch it.
+### **3. Info Box Messages**
 
-**Problem**: The database may contain an email address (e.g., `'events@example.com'`) that doesn't exist in the tenant email addresses list. This creates a conflict where:
-- The form field appears empty (because `FromEmailSelect` can't display a value not in its list)
-- But `form.fromEmail` still has the database value
-- Validation passes incorrectly because the field has a value (even though it's invalid)
+#### **No Events at All (Both Future and Past)**
+- **Condition**: `futureEventCount === 0 && pastEventCount === 0`
+- **Message**: 
+  - **Title**: "There are no events listed yet."
+  - **Body**: "Please check back again. New events will appear here once they are created. Please use future / past events switch above."
+- **Styling**: Blue info box (`bg-blue-50 border border-blue-200`)
+- **Icon**: Info icon (blue)
 
-**Solution**: Validate the database value on event load and clear it if it doesn't exist in the email addresses list.
+#### **Showing Past Events (No Future Events Exist)**
+- **Condition**: `showPastEvents === true && futureEventCount === 0 && pastEventCount > 0`
+- **Message**: "Here is the list of recent events. New future events will be added soon. Please use future / past events switch above."
+- **Styling**: Amber info box (`bg-amber-50 border border-amber-200`)
+- **Icon**: Info icon (amber)
+- **Position**: Above the events table
 
-**Implementation Pattern:**
+#### **Showing Future Events (No Future Events Exist)**
+- **Condition**: `showPastEvents === false && futureEventCount === 0`
+- **Message**:
+  - **Title**: "No future events created."
+  - **Body**: "Please use future / past events switch above."
+- **Styling**: Blue info box (`bg-blue-50 border border-blue-200`)
+- **Icon**: Info icon (blue)
+- **Admin Pages**: Include "Create New Event" button
+- **Public Pages**: No action button (public users cannot create events)
+
+### **4. Date Filtering Logic**
+
+#### **Future Events Filter**
+- **Query Parameter**: `startDate.greaterThanOrEqual=${today}`
+- **Sort**: `startDate,asc` (earliest first)
+- **Definition**: Events that start today or in the future (including today)
+
+#### **Past Events Filter**
+- **Query Parameter**: `endDate.lessThan=${today}`
+- **Sort**: `startDate,desc` (newest first)
+- **Definition**: Events that have already ended (ended before today)
+
+### **5. Date Format**
+- **Format**: `YYYY-MM-DD` (ISO date format)
+- **Calculation**: `new Date().toISOString().split('T')[0]`
+- **Usage**: Used for all date comparisons and API queries
+
+## **Implementation Pattern**
+
+### **State Management**
 ```tsx
-// In EventForm useEffect when loading event data
-useEffect(() => {
-  if (event) {
-    // CRITICAL: Validate fromEmail against the email addresses list
-    // If the database value doesn't exist in the list, clear it so validation will catch it
-    const validateAndSetFromEmail = async () => {
-      let validFromEmail = event.fromEmail || '';
-
-      // Only validate if fromEmail has a value
-      if (validFromEmail && validFromEmail.trim() !== '') {
-        try {
-          // Fetch all email addresses (use a large page size to get all)
-          const emailAddresses = await fetchTenantEmailAddressesServer(0, 1000);
-
-          // Check if the fromEmail exists in the list and is active
-          const emailExists = emailAddresses.some(
-            email => email.emailAddress === validFromEmail && email.isActive === true
-          );
-
-          if (!emailExists) {
-            // Email doesn't exist in the list - clear it so validation will catch it
-            console.warn('[EventForm] fromEmail from database does not exist in email addresses list:', {
-              fromEmail: validFromEmail,
-              availableEmails: emailAddresses.map(e => e.emailAddress),
-            });
-            validFromEmail = '';
-          }
-        } catch (error) {
-          // If fetching email addresses fails, log error but still clear the field
-          // This ensures validation will catch it
-          console.error('[EventForm] Failed to validate fromEmail against email addresses list:', error);
-          validFromEmail = '';
-        }
-      }
-
-      // Set form with validated fromEmail
-      const formData = { ...defaultEvent, ...event, fromEmail: validFromEmail };
-      setForm(formData);
-
-      // ... rest of event loading logic (metadata, etc.)
-    };
-
-    // Call the async function to validate and set fromEmail
-    void validateAndSetFromEmail();
-  }
-}, [event]);
+// Track event counts for both future and past
+const [futureEventCount, setFutureEventCount] = useState<number | null>(null);
+const [pastEventCount, setPastEventCount] = useState<number | null>(null);
+const [hasCheckedInitialLoad, setHasCheckedInitialLoad] = useState(false);
+const [isAutoSwitching, setIsAutoSwitching] = useState(false);
+const [showPastEvents, setShowPastEvents] = useState(false);
 ```
 
-**Key Requirements:**
-- ✅ **Always validate** database `fromEmail` value against the email addresses list when loading event data
-- ✅ **Clear invalid values** - if database value doesn't exist in list, set `form.fromEmail = ''`
-- ✅ **Check active status** - only consider emails where `isActive === true`
-- ✅ **Handle errors gracefully** - if fetching email addresses fails, clear the field to ensure validation catches it
-- ✅ **Log warnings** - log when database value doesn't match list for debugging
-- ✅ **Run before form initialization** - validation must complete before setting form state
+### **Initial Load Check**
+```tsx
+// On initial load, check both future and past event counts
+if (!hasCheckedInitialLoad && page === 0 && !searchTitle && !searchDateFrom && !searchDateTo) {
+  // Check future events count
+  const futureParams = {
+    sort: 'startDate,asc',
+    pageNum: 0,
+    pageSize: 1, // Just need count, not data
+    startDate: today,
+  };
+  const { totalCount: futureCount } = await fetchEventsFilteredServer(futureParams);
+  setFutureEventCount(futureCount);
 
-**Why This Is Critical:**
-- Prevents silent validation failures where form appears empty but has invalid value
-- Ensures users must select a valid email from the dropdown
-- Maintains data integrity by only allowing emails from the tenant email addresses list
-- Provides clear validation feedback when database contains invalid data
+  // Check past events count
+  const pastParams = {
+    sort: 'startDate,desc',
+    pageNum: 0,
+    pageSize: 1, // Just need count, not data
+    endDate: today,
+  };
+  const { totalCount: pastCount } = await fetchEventsFilteredServer(pastParams);
+  setPastEventCount(pastCount);
 
-### **2. Empty Email List Validation**
+  setHasCheckedInitialLoad(true);
 
-When the email address list is empty (length === 0), the component must:
-
-- **Display Error Message**: Show a prominent error message below the input field
-- **Error Message Text**: "The from email list is empty. Please contact Admin to add the list of from email addresses."
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
