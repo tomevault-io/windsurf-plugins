@@ -1,243 +1,223 @@
 ---
 trigger: always_on
-description: JavaScript best practices, ES2022+ features, and modern patterns for scalable applications
+description: description: Intelligent context management and memory optimization strategies
 ---
 
-# JavaScript Best Practices
+---
+description: Intelligent context management and memory optimization strategies
+globs: ["**/*"]
+alwaysApply: false
+---
 
-Modern JavaScript development guide focusing on ES2022+ features, performance, and clean code patterns.
+# Memory Management & Context Optimization
 
-## 1. Modern JavaScript Fundamentals
+## 🧠 Context Priority Levels
 
-### 1.1 Variable Declarations and Scope
-
-```javascript
-// Use const for immutable bindings
-const API_KEY = process.env.API_KEY;
-const config = Object.freeze({
-  timeout: 5000,
-  retries: 3
-});
-
-// Use let only when reassignment is needed
-let retryCount = 0;
-while (retryCount < MAX_RETRIES) {
-  retryCount++;
-}
-
-// Block scope with const/let
-{
-  const temp = calculateTemp();
-  // temp is only available in this block
-}
+### Level 1: CRITICAL (Always Retain)
+```
+- Current task definition
+- Active file being edited
+- Recent error messages
+- Explicit user requirements
+- Security/authentication context
 ```
 
-### 1.2 Destructuring Patterns
-
-```javascript
-// Advanced destructuring with defaults and renaming
-const { 
-  data: users = [], 
-  meta: { total = 0, page = 1 } = {},
-  ...rest 
-} = response;
-
-// Array destructuring with rest
-const [first, second, ...remaining] = items;
-
-// Destructuring in function parameters
-function createUser({ 
-  name, 
-  email, 
-  role = 'user',
-  metadata: { source = 'web' } = {}
-} = {}) {
-  return { id: generateId(), name, email, role, source };
-}
-
-// Dynamic property destructuring
-const key = 'name';
-const { [key]: value } = object;
+### Level 2: IMPORTANT (Retain if Relevant)
+```
+- Related file imports/exports
+- Function signatures being used
+- Recent code modifications
+- Database schema if querying
+- API contracts if integrating
 ```
 
-### 1.3 Object and Array Operations
-
-```javascript
-// Object property shorthand and computed properties
-const name = 'John';
-const age = 30;
-const user = {
-  name,
-  age,
-  [`is${age}YearsOld`]: true,
-  // Method shorthand
-  greet() {
-    return `Hello, I'm ${this.name}`;
-  }
-};
-
-// Array methods for immutability
-const doubled = numbers.map(n => n * 2);
-const filtered = users.filter(u => u.active);
-const sum = numbers.reduce((acc, n) => acc + n, 0);
-const found = users.find(u => u.id === targetId);
-const hasAdmin = users.some(u => u.role === 'admin');
-const allActive = users.every(u => u.active);
-
-// Object transformation
-const transformed = Object.entries(data)
-  .filter(([key, value]) => value != null)
-  .reduce((acc, [key, value]) => ({ ...acc, [key]: transform(value) }), {});
+### Level 3: HELPFUL (Include if Space)
+```
+- Project conventions discovered
+- Similar patterns in codebase
+- Previous solutions to similar problems
+- Performance considerations
 ```
 
-## 2. Advanced Functions and Closures
-
-### 2.1 Function Patterns
-
-```javascript
-// Default parameters with destructuring
-function fetchData(url, { 
-  method = 'GET', 
-  headers = {}, 
-  timeout = 5000 
-} = {}) {
-  return fetch(url, { method, headers, signal: AbortSignal.timeout(timeout) });
-}
-
-// Rest parameters and spread
-function combine(separator, ...parts) {
-  return parts.filter(Boolean).join(separator);
-}
-
-// Immediately Invoked Function Expression (IIFE)
-const module = (() => {
-  let privateVar = 0;
-  
-  return {
-    increment() { privateVar++; },
-    getCount() { return privateVar; }
-  };
-})();
-
-// Function composition
-const compose = (...fns) => x => fns.reduceRight((acc, fn) => fn(acc), x);
-const pipe = (...fns) => x => fns.reduce((acc, fn) => fn(acc), x);
-
-// Currying
-const curry = (fn) => {
-  return function curried(...args) {
-    if (args.length >= fn.length) {
-      return fn.apply(this, args);
-    }
-    return (...nextArgs) => curried(...args, ...nextArgs);
-  };
-};
+### Level 4: ARCHIVE (Prune First)
+```
+- Successful operations from >10 messages ago
+- Resolved errors
+- Exploratory dead ends
+- Duplicate information
 ```
 
-### 2.2 Closures and Private State
+## 📊 Context Pruning Strategy
 
-```javascript
-// Module pattern with private state
-function createCounter(initial = 0) {
-  let count = initial;
-  
-  return {
-    increment() { return ++count; },
-    decrement() { return --count; },
-    reset() { count = initial; return count; },
-    valueOf() { return count; }
-  };
-}
-
-// Memoization with closure
-function memoize(fn, keyFn = JSON.stringify) {
-  const cache = new Map();
-  
-  return function memoized(...args) {
-    const key = keyFn(args);
-    
-    if (cache.has(key)) {
-      return cache.get(key);
-    }
-    
-    const result = fn.apply(this, args);
-    cache.set(key, result);
-    return result;
-  };
-}
+### When Context Gets Full:
+```
+1. Remove Level 4 items first
+2. Summarize Level 3 items
+3. Compress Level 2 (keep signatures only)
+4. NEVER remove Level 1
 ```
 
-## 3. Asynchronous JavaScript
-
-### 3.1 Promises and Async Patterns
-
+### Smart Compression Examples:
 ```javascript
-// Promise creation and chaining
-const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+// BEFORE: Full context
+"User implemented a UserController with methods: 
+- getUsers(): returns all users with pagination
+- getUser(id): returns single user by ID  
+- createUser(data): creates new user with validation
+- updateUser(id, data): updates existing user
+- deleteUser(id): soft deletes user"
 
-// Promise combinators
-async function fetchAllData(urls) {
-  // Parallel execution
-  const results = await Promise.all(urls.map(url => fetch(url)));
-  
-  // Handle partial failures
-  const settledResults = await Promise.allSettled(urls.map(url => fetch(url)));
-  
-  // Race condition
-  const fastest = await Promise.race([
-    fetch('/api/primary'),
-    fetch('/api/backup')
-  ]);
-  
-  // First successful result
-  const firstSuccess = await Promise.any([
-    fetch('/api/server1'),
-    fetch('/api/server2'),
-    fetch('/api/server3')
-  ]);
-}
-
-// Async iteration
-async function* fetchPages(baseUrl) {
-  let page = 1;
-  let hasMore = true;
-  
-  while (hasMore) {
-    const response = await fetch(`${baseUrl}?page=${page}`);
-    const data = await response.json();
-    yield data.items;
-    hasMore = data.hasNextPage;
-    page++;
-  }
-}
-
-// Using async generators
-for await (const items of fetchPages('/api/users')) {
-  processItems(items);
-}
+// AFTER: Compressed
+"UserController implemented with CRUD operations (get/create/update/delete)"
 ```
 
-### 3.2 Advanced Error Handling
+## 🎯 Focus Maintenance
 
+### Track Current Objective
+```
+CURRENT_TASK: [Implementation of user authentication]
+SUBTASK: [Adding JWT validation middleware]
+BLOCKED_BY: [Need database schema]
+NEXT_STEP: [Test the middleware]
+```
+
+### Context Switching
+```
+When switching tasks:
+1. Summarize completed work
+2. Clear Level 3-4 context
+3. Load new task context
+4. Preserve learned patterns
+```
+
+## 💡 Pattern Recognition & Storage
+
+### Store Reusable Patterns
 ```javascript
-// Retry mechanism with exponential backoff
-async function retryWithBackoff(fn, maxRetries = 3, baseDelay = 1000) {
-  for (let i = 0; i < maxRetries; i++) {
-    try {
-      return await fn();
-    } catch (error) {
-      if (i === maxRetries - 1) throw error;
-      
-      const delay = baseDelay * Math.pow(2, i);
-      await new Promise(resolve => setTimeout(resolve, delay));
-    }
-  }
+// PATTERN DETECTED: Error handling in this project
+try {
+  // operation
+} catch (error) {
+  logger.error(`${context}: ${error.message}`, { error, metadata });
+  throw new CustomError(error.message, ERROR_CODES.OPERATION_FAILED);
 }
+// STORE: Project uses custom error wrapper with logging
+```
 
-// Circuit breaker pattern
-class CircuitBreaker {
+### Project Conventions
+```
+DISCOVERED PATTERNS:
+- File naming: kebab-case.ts
+- Exports: Named exports preferred
+- Testing: *.test.ts files
+- API routes: /api/v1/resource
+```
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+## 🔍 Information Retrieval
+
+### Quick Reference Format
+```
+FILE_STRUCTURE:
+src/
+  controllers/ (business logic)
+  services/ (external integrations)
+  utils/ (shared helpers)
+  types/ (TypeScript interfaces)
+
+KEY_FUNCTIONS:
+- authenticate() in auth.service.ts
+- validateRequest() in middleware/
+- handleError() in utils/error.ts
+```
+
+### Relationship Mapping
+```
+UserController -> UserService -> UserRepository
+     |                |               |
+     v                v               v
+validation.ts    external-api.ts   database.ts
+```
+
+## 📈 Context Quality Metrics
+
+### Good Context Indicators:
+- Can answer "what was I doing?" instantly
+- Know which files are affected
+- Understand dependencies
+- Remember key decisions
+
+### Bad Context Indicators:
+- Repeating same questions
+- Lost track of requirements
+- Forgetting recent changes
+- Circular discussions
+
+## 🚀 Optimization Techniques
+
+### Batch Related Information
+```
+// Instead of scattered context:
+"User model has email field"
+"User model has password field"  
+"User model has createdAt field"
+
+// Batch together:
+"User model: { email, password, createdAt, updatedAt, role }"
+```
+
+### Use References
+```
+// Instead of repeating:
+"The validateEmail function checks format and domain"
+"The validateEmail function returns boolean"
+
+// Reference once:
+validateEmail(): boolean - checks format and domain
+// Then refer as: "use validateEmail() defined above"
+```
+
+## 💾 Session Continuity
+
+### End of Session Summary
+```
+SESSION SUMMARY:
+- Implemented: User authentication with JWT
+- Modified: auth.service.ts, user.controller.ts
+- Decisions: Used refresh tokens, 7-day expiry
+- TODO: Add rate limiting, implement logout
+- Gotchas: Remember to handle token refresh edge case
+```
+
+### Session Startup
+```
+RESUMING FROM:
+- Working on: [Feature name]
+- Last action: [What was completed]
+- Next step: [What needs doing]
+- Context: @previous-session-summary
+```
+
+## 🎪 Memory Management Commands
+
+### Mental Commands to Use:
+```
+COMPRESS: Summarize current context
+PRUNE: Remove outdated information
+FOCUS: Narrow to current task only
+SNAPSHOT: Save current state
+RESTORE: Load previous context
+```
+
+### Context Health Check:
+```
+Every 10 interactions:
+1. Is context still relevant?
+2. Any duplicate information?
+3. Missing critical context?
+4. Can I answer user's original request?
+```
+
+Remember: Quality > Quantity. Better to have 5 relevant facts than 50 irrelevant ones.
 
 ---
 > Source: [DVC2/cursor_prompts](https://github.com/DVC2/cursor_prompts) — distributed by [TomeVault](https://tomevault.io).
