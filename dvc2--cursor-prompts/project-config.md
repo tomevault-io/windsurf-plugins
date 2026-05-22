@@ -1,211 +1,245 @@
 ---
 trigger: always_on
-description: Recursive audit system with deep thinking, surgical fixes, automated patterns, and continuous learning
+description: description: Core development best practices and common sense patterns
 ---
 
+---
+description: Core development best practices and common sense patterns
+globs: ["**/*"]
+alwaysApply: true
+---
 
-# 🔍 RECURSIVE AUDIT SYSTEM WITH INTELLIGENT RESOLUTION
+# Common Sense Development Rules
 
-## CORE PHILOSOPHY: THINK DEEPLY, FIX SURGICALLY, LEARN CONTINUOUSLY
+## 🎯 Code Quality First
 
-I am a meticulous code auditor that:
-- Questions EVERYTHING through explicit thinking
-- Fixes issues surgically with zero redundancy
-- Learns patterns from every fix for future automation
-- Shares knowledge to prevent recurrence
-- Maintains brutal honesty while being actionable
-
-## 🧠 MANDATORY THINKING PROTOCOL
-
-Before ANY action, I MUST think:
-```
-<thinking>
-1. What am I seeing and why does it matter?
-2. Is this the root cause or just a symptom?
-3. Have I seen this pattern before?
-4. What's the minimal surgical fix?
-5. Can this be automated next time?
-6. What should the team learn from this?
-</thinking>
-```
-
-## 🔄 RECURSIVE AUDIT PIPELINE
-
-### Phase 1: INTELLIGENT DISCOVERY
-```
-FOR each file/module:
-  <thinking>
-  - What is this code trying to accomplish?
-  - What patterns am I detecting?
-  - What tools will give the best insights?
-  - Where should I dig deeper?
-  </thinking>
-  
-  EXECUTE multi-tool scan:
-  - Static analysis (ESLint, TSC, language-specific)
-  - Security scanning (npm audit, Snyk, OWASP)
-  - Complexity analysis (cyclomatic, cognitive)
-  - Performance profiling (where applicable)
-  - Custom pattern matching (learned patterns)
-  - Architecture violations (dependency rules)
-  
-  CLASSIFY findings by:
-  - Severity (P0-P4)
-  - Confidence (false positive probability)
-  - Fix pattern (known/unknown)
-  - Impact radius (local/module/system)
-```
-
-### Phase 2: DEEP RECURSIVE ANALYSIS
-```
-FOR each finding (ordered by priority):
-  <thinking>
-  - Why does this problem exist?
-  - What allowed this to happen?
-  - Is this part of a larger pattern?
-  - What's the real impact?
-  - Should I investigate related code?
-  </thinking>
-  
-  IF pattern exists in knowledge base:
-    - Verify pattern still applies
-    - Check confidence score (>0.8 for auto-fix)
-    - Validate no special circumstances
-  ELSE:
-    - Trace root cause recursively
-    - Analyze call chains and data flow
-    - Check for similar issues elsewhere
-    - Design minimal fix approach
-    
-  RECURSIVE CHECK (max depth: 3):
-    - Find related code sections
-    - Identify coupled components
-    - Detect similar anti-patterns
-    - Add to investigation queue
-```
-
-### Phase 3: SURGICAL INTERVENTION
-```
-FOR each verified issue:
-  <thinking>
-  - What's the absolute minimal change?
-  - Will this break anything?
-  - Is this the RIGHT fix or a hack?
-  - How do I make this educational?
-  - Can I extract a reusable pattern?
-  </thinking>
-  
-  IF auto-fixable (pattern confidence > 0.9):
-    - Create sandbox environment
-    - Apply pattern-based fix
-    - Validate comprehensively
-    - Update pattern confidence
-  ELSE:
-    - Design surgical fix
-    - Document reasoning
-    - Create learning opportunity
-    
-  ALWAYS:
-    - Fix IN-PLACE (no duplicate files)
-    - Remove rather than comment
-    - Simplify rather than complicate
-    - Test edge cases
-    - Extract pattern for future
-```
-
-### Phase 4: VERIFICATION & LEARNING
-```
-AFTER each fix:
-  <thinking>
-  - Did this solve the root problem?
-  - What can we learn from this?
-  - Are there similar issues to fix?
-  - How do we prevent recurrence?
-  - What patterns emerged?
-  </thinking>
-  
-  VERIFY:
-    - Original issue resolved
-    - No regressions introduced
-    - Performance maintained/improved
-    - Security posture improved
-    - Tests cover the fix
-    
-  LEARN:
-    - Extract fix pattern
-    - Update knowledge base
-    - Generate prevention rule
-    - Create team learning content
-    - Find and fix similar issues
-```
-
-## 🎯 PRIORITY CLASSIFICATION
-
-### P0: CRITICAL (Fix Immediately)
-- Security vulnerabilities (injection, auth bypass, data exposure)
-- Data corruption risks
-- Production crashes
-- Memory leaks > 10MB/hour
-- Race conditions with data loss
-
-**Auto-fix threshold**: 0.95 confidence
-**Manual review**: ALWAYS for security
-
-### P1: HIGH (Fix This Session)
-- Logic errors affecting correctness
-- Performance degradation > 100ms
-- Broken error handling
-- Missing input validation
-- Resource exhaustion risks
-
-**Auto-fix threshold**: 0.9 confidence
-**Batch processing**: Group similar issues
-
-### P2: MEDIUM (Fix This Sprint)
-- Code duplication > 20 lines
-- Complexity > 10 (cyclomatic)
-- Missing critical tests
-- Inconsistent patterns
-- Technical debt accumulation
-
-**Auto-fix threshold**: 0.85 confidence
-**Learning focus**: Extract patterns
-
-### P3: LOW (Backlog)
-- Style inconsistencies
-- Minor performance < 10ms
-- Documentation gaps
-- Non-critical warnings
-- Refactoring opportunities
-
-**Auto-fix threshold**: 0.8 confidence
-**Bulk operations**: Apply patterns at scale
-
-### P4: COSMETIC (Optional)
-- Formatting/whitespace
-- Import ordering
-- Comment clarity
-- File organization
-
-**Auto-fix threshold**: Always (deterministic)
-
-## 🚨 PATTERN DETECTION & RESOLUTION
-
-### Known Anti-Pattern Library
+### Simple > Complex
 ```javascript
-const antiPatterns = {
-  // Security Patterns
-  'sql_injection': {
-    detect: /(\$\{.*\}|['"]?\s*\+\s*(?:req|user|input))/,
-    severity: 'P0',
-    fix: convertToParameterizedQuery,
-    test: validateNoSQLInjection,
-    learn: extractQueryPattern
-  },
-  
-  'hardcoded_secrets': {
+// ✅ GOOD: Clear intent
+const isActive = user.status === 'active';
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+// ❌ BAD: Unnecessary complexity
+const isActive = (() => user?.status?.toLowerCase() === 'active')();
+```
+
+### Early Returns
+```javascript
+// ✅ GOOD: Fail fast
+function processUser(user) {
+  if (!user) return null;
+  if (!user.email) return null;
+  
+  // Main logic here
+}
+
+// ❌ BAD: Nested hell
+function processUser(user) {
+  if (user) {
+    if (user.email) {
+      // Main logic here
+    }
+  }
+}
+```
+
+## 🛡️ Error Handling
+
+### Always Handle Errors
+```javascript
+// ✅ GOOD: Explicit handling
+try {
+  const data = await fetchData();
+  return processData(data);
+} catch (error) {
+  console.error('Failed to fetch data:', error);
+  return defaultData;
+}
+
+// ❌ BAD: Silent failures
+const data = await fetchData();
+return processData(data);
+```
+
+### Meaningful Error Messages
+```javascript
+// ✅ GOOD: Context included
+throw new Error(`User ${userId} not found in database`);
+
+// ❌ BAD: Generic
+throw new Error('Error');
+```
+
+## 📝 Naming Conventions
+
+### Be Descriptive
+```javascript
+// ✅ GOOD
+const userAuthenticationToken = generateToken();
+const isEmailValid = validateEmail(email);
+
+// ❌ BAD
+const token = genTok();
+const valid = check(e);
+```
+
+### Boolean Naming
+```javascript
+// ✅ GOOD: Clear boolean names
+const isLoading = true;
+const hasPermission = false;
+const canEdit = true;
+
+// ❌ BAD: Ambiguous
+const loading = true;
+const permission = false;
+const edit = true;
+```
+
+## 🔄 Function Design
+
+### Single Responsibility
+```javascript
+// ✅ GOOD: One clear purpose
+function calculateTax(amount, rate) {
+  return amount * rate;
+}
+
+function formatCurrency(amount) {
+  return `$${amount.toFixed(2)}`;
+}
+
+// ❌ BAD: Multiple responsibilities
+function calculateAndFormat(amount, rate) {
+  const tax = amount * rate;
+  return `$${tax.toFixed(2)}`;
+}
+```
+
+### Consistent Return Types
+```javascript
+// ✅ GOOD: Always returns same type
+function findUser(id) {
+  const user = users.find(u => u.id === id);
+  return user || null;
+}
+// ❌ BAD: Mixed returns
+function findUser(id) {
+  const user = users.find(u => u.id === id);
+  if (!user) return 'Not found';
+  return user;
+}
+```
+
+## 🚀 Performance Patterns
+
+### Avoid Premature Optimization
+```javascript
+// Only optimize when you have metrics showing a problem
+// Profile first, optimize second
+```
+
+### Use Appropriate Data Structures
+```javascript
+// ✅ GOOD: O(1) lookup
+const userMap = new Map(users.map(u => [u.id, u]));
+const user = userMap.get(userId);
+
+// ❌ BAD: O(n) lookup for frequent operations
+const user = users.find(u => u.id === userId);
+```
+
+## 💾 State Management
+
+### Immutability
+```javascript
+// ✅ GOOD: Create new objects
+const updatedUser = { ...user, name: newName };
+const newItems = [...items, newItem];
+
+// ❌ BAD: Mutate directly
+user.name = newName;
+items.push(newItem);
+```
+
+### Clear State Updates
+```javascript
+// ✅ GOOD: Explicit state changes
+setState(prevState => ({
+  ...prevState,
+  isLoading: false,
+  data: newData
+}));
+
+// ❌ BAD: Unclear mutations
+state.isLoading = false;
+state.data = newData;
+```
+
+## 🧪 Testing Mindset
+
+### Write Testable Code
+```javascript
+// ✅ GOOD: Pure, testable
+function calculateDiscount(price, percentage) {
+  return price * (1 - percentage / 100);
+}
+
+// ❌ BAD: Hard to test
+function calculateDiscount() {
+  const price = document.getElementById('price').value;
+  const percentage = globalDiscount;
+  return price * (1 - percentage / 100);
+}
+```
+
+## 📚 Documentation
+
+### Document Why, Not What
+```javascript
+// ✅ GOOD: Explains reasoning
+// Use exponential backoff to avoid overwhelming the server
+const delay = Math.min(1000 * Math.pow(2, retryCount), 30000);
+
+// ❌ BAD: States obvious
+// Multiply 1000 by 2 to the power of retryCount
+const delay = 1000 * Math.pow(2, retryCount);
+```
+
+## 🔐 Security Basics
+
+### Never Trust User Input
+```javascript
+// ✅ GOOD: Validate and sanitize
+const userId = parseInt(req.params.id, 10);
+if (isNaN(userId) || userId <= 0) {
+  return res.status(400).json({ error: 'Invalid user ID' });
+}
+
+// ❌ BAD: Direct usage
+const query = `SELECT * FROM users WHERE id = ${req.params.id}`;
+```
+
+## 🎭 Code Style
+
+### Consistency Over Personal Preference
+- Follow project conventions
+- Use formatters (Prettier, ESLint)
+- Don't mix styles in same file
+
+### Remove Dead Code
+- Delete commented code
+- Remove unused imports
+- Clean up console.logs
+
+## ⚡ Quick Decisions
+
+When unsure:
+1. Choose readability
+2. Choose maintainability
+3. Choose simplicity
+4. Choose explicitness
+
+Remember: Code is read 10x more than written. Optimize for the reader!
 
 ---
 > Source: [DVC2/cursor_prompts](https://github.com/DVC2/cursor_prompts) — distributed by [TomeVault](https://tomevault.io).
