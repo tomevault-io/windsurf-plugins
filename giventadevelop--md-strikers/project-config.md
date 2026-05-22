@@ -1,184 +1,136 @@
 ---
 trigger: always_on
-description: This guide provides standards for creating consistent and maintainable UI components across the application UI
+description: Handles cases where existing user profiles (especially those created via mobile payments) need to be updated with current Clerk user data during sign-in and profile page load.
 ---
 
-# UI Component Style Guide
-
-This guide provides standards for creating consistent and maintainable UI components across the application UI
-.
 
 ---
-
-## 1. Page & Content Layout
-
-### Page Container
-
-- **Rule:** Use `max-w-5xl mx-auto px-8 py-8` for main page containers.
-- **Purpose:** Enforces a consistent 80% width and center alignment on desktop views.
-- **Example:**
-  ```tsx
-  // ✅ DO: Use consistent page layout
-  <div className="max-w-5xl mx-auto px-8 py-8">
-    {/* Page content goes here */}
-  </div>
-  ```
-
-### Content Card
-
-- **Rule:** Use `bg-white rounded-lg shadow-md p-6` for containers that wrap main content sections (tables, forms, etc.).
-- **Purpose:** Creates a consistent, elevated card-based layout for content.
-- **Example:**
-  ```tsx
-  // ✅ DO: Use a styled container for content sections
-  <div className="bg-white rounded-lg shadow-md p-6">
-    {/* Table, list, or form content */}
-  </div>
-  ```
-
-### Centered Card Grid Layout
-
-- **Rule:** Use CSS modules with flexbox for centered card grids (Featured Guests, Contact Information, Program Directors, Gallery thumbnails, Team members).
-- **Purpose:** Ensures cards are perfectly centered regardless of the number of items, preventing left-aligned layouts when items don't fill the full width.
-- **Pattern:** Create a CSS module file (e.g., `CenteredCardGrid.module.css`) with:
-  - Flexbox container with `justify-content: center`
-  - Responsive `max-width` calculations based on number of columns
-  - Fixed or calculated widths for card items
-- **Example:**
-  ```css
-  /* Centered Card Grid */
-  .centeredCardGrid {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 1rem;
-    width: 100%;
-    justify-content: center;
-    align-items: flex-start;
-    margin: 0 auto;
-  }
-
-  /* Desktop: 3 columns */
-  @media (min-width: 1024px) {
-    .centeredCardGrid {
-      max-width: calc(3 * 350px + 2 * 1rem);
-    }
-    .cardItem {
-      width: 350px;
-      max-width: 350px;
-    }
-  }
-
-  /* Tablet: 2 columns */
-  @media (min-width: 768px) and (max-width: 1023px) {
-    .centeredCardGrid {
-      max-width: calc(2 * 350px + 1 * 1rem);
-    }
-    .cardItem {
-      width: calc((100% - 1rem) / 2);
-      max-width: calc((100% - 1rem) / 2);
-    }
-  }
-
-  /* Mobile: 1 column */
-  @media (max-width: 767px) {
-    .centeredCardGrid {
-      max-width: 100%;
-    }
-    .cardItem {
-      width: 100%;
-      max-width: 100%;
-    }
-  }
-  ```
-- **Usage:**
-  ```tsx
-  // ✅ DO: Use CSS module for centered card grids
-  import cardGridStyles from './CenteredCardGrid.module.css';
-
-  <div className={cardGridStyles.centeredCardGrid}>
-    {items.map((item) => (
-      <div key={item.id} className={cardGridStyles.cardItem}>
-        {/* Card content */}
-      </div>
-    ))}
-  </div>
-
-  // ❌ DON'T: Use standard grid without centering
-  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-    {/* Cards will be left-aligned when not filling full width */}
-  </div>
-  ```
-- **References:**
-  - See `src/app/events/[id]/CenteredCardGrid.module.css` for implementation
-  - See `src/app/events/[id]/GalleryThumbnails.module.css` for gallery pattern
-  - See `src/components/TeamSection.module.css` for team member pattern
-
+description: Comprehensive rules for user profile operations including fetch, creation, and update patterns
+globs: src/app/profile/**/*.ts, src/pages/api/proxy/user-profiles/**/*.ts
+alwaysApply: true
 ---
 
-## 2. Forms
+### **User Profile Fetch Operations (4-Step Fallback)**
 
-### Input Fields
+- **Step 1: Primary Lookup by User ID**
+  - Always attempt to fetch profile using `/api/proxy/user-profiles/by-user/{userId}`
+  - Use Clerk `currentUser()` to get authenticated user context
+  - Return profile immediately if found
 
-- **Rule:** Use the following classes for consistent input field styling.
-- **Example:**
-  ```tsx
-  // ✅ DO: Use consistent input field styling
-  <input
-    type="text"
-    className="mt-1 block w-full border border-gray-400 rounded-xl focus:border-blue-500 focus:ring-blue-500 px-4 py-3 text-base"
-  />
-  ```
+- **Step 2: Email-Based Fallback Lookup with Reconciliation**
+  - If Step 1 fails (404), extract email from Clerk user object
+  - Query using `/api/proxy/user-profiles?email.equals={email}`
+  - **NEW: Profile Reconciliation Logic**
+    - If profile found by email but `userId` differs from Clerk user ID
+    - OR if `firstName`/`lastName` are empty/placeholder values
+    - Update profile with current Clerk user data
+    - This handles mobile payment profiles and incomplete profiles
+  - Validate profile exists and has valid ID before returning
+  - Log reconciliation attempts for debugging
 
-### Labels
+- **Step 3: Automatic Profile Creation**
+  - If no profile exists, create automatically using Clerk user data
+  - Use placeholder values for required fields (no null values)
+  - Include all required fields: `userId`, `email`, `firstName`, `lastName`, `tenantId`, `createdAt`, `updatedAt`
+  - Use proxy endpoint `/api/proxy/user-profiles` for creation
+  - Handle race conditions gracefully (profile might be created by another request)
 
-- **Rule:** Use the following classes for consistent label styling.
-- **Example:**
-  ```tsx
-  // ✅ DO: Use consistent label styling
-  <label className="block text-sm font-medium text-gray-700">
-    Field Label
-  </label>
-  ```
+- **Step 4: Final Fallback**
+  - Return `null` if all steps fail
+  - This triggers profile form display for manual creation
+  - Log comprehensive failure information for debugging
 
-### Checkboxes
+## Profile Reconciliation Logic (New Section)
 
-- **Rule:** Use the `custom-checkbox` implementation for a larger, more visible checkbox with a custom tick mark.
-- **Click Handling:** Always include `onClick={(e) => e.stopPropagation()}` on the `input` to prevent unintended event bubbling, especially inside clickable table rows or containers.
-- **Example:**
-  ```tsx
-  // ✅ DO: Use consistent checkbox styling with stopPropagation
-  <label className="flex flex-col items-center">
-    <span className="relative flex items-center justify-center">
-      <input
-        type="checkbox"
-        className="custom-checkbox"
-        checked={isChecked}
-        onChange={handleChange}
-        onClick={(e) => e.stopPropagation()}
-      />
-      <span className="custom-checkbox-tick">
-        {isChecked && (
-          <svg className="w-6 h-6 text-black" fill="none" stroke="currentColor" strokeWidth="4" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l5 5L19 7" />
-          </svg>
-        )}
-      </span>
-    </span>
-    <span className="mt-2 text-xs text-center select-none break-words max-w-[6rem]">Checkbox Label</span>
-  </label>
-  ```
+### Purpose
+Handles cases where existing user profiles (especially those created via mobile payments) need to be updated with current Clerk user data during sign-in and profile page load.
 
-- **Checkbox Group Layout:**
-  ```tsx
-  // ✅ DO: Use a CSS grid for checkbox group layout
-  <div className="custom-grid-table mt-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
-    {/* Checkbox items */}
-  </div>
-  ```
+### Trigger Points
+- **Clerk Sign-In**: Direct client-side reconciliation after successful sign-in (PRIMARY METHOD)
+- **Profile Page Load**: When user visits profile page after sign-in (FALLBACK METHOD)
+- ~~**Clerk Webhook**: `session.created` webhook (DEPRECATED - unreliable in development)~~
 
-- **Required CSS (`globals.css`):**
-  ```css
-  .custom-checkbox {
+### Scenarios Covered
+1. **Mobile Payment Profiles**: Guest profiles with empty names get proper Clerk user data
+2. **Incomplete Profiles**: Profiles with placeholder names ('Pending', 'User') get real names
+3. **User ID Mismatches**: Profiles with old/guest user IDs get current Clerk user ID
+
+### Reconciliation Conditions
+Profile needs reconciliation if ANY of these are true:
+- `profile.userId !== currentClerkUserId` (different user ID)
+- `profile.firstName` is empty, null, or 'Pending'
+- `profile.lastName` is empty, null, or 'User'
+
+### Implementation Patterns
+
+#### Clerk Sign-In Flow (Client-Side Integration) - PRIMARY METHOD
+```typescript
+// src/components/SignInWithReconciliation.tsx - Custom sign-in wrapper
+'use client';
+import { SignIn } from "@clerk/nextjs";
+import { useUser } from "@clerk/nextjs";
+import { useEffect, useState } from "react";
+
+export function SignInWithReconciliation() {
+  const { isSignedIn, user } = useUser();
+  const [hasTriggeredReconciliation, setHasTriggeredReconciliation] = useState(false);
+
+  useEffect(() => {
+    // Trigger profile reconciliation immediately after successful sign-in
+    if (isSignedIn && user && !hasTriggeredReconciliation) {
+      setHasTriggeredReconciliation(true);
+
+      // Call existing profile reconciliation API endpoint
+      fetch('/api/auth/profile-reconciliation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ triggerSource: 'sign_in_flow' })
+      }).then(response => {
+        if (response.ok) {
+          console.log('Profile reconciliation completed after sign-in');
+          setTimeout(() => window.location.href = '/', 1000);
+        }
+      }).catch(error => {
+        console.error('Profile reconciliation failed:', error);
+      });
+    }
+  }, [isSignedIn, user, hasTriggeredReconciliation]);
+
+  return <SignIn redirectUrl="/" />;
+}
+```
+
+#### ~~Clerk Sign-In Flow (Webhook) - DEPRECATED~~
+```typescript
+// DEPRECATED: Webhook approach was unreliable in development environments
+// Use client-side integration instead (see above)
+```
+
+#### Profile Page Load Flow (Server Action)
+```typescript
+// src/app/profile/ApiServerActions.ts - fetchUserProfileServer Step 2
+// Step 2: Fallback to email lookup with reconciliation
+const profile = await findProfileByEmail(email);
+if (profile && needsReconciliation(profile, userId, currentUser)) {
+  const reconciledProfile = await reconcileProfileWithClerkData(profile, userId, currentUser);
+  return reconciledProfile;
+}
+```
+
+### Profile Update Helper Function
+```typescript
+async function reconcileProfileWithClerkData(
+  profile: UserProfileDTO,
+  currentClerkUserId: string,
+  currentUser: any
+): Promise<UserProfileDTO> {
+  const updatePayload = {
+    id: profile.id,
+    userId: currentClerkUserId, // Always update to current Clerk user ID
+    updatedAt: new Date().toISOString()
+  };
+
+  // Update names if they're empty or different
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
