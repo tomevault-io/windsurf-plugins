@@ -1,220 +1,240 @@
 ---
 trigger: always_on
-description: This document outlines the testing standards and best practices for the OpenFrame project.
+description: This document outlines the UI component standards and usage patterns for the OpenFrame project.
 ---
 
-# Testing Standards
+# UI Components
 
-This document outlines the testing standards and best practices for the OpenFrame project.
+This document outlines the UI component standards and usage patterns for the OpenFrame project.
 
-## Testing Pyramid
+## Component Library
 
-OpenFrame follows the testing pyramid approach:
+OpenFrame uses a shared component library to ensure consistency across the application. The component library is located in `services/openframe-frontend/src/components/ui/`.
 
+### Core Components
+
+- Use shared components from the component library
+- Follow consistent naming conventions
+- Implement proper props and events
+- Document component usage
+- Support both light and dark modes
+
+Example component structure:
 ```
-    /\
-   /  \
-  /    \
- / E2E  \
-/--------\
-/ Integration \
-/----------------\
-/     Unit Tests    \
-/----------------------\
-```
-
-- **Unit Tests**: Test individual components in isolation
-- **Integration Tests**: Test interactions between components
-- **End-to-End Tests**: Test complete user flows
-
-## Unit Testing
-
-### Java Unit Tests
-
-Java unit tests use JUnit 5 and Mockito:
-
-```java
-@ExtendWith(MockitoExtension.class)
-public class DeviceServiceTest {
-    @Mock
-    private DeviceRepository deviceRepository;
-    
-    @InjectMocks
-    private DeviceService deviceService;
-    
-    @Test
-    public void testGetDeviceById() {
-        // Arrange
-        String deviceId = "device-123";
-        Device expectedDevice = new Device();
-        expectedDevice.setId(deviceId);
-        expectedDevice.setHostname("test-device");
-        
-        when(deviceRepository.findById(deviceId)).thenReturn(Mono.just(expectedDevice));
-        
-        // Act
-        Mono<Device> result = deviceService.getDeviceById(deviceId);
-        
-        // Assert
-        StepVerifier.create(result)
-            .expectNext(expectedDevice)
-            .verifyComplete();
-        
-        verify(deviceRepository).findById(deviceId);
-    }
-}
+components/
+├── ui/                 # Shared UI components
+│   ├── Button.vue      # Button component
+│   ├── Card.vue        # Card component
+│   ├── DataTable.vue   # Data table component
+│   ├── Dialog.vue      # Dialog component
+│   ├── Dropdown.vue    # Dropdown component
+│   ├── Input.vue       # Input component
+│   ├── Tabs.vue        # Tabs component
+│   └── ...
+├── shared/             # Shared feature components
+│   ├── Header.vue      # Application header
+│   ├── Sidebar.vue     # Application sidebar
+│   ├── Footer.vue      # Application footer
+│   └── ...
+└── features/           # Feature-specific components
+    ├── rmm/            # RMM components
+    ├── mdm/            # MDM components
+    └── ...
 ```
 
-### Vue.js Unit Tests
+### Button Component
 
-Vue.js unit tests use Vitest and Vue Test Utils:
+The Button component is used for all clickable actions in the application.
 
-```typescript
-import { describe, it, expect, vi } from 'vitest';
-import { mount } from '@vue/test-utils';
-import DeviceList from '@/components/DeviceList.vue';
+```vue
+<template>
+  <button
+    :class="[
+      'of-button',
+      `of-button--${variant}`,
+      `of-button--${size}`,
+      { 'of-button--loading': loading }
+    ]"
+    :disabled="disabled || loading"
+    @click="$emit('click', $event)"
+  >
+    <span v-if="loading" class="of-button__loader"></span>
+    <span v-else class="of-button__content">
+      <slot></slot>
+    </span>
+  </button>
+</template>
 
-describe('DeviceList', () => {
-  it('renders devices correctly', async () => {
-    // Arrange
-    const devices = [
-      { id: '1', hostname: 'device-1', status: 'online' },
-      { id: '2', hostname: 'device-2', status: 'offline' }
-    ];
-    
-    // Act
-    const wrapper = mount(DeviceList, {
-      props: {
-        devices
-      }
-    });
-    
-    // Assert
-    expect(wrapper.findAll('tr').length).toBe(devices.length + 1); // +1 for header row
-    expect(wrapper.text()).toContain('device-1');
-    expect(wrapper.text()).toContain('device-2');
-  });
-  
-  it('emits select event when device is clicked', async () => {
-    // Arrange
-    const devices = [
-      { id: '1', hostname: 'device-1', status: 'online' }
-    ];
-    
-    const wrapper = mount(DeviceList, {
-      props: {
-        devices
-      }
-    });
-    
-    // Act
-    await wrapper.find('tr:nth-child(2)').trigger('click');
-    
-    // Assert
-    expect(wrapper.emitted().select).toBeTruthy();
-    expect(wrapper.emitted().select[0]).toEqual([devices[0]]);
-  });
+<script setup lang="ts">
+defineProps({
+  variant: {
+    type: String,
+    default: 'primary',
+    validator: (value: string) => ['primary', 'secondary', 'danger', 'ghost'].includes(value)
+  },
+  size: {
+    type: String,
+    default: 'medium',
+    validator: (value: string) => ['small', 'medium', 'large'].includes(value)
+  },
+  loading: {
+    type: Boolean,
+    default: false
+  },
+  disabled: {
+    type: Boolean,
+    default: false
+  }
 });
-```
 
-## Integration Testing
+defineEmits(['click']);
+</script>
 
-### Spring Boot Integration Tests
-
-Spring Boot integration tests use `@SpringBootTest`:
-
-```java
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-public class DeviceControllerIntegrationTest {
-    @Autowired
-    private WebTestClient webTestClient;
-    
-    @Autowired
-    private DeviceRepository deviceRepository;
-    
-    @BeforeEach
-    public void setup() {
-        deviceRepository.deleteAll().block();
-    }
-    
-    @Test
-    public void testGetDevices() {
-        // Arrange
-        Device device1 = new Device();
-        device1.setHostname("device-1");
-        device1.setStatus("online");
-        
-        Device device2 = new Device();
-        device2.setHostname("device-2");
-        device2.setStatus("offline");
-        
-        deviceRepository.saveAll(Arrays.asList(device1, device2)).blockLast();
-        
-        // Act & Assert
-        webTestClient.get()
-            .uri("/api/devices")
-            .exchange()
-            .expectStatus().isOk()
-            .expectBodyList(Device.class)
-            .hasSize(2)
-            .contains(device1, device2);
-    }
+<style scoped>
+.of-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
-```
 
-### API Integration Tests
-
-API integration tests use WebTestClient:
-
-```java
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-public class ApiIntegrationTest {
-    @Autowired
-    private WebTestClient webTestClient;
-    
-    @Test
-    public void testCreateDevice() {
-        // Arrange
-        DeviceRequest request = new DeviceRequest();
-        request.setHostname("test-device");
-        request.setOperatingSystem("Linux");
-        
-        // Act & Assert
-        webTestClient.post()
-            .uri("/api/devices")
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(request)
-            .exchange()
-            .expectStatus().isCreated()
-            .expectBody()
-            .jsonPath("$.id").isNotEmpty()
-            .jsonPath("$.hostname").isEqualTo("test-device")
-            .jsonPath("$.operatingSystem").isEqualTo("Linux");
-    }
+.of-button--primary {
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
 }
+
+.of-button--secondary {
+  background-color: transparent;
+  color: var(--primary-color);
+  border: 1px solid var(--primary-color);
+}
+
+.of-button--danger {
+  background-color: var(--danger-color);
+  color: white;
+  border: none;
+}
+
+.of-button--ghost {
+  background-color: transparent;
+  color: var(--text-color);
+  border: none;
+}
+
+.of-button--small {
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+.of-button--medium {
+  padding: 8px 16px;
+  font-size: 14px;
+}
+
+.of-button--large {
+  padding: 10px 20px;
+  font-size: 16px;
+}
+
+.of-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.of-button__loader {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: white;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+</style>
 ```
 
-## End-to-End Testing
+Usage example:
+```vue
+<Button variant="primary" size="medium" @click="saveChanges">Save Changes</Button>
+<Button variant="secondary" @click="cancel">Cancel</Button>
+<Button variant="danger" @click="deleteItem">Delete</Button>
+<Button variant="ghost" @click="showDetails">View Details</Button>
+<Button loading>Processing...</Button>
+```
 
-### Cypress Tests
+### Data Table Component
 
-End-to-end tests use Cypress:
+The DataTable component is used for displaying tabular data throughout the application.
 
-```javascript
-describe('Device Management', () => {
-  beforeEach(() => {
-    cy.login('admin', 'password');
-    cy.visit('/devices');
-  });
+```vue
+<template>
+  <div class="of-data-table">
+    <div v-if="loading" class="of-data-table__loading">
+      <div class="of-data-table__spinner"></div>
+      <span>Loading data...</span>
+    </div>
+    <table v-else>
+      <thead>
+        <tr>
+          <th v-for="column in columns" :key="column.field">
+            {{ column.label }}
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr v-for="(row, index) in data" :key="index">
+          <td v-for="column in columns" :key="column.field">
+            <slot :name="column.field" :row="row">
+              {{ getColumnValue(row, column) }}
+            </slot>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+    <div v-if="!loading && data.length === 0" class="of-data-table__empty">
+      <slot name="empty">No data available</slot>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { computed } from 'vue';
+
+const props = defineProps({
+  columns: {
+    type: Array,
+    required: true
+  },
+  data: {
+    type: Array,
+    default: () => []
+  },
+  loading: {
+    type: Boolean,
+    default: false
+  }
+});
+
+const getColumnValue = (row: any, column: any) => {
+  if (column.formatter) {
+    return column.formatter(row);
+  }
   
-  it('should display device list', () => {
-    cy.get('table').should('be.visible');
-    cy.get('tr').should('have.length.greaterThan', 1);
-  });
+  const value = column.field.split('.').reduce((obj, key) => {
+    return obj && obj[key] !== undefined ? obj[key] : null;
+  }, row);
   
-  it('should navigate to device details', () => {
-    cy.get('tr').eq(1).click();
-    cy.url().should('include', '/devices/');
+  return value !== null ? value : '';
+};
+</script>
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
