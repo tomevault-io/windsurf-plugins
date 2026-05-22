@@ -1,167 +1,107 @@
 ---
 trigger: always_on
-description: Standard pattern for form validation styling, error display, and scroll-to-error functionality across all forms (ProfileForm, EventForm, etc.)
+description: This rule defines the validation patterns and error handling for the `FromEmailSelect` component used in event forms and other admin pages. The component provides a searchable dropdown for selecting tenant email addresses with comprehensive validation.
 ---
 
-
-# Form Validation Styling Pattern
+# From Email Select Component - Validation Rules
 
 ## **Overview**
-This rule defines the standard pattern for form validation styling, error display, and scroll-to-error functionality used across all forms in the application (ProfileForm, EventForm, etc.). This ensures consistent validation UX, error styling, and user feedback patterns.
+This rule defines the validation patterns and error handling for the `FromEmailSelect` component used in event forms and other admin pages. The component provides a searchable dropdown for selecting tenant email addresses with comprehensive validation.
 
 ## **Problem Solved**
-- **Consistent Validation UX**: Ensures all forms use the same validation styling and error display patterns
-- **Error Visibility**: Red borders, inline error messages, and error summary boxes provide clear feedback
-- **Scroll-to-Error**: Automatically navigates users to the first error field on validation failure
-- **Real-time Error Clearing**: Errors clear as users type, providing immediate feedback
-- **Immediate Field Validation**: Required fields validate on blur (when user clicks outside), showing errors immediately without waiting for form submission
-- **Professional Presentation**: Consistent error styling (red borders, red text, error icons) across all forms
+- **Database Value Validation**: Validates that `fromEmail` from database matches an email in the tenant email addresses list, clearing invalid values
+- **Empty List Validation**: Detects when no email addresses are configured and shows appropriate error message
+- **Empty Field Validation**: Validates that user has selected an email address before form submission
+- **Custom Error Messages**: Provides user-friendly error messages instead of browser default validation
+- **Parent Component Integration**: Notifies parent components about validation state for form-level validation
 
-## **Core Pattern**
+## **Component Location**
+- **Component**: `src/components/FromEmailSelect.tsx`
+- **Usage**: `src/components/EventForm.tsx` and other admin forms
 
-### **1. State Management**
+## **Validation Rules**
 
+### **1. Database Value Validation (Event Loading)**
+
+**CRITICAL**: When loading event data from the database, the `fromEmail` value must be validated against the tenant email addresses list. If the database value doesn't exist in the list, it must be cleared so validation will catch it.
+
+**Problem**: The database may contain an email address (e.g., `'events@example.com'`) that doesn't exist in the tenant email addresses list. This creates a conflict where:
+- The form field appears empty (because `FromEmailSelect` can't display a value not in its list)
+- But `form.fromEmail` still has the database value
+- Validation passes incorrectly because the field has a value (even though it's invalid)
+
+**Solution**: Validate the database value on event load and clear it if it doesn't exist in the email addresses list.
+
+**Implementation Pattern:**
 ```tsx
-// ✅ DO: Add validation state and field refs
-import { useState, useRef } from "react";
-import { flushSync } from "react-dom";
+// In EventForm useEffect when loading event data
+useEffect(() => {
+  if (event) {
+    // CRITICAL: Validate fromEmail against the email addresses list
+    // If the database value doesn't exist in the list, clear it so validation will catch it
+    const validateAndSetFromEmail = async () => {
+      let validFromEmail = event.fromEmail || '';
 
-export default function FormComponent() {
-  // Error state management
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [showErrors, setShowErrors] = useState(false);
+      // Only validate if fromEmail has a value
+      if (validFromEmail && validFromEmail.trim() !== '') {
+        try {
+          // Fetch all email addresses (use a large page size to get all)
+          const emailAddresses = await fetchTenantEmailAddressesServer(0, 1000);
 
-  // Refs for form fields to enable scroll-to-error functionality
-  const fieldRefs = useRef<Record<string, HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>>({});
+          // Check if the fromEmail exists in the list and is active
+          const emailExists = emailAddresses.some(
+            email => email.emailAddress === validFromEmail && email.isActive === true
+          );
 
-  // ... rest of component
-}
-```
-
-### **2. Scroll-to-Error Function**
-
-```tsx
-// ✅ DO: Add scroll-to-first-error function
-const scrollToFirstError = (errorObj?: Record<string, string>) => {
-  // Use provided errors or fall back to state
-  const errorsToUse = errorObj || errors;
-  const firstErrorField = Object.keys(errorsToUse)[0];
-  if (firstErrorField && fieldRefs.current[firstErrorField]) {
-    const field = fieldRefs.current[firstErrorField];
-    // Scroll to field but DON'T focus it immediately
-    // This allows all fields to show red borders before focusing
-    field.scrollIntoView({
-      behavior: 'smooth',
-      block: 'center',
-      inline: 'nearest'
-    });
-    // Delay focus slightly to ensure all fields have rendered with red borders
-    setTimeout(() => {
-      if (fieldRefs.current[firstErrorField]) {
-        fieldRefs.current[firstErrorField]?.focus();
+          if (!emailExists) {
+            // Email doesn't exist in the list - clear it so validation will catch it
+            console.warn('[EventForm] fromEmail from database does not exist in email addresses list:', {
+              fromEmail: validFromEmail,
+              availableEmails: emailAddresses.map(e => e.emailAddress),
+            });
+            validFromEmail = '';
+          }
+        } catch (error) {
+          // If fetching email addresses fails, log error but still clear the field
+          // This ensures validation will catch it
+          console.error('[EventForm] Failed to validate fromEmail against email addresses list:', error);
+          validFromEmail = '';
+        }
       }
-    }, 100);
+
+      // Set form with validated fromEmail
+      const formData = { ...defaultEvent, ...event, fromEmail: validFromEmail };
+      setForm(formData);
+
+      // ... rest of event loading logic (metadata, etc.)
+    };
+
+    // Call the async function to validate and set fromEmail
+    void validateAndSetFromEmail();
   }
-};
+}, [event]);
 ```
 
-### **3. Error Count Helper**
+**Key Requirements:**
+- ✅ **Always validate** database `fromEmail` value against the email addresses list when loading event data
+- ✅ **Clear invalid values** - if database value doesn't exist in list, set `form.fromEmail = ''`
+- ✅ **Check active status** - only consider emails where `isActive === true`
+- ✅ **Handle errors gracefully** - if fetching email addresses fails, clear the field to ensure validation catches it
+- ✅ **Log warnings** - log when database value doesn't match list for debugging
+- ✅ **Run before form initialization** - validation must complete before setting form state
 
-```tsx
-// ✅ DO: Add helper function to get error count
-const getErrorCount = () => Object.keys(errors).length;
-```
+**Why This Is Critical:**
+- Prevents silent validation failures where form appears empty but has invalid value
+- Ensures users must select a valid email from the dropdown
+- Maintains data integrity by only allowing emails from the tenant email addresses list
+- Provides clear validation feedback when database contains invalid data
 
-### **4. Validation Function**
+### **2. Empty Email List Validation**
 
-```tsx
-// ✅ DO: Add validate() function with flushSync for immediate state updates
-function validate(): boolean {
-  const errs: Record<string, string> = {};
+When the email address list is empty (length === 0), the component must:
 
-  // Required field validations
-  if (!formData.firstName || formData.firstName.trim() === '') {
-    errs.firstName = 'First name is required';
-  }
-  if (!formData.lastName || formData.lastName.trim() === '') {
-    errs.lastName = 'Last name is required';
-  }
-  if (!formData.email || formData.email.trim() === '') {
-    errs.email = 'Email is required';
-  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
-    errs.email = 'Please enter a valid email address';
-  }
-
-  // Additional validations (length, format, etc.)
-  if (formData.title && formData.title.length > 250) {
-    errs.title = 'Title must not exceed 250 characters';
-  }
-
-  // CRITICAL: Use flushSync to force immediate state update so red borders appear instantly
-  const hasErrors = Object.keys(errs).length > 0;
-
-  if (hasErrors) {
-    // Force synchronous state updates so fields show red borders immediately
-    flushSync(() => {
-      setErrors(errs);
-      setShowErrors(true);
-    });
-
-    // Scroll to first error field
-    scrollToFirstError(errs);
-  } else {
-    setErrors({});
-    setShowErrors(false);
-  }
-
-  return !hasErrors;
-}
-```
-
-### **5. HandleChange Pattern (Error Clearing)**
-
-```tsx
-// ✅ DO: Clear errors when user starts typing
-const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-  const { name, value, type } = e.target;
-  const checked = (e.target as HTMLInputElement).checked;
-
-  // Clear error for this field when user starts typing
-  if (errors[name]) {
-    setErrors(prev => {
-      const newErrors = { ...prev };
-      delete newErrors[name];
-      return newErrors;
-    });
-  }
-
-  // Update form data
-  setFormData((prev) => ({
-    ...prev,
-    [name]: type === 'checkbox' ? checked : (value || ''),
-  }));
-};
-```
-
-### **6. Individual Field Validation (onBlur Pattern)**
-
-```tsx
-// ✅ DO: Create validateField function for individual field validation on blur
-const validateField = (fieldName: keyof ValidationErrors) => {
-  const newErrors: ValidationErrors = { ...errors };
-
-  switch (fieldName) {
-    case 'fieldName': {
-      if (!formData.fieldName?.trim()) {
-        newErrors.fieldName = 'Field name is required.';
-      } else {
-        delete newErrors.fieldName;
-      }
-      break;
-    }
-
-    case 'description': {
-      if (!formData.description?.trim()) {
+- **Display Error Message**: Show a prominent error message below the input field
+- **Error Message Text**: "The from email list is empty. Please contact Admin to add the list of from email addresses."
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
