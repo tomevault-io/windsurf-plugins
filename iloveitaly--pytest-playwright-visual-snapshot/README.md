@@ -7,13 +7,13 @@ Easy pytest visual regression testing using playwright
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `copilot-instructions.md` in [iloveitaly/pytest-playwright-visual-snapshot](https://github.com/iloveitaly/pytest-playwright-visual-snapshot).
+Original source: `.cursor/rules/*.mdc` in [iloveitaly/pytest-playwright-visual-snapshot](https://github.com/iloveitaly/pytest-playwright-visual-snapshot).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
-- **Cursor** — `project-config.mdc`
+- **GitHub Copilot** — `copilot-instructions.md`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
