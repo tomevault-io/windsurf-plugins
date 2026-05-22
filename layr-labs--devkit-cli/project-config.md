@@ -1,151 +1,76 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: This document outlines coding standards, patterns, and best practices to be followed when developing Go applications and libraries for the `devkit-cli` project. These rules are based on general Go best practices and observed patterns within this
 ---
 
-# CLAUDE.md
+# Go Development Guidelines for devkit-cli
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This document outlines coding standards, patterns, and best practices to be followed when developing Go applications and libraries for the `devkit-cli` project. These rules are based on general Go best practices and observed patterns within this 
+codebase.
 
-## Project Overview
+## 0. Always..
 
-EigenLayer DevKit is a CLI toolkit for scaffolding, developing, and testing EigenLayer Autonomous Verifiable Services (AVS). It's built in Go and focuses on the Hourglass task-based architecture. The DevKit is currently in closed alpha and intended for local experimentation and development only.
+- Run `make tests` when completing a task to make sure the entire test suite passes
+- Run `make lint` to lint the code
 
-## Common Development Commands
+## 1. Code Formatting
 
-### Building and Testing
-```bash
-# Build the CLI binary
-make build
+- **`gofmt`/`goimports`**: All Go code **MUST** be formatted using `gofmt` or `goimports` before committing. This ensures consistent code style across the project. `goimports` is preferred as it also manages import statements.
+    - Configure your IDE to format on save.
+    - This is likely enforced by pre-commit hooks.
 
-# Run all tests (may be slow)
-make tests
+## 2. Naming Conventions
 
-# Run fast tests (skips slow integration tests) 
-make tests-fast
+- **Packages**:
+    - Package names **SHOULD** be short, concise, and all lowercase.
+    - Avoid overly generic names like `util` or `common` unless the package truly contains cross-cutting concerns. If so, sub-packages within `common` (e.g., `common/httputil`) are preferred.
+    - The project uses `pkg/common` for shared utilities (e.g., `logger`, context management), which is acceptable.
+- **Variables**:
+    - Local variables and function parameters **SHOULD** use `camelCase` (e.g., `myVariable`).
+    - Exported variables **MUST** use `PascalCase` (e.g., `ExportedVariable`).
+- **Functions and Methods**:
+    - Function and method names **SHOULD** use `camelCase` for unexported identifiers (e.g., `calculateValue`).
+    - Exported functions and methods **MUST** use `PascalCase` (e.g., `CalculateValue`).
+- **Interfaces**:
+    - Interfaces **SHOULD** be named with the `-er` suffix if they have only one method (e.g., `Reader`, `Writer`).
+    - For more complex interfaces, choose a name that describes its purpose (e.g., `DataStore`).
+- **Avoid Stutter**: Do not repeat package names in identifiers. For example, in package `logger`, prefer `logger.New()` over `logger.NewLogger()`.
+- **Acronyms**: Acronyms like HTTP, ID, URL **SHOULD** be consistently cased (e.g., `serveHTTP`, `userID`, `parseURL`). `PascalCase` for exported acronyms (e.g., `ServeHTTP`, `UserID`, `ParseURL`).
 
-# Install binary to ~/bin/ and set up shell completion
-make install
+## 3. Packages and Project Structure
 
-# Format code
-make fmt
+- **`cmd/`**: Main application(s). Each subdirectory in `cmd/` is a separate executable.
+- **`pkg/`**: Library code that can be used by other applications or projects. Code here should be designed to be reusable.
+    - CLI command logic is well-organized under `pkg/commands`.
+- **`internal/`**: Private application and library code. This is the ideal place for code that is specific to this project and should not be imported by other projects.
+    - The `internal/version` pattern for build-time variable injection is good.
+- **Clarity**: Package structure should clearly communicate the purpose and separation of concerns.
+- **Circular Dependencies**: Avoid circular dependencies between packages.
 
-# Run linter
-make lint
+## 4. Error Handling
 
-# Clean up build artifacts
-make clean
-```
+- **Explicit Handling**: Errors **MUST** be handled explicitly. Do not ignore errors using the blank identifier (`_`) unless there is a very specific and documented reason.
+- **Return Errors**: Functions that can fail **MUST** return an `error` as their last return value.
+- **Error Wrapping**: When an error is propagated up the call stack, it **SHOULD** be wrapped with additional context using `fmt.Errorf("operation X failed: %w", err)`. This preserves the original error and adds a stack of contextual information.
+    - Use `errors.Is()` and `errors.As()` from the standard `errors` package to inspect wrapped errors.
+- **Error Messages**: Error messages should be lowercase and not end with punctuation, as they are often combined with other context.
+- **Top-Level Handling**: In `main()` or top-level HTTP handlers, errors should be logged appropriately, and the program/request should terminate gracefully (e.g., `log.Fatal(err)` in `main.go` is acceptable for CLI startup).
 
-### Testing the CLI
-After building, test the CLI:
-```bash
-./bin/devkit --help
-./bin/devkit avs --help
-```
+## 5. Comments and Documentation
 
-### Cross-platform Builds
-```bash
-# Build for specific platforms
-make build/darwin-arm64
-make build/darwin-amd64  
-make build/linux-arm64
-make build/linux-amd64
+- **Godoc**: All exported identifiers (variables, constants, functions, types) **MUST** have Godoc comments.
+    - Comments should start with the name of the identifier they describe.
+    - Provide clear, concise explanations of what the identifier does, its parameters, and return values.
+- **Non-Obvious Code**: Add comments to explain complex, non-obvious, or surprising logic.
+- **TODOs**: Use `// TODO:` comments to mark areas that need future attention. Include context or a reference if possible.
 
-# Build all platforms
-make release
-```
+## 6. Logging
 
-## Architecture Overview
+- **Structured Logging**: Use a structured logging library like `zap` (as currently used in `pkg/common/logger/zap_logger.go`).
+- **Log Levels**: Use appropriate log levels (e.g., DEBUG, INFO, WARN, ERROR, FATAL).
+- **Contextual Information**: Include relevant contextual information in log messages (e.g., request IDs, user IDs) to aid debugging.
 
-### CLI Command Structure
-The CLI is built with `urfave/cli/v2` and organized hierarchically:
-- **Main entry**: `cmd/devkit/main.go`
-- **Core commands**: All under `devkit avs` subcommand
-- **Command implementations**: `pkg/commands/` directory
-
-Key commands:
-- `devkit avs create` - Scaffold new AVS projects from templates
-- `devkit avs build` - Compile contracts and binaries via template scripts
-- `devkit avs devnet` - Manage local Docker-based development networks
-- `devkit avs call` - Simulate task execution
-- `devkit avs config/context` - Configuration management
-
-### Configuration System
-Multi-layered configuration with migration support:
-
-1. **Global Config** (`~/.config/devkit/config.yaml`): User preferences, telemetry settings
-2. **Project Config** (`config/config.yaml`): Project metadata, template info
-3. **Context Config** (`config/contexts/{context}.yaml`): Environment-specific settings (devnet, testnet, mainnet)
-
-**Current Versions**: Config v0.0.2, Context v0.0.6
-
-The system includes automatic migrations between versions via `pkg/migration/` that preserve user customizations.
-
-### Template System Architecture
-Projects are scaffolded from versioned Git templates:
-- **Template registry**: `config/templates.yaml` defines available templates
-- **Template fetching**: `pkg/template/git_fetcher.go` handles Git operations
-- **Project initialization**: Templates provide `.devkit/scripts/init` for setup
-- **Build/run integration**: Templates provide `.devkit/scripts/build` and `.devkit/scripts/run`
-
-### Devnet System
-The devnet management system (`pkg/commands/devnet.go`) provides:
-- Local Docker-based Anvil chains with EigenLayer state forked from Holesky
-- Automated contract deployment (L1/L2)
-- Pre-funded test operators with BLS keystores
-- AVS registration and operator management
-
-### Package Organization
-- **`pkg/commands/`**: CLI command implementations
-- **`pkg/common/`**: Shared utilities, configuration, contracts, logging
-- **`pkg/template/`**: Git-based template management
-- **`pkg/telemetry/`**: PostHog analytics integration  
-- **`pkg/migration/`**: Configuration migration system
-- **`pkg/hooks/`**: Command lifecycle hooks
-
-## Key Dependencies
-
-- **Go 1.23.6+** required
-- **EigenLayer contracts**: `github.com/Layr-Labs/eigenlayer-contracts`
-- **Hourglass AVS**: `github.com/Layr-Labs/hourglass-monorepo/ponos`
-- **External tools**: Docker, Foundry, Zeus (npm package `@layr-labs/zeus@1.5.2`)
-
-## Development Environment Setup
-
-1. Install prerequisites: Docker, Foundry, Go 1.23.6+, make, jq, yq
-2. Clone repository and run `make install`
-3. Zeus is automatically installed as npm global package during `make install`
-
-## Testing Patterns
-
-- Unit tests use standard Go testing
-- Integration tests may require Docker and external dependencies
-- Use `make tests-fast` for quick feedback during development
-- Integration tests in `test/integration/` directory
-
-## Configuration Migration
-
-When adding new configuration fields:
-1. Update config structs in `pkg/common/`
-2. Create migration in `config/configs/migrations/` or `config/contexts/migrations/`
-3. Update embedded config versions in `config/`
-4. Test migration with existing project configs
-
-## Template Development
-
-Templates must provide:
-- `.devkit/scripts/init` - Project initialization
-- `.devkit/scripts/build` - Build script for contracts/binaries
-- `.devkit/scripts/run` - Run script for AVS components
-- Standard Go project structure for task-based architecture
-
-## Telemetry System
-
-Optional PostHog-based telemetry with:
-- Global and project-level opt-in/opt-out
-- Privacy-conscious data collection
-- CI environment auto-detection (defaults to disabled)
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [Layr-Labs/devkit-cli](https://github.com/Layr-Labs/devkit-cli) — distributed by [TomeVault](https://tomevault.io).
