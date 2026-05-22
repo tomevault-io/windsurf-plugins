@@ -1,139 +1,127 @@
 ---
 trigger: always_on
-description: This rule defines the standard pattern for responsive button groups displayed in a grid layout across admin pages. The pattern ensures consistent 2-column layout on mobile devices, proper spacing, and responsive sizing for icons, text, and containers.
+description: Standard pattern for toggle switch components used in admin pages for filtering and state toggling
 ---
 
-# Admin Page Responsive Button Group Pattern
+
+# Admin Toggle Switch Styling Pattern
 
 ## **Overview**
-This rule defines the standard pattern for responsive button groups displayed in a grid layout across admin pages. The pattern ensures consistent 2-column layout on mobile devices, proper spacing, and responsive sizing for icons, text, and containers.
+This rule defines the standard pattern for toggle switch components used in admin pages for filtering and state toggling. The pattern provides consistent styling, smooth animations, and clear visual feedback for binary state changes.
 
 ## **Problem Solved**
-- **Mobile Layout**: Ensures 2 items per row on mobile instead of 1 (better space utilization)
-- **Responsive Alignment**: Proper spacing and padding across all screen sizes
-- **Icon & Text Scaling**: Icons and text scale appropriately for mobile, tablet, and desktop
-- **Consistent Spacing**: Standardized gaps and padding that work across breakpoints
-- **Touch-Friendly**: Adequate button sizes for mobile touch interactions
+- **Consistent Toggle UI**: Ensures all toggle switches use the same visual pattern across admin pages
+- **Smooth Animations**: Standardized transition effects and state changes
+- **Clear Visual Feedback**: Color-coded states and icons for immediate understanding
+- **Accessibility**: Proper ARIA labels and focus states
+- **Responsive Design**: Works consistently across different screen sizes
 
 ## **Core Pattern**
 
-### **Grid Container**
+### **Toggle Switch Container**
 ```tsx
-// ✅ DO: Use responsive grid layout with 2 columns on mobile
-<div className="bg-white rounded-xl shadow-lg p-4 sm:p-6 lg:p-8">
-  <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
-    {/* Button cards */}
-  </div>
+// ✅ DO: Use the standard toggle switch container pattern
+<div className="flex justify-center items-center gap-4 mt-6">
+  {/* Left Label */}
+  {/* Toggle Switch Button */}
+  {/* Right Label */}
 </div>
 ```
 
-### **Button Card Structure**
+### **Toggle Switch Button Structure**
 ```tsx
-// ✅ DO: Use responsive button card pattern
-<Link
-  href="/admin/path/to/resource"
-  className={`flex flex-col items-center justify-center rounded-lg border-2 p-2.5 sm:p-3 lg:p-4 transition-all duration-300 hover:scale-105 hover:shadow-md group ${colorClasses}`}
-  title="Button Label"
-  aria-label="Button Label"
+// ✅ DO: Use the standard toggle switch button pattern
+<button
+  onClick={() => setState(!state)}
+  className={`relative inline-flex h-10 w-16 items-center rounded-full transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 hover:scale-105 ${
+    state
+      ? 'bg-blue-500 focus:ring-blue-500'
+      : 'bg-purple-500 focus:ring-purple-500'
+    }`}
+  title={state ? 'Switch to Off State' : 'Switch to On State'}
+  aria-label={state ? 'Switch to Off State' : 'Switch to On State'}
 >
-  <div className={`flex-shrink-0 w-10 h-10 sm:w-11 sm:h-11 rounded-xl ${iconBgColor} flex items-center justify-center mb-1.5 sm:mb-2 group-hover:scale-110 transition-transform duration-300`}>
-    <IconComponent className={`w-6 h-6 sm:w-8 sm:h-8 ${iconTextColor}`} />
-  </div>
-  <span className="font-semibold text-center text-xs sm:text-sm lg:text-base leading-tight px-1">
-    Button Label
+  <span
+    className={`inline-flex items-center justify-center h-8 w-8 transform rounded-full bg-white transition-transform duration-300 shadow-md ${
+      state ? 'translate-x-7' : 'translate-x-1'
+    }`}
+  >
+    {/* Icon based on state */}
   </span>
-</Link>
+</button>
 ```
 
 ## **Key CSS Properties**
 
-### **Grid Container Requirements**
-- **`grid grid-cols-2`**: **CRITICAL**: 2 columns on mobile (not 1)
-- **`sm:grid-cols-2`**: 2 columns on small screens (640px+)
-- **`md:grid-cols-3`**: 3 columns on medium screens (768px+)
-- **`lg:grid-cols-4`**: 4 columns on large screens (1024px+)
-- **`gap-3 sm:gap-4 lg:gap-6`**: Responsive gaps
-  - Mobile: 12px (0.75rem)
-  - Small screens: 16px (1rem)
-  - Large screens: 24px (1.5rem)
+### **Container Requirements**
+- **`flex justify-center items-center`**: Centers toggle switch horizontally and vertically
+- **`gap-4`**: Spacing between labels and switch (16px)
+- **`mt-6`**: Top margin (24px) for spacing above toggle
 
-### **Card Container Requirements**
-- **`p-4 sm:p-6 lg:p-8`**: Responsive padding
-  - Mobile: 16px (1rem)
-  - Small screens: 24px (1.5rem)
-  - Large screens: 32px (2rem)
+### **Button Requirements**
+- **`relative`**: Enables absolute positioning of thumb
+- **`inline-flex`**: Inline flex layout
+- **`h-10`**: Fixed height (40px) for toggle track
+- **`w-16`**: Fixed width (64px) for toggle track
+- **`items-center`**: Centers thumb vertically
+- **`rounded-full`**: Fully rounded track (pill shape)
+- **`transition-all duration-300`**: Smooth transitions for all properties
+- **`focus:outline-none focus:ring-2 focus:ring-offset-2`**: Focus ring for accessibility
+- **`hover:scale-105`**: Subtle scale effect on hover (5% increase)
+- **State Colors**:
+  - **Active/On State**: `bg-blue-500 focus:ring-blue-500`
+  - **Inactive/Off State**: `bg-purple-500 focus:ring-purple-500`
 
-### **Button Card Requirements**
-- **`flex flex-col items-center justify-center`**: Centers content vertically and horizontally
-- **`rounded-lg`**: Medium border radius (8px) for card appearance
-- **`border-2`**: 2px border for definition
-- **`p-2.5 sm:p-3 lg:p-4`**: Responsive padding
-  - Mobile: 10px (0.625rem)
-  - Small screens: 12px (0.75rem)
-  - Large screens: 16px (1rem)
-- **`transition-all duration-300`**: Smooth transitions
-- **`hover:scale-105`**: 5% scale increase on hover
-- **`hover:shadow-md`**: Medium shadow on hover
-- **`group`**: Enables group hover effects on child elements
+### **Thumb (Slider) Requirements**
+- **`inline-flex items-center justify-center`**: Centers icon within thumb
+- **`h-8 w-8`**: Fixed thumb size (32px × 32px)
+- **`transform rounded-full`**: Fully rounded thumb
+- **`bg-white`**: White background for thumb
+- **`transition-transform duration-300`**: Smooth slide animation
+- **`shadow-md`**: Medium shadow for depth
+- **Position**:
+  - **Active/On State**: `translate-x-7` (moves to right, 28px)
+  - **Inactive/Off State**: `translate-x-1` (moves to left, 4px)
 
-### **Icon Container Requirements**
-- **`flex-shrink-0`**: Prevents icon container from shrinking
-- **`w-10 h-10 sm:w-11 sm:h-11`**: Responsive icon container size
-  - Mobile: 40px × 40px
-  - Small screens+: 44px × 44px
-- **`rounded-xl`**: Large border radius (12px) for icon container
-- **`flex items-center justify-center`**: Centers icon within container
-- **`mb-1.5 sm:mb-2`**: Responsive margin bottom
-  - Mobile: 6px (0.375rem)
-  - Small screens+: 8px (0.5rem)
-- **`group-hover:scale-110`**: Scales up 10% when parent card is hovered
-- **`transition-transform duration-300`**: Smooth scale animation
+### **Label Requirements**
+- **`text-lg font-semibold`**: Large, bold text
+- **`transition-colors duration-300`**: Smooth color transitions
+- **Active State**: `text-purple-600` or `text-blue-600` (vibrant color)
+- **Inactive State**: `text-purple-300` or `text-blue-300` (muted color)
 
 ### **Icon Requirements**
-- **`w-6 h-6 sm:w-8 sm:h-8`**: Responsive icon size
-  - Mobile: 24px × 24px
-  - Small screens+: 32px × 32px
-- **Color**: Use semantic color matching action type (e.g., `text-blue-600`)
-
-### **Text Requirements**
-- **`font-semibold`**: Bold text for emphasis
-- **`text-center`**: Centers text horizontally
-- **`text-xs sm:text-sm lg:text-base`**: Responsive text size
-  - Mobile: 12px (0.75rem)
-  - Small screens: 14px (0.875rem)
-  - Large screens: 16px (1rem)
-- **`leading-tight`**: Tighter line height for compact display
-- **`px-1`**: **CRITICAL**: Small horizontal padding prevents text overflow on mobile
+- **`w-5 h-5`**: Icon size (20px × 20px)
+- **Color**: Matches button state color (`text-blue-600` or `text-purple-600`)
+- **SVG**: Use Heroicons pattern with `fill="none" stroke="currentColor"`
 
 ## **Complete Example**
 
-### **Full Responsive Button Group**
+### **Future/Past Events Toggle**
 ```tsx
-export default function AdminPage() {
-  const adminButtons = [
-    {
-      href: '/admin',
-      icon: 'home',
-      label: 'Admin Home',
-      color: 'blue',
-      key: 'admin-home'
-    },
-    // ... more buttons
-  ];
-
-  const getColorClasses = (color: string) => {
-    const colorMap: Record<string, string> = {
-      blue: 'bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200',
-      green: 'bg-green-50 hover:bg-green-100 text-green-700 border-green-200',
-      // ... other colors
-    };
-    return colorMap[color] || colorMap.blue;
-  };
-
-  const getIconBgColor = (color: string) => {
-    const colorMap: Record<string, string> = {
-      blue: 'bg-blue-100',
-      green: 'bg-green-100',
+{/* Event Filter Toggle */}
+<div className="flex justify-center items-center gap-4 mt-6">
+  <span className={`text-lg font-semibold transition-colors duration-300 ${!showPastEvents ? 'text-purple-600' : 'text-purple-300'}`}>
+    Future Events
+  </span>
+  <button
+    onClick={() => setShowPastEvents(!showPastEvents)}
+    className={`relative inline-flex h-10 w-16 items-center rounded-full transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 hover:scale-105 ${
+      showPastEvents
+        ? 'bg-blue-500 focus:ring-blue-500'
+        : 'bg-purple-500 focus:ring-purple-500'
+    }`}
+    title={showPastEvents ? 'Show Future Events' : 'Show Past Events'}
+    aria-label={showPastEvents ? 'Show Future Events' : 'Show Past Events'}
+  >
+    <span
+      className={`inline-flex items-center justify-center h-8 w-8 transform rounded-full bg-white transition-transform duration-300 shadow-md ${showPastEvents ? 'translate-x-7' : 'translate-x-1'}`}
+    >
+      {showPastEvents ? (
+        <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      ) : (
+        <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
