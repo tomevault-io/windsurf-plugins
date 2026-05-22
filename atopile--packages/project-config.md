@@ -1,213 +1,79 @@
 ---
 trigger: always_on
-description: ato is a declarative DSL to design electronics (PCBs) with.
+description: A package is a special atopile project that is intended to be shared and reused in other designs. A package is denoted by a `package` section in the ato.yaml file. A package aims to design a basic implementation of a given integrated circuit component. The requirement is for this package to include all the necessary components to get the core device working, such as decoupling capacitors, pullup/pulldown resistors, and more. Most importantly, since this package will be reused in a different desi
 ---
 
-# CLAUDE.md
 
-ato is a declarative DSL to design electronics (PCBs) with.
-It is part of the atopile project.
-Atopile is run by the vscode/cursor/windsurf extension.
-The CLI (which is invoked by the extension) actually builds the project.
+# 0 Context
+A package is a special atopile project that is intended to be shared and reused in other designs. A package is denoted by a `package` section in the ato.yaml file. A package aims to design a basic implementation of a given integrated circuit component. The requirement is for this package to include all the necessary components to get the core device working, such as decoupling capacitors, pullup/pulldown resistors, and more. Most importantly, since this package will be reused in a different design, it is critical to correctly create, expose, and connect all the external interfaces properly. External interfaces should be created using the proper object type (ElectricPower/ElectricLogic/etc.) and clearly defined with docstrings.
+Some examples of critical interfaces to expose for users include but are not limited to:
+  - ElectricPower for the power rails - `add electricpower.required = true` for required power rails
+  - SPI/I2C/I2S/etc. - communication interfaces should be defined and connected to the pins of the physical package
+  - EnablePins - `enable_pin.line.required = true` so users don't ignore or forget to connect the enable line somewhere
 
-# Not available in ato
+The purpose of the usage build is to show users how to use the package. This means this example should show the preferred method of use, and is most helpful if it shows the user how to use many of the interfaces.
 
-- if statements
-- while loops
-- functions (calls or definitions)
-- classes
-- objects
-- exceptions
-- generators
+# 1 Building a new package
 
+## 1.1 File Structure
 
-# Ato Syntax
+```
+packages/
+  packages/
+    <package_name>/
+        layouts/
+        parts/
+        ato.yaml
+        <package_name>.ato
+        README.md
+        usage.ato
+```
 
-ato sytax is heavily inspired by Python, but fully declarative.
-ato thus has no procedural code, and no side effects.
+## 1.2 Steps to create a new package
 
-## Examples of syntax
+1. Create a new directory `<package_name>` as stated in the file structure.
+2. Create ato.yaml, `<package_name>.ato`, README.md, usage.ato
+3. Look through other packages for inspiration
+4. Create part using tool call 'search_and_install_jlcpcb_part'
+   4.1 Inspect the part ato file in the parts/ directory
+5. Import the part into the main ato file
+6. Read the datasheet for the device
+7. Populate the files with the correct information (see below)
+   7.1 Create interfaces and connect them
+   7.2 Add decoupling caps where needed
+   7.3 Add i2c addressor if device has configurable address
+   If format is: <n x fixed address bits><m x pin configured address bits>
+   use addressor module:
 
-```ato
-#pragma text
-#pragma func("X")
-# enable for loop syntax feature:
-#pragma experiment("FOR_LOOP)
+- Use `Addressor<address_bits=N>` where **N = number of address pins**.
+- Connect each `address_lines[i].line` to the corresponding pin, and its `.reference` to a local power rail.
+- Set `addressor.base` to the lowest possible address and `assert addressor.address is i2c.address`.
 
-# --- Imports ---
-# Standard import (newline terminated)
-import ModuleName
+  7.4 Other configuration etc
 
-# Import with multiple modules (newline terminated)
-import Module1, Module2.Submodule
+8. Review the content wholistically again
+9. Build the main build target using CLI `ato build`
+10. Make sure to make use of the LSP and build errors
 
-# Import from a specific file/source (newline terminated)
-from "path/to/source.ato" import SpecificModule
+## 1.3 Additional Notes & Gotchas (generic)
 
-# Multiple imports on one line (semicolon separated)
-import AnotherModule; from "another/source.ato" import AnotherSpecific
+- Multi-rail devices (VDD / VDDIO, AVDD / DVDD, etc.)
 
-# Deprecated import form (newline terminated)
-# TODO: remove when unsupported
-import DeprecatedModule from "other/source.ato"
+  - Model separate `ElectricPower` interfaces for each rail (e.g. `power_core`, `power_io`).
+  - Mark each `.required = True` if the device cannot function without it, and add voltage assertions per datasheet.
 
-# --- Top-level Definitions and Statements ---
+- Using the right type of signal: Eletrical, ElectricLogic, ElectricSignal, DifferentialPair, I2C, SPI, ...
 
-pass
-pass;
+  - Electrical: Represents a basic electrical object, does not have a voltage reference.
+  - ElectricSignal: Represents an electric signal with a voltage domain reference (electricsignla.reference) which should be connected to the appropriate ElectricPower object. The electricsignal.line can represent any voltage between the hv and lv of the reference. Useful for things like analog signals, voltage divider outputs, etc.
+  - ElectricLogic: Represents an electric logic, which is a special type of electric signal that should only take the discrete values of reference.hv and reference.lv. electriclogic.line  will often be soft pulled up or down to its reference rails.
+  - DifferentialPair: Represents a pair of ElectricLogics that share a reference ground (still need to connect the reference ElectricPower to something) and carry a signal differentially between the p.line and n.line
+  - I2C, SPI, etc: Represent interfaces of common communication protocols. Investigate the files in the standard library to find which signals are available for each interface. Interfaces should be used wherever possible as a layer of abstraction. Instead of connecting sensor.sda_pin~micro.sda_pin and sensor.scl_pin~micro.scl_pin, I2C interfaces should be described in the definition of the sensor and the micro such that at application level they can be connected via sensor.i2c ~ micro.i2c
 
-"docstring-like statement"
-"docstring-like statement";
-
-top_level_var = 123
-
-# Compound statement
-pass; another_var = 456; "another docstring"
-
-# Block definitions
-component MyComponent:
-    # Simple statement inside block (newline terminated)
-    pass
-
-    # Multiple simple statements on one line (semicolon separated)
-    pass; internal_flag = True
-
-module AnotherBaseModule:
-    pin base_pin
-    base_param = 10
-
-interface MyInterface:
-    pin io
-
-module DemoModule from AnotherBaseModule:
-    # --- Declarations ---
-    pin p1              # Pin declaration with name
-    pin 1               # Pin declaration with number
-    pin "GND"           # Pin declaration with string
-    signal my_signal    # Signal definition
-    a_field: AnotherBaseModule      # Field declaration with type hint
-
-    # --- Assignments ---
-    # Newline terminated:
-    internal_variable = 123
-
-    # Semicolon separated on one line:
-    var_a = 1; var_b = "string"
-
-    # Cumulative assignment (+=, -=) - Newline terminated
-    value = 1
-    value += 1; value -= 1
-
-    # Set assignment (|=, &=) - Newline terminated
-    flags |= 1; flags &= 2
-
-    # --- Connections ---
-    p1 ~ base_pin
-    mif ~> bridge
-    mif ~> bridge ~> bridge
-    mif ~> bridge ~> bridge ~> mif
-    bridge ~> mif
-    mif <~ bridge
-    mif <~ bridge <~ bridge
-    mif <~ bridge <~ bridge <~ mif
-    bridge <~ mif
-
-    # Semicolon separated on one line:
-    p_multi1 ~ my_signal; p_multi2 ~ sig_multi1
-
-    # --- Retyping ---
-    instance.x -> AnotherBaseModule
-
-    # --- Instantiation ---
-    instance = new MyComponent
-    container = new MyComponent[10]
-    templated_instance_a = new MyComponent
-    templated_instance_b = new MyComponent<int_=1>
-    templated_instance_c = new MyComponent<float_=2.5>
-    templated_instance_d = new MyComponent<string_="hello">
-    templated_instance_e = new MyComponent<int_=1, float_=2.5, string_="hello">
-    templated_instance_f = new MyComponent<int_=1, float_=2.5, string_="hello", bool_=True>
-
-    # Semicolon separated instantiations (via assignment):
-    inst_a = new MyComponent; inst_b = new AnotherBaseModule
-
-    # --- Traits ---
-    trait trait_name
-    trait trait_name<int_=1>
-    trait trait_name<float_=2.5>
-    trait trait_name<string_="hello">
-    trait trait_name<bool_=True>
-    trait trait_name::constructor
-    trait trait_name::constructor<int_=1>
-
-    # Semicolon separated on one line:
-    trait TraitA; trait TraitB::constructor; trait TraitC<arg_=1>
-
-    # --- Assertions ---
-    assert x > 5V
-    assert x < 10V
-    assert 5V < x < 10V
-    assert x >= 5V
-    assert x <= 10V
-    assert current within 1A +/- 10mA
-    assert voltage within 1V +/- 10%
-    assert resistance is 1kohm to 1.1kohm
-
-    # Semicolon separated on one line:
-    assert x is 1V; assert another_param is 2V
-
-    # --- Loops ---
-    for item in container:
-        item ~ p1
-
-    # For loop iterating over a slice
-    for item in container[0:4]:
-        pass
-        item.value = 1; pass
-
-    # For loop iterating over a list literal of field references
-    for ref in [p1, x.1, x.GND]:
-        pass
-
-    # --- References and Indexing ---
-    # Reference with array index assignment
-    array_element = container[3]
-
-    # --- Literals and Expressions ---
-    # Integer
-    int_val = 100
-    neg_int_val = -50
-    hex_val = 0xF1
-    bin_val = 0b10
-    oct_val = 0o10
-    # Float
-    float_val = 3.14
-    # Physical quantities
-    voltage: V = 5V
-    resistance: ohm = 10kohm
-    capacitance: F = 100nF
-    # Bilateral tolerance
-    tolerance_val = 1kohm +/- 10%
-    tolerance_abs = 5V +/- 500mV
-    tolerance_explicit_unit = 10A +/- 1A
-    # Bounded quantity (range)
-    voltage_range = 3V to 3.6V
-    # Boolean
-    is_enabled = True
-    is_active = False
-    # String
-    message = "Hello inside module"
-
-    # Arithmetic expressions
-    sum_val = 1 + 2
-    diff_val = 10 - 3ohm
-    prod_val = 5 * 2mA
-    div_val = 10V / 2kohm # Results in current
-    power_val = 2**3
-    complex_expr = (5 + 3) * 2 - 1
-    flag_check = state | MASK_VALUE
-
-    # Comparisons
+- Use arrays for multiple channels or repetitve signals/modules
+  e.g `vouts = new ElectricLogic[4]` and access them with for-loops
+  e.g `gpios = new ElectricLogic[10]` and access them with a for-loop such as
+      for gpio in gpios:
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
