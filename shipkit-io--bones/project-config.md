@@ -1,180 +1,179 @@
 ---
 trigger: always_on
-description: Shipkit implements graceful degradation to provide a seamless experience whether users have a database configured or not. When no `DATABASE_URL` is provided, the application automatically falls back to local storage for data persistence.
+description: Multi-zone architecture allows Shipkit applications to be split into multiple Next.js applications while appearing as a single domain to users. This pattern is ideal for:
 ---
 
-# Shipkit Graceful Degradation
+# Multi-Zone Architecture Rules
 
 ## Overview
 
-Shipkit implements graceful degradation to provide a seamless experience whether users have a database configured or not. When no `DATABASE_URL` is provided, the application automatically falls back to local storage for data persistence.
+Multi-zone architecture allows Shipkit applications to be split into multiple Next.js applications while appearing as a single domain to users. This pattern is ideal for:
 
-## Architecture
+- **Scalability**: Different teams can work on different zones independently
+- **Performance**: Each zone can be optimized for its specific use case
+- **Deployment**: Zones can be deployed and updated independently
+- **Technology Freedom**: Each zone can use different technologies while maintaining consistency
 
-### Database Detection
+## Zone Configuration Patterns
 
-The system checks for database availability in multiple places:
+### Standard Zone Structure
+```
+domain.com/          → Main app (marketing, dashboard, auth)
+domain.com/docs/*    → Documentation zone
+domain.com/blog/*    → Blog zone
+domain.com/ui/*      → UI component library zone
+domain.com/tools/*   → Developer tools zone
+```
 
-1. **[src/server/db/index.ts](mdc:src/server/db/index.ts)** - Database connection with graceful degradation
-2. **[src/payload.config.ts](mdc:src/payload.config.ts)** - Payload CMS conditional initialization
-3. **[src/lib/payload/payload.ts](mdc:src/lib/payload/payload.ts)** - Payload client initialization with null fallback
-4. **Service layer** - All data operations check `db` availability before proceeding
+### Zone Types
 
-### Local Storage Fallbacks
+#### 1. Main Zone (Primary Application)
+- **Purpose**: Core application functionality
+- **Contains**: Authentication, dashboard, marketing pages, API routes
+- **Routing**: Handles all routes not claimed by other zones
+- **Configuration**: Standard Shipkit configuration with multi-zone rewrites
 
-When database is unavailable, the following local storage services are used:
+#### 2. Documentation Zone
+- **Purpose**: Product documentation, guides, API reference
+- **Features**: Search functionality, versioning, navigation tree
+- **Content**: MDX files, code examples, tutorials
+- **Optimization**: Static generation, fast search indexing
 
-- **[src/lib/local-storage/project-storage.ts](mdc:src/lib/local-storage/project-storage.ts)** - Project management
-- **[src/lib/local-storage/team-storage.ts](mdc:src/lib/local-storage/team-storage.ts)** - Team management
+#### 3. Blog Zone
+- **Purpose**: Blog posts, announcements, case studies
+- **Features**: CMS integration, commenting, social sharing
+- **Content**: Articles, author profiles, categories
+- **Optimization**: SEO optimization, RSS feeds
+
+#### 4. UI Component Library Zone
+- **Purpose**: Component showcase, design system documentation
+- **Features**: Interactive component playground, code examples
+- **Content**: Component demos, design tokens, usage guidelines
+- **Optimization**: Component isolation, visual regression testing
+
+#### 5. Developer Tools Zone
+- **Purpose**: Interactive utilities, API explorers, validators
+- **Features**: Real-time tools, code generators, testing utilities
+- **Content**: Interactive forms, API documentation, utilities
+- **Optimization**: Client-side interactivity, tool performance
 
 ## Implementation Patterns
 
-### Service Pattern
+### 1. Zone Setup
 
-All services follow this pattern for graceful degradation:
+#### Directory Structure
+```
+project-root/
+├── shipkit/              # Main application
+├── shipkit-docs/         # Documentation zone
+├── shipkit-blog/         # Blog zone
+├── shipkit-ui/           # UI library zone
+└── shipkit-tools/        # Tools zone
+```
 
+#### Zone Creation Commands
+```bash
+# Create zones by cloning Shipkit
+git clone https://github.com/lacymorrow/shipkit.git shipkit-docs
+git clone https://github.com/lacymorrow/shipkit.git shipkit-blog
+git clone https://github.com/lacymorrow/shipkit.git shipkit-ui
+git clone https://github.com/lacymorrow/shipkit.git shipkit-tools
+
+# Install dependencies for each zone
+cd shipkit-docs && bun install --frozen-lockfile
+cd shipkit-blog && bun install --frozen-lockfile
+cd shipkit-ui && bun install --frozen-lockfile
+cd shipkit-tools && bun install --frozen-lockfile
+```
+
+### 2. Configuration Patterns
+
+#### Main Zone Configuration (next.config.ts)
 ```typescript
-async someMethod(params: any) {
-  if (!db) {
-    // Use local storage fallback
-    return LocalStorageService.someMethod(params);
+async rewrites() {
+  const multiZoneRewrites = [];
+
+  // Documentation Zone
+  if (process.env.DOCS_DOMAIN) {
+    multiZoneRewrites.push(
+      { source: '/docs', destination: `${process.env.DOCS_DOMAIN}/docs` },
+      { source: '/docs/:path*', destination: `${process.env.DOCS_DOMAIN}/docs/:path*` }
+    );
   }
 
-  // Use database
-  return await this.database.someMethod(params);
+  // Add other zones similarly...
+
+  return multiZoneRewrites;
 }
 ```
 
-### Payload Client Pattern
-
-Always use `getPayloadClient()` function, never import singleton:
-
+#### Zone-Specific Configuration
 ```typescript
-// ✅ Correct
-import { getPayloadClient } from "@/lib/payload/payload";
+// Each zone's next.config.ts
+const nextConfig: NextConfig = {
+  basePath: '/docs', // or /blog, /ui, /tools
+  assetPrefix: '/docs-static', // or /blog-static, etc.
 
-const payload = await getPayloadClient();
-if (!payload) {
-  // Handle gracefully - CMS not available
-  return null;
-}
-
-// ❌ Wrong - Don't use singleton (causes crashes)
-import { payload } from "@/lib/payload/payload";
+  // Inherit all Shipkit configurations
+  ...existingShipkitConfig,
+};
 ```
 
-### Conditional Configuration
+### 3. Environment Variables
 
-Configuration files check for environment variables before initializing database-dependent features:
-
-```typescript
-const isFeatureEnabled = !!process.env.DATABASE_URL && process.env.FEATURE_FLAG === "true";
-
-if (isFeatureEnabled) {
-  // Initialize database-dependent features
-}
+#### Development Environment
+```bash
+# Main app .env.local
+DOCS_DOMAIN=http://localhost:3001
+BLOG_DOMAIN=http://localhost:3002
+UI_DOMAIN=http://localhost:3003
+TOOLS_DOMAIN=http://localhost:3004
 ```
 
-## Key Files
-
-### Core Database Files
-- **[src/server/db/index.ts](mdc:src/server/db/index.ts)** - Main database connection with null fallback
-- **[src/payload.config.ts](mdc:src/payload.config.ts)** - Conditional Payload initialization
-
-### Local Storage Services
-- **[src/lib/local-storage/project-storage.ts](mdc:src/lib/local-storage/project-storage.ts)** - Project CRUD operations
-- **[src/lib/local-storage/team-storage.ts](mdc:src/lib/local-storage/team-storage.ts)** - Team CRUD operations
-
-### Service Integration
-- **[src/server/services/project-service.ts](mdc:src/server/services/project-service.ts)** - Project service with fallbacks
-- **[src/server/services/team-service.ts](mdc:src/server/services/team-service.ts)** - Team service with fallbacks
-
-## Data Models
-
-Local storage services mirror the database schema exactly:
-
-### Projects
-```typescript
-interface LocalProject {
-  id: string;
-  name: string;
-  teamId: string;
-  createdAt: Date;
-  updatedAt: Date;
-  members: LocalProjectMember[];
-}
+#### Production Environment
+```bash
+# Main app production environment
+DOCS_DOMAIN=https://docs-shipkit.vercel.app
+BLOG_DOMAIN=https://blog-shipkit.vercel.app
+UI_DOMAIN=https://ui-shipkit.vercel.app
+TOOLS_DOMAIN=https://tools-shipkit.vercel.app
 ```
 
-### Teams
-```typescript
-interface LocalTeam {
-  id: string;
-  name: string;
-  type: "personal" | "workspace";
-  createdAt: Date;
-  updatedAt: Date | null;
-  deletedAt: Date | null;
-}
+## Navigation Patterns
+
+### Inter-Zone Navigation
+```tsx
+// Use anchor tags for navigation between zones
+<a href="/docs/getting-started" className="nav-link">
+  Documentation
+</a>
+
+// NOT Next.js Link for cross-zone navigation
+// ❌ <Link href="/docs/getting-started">Documentation</Link>
 ```
 
-## Environment Variables
+### Intra-Zone Navigation
+```tsx
+// Use Next.js Link within the same zone
+import Link from 'next/link'
 
-### Required for Database Mode
-- `DATABASE_URL` - PostgreSQL connection string
-- `PAYLOAD_SECRET` - Secret key to enable Payload CMS (optional, can use `DISABLE_PAYLOAD=true` to disable)
-
-### Optional Feature Flags
-- `NEXT_PUBLIC_FEATURE_S3_ENABLED` - Enable S3 storage
-- `NEXT_PUBLIC_FEATURE_VERCEL_BLOB_ENABLED` - Enable Vercel Blob storage
-- `NEXT_PUBLIC_FEATURE_AUTH_RESEND_ENABLED` - Enable Resend email
-
-## Demo Data
-
-When no database is available and no local data exists, the system automatically initializes with demo data:
-
-- Demo user account
-- Sample personal team
-- Example projects
-- Realistic project members
-
-## Best Practices
-
-### 1. Always Check Database Availability
-```typescript
-if (!db) {
-  // Local storage fallback
-  return LocalStorage.method();
-}
+<Link href="/docs/advanced-topics">
+  Advanced Topics
+</Link>
 ```
 
-### 2. Mirror Database APIs
-Local storage services should exactly match database service method signatures.
+### Shared Navigation Components
+```tsx
+// Create zone-aware navigation components
+const NavLink = ({ href, children, ...props }) => {
+  const isExternal = href.startsWith('/docs') ||
+                    href.startsWith('/blog') ||
+                    href.startsWith('/ui') ||
+                    href.startsWith('/tools');
 
-### 3. Handle User Sessions
-Demo mode creates a consistent user session that persists across browser sessions.
+  if (isExternal) {
 
-### 4. Data Consistency
-Local storage maintains referential integrity similar to database constraints.
-
-### 5. Error Handling
-Graceful degradation should never throw errors - always provide fallbacks.
-
-## Debugging
-
-### Check Database Status
-```typescript
-import { db } from "@/server/db";
-console.log("Database available:", !!db);
-```
-
-### Inspect Local Storage
-```typescript
-console.log("Projects:", LocalProjectStorage.getAllProjects());
-console.log("Teams:", LocalTeamStorage.getAllTeams());
-```
-
-### Environment Validation
-Check that all required environment variables are set for the desired mode of operation.
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [shipkit-io/bones](https://github.com/shipkit-io/bones) — distributed by [TomeVault](https://tomevault.io).
