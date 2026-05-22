@@ -1,138 +1,124 @@
 ---
 trigger: always_on
-description: Standard patterns for displaying portrait and member images without cropping, with proper centering and aspect ratio preservation
+description: - **Prisma Client Initialization**
 ---
 
+# Prisma Usage Rules
 
-# Portrait Image Display Pattern
+- **Prisma Client Initialization**
+  - ✅ DO: Use the standard singleton pattern in `src/lib/prisma.ts`
+    ```typescript
+    import { PrismaClient } from '@prisma/client'
 
-## **Overview**
-This rule defines the correct patterns for displaying portrait and member images (people photos) that must be fully visible without cropping heads or other important parts. This pattern ensures images are properly centered, maintain their aspect ratio, and display consistently across all screen sizes.
+    const globalForPrisma = globalThis as unknown as {
+      prisma: PrismaClient | undefined
+    }
 
-## **Problem Solved**
-- **Head Cropping**: Prevents portrait images from cutting off people's heads or faces
-- **Improper Centering**: Ensures images are centered both horizontally and vertically
-- **Aspect Ratio Issues**: Maintains original image proportions without distortion
-- **Inconsistent Display**: Provides uniform display across different portrait orientations
-- **User Experience**: Shows complete portraits so viewers can see the full person
+    export const prisma =
+      globalForPrisma.prisma ??
+      new PrismaClient({
+        log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+      })
 
-## **When to Use This Pattern**
+    if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
+    ```
+  - ❌ DON'T: Create multiple Prisma client instances
+  - ❌ DON'T: Initialize Prisma client without proper global caching
+  - ❌ DON'T: Use direct instantiation in route handlers or components
 
-### **Use for:**
-- ✅ Team member profiles and portraits
-- ✅ Leadership/executive team displays
-- ✅ Clergy and religious leader portraits
-- ✅ Board member and staff photos
-- ✅ Speaker or guest profiles
-- ✅ Any people-centric imagery where the full person must be visible
+- **Runtime Configuration**
+  - ✅ DO: Always use Node.js runtime for routes with Prisma
+    ```typescript
+    // Required for Prisma compatibility
+    export const runtime = 'nodejs'
+    ```
+  - ❌ DON'T: Use Edge runtime with Prisma operations
+  - ❌ DON'T: Omit runtime configuration in API routes using Prisma
 
-### **Don't Use for:**
-- ❌ Banner/hero images (use image_containment_prevention.mdc instead)
-- ❌ Background images where cropping is acceptable
-- ❌ Decorative images where partial visibility is fine
-- ❌ Product or object photos that can be cropped
+- **Import Requirements**
+  - ✅ DO: Import Prisma client from the centralized location
+    ```typescript
+    import { prisma } from '@/lib/prisma'
+    ```
+  - ❌ DON'T: Import PrismaClient directly in route files
+  - ❌ DON'T: Create new PrismaClient instances outside `src/lib/prisma.ts`
 
-## **Core Pattern: Portrait Grid Cards**
+- **Error Handling**
+  - ✅ DO: Use try-catch blocks around Prisma operations
+    ```typescript
+    try {
+      const result = await prisma.user.findMany()
+    } catch (error) {
+      console.error('Database error:', error)
+      throw new Error('Failed to fetch users')
+    }
+    ```
+  - ✅ DO: Log database errors with proper context
+  - ❌ DON'T: Expose raw Prisma errors to clients
 
-### **Container Setup**
-```tsx
-// ✅ DO: Use aspect ratio container with flexible height
-<div className="relative w-full h-auto aspect-[3/4] mx-auto mb-4 rounded-lg overflow-hidden sacred-shadow-sm group-hover:sacred-shadow reverent-transition bg-muted/20">
-  <div className="relative w-full h-full flex items-center justify-center p-2">
-    {/* Image goes here */}
-  </div>
-</div>
+- **Transaction Handling**
+  - ✅ DO: Use transactions for multiple operations
+    ```typescript
+    await prisma.$transaction([
+      prisma.user.create({ data: userData }),
+      prisma.log.create({ data: logData })
+    ])
+    ```
+  - ❌ DON'T: Perform multiple dependent operations without transactions
 
-// ❌ DON'T: Use fixed height that crops images
-<div className="w-full h-48 mx-auto mb-4 rounded-lg overflow-hidden">
-  {/* This will crop images */}
-</div>
-```
+- **Performance Considerations**
+  - ✅ DO: Use proper select and include statements
+    ```typescript
+    const user = await prisma.user.findUnique({
+      where: { id },
+      select: { id: true, email: true }
+    })
+    ```
+  - ❌ DON'T: Fetch unnecessary fields
+  - ❌ DON'T: Use nested includes without proper selection
 
-### **Image Configuration**
-```tsx
-// ✅ DO: Use object-contain with fill and proper sizing
-<Image
-  src={member.image}
-  alt={member.name}
-  fill
-  sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
-  className="object-contain group-hover:scale-105 reverent-transition"
-  style={{
-    objectPosition: 'center center'
-  }}
-/>
+- **Environment Setup**
+  - ✅ DO: Include DATABASE_URL in .env
+    ```env
+    DATABASE_URL="postgresql://user:password@localhost:5432/db?schema=public"
+    ```
+  - ✅ DO: Include DIRECT_URL for serverless environments
+  - ❌ DON'T: Commit database credentials to version control
 
-// ❌ DON'T: Use object-cover which crops images
-<Image
-  src={member.image}
-  alt={member.name}
-  width={242}
-  height={156}
-  className="w-full h-full object-cover"
-/>
-```
+- **File Organization**
+  - ✅ DO: Keep Prisma schema in `prisma/schema.prisma`
+  - ✅ DO: Keep client initialization in `src/lib/prisma.ts`
+  - ✅ DO: Keep migrations in `prisma/migrations`
+  - ❌ DON'T: Place Prisma-related files in component directories
 
-## **Pattern Variations**
+- **Validation Rules**
+  These rules will be automatically checked:
+  1. All API routes using Prisma must have `runtime = 'nodejs'`
+  2. No direct PrismaClient instantiation outside `src/lib/prisma.ts`
+  3. Proper error handling around Prisma operations
+  4. Consistent import pattern for Prisma client
+  5. Transaction usage for multiple operations
+  6. Proper field selection in queries
 
-### **1. Grid Layout (Team Members, Synod Members)**
+- **Automated Checks**
+  The following patterns trigger warnings:
+  - Missing runtime declaration in API routes
+  - Direct PrismaClient imports
+  - Missing try-catch blocks around Prisma operations
+  - Missing transaction blocks for multiple operations
+  - Missing field selection in queries
 
-**Use Case**: Multiple portraits in a responsive grid (3-4 columns)
-
-**Important**: Use **flexbox with `justify-content: center`** instead of CSS Grid to automatically center the last row when there are fewer cards than columns. This ensures cards expand from the center outward, and the last row is always centered.
-
-```tsx
-// ✅ DO: Use flexbox for automatic last-row centering
-<div className="flex flex-wrap gap-6 justify-center items-start max-w-7xl mx-auto">
-  {members.map((member) => (
-    <Link
-      key={member.id}
-      href={member.href}
-      className="bg-card rounded-lg sacred-shadow p-6 hover:sacred-shadow-lg reverent-transition group w-full sm:w-[calc(50%-0.75rem)] lg:w-[calc(33.333%-1rem)] flex-shrink-0"
-      style={{ maxWidth: '400px' }}
-    >
-      <div className="text-center">
-        {/* Image Container */}
-        <div className="relative w-full h-auto aspect-[3/4] mx-auto mb-4 rounded-lg overflow-hidden sacred-shadow-sm group-hover:sacred-shadow reverent-transition bg-muted/20">
-          <div className="relative w-full h-full flex items-center justify-center p-2">
-            <Image
-              src={member.image}
-              alt={member.name}
-              fill
-              sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
-              className="object-contain group-hover:scale-105 reverent-transition"
-              style={{ objectPosition: 'center center' }}
-            />
-          </div>
-        </div>
-        
-        {/* Member Info */}
-        <h3 className="font-heading font-semibold text-lg text-foreground mb-2">
-          {member.name}
-        </h3>
-        <p className="font-body text-sm text-primary font-medium mb-3">
-          {member.title}
-        </p>
-      </div>
-    </Link>
-  ))}
-</div>
-
-// ❌ DON'T: Use CSS Grid - last row won't center with fewer items
-<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-  {/* Last row items will align left, not center */}
-</div>
-```
-
-**Key Implementation Details**:
-- **Flexbox Container**: `flex flex-wrap justify-center` - automatically centers all rows, including the last row
-- **Card Widths**: `w-full sm:w-[calc(50%-0.75rem)] lg:w-[calc(33.333%-1rem)]` - responsive widths with gap compensation
-- **Prevent Shrinking**: `flex-shrink-0` - maintains card size, prevents compression
-- **Max Width**: `style={{ maxWidth: '400px' }}` - consistent card size limit across screen sizes
-- **Gap**: `gap-6` - consistent spacing between cards (1.5rem / 24px)
-- **Center Alignment**: `justify-center items-start` - centers cards horizontally, aligns tops
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- **Migration and Deployment**
+  - ✅ DO: Run migrations in deployment scripts
+    ```bash
+    npx prisma migrate deploy
+    ```
+  - ✅ DO: Generate Prisma client in build steps
+    ```bash
+    npx prisma generate
+    ```
+  - ❌ DON'T: Skip migration steps in deployment
+  - ❌ DON'T: Deploy without generating client
 
 ---
 > Source: [giventadevelop/md-strikers](https://github.com/giventadevelop/md-strikers) — distributed by [TomeVault](https://tomevault.io).
