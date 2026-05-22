@@ -1,68 +1,186 @@
 ---
 trigger: always_on
-description: - **All task-master files must be stored in `.task-master/`**
+description: This guide provides standards for creating consistent and maintainable UI components across the application UI
 ---
 
-- **All task-master files must be stored in `.task-master/`**
-  - Includes `tasks.json`, `PRD.txt`, and all individual task files (e.g., `.task-master/tasks/1.txt`)
-  - Do **not** store these files in `scripts/` or the project root
-  - Example structure:
-    ```
-    .task-master/
-      tasks.json
-      PRD.txt
-      tasks/
-        1.txt
-        2.txt
-      dev.mjs
-    scripts/
-      example_prd.txt
-      README.template.md
-    ```
+# UI Component Style Guide
 
-- **The dev script file must be at `.task-master/dev.mjs`**
-  - Do **not** place `dev.mjs` or `dev.js` in the `scripts/` folder
-  - All task-master CLI commands should reference `.task-master/dev.mjs`
-  - Example usage:
-    ```sh
-    node .task-master/dev.mjs list
-    node .task-master/dev.mjs parse-prd --input=.task-master/PRD.txt
-    ```
+This guide provides standards for creating consistent and maintainable UI components across the application UI
+.
 
-- **Scripts and templates must be stored in `scripts/`**
-  - Example: `scripts/example_prd.txt`, `scripts/README.template.md`
-  - Do **not** store templates or example PRDs in `.task-master/`
+---
 
-- **File naming conventions**
-  - Main PRD file: `.task-master/PRD.txt`
-  - Main tasks file: `.task-master/tasks.json`
-  - Individual task files: `.task-master/tasks/<id>.txt` (where `<id>` is the task ID)
-  - Dev script: `.task-master/dev.mjs`
-  - Example/template files: `scripts/`
-  - Do **not** use alternative extensions or locations for these files
+## 1. Page & Content Layout
 
-- **Best Practices**
-  - Keep `.task-master/` as the single source of truth for all task-master data and scripts
-  - Use `scripts/` only for reference/example/template files
-  - Reference this rule in onboarding and documentation for new contributors
+### Page Container
 
-- **Anti-patterns**
-  ```
-  // ❌ DON'T: Place tasks.json or PRD.txt in scripts/
-  scripts/tasks.json
-  scripts/PRD.txt
-
-  // ❌ DON'T: Place dev.mjs in scripts/
-  scripts/dev.mjs
-
-  // ❌ DON'T: Store templates in .task-master/
-  .task-master/example_prd.txt
+- **Rule:** Use `max-w-5xl mx-auto px-8 py-8` for main page containers.
+- **Purpose:** Enforces a consistent 80% width and center alignment on desktop views.
+- **Example:**
+  ```tsx
+  // ✅ DO: Use consistent page layout
+  <div className="max-w-5xl mx-auto px-8 py-8">
+    {/* Page content goes here */}
+  </div>
   ```
 
-- **References**
-  - See [cursor_rules.mdc](mdc:.cursor/rules/cursor_rules.mdc) for rule formatting
-  - Example PRD: [scripts/example_prd.txt](mdc:scripts/example_prd.txt)
-  - Example dev script: [.task-master/dev.mjs](mdc:.task-master/dev.mjs)
+### Content Card
+
+- **Rule:** Use `bg-white rounded-lg shadow-md p-6` for containers that wrap main content sections (tables, forms, etc.).
+- **Purpose:** Creates a consistent, elevated card-based layout for content.
+- **Example:**
+  ```tsx
+  // ✅ DO: Use a styled container for content sections
+  <div className="bg-white rounded-lg shadow-md p-6">
+    {/* Table, list, or form content */}
+  </div>
+  ```
+
+### Centered Card Grid Layout
+
+- **Rule:** Use CSS modules with flexbox for centered card grids (Featured Guests, Contact Information, Program Directors, Gallery thumbnails, Team members).
+- **Purpose:** Ensures cards are perfectly centered regardless of the number of items, preventing left-aligned layouts when items don't fill the full width.
+- **Pattern:** Create a CSS module file (e.g., `CenteredCardGrid.module.css`) with:
+  - Flexbox container with `justify-content: center`
+  - Responsive `max-width` calculations based on number of columns
+  - Fixed or calculated widths for card items
+- **Example:**
+  ```css
+  /* Centered Card Grid */
+  .centeredCardGrid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    width: 100%;
+    justify-content: center;
+    align-items: flex-start;
+    margin: 0 auto;
+  }
+
+  /* Desktop: 3 columns */
+  @media (min-width: 1024px) {
+    .centeredCardGrid {
+      max-width: calc(3 * 350px + 2 * 1rem);
+    }
+    .cardItem {
+      width: 350px;
+      max-width: 350px;
+    }
+  }
+
+  /* Tablet: 2 columns */
+  @media (min-width: 768px) and (max-width: 1023px) {
+    .centeredCardGrid {
+      max-width: calc(2 * 350px + 1 * 1rem);
+    }
+    .cardItem {
+      width: calc((100% - 1rem) / 2);
+      max-width: calc((100% - 1rem) / 2);
+    }
+  }
+
+  /* Mobile: 1 column */
+  @media (max-width: 767px) {
+    .centeredCardGrid {
+      max-width: 100%;
+    }
+    .cardItem {
+      width: 100%;
+      max-width: 100%;
+    }
+  }
+  ```
+- **Usage:**
+  ```tsx
+  // ✅ DO: Use CSS module for centered card grids
+  import cardGridStyles from './CenteredCardGrid.module.css';
+
+  <div className={cardGridStyles.centeredCardGrid}>
+    {items.map((item) => (
+      <div key={item.id} className={cardGridStyles.cardItem}>
+        {/* Card content */}
+      </div>
+    ))}
+  </div>
+
+  // ❌ DON'T: Use standard grid without centering
+  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    {/* Cards will be left-aligned when not filling full width */}
+  </div>
+  ```
+- **References:**
+  - See `src/app/events/[id]/CenteredCardGrid.module.css` for implementation
+  - See `src/app/events/[id]/GalleryThumbnails.module.css` for gallery pattern
+  - See `src/components/TeamSection.module.css` for team member pattern
+
+---
+
+## 2. Forms
+
+### Input Fields
+
+- **Rule:** Use the following classes for consistent input field styling.
+- **Example:**
+  ```tsx
+  // ✅ DO: Use consistent input field styling
+  <input
+    type="text"
+    className="mt-1 block w-full border border-gray-400 rounded-xl focus:border-blue-500 focus:ring-blue-500 px-4 py-3 text-base"
+  />
+  ```
+
+### Labels
+
+- **Rule:** Use the following classes for consistent label styling.
+- **Example:**
+  ```tsx
+  // ✅ DO: Use consistent label styling
+  <label className="block text-sm font-medium text-gray-700">
+    Field Label
+  </label>
+  ```
+
+### Checkboxes
+
+- **Rule:** Use the `custom-checkbox` implementation for a larger, more visible checkbox with a custom tick mark.
+- **Click Handling:** Always include `onClick={(e) => e.stopPropagation()}` on the `input` to prevent unintended event bubbling, especially inside clickable table rows or containers.
+- **Example:**
+  ```tsx
+  // ✅ DO: Use consistent checkbox styling with stopPropagation
+  <label className="flex flex-col items-center">
+    <span className="relative flex items-center justify-center">
+      <input
+        type="checkbox"
+        className="custom-checkbox"
+        checked={isChecked}
+        onChange={handleChange}
+        onClick={(e) => e.stopPropagation()}
+      />
+      <span className="custom-checkbox-tick">
+        {isChecked && (
+          <svg className="w-6 h-6 text-black" fill="none" stroke="currentColor" strokeWidth="4" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l5 5L19 7" />
+          </svg>
+        )}
+      </span>
+    </span>
+    <span className="mt-2 text-xs text-center select-none break-words max-w-[6rem]">Checkbox Label</span>
+  </label>
+  ```
+
+- **Checkbox Group Layout:**
+  ```tsx
+  // ✅ DO: Use a CSS grid for checkbox group layout
+  <div className="custom-grid-table mt-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
+    {/* Checkbox items */}
+  </div>
+  ```
+
+- **Required CSS (`globals.css`):**
+  ```css
+  .custom-checkbox {
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [giventadevelop/md-strikers](https://github.com/giventadevelop/md-strikers) — distributed by [TomeVault](https://tomevault.io).
