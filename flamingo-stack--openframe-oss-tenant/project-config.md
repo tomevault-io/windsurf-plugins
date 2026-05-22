@@ -1,171 +1,172 @@
 ---
 trigger: always_on
-description: This document outlines the messaging and event-driven architecture patterns used in the OpenFrame project.
+description: This document outlines the monitoring and observability best practices for the OpenFrame project.
 ---
 
-# Messaging Patterns
+# Monitoring and Observability
 
-This document outlines the messaging and event-driven architecture patterns used in the OpenFrame project.
+This document outlines the monitoring and observability best practices for the OpenFrame project.
 
-## Kafka Usage Patterns
+## Monitoring Stack
 
-### Topic Naming Conventions
+OpenFrame uses a comprehensive monitoring stack:
 
-- Use kebab-case for topic names
-- Follow the pattern `{domain}-{entity}-{action}`
-- Use plural for entity collections
-- Use past tense for actions
+- **Prometheus**: Metrics collection and storage
+- **Grafana**: Visualization and dashboards
+- **Loki**: Log aggregation
+- **Tempo**: Distributed tracing
+- **Alertmanager**: Alert management and notifications
 
-Examples:
 ```
-devices-created
-devices-updated
-devices-deleted
-alerts-triggered
-metrics-collected
-```
-
-### Producer Patterns
-
-- Use the KafkaTemplate for producing messages
-- Set appropriate key for message partitioning
-- Include metadata in message headers
-- Handle production errors gracefully
-- Use asynchronous sending for non-blocking operations
-
-Example producer:
-```java
-@Service
-public class DeviceEventProducer {
-    private final KafkaTemplate<String, DeviceEvent> kafkaTemplate;
-    
-    public CompletableFuture<SendResult<String, DeviceEvent>> publishDeviceCreated(Device device) {
-        DeviceEvent event = new DeviceEvent(
-            UUID.randomUUID().toString(),
-            "DEVICE_CREATED",
-            LocalDateTime.now(),
-            device
-        );
-        
-        return kafkaTemplate.send("devices-created", device.getId(), event)
-            .handle((result, ex) -> {
-                if (ex != null) {
-                    log.error("Failed to send device created event: {}", ex.getMessage());
-                    throw new EventPublishingException("Failed to publish device created event", ex);
-                }
-                return result;
-            });
-    }
-}
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│             │     │             │     │             │
+│  Prometheus │     │    Loki     │     │   Tempo     │
+│             │     │             │     │             │
+└──────┬──────┘     └──────┬──────┘     └──────┬──────┘
+       │                   │                   │
+       │                   │                   │
+       ▼                   ▼                   ▼
+┌─────────────────────────────────────────────────────┐
+│                                                     │
+│                      Grafana                        │
+│                                                     │
+└─────────────────────────────────────────────────────┘
+                          │
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────┐
+│                                                     │
+│                   Alertmanager                      │
+│                                                     │
+└─────────────────────────────────────────────────────┘
 ```
 
-### Consumer Patterns
+## Metrics Collection
 
-- Use the @KafkaListener annotation for consuming messages
-- Group consumers by functionality
-- Handle deserialization errors
-- Implement idempotent processing
-- Use manual acknowledgment for critical processing
-- Implement proper error handling and retries
+### Application Metrics
 
-Example consumer:
-```java
-@Service
-public class DeviceEventConsumer {
-    private final DeviceService deviceService;
-    
-    @KafkaListener(
-        topics = "devices-created",
-        groupId = "device-processor",
-        containerFactory = "kafkaListenerContainerFactory"
-    )
-    public void consumeDeviceCreatedEvent(
-            @Payload DeviceEvent event,
-            @Header(KafkaHeaders.RECEIVED_KEY) String key,
-            @Header(KafkaHeaders.RECEIVED_PARTITION) int partition,
-            @Header(KafkaHeaders.OFFSET) long offset,
-            Acknowledgment acknowledgment) {
-        
-        try {
-            log.info("Processing device created event: {}, partition: {}, offset: {}", 
-                    event.getId(), partition, offset);
-            
-            deviceService.processDeviceCreated(event.getDevice());
-            
-            acknowledgment.acknowledge();
-        } catch (Exception e) {
-            log.error("Error processing device created event: {}", e.getMessage());
-            // Implement retry or dead letter queue logic
-        }
-    }
-}
-```
+Spring Boot applications expose metrics through Micrometer and Actuator:
 
-### Serialization
-
-- Use JSON for message serialization
-- Define clear schema for each message type
-- Include version information in the schema
-- Handle schema evolution gracefully
-- Consider using Avro for complex schemas
-
-Example serialization configuration:
 ```java
 @Configuration
-public class KafkaConfig {
+public class MetricsConfig {
     @Bean
-    public KafkaTemplate<String, Object> kafkaTemplate(
-            ProducerFactory<String, Object> producerFactory) {
-        return new KafkaTemplate<>(producerFactory);
+    public MeterRegistryCustomizer<MeterRegistry> metricsCommonTags(
+            @Value("${spring.application.name}") String applicationName) {
+        return registry -> registry.config()
+            .commonTags("application", applicationName);
     }
     
     @Bean
-    public ProducerFactory<String, Object> producerFactory() {
-        Map<String, Object> configProps = new HashMap<>();
-        configProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-        configProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
-        configProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonSerializer.class);
-        return new DefaultKafkaProducerFactory<>(configProps);
-    }
-    
-    @Bean
-    public ConsumerFactory<String, Object> consumerFactory() {
-        Map<String, Object> configProps = new HashMap<>();
-        configProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-        configProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
-        configProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JsonDeserializer.class);
-        configProps.put(JsonDeserializer.TRUSTED_PACKAGES, "com.openframe.*");
-        return new DefaultKafkaConsumerFactory<>(configProps);
-    }
-    
-    @Bean
-    public ConcurrentKafkaListenerContainerFactory<String, Object> kafkaListenerContainerFactory() {
-        ConcurrentKafkaListenerContainerFactory<String, Object> factory =
-            new ConcurrentKafkaListenerContainerFactory<>();
-        factory.setConsumerFactory(consumerFactory());
-        factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL_IMMEDIATE);
-        return factory;
+    public TimedAspect timedAspect(MeterRegistry registry) {
+        return new TimedAspect(registry);
     }
 }
 ```
 
-## Event Schema Design
-
-### Event Structure
-
-- Use a consistent structure for all events
-- Include common metadata fields
-- Use strong typing for event payloads
-- Version your event schemas
-
-Example event structure:
+Example usage in code:
 ```java
-@Data
-public class Event<T> {
-    private String id;
-    private String type;
-    private String source;
-    private LocalDateTime timestamp;
+@Service
+public class DeviceService {
+    private final MeterRegistry meterRegistry;
+    private final DeviceRepository deviceRepository;
+    
+    @Timed(value = "device.service.get.time", description = "Time taken to get device")
+    public Mono<Device> getDeviceById(String id) {
+        return deviceRepository.findById(id)
+            .doOnSuccess(device -> {
+                if (device != null) {
+                    meterRegistry.counter("device.service.get.success").increment();
+                } else {
+                    meterRegistry.counter("device.service.get.notfound").increment();
+                }
+            })
+            .doOnError(e -> meterRegistry.counter("device.service.get.error").increment());
+    }
+    
+    @Timed(value = "device.service.create.time", description = "Time taken to create device")
+    public Mono<Device> createDevice(Device device) {
+        return deviceRepository.save(device)
+            .doOnSuccess(d -> meterRegistry.counter("device.service.create.success").increment())
+            .doOnError(e -> meterRegistry.counter("device.service.create.error").increment());
+    }
+}
+```
+
+### Custom Metrics
+
+Define custom metrics for business-specific monitoring:
+
+```java
+@Component
+public class DeviceMetrics {
+    private final MeterRegistry meterRegistry;
+    
+    @Scheduled(fixedRate = 60000)
+    public void recordDeviceMetrics() {
+        // Record device count by status
+        Map<String, Long> deviceCountByStatus = deviceRepository.countByStatus().block();
+        deviceCountByStatus.forEach((status, count) -> {
+            meterRegistry.gauge("device.count.by.status", 
+                Tags.of("status", status), count);
+        });
+        
+        // Record device count by OS
+        Map<String, Long> deviceCountByOs = deviceRepository.countByOperatingSystem().block();
+        deviceCountByOs.forEach((os, count) -> {
+            meterRegistry.gauge("device.count.by.os", 
+                Tags.of("os", os), count);
+        });
+    }
+}
+```
+
+### Prometheus Configuration
+
+Configure Prometheus to scrape metrics from OpenFrame services:
+
+```yaml
+# prometheus.yml
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'openframe-api'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['openframe-api:8080']
+    
+  - job_name: 'openframe-gateway'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['openframe-gateway:8100']
+    
+  - job_name: 'openframe-management'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['openframe-management:8081']
+    
+  # Additional services...
+```
+
+## Logging
+
+### Structured Logging
+
+Use structured logging with JSON format:
+
+```xml
+<!-- logback-spring.xml -->
+<configuration>
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <includeMdc>true</includeMdc>
+            <includeContext>true</includeContext>
+            <customFields>{"application":"${spring.application.name}"}</customFields>
+        </encoder>
+    </appender>
+    
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
