@@ -1,242 +1,191 @@
 ---
 trigger: always_on
-description: This document outlines the API design patterns and standards for the OpenFrame project.
+description: description: API development patterns and best practices for OpenFrame REST and GraphQL APIs
 ---
 
-# API Design
 
-This document outlines the API design patterns and standards for the OpenFrame project.
+---
+description: API development patterns and best practices for OpenFrame REST and GraphQL APIs
+globs:
+  - "openframe/services/*/src/main/java/**/controller/**"
+  - "openframe/services/*/src/main/java/**/service/**"
+  - "openframe/libs/api-library/**"
+alwaysApply: false
+---
 
-## RESTful API Design
+# API Development Patterns in OpenFrame
 
-### URL Structure
+OpenFrame follows a shared library approach to eliminate code duplication between GraphQL and REST APIs. Follow these patterns for consistent API development.
 
-- Use resource-based URLs
-- Use plural nouns for resource collections
-- Use hierarchical structure for nested resources
-- Use kebab-case for multi-word resource names
-- Include API version in the URL path
+## Shared Library Architecture
 
-Examples:
-```
-GET /api/v1/devices                  # Get all devices
-GET /api/v1/devices/{id}             # Get a specific device
-GET /api/v1/devices/{id}/scripts     # Get scripts for a device
-POST /api/v1/devices                 # Create a new device
-PUT /api/v1/devices/{id}             # Update a device
-DELETE /api/v1/devices/{id}          # Delete a device
-```
+### Business Logic in api-library
+- **DO**: Place all business logic in [api-library services](mdc:openframe/libs/api-library/src/main/java/com/openframe/api/service)
+- **DON'T**: Duplicate business logic between GraphQL and REST controllers
+- **Pattern**: Controllers are thin adapters that delegate to shared services
 
-### HTTP Methods
-
-- Use appropriate HTTP methods for operations:
-  - GET: Retrieve resources
-  - POST: Create resources
-  - PUT: Update resources (full update)
-  - PATCH: Partial update of resources
-  - DELETE: Remove resources
-
-### Status Codes
-
-- Use appropriate HTTP status codes:
-  - 200 OK: Successful request
-  - 201 Created: Resource created successfully
-  - 204 No Content: Successful request with no response body
-  - 400 Bad Request: Invalid request parameters
-  - 401 Unauthorized: Authentication required
-  - 403 Forbidden: Authenticated but not authorized
-  - 404 Not Found: Resource not found
-  - 409 Conflict: Request conflicts with current state
-  - 422 Unprocessable Entity: Validation errors
-  - 500 Internal Server Error: Server-side error
-
-### Request/Response Format
-
-- Use JSON for request and response bodies
-- Use consistent property naming (camelCase)
-- Include appropriate content-type headers
-- Provide meaningful error messages
-- Use pagination for large collections
-- Support filtering, sorting, and field selection
-
-Example response:
-```json
-{
-  "data": [
-    {
-      "id": "123",
-      "hostname": "device-1",
-      "operatingSystem": "Windows",
-      "status": "online",
-      "lastSeen": "2023-04-01T12:00:00Z"
+```java
+// ✅ GOOD - Service in api-library
+@Service
+public class DeviceService {
+    public DeviceQueryResult queryDevices(DeviceFilterCriteria criteria) {
+        // Business logic here
     }
-  ],
-  "pagination": {
-    "total": 100,
-    "page": 1,
-    "pageSize": 10,
-    "totalPages": 10
-  }
-}
-```
-
-Example error response:
-```json
-{
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "Invalid request parameters",
-    "details": [
-      {
-        "field": "hostname",
-        "message": "Hostname is required"
-      }
-    ]
-  }
-}
-```
-
-## GraphQL API Design
-
-### Schema Design
-
-- Use descriptive type names
-- Follow naming conventions (PascalCase for types, camelCase for fields)
-- Define clear relationships between types
-- Use input types for mutations
-- Include appropriate descriptions for types and fields
-- Use enums for fixed sets of values
-
-Example schema:
-```graphql
-"""
-Represents a device in the system
-"""
-type Device {
-  "Unique identifier for the device"
-  id: ID!
-  "Hostname of the device"
-  hostname: String!
-  "Operating system of the device"
-  operatingSystem: String!
-  "Current status of the device"
-  status: DeviceStatus!
-  "When the device was last seen"
-  lastSeen: DateTime
-  "Scripts associated with this device"
-  scripts: [Script!]!
 }
 
-"""
-Status of a device
-"""
-enum DeviceStatus {
-  ONLINE
-  OFFLINE
-  MAINTENANCE
-}
+// ✅ GOOD - REST controller delegates to service
+@RestController
+public class DeviceController {
+    private final DeviceService deviceService;
 
-"""
-Input for creating a new device
-"""
-input CreateDeviceInput {
-  hostname: String!
-  operatingSystem: String!
-}
-```
-
-### Query Design
-
-- Design queries around specific use cases
-- Support pagination for collections
-- Allow filtering and sorting
-- Enable field selection
-- Use arguments for customization
-- Consider query complexity and depth
-
-Example query:
-```graphql
-query GetDevices($status: DeviceStatus, $page: Int, $pageSize: Int) {
-  devices(status: $status, page: $page, pageSize: $pageSize) {
-    nodes {
-      id
-      hostname
-      operatingSystem
-      status
-      lastSeen
+    @GetMapping("/devices")
+    public DeviceResponse getDevices(@AuthenticationPrincipal AuthPrincipal principal) {
+        return deviceService.queryDevices(criteria);
     }
-    pageInfo {
-      totalCount
-      hasNextPage
-      hasPreviousPage
-    }
-  }
 }
 ```
 
-### Mutation Design
+## Controller Patterns
 
-- Use descriptive names (createDevice, updateDevice, etc.)
-- Accept input types for arguments
-- Return the modified resource
-- Include error information in the response
-- Use consistent naming patterns
+### Modern Spring Boot Style
+Use DTO + Exceptions approach instead of ResponseEntity everywhere:
 
-Example mutation:
-```graphql
-mutation CreateDevice($input: CreateDeviceInput!) {
-  createDevice(input: $input) {
-    device {
-      id
-      hostname
-      operatingSystem
-      status
-    }
-    errors {
-      field
-      message
-    }
-  }
+```java
+// ✅ GOOD - Modern Spring Boot style
+@GetMapping("/{id}")
+@ResponseStatus(OK)
+public DeviceResponse getDevice(@PathVariable String id) {
+    Device device = deviceService.findById(id)
+        .orElseThrow(() -> new DeviceNotFoundException("Device not found: " + id));
+    return deviceMapper.toResponse(device);
+}
+
+// ❌ BAD - Old ResponseEntity style
+@GetMapping("/{id}")
+public ResponseEntity<DeviceResponse> getDevice(@PathVariable String id) {
+    return deviceService.findById(id)
+        .map(device -> ResponseEntity.ok(deviceMapper.toResponse(device)))
+        .orElse(ResponseEntity.notFound().build());
 }
 ```
 
-## API Gateway Patterns
+### Authentication Principal Pattern
+Always use `@AuthenticationPrincipal AuthPrincipal principal` for user context:
 
-### Routing
+```java
+@RestController
+@RequestMapping("/api-keys")
+public class ApiKeyController {
+    @GetMapping
+    public List<ApiKeyResponse> getApiKeys(@AuthenticationPrincipal AuthPrincipal principal) {
+        return apiKeyService.getApiKeysForUser(principal.getId());
+    }
 
-- Route requests based on path prefixes
-- Use consistent routing patterns
-- Support path rewriting for backend services
-- Handle versioning at the gateway level
-
-Example gateway configuration:
-```yaml
-spring:
-  cloud:
-    gateway:
-      routes:
-        - id: device-service
-          uri: lb://device-service
-          predicates:
-            - Path=/api/v1/devices/**
-          filters:
-            - RewritePath=/api/v1/devices/(?<path>.*), /devices/$\{path}
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    public CreateApiKeyResponse createApiKey(
+            @Valid @RequestBody CreateApiKeyRequest request,
+            @AuthenticationPrincipal AuthPrincipal principal) {
+        return apiKeyService.createApiKey(principal.getId(), request);
+    }
+}
 ```
 
-### Authentication and Authorization
+**Reference**: [ApiKeyController.java](mdc:openframe/services/openframe-api/src/main/java/com/openframe/api/controller/ApiKeyController.java)
 
-- Implement JWT authentication at the gateway
-- Validate tokens for each request
-- Include user information in request headers
-- Support role-based access control
-- Use consistent authorization patterns
+## Error Handling Patterns
 
-Example authentication filter:
+### Global Exception Handler
+Use global exception handlers with consistent error responses:
+
+```java
+@ControllerAdvice
+public class GlobalExceptionHandler {
+    @ExceptionHandler(DeviceNotFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public ErrorResponse handleDeviceNotFound(DeviceNotFoundException ex) {
+        return ErrorResponse.builder()
+            .code("DEVICE_NOT_FOUND")
+            .message(ex.getMessage())
+            .timestamp(LocalDateTime.now())
+            .build();
+    }
+}
+```
+
+### Custom Domain Exceptions
+Create specific exceptions for domain errors:
+
+```java
+public class ApiKeyNotFoundException extends RuntimeException {
+    public ApiKeyNotFoundException(String keyId) {
+        super("API key not found: " + keyId);
+    }
+}
+```
+
+**Reference**: [ErrorResponse.java](mdc:openframe/libs/openframe-core/src/main/java/com/openframe/core/dto/ErrorResponse.java)
+
+## DTO and Mapping Patterns
+
+### Record-based DTOs
+Use Java records for immutable DTOs:
+
+```java
+public record CreateApiKeyRequest(
+    @NotBlank String name,
+    String description,
+    @Future LocalDateTime expiresAt
+) {}
+
+public record ApiKeyResponse(
+    String id,
+    String name,
+    String description,
+    boolean enabled,
+    LocalDateTime createdAt,
+    LocalDateTime expiresAt
+) {}
+```
+
+### Service to DTO Conversion
+Convert between domain models and DTOs in dedicated mappers:
+
 ```java
 @Component
-public class JwtAuthenticationFilter implements WebFilter {
-    @Override
-    public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
+public class DeviceMapper {
+    public DeviceResponse toDeviceResponse(DeviceQueryResult result) {
+        return DeviceResponse.builder()
+            .id(result.getId())
+            .hostname(result.getHostname())
+            .status(result.getStatus())
+            .build();
+    }
+}
+```
+
+## Validation Patterns
+
+### Bean Validation
+Use Bean Validation annotations for request validation:
+
+```java
+public record DeviceRequest(
+    @NotBlank(message = "Hostname is required")
+    @Size(min = 3, max = 50, message = "Hostname must be between 3 and 50 characters")
+    String hostname,
+
+    @NotBlank(message = "Operating system is required")
+    String operatingSystem,
+
+    @Pattern(regexp = "^([0-9]{1,3}\\.){3}[0-9]{1,3}$", message = "Invalid IP address format")
+    String ipAddress
+) {}
+```
+
+### Controller Validation
+Use `@Valid` annotation in controller methods:
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
