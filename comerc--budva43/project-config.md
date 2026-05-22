@@ -1,17 +1,16 @@
 ---
 trigger: always_on
-description: применяй это правило для очерёдности импортов:
+description: не надо делать локальные импорты через относительные пути:
 ---
 
-применяй это правило для очерёдности импортов:
+не надо делать локальные импорты через относительные пути:
 
-```yml
-    gci:
-      sections:
-        - standard
-        - default
-        - prefix(github.com/comerc/budva43)
-      custom-order: true
+```go
+// плохо
+import "../../config"
+
+// хорошо
+import "github.com/comerc/budva43/some/path/config"
 ```
 
 ---
