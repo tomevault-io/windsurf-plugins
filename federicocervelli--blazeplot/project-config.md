@@ -1,0 +1,61 @@
+---
+trigger: always_on
+description: - Use Bun; `bun.lock` is the lockfile and `bun test` is the test runner.
+---
+
+# AGENTS.md
+
+## Commands
+
+- Use Bun; `bun.lock` is the lockfile and `bun test` is the test runner.
+- Install deps with `bun install` if `node_modules/` is missing.
+- Run all tests: `bun test`.
+- Run one test file: `bun test tests/core/RingBuffer.test.ts`.
+- Run one named test: `bun test tests/core/RingBuffer.test.ts -t "wraps around"`.
+- Typecheck: `bun run typecheck` (`tsc --noEmit`).
+- Build the npm package: `bun run build` (Vite/Rolldown library build + declaration emit via `vite-plugin-dts`).
+- Build JS only: `bun run build:js`.
+- Full CI locally: `bun run ci` (typecheck + tests + package build + package export smoke test + package contents dry-run + bundle-size check + headless benchmark smoke test + automated chart visual tests + automated interaction tests).
+- Benchmark smoke test only: `bun run bench:ci` (`ci-smoke` scenario in a headless Chrome/Chromium/Brave browser). Set `BLAZEPLOT_BENCH_CHROME=/path/to/browser` if auto-detection fails.
+- Chart visual tests only: `bun run test:visual` (renders one focused browser case per chart/plugin feature, asserts render/DOM/screenshot output, and writes screenshots to `build/visual-tests/`).
+- Browser interaction tests only: `bun run test:interaction` (automates hover, crosshair, wheel zoom, shift-drag pan, box zoom, reset, and selection through Chrome DevTools Protocol input events).
+- Append benchmark results to the current release changelog: `bun run release:benchmarks`.
+- Preview package contents: `bun pm pack --dry-run`.
+- Dev server: `bun run dev` serves the Lit website (`website/`) with integrated docs and previews. Use `bun run legacy-preview:dev` only for browser fixture debugging under `tests/browser/`.
+- There is no lint or formatter script in `package.json`.
+
+## Branch and Release Flow
+
+- `main` is the protected release branch. It requires PRs, the `validate` status check, up-to-date branches, conversation resolution, linear history, and blocks force-push/deletion. It does **not** require approving reviews so the agent can merge its own tested release PRs when asked.
+- `development` is the integration branch for normal work. Open feature/fix PRs into `development`; open release PRs from `development` into `main`.
+- Implement each requested feature/fix on its own branch from updated `development` (for example `feature/<topic>` or `docs/<topic>`), make focused commits there, then merge it back to `development`. Do not stack unrelated changes in one feature branch.
+- Prefer `git merge --no-ff <feature-branch>` when merging completed feature branches back to `development` so feature boundaries remain visible in history.
+- Do not open PRs to `main` until the user explicitly asks for a release PR. Normal completed work should stop after merging to `development` and pushing it.
+- GitHub Pages deploys on pushes to `main` and `development`. The stable site is served at `https://blazeplot.cervelli.dev/`; stable previews are at `https://blazeplot.cervelli.dev/previews`; the in-progress `development` site is served at `https://blazeplot.cervelli.dev/development/`; integrated development previews live under `/development/previews`.
+- Releases are merge-to-main based. Do not use tag-push/manual release scripts.
+- To prepare a release PR:
+  1. Start on updated `development`.
+  2. Run `bun run version:patch` (or `version:minor` / `version:major`) to bump `package.json` and create `changelogs/vX.Y.Z.md`.
+  3. Edit the changelog notes.
+  4. Run `bun run release:benchmarks` so benchmark tables are included in the version markdown. The release workflow also runs this with `--if-missing` before publishing.
+  5. Run `bun run docs:readme` so the README changelog link points at the new version.
+  6. Run `bun run ci`, and ideally `bun run pages:build` and `bun pm pack --dry-run`.
+  7. Push `development`, open a PR to `main`, wait for `validate`, then merge.
+- Merging an unpublished `package.json` version to `main` runs the release workflow: CI, benchmark-result insertion if missing, package pack, npm publish, `vX.Y.Z` tag creation, and GitHub Release creation from `changelogs/vX.Y.Z.md` plus commits.
+- If the `vX.Y.Z` tag already exists, the release workflow skips publishing for that version.
+
+## Project Shape
+
+- Public API exports live in `src/index.ts`.
+- npm package output includes the core `dist/index.js` / `dist/index.d.ts` plus separate subpath chunks/declarations for `react`, `linked`, `export`, and built-in plugins; package metadata points `exports`, `main`, `module`, and `types` at `dist/`.
+- `website/` is the docs/previews app served by `bun run dev` and built by `bun run pages:build`. Shared website preview data helpers live in `website/src/`.
+- `tests/browser/` contains the Vite-served benchmark, visual, and interaction fixture pages used by `bun run bench:ci`, `bun run test:visual`, and `bun run test:interaction`. `bun run legacy-preview:dev` serves this fixture root for debugging.
+- `src/core/` is the data engine and should not depend on UI, DOM, or GPU code.
+- `src/render/` owns the GPU abstraction and the native WebGL2 implementation.
+- `src/interaction/` owns `Camera2D`, tick helpers, and viewport policy/intent types; interaction mutates the camera, not series data.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [Federicocervelli/blazeplot](https://github.com/Federicocervelli/blazeplot) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-22 -->
