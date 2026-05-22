@@ -1,65 +1,77 @@
 ---
 trigger: always_on
-description: Standard pattern for integrating Givebutter donation widgets with popup modal functionality in Next.js applications
+description: This rule defines the section shown **directly under the hero** on the home page when there is a **future** event marked as **featured** (`isFeaturedEvent`) and that event has at least one media file marked as **featured event image** (`isFeaturedEventImage`). The section displays a **single image** (no rotation/carousel) with the same "Buy ticket click here" / "Fundraiser ticket click here" overlay at the **bottom right** as the hero section.
 ---
 
-
-# Givebutter Widget Integration Pattern
+# Featured Event Banner Section (Under Hero)
 
 ## **Overview**
-This rule defines the standard pattern for integrating Givebutter donation widgets into Next.js applications, specifically for creating donate buttons that open popup modals with donation forms. This pattern addresses X-Frame-Options restrictions and provides reliable popup functionality across desktop and mobile devices.
+This rule defines the section shown **directly under the hero** on the home page when there is a **future** event marked as **featured** (`isFeaturedEvent`) and that event has at least one media file marked as **featured event image** (`isFeaturedEventImage`). The section displays a **single image** (no rotation/carousel) with the same "Buy ticket click here" / "Fundraiser ticket click here" overlay at the **bottom right** as the hero section.
 
 ## **Problem Solved**
-- **X-Frame-Options Restriction**: Givebutter sets `X-Frame-Options: sameorigin`, preventing iframe embedding from other domains
-- **Popup/New Tab Functionality**: Donate button opens the full campaign page in a popup (desktop) or new tab (mobile), so dashboard settings (suggested amounts, **Other amount**, minimum donation) are visible
-- **Other Amount & Minimum**: The widget modal does not reliably show “Other” option or minimum donation from the dashboard; opening the full campaign URL ensures these options appear
-- **Cross-Platform Compatibility**: Works consistently on both desktop and mobile browsers
-- **Fallback**: If popup is blocked, opens campaign in new tab
+- **Single featured spotlight**: One prominent featured event image below the hero when criteria are met
+- **No looping**: Unlike the hero, this block shows one image only (no rotation)
+- **Same overlay behavior**: Reuses hero overlay logic (ticketed fundraiser → fundraiser image + donation checkout; regular ticketed → red "buy tickets" + checkout/manual-checkout)
+- **Conditional visibility**: Section is hidden when there is no qualifying featured event with featured event image
 
-## **Credentials and configuration from Givebutter dashboard**
+## **Display Criteria (All required)**
 
-To make the donate button (and optional widget script) work, you need the following from the Givebutter dashboard. **No API keys, Aadhaar, or other identity credentials are required in this application** for the home-page donate button.
+1. **Future event**: Event `startDate` is today or in the future (upcoming events from `useEventsData` already satisfy this).
+2. **Event-level flag**: Event has `isFeaturedEvent === true`.
+3. **Media-level flag**: Event has at least one media item with `isFeaturedEventImage === true`.
+4. **Image URL**: The chosen media has a valid `fileUrl`.
 
-| What you need | Where to get it in Givebutter | Where it’s used in the app | Required for donate button? |
-|---------------|-------------------------------|----------------------------|-----------------------------|
-| **Campaign ID** | Campaign URL: `https://givebutter.com/{CampaignID}` (e.g. `mhoZp0`). Or: open the campaign → Sharing → copy from campaign link or embed code. | Set in **`.env.local`** (and production env) as **`NEXT_PUBLIC_GIVEBUTTER_CAMPAIGN_ID`**. Read by `GivebutterDonateButton` and `GivebutterWidget`; optional `campaignId` prop overrides. Declared in `next.config.mjs` `env`. Builds URL: `https://givebutter.com/{campaignId}`. | **Yes** – without it the button would open the wrong or no campaign. |
-| **Widget ID** | Givebutter embed for **event fund** (not donation): e.g. `<givebutter-widget id="j1ek6j">`. Get the ID from the widget embed code in Givebutter. | Set in **`.env.local`** (and production env) as **`NEXT_PUBLIC_GIVEBUTTER_WIDGET_ID`** (e.g. `j1ek6j`). Used by event GiveButter checkout page (`/events/[id]/givebutter-checkout`): when the event’s `donation_metadata` has no `givebutterWidgetId`, the app falls back to this env. Declared in `next.config.mjs` `env`. | **No** for the home-page donate button. **Yes** for the event fund embed when you want a single global widget ID without storing it per event. |
-| **Account ID** | Dashboard → **Campaign** → **Sharing** → **Widgets** → **Installation**. Shown in the script snippet as `acct=...` (e.g. `mKoUpYQebNsn6RqA`). | `src/app/layout.tsx`: Givebutter script `src="...?acct={AccountID}&p=other"`. | **No** for the donate button (button only opens the campaign URL). **Yes** if you use Givebutter embed widgets (e.g. `givebutter-form`, `givebutter-button`) elsewhere. |
-| **Webhook URL** | Not “brought” into the app; you **configure** in Givebutter: Campaign or Account → Integrations / Webhooks → add endpoint. Set URL to your app’s route, e.g. `https://your-domain.com/api/webhooks/givebutter`. | Givebutter sends donation events to this URL. App route: `src/app/api/webhooks/givebutter/route.ts` (forwards to backend). | No – only needed if you want server-side handling of donation events. |
-| **Webhook signing secret** | Givebutter dashboard: when you add the webhook, Givebutter shows or lets you copy a **signing secret**. | Stored and used by the **backend** (not in Next.js env) to verify `X-Givebutter-Signature`. Backend matches secret per tenant in `payment_provider_config`. | No – backend only; not needed for the button to open. |
-
-**Summary for the home-page donate button only:**
-
-1. **Campaign ID** – Get from the campaign’s Givebutter URL or Sharing/Widgets. Put it in the app as:
-   - **Option A:** Pass `campaignId` to `<GivebutterDonateButton campaignId="mhoZp0" />` (e.g. in `HeroSection.tsx`), or
-   - **Option B:** Set `NEXT_PUBLIC_GIVEBUTTER_CAMPAIGN_ID` in `.env.local` and use it in the component so the same env can be used in production.
-2. **Account ID** – Only if you use the widget script (e.g. for other Givebutter embeds). Put it in the script URL in `layout.tsx`: `acct=YOUR_ACCOUNT_ID`.
-
-**What is not needed in this app for the button:**
-
-- No Givebutter API key in the frontend (backend may use API for donation status if needed).
-- No Aadhaar or other identity credentials – Givebutter does not use Aadhaar for this integration.
-- No webhook secret in the Next.js app – the backend holds and verifies it.
+When all are satisfied, show the section; otherwise render nothing.
 
 ## **Core Pattern**
 
-### **1. Script Installation in Layout**
+### **Data source and selection**
+- Use `useFilteredEvents('featured')` to get events that have media with `isFeaturedEventImage === true`.
+- Filter results to events where `event.isFeaturedEvent === true`.
+- Sort by `event.featuredEventPriorityRanking` (ascending: lower number = higher priority).
+- Take the **first** item; use its `event` and first matching `media` (with `isFeaturedEventImage`).
+- If no item remains or media has no `fileUrl`, do not render the section.
 
-```tsx
-// ✅ DO: Add Givebutter script to root layout using Next.js Script component
-// src/app/layout.tsx
-import Script from "next/script";
+### **Single image (no rotation)**
+- Render **one** image: the featured event image (`media.fileUrl`).
+- No carousel, no automatic rotation, no multiple slides.
+- Image should be contained (e.g. `object-contain`, full width, auto height) and link to the event page (`/events/[id]`).
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <html>
-      <body>
-        {/* Other content */}
+### **Overlay (same as hero)**
+- Use the **same overlay logic and position** as the hero section:
+  - **Position**: Bottom right of the image (reuse `hero-ticket-overlay` class from `globals.css`).
+  - **Logic**: Use `getOverlayInfo(event)` from `@/lib/heroOverlay` (shared with `HeroSection`).
+  - **Behavior**:
+    - **Ticketed fundraiser**: Show fundraiser CTA image; link to `/events/[id]/givebutter-checkout`.
+    - **Regular ticketed**: Show red "Buy tickets" image; link to `/events/[id]/checkout` or `/events/[id]/manual-checkout` based on `manualPaymentEnabled` and `paymentFlowMode`.
+    - **Non-upcoming or non-ticketed**: No overlay (`getOverlayInfo` returns `null`).
+- **Overlay image sizes**: Match hero (e.g. `w-[140px] h-[48px] sm:w-[180px] sm:h-[62px] md:w-[200px] md:h-[70px]`).
 
-        {/* Givebutter Widget Script */}
-        <Script
+### **Placement**
+- Section is a **direct sibling below the hero** on the home page (e.g. after `<HeroSection />`, before the next content).
+- Only one such section; it shows at most one featured event image.
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+## **Implementation References**
+
+- **Component**: [`src/components/FeaturedEventBannerSection.tsx`](mdc:src/components/FeaturedEventBannerSection.tsx) – uses `useFilteredEvents('featured')`, filters by `isFeaturedEvent`, sorts by `featuredEventPriorityRanking`, renders one image + overlay.
+- **Overlay util**: [`src/lib/heroOverlay.ts`](mdc:src/lib/heroOverlay.ts) – `getOverlayInfo(event)` used by both hero and featured event banner.
+- **Hero overlay / rotation**: [hero_section_image_rotation.mdc](mdc:.cursor/rules/hero_section_image_rotation.mdc) – overlay logic and "Overlay Logic (Buy Tickets Click Here Image Pattern)".
+- **Home page**: [`src/app/page.tsx`](mdc:src/app/page.tsx) – `<FeaturedEventBannerSection />` rendered immediately after `<HeroSection />`.
+- **CSS**: `hero-ticket-overlay` in [`src/app/globals.css`](mdc:src/app/globals.css) – bottom-right positioning for the CTA.
+
+## **Best Practices**
+
+### **DO**
+- Reuse `getOverlayInfo` from `@/lib/heroOverlay` for overlay content and links.
+- Reuse `hero-ticket-overlay` class for overlay position and styling.
+- Restrict to events with `isFeaturedEvent === true` and media with `isFeaturedEventImage === true`.
+- Use a single image and a single event (first after sorting by `featuredEventPriorityRanking`).
+- Link the main image to the event page and the overlay to checkout/donation as per `getOverlayInfo`.
+
+### **DON'T**
+- Do not add rotation/carousel for this section.
+- Do not show the section when there is no qualifying featured event with featured event image.
+- Do not implement separate overlay logic; use the shared hero overlay util and CSS.
 
 ---
 > Source: [giventadevelop/md-strikers](https://github.com/giventadevelop/md-strikers) — distributed by [TomeVault](https://tomevault.io).
