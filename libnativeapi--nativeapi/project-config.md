@@ -1,88 +1,180 @@
 ---
 trigger: always_on
-description: Pattern for exposing platform-specific native handles from cross-platform wrappers
+description: PIMPL (Pointer to Implementation) pattern for platform-specific code
 ---
 
 
-# Native Object Provider Pattern Rules
+# PIMPL Pattern Rules
 
-Classes that wrap platform-specific objects inherit from [NativeObjectProvider](mdc:src/foundation/native_object_provider.h) to expose their underlying native handles. This enables advanced use cases where users need direct access to platform APIs while maintaining the cross-platform abstraction.
+The nativeapi library uses the PIMPL (Pointer to Implementation) idiom extensively to hide platform-specific implementation details from the public API. This provides binary compatibility, reduces compilation dependencies, and enables clean platform abstraction.
 
-## Purpose
+## What is PIMPL?
 
-The NativeObjectProvider pattern serves several purposes:
+PIMPL separates a class's interface from its implementation by:
+1. Declaring a private nested `Impl` class in the header
+2. Storing only a pointer to the implementation
+3. Implementing platform-specific logic in the source files
 
-1. **Escape Hatch** - Allows access to native APIs not wrapped by the library
-2. **Interop** - Enables integration with other libraries expecting native handles
-3. **Advanced Features** - Supports platform-specific functionality
-4. **Type Safety** - Returns `void*` for cross-platform compatibility
-5. **Encapsulation** - Keeps implementation details hidden until explicitly requested
+## Pattern Structure
 
-## Base Class Structure
-
-### Header ([foundation/native_object_provider.h](mdc:src/foundation/native_object_provider.h))
+### Header File Pattern ([window.h](mdc:src/window.h))
 
 ```cpp
 #pragma once
+#include <memory>
 
 namespace nativeapi {
 
-class NativeObjectProvider {
+class Window {
 public:
-    virtual ~NativeObjectProvider() = default;
-    
-    /**
-     * Get the native platform-specific object.
-     * 
-     * Platform-specific return types:
-     * - macOS: NSWindow*, NSMenu*, NSMenuItem*, NSView*, etc.
-     * - Windows: HWND, HMENU, etc.
-     * - Linux: GtkWidget*, GtkMenu*, GdkWindow*, etc.
-     */
-    void* GetNativeObject() const {
-        return GetNativeObjectInternal();
-    }
+    Window();
+    Window(void* native_window);
+    virtual ~Window();
 
-protected:
-    /**
-     * Derived classes must implement this to return their native object.
-     */
-    virtual void* GetNativeObjectInternal() const = 0;
+    // Public interface methods
+    void Show();
+    void Hide();
+    bool IsVisible() const;
+
+private:
+    // Forward declaration only - no definition
+    class Impl;
+
+    // Pointer to implementation
+    std::unique_ptr<Impl> pimpl_;
 };
 
 }  // namespace nativeapi
 ```
 
-## Implementing NativeObjectProvider
+**Key Points:**
+- Forward declare `Impl` class - don't define it in header
+- Use `std::unique_ptr<Impl>` for automatic cleanup
+- No platform-specific includes in header
+- No platform-specific types in public interface
 
-### Pattern for Classes
+### Platform-Specific Implementation Files
 
-All classes wrapping native objects should:
+Each platform provides its own `Impl` definition:
 
-1. Inherit from `NativeObjectProvider`
-2. Implement `GetNativeObjectInternal()` protected method
-3. Return platform-specific handle as `void*`
-
-### Example: Window Class
-
-#### Header ([window.h](mdc:src/window.h))
+#### Windows Implementation ([platform/windows/window_windows.cpp](mdc:src/platform/windows))
 
 ```cpp
-#pragma once
-#include "foundation/native_object_provider.h"
+#include <windows.h>  // Platform includes only in .cpp
+#include "../../window.h"
 
 namespace nativeapi {
 
-class Window : public NativeObjectProvider {
+// Define Impl class with platform-specific members
+class Window::Impl {
 public:
-    Window();
-    Window(void* native_window);
-    virtual ~Window();
-    
-    // ... public API methods ...
+    Impl(HWND hwnd) : hwnd_(hwnd) {}
 
-protected:
-    void* GetNativeObjectInternal() const override;
+    HWND hwnd_;  // Windows-specific handle
+    // Other Windows-specific state...
+};
+
+Window::Window() : pimpl_(std::make_unique<Impl>(nullptr)) {}
+
+Window::Window(void* window)
+    : pimpl_(std::make_unique<Impl>(static_cast<HWND>(window))) {}
+
+Window::~Window() = default;  // unique_ptr handles cleanup
+
+void Window::Show() {
+    if (pimpl_->hwnd_) {
+        ShowWindow(pimpl_->hwnd_, SW_SHOW);
+    }
+}
+
+}  // namespace nativeapi
+```
+
+#### macOS Implementation ([platform/macos/window_macos.mm](mdc:src/platform/macos))
+
+```objc
+#import <Cocoa/Cocoa.h>  // Platform includes only in .mm
+#include "../../window.h"
+
+namespace nativeapi {
+
+// Define Impl class with macOS-specific members
+class Window::Impl {
+public:
+    Impl(NSWindow* window) : window_(window) {}
+
+    NSWindow* window_;  // macOS-specific handle
+    // Other macOS-specific state...
+};
+
+Window::Window() : pimpl_(std::make_unique<Impl>(nil)) {}
+
+Window::Window(void* window)
+    : pimpl_(std::make_unique<Impl>(static_cast<NSWindow*>(window))) {}
+
+Window::~Window() = default;
+
+void Window::Show() {
+    if (pimpl_->window_) {
+        [pimpl_->window_ makeKeyAndOrderFront:nil];
+    }
+}
+
+}  // namespace nativeapi
+```
+
+#### Linux Implementation ([platform/linux/window_linux.cpp](mdc:src/platform/linux))
+
+```cpp
+#include <gtk/gtk.h>  // Platform includes only in .cpp
+#include "../../window.h"
+
+namespace nativeapi {
+
+// Define Impl class with GTK-specific members
+class Window::Impl {
+public:
+    Impl(GtkWidget* window) : window_(window) {}
+
+    GtkWidget* window_;  // GTK-specific handle
+    // Other GTK-specific state...
+};
+
+Window::Window() : pimpl_(std::make_unique<Impl>(nullptr)) {}
+
+Window::Window(void* window)
+    : pimpl_(std::make_unique<Impl>(static_cast<GtkWidget*>(window))) {}
+
+Window::~Window() = default;
+
+void Window::Show() {
+    if (pimpl_->window_) {
+        gtk_widget_show(pimpl_->window_);
+    }
+}
+
+}  // namespace nativeapi
+```
+
+## Implementation Guidelines
+
+### 1. Creating a New PIMPL Class
+
+When adding a new cross-platform class:
+
+```cpp
+// my_class.h
+#pragma once
+#include <memory>
+
+namespace nativeapi {
+
+class MyClass {
+public:
+    MyClass();
+    virtual ~MyClass();
+
+    void DoSomething();
 
 private:
     class Impl;
@@ -92,126 +184,58 @@ private:
 }  // namespace nativeapi
 ```
 
-#### Platform Implementations
+Then create implementations for each platform:
+- `src/platform/windows/my_class_windows.cpp`
+- `src/platform/macos/my_class_macos.mm`
+- `src/platform/linux/my_class_linux.cpp`
 
-##### Windows ([platform/windows/window_windows.cpp](mdc:src/platform/windows))
+### 2. Accessing Platform State
+
+Always access platform-specific members through `pimpl_`:
 
 ```cpp
-#include <windows.h>
-#include "../../window.h"
-
-namespace nativeapi {
-
-class Window::Impl {
-public:
-    HWND hwnd_;
-};
-
-void* Window::GetNativeObjectInternal() const {
-    // Cast HWND to void*
-    return static_cast<void*>(pimpl_->hwnd_);
+// Good
+void Window::SetTitle(const std::string& title) {
+    if (pimpl_->hwnd_) {  // Access through pimpl_
+        SetWindowTextW(pimpl_->hwnd_, ...);
+    }
 }
 
-}  // namespace nativeapi
+// Bad - won't compile, hwnd_ not in public interface
+void Window::SetTitle(const std::string& title) {
+    if (hwnd_) {  // Error: no member named 'hwnd_'
+        ...
+    }
+}
 ```
 
-##### macOS ([platform/macos/window_macos.mm](mdc:src/platform/macos))
+### 3. Constructor/Destructor Pattern
 
-```objc
-#import <Cocoa/Cocoa.h>
-#include "../../window.h"
+Follow this pattern for all PIMPL classes:
 
-namespace nativeapi {
-
-class Window::Impl {
+```cpp
+// Header
+class MyClass {
 public:
-    NSWindow* window_;
+    MyClass();
+    virtual ~MyClass();  // Virtual if used as base class
+
+    // Copy/move operations - handle appropriately
+    MyClass(const MyClass&) = delete;
+    MyClass& operator=(const MyClass&) = delete;
+
+private:
+    class Impl;
+    std::unique_ptr<Impl> pimpl_;
 };
 
-void* Window::GetNativeObjectInternal() const {
-    // Cast NSWindow* to void*
-    return static_cast<void*>(pimpl_->window_);
-}
-
-}  // namespace nativeapi
+// Implementation
+MyClass::MyClass() : pimpl_(std::make_unique<Impl>()) {}
+MyClass::~MyClass() = default;  // unique_ptr handles cleanup
 ```
 
-##### Linux ([platform/linux/window_linux.cpp](mdc:src/platform/linux))
+#### Constructor Delegation Pattern
 
-```cpp
-#include <gtk/gtk.h>
-#include "../../window.h"
-
-namespace nativeapi {
-
-class Window::Impl {
-public:
-    GtkWidget* window_;
-};
-
-void* Window::GetNativeObjectInternal() const {
-    // Cast GtkWidget* to void*
-    return static_cast<void*>(pimpl_->window_);
-}
-
-}  // namespace nativeapi
-```
-
-## Using Native Objects
-
-### Cross-Platform Usage
-
-Users can access native objects when they need platform-specific functionality. Since platform-specific implementations are separated into `/platform/{windows|macos|linux}` directories, users should cast the native handle to the appropriate platform-specific type:
-
-```cpp
-#include <nativeapi.h>
-
-using namespace nativeapi;
-
-auto& manager = WindowManager::GetInstance();
-auto window = manager.Create(options);
-
-// Get native handle
-void* native = window->GetNativeObject();
-
-// Cast to platform-specific type
-// Windows: HWND
-// macOS: NSWindow*
-// Linux: GtkWidget* (GtkWindow)
-```
-
-### Platform-Specific Usage Examples
-
-#### Windows Implementation
-```cpp
-// In Windows-specific code
-HWND hwnd = static_cast<HWND>(window->GetNativeObject());
-SetWindowLongPtr(hwnd, GWL_EXSTYLE, WS_EX_LAYERED);
-```
-
-#### macOS Implementation
-```objc
-// In macOS-specific code
-NSWindow* nswindow = static_cast<NSWindow*>(window->GetNativeObject());
-[nswindow setCollectionBehavior:NSWindowCollectionBehaviorFullScreenPrimary];
-```
-
-#### Linux Implementation
-```cpp
-// In Linux-specific code
-GtkWidget* gtkwindow = static_cast<GtkWidget*>(window->GetNativeObject());
-gtk_window_set_keep_above(GTK_WINDOW(gtkwindow), TRUE);
-```
-
-## Classes Using NativeObjectProvider
-
-The following classes inherit from NativeObjectProvider:
-
-| Class | Native Type (Windows) | Native Type (macOS) | Native Type (Linux) |
-|-------|----------------------|---------------------|---------------------|
-| [Window](mdc:src/window.h) | `HWND` | `NSWindow*` | `GtkWidget*` (GtkWindow) |
-| [Display](mdc:src/display.h) | `HMONITOR` | `NSScreen*` | `GdkDisplay*` / `GdkMonitor*` |
-| [Menu](mdc:src/menu.h) | `HMENU` | `NSMenu*` | `GtkWidget*` (GtkMenu) |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
