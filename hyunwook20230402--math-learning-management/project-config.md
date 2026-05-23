@@ -1,221 +1,232 @@
 ---
 trigger: always_on
-description: - **NEVER** use `user.id` (Supabase Auth) as foreign key
+description: - **Node.js**: Version 18 or higher
 ---
 
-# 🗄️ Database & API Guidelines
+# 🛠️ Development Workflow & Tooling
 
-## Database Architecture Rules
+## Development Environment
 
-### ID Usage (CRITICAL)
-- **NEVER** use `user.id` (Supabase Auth) as foreign key
-- **ALWAYS** use `profile.id` for all foreign key references
-- **ALWAYS** fetch profile first, then use `profile.id` for database operations
+### Required Tools
+- **Node.js**: Version 18 or higher
+- **npm**: Package manager
+- **Supabase CLI**: For database management
+- **Git**: Version control
 
-```typescript
-// ✅ CORRECT: Get profile.id first
-const { data: { user } } = await supabase.auth.getUser();
-const { data: profile } = await supabase
-  .from('profiles')
-  .select('id')
-  .eq('user_id', user.id)
-  .single();
+### Project Setup
+```bash
+# Install dependencies
+npm install
 
-const problemData = {
-  teacher_id: profile.id, // ✅ Use profile.id
-  title: 'Problem Title'
-};
+# Start development server
+npm run dev
 
-// ❌ WRONG: Using user.id directly
-const problemData = {
-  teacher_id: user.id, // ❌ Foreign key constraint violation
-  title: 'Problem Title'
-};
+# Build for production
+npm run build
+
+# Preview production build
+npm run preview
+
+# Run linting
+npm run lint
 ```
 
-### Database Schema Understanding
+## Code Quality Tools
 
-#### Core Tables
-```sql
-profiles (id, user_id, name, role, email)
-├── problems (id, teacher_id, title, difficulty, category, unit)
-├── problem_sets (id, teacher_id, name, description)
-│   └── problem_set_items (problem_set_id, problem_id)
-├── distributions (id, teacher_id, problem_set_id, due_date)
-│   └── distribution_students (distribution_id, student_id)
-├── student_answers (id, student_id, problem_id, answer, is_correct)
-└── wrong_answers (id, student_id, problem_id, attempts)
+### ESLint Configuration
+- **TypeScript Support**: Full TypeScript integration
+- **React Hooks**: Enforces rules of hooks
+- **React Refresh**: Hot reload optimization
+- **Custom Rules**: Disabled unused vars for development flexibility
+
+### TypeScript Configuration
+```json
+{
+  "strictNullChecks": false,    // Relaxed for development
+  "noImplicitAny": false,       // Allow implicit any
+  "allowJs": true,              // Allow JavaScript files
+  "skipLibCheck": true,         // Skip library type checking
+  "noUnusedLocals": false,      // Allow unused locals
+  "noUnusedParameters": false   // Allow unused parameters
+}
 ```
 
-#### Key Relationships
-- **Teacher-Student**: Through `distributions` and `distribution_students`
-- **Problem-Set**: Many-to-many through `problem_set_items`
-- **Student-Answer**: One-to-many for tracking attempts
+## Build System
 
-## API Service Patterns
+### Vite Configuration
+- **Development Server**: Runs on port 8080
+- **Hot Module Replacement**: Fast development experience
+- **Path Aliases**: `@/` maps to `src/`
+- **SWC Compilation**: Fast TypeScript compilation
 
-### Standard API Structure
+### Build Optimization
 ```typescript
-export const domainApi = {
-  // GET operations
-  getItems: async (filters?: FilterType): Promise<ItemType[]> => {
-    const { data, error } = await supabase
-      .from('table_name')
-      .select('*')
-      .eq('field', value);
-    
-    if (error) throw error;
-    return data || [];
+// Vite config optimizations
+export default defineConfig({
+  server: {
+    host: "::",    // Allow external connections
+    port: 8080,    // Consistent port
   },
-
-  // CREATE operations
-  createItem: async (itemData: CreateItemType): Promise<ItemType> => {
-    const { data, error } = await supabase
-      .from('table_name')
-      .insert(itemData)
-      .select()
-      .single();
-    
-    if (error) throw error;
-    return data;
-  },
-
-  // UPDATE operations
-  updateItem: async (id: string, updates: UpdateItemType): Promise<ItemType> => {
-    const { data, error } = await supabase
-      .from('table_name')
-      .update(updates)
-      .eq('id', id)
-      .select()
-      .single();
-    
-    if (error) throw error;
-    return data;
-  },
-
-  // DELETE operations
-  deleteItem: async (id: string): Promise<void> => {
-    const { error } = await supabase
-      .from('table_name')
-      .delete()
-      .eq('id', id);
-    
-    if (error) throw error;
-  }
-};
-```
-
-### Error Handling Patterns
-```typescript
-// Always include comprehensive error handling
-const apiCall = async () => {
-  try {
-    console.log('Starting API call...');
-    const result = await supabase.from('table').select('*');
-    
-    if (result.error) {
-      console.error('Database error:', result.error);
-      throw new Error(`Database operation failed: ${result.error.message}`);
+  plugins: [
+    react(),       // React support
+    componentTagger() // Development tooling
+  ],
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "./src") // Path aliases
     }
-    
-    console.log('API call successful:', result.data);
-    return result.data;
-  } catch (error) {
-    console.error('API call failed:', error);
-    throw error;
   }
-};
+});
 ```
 
-## Data Validation
+## Version Control
 
-### Input Validation
+### Git Workflow
+```bash
+# Version management scripts
+npm run version:patch    # Patch version (1.0.0 → 1.0.1)
+npm run version:minor    # Minor version (1.0.0 → 1.1.0)
+npm run version:major    # Major version (1.0.0 → 2.0.0)
+npm run release         # Build and patch version
+```
+
+### Commit Guidelines
+- **Conventional Commits**: Use standard commit message format
+- **Descriptive Messages**: Clear description of changes
+- **Atomic Commits**: One logical change per commit
+
+## Database Management
+
+### Supabase Integration
+```bash
+# Supabase CLI commands
+supabase login                    # Login to Supabase
+supabase link --project-ref <ref> # Link to project
+supabase db push                  # Apply migrations
+supabase gen types typescript     # Generate TypeScript types
+```
+
+### Migration Management
+- **Migration Files**: Located in `supabase/migrations/`
+- **Naming Convention**: `YYYYMMDDHHMMSS_description.sql`
+- **Version Control**: All migrations tracked in Git
+
+## Development Best Practices
+
+### Hot Reload Optimization
 ```typescript
-// Use Zod for schema validation
-import { z } from 'zod';
-
-const problemSchema = z.object({
-  title: z.string().min(1, 'Title is required'),
-  difficulty: z.number().min(1).max(5),
-  category: z.string().min(1, 'Category is required'),
-  unit: z.string().min(1, 'Unit is required')
+// Use React.memo for expensive components
+const ExpensiveComponent = React.memo(() => {
+  // Component logic
 });
 
-// Validate before API calls
-const createProblem = async (data: unknown) => {
-  const validatedData = problemSchema.parse(data);
-  return await problemApi.createProblem(validatedData);
+// Use useCallback for stable references
+const handleClick = useCallback(() => {
+  // Handler logic
+}, [dependencies]);
+```
+
+### Development Debugging
+```typescript
+// Consistent logging format
+console.log('Component mounted:', componentName);
+console.log('API call:', { endpoint, params });
+console.error('Error occurred:', { error, context });
+
+// Development-only code
+if (process.env.NODE_ENV === 'development') {
+  console.log('Debug info:', debugData);
+}
+```
+
+## Environment Configuration
+
+### Environment Variables
+```typescript
+// Supabase configuration
+const SUPABASE_URL = "https://grukqugorspbwsxqdhru.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...";
+
+// Development vs Production
+const isDevelopment = process.env.NODE_ENV === 'development';
+const isProduction = process.env.NODE_ENV === 'production';
+```
+
+### Build Modes
+```bash
+# Development build
+npm run build:dev
+
+# Production build
+npm run build
+
+# Preview build
+npm run preview
+```
+
+## Testing Strategy
+
+### Component Testing
+- **Unit Tests**: Test individual components
+- **Integration Tests**: Test component interactions
+- **E2E Tests**: Test complete user workflows
+
+### API Testing
+```typescript
+// Test API functions
+const testApiCall = async () => {
+  try {
+    const result = await api.getData();
+    expect(result).toBeDefined();
+  } catch (error) {
+    fail('API call should not throw error');
+  }
 };
 ```
 
-### Type Safety
-```typescript
-// Define clear interfaces for database operations
-interface CreateProblemData {
-  teacher_id: string;
-  title: string;
-  problem_number: number;
-  difficulty: number;
-  category: string;
-  unit: string;
-  answer_type: 'multiple_choice' | 'short_answer';
-  correct_answer: string;
-  choices?: string[];
-  explanation?: string;
-  image_url?: string;
-  explanation_image_url?: string;
-}
+## Performance Monitoring
 
-interface Problem extends CreateProblemData {
-  id: string;
-  created_at: string;
-  updated_at: string;
-}
+### Bundle Analysis
+```bash
+# Analyze bundle size
+npm run build
+npx vite-bundle-analyzer dist
 ```
 
-## Query Optimization
+### Performance Metrics
+- **First Contentful Paint**: Measure initial load time
+- **Largest Contentful Paint**: Measure main content load
+- **Cumulative Layout Shift**: Measure visual stability
 
-### Efficient Queries
-```typescript
-// Use specific select statements
-const { data } = await supabase
-  .from('problems')
-  .select('id, title, difficulty, category') // Only select needed fields
-  .eq('teacher_id', profileId)
-  .order('created_at', { ascending: false })
-  .limit(20);
+## Deployment
 
-// Use joins for related data
-const { data } = await supabase
-  .from('problem_sets')
-  .select(`
-    *,
-    problems:problem_set_items(
-      problem:problems(*)
-    )
-  `)
-  .eq('teacher_id', profileId);
+### Production Build
+```bash
+# Create optimized production build
+npm run build
+
+# Preview production build locally
+npm run preview
 ```
 
-### Pagination
+### Deployment Checklist
+- [ ] All tests passing
+- [ ] Build successful
+- [ ] Environment variables configured
+- [ ] Database migrations applied
+- [ ] Performance metrics acceptable
+
+## Troubleshooting
+
+### Common Issues
+1. **Build Failures**: Check TypeScript errors and dependencies
+2. **Hot Reload Issues**: Restart development server
+3. **Database Connection**: Verify Supabase credentials
+4. **Import Errors**: Check path aliases and file extensions
+
+### Debug Tools
 ```typescript
-// Implement pagination for large datasets
-const getProblemsPaginated = async (
-  page: number = 1, 
-  pageSize: number = 20
-) => {
-  const from = (page - 1) * pageSize;
-  const to = from + pageSize - 1;
-  
-  const { data, error, count } = await supabase
-    .from('problems')
-    .select('*', { count: 'exact' })
-    .range(from, to)
-    .order('created_at', { ascending: false });
-  
-  return {
-    data: data || [],
-    totalCount: count || 0,
+// React Developer Tools
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
