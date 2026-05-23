@@ -7,14 +7,14 @@ My personal Claude Code and OpenAI Codex setup with battle-tested skills, plugin
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `GEMINI.md` in [fcakyon/claude-codex-settings](https://github.com/fcakyon/claude-codex-settings).
+Original source: `AGENTS.md` in [fcakyon/claude-codex-settings](https://github.com/fcakyon/claude-codex-settings).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
+- **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
 From [fcakyon/claude-codex-settings](https://github.com/fcakyon/claude-codex-settings) — a repo with 663+ stars on GitHub.
