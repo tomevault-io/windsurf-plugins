@@ -7,11 +7,11 @@ Hinbox is a flexible, domain-configurable entity extraction system designed for 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [strickvl/hinbox](https://github.com/strickvl/hinbox).
+Original source: `CLAUDE.md` in [strickvl/hinbox](https://github.com/strickvl/hinbox).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
