@@ -1,59 +1,91 @@
 ---
 trigger: always_on
-description: description: JAXgarden tutorial chapter on Rotary Position Embeddings (RoPE) for injecting relative positional information in attention.
+description: description: Tutorial chapter for the jaxgarden Tokenizer, detailing text encoding/decoding and chat templating for JAX.
 ---
 
 ---
-description: JAXgarden tutorial chapter on Rotary Position Embeddings (RoPE) for injecting relative positional information in attention.
+description: Tutorial chapter for the jaxgarden Tokenizer, detailing text encoding/decoding and chat templating for JAX.
 globs: 
 alwaysApply: false
 ---
-# Chapter 8: Rotary Position Embeddings (RoPE)
+# Chapter 1: Tokenizer
 
-In the [previous chapter](attention_mechanism__multiheadattention___dot_product_attention_.mdc), we explored the core `MultiHeadAttention` mechanism and its efficient backend implementations. However, standard self-attention is permutation-invariant, meaning it doesn't inherently understand the order of tokens in a sequence. To address this, models need positional information. This chapter introduces Rotary Position Embeddings (RoPE), a clever technique for incorporating relative position information directly into the attention mechanism.
+Welcome to the `jaxgarden` library tutorial! This first chapter introduces the `Tokenizer` class, a fundamental component for processing text data within JAX-based Natural Language Processing (NLP) models.
 
-**Motivation:** Traditional methods for adding positional information include adding learned absolute position embeddings or fixed sinusoidal embeddings to the input token embeddings. While effective, these methods add extra parameters (learned embeddings) or modify the input representation before the transformer layers. RoPE offers an alternative by *rotating* the query and key vectors based on their absolute positions *before* the dot-product calculation in the attention mechanism. This rotation is designed such that the dot product between a rotated query and a rotated key naturally depends on their relative positions, effectively injecting relative positional awareness directly into the attention scores without adding separate embedding vectors.
+**Motivation:** Deep learning models, especially those built with JAX, operate on numerical tensors. Raw text needs to be converted into a numerical format (token IDs) that models can understand, and conversely, model outputs (token IDs) need to be converted back into human-readable text. Furthermore, different models, particularly instruction-tuned ones, expect conversational inputs to be formatted in specific ways (chat templates). The Hugging Face `tokenizers` library is excellent for this, but its outputs are standard Python lists. `jaxgarden.Tokenizer` wraps this library to provide a seamless experience for JAX users, returning `jax.numpy.ndarray` (jnp arrays) directly and integrating features like chat templating.
 
-**Central Use Case:** Applying RoPE within the attention modules of models like [LlamaForCausalLM](llamaforcausallm.mdc) (`LlamaAttention`) or [ModernBERTForMaskedLM](modernbertformaskedlm.mdc) (`ModernBertAttention`). RoPE modifies the query and key vectors just before their dot product, enabling the attention mechanism to weigh interactions based on how far apart tokens are in the sequence.
+**Central Use Case:** Preparing text input for a JAX-based language model like [LlamaForCausalLM](llamaforcausallm.mdc) and decoding its generated token IDs. For conversational models, formatting user prompts and conversation history according to the model's specific chat template is crucial.
 
 ## Key Concepts
 
-1.  **Core Idea:** RoPE operates by viewing pairs of features in the query and key vectors as complex numbers and rotating them in the complex plane. The angle of rotation depends on the token's absolute position (`m`) and the feature index (`i`). When computing the dot product between a rotated query (at position `m`) and a rotated key (at position `n`), the resulting score implicitly depends on their relative distance (`m - n`).
-2.  **Mathematical Basis:** The rotation is achieved using sinusoidal functions derived from the position index (`m`) and the feature dimension (`d`). Specifically, frequencies (`theta_i`) are calculated based on the feature index `i` and a base value (`base`, often 10000 or larger). The rotation involves multiplying elements by `cos(m * theta_i)` and `sin(m * theta_i)`.
-3.  **Implementation Variations:** `jaxgarden` provides two main implementations reflecting common practices:
-    *   **`LlamaRotaryEmbedding`:** Used in [LlamaForCausalLM](llamaforcausallm.mdc). It calculates the `cos` and `sin` values *on-the-fly* based on the input `position_ids`. This is flexible for varying sequence lengths during generation.
-    *   **`RoPEPositionalEmbedding`:** Used in [ModernBERTForMaskedLM](modernbertformaskedlm.mdc). It *pre-computes* and caches the `cos` and `sin` values for positions up to a specified `max_position_embeddings` during initialization. This can be more efficient if the maximum sequence length is known and fixed, as it replaces calculation with lookup.
-4.  **Application Point:** RoPE is applied to the query and key vectors *after* their initial linear projections (`Wq`, `Wk`) but *before* the dot-product attention score calculation (`QK^T`). This modification is typically encapsulated within a helper function (e.g., `apply_rotary_pos_emb`) called by the attention module.
+The `jaxgarden.Tokenizer` provides several core functionalities:
 
-## Using RoPE
+1.  **Loading:** Instantiating a tokenizer from pre-trained configurations stored on the Hugging Face Hub or locally.
+2.  **Encoding:** Converting text strings into sequences of token IDs, handling padding and truncation, and returning JAX arrays.
+3.  **Decoding:** Converting sequences of token IDs back into text strings.
+4.  **Special Token Management:** Automatically identifying or allowing specification of crucial tokens like Beginning-of-Sequence (BOS), End-of-Sequence (EOS), and Padding (PAD).
+5.  **Chat Templating:** Applying Jinja-based templates to format conversational data for instruction-tuned models.
 
-RoPE is generally an internal component of attention modules. You typically don't interact with `LlamaRotaryEmbedding` or `RoPEPositionalEmbedding` directly unless implementing a custom attention layer. Instead, you configure the model (via its `Config` object) which implicitly configures the RoPE within its attention layers.
+## Using the Tokenizer
 
-**Example 1: RoPE within `LlamaAttention`**
+Let's explore how to use the `Tokenizer`.
 
-The `LlamaAttention` module internally instantiates `LlamaRotaryEmbedding` and uses it within its `__call__` method.
+### Loading a Tokenizer
+
+The primary way to get a `Tokenizer` instance is using the `from_pretrained` class method. You provide a model identifier from the Hugging Face Hub (e.g., `"gpt2"`, `"meta-llama/Llama-2-7b-chat-hf"`) or a path to a local directory containing `tokenizer.json` and optionally `tokenizer_config.json`.
 
 ```python
-# Inside LlamaAttention initialization (__init__)
-# config values like head_dim and rope_theta are passed
-self.rotary_emb = LlamaRotaryEmbedding(
-    dim=config.head_dim,
-    base=config.rope_theta,
-    rngs=rngs
+# Assuming jaxgarden is installed
+from jaxgarden.tokenization import Tokenizer
+
+# Load from Hugging Face Hub
+tokenizer = Tokenizer.from_pretrained("gpt2")
+
+# Example: Load from a local directory (if you have one)
+# tokenizer_local = Tokenizer.from_pretrained("./path/to/local_tokenizer_files")
+
+print(f"Loaded tokenizer for 'gpt2' with vocab size: {tokenizer.vocab_size}")
+print(f"Pad token: {tokenizer.pad_token}, ID: {tokenizer.pad_token_id}")
+print(f"BOS token: {tokenizer.bos_token}, ID: {tokenizer.bos_token_id}")
+print(f"EOS token: {tokenizer.eos_token}, ID: {tokenizer.eos_token_id}")
+```
+
+**Explanation:** `from_pretrained` downloads necessary files (`tokenizer.json`, `tokenizer_config.json`) from the Hub or reads them locally. It then instantiates the underlying Hugging Face `tokenizers.Tokenizer` and extracts configuration like special tokens and chat templates (if available in `tokenizer_config.json`). The `jaxgarden.Tokenizer` wrapper uses this information to set its own attributes like `pad_token_id`, `bos_token_id`, etc.
+
+### Encoding Text
+
+The `encode` method converts text into token IDs. It offers options for handling batches, padding, and truncation, returning JAX arrays by default.
+
+```python
+import jax.numpy as jnp
+
+text = "Hello, world!"
+batch_text = ["First sequence.", "This is a second sequence."]
+
+# Basic encoding
+encoded_single = tokenizer.encode(text)
+print("Encoded Single:", encoded_single)
+# Output: Encoded Single: {'input_ids': DeviceArray([[50256, 15496,  11,  1917,   25, 50256]], dtype=int32),
+#                       'attention_mask': DeviceArray([[1, 1, 1, 1, 1, 1]], dtype=int32)}
+
+# Encoding a batch with padding to the longest sequence
+encoded_batch = tokenizer.encode(batch_text, padding=True, add_special_tokens=False)
+print("Encoded Batch (padded):", encoded_batch)
+# Output: Encoded Batch (padded): {
+#  'input_ids': DeviceArray([[ 8285, 16337,    13, 50256, 50256, 50256],
+#                          [ 1212,   318,   257,  1144, 16337,    13]], dtype=int32),
+#  'attention_mask': DeviceArray([[1, 1, 1, 0, 0, 0], [1, 1, 1, 1, 1, 1]], dtype=int32) }
+
+
+# Encoding with truncation and padding to a max length
+encoded_truncated = tokenizer.encode(
+    batch_text, padding="max_length", truncation=True, max_length=5, add_special_tokens=False
 )
-
-# Inside LlamaAttention forward pass (__call__)
-def __call__(self, x, position_ids, attention_mask):
-    # ... project x to query, key, value ...
-    query = self.q_proj(x).reshape(...) # [batch, n_heads, seq_len, head_dim]
-    key = self.k_proj(x).reshape(...)   # [batch, n_kv_heads, seq_len, head_dim]
-    value = self.v_proj(x).reshape(...) # [batch, n_kv_heads, seq_len, head_dim]
-
-    # Calculate cos/sin on the fly (assuming batch_size=1 for simplicity here)
-    cos, sin = self.rotary_emb(position_ids[0])
-
-    # Apply RoPE rotation *before* attention calculation
-    query, key = self.apply_rotary_pos_emb(query, key, cos, sin)
+print("Encoded Batch (truncated/padded):", encoded_truncated)
+# Output: Encoded Batch (truncated/padded): {
+# 'input_ids': DeviceArray([[ 8285, 16337,    13, 50256, 50256],
+#                         [ 1212,   318,   257,  1144, 16337]], dtype=int32),
+# 'attention_mask': DeviceArray([[1, 1, 1, 0, 0], [1, 1, 1, 1, 1]], dtype=int32)}
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
