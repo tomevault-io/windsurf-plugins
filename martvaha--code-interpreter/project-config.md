@@ -1,13 +1,13 @@
 ---
 trigger: always_on
-description: Maintains consistent project organization and architecture
+description: Enforces Python best practices and coding standards
 ---
 
-- Keep models in app/models/
-- Business logic belongs in app/services/
-- Shared functionality in app/shared/
-- Utility functions in app/utils/
-- API routes in app/api/
+- Follow PEP 8 style guidelines
+- Use type hints for function parameters and return values
+- Document functions and classes using docstrings
+- Keep functions focused and single-purpose
+- Use meaningful variable and function names
 
 ---
 > Source: [martvaha/code-interpreter](https://github.com/martvaha/code-interpreter) — distributed by [TomeVault](https://tomevault.io).
