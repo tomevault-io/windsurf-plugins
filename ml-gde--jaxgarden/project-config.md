@@ -1,68 +1,67 @@
 ---
 trigger: always_on
-description: description: Guidelines for using jaxgarden
+description: description: Details the jaxgarden ModernBERTForMaskedLM model, a bidirectional encoder with RoPE, pre-LN, and mixed attention for MLM tasks.
 ---
 
 ---
-description: Guidelines for using jaxgarden
-globs: 
-alwaysApply: true
+description: Details the jaxgarden ModernBERTForMaskedLM model, a bidirectional encoder with RoPE, pre-LN, and mixed attention for MLM tasks.
+globs: jaxgarden/models/modernbert.py
+alwaysApply: false
 ---
-The `jaxgarden` project provides a library for building and utilizing neural network models, primarily focused on **Transformer architectures**, using *JAX* and *Flax NNX*. It establishes a structured framework through abstract base classes: `BaseModel` defines the core model interface, including state management (parameters, mutable states via `nnx.State`), checkpointing (*Serialization*) with Orbax, and a standardized mechanism for importing and converting weights from Hugging Face's *Safetensors* format. `BaseConfig` offers a consistent way to manage model hyperparameters (*Configuration Management*).
+# Chapter 6: ModernBERTForMaskedLM
 
-The library implements specific models like `LlamaForCausalLM` (a decoder-only model) and `ModernBERTForMaskedLM` (an encoder model), showcasing modern techniques. Key architectural components are modularized:
-- `Attention Mechanism`: Provides multi-head attention, potentially leveraging hardware acceleration like *Flash Attention* via cuDNN backend selection in `dot_product_attention`.
-- `Rotary Position Embeddings (RoPE)`: Implements relative position encoding within the attention mechanism itself, used by both Llama and ModernBERT variants.
+In the [previous chapter](generationmixin.mdc), we explored `GenerationMixin`, focusing on autoregressive text generation for causal language models. Now, we shift our focus to a different type of transformer architecture: a bidirectional encoder designed specifically for Masked Language Modeling (MLM) tasks, incorporating modern optimizations. Welcome to `ModernBERTForMaskedLM`.
 
-Functionality includes:
-- **Text Generation**: The `GenerationMixin` adds autoregressive text generation capabilities to causal models like Llama, supporting various sampling strategies (temperature, top-k, top-p, min-p) and efficient implementation via `jax.lax.scan`.
-- **Tokenization**: A `Tokenizer` class wraps the Hugging Face `tokenizers` library, providing a JAX-friendly API for encoding/decoding text and applying chat templates.
-- **Interoperability**: Facilitates using pretrained models from the Hugging Face Hub.
+**Motivation:** While causal models excel at text generation, many NLP tasks benefit from understanding context bidirectionally (both left and right). Traditional BERT achieved this but often suffered from computational inefficiency, especially with long sequences. The ModernBERT architecture, as proposed by Answer.AI, aims to create a "Smarter, Better, Faster, Longer" bidirectional encoder by incorporating techniques like Rotary Position Embeddings (RoPE), pre-Layer Normalization, and efficient attention mechanisms, making it suitable for fast, memory-efficient training and inference, particularly for long contexts. `ModernBERTForMaskedLM` implements this architecture within `jaxgarden` for the MLM pre-training objective.
 
-Overall, `jaxgarden` aims for high performance and *modularity*, enabling researchers and developers to work with modern NLP models within the JAX ecosystem, promoting *code reuse* and *extensibility* through its base classes and focused components.
+**Central Use Case:** Pre-training or fine-tuning a language model using the masked language modeling objective, where the model predicts randomly masked tokens in the input sequence. This model can also serve as a powerful feature extractor for downstream NLP tasks requiring bidirectional context understanding, potentially after loading pre-trained weights using the framework provided by [BaseModel](basemodel.mdc).
 
+## Key Concepts
 
-**Source Repository:** [https://github.com/ml-gde/jaxgarden.git](https://github.com/ml-gde/jaxgarden.git)
+`ModernBERTForMaskedLM` integrates several components and modern architectural choices:
 
-```mermaid
-flowchart TD
-    A0["BaseModel"]
-    A1["BaseConfig"]
-    A2["Tokenizer"]
-    A3["Attention Mechanism (MultiHeadAttention / dot_product_attention)"]
-    A4["GenerationMixin"]
-    A5["LlamaForCausalLM"]
-    A6["ModernBERTForMaskedLM"]
-    A7["Rotary Position Embeddings (RoPE)"]
-    A0 -- "Manages" --> A1
-    A5 -- "Inherits From" --> A0
-    A6 -- "Inherits From" --> A0
-    A5 -- "Uses Config" --> A1
-    A6 -- "Uses Config" --> A1
-    A4 -- "Uses Token IDs" --> A2
-    A5 -- "Uses Attention" --> A3
-    A6 -- "Uses Attention" --> A3
-    A5 -- "Inherits From" --> A4
-    A4 -- "Calls Model" --> A5
-    A5 -- "Uses RoPE" --> A7
-    A6 -- "Uses RoPE" --> A7
-```
+1.  **Inheritance:** It inherits from [BaseModel](basemodel.mdc), gaining standardized configuration management, state handling (Flax NNX), checkpointing (`save`/`load`), and the interface for Hugging Face weight conversion (`from_hf`).
+2.  **`ModernBertEmbeddings`:** Handles the initial input processing. It converts token IDs into dense vectors using an embedding layer and applies Layer Normalization. Crucially, unlike traditional BERT, it does *not* include explicit learned position embeddings; positional information is injected later via RoPE.
+3.  **`ModernBERTEncoder`:** The core of the model, consisting of a stack of `ModernBertLayer` instances (`num_hidden_layers` defined in `ModernBERTConfig`).
+4.  **`ModernBertLayer`:** Implements a single transformer block using the **Pre-LayerNorm** architecture (LayerNorm applied *before* the attention and MLP sub-layers, followed by residual connections). This structure often leads to more stable training compared to the original Post-LayerNorm BERT. Each layer contains:
+    *   `ModernBertAttention`: Performs multi-head self-attention.
+    *   `ModernBertMLP`: A feed-forward network applied after attention.
+5.  **`ModernBertAttention`:**
+    *   Calculates query, key, and value projections from the input.
+    *   Applies **[Rotary Position Embeddings (RoPE)](rotary_position_embeddings__rope_.mdc)** directly to the query and key vectors before computing attention scores. `RoPEPositionalEmbedding` generates the necessary sinusoidal encodings.
+    *   Supports **Mixed Global and Local Attention:** Can operate in standard global attention mode (all tokens attend to all others) or use a sliding window (local attention) where tokens only attend to nearby tokens (`local_attention` parameter). This can be configured to happen only on certain layers (`global_attn_every_n_layers`) to balance global context understanding with computational efficiency.
+6.  **`ModernBertMLP`:** Uses GELU activation function within the feed-forward network.
+7.  **`ModernBERTMLMHead`:** Added on top of the `ModernBERTEncoder`. It takes the final hidden states, applies Layer Normalization, a dense layer with GELU activation, and finally projects the result to the vocabulary size to produce logits for predicting the original masked tokens. The final projection layer (decoder) is often tied to the token embedding weights.
 
-## Chapters
+## Using `ModernBERTForMaskedLM`
 
-[Tokenizer](tokenizer.mdc)
-[BaseModel](basemodel.mdc)
-[BaseConfig](baseconfig.mdc)
-[LlamaForCausalLM](llamaforcausallm.mdc)
-[GenerationMixin](generationmixin.mdc)
-[ModernBERTForMaskedLM](modernbertformaskedlm.mdc)
-[Attention Mechanism (MultiHeadAttention / dot_product_attention)](attention_mechanism__multiheadattention___dot_product_attention_.mdc)
-[Rotary Position Embeddings (RoPE)](rotary_position_embeddings__rope_.mdc)
+Let's see how to instantiate and use the model.
 
+### Initialization
 
----
+Define a `ModernBERTConfig` and initialize the model. Key parameters in the config control the architecture, including attention behavior.
 
-Generated by [Rules for AI](https://github.com/altaidevorg/rules-for-ai)
+```python
+import jax
+import jax.numpy as jnp
+from flax import nnx
+from jaxgarden.models.modernbert import ModernBERTConfig, ModernBERTForMaskedLM
+
+# Configuration for a smaller ModernBERT model
+config = ModernBERTConfig(
+    vocab_size=30522, # Example BERT vocab size
+    hidden_size=256,
+    num_hidden_layers=4,
+    num_attention_heads=8,
+    intermediate_size=512,
+    max_position_embeddings=512, # Max sequence length for RoPE cache
+    attention_dropout=0.1,
+    hidden_dropout=0.1,
+    # Use local attention (window size 128 left, 128 right)
+    local_attention=(128, 128),
+    # Apply global attention every 2 layers (layers 0, 2)
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [ml-gde/jaxgarden](https://github.com/ml-gde/jaxgarden) — distributed by [TomeVault](https://tomevault.io).
