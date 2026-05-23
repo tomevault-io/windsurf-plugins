@@ -7,11 +7,11 @@ Fast and flexible memory for agents and AI applications using Redis
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [redis/agent-memory-server](https://github.com/redis/agent-memory-server).
+Original source: `AGENTS.md` in [redis/agent-memory-server](https://github.com/redis/agent-memory-server).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
