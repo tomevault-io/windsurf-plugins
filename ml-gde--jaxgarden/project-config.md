@@ -1,72 +1,68 @@
 ---
 trigger: always_on
-description: description: jaxgarden tutorial on GenerationMixin, providing autoregressive text generation with sampling for JAX models.
+description: description: Guidelines for using jaxgarden
 ---
 
 ---
-description: jaxgarden tutorial on GenerationMixin, providing autoregressive text generation with sampling for JAX models.
-globs: jaxgarden/models/generation_utils.py
-alwaysApply: false
+description: Guidelines for using jaxgarden
+globs: 
+alwaysApply: true
 ---
-# Chapter 5: GenerationMixin
+The `jaxgarden` project provides a library for building and utilizing neural network models, primarily focused on **Transformer architectures**, using *JAX* and *Flax NNX*. It establishes a structured framework through abstract base classes: `BaseModel` defines the core model interface, including state management (parameters, mutable states via `nnx.State`), checkpointing (*Serialization*) with Orbax, and a standardized mechanism for importing and converting weights from Hugging Face's *Safetensors* format. `BaseConfig` offers a consistent way to manage model hyperparameters (*Configuration Management*).
 
-In the [previous chapter](llamaforcausallm.mdc), we explored `LlamaForCausalLM`, a causal language model built using `jaxgarden` components. We saw that it inherits text generation capabilities. This chapter focuses on the `GenerationMixin` class, the source of that functionality.
+The library implements specific models like `LlamaForCausalLM` (a decoder-only model) and `ModernBERTForMaskedLM` (an encoder model), showcasing modern techniques. Key architectural components are modularized:
+- `Attention Mechanism`: Provides multi-head attention, potentially leveraging hardware acceleration like *Flash Attention* via cuDNN backend selection in `dot_product_attention`.
+- `Rotary Position Embeddings (RoPE)`: Implements relative position encoding within the attention mechanism itself, used by both Llama and ModernBERT variants.
 
-**Motivation:** Implementing autoregressive text generation involves complex logic: managing the token-by-token loop efficiently, handling various sampling strategies (temperature, top-k, top-p, min-p), managing padding and end-of-sequence tokens, and dealing with JAX's PRNG key management and JIT compilation nuances. Encapsulating this logic in a reusable mixin avoids code duplication across different causal language models and provides a standardized generation interface. `GenerationMixin` solves this by providing a robust `generate` method that can be easily added to any compatible causal LM inheriting from [BaseModel](basemodel.mdc).
+Functionality includes:
+- **Text Generation**: The `GenerationMixin` adds autoregressive text generation capabilities to causal models like Llama, supporting various sampling strategies (temperature, top-k, top-p, min-p) and efficient implementation via `jax.lax.scan`.
+- **Tokenization**: A `Tokenizer` class wraps the Hugging Face `tokenizers` library, providing a JAX-friendly API for encoding/decoding text and applying chat templates.
+- **Interoperability**: Facilitates using pretrained models from the Hugging Face Hub.
 
-**Central Use Case:** Adding the `generate` method to a custom causal language model (or using it via an existing model like `LlamaForCausalLM`). This allows the model instance to perform text generation based on a prompt, controlling the output's creativity and coherence through sampling parameters, and leveraging JAX optimizations like `lax.scan` and JIT compilation for performance on accelerators.
+Overall, `jaxgarden` aims for high performance and *modularity*, enabling researchers and developers to work with modern NLP models within the JAX ecosystem, promoting *code reuse* and *extensibility* through its base classes and focused components.
 
-## Key Concepts
 
-1.  **Mixin Pattern:** `GenerationMixin` is not meant to be used standalone. It's designed to be inherited *alongside* a primary base class (like `BaseModel` or a specific model class like `LlamaForCausalLM`). It "mixes in" the `generate` method and its helpers into the inheriting class.
-2.  **Autoregressive Loop (`jax.lax.scan`):** Text generation is sequential. The model predicts the next token based on the previously generated tokens. `GenerationMixin` implements this loop using `jax.lax.scan`, which is highly efficient for iterative computations on JAX accelerators (GPU/TPU) as it unrolls the loop within the compiled computation graph.
-3.  **Sampling Strategies:** Controls how the next token is chosen from the model's output probability distribution (logits).
-    *   `temperature`: Scales logits before sampling. Higher values -> more randomness; lower values -> more determinism.
-    *   `top_k`: Restricts sampling to the `k` most likely tokens.
-    *   `top_p` (Nucleus Sampling): Restricts sampling to the smallest set of tokens whose cumulative probability exceeds `p`.
-    *   `min_p`: Restricts sampling to tokens with probability `p * max_probability` or higher.
-    *   `do_sample`: Boolean flag to enable/disable sampling (if `False`, uses greedy decoding - picks the most likely token).
-4.  **Helper Functions:** Sampling strategies are implemented via standalone helper functions (`temperature_scale`, `top_k_logits`, `top_p_logits`, `min_p_logits`, `sample_logits`) for clarity and testability.
-5.  **State Management:** The generation loop manages the sequence length, detects the End-of-Sequence (EOS) token to stop generation for specific sequences in a batch, handles padding (`pad_token_id`), and correctly splits and passes the JAX PRNG key (`rng`) at each step if sampling is enabled.
-6.  **JIT Compilation (`use_jit`):** The `generate` method offers a `use_jit` flag. If `True`, it calls a pre-compiled version of the core generation loop (`_generate_compiled`). This requires specifying `static_argnames` (like `max_length`, `temperature`, `top_k`, etc., and crucially `self`) to `jax.jit`, as these values influence the computation graph structure and cannot be dynamic JAX tracers during compilation.
+**Source Repository:** [https://github.com/ml-gde/jaxgarden.git](https://github.com/ml-gde/jaxgarden.git)
 
-## Using `GenerationMixin`
+```mermaid
+flowchart TD
+    A0["BaseModel"]
+    A1["BaseConfig"]
+    A2["Tokenizer"]
+    A3["Attention Mechanism (MultiHeadAttention / dot_product_attention)"]
+    A4["GenerationMixin"]
+    A5["LlamaForCausalLM"]
+    A6["ModernBERTForMaskedLM"]
+    A7["Rotary Position Embeddings (RoPE)"]
+    A0 -- "Manages" --> A1
+    A5 -- "Inherits From" --> A0
+    A6 -- "Inherits From" --> A0
+    A5 -- "Uses Config" --> A1
+    A6 -- "Uses Config" --> A1
+    A4 -- "Uses Token IDs" --> A2
+    A5 -- "Uses Attention" --> A3
+    A6 -- "Uses Attention" --> A3
+    A5 -- "Inherits From" --> A4
+    A4 -- "Calls Model" --> A5
+    A5 -- "Uses RoPE" --> A7
+    A6 -- "Uses RoPE" --> A7
+```
 
-You typically don't interact with `GenerationMixin` directly. Instead, you call the `generate` method on a model class that inherits from it, like `LlamaForCausalLM`.
+## Chapters
 
-```python
-import jax
-import jax.numpy as jnp
-from flax import nnx
-# Assume LlamaForCausalLM and Tokenizer are imported and initialized
-# from jaxgarden.models.llama import LlamaConfig, LlamaForCausalLM
-# from jaxgarden.tokenization import Tokenizer
+[Tokenizer](tokenizer.mdc)
+[BaseModel](basemodel.mdc)
+[BaseConfig](baseconfig.mdc)
+[LlamaForCausalLM](llamaforcausallm.mdc)
+[GenerationMixin](generationmixin.mdc)
+[ModernBERTForMaskedLM](modernbertformaskedlm.mdc)
+[Attention Mechanism (MultiHeadAttention / dot_product_attention)](attention_mechanism__multiheadattention___dot_product_attention_.mdc)
+[Rotary Position Embeddings (RoPE)](rotary_position_embeddings__rope_.mdc)
 
-# --- Setup (Conceptual) ---
-# model_config = LlamaConfig(...) # Load appropriate config
-# tokenizer = Tokenizer.from_pretrained(...) # Load matching tokenizer
-# rngs = nnx.Rngs(0)
-# model = LlamaForCausalLM(model_config, rngs=rngs)
-# model.from_hf(...) # Optional: Load pretrained weights
 
-# --- Generation Call ---
-# prompt = "The definition of JAX is"
-# inputs = tokenizer.encode(prompt, return_tensors="jax")
-# input_ids = inputs['input_ids']
-# attention_mask = inputs['attention_mask'] # Important for initial prompt
+---
 
-# Set generation parameters
-# max_new_tokens = 50
-# target_max_length = input_ids.shape[1] + max_new_tokens
-# generation_rng = jax.random.PRNGKey(42)
-# pad_token_id = tokenizer.pad_token_id
-# eos_token_id = tokenizer.eos_token_id
-
-# print(f"Generating text with max_length={target_max_length}, temperature=0.8, top_k=50")
-
-# --- The core call to the generate method ---
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+Generated by [Rules for AI](https://github.com/altaidevorg/rules-for-ai)
 
 ---
 > Source: [ml-gde/jaxgarden](https://github.com/ml-gde/jaxgarden) — distributed by [TomeVault](https://tomevault.io).
