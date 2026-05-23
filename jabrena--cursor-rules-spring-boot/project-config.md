@@ -1,166 +1,114 @@
 ---
 trigger: always_on
-description: Spring Boot slice testing allows you to test specific layers or "slices" of your application in isolation, providing faster and more focused tests than full integration tests. This approach helps maintain test clarity, reduces test execution time, and improves maintainability.
+description: These guidelines aim to ensure consistency, reliability, and maintainability of integration tests within the project.
 ---
 
-# Spring Boot Slice Testing
+# Java Integration testing guidelines
 
-Spring Boot slice testing allows you to test specific layers or "slices" of your application in isolation, providing faster and more focused tests than full integration tests. This approach helps maintain test clarity, reduces test execution time, and improves maintainability.
+These guidelines aim to ensure consistency, reliability, and maintainability of integration tests within the project.
 
 ## Implementing These Principles
 
 These guidelines are built upon the following core principles:
 
-- **Layer Isolation**: Test each application layer independently without loading the entire Spring context
-- **Focused Testing**: Use appropriate slice annotations to load only the components needed for specific functionality
-- **Mock Dependencies**: Mock external dependencies and other layers to achieve true unit testing at the slice level
-- **Fast Execution**: Minimize Spring context loading to achieve rapid test feedback cycles
+- Principle 1: Test Isolation - Each integration test must be independent and not affect other tests
+- Principle 2: Environment Reproducibility - Use containerized dependencies for consistent test environments  
+- Principle 3: Clear Test Boundaries - Focus on integration points rather than duplicating unit test logic
+- Principle 4: Performance Optimization - Balance thorough testing with execution speed
+- Principle 5: Maintainable Assertions - Use specific, clear assertions that provide meaningful feedback
+- Principle 6: Resource Management - Properly manage external dependencies and cleanup after tests
 
 ## Table of contents
 
-- Rule 1: Use @WebMvcTest for Web Layer Testing
-- Rule 2: Use @JdbcTest for Repository Layer Testing
-- Rule 3: Use @JsonTest for JSON Serialization Testing
-- Rule 4: Use @MockBean for Mocking Dependencies
-- Rule 5: Configure Test Profiles Appropriately
-- Rule 6: Use @TestConfiguration for Custom Test Setup
+- Rule 1: Define Clear Scope and Purpose for Integration Tests
+- Rule 2: Manage Test Environment & Dependencies with Testcontainers
+- Rule 3: Utilize TestRestTemplate for Robust API Testing
+- Rule 4: Implement Consistent Data Management Strategies
+- Rule 5: Maintain Clear Test Structure and Assertions
+- Rule 6: Optimize for Performance and Ensure Proper Cleanup
 
-## Rule 1: Use @WebMvcTest for Web Layer Testing
+## Rule 1: Define Clear Scope and Purpose for Integration Tests
 
-Title: Test Controllers in Isolation with @WebMvcTest
-Description: Use @WebMvcTest to test only the web layer (controllers) without loading the full application context. This annotation configures Spring MVC infrastructure and auto-configures MockMvc for testing HTTP requests and responses.
+Title: Clearly Define the Scope and Purpose of Each Integration Test
+Description:
+- Integration tests must verify the interaction between multiple components or systems (e.g., service layer with database, service-to-service communication over HTTP).
+- Clearly define the boundary of each integration test. What specific interaction, contract, or flow is being tested?
+- Prefer integration tests for verifying contracts between services (APIs) and interactions with external dependencies (databases, message queues, etc.).
+- Avoid replicating complex business logic in integration tests if it is already thoroughly covered by unit tests. Focus on the integration points.
 
 **Good example:**
-
 ```java
-@WebMvcTest(UserController.class)
-class UserControllerTest {
+// Assume: ProductService interacts with ProductRepository (database) and NotificationService (external HTTP)
 
-    @Autowired
-    private MockMvc mockMvc;
+// @SpringBootTest // or similar context for the test
+// @Testcontainers // if using Testcontainers
+public class ProductServiceIT {
+    private static final Logger log = LoggerFactory.getLogger(ProductServiceIT.class);
+
+    // @Autowired
+    // private ProductService productService;
     
-    @MockBean
-    private UserService userService;
-    
-    @Test
-    void shouldReturnUserWhenValidId() throws Exception {
-        // Given
-        User user = new User(1L, "John Doe", "john@example.com");
-        when(userService.findById(1L)).thenReturn(user);
-        
-        // When & Then
-        mockMvc.perform(get("/api/users/1"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.name").value("John Doe"))
-            .andExpect(jsonPath("$.email").value("john@example.com"));
+    // @Autowired
+    // private ProductRepository productRepository; // To verify DB state
+
+    // Mock or use a Testcontainer for NotificationService if its actual calls are out of scope
+    // @MockBean
+    // private NotificationService mockNotificationService;
+
+    // @Test
+    void should_createProduct_saveToDatabase_and_sendNotification() {
+        // Scope: Test the flow of creating a product, ensuring it's saved,
+        // and that a notification attempt is made.
+
+        // Given: A product DTO
+        // ProductDto newProductDto = new ProductDto("Laptop X1", 1500.00);
+
+        // When: ProductService creates the product
+        // Product createdProduct = productService.createProduct(newProductDto);
+
+        // Then: Verify interactions
+        // 1. Product is saved in the database (verify via repository or direct query)
+        // Optional<ProductEntity> savedEntity = productRepository.findById(createdProduct.getId());
+        // assertThat(savedEntity).isPresent();
+        // assertThat(savedEntity.get().getName()).isEqualTo("Laptop X1");
+
+        // 2. Notification service was called (verify via mock or wiremock if testing HTTP contract)
+        // verify(mockNotificationService).sendProductCreationNotification(any(Product.class));
+        log.info("Conceptual test: Product creation flow verified.");
     }
 }
 ```
 
 **Bad Example:**
-
 ```java
-@SpringBootTest
-@AutoConfigureTestDatabase
-class UserControllerTest {
-    
-    @Autowired
-    private TestRestTemplate restTemplate;
-    
-    @Test
-    void shouldReturnUser() {
-        // This loads the entire application context unnecessarily
-        // and requires database setup for a simple controller test
-        ResponseEntity<User> response = restTemplate.getForEntity("/api/users/1", User.class);
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+// @SpringBootTest
+public class OverlappingProductLogicIT {
+    private static final Logger log = LoggerFactory.getLogger(OverlappingProductLogicIT.class);
+
+    // @Autowired
+    // private ProductService productService;
+
+    // @Test
+    void should_calculateComplexPricing_duringProductCreation() {
+        // Bad: This test might be re-testing complex pricing logic
+        // that should already be unit-tested in ProductService or a PricingEngine unit test.
+        // The integration test should focus on whether ProductService correctly integrates
+        // with the database and other services during creation, assuming pricing logic is correct.
+        
+        // ProductDto productWithComplexPricing = new ProductDto("ComplexItem", 10.0, List.of(new DiscountRule(...)));
+        // Product createdProduct = productService.createProduct(productWithComplexPricing);
+        
+        // If asserts here are deeply checking specific price calculations, it's likely a unit test concern.
+        // assertThat(createdProduct.getFinalPrice()).isEqualTo(9.99); // This might be too specific for an IT
+        log.warn("Conceptual bad test: Replicating unit test logic for pricing.");
     }
 }
 ```
 
-## Rule 2: Use @JdbcTest for Repository Layer Testing
+## Rule 2: Manage Test Environment & Dependencies with Testcontainers
 
-Title: Test JDBC Repositories with @JdbcTest
-Description: Use @JdbcTest to test Spring Data JDBC repositories in isolation. This annotation configures an in-memory database, auto-configures JdbcTemplate and NamedParameterJdbcTemplate, and loads Spring Data JDBC repositories without loading the full application context.
-
-**Good example:**
-
-```java
-@JdbcTest
-class UserRepositoryTest {
-
-    @Autowired
-    private JdbcTemplate jdbcTemplate;
-    
-    @Autowired
-    private UserRepository userRepository;
-    
-    @Test
-    void shouldFindUserByEmail() {
-        // Given
-        User user = new User(null, "John Doe", "john@example.com");
-        User saved = userRepository.save(user);
-        
-        // When
-        Optional<User> found = userRepository.findByEmail("john@example.com");
-        
-        // Then
-        assertThat(found).isPresent();
-        assertThat(found.get().getName()).isEqualTo("John Doe");
-        assertThat(found.get().getEmail()).isEqualTo("john@example.com");
-    }
-    
-    @Test
-    void shouldReturnEmptyWhenUserNotFound() {
-        // When
-        Optional<User> found = userRepository.findByEmail("nonexistent@example.com");
-        
-        // Then
-        assertThat(found).isEmpty();
-    }
-    
-    @Test
-    void shouldUseJdbcTemplateForCustomQueries() {
-        // Given
-        jdbcTemplate.update(
-            "INSERT INTO users (name, email) VALUES (?, ?)", 
-            "Jane Smith", "jane@example.com"
-        );
-        
-        // When
-        Long count = jdbcTemplate.queryForObject(
-            "SELECT COUNT(*) FROM users WHERE email LIKE '%@example.com'", 
-            Long.class
-        );
-        
-        // Then
-        assertThat(count).isEqualTo(1L);
-    }
-}
-```
-
-**Bad Example:**
-
-```java
-@SpringBootTest
-class UserRepositoryTest {
-    
-    @Autowired
-    private UserRepository userRepository;
-    
-    @Test
-    void shouldFindUserByEmail() {
-        // This loads the entire application context and all beans
-        // unnecessarily for a simple repository test
-        User user = new User(null, "John Doe", "john@example.com");
-        userRepository.save(user);
-        
-        Optional<User> found = userRepository.findByEmail("john@example.com");
-        assertThat(found).isPresent();
-    }
-}
-```
-
-## Rule 3: Use @JsonTest for JSON Serialization Testing
+Title: Use Testcontainers for Reliable Management of External Dependencies
+Description:
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
