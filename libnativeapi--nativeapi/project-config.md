@@ -1,241 +1,226 @@
 ---
 trigger: always_on
-description: PIMPL (Pointer to Implementation) pattern for platform-specific code
+description: Guidelines for implementing platform-specific code for Windows, macOS, and Linux
 ---
 
 
-# PIMPL Pattern Rules
+# Platform-Specific Implementation Rules
 
-The nativeapi library uses the PIMPL (Pointer to Implementation) idiom extensively to hide platform-specific implementation details from the public API. This provides binary compatibility, reduces compilation dependencies, and enables clean platform abstraction.
+All platform-specific code lives in [src/platform/](mdc:src/platform) organized by operating system. Each platform implements the same cross-platform interfaces using native APIs.
 
-## What is PIMPL?
+## Platform Directories
 
-PIMPL separates a class's interface from its implementation by:
-1. Declaring a private nested `Impl` class in the header
-2. Storing only a pointer to the implementation
-3. Implementing platform-specific logic in the source files
-
-## Pattern Structure
-
-### Header File Pattern ([window.h](mdc:src/window.h))
-
-```cpp
-#pragma once
-#include <memory>
-
-namespace nativeapi {
-
-class Window {
-public:
-    Window();
-    Window(void* native_window);
-    virtual ~Window();
-
-    // Public interface methods
-    void Show();
-    void Hide();
-    bool IsVisible() const;
-
-private:
-    // Forward declaration only - no definition
-    class Impl;
-
-    // Pointer to implementation
-    std::unique_ptr<Impl> pimpl_;
-};
-
-}  // namespace nativeapi
+```
+src/platform/
+├── windows/    # Windows implementation (*.cpp)
+├── macos/      # macOS implementation (*.mm for Objective-C++)
+└── linux/      # Linux implementation (*.cpp with GTK)
 ```
 
-**Key Points:**
-- Forward declare `Impl` class - don't define it in header
-- Use `std::unique_ptr<Impl>` for automatic cleanup
-- No platform-specific includes in header
-- No platform-specific types in public interface
+## Platform APIs Used
 
-### Platform-Specific Implementation Files
+| Platform | Primary APIs | Language | File Extension |
+|----------|-------------|----------|----------------|
+| **Windows** | Win32 API, GDI+ | C++ | `.cpp` |
+| **macOS** | Cocoa/AppKit | Objective-C++ | `.mm` |
+| **Linux** | GTK 3.0, X11 | C++ | `.cpp` |
 
-Each platform provides its own `Impl` definition:
+## File Naming Convention
 
-#### Windows Implementation ([platform/windows/window_windows.cpp](mdc:src/platform/windows))
+Platform files follow: `<module>_<platform>.<ext>`
+
+Examples:
+- `window_windows.cpp` - Windows window implementation
+- `window_macos.mm` - macOS window implementation  
+- `window_linux.cpp` - Linux window implementation
+- `menu_windows.cpp` - Windows menu implementation
+
+## Implementation Pattern
+
+### 1. Define Platform-Specific PIMPL::Impl
+
+Each platform file defines the `Impl` class declared in the cross-platform header:
+
+#### Windows Example ([platform/windows/window_windows.cpp](mdc:src/platform/windows))
 
 ```cpp
-#include <windows.h>  // Platform includes only in .cpp
+// clang-format off
+#include <windows.h>
+#include <shellapi.h>
+// clang-format on
 #include "../../window.h"
 
 namespace nativeapi {
 
-// Define Impl class with platform-specific members
+// Define platform-specific Impl
 class Window::Impl {
 public:
     Impl(HWND hwnd) : hwnd_(hwnd) {}
-
-    HWND hwnd_;  // Windows-specific handle
+    
+    HWND hwnd_;  // Windows window handle
     // Other Windows-specific state...
 };
 
+// Implement constructors
 Window::Window() : pimpl_(std::make_unique<Impl>(nullptr)) {}
 
-Window::Window(void* window)
+Window::Window(void* window) 
     : pimpl_(std::make_unique<Impl>(static_cast<HWND>(window))) {}
 
-Window::~Window() = default;  // unique_ptr handles cleanup
+Window::~Window() = default;
 
+// Implement methods using Win32 API
 void Window::Show() {
     if (pimpl_->hwnd_) {
         ShowWindow(pimpl_->hwnd_, SW_SHOW);
+        SetForegroundWindow(pimpl_->hwnd_);
     }
+}
+
+void Window::Hide() {
+    if (pimpl_->hwnd_) {
+        ShowWindow(pimpl_->hwnd_, SW_HIDE);
+    }
+}
+
+bool Window::IsVisible() const {
+    return pimpl_->hwnd_ && IsWindowVisible(pimpl_->hwnd_);
+}
+
+void* Window::GetNativeObjectInternal() const {
+    return static_cast<void*>(pimpl_->hwnd_);
 }
 
 }  // namespace nativeapi
 ```
 
-#### macOS Implementation ([platform/macos/window_macos.mm](mdc:src/platform/macos))
+#### macOS Example ([platform/macos/window_macos.mm](mdc:src/platform/macos))
 
 ```objc
-#import <Cocoa/Cocoa.h>  // Platform includes only in .mm
+#import <Cocoa/Cocoa.h>
 #include "../../window.h"
 
 namespace nativeapi {
 
-// Define Impl class with macOS-specific members
+// Define platform-specific Impl
 class Window::Impl {
 public:
-    Impl(NSWindow* window) : window_(window) {}
-
-    NSWindow* window_;  // macOS-specific handle
-    // Other macOS-specific state...
+    Impl(NSWindow* window) : window_(window) {
+        if (window_) {
+            [window_ retain];  // Retain ownership
+        }
+    }
+    
+    ~Impl() {
+        if (window_) {
+            [window_ release];  // Release ownership
+        }
+    }
+    
+    NSWindow* window_;  // macOS window handle
 };
 
+// Implement constructors
 Window::Window() : pimpl_(std::make_unique<Impl>(nil)) {}
 
-Window::Window(void* window)
+Window::Window(void* window) 
     : pimpl_(std::make_unique<Impl>(static_cast<NSWindow*>(window))) {}
 
 Window::~Window() = default;
 
+// Implement methods using Cocoa API
 void Window::Show() {
     if (pimpl_->window_) {
         [pimpl_->window_ makeKeyAndOrderFront:nil];
     }
 }
 
+void Window::Hide() {
+    if (pimpl_->window_) {
+        [pimpl_->window_ orderOut:nil];
+    }
+}
+
+bool Window::IsVisible() const {
+    return pimpl_->window_ && [pimpl_->window_ isVisible];
+}
+
+void* Window::GetNativeObjectInternal() const {
+    return static_cast<void*>(pimpl_->window_);
+}
+
 }  // namespace nativeapi
 ```
 
-#### Linux Implementation ([platform/linux/window_linux.cpp](mdc:src/platform/linux))
+#### Linux Example ([platform/linux/window_linux.cpp](mdc:src/platform/linux))
 
 ```cpp
-#include <gtk/gtk.h>  // Platform includes only in .cpp
+#include <gtk/gtk.h>
 #include "../../window.h"
 
 namespace nativeapi {
 
-// Define Impl class with GTK-specific members
+// Define platform-specific Impl
 class Window::Impl {
 public:
-    Impl(GtkWidget* window) : window_(window) {}
-
-    GtkWidget* window_;  // GTK-specific handle
-    // Other GTK-specific state...
+    Impl(GtkWidget* window) : window_(window) {
+        if (window_) {
+            g_object_ref(window_);  // Increase reference count
+        }
+    }
+    
+    ~Impl() {
+        if (window_) {
+            g_object_unref(window_);  // Decrease reference count
+        }
+    }
+    
+    GtkWidget* window_;  // GTK window handle
 };
 
+// Implement constructors
 Window::Window() : pimpl_(std::make_unique<Impl>(nullptr)) {}
 
-Window::Window(void* window)
+Window::Window(void* window) 
     : pimpl_(std::make_unique<Impl>(static_cast<GtkWidget*>(window))) {}
 
 Window::~Window() = default;
 
+// Implement methods using GTK API
 void Window::Show() {
     if (pimpl_->window_) {
-        gtk_widget_show(pimpl_->window_);
+        gtk_widget_show_all(pimpl_->window_);
+        gtk_window_present(GTK_WINDOW(pimpl_->window_));
     }
+}
+
+void Window::Hide() {
+    if (pimpl_->window_) {
+        gtk_widget_hide(pimpl_->window_);
+    }
+}
+
+bool Window::IsVisible() const {
+    return pimpl_->window_ && gtk_widget_get_visible(pimpl_->window_);
+}
+
+void* Window::GetNativeObjectInternal() const {
+    return static_cast<void*>(pimpl_->window_);
 }
 
 }  // namespace nativeapi
 ```
 
-## Implementation Guidelines
+## Platform Handle Types
 
-### 1. Creating a New PIMPL Class
+### Native Handle Mapping
 
-When adding a new cross-platform class:
-
-```cpp
-// my_class.h
-#pragma once
-#include <memory>
-
-namespace nativeapi {
-
-class MyClass {
-public:
-    MyClass();
-    virtual ~MyClass();
-
-    void DoSomething();
-
-private:
-    class Impl;
-    std::unique_ptr<Impl> pimpl_;
-};
-
-}  // namespace nativeapi
-```
-
-Then create implementations for each platform:
-- `src/platform/windows/my_class_windows.cpp`
-- `src/platform/macos/my_class_macos.mm`
-- `src/platform/linux/my_class_linux.cpp`
-
-### 2. Accessing Platform State
-
-Always access platform-specific members through `pimpl_`:
-
-```cpp
-// Good
-void Window::SetTitle(const std::string& title) {
-    if (pimpl_->hwnd_) {  // Access through pimpl_
-        SetWindowTextW(pimpl_->hwnd_, ...);
-    }
-}
-
-// Bad - won't compile, hwnd_ not in public interface
-void Window::SetTitle(const std::string& title) {
-    if (hwnd_) {  // Error: no member named 'hwnd_'
-        ...
-    }
-}
-```
-
-### 3. Constructor/Destructor Pattern
-
-Follow this pattern for all PIMPL classes:
-
-```cpp
-// Header
-class MyClass {
-public:
-    MyClass();
-    virtual ~MyClass();  // Virtual if used as base class
-
-    // Copy/move operations - handle appropriately
-    MyClass(const MyClass&) = delete;
-    MyClass& operator=(const MyClass&) = delete;
-
-private:
-    class Impl;
-    std::unique_ptr<Impl> pimpl_;
-};
-
-// Implementation
-MyClass::MyClass() : pimpl_(std::make_unique<Impl>()) {}
-MyClass::~MyClass() = default;  // unique_ptr handles cleanup
-```
-
-#### Constructor Delegation Pattern
-
+| Component | Windows | macOS | Linux |
+|-----------|---------|-------|-------|
+| Window | `HWND` | `NSWindow*` | `GtkWidget*` (GtkWindow) |
+| Menu | `HMENU` | `NSMenu*` | `GtkWidget*` (GtkMenu) |
+| MenuItem | N/A (in HMENU) | `NSMenuItem*` | `GtkWidget*` (GtkMenuItem) |
+| Display | `HMONITOR` | `NSScreen*` | `GdkDisplay*` |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
