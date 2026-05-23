@@ -1,50 +1,107 @@
 ---
 trigger: always_on
-description: description: jaxgarden tutorial chapter on Attention Mechanism MultiHeadAttention module using customizable dot_product_attention backend (XLA/cuDNN Flash).
+description: description: JAXgarden tutorial chapter detailing BaseConfig, the base dataclass for managing model hyperparameters and configurations.
 ---
 
 ---
-description: jaxgarden tutorial chapter on Attention Mechanism MultiHeadAttention module using customizable dot_product_attention backend (XLA/cuDNN Flash).
+description: JAXgarden tutorial chapter detailing BaseConfig, the base dataclass for managing model hyperparameters and configurations.
 globs: 
 alwaysApply: false
 ---
-# Chapter 7: Attention Mechanism (MultiHeadAttention / dot_product_attention)
+# Chapter 3: BaseConfig
 
-In the previous chapters, we explored end-to-end models like [LlamaForCausalLM](llamaforcausallm.mdc) and [ModernBERTForMaskedLM](modernbertformaskedlm.mdc). We saw that a key component within their transformer layers is the attention mechanism (e.g., `LlamaAttention`, `ModernBertAttention`). This chapter delves into the core implementation of attention within `jaxgarden`, specifically the `MultiHeadAttention` module and the underlying `dot_product_attention` function.
+In the [previous chapter](basemodel.mdc), we explored `BaseModel`, the foundational class for models in `jaxgarden`. We saw that each `BaseModel` instance is initialized with a configuration object. This chapter dives into the base class for those configuration objects: `BaseConfig`.
 
-**Motivation:** Attention mechanisms, particularly scaled dot-product attention and its multi-head variant, are the computational heart of transformer models. Implementing this efficiently is critical for performance. Furthermore, modern hardware and libraries offer highly optimized kernels like Flash Attention (accessible via cuDNN in JAX) that can significantly speed up computation and reduce memory usage, especially for long sequences. `jaxgarden` aims to provide a flexible attention implementation that leverages these optimizations while integrating smoothly with the Flax NNX framework.
+**Motivation:** Neural models are complex systems with numerous hyperparameters (like hidden size, number of layers, dropout rates) and settings (like data types, precision). Managing these configurations consistently across different models is crucial for reproducibility, maintainability, and ease of use. Using simple dictionaries or ad-hoc parameter passing can quickly become messy and error-prone. `BaseConfig` provides a standardized, structured way to define, manage, and serialize these configurations.
 
-**Central Use Case:** Building or utilizing a transformer layer within `jaxgarden` that requires efficient multi-head self-attention. This involves instantiating `jaxgarden.attention.MultiHeadAttention` (often within a higher-level layer like `LlamaAttention`) and potentially configuring it to use an optimized backend like `"cudnn"` to enable Flash Attention on compatible hardware, thereby accelerating model training and inference.
+**Central Use Case:** Defining the set of hyperparameters for a new model implementation (e.g., creating a `MyTransformerConfig` that inherits from `BaseConfig`) or inspecting and modifying the configuration of an existing `jaxgarden` model like [LlamaForCausalLM](llamaforcausallm.mdc), which uses its own `LlamaConfig` subclass derived from `BaseConfig`.
 
 ## Key Concepts
 
-1.  **Scaled Dot-Product Attention:** The fundamental operation defined as `Attention(Q, K, V) = softmax(QK^T / sqrt(d_k))V`. It calculates attention scores by taking the dot product between queries (Q) and keys (K), scaling them, applying a softmax function to get probabilities, and then using these probabilities to compute a weighted sum of the values (V).
-2.  **Multi-Head Attention (MHA):** Instead of performing a single attention calculation, MHA projects the Q, K, and V inputs into multiple lower-dimensional "heads", performs scaled dot-product attention independently for each head in parallel, and then concatenates the results and projects them back to the original dimension. This allows the model to jointly attend to information from different representation subspaces at different positions.
-3.  **`dot_product_attention` (Functional Interface):** Located in `jaxgarden.functional.attention`, this function provides the low-level implementation of scaled dot-product attention. It's a wrapper around `jax.nn.dot_product_attention`.
-    *   **Core Logic:** Handles the matrix multiplications, scaling, and softmax.
-    *   **Masking/Bias:** Accepts an optional `mask` or `bias` argument. It automatically converts a boolean mask (where `True` means keep) into an additive bias (0.0 for keep, -inf for mask out) suitable for the underlying JAX function.
-    *   **Backend Selection:** Crucially, it accepts an `implementation` argument (`"xla"`, `"cudnn"`, `"flash"` or `None`). This allows specifying which JAX backend implementation to use for the attention computation. `"cudnn"` (aliased as `"flash"`) attempts to use optimized kernels like Flash Attention if supported by the hardware (NVIDIA GPU) and cuDNN version. `None` lets JAX choose the best available option.
-4.  **`MultiHeadAttention` (NNX Module):** Located in `jaxgarden.attention.multi_head_attention`, this module provides a standard Flax NNX interface for multi-head attention.
-    *   **Inheritance:** It subclasses the standard `flax.nnx.MultiHeadAttention`.
-    *   **Integration:** It overrides the default `attention_fn` used by the parent Flax MHA. Instead of using Flax's default attention, it uses a customized function that internally calls `jaxgarden.functional.dot_product_attention`, passing along the desired `implementation` backend specified during the `jaxgarden.MultiHeadAttention` initialization.
-    *   **Responsibilities:** Manages the multiple heads, input/output linear projections (for Q, K, V and the final output), dropout, and precision settings, encapsulating the full MHA logic.
+`BaseConfig` leverages Python's `dataclasses` to provide a simple yet powerful configuration system:
 
-## Using the Attention Mechanism
+1.  **Dataclass Structure:** It's defined using the `@dataclass` decorator, offering type hints, default values, and automatic `__init__` generation.
+2.  **Inheritance:** Model-specific configurations (e.g., `LlamaConfig`, `ModernBERTConfig`) inherit from `BaseConfig`, adding their unique parameters while retaining the common base attributes.
+3.  **Common Attributes:** Provides essential base attributes applicable to most models, such as `seed` for reproducibility and `log_level` for controlling verbosity.
+4.  **Extensibility:** An `extra` dictionary allows storing arbitrary additional parameters not explicitly defined in the dataclass fields, offering flexibility.
+5.  **Serialization:** The `to_dict()` method converts the configuration object into a standard Python dictionary, useful for logging, saving, or inspection.
+6.  **Programmatic Updates:** The `update()` method allows modifying configuration attributes after instantiation using keyword arguments.
 
-While `dot_product_attention` is a functional component usually called internally, `MultiHeadAttention` is the module you would typically interact with if building custom transformer layers. Higher-level models like `LlamaForCausalLM` use specialized attention modules (`LlamaAttention`) which themselves *might* use `jaxgarden.MultiHeadAttention` or implement similar logic incorporating `dot_product_attention`.
+## Using `BaseConfig`
 
-Here's how you could instantiate and use `jaxgarden.MultiHeadAttention`:
+You typically interact with subclasses of `BaseConfig` tailored to specific models.
+
+### Defining a Custom Configuration
+
+To define a configuration for a new model, create a class inheriting from `BaseConfig` and use the `@dataclass` decorator. Add fields for your model's specific hyperparameters.
 
 ```python
-import jax
-import jax.numpy as jnp
-import flax.nnx as nnx
-from jaxgarden.attention import MultiHeadAttention # This is jaxgarden's MHA
+from dataclasses import dataclass, field
+from jaxgarden.models.base import BaseConfig
+from typing import Any
 
-# --- Configuration ---
-batch_size = 2
-seq_len = 128
-hidden_dim = 256 # Also in_features
+@dataclass
+class MyModelConfig(BaseConfig):
+    """Configuration for MyCustomModel."""
+    hidden_size: int = 256
+    num_layers: int = 4
+    dropout_rate: float = 0.1
+    activation_fn: str = "relu"
+    # Override a base attribute default if needed
+    seed: int = 123
+
+# Instantiate the configuration
+my_config = MyModelConfig(hidden_size=512) # Override default hidden_size
+
+print(f"MyModelConfig instance: {my_config}")
+# Output: MyModelConfig instance: MyModelConfig(seed=123, log_level='info', extra={}, hidden_size=512, num_layers=4, dropout_rate=0.1, activation_fn='relu')
+
+print(f"Hidden size: {my_config.hidden_size}")
+# Output: Hidden size: 512
+print(f"Seed (overridden): {my_config.seed}")
+# Output: Seed (overridden): 123
+print(f"Log Level (from base): {my_config.log_level}")
+# Output: Log Level (from base): info
+```
+
+**Explanation:**
+- We define `MyModelConfig` inheriting from `BaseConfig`.
+- `@dataclass` automatically generates methods like `__init__`.
+- We add model-specific fields like `hidden_size` and `num_layers` with type hints and default values.
+- We can override defaults during instantiation (`hidden_size=512`).
+- Base attributes like `seed` and `log_level` are inherited.
+
+### Serialization (`to_dict`)
+
+Convert the configuration object to a dictionary for easy inspection or storage.
+
+```python
+config_dict = my_config.to_dict()
+print(f"Configuration as dictionary: {config_dict}")
+# Output: Configuration as dictionary: {'seed': 123, 'log_level': 'info', 'extra': {}, 'hidden_size': 512, 'num_layers': 4, 'dropout_rate': 0.1, 'activation_fn': 'relu'}
+
+import json
+print(f"Configuration as JSON: {json.dumps(config_dict, indent=2)}")
+# Output:
+# Configuration as JSON: {
+#  "seed": 123,
+#  "log_level": "info",
+#  "extra": {},
+#  "hidden_size": 512,
+#  "num_layers": 4,
+#  "dropout_rate": 0.1,
+#  "activation_fn": "relu"
+# }
+```
+
+**Explanation:** The `to_dict()` method simply returns the internal `__dict__` of the dataclass instance, making it compatible with standard serialization libraries like `json`.
+
+### Programmatic Updates (`update`)
+
+Modify configuration values after the object has been created.
+
+```python
+print(f"Original dropout rate: {my_config.dropout_rate}")
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
