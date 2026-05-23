@@ -1,130 +1,152 @@
 ---
 trigger: always_on
-description: This comprehensive guide provides essential principles for designing robust, maintainable, and secure REST APIs using Spring Boot. These rules ensure your APIs follow industry best practices, maintain consistency, and provide excellent developer experience for API consumers.
+description: Spring Data JDBC provides a simpler alternative to JPA, offering direct SQL control while maintaining Spring's repository abstractions. When combined with Java records, it creates clean, immutable data models perfect for modern Java applications.
 ---
 
-# Java REST API Design Principles
+# Spring Data JDBC with Records
 
-This comprehensive guide provides essential principles for designing robust, maintainable, and secure REST APIs using Spring Boot. These rules ensure your APIs follow industry best practices, maintain consistency, and provide excellent developer experience for API consumers.
+Spring Data JDBC provides a simpler alternative to JPA, offering direct SQL control while maintaining Spring's repository abstractions. When combined with Java records, it creates clean, immutable data models perfect for modern Java applications.
 
 ## Implementing These Principles
 
 These guidelines are built upon the following core principles:
 
-- **Semantic Consistency**: Use HTTP methods, status codes, and URI patterns according to their intended semantics
-- **Clear Communication**: Provide unambiguous API contracts through proper DTOs, error handling, and documentation
-- **Security by Design**: Implement authentication, authorization, and input validation from the start
-- **Evolutionary Design**: Version APIs and structure them to support future changes without breaking existing clients
+- **Immutability**: Use records for immutable entities that are thread-safe and predictable
+- **Simplicity**: Leverage Spring Data JDBC's straightforward approach over complex ORM mapping
+- **Constructor Injection**: Always use constructor-based dependency injection for better testability
+- **Transaction Boundaries**: Keep transactions at the service layer, not repository layer
+- **SQL Control**: Use custom queries when needed for optimal performance
 
 ## Table of contents
 
-- Rule 1: Use HTTP Methods Correctly
-- Rule 2: Design Clear and Consistent Resource URIs
-- Rule 3: Use HTTP Status Codes Appropriately
-- Rule 4: Implement Effective Request and Response Payloads (DTOs)
-- Rule 5: Version Your APIs
-- Rule 6: Handle Errors Gracefully
-- Rule 7: Secure Your APIs
-- Rule 8: Document Your APIs
-- Rule 9: Use Controller Advice for Global Exception Handling
-- Rule 10: Implement Problem Details for Error Responses
+- Rule 1: Use Records for Entity Classes
+- Rule 2: Implement Repository Pattern Correctly
+- Rule 3: Handle Updates with Immutable Records
+- Rule 4: Design Aggregate Relationships Properly
+- Rule 5: Use Custom Queries for Complex Operations
+- Rule 6: Implement Proper Transaction Management
+- Rule 7: Embrace Single Query Loading to Eliminate N+1 Problems
 
-## Rule 1: Use HTTP Methods Correctly
+## Rule 1: Use Records for Entity Classes
 
-Title: Employ HTTP Methods Semantically
-Description: Use HTTP methods according to their defined semantics to ensure predictability and compliance with web standards. `GET` for retrieval, `POST` for creation, `PUT` for update/replace, `PATCH` for partial update, and `DELETE` for removal.
+Title: Prefer Records Over Classes for Entity Definitions
+Description: Records provide immutability, automatic equals/hashCode, and clean constructor-based mapping that works perfectly with Spring Data JDBC. They eliminate boilerplate code and ensure thread safety. Use @PersistenceCreator when you have multiple constructors to specify which one Spring Data JDBC should use. Use @Column to explicitly map record fields to database columns, especially when field names differ from column names.
 
 **Good example:**
 
 ```java
-// Using Spring MVC annotations for illustration
-@RestController
-@RequestMapping("/users")
-public class UserController {
-
-    @GetMapping("/{id}") // GET for retrieving a user
-    public ResponseEntity<UserDTO> getUser(@PathVariable String id) {
-        // ... logic to fetch user ...
-        return ResponseEntity.ok(new UserDTO());
-    }
-
-    @PostMapping // POST for creating a new user
-    public ResponseEntity<UserDTO> createUser(@RequestBody UserCreateDTO userCreateDTO) {
-        // ... logic to create user ...
-        UserDTO newUser = new UserDTO(); // Assume it gets an ID after creation
-        return ResponseEntity.created(URI.create("/users/" + newUser.getId())).body(newUser);
-    }
-
-    @PutMapping("/{id}") // PUT for replacing/updating a user
-    public ResponseEntity<UserDTO> updateUser(@PathVariable String id, @RequestBody UserUpdateDTO userUpdateDTO) {
-        // ... logic to update user ...
-        return ResponseEntity.ok(new UserDTO());
-    }
-
-    @DeleteMapping("/{id}") // DELETE for removing a user
-    public ResponseEntity<Void> deleteUser(@PathVariable String id) {
-        // ... logic to delete user ...
-        return ResponseEntity.noContent().build();
+public record Customer(
+    @Id 
+    @Column("customer_id") 
+    Long id,
+    
+    @Column("first_name") 
+    String firstName,
+    
+    @Column("last_name") 
+    String lastName,
+    
+    @Column("email_address") 
+    String email,
+    
+    @Column("created_at") 
+    LocalDateTime createdAt
+) {
+    // Constructor for Spring Data JDBC (explicit annotation when multiple constructors exist)
+    @PersistenceCreator
+    public Customer(Long id, String firstName, String lastName, String email, LocalDateTime createdAt) {
+        this.id = id;
+        this.firstName = firstName;
+        this.lastName = lastName;
+        this.email = email;
+        this.createdAt = createdAt;
     }
     
-    @PatchMapping("/{id}") // PATCH for partial updates
-    public ResponseEntity<UserDTO> partiallyUpdateUser(@PathVariable String id, @RequestBody Map<String, Object> updates) {
-        // ... logic to partially update user ...
-        return ResponseEntity.ok(new UserDTO());
+    // Factory method for new entities
+    public static Customer of(String firstName, String lastName, String email) {
+        return new Customer(null, firstName, lastName, email, LocalDateTime.now());
     }
 }
-// Dummy DTO classes
-class UserDTO { private String id; public String getId() { return id; } /* ... other fields, getters, setters ... */ }
-class UserCreateDTO { /* ... fields ... */ }
-class UserUpdateDTO { /* ... fields ... */ }
 ```
 
 **Bad Example:**
 
 ```java
-@RestController
-@RequestMapping("/api")
-public class BadUserController {
-
-    // Bad: Using GET to perform a state change (e.g., delete)
-    @GetMapping("/deleteUser")
-    public ResponseEntity<String> deleteUserViaGet(@RequestParam String id) {
-        System.out.println("Deleting user: " + id + " (Bad: GET used for delete)");
-        // ... delete logic ...
-        return ResponseEntity.ok("User deleted (but GET was used!)");
+// Missing @PersistenceCreator annotation with multiple constructors
+public record Customer(
+    @Id Long id,
+    String firstName,
+    String lastName,
+    String email,
+    LocalDateTime createdAt
+) {
+    // Multiple constructors without @PersistenceCreator - Spring Data JDBC won't know which to use
+    public Customer(Long id, String firstName, String lastName, String email, LocalDateTime createdAt) {
+        this.id = id;
+        this.firstName = firstName;
+        this.lastName = lastName;
+        this.email = email;
+        this.createdAt = createdAt;
     }
-
-    // Bad: Using POST for all operations, including retrieval
-    @PostMapping("/getUser")
-    public ResponseEntity<UserDTO> getUserViaPost(@RequestBody String idPayload) {
-        System.out.println("Fetching user: " + idPayload + " (Bad: POST used for GET)");
-        // ... fetch logic ...
-        return ResponseEntity.ok(new UserDTO());
+    
+    public Customer(String firstName, String lastName, String email) {
+        this(null, firstName, lastName, email, LocalDateTime.now());
     }
+}
+
+// Or using mutable entity class with boilerplate
+public class Customer {
+    @Id
+    private Long id;
+    private String firstName;
+    private String lastName;
+    private String email;
+    private LocalDateTime createdAt;
+    
+    // Constructors, getters, setters, equals, hashCode...
+    // 50+ lines of boilerplate code
 }
 ```
 
-## Rule 2: Design Clear and Consistent Resource URIs
+## Rule 2: Implement Repository Pattern Correctly
 
-Title: Use Nouns for Resources and Maintain URI Consistency
-Description: Design URIs that are intuitive and clearly represent resources. Use nouns (e.g., `/users`, `/orders`) instead of verbs. Keep URIs consistent in style (e.g., lowercase, hyphenated or camelCase for path segments).
+Title: Extend Appropriate Repository Interfaces
+Description: Use CrudRepository or PagingAndSortingRepository as base interfaces. Leverage method query derivation for simple queries and @Query for complex ones. Always annotate with @Repository.
 
 **Good example:**
 
-```
-GET /users                           // Get all users
-GET /users/{userId}                  // Get a specific user
-GET /users/{userId}/orders           // Get all orders for a specific user
-GET /users/{userId}/orders/{orderId} // Get a specific order for a user
-POST /users                          // Create a new user
+```java
+@Repository
+public interface CustomerRepository extends CrudRepository<Customer, Long> {
+    
+    // Method query derivation
+    List<Customer> findByLastName(String lastName);
+    Optional<Customer> findByEmail(String email);
+    
+    // Custom query for complex operations
+    @Query("SELECT * FROM customer WHERE email LIKE :pattern")
+    List<Customer> findByEmailPattern(@Param("pattern") String pattern);
+}
 ```
 
 **Bad Example:**
 
+```java
+// Missing @Repository annotation and poor method naming
+public interface CustomerRepository extends CrudRepository<Customer, Long> {
+    
+    // Unclear method names that don't follow Spring Data conventions
+    List<Customer> getCustomersWithLastName(String lastName);
+    
+    // Raw SQL without parameters
+    @Query("SELECT * FROM customer WHERE email LIKE '%@gmail.com%'")
+    List<Customer> findGmailUsers();
+}
 ```
-GET /getAllUsers
-GET /fetchUserById?id={userId}
-POST /createNewUser
+
+## Rule 3: Handle Updates with Immutable Records
+
+Title: Create New Record Instances for Updates
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
