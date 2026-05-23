@@ -1,186 +1,217 @@
 ---
 trigger: always_on
-description: Generic event system architecture and usage patterns
+description: Pattern for exposing platform-specific native handles from cross-platform wrappers
 ---
 
 
-# Generic Event System Rules
+# Native Object Provider Pattern Rules
 
-This project uses a comprehensive, type-safe event system built on top of C++ templates and inheritance. Understanding this system is crucial for working with any event-driven components.
+Classes that wrap platform-specific objects inherit from [NativeObjectProvider](mdc:src/foundation/native_object_provider.h) to expose their underlying native handles. This enables advanced use cases where users need direct access to platform APIs while maintaining the cross-platform abstraction.
 
-## Core Architecture
+## Purpose
 
-### Base Event Class
+The NativeObjectProvider pattern serves several purposes:
 
-All events inherit from [Event](mdc:src/foundation/event.h) which provides:
+1. **Escape Hatch** - Allows access to native APIs not wrapped by the library
+2. **Interop** - Enables integration with other libraries expecting native handles
+3. **Advanced Features** - Supports platform-specific functionality
+4. **Type Safety** - Returns `void*` for cross-platform compatibility
+5. **Encapsulation** - Keeps implementation details hidden until explicitly requested
 
-- Automatic timestamp generation
-- Virtual `GetTypeName()` method for debugging
-- Type-safe event hierarchy
+## Base Class Structure
 
-### Event Emitter Pattern
-
-Classes that emit events inherit from `EventEmitter<BaseEventType>` from [event_emitter.h](mdc:src/foundation/event_emitter.h):
-
-- Provides compile-time type safety
-- Supports both synchronous and asynchronous event emission
-- Thread-safe listener management
-- Automatic background thread management for async events
-
-## Event Types
-
-Events are organized into hierarchies based on their domain. Each hierarchy has a base event class that other specific events inherit from. This provides type safety and allows listeners to register for either specific events or entire categories.
-
-## Usage Patterns
-
-### Creating Event Classes
+### Header ([foundation/native_object_provider.h](mdc:src/foundation/native_object_provider.h))
 
 ```cpp
-class MyCustomEvent : public Event {
+#pragma once
+
+namespace nativeapi {
+
+class NativeObjectProvider {
 public:
-    MyCustomEvent(const std::string& data) : data_(data) {}
-
-    const std::string& GetData() const { return data_; }
-    std::string GetTypeName() const override { return "MyCustomEvent"; }
-
-private:
-    std::string data_;
-};
-```
-
-### Creating Event Emitters
-
-```cpp
-class MyClass : public EventEmitter<MyCustomEvent> {
-public:
-    void DoSomething() {
-        // Synchronous emission
-        Emit<MyCustomEvent>("some data");
-
-        // Asynchronous emission
-        EmitAsync<MyCustomEvent>("async data");
-    }
-};
-```
-
-### Adding Event Listeners
-
-```cpp
-// Using lambda functions
-auto listener_id = emitter.AddListener<MyCustomEvent>(
-    [](const MyCustomEvent& event) {
-        std::cout << "Received: " << event.GetData() << std::endl;
-    }
-);
-
-// Using custom listener class
-class MyListener : public EventListener<MyCustomEvent> {
-public:
-    void OnEvent(const MyCustomEvent& event) override {
-        // Handle event
-    }
-};
-
-MyListener listener;
-auto listener_id = emitter.AddListener<MyCustomEvent>(&listener);
-```
-
-### Removing Listeners
-
-```cpp
-// Remove by ID
-emitter.RemoveListener(listener_id);
-
-// Remove all listeners for specific event type
-emitter.RemoveAllListeners<MyCustomEvent>();
-
-// Remove all listeners
-emitter.RemoveAllListeners();
-```
-
-## Best Practices
-
-1. **Always inherit from appropriate base event class** - Don't inherit directly from `Event` unless creating a new event hierarchy
-2. **Use specific event types** - Prefer `EventListener<SpecificEvent>` over `EventListener<Event>` for type safety
-3. **Implement GetTypeName()** - Always override this method for debugging purposes
-4. **Use const references** - Event handlers should accept `const EventType&` parameters
-5. **Manage listener lifetimes** - Ensure listener objects remain valid while registered
-6. **Prefer async emission for heavy operations** - Use `EmitAsync` for events that might trigger expensive operations
-7. **Use RAII for listener management** - Store listener IDs and remove them in destructors
-
-## Thread Safety
-
-- Event emission is thread-safe
-- Listener registration/removal is thread-safe
-- Async event processing uses a dedicated background thread
-- Event handlers may be called from different threads depending on emission method
-
-## Common Patterns
-
-### Singleton Event Emitters
-
-Many managers (WindowManager, DisplayManager) are singletons that emit events:
-
-```cpp
-auto& manager = WindowManager::GetInstance();
-manager.AddListener<WindowCreatedEvent>([](const WindowCreatedEvent& event) {
-    // Handle window creation
-});
-```
-
-### Event Forwarding
-
-Platform-specific implementations often forward system events to the generic event system:
-
-```cpp
-void PlatformWindow::OnSystemEvent(const SystemEvent& sys_event) {
-    // Convert to generic event and emit
-    WindowEvent generic_event(sys_event.GetWindowId());
-    emitter_.Emit(generic_event);
-}
-```
-
-### Event Filtering
-
-Listeners can filter events by checking specific types:
-
-```cpp
-emitter.AddListener<WindowEvent>([](const WindowEvent& event) {
-    if (auto moved_event = dynamic_cast<const WindowMovedEvent*>(&event)) {
-        // Handle only window moved events
-    }
-});
-```
-
-### Event Listening Lifecycle Management
-
-Managers can efficiently manage platform-specific event monitoring by overriding `StartEventListening()` and `StopEventListening()` hooks. These hooks are automatically called when the first listener is added and when the last listener is removed, respectively.
-
-#### Purpose
-
-This pattern allows managers to:
-- **Lazy initialization** - Only start platform event monitoring when needed
-- **Resource efficiency** - Stop monitoring when no listeners exist
-- **Automatic management** - No manual tracking of listener count required
-
-#### Implementation Pattern
-
-```cpp
-// tray_icon.h
-class TrayIcon : public EventEmitter<TrayIconEvent>, public NativeObjectProvider {
-public:
-    TrayIcon();
-    virtual ~TrayIcon();
+    virtual ~NativeObjectProvider() = default;
     
-    // ... public API ...
+    /**
+     * Get the native platform-specific object.
+     * 
+     * Platform-specific return types:
+     * - macOS: NSWindow*, NSMenu*, NSMenuItem*, NSView*, etc.
+     * - Windows: HWND, HMENU, etc.
+     * - Linux: GtkWidget*, GtkMenu*, GdkWindow*, etc.
+     */
+    void* GetNativeObject() const {
+        return GetNativeObjectInternal();
+    }
 
 protected:
-    // Override these to control platform event monitoring
-    void StartEventListening() override;
-    void StopEventListening() override;
+    /**
+     * Derived classes must implement this to return their native object.
+     */
+    virtual void* GetNativeObjectInternal() const = 0;
+};
+
+}  // namespace nativeapi
+```
+
+## Implementing NativeObjectProvider
+
+### Pattern for Classes
+
+All classes wrapping native objects should:
+
+1. Inherit from `NativeObjectProvider`
+2. Implement `GetNativeObjectInternal()` protected method
+3. Return platform-specific handle as `void*`
+
+### Example: Window Class
+
+#### Header ([window.h](mdc:src/window.h))
+
+```cpp
+#pragma once
+#include "foundation/native_object_provider.h"
+
+namespace nativeapi {
+
+class Window : public NativeObjectProvider {
+public:
+    Window();
+    Window(void* native_window);
+    virtual ~Window();
+    
+    // ... public API methods ...
+
+protected:
+    void* GetNativeObjectInternal() const override;
 
 private:
     class Impl;
+    std::unique_ptr<Impl> pimpl_;
+};
+
+}  // namespace nativeapi
+```
+
+#### Platform Implementations
+
+##### Windows ([platform/windows/window_windows.cpp](mdc:src/platform/windows))
+
+```cpp
+#include <windows.h>
+#include "../../window.h"
+
+namespace nativeapi {
+
+class Window::Impl {
+public:
+    HWND hwnd_;
+};
+
+void* Window::GetNativeObjectInternal() const {
+    // Cast HWND to void*
+    return static_cast<void*>(pimpl_->hwnd_);
+}
+
+}  // namespace nativeapi
+```
+
+##### macOS ([platform/macos/window_macos.mm](mdc:src/platform/macos))
+
+```objc
+#import <Cocoa/Cocoa.h>
+#include "../../window.h"
+
+namespace nativeapi {
+
+class Window::Impl {
+public:
+    NSWindow* window_;
+};
+
+void* Window::GetNativeObjectInternal() const {
+    // Cast NSWindow* to void*
+    return static_cast<void*>(pimpl_->window_);
+}
+
+}  // namespace nativeapi
+```
+
+##### Linux ([platform/linux/window_linux.cpp](mdc:src/platform/linux))
+
+```cpp
+#include <gtk/gtk.h>
+#include "../../window.h"
+
+namespace nativeapi {
+
+class Window::Impl {
+public:
+    GtkWidget* window_;
+};
+
+void* Window::GetNativeObjectInternal() const {
+    // Cast GtkWidget* to void*
+    return static_cast<void*>(pimpl_->window_);
+}
+
+}  // namespace nativeapi
+```
+
+## Using Native Objects
+
+### Cross-Platform Usage
+
+Users can access native objects when they need platform-specific functionality. Since platform-specific implementations are separated into `/platform/{windows|macos|linux}` directories, users should cast the native handle to the appropriate platform-specific type:
+
+```cpp
+#include <nativeapi.h>
+
+using namespace nativeapi;
+
+auto& manager = WindowManager::GetInstance();
+auto window = manager.Create(options);
+
+// Get native handle
+void* native = window->GetNativeObject();
+
+// Cast to platform-specific type
+// Windows: HWND
+// macOS: NSWindow*
+// Linux: GtkWidget* (GtkWindow)
+```
+
+### Platform-Specific Usage Examples
+
+#### Windows Implementation
+```cpp
+// In Windows-specific code
+HWND hwnd = static_cast<HWND>(window->GetNativeObject());
+SetWindowLongPtr(hwnd, GWL_EXSTYLE, WS_EX_LAYERED);
+```
+
+#### macOS Implementation
+```objc
+// In macOS-specific code
+NSWindow* nswindow = static_cast<NSWindow*>(window->GetNativeObject());
+[nswindow setCollectionBehavior:NSWindowCollectionBehaviorFullScreenPrimary];
+```
+
+#### Linux Implementation
+```cpp
+// In Linux-specific code
+GtkWidget* gtkwindow = static_cast<GtkWidget*>(window->GetNativeObject());
+gtk_window_set_keep_above(GTK_WINDOW(gtkwindow), TRUE);
+```
+
+## Classes Using NativeObjectProvider
+
+The following classes inherit from NativeObjectProvider:
+
+| Class | Native Type (Windows) | Native Type (macOS) | Native Type (Linux) |
+|-------|----------------------|---------------------|---------------------|
+| [Window](mdc:src/window.h) | `HWND` | `NSWindow*` | `GtkWidget*` (GtkWindow) |
+| [Display](mdc:src/display.h) | `HMONITOR` | `NSScreen*` | `GdkDisplay*` / `GdkMonitor*` |
+| [Menu](mdc:src/menu.h) | `HMENU` | `NSMenu*` | `GtkWidget*` (GtkMenu) |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
