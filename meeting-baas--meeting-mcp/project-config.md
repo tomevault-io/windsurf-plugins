@@ -1,284 +1,153 @@
 ---
 trigger: always_on
-description: https://github.com/punkpeye/fastmcp
+description: Model Context Protocol home pagedark logo
 ---
 
-https://github.com/punkpeye/fastmcp
 
 
-Skip to content
-Navigation Menu
-punkpeye
-fastmcp
 
-Type / to search
-Code
-Issues
-3
-Pull requests
-Actions
-Security
-Insights
-Owner avatar
-fastmcp
-Public
-punkpeye/fastmcp
-Go to file
-t
-Name		
-punkpeye
-punkpeye
-fix: gracefully handle failure to shutdown
-754ff55
- · 
-last week
-.github/workflows
-fix: correct ci configuration
-3 months ago
-src
-fix: gracefully handle failure to shutdown
-last week
-.gitignore
-release fastmcp
-3 months ago
-LICENSE
-release fastmcp
-3 months ago
-README.md
-fix: rename auth to session
-last week
-eslint.config.js
-release fastmcp
-3 months ago
-jsr.json
-fix: limit included files
-3 months ago
-package.json
-feat: support MCP client authentication
-last week
-pnpm-lock.yaml
-feat: support MCP client authentication
-last week
-tsconfig.json
-chore: lint using tsc
-3 months ago
-vitest.config.js
-feat: allow to retrieve current list of clients
-2 months ago
-Repository files navigation
-README
-MIT license
-FastMCP
-A TypeScript framework for building MCP servers capable of handling client sessions.
+Model Context Protocol home pagedark logo
 
-Note
-
-For a Python implementation, see FastMCP.
-
-Features
-Simple Tool, Resource, Prompt definition
-Authentication
-Sessions
-Image content
-Logging
-Error handling
-SSE
-CORS (enabled by default)
-Progress notifications
-Typed server events
-Prompt argument auto-completion
-Sampling
-Automated SSE pings
-Roots
-CLI for testing and debugging
-Installation
-npm install fastmcp
+Search...
+Python SDK
+TypeScript SDK
+Java SDK
+Kotlin SDK
+Specification
+Get Started
+Introduction
 Quickstart
-import { FastMCP } from "fastmcp";
-import { z } from "zod";
-
-const server = new FastMCP({
-  name: "My Server",
-  version: "1.0.0",
-});
-
-server.addTool({
-  name: "add",
-  description: "Add two numbers",
-  parameters: z.object({
-    a: z.number(),
-    b: z.number(),
-  }),
-  execute: async (args) => {
-    return String(args.a + args.b);
-  },
-});
-
-server.start({
-  transportType: "stdio",
-});
-That's it! You have a working MCP server.
-
-You can test the server in terminal with:
-
-git clone https://github.com/punkpeye/fastmcp.git
-cd fastmcp
-
-npm install
-
-# Test the addition server example using CLI:
-npx fastmcp dev src/examples/addition.ts
-# Test the addition server example using MCP Inspector:
-npx fastmcp inspect src/examples/addition.ts
-SSE
-You can also run the server with SSE support:
-
-server.start({
-  transportType: "sse",
-  sse: {
-    endpoint: "/sse",
-    port: 8080,
-  },
-});
-This will start the server and listen for SSE connections on http://localhost:8080/sse.
-
-You can then use SSEClientTransport to connect to the server:
-
-import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
-
-const client = new Client(
-  {
-    name: "example-client",
-    version: "1.0.0",
-  },
-  {
-    capabilities: {},
-  },
-);
-
-const transport = new SSEClientTransport(new URL(`http://localhost:8080/sse`));
-
-await client.connect(transport);
-Core Concepts
+Example Servers
+Example Clients
+Tutorials
+Building MCP with LLMs
+Debugging
+Inspector
+Concepts
+Core architecture
+Resources
+Prompts
 Tools
-Tools in MCP allow servers to expose executable functions that can be invoked by clients and used by LLMs to perform actions.
+Sampling
+Roots
+Transports
+Development
+What's New
+Roadmap
+Contributing
+Documentation
+SDKs
+GitHub
 
-server.addTool({
-  name: "fetch",
-  description: "Fetch the content of a url",
-  parameters: z.object({
-    url: z.string(),
-  }),
-  execute: async (args) => {
-    return await fetchWebpageContent(args.url);
-  },
-});
-Returning a string
-execute can return a string:
+Get Started
+Introduction
+Get started with the Model Context Protocol (MCP)
 
-server.addTool({
-  name: "download",
-  description: "Download a file",
-  parameters: z.object({
-    url: z.string(),
-  }),
-  execute: async (args) => {
-    return "Hello, world!";
-  },
-});
-The latter is equivalent to:
+Java SDK released! Check out what else is new.
+MCP is an open protocol that standardizes how applications provide context to LLMs. Think of MCP like a USB-C port for AI applications. Just as USB-C provides a standardized way to connect your devices to various peripherals and accessories, MCP provides a standardized way to connect AI models to different data sources and tools.
 
-server.addTool({
-  name: "download",
-  description: "Download a file",
-  parameters: z.object({
-    url: z.string(),
-  }),
-  execute: async (args) => {
-    return {
-      content: [
-        {
-          type: "text",
-          text: "Hello, world!",
-        },
-      ],
-    };
-  },
-});
-Returning a list
-If you want to return a list of messages, you can return an object with a content property:
+​
+Why MCP?
+MCP helps you build agents and complex workflows on top of LLMs. LLMs frequently need to integrate with data and tools, and MCP provides:
 
-server.addTool({
-  name: "download",
-  description: "Download a file",
-  parameters: z.object({
-    url: z.string(),
-  }),
-  execute: async (args) => {
-    return {
-      content: [
-        { type: "text", text: "First message" },
-        { type: "text", text: "Second message" },
-      ],
-    };
-  },
-});
-Returning an image
-Use the imageContent to create a content object for an image:
+A growing list of pre-built integrations that your LLM can directly plug into
+The flexibility to switch between LLM providers and vendors
+Best practices for securing your data within your infrastructure
+​
+General architecture
+At its core, MCP follows a client-server architecture where a host application can connect to multiple servers:
 
-import { imageContent } from "fastmcp";
+MCP Hosts: Programs like Claude Desktop, IDEs, or AI tools that want to access data through MCP
+MCP Clients: Protocol clients that maintain 1:1 connections with servers
+MCP Servers: Lightweight programs that each expose specific capabilities through the standardized Model Context Protocol
+Local Data Sources: Your computer’s files, databases, and services that MCP servers can securely access
+Remote Services: External systems available over the internet (e.g., through APIs) that MCP servers can connect to
+​
+Get started
+Choose the path that best fits your needs:
 
-server.addTool({
-  name: "download",
-  description: "Download a file",
-  parameters: z.object({
-    url: z.string(),
-  }),
-  execute: async (args) => {
-    return imageContent({
-      url: "https://example.com/image.png",
-    });
+​
+Quick Starts
+For Server Developers
+Get started building your own server to use in Claude for Desktop and other clients
 
-    // or...
-    // return imageContent({
-    //   path: "/path/to/image.png",
-    // });
+For Client Developers
+Get started building your own client that can integrate with all MCP servers
 
-    // or...
-    // return imageContent({
-    //   buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=", "base64"),
-    // });
+For Claude Desktop Users
+Get started using pre-built servers in Claude for Desktop
 
-    // or...
-    // return {
-    //   content: [
-    //     await imageContent(...)
-    //   ],
-    // };
-  },
-});
-The imageContent function takes the following options:
+​
+Examples
+Example Servers
+Check out our gallery of official MCP servers and implementations
 
-url: The URL of the image.
-path: The path to the image file.
-buffer: The image data as a buffer.
-Only one of url, path, or buffer must be specified.
+Example Clients
+View the list of clients that support MCP integrations
 
-The above example is equivalent to:
+​
+Tutorials
+Building MCP with LLMs
+Learn how to use LLMs like Claude to speed up your MCP development
 
-server.addTool({
-  name: "download",
-  description: "Download a file",
-  parameters: z.object({
-    url: z.string(),
-  }),
-  execute: async (args) => {
-    return {
-      content: [
-        {
-          type: "image",
+Debugging Guide
+Learn how to effectively debug MCP servers and integrations
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+MCP Inspector
+Test and inspect your MCP servers with our interactive debugging tool
+
+​
+Explore MCP
+Dive deeper into MCP’s core concepts and capabilities:
+
+Core architecture
+Understand how MCP connects clients, servers, and LLMs
+
+Resources
+Expose data and content from your servers to LLMs
+
+Prompts
+Create reusable prompt templates and workflows
+
+Tools
+Enable LLMs to perform actions through your server
+
+Sampling
+Let your servers request completions from LLMs
+
+Transports
+Learn about MCP’s communication mechanism
+
+​
+Contributing
+Want to contribute? Check out our Contributing Guide to learn how you can help improve MCP.
+
+​
+Support and Feedback
+Here’s how to get help or provide feedback:
+
+For bug reports and feature requests related to the MCP specification, SDKs, or documentation (open source), please create a GitHub issue
+For discussions or Q&A about the MCP specification, use the specification discussions
+For discussions or Q&A about other MCP open source components, use the organization discussions
+For bug reports, feature requests, and questions related to Claude.app and claude.ai’s MCP integration, please email mcp-support@anthropic.com
+Was this page helpful?
+
+
+Yes
+
+No
+For Server Developers
+github
+On this page
+Why MCP?
+General architecture
+Get started
+Quick Starts
+Examples
+Tutorials
+Explore MCP
+Contributing
+Support and Feedback
 
 ---
 > Source: [Meeting-BaaS/meeting-mcp](https://github.com/Meeting-BaaS/meeting-mcp) — distributed by [TomeVault](https://tomevault.io).
