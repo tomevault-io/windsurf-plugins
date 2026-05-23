@@ -1,226 +1,152 @@
 ---
 trigger: always_on
-description: Guidelines for implementing platform-specific code for Windows, macOS, and Linux
+description: Project structure, organization, and architectural patterns
 ---
 
 
-# Platform-Specific Implementation Rules
+# Project Architecture Rules
 
-All platform-specific code lives in [src/platform/](mdc:src/platform) organized by operating system. Each platform implements the same cross-platform interfaces using native APIs.
+This document describes the overall architecture and organization of the nativeapi project.
 
-## Platform Directories
+## Project Overview
+
+**nativeapi** is a modern cross-platform C++ library providing unified access to native system APIs across Windows, macOS, and Linux. The library abstracts platform-specific details behind a clean, type-safe C++ interface and provides optional C bindings for FFI compatibility.
+
+## Directory Structure
 
 ```
-src/platform/
-├── windows/    # Windows implementation (*.cpp)
-├── macos/      # macOS implementation (*.mm for Objective-C++)
-└── linux/      # Linux implementation (*.cpp with GTK)
+nativeapi/
+├── include/              # Public API headers
+│   └── nativeapi.h      # Single include file for all functionality
+├── src/                  # Source code
+│   ├── foundation/      # Core utilities (events, geometry, ID allocation)
+│   ├── capi/           # C API bindings (FFI-friendly)
+│   ├── platform/       # Platform-specific implementations
+│   │   ├── windows/   # Windows implementations (*.cpp)
+│   │   ├── macos/     # macOS implementations (*.mm)
+│   │   └── linux/     # Linux implementations (*.cpp with GTK)
+│   └── *.h, *.cpp     # Cross-platform interface definitions
+├── examples/            # Example applications
+└── docs/               # Documentation
 ```
 
-## Platform APIs Used
+## Core Architectural Layers
 
-| Platform | Primary APIs | Language | File Extension |
-|----------|-------------|----------|----------------|
-| **Windows** | Win32 API, GDI+ | C++ | `.cpp` |
-| **macOS** | Cocoa/AppKit | Objective-C++ | `.mm` |
-| **Linux** | GTK 3.0, X11 | C++ | `.cpp` |
+### 1. Foundation Layer ([src/foundation/](mdc:src/foundation))
 
-## File Naming Convention
+Provides fundamental utilities used throughout the library:
 
-Platform files follow: `<module>_<platform>.<ext>`
+- **[event.h](mdc:src/foundation/event.h)** - Base event class with timestamps
+- **[event_emitter.h](mdc:src/foundation/event_emitter.h)** - Generic event system with listeners
+- **[geometry.h](mdc:src/foundation/geometry.h)** - Cross-platform geometry types (Point, Size, Rectangle)
+- **[id_allocator.h](mdc:src/foundation/id_allocator.h)** - Thread-safe ID generation
+- **[native_object_provider.h](mdc:src/foundation/native_object_provider.h)** - Base class for exposing native handles
 
-Examples:
-- `window_windows.cpp` - Windows window implementation
-- `window_macos.mm` - macOS window implementation  
-- `window_linux.cpp` - Linux window implementation
-- `menu_windows.cpp` - Windows menu implementation
+### 2. Cross-Platform Interface Layer ([src/](mdc:src))
 
-## Implementation Pattern
+Defines platform-agnostic APIs that all platforms must implement:
 
-### 1. Define Platform-Specific PIMPL::Impl
+- **Window Management** - [window.h](mdc:src/window.h), [window_manager.h](mdc:src/window_manager.h)
+- **Display Management** - [display.h](mdc:src/display.h), [display_manager.h](mdc:src/display_manager.h)
+- **Tray Icons** - [tray_icon.h](mdc:src/tray_icon.h), [tray_manager.h](mdc:src/tray_manager.h)
+- **Menus** - [menu.h](mdc:src/menu.h)
+- **Keyboard Monitoring** - [keyboard_monitor.h](mdc:src/keyboard_monitor.h)
+- **Accessibility** - [accessibility_manager.h](mdc:src/accessibility_manager.h)
+- **Events** - [window_event.h](mdc:src/window_event.h), [display_event.h](mdc:src/display_event.h), etc.
 
-Each platform file defines the `Impl` class declared in the cross-platform header:
+### 3. Platform-Specific Implementation Layer
 
-#### Windows Example ([platform/windows/window_windows.cpp](mdc:src/platform/windows))
+Each platform implements the cross-platform interfaces using native APIs:
+
+- **Windows** - Uses Win32 API (HWND, HMENU, GDI+)
+- **macOS** - Uses Cocoa/AppKit (NSWindow, NSMenu, Objective-C++)
+- **Linux** - Uses GTK 3.0 (GtkWindow, GtkMenu)
+
+### 4. C API Layer ([src/capi/](mdc:src/capi))
+
+Provides C-compatible bindings for all C++ APIs to enable FFI from other languages:
+
+- Each C++ API has a corresponding `_c.h` and `_c.cpp` file
+- Uses opaque pointers and plain C types
+- Memory management follows C conventions (explicit free functions)
+
+## Key Design Patterns
+
+### Singleton Pattern
+
+Managers use Meyer's singleton pattern for global access:
 
 ```cpp
-// clang-format off
-#include <windows.h>
-#include <shellapi.h>
-// clang-format on
-#include "../../window.h"
-
-namespace nativeapi {
-
-// Define platform-specific Impl
-class Window::Impl {
+class WindowManager {
 public:
-    Impl(HWND hwnd) : hwnd_(hwnd) {}
-    
-    HWND hwnd_;  // Windows window handle
-    // Other Windows-specific state...
+    static WindowManager& GetInstance();
+private:
+    WindowManager();  // Private constructor
 };
-
-// Implement constructors
-Window::Window() : pimpl_(std::make_unique<Impl>(nullptr)) {}
-
-Window::Window(void* window) 
-    : pimpl_(std::make_unique<Impl>(static_cast<HWND>(window))) {}
-
-Window::~Window() = default;
-
-// Implement methods using Win32 API
-void Window::Show() {
-    if (pimpl_->hwnd_) {
-        ShowWindow(pimpl_->hwnd_, SW_SHOW);
-        SetForegroundWindow(pimpl_->hwnd_);
-    }
-}
-
-void Window::Hide() {
-    if (pimpl_->hwnd_) {
-        ShowWindow(pimpl_->hwnd_, SW_HIDE);
-    }
-}
-
-bool Window::IsVisible() const {
-    return pimpl_->hwnd_ && IsWindowVisible(pimpl_->hwnd_);
-}
-
-void* Window::GetNativeObjectInternal() const {
-    return static_cast<void*>(pimpl_->hwnd_);
-}
-
-}  // namespace nativeapi
 ```
 
-#### macOS Example ([platform/macos/window_macos.mm](mdc:src/platform/macos))
+Examples: [WindowManager](mdc:src/window_manager.h), [DisplayManager](mdc:src/display_manager.h), [TrayManager](mdc:src/tray_manager.h)
 
-```objc
-#import <Cocoa/Cocoa.h>
-#include "../../window.h"
+### PIMPL (Pointer to Implementation)
 
-namespace nativeapi {
-
-// Define platform-specific Impl
-class Window::Impl {
-public:
-    Impl(NSWindow* window) : window_(window) {
-        if (window_) {
-            [window_ retain];  // Retain ownership
-        }
-    }
-    
-    ~Impl() {
-        if (window_) {
-            [window_ release];  // Release ownership
-        }
-    }
-    
-    NSWindow* window_;  // macOS window handle
-};
-
-// Implement constructors
-Window::Window() : pimpl_(std::make_unique<Impl>(nil)) {}
-
-Window::Window(void* window) 
-    : pimpl_(std::make_unique<Impl>(static_cast<NSWindow*>(window))) {}
-
-Window::~Window() = default;
-
-// Implement methods using Cocoa API
-void Window::Show() {
-    if (pimpl_->window_) {
-        [pimpl_->window_ makeKeyAndOrderFront:nil];
-    }
-}
-
-void Window::Hide() {
-    if (pimpl_->window_) {
-        [pimpl_->window_ orderOut:nil];
-    }
-}
-
-bool Window::IsVisible() const {
-    return pimpl_->window_ && [pimpl_->window_ isVisible];
-}
-
-void* Window::GetNativeObjectInternal() const {
-    return static_cast<void*>(pimpl_->window_);
-}
-
-}  // namespace nativeapi
-```
-
-#### Linux Example ([platform/linux/window_linux.cpp](mdc:src/platform/linux))
+All cross-platform classes use PIMPL to hide platform-specific details:
 
 ```cpp
-#include <gtk/gtk.h>
-#include "../../window.h"
-
-namespace nativeapi {
-
-// Define platform-specific Impl
-class Window::Impl {
-public:
-    Impl(GtkWidget* window) : window_(window) {
-        if (window_) {
-            g_object_ref(window_);  // Increase reference count
-        }
-    }
-    
-    ~Impl() {
-        if (window_) {
-            g_object_unref(window_);  // Decrease reference count
-        }
-    }
-    
-    GtkWidget* window_;  // GTK window handle
+class Window {
+private:
+    class Impl;  // Forward declaration
+    std::unique_ptr<Impl> pimpl_;  // Platform-specific implementation
 };
-
-// Implement constructors
-Window::Window() : pimpl_(std::make_unique<Impl>(nullptr)) {}
-
-Window::Window(void* window) 
-    : pimpl_(std::make_unique<Impl>(static_cast<GtkWidget*>(window))) {}
-
-Window::~Window() = default;
-
-// Implement methods using GTK API
-void Window::Show() {
-    if (pimpl_->window_) {
-        gtk_widget_show_all(pimpl_->window_);
-        gtk_window_present(GTK_WINDOW(pimpl_->window_));
-    }
-}
-
-void Window::Hide() {
-    if (pimpl_->window_) {
-        gtk_widget_hide(pimpl_->window_);
-    }
-}
-
-bool Window::IsVisible() const {
-    return pimpl_->window_ && gtk_widget_get_visible(pimpl_->window_);
-}
-
-void* Window::GetNativeObjectInternal() const {
-    return static_cast<void*>(pimpl_->window_);
-}
-
-}  // namespace nativeapi
 ```
 
-## Platform Handle Types
+See [PIMPL Pattern Rules](mdc:.cursor/rules/pimpl-pattern.mdc) for details.
 
-### Native Handle Mapping
+### Event-Driven Architecture
 
-| Component | Windows | macOS | Linux |
-|-----------|---------|-------|-------|
-| Window | `HWND` | `NSWindow*` | `GtkWidget*` (GtkWindow) |
-| Menu | `HMENU` | `NSMenu*` | `GtkWidget*` (GtkMenu) |
-| MenuItem | N/A (in HMENU) | `NSMenuItem*` | `GtkWidget*` (GtkMenuItem) |
-| Display | `HMONITOR` | `NSScreen*` | `GdkDisplay*` |
+All managers and many objects inherit from `EventEmitter` to provide event notifications:
+
+```cpp
+class WindowManager : public EventEmitter<WindowEvent> {
+    // Can emit WindowCreatedEvent, WindowClosedEvent, etc.
+};
+```
+
+See [Event System Rules](mdc:.cursor/rules/event-system.mdc) for details.
+
+### Native Object Provider
+
+Classes that wrap platform-specific objects inherit from `NativeObjectProvider` to expose native handles:
+
+```cpp
+class Window : public NativeObjectProvider {
+protected:
+    void* GetNativeObjectInternal() const override;  // Returns HWND, NSWindow*, or GtkWidget*
+};
+```
+
+## Build System
+
+The project uses CMake ([CMakeLists.txt](mdc:CMakeLists.txt)) with platform detection:
+
+- **C++17 Standard** required
+- **Conditional Compilation** - Platform sources selected based on `CMAKE_SYSTEM_NAME`
+- **Platform Dependencies**:
+  - Windows: user32, shell32, dwmapi, gdiplus
+  - macOS: Cocoa framework, Objective-C++ enabled
+  - Linux: GTK 3.0, X11, ayatana-appindicator
+
+## Naming Conventions
+
+### C++ API
+
+- **Classes**: PascalCase (e.g., `WindowManager`, `MenuItem`)
+- **Methods**: PascalCase (e.g., `GetSize()`, `SetVisible()`)
+- **Member Variables**: snake_case with trailing underscore (e.g., `window_id_`, `pimpl_`)
+- **Enums**: PascalCase for type, PascalCase for values (e.g., `MenuItemType::Checkbox`)
+- **Files**: snake_case (e.g., `window_manager.h`, `display_event.h`)
+
+### C API
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
