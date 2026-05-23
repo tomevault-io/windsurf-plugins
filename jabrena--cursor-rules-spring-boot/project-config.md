@@ -1,152 +1,156 @@
 ---
 trigger: always_on
-description: Spring Data JDBC provides a simpler alternative to JPA, offering direct SQL control while maintaining Spring's repository abstractions. When combined with Java records, it creates clean, immutable data models perfect for modern Java applications.
+description: HikariCP is the default connection pool for Spring Boot and is known for being the fastest, most reliable connection pool available for Java applications. This guide will help you configure HikariCP optimally for your Spring Boot applications.
 ---
 
-# Spring Data JDBC with Records
+# Spring Boot HikariCP Connection Pool Configuration
 
-Spring Data JDBC provides a simpler alternative to JPA, offering direct SQL control while maintaining Spring's repository abstractions. When combined with Java records, it creates clean, immutable data models perfect for modern Java applications.
+HikariCP is the default connection pool for Spring Boot and is known for being the fastest, most reliable connection pool available for Java applications. This guide will help you configure HikariCP optimally for your Spring Boot applications.
 
 ## Implementing These Principles
 
 These guidelines are built upon the following core principles:
 
-- **Immutability**: Use records for immutable entities that are thread-safe and predictable
-- **Simplicity**: Leverage Spring Data JDBC's straightforward approach over complex ORM mapping
-- **Constructor Injection**: Always use constructor-based dependency injection for better testability
-- **Transaction Boundaries**: Keep transactions at the service layer, not repository layer
-- **SQL Control**: Use custom queries when needed for optimal performance
+- **Performance First**: Configure pool sizes based on your application's actual database concurrency needs
+- **Resource Efficiency**: Balance connection availability with memory and database server resources
+- **Monitoring & Observability**: Enable metrics and logging to understand pool behavior
+- **Environment-Specific**: Adjust configurations based on development, testing, and production environments
+- **Fail-Fast**: Configure appropriate timeouts to detect issues quickly
 
 ## Table of contents
 
-- Rule 1: Use Records for Entity Classes
-- Rule 2: Implement Repository Pattern Correctly
-- Rule 3: Handle Updates with Immutable Records
-- Rule 4: Design Aggregate Relationships Properly
-- Rule 5: Use Custom Queries for Complex Operations
-- Rule 6: Implement Proper Transaction Management
-- Rule 7: Embrace Single Query Loading to Eliminate N+1 Problems
+- Rule 1: Essential Pool Sizing Configuration
+- Rule 2: Connection Timeout and Lifecycle Management
+- Rule 3: Health Check and Validation Configuration
+- Rule 4: Performance Monitoring and Metrics
+- Rule 5: Environment-Specific Configuration Strategies
 
-## Rule 1: Use Records for Entity Classes
+## Rule 1: Essential Pool Sizing Configuration
 
-Title: Prefer Records Over Classes for Entity Definitions
-Description: Records provide immutability, automatic equals/hashCode, and clean constructor-based mapping that works perfectly with Spring Data JDBC. They eliminate boilerplate code and ensure thread safety. Use @PersistenceCreator when you have multiple constructors to specify which one Spring Data JDBC should use. Use @Column to explicitly map record fields to database columns, especially when field names differ from column names.
+**Title**: Right-size your connection pool based on application needs
+
+**Description**: The most critical aspect of HikariCP configuration is determining the optimal pool size. Ask yourself: "How many concurrent database operations does my application actually need?" Most applications need far fewer connections than developers initially think.
+
+**Key Questions to Ask:**
+- How many concurrent users will access my application?
+- How many database operations happen per user request?
+- What's my database server's connection limit?
+- Am I running multiple application instances?
 
 **Good example:**
 
+```yaml
+# application.yml
+spring:
+  datasource:
+    hikari:
+      # Start with this formula: connections = ((core_count * 2) + effective_spindle_count)
+      # For most web apps: 10-15 connections is often sufficient
+      maximum-pool-size: 10
+      minimum-idle: 5
+      # Allow pool to shrink during low activity
+      idle-timeout: 300000  # 5 minutes
+```
+
 ```java
-public record Customer(
-    @Id 
-    @Column("customer_id") 
-    Long id,
+// For programmatic configuration
+@Configuration
+public class DatabaseConfig {
     
-    @Column("first_name") 
-    String firstName,
-    
-    @Column("last_name") 
-    String lastName,
-    
-    @Column("email_address") 
-    String email,
-    
-    @Column("created_at") 
-    LocalDateTime createdAt
-) {
-    // Constructor for Spring Data JDBC (explicit annotation when multiple constructors exist)
-    @PersistenceCreator
-    public Customer(Long id, String firstName, String lastName, String email, LocalDateTime createdAt) {
-        this.id = id;
-        this.firstName = firstName;
-        this.lastName = lastName;
-        this.email = email;
-        this.createdAt = createdAt;
-    }
-    
-    // Factory method for new entities
-    public static Customer of(String firstName, String lastName, String email) {
-        return new Customer(null, firstName, lastName, email, LocalDateTime.now());
+    @Bean
+    @ConfigurationProperties("spring.datasource.hikari")
+    public HikariConfig hikariConfig() {
+        HikariConfig config = new HikariConfig();
+        // Conservative pool sizing for most applications
+        config.setMaximumPoolSize(10);
+        config.setMinimumIdle(5);
+        config.setIdleTimeout(300_000);
+        return config;
     }
 }
 ```
 
 **Bad Example:**
 
-```java
-// Missing @PersistenceCreator annotation with multiple constructors
-public record Customer(
-    @Id Long id,
-    String firstName,
-    String lastName,
-    String email,
-    LocalDateTime createdAt
-) {
-    // Multiple constructors without @PersistenceCreator - Spring Data JDBC won't know which to use
-    public Customer(Long id, String firstName, String lastName, String email, LocalDateTime createdAt) {
-        this.id = id;
-        this.firstName = firstName;
-        this.lastName = lastName;
-        this.email = email;
-        this.createdAt = createdAt;
-    }
-    
-    public Customer(String firstName, String lastName, String email) {
-        this(null, firstName, lastName, email, LocalDateTime.now());
-    }
-}
-
-// Or using mutable entity class with boilerplate
-public class Customer {
-    @Id
-    private Long id;
-    private String firstName;
-    private String lastName;
-    private String email;
-    private LocalDateTime createdAt;
-    
-    // Constructors, getters, setters, equals, hashCode...
-    // 50+ lines of boilerplate code
-}
+```yaml
+# application.yml - DON'T DO THIS
+spring:
+  datasource:
+    hikari:
+      # Too many connections - wastes resources and can overwhelm DB
+      maximum-pool-size: 100
+      minimum-idle: 50
+      # Never let connections be idle - keeps unnecessary connections
+      idle-timeout: 0
 ```
 
-## Rule 2: Implement Repository Pattern Correctly
+## Rule 2: Connection Timeout and Lifecycle Management
 
-Title: Extend Appropriate Repository Interfaces
-Description: Use CrudRepository or PagingAndSortingRepository as base interfaces. Leverage method query derivation for simple queries and @Query for complex ones. Always annotate with @Repository.
+**Title**: Configure appropriate timeouts for reliable connection handling
+
+**Description**: Proper timeout configuration ensures your application fails fast when database issues occur and doesn't hold onto stale connections. Ask yourself: "How long should my application wait for a database connection before giving up?"
+
+**Key Questions to Ask:**
+- What's an acceptable wait time for users when the database is under load?
+- How quickly should I detect database connectivity issues?
+- What's my application's typical query execution time?
 
 **Good example:**
 
+```yaml
+# application.yml
+spring:
+  datasource:
+    hikari:
+      # Fast failure for connection acquisition
+      connection-timeout: 20000      # 20 seconds - adjust based on your needs
+      # Detect stale connections quickly
+      max-lifetime: 1800000         # 30 minutes - less than DB connection timeout
+      # Quick validation of connections
+      validation-timeout: 5000       # 5 seconds
+      # Test connections when borrowed from pool
+      connection-test-query: SELECT 1
+```
+
 ```java
-@Repository
-public interface CustomerRepository extends CrudRepository<Customer, Long> {
+// Programmatic configuration with monitoring
+@Configuration
+public class DatabaseConfig {
     
-    // Method query derivation
-    List<Customer> findByLastName(String lastName);
-    Optional<Customer> findByEmail(String email);
-    
-    // Custom query for complex operations
-    @Query("SELECT * FROM customer WHERE email LIKE :pattern")
-    List<Customer> findByEmailPattern(@Param("pattern") String pattern);
+    @Bean
+    @ConfigurationProperties("spring.datasource.hikari")
+    public HikariConfig hikariConfig() {
+        HikariConfig config = new HikariConfig();
+        config.setConnectionTimeout(20_000);
+        config.setMaxLifetime(1_800_000);
+        config.setValidationTimeout(5_000);
+        
+        // Enable connection testing
+        config.setConnectionTestQuery("SELECT 1");
+        return config;
+    }
 }
 ```
 
 **Bad Example:**
 
-```java
-// Missing @Repository annotation and poor method naming
-public interface CustomerRepository extends CrudRepository<Customer, Long> {
-    
-    // Unclear method names that don't follow Spring Data conventions
-    List<Customer> getCustomersWithLastName(String lastName);
-    
-    // Raw SQL without parameters
-    @Query("SELECT * FROM customer WHERE email LIKE '%@gmail.com%'")
-    List<Customer> findGmailUsers();
-}
+```yaml
+# application.yml - DON'T DO THIS
+spring:
+  datasource:
+    hikari:
+      # Too long - users will think app is frozen
+      connection-timeout: 120000
+      # Too long - may exceed DB server timeout
+      max-lifetime: 7200000
+      # No validation - stale connections may be used
+      # connection-test-query: # missing
 ```
 
-## Rule 3: Handle Updates with Immutable Records
+## Rule 3: Health Check and Validation Configuration
 
-Title: Create New Record Instances for Updates
+**Title**: Implement robust connection health checking
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
