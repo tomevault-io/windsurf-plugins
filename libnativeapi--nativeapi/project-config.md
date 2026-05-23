@@ -1,185 +1,186 @@
 ---
 trigger: always_on
-description: Creating C API bindings for C++ APIs to enable FFI from other languages
+description: Generic event system architecture and usage patterns
 ---
 
 
-# C API Bindings Rules
+# Generic Event System Rules
 
-The nativeapi library provides C-compatible bindings for all C++ APIs to enable Foreign Function Interface (FFI) from languages like Dart, Swift, Rust, Python, etc. All C API code lives in [src/capi/](mdc:src/capi).
+This project uses a comprehensive, type-safe event system built on top of C++ templates and inheritance. Understanding this system is crucial for working with any event-driven components.
 
-## Why C API Bindings?
+## Core Architecture
 
-1. **Language Interoperability** - C is the universal FFI standard
-2. **Stable ABI** - C has predictable memory layout and calling conventions
-3. **No Name Mangling** - C functions have simple, predictable names
-4. **Simplicity** - C types map directly to FFI types in most languages
+### Base Event Class
 
-## File Organization
+All events inherit from [Event](mdc:src/foundation/event.h) which provides:
 
-For each C++ API, create corresponding C binding files:
+- Automatic timestamp generation
+- Virtual `GetTypeName()` method for debugging
+- Type-safe event hierarchy
 
-| C++ API | C API Header | C API Implementation |
-|---------|-------------|---------------------|
-| [window.h](mdc:src/window.h) | [window_c.h](mdc:src/capi/window_c.h) | [window_c.cpp](mdc:src/capi/window_c.cpp) |
-| [window_manager.h](mdc:src/window_manager.h) | [window_manager_c.h](mdc:src/capi/window_manager_c.h) | [window_manager_c.cpp](mdc:src/capi/window_manager_c.cpp) |
-| [menu.h](mdc:src/menu.h) | [menu_c.h](mdc:src/capi/menu_c.h) | [menu_c.cpp](mdc:src/capi/menu_c.cpp) |
+### Event Emitter Pattern
 
-## C API Header Pattern
+Classes that emit events inherit from `EventEmitter<BaseEventType>` from [event_emitter.h](mdc:src/foundation/event_emitter.h):
 
-### Basic Structure ([window_c.h](mdc:src/capi/window_c.h))
+- Provides compile-time type safety
+- Supports both synchronous and asynchronous event emission
+- Thread-safe listener management
+- Automatic background thread management for async events
 
-```c
-#pragma once
+## Event Types
 
-#include <stdbool.h>
-#include <stdint.h>
+Events are organized into hierarchies based on their domain. Each hierarchy has a base event class that other specific events inherit from. This provides type safety and allows listeners to register for either specific events or entire categories.
 
-// Export macro for DLL support
-#if _WIN32
-#define FFI_PLUGIN_EXPORT __declspec(dllexport)
-#else
-#define FFI_PLUGIN_EXPORT
-#endif
+## Usage Patterns
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#include "geometry_c.h"  // Include C versions of dependencies
-
-// Opaque handle type
-typedef void* native_window_t;
-typedef long native_window_id_t;
-
-// C struct for options (plain C types only)
-typedef struct {
-    const char* title;
-    native_size_t size;
-    native_size_t minimum_size;
-    native_size_t maximum_size;
-    bool centered;
-} native_window_options_t;
-
-// C functions matching C++ API
-FFI_PLUGIN_EXPORT
-native_window_t native_window_create(const native_window_options_t* options);
-
-FFI_PLUGIN_EXPORT
-void native_window_destroy(native_window_t window);
-
-FFI_PLUGIN_EXPORT
-native_window_id_t native_window_get_id(native_window_t window);
-
-FFI_PLUGIN_EXPORT
-void native_window_show(native_window_t window);
-
-FFI_PLUGIN_EXPORT
-void native_window_hide(native_window_t window);
-
-FFI_PLUGIN_EXPORT
-bool native_window_is_visible(native_window_t window);
-
-// Memory management helpers
-FFI_PLUGIN_EXPORT
-void native_window_free(native_window_t window);
-
-#ifdef __cplusplus
-}
-#endif
-```
-
-### Key Elements
-
-1. **Export Macro** - `FFI_PLUGIN_EXPORT` for DLL/shared library support
-2. **Extern "C" Block** - Prevents C++ name mangling
-3. **Opaque Pointers** - `typedef void* native_xxx_t` for object handles
-4. **Plain C Types** - Only `bool`, `int`, `float`, `double`, `char*`, structs
-5. **Naming Convention** - `native_<module>_<function>` pattern
-6. **Documentation** - Comment each function for FFI consumers
-
-## C API Implementation Pattern
-
-### Basic Structure ([window_c.cpp](mdc:src/capi/window_c.cpp))
+### Creating Event Classes
 
 ```cpp
-#include "window_c.h"
-#include <memory>
-#include "../window.h"
-#include "../window_manager.h"
-#include "string_utils_c.h"
+class MyCustomEvent : public Event {
+public:
+    MyCustomEvent(const std::string& data) : data_(data) {}
 
-using namespace nativeapi;
+    const std::string& GetData() const { return data_; }
+    std::string GetTypeName() const override { return "MyCustomEvent"; }
 
-// Convert C options to C++ options
-static WindowOptions ConvertToWindowOptions(const native_window_options_t* options) {
-    WindowOptions cpp_options;
-    
-    if (options->title) {
-        cpp_options.title = std::string(options->title);
+private:
+    std::string data_;
+};
+```
+
+### Creating Event Emitters
+
+```cpp
+class MyClass : public EventEmitter<MyCustomEvent> {
+public:
+    void DoSomething() {
+        // Synchronous emission
+        Emit<MyCustomEvent>("some data");
+
+        // Asynchronous emission
+        EmitAsync<MyCustomEvent>("async data");
     }
-    
-    cpp_options.size.width = options->size.width;
-    cpp_options.size.height = options->size.height;
-    cpp_options.minimum_size.width = options->minimum_size.width;
-    cpp_options.minimum_size.height = options->minimum_size.height;
-    cpp_options.maximum_size.width = options->maximum_size.width;
-    cpp_options.maximum_size.height = options->maximum_size.height;
-    cpp_options.centered = options->centered;
-    
-    return cpp_options;
-}
+};
+```
 
-// Convert C++ window to C handle
-static native_window_t WindowToHandle(std::shared_ptr<Window> window) {
-    return window ? static_cast<void*>(window.get()) : nullptr;
-}
+### Adding Event Listeners
 
-// Convert C handle to C++ window
-static std::shared_ptr<Window> HandleToWindow(native_window_t handle) {
-    if (!handle) return nullptr;
-    
-    // Get from manager's internal registry
-    Window* raw_ptr = static_cast<Window*>(handle);
-    return WindowManager::GetInstance().Get(raw_ptr->GetId());
-}
-
-// Implement C functions
-native_window_t native_window_create(const native_window_options_t* options) {
-    if (!options) return nullptr;
-    
-    try {
-        auto cpp_options = ConvertToWindowOptions(options);
-        auto window = WindowManager::GetInstance().Create(cpp_options);
-        return WindowToHandle(window);
-    } catch (...) {
-        return nullptr;
+```cpp
+// Using lambda functions
+auto listener_id = emitter.AddListener<MyCustomEvent>(
+    [](const MyCustomEvent& event) {
+        std::cout << "Received: " << event.GetData() << std::endl;
     }
-}
+);
 
-void native_window_destroy(native_window_t window) {
-    try {
-        auto cpp_window = HandleToWindow(window);
-        if (cpp_window) {
-            WindowManager::GetInstance().Destroy(cpp_window->GetId());
-        }
-    } catch (...) {
-        // Ignore exceptions
+// Using custom listener class
+class MyListener : public EventListener<MyCustomEvent> {
+public:
+    void OnEvent(const MyCustomEvent& event) override {
+        // Handle event
     }
-}
+};
 
-native_window_id_t native_window_get_id(native_window_t window) {
-    try {
-        auto cpp_window = HandleToWindow(window);
-        return cpp_window ? cpp_window->GetId() : 0;
-    } catch (...) {
-        return 0;
+MyListener listener;
+auto listener_id = emitter.AddListener<MyCustomEvent>(&listener);
+```
+
+### Removing Listeners
+
+```cpp
+// Remove by ID
+emitter.RemoveListener(listener_id);
+
+// Remove all listeners for specific event type
+emitter.RemoveAllListeners<MyCustomEvent>();
+
+// Remove all listeners
+emitter.RemoveAllListeners();
+```
+
+## Best Practices
+
+1. **Always inherit from appropriate base event class** - Don't inherit directly from `Event` unless creating a new event hierarchy
+2. **Use specific event types** - Prefer `EventListener<SpecificEvent>` over `EventListener<Event>` for type safety
+3. **Implement GetTypeName()** - Always override this method for debugging purposes
+4. **Use const references** - Event handlers should accept `const EventType&` parameters
+5. **Manage listener lifetimes** - Ensure listener objects remain valid while registered
+6. **Prefer async emission for heavy operations** - Use `EmitAsync` for events that might trigger expensive operations
+7. **Use RAII for listener management** - Store listener IDs and remove them in destructors
+
+## Thread Safety
+
+- Event emission is thread-safe
+- Listener registration/removal is thread-safe
+- Async event processing uses a dedicated background thread
+- Event handlers may be called from different threads depending on emission method
+
+## Common Patterns
+
+### Singleton Event Emitters
+
+Many managers (WindowManager, DisplayManager) are singletons that emit events:
+
+```cpp
+auto& manager = WindowManager::GetInstance();
+manager.AddListener<WindowCreatedEvent>([](const WindowCreatedEvent& event) {
+    // Handle window creation
+});
+```
+
+### Event Forwarding
+
+Platform-specific implementations often forward system events to the generic event system:
+
+```cpp
+void PlatformWindow::OnSystemEvent(const SystemEvent& sys_event) {
+    // Convert to generic event and emit
+    WindowEvent generic_event(sys_event.GetWindowId());
+    emitter_.Emit(generic_event);
+}
+```
+
+### Event Filtering
+
+Listeners can filter events by checking specific types:
+
+```cpp
+emitter.AddListener<WindowEvent>([](const WindowEvent& event) {
+    if (auto moved_event = dynamic_cast<const WindowMovedEvent*>(&event)) {
+        // Handle only window moved events
     }
-}
+});
+```
 
-void native_window_show(native_window_t window) {
-    try {
-        auto cpp_window = HandleToWindow(window);
+### Event Listening Lifecycle Management
+
+Managers can efficiently manage platform-specific event monitoring by overriding `StartEventListening()` and `StopEventListening()` hooks. These hooks are automatically called when the first listener is added and when the last listener is removed, respectively.
+
+#### Purpose
+
+This pattern allows managers to:
+- **Lazy initialization** - Only start platform event monitoring when needed
+- **Resource efficiency** - Stop monitoring when no listeners exist
+- **Automatic management** - No manual tracking of listener count required
+
+#### Implementation Pattern
+
+```cpp
+// tray_icon.h
+class TrayIcon : public EventEmitter<TrayIconEvent>, public NativeObjectProvider {
+public:
+    TrayIcon();
+    virtual ~TrayIcon();
+    
+    // ... public API ...
+
+protected:
+    // Override these to control platform event monitoring
+    void StartEventListening() override;
+    void StopEventListening() override;
+
+private:
+    class Impl;
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
