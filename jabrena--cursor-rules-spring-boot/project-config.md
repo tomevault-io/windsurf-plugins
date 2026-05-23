@@ -1,192 +1,130 @@
 ---
 trigger: always_on
-description: generateSystemHealthReport();
+description: This comprehensive guide provides essential principles for designing robust, maintainable, and secure REST APIs using Spring Boot. These rules ensure your APIs follow industry best practices, maintain consistency, and provide excellent developer experience for API consumers.
 ---
 
-# Spring Boot Core
+# Java REST API Design Principles
 
-Spring Boot Core guidelines focus on proper usage of main annotations, bean management, and configuration best practices to build maintainable and efficient Spring Boot applications.
+This comprehensive guide provides essential principles for designing robust, maintainable, and secure REST APIs using Spring Boot. These rules ensure your APIs follow industry best practices, maintain consistency, and provide excellent developer experience for API consumers.
 
 ## Implementing These Principles
 
 These guidelines are built upon the following core principles:
 
-- Principle 1: Use appropriate Spring annotations to clearly express component responsibilities
-- Principle 2: Leverage Spring's dependency injection and IoC container effectively
-- Principle 3: Follow configuration best practices for maintainable and testable applications
-- Principle 4: Apply proper bean lifecycle management and scoping
+- **Semantic Consistency**: Use HTTP methods, status codes, and URI patterns according to their intended semantics
+- **Clear Communication**: Provide unambiguous API contracts through proper DTOs, error handling, and documentation
+- **Security by Design**: Implement authentication, authorization, and input validation from the start
+- **Evolutionary Design**: Version APIs and structure them to support future changes without breaking existing clients
 
 ## Table of contents
 
-- Rule 0: Spring Boot Main Application Class
-- Rule 1: Main Spring Boot Annotations Usage
-- Rule 2: Bean Definition and Management
-- Rule 3: Configuration Classes and Properties
-- Rule 4: Component Scanning and Package Organization
-- Rule 5: Conditional Configuration and Profiles
-- Rule 6: Constructor Dependency Injection Best Practices
-- Rule 7: Bean Minimization and Composition
-- Rule 8: Scheduled Tasks and Background Processing
+- Rule 1: Use HTTP Methods Correctly
+- Rule 2: Design Clear and Consistent Resource URIs
+- Rule 3: Use HTTP Status Codes Appropriately
+- Rule 4: Implement Effective Request and Response Payloads (DTOs)
+- Rule 5: Version Your APIs
+- Rule 6: Handle Errors Gracefully
+- Rule 7: Secure Your APIs
+- Rule 8: Document Your APIs
+- Rule 9: Use Controller Advice for Global Exception Handling
+- Rule 10: Implement Problem Details for Error Responses
 
-## Rule 0: Spring Boot Main Application Class
+## Rule 1: Use HTTP Methods Correctly
 
-Title: Create a Proper Spring Boot Main Application Class
-Description: Every Spring Boot application should have a main application class annotated with @SpringBootApplication. This class serves as the entry point and configuration root, combining @Configuration, @EnableAutoConfiguration, and @ComponentScan annotations.
+Title: Employ HTTP Methods Semantically
+Description: Use HTTP methods according to their defined semantics to ensure predictability and compliance with web standards. `GET` for retrieval, `POST` for creation, `PUT` for update/replace, `PATCH` for partial update, and `DELETE` for removal.
 
 **Good example:**
 
 ```java
-@SpringBootApplication
-public class MainApplication {
+// Using Spring MVC annotations for illustration
+@RestController
+@RequestMapping("/users")
+public class UserController {
+
+    @GetMapping("/{id}") // GET for retrieving a user
+    public ResponseEntity<UserDTO> getUser(@PathVariable String id) {
+        // ... logic to fetch user ...
+        return ResponseEntity.ok(new UserDTO());
+    }
+
+    @PostMapping // POST for creating a new user
+    public ResponseEntity<UserDTO> createUser(@RequestBody UserCreateDTO userCreateDTO) {
+        // ... logic to create user ...
+        UserDTO newUser = new UserDTO(); // Assume it gets an ID after creation
+        return ResponseEntity.created(URI.create("/users/" + newUser.getId())).body(newUser);
+    }
+
+    @PutMapping("/{id}") // PUT for replacing/updating a user
+    public ResponseEntity<UserDTO> updateUser(@PathVariable String id, @RequestBody UserUpdateDTO userUpdateDTO) {
+        // ... logic to update user ...
+        return ResponseEntity.ok(new UserDTO());
+    }
+
+    @DeleteMapping("/{id}") // DELETE for removing a user
+    public ResponseEntity<Void> deleteUser(@PathVariable String id) {
+        // ... logic to delete user ...
+        return ResponseEntity.noContent().build();
+    }
     
-    public static void main(String[] args) {
-        SpringApplication.run(MainApplication.class, args);
+    @PatchMapping("/{id}") // PATCH for partial updates
+    public ResponseEntity<UserDTO> partiallyUpdateUser(@PathVariable String id, @RequestBody Map<String, Object> updates) {
+        // ... logic to partially update user ...
+        return ResponseEntity.ok(new UserDTO());
     }
 }
-
-// For more complex scenarios with custom configuration
-@SpringBootApplication(
-    scanBasePackages = {
-        "com.company.app.controller",
-        "com.company.app.service", 
-        "com.company.app.repository",
-        "com.company.app.config"
-    },
-    exclude = {
-        DataSourceAutoConfiguration.class,
-        SecurityAutoConfiguration.class
-    }
-)
+// Dummy DTO classes
+class UserDTO { private String id; public String getId() { return id; } /* ... other fields, getters, setters ... */ }
+class UserCreateDTO { /* ... fields ... */ }
+class UserUpdateDTO { /* ... fields ... */ }
 ```
 
 **Bad Example:**
-
-```java
-// Missing @SpringBootApplication annotation
-public class MainApplication {
-    public static void main(String[] args) {
-        // Manual Spring context setup instead of SpringApplication.run()
-        ApplicationContext context = new AnnotationConfigApplicationContext();
-        // Manual configuration - loses Spring Boot benefits
-    }
-}
-
-// Using individual annotations instead of @SpringBootApplication
-@Configuration
-@EnableAutoConfiguration  
-@ComponentScan
-public class MainApplication { // Verbose and error-prone
-    public static void main(String[] args) {
-        SpringApplication.run(MainApplication.class, args);
-    }
-}
-
-// Poor naming and structure
-@SpringBootApplication
-public class App { // Non-descriptive name
-    
-    @Autowired
-    private UserService userService; // Business logic in main class
-    
-    public static void main(String[] args) {
-        SpringApplication.run(App.class, args);
-        
-        // Business logic in main method - should be in separate components
-        System.out.println("Processing users...");
-    }
-}
-```
-
-## Rule 1: Main Spring Boot Annotations Usage
-
-Title: Use Appropriate Spring Boot Annotations for Component Definition
-Description: Use the correct Spring Boot annotations to define components, controllers, services, and repositories. Each annotation has specific semantics and should be used according to the layer's responsibility.
-
-**Good example:**
 
 ```java
 @RestController
-@RequestMapping("/api/users")
-public class UserController {
-    
-    @Autowired
-    private UserService userService;
-    
-    @GetMapping("/{id}")
-    public ResponseEntity<User> getUser(@PathVariable Long id) {
-        return ResponseEntity.ok(userService.findById(id));
+@RequestMapping("/api")
+public class BadUserController {
+
+    // Bad: Using GET to perform a state change (e.g., delete)
+    @GetMapping("/deleteUser")
+    public ResponseEntity<String> deleteUserViaGet(@RequestParam String id) {
+        System.out.println("Deleting user: " + id + " (Bad: GET used for delete)");
+        // ... delete logic ...
+        return ResponseEntity.ok("User deleted (but GET was used!)");
+    }
+
+    // Bad: Using POST for all operations, including retrieval
+    @PostMapping("/getUser")
+    public ResponseEntity<UserDTO> getUserViaPost(@RequestBody String idPayload) {
+        System.out.println("Fetching user: " + idPayload + " (Bad: POST used for GET)");
+        // ... fetch logic ...
+        return ResponseEntity.ok(new UserDTO());
     }
 }
+```
 
-@Service
-@Transactional
-public class UserService {
-    
-    @Autowired
-    private UserRepository userRepository;
-    
-    public User findById(Long id) {
-        return userRepository.findById(id)
-            .orElseThrow(() -> new UserNotFoundException(id));
-    }
-}
+## Rule 2: Design Clear and Consistent Resource URIs
 
-@Repository
-public interface UserRepository extends CrudRepository<User, Long> {
-    
-    @Query("SELECT * FROM users WHERE email = :email")
-    Optional<User> findByEmail(@Param("email") String email);
-    
-    @Modifying
-    @Query("UPDATE users SET last_login = :lastLogin WHERE id = :id")
-    void updateLastLogin(@Param("id") Long id, @Param("lastLogin") LocalDateTime lastLogin);
-}
+Title: Use Nouns for Resources and Maintain URI Consistency
+Description: Design URIs that are intuitive and clearly represent resources. Use nouns (e.g., `/users`, `/orders`) instead of verbs. Keep URIs consistent in style (e.g., lowercase, hyphenated or camelCase for path segments).
 
-@Table("users")
-public class User {
-    
-    @Id
-    private Long id;
-    
-    @Column("email")
-    private String email;
-    
-    @Column("first_name")
-    private String firstName;
-    
-    @Column("last_name") 
-    private String lastName;
-    
-    @Column("last_login")
-    private LocalDateTime lastLogin;
-    
-    // Constructors, getters, and setters
-}
+**Good example:**
+
+```
+GET /users                           // Get all users
+GET /users/{userId}                  // Get a specific user
+GET /users/{userId}/orders           // Get all orders for a specific user
+GET /users/{userId}/orders/{orderId} // Get a specific order for a user
+POST /users                          // Create a new user
 ```
 
 **Bad Example:**
 
-```java
-@Component // Should be @RestController
-public class UserController {
-    
-    @Inject // Use @Autowired for Spring Boot
-    private UserService userService;
-}
-
-@Component // Should be @Service
-public class UserService {
-    // Missing @Transactional for data operations
-}
-
-@Component // Should be @Repository
-public class UserRepository {
-    // Manual JDBC instead of using Spring Data JDBC
-}
 ```
-
-## Rule 2: Bean Definition and Management
-
+GET /getAllUsers
+GET /fetchUserById?id={userId}
+POST /createNewUser
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
