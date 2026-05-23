@@ -1,114 +1,195 @@
 ---
 trigger: always_on
-description: These guidelines aim to ensure consistency, reliability, and maintainability of integration tests within the project.
+description: Best practices for local testing in Spring Boot applications using `spring-boot-docker-compose` for seamless integration with external services like databases, message queues, and caches.
 ---
 
-# Java Integration testing guidelines
+# Spring Boot Local Testing with Docker Compose
 
-These guidelines aim to ensure consistency, reliability, and maintainability of integration tests within the project.
+Best practices for local testing in Spring Boot applications using `spring-boot-docker-compose` for seamless integration with external services like databases, message queues, and caches.
 
 ## Implementing These Principles
 
 These guidelines are built upon the following core principles:
 
-- Principle 1: Test Isolation - Each integration test must be independent and not affect other tests
-- Principle 2: Environment Reproducibility - Use containerized dependencies for consistent test environments  
-- Principle 3: Clear Test Boundaries - Focus on integration points rather than duplicating unit test logic
-- Principle 4: Performance Optimization - Balance thorough testing with execution speed
-- Principle 5: Maintainable Assertions - Use specific, clear assertions that provide meaningful feedback
-- Principle 6: Resource Management - Properly manage external dependencies and cleanup after tests
+- **Seamless Integration**: Use spring-boot-docker-compose to automatically manage external service dependencies
+- **Environment Parity**: Maintain consistency between local development and production environments
+- **Test Isolation**: Ensure tests are independent and can run in any order without side effects
+- **Performance Optimization**: Minimize container startup time and resource usage for faster development cycles
+- **Configuration Management**: Use profiles and dynamic properties for flexible environment-specific configurations
 
 ## Table of contents
 
-- Rule 1: Define Clear Scope and Purpose for Integration Tests
-- Rule 2: Manage Test Environment & Dependencies with Testcontainers
-- Rule 3: Utilize TestRestTemplate for Robust API Testing
-- Rule 4: Implement Consistent Data Management Strategies
-- Rule 5: Maintain Clear Test Structure and Assertions
-- Rule 6: Optimize for Performance and Ensure Proper Cleanup
+- Rule 1: Dependency Configuration
+- Rule 2: Docker Compose Service Definition
+- Rule 3: Application Profile Configuration
+- Rule 4: Integration Test Setup
+- Rule 5: Service Connection Management
+- Rule 6: Health Check Implementation
+- Rule 7: Test Data Management
+- Rule 8: Performance Optimization
 
-## Rule 1: Define Clear Scope and Purpose for Integration Tests
+## Rule 1: Dependency Configuration
 
-Title: Clearly Define the Scope and Purpose of Each Integration Test
-Description:
-- Integration tests must verify the interaction between multiple components or systems (e.g., service layer with database, service-to-service communication over HTTP).
-- Clearly define the boundary of each integration test. What specific interaction, contract, or flow is being tested?
-- Prefer integration tests for verifying contracts between services (APIs) and interactions with external dependencies (databases, message queues, etc.).
-- Avoid replicating complex business logic in integration tests if it is already thoroughly covered by unit tests. Focus on the integration points.
+Title: Proper Spring Boot Docker Compose Dependency Setup
+Description: Configure the spring-boot-docker-compose dependency correctly for runtime-only usage to automatically manage Docker services during application startup.
 
 **Good example:**
-```java
-// Assume: ProductService interacts with ProductRepository (database) and NotificationService (external HTTP)
 
-// @SpringBootTest // or similar context for the test
-// @Testcontainers // if using Testcontainers
-public class ProductServiceIT {
-    private static final Logger log = LoggerFactory.getLogger(ProductServiceIT.class);
+```xml
+<!-- Maven -->
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-docker-compose</artifactId>
+    <scope>runtime</scope>
+</dependency>
 
-    // @Autowired
-    // private ProductService productService;
-    
-    // @Autowired
-    // private ProductRepository productRepository; // To verify DB state
-
-    // Mock or use a Testcontainer for NotificationService if its actual calls are out of scope
-    // @MockBean
-    // private NotificationService mockNotificationService;
-
-    // @Test
-    void should_createProduct_saveToDatabase_and_sendNotification() {
-        // Scope: Test the flow of creating a product, ensuring it's saved,
-        // and that a notification attempt is made.
-
-        // Given: A product DTO
-        // ProductDto newProductDto = new ProductDto("Laptop X1", 1500.00);
-
-        // When: ProductService creates the product
-        // Product createdProduct = productService.createProduct(newProductDto);
-
-        // Then: Verify interactions
-        // 1. Product is saved in the database (verify via repository or direct query)
-        // Optional<ProductEntity> savedEntity = productRepository.findById(createdProduct.getId());
-        // assertThat(savedEntity).isPresent();
-        // assertThat(savedEntity.get().getName()).isEqualTo("Laptop X1");
-
-        // 2. Notification service was called (verify via mock or wiremock if testing HTTP contract)
-        // verify(mockNotificationService).sendProductCreationNotification(any(Product.class));
-        log.info("Conceptual test: Product creation flow verified.");
-    }
-}
+<!-- Testcontainers for integration tests -->
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-testcontainers</artifactId>
+    <scope>test</scope>
+</dependency>
 ```
 
 **Bad Example:**
-```java
-// @SpringBootTest
-public class OverlappingProductLogicIT {
-    private static final Logger log = LoggerFactory.getLogger(OverlappingProductLogicIT.class);
 
-    // @Autowired
-    // private ProductService productService;
+```xml
+<!-- Don't include as compile dependency -->
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-docker-compose</artifactId>
+    <scope>compile</scope>
+</dependency>
 
-    // @Test
-    void should_calculateComplexPricing_duringProductCreation() {
-        // Bad: This test might be re-testing complex pricing logic
-        // that should already be unit-tested in ProductService or a PricingEngine unit test.
-        // The integration test should focus on whether ProductService correctly integrates
-        // with the database and other services during creation, assuming pricing logic is correct.
-        
-        // ProductDto productWithComplexPricing = new ProductDto("ComplexItem", 10.0, List.of(new DiscountRule(...)));
-        // Product createdProduct = productService.createProduct(productWithComplexPricing);
-        
-        // If asserts here are deeply checking specific price calculations, it's likely a unit test concern.
-        // assertThat(createdProduct.getFinalPrice()).isEqualTo(9.99); // This might be too specific for an IT
-        log.warn("Conceptual bad test: Replicating unit test logic for pricing.");
-    }
-}
+<!-- Missing testcontainers dependency -->
 ```
 
-## Rule 2: Manage Test Environment & Dependencies with Testcontainers
+## Rule 2: Docker Compose Service Definition
 
-Title: Use Testcontainers for Reliable Management of External Dependencies
-Description:
+Title: Well-structured Docker Compose Configuration
+Description: Define services with proper health checks, environment variables, and port mappings for reliable local testing.
+
+**Good example:**
+
+```yaml
+# compose.yaml
+services:
+  postgres:
+    image: 'postgres:15'
+    environment:
+      POSTGRES_DB: testdb
+      POSTGRES_USER: testuser
+      POSTGRES_PASSWORD: testpass
+    ports:
+      - '5432:5432'
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U testuser -d testdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
+```
+
+**Bad Example:**
+
+```yaml
+# compose.yaml
+services:
+  postgres:
+    image: 'postgres'  # No version specified
+    environment:
+      - POSTGRES_PASSWORD=password  # Hardcoded, no DB/USER
+    # Missing health checks
+    # Missing volume persistence
+    # Missing proper port mapping
+```
+
+## Rule 3: Application Profile Configuration
+
+Title: Environment-specific Configuration Management
+Description: Use Spring profiles to manage different configurations for local development, testing, and production environments.
+
+**Good example:**
+
+```yaml
+# application-local.yml
+spring:
+  docker:
+    compose:
+      enabled: true
+      file: compose.yaml
+      lifecycle-management: start_and_stop
+      readiness:
+        wait: HEALTHY
+        timeout: 2m
+  
+  datasource:
+    url: jdbc:postgresql://localhost:5432/testdb
+    username: testuser
+    password: testpass
+    
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+
+logging:
+  level:
+    org.springframework.boot.docker: DEBUG
+```
+
+**Bad Example:**
+
+```yaml
+# application.yml
+spring:
+  docker:
+    compose:
+      enabled: true  # Always enabled, no profile separation
+      lifecycle-management: none  # No lifecycle management
+  
+  datasource:
+    url: jdbc:postgresql://localhost:5432/proddb  # Production DB in local config
+    username: root  # Unsafe credentials
+    password: admin
+```
+
+## Rule 4: Integration Test Setup
+
+Title: Testcontainers Integration with Service Connections
+Description: Use @ServiceConnection and @Testcontainers for clean integration test setup with automatic container management.
+
+**Good example:**
+
+```java
+@SpringBootTest
+@Testcontainers
+@ActiveProfiles("test")
+class UserRepositoryIntegrationTest {
+    
+    @Container
+    @ServiceConnection
+    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:15")
+            .withDatabaseName("testdb")
+            .withUsername("test")
+            .withPassword("test");
+    
+    @Autowired
+    private UserRepository userRepository;
+    
+    @Test
+    void shouldSaveAndRetrieveUser() {
+        User user = new User("john.doe@example.com", "John Doe");
+        User saved = userRepository.save(user);
+        
+        assertThat(saved.getId()).isNotNull();
+        assertThat(userRepository.findByEmail("john.doe@example.com"))
+                .isPresent()
+                .get()
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
