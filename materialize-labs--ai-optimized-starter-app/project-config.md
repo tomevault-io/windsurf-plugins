@@ -1,200 +1,205 @@
 ---
 trigger: always_on
-description: Follow these rules when working on the backend.
+description: Follow these rules when working on the frontend.
 ---
 
-# Backend Architecture Guidelines
+# Frontend Architecture Guidelines
 
-This document outlines our backend architecture and coding standards. Our backend stack includes:
+## Technology Stack
 
-- **Database**: PostgreSQL via Supabase
-- **ORM**: Drizzle for type-safe database access
-- **API Layer**: Next.js Server Actions
-- **Infrastructure**: Serverless via Vercel
+Our frontend leverages a modern stack designed for performance, developer experience, and maintainability:
+
+- **Framework**: Next.js 15+ with App Router
+- **Styling**: Tailwind CSS for utility-first styling
+- **UI Components**: Shadcn UI as a component foundation
+- **Animations**: Framer Motion for fluid animations
+- **Icons**: Lucide React for consistent iconography
 
 ## Core Principles
 
-1. **Type Safety**: Maintain full type safety between database and application code
-2. **Scalability**: Design for scale from the beginning
-3. **Maintainability**: Follow consistent patterns across the codebase
-4. **Security**: Validate all inputs and handle user permissions properly
-5. **Performance**: Optimize database queries and API responses
+1. **Type Safety**: Leverage TypeScript for robust, maintainable code
+2. **Component-Driven Development**: Build reusable, composable components 
+3. **Performance-First**: Optimize for core web vitals and user experience
+4. **Accessibility**: Ensure WCAG compliance in all UIs
+5. **Progressive Enhancement**: Build resilient interfaces that work across devices
 
-## Database Schema Design
+## Component Architecture
 
-### Directory Structure
+### Component Types
+
+Our application uses both **Server Components** and **Client Components** following Next.js paradigms:
+
+| Component Type | Use Case | Key Considerations |
+|---------------|----------|-------------------|
+| **Server Components** | Data fetching, SEO-critical content | No `useState`, no event handlers |
+| **Client Components** | Interactive UIs, forms, animations | Add `"use client"` directive at top of file |
+
+### Component Organization
 
 ```
-db/
-├── db.ts                # Main database configuration
-├── index.ts             # Public exports
-├── migrations/          # Database migrations
-└── schema/              # Database schema definitions
-    ├── [entity].ts  # Individual entity schemas
+app/
+├── [route]/              # Route directories
+│   ├── _components/      # Route-specific components
+│   ├── page.tsx          # Route page component
+│   └── layout.tsx        # Route layout component
+components/
+├── ui/                   # Shared UI components
+└── [feature]/            # Feature-specific shared components
 ```
-
-### Schema Definition Standards
 
 #### Naming Conventions
 
-- Use kebab-case for files: `contacts.ts`
-- Use camelCase for table and column names in code
-- Use snake_case for the actual database column names
-- Export types with standardized prefixes: `Select[Entity]` and `Insert[Entity]`
+- Use kebab-case for all component files: `data-table.tsx` 
+- Use PascalCase for component names: `DataTable`
+- Group related components in feature-specific directories
+- Suffix context providers with `Provider`: `AuthProvider`
 
-#### Required Fields
+### Component Guidelines
 
-All tables should include these standard fields:
+#### Server vs Client Components
 
-```typescript
-{
-  // Always use UUID for primary keys
-  id: uuid("id").defaultRandom().primaryKey(),
+- Always add the appropriate directive at the top of your file:
+  - `"use server"` for server components
+  - `"use client"` for client components
+
+- Server components should:
+  - Perform data fetching
+  - Pass data to client components via props
+  - Minimize client-side JavaScript
   
-  // User association (when applicable)
-  userId: text("user_id").notNull(),
-  
-  // Timestamps
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .defaultNow()
-    .notNull()
-    .$onUpdate(() => new Date())
+- Client components should:
+  - Handle user interactions
+  - Manage local state
+  - Implement animations and effects
+
+#### Code Structure
+
+- Import ordering:
+  1. React and Next.js imports
+  2. Third-party libraries
+  3. Internal components and utilities
+  4. Types and styles
+
+- Export components as named exports for components meant to be used within a directory, and as default exports for page components or major feature components
+
+## Server Component Patterns
+
+### Data Fetching
+
+- Fetch data directly in server components using appropriate patterns:
+
+```tsx
+// Good: Fetch in server components
+async function ProductList() {
+  const products = await getProductsAction()
+
+  return <ProductGrid products={products.data} />
 }
 ```
 
-#### Using Enums
+- Use Suspense boundaries for asynchronous content:
 
-For fields with a fixed set of values, use PostgreSQL enums:
+```tsx
+// page.tsx
+export default function Page() {
+  return (
+    <div>
+      <Header />
+      <Suspense fallback={<ProductsSkeleton />}>
+        <ProductsContent />
+      </Suspense>
+    </div>
+  )
+}
 
-```typescript
-import { pgEnum } from "drizzle-orm/pg-core"
+// Async component in same file or imported
+async function ProductsContent() {
+  const products = await getProducts()
 
-// Define the enum
-export const statusEnum = pgEnum("status", ["active", "pending", "archived"])
-
-// Use it in your schema
-status: statusEnum("status").notNull().default("pending")
-```
-
-#### Relationships
-
-Always define explicit relationships between tables and include appropriate cascade behavior:
-
-```typescript
-// One-to-many relationship example
-projectId: uuid("project_id")
-  .references(() => projectsTable.id, { onDelete: "cascade" })
-  .notNull()
-```
-
-### Schema Example
-
-```typescript
-// db/schema/contacts.ts
-import { pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core"
-
-export const contactsTable = pgTable("contacts", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  userId: text("user_id").notNull(),
-  name: text("name").notNull(),
-  email: text("email"),
-  phone: text("phone"),
-  notes: text("notes"),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .defaultNow()
-    .notNull()
-    .$onUpdate(() => new Date())
-})
-
-export type InsertContact = typeof contactsTable.$inferInsert
-export type SelectContact = typeof contactsTable.$inferSelect
-```
-
-Make sure to export your schema from the index file:
-
-```typescript
-// db/schema/index.ts
-export * from "./contacts"
-// ... other schema exports
-```
-
-And register it in your database configuration:
-
-```typescript
-// db/db.ts
-import { contactsTable } from "@/db/schema"
-
-export const schema = {
-  contacts: contactsTable,
-  // ... other tables
+  return <ProductList products={products.data} />
 }
 ```
 
-## Server Actions
+### Detailed Examples
 
-Server Actions are our primary method for exposing backend functionality. They provide type-safe, secure APIs for frontend components.
+#### Server Layout Example
 
-### Organization Pattern
+```tsx
+// app/dashboard/layout.tsx
+import { SidebarNav } from "./_components/sidebar-nav"
+import { DashboardHeader } from "./_components/dashboard-header"
+import { getProfile } from "@/actions/profile"
+import { redirect } from "next/navigation"
 
-```
-actions/
-├── auth/                # Authentication-related actions
-├── db/                  # Database operations
-│   ├── [entity].ts
-└── utils/               # Utility actions
-```
-
-### Action Implementation Guidelines
-
-1. **Standardized Return Type**: Use the `ActionState<T>` pattern for consistency
-
-```typescript
-export type ActionState<T> =
-  | { isSuccess: true; message: string; data: T }
-  | { isSuccess: false; message: string; data?: never }
-```
-
-2. **Naming Convention**: All action functions should end with `Action` suffix
-
-3. **Input Validation**: Validate inputs before database operations
-
-4. **Error Handling**: Use try/catch blocks and provide meaningful error messages
-
-5. **Organization**: Group actions by entity and order methods by CRUD operations
-
-### Server Action Example
-
-```typescript
-// actions/db/contacts.ts
-'use server'
-
-import { eq } from 'drizzle-orm'
-
-import { db } from '@/db/db'
-import { contactsTable, InsertContact, SelectContact } from '@/db/schema/contacts'
-import { ActionState } from '@/types/server-action'
-
-export async function createContact(contact: InsertContact): Promise<ActionState<SelectContact>> {
-  try {
-    const [newContact] = await db.insert(contactsTable).values(contact).returning()
-
-    return {
-      isSuccess: true,
-      message: 'Contact created successfully',
-      data: newContact,
-    }
-  } catch (error) {
-    console.error('Error creating contact:', error)
-
-    return { isSuccess: false, message: 'Failed to create contact' }
+export default async function DashboardLayout({
+  children
+}: {
+  children: React.ReactNode
+}) {
+  const profile = await getProfile()
+  
+  if (!profile.isSuccess) {
+    return redirect("/login")
   }
+  
+  return (
+    <div className="flex min-h-screen flex-col">
+      <DashboardHeader user={profile.data} />
+      
+      <div className="flex flex-1">
+        <SidebarNav />
+        <main className="flex-1 p-6">
+          {children}
+        </main>
+      </div>
+    </div>
+  )
+}
+```
+
+#### Server Page with Suspense
+
+```tsx
+// app/dashboard/page.tsx
+import { Suspense } from "react"
+import { DashboardSkeleton } from "./_components/dashboard-skeleton"
+import { DashboardMetrics } from "./_components/dashboard-metrics"
+import { DashboardCharts } from "./_components/dashboard-charts"
+
+export default function DashboardPage() {
+  return (
+    <div className="space-y-6">
+      <h1 className="text-3xl font-bold">Dashboard</h1>
+      
+      <Suspense fallback={<DashboardSkeleton type="metrics" />}>
+        <DashboardMetricsContent />
+      </Suspense>
+      
+      <Suspense fallback={<DashboardSkeleton type="charts" />}>
+        <DashboardChartsContent />
+      </Suspense>
+    </div>
+  )
 }
 
-export async function getContacts(userId: string): Promise<ActionState<SelectContact[]>> {
-  try {
-    const contacts = await db.query.contacts.findMany({
+async function DashboardMetricsContent() {
+  const metrics = await getMetrics()
+
+  return <DashboardMetrics data={metrics.data} />
+}
+
+async function DashboardChartsContent() {
+  const chartData = await getChartData()
+
+  return <DashboardCharts data={chartData.data} />
+}
+```
+
+## Client Component Patterns
+
+### State Management
+
+- Use React's built-in state management for component-level state
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
