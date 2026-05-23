@@ -1,220 +1,154 @@
 ---
 trigger: always_on
-description: Comprehensive rules to help you write advanced Trigger.dev tasks
+description: Manages failed workflow runs with options to resume, restart, or retry failure callbacks.
 ---
 
-# Trigger.dev Advanced Tasks (v4)
 
-**Advanced patterns and features for writing tasks**
+# Upstash Workflow
 
-## Tags & Organization
+Upstash Workflow is a serverless orchestration framework that enables durable, reliable, and performant long-running functions without infrastructure management. Built on QStash, it transforms serverless functions into resilient workflows by breaking complex logic into individual steps, each with automatic retries, state persistence, and independent execution timeouts. This step-based architecture eliminates traditional serverless limitations like function timeouts and transient failures.
 
-```ts
-import { task, tags } from "@trigger.dev/sdk";
+The framework provides delivery guarantees with at-least-once execution semantics, automatic failure recovery through a Dead Letter Queue, and real-time observability. Workflows can sleep for days or months, wait for external events, make HTTP calls lasting up to 2 hours without consuming function execution time, run steps in parallel, and handle scheduled recurring tasks. Available for Next.js, Cloudflare Workers, FastAPI, and other platforms in both TypeScript and Python.
 
-export const processUser = task({
-  id: "process-user",
-  run: async (payload: { userId: string; orgId: string }, { ctx }) => {
-    // Add tags during execution
-    await tags.add(`user_${payload.userId}`);
-    await tags.add(`org_${payload.orgId}`);
+## Core Workflow Methods
 
-    return { processed: true };
+### Define a workflow endpoint with serve
+
+Creates a workflow endpoint that orchestrates multi-step serverless functions with automatic state management and retry logic.
+
+```typescript
+// api/workflow/route.ts
+import { serve } from "@upstash/workflow/nextjs";
+
+interface UserData {
+  userId: string;
+  email: string;
+  name: string;
+}
+
+export const { POST } = serve<UserData>(
+  async (context) => {
+    const { userId, email, name } = context.requestPayload;
+
+    const user = await context.run("register-user", async () => {
+      const newUser = await db.users.create({ userId, email, name });
+      console.log(`Registered user: ${userId}`);
+      return newUser;
+    });
+
+    await context.sleep("wait-for-3-days", 60 * 60 * 24 * 3);
+
+    const message = await context.call("generate-welcome-message", {
+      url: "https://api.openai.com/v1/chat/completions",
+      method: "POST",
+      headers: { authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
+      body: {
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "system",
+            content: "Generate personalized welcome messages.",
+          },
+          { role: "user", content: `Welcome message for ${name}` },
+        ],
+      },
+      retries: 3,
+    });
+
+    await context.run("send-welcome-email", async () => {
+      await sendEmail(email, message.body.choices[0].message.content);
+    });
+
+    return { success: true, userId: user.id };
   },
-});
-
-// Trigger with tags
-await processUser.trigger(
-  { userId: "123", orgId: "abc" },
-  { tags: ["priority", "user_123", "org_abc"] } // Max 10 tags per run
+  {
+    failureFunction: async ({ context, failStatus, failResponse }) => {
+      console.error(`Workflow ${context.workflowRunId} failed:`, failResponse);
+      await notifyAdmin(
+        `User onboarding failed for ${context.requestPayload.email}`
+      );
+      return `Failed with status ${failStatus}`;
+    },
+  }
 );
-
-// Subscribe to tagged runs
-for await (const run of runs.subscribeToRunsWithTag("user_123")) {
-  console.log(`User task ${run.id}: ${run.status}`);
-}
 ```
 
-**Tag Best Practices:**
+```python
+# main.py
+from fastapi import FastAPI
+from upstash_workflow.fastapi import Serve
+from upstash_workflow import AsyncWorkflowContext
+from typing import TypedDict
 
-- Use prefixes: `user_123`, `org_abc`, `video:456`
-- Max 10 tags per run, 1-64 characters each
-- Tags don't propagate to child tasks automatically
+app = FastAPI()
+serve = Serve(app)
 
-## Concurrency & Queues
+class UserData(TypedDict):
+    user_id: str
+    email: str
+    name: str
 
-```ts
-import { task, queue } from "@trigger.dev/sdk";
+async def failure_handler(context, fail_status, fail_response, fail_headers):
+    print(f"Workflow {context.workflow_run_id} failed: {fail_response}")
+    await notify_admin(f"Onboarding failed for {context.request_payload['email']}")
 
-// Shared queue for related tasks
-const emailQueue = queue({
-  name: "email-processing",
-  concurrencyLimit: 5, // Max 5 emails processing simultaneously
-});
+@serve.post("/api/onboarding", failure_function=failure_handler)
+async def onboarding_workflow(context: AsyncWorkflowContext[UserData]) -> dict:
+    data = context.request_payload
 
-// Task-level concurrency
-export const oneAtATime = task({
-  id: "sequential-task",
-  queue: { concurrencyLimit: 1 }, // Process one at a time
-  run: async (payload) => {
-    // Critical section - only one instance runs
-  },
-});
+    async def _register_user():
+        user = await db.users.create(data)
+        print(f"Registered user: {data['user_id']}")
+        return user
 
-// Per-user concurrency
-export const processUserData = task({
-  id: "process-user-data",
-  run: async (payload: { userId: string }) => {
-    // Override queue with user-specific concurrency
-    await childTask.trigger(payload, {
-      queue: {
-        name: `user-${payload.userId}`,
-        concurrencyLimit: 2,
-      },
-    });
-  },
-});
+    user = await context.run("register-user", _register_user)
 
-export const emailTask = task({
-  id: "send-email",
-  queue: emailQueue, // Use shared queue
-  run: async (payload: { to: string }) => {
-    // Send email logic
-  },
-});
-```
+    await context.sleep("wait-for-3-days", 60 * 60 * 24 * 3)
 
-## Error Handling & Retries
-
-```ts
-import { task, retry, AbortTaskRunError } from "@trigger.dev/sdk";
-
-export const resilientTask = task({
-  id: "resilient-task",
-  retry: {
-    maxAttempts: 10,
-    factor: 1.8, // Exponential backoff multiplier
-    minTimeoutInMs: 500,
-    maxTimeoutInMs: 30_000,
-    randomize: false,
-  },
-  catchError: async ({ error, ctx }) => {
-    // Custom error handling
-    if (error.code === "FATAL_ERROR") {
-      throw new AbortTaskRunError("Cannot retry this error");
-    }
-
-    // Log error details
-    console.error(`Task ${ctx.task.id} failed:`, error);
-
-    // Allow retry by returning nothing
-    return { retryAt: new Date(Date.now() + 60000) }; // Retry in 1 minute
-  },
-  run: async (payload) => {
-    // Retry specific operations
-    const result = await retry.onThrow(
-      async () => {
-        return await unstableApiCall(payload);
-      },
-      { maxAttempts: 3 }
-    );
-
-    // Conditional HTTP retries
-    const response = await retry.fetch("https://api.example.com", {
-      retry: {
-        maxAttempts: 5,
-        condition: (response, error) => {
-          return response?.status === 429 || response?.status >= 500;
+    message = await context.call(
+        "generate-welcome-message",
+        url="https://api.openai.com/v1/chat/completions",
+        method="POST",
+        headers={"authorization": f"Bearer {os.environ['OPENAI_API_KEY']}"},
+        body={
+            "model": "gpt-4o",
+            "messages": [
+                {"role": "system", "content": "Generate personalized welcome messages."},
+                {"role": "user", "content": f"Welcome message for {data['name']}"}
+            ]
         },
-      },
-    });
+        retries=3
+    )
 
-    return result;
-  },
-});
+    async def _send_email():
+        await send_email(data["email"], message.body["choices"][0]["message"]["content"])
+
+    await context.run("send-welcome-email", _send_email)
+
+    return {"success": True, "user_id": user["id"]}
 ```
 
-## Machines & Performance
+### Execute workflow steps with context.run
 
-```ts
-export const heavyTask = task({
-  id: "heavy-computation",
-  machine: { preset: "large-2x" }, // 8 vCPU, 16 GB RAM
-  maxDuration: 1800, // 30 minutes timeout
-  run: async (payload, { ctx }) => {
-    // Resource-intensive computation
-    if (ctx.machine.preset === "large-2x") {
-      // Use all available cores
-      return await parallelProcessing(payload);
-    }
+Executes a function as an independent workflow step with automatic retries and state persistence.
 
-    return await standardProcessing(payload);
-  },
-});
+```typescript
+import { serve } from "@upstash/workflow/nextjs";
 
-// Override machine when triggering
-await heavyTask.trigger(payload, {
-  machine: { preset: "medium-1x" }, // Override for this run
-});
-```
+export const { POST } = serve<{ orderId: string }>(async (context) => {
+  const { orderId } = context.requestPayload;
 
-**Machine Presets:**
+  // Serial execution
+  const inventory = await context.run("check-inventory", async () => {
+    const stock = await db.inventory.findOne({ orderId });
+    if (!stock.available) throw new Error("Out of stock");
+    return stock;
+  });
 
-- `micro`: 0.25 vCPU, 0.25 GB RAM
-- `small-1x`: 0.5 vCPU, 0.5 GB RAM (default)
-- `small-2x`: 1 vCPU, 1 GB RAM
-- `medium-1x`: 1 vCPU, 2 GB RAM
-- `medium-2x`: 2 vCPU, 4 GB RAM
-- `large-1x`: 4 vCPU, 8 GB RAM
-- `large-2x`: 8 vCPU, 16 GB RAM
-
-## Idempotency
-
-```ts
-import { task, idempotencyKeys } from "@trigger.dev/sdk";
-
-export const paymentTask = task({
-  id: "process-payment",
-  retry: {
-    maxAttempts: 3,
-  },
-  run: async (payload: { orderId: string; amount: number }) => {
-    // Automatically scoped to this task run, so if the task is retried, the idempotency key will be the same
-    const idempotencyKey = await idempotencyKeys.create(`payment-${payload.orderId}`);
-
-    // Ensure payment is processed only once
-    await chargeCustomer.trigger(payload, {
-      idempotencyKey,
-      idempotencyKeyTTL: "24h", // Key expires in 24 hours
-    });
-  },
-});
-
-// Payload-based idempotency
-import { createHash } from "node:crypto";
-
-function createPayloadHash(payload: any): string {
-  const hash = createHash("sha256");
-  hash.update(JSON.stringify(payload));
-  return hash.digest("hex");
-}
-
-export const deduplicatedTask = task({
-  id: "deduplicated-task",
-  run: async (payload) => {
-    const payloadHash = createPayloadHash(payload);
-    const idempotencyKey = await idempotencyKeys.create(payloadHash);
-
-    await processData.trigger(payload, { idempotencyKey });
-  },
-});
-```
-
-## Metadata & Progress Tracking
-
-```ts
-import { task, metadata } from "@trigger.dev/sdk";
-
+  const payment = await context.run("process-payment", async () => {
+    const result = await stripe.charges.create({
+      amount: inventory.price,
+      currency: "usd",
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
