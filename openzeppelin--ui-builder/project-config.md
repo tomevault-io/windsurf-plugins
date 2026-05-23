@@ -1,118 +1,166 @@
 ---
 trigger: always_on
-description: Use this rule when you are building any UI.
+description: Use these rules when working on UI components and layout.
 ---
 
 
-# Tech Stack Overview
+# Design System Rules
 
-This project uses a modern React + TypeScript frontend stack with Vite as the build tool, organized as a multi‑package monorepo. Key packages include:
+This document outlines the core design system rules for the UI Builder application, providing essential guidelines for maintaining consistency across the UI.
 
-- **@openzeppelin/ui-builder-app (packages/builder)**: Main builder application with the UI and export system
-- **@openzeppelin/ui-builder-renderer (packages/renderer)**: Shared rendering library
-- **@openzeppelin/ui-builder-ui (packages/ui)**: Shared UI component library
-- **@openzeppelin/ui-builder-types (packages/types)**: Shared type system (single source of truth, includes ContractAdapter)
-- **@openzeppelin/ui-builder-styles (packages/styles)**: Centralized styling system
-- **@openzeppelin/ui-builder-utils (packages/utils)**: Shared utilities (logger, AppConfigService, cn, etc.)
-- **@openzeppelin/ui-builder-react-core (packages/react-core)**: Shared React providers/hooks (adapter and wallet state)
-- **@openzeppelin/ui-builder-storage (packages/storage)**: Dexie/IndexedDB persistence for builder history
-- **@openzeppelin/ui-builder-adapter-_ (packages/adapter-_)**: Chain‑specific adapters (EVM, Solana, Stellar, Midnight, ...)
+## Spacing
 
-Key technologies include:
+### Spacing Scale
 
-- React 19 - UI library with modern hooks API and concurrent features
-- TypeScript 5.8+ - Static typing with enhanced type inference
-- Vite 6/7 - Fast build tool and dev server with HMR
-- pnpm workspaces - Monorepo package management
-- Tailwind CSS v4 - Utility-first CSS framework with new HSL theme syntax
-- shadcn/ui - Unstyled, accessible component system built on Radix UI
-- Vitest - Testing framework integrated with Vite
-- pnpm - Fast, disk-efficient package manager
-- ESLint 9 + Prettier - Code quality and formatting tools
-- Husky + lint-staged - Git hooks for quality assurance
-- Conventional Commits - Structured commit message format
+We use a consistent spacing scale throughout the application based on Tailwind's default spacing scale:
 
-# Framework-Specific Rules
+| Name | Size | Tailwind Class | Use Case                                     |
+| ---- | ---- | -------------- | -------------------------------------------- |
+| xs   | 4px  | `p-1`, `m-1`   | Minimal spacing, tight elements              |
+| sm   | 8px  | `p-2`, `m-2`   | Standard element padding, form field spacing |
+| md   | 16px | `p-4`, `m-4`   | Spacing between related components           |
+| lg   | 24px | `p-6`, `m-6`   | Section padding, major component separation  |
+| xl   | 32px | `p-8`, `m-8`   | Page section spacing                         |
+| 2xl  | 48px | `p-12`, `m-12` | Major layout divisions                       |
 
-When working with React components:
+### Standard Spacing Patterns
 
-- Use functional components with hooks
-- Prefer destructuring props
-- Keep components focused on a single responsibility
-- Extract reusable logic into custom hooks
-- Use memoization (useMemo, useCallback) for expensive operations
-- Use React.ComponentRef instead of React.ElementRef
+- **Form Fields**: Use `gap-2` (8px) between label and input
+- **Form Field Groups**: Use `space-y-4` (16px) between field groups
+- **Form Sections**: Use `space-y-6` (24px) between sections
+- **Card Padding**: Use `p-4` (16px) or `p-6` (24px) for card content
+- **Page Sections**: Use `py-8` (32px) for vertical section spacing
 
-# Monorepo Architecture
+## Typography
 
-Workspace structure (selected):
+### Font Family
 
-- **packages/builder** - Main application with builder UI and export system
-- **packages/renderer** - Shared rendering library
-- **packages/ui** - Shared UI components
-- **packages/types** - Shared types
-- **packages/styles** - Centralized styles
-- **packages/utils** - Utilities
-- **packages/react-core** - React providers/hooks
-- **packages/storage** - IndexedDB storage
-- **packages/adapter-\*** - Chain‑specific adapters
+We use a system font stack for optimal performance:
 
-Guidelines for monorepo development:
+```css
+font-family:
+  ui-sans-serif,
+  system-ui,
+  -apple-system,
+  BlinkMacSystemFont,
+  'Segoe UI',
+  Roboto,
+  'Helvetica Neue',
+  Arial,
+  sans-serif;
+```
 
-- Keep core rendering logic in the renderer package
-- The builder app imports shared libraries by published package names (no cross‑package source imports outside configured aliases/virtual modules)
-- Each package has its own tsconfig.json extending from the root tsconfig.base.json
-- Run commands with package filtering: `pnpm --filter=@openzeppelin/ui-builder-app <command>`
-- Use workspace-level commands when applicable: `pnpm -r <command>` (runs in all packages)
-- Keep package.json scripts synchronized between packages for consistency
+### Font Sizes
 
-# Frontend Architecture
+| Name | Size | Tailwind Class | Use Case                     |
+| ---- | ---- | -------------- | ---------------------------- |
+| xs   | 12px | `text-xs`      | Helper text, captions        |
+| sm   | 14px | `text-sm`      | Form labels, secondary text  |
+| base | 16px | `text-base`    | Body text (default)          |
+| lg   | 18px | `text-lg`      | Subheadings, emphasized text |
+| xl   | 20px | `text-xl`      | Section headings             |
+| 2xl  | 24px | `text-2xl`     | Page titles                  |
+| 3xl  | 30px | `text-3xl`     | Major headings               |
 
-Architecture patterns:
+### Font Weights
 
-- Component-driven development with composition patterns
-- Separation of UI components from business logic
-- Headless UI pattern (shadcn/ui + Radix) for accessibility and customization
-- Atomic design principles for component organization
-- Custom hooks for shared stateful logic
-- Utility functions for shared stateless logic
-- Shared form rendering logic in the form-renderer package
+- **Regular**: `font-normal` (400)
+- **Medium**: `font-medium` (500)
+- **Semibold**: `font-semibold` (600)
+- **Bold**: `font-bold` (700)
 
-# TypeScript
+### Standard Text Patterns
 
-[tsconfig.json](mdc:packages/builder/tsconfig.json)
-[tsconfig.json](mdc:packages/renderer/tsconfig.json)
-[tsconfig.base.json](mdc:tsconfig.base.json)
-[tsconfig.json](mdc:tsconfig.json)
+- **Body Text**: `text-base` (16px), `font-normal`, `text-foreground`
+- **Form Labels**: `text-sm` (14px), `font-medium`
+- **Headings**: `text-xl` to `text-3xl`, `font-semibold`
+- **Helper Text**: `text-sm` (14px), `text-muted-foreground`
+- **Error Messages**: `text-sm` (14px), `text-red-500`
 
-When writing TypeScript:
+## Colors
 
-- Use explicit return types for functions and React components
-- Prefer interfaces for public APIs and types for internal usage
-- Use proper type narrowing instead of type assertions (avoid `as` casts)
-- Leverage TypeScript's utility types (Partial, Pick, Omit, etc.)
-- Prefer readonly arrays and properties when data shouldn't change
-- Use discriminated unions for state management
-- Ensure strict null checks by avoiding `!` assertions
-- Use path aliases for imports between packages:
-  - Within builder: `@/` for src directory
-  - Use published package imports (e.g., `@openzeppelin/ui-builder-renderer`) and configured aliases
+We use a semantic color system with HSL variables for easy theme customization:
 
-# Tailwind CSS v4
+### Base Colors
 
-[tailwind.config.cjs](mdc:packages/builder/tailwind.config.cjs)
-[postcss.config.cjs](mdc:postcss.config.cjs)
-[index.css](mdc:packages/builder/src/index.css)
+```css
+--color-primary: oklch(0.57 0.19 275); /* Purple */
+--color-secondary: oklch(0.65 0.15 245); /* Lavender */
+--color-accent: oklch(0.65 0.3 25); /* Amber */
+--color-destructive: oklch(0.65 0.22 25); /* Red */
+--color-success: oklch(0.65 0.15 150); /* Green */
+--color-warning: oklch(0.8 0.17 80); /* Yellow/Orange */
+--color-info: oklch(0.65 0.18 225); /* Blue */
+```
 
-When using Tailwind CSS v4:
+### Neutral Colors
 
-- Use centralized `@styles/global.css` and semantic classes (`bg-primary`, etc.)
-- Use simplified class names like `bg-primary` instead of verbose `bg-[hsl(var(--color))]` syntax
-- Define colors using OKLCH format for better color reproduction (e.g., `--color-primary: oklch(0.5 0.2 120)`)
-- Use Tailwind's built-in dark mode with the 'class' strategy
-- Use component composition rather than extending with apply when possible
-- For complex UI patterns, create reusable components instead of utility classes
-- Follow the container pattern for responsive layouts
+```css
+--color-background: oklch(1 0 0); /* White */
+--color-foreground: oklch(0.18 0 0); /* Near black for text */
+--color-muted: oklch(0.96 0 0); /* Subtle background */
+--color-muted-foreground: oklch(0.45 0 0); /* Secondary text */
+--color-border: oklch(0.83 0 0); /* Standard borders */
+```
+
+### Color Usage
+
+- Use semantic color classes (`bg-primary`, `text-destructive`) rather than literal colors
+- Follow a11y contrast guidelines (4.5:1 minimum for text)
+- Reserve accent colors for interactive elements and emphasis
+- Use muted colors for backgrounds and secondary elements
+
+## Component Guidelines
+
+### Borders & Rounding
+
+- Default border radius: `rounded-md` (6px)
+- Small border radius: `rounded` (4px)
+- Large border radius: `rounded-lg` (8px)
+- Full rounding: `rounded-full` (9999px, for pills, avatars)
+- Default border: `border` (1px), `border-border` (standard color)
+
+### Shadows
+
+- Subtle shadow: `shadow-sm` (for cards, dropdowns)
+- Standard shadow: `shadow` (for popovers, modals)
+- Large shadow: `shadow-lg` (for elevating important elements)
+
+### Interactive States
+
+- **Focus**: Blue outline with `ring-2`, `ring-offset-2`
+- **Hover**: Slightly darkened background (10-15%)
+- **Active/Pressed**: Darker background than hover (20-25%)
+- **Disabled**: `opacity-50`, `pointer-events-none`
+
+## Layout Guidelines
+
+### Container Sizes
+
+- Default max width: `max-w-7xl` (1280px)
+- Constrained content: `max-w-prose` (65ch, ideal for reading)
+- Narrow panels: `max-w-md` (448px)
+- Wide content: `max-w-screen-xl` (1280px)
+
+### Responsive Breakpoints
+
+- **sm**: 640px - Small devices (mobile landscape)
+- **md**: 768px - Medium devices (tablets)
+- **lg**: 1024px - Large devices (desktops)
+- **xl**: 1280px - Extra large devices
+- **2xl**: 1536px - Very large screens
+
+### Grid System
+
+- Use CSS Grid (`grid`) for 2D layouts
+- Use Flexbox (`flex`) for 1D layouts
+- Standard grid columns: `grid-cols-1 md:grid-cols-2 lg:grid-cols-3`
+- Standard gap: `gap-4` (16px) or `gap-6` (24px)
+
+## Form Element Sizing
+
+- **Input/Button Height**: 40px (default), 32px (small), 48px (large)
+- **Checkbox/Radio Size**: 16px × 16px
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
