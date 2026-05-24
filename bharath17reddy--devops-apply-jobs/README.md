@@ -5,14 +5,14 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `GEMINI.md` in [bharath17reddy/devops_apply_jobs](https://github.com/bharath17reddy/devops_apply_jobs).
+Original source: `CLAUDE.md` in [bharath17reddy/devops_apply_jobs](https://github.com/bharath17reddy/devops_apply_jobs).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
+- **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
 From [bharath17reddy/devops_apply_jobs](https://github.com/bharath17reddy/devops_apply_jobs) — a repo with 0+ stars on GitHub.
