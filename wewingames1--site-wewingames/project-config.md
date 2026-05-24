@@ -1,113 +1,139 @@
 ---
 trigger: always_on
-description: <laravel-boost-guidelines>
+description: WeWinGames is a comprehensive sports betting information and picks service built with Laravel 12 and Vue.js 3. The platform provides betting recommendations, game analysis, subscription-based access to premium picks, and a full suite of content management and user engagement features.
 ---
 
-<laravel-boost-guidelines>
-=== foundation rules ===
+# WeWinGames - Sports Betting Platform
 
-# Laravel Boost Guidelines
+## Overview
+WeWinGames is a comprehensive sports betting information and picks service built with Laravel 12 and Vue.js 3. The platform provides betting recommendations, game analysis, subscription-based access to premium picks, and a full suite of content management and user engagement features.
 
-The Laravel Boost guidelines are specifically curated by Laravel maintainers for this application. These guidelines should be followed closely to enhance the user's satisfaction building Laravel applications.
+## Technology Stack
 
-## Foundational Context
-This application is a Laravel application and its main Laravel ecosystems package & versions are below. You are an expert with them all. Ensure you abide by these specific packages & versions.
+### Backend
+- **Framework**: Laravel 12 (PHP 8.2+)
+- **Database**: MySQL 8.0 / SQLite (local development)
+- **Cache**: File/Redis with Cloudflare integration
+- **Queue**: Laravel Queue with database driver
+- **Authentication**: Laravel Breeze with Inertia.js
+- **Billing**: Laravel Cashier (Stripe integration)
+- **SSR**: Inertia.js v2
 
-- php - 8.3.30
-- inertiajs/inertia-laravel (INERTIA) - v2
-- laravel/framework (LARAVEL) - v12
-- laravel/nightwatch (NIGHTWATCH) - v1
-- laravel/prompts (PROMPTS) - v0
-- tightenco/ziggy (ZIGGY) - v2
-- laravel/pint (PINT) - v1
-- @inertiajs/vue3 (INERTIA) - v2
-- vue (VUE) - v3
+### Frontend
+- **Framework**: Vue.js 3 with TypeScript
+- **Build Tool**: Vite 6
+- **CSS**: Bootstrap 5 (migrated from Tailwind CSS)
+- **UI Components**: Bootstrap 5 components with custom admin theme
+- **Rich Text**: TinyMCE and Tiptap editors
+- **Charts**: Chart.js with vue-chartjs
+- **3D Graphics**: Three.js
+- **Icons**: Bootstrap Icons, Lucide Vue, Heroicons
 
+### Third-Party Services
+- **Payment**: Stripe (with dynamic product management)
+- **Push Notifications**: OneSignal & Web Push API
+- **Analytics**: Google Analytics & Tag Manager
+- **Security**: Cloudflare Turnstile
+- **Email**: SendGrid (via LoggedMailChannel)
+- **Marketing**: SpringBig (member sync & tier segments)
+- **Monitoring**: Laravel Telescope
+- **Media**: Spatie Media Library
+- **Permissions**: Spatie Laravel Permission
+- **Activity Logging**: Spatie Activity Log
 
-## Conventions
-- You must follow all existing code conventions used in this application. When creating or editing a file, check sibling files for the correct structure, approach, naming.
-- Use descriptive names for variables and methods. For example, `isRegisteredForDiscounts`, not `discount()`.
-- Check for existing components to reuse before writing a new one.
+## Project Structure
 
-## Verification Scripts
-- Do not create verification scripts or tinker when tests cover that functionality and prove it works. Unit and feature tests are more important.
+```
+.
+├── app/
+│   ├── Console/           # Artisan commands
+│   ├── Events/            # Event classes
+│   ├── Http/
+│   │   ├── Controllers/   # All controllers including Admin/
+│   │   ├── Middleware/    # Custom middleware
+│   │   └── Requests/      # Form requests
+│   ├── Models/            # Eloquent models (30+ models)
+│   ├── Services/          # Business logic services
+│   ├── Policies/          # Authorization policies
+│   └── Mail/              # Mailable classes
+├── resources/
+│   ├── js/
+│   │   ├── components/    # Reusable Vue components
+│   │   ├── pages/         # Page components
+│   │   ├── layouts/       # Layout components
+│   │   └── composables/   # Vue composition utilities
+│   └── css/               # Bootstrap-based styles
+├── routes/                # Application routes
+├── database/              # Migrations, seeders, factories
+├── tests/                 # PHPUnit & Feature tests
+└── docker/                # Docker configuration
+```
 
-## Application Structure & Architecture
-- Stick to existing directory structure - don't create new base folders without approval.
-- Do not change the application's dependencies without approval.
+## Key Features
 
-## Frontend Bundling
-- If the user doesn't see a frontend change reflected in the UI, it could mean they need to run `npm run build`, `npm run dev`, or `composer run dev`. Ask them.
+### 1. Betting System
+- **Bet Management**: Create, edit, track betting picks with performance metrics
+- **Parlay Support**: Multi-bet parlays with combined odds
+- **Golf Betting**: Each-way bets with place fractions and dead heat rules
+- **CSV Import/Export**: Wizard-based bulk data management
+- **Mass Edit**: Batch updates for golf positions
+- **Premium Notes**: Subscriber-only betting insights
+- **Profit Tracking**: Detailed P&L calculations
 
-## Replies
-- Be concise in your explanations - focus on what's important rather than explaining obvious details.
+### 2. User & Subscription System
+- **User Types**: Regular, Ambassador, Gifted, Admin
+- **Subscription Tiers**: Bronze, Silver, Gold, Platinum
+- **Billing Periods**: Daily, Weekly, Monthly, Yearly
+- **Dynamic Stripe Products**: Database-driven product management
+- **Discount Codes**: Percentage/fixed with usage limits
+- **Affiliate System**: Track and manage affiliates
+- **Impersonation**: Admin user switching
+- **Quick Checkout**: Payment-first registration flow (feature flagged)
 
-## Documentation Files
-- You must only create documentation files if explicitly requested by the user.
+### 3. Content Management
+- **Blog System**: Full-featured with SEO, categories, view tracking
+- **CMS Pages**: Dynamic page creation and management
+- **Landing Pages**: Marketing-focused pages
+- **FAQ System**: Categorized Q&A management
+- **Knowledgebase**: Article-based help system
+- **Media Library**: Centralized file management
+- **Testimonials**: Customer reviews with Google integration
 
+### 4. Communication Features
+- **Email System**: 
+  - Template management
+  - Full logging with SendGrid
+  - Customizable transactional emails
+- **Push Notifications**:
+  - OneSignal integration (NEW)
+  - Web Push API fallback
+  - Tier-based targeting
+  - Notification history
+- **Support Tickets**: Guest-accessible support system
 
-=== boost rules ===
+### 5. Career/Jobs System
+- **Job Positions**: Manage job listings
+- **Resume Submissions**: Application tracking system
+- **Admin Review**: Application management interface
 
-## Laravel Boost
-- Laravel Boost is an MCP server that comes with powerful tools designed specifically for this application. Use them.
+### 6. Admin Dashboard
+Located at `/admin`, provides:
+- **Statistics Dashboard**: MRR, user growth, betting activity
+- **User Management**: Complete user administration
+- **Bet Management**: Full CRUD with import/export
+- **Content Editing**: Pages, posts, FAQs, testimonials
+- **Subscription Dashboard**: Customer & revenue tracking
+- **System Settings**: Configuration management
+- **Activity Logs**: User action tracking
+- **Cache Management**: Clear Laravel & Cloudflare cache
 
-## Artisan
-- Use the `list-artisan-commands` tool when you need to call an Artisan command to double check the available parameters.
-
-## URLs
-- Whenever you share a project URL with the user you should use the `get-absolute-url` tool to ensure you're using the correct scheme, domain / IP, and port.
-
-## Tinker / Debugging
-- You should use the `tinker` tool when you need to execute PHP to debug code or query Eloquent models directly.
-- Use the `database-query` tool when you only need to read from the database.
-
-## Reading Browser Logs With the `browser-logs` Tool
-- You can read browser logs, errors, and exceptions using the `browser-logs` tool from Boost.
-- Only recent browser logs will be useful - ignore old logs.
-
-## Searching Documentation (Critically Important)
-- Boost comes with a powerful `search-docs` tool you should use before any other approaches. This tool automatically passes a list of installed packages and their versions to the remote Boost API, so it returns only version-specific documentation specific for the user's circumstance. You should pass an array of packages to filter on if you know you need docs for particular packages.
-- The 'search-docs' tool is perfect for all Laravel related packages, including Laravel, Inertia, Livewire, Filament, Tailwind, Pest, Nova, Nightwatch, etc.
-- You must use this tool to search for Laravel-ecosystem documentation before falling back to other approaches.
-- Search the documentation before making code changes to ensure we are taking the correct approach.
-- Use multiple, broad, simple, topic based queries to start. For example: `['rate limiting', 'routing rate limiting', 'routing']`.
-- Do not add package names to queries - package information is already shared. For example, use `test resource table`, not `filament 4 test resource table`.
-
-### Available Search Syntax
-- You can and should pass multiple queries at once. The most relevant results will be returned first.
-
-1. Simple Word Searches with auto-stemming - query=authentication - finds 'authenticate' and 'auth'
-2. Multiple Words (AND Logic) - query=rate limit - finds knowledge containing both "rate" AND "limit"
-3. Quoted Phrases (Exact Position) - query="infinite scroll" - Words must be adjacent and in that order
-4. Mixed Queries - query=middleware "rate limit" - "middleware" AND exact phrase "rate limit"
-5. Multiple Queries - queries=["authentication", "middleware"] - ANY of these terms
-
-
-=== php rules ===
-
-## PHP
-
-- Always use curly braces for control structures, even if it has one line.
-
-### Constructors
-- Use PHP 8 constructor property promotion in `__construct()`.
-    - <code-snippet>public function __construct(public GitHub $github) { }</code-snippet>
-- Do not allow empty `__construct()` methods with zero parameters.
-
-### Type Declarations
-- Always use explicit return type declarations for methods and functions.
-- Use appropriate PHP type hints for method parameters.
-
-<code-snippet name="Explicit Return Types and Method Params" lang="php">
-protected function isAccessible(User $user, ?string $path = null): bool
-{
-    ...
-}
-</code-snippet>
-
-## Comments
-- Prefer PHPDoc blocks over comments. Never use comments within the code itself unless there is something _very_ complex going on.
-
+### 7. Security & Performance
+- **Middleware**:
+  - Admin security headers
+  - Rate limiting
+  - IP blacklisting
+  - Spam prevention
+- **Under Construction Mode**: Site-wide maintenance
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
