@@ -1,8 +1,16 @@
 ---
 trigger: always_on
-description: Performance, design, and architecture techniques distilled from performance.dev articles. Apply when building tools that must feel instant, designing local-first sync, or optimizing perceived performance.
+description: Agent-loadable instructions distilled from each article on performance.dev. Claude Code reads this file as project-level guidance when it lives at the project root.
 ---
 
+# performance.dev skills
+
+Agent-loadable instructions distilled from each article on performance.dev. Claude Code reads this file as project-level guidance when it lives at the project root.
+
+Canonical source: https://performance.dev/skills
+Plugin install: `/plugin marketplace add brotzky/performance-skills && /plugin install perf@skills`
+
+---
 
 ## linear-local-first-architecture
 
@@ -118,12 +126,6 @@ Eliminate the waterfall of fetch → parse → fetch imports by declaring all cr
 <link rel=modulepreload crossorigin
   href="https://static.linear.app/client/assets/SyncWebSocket.Djw6l_Op.js">
 <link rel=modulepreload crossorigin
-  href="https://static.linear.app/client/assets/DatabaseManager.DKssGAN8.js">
-<!-- ...around many more -->
-```
-
-The `crossorigin` attribute on each preload matches the `crossorigin` on the entry script, so the browser reuses the cached fetch. The cold-load timeline collapses from a sequential waterfall into a single parallel batch.
-
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
