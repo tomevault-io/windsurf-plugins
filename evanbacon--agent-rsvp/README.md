@@ -7,11 +7,11 @@ Speed-reading skill for agents
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [EvanBacon/agent-rsvp](https://github.com/EvanBacon/agent-rsvp).
+Original source: `AGENTS.md` in [EvanBacon/agent-rsvp](https://github.com/EvanBacon/agent-rsvp).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
