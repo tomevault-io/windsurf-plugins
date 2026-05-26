@@ -1,265 +1,150 @@
 ---
 trigger: always_on
-description: docker, infrastructure
+description: Suna is an open-source generalist AI Worker with a full-stack architecture:
 ---
 
 
-# Infrastructure & DevOps Guidelines
+# Suna AI Worker Project - Cursor Rules
 
-## Docker & Containerization
+## Project Overview
 
-### Dockerfile Best Practices
+Suna is an open-source generalist AI Worker with a full-stack architecture:
 
-```dockerfile
-# Multi-stage build pattern for production optimization
-FROM node:18-alpine AS frontend-builder
-WORKDIR /app
-COPY frontend/package*.json ./
-RUN npm ci --only=production
-COPY frontend/ ./
-RUN npm run build
+- **Frontend**: Next.js 15+ with TypeScript, Tailwind CSS, Radix UI, React Query
+- **Backend**: Python 3.11+ with FastAPI, Supabase, Redis, LiteLLM, Dramatiq
+- **Agent System**: Isolated Docker environments with comprehensive tool execution
+- **Database**: Supabase for persistence, authentication, real-time features, and RLS
 
-FROM python:3.11-slim AS backend-base
-WORKDIR /app
-COPY backend/pyproject.toml ./
-RUN pip install -e .
+## Architecture Components
 
-FROM backend-base AS backend-production
-COPY backend/ ./
-EXPOSE 8000
-CMD ["gunicorn", "api:app", "--host", "0.0.0.0", "--port", "8000"]
+### Core Stack
 
-# Security best practices
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
-USER nextjs
+- **Frontend**: Next.js App Router + TypeScript + Tailwind + Radix UI
+- **Backend**: FastAPI + Supabase + Redis + LiteLLM + Dramatiq workers
+- **Database**: PostgreSQL via Supabase with Row Level Security
+- **Agent Runtime**: Docker containers with browser automation, code interpreter
+- **Authentication**: Supabase Auth with JWT validation
+- **Monitoring**: Langfuse tracing, Sentry error tracking, Prometheus metrics
 
-# Health check implementation
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:8000/health || exit 1
+### File Organization
+
+```txt
+project/
+├── frontend/               # Next.js application
+│   └── src/
+│       ├── app/           # Next.js app router pages
+│       ├── components/    # Reusable React components
+│       ├── hooks/         # Custom React hooks
+│       ├── lib/          # Utilities and configurations
+│       ├── providers/    # Context providers
+│       └── contexts/     # React contexts
+├── backend/               # Python FastAPI backend
+│   ├── agent/            # AI Worker core implementation
+│   ├── services/         # Business logic services
+│   ├── utils/           # Shared utilities
+│   ├── supabase/        # Database migrations & config
+│   ├── tools/           # Agent tool implementations
+│   ├── auth/            # Authentication logic
+│   ├── triggers/        # Event-driven triggers
+│   └── api.py           # Main FastAPI application
+└── docs/                 # Documentation
 ```
 
-### Docker Compose Patterns
+## Development Principles
 
-```yaml
-# Production-ready docker-compose.yml
-version: "3.8"
+### Code Quality Standards
 
-services:
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      target: production
-    ports:
-      - "3000:3000"
-    environment:
-      - NODE_ENV=production
-      - NEXT_PUBLIC_SUPABASE_URL=${SUPABASE_URL}
-    depends_on:
-      - backend
-    restart: unless-stopped
-    networks:
-      - app-network
+- **Type Safety**: Strict TypeScript frontend, comprehensive Python type hints
+- **Error Handling**: Structured error responses, proper exception handling
+- **Logging**: Structured logging with context throughout the stack
+- **Testing**: Unit tests for core logic, integration tests for APIs
+- **Security**: Input validation, authentication, encryption for sensitive data
 
-  backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    ports:
-      - "8000:8000"
-    environment:
-      - DATABASE_URL=${DATABASE_URL}
-      - REDIS_URL=${REDIS_URL}
-    volumes:
-      - ./backend/logs:/app/logs
-    depends_on:
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
-    networks:
-      - app-network
+### Performance Guidelines
 
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis-data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 3s
-      retries: 3
-    restart: unless-stopped
-    networks:
-      - app-network
+- **Frontend**: Code splitting, lazy loading, optimized bundle size
+- **Backend**: Async/await patterns, connection pooling, Redis caching
+- **Database**: Proper indexing, query optimization, RLS policies
+- **Agent**: Timeout handling, resource limits, sandbox isolation
 
-  nginx:
-    image: nginx:alpine
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./ssl:/etc/nginx/ssl:ro
-    depends_on:
-      - frontend
-      - backend
-    restart: unless-stopped
-    networks:
-      - app-network
+### Integration Patterns
 
-volumes:
-  redis-data:
+- **LLM Integration**: LiteLLM for multi-provider support, structured prompts
+- **Tool System**: Dual schema decorators (OpenAPI + XML), consistent ToolResult
+- **Real-time**: Supabase subscriptions for live updates
 
-networks:
-  app-network:
-    driver: bridge
-```
+## Key Technologies
 
-## Environment Management
+### Frontend Dependencies
 
-### Environment Configuration
+- Next.js 15+, React 18+, TypeScript 5+
+- @tanstack/react-query, @supabase/supabase-js
+- @radix-ui components, @tailwindcss/typography
+- @hookform/resolvers, react-hook-form
 
-```bash
-# .env.local (development)
-NODE_ENV=development
-NEXT_PUBLIC_SUPABASE_URL=http://localhost:54321
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
-DATABASE_URL=postgresql://user:pass@localhost:5432/suna_dev
-REDIS_URL=redis://localhost:6379
-LOG_LEVEL=debug
+### Backend Dependencies
 
-# .env.production
-NODE_ENV=production
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-DATABASE_URL=postgresql://user:pass@prod-db:5432/suna_prod
-REDIS_URL=redis://prod-redis:6379
-LOG_LEVEL=info
-SENTRY_DSN=your_sentry_dsn
-```
+- FastAPI 0.115+, Python 3.11+
+- Supabase 2.17+, Redis 5.2+, LiteLLM 1.72+
+- Dramatiq 1.18+, Pydantic for validation
+- Sentry, Langfuse, Prometheus for observability
 
-### Tool Version Management (mise.toml)
+## Advanced Patterns
 
-```toml
-[tools]
-node = "18.17.0"
-python = "3.11.5"
-docker = "24.0.0"
-docker-compose = "2.20.0"
+### Agent System Architecture
 
-[env]
-UV_VENV = ".venv"
-PYTHON_KEYRING_BACKEND = "keyring.backends.null.Keyring"
-```
+- **Versioning**: Multiple agent versions with `agent_versions` table
+- **Configuration**: JSONB config storage with validation
+- **Workflows**: Step-by-step execution with `agent_workflows`
+- **Triggers**: Scheduled and event-based automation
+- **Builder Tools**: Dynamic agent creation and management
 
-### Environment-Specific Scripts
+### Security & Authentication
 
-```bash
-#!/bin/bash
-# scripts/start-dev.sh
-set -e
+- **JWT Validation**: Supabase token verification without signature check
+- **Row Level Security**: Database-level access control
+- **Credential Encryption**: Secure storage of sensitive API keys
+- **Input Validation**: Pydantic models for all user inputs
 
-echo "Starting development environment..."
+### Database Patterns
 
-# Check if required tools are installed
-command -v docker >/dev/null 2>&1 || { echo "Docker is required but not installed. Aborting." >&2; exit 1; }
-command -v docker-compose >/dev/null 2>&1 || { echo "Docker Compose is required but not installed. Aborting." >&2; exit 1; }
+- **Migrations**: Idempotent SQL with proper error handling
+- **Indexing**: Foreign keys and query optimization
+- **Triggers**: Automated timestamp management
+- **Enums**: Safe enum creation with duplicate handling
 
-# Start services
-docker-compose -f docker-compose.dev.yml up -d
-echo "✅ Development services started"
+## Development Workflow
 
-# Wait for services to be healthy
-echo "Waiting for services to be ready..."
-sleep 10
+### Environment Setup
 
-# Run database migrations
-docker-compose -f docker-compose.dev.yml exec backend python -m alembic upgrade head
-echo "✅ Database migrations completed"
+- Use `mise.toml` for tool version management
+- Docker Compose for local development stack
+- Environment-specific configurations (LOCAL/STAGING/PRODUCTION)
 
-echo "🚀 Development environment is ready!"
-echo "Frontend: http://localhost:3000"
-echo "Backend: http://localhost:8000"
-echo "Redis: localhost:6379"
-```
+### Code Standards
 
-## Deployment Strategies
+- Follow established naming conventions
+- Implement proper error boundaries
+- Use consistent logging patterns
+- Handle loading and error states
 
-### GitHub Actions CI/CD
+### Testing Strategy
 
-```yaml
-# .github/workflows/deploy.yml
-name: Deploy to Production
+- Unit tests for business logic
+- Integration tests for API endpoints
+- E2E tests for critical user flows
+- Performance testing for agent execution
 
-on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+## When in Doubt
 
-env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: "3.11"
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "18"
-          cache: "npm"
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Install backend dependencies
-        run: |
-          cd backend
-          pip install -e .
-
-      - name: Install frontend dependencies
-        run: |
-          cd frontend
-          npm ci
-
-      - name: Run backend tests
-        run: |
-          cd backend
-          pytest
-
-      - name: Run frontend tests
-        run: |
-          cd frontend
-          npm run test
-
-      - name: Lint code
-        run: |
-          cd backend && python -m black --check .
-          cd frontend && npm run lint
-
-  build-and-push:
-    needs: test
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-
-    permissions:
-      contents: read
-      packages: write
-
-    steps:
-      - uses: actions/checkout@v4
-
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- Follow existing patterns in the codebase
+- Check similar implementations for guidance
+- Use established error handling and logging
+- Prioritize type safety and security
+- Consult domain-specific rule files for detailed guidance
+- Check similar implementations for guidance
+- Use the established error handling patterns
+- Follow the logging conventions with structured logging
 
 ---
 > Source: [elhayatferdos67-ux/mytask.v2](https://github.com/elhayatferdos67-ux/mytask.v2) — distributed by [TomeVault](https://tomevault.io).
