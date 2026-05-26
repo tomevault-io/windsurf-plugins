@@ -7,11 +7,11 @@ The repository for Android Stream Desk project
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [aniadev/android-stream-desk](https://github.com/aniadev/android-stream-desk).
+Original source: `CLAUDE.md` in [aniadev/android-stream-desk](https://github.com/aniadev/android-stream-desk).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
