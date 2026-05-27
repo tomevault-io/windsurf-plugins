@@ -1,243 +1,116 @@
 ---
 trigger: always_on
-description: Testing guidelines, test structure, coverage requirements, mocking patterns, and VS Code extension testing
+description: Camouflage is a VS Code extension that visually masks sensitive values in configuration files
 ---
 
+# AGENTS.md
 
-# Testing Guidelines
+Camouflage is a VS Code extension that visually masks sensitive values in configuration files
+(.env, .json, .yaml, .toml, .properties, .sh) using text decorations. It **never modifies file
+content** -- masking is purely visual via CSS tricks (letterSpacing, opacity, pseudo-elements).
 
-## Test Philosophy
+## Build / Lint / Test / Package Commands
 
-### Core Principles
-
-1. **Tests are documentation**: Test names should explain behavior
-2. **Fast feedback**: Unit tests should run in milliseconds
-3. **Reliable**: Tests should not be flaky
-4. **Maintainable**: Tests should be easy to update when requirements change
-5. **Coverage**: Minimum 80% code coverage, aim for 90%+
-
-## Test Structure
-
-### AAA Pattern (Arrange, Act, Assert)
-
-```typescript
-describe('generateHiddenText', () => {
-  it('should mask text with stars style', () => {
-    // Arrange
-    const input = 'secret123';
-    const style: HiddenTextStyle = 'stars';
-
-    // Act
-    const result = generateHiddenText(input, style);
-
-    // Assert
-    expect(result).toBe('*********');
-  });
-});
+```bash
+npm install                          # Install dependencies
+npm run compile                      # Compile TypeScript (tsc -p ./) → out/
+npm run watch                        # Watch mode compilation
+npm run lint                         # ESLint (src/)
+npm run format                       # Prettier (write)
+npm test                             # Run all tests (Jest)
+npm test -- --watch                  # Watch mode
+npm test -- --coverage               # With coverage report
+npm test -- path/to/file.test.ts     # Run a single test file
+npm test -- --testNamePattern="name" # Run tests matching a name pattern
+npm test -- --clearCache             # Clear Jest cache if tests are stale
+npm run package                      # vsce package → produces .vsix file
 ```
 
-### Test File Organization
+Coverage threshold is 80% (branches, functions, lines, statements).
 
-```typescript
-// Top-level describe: Module or class name
-describe('Camouflage', () => {
-  // Setup and teardown
-  beforeEach(() => {
-    // Reset state before each test
-  });
+## CI/CD Pipeline
 
-  afterEach(() => {
-    // Cleanup after each test
-  });
+Four GitHub Actions workflows on `main`:
 
-  // Nested describe: Method or feature
-  describe('updateDecorations', () => {
-    // Individual test cases
-    it('should apply decorations to .env file', () => {});
-    it('should skip non-.env files', () => {});
-    it('should handle empty files', () => {});
-  });
+| Workflow                    | Trigger                       | What it does                                                                                        |
+| --------------------------- | ----------------------------- | --------------------------------------------------------------------------------------------------- |
+| **CI** (`ci.yml`)           | PR → main                     | `npm ci` → prettier --check → lint → test --coverage → Codecov                                      |
+| **Publish** (`publish.yml`) | push/merge to main            | CI steps → compile → semantic-release → `vsce package` → `vsce publish` → GitHub Release with .vsix |
+| **CodeQL** (`codeql.yml`)   | push/PR to main + weekly cron | Security & quality analysis (TypeScript)                                                            |
+| **Stale** (`stale.yml`)     | daily cron                    | Marks issues stale after 60 days, closes after 14 more                                              |
 
-  describe('toggle', () => {
-    it('should disable when enabled', () => {});
-    it('should enable when disabled', () => {});
-  });
-});
+**Release flow**: semantic-release reads conventional commits → bumps version in `package.json`
+→ generates `CHANGELOG.md` → commits with `chore(release): x.y.z [skip ci]` → creates GitHub
+release → workflow then runs `vsce package` + `vsce publish` to VS Code Marketplace.
+
+Secrets required: `VSCE_PAT` (Marketplace token), `CODECOV_TOKEN`, `GITHUB_TOKEN` (auto).
+
+## Git Hooks (Husky)
+
+- **pre-commit**: `npx lint-staged` → runs `eslint --fix` + `prettier --write` on staged
+  `.ts`/`.js` files, `prettier --write` on `.json`/`.md`/`.yml`/`.yaml`
+- **commit-msg**: `npx commitlint` → enforces Conventional Commits format
+
+## Project Structure
+
+```
+src/
+  extension.ts              # Entry point: activate(), deactivate(), command registration
+  core/camouflage.ts        # Main engine: decorations, events, status bar
+  core/types.ts             # HiddenTextStyle enum
+  parsers/                  # Strategy pattern: one parser per format
+    types.ts                # ParsedVariable, Parser interface
+    base-parser.ts          # Abstract base class
+    env-parser.ts           # .env, .envrc, .sh
+    json-parser.ts          # .json (nested keys)
+    yaml-parser.ts          # .yaml, .yml (nested keys)
+    toml-parser.ts          # .toml
+    properties-parser.ts    # .properties, .ini, .conf
+    index.ts                # ParserRegistry singleton
+  lib/text-generator.ts     # Pure: generateHiddenText(), scrambleText()
+  decorators/               # @HandleErrors, @Log, @ValidateConfig, @Debounce, @MeasurePerformance
+  utils/config.ts           # Configuration facade (all getters for camouflage.* settings)
+  utils/file.ts             # isSupportedFile(), parseFileContent()
+  utils/pattern-matcher.ts  # Wildcard pattern matching (*, KEY*, *KEY)
+  __mocks__/vscode.ts       # Full VS Code API mock for Jest
 ```
 
-## Test Coverage Requirements
+Tests live in `__tests__/` dirs co-located with each module (e.g., `parsers/__tests__/`).
 
-### Required Coverage
+## Dependency Rules
 
-- **Statements**: 80%+
-- **Branches**: 75%+
-- **Functions**: 80%+
-- **Lines**: 80%+
-
-### What to Test
-
-✅ **Must Test**:
-
-- All public methods and functions
-- Edge cases (empty input, null, undefined)
-- Error conditions
-- Configuration changes
-- State transitions
-
-✅ **Should Test**:
-
-- Private methods with complex logic
-- Integration between modules
-- Performance-critical paths
-
-❌ **Don't Test**:
-
-- Third-party library code
-- Generated code
-- Simple getters/setters without logic
-- VS Code API itself
-
-## Unit Testing Patterns
-
-### Pure Functions (Easiest)
-
-```typescript
-// Function to test
-export function matchPattern(key: string, pattern: string): boolean {
-  return new RegExp(pattern, 'i').test(key);
-}
-
-// Test
-describe('matchPattern', () => {
-  it('should match case-insensitively', () => {
-    expect(matchPattern('API_KEY', 'api')).toBe(true);
-    expect(matchPattern('api_key', 'API')).toBe(true);
-  });
-
-  it('should support wildcard patterns', () => {
-    expect(matchPattern('MY_API_KEY', '*API*')).toBe(true);
-    expect(matchPattern('SECRET_TOKEN', '*TOKEN')).toBe(true);
-  });
-
-  it('should return false for non-matches', () => {
-    expect(matchPattern('DATABASE_URL', 'api')).toBe(false);
-  });
-});
+```
+extension.ts -> core/ -> parsers/ + lib/ + utils/
 ```
 
-### Functions with Dependencies (Use Mocks)
+- `lib/` must be pure functions -- no VS Code API, no side effects
+- `parsers/` must not import from `core/` or `utils/`
+- `utils/` must not import from `core/`
+- No circular dependencies
 
-```typescript
-// Function to test
-export function readEnvFile(filePath: string): string {
-  return fs.readFileSync(filePath, 'utf8');
-}
+## Code Style
 
-// Test with mock
-jest.mock('fs');
+### TypeScript
 
-describe('readEnvFile', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
+- **Strict mode** enabled (`strict: true`, `experimentalDecorators: true`)
+- Target: ES2022, Module: NodeNext
+- Explicit types on function signatures; avoid `any` (eslint warns)
+- Use `interface` for object shapes, `type` for unions/computed types
+- Prefer `const` over `let`; use `===` always (`eqeqeq: error`)
+- Always use curly braces, even for single-line blocks (`curly: error`)
+- Prefix unused params with `_` (`argsIgnorePattern: "^_"`)
 
-  it('should read file content', () => {
-    const mockContent = 'API_KEY=secret';
-    (fs.readFileSync as jest.Mock).mockReturnValue(mockContent);
+### Formatting (Prettier)
 
-    const result = readEnvFile('/path/.env');
+- Single quotes, 2-space indent, 100 char print width
+- Trailing commas (ES5), semicolons always
 
-    expect(result).toBe(mockContent);
-    expect(fs.readFileSync).toHaveBeenCalledWith('/path/.env', 'utf8');
-  });
+### Naming
 
-  it('should throw on file not found', () => {
-    (fs.readFileSync as jest.Mock).mockImplementation(() => {
-      throw new Error('ENOENT');
-    });
-
-    expect(() => readEnvFile('/path/.env')).toThrow('ENOENT');
-  });
-});
-```
-
-### Class Testing
-
-```typescript
-describe('Camouflage', () => {
-  let camouflage: Camouflage;
-  let mockEditor: vscode.TextEditor;
-
-  beforeEach(() => {
-    camouflage = new Camouflage();
-    mockEditor = createMockEditor(); // Helper function
-  });
-
-  afterEach(() => {
-    camouflage.dispose();
-  });
-
-  describe('initialization', () => {
-    it('should create status bar item', () => {
-      expect(camouflage['statusBarItem']).toBeDefined();
-    });
-
-    it('should apply decorations if .env file is open', () => {
-      mockEditor.document.fileName = '/path/.env';
-      vscode.window.activeTextEditor = mockEditor;
-
-      camouflage = new Camouflage();
-
-      expect(mockEditor.setDecorations).toHaveBeenCalled();
-    });
-  });
-
-  describe('toggle', () => {
-    it('should disable extension when enabled', async () => {
-      await camouflage.toggle();
-
-      expect(config.isEnabled()).toBe(false);
-    });
-  });
-});
-```
-
-## Mocking VS Code API
-
-### Mock Structure
-
-```typescript
-// __mocks__/vscode.ts
-export const window = {
-  activeTextEditor: undefined,
-  createStatusBarItem: jest.fn(() => ({
-    text: '',
-    tooltip: '',
-    show: jest.fn(),
-    hide: jest.fn(),
-    dispose: jest.fn(),
-  })),
-  showInformationMessage: jest.fn(),
-  showErrorMessage: jest.fn(),
-};
-
-export const workspace = {
-  getConfiguration: jest.fn(() => ({
-    get: jest.fn(),
-    update: jest.fn(),
-  })),
-  onDidChangeConfiguration: jest.fn(),
-  onDidChangeTextDocument: jest.fn(),
-};
-
-export const commands = {
-  registerCommand: jest.fn(),
-  executeCommand: jest.fn(),
-};
-
-export class Range {
-  constructor(
-    public start: { line: number; character: number },
+- `camelCase` for variables/functions, `PascalCase` for classes/interfaces/enums
+- `UPPER_SNAKE_CASE` for true constants
+- Booleans: prefix with `is`, `has`, `should`, `can`
+- Files: `kebab-case.ts`, tests: `*.test.ts`
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
