@@ -1,271 +1,261 @@
 ---
 trigger: always_on
-description: Git workflow, commit message format, branching strategy, and semantic release process
+description: Design patterns (Decorator, Strategy, Facade) and anti-patterns used in Camouflage codebase
 ---
 
 
-# Git Workflow and Release Process
+# Design Patterns and Anti-Patterns
 
-## Commit Message Format
+## Recommended Patterns
 
-We use **Conventional Commits** for automated semantic versioning and changelog generation.
+### 1. Decorator Pattern (Method Decorators)
 
-### Format
+**Purpose**: Add cross-cutting concerns without modifying core logic.
 
-```
-<type>(<scope>): <subject>
+**Implementation**:
 
-<body>
+```typescript
+// lib/decorators.ts
+export function Log(message: string) {
+  return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+    const originalMethod = descriptor.value;
 
-<footer>
-```
+    descriptor.value = function (...args: any[]) {
+      console.log(`[${message}] Executing ${propertyKey}`);
+      return originalMethod.apply(this, args);
+    };
 
-### Type
+    return descriptor;
+  };
+}
 
-Must be one of:
-
-- **feat**: New feature (triggers minor version bump)
-- **fix**: Bug fix (triggers patch version bump)
-- **docs**: Documentation changes
-- **style**: Code style changes (formatting, no logic change)
-- **refactor**: Code refactoring (no features or bugs)
-- **perf**: Performance improvements
-- **test**: Adding or updating tests
-- **chore**: Build process, dependencies, tooling
-- **ci**: CI/CD configuration changes
-
-### Scope (Optional)
-
-The scope specifies the area of the codebase:
-
-- `core`: Core functionality (camouflage.ts)
-- `config`: Configuration management
-- `decorators`: Decorator functions
-- `patterns`: Pattern matching
-- `tests`: Test files
-- `docs`: Documentation
-
-### Subject
-
-- Imperative mood ("add" not "added" or "adds")
-- Lowercase first letter
-- No period at the end
-- Max 50 characters
-
-### Breaking Changes
-
-Breaking changes trigger a major version bump:
-
-```
-feat(core): redesign pattern matching API
-
-BREAKING CHANGE: matchPattern now returns object instead of boolean
+// Usage
+export class Camouflage {
+  @Log('Camouflage')
+  @HandleErrors
+  @Debounce(100)
+  private updateDecorations(): void {
+    // Core logic only, concerns handled by decorators
+  }
+}
 ```
 
-### Examples
+**Benefits**:
 
-```bash
-# Feature (bumps 1.0.0 → 1.1.0)
-feat(core): add support for custom hiding characters
+- ✅ Separation of concerns
+- ✅ Reusable across methods
+- ✅ Easy to add/remove
+- ✅ Clean core logic
 
-# Bug fix (bumps 1.0.0 → 1.0.1)
-fix(patterns): handle special regex characters correctly
+**When to Use**:
 
-# Documentation
-docs: update README with new configuration options
+- Logging
+- Error handling
+- Performance monitoring
+- Debouncing
+- Validation
 
-# Refactoring
-refactor(core): extract decoration logic into separate method
+### 2. Facade Pattern (Configuration)
 
-# Performance
-perf(patterns): cache compiled regexes for pattern matching
+**Purpose**: Simplify complex API into simple interface.
 
-# Breaking change (bumps 1.0.0 → 2.0.0)
-feat(core): redesign configuration API
+**Implementation**:
 
-BREAKING CHANGE: Configuration keys changed from camelCase to snake_case
+```typescript
+// utils/config.ts - Facade
+export function isEnabled(): boolean {
+  return vscode.workspace.getConfiguration('camouflage').get<boolean>('enabled', true);
+}
+
+export function getHidingStyle(): HiddenTextStyle {
+  return vscode.workspace
+    .getConfiguration('camouflage')
+    .get<HiddenTextStyle>('hiddenTextStyle', 'text');
+}
+
+export function getPatterns(): string[] {
+  return vscode.workspace
+    .getConfiguration('camouflage')
+    .get<string[]>('selectiveHiding.patterns', []);
+}
+
+// Usage - Simple!
+import * as config from '../utils/config';
+
+if (config.isEnabled()) {
+  const style = config.getHidingStyle();
+}
 ```
 
-### Body (Optional)
+**Benefits**:
 
-- Detailed explanation of the change
-- Motivation for the change
-- Contrast with previous behavior
+- ✅ Hides VS Code API complexity
+- ✅ Consistent access pattern
+- ✅ Easy to mock in tests
+- ✅ Single place for default values
 
-```
-feat(core): add selective hiding by pattern
+**When to Use**:
 
-This allows users to hide only specific environment variables
-by providing wildcard patterns like *API*, *SECRET, etc.
+- Configuration access
+- API wrappers
+- Complex subsystems
 
-Previously, all values were hidden or none were hidden.
-```
+### 3. Strategy Pattern (Text Generation)
 
-### Footer (Optional)
+**Purpose**: Different algorithms for same task, selectable at runtime.
 
-- Reference issues
-- Note breaking changes
-- Credit co-authors
+**Implementation**:
 
-```
-fix(patterns): escape special regex characters
+```typescript
+// lib/text-generator.ts
+type GeneratorStrategy = (text: string) => string;
 
-Fixes #45
-```
+const strategies: Record<HiddenTextStyle, GeneratorStrategy> = {
+  text: (text) => 'camouflage'.repeat(Math.ceil(text.length / 10)),
+  stars: (text) => '*'.repeat(text.length),
+  dotted: (text) => '•'.repeat(text.length),
+  scramble: (text) => scrambleText(text),
+};
 
-## Branching Strategy
-
-### Main Branches
-
-- **`main`**: Production-ready code, protected branch
-- **`develop`**: Integration branch (optional for larger teams)
-
-### Feature Branches
-
-```bash
-# Create feature branch from main
-git checkout main
-git pull origin main
-git checkout -b feature/add-custom-characters
-
-# Work on feature
-git add .
-git commit -m "feat(core): add custom hiding characters"
-
-# Push to remote
-git push origin feature/add-custom-characters
+export function generateHiddenText(text: string, style: HiddenTextStyle): string {
+  const strategy = strategies[style];
+  if (!strategy) {
+    throw new Error(`Unknown style: ${style}`);
+  }
+  return strategy(text);
+}
 ```
 
-**Naming**:
+**Benefits**:
 
-- `feature/*` - New features
-- `fix/*` - Bug fixes
-- `docs/*` - Documentation
-- `refactor/*` - Code refactoring
-- `test/*` - Test improvements
-- `chore/*` - Tooling, dependencies
+- ✅ Easy to add new styles
+- ✅ No if/else chains
+- ✅ Each strategy independently testable
+- ✅ Clear separation
 
-### Bug Fix Branches
+**When to Use**:
 
-```bash
-# Create from main
-git checkout -b fix/regex-escape-issue
+- Multiple algorithms for same task
+- Behavior selected at runtime
+- Open/Closed principle (open for extension, closed for modification)
 
-# Fix and commit
-git commit -m "fix(patterns): escape special characters in patterns"
+### 4. Observer Pattern (Event Handling)
 
-# Push
-git push origin fix/regex-escape-issue
+**Purpose**: React to state changes.
+
+**Implementation**:
+
+```typescript
+// VS Code already provides this
+vscode.workspace.onDidChangeConfiguration((event) => {
+  if (event.affectsConfiguration('camouflage')) {
+    // React to configuration change
+    this.reloadConfiguration();
+  }
+});
+
+vscode.window.onDidChangeActiveTextEditor((editor) => {
+  if (editor && isEnvFile(editor.document.fileName)) {
+    // React to editor change
+    this.updateDecorations();
+  }
+});
 ```
 
-### Hotfix Branches
+**Benefits**:
 
-For urgent production fixes:
+- ✅ Loose coupling
+- ✅ Reactive architecture
+- ✅ Easy to add listeners
 
-```bash
-# Create from main
-git checkout -b hotfix/security-vulnerability
+**When to Use**:
 
-# Fix and commit with appropriate type
-git commit -m "fix(security): sanitize user input in pattern matching"
+- Event-driven architecture
+- State synchronization
+- Multiple components need updates
 
-# Push
-git push origin hotfix/security-vulnerability
+### 5. Singleton Pattern (Extension Instance)
+
+**Purpose**: Single instance of extension core.
+
+**Implementation**:
+
+```typescript
+// extension.ts
+let camouflage: Camouflage | undefined;
+
+export function activate(context: vscode.ExtensionContext): void {
+  if (!camouflage) {
+    camouflage = new Camouflage();
+    camouflage.initialize(context);
+  }
+}
+
+export function deactivate(): void {
+  if (camouflage) {
+    camouflage.dispose();
+    camouflage = undefined;
+  }
+}
 ```
 
-## Pull Request Process
+**Benefits**:
 
-### Creating a PR
+- ✅ Single source of truth
+- ✅ Controlled access
+- ✅ Resource management
 
-1. **Push branch to GitHub**
+**When to Use**:
 
-```bash
-git push origin feature/my-feature
+- Extension activation
+- Global state management
+- Resource coordination
+
+### 6. Factory Pattern (Decoration Creation)
+
+**Purpose**: Create complex objects with consistent configuration.
+
+**Implementation**:
+
+```typescript
+export class DecorationFactory {
+  static createDecorationType(
+    style: HiddenTextStyle,
+    color: string
+  ): vscode.TextEditorDecorationType {
+    const baseConfig = {
+      color,
+      textDecoration: 'none',
+    };
+
+    const styleConfig = this.getStyleConfig(style);
+
+    return vscode.window.createTextEditorDecorationType({
+      ...baseConfig,
+      ...styleConfig,
+    });
+  }
+
+  private static getStyleConfig(style: HiddenTextStyle) {
+    switch (style) {
+      case 'text':
+        return {
+          letterSpacing: '-0.5em',
+          opacity: '0',
+        };
+      case 'dotted':
+        return {
+          letterSpacing: '0.3em',
+          before: { contentText: '•' },
+        };
+      // ... other styles
+    }
+  }
+}
 ```
 
-2. **Create PR on GitHub**
+**Benefits**:
 
-   - Base: `main`
-   - Compare: `feature/my-feature`
-   - Fill in PR template
-
-3. **PR Title**: Should match commit message format
-
-```
-feat(core): add custom hiding characters
-```
-
-4. **PR Description**: Include:
-   - What changed
-   - Why it changed
-   - How to test
-   - Screenshots (if UI changes)
-   - Related issues
-
-### PR Template
-
-```markdown
-## Description
-
-Brief description of changes
-
-## Type of Change
-
-- [ ] Bug fix (fix)
-- [ ] New feature (feat)
-- [ ] Breaking change (BREAKING CHANGE)
-- [ ] Documentation update (docs)
-
-## Testing
-
-- [ ] All tests pass (`npm test`)
-- [ ] No linting errors (`npm run lint`)
-- [ ] Manual testing completed
-
-## Checklist
-
-- [ ] Code follows project style guidelines
-- [ ] Self-review completed
-- [ ] Comments added for complex logic
-- [ ] Documentation updated
-- [ ] Tests added/updated
-- [ ] No console.log statements left
-```
-
-### PR Review Guidelines
-
-**For Authors**:
-
-- Keep PRs small and focused (< 400 lines)
-- Write clear commit messages
-- Add tests for new features
-- Update documentation
-- Respond to feedback promptly
-
-**For Reviewers**:
-
-- Check code quality and style
-- Verify tests are adequate
-- Look for potential bugs
-- Suggest improvements
-- Be constructive and respectful
-
-### Merging
-
-- **Squash and merge** is preferred for feature branches
-- Ensure final commit message follows conventional format
-- Delete branch after merge
-
-## Semantic Release Process
-
-### Automated Releases
-
-We use `semantic-release` for automated versioning and releases.
-
-**Workflow**:
-
-1. PR merged to `main`
-2. GitHub Actions runs `semantic-release`
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
