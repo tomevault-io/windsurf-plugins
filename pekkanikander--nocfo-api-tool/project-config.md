@@ -88,7 +88,7 @@ dotnet run --project tools -- <args>
 # Regenerate from updated OpenAPI spec
 curl -H "Accept: application/vnd.oai.openapi+json;version=3.0" \
   https://api-tst.nocfo.io/openapi/ > api/openapi.json
-dotnet ./vendor/Hawaii/src/bin/Release/net6.0/Hawaii.dll \
+dotnet ./vendor/Hawaii/src/bin/Release/net10.0/Hawaii.dll \
   --config ./hawaii-client/nocfo-api-hawaii.json --no-logo
 
 # Build the local Hawaii generator (only needed after submodule changes)
@@ -129,11 +129,12 @@ F# requires declaration-before-use ordering:
 2. `Http.fs` — HTTP client wrapper
 3. `AsyncSeq.fs` — Async/Result/AsyncSeq helpers
 4. `Streams.fs` — Generic streaming + alignment
-5. `PatchShape.fs` — Reflection-based patch normalisation
-6. `Domain.fs` — Domain model, hydration, diffing, commands
-7. `Reports.fs` — Example fold (trial balance)
-8. `CsvHelper.fs` — Custom CsvHelper converters
-9. `Csv.fs` — CSV read/write API
+5. `JsonHelpers.fs` — STJ utility layer (wraps `Serializer.options`, JSON helpers)
+6. `PatchShape.fs` — Reflection-based patch normalisation
+7. `Domain.fs` — Domain model, hydration, diffing, commands
+8. `Reports.fs` — Example fold (trial balance)
+9. `CsvHelper.fs` — Custom CsvHelper converters
+10. `Csv.fs` — CSV read/write API
 
 ---
 
@@ -141,17 +142,17 @@ F# requires declaration-before-use ordering:
 
 - **`update businesses` not implemented** (exits with EX_SOFTWARE).
 - **`create accounts/businesses`** not yet implemented.
-- **Hawaii fork targets net6.0** (EOL) — upstreaming patches is outstanding work.
 - Generated code is **checked in** — regeneration is a manual step when the API spec changes.
-- `BusinessIdentifier.type` comes back as a `JToken` (not a closed enum) — string comparison required.
 
 ---
 
-## Hawaii Generator Fork
+## Hawaii Generator
 
+Located at `vendor/Hawaii/` (git submodule), pointing at
+`Alterna-Dev-Studio/Hawaii-5-0`.  Hawaii-5-0 targets net10.0 and uses
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/pekkanikander) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-14 -->
+> Source: [pekkanikander/nocfo-api-tool](https://github.com/pekkanikander/nocfo-api-tool) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-27 -->
