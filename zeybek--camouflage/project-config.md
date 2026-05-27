@@ -1,248 +1,199 @@
 ---
 trigger: always_on
-description: Critical guidelines for AI assistants working with Camouflage codebase - security rules, code style, and best practices
+description: Project architecture, directory structure, module responsibilities, and dependency rules
 ---
 
 
-# AI Assistant Guidelines
+# Project Architecture
 
-## Overview
+## Directory Structure
 
-These guidelines help AI assistants (like Claude, GPT-4, Copilot) work effectively with the Camouflage codebase.
-
-## Priority Rules
-
-### 1. Never Modify File Content
-
-**CRITICAL**: Camouflage NEVER modifies `.env` file content.
-
-```typescript
-// ❌ NEVER suggest this
-const edit = new vscode.WorkspaceEdit();
-edit.replace(document.uri, range, maskedValue);
-await vscode.workspace.applyEdit(edit);
-
-// ✅ ALWAYS use decorations
-editor.setDecorations(decorationType, ranges);
+```
+camouflage/
+├── src/
+│   ├── core/              # Business logic
+│   │   └── camouflage.ts  # Main engine
+│   ├── lib/               # Pure functions
+│   │   ├── decorators.ts  # Method decorators
+│   │   └── text-generator.ts # Text transformation
+│   ├── parsers/           # Multi-format parsers
+│   │   ├── types.ts       # Parser interfaces
+│   │   ├── base-parser.ts # Abstract base class
+│   │   ├── env-parser.ts  # ENV/Shell parser
+│   │   ├── json-parser.ts # JSON parser (nested)
+│   │   ├── yaml-parser.ts # YAML parser (nested)
+│   │   ├── properties-parser.ts # Properties parser
+│   │   ├── toml-parser.ts # TOML parser
+│   │   └── index.ts       # Parser registry
+│   ├── utils/             # Helper utilities
+│   │   ├── config.ts      # Configuration facade
+│   │   ├── file.ts        # File operations
+│   │   ├── pattern-matcher.ts # Pattern matching
+│   │   └── validator.ts   # Input validation
+│   ├── __tests__/         # Test files (mirrors src)
+│   │   ├── core/
+│   │   ├── lib/
+│   │   ├── parsers/
+│   │   └── utils/
+│   ├── __mocks__/         # Test mocks
+│   │   └── vscode.ts      # VS Code API mock
+│   └── extension.ts       # Entry point
+├── .github/
+│   └── workflows/         # CI/CD pipelines
+├── .vscode/               # VS Code workspace config
+├── dist/                  # Compiled output
+└── node_modules/          # Dependencies
 ```
 
-**If asked to modify files**: Politely explain that Camouflage is decoration-only by design.
+## Module Responsibilities
 
-### 2. Respect Existing Architecture
+### Core Module (`src/core/`)
 
-Before suggesting changes:
+**Purpose**: Contains the main business logic and state management
 
-1. ✅ Read relevant rule files (especially `architecture.mdc`)
-2. ✅ Understand module dependencies
-3. ✅ Follow established patterns
-4. ❌ Don't suggest architectural changes without justification
+**Files**:
 
-### 3. Security First
+- `camouflage.ts`: Main class managing decorations, events, status bar
 
-Always consider security implications:
+**Responsibilities**:
 
-- ✅ No network requests with sensitive data
-- ✅ Validate all user input
-- ✅ No logging of values
-- ✅ Sanitize patterns before regex compilation
+- Apply/remove decorations
+- Handle editor events
+- Manage extension state
+- Status bar updates
+- Command execution
+- Delegate parsing to parser registry
 
-## Code Suggestions
+**Dependencies**: Can import from `lib/`, `utils/`, `parsers/`, and VS Code API
 
-### Before Suggesting Code
+### Parsers Module (`src/parsers/`)
 
-1. **Read context**: Check what files are open, what the user is working on
-2. **Check existing implementation**: Look for similar functionality
-3. **Follow conventions**: Use existing naming, structure, patterns
-4. **Consider tests**: Think about how it will be tested
+**Purpose**: Multi-format file parsing with Strategy Pattern
 
-### Code Style
+**Files**:
 
-```typescript
-// ✅ GOOD: Follow project conventions
-export function matchPattern(key: string, pattern: string): boolean {
-  const sanitized = sanitizePattern(pattern);
-  return new RegExp(sanitized, 'i').test(key);
-}
+- `types.ts`: Parser interface and type definitions
+- `base-parser.ts`: Abstract base class with common functionality
+- `env-parser.ts`: ENV, Shell script, .envrc parser
+- `json-parser.ts`: JSON parser with nested key support
+- `yaml-parser.ts`: YAML parser with nested key support
+- `properties-parser.ts`: Properties, INI, conf parser
+- `toml-parser.ts`: TOML parser
+- `index.ts`: Parser registry and factory
 
-// ❌ BAD: Different style
-export const matchPattern = (key, pattern) => {
-  return new RegExp(pattern, 'i').test(key);
-};
+**Rules**:
+
+- ✅ Each parser extends `BaseParser`
+- ✅ Parsers implement `Parser` interface
+- ✅ Parsers are stateless (options via constructor)
+- ✅ Registry handles parser selection by file extension
+- ✅ Nested keys returned as dot-separated paths
+
+**Dependencies**: Can only import Node.js built-ins and types
+
+### Library Module (`src/lib/`)
+
+**Purpose**: Pure, reusable functions with no side effects
+
+**Files**:
+
+- `decorators.ts`: Method decorators (@Log, @HandleErrors, etc.)
+- `text-generator.ts`: Text transformation algorithms
+
+**Rules**:
+
+- ✅ Must be pure functions (same input → same output)
+- ✅ No side effects (no file I/O, no global state)
+- ✅ No VS Code API imports
+- ✅ Fully unit testable
+
+**Dependencies**: Can only import Node.js built-ins and other lib modules
+
+### Utils Module (`src/utils/`)
+
+**Purpose**: Helper functions and facades
+
+**Files**:
+
+- `config.ts`: Configuration access facade
+- `file.ts`: File system operations
+- `pattern-matcher.ts`: Pattern matching logic
+- `validator.ts`: Input validation
+
+**Rules**:
+
+- ✅ Can have side effects (file I/O, API calls)
+- ✅ Can import VS Code API
+- ✅ Should be stateless where possible
+- ✅ Each file has single responsibility
+
+**Dependencies**: Can import from `lib/`, `parsers/`, and VS Code API, but not `core/`
+
+### Tests Module (`src/__tests__/`)
+
+**Purpose**: All test files
+
+**Structure**: Mirrors `src/` directory structure
+
+**Rules**:
+
+- ✅ Every module must have corresponding test file
+- ✅ Use `describe` blocks for grouping
+- ✅ Use AAA pattern (Arrange, Act, Assert)
+- ✅ Mock external dependencies
+- ✅ Test file naming: `*.test.ts`
+
+## Dependency Rules
+
+### Allowed Dependencies
+
+```
+extension.ts → core/ → lib/ + utils/ + parsers/
+                ↓
+            VS Code API
 ```
 
-### Imports
+### Forbidden Dependencies
 
-Always use existing import structure:
+- ❌ `lib/` MUST NOT import from `core/`, `utils/`, or `parsers/`
+- ❌ `utils/` MUST NOT import from `core/`
+- ❌ `parsers/` MUST NOT import from `core/` or `utils/`
+- ❌ Circular dependencies between modules
+- ❌ Direct file system access in `lib/`
+
+## File Organization Rules
+
+### File Naming
+
+- `kebab-case.ts` for all files
+- `*.test.ts` for test files
+- `*.d.ts` for type declarations
+
+### File Size
+
+- Max 300 lines per file (excluding tests)
+- If exceeding, split into smaller modules
+- Exception: Generated files, type definitions
+
+### Export Rules
+
+- ✅ Named exports preferred over default exports
+- ✅ One main export per file (with supporting types)
+- ✅ Export only public API
+- ✅ Use `export type` for type-only exports
+
+### Import Order
+
+1. Node.js built-ins (`import * as fs from 'fs'`)
+2. External packages (`import * as vscode from 'vscode'`)
+3. Internal modules - absolute paths from src root
+4. Type imports (`import type { ... }`)
+
+**Example**:
 
 ```typescript
-// ✅ GOOD: Project convention
+import * as path from 'path';
 import * as vscode from 'vscode';
-import { generateHiddenText } from '../lib/text-generator';
-import * as config from '../utils/config';
-
-// ❌ BAD: Different convention
-import vscode = require('vscode');
-const { generateHiddenText } = require('../lib/text-generator');
-```
-
-## Responding to Requests
-
-### Adding Features
-
-When asked to add a feature:
-
-1. **Clarify requirements**:
-
-   - What problem does it solve?
-   - How should it behave?
-   - What edge cases exist?
-
-2. **Propose approach**:
-
-   - Where should code go?
-   - What files need changes?
-   - Any architectural concerns?
-
-3. **Consider impacts**:
-
-   - Breaking changes?
-   - Performance impact?
-   - Security implications?
-   - Testing requirements?
-
-4. **Provide implementation**:
-   - Follow coding standards
-   - Include tests
-   - Update documentation
-
-### Example: Adding New Hiding Style
-
-**User**: "Add a rainbow hiding style"
-
-**AI Response**:
-
-```
-I'll help you add a rainbow hiding style. Here's the approach:
-
-1. **Update package.json**: Add 'rainbow' to hiddenTextStyle enum
-2. **Update text-generator.ts**: Implement rainbow transformation
-3. **Add tests**: Test the new style
-4. **Update README**: Document new feature
-
-Here's the implementation:
-
-[Code for package.json]
-[Code for text-generator.ts]
-[Code for tests]
-[Documentation update]
-
-This follows the Strategy pattern already used for hiding styles.
-Want me to proceed with implementation?
-```
-
-### Debugging
-
-When helping debug:
-
-1. **Understand the problem**:
-
-   - What's the expected behavior?
-   - What's actually happening?
-   - When does it occur?
-
-2. **Check common issues**:
-
-   - Is extension activated?
-   - Is file recognized as `.env`?
-   - Are decorations being applied?
-   - Any console errors?
-
-3. **Suggest investigation**:
-
-   - Add logging
-   - Check configuration
-   - Review event listeners
-
-4. **Provide fix**:
-   - Explain root cause
-   - Show fix with explanation
-   - Suggest test to prevent regression
-
-### Refactoring
-
-When suggesting refactoring:
-
-1. **Explain why**: What's improved?
-2. **Show before/after**: Clear comparison
-3. **Preserve behavior**: No functional changes
-4. **Update tests**: Ensure they still pass
-
-```
-I suggest extracting this pattern matching logic into a separate function:
-
-Before:
-[Current code]
-
-After:
-[Refactored code]
-
-Benefits:
-- More testable
-- Reusable
-- Clearer responsibility
-
-This follows the Single Responsibility Principle outlined in patterns.mdc.
-```
-
-## Testing Guidance
-
-### Always Consider Tests
-
-When suggesting code changes:
-
-```typescript
-// Suggest implementation
-export function newFeature(input: string): string {
-  return transform(input);
-}
-
-// ALSO suggest test
-describe('newFeature', () => {
-  it('should transform input correctly', () => {
-    expect(newFeature('test')).toBe('expected');
-  });
-
-  it('should handle empty string', () => {
-    expect(newFeature('')).toBe('');
-  });
-});
-```
-
-### Test Patterns
-
-Follow AAA pattern:
-
-```typescript
-it('should mask sensitive values', () => {
-  // Arrange
-  const input = 'API_KEY=secret';
-  const style: HiddenTextStyle = 'stars';
-
-  // Act
-  const result = maskValue(input, style);
-
-  // Assert
-  expect(result).toBe('API_KEY=******');
-});
-```
-
-## Documentation
-
-### Update Documentation
-
-When adding/changing features:
-
-1. ✅ Update README if user-facing
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
