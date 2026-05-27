@@ -1,71 +1,70 @@
 ---
 trigger: always_on
-description: Comprehensive reference for Taskmaster MCP tools and CLI commands.
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-# Taskmaster Tool & Command Reference
+# CLAUDE.md
 
-This document provides a detailed reference for interacting with Taskmaster, covering both the recommended MCP tools, suitable for integrations like Cursor, and the corresponding `task-master` CLI commands, designed for direct user interaction or fallback.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-**Note:** For interacting with Taskmaster programmatically or via integrated tools, using the **MCP tools is strongly recommended** due to better performance, structured data, and error handling. The CLI commands serve as a user-friendly alternative and fallback. 
+## Development Commands
 
-**Important:** Several MCP tools involve AI processing... The AI-powered tools include `parse_prd`, `analyze_project_complexity`, `update_subtask`, `update_task`, `update`, `expand_all`, `expand_task`, and `add_task`.
+- **Build**: `npm run build` - Compiles TypeScript to `dist/` directory
+- **Start**: `npm start` - Runs the compiled server from `dist/index.js`
+- **Development**: `npm run dev` - Runs TypeScript compiler in watch mode for live rebuilding
+- **Install**: `npm install` - Installs dependencies
 
----
+## Architecture Overview
 
-## Initialization & Setup
+This is a Model Context Protocol (MCP) server that provides Twitter API integration for LLM applications. The architecture follows a handler-based pattern:
 
-### 1. Initialize Project (`init`)
+### Core Components
 
-*   **MCP Tool:** `initialize_project`
-*   **CLI Command:** `task-master init [options]`
-*   **Description:** `Set up the basic Taskmaster file structure and configuration in the current directory for a new project.`
-*   **Key CLI Options:**
-    *   `--name <name>`: `Set the name for your project in Taskmaster's configuration.`
-    *   `--description <text>`: `Provide a brief description for your project.`
-    *   `--version <version>`: `Set the initial version for your project, e.g., '0.1.0'.`
-    *   `-y, --yes`: `Initialize Taskmaster quickly using default settings without interactive prompts.`
-*   **Usage:** Run this once at the beginning of a new project.
-*   **MCP Variant Description:** `Set up the basic Taskmaster file structure and configuration in the current directory for a new project by running the 'task-master init' command.`
-*   **Key MCP Parameters/Options:**
-    *   `projectName`: `Set the name for your project.` (CLI: `--name <name>`)
-    *   `projectDescription`: `Provide a brief description for your project.` (CLI: `--description <text>`)
-    *   `projectVersion`: `Set the initial version for your project, e.g., '0.1.0'.` (CLI: `--version <version>`)
-    *   `authorName`: `Author name.` (CLI: `--author <author>`)
-    *   `skipInstall`: `Skip installing dependencies. Default is false.` (CLI: `--skip-install`)
-    *   `addAliases`: `Add shell aliases tm and taskmaster. Default is false.` (CLI: `--aliases`)
-    *   `yes`: `Skip prompts and use defaults/provided arguments. Default is false.` (CLI: `-y, --yes`)
-*   **Usage:** Run this once at the beginning of a new project, typically via an integrated tool like Cursor. Operates on the current working directory of the MCP server. 
-*   **Important:** Once complete, you *MUST* parse a prd in order to generate tasks. There will be no tasks files until then. The next step after initializing should be to create a PRD using the example PRD in scripts/example_prd.txt. 
+- **Entry Point**: `src/index.ts` - Main server setup with MCP SDK, registers all tool handlers
+- **Tool Definitions**: `src/tools.ts` - Centralized tool schemas with Zod validation
+- **Twitter Client**: `src/client/twitter.ts` - Wrapper around twitter-api-v2 library
+- **Handler Pattern**: `src/handlers/` - Organized by functionality (tweet, user, engagement, list, search)
 
-### 2. Parse PRD (`parse_prd`)
+### Handler Organization
 
-*   **MCP Tool:** `parse_prd`
-*   **CLI Command:** `task-master parse-prd [file] [options]`
-*   **Description:** `Parse a Product Requirements Document, PRD, or text file with Taskmaster to automatically generate an initial set of tasks in tasks.json.`
-*   **Key Parameters/Options:**
-    *   `input`: `Path to your PRD or requirements text file that Taskmaster should parse for tasks.` (CLI: `[file]` positional or `-i, --input <file>`)
-    *   `output`: `Specify where Taskmaster should save the generated 'tasks.json' file. Defaults to 'tasks/tasks.json'.` (CLI: `-o, --output <file>`)
-    *   `numTasks`: `Approximate number of top-level tasks Taskmaster should aim to generate from the document.` (CLI: `-n, --num-tasks <number>`)
-    *   `force`: `Use this to allow Taskmaster to overwrite an existing 'tasks.json' without asking for confirmation.` (CLI: `-f, --force`)
-*   **Usage:** Useful for bootstrapping a project from an existing requirements document.
-*   **Notes:** Task Master will strictly adhere to any specific requirements mentioned in the PRD, such as libraries, database schemas, frameworks, tech stacks, etc., while filling in any gaps where the PRD isn't fully specified. Tasks are designed to provide the most direct implementation path while avoiding over-engineering.
-*   **Important:** This MCP tool makes AI calls and can take up to a minute to complete. Please inform users to hang tight while the operation is in progress. If the user does not have a PRD, suggest discussing their idea and then use the example PRD in `scripts/example_prd.txt` as a template for creating the PRD based on their idea, for use with `parse-prd`.
+**Twitter API Handlers:**
+- `tweet.handlers.ts` - Post, get, reply, delete tweets, user timeline
+- `user.handlers.ts` - User info, follow/unfollow, followers/following
+- `engagement.handlers.ts` - Like, unlike, retweet, retweets
+- `list.handlers.ts` - Create lists, add/remove members, get members
+- `search.handlers.ts` - Search tweets, hashtag analytics
 
----
+**SocialData.tools Handlers:**
+- `handlers/socialdata/search.handlers.ts` - Advanced search, historical data, trending topics
+- `handlers/socialdata/user.handlers.ts` - Bulk profiles, growth analytics, influence metrics
 
-## AI Model Configuration
+### Key Patterns
 
-### 2. Manage Models (`models`)
-*   **MCP Tool:** `models`
-*   **CLI Command:** `task-master models [options]`
-*   **Description:** `View the current AI model configuration or set specific models for different roles (main, research, fallback). Allows setting custom model IDs for Ollama and OpenRouter.`
-*   **Key MCP Parameters/Options:**
-    *   `setMain <model_id>`: `Set the primary model ID for task generation/updates.` (CLI: `--set-main <model_id>`)
-    *   `setResearch <model_id>`: `Set the model ID for research-backed operations.` (CLI: `--set-research <model_id>`)
-    *   `setFallback <model_id>`: `Set the model ID to use if the primary fails.` (CLI: `--set-fallback <model_id>`)
+1. **Handler Functions**: Each tool has a dedicated handler function that takes `(client, args)` and returns `{ response: string, tools?: any[] }`
+2. **Error Handling**: Standardized error responses across all handlers
+3. **Type Safety**: TypeScript interfaces in `src/types/handlers.ts` for handler arguments
+4. **MCP Integration**: Server uses stdio transport and follows MCP tool calling patterns
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+### Environment Setup
+
+Required Twitter API credentials in `.env`:
+- `X_API_KEY`
+- `X_API_SECRET` 
+- `X_ACCESS_TOKEN`
+- `X_ACCESS_TOKEN_SECRET`
+
+Optional SocialData.tools API credentials for enhanced search and analytics:
+- `SOCIALDATA_API_KEY` - Get from https://socialdata.tools
+- `SOCIALDATA_BASE_URL` - Optional, defaults to https://api.socialdata.tools
+
+### Known Issues
+
+Several tools have parameter validation issues causing 400 errors:
+- `getUserTimeline` - Invalid request parameters
+- `searchTweets` - Query parameter formatting issues  
+- `getLikedTweets` - Parameter validation problems
+
+When fixing these, check the Twitter API v2 documentation for correct parameter formatting and ensure handler argument types match the tool schemas in `tools.ts`.
 
 ---
 > Source: [crazyrabbitLTC/mcp-twitter-server](https://github.com/crazyrabbitLTC/mcp-twitter-server) — distributed by [TomeVault](https://tomevault.io).
