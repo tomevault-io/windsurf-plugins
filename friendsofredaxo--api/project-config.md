@@ -1,0 +1,90 @@
+---
+trigger: always_on
+description: Diese Datei bietet Orientierung für Claude Code (claude.ai/code) bei der Arbeit mit diesem Repository.
+---
+
+# CLAUDE.md
+
+Diese Datei bietet Orientierung für Claude Code (claude.ai/code) bei der Arbeit mit diesem Repository.
+
+## Projektübersicht
+
+Dies ist das **API-AddOn** für REDAXO CMS. Es stellt eine REST-API-Schicht bereit, die REDAXO-Kernfunktionalität (Artikel, Kategorien, Medien, Benutzer, Templates, Module, Sprachen) als HTTP-Endpunkte verfügbar macht. Basiert auf Symfony Routing/HttpFoundation/HttpKernel mit OpenAPI-3.0-Dokumentation via Swagger UI im Backend.
+
+**Namespace:** `FriendsOfRedaxo\Api`
+**PHP:** >=8.2
+**Abhängigkeiten:** REDAXO >=5.17.0, YForm >=4.1.1
+
+## Entwicklungsbefehle
+
+```bash
+# Alle Tests ausführen (erfordert laufende REDAXO-Instanz + tests/.env)
+./vendor/bin/phpunit
+
+# Einzelne Testdatei ausführen
+./vendor/bin/phpunit tests/ClangsApiTest.php
+
+# Swagger-UI-Assets bauen
+pnpm install && pnpm build
+```
+
+Tests sind **Integrationstests**, die echte HTTP-Requests via cURL an eine laufende REDAXO-Installation senden. Setup:
+
+1. `cp tests/.env.example tests/.env` und Werte anpassen (Basis-URL, Bearer-Token, Backend-Credentials, existierende IDs).
+2. Bearer-Token im REDAXO-Backend unter `API → Token` anlegen und alle benötigten Scopes vergeben — die Test-Suite erwartet u.a. `structure/articles/slices/{list,add,get,update,delete}`, `system/clangs/*`, `modules/*`, `templates/*`, `users/*`, `media/*`, `metainfo/*`.
+3. Restricted-Backend-User mit eingeschränkten Permissions anlegen (Default-Login `apitest_restricted`):
+   ```bash
+   redaxo/bin/console user:create apitest_restricted <password> --name="API Test Restricted"
+   ```
+4. `tests/.env` ist gitignored — Geheimnisse bleiben lokal.
+
+`tests/bootstrap.php` parst `.env` ohne externe Dependency; `tests/config.php` liest die Werte über `getenv()` mit Fallbacks.
+
+## Architektur
+
+### Request-Ablauf
+
+1. `boot.php` registriert alle RoutePackages in `RouteCollection` und hängt sich in `YREWRITE_PREPARE` ein (early priority)
+2. `RouteCollection::handle()` prüft, ob der Request-Pfad mit `/api/` beginnt, und nutzt dann Symfonys `UrlMatcher` zum Routen-Matching
+3. Das `Auth`-Objekt der gematchten Route wird geprüft (`BearerAuth` oder `BackendUser`); bei fehlender Autorisierung wird 401 zurückgegeben
+4. Der `_controller`-Callback der Route wird mit den gematchten Parametern aufgerufen
+
+### Zentrale Klassen
+
+- **`RouteCollection`** (`lib/RouteCollection.php`) — Zentrales Routen-Register. Registriert Routen, matcht Requests, dispatcht an Controller. Bietet auch `getQuerySet()` zur Validierung/Typumwandlung von Request-Parametern gegen Route-Definitionen.
+- **`RoutePackage`** (`lib/RoutePackage.php`) — Abstrakte Basisklasse. Jede Ressourcengruppe erweitert diese und implementiert `loadRoutes()`.
+- **`Auth`** (`lib/Auth/Auth.php`) — Abstrakte Auth-Basis. Zwei Implementierungen:
+  - `BearerAuth` — Token-basierte Authentifizierung via `Authorization: Bearer <token>` Header, validiert gegen `rex_api_token`-Tabelle mit Scope-Prüfung
+  - `BackendUser` — Session-Cookie-Authentifizierung für reine Backend-Endpunkte
+- **`Token`** (`lib/Token.php`) — Verwaltet API-Tokens in der `rex_api_token`-Tabelle. Tokens haben Scopes (kommagetrennte Route-Scope-Namen).
+- **`OpenAPIConfig`** (`lib/OpenAPIConfig.php`) — Generiert OpenAPI-3.0-Spezifikation aus registrierten Routen für Swagger UI.
+
+### Route Packages (lib/RoutePackage/)
+
+Jede Datei definiert Routen und Handler-Methoden für eine Ressourcengruppe:
+
+| Datei              | Endpunkte                                              | Scope-Prefix     |
+| ------------------ | ------------------------------------------------------ | ---------------- |
+| `Structure.php`    | Artikel, Kategorien, Slices CRUD                       | `structure/`     |
+| `Media.php`        | Mediendateien und Medienkategorien CRUD                | `media/`         |
+| `Users.php`        | Benutzer und Rollen                                    | `users/`         |
+| `Modules.php`      | Module CRUD                                            | `modules/`       |
+| `Templates.php`    | Templates CRUD                                         | `templates/`     |
+| `Clangs.php`       | Sprachen CRUD                                          | `system/clangs/` |
+| `Metainfo.php`     | Metainfo-Felddefinitionen + Werte (Artikel/Kategorie/Medium/Sprache) | `metainfo/`      |
+
+Die `lib/RoutePackage/Backend/`-Klassen erweitern jeweils ihre Bearer-Variante, klonen alle passenden Routen, hängen `backend/` an Pfad und Scope und ersetzen das Auth-Objekt durch `BackendUser`. Beim Anlegen eines neuen Bearer-Endpunkts entsteht der Backend-Spiegel automatisch — eigene `Backend/*.php`-Implementierungen sind nur nötig, wenn das Standardverhalten überschrieben werden soll (Beispiel: `Backend/Media.php`).
+
+### Neuen Endpunkt hinzufügen
+
+1. Eine `RoutePackage`-Subklasse in `lib/RoutePackage/` erstellen oder erweitern
+2. In `loadRoutes()` `RouteCollection::registerRoute()` aufrufen mit:
+   - Einem eindeutigen **Scope**-String (z.B. `'resource/action'`) — wird auch für Token-Berechtigungen verwendet
+   - Einem Symfony `Route`-Objekt mit `_controller`, optionalen `Body`- (POST/PUT-Felder) und `query`-Definitionen (GET-Parameter)
+   - Einem `Auth`-Objekt (`new BearerAuth()` oder `new BackendUser()`)
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [FriendsOfREDAXO/api](https://github.com/FriendsOfREDAXO/api) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-27 -->
