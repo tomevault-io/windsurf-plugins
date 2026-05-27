@@ -22,5 +22,5 @@ description: - Leverage the `vi` object for test doubles - Use `vi.fn()` for fun
 - Leverage TypeScript type checking in tests - Enable strict typing in your tests to catch type errors early, use `expectTypeOf()` for type-level assertions, and ensure mocks preserve the original type signatures.
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/thehardway15) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-15 -->
+> Source: [thehardway15/10x-cards](https://github.com/thehardway15/10x-cards) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-27 -->
