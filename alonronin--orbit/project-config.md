@@ -9,6 +9,5 @@ description: - Never add packages manually to package.json
 - Always use bun to install dependencies and run scripts.
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/alonronin)
-> This is a context snippet only. You'll also want the standalone SKILL.md file — [download at TomeVault](https://tomevault.io/claim/alonronin)
-<!-- tomevault:4.0:windsurf_rules:2026-04-08 -->
+> Source: [alonronin/orbit](https://github.com/alonronin/orbit) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-27 -->
