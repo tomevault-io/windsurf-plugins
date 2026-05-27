@@ -1,44 +1,85 @@
 ---
 trigger: always_on
-description: Design system reference for Urban Tech Creative website. Covers utilities, atoms, molecules, tokens, grid system, composition patterns, and design philosophy.
+description: Session handover — current project state, immediate next steps, and open decisions. Updated at the end of each working session.
 ---
 
 
-# UTC Design System
+# Session Handover
 
-## Documentation Structure
+Last updated: 2026-03-09 (session 3)
 
-- **`.cursor/rules/design-system.mdc`** (this file): Operational reference. Conventions, tokens, component APIs, composition patterns. Automatically available when editing `components/**` or `app/**`. This is the source of truth for "how to use things".
-- **`docs/lld/*.md`**: Deep-dive implementation docs. Why things work the way they do, motion models, performance rationale, edge cases. The source of truth for "how things work internally". Read these when modifying a specific subsystem.
+## What happened this session
 
-| Topic | Quick reference | Deep dive |
-|-------|----------------|-----------|
-| Design system | This file | -- |
-| Cube (3D interaction) | Cube Face Mapping (below) | `docs/lld/cube.md` |
-| Frame (semantic use) | Atoms section (below) | `docs/lld/frame.md` |
-| UIGrid (layout grid) | Grid System section (below) | `docs/lld/ui-grid.md` |
+Performance fix for the 3D cube (GPU black-box artifacts) plus favicon replacement.
+
+### 1. Cube face baking — GPU fix
+
+The cube was causing black-box rendering artifacts in the browser. Root cause: `mix-blend-mode` inside `transform-style: preserve-3d` with continuous RAF animation exhausts the GPU compositor. Fixed by replacing the live face component layouts with static JPEG images captured from Storybook.
+
+**Baked faces (done):** XR (`public/faces/xr.jpg`), Work (`public/faces/work.jpg`), Hamster (`public/faces/hamster.jpg`)
+
+**Unbaked faces (still live):** AI, Collaborators, Showcase — these are placeholder layouts with no blend modes, so they're not causing GPU issues.
+
+**Pattern:** Each baked face component (e.g. `XR.tsx`) returns a plain `<img src="/faces/xr.jpg" ... />`. The original FaceGrid layout is preserved as a named const (`XRDesign`, `WorkDesign`, `HamsterDesign`) so redesign + re-bake is possible without losing the source.
+
+**Capture script:** `scripts/capture-face.ts` — runs `npx tsx scripts/capture-face.ts <face>`. Navigates Playwright to the canonical `Cube/Faces` Storybook story, screenshots the face element at 300×300 `@2x DPR` → 600×600 JPEG q90. JPEG (not PNG) gives 70-84% smaller files vs PNG with no visible quality loss on these designs.
+
+**Image format note:** Playwright `element.screenshot()` only supports `png` and `jpeg` — no WebP natively. JPEG at q90 is the pragmatic choice. This project is on Cloudflare/OpenNext where `next/image` WebP conversion requires paid Cloudflare Image Resizing; static JPEG from CDN is simpler and good enough.
+
+**Preload hints:** `app/page.tsx` uses `ReactDOM.preload()` to hoist preload hints for all three baked face images so they fetch in parallel with other page resources.
+
+**Storybook story size:** `Faces.stories.tsx` decorator bumped from `200px` to `300px` (matches cube max size, so Playwright captures at the correct source resolution).
+
+### 2. Favicon replacement
+
+Replaced the default Vercel triangle (`favicon.ico` — deleted) with the UTC cube logomark.
+
+- `app/icon.png` — 256×256 RGBA PNG, transparent background. Browser tab favicon, auto-registered by Next.js App Router.
+- `app/apple-icon.png` — 180×180 RGBA PNG, transparent background. iOS "Add to Home Screen" touch icon.
+
+**Capture script:** `scripts/capture-favicon.ts` — single command captures both. Navigates Playwright to dedicated Storybook stories (`FaviconCapture`, `AppleFaviconCapture` in `Logo.stories.tsx`), uses `page.screenshot({ type: 'png', omitBackground: true })` for transparency.
+
+**Transparency gotcha (important for future):** Three separate background layers needed clearing before `omitBackground: true` worked:
+1. `html { background: var(--theme-black) }` — app's `globals.css` — cleared via `documentElement.style.background = 'transparent'`
+2. `body.sb-main-fullscreen { background: white }` — Storybook class — cleared by stripping `document.body.className`
+3. Storybook's layout wrapper — `<div style="position: fixed; inset: 0; background: rgb(255,255,255)">` as first child of `#storybook-root`, inline style — cleared via `storybookRoot.firstElementChild.style.background = 'transparent'`. This was the hard one: inline styles can only be overridden by other inline styles, so no stylesheet `!important` approach works.
+
+**Favicon stories:** `FaviconCapture` (128×128 viewport @2x → 256×256) and `AppleFaviconCapture` (90×90 viewport @2x → 180×180) added to `Logo.stories.tsx`. Containers are viewport-filling (`100vw × 100vh`) so `page.screenshot()` captures exactly the viewport, avoiding clipping from the CSS layout box that the 3D-transformed cube visually overflows.
+
+### 3. Cursor skill added
+
+`.cursor/skills/bake-cube-face/SKILL.md` — LM skill for both face baking and favicon capture workflows. Triggered when user says "bake", "capture", "snapshot", or "freeze" a face.
 
 ---
 
-## Atomic Design Hierarchy
+## Current state of the design system
 
-### Utilities
+### Component hierarchy
 
-- **Pressable** (`components/Pressable/Pressable.tsx`): Makes any subtree interactive and accessible. Zero visual opinion — no borders, backgrounds, padding, or hover effects. Renders `<Link>` for internal navigation (`href` starts with `/`), `<a target="_blank" rel="noopener noreferrer">` for external URLs (`href` starts with `http`), or `<button type="button">` for actions (no `href`). Props: `href?`, `onClick?`, `onMouseEnter?`, `onMouseLeave?`, `children`, `className?`, `aria-label?`, `aria-expanded?`, `aria-haspopup?` (for menu triggers), `data-testid?`. Use when wrapping custom compositions (Logo lockups, NavLinks) where the visual treatment is owned by the children.
-- **NavMenu** (`components/Nav/NavMenu.tsx`): Handles show/hide and positioning of a dropdown menu. Renders a trigger (supplied by parent) and, when open, a panel positioned below it and right-aligned (`absolute top-full right-0`). Closes on click outside or Escape key. No visual opinion on panel content — parent provides trigger and panel (e.g. Frame + NavList). Props: `open`, `onClose`, `trigger` (ReactNode), `children` (panel content), `className?`, `panelClassName?`. Use for primary nav dropdown or any similar floating menu.
-- **Icon**: Icons from `@phosphor-icons/react`. Prefer the **fill** variant for the acid design aesthetic — bold, solid shapes with strong silhouettes. Fall back to regular weight for secondary/supporting icons.
+| Layer | Components |
+|-------|-----------|
+| Utilities | Pressable, Icon |
+| Atoms | Frame, Accent, Heading, UIGrid, Overlay |
+| Molecules | Button (primary/secondary/tertiary), NavLink, Logo lockup |
+| Organisms | SiteHeader, PrimaryNav, NavMenuPanel, Cube, SectionDetail |
 
-### Atoms (primitives)
+### Key interaction patterns
 
-- **Frame** (`components/Frame/Frame.tsx`): Post-neobrutalist bordered container. A self-contained piece of UI or content. Thick black borders (4px default). Selective rounded corners add friendliness — use sparingly (one curve is the sweet spot). Props: `borderSides` (omit sides to prevent double-borders when stacking adjacent Frames), `roundedCorners`, `borderWidth` (`border-2` | `border-4`). Purely presentational — no hover or interactive behaviour.
-- **Accent** (`components/Accent/Accent.tsx`): Gradient bar placed alongside a Frame for visual emphasis. Draws the user's eye using colour. Gradients: `magenta-green`, `purple-orange`, `orange-purple`. Props: `direction` (`vertical` | `horizontal`), `gradient`, `borderSides` (match adjacent Frame to avoid double-borders). Purely presentational — no hover or interactive behaviour.
-- **Heading** (`components/Heading.tsx`): Semantic heading component (h1-h6). Predefined size/weight classes per level. Uses Recursive font.
-- **UIGrid** (`components/UIGrid/UIGrid.tsx`): Site-wide layout grid with square cells. Uses ResizeObserver to compute cell size so cells never stretch or squash. Use for LCARS-style panel positioning. Pair with **GridBlock** (`components/UIGrid/GridBlock.tsx`) for placement (col, row, colSpan, rowSpan). NOT for cube faces — use FaceGrid for those.
-- **Overlay** (`components/Overlay/Overlay.tsx`): Full-viewport overlay with backdrop. Renders via portal (`document.body`). Props: `open` (boolean), `onClose` (backdrop click or Escape), `children`, `className`. CSS keyframe animations for fade + scale entrance. Handles focus management (auto-focus on mount, restore on close) and locks body scroll while open. Use as the base layer for any modal, detail panel, or dialog.
+- **Button** = drop-in, opinionated, self-contained (use for standard actions)
+- **Pressable** = zero-opinion wrapper (use for custom compositions like Logo lockups, NavLinks)
+- **Hover** = cyan bg (Button built-in) or `group-hover:` (Pressable compositions)
+- **Active/press** = `translate-y-1` downward shift, 100ms (Button built-in)
+- **Focus** = 4px magenta outline, 2px offset (Button built-in; add manually for Pressable compositions)
 
-### Molecules (combinations of atoms)
+### Cube face status
 
-- **Breadcrumbs** (`components/Breadcrumbs/Breadcrumbs.tsx`): Frame (theme-black bg, top-right curve, no border) + breadcrumb nav. Chevron separators, white text, cyan hover. Props: `items` (`{ label, path?, current? }[]`). Use for hierarchical page context (e.g. Work › Afghan Project).
+| Face | Position | Status |
+|------|----------|--------|
+| XR | top | Baked → `public/faces/xr.jpg`, source in `XRDesign` const |
+| Work | front | Baked → `public/faces/work.jpg`, source in `WorkDesign` const |
+| Hamster | bottom | Baked → `public/faces/hamster.jpg`, source in `HamsterDesign` const |
+| AI | back | Live placeholder — needs design |
+| Collaborators | left | Live placeholder — needs design |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
