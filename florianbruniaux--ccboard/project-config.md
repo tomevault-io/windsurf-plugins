@@ -174,4 +174,4 @@ Located in `ccboard-core/src/parsers/`:
 
 ---
 > Source: [FlorianBruniaux/ccboard](https://github.com/FlorianBruniaux/ccboard) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-05-27 -->
