@@ -7,14 +7,14 @@ A repo with a devcontainer ready to vibe with Claude, Codex or Gemini
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `GEMINI.md` in [wandb/vibes](https://github.com/wandb/vibes).
+Original source: `AGENTS.md` in [wandb/vibes](https://github.com/wandb/vibes).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
+- **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
 From [wandb/vibes](https://github.com/wandb/vibes) — a repo with 37+ stars on GitHub.
