@@ -1,27 +1,9 @@
 ---
 trigger: always_on
-description: Ultracite enforces strict type safety, accessibility standards, and consistent code quality for JavaScript/TypeScript projects using Biome's lightning-fast formatter and linter.
+description: Ultracite Rules
 ---
 
 
-# Project Context
-Ultracite enforces strict type safety, accessibility standards, and consistent code quality for JavaScript/TypeScript projects using Biome's lightning-fast formatter and linter.
-
-## Key Principles
-- Zero configuration required
-- Subsecond performance
-- Maximum type safety
-- AI-friendly code generation
-
-## Before Writing Code
-1. Analyze existing patterns in the codebase
-2. Consider edge cases and error scenarios
-3. Follow the rules below strictly
-4. Validate accessibility requirements
-
-## Rules
-
-### Accessibility (a11y)
 - Don't use `accessKey` attribute on any HTML element.
 - Don't set `aria-hidden="true"` on focusable elements.
 - Don't add ARIA roles, states, and properties to elements that don't support them.
@@ -32,7 +14,7 @@ Ultracite enforces strict type safety, accessibility standards, and consistent c
 - Don't assign interactive ARIA roles to non-interactive HTML elements.
 - Don't assign `tabIndex` to non-interactive HTML elements.
 - Don't use positive integers for `tabIndex` property.
-- Don't include "image", "picture", or "photo" in img alt prop.
+- Don't include "image", "picture", or "photo" in img `alt` prop.
 - Don't use explicit role property that's the same as the implicit/default role.
 - Make static elements with click handlers use a valid role attribute.
 - Always include a `title` element for SVG elements.
@@ -56,8 +38,6 @@ Ultracite enforces strict type safety, accessibility standards, and consistent c
 - Use valid ARIA state and property values.
 - Use valid values for the `autocomplete` attribute on input elements.
 - Use correct ISO language/country codes for the `lang` attribute.
-
-### Code Complexity and Quality
 - Don't use consecutive spaces in regular expression literals.
 - Don't use the `arguments` object.
 - Don't use primitive type aliases or misleading types.
@@ -86,7 +66,7 @@ Ultracite enforces strict type safety, accessibility standards, and consistent c
 - Don't use useless `this` aliasing.
 - Don't use any or unknown as type constraints.
 - Don't initialize variables to undefined.
-- Don't use the void operators (they're not familiar).
+- Don't use void operators (they're not familiar).
 - Use arrow functions instead of function expressions.
 - Use Date.now() to get milliseconds since the Unix Epoch.
 - Use .flatMap() instead of map().flat() when possible.
@@ -99,6 +79,18 @@ Ultracite enforces strict type safety, accessibility standards, and consistent c
 - Use while loops instead of for loops when you don't need initializer and update expressions.
 - Don't pass children as props.
 - Don't reassign const variables.
+- Don't use constant expressions in conditions.
+- Don't use `Math.min` and `Math.max` to clamp values when the result is constant.
+- Don't return a value from a constructor.
+- Don't use empty character classes in regular expression literals.
+- Don't use empty destructuring patterns.
+- Don't call global object properties as functions.
+- Don't declare functions and vars that are accessible outside their block.
+- Make sure builtins are correctly instantiated.
+- Don't use super() incorrectly inside classes. Also check that super() is called in classes that extend other constructors.
+- Don't use variables and function parameters before they're declared.
+- Don't use 8 and 9 escape sequences in string literals.
+- Don't use literal numbers that lose precision.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
