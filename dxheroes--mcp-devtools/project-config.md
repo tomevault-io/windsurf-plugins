@@ -1,220 +1,65 @@
 ---
 trigger: always_on
-description: Guidelines for Creating a New MCP Server Package
+description: Package Documentation Standards
 ---
 
 
-# Creating a New MCP Server Package
+# Package Documentation Standards
 
-This guide provides a step-by-step process for creating a new MCP server package in the MCP DevTools monorepo.
+Each package README.md should follow this structure:
 
-@url https://docs.cursor.com/context/rules-for-ai
-@file packages/jira/package.json
-@file packages/jira/src/index.ts
+@file packages/jira/README.md
 @file .cursor/rules/repository-structure.mdc
-@file .cursor/rules/mcp-server-implementation.mdc
-@file .cursor/rules/core-libraries-usage.mdc
 
-## Step 1: Set Up Package Structure
+## Required Sections
 
-First, create the basic package structure:
+1. **Title and Badges**
 
-```bash
-# 1. Create package directory
-mkdir -p packages/[service-name]/src/{tools,api,types,utils}
+   ```markdown
+   # @mcp-devtools/package-name
 
-# 2. Create main files
-touch packages/[service-name]/package.json
-touch packages/[service-name]/tsconfig.json
-touch packages/[service-name]/README.md
-touch packages/[service-name]/src/index.ts
-touch packages/[service-name]/src/types/index.ts
-```
+   ![npm version](mdc:https:/img.shields.io/npm/v/@mcp-devtools/package-name.svg)
+   ![License: MIT](mdc:https:/img.shields.io/badge/License-MIT-blue.svg)
+   ![Status Badge](mdc:https:/img.shields.io/badge/status-beta-orange)
+   ```
 
-## Step 2: Configure Package Files
+2. **Short Description**
 
-### package.json
+   - Single paragraph explaining the purpose of the package
 
-```json
-{
-  "name": "@mcp-devtools/[service-name]",
-  "version": "0.1.0",
-  "description": "MCP server for [service] integration",
-  "main": "build/index.js",
-  "scripts": {
-    "build": "tsc",
-    "start": "node build/index.js",
-    "dev": "ts-node src/index.ts",
-    "test": "jest",
-    "lint": "eslint src --ext .ts",
-    "format": "prettier --write 'src/**/*.ts'"
-  },
-  "files": ["build"],
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/github-user/mcp-devtools.git"
-  },
-  "dependencies": {
-    "@modelcontextprotocol/server": "^0.1.0",
-    "@modelcontextprotocol/types": "^0.1.0",
-    "@mcp-devtools/core": "^0.1.0"
-  },
-  "devDependencies": {
-    "@types/jest": "^29.5.0",
-    "@types/node": "^18.0.0",
-    "eslint": "^8.0.0",
-    "jest": "^29.5.0",
-    "prettier": "^2.8.0",
-    "ts-jest": "^29.1.0",
-    "ts-node": "^10.9.0",
-    "typescript": "^5.0.0"
-  },
-  "publishConfig": {
-    "access": "public"
-  }
-}
-```
+3. **Highlights**
 
-### tsconfig.json
+   - Bullet points of key features with emoji icons
 
-```json
-{
-  "extends": "../../tsconfig.base.json",
-  "compilerOptions": {
-    "outDir": "build",
-    "rootDir": "src"
-  },
-  "include": ["src/**/*"],
-  "exclude": ["**/*.test.ts", "node_modules"]
-}
-```
+4. **Quick Start**
 
-## Step 3: Implement Basic Server
+   - Installation instructions
+   - Configuration examples
+   - Minimal setup code
 
-Create your `src/index.ts` file:
+5. **Tool Reference**
 
-```typescript
-import { createMcpServer } from "@modelcontextprotocol/server";
-import { loadConfig } from "@mcp-devtools/core/config";
-import { logger } from "@mcp-devtools/core/logger";
+   - Table with columns: Tool, Description, Parameters, Aliases, Implementation
+   - Each parameter should list type and whether it's required
+   - Link each tool name to its implementation file
 
-// Import tool registration functions
-import { registerTool1 } from "./tools/tool1";
-import { registerTool2 } from "./tools/tool2";
+6. **Usage Examples**
 
-// Define config type
-interface ServiceConfig {
-  SERVICE_URL: string;
-  SERVICE_API_KEY: string;
-  DEBUG?: string;
-}
+   - Show practical examples of using each tool
+   - Group related examples under headings
 
-// Load and validate configuration
-const getConfig = (): ServiceConfig => {
-  return loadConfig({
-    requiredVars: ["SERVICE_URL", "SERVICE_API_KEY"],
-    optionalVars: {
-      DEBUG: "false",
-    },
-  }) as ServiceConfig;
-};
+7. **Configuration**
+   - Environment variables
+   - Configuration options
+   - Integration examples with different platforms
 
-// Initialize API client
-import { initApiClient } from "./api/client";
+## Style Guidelines
 
-const initServer = async () => {
-  try {
-    // Get config
-    const config = getConfig();
-
-    // Initialize API client
-    const apiClient = initApiClient({
-      baseUrl: config.SERVICE_URL,
-      apiKey: config.SERVICE_API_KEY,
-    });
-
-    // Create MCP server
-    const server = createMcpServer();
-
-    // Register all tools
-    registerTool1(server, apiClient);
-    registerTool2(server, apiClient);
-
-    // Start the server
-    server.start();
-    logger.info("[service-name] MCP server started successfully");
-  } catch (error) {
-    logger.error("Failed to start [service-name] MCP server", { error });
-    process.exit(1);
-  }
-};
-
-// Start the server
-initServer();
-```
-
-## Step 4: Create API Client
-
-Create your `src/api/client.ts` file:
-
-```typescript
-import { httpClient } from "@mcp-devtools/core/http";
-import { logger } from "@mcp-devtools/core/logger";
-
-interface ApiClientConfig {
-  baseUrl: string;
-  apiKey: string;
-}
-
-export interface ApiClient {
-  get: (path: string, options?: any) => Promise<any>;
-  post: (path: string, data: any, options?: any) => Promise<any>;
-  put: (path: string, data: any, options?: any) => Promise<any>;
-  delete: (path: string, options?: any) => Promise<any>;
-}
-
-export const initApiClient = (config: ApiClientConfig): ApiClient => {
-  const headers = {
-    Authorization: `Bearer ${config.apiKey}`,
-    "Content-Type": "application/json",
-  };
-
-  return {
-    get: async (path, options = {}) => {
-      try {
-        const url = `${config.baseUrl}${path}`;
-        return await httpClient.get(url, { ...options, headers });
-      } catch (error) {
-        logger.error(`API GET request failed: ${path}`, { error });
-        throw error;
-      }
-    },
-
-    post: async (path, data, options = {}) => {
-      try {
-        const url = `${config.baseUrl}${path}`;
-        return await httpClient.post(url, data, { ...options, headers });
-      } catch (error) {
-        logger.error(`API POST request failed: ${path}`, { error });
-        throw error;
-      }
-    },
-
-    put: async (path, data, options = {}) => {
-      try {
-        const url = `${config.baseUrl}${path}`;
-        return await httpClient.put(url, data, { ...options, headers });
-      } catch (error) {
-        logger.error(`API PUT request failed: ${path}`, { error });
-        throw error;
-      }
-    },
-
-    delete: async (path, options = {}) => {
-      try {
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- Use emoji icons in section headers
+- Include code examples in markdown code blocks
+- Use tables for structured information
+- Keep language clear and concise
+- Include links to related documentation
 
 ---
 > Source: [DXHeroes/mcp-devtools](https://github.com/DXHeroes/mcp-devtools) — distributed by [TomeVault](https://tomevault.io).
