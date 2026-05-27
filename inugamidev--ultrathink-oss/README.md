@@ -2,8 +2,6 @@
 
 > Tome by [InugamiDev](https://github.com/InugamiDev/ultrathink-oss) — distributed by [TomeVault](https://tomevault.io)
 
-AI instruction skills by InugamiDev
-
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
