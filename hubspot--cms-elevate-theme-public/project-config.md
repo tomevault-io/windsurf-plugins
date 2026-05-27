@@ -1,140 +1,77 @@
 ---
 trigger: always_on
-description: This rule guides implementing CSS Grid layouts using template-embedded conditionals within HubSpot CMS themes, implementing RFC 0942 Grid Layouts properly.
+description: This rule is for scaffolding react modules using CSS modules instead of other CSS in JS solutions.
 ---
 
-# HubSpot Grid Layout Template Implementation Guide
+# Scaffold react module
 
-You are assisting with implementing **CSS Grid layout sections within templates** for HubSpot CMS themes. This implements RFC 0942 Grid Layouts by embedding grid-specific code directly within template files using **conditional logic**, while preserving existing Bootstrap 2 implementations.
+## Your task
 
-Here is the doc link for RFC 0942 Grid Layouts: https://product.hubteam.com/docs/content/rfcs/0942-grid-layouts.html. Use the Hubspot MCP server to read this documentation before starting.
+Your task is to simply create the general structure / scaffold for a new react module.
 
-## Overview & Methodology
+Follow these steps to do so:
 
-### Implementation Goals
-- Embed **CSS Grid layout code directly within templates** using conditional logic
-- Use **template-level conditionals** to choose between legacy and grid implementations
-- Maintain **complete separation** between Bootstrap 2 and Grid Layout approaches within same template
-- Enable modern CSS Grid layouts without disrupting existing functionality
-- Keep all grid and legacy code within the same template file for easier maintenance
+1. Make a directory inside of `/src/unified-theme/components/modules` with the name of the module in camel case.
+2. Create an index.tsx file inside of that new directory.
+3. Create a styles.module.css file inside of that new directory
+4. Create a blank fields.tsx file inside of that new directory.
+5. Import the new files into the index file.
+6. Populate the rest of the index file based off of the scaffold example below.
 
-### Template-Embedded Grid Approach
-1. **Modify template files directly** - Add grid conditionals within existing template structure
-2. **Use `{% if grids %}` conditionals** - Separate grid and Bootstrap implementations completely
-3. **Embed complete grid sections** - Write full grid section code within conditional blocks
-4. **Preserve Bootstrap references** - Keep existing Bootstrap sections as `include_dnd_partial` calls
-5. **Maintain single template files** - All layout variations contained within same template
+Index.tsx file example.
+```tsx
+  import styles from './styles.module.css';
 
-## RFC 0942 Implementation Context
+  export const Component = (props) => {
+    const {text} = props
 
-### Beta Implementation Phase
-This implementation follows **RFC 0942 Grid Layouts** adoption strategy:
-- Currently in **beta phase** with gated rollout starting in Elevate theme
-- Uses temporary `{% if grids %}` parameter for conditional rendering
-- Post-beta: Parameter will be removed and replaced with automatic content tree detection
-- Emergency rollback capability required during beta phase
+    return (
+      <div className={styles['defaultContainer']}>
+        <h1>Scaffold default content</h1>
+        <p>{ text }</p>
+      </div>
+    );
+  };
 
-### Migration Strategy
-- Grid implementations are **additive** during beta (no breaking changes)
-- Future migration phase will handle existing Bootstrap 2 content conversion
-- Template retrofitting required post-alpha for existing implementations
-- See issue #2158 for comprehensive deprecation planning
+  export const meta = {
+    label: 'Scaffold module', // Can replace this with a label that makes sense
+    content_types: ['SITE_PAGE'],
+  };
 
-## Template Structure Strategy
+  export { fields } from './fields.tsx';
 
-### Template File Focus
-Modify existing template files to include embedded grid conditionals:
-
-```
-src/unified-theme/templates/
-├── contact.hubl.html          # Contains both grid and Bootstrap implementations
-├── features.hubl.html         # Contains both grid and Bootstrap implementations
-├── pricing.hubl.html          # Contains both grid and Bootstrap implementations
-└── home.hubl.html             # Contains both grid and Bootstrap implementations
+  export const defaultModuleConfig = {
+    moduleName: 'elevate/components/modules/scaffold_module', // Can replace this with snake case name that makes sense
+    version: 0,
+    themeModule: true
+  };
 ```
 
-## Template Implementation Patterns
+Default fields file example
+```tsx
+  import {
+    ModuleFields,
+    TextField
+  } from '@hubspot/cms-components/fields';
 
-### Simple Single-Section Template
-Templates use a SINGLE `{% if grids %}` conditional wrapping complete `dnd_area` blocks:
-
-```hubl
-<!-- templates/contact.hubl.html -->
-{% extends "./layouts/base.hubl.html" %}
-
-{% block body %}
-  {% if grids %}
-    {# Grid Implementation - Complete dnd_area with grid sections #}
-    {% dnd_area "dnd_area" 
-      label="Main content" 
-    %}
-      {% dnd_grid_section
-        content_width={{ section_width_narrow }},
-        background_layers=[
-          {
-            "type": "color",
-            "value": light_section_3_background_color
-          }
-        ]
-      %}
-        {% dnd_grid_container
-           type="vertical_stack",
-           gap={{ spacing_0 }}
-        %}
-          {% dnd_grid_module
-            path="../components/modules/Anchor",
-            anchor={{ scaffold_content.anchor.anchor_id }}
-          %}
-          {% end_dnd_grid_module %}
-          {% dnd_grid_module
-            path="../components/modules/Heading",
-            headingAndTextHeadingLevel="h1",
-            headingAndTextHeading={{ template_translations.contact_heading.message }}
-          %}
-          {% end_dnd_grid_module %}
-        {% end_dnd_grid_container %}
-      {% end_dnd_grid_section %}
-    {% end_dnd_area %}
-  {% else %}
-    {# Bootstrap Implementation - Complete dnd_area with Bootstrap sections #}
-    {% dnd_area "dnd_area" 
-      label="Main content" 
-    %}
-      {% include_dnd_partial name="contact" %}
-    {% end_dnd_area %}
-  {% endif %}
-{% endblock %}
+  export const fields = (
+    <ModuleFields>
+      <TextField
+        label="Text"
+        name="text"
+        default="Scaffold content"
+      />
+    </ModuleFields>
+  );
 ```
 
-### Multi-Section Template Pattern
-For templates with multiple sections, use a SINGLE `{% if grids %}` conditional wrapping complete `dnd_area` blocks:
-
-```hubl
-<!-- templates/home.hubl.html with multiple sections -->
-{% extends "./layouts/base.hubl.html" %}
-
-{% block body %}
-  {% if grids %}
-    {# Grid Implementation - Complete dnd_area with all grid sections #}
-    {% dnd_area "dnd_area" 
-      label="Main content" 
-    %}
-      {% dnd_grid_section %}
-        {% dnd_grid_container
-           type="grid",
-           rows=["1fr"],
-           columns=["1fr", "1fr"] 
-        %}
-          {% dnd_grid_module path="../modules/hero-content" %}
-          {% end_dnd_grid_module %}
-          {% dnd_grid_module path="../modules/hero-image" %}
-          {% end_dnd_grid_module %}
-        {% end_dnd_grid_container %}
-      {% end_dnd_grid_section %}
-
-      {% dnd_grid_section %}
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+Default styles.module.css file example
+```css
+.defaultContainer {
+  display: block;
+  width: 100%;
+}
+```
 
 ---
 > Source: [HubSpot/cms-elevate-theme-public](https://github.com/HubSpot/cms-elevate-theme-public) — distributed by [TomeVault](https://tomevault.io).
