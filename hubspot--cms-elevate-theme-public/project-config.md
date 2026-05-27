@@ -1,223 +1,185 @@
 ---
 trigger: always_on
-description: Create module fields
+description: Implement and finish building a scaffolded module
 ---
 
-# HubSpot Module Fields Guide
+# HubSpot React Module Implementation Guide
 
-This guide helps you create properly structured `fields.tsx` files for HubSpot CMS modules. Follow these patterns and examples to ensure consistency and best practices.
+This rule guides you through implementing a HubSpot React module after the initial scaffolding and field definitions are complete.
 
-## Field Library Components
+## Prerequisites
+- Module scaffolding should be complete with basic file structure
+- `fields.tsx` should be fully defined with all necessary module fields
+- Types should be defined in `types.ts`
 
-Use these pre-built components from `src/components/fieldLibrary/` whenever possible:
+## IMPORTANT: NEVER dangerouslySetInnerHTML
+- Never, under any circumstance, is it OK to use `dangerouslySetInnerHTML`
+  - Instead you should find another way to implement setting of content.
+  - There are plenty of examples on how to correctly do this at the bottom of this file.
 
-```typescript
-import {
-  ButtonContent,    // Button fields with text, link, and icon options
-  ButtonStyle,      // Button styling (primary/secondary/tertiary/accent)
-  CardStyle,        // Card styling variants
-  HeadingAndText,   // Heading text with level selection
-  HeadingStyle,     // Heading style variants
-  RichTextContent,  // Rich text editing with different feature sets
-  SectionStyle,     // Section styling variants
-  LinkStyle,        // Link styling (primary/secondary)
-} from '../../fieldLibrary/index.js';
-```
+## Implementation Steps
 
-## Core Field Patterns
+### 1. Review Module Structure
+1. Confirm the following files exist:
+   - `index.tsx` - Main module implementation
+   - `fields.tsx` - Field definitions
+   - `types.ts` - TypeScript types
+   - `assets/` - Directory for module assets
+   - `islands/` - Directory for client-side interactive components (if needed)
 
-### Basic Module Structure
-```typescript
-import { ModuleFields, FieldGroup } from '@hubspot/cms-components/fields';
+### 2. Implement Core Module Component
+1. Import necessary dependencies:
+   ```typescript
+   import { ModuleMeta } from '../../types/modules.js';
+   import styles from '../component.module.css';
+   import { createComponent } from '../../utils/create-component.js';
+   import cx, { staticWithModule } from '../../utils/classnames.js';
+   // Add other required imports
+   ```
 
-export const fields = (
-  <ModuleFields>
-    {/* Content fields at top level */}
-    <TextField
-      name="title"
-      label="Title"
-      default="Default Title"
-    />
+2. Define styled components using CSS Modules and createComponent:
+   ```typescript
+   const swm = staticWithModule(styles);
 
-    {/* Style fields in STYLE tab */}
-    <FieldGroup name="groupStyle" label="Styles" tab="STYLE">
-      <SectionStyle sectionStyleDefault="section_variant_1" />
-      <HeadingStyle headingStyleDefault="h2" />
-    </FieldGroup>
-  </ModuleFields>
-);
-```
+   const StyledContainer = createComponent('div');
+   // inside the CSS Module file:
+   // .className-one {
+   // max-width: var(--hsElevate--container--maxWidth, 1200px);
+   // margin: 0 auto;
+   // padding: var(--hsElevate--spacing--48, 48px) var(--hsElevate--spacing--24, 24px);
+   // }
+   ```
 
-### Repeated Content Pattern
-```typescript
-<RepeatedFieldGroup
-  name="items"
-  label="Items"
-  occurrence={{
-    min: 1,
-    max: 4,
-    default: 2
-  }}
-  default={[
-    { title: 'Item 1' },
-    { title: 'Item 2' }
-  ]}
->
-  <TextField
-    name="title"
-    label="Item Title"
-    default="New Item"
-  />
-</RepeatedFieldGroup>
-```
+3. Implement the main Component:
+   ```typescript
+   export const Component = (props: ModuleFields) => {
+     // Destructure props
+     // Implement component logic
+     return (
+        <StyledContainer className={cx(swm('className-one'), 'className-two')}>
+           {/* Component JSX */}
+        </StyledContainer>
+     );
+   };
+   ```
 
-### Common Field Library Usage
+### 3. Island Components (if needed)
+If the module requires client-side interactivity:
+1. Create an island component in `islands/` directory
+2. Use the `?island` suffix when importing
+3. Use regular `Island` component from `@hubspot/cms-components`
+4. Set appropriate hydration strategy
 
-#### HeadingAndText
-```typescript
-<HeadingAndText
-  headingLevelDefault="h2"
-  textDefault="Default Heading"
-  headingTextLabel="Section Heading" // optional
-/>
-```
+### 4. Module Metadata
+1. Define the module meta information:
+   ```typescript
+   export const meta: ModuleMeta = {
+     label: 'Module Name',
+     content_types: ['SITE_PAGE', 'LANDING_PAGE'],
+     icon: moduleIconSvg,
+     categories: ['design'],
+   };
+   ```
 
-#### ButtonContent
-```typescript
-<ButtonContent
-  textDefault="Learn More"
-  linkDefault={{
-    open_in_new_tab: true,
-    url: { href: '#' }
-  }}
-  iconPositionDefault="right"
-/>
-```
+2. Set module configuration:
+   ```typescript
+   export const defaultModuleConfig = {
+     moduleName: 'elevate/components/modules/module_name',
+     version: 0,
+     themeModule: true,
+   };
+   ```
 
-#### RichTextContent
-```typescript
-<RichTextContent
-  label="Description"
-  featureSet="text" // or "extended"
-  richTextDefault="<p>Default content</p>"
-/>
-```
+### 5. Styling Guidelines
+1. Use HubSpot Elevate CSS variables for:
+   - Spacing: `var(--hsElevate--spacing--{size})`
+   - Colors: `var(--hsElevate--{context}--{property})`
+   - Typography: Apply typography classes from field definitions
+2. Ensure responsive design
+3. Follow accessibility best practices
 
-## Available Field Types
+### 6. Best Practices
+1. Use TypeScript types for all props and data structures
+2. Implement proper error handling
+3. Use semantic HTML elements
+4. Follow React performance best practices
+5. Add helpful comments for complex logic
+6. Ensure proper data validation
 
-### Basic Fields
-```typescript
-import {
-  TextField,         // Simple text input
-  RichTextField,     // Formatted text
-  ImageField,        // Image uploads
-  LinkField,         // URL/page links
-  BooleanField,      // Toggles
-  ChoiceField,       // Dropdowns/radio/checkboxes
-  ColorField,        // Color selection
-  NumberField,       // Numeric input
-} from '@hubspot/cms-components/fields';
-```
+### 7. Testing
+1. Test the module with various field configurations
+2. Verify responsive behavior
+3. Test accessibility
+4. Verify island component hydration (if applicable)
 
-### Specialized Fields
-```typescript
-import {
-  MenuField,          // Menu selection
-  IconField,          // Icon selection
-  BlogField,          // Blog selection
-  LogoField,          // Logo uploads
-  TextAlignmentField, // Text alignment
-  AlignmentField,     // General alignment
-  DateField,          // Date input
-} from '@hubspot/cms-components/fields';
-```
-
-## Field Visibility
-
-Use for conditional field display:
-```typescript
-<TextField
-  name="conditionalField"
-  label="Conditional Field"
-  visibility={{
-    controlling_field_path: 'someToggle',
-    controlling_value_regex: 'true',
-    operator: 'EQUAL'
-  }}
-/>
-```
-
-## Best Practices
-
-1. **Structure**
-   - Keep content fields at top level
-   - Group style fields under `FieldGroup` with `tab="STYLE"`
-   - Use descriptive `name` and `label` properties
-
-2. **Defaults**
-   - Always set default values
-   - Use sensible defaults that work out of the box
-   - Set appropriate min/max for repeated fields
-
-3. **Required Fields**
-    - Do not require fields.
-    - Do not use the 'required' property.
-
-3. **Grouping**
-   - Only group related fields
-   - Use consistent naming (`group` prefix for groups)
-   - Keep style-related fields in STYLE tab
-
-4. **Validation**
-   - Set appropriate validation rules
-   - Include help text for complex fields
-   - Use visibility rules when needed
-
-Remember: The goal is to create intuitive, well-structured fields that provide a good editing experience in the HubSpot CMS.
-
-## Examples
-
-### Menu Fields.tsx
+### 5. Field Destructuring and Consumption
+Example showing proper field destructuring and usage from the SiteHeader module:
 
 ```typescript
-import {
-  ModuleFields,
-  MenuField,
-  FieldGroup,
-  ChoiceField,
-  NumberField,
-  AlignmentField,
-  TextField,
-} from '@hubspot/cms-components/fields';
-import { SizeChoice } from '../../MenuComponent/types.js';
-import LinkStyle from '../../fieldLibrary/LinkStyle/index.js';
+// Types definition
+type MenuModulePropTypes = {
+  hublData: {
+    navigation: {
+      children: MenuDataType[];
+    };
+    companyName: string;
+    defaultLogo: LogoType;
+    logoLink: LinkType;
+  };
+  groupLogo: {
+    logo: LogoFieldType;
+  };
+  defaultContent: {
+    logoLinkAriaText: string;
+  };
+  groupButton: ButtonGroupType;
+  styles: StylesType;
+};
 
-const sizeOptions: SizeChoice[] = [
-  ['none', 'None'],
-  ['small', 'Small'],
-  ['medium', 'Medium'],
-  ['large', 'Large'],
-];
+// Component implementation with proper destructuring
+export const Component = (props: MenuModulePropTypes) => {
+  // First level destructuring - main groups
+  const {
+    hublData,
+    groupLogo: { logo: logoField },
+    defaultContent: { logoLinkAriaText },
+    groupButton,
+    styles,
+  } = props;
 
-export const fields = (
-  <ModuleFields>
-    <MenuField
-      label='Menu'
-      name='menu'
-      default='default'
-    />
-    <NumberField
-      label='Max menu depth'
-      name='maxDepth'
-      display='slider'
-      min={1}
-      max={3}
-      helpText='Set the maximum number of menu levels to include. Must always include at least 1 level or else no menu would populate.'
-      default={3}
-    />
-    <TextField
-      label='Accessible menu name'
-      name='menuName'
+  // Second level destructuring - hublData
+  const {
+    navigation: { children: navDataArray = [] },
+    companyName,
+    defaultLogo,
+    logoLink,
+  } = hublData;
+
+  // Destructure button group fields
+  const {
+    showButton,
+    buttonContentText: buttonText,
+    buttonContentLink: buttonLink,
+    buttonContentShowIcon: showIcon,
+    buttonContentIconPosition: iconPosition,
+  } = groupButton;
+
+  // Destructure style fields with defaults
+  const {
+    groupMenu: {
+      menuAlignment,
+      menuBackgroundColor: { color: menuBackgroundColor } = { color: '#ffffff' },
+      menuTextColor: { color: menuTextColor } = { color: '#09152B' },
+    },
+    groupButton: { buttonStyleVariant, buttonStyleSize },
+  } = styles;
+
+  return (
+    <SiteHeader>
+      <SiteHeaderContainer>
+        {/* Use destructured fields */}
+        <LogoContainer>
+          {showButton && (
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
