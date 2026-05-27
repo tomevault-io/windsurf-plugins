@@ -9,4 +9,4 @@ description: - Use `pnpm` for all package management and script execution (not `
 
 ---
 > Source: [agneym/pi-honcho-memory](https://github.com/agneym/pi-honcho-memory) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-03 -->
+<!-- tomevault:4.0:windsurf_rules:2026-05-27 -->
