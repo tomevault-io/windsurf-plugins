@@ -1,116 +1,237 @@
 ---
 trigger: always_on
-description: Camouflage is a VS Code extension that visually masks sensitive values in configuration files
+description: VS Code extension development rules - lifecycle, API usage, decorations, commands, and configuration
 ---
 
-# AGENTS.md
 
-Camouflage is a VS Code extension that visually masks sensitive values in configuration files
-(.env, .json, .yaml, .toml, .properties, .sh) using text decorations. It **never modifies file
-content** -- masking is purely visual via CSS tricks (letterSpacing, opacity, pseudo-elements).
+# VS Code Extension Development Rules
 
-## Build / Lint / Test / Package Commands
+## Extension Lifecycle
 
-```bash
-npm install                          # Install dependencies
-npm run compile                      # Compile TypeScript (tsc -p ./) → out/
-npm run watch                        # Watch mode compilation
-npm run lint                         # ESLint (src/)
-npm run format                       # Prettier (write)
-npm test                             # Run all tests (Jest)
-npm test -- --watch                  # Watch mode
-npm test -- --coverage               # With coverage report
-npm test -- path/to/file.test.ts     # Run a single test file
-npm test -- --testNamePattern="name" # Run tests matching a name pattern
-npm test -- --clearCache             # Clear Jest cache if tests are stale
-npm run package                      # vsce package → produces .vsix file
+### Activation
+
+The extension activates when specified events occur (defined in `package.json`):
+
+```json
+"activationEvents": [
+  "onLanguage:dotenv",
+  "onLanguage:properties",
+  "onLanguage:plaintext",
+  "onLanguage:json",
+  "onLanguage:yaml",
+  "onLanguage:toml",
+  "onStartupFinished"
+]
 ```
 
-Coverage threshold is 80% (branches, functions, lines, statements).
+This enables the extension for all supported configuration file formats.
 
-## CI/CD Pipeline
+**Rules**:
 
-Four GitHub Actions workflows on `main`:
+- ✅ Activate only when needed (lazy loading)
+- ✅ Keep activation time < 200ms
+- ❌ Don't activate on `*` (every file)
+- ❌ Don't do heavy work in `activate()`
 
-| Workflow                    | Trigger                       | What it does                                                                                        |
-| --------------------------- | ----------------------------- | --------------------------------------------------------------------------------------------------- |
-| **CI** (`ci.yml`)           | PR → main                     | `npm ci` → prettier --check → lint → test --coverage → Codecov                                      |
-| **Publish** (`publish.yml`) | push/merge to main            | CI steps → compile → semantic-release → `vsce package` → `vsce publish` → GitHub Release with .vsix |
-| **CodeQL** (`codeql.yml`)   | push/PR to main + weekly cron | Security & quality analysis (TypeScript)                                                            |
-| **Stale** (`stale.yml`)     | daily cron                    | Marks issues stale after 60 days, closes after 14 more                                              |
+### Activation Function
 
-**Release flow**: semantic-release reads conventional commits → bumps version in `package.json`
-→ generates `CHANGELOG.md` → commits with `chore(release): x.y.z [skip ci]` → creates GitHub
-release → workflow then runs `vsce package` + `vsce publish` to VS Code Marketplace.
+```typescript
+export function activate(context: vscode.ExtensionContext): void {
+  // 1. Initialize lightweight components first
+  const camouflage = new Camouflage();
 
-Secrets required: `VSCE_PAT` (Marketplace token), `CODECOV_TOKEN`, `GITHUB_TOKEN` (auto).
+  // 2. Register commands
+  const toggleCommand = vscode.commands.registerCommand('camouflage.toggle', () =>
+    camouflage.toggle()
+  );
 
-## Git Hooks (Husky)
+  // 3. Register all disposables
+  context.subscriptions.push(toggleCommand, camouflage);
 
-- **pre-commit**: `npx lint-staged` → runs `eslint --fix` + `prettier --write` on staged
-  `.ts`/`.js` files, `prettier --write` on `.json`/`.md`/`.yml`/`.yaml`
-- **commit-msg**: `npx commitlint` → enforces Conventional Commits format
-
-## Project Structure
-
-```
-src/
-  extension.ts              # Entry point: activate(), deactivate(), command registration
-  core/camouflage.ts        # Main engine: decorations, events, status bar
-  core/types.ts             # HiddenTextStyle enum
-  parsers/                  # Strategy pattern: one parser per format
-    types.ts                # ParsedVariable, Parser interface
-    base-parser.ts          # Abstract base class
-    env-parser.ts           # .env, .envrc, .sh
-    json-parser.ts          # .json (nested keys)
-    yaml-parser.ts          # .yaml, .yml (nested keys)
-    toml-parser.ts          # .toml
-    properties-parser.ts    # .properties, .ini, .conf
-    index.ts                # ParserRegistry singleton
-  lib/text-generator.ts     # Pure: generateHiddenText(), scrambleText()
-  decorators/               # @HandleErrors, @Log, @ValidateConfig, @Debounce, @MeasurePerformance
-  utils/config.ts           # Configuration facade (all getters for camouflage.* settings)
-  utils/file.ts             # isSupportedFile(), parseFileContent()
-  utils/pattern-matcher.ts  # Wildcard pattern matching (*, KEY*, *KEY)
-  __mocks__/vscode.ts       # Full VS Code API mock for Jest
+  // 4. Start extension
+  camouflage.initialize(context);
+}
 ```
 
-Tests live in `__tests__/` dirs co-located with each module (e.g., `parsers/__tests__/`).
+### Deactivation
 
-## Dependency Rules
-
+```typescript
+export function deactivate(): void {
+  // Dispose resources not in context.subscriptions
+  // Usually not needed if everything is properly registered
+}
 ```
-extension.ts -> core/ -> parsers/ + lib/ + utils/
+
+## VS Code API Usage
+
+### Window API
+
+```typescript
+// ✅ GOOD: Check for active editor
+const editor = vscode.window.activeTextEditor;
+if (editor) {
+  // Work with editor
+}
+
+// ❌ BAD: Assume editor exists
+const editor = vscode.window.activeTextEditor!;
+editor.document.getText(); // Crash if no editor!
+
+// Status bar
+const statusBar = vscode.window.createStatusBarItem(
+  vscode.StatusBarAlignment.Right,
+  100 // Priority
+);
+context.subscriptions.push(statusBar); // Always dispose!
+
+// Messages
+vscode.window.showInformationMessage('Success!');
+vscode.window.showWarningMessage('Warning!');
+vscode.window.showErrorMessage('Error!');
 ```
 
-- `lib/` must be pure functions -- no VS Code API, no side effects
-- `parsers/` must not import from `core/` or `utils/`
-- `utils/` must not import from `core/`
-- No circular dependencies
+### Workspace API
 
-## Code Style
+```typescript
+// Configuration
+const config = vscode.workspace.getConfiguration('camouflage');
+const isEnabled = config.get<boolean>('enabled', true);
 
-### TypeScript
+// Update configuration
+await config.update('enabled', false, vscode.ConfigurationTarget.Global);
 
-- **Strict mode** enabled (`strict: true`, `experimentalDecorators: true`)
-- Target: ES2022, Module: NodeNext
-- Explicit types on function signatures; avoid `any` (eslint warns)
-- Use `interface` for object shapes, `type` for unions/computed types
-- Prefer `const` over `let`; use `===` always (`eqeqeq: error`)
-- Always use curly braces, even for single-line blocks (`curly: error`)
-- Prefix unused params with `_` (`argsIgnorePattern: "^_"`)
+// File system
+const files = await vscode.workspace.findFiles('**/.env', '**/node_modules/**');
 
-### Formatting (Prettier)
+// Text documents
+vscode.workspace.textDocuments.forEach((doc) => {
+  // Process each open document
+});
+```
 
-- Single quotes, 2-space indent, 100 char print width
-- Trailing commas (ES5), semicolons always
+### Commands API
 
-### Naming
+```typescript
+// Register command
+const disposable = vscode.commands.registerCommand('camouflage.toggle', async () => {
+  // Command implementation
+  await toggle();
+});
 
-- `camelCase` for variables/functions, `PascalCase` for classes/interfaces/enums
-- `UPPER_SNAKE_CASE` for true constants
-- Booleans: prefix with `is`, `has`, `should`, `can`
-- Files: `kebab-case.ts`, tests: `*.test.ts`
+// Execute existing command
+await vscode.commands.executeCommand('workbench.action.reloadWindow');
+
+// Pass arguments
+await vscode.commands.executeCommand('editor.action.insertSnippet', {
+  snippet: 'API_KEY=${1:value}',
+});
+```
+
+### TextEditor Decorations
+
+```typescript
+// Create decoration type
+const decorationType = vscode.window.createTextEditorDecorationType({
+  color: '#FF0000',
+  backgroundColor: '#00000000',
+  letterSpacing: '-0.5em',
+  opacity: '0',
+  textDecoration: 'none; font-size: 0;',
+});
+
+// Apply decorations
+const ranges = [new vscode.Range(0, 10, 0, 20)];
+editor.setDecorations(decorationType, ranges);
+
+// Clear decorations
+editor.setDecorations(decorationType, []);
+
+// Dispose when done
+decorationType.dispose();
+```
+
+## Event Handling
+
+### Document Events
+
+```typescript
+// Text document changes (debounce this!)
+vscode.workspace.onDidChangeTextDocument((event) => {
+  if (event.document === vscode.window.activeTextEditor?.document) {
+    updateDecorations();
+  }
+});
+
+// Editor selection changes
+vscode.window.onDidChangeActiveTextEditor((editor) => {
+  if (editor && isEnvFile(editor.document.fileName)) {
+    updateDecorations();
+  }
+});
+
+// Configuration changes
+vscode.workspace.onDidChangeConfiguration((event) => {
+  if (event.affectsConfiguration('camouflage')) {
+    reloadConfiguration();
+  }
+});
+```
+
+### Event Disposal
+
+```typescript
+// ✅ GOOD: Register for automatic disposal
+const disposable = vscode.workspace.onDidChangeTextDocument(handler);
+context.subscriptions.push(disposable);
+
+// ❌ BAD: Never disposed
+vscode.workspace.onDidChangeTextDocument(handler); // Memory leak!
+```
+
+## Performance Best Practices
+
+### Debounce Frequent Events
+
+```typescript
+// ✅ GOOD: Debounce text changes
+@Debounce(100)
+private updateDecorations(): void {
+  // Called max once per 100ms
+}
+
+vscode.workspace.onDidChangeTextDocument(() => {
+  this.updateDecorations();
+});
+
+// ❌ BAD: No debouncing
+vscode.workspace.onDidChangeTextDocument(() => {
+  this.updateDecorations(); // Called on EVERY keystroke!
+});
+```
+
+### Cache Expensive Operations
+
+```typescript
+// ✅ GOOD: Cache decoration type
+private decorationType?: vscode.TextEditorDecorationType;
+
+private getDecorationType(): vscode.TextEditorDecorationType {
+  if (!this.decorationType) {
+    this.decorationType = vscode.window.createTextEditorDecorationType({
+      // ... decoration config
+    });
+  }
+  return this.decorationType;
+}
+
+// ❌ BAD: Create new decoration type every time
+private getDecorationType(): vscode.TextEditorDecorationType {
+  return vscode.window.createTextEditorDecorationType({
+    // ... decoration config
+  }); // Creates new object every call!
+}
+```
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
