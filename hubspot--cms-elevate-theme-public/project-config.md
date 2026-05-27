@@ -1,206 +1,131 @@
 ---
 trigger: always_on
-description: Scaffold a new module
+description: Scaffold a new section
 ---
 
-# Scaffold a React Module
+# Scaffold a Section
 
-When scaffolding a new React module, follow these guidelines to create a consistent, well-structured foundation. Focus on creating the basic structure and necessary files without implementing the full functionality.
+When scaffolding a new section, follow these guidelines to create a consistent, well-structured foundation. Focus on creating the basic structure and necessary content without worrying about translations, scaffolding, or context values.
 
 ## Key Principles
 - Create minimal, well-organized file structure
 - Add TODOs and comments for future implementation
-- Focus on scaffolding, not full implementation
-- Include type definitions and prop interfaces
-- Set up proper module metadata and configuration
+- Focus on building out the section using DND tags with hardcoded content
+- Set up proper section template annotations
+- Never hardcode colors or unnecessary styles
+- Use existing theme modules over default modules
+- Always check the codebase for existing modules before assuming default modules exist
+- Always check existing sections to see what fields they're passing into modules
 
-## Required Files Structure
+## Core Concepts
+
+### Template Annotations
+At the top of a section is the file's [template annotations](mdc:https:/developers.hubspot.com/docs/guides/cms/content/templates/drag-and-drop/sections#section-template-files) which includes meta information about the section that is then used to display the section in the page editor when a user is editing a page. Below is an example of a template annotation for a section.
+
 ```
-src/unified-theme/components/modules/[ModuleName]/
-├── index.tsx           # Main module component
-├── fields.tsx          # Module field definitions
-├── types.ts           # Type definitions
-└── islands/           # (If needed) Client-side interactive components
-    └── [Name]Island.tsx
-```
-
-## File Templates
-
-### index.tsx
-```tsx
-import { ModuleMeta } from '../../types/modules.js';
-import { createComponent } from '../../utils/create-component.js';
-import { CSSPropertiesMap } from '../../types/components.js';
-import styles from './[module-name].module.css';
-import cx, { staticWithModule } from '../../utils/classnames.js';
-import { ModuleProps } from './types.js';
-
-const swm = staticWithModule(styles);
-
-// Components
-const ModuleContainer = createComponent('div');
-
-export const Component = (props: ModuleProps) => {
-  // Generate CSS variables if needed
-  const cssVarsMap: CSSPropertiesMap = {
-    // Add CSS custom properties here
-  };
-
-  return (
-    <ModuleContainer
-      className={swm('hs-elevate-[module-name]')}
-      style={cssVarsMap}
-    >
-      {/* TODO: Implement module content */}
-    </ModuleContainer>
-  );
-};
-
-export { fields } from './fields.js';
-
-export const meta: ModuleMeta = {
-  label: '[Module Label]',
-  content_types: ['SITE_PAGE', 'LANDING_PAGE'],
-  categories: ['design', 'body_content'],
-};
-
-export const defaultModuleConfig = {
-  moduleName: 'elevate/components/modules/[module_name]',
-  version: 0,
-  themeModule: true,
-};
+<!--
+  templateType: section
+  label: Name of the section
+  isAvailableForNewContent: true
+  screenshotPath: ../images/section-previews/screenshot-of-the-section.png
+  description: "Description of the section"
+-->
 ```
 
-### fields.tsx
-```tsx
-import { ModuleFields } from '@hubspot/cms-components/fields';
+### DND Area Tags
+A section is made up of [drag and drop HubL tags](mdc:https:/developers.hubspot.com/docs/reference/cms/hubl/tags/dnd-areas). A `dnd_section` is made up of `dnd_row`s, `dnd_column`s, and `dnd_module`s. You can read more about the HubL tags, their available parameters, and their nesting rules [here](mdc:https:/developers.hubspot.com/docs/reference/cms/hubl/tags/dnd-areas). Below is a very basic example of a section.
 
+```
+{% dnd_section %}
+  {% dnd_column %}
+    {% dnd_row %}
+      {% dnd_column %}
+        {% dnd_module
+          path="../path/to/module.html"
+          fieldName="fieldValue"
+        %}
+        {% end_dnd_module %}
+      {% end_dnd_column %}
+    {% end_dnd_row %}
+  {% end_dnd_column %}
+{% end_dnd_section %}
+```
+
+### Modules Available to Be Used in a Section
+A section can be built with theme and/or default modules.
+
+#### Theme Modules (Preferred)
+A theme module is a module that exists within a website theme and can only be used in that particular website theme. These files live in the same folder as the theme. You can learn more about theme modules [here](mdc:https:/developers.hubspot.com/docs/guides/cms/content/themes/overview).
+
+Theme modules are located inside the components/modules directory and should be referenced with the path `../components/modules/ModuleName`. These modules:
+- Are specific to the website theme
+- Should be used before considering default modules
+- May be new and not used in other sections yet - check the components/modules directory
+- Are referenced with `../` in the path
+
+
+#### Default Modules
+Default modules are modules that can be used in any themes. These files live separately from themes. You can learn more about default modules and what their different fields are [here](mdc:https:/developers.hubspot.com/docs/reference/cms/modules/default-modules).
+
+Default modules (prefixed with @hubspot/) should only be used when a suitable theme module doesn't exist. Always check the theme modules directory first.
+
+When using default HubSpot modules, make sure to use the exact module names as they appear in existing code:
+
+- For images, use `@hubspot/linked_image` (NOT `@hubspot/image` because that doesn't exist)
+- For image galleries, use `@hubspot/image_grid`
+- For forms, use `@hubspot/form`
+
+Always check existing sections first to see how modules are implemented before adding new ones. Grep for "@hubspot/" to find examples of default modules in use.
+
+
+### How to Reference Module Fields From a Section
+Each module is made up of fields. Fields are what are used by a user to edit the module's contents. You can learn more about the fields available for HubL modules [here](mdc:https:/developers.hubspot.com/docs/reference/cms/fields/module-theme-fields) and the fields available for React modules [here](https://developers.hubspot.com/docs/guides/cms/react/modules#module-fields). When adding a module to a section, you can reference the module's fields to change the module field values for that particular section. Below is an example of a module's fields.json for a HubL module, equivalent fields.tsx file for a React module, and how that module is referenced in the section.
+
+**Fields.json:**
+```
+[
+  {
+    "label": "Icon",
+    "name": "icon",
+    "type": "icon",
+    "icon_set": "fontawesome-6.4.2",
+    "default": {
+      "name": "arrow-alt-circle-up",
+      "type": "SOLID",
+      "unicode": "f35b"
+    }
+  }
+]
+```
+
+**Fields.tsx:**
+```
+import {
+  IconField,
+} from '@hubspot/cms-components/fields';
 export const fields = (
   <ModuleFields>
-    {/*
-    TODO: Define module fields
-    Common field types:
-    - text
-    - image
-    - choice
-    - group
-    - boolean
-    */}
+    <IconField
+      label='Icon'
+      name='icon'
+      iconSet='fontawesome-6.4.2'
+      default={{
+        name: 'arrow-alt-circle-up',
+        type: 'SOLID',
+        unicode: 'f35b'
+      }}
+    />
   </ModuleFields>
 );
 ```
 
-### types.ts
-```typescript
-export interface ModuleProps {
-  // TODO: Define module props based on fields
-}
-
-// TODO: Add additional type definitions as needed
+**Reference in section:**
 ```
-
-### [Name]Island.tsx (if needed)
-```tsx
-import { createComponent } from '../../../utils/create-component.js';
-import { CSSPropertiesMap } from '../../../types/components.js';
-import styles from './[island-name].module.css';
-import cx, { staticWithModule } from '../../../utils/classnames.js';
-
-const swm = staticWithModule(styles);
-
-interface IslandProps {
-  // TODO: Define island props
-}
-
-// Components
-const IslandContainer = createComponent('div');
-
-const [Name]Island = (props: IslandProps) => {
-  // Generate CSS variables if needed
-  const cssVarsMap: CSSPropertiesMap = {
-    // Add CSS custom properties here
-  };
-
-  return (
-    <IslandContainer
-      className={swm('hs-elevate-[island-name]')}
-      style={cssVarsMap}
-    >
-      {/* TODO: Implement island content */}
-    </IslandContainer>
-  );
-};
-
-export default [Name]Island;
-```
-
-## Implementation Steps
-
-1. **Analyze Requirements**
-   - Identify if client-side interactivity is needed (islands)
-   - Determine required field types
-   - Plan component structure
-
-2. **Create File Structure**
-   - Create module directory
-   - Add all required files
-   - Set up proper imports
-
-3. **Define Types**
-   - Create interfaces for props
-   - Add type definitions for any complex data structures
-
-4. **Configure Module**
-   - Set proper module metadata
-   - Configure content types and categories
-   - Set up module name and version
-
-5. **Add TODOs and Comments**
-   - Document required implementations
-   - Note any complex logic that will be needed
-   - Mark areas for future styling
-
-## Best Practices
-- Use TypeScript for all files
-- Use createComponent utility for semantic component creation
-- Follow HubSpot module naming conventions
-- Add clear TODOs for future implementation
-- Keep initial implementation minimal
-- Document expected props and field usage
-
-Remember: The goal is to create a solid foundation that can be built upon, not to implement the full functionality in the scaffolding phase.
-
-## Example Scenario
-
-Let's walk through creating a "Featured Products" module with the following requirements:
-
-Note that you shouldn't use this in your final output. But this example provides details on the process you should follow and what expectations are.
-
-1. Display a grid of product cards
-2. Each product card has:
-   - Product image
-   - Title
-   - Description
-   - Price
-   - "Learn More" button
-3. Interactive features:
-   - Hover effects on cards
-   - Click to expand product details
-4. Styling options:
-   - Card layout (grid/list)
-   - Color scheme
-   - Spacing between cards
-
-## Step 1: Module Analysis
-
-### Module Purpose
-- Primary function: Display featured products in a grid/list layout
-- Content type: Product information with images
-- User interactions: Hover effects and expandable details
-
-### Component Architecture
-- Main module component
-- Product card component (reusable)
+{% dnd_section %}
+  {% dnd_column %}
+    {% dnd_row %}
+      {% dnd_column %}
+        {% dnd_module
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
