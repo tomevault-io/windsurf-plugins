@@ -1,77 +1,208 @@
 ---
 trigger: always_on
-description: This rule is for scaffolding react modules using CSS modules instead of other CSS in JS solutions.
+description: Scaffold a new module
 ---
 
-# Scaffold react module
+# Scaffold a React Module
 
-## Your task
+When scaffolding a new React module, follow these guidelines to create a consistent, well-structured foundation. Focus on creating the basic structure and necessary files without implementing the full functionality.
 
-Your task is to simply create the general structure / scaffold for a new react module.
+## Key Principles
+- Create minimal, well-organized file structure
+- Add TODOs and comments for future implementation
+- Focus on scaffolding, not full implementation
+- Include type definitions and prop interfaces
+- Set up proper module metadata and configuration
 
-Follow these steps to do so:
-
-1. Make a directory inside of `/src/unified-theme/components/modules` with the name of the module in camel case.
-2. Create an index.tsx file inside of that new directory.
-3. Create a styles.module.css file inside of that new directory
-4. Create a blank fields.tsx file inside of that new directory.
-5. Import the new files into the index file.
-6. Populate the rest of the index file based off of the scaffold example below.
-
-Index.tsx file example.
-```tsx
-  import styles from './styles.module.css';
-
-  export const Component = (props) => {
-    const {text} = props
-
-    return (
-      <div className={styles['defaultContainer']}>
-        <h1>Scaffold default content</h1>
-        <p>{ text }</p>
-      </div>
-    );
-  };
-
-  export const meta = {
-    label: 'Scaffold module', // Can replace this with a label that makes sense
-    content_types: ['SITE_PAGE'],
-  };
-
-  export { fields } from './fields.tsx';
-
-  export const defaultModuleConfig = {
-    moduleName: 'elevate/components/modules/scaffold_module', // Can replace this with snake case name that makes sense
-    version: 0,
-    themeModule: true
-  };
+## Required Files Structure
+```
+src/unified-theme/components/modules/[ModuleName]/
+├── index.tsx           # Main module component
+├── fields.tsx          # Module field definitions
+├── types.ts           # Type definitions
+└── islands/           # (If needed) Client-side interactive components
+    └── [Name]Island.tsx
 ```
 
-Default fields file example
-```tsx
-  import {
-    ModuleFields,
-    TextField
-  } from '@hubspot/cms-components/fields';
+## File Templates
 
-  export const fields = (
-    <ModuleFields>
-      <TextField
-        label="Text"
-        name="text"
-        default="Scaffold content"
-      />
-    </ModuleFields>
+### index.tsx
+```tsx
+import { ModuleMeta } from '../../types/modules.js';
+import { createComponent } from '../../utils/create-component.js';
+import { CSSPropertiesMap } from '../../types/components.js';
+import styles from './[module-name].module.css';
+import cx, { staticWithModule } from '../../utils/classnames.js';
+import { ModuleProps } from './types.js';
+
+const swm = staticWithModule(styles);
+
+// Components
+const ModuleContainer = createComponent('div');
+
+export const Component = (props: ModuleProps) => {
+  // Generate CSS variables if needed
+  const cssVarsMap: CSSPropertiesMap = {
+    // Add CSS custom properties here
+  };
+
+  return (
+    <ModuleContainer
+      className={swm('hs-elevate-[module-name]')}
+      style={cssVarsMap}
+    >
+      {/* TODO: Implement module content */}
+    </ModuleContainer>
   );
+};
+
+export { fields } from './fields.js';
+
+export const meta: ModuleMeta = {
+  label: '[Module Label]',
+  content_types: ['SITE_PAGE', 'LANDING_PAGE'],
+  categories: ['design', 'body_content'],
+};
+
+export const defaultModuleConfig = {
+  moduleName: 'elevate/components/modules/[module_name]',
+  version: 0,
+  themeModule: true,
+};
 ```
 
-Default styles.module.css file example
-```css
-.defaultContainer {
-  display: block;
-  width: 100%;
-}
+### fields.tsx
+```tsx
+import { ModuleFields } from '@hubspot/cms-components/fields';
+
+export const fields = (
+  <ModuleFields>
+    {/*
+    TODO: Define module fields
+    Common field types:
+    - text
+    - image
+    - choice
+    - group
+    - boolean
+    */}
+  </ModuleFields>
+);
 ```
+
+### types.ts
+```typescript
+export interface ModuleProps {
+  // TODO: Define module props based on fields
+}
+
+// TODO: Add additional type definitions as needed
+```
+
+### [Name]Island.tsx (if needed)
+```tsx
+import { createComponent } from '../../../utils/create-component.js';
+import { CSSPropertiesMap } from '../../../types/components.js';
+import styles from './[island-name].module.css';
+import cx, { staticWithModule } from '../../../utils/classnames.js';
+
+const swm = staticWithModule(styles);
+
+interface IslandProps {
+  // TODO: Define island props
+}
+
+// Components
+const IslandContainer = createComponent('div');
+
+const [Name]Island = (props: IslandProps) => {
+  // Generate CSS variables if needed
+  const cssVarsMap: CSSPropertiesMap = {
+    // Add CSS custom properties here
+  };
+
+  return (
+    <IslandContainer
+      className={swm('hs-elevate-[island-name]')}
+      style={cssVarsMap}
+    >
+      {/* TODO: Implement island content */}
+    </IslandContainer>
+  );
+};
+
+export default [Name]Island;
+```
+
+## Implementation Steps
+
+1. **Analyze Requirements**
+   - Identify if client-side interactivity is needed (islands)
+   - Determine required field types
+   - Plan component structure
+
+2. **Create File Structure**
+   - Create module directory
+   - Add all required files
+   - Set up proper imports
+
+3. **Define Types**
+   - Create interfaces for props
+   - Add type definitions for any complex data structures
+
+4. **Configure Module**
+   - Set proper module metadata
+   - Configure content types and categories
+   - Set up module name and version
+
+5. **Add TODOs and Comments**
+   - Document required implementations
+   - Note any complex logic that will be needed
+   - Mark areas for future styling
+
+## Best Practices
+- Use TypeScript for all files
+- Use createComponent utility for semantic component creation
+- Follow HubSpot module naming conventions
+- Add clear TODOs for future implementation
+- Keep initial implementation minimal
+- Document expected props and field usage
+
+Remember: The goal is to create a solid foundation that can be built upon, not to implement the full functionality in the scaffolding phase.
+
+## Example Scenario
+
+Let's walk through creating a "Featured Products" module with the following requirements:
+
+Note that you shouldn't use this in your final output. But this example provides details on the process you should follow and what expectations are.
+
+1. Display a grid of product cards
+2. Each product card has:
+   - Product image
+   - Title
+   - Description
+   - Price
+   - "Learn More" button
+3. Interactive features:
+   - Hover effects on cards
+   - Click to expand product details
+4. Styling options:
+   - Card layout (grid/list)
+   - Color scheme
+   - Spacing between cards
+
+## Step 1: Module Analysis
+
+### Module Purpose
+- Primary function: Display featured products in a grid/list layout
+- Content type: Product information with images
+- User interactions: Hover effects and expandable details
+
+### Component Architecture
+- Main module component
+- Product card component (reusable)
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [HubSpot/cms-elevate-theme-public](https://github.com/HubSpot/cms-elevate-theme-public) — distributed by [TomeVault](https://tomevault.io).
