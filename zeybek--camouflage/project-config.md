@@ -1,67 +1,223 @@
 ---
 trigger: always_on
-description: Project overview, architecture, supported formats, and key features of Camouflage VS Code extension
+description: Quick reference for commands, key files, common tasks, testing patterns, and debugging tips
 ---
 
 
-# Camouflage - VS Code Extension Project Overview
+# Quick Reference
 
-## Project Purpose
+## Essential Commands
 
-Camouflage is a Visual Studio Code extension that protects sensitive values in configuration files during screen sharing, streaming, and recording sessions. It provides real-time visual masking of values while maintaining full editability.
+```bash
+# Development
+npm install          # Install dependencies
+npm run compile      # Compile TypeScript
+npm run watch        # Watch mode compilation
+npm test             # Run tests
+npm test -- --watch  # Watch mode tests
+npm run lint         # Run ESLint
+npm run format       # Format with Prettier
 
-## Core Problem Solved
+# Extension Keyboard Shortcuts
+F5                   # Launch Extension Development Host
+Ctrl+Shift+H         # Hide values (Windows/Linux)
+Cmd+Shift+H          # Hide values (macOS)
+Ctrl+Shift+R         # Reveal values (Windows/Linux)
+Cmd+Shift+R          # Reveal values (macOS)
+Ctrl+Shift+T         # Toggle value at cursor (Windows/Linux)
+Cmd+Shift+T          # Toggle value at cursor (macOS)
+Ctrl+Shift+S         # Toggle selective mode (Windows/Linux)
+Cmd+Shift+S          # Toggle selective mode (macOS)
 
-Developers frequently need to share their screen (Zoom, streaming, recordings) but configuration files contain sensitive data (API keys, passwords, tokens). Camouflage automatically masks these values visually without modifying the actual file content.
+# Release (automated)
+git commit -m "feat: new feature"  # Semantic commit
+git push origin main               # Auto-release on merge
+```
+
+## Key Files
+
+| File                       | Purpose                              |
+| -------------------------- | ------------------------------------ |
+| `src/extension.ts`         | Extension entry point & commands     |
+| `src/core/camouflage.ts`   | Main business logic & decorations    |
+| `src/parsers/index.ts`     | Parser registry & factory            |
+| `src/parsers/base-parser.ts` | Abstract parser base               |
+| `src/utils/config.ts`      | Configuration facade & file exclusion|
+| `src/utils/file.ts`        | File utilities & format detection    |
+| `package.json`             | Extension manifest & settings schema |
+| `tsconfig.json`            | TypeScript config                    |
+| `jest.config.js`           | Test config                          |
+| `examples/`                | Example config files for all formats |
 
 ## Supported File Formats
 
-- **Environment Files**: `.env`, `.env.*`, `*.env`, `.envrc`
-- **Shell Scripts**: `.sh`
-- **JSON**: `.json` (with nested key support)
-- **YAML**: `.yaml`, `.yml` (with nested key support)
-- **Properties**: `.properties`, `.ini`, `.conf`
-- **TOML**: `.toml`
+| Format     | Extensions                          | Parser Class        |
+| ---------- | ----------------------------------- | ------------------- |
+| ENV        | `.env`, `.env.*`, `*.env`, `.envrc` | `EnvParser`         |
+| Shell      | `.sh`                               | `EnvParser`         |
+| JSON       | `.json`                             | `JsonParser`        |
+| YAML       | `.yaml`, `.yml`                     | `YamlParser`        |
+| Properties | `.properties`, `.ini`, `.conf`      | `PropertiesParser`  |
+| TOML       | `.toml`                             | `TomlParser`        |
 
-## Architecture Type
+## Dependency Flow
 
-**Modular Layered Architecture**:
+```
+extension.ts
+    ↓
+core/camouflage.ts
+    ↓
+parsers/ + lib/ + utils/
+```
 
-- **Presentation Layer**: VS Code UI integration (decorations, status bar, commands)
-- **Business Logic Layer**: Core masking engine, pattern matching, configuration
-- **Parser Layer**: Multi-format parsers (env, json, yaml, properties, toml)
-- **Utility Layer**: Helper functions, text generation, validation
-- **Infrastructure Layer**: VS Code API integration, file system, event handling
+**Rules**:
 
-## Key Technologies
+- `parsers/` → File format parsing (Strategy Pattern)
+- `lib/` → Pure functions only
+- `utils/` → Can use VS Code API
+- `core/` → Orchestrates everything
+- No circular dependencies
 
-- **TypeScript**: 100% TypeScript codebase for type safety
-- **VS Code Extension API**: Native VS Code extension development
-- **Jest**: Unit and integration testing framework
-- **ESLint + Prettier**: Code quality and formatting
-- **Semantic Release**: Automated versioning and changelog generation
+## Common Tasks
 
-## Project Success Factors
+### Add New Parser
 
-1. **Zero File Modification**: Never touches actual file content
-2. **Real-time Performance**: Sub-100ms decoration updates
-3. **Pattern Flexibility**: Wildcard and regex pattern matching
-4. **Security First**: No telemetry, all processing local
-5. **User Experience**: Intuitive, non-intrusive, keyboard-friendly
-6. **Multi-Format Support**: Works with various configuration file formats
+1. Create parser file in `src/parsers/`:
 
-## Key Features
+```typescript
+import { BaseParser } from './base-parser';
+import type { ParsedVariable } from './types';
 
-- Multi-format support (ENV, JSON, YAML, Properties, TOML, Shell)
-- Nested key support for JSON and YAML files
-- Multiple hiding styles (Text, Dotted, Stars, Scramble)
-- Selective hiding with pattern matching
-- Case-insensitive pattern support
-- Keyboard shortcuts for quick toggle
-- Status bar indicator
-- Context menu integration
-- Performance monitoring decorators
-- Comprehensive error handling
+export class NewParser extends BaseParser {
+  readonly name = 'new';
+  readonly supportedExtensions = ['.new'];
+
+  parse(content: string): ParsedVariable[] {
+    const variables: ParsedVariable[] = [];
+    // Parse content and populate variables
+    return variables;
+  }
+}
+```
+
+2. Register in `src/parsers/index.ts`:
+
+```typescript
+import { NewParser } from './new-parser';
+
+// In ParserRegistry constructor:
+this.registerParser(new NewParser());
+```
+
+3. Update `package.json` (enabledParsers enum):
+
+```json
+"camouflage.files.enabledParsers": {
+  "items": {
+    "enum": ["env", "json", "yaml", "properties", "toml", "new"]
+  }
+}
+```
+
+4. Add tests in `src/parsers/__tests__/new-parser.test.ts`
+5. Update README with examples
+
+### Add New Hiding Style
+
+1. Update `package.json`:
+
+```json
+"enum": ["text", "dotted", "stars", "scramble", "newStyle"]
+```
+
+2. Update `text-generator.ts`:
+
+```typescript
+const strategies: Record<HiddenTextStyle, GeneratorStrategy> = {
+  // ... existing
+  newStyle: (text) => transformText(text),
+};
+```
+
+3. Add tests:
+
+```typescript
+it('should generate newStyle text', () => {
+  expect(generateHiddenText('test', 'newStyle')).toBe('expected');
+});
+```
+
+4. Update README with example
+
+### Add New Command
+
+1. Update `package.json`:
+
+```json
+"commands": [{
+  "command": "camouflage.newCommand",
+  "title": "Camouflage: New Command"
+}]
+```
+
+2. Register in `extension.ts`:
+
+```typescript
+const command = vscode.commands.registerCommand('camouflage.newCommand', () =>
+  camouflage.newCommand()
+);
+context.subscriptions.push(command);
+```
+
+3. Implement in `camouflage.ts`:
+
+```typescript
+@Log('New Command')
+@HandleErrors
+public newCommand(): void {
+  // Implementation
+}
+```
+
+### Add New Configuration
+
+1. Update `package.json`:
+
+```json
+"camouflage.newSetting": {
+  "type": "boolean",
+  "default": true,
+  "description": "New setting description"
+}
+```
+
+2. Add getter in `config.ts`:
+
+```typescript
+export function getNewSetting(): boolean {
+  return vscode.workspace.getConfiguration('camouflage').get<boolean>('newSetting', true);
+}
+```
+
+3. Use in code:
+
+```typescript
+import * as config from '../utils/config';
+
+if (config.getNewSetting()) {
+  // Do something
+}
+```
+
+## Testing Patterns
+
+### Unit Test Template
+
+```typescript
+describe('functionName', () => {
+  beforeEach(() => {
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [zeybek/camouflage](https://github.com/zeybek/camouflage) — distributed by [TomeVault](https://tomevault.io).
