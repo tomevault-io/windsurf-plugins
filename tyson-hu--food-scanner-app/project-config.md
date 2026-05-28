@@ -132,5 +132,5 @@ export OTHER_SWIFT_FLAGS='-warnings-as-errors'
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/tyson-hu) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-09 -->
+> Source: [tyson-hu/Food-Scanner-App](https://github.com/tyson-hu/Food-Scanner-App) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-28 -->
