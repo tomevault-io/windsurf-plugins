@@ -7,11 +7,11 @@ OpenAPI and AsyncAPI specifications for cryptocurrency exchanges and DeFi protoc
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [openxapi/openxapi](https://github.com/openxapi/openxapi).
+Original source: `CLAUDE.md` in [openxapi/openxapi](https://github.com/openxapi/openxapi).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
