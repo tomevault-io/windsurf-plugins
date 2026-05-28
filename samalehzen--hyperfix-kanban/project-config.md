@@ -1,242 +1,261 @@
 ---
 trigger: always_on
-description: Deployment and DevOps guidelines for Docker Compose and Kubernetes
+description: Development conventions, code style, and best practices for the HyperFix project
 ---
 
-# Deployment & DevOps Guidelines
+# Development Conventions
 
-HyperFix supports multiple deployment methods: Docker Compose for development/testing and Kubernetes for production. This document outlines deployment patterns and best practices.
+This document outlines coding standards, conventions, and best practices for the HyperFix project.
 
-## Docker Compose
+## Code Style
 
-### Configuration
+### Biome Configuration
 
-The main Docker Compose configuration is in `compose.yml` at the project root.
+HyperFix uses **Biome** for linting and formatting. Configuration is in `biome.json`.
 
-### Service Structure
+#### Formatting Rules
 
-```yaml
-services:
-  postgres:
-    image: postgres:16-alpine
-    env_file:
-      - .env
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U hyperfix -d hyperfix"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  api:
-    image: ghcr.io/samalehzen/hyper-api:latest
-    ports:
-      - "1337:1337"
-    env_file:
-      - .env
-    depends_on:
-      postgres:
-        condition: service_healthy
-    restart: unless-stopped
-
-  web:
-    image: ghcr.io/samalehzen/hyper-web:latest
-    ports:
-      - "5173:5173"
-    env_file:
-      - .env
-    depends_on:
-      - api
-    restart: unless-stopped
-```
-
-### Best Practices
-
-1. **Health Checks**: Always include health checks for databases
-2. **Dependencies**: Use `depends_on` with `condition: service_healthy` for databases
-3. **Volumes**: Use named volumes for persistent data
-4. **Restart Policy**: Use `unless-stopped` for production-like behavior
-5. **Environment Variables**: Use `.env` file, never hardcode secrets
-
-```yaml
-# Good: Proper health check and dependency
-services:
-  api:
-    depends_on:
-      postgres:
-        condition: service_healthy
-
-  postgres:
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U hyperfix -d hyperfix"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-```
-
-## Kubernetes (Helm Charts)
-
-### Chart Structure
-
-Helm charts are located in `charts/hyperfix/`:
-
-```
-charts/hyperfix/
-├── Chart.yaml              # Chart metadata
-├── values.yaml             # Default values
-├── README.md               # Chart documentation
-└── templates/
-    ├── deployment.yaml     # API and Web deployments
-    ├── services.yaml       # Service definitions
-    ├── ingress.yaml        # Ingress configuration
-    ├── postgresql-deployment.yaml  # PostgreSQL deployment
-    ├── pvc.yaml            # Persistent volume claims
-    ├── hpa.yaml            # Horizontal Pod Autoscaler
-    └── serviceaccount.yaml # Service accounts
-```
-
-### Deployment Patterns
-
-#### API Deployment
-
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: {{ include "hyperfix.fullname" . }}-api
-spec:
-  replicas: {{ .Values.api.replicaCount }}
-  template:
-    spec:
-      containers:
-      - name: api
-        image: "{{ .Values.api.image.repository }}:{{ .Values.api.image.tag }}"
-        env:
-        - name: DATABASE_URL
-          valueFrom:
-            secretKeyRef:
-              name: {{ include "hyperfix.fullname" . }}-secrets
-              key: database-url
-```
-
-#### Web Deployment
-
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: {{ include "hyperfix.fullname" . }}-web
-spec:
-  replicas: {{ .Values.web.replicaCount }}
-  template:
-    spec:
-      containers:
-      - name: web
-        image: "{{ .Values.web.image.repository }}:{{ .Values.web.image.tag }}"
-        env:
-        - name: VITE_API_URL
-          value: {{ .Values.web.apiUrl | quote }}
-```
-
-### Best Practices
-
-1. **Secrets Management**: Use Kubernetes Secrets, never hardcode
-2. **ConfigMaps**: Use ConfigMaps for non-sensitive configuration
-3. **Resource Limits**: Always set resource requests and limits
-4. **Health Checks**: Include liveness and readiness probes
-5. **Replicas**: Configure appropriate replica counts for high availability
-
-```yaml
-# Good: Proper resource limits and health checks
-containers:
-- name: api
-  resources:
-    requests:
-      memory: "256Mi"
-      cpu: "100m"
-    limits:
-      memory: "512Mi"
-      cpu: "500m"
-  livenessProbe:
-    httpGet:
-      path: /api/health
-      port: 1337
-    initialDelaySeconds: 30
-    periodSeconds: 10
-  readinessProbe:
-    httpGet:
-      path: /api/health
-      port: 1337
-    initialDelaySeconds: 5
-    periodSeconds: 5
-```
-
-## Environment Variables
-
-### Development
-
-All environment variables in a single `.env` file at project root:
-
-```bash
-# Database
-DATABASE_URL=postgresql://hyperfix_user:hyperfix_password@localhost:5432/hyperfix
-POSTGRES_DB=hyperfix
-POSTGRES_USER=hyperfix_user
-POSTGRES_PASSWORD=hyperfix_password
-
-# API
-KANEO_API_URL=http://localhost:1337
-AUTH_SECRET=your-secret-key
-
-# Web
-KANEO_CLIENT_URL=http://localhost:5173
-VITE_API_URL=http://localhost:1337
-```
-
-### Production
-
-Use Kubernetes Secrets and ConfigMaps:
-
-```yaml
-# Secret for sensitive data
-apiVersion: v1
-kind: Secret
-metadata:
-  name: hyperfix-secrets
-type: Opaque
-stringData:
-  database-url: postgresql://user:pass@postgres:5432/hyperfix
-  auth-secret: your-secret-key
-
-# ConfigMap for non-sensitive data
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: hyperfix-config
-data:
-  api-url: https://api.example.com
-  client-url: https://app.example.com
-```
-
-## Database Migrations
-
-### Automatic Migrations
-
-Migrations run automatically on API startup:
+- **Indentation**: Tabs (not spaces) for TypeScript/TSX
+- **JavaScript**: Spaces for indentation (legacy support)
+- **Quote Style**: Double quotes (`"`)
+- **Semicolons**: Required
 
 ```typescript
-// apps/api/src/index.ts
-await migrate(db, {
-  migrationsFolder: `${process.cwd()}/drizzle`,
-});
+// Good: Tabs, double quotes, semicolons
+function example() {
+	const value = "hello";
+	return value;
+}
+
+// Bad: Spaces, single quotes, no semicolons
+function example() {
+  const value = 'hello'
+  return value
+}
 ```
 
-### Manual Migrations
+#### Linting Rules
 
+Key Biome rules enabled:
+
+- `noParameterAssign`: Don't reassign function parameters
+- `useAsConstAssertion`: Use `as const` for literal types
+- `useDefaultParameterLast`: Default parameters must be last
+- `useSelfClosingElements`: Use self-closing JSX elements
+- `useSingleVarDeclarator`: One variable per declaration
+- `noInferrableTypes`: Don't add explicit types that can be inferred
+
+```typescript
+// Good: Follows Biome rules
+const items = ["a", "b"] as const;
+function greet(name: string, greeting = "Hello") {
+	return `${greeting}, ${name}`;
+}
+const x = 1;
+const y = 2;
+
+// Bad: Violates Biome rules
+const items: string[] = ["a", "b"];
+function greet(greeting = "Hello", name: string) {
+	return `${greeting}, ${name}`;
+}
+const x = 1, y = 2;
+```
+
+### Running Linter
+
+```bash
+# Check and auto-fix
+pnpm lint
+
+# Check only (no fixes)
+pnpm biome check .
+```
+
+## TypeScript Conventions
+
+### Type Definitions
+
+- **Types**: Prefer types for all type definitions (object shapes, unions, intersections, computed types)
+- **Interfaces**: Only use interfaces when extending/merging is needed (rare)
+- **Inference**: Prefer type inference when types are obvious
+
+```typescript
+// Good: Type for object shape
+type Task = {
+	id: string;
+	title: string;
+	status: string;
+};
+
+// Good: Type for union
+type Status = "to-do" | "in-progress" | "done";
+
+// Good: Type inference
+const tasks: Task[] = []; // Explicit for arrays
+const count = tasks.length; // Inferred
+```
+
+### File Naming
+
+- **Components**: PascalCase: `TaskCard.tsx`
+- **Utilities**: kebab-case: `format-date.ts`
+- **Hooks**: camelCase with `use` prefix: `use-task.ts`
+- **Types**: kebab-case: `task-types.ts`
+
+```
+components/
+├── TaskCard.tsx          # Component
+├── task-card.tsx         # Also acceptable
+└── utils/
+    └── format-date.ts   # Utility function
+```
+
+## Git Conventions
+
+### Commit Messages
+
+Use [Conventional Commits](https://www.conventionalcommits.org/):
+
+```
+<type>: <description>
+
+[optional body]
+
+[optional footer]
+```
+
+#### Commit Types
+
+- `feat:` - New features
+- `fix:` - Bug fixes
+- `docs:` - Documentation changes
+- `refactor:` - Code refactoring (no feature/fix)
+- `test:` - Adding or updating tests
+- `chore:` - Maintenance tasks (deps, config, etc.)
+- `style:` - Code style changes (formatting, etc.)
+
+#### Examples
+
+```bash
+feat: add bulk task operations
+fix: resolve calendar date selection bug
+docs: update deployment guide
+refactor: simplify task controller logic
+chore: update dependencies
+```
+
+### Branch Naming
+
+Use descriptive branch names with prefixes:
+
+- `feat/` - New features
+- `fix/` - Bug fixes
+- `docs/` - Documentation
+- `refactor/` - Refactoring
+- `chore/` - Maintenance
+
+```bash
+feat/bulk-task-operations
+fix/calendar-date-bug
+docs/update-deployment-guide
+```
+
+## Import Organization
+
+Biome automatically organizes imports. Follow these patterns:
+
+### Import Order
+
+1. External packages
+2. Internal packages (`@/` aliases)
+3. Relative imports
+
+```typescript
+// Good: Organized imports
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { TaskCard } from "./task-card";
+```
+
+### Import Style
+
+- Use named imports when possible
+- Group related imports
+- Remove unused imports (Biome does this automatically)
+
+```typescript
+// Good: Named imports
+import { useState, useEffect } from "react";
+import { Button, Input } from "@/components/ui";
+
+// Avoid: Default imports when named available
+import React from "react"; // Prefer named imports
+```
+
+## File Structure
+
+### Component Files
+
+```typescript
+// 1. Imports (external, then internal)
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+
+// 2. Types
+type ComponentProps = {
+	title: string;
+};
+
+// 3. Component
+export function Component({ title }: ComponentProps) {
+	// Implementation
+}
+
+// 4. Exports (if needed)
+export default Component;
+```
+
+### API Controller Files
+
+```typescript
+// 1. Imports
+import db from "../../database";
+import { taskTable } from "../../database/schema";
+
+// 2. Function
+export default async function getTask(id: string) {
+	// Implementation
+}
+```
+
+## Error Handling
+
+### Backend
+
+Use Hono's HTTPException:
+
+```typescript
+import { HTTPException } from "hono/http-exception";
+
+if (!task) {
+	throw new HTTPException(404, { message: "Task not found" });
+}
+```
+
+### Frontend
+
+Use try-catch with user-friendly messages:
+
+```typescript
+import { toast } from "sonner";
+
+try {
+	await updateTask(taskId, data);
+	toast.success("Task updated");
+} catch (error) {
+	toast.error(
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
