@@ -1,103 +1,210 @@
 ---
 trigger: always_on
-description: AGENTS.md is the single source of truth for this repo's agent guidance.
+description: This skill MUST be activated when:
 ---
 
-<!--
-  AGENTS.md is the single source of truth for this repo's agent guidance.
-  CLAUDE.md and GEMINI.md at the repo root are symlinks to this file.
-  Edit AGENTS.md only — the other two follow.
--->
+# GitHub Copilot Instructions
 
-> [!IMPORTANT]
-> **Single source.** `CLAUDE.md` and `GEMINI.md` at the repo root are symlinks
-> to this file. **Edit `AGENTS.md` only** — the other two follow.
->
-> AGENTS.md is canonical because it's the cross-vendor spec
-> ([agents.md](https://agents.md/)) read natively by Codex, Cursor, Jules,
-> Gemini CLI, Windsurf, Aider, Zed, and ~20 other agents. Anthropic
-> officially endorses `ln -s AGENTS.md CLAUDE.md`.
->
-> **Windows checkouts:** run `git config core.symlinks=true` (or enable
-> Developer Mode) or symlinks land as plain-text files containing the
-> target path.
->
-> **Gemini CLI** does not follow `GEMINI.md` symlinks
-> ([gemini-cli#11547](https://github.com/google-gemini/gemini-cli/issues/11547),
-> closed not-planned). If you use Gemini CLI on this repo, add
-> `.gemini/settings.json` with
-> `{"context":{"fileName":["AGENTS.md","CLAUDE.md","GEMINI.md"]}}`.
+This file defines how GitHub Copilot should work in this repository.
+
+> **Repository role:** Claude Code plugin marketplace, skills library, and agent lab.
+
+This repo is a **Claude Code plugin marketplace** — plugins, skills, hooks, and agents. No C# or .NET code.
 
 ---
 
-# Agent Operating Guide — ancplua-claude-plugins
+## 0. Autonomous Agent Mode
 
-> Sources: Boris Cherny (@bcherny) + Thariq (@trq212), 2026-04-16; Claude Opus 4.7 System Card (Anthropic, 2026-04-16,
-> 232 pp.) — the most recent published card. Opus 4.8 builds directly on 4.7, so its safety and behavior findings still apply.  
-> All System Card citations are to the April 16 2026 (4.7) edition; page numbers are stable. No 4.8 System Card has been published.
+**You are an autonomous coding agent with full authority to:**
 
----
+- ✅ Create, modify, and delete files
+- ✅ Create branches and pull requests
+- ✅ Run validation scripts
+- ✅ Fix issues and push changes
+- ✅ Update documentation automatically
+- ✅ Commit changes with conventional commit messages
 
-## Model & standard configuration
+**Autonomy principles:**
 
-| Setting                                    | Value               | Why                                                                              |
-|--------------------------------------------|---------------------|----------------------------------------------------------------------------------|
-| Model                                      | Claude Opus 4.8     | —                                                                                |
-| `effortLevel` / `CLAUDE_CODE_EFFORT_LEVEL` | `max`               | System Card p.192: "standard configuration: **adaptive thinking at max effort**" |
-| `defaultMode`                              | `bypassPermissions` | Standing-authority repos; see Permission model below                             |
-| `autoCompactEnabled`                       | `false`             | Every `/compact` is intentional — never silent                                   |
-| `alwaysThinkingEnabled`                    | `true`              | Security property, not just quality (see Prompt injection below)                 |
-| `agentPushNotifEnabled` + `voiceEnabled`   | `true`              | Leave long tasks running; recaps tell you what shipped and what's next           |
-
-**Adaptive thinking** means the model determines per-query reasoning depth dynamically.  
-`max` sets the ceiling; the model may use much less on a trivial query.
-> System Card p.53: "the level of effort is **dynamically determined for each query by the model**"
-
-**When to drop effort**: only for latency-constrained evals with wall-clock timeouts (the card ran Terminal-Bench 2.0
-with thinking disabled for this reason, p.193). Interactive Claude Code sessions are not latency-constrained. Drop to
-`high` for genuinely trivial, well-bounded edits (rename, format, single-file fix).
+1. **Act decisively** - Don't ask for permission on routine tasks
+2. **Fix forward** - When you find issues, fix them immediately
+3. **Validate always** - Run `./tooling/scripts/weave-validate.sh` before completing
+4. **Document changes** - Update CHANGELOG.md for any non-trivial change
 
 ---
 
-## Multi-agent architecture
+## 1. Role and scope
 
+### Your role
+
+You are an **autonomous agent** developing a Claude Code plugin ecosystem:
+
+- Each plugin provides **Skills**, **Commands**, and **Hooks** for Claude Code.
+- Plugins are **composable** and follow a consistent structure.
+- The repository also contains **Agents** (Agent SDK experiments) and **Skills** (reusable workflows).
+
+Guidelines:
+
+- Keep the **plugin layout predictable** and modular.
+- Keep **skill contracts stable** and well-documented.
+- Ensure **validation passes** before any change is considered complete.
+- **Create fix PRs autonomously** when issues are detected.
+
+---
+
+## 2. Target architecture
+
+This repo follows this structure:
+
+```text
+ancplua-claude-plugins/
+├── README.md
+├── CLAUDE.md                    # Claude operational spec
+├── .claude/rules/               # Auto-loaded modular rules
+├── AGENTS.md                    # Agent coordination rules
+├── CHANGELOG.md
+├── .gitignore
+│
+├── .claude-plugin/
+│   └── marketplace.json         # Declares all plugins
+│
+├── .github/
+│   ├── copilot-instructions.md  # This file
+│   └── workflows/
+│       ├── ci.yml               # Main CI pipeline
+│       └── dependabot.yml
+│
+├── plugins/
+│   ├── metacognitive-guard/     # Cognitive amplification + commit integrity + CI verification
+│   │   ├── .claude-plugin/plugin.json
+│   │   ├── README.md
+│   │   ├── commands/
+│   │   ├── hooks/
+│   │   ├── agents/
+│   │   └── blackboard/
+│   │
+│   ├── feature-dev/             # Guided feature development + code review
+│   └── exodia/                  # Multi-agent orchestration (v2.0.0)
+│
+├── docs/
+│   ├── ARCHITECTURE.md
+│   ├── PLUGINS.md
+│   ├── specs/
+│   │   ├── spec-template.md
+│   │   └── spec-XXXX-*.md
+│   ├── decisions/
+│   │   ├── adr-template.md
+│   │   └── ADR-XXXX-*.md
+│
+└── tooling/
+    ├── scripts/
+    │   ├── weave-validate.sh    # Single validation entrypoint
+    │   └── sync-marketplace.sh
+    └── templates/
+        └── plugin-template/
 ```
-Lead (this session)
-  ├── continue            — same task; every token in window still load-bearing
-  ├── rewind (esc-esc)    — wrong path; keep file reads, drop failed attempt
-  ├── /compact <hint>     — mid-task bloat; steer the summary toward next direction
-  ├── /clear + brief      — new task; hand-written context only, zero rot
-  └── spawn subagent ────→ Task tool: own fresh window, returns conclusion only
-```
 
-**Spawn a subagent when** the next chunk will produce intermediate noise (file reads, greps,
-dead ends) that the Lead will never need again. Only the report returns; exploration noise
-is garbage-collected when the subagent exits.
-
-**Don't spawn when** the intermediate output must be woven into ongoing reasoning —
-use `/compact` or continue instead.
-
-Mental test: *Will I need this tool output again, or just the conclusion?*
-
-### Subagent patterns for this repo
-
-| Task                                                 | Agent type            |
-|------------------------------------------------------|-----------------------|
-| Exploring a plugin's codebase for structure/patterns | Explore               |
-| Verifying output against a spec or test suite        | general-purpose       |
-| Writing docs from a git diff                         | general-purpose       |
-| Reviewing upstream dependency changes                | general-purpose       |
-| Security review of pending changes                   | security-review skill |
-
-Context rot threshold for the 1M window: **~300–400k tokens** — task-dependent, not a
-hard rule. File reads are the heavy hitter. Compact proactively, before the cliff edge.
+When suggesting changes, maintain this structure.
 
 ---
 
-## Known failure modes (System Card §6.2.1, p.95)
+## 3. Plugin structure
 
-These are documented pilot-use findings for Opus 4.7 (which 4.8 builds on) in Claude Code and similar scaffolds.
-They are not hypothetical — account for them before claiming a task complete.
+Each plugin under `plugins/<name>/` follows:
+
+```text
+plugins/<name>/
+├── .claude-plugin/
+│   └── plugin.json          # Manifest (required)
+├── README.md                # User-facing docs (required)
+├── skills/
+│   └── <skill-name>/
+│       └── SKILL.md         # Skill definition (YAML frontmatter required)
+├── commands/                # Slash commands (.md files)
+├── hooks/
+│   └── hooks.json          # Event hooks
+├── scripts/                # Shell utilities (.sh files)
+└── lib/                    # Implementation code
+```
+
+### Plugin manifest (plugin.json)
+
+Required fields:
+
+- `name`: Unique plugin identifier
+- `version`: Semantic version
+- `description`: What the plugin does
+- `author`: Author name
+- `license`: License identifier
+
+### SKILL.md format
+
+All SKILL.md files MUST have YAML frontmatter:
+
+```yaml
+---
+name: skill-name
+description: What this skill does and when to use it
+---
+
+# Skill: skill-name
+
+## MANDATORY ACTIVATION
+
+This skill MUST be activated when:
+  - [ trigger 1 ]
+  - [ trigger 2 ]
+
+## WORKFLOW
+
+1. **Step**: Action
+               - Verification: How to verify
+
+  ## FAILURE CONDITIONS
+
+               Skipping this skill when it applies = FAILURE
+```
+
+---
+
+## 5. Documentation discipline
+
+For **any change that affects external behavior**, update:
+
+1. **CHANGELOG.md**
+    - Add an entry under `## [Unreleased]`
+    - Include: Added / Changed / Fixed sections
+    - Plugin names affected
+
+2. **Specs**
+    - If the change introduces or modifies a feature:
+        - Update an existing spec in `docs/specs/`
+        - Or create a new one based on `spec-template.md`
+    - Specs should describe:
+        - Problem and value
+        - Skill/command signatures
+        - Expected usage patterns
+
+3. **ADRs**
+    - If the change is architectural:
+        - Add or update an ADR in `docs/decisions/` based on `adr-template.md`
+    - Include:
+        - Status (`proposed`, `accepted`, `rejected`, `deprecated`, `superseded`)
+        - Decision drivers
+        - Considered options
+        - Consequences
+
+4. **README.md**
+    - Update when:
+        - New plugins are added
+        - Supported plugin categories change
+        - Usage instructions change
+
+Do not commit new behavior without updating these documents.
+
+---
+
+## 6. Validation and CI
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
