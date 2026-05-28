@@ -7,11 +7,11 @@ Command-line password manager
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [dbohdan/pago](https://github.com/dbohdan/pago).
+Original source: `CLAUDE.md` in [dbohdan/pago](https://github.com/dbohdan/pago).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
