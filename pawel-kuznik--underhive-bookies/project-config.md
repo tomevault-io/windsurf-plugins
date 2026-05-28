@@ -1,14 +1,9 @@
 ---
 trigger: always_on
-description: When creating React components follow these rules:
+description: When creating UI, prefer components found in the @pawel-kuznik/react-faceplate library.
 ---
 
-When creating React components follow these rules:
-- declare components with `function` keyword.
-- split components by concert. 
-- prefer small components.
-
-- apply SOLID and DDD principles.
+When creating UI, prefer components found in the @pawel-kuznik/react-faceplate library.
 
 ---
 > Source: [pawel-kuznik/underhive-bookies](https://github.com/pawel-kuznik/underhive-bookies) — distributed by [TomeVault](https://tomevault.io).
