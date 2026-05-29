@@ -9,4 +9,4 @@ Always load the skills in the sub-directories under /skills/.
 
 ---
 > Source: [peterbamuhigire/skills-web-dev](https://github.com/peterbamuhigire/skills-web-dev) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-09 -->
+<!-- tomevault:4.0:windsurf_rules:2026-05-29 -->
