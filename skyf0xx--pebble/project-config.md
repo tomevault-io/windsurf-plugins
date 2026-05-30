@@ -1,0 +1,117 @@
+---
+trigger: always_on
+description: > A PWA chat interface for Hermes and Open Claw agents. Warm, minimal, installable. No backend needed.
+---
+
+# Pebble — Claude Code Context
+
+> A PWA chat interface for Hermes and Open Claw agents. Warm, minimal, installable. No backend needed.
+
+## Before you start
+
+- **SPEC.md** — product vision, session model, rendering rationale. Read for the *why* (some sections describe the old MCP/tunnel architecture and are out of date — the transport is now Hermes-only).
+- **TODO.md** — the build order. Each task is self-contained. Work one task at a time, commit, move on.
+- **hermes-plugin/skills/pebble-protocol/SKILL.md** — the `pebble_send` protocol (message/ui/status/push) and json-render component catalogue. Read before touching `AgentUIBlock` or the Hermes adapter's tool-call interception.
+
+## What we're building
+
+A static React PWA that connects directly to a Hermes agent's HTTP API. No backend, no MCP server, no tunnel — the user just opens `?hermes=<base_url>&token=<key>` and Pebble talks to the agent over `GET /api/sessions` + `POST /api/sessions/{id}/chat/stream` (SSE).
+
+The UI has two views:
+- **Session list** — chat inbox sorted by `last_updated` (WhatsApp-style, not a task board)
+- **Chat thread** — messages + inline interactive UI pushed by the agent
+
+## Stack
+
+| | |
+|---|---|
+| Framework | React + Vite (static output) |
+| PWA | vite-plugin-pwa |
+| Styling | Tailwind CSS v4 |
+| Components | shadcn/ui |
+| Generative UI | @json-render/react |
+| State | Zustand |
+| Transport | Hermes HTTP API (SSE streaming via `fetch`) |
+| Persistence | localStorage + IndexedDB |
+| Icons | lucide-react |
+| Avatars | DiceBear Thumbs (CDN) |
+
+## Project structure
+
+```
+pebble/
+├── src/
+│   ├── components/
+│   │   ├── sessions/      # SessionList, SessionRow, StatusIcon
+│   │   ├── chat/          # ChatThread, MessageBubble, InputBar
+│   │   └── ui/            # AgentUIBlock, agent_push overlay
+│   ├── lib/
+│   │   ├── connection.ts  # Adapter façade — picks config from URL, dispatches events to store
+│   │   ├── adapters/      # HostAdapter implementations (currently: hermes.ts)
+│   │   └── storage.ts     # localStorage/IndexedDB helpers
+│   ├── store/
+│   │   └── index.ts       # Zustand store (sessions, messages, ws state)
+│   ├── types.ts            # Shared TypeScript types
+│   ├── App.tsx
+│   └── main.tsx
+├── public/
+├── CLAUDE.md
+├── TODO.md
+└── skills/                # Project skill files
+```
+
+## Internal protocol (adapter ↔ store)
+
+The Hermes adapter normalises Hermes' HTTP API into a small internal vocabulary. Components and the store only ever see this shape — they don't know about Hermes.
+
+**ClientMessage (components → adapter via `send()`):**
+```ts
+{ type: "session_create", label?: string }
+{ type: "session_resume", session_id: string }
+{ type: "session_delete", session_id: string }
+{ type: "user_message", session_id: string, content: string, timestamp: ISO8601 }
+{ type: "ui_action", session_id: string, action: string, payload: Record<string,any>, timestamp: ISO8601 }
+```
+
+**AgentMessage (adapter → store via `dispatch()` in connection.ts):**
+```ts
+{ type: "session_list", sessions: SessionMeta[] }
+{ type: "session_history", session_id: string, messages: Message[] }
+{ type: "agent_message", session_id, message_id, kind: "thought"|"message", content, streaming, timestamp }
+{ type: "agent_ui", session_id, message_id, spec: JsonRenderSpec, timestamp }
+{ type: "session_status", session_id, status: "active"|"waiting"|"done"|"error", label? }
+{ type: "error", code, message, session_id? }
+```
+
+**SessionMeta shape:**
+```ts
+{
+  session_id: string
+  label: string
+  status: "active" | "waiting" | "done" | "error"
+  last_message: string
+  last_updated: ISO8601
+  unread: number
+}
+```
+
+**Hermes mapping (in `src/lib/adapters/hermes.ts`):**
+
+The agent communicates **only** through the `pebble_send` tool, provided by the bundled Hermes plugin (`hermes-plugin/`, installed to `~/.hermes/plugins/pebble/` by the launcher). The agent never emits plain `assistant.delta` text — all user-visible output is a `pebble_send` tool call.
+
+- `?hermes=<base>&token=<key>` on load → `HermesAdapter`.
+- `connect()` → `GET /api/sessions` → emits `session_list`.
+- `user_message` → `POST /api/sessions/{id}/chat/stream` (SSE). Stream events translated:
+  - `tool.started` for `pebble_send` → read `arguments.type` and dispatch: `message` → `agent_message` (kind `message`), `ui` → `agent_ui`, `status` → `session_status`, `push` → `agent_message` and/or `agent_ui`. A `label` on any type updates the session name. `session_status: active` is emitted once at stream start, `done` on `run.completed`.
+  - `tool.started` for other tools → `agent_message` kind `thought` ("Running X…"); finalized to "Ran X" on `tool.completed` (or on stream end, so the "Thinking…" indicator never sticks).
+- `ui_action` → next user turn carrying `{"ui_action":..., "payload":..., "session_id":...}` JSON envelope. The plugin's `pre_llm_call` hook parses that and injects it as structured context.
+
+## Design language
+
+- **Palette:** Primary `#3B82F6` (blue), Secondary `#F97316` (orange), Tertiary `#D16900` (dark orange), Neutral `#757780` (grey). Background `#ffffff`, surface `#f8f9fa`, foreground `#1e1e2e`, border `#e2e8f0`.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [skyf0xx/Pebble](https://github.com/skyf0xx/Pebble) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-30 -->
