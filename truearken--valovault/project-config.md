@@ -39,5 +39,5 @@ description: - **Development**: `cd backend && air` (live reload) or `go run .`
 - **No tests**: Currently no test framework
 
 ---
-> Source: [truearken/valovault](https://github.com/truearken/valovault) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-22 -->
+> Source: [truearken/ValoVault](https://github.com/truearken/ValoVault) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-30 -->
