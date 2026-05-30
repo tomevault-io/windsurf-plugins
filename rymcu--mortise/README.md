@@ -7,12 +7,12 @@ mortise —— 一款现代化的后台管理脚手架项目，使用 SpringBoot
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `copilot-instructions.md` in [rymcu/mortise](https://github.com/rymcu/mortise).
+Original source: `AGENTS.md` in [rymcu/mortise](https://github.com/rymcu/mortise).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
+- **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
