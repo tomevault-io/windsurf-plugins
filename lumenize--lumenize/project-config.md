@@ -1,152 +1,72 @@
 ---
 trigger: always_on
-description: Documentation standards and workflow - critical rules for doc creation
+description: Lumenize is a collection of liberally licensed (MIT) and more restrictively licensed (BUSL-1.1 — Business Source License) open-source packages targeting Cloudflare's Durable Objects, which are part of Cloudflare's Workers edge computing platform. There are two complementary but distinct goals:
 ---
 
+# Lumenize Project Context
 
-# Documentation Standards
+## Overview
+Lumenize is a collection of liberally licensed (MIT) and more restrictively licensed (BUSL-1.1 — Business Source License) open-source packages targeting Cloudflare's Durable Objects, which are part of Cloudflare's Workers edge computing platform. There are two complementary but distinct goals:
+1. Provide a de✨light✨ful suite of packages that any developer can use to build scalable, high-quality, and maintainable products (MIT licensed).
+2. Build the ultimate framework for vibe coding enterprise or B2B SaaS software products in a rapid and secure manner. It will be BUSL-1.1 licensed, available to enterprises via commercial licenses, and offered as a platform as a service (PaaS) with generous free tier. Nebula-related packages currently marked `UNLICENSED` pending external launch.
 
-Documentation philosophy and tooling for Lumenize.
+## Guiding Principles
+- **Quality**: 
+  - Code quality achieved via high test coverage: Branch >80%, Statement >90%
+  - Documentation quality achieved via custom Docusaurus tooling that ensures examples always work (see Documentation section)
+- **Opinionated where it matters. Flexible where it counts**: For example, the Lumenize Mesh base classes are minimal but opinionated about best practices while also providing a flexible plugin system to extend functionality along with batteries-included plugins for common use cases.
+- **No foot-guns**: Vibe coders are experts in their field, but not necessarily coding or operations. Lumenize makes it easy for both the product creator AND the LLM they are using to follow best practices. For example, Durable Objects were designed to make parallel programming safer if you follow certain patterns, but will happily allow you to violate those patterns without warning. Even when Lumenize allows you to break the rules, you are loudly warned of the risks.
+- **Security**: Authentication and access control are built-in and on by default. You have to jump through hoops to avoid them. At the same time, they are flexible and can be adapted to any context.
 
-## ⚠️ CRITICAL: Never Add @skip-check Without Asking
+## Development Workflow Instructions
 
-**Exceptions:**
-1. **Non-executable examples** - Bash commands, configuration snippets, install commands
-2. **Phase 1 of documentation workflow** - Temporary use during narrative drafting with explicit approval
+We use task files in the `tasks/` directory to track work:
+- **`tasks/backlog.md`** - Small tasks and ideas for casual coding time
+- **`tasks/[project-name].md`** - Active multi-phase projects with detailed plans
+- **`tasks/decisions/`** - Research findings and technical decisions
+- **`tasks/archive/`** - Completed projects for reference
 
-**Phase 1 Exception:** During narrative-first drafting (Phase 1), `@skip-check` can be used temporarily. However, the transition from Phase 1 → Phase 2 must be explicitly approved by the user, acknowledging that all `@skip-check` annotations will be replaced with `@check-example` annotations pointing to real tests.
+When starting a new project, create a task file with phases and steps. See `tasks/README.md` for template and usage.
 
-**Never:** Use `@skip-check` for final pedagogical code examples without validation tests.
+### General Development Rules
+- When we change our minds on the plan from learning of earlier steps, propose updates to the task file.
+- Provide clear summaries of what was implemented after each step.
+- Explain design decisions and trade-offs.
+- After each step/phase, ask for code review before proceeding. Ask "Ready to proceed with [next step/phase]?" after completing each step or phase.
+- API changes: Mark one test as `.only` to verify the new pattern works, then update remaining tests.
+- **CRITICAL SECURITY: NEVER put secrets, tokens, API keys, or credentials directly in source code files (including wrangler.jsonc, tsconfig.json, etc.). Always use `.dev.vars` files (which are gitignored) or environment variables. Tokens in wrangler.jsonc `vars` section will be committed to git.**
 
-**Why:** `@skip-check` creates risk of docs/code divergence. Every code example showing functionality should be validated.
+## How we do things around here
 
-**Ask First:** If you think @skip-check is needed outside these exceptions, ask the user.
+### Environment Variables and Secrets
+**Centralized `.dev.vars` management**:
+- Single root `/lumenize/.dev.vars` file (gitignored) contains all secrets
+- Test directories use symlinks to the root `.dev.vars`
+- `/lumenize/.dev.vars.example` provides template for contributors
+- `scripts/setup-symlinks.sh` automatically creates/verifies symlinks (runs via `postinstall` hook)
+- Run manually anytime: `./scripts/setup-symlinks.sh`
 
-## Philosophy
+**When adding new test environments**:
+1. Add symlink to `scripts/setup-symlinks.sh` SYMLINKS array
+2. Add any new variables to root `.dev.vars` and `.dev.vars.example`
+3. Run `./scripts/setup-symlinks.sh` to verify setup
 
-Documentation quality is ensured by custom Docusaurus tooling that guarantees all code examples are tested and working. The website at https://lumenize.com is the single source of truth for user-facing documentation.
+### Tools
+- Use `npm`. Never `pnpm` or `yarn`.
+- If the library is installed never use `npx` because it requires me to approve it.
 
-All documentation is hand-written `.mdx` with code examples validated by the `check-examples` plugin. API references are hand-written pages (not auto-generated). See `website/docs/auth/api-reference.mdx` for the pattern.
+### Coding style
+- Never use Typescript keyword `private`. Rather use JavaScript equivalent of starting the identifier with "#".
+- **Always use synchronous storage operations** (`ctx.storage.kv.*` and `ctx.storage.sql.*`) instead of the legacy async API (`ctx.storage.get/put/delete`). This is Cloudflare's recommended pattern going forward and requires `compatibility_date: "2025-09-12"` or later.
+- Storage operations are synchronous because SQLite is embedded - no async needed, no performance penalty.
 
-## Where Documentation Lives
+### Rule of Wire Separation for Types:
+- Use TypeScript types for transient in-memory constructs.
+- Use TypeBox schemas for any structure that can cross a process, network, or persistence boundary.
 
-### Website Documentation (`/website/docs/`)
+### No build during development
 
-**Always:**
-- ✅ All user-facing documentation goes here
-- ✅ Create/update `.mdx` files in `/website/docs/[package-name]/`
-- ✅ Add new files to `/website/sidebars.ts` for navigation
-- ✅ Use proper frontmatter with `title` and `description`
-- ✅ Link between pages with relative links (e.g., `[CORS Support](/docs/utils/cors-support)`)
-- ✅ Large features should be separate files linked from main docs
-
-**Never:**
-- ❌ Don't create temporary docs in package directories (`IMPLEMENTATION.md`, `FEATURE_GUIDE.md`, etc.)
-- ❌ Don't include internal communication content (testing details, compatibility matrices, progress updates)
-
-### Package README.md Files
-
-**Always keep minimal:**
-- ✅ Name, tagline with de✨light✨ful branding
-- ✅ Link to website documentation
-- ✅ Key features (bullet list)
-- ✅ Installation command
-
-**Standard structure:**
-```markdown
-# @lumenize/package-name
-
-A de✨light✨ful [one-line description].
-
-For complete documentation, visit **[https://lumenize.com/docs/package-name](https://lumenize.com/docs/package-name)**
-
-## Features
-
-- **Feature 1**: Brief description
-- **Feature 2**: Brief description
-
-## Installation
-
-\`\`\`bash
-npm install @lumenize/package-name
-\`\`\`
-```
-
-## Documentation Tooling
-
-### `check-examples` - Code Example Validation Plugin
-
-- Scans hand-written `.mdx` files for code blocks with `@check-example` annotations
-- Each annotation includes a path to a passing test file
-- Fails the build if documentation code doesn't match test code
-- Supports `// ...` wildcards in code blocks to skip boilerplate
-
-### Deprecated tooling
-
-- **`doc-testing`** — Generated `.mdx` from test files with embedded markdown. Do not use for new work. Some older packages still have generated files marked with `generated_by: doc-testing` frontmatter — do not hand-edit those.
-- **TypeDoc** — Auto-generated API reference from JSDoc. Do not use for new work. Replaced by hand-written API reference pages.
-
-### Running Validation
-
-```bash
-# Fast validation (recommended during development)
-cd website && npm run check-examples
-
-# Full website build (slower, full validation)
-cd website && npm run build
-```
-
-## Code Example Validation
-
-### `@check-example` Annotations
-
-**Always:**
-```typescript
-\`\`\`typescript @check-example('packages/rpc/test/for-docs/basic-usage.test.ts')
-const client = await createRpcClient(stub);
-const result = await client.echo('Hello');
-expect(result).toBe('DO echoed: Hello');
-\`\`\`
-```
-
-**Rules:**
-- ✅ Every code example must be validated against a passing test
-- ✅ Use `// ...` or `/* ... */` to skip boilerplate
-- ✅ Import statements are automatically skipped
-
-**Never:**
-```typescript
-\`\`\`typescript @skip-check
-// Only for non-executable examples like bash commands
-npm install @lumenize/package
-\`\`\`
-```
-
-## Documentation Workflow
-
-For the complete 4-phase documentation process, use the command:
-- **Command:** `/documentation-workflow`
-
-**Quick reference:**
-1. **Phase 1**: Narrative & Pedagogy First (use `@skip-check` temporarily)
-2. **Phase 2**: Make Examples Real (create `test/for-docs/` tests)
-3. **Phase 3**: Fast Validation Loop (`npm run check-examples`)
-4. **Phase 4**: Full Build & Polish (`npm run build`)
-
-## API Reference Pages
-
-For packages with public APIs, write a hand-written API reference page. Include:
-- **Summary table** at the top with links to detailed sections
-- **Environment variables table** if applicable
-- **Function signatures** with options and defaults
-- **Detailed sections** for each endpoint/function with request/response examples
-
-Keep JSDoc in source code focused: parameter descriptions, return types, brief explanation, and `@see` links to the hand-written docs.
-
-## Reference
-
-- **check-examples tool**: `/tooling/check-examples/`
-- **Docusaurus config**: `/website/docusaurus.config.ts`
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [lumenize/lumenize](https://github.com/lumenize/lumenize) — distributed by [TomeVault](https://tomevault.io).
