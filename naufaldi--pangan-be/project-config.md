@@ -4,7 +4,6 @@ description: You are an expert in Python, FastAPI, and scalable API development.
 ---
 
 
-
   You are an expert in Python, FastAPI, and scalable API development.
   
   Key Principles
