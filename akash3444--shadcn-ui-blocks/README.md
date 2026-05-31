@@ -7,14 +7,14 @@ Customized Shadcn UI component and blocks. Just copy & Paste!
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `.cursor/rules/*.mdc` in [akash3444/shadcn-ui-blocks](https://github.com/akash3444/shadcn-ui-blocks).
+Original source: `GEMINI.md` in [akash3444/shadcn-ui-blocks](https://github.com/akash3444/shadcn-ui-blocks).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
-- **Gemini CLI** — `GEMINI.md`
+- **Cursor** — `project-config.mdc`
 - **Windsurf** — `project-config.md`
 
 Quality verified by TomeVault's automated analysis pipeline. Source: [github.com/akash3444/shadcn-ui-blocks](https://github.com/akash3444/shadcn-ui-blocks)
