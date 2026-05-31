@@ -7,11 +7,11 @@ Cosenseのページを読み・調べ・編集する為のCLIとAgent Skillの�
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [helpfeel/cosense-cli](https://github.com/helpfeel/cosense-cli).
+Original source: `AGENTS.md` in [helpfeel/cosense-cli](https://github.com/helpfeel/cosense-cli).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
