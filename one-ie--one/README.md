@@ -7,11 +7,11 @@ Make Your Ideas Real. Build Apps, Websites and AI Agents with Plain English with
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [one-ie/one](https://github.com/one-ie/one).
+Original source: `CLAUDE.md` in [one-ie/one](https://github.com/one-ie/one).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
