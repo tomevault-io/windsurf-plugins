@@ -1,74 +1,78 @@
 ---
 trigger: always_on
-description: Based on https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices.md
+description: Use this file as the source of truth when creating or editing prompts.
 ---
 
+# Copyfy Prompt Engineering Rules
 
-Based on https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices.md
+Use this file as the source of truth when creating or editing prompts.
 
-# Prompting best practices
+## 1) Canonical References
 
-Comprehensive guide to prompt engineering techniques for Claude's latest models, covering clarity, examples, XML structuring, thinking, and agentic systems.
+MUST:
+- Treat `src/lib/services/ai-gateway/prompts` as the canonical reference for prompt structure, naming, and composition style.
+- Keep prompts in dedicated prompt files instead of burying long prompt strings inside orchestration code.
+- Follow the existing prompt-folder pattern: typed input, small reusable helpers/constants, and `buildXPrompt()` functions.
 
----
+## 2) Prompt Construction Rules
 
-This is the single reference for prompt engineering with Claude's latest models, including Claude Opus 4.7, Claude Opus 4.6, Claude Sonnet 4.6, and Claude Haiku 4.5. It covers foundational techniques, output control, tool use, thinking, and agentic systems. Jump to the section that matches your situation.
+MUST:
+- Start with a precise role and a single objective.
+- Prefer simple, positive instructions over long lists of constraints.
+- Be explicit about the expected output, success criteria, scope, and allowed evidence.
+- Use variables and typed inputs for dynamic values instead of hardcoding request-specific content.
+- Keep prompts concise, direct, and easy to scan.
 
-<Tip>
-  For an overview of model capabilities, see the [models overview](/docs/en/about-claude/models/overview). For details on what's new in Claude Opus 4.7, see [What's new in Claude Opus 4.7](/docs/en/about-claude/models/whats-new-claude-4-7). For migration guidance, see the [Migration guide](/docs/en/about-claude/models/migration-guide).
-</Tip>
+SHOULD:
+- Add examples, schemas, or canonical labels when output shape matters.
+- Reuse shared helpers such as `joinSections`, `toJsonBlock`, `toTextBlock`, or shared output rules when the prompt family repeats the same structure.
 
-## Prompting Claude Opus 4.7
+## 3) Preferred Section Order
 
-Claude Opus 4.7 is our most capable generally available model, with particular strengths in long-horizon agentic work, knowledge work, vision, and memory tasks. It performs well out of the box on existing Claude Opus 4.6 prompts. The patterns below cover the behaviors that most often require tuning.
+Mirror the sectioned style already used in `src/lib/services/ai-gateway/prompts` whenever it fits the task:
+- `ROLE`
+- `OBJECTIVE`
+- `CONTEXT` or source guidance
+- `DECISION RULES` or `ANALYSIS RULES`
+- `OUTPUT CONTRACT`
+- `OUTPUT RULES`
+- `INPUTS`
 
-<Note>
-For API parameter changes when migrating from Claude Opus 4.6 (effort levels, task budgets, thinking configuration, sampling-parameter removal, and tokenization), see the [migration guide](/docs/en/about-claude/models/migration-guide#migrating-to-claude-opus-4-7).
-</Note>
+Example pattern:
+- `ROLE:`
+- `OBJECTIVE:`
+- `OUTPUT CONTRACT: Return exactly this JSON shape`
+- `OUTPUT RULES: Return ONLY valid JSON`
+- `INPUTS:`
 
-### Response length and verbosity
+## 4) Technique Selection
 
-Claude Opus 4.7 calibrates response length to how complex it judges the task to be, rather than defaulting to a fixed verbosity. This usually means shorter answers on simple lookups and much longer ones on open-ended analysis.
+MUST:
+- Use role, system, and contextual prompting by default.
+- Use few-shot examples when the model needs help matching a structure, format, edge case, or classification pattern.
+- Mix class order in few-shot classification examples instead of repeating the same class sequence.
+- Use step-back, Chain of Thought, self-consistency, or ReAct only when the task genuinely needs deeper reasoning or tool use.
 
-If your product depends on a certain style or verbosity of output, you may need to tune your prompts. As an example, to decrease verbosity, you might add:
+SHOULD:
+- Start with zero-shot or a strict schema first, then add few-shot examples only if reliability is still weak.
+- Keep reasoning internal unless the product requirement explicitly needs visible reasoning steps.
 
-```text
-Provide concise, focused responses. Skip non-essential context, and keep examples minimal.
-```
+## 5) Output and Reliability Rules
 
-If you see specific examples of kinds of verbosity (i.e. over-explaining), you can add additional instructions in your prompt to prevent them. Positive examples showing how Claude can communicate with the appropriate level of concision tend to be more effective than negative examples or instructions that tell the model what not to do.
+MUST:
+- For structured tasks, define the exact output contract and say whether empty or missing evidence should return `null`, `[]`, or an empty string.
+- For extraction, classification, or analysis tasks, prefer structured outputs such as JSON.
+- For evidence-based tasks, instruct the model to stay conservative, separate observation from inference, and never invent unsupported claims.
+- If the prompt depends on formatting compliance, explicitly forbid markdown fences and extra commentary.
 
-### Calibrating effort and thinking depth
+## 6) Model Configuration and Iteration
 
-The [effort parameter](/docs/en/build-with-claude/effort) allows you to tune Claude's intelligence vs. token spend, trading off capability for faster speed and lower costs. Start with the new `xhigh` effort level for coding and agentic use cases, and use a minimum of `high` effort for most intelligence-sensitive use cases. Experiment with other effort levels to further tune token usage and intelligence:
-
-- **`max`:** Max effort can deliver performance gains in some use cases, but may show diminishing returns from increased token usage. This setting can also sometimes be prone to overthinking. We recommend testing max effort for intelligence-demanding tasks.
-- **`xhigh` (new):** Extra high effort is the best setting for most coding and agentic use cases.
-- **`high`:** This setting balances token usage and intelligence. For most intelligence-sensitive use cases, we recommend a minimum of `high` effort.
-- **`medium`:** Good for cost-sensitive use cases that need to reduce token usage while trading off intelligence.
-- **`low`:** Reserve for short, scoped tasks and latency-sensitive workloads that are not intelligence-sensitive.
-
-Meaningfully changing from Claude Opus 4.6, Claude Opus 4.7 respects effort levels strictly, especially at the low end. At `low` and `medium`, the model scopes its work to what was asked rather than going above and beyond. This is good for latency and cost, but on moderately complex tasks running at `low` effort there is some risk of under-thinking.
-
-If you observe shallow reasoning on complex problems, raise effort to `high` or `xhigh` rather than prompting around it. If you need to keep effort at `low` for latency, add targeted guidance:
-
-```text
-This task involves multi-step reasoning. Think carefully through the problem before responding.
-```
-
-We expect effort to be more important for this model than for any prior Opus, and recommend experimenting with it actively when you upgrade.
-
-The triggering behavior for adaptive thinking is steerable. If you find the model thinking more often than you'd like — which can happen with large or complex system prompts — add guidance to steer it. As always, measure the effect of any prompting changes on performance. Example:
-
-```text
-Thinking adds latency and should only be used when it will meaningfully improve answer quality — typically for problems that require multi-step reasoning. When in doubt, respond directly.
-```
-
-Conversely, if you're running hard workloads at `medium` and seeing under-thinking, the first lever is to raise effort. If you need finer control, prompt for it directly.
-
-<Note>
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+MUST:
+- Keep deterministic tasks like extraction, classification, ranking, and validation biased toward low-temperature behavior.
+- If Chain of Thought is intentionally used for a single correct answer, prefer temperature `0`.
+- Control output length both through model settings and explicit prompt instructions when brevity matters.
+- Re-test prompts when model versions, sampling settings, or upstream context change.
+- Document important prompt attempts, assumptions, and settings outside the prompt when behavior is being tuned over time.
 
 ---
 > Source: [kevinrss01/framedeck](https://github.com/kevinrss01/framedeck) — distributed by [TomeVault](https://tomevault.io).
