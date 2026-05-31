@@ -1,93 +1,188 @@
 ---
 trigger: always_on
-description: - Use `_` prefix for all private variables, constants, functions, methods, properties, etc. that don't need to be accessible from outside the module
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-# Code Style
-- Use `_` prefix for all private variables, constants, functions, methods, properties, etc. that don't need to be accessible from outside the module
-- Mark everything as private that does not absolutely need to be accessible from outside the module
-- Use `@override` (imported from `typing_extensions`) decorator for all methods that override a parent class method
-- Use type hints for all variables, functions, methods, properties, return values, parameters etc.
-- Omit `Any` within type hints unless absolutely necessary
-- Use built-in types (e.g., `list`, `dict`, `tuple`, `set`, `str | None`) instead of types from `typing` module (e.g. `List`, `Dict`, `Tuple`, `Set`, `Optional`, `Union`) wherever possible
-- Instead of `Optional` use `| None`
-- Create a `__init__.py` file in each folder
-- Never pass literals, e.g., `error_msg`, directly to `Exceptions`, but instead assign them to variables and pass them to the exception, e.g., `raise FileNotFoundError(error_msg)` instead of `raise FileNotFoundError(f"Thread {thread_id} not found")`
-- Always specify `encoding="utf-8"` for all file read and write operations (e.g., `Path.read_text()`, `Path.write_text()`, `open()`, etc.) to ensure proper handling of Unicode characters across all platforms
+# CLAUDE.md
 
-## FastAPI
-- Instead of defining `response_model` within route annotation, use the model as the response type in the function signature
-- Do not assign `None` to dependencies but instead move it before arguments with default values
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-# Testing
-- Use `pytest-mock` for mocking in tests wherever you need to mock something and pytest-mock can do the job.
+## Project Overview
 
-# Git
-- Never use `git add .` - always explicitly add files that are related to the task using `git add <file1> <file2> ...`
-- Use conventional commits format for commit messages (e.g., `feat:`, `fix:`, `docs:`, `style:`, `refactor:`, `test:`, `chore:`)
-- Always run linting/pdm commands before committing to ensure code quality. The following commands must pass:
-  - `pdm run format` - code formatting with ruff (must pass)
-  - `pdm run lint` - linting with ruff (must pass, or use `pdm run lint:fix` to auto-fix issues)
-  - `pdm run typecheck:all` - type checking with mypy (may have pre-existing errors from venv/optional dependencies, but should not introduce new errors)
-  - Alternatively, use `pdm run qa:fix` which runs `typecheck:all`, `format`, and `lint:fix`
+**AskUI Vision Agent** is a Python desktop and mobile automation framework that enables AI agents to control computers (Windows, macOS, Linux), mobile devices (Android, iOS), and HMI systems. It supports both programmatic UI automation (RPA-like single-step commands) and agentic intent-based instructions using vision/computer vision models.
 
-# Documentation
+**Tech Stack:** Python 3.10+, Pydantic 2, Anthropic SDK, OpenTelemetry, Model Context Protocol (MCP), PDM
 
-## Docstrings
-- All public functions, constants, classes, types etc. should have docstrings
-- Document the constructor (`__init__`) args as part of the class docstring
-- Omit the `__init__` docstring
-- All function parameter should be documented with their type (followed by `, optional` if there is a default value) in parenthesis and description
-- In descriptions, use backticks for all code references (variables, types, etc.), including types, e.g., `str`
-- When referencing a function, use the function name in backticks plus parentheses, e.g., `click()`
-- When referencing a class, use the class name in backticks, e.g., `VisionAgent`
-- When referencing a method, use the class name in backticks plus the method name in parentheses, e.g., `VisionAgent.click()`
-- When referencing a class attribute, use the class name in backticks plus the attribute name, e.g., `VisionAgent.display`
-- Use `Example` section for code examples
-- Use `Returns` section for return values
-- Use `Raises` section for exceptions listing all possible exceptions that can be raised by the function
-- Use `Notes` section for additional notes
-- Use `See Also` section for related functions
-- Use `References` section for references
-- Use `Examples` section for code examples
-- Example of a good docstring:
-  ```python
-  def locate(
-      self,
-      locator: str | Locator,
-      screenshot: InputSource | None = None,
-      model: ModelComposition | str | None = None,
-  ) -> Point:
-      """
-      Find the position of the UI element identified by the `locator` using the `model`.
+## Common Commands
 
-      Args:
-          locator (str | Locator): The identifier or description of the element to locate.
-          screenshot (InputSource | None, optional): The screenshot to use for locating the
-              element. Can be a path to an image file, a PIL Image object or a data URL.
-              If `None`, takes a screenshot of the currently selected screen.
-          model (ModelComposition | str | None, optional): The composition or name of
-              the model(s) to be used for locating the element using the `locator`.
+### Development Setup
+```bash
+# Install dependencies
+pdm install
+```
 
-      Returns:
-          Point: The coordinates of a point on the element, usually the center of the element, as a tuple (x, y).
+### Testing
+```bash
+# Run all tests (parallel execution)
+pdm run test
 
-      Raises:
-          ValueError: If the arguments are not of the correct type.
-          ElementNotFoundError: If no element can be found.
+# Run specific test suites
+pdm run test:unit          # Unit tests only
+pdm run test:integration   # Integration tests only
+pdm run test:e2e          # End-to-end tests only
 
-      Example:
-          ```python
-          from askui import VisionAgent
+# Run tests with coverage
+pdm run test:cov          # All tests with coverage report
+pdm run test:cov:view     # View coverage report in browser
+```
 
-          with VisionAgent() as agent:
-              point = agent.locate("Submit button")
-              print(f"Element found at coordinates: {point}")
-          ```
-      """
-      ...
-  ```
+### Code Quality
+```bash
+# Quick QA: type check, format, and fix linting issues (run before commits)
+pdm run qa:fix
+
+# Individual commands
+pdm run typecheck:all     # Type checking with mypy
+pdm run format            # Format code with ruff
+pdm run lint              # Lint code with ruff
+pdm run lint:fix          # Auto-fix linting issues
+```
+
+### Code Generation
+```bash
+# Regenerate gRPC client code from .proto files
+pdm run grpc:gen
+
+# Regenerate Pydantic models from JSON schemas
+pdm run json:gen
+```
+
+## High-Level Architecture
+
+### Core SDK Architecture
+
+```
+ComputerAgent (Main SDK Entry Point)
+    ↓
+Agent (Abstract base class for all agents)
+    ├── ComputerAgent (Desktop automation)
+    ├── AndroidAgent (Mobile Android automation)
+    ├── WebVisionAgent (Web-specific automation)
+    └── WebTestingAgent (Web testing framework)
+
+    Uses:
+    ├── ModelRouter → Model selection/composition
+    ├── AgentToolbox → Tool & OS abstraction
+    └── Locators → UI element identification
+```
+
+**Key Flow:**
+1. User calls `agent.click("Submit button")` on `ComputerAgent`
+2. `AgentBase.locate()` routes to appropriate model via `ModelRouter`
+3. Model receives screenshot + locator → returns coordinates
+4. `AgentToolbox.os.click()` → gRPC call to Agent OS
+5. Agent OS performs actual mouse click
+
+### Chat API Architecture
+
+```
+FastAPI Chat API (Experimental)
+    ├── Assistants (AI agent configurations)
+    ├── Threads (Conversation sessions)
+    ├── Messages (Chat history)
+    ├── Runs (Agent execution iterations)
+    ├── Files (Attachments & resources)
+    ├── MCP Configs (Tool providers)
+    └── Workflows & Scheduled Jobs (Automation triggers)
+```
+
+**Key Flow:**
+1. User → Chat UI (hub.askui.com) → Chat API (FastAPI)
+2. Thread/Messages stored in SQLAlchemy database
+3. Runs execute agent steps in a loop
+4. Agent uses ModelRouter → Tools (MCP servers or direct) → AgentOS
+
+### Model Router & Composition
+
+The `ModelRouter` provides a flexible abstraction for AI model selection:
+
+```python
+# Single model for all tasks
+model = "askui"
+
+# Task-specific models (ActModel, GetModel, LocateModel)
+model = {
+    "act": "claude-sonnet-4-20250514",
+    "get": "askui",
+    "locate": "askui-combo"
+}
+
+# Custom registry
+models = ModelRegistry()
+models.register("my-model", custom_model_instance)
+```
+
+**Supported Model Providers:**
+- **AskUI Models** (Primary - internally hosted)
+- **Anthropic Claude** (Computer Use, Messages API)
+- **Google Gemini** (via OpenRouter)
+- **Hugging Face Spaces** (Community models)
+
+### Agent OS Abstraction
+
+`AgentOs` provides an abstraction layer for OS-level operations:
+
+```
+AgentOs (Abstract Interface)
+    ├── AskUiControllerClient (gRPC to AskUI Agent OS - primary)
+    ├── PlaywrightAgentOs (Web browser automation)
+    └── AndroidAgentOs (Android ADB)
+```
+
+### Locator System
+
+Locators identify UI elements in multiple ways:
+
+- **Text**: Match by text content (exact/similar/contains/regex)
+- **Image**: Match by image file or base64
+- **Prompt**: Natural language description
+- **Coordinate**: Absolute (x, y) position
+- **Relatable**: Positional relationships (right_of, below, etc.)
+
+Serialization differs by model type (VLM vs. traditional).
+
+### Tool System (MCP)
+
+Tools follow the Model Context Protocol (MCP) for extensibility:
+
+```
+Tools (MCP Servers)
+    ├── Computer: screenshot, click, type, mouse, clipboard
+    ├── Android: device control via ADB
+    ├── Testing: scenario & feature management
+    └── Utility: file ops, data extraction
+```
+
+Tools are auto-discovered and can be dynamically loaded via MCP configurations.
+
+## Key Code Locations
+
+### Core SDK
+- `src/askui/agent.py` - Main `ComputerAgent` class (user-facing API)
+- `src/askui/agent_base.py` - Abstract `Agent` (base) with shared agent logic
+- `src/askui/android_agent.py` - Android-specific agent
+- `src/askui/web_agent.py` - Web-specific agent
+
+### Models & AI
+- `src/askui/models/` - AI model providers & router factory
+- `src/askui/models/shared/` - Shared abstractions (`Agent`, `Tool`, `MessagesApi`)
+- `src/askui/models/{provider}/` - Provider implementations
+- `src/askui/prompts/` - System prompts for different models
+
+### Tools & OS
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/askui) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-09 -->
+> Source: [askui/python-sdk](https://github.com/askui/python-sdk) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-31 -->
