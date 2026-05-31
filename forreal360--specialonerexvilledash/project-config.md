@@ -1,6 +1,6 @@
 ---
 trigger: always_on
-description: Guía de desarrollo para el proyecto Hyundai Special One Rexville Dashboard
+description: - Laravel 12.x con PHP 8.2+
 ---
 
 
@@ -78,43 +78,73 @@ return $this->validationErrorResult(
 - Inyectan Actions y Services via dependency injection
 - Manejan estados de formulario y validación en tiempo real
 
-## Comandos Artisan Personalizados
+## Componentes Reutilizables
 
-### Crear un módulo completo:
-```bash
-php artisan make:module NombreModulo
-```
-Genera: Modelo, Migración, Service, Actions CRUD, Controlador, Seeder
+### 1. Componentes de Formularios (`resources/views/components/forms/`)
 
-### Crear Action individual:
-```bash
-php artisan make:action ModuleName/ActionName
-php artisan make:action Admin/CreateAdmin  # Con subdirectorio
-```
-
-### Crear Service:
-```bash
-php artisan make:service ServiceName ModelName
-```
-
-## Patrones de UI con Flux
-
-### 1. Layouts
-- **Auth**: `v1.layouts.auth.main` - Para login/registro
-- **Panel**: `v1.layouts.panel.main` - Para área administrativa
-
-### 2. Componentes Reutilizables
-
-**Formularios:**
+#### `<x-forms.form-field>`
+Wrapper estándar para todos los campos de formulario:
 ```blade
-<x-forms.form-field label="Nombre*" for="name">
-    <flux:input wire:model="name" placeholder="Ingrese nombre" />
+<x-forms.form-field label="{{ __('panel.name') }}*" for="name" :error="$errors->first('name')">
+    <flux:input
+        id="name"
+        wire:model="name"
+        placeholder="Nombre"
+        error="{{ $errors->first('name') }}"
+    />
 </x-forms.form-field>
 ```
 
-**Tablas con filtros:**
+#### `<x-forms.flatpickr-date>`
+Componente de selección de fecha con Flatpickr:
 ```blade
-<x-table.table :data="$items" searchPlaceholder="Buscar...">
+<x-forms.form-field label="{{ __('panel.start_date') }}*" for="start_date" :error="$errors->first('start_date')">
+    <x-forms.flatpickr-date
+        name="start_date"
+        wire:model="start_date"
+        dateFormat="m/d/Y"
+        placeholder="{{ __('panel.start_date') }}"
+        minDate="today"
+        error="{{ $errors->first('start_date') }}"
+        required
+    />
+</x-forms.form-field>
+```
+
+**Propiedades disponibles:**
+- `dateFormat`: Formato de fecha (por defecto 'd/m/Y')
+- `placeholder`: Texto placeholder
+- `minDate/maxDate`: Fechas límite
+- `locale`: Idioma ('es' por defecto)
+- `required`: Si es obligatorio
+- `size`: Tamaño ('xs', 'sm', 'md', 'lg', 'xl')
+
+#### `<x-forms.file-upload>`
+Componente de subida de archivos con drag & drop:
+```blade
+<x-forms.form-field label="{{ __('panel.image') }}*" for="file" :error="$errors->first('file')">
+    <x-forms.file-upload
+        name="file"
+        wireModel="file"
+        accept="image/*"
+        :error="$errors->first('file')"
+        required
+    />
+</x-forms.form-field>
+```
+
+### 2. Componentes de Tabla (`resources/views/components/table/`)
+
+#### `<x-table.table>`
+Componente principal de tabla con paginación, búsqueda y filtros:
+```blade
+<x-table.table
+    :data="$items"
+    :perPageOptions="$perPageOptions"
+    :currentPerPage="$perPage"
+    :search="$search"
+    searchPlaceholder="{{ __('panel.search_placeholder') }}"
+>
     <x-slot name="filters">
         <!-- Filtros aquí -->
     </x-slot>
@@ -127,104 +157,38 @@ php artisan make:service ServiceName ModelName
 </x-table.table>
 ```
 
-**Contenedores:**
+#### Filtros de Tabla
+Los filtros van dentro del slot `filters` usando `<flux:field>`:
 ```blade
-<x-containers.card-container>
-    <!-- Contenido aquí -->
-</x-containers.card-container>
-```
+<x-slot name="filters">
+    <!-- Filtro de estado -->
+    <flux:field class="w-full">
+        <flux:label>{{ __('panel.status') }}</flux:label>
+        <flux:select wire:model.live="status" size="sm" placeholder="{{ __('panel.all_statuses') }}">
+            <flux:select.option value="active">{{ __('panel.active') }}</flux:select.option>
+            <flux:select.option value="inactive">{{ __('panel.inactive') }}</flux:select.option>
+        </flux:select>
+    </flux:field>
 
-### 3. Navegación y Breadcrumbs
+    <!-- Filtro de fecha desde -->
+    <x-forms.flatpickr-date
+        name="filter_start_date"
+        wire:model.live="filter_start_date"
+        size="sm"
+        label="{{ __('panel.filter_start_date') }}"
+        dateFormat="m/d/Y"
+        placeholder="{{ __('panel.filter_start_date') }}"
+        locale="{{ app()->getLocale() }}"
+    />
 
-```blade
-@section('breadcrumbs')
-<flux:breadcrumbs.item href="{{route('v1.panel.home')}}" separator="slash">
-    {{ __('panel.breadcrumb_home') }}
-</flux:breadcrumbs.item>
-<flux:breadcrumbs.item separator="slash">
-    {{ __('panel.breadcrumb_current') }}
-</flux:breadcrumbs.item>
-@endsection
-```
-
-## Sistema de Traducciones
-
-### Organización:
-- `lang/es/` - Español
-- `lang/en/` - Inglés
-
-### Archivos principales:
-- `panel.php` - Textos del panel administrativo
-- `auth.php` - Textos de autenticación
-- `validation.php` - Mensajes de validación
-
-### Uso:
-```blade
-{{ __('panel.create_admin') }}
-{{ __('panel.admin_created_successfully') }}
-```
-
-## Rutas y Controladores
-
-### Estructura de rutas (`routes/web.php`):
-```php
-// Rutas públicas
-Route::get('/login', LoginComponent::class)->name('login');
-
-// Rutas protegidas
-Route::group([
-    "prefix" => "v1/panel",
-    "middleware" => "auth:admin",
-    "as" => "v1.panel."
-], function () {
-    Route::get('/home', HomeComponent::class)->name("home");
-    Route::get('/admins', GetAdminsComponent::class)->name("admins.index");
-    // ...
-});
-```
-
-## Mejores Prácticas de Desarrollo
-
-### 1. Crear un nuevo módulo:
-
-1. **Ejecutar comando de módulo:**
-```bash
-php artisan make:module Cliente
-```
-
-2. **Configurar el Service** en `app/Services/V1/ClienteService.php`:
-```php
-$this->searchableFields = ['name', 'email', 'phone'];
-$this->per_page = 10;
-```
-
-3. **Implementar Actions** en `app/Actions/V1/Cliente/`:
-- `CreateClienteAction.php`
-- `UpdateClienteAction.php`
-- `GetClienteAction.php`
-- etc.
-
-4. **Crear componentes Livewire:**
-```bash
-php artisan make:livewire V1/Panel/Cliente/GetClientesComponent
-php artisan make:livewire V1/Panel/Cliente/CreateClienteComponent
-```
-
-5. **Crear vistas** en `resources/views/v1/panel/cliente/`
-
-6. **Agregar traducciones** en `lang/es/panel.php` y `lang/en/panel.php`
-
-7. **Agregar rutas** en `routes/web.php`
-
-### 2. Patrón de Action:
-
-```php
-class CreateClienteAction extends Action
-{
-    public function __construct(
-        private ClienteService $clienteService
-    ) {}
-
+    <!-- Filtro de fecha hasta -->
+    <x-forms.flatpickr-date
+        name="filter_end_date"
+        wire:model.live="filter_end_date"
+        size="sm"
+        label="{{ __('panel.filter_end_date') }}"
+        dateFormat="m/d/Y"
+        placeholder="{{ __('panel.filter_end_date') }}"
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
