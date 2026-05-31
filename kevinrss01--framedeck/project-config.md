@@ -1,78 +1,72 @@
 ---
 trigger: always_on
-description: Based on https://developers.openai.com/api/docs/guides/prompt-guidance
+description: Based on https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices.md
 ---
 
 
-Based on https://developers.openai.com/api/docs/guides/prompt-guidance
+Based on https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices.md
 
-# GPT-5.5 prompting guide
+# Prompting best practices
 
-Prompt GPT-5.5 with outcome-first goals, concise style controls, retrieval budgets, and validation loops.
+Comprehensive guide to prompt engineering techniques for Claude's latest models, covering clarity, examples, XML structuring, thinking, and agentic systems.
 
-## New in GPT-5.5 vs GPT-5.4
-- Shorter, outcome-first prompts usually work better than process-heavy prompt stacks.
-- More efficient reasoning means `low` and `medium` effort should be re-evaluated before escalating.
-- Preambles, `phase` handling, and assistant-item replay remain important for tool-heavy Responses workflows.
-- Explicit personality, retrieval budgets, and validation rules help shape customer-facing and agentic UX.
+---
 
-GPT-5.5 works best when prompts define the outcome and leave room for the model to choose an efficient solution path. Compared with earlier models, you can often use shorter, more outcome-oriented prompts: describe what good looks like, what constraints matter, what evidence is available, and what the final answer should contain.
+This is the single reference for prompt engineering with Claude's latest models, including Claude Opus 4.7, Claude Opus 4.6, Claude Sonnet 4.6, and Claude Haiku 4.5. It covers foundational techniques, output control, tool use, thinking, and agentic systems. Jump to the section that matches your situation.
 
-Avoid carrying over every instruction from an older prompt stack. Legacy prompts often over-specify the process because earlier models needed more help staying on track. With GPT-5.5, that can add noise, narrow the model's search space, or lead to overly mechanical answers.
+<Tip>
+  For an overview of model capabilities, see the [models overview](/docs/en/about-claude/models/overview). For details on what's new in Claude Opus 4.7, see [What's new in Claude Opus 4.7](/docs/en/about-claude/models/whats-new-claude-4-7). For migration guidance, see the [Migration guide](/docs/en/about-claude/models/migration-guide).
+</Tip>
 
-For more detail on GPT-5.5 behavior changes, start with the [Using GPT-5.5 guide](https://developers.openai.com/api/docs/guides/latest-model). This guide focuses on prompt changes that follow from those behavior changes.
+## Prompting Claude Opus 4.7
 
-The patterns here are starting points. Adapt them to your product surface, tools, evals, and user experience goals.
+Claude Opus 4.7 is our most capable generally available model, with particular strengths in long-horizon agentic work, knowledge work, vision, and memory tasks. It performs well out of the box on existing Claude Opus 4.6 prompts. The patterns below cover the behaviors that most often require tuning.
 
-## Automated migration with Codex
+<Note>
+For API parameter changes when migrating from Claude Opus 4.6 (effort levels, task budgets, thinking configuration, sampling-parameter removal, and tokenization), see the [migration guide](/docs/en/about-claude/models/migration-guide#migrating-to-claude-opus-4-7).
+</Note>
 
-Codex can implement the changes from this guide with the [OpenAI Docs Skill](https://github.com/openai/skills/tree/main/skills/.curated/openai-docs).
+### Response length and verbosity
 
-```text
-$openai-docs migrate this project to gpt-5.5
-```
+Claude Opus 4.7 calibrates response length to how complex it judges the task to be, rather than defaulting to a fixed verbosity. This usually means shorter answers on simple lookups and much longer ones on open-ended analysis.
 
-To use this skill in other coding agents, download it from the [OpenAI skills repository](https://github.com/openai/skills/tree/main/skills/.curated/openai-docs).
-
-## Personality and behavior
-
-GPT-5.5's default style is efficient, direct, and task-oriented. This is useful for production systems: responses stay focused, behavior is easier to steer, and the model avoids unnecessary conversational padding.
-
-For customer-facing assistants, support workflows, coaching experiences, and other conversational products, define both personality and collaboration style.
-
-- **Personality** controls how the assistant sounds: tone, warmth, directness, formality, humor, empathy, and level of polish.
-- **Collaboration style** controls how the assistant works: when it asks questions, when it makes assumptions, how proactive it should be, how much context it gives, when it checks work, and how it handles uncertainty or risk.
-
-Keep both short. Personality instructions should shape the user experience. Collaboration instructions should shape task behavior. Neither should replace clear goals, success criteria, tool rules, or stopping conditions.
-
-Example personality block for a steady task-focused assistant:
+If your product depends on a certain style or verbosity of output, you may need to tune your prompts. As an example, to decrease verbosity, you might add:
 
 ```text
-# Personality
-You are a capable collaborator: approachable, steady, and direct. Assume the user is competent and acting in good faith, and respond with patience, respect, and practical helpfulness.
-
-Prefer making progress over stopping for clarification when the request is already clear enough to attempt. Use context and reasonable assumptions to move forward. Ask for clarification only when the missing information would materially change the answer or create meaningful risk, and keep any question narrow.
-
-Stay concise without becoming curt. Give enough context for the user to understand and trust the answer, then stop. Use examples, comparisons, or simple analogies when they make the point easier to grasp. When correcting the user or disagreeing, be candid but constructive. When an error is pointed out, acknowledge it plainly and focus on fixing it.
-
-Match the user's tone within professional bounds. Avoid emojis and profanity by default, unless the user explicitly asks for that style or has clearly established it as appropriate for the conversation.
+Provide concise, focused responses. Skip non-essential context, and keep examples minimal.
 ```
 
-Example personality block for an expressive collaborative assistant:
+If you see specific examples of kinds of verbosity (i.e. over-explaining), you can add additional instructions in your prompt to prevent them. Positive examples showing how Claude can communicate with the appropriate level of concision tend to be more effective than negative examples or instructions that tell the model what not to do.
+
+### Calibrating effort and thinking depth
+
+The [effort parameter](/docs/en/build-with-claude/effort) allows you to tune Claude's intelligence vs. token spend, trading off capability for faster speed and lower costs. Start with the new `xhigh` effort level for coding and agentic use cases, and use a minimum of `high` effort for most intelligence-sensitive use cases. Experiment with other effort levels to further tune token usage and intelligence:
+
+- **`max`:** Max effort can deliver performance gains in some use cases, but may show diminishing returns from increased token usage. This setting can also sometimes be prone to overthinking. We recommend testing max effort for intelligence-demanding tasks.
+- **`xhigh` (new):** Extra high effort is the best setting for most coding and agentic use cases.
+- **`high`:** This setting balances token usage and intelligence. For most intelligence-sensitive use cases, we recommend a minimum of `high` effort.
+- **`medium`:** Good for cost-sensitive use cases that need to reduce token usage while trading off intelligence.
+- **`low`:** Reserve for short, scoped tasks and latency-sensitive workloads that are not intelligence-sensitive.
+
+Meaningfully changing from Claude Opus 4.6, Claude Opus 4.7 respects effort levels strictly, especially at the low end. At `low` and `medium`, the model scopes its work to what was asked rather than going above and beyond. This is good for latency and cost, but on moderately complex tasks running at `low` effort there is some risk of under-thinking.
+
+If you observe shallow reasoning on complex problems, raise effort to `high` or `xhigh` rather than prompting around it. If you need to keep effort at `low` for latency, add targeted guidance:
 
 ```text
-# Personality
-Adopt a vivid conversational presence: intelligent, curious, playful when appropriate, and attentive to the user's thinking. Ask good questions when the problem is blurry, then become decisive once there is enough context.
-
-Be warm, collaborative, and polished. Conversation should feel easy and alive, but not chatty for its own sake. Offer a real point of view rather than merely mirroring the user, while staying responsive to their goals and constraints.
-
-Be thoughtful and grounded when the task calls for synthesis or advice. State a clear recommendation when you have enough context, explain important tradeoffs, and name uncertainty without becoming evasive.
+This task involves multi-step reasoning. Think carefully through the problem before responding.
 ```
 
-For more expressive products, add warmth, curiosity, humor, or point of view explicitly, but keep the block short. Use personality to shape the experience, not to compensate for unclear goals or missing task instructions.
+We expect effort to be more important for this model than for any prior Opus, and recommend experimenting with it actively when you upgrade.
 
-## Improve time to first visible token with a preamble
+The triggering behavior for adaptive thinking is steerable. If you find the model thinking more often than you'd like — which can happen with large or complex system prompts — add guidance to steer it. As always, measure the effect of any prompting changes on performance. Example:
 
+```text
+Thinking adds latency and should only be used when it will meaningfully improve answer quality — typically for problems that require multi-step reasoning. When in doubt, respond directly.
+```
+
+Conversely, if you're running hard workloads at `medium` and seeing under-thinking, the first lever is to raise effort. If you need finer control, prompt for it directly.
+
+<Note>
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
