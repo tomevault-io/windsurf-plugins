@@ -1,0 +1,144 @@
+---
+trigger: always_on
+description: **ALWAYS follow these instructions first and only fallback to additional search and context gathering if the information here is incomplete or found to be in error.**
+---
+
+# Copilot instructions for this repository
+
+**ALWAYS follow these instructions first and only fallback to additional search and context gathering if the information here is incomplete or found to be in error.**
+
+* Review the `CONTRIBUTING.md` file for instructions to build and test the software.
+* Run the `.github/Prime-ForCopilot.ps1` script (once) before running any `dotnet` or `msbuild` commands.
+  If you see any build errors about not finding git objects or a shallow clone, it may be time to run this script again.
+
+## Working Effectively
+
+### Bootstrap and Build
+**CRITICAL**: Set the `NBGV_GitEngine` environment variable to `Disabled` before running ANY `dotnet` or `msbuild` commands.
+
+```bash
+export NBGV_GitEngine=Disabled
+```
+
+**Setup dependencies** (takes ~2-3 seconds):
+```bash
+./init.ps1 -UpgradePrerequisites -NoNuGetCredProvider
+```
+
+**Build the repository** (takes 7-76 seconds depending on cache - do not cancel unless it exceeds 10-15 minutes, set timeout to 10-15 minutes):
+```bash
+dotnet build tools/dirs.proj -t:build,pack --no-restore -c Release
+```
+
+### Testing
+**Run tests** (takes ~25 seconds - NEVER CANCEL, set timeout to 5-10 minutes):
+```bash
+dotnet test --no-build -c Release -- --filter-not-trait "TestCategory=FailsInCloudTest"
+```
+
+### Code Quality
+**Verify code formatting** (takes ~71 seconds - NEVER CANCEL, set timeout to 90+ minutes):
+```bash
+dotnet format --verify-no-changes --no-restore
+```
+
+**Build documentation** (takes ~19 seconds):
+```bash
+DocFx=true dotnet docfx docfx/docfx.json --warningsAsErrors --disableGitFeatures
+```
+
+**NEVER CANCEL**: Code formatting verification takes approximately 71 seconds. This is normal and expected.
+
+## Validation Scenarios
+**ALWAYS test functionality after making changes by running validation scenarios:**
+
+**Test AOT Native Console sample**:
+```bash
+cd test/AotNativeConsole
+dotnet run --no-build -c Release
+```
+Expected output: JSON data followed by tree structure with fruits and seeds, ending with "Success".
+
+**Test ASP.NET MVC integration**:
+```bash
+cd samples/AspNetMvc
+dotnet run --no-build -c Release
+```
+Should start web server without errors (web UI testing limited in this environment).
+
+## Repository Structure
+
+### Key Projects (src/)
+- `Nerdbank.MessagePack` - Main MessagePack serialization library
+- `Nerdbank.MessagePack.SignalR` - SignalR integration
+- `Nerdbank.MessagePack.AspNetCoreMvcFormatter` - ASP.NET Core MVC formatter
+- `Nerdbank.MessagePack.Analyzers` - Roslyn analyzers and code fixes
+
+### Test Projects (test/)
+- Each shipping project has a corresponding `.Tests` project
+- `AotNativeConsole` - NativeAOT compatibility validation
+- `Benchmarks` - Performance benchmarks
+
+### Samples (samples/)
+- `AspNetMvc` - ASP.NET Core MVC integration example
+- `SignalR` - SignalR integration example
+- `cs` and `fs` - C# and F# usage examples
+
+## Software Design
+
+* Design APIs to be highly testable, and all functionality should be tested.
+* Avoid introducing binary breaking changes in public APIs of projects under `src` unless their project files have `IsPackable` set to `false`.
+
+## Testing
+
+**IMPORTANT**: This repository uses Microsoft.Testing.Platform (MTP v2) with xunit v3. Traditional `--filter` syntax does NOT work. Use the options below instead.
+
+* There should generally be one test project (under the `test` directory) per shipping project (under the `src` directory). Test projects are named after the project being tested with a `.Tests` suffix.
+* Tests use xunit v3 with Microsoft.Testing.Platform (MTP v2). Traditional VSTest `--filter` syntax does NOT work.
+* Some tests are known to be unstable. When running tests, you should skip the unstable ones by using `-- --filter-not-trait "TestCategory=FailsInCloudTest"`.
+
+### Running Tests
+
+**Run all tests**:
+```bash
+dotnet test --no-build -c Release
+```
+
+**Run tests for a specific test project**:
+```bash
+dotnet test --project test/Nerdbank.MessagePack.Tests/Nerdbank.MessagePack.Tests.csproj --no-build -c Release
+```
+
+**Run a single test method**:
+```bash
+dotnet test --project test/Nerdbank.MessagePack.Tests/Nerdbank.MessagePack.Tests.csproj --no-build -c Release -- --filter-method ClassName.MethodName
+```
+
+**Run all tests in a test class**:
+```bash
+dotnet test --project test/Nerdbank.MessagePack.Tests/Nerdbank.MessagePack.Tests.csproj --no-build -c Release -- --filter-class ClassName
+```
+
+**Run tests with wildcard matching** (supports wildcards at beginning and/or end):
+```bash
+dotnet test --project test/Nerdbank.MessagePack.Tests/Nerdbank.MessagePack.Tests.csproj --no-build -c Release -- --filter-method "*Pattern*"
+```
+
+**Run tests with a specific trait** (equivalent to category filtering):
+```bash
+dotnet test --project test/Nerdbank.MessagePack.Tests/Nerdbank.MessagePack.Tests.csproj --no-build -c Release -- --filter-trait "TraitName=value"
+```
+
+**Exclude tests with a specific trait** (skip unstable tests):
+```bash
+dotnet test --project test/Nerdbank.MessagePack.Tests/Nerdbank.MessagePack.Tests.csproj --no-build -c Release -- --filter-not-trait "TestCategory=FailsInCloudTest"
+```
+
+**Run tests for a specific framework only**:
+```bash
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [AArnott/Nerdbank.MessagePack](https://github.com/AArnott/Nerdbank.MessagePack) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-05-31 -->
