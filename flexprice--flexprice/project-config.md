@@ -1,31 +1,136 @@
 ---
 trigger: always_on
-description: Repository architecture literacy — read docs before large edits and preserve layering
+description: This file provides guidance to WARP (warp.dev) when working with code in this repository.
 ---
 
+# AGENTS.md
 
-# FlexPrice architecture rule
+This file provides guidance to WARP (warp.dev) when working with code in this repository.
 
-Before substantive work (new features, refactors, integrations, Temporal changes, Kafka topics, migrations):
+## Quick Start Commands
 
-1. **Read orientation docs** under `docs/` in this order when scope is ambiguous:
-   - `docs/REPO_MAP.md` — census and boundaries  
-   - `docs/ARCHITECTURE.md` — principles and conventions  
-   - `docs/DEPENDENCY_GRAPH.md` — coupling and hotspots context  
-   - `docs/HOTSPOTS.md` — avoid enlarging risky areas blindly  
-   - `docs/FLOWS/*.md` — when touching authentication, metering, billing, invoices, subscriptions, webhooks, or retries  
+### Development Setup
 
-2. **Trace dependencies before editing** — follow constructor wiring from `cmd/server/main.go`, service interfaces in `internal/service`, and domain contracts in `internal/domain`. Prefer explicit injection over widening hidden globals.
+```bash
+# Complete development environment setup (Docker-based)
+make dev-setup
 
-3. **Preserve layering** — domain packages do not import repositories or HTTP layers. Handlers delegate to services. Do not bypass services for transactional rules.
+# Run application locally (requires infrastructure running)
+go run cmd/server/main.go
 
-4. **Minimize coupling and blast radius** — prefer localized diffs in the bounded context already owning the behavior. Avoid “drive-by” refactors unrelated to the ticket.
+# Start only infrastructure services
+docker compose up -d postgres kafka clickhouse temporal temporal-ui
+```
 
-5. **No silent architecture changes** — if you materially change pipelines (Kafka topics/groups), deployment modes, Temporal schedules, tenancy/RBAC semantics, or data stores, update the matching `docs/*` sections in the same change when practical.
+### Running the Application
 
-6. **Generated code discipline** — do not hand-edit Ent outputs under `repository/ent` or generated SDK trees; edit schema/spec + run documented `make` targets.
+The application supports multiple deployment modes via `FLEXPRICE_DEPLOYMENT_MODE` environment variable:
 
-7. **Graphify** — When `graphify-out/graph.json` exists, prefer `graphify query` / `path` / `explain` before undirected codebase search. After structural code changes, run `graphify update .` so the graph matches the tree (`docs/ARCHITECTURE.md` Graphify section).
+- `local` - Runs all services (API, Consumer, Worker) in a single process
+- `api` - Runs only the API server
+- `consumer` - Runs only the Kafka consumer for event processing
+- `temporal_worker` - Runs only Temporal workflow workers
+
+```bash
+# Run in local mode (default)
+make run-server
+
+# Using Docker Compose
+make up  # Start all services
+make down  # Stop all services
+make restart-flexprice  # Restart only FlexPrice services (not infrastructure)
+```
+
+### Testing
+
+```bash
+# Run all tests
+make test
+
+# Run tests with coverage
+make test-coverage
+
+# Run tests verbosely
+make test-verbose
+```
+
+### Database Operations
+
+```bash
+# Generate Ent code from schema
+make generate-ent
+
+# Run database migrations
+make migrate-ent
+
+# Dry-run migrations (see SQL without executing)
+make migrate-ent-dry-run
+
+# Generate migration file
+make generate-migration
+
+# Run PostgreSQL migrations only
+make migrate-postgres
+
+# Run ClickHouse migrations only
+make migrate-clickhouse
+```
+
+### API Documentation
+
+```bash
+# Generate Swagger documentation
+make swagger
+
+# Generates both Swagger 2.0 and OpenAPI 3.0 specs in docs/swagger/
+```
+
+### SDK Generation
+
+SDKs and the MCP server are generated from the OpenAPI spec. Output layout: **api/** (api/go, api/typescript, api/python, api/mcp).
+
+**Source:** [docs/swagger/swagger-3-0.json](docs/swagger/swagger-3-0.json) (regenerate with `make swagger`).
+
+**Commands:**
+
+```bash
+# Single command: validate + generate all SDKs/MCP + merge custom (uses existing docs/swagger/swagger-3-0.json)
+make sdk-all
+
+# When you change the API, regenerate the spec first, then run sdk-all
+make swagger
+make sdk-all
+
+# Validate OpenAPI
+make speakeasy-validate
+
+# Generate Go SDK (validate + generate + custom merge + build; uses existing swagger)
+make go-sdk
+
+# Quick regeneration (no clean)
+make regenerate-go-sdk
+
+# Generate all targets (after configuring workflow targets)
+make swagger speakeasy-generate
+make merge-custom
+
+# Merge custom files only (after any SDK generation run)
+make merge-custom
+```
+
+**Custom methods and files:** Custom logic lives in `api/custom/<lang>/` (same path structure as api/<lang>/). It is merged into the generated output after every generation via `make merge-custom`. Do not edit generated files under api/<lang>/ for custom code; edit the custom tree so changes survive regeneration. See [api/custom/README.md](api/custom/README.md). READMEs for each SDK and MCP are maintained in `api/custom/<lang>/README.md` and overwrite the generated README on merge; `api/go`, `api/python`, and `api/typescript` also list README in `.genignore` so a generate run without merge-custom does not overwrite the current README.
+
+**MCP server:** Generated in **api/mcp**. Run from that directory (e.g. `npx . start` or per generated README). Auth: set `FLEXPRICE_API_KEY` or the env var documented in the MCP server README. For large tool sets, use dynamic mode (e.g. `--mode dynamic`) to reduce context size; document in api/mcp README. Only operations whose OpenAPI tags are listed in the MCP allowed-tags configuration are included; the filtered spec is built by `make filter-mcp-spec` (runs automatically before `make sdk-all`). To change which tools are exposed, edit `.speakeasy/mcp/allowed-tags.yaml` and run `make filter-mcp-spec` then `make sdk-all`.
+
+**SDK integration tests:** In **api/tests/** – tests for published SDKs only. Repos: Go [go-sdk](https://github.com/flexprice/go-sdk), Python [python-sdk](https://github.com/flexprice/python-sdk), TypeScript [javascript-sdk](https://github.com/flexprice/javascript-sdk), MCP [mcp-server](https://github.com/flexprice/mcp-server). Published packages: `pip install flexprice`, `npm i @flexprice/sdk`, `npm i @flexprice/mcp-server`. Run `make test-sdk` or `make test-sdks`; see [api/tests/README.md](api/tests/README.md). Context: [SDK PR #1288](https://github.com/flexprice/flexprice/pull/1288).
+
+**Publishing:** Single workflow [.github/workflows/generate-sdks.yml](.github/workflows/generate-sdks.yml): on push to main (path-filtered) or workflow_dispatch it runs generate → push to GitHub repos → publish to npm/PyPI. Secrets: `SPEAKEASY_API_KEY`, `SDK_DEPLOY_GIT_TOKEN`, `NPM_TOKEN`, `PYPI_TOKEN`. See [api/README.md](api/README.md#publishing). To test the full pipeline (including artifact upload), run on GitHub; local `act` runs often fail at upload-artifact due to missing `ACTIONS_RUNTIME_TOKEN`.
+
+**Best practices checklist (per release):**
+
+| Area           | Practices                                                                                                              |
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [flexprice/flexprice](https://github.com/flexprice/flexprice) — distributed by [TomeVault](https://tomevault.io).
