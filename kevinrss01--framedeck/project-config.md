@@ -1,146 +1,78 @@
 ---
 trigger: always_on
-description: Framedeck is an AI-powered video editor. Users edit videos with natural language prompts to remove silences, add b-roll, generate subtitles, create motion designs, analyze footage, prepare voiceovers, and render finished videos.
+description: Based on https://developers.openai.com/api/docs/guides/prompt-guidance
 ---
 
-# Framedeck - Agent Guide
 
-Framedeck is an AI-powered video editor. Users edit videos with natural language prompts to remove silences, add b-roll, generate subtitles, create motion designs, analyze footage, prepare voiceovers, and render finished videos.
+Based on https://developers.openai.com/api/docs/guides/prompt-guidance
 
-This file is the root guide for coding agents. Keep changes small, preserve the existing architecture, and prefer local project patterns over new abstractions.
+# GPT-5.5 prompting guide
 
-## Project Overview
+Prompt GPT-5.5 with outcome-first goals, concise style controls, retrieval budgets, and validation loops.
 
-Framedeck is a PNPM/Turborepo monorepo with a shared `ts-rest` contract.
+## New in GPT-5.5 vs GPT-5.4
+- Shorter, outcome-first prompts usually work better than process-heavy prompt stacks.
+- More efficient reasoning means `low` and `medium` effort should be re-evaluated before escalating.
+- Preambles, `phase` handling, and assistant-item replay remain important for tool-heavy Responses workflows.
+- Explicit personality, retrieval budgets, and validation rules help shape customer-facing and agentic UX.
+
+GPT-5.5 works best when prompts define the outcome and leave room for the model to choose an efficient solution path. Compared with earlier models, you can often use shorter, more outcome-oriented prompts: describe what good looks like, what constraints matter, what evidence is available, and what the final answer should contain.
+
+Avoid carrying over every instruction from an older prompt stack. Legacy prompts often over-specify the process because earlier models needed more help staying on track. With GPT-5.5, that can add noise, narrow the model's search space, or lead to overly mechanical answers.
+
+For more detail on GPT-5.5 behavior changes, start with the [Using GPT-5.5 guide](https://developers.openai.com/api/docs/guides/latest-model). This guide focuses on prompt changes that follow from those behavior changes.
+
+The patterns here are starting points. Adapt them to your product surface, tools, evals, and user experience goals.
+
+## Automated migration with Codex
+
+Codex can implement the changes from this guide with the [OpenAI Docs Skill](https://github.com/openai/skills/tree/main/skills/.curated/openai-docs).
 
 ```text
-apps/
-├── frontend/          # Next.js 16, React 19, Tailwind CSS v4, shadcn, Zustand, Remotion
-├── server/            # NestJS 11, AI SDK, S3, Socket.IO, ElevenLabs Scribe v2, TwelveLabs
-└── media-processor/   # Rust/Axum internal service for FFmpeg audio extraction
-packages/
-└── api-types/         # Shared ts-rest contracts, Zod schemas, realtime constants
+$openai-docs migrate this project to gpt-5.5
 ```
 
-The API contract in `packages/api-types` is the source of truth for frontend hooks and server handlers. Do not hardcode backend URLs in frontend code; use the generated `api` client and env-driven base URLs.
+To use this skill in other coding agents, download it from the [OpenAI skills repository](https://github.com/openai/skills/tree/main/skills/.curated/openai-docs).
 
-## Required Setup
+## Personality and behavior
 
-Prerequisites:
+GPT-5.5's default style is efficient, direct, and task-oriented. This is useful for production systems: responses stay focused, behavior is easier to steer, and the model avoids unnecessary conversational padding.
 
-- Node.js LTS and PNPM `10.22.0`
-- Rust toolchain and Cargo
-- FFmpeg for media extraction and local media workflows
-- App-specific `.env` files copied from each `.env.example`
-- Provider credentials as needed: AWS S3/Remotion, AI Gateway or OpenAI-compatible API, ElevenLabs, TwelveLabs, Deepgram
+For customer-facing assistants, support workflows, coaching experiences, and other conversational products, define both personality and collaboration style.
 
-Install dependencies from the repo root:
+- **Personality** controls how the assistant sounds: tone, warmth, directness, formality, humor, empathy, and level of polish.
+- **Collaboration style** controls how the assistant works: when it asks questions, when it makes assumptions, how proactive it should be, how much context it gives, when it checks work, and how it handles uncertainty or risk.
 
-```bash
-pnpm install
+Keep both short. Personality instructions should shape the user experience. Collaboration instructions should shape task behavior. Neither should replace clear goals, success criteria, tool rules, or stopping conditions.
+
+Example personality block for a steady task-focused assistant:
+
+```text
+# Personality
+You are a capable collaborator: approachable, steady, and direct. Assume the user is competent and acting in good faith, and respond with patience, respect, and practical helpfulness.
+
+Prefer making progress over stopping for clarification when the request is already clear enough to attempt. Use context and reasonable assumptions to move forward. Ask for clarification only when the missing information would materially change the answer or create meaningful risk, and keep any question narrow.
+
+Stay concise without becoming curt. Give enough context for the user to understand and trust the answer, then stop. Use examples, comparisons, or simple analogies when they make the point easier to grasp. When correcting the user or disagreeing, be candid but constructive. When an error is pointed out, acknowledge it plainly and focus on fixing it.
+
+Match the user's tone within professional bounds. Avoid emojis and profanity by default, unless the user explicitly asks for that style or has clearly established it as appropriate for the conversation.
 ```
 
-The root does not own a single combined env file. Configure env files per app:
+Example personality block for an expressive collaborative assistant:
 
-- `apps/frontend/.env`
-- `apps/server/.env`
-- `apps/media-processor/.env`
+```text
+# Personality
+Adopt a vivid conversational presence: intelligent, curious, playful when appropriate, and attentive to the user's thinking. Ask good questions when the problem is blurry, then become decisive once there is enough context.
 
-## Development Commands
+Be warm, collaborative, and polished. Conversation should feel easy and alive, but not chatty for its own sake. Offer a real point of view rather than merely mirroring the user, while staying responsive to their goals and constraints.
 
-Run the full stack:
-
-```bash
-pnpm dev
+Be thoughtful and grounded when the task calls for synthesis or advice. State a clear recommendation when you have enough context, explain important tradeoffs, and name uncertainty without becoming evasive.
 ```
 
-Run without portless URL injection:
+For more expressive products, add warmth, curiosity, humor, or point of view explicitly, but keep the block short. Use personality to shape the experience, not to compensate for unclear goals or missing task instructions.
 
-```bash
-pnpm dev:direct
-```
+## Improve time to first visible token with a preamble
 
-Run individual apps:
-
-```bash
-pnpm --filter frontend dev
-pnpm --filter server dev
-pnpm --filter media-processor dev
-pnpm --filter api-types dev
-```
-
-Common checks:
-
-```bash
-pnpm typecheck
-pnpm test
-pnpm build
-pnpm --filter frontend lint
-pnpm --filter server lint
-pnpm --filter media-processor lint
-```
-
-Package-specific commands:
-
-```bash
-pnpm --filter api-types build
-pnpm --filter frontend exec tsc
-pnpm --filter server exec tsc
-pnpm --filter server test
-pnpm --filter server test:e2e
-pnpm --filter server test:cov
-pnpm --filter media-processor test
-```
-
-Portless dev URLs:
-
-- Frontend: `http://ai-video-editor.localhost:1355`
-- Backend: `http://api-ai-video-editor.localhost:1355`
-- Media processor: `http://media-ai-video-editor.localhost:1355`
-
-Use `pnpm portless:list` to inspect active routes.
-
-## Architecture
-
-### ts-rest API Workflow
-
-When adding or changing an API route:
-
-1. Update `packages/api-types/src/index.ts` with Zod schemas and the `apiContracts` route.
-2. Build shared types with `pnpm --filter api-types build`.
-3. On the server, bind the route with `@TsRestHandler(apiContracts.<router>.<endpoint>)`.
-4. Keep business logic in services, not controllers.
-5. On the frontend, consume through `api.<router>.<endpoint>.useQuery()` or `.useMutation()`.
-
-Request and response shape changes must start in `api-types` so frontend and server compile against the same contract.
-
-### Upload Pipeline
-
-1. Client calls `POST /uploads/init` to create a multipart upload and receive presigned URLs.
-2. Client calls `POST /uploads/:uploadId/sign-parts` to sign chunks.
-3. Browser uploads directly to S3 through `directS3Upload()` with parallel multipart upload and Transfer Acceleration.
-4. Client calls `POST /uploads/:uploadId/complete`.
-5. Server starts ElevenLabs Scribe v2 transcription in the background.
-6. Server starts TwelveLabs video analysis in the background for video assets.
-7. Results arrive over WebSocket events such as `transcriptionComplete` and `upload:videoAnalysisComplete`.
-
-Asset statuses may include `pending-upload`, `uploading`, `in-progress`, `transcribing`, `ready`, `uploaded`, and `error`. Check existing frontend/server usage before renaming or consolidating statuses.
-
-### Video Analysis
-
-- TwelveLabs analysis is triggered after `POST /uploads/:uploadId/complete` for video assets.
-- It runs in parallel with ElevenLabs Scribe v2 transcription and must not block upload completion.
-- The pipeline is presigned S3 GET URL, TwelveLabs indexing, parallel prompt analysis, then WebSocket `upload:videoAnalysisComplete`.
-- Frontend stores analysis on `asset.summary` with fields such as `macroView`, `causalLogic`, `sequentialSummary`, `socket`, and `plug`.
-
-### Agent-Driven Editor
-
-- `ai-gateway.service.ts` streams text and reasoning through the AI SDK and calls tools from `ToolsService.getTools()`.
-- `tools.service.ts` defines Zod-validated tools named with `editorToolNames`.
-- Tool calls emit WebSocket start, delta, end, and result events.
-- `selectTimelineItems` dispatches through `RealtimeService`.
-- `removeSilences` waits for frontend results through `registerToolResult` using tool-call-id promises.
-- `WebSocketProvider.tsx` routes realtime messages by `RealtimeMessageType`.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
