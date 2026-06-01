@@ -1,259 +1,216 @@
 ---
 trigger: always_on
-description: Mongoose model patterns for MongoDB schemas
+description: Step-by-step guide for creating a new module using the tbk CLI
 ---
 
 
-# Mongoose Model Patterns
+# Creating a New Module
 
-## Core Principle
+This guide shows how to create a new module using the `tbk` CLI tool and customize it according to project patterns.
 
-Models define MongoDB schemas using Mongoose. Keep them simple and focused on data structure.
+## Quick Start
 
-## Model Template
+### Step 1: Generate Module Scaffolding
+
+Use the `tbk` CLI to generate all module files automatically:
+
+```bash
+pnpm exec tbk generate:module <module-name>
+```
+
+Or with custom API path prefix:
+
+```bash
+pnpm exec tbk generate:module <module-name> --path /api/v1
+```
+
+**Example:**
+
+```bash
+pnpm exec tbk generate:module product
+# Creates: src/modules/product/ with all required files
+```
+
+This creates a complete module structure:
+
+```
+src/modules/<module-name>/
+├── <module-name>.dto.ts         # TypeScript types and Zod schemas
+├── <module-name>.model.ts       # Mongoose model
+├── <module-name>.schema.ts      # Request/response validation schemas
+├── <module-name>.services.ts    # Business logic and database operations
+├── <module-name>.controller.ts  # HTTP request handlers
+└── <module-name>.router.ts      # MagicRouter route definitions
+```
+
+### Step 2: Customize Module Files
+
+The generated files follow project patterns but need customization for your specific use case. Refer to these rules for detailed patterns:
+
+#### 2.1 Update Model (`<module-name>.model.ts`)
+
+- **Rule:** `@models`
+- Add/modify fields in the Mongoose schema
+- Define indexes, virtuals, and methods
+- Configure schema options (timestamps, etc.)
+
+#### 2.2 Update DTOs (`<module-name>.dto.ts`)
+
+- Define input/output types using Zod
+- Use `definePaginatedResponse` from `common.utils` for list endpoints
+- Export type definitions for type safety
+
+#### 2.3 Update Validation Schemas (`<module-name>.schema.ts`)
+
+- **Rule:** `@schemas`
+- Add/modify Zod validation for create/update operations
+- Configure query parameter validation (pagination, search, filters)
+- Define proper error messages and transformations
+
+#### 2.4 Update Services (`<module-name>.services.ts`)
+
+- **Rule:** `@services`
+- Implement business logic
+- Handle database operations using the model
+- Use proper error handling (throw errors with descriptive messages)
+- Optimize queries with proper filtering, pagination, and sorting
+
+#### 2.5 Update Controller (`<module-name>.controller.ts`)
+
+- **Rule:** `@controllers`
+- Handle HTTP request/response
+- Use `successResponse` from `@/utils/response.utils`
+- Use proper HTTP status codes from `@/openapi/status-codes`
+- Keep controllers thin - delegate logic to services
+
+#### 2.6 Update Router (`<module-name>.router.ts`)
+
+- **Rule:** `@routing`
+- Configure MagicRouter routes
+- Add proper middleware (authentication, authorization)
+- Use `canAccess()` for protected routes
+- Define request validation schemas
+
+### Step 3: Register Router
+
+Add the router to `src/routes/routes.ts`:
 
 ```typescript
-import { Schema, model, type Document } from 'mongoose';
+import <module-name>Router from '@/modules/<module-name>/<module-name>.router';
 
-// TypeScript interface
-export interface IModel extends Document {
-  name: string;
-  email: string;
-  status: 'active' | 'inactive';
-  metadata?: Record<string, any>;
-  createdBy?: Schema.Types.ObjectId;
-  createdAt: Date;
-  updatedAt: Date;
-}
+// In the registerRoutes function or where routes are registered
+app.use(<module-name>Router);
+```
 
-// Mongoose schema
-const schema = new Schema<IModel>(
-  {
-    name: {
-      type: String,
-      required: [true, 'Name is required'],
-      trim: true,
-      minlength: [2, 'Name must be at least 2 characters'],
-      maxlength: [100, 'Name must not exceed 100 characters'],
-    },
-    email: {
-      type: String,
-      required: [true, 'Email is required'],
-      unique: true,
-      lowercase: true,
-      trim: true,
-      match: [/^\S+@\S+\.\S+$/, 'Please provide a valid email'],
-    },
-    status: {
-      type: String,
-      enum: {
-        values: ['active', 'inactive'],
-        message: 'Status must be either active or inactive',
-      },
-      default: 'active',
-    },
-    metadata: {
-      type: Schema.Types.Mixed,
-      default: {},
-    },
-    createdBy: {
-      type: Schema.Types.ObjectId,
-      ref: 'User',
-    },
-  },
-  {
-    timestamps: true, // Adds createdAt and updatedAt automatically
-    collection: 'models', // Optional: specify collection name
-  },
+### Step 4: Test the Module
+
+1. Start development server:
+
+   ```bash
+   pnpm dev
+   ```
+
+2. Visit Swagger UI:
+
+   ```
+   http://localhost:3000/docs
+   ```
+
+3. Test all endpoints using the interactive API documentation
+
+4. Verify:
+   - All CRUD operations work correctly
+   - Validation catches invalid inputs
+   - Error responses are properly formatted
+   - OpenAPI documentation is accurate
+
+## Module File Responsibilities
+
+### 1. DTO (`*.dto.ts`)
+
+- Zod schemas for input/output validation
+- TypeScript type definitions
+- Paginated response schemas
+
+### 2. Model (`*.model.ts`)
+
+- Mongoose schema definition
+- Database field types and constraints
+- Indexes and virtuals
+- Model interface extending Document
+
+### 3. Schema (`*.schema.ts`)
+
+- Request validation schemas (create, update, query)
+- Zod transformations and refinements
+- Type exports for controllers
+
+### 4. Services (`*.services.ts`)
+
+- Business logic implementation
+- Database operations (CRUD)
+- Data transformation
+- Error handling
+
+### 5. Controller (`*.controller.ts`)
+
+- HTTP request/response handling
+- Call service methods
+- Return standardized responses
+- Handle HTTP status codes
+
+### 6. Router (`*.router.ts`)
+
+- Route definitions using MagicRouter
+- Middleware configuration
+- Request validation binding
+- OpenAPI metadata
+
+## Best Practices
+
+### Follow Project Patterns
+
+- **Always** use MagicRouter for automatic OpenAPI generation
+- **Never** use plain Express `app.get()` or `router.get()`
+- **Always** validate requests with Zod schemas
+- **Always** use TypeScript strict mode - no `any` types
+
+### Error Handling
+
+- Throw descriptive errors in services
+- Let global error handler format responses
+- Use proper HTTP status codes
+
+### Type Safety
+
+- Export and use TypeScript types from DTOs
+- Use Zod's `.infer` for type generation
+- Keep runtime validation and TypeScript types in sync
+
+### Code Organization
+
+- Keep controllers thin - delegate to services
+- Put business logic in services
+- Use common utilities for shared functionality
+- Follow the single responsibility principle
+
+## Advanced Customization
+
+### Adding Authentication
+
+Use `canAccess()` middleware in router:
+
+```typescript
+import { canAccess } from '@/middlewares/can-access';
+
+router.post(
+  '/',
+  { requestType: { body: createSchema } },
+  canAccess(), // Add authentication
+  handleCreate,
 );
-
-// Indexes for query performance
-schema.index({ email: 1 }); // Single field index
-schema.index({ status: 1, createdAt: -1 }); // Compound index
-schema.index({ name: 'text' }); // Text index for search
-
-// Virtual properties
-schema.virtual('displayName').get(function () {
-  return `${this.name} (${this.email})`;
-});
-
-// Instance methods
-schema.methods.isActive = function () {
-  return this.status === 'active';
-};
-
-schema.methods.toJSON = function () {
-  const obj = this.toObject();
-  delete obj.__v; // Remove version key
-  return obj;
-};
-
-// Static methods
-schema.statics.findActive = function () {
-  return this.find({ status: 'active' });
-};
-
-schema.statics.findByEmail = function (email: string) {
-  return this.findOne({ email: email.toLowerCase() });
-};
-
-// Pre-save hook
-schema.pre('save', async function (next) {
-  // Example: Normalize email
-  if (this.isModified('email')) {
-    this.email = this.email.toLowerCase().trim();
-  }
-  next();
-});
-
-// Post-save hook
-schema.post('save', function (doc) {
-  // Example: Log creation
-  console.log('Document saved:', doc._id);
-});
-
-// Pre-remove hook
-schema.pre('remove', async function (next) {
-  // Example: Clean up related data
-  await RelatedModel.deleteMany({ modelId: this._id });
-  next();
-});
-
-// Create and export model
-export const Model = model<IModel>('Model', schema);
 ```
 
-## Common Field Types
-
-### Basic Types
-
-```typescript
-{
-  stringField: { type: String },
-  numberField: { type: Number },
-  booleanField: { type: Boolean },
-  dateField: { type: Date },
-  bufferField: { type: Buffer },
-  mixedField: { type: Schema.Types.Mixed },
-}
-```
-
-### References
-
-```typescript
-{
-  userId: {
-    type: Schema.Types.ObjectId,
-    ref: "User", // Reference to User model
-    required: true,
-  },
-}
-```
-
-### Arrays
-
-```typescript
-{
-  tags: [String], // Array of strings
-  items: [{ // Array of subdocuments
-    name: String,
-    quantity: Number,
-  }],
-  userIds: [{
-    type: Schema.Types.ObjectId,
-    ref: "User",
-  }],
-}
-```
-
-### Enums
-
-```typescript
-{
-  status: {
-    type: String,
-    enum: {
-      values: ["pending", "active", "inactive"],
-      message: "Invalid status value",
-    },
-    default: "pending",
-  },
-}
-```
-
-### Nested Objects
-
-```typescript
-{
-  address: {
-    street: String,
-    city: String,
-    country: String,
-    zipCode: String,
-  },
-}
-```
-
-## Field Options
-
-### Common Options
-
-```typescript
-{
-  field: {
-    type: String,
-    required: [true, "Error message"], // or just true
-    unique: true, // Creates unique index
-    index: true, // Creates index
-    default: "value", // or function: () => Date.now()
-    lowercase: true, // Auto-lowercase (String only)
-    uppercase: true, // Auto-uppercase (String only)
-    trim: true, // Remove whitespace (String only)
-    minlength: 5, // Min length (String only)
-    maxlength: 100, // Max length (String only)
-    min: 0, // Min value (Number/Date only)
-    max: 100, // Max value (Number/Date only)
-    match: /regex/, // Regex validation (String only)
-    validate: { // Custom validator
-      validator: (v) => v > 0,
-      message: "Must be positive",
-    },
-  },
-}
-```
-
-## Indexes
-
-Add indexes for frequently queried fields:
-
-```typescript
-// Single field index
-schema.index({ email: 1 }); // 1 = ascending, -1 = descending
-
-// Compound index
-schema.index({ status: 1, createdAt: -1 });
-
-// Text index for search
-schema.index({ name: 'text', description: 'text' });
-
-// Unique compound index
-schema.index({ userId: 1, itemId: 1 }, { unique: true });
-
-// Sparse index (only for documents with the field)
-schema.index({ optionalField: 1 }, { sparse: true });
-
-// TTL index (auto-delete after time)
-schema.index({ expireAt: 1 }, { expireAfterSeconds: 0 });
-```
-
-## Hooks (Middleware)
-
-### Pre hooks
-
-```typescript
-// Before save
-schema.pre('save', async function (next) {
-  // this = document being saved
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
