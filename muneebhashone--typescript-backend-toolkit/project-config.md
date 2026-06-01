@@ -1,240 +1,310 @@
 ---
 trigger: always_on
-description: Controller patterns for handling business logic
+description: Development workflow and commands
 ---
 
 
-# Controller Patterns
+# Development Workflow
 
-## Core Principle
+## Setup
 
-Controllers are async functions that handle validated requests and return responses. They should be thin - delegate complex logic to services.
+### Initial Setup
 
-## Controller Template
+```bash
+# 1. Install dependencies
+pnpm install
 
-```typescript
-import type { Request } from 'express';
-import type { ResponseExtended } from '@/types';
-import type {
-  CreateItemSchemaType,
-  GetItemsSchemaType,
-  UpdateItemSchemaType,
-  CreateItemResponseSchema,
-  GetItemByIdResponseSchema,
-  GetItemsResponseSchema,
-  UpdateItemResponseSchema,
-} from './module.schema';
-import {
-  createItem,
-  deleteItem,
-  findById,
-  getItems,
-  updateItem,
-} from './module.service';
+# 2. Start Docker services (MongoDB + Redis)
+docker compose up -d
 
-/**
- * Create new item
- */
-export const handleCreate = async (
-  req: Request<unknown, unknown, CreateItemSchemaType>,
-  res: ResponseExtended<CreateItemResponseSchema>,
-) => {
-  // 1. Extract validated data (already validated by Zod middleware)
-  const data = req.body;
+# 3. Copy environment template
+cp .env.sample .env
 
-  // 2. Access JWT payload (if route uses canAccess middleware)
-  const userId = req.user?.sub;
+# 4. Edit .env with your values
+nano .env
 
-  // 3. Call service layer for business logic
-  const item = await createItem({ ...data, createdBy: userId });
+# 5. (Optional) Seed database
+pnpm run seeder
 
-  // 4. Return typed response
-  return res.created?.({
-    success: true,
-    message: 'Item created successfully',
-    data: item,
-  });
-};
-
-/**
- * Get single item by ID
- */
-export const handleGetById = async (
-  req: Request<{ id: string }, unknown, unknown>,
-  res: ResponseExtended<GetItemByIdResponseSchema>,
-) => {
-  const { id } = req.params;
-
-  const item = await findById(id);
-
-  if (!item) {
-    return res.notFound?.({
-      success: false,
-      message: 'Item not found',
-    });
-  }
-
-  return res.ok?.({
-    success: true,
-    data: item,
-  });
-};
-
-/**
- * Get paginated list of items
- */
-export const handleGetItems = async (
-  req: Request<unknown, unknown, unknown, GetItemsSchemaType>,
-  res: ResponseExtended<GetItemsResponseSchema>,
-) => {
-  const { results, paginatorInfo } = await getItems(req.query);
-
-  return res.ok?.({
-    success: true,
-    data: {
-      items: results,
-      paginator: paginatorInfo,
-    },
-  });
-};
-
-/**
- * Update existing item
- */
-export const handleUpdate = async (
-  req: Request<{ id: string }, unknown, UpdateItemSchemaType>,
-  res: ResponseExtended<UpdateItemResponseSchema>,
-) => {
-  const { id } = req.params;
-  const data = req.body;
-  const userId = req.user?.sub;
-
-  const item = await updateItem(id, data, userId);
-
-  if (!item) {
-    return res.notFound?.({
-      success: false,
-      message: 'Item not found',
-    });
-  }
-
-  return res.ok?.({
-    success: true,
-    message: 'Item updated successfully',
-    data: item,
-  });
-};
-
-/**
- * Delete item
- */
-export const handleDelete = async (
-  req: Request<{ id: string }, unknown, unknown>,
-  res: ResponseExtended<Record<string, never>>,
-) => {
-  const { id } = req.params;
-
-  await deleteItem(id);
-
-  return res.ok?.({
-    success: true,
-    message: 'Item deleted successfully',
-  });
-};
+# 6. Start development server
+pnpm run dev
 ```
 
-## Key Points
+### Prerequisites
 
-### TypeScript Request Typing
+- Node.js (v18+)
+- pnpm (package manager)
+- Docker and Docker Compose
+- MongoDB (via Docker or local)
+- Redis (via Docker or local)
 
-Always use TypeScript generics for type-safe requests:
+## Development Commands
 
-```typescript
-Request<ParamsType, unknown, BodyType, QueryType>;
+### Running the Server
 
-// Examples:
-Request<{ id: string }, unknown, unknown>; // params only
-Request<unknown, unknown, CreateUserSchemaType>; // body only
-Request<unknown, unknown, unknown, GetUsersSchemaType>; // query only
-Request<{ id: string }, unknown, UpdateUserSchemaType>; // params + body
+```bash
+# Development with hot reload
+pnpm run dev
+
+# Backend only (without email template server)
+pnpm run start:dev
+
+# Production build + start
+pnpm run build && pnpm run start:prod
+
+# Local production (uses .env.local)
+pnpm run start:local
 ```
 
-### Request Data Access
+### Building
 
-- `req.body` - Request body (validated by Zod)
-- `req.params` - URL parameters (validated by Zod)
-- `req.query` - Query parameters (validated by Zod)
-- `req.user` - JWT token payload (if using extractJwt middleware)
-- `req.file` / `req.files` - Uploaded files (if using multer middleware)
+```bash
+# Build TypeScript to dist/
+pnpm run build
 
-### JWT Payload Access
-
-When route uses `extractJwt` middleware from [extract-jwt-schema.ts](mdc:src/middlewares/extract-jwt-schema.ts):
-
-```typescript
-import type { JwtPayload } from '@/utils/jwt.utils';
-
-// Access JWT payload via req.user
-const userId = req.user?.sub; // User ID
-const email = req.user?.email; // User email
-const username = req.user?.username; // Username
-const role = req.user?.role; // User role
-
-// Type assertion if needed
-const payload = req.user as JwtPayload;
+# Build uses tsup (configured in build.ts)
 ```
 
-**JwtPayload Type:**
+### Linting
 
-```typescript
-type JwtPayload = {
-  sub: string; // User ID
-  email?: string | null;
-  phoneNo?: string | null;
-  username: string;
-  role: RoleType;
-};
+```bash
+# Check for linting errors
+pnpm run lint
+
+# Auto-fix linting errors
+pnpm run lint:fix
 ```
 
-### File Upload Access
+### Database
 
-When route uses multer middleware from [multer-s3.ts](mdc:src/middlewares/multer-s3.ts):
-
-```typescript
-const file = req.file; // For single file
-const files = req.files; // For multiple files
-const url = (req.file as any).location; // S3 URL
+```bash
+# Run database seeder
+pnpm run seeder
 ```
 
-### Response Pattern (RECOMMENDED)
+### Email Development
 
-Use `ResponseExtended` typed response helpers for all controllers:
+```bash
+# Start email template development server
+pnpm run email:dev
 
-```typescript
-import type { ResponseExtended } from '@/types';
-import type { CreateItemResponseSchema } from './module.schema';
-
-export const handleCreate = async (
-  req: Request<unknown, unknown, CreateItemSchemaType>,
-  res: ResponseExtended<CreateItemResponseSchema>,
-) => {
-  const item = await createItem(req.body);
-  
-  // 201 Created response
-  return res.created?.({
-    success: true,
-    message: 'Item created',
-    data: item,
-  });
-};
+# Access at: http://localhost:3001
 ```
 
-**Available Response Methods:**
+## Project Structure
+
+```
+src/
+├── main.ts                 # Application entry point
+├── config/                 # Configuration management
+├── lib/                    # Core libraries (DB, Redis, AWS, etc.)
+├── modules/                # Feature modules (auth, user, etc.)
+│   └── module-name/
+│       ├── module.model.ts
+│       ├── module.controller.ts
+│       ├── module.service.ts
+│       ├── module.router.ts
+│       ├── module.schema.ts
+│       └── module.dto.ts
+├── middlewares/            # Express middlewares
+├── queues/                 # BullMQ background jobs
+├── routes/                 # Route registration
+├── email/                  # Email templates (React Email)
+└── utils/                  # Utility functions
+```
+
+## Key Endpoints
+
+### API Documentation
+
+- Swagger UI: `http://localhost:3000/docs`
+- OpenAPI JSON: `http://localhost:3000/openapi.yml`
+
+### Queue Dashboard
+
+- BullMQ Admin: `http://localhost:3000/queues`
+
+### Health Check
+
+- `GET http://localhost:3000/api/health`
+
+## Development Workflow
+
+### Creating a New Feature
+
+1. Create new module in `src/modules/feature-name/`
+2. Create model, controller, service, router, schema files
+3. Register router in `src/routes/routes.ts`
+4. Test in Swagger UI
+5. (Optional) Add seeder
+
+See [new-module.mdc](mdc:.cursor/rules/new-module.mdc) for detailed steps.
+
+### Making Changes
+
+1. Edit files (hot reload enabled in dev mode)
+2. Check for linter errors: `pnpm run lint`
+3. Fix errors: `pnpm run lint:fix`
+4. Test changes in Swagger UI or API client
+5. Commit changes
+
+### Adding Dependencies
+
+```bash
+# Add runtime dependency
+pnpm add package-name
+
+# Add dev dependency
+pnpm add -D package-name
+```
+
+## Testing the API
+
+### Using Swagger UI
+
+1. Navigate to `http://localhost:3000/docs`
+2. Expand endpoint
+3. Click "Try it out"
+4. Fill in parameters
+5. Execute request
+6. View response
+
+### Using curl
+
+```bash
+# Public endpoint
+curl http://localhost:3000/api/health
+
+# Protected endpoint (requires JWT)
+curl -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  http://localhost:3000/api/user/profile
+
+# POST request
+curl -X POST http://localhost:3000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com","password":"password123"}'
+```
+
+### Using Postman/Insomnia
+
+1. Import OpenAPI spec from `http://localhost:3000/docs.json`
+2. All endpoints auto-configured
+3. Set Authorization header for protected routes
+
+## Debugging
+
+### Logging
+
+Logs use Pino logger from [logger.ts](mdc:src/plugins/observability/logger.ts):
 
 ```typescript
-// 200 OK - Success response
-return res.ok?.({
-  success: true,
+import { logger } from '@/plugins/logger';
+
+logger.info('Info message', { data });
+logger.error('Error message', { error });
+logger.debug('Debug message', { data });
+```
+
+### VS Code Debugging
+
+Add to `.vscode/launch.json`:
+
+```json
+{
+  "type": "node",
+  "request": "launch",
+  "name": "Debug Dev Server",
+  "runtimeExecutable": "pnpm",
+  "runtimeArgs": ["run", "dev"],
+  "skipFiles": ["<node_internals>/**"]
+}
+```
+
+### MongoDB Debugging
+
+```bash
+# Connect to MongoDB
+docker exec -it mongodb mongosh
+
+# List databases
+show dbs
+
+# Use database
+use your-db-name
+
+# List collections
+show collections
+
+# Query data
+db.users.find()
+```
+
+### Redis Debugging
+
+```bash
+# Connect to Redis
+docker exec -it redis redis-cli
+
+# List all keys
+KEYS *
+
+# Get value
+GET key-name
+
+# Monitor commands
+MONITOR
+```
+
+## Common Issues
+
+### Port Already in Use
+
+```bash
+# Find process using port 3000
+lsof -i :3000
+
+# Kill process
+kill -9 PID
+```
+
+### MongoDB Connection Failed
+
+- Check Docker is running: `docker ps`
+- Check connection string in `.env`
+- Restart MongoDB: `docker compose restart mongodb`
+
+### Redis Connection Failed
+
+- Check Docker is running: `docker ps`
+- Check Redis config in `.env`
+- Restart Redis: `docker compose restart redis`
+
+### TypeScript Errors
+
+```bash
+# Check TypeScript errors
+npx tsc --noEmit
+
+# Clean build and rebuild
+rm -rf dist && pnpm run build
+```
+
+### Module Not Found
+
+```bash
+# Clear node_modules and reinstall
+rm -rf node_modules pnpm-lock.yaml
+pnpm install
+```
+
+## Production Deployment
+
+### Build
+
+```bash
+pnpm run build
+```
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
