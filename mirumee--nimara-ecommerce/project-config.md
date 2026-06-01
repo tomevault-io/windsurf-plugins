@@ -1,110 +1,129 @@
 ---
 trigger: always_on
-description: You are an expert AI assistant for the Nimara e-commerce project - a Next.js 16 full-stack platform with Saleor headless commerce backend.
+description: This file provides comprehensive context for AI coding assistants (GitHub Copilot, Cursor, etc.) working on the Nimara e-commerce project. It enables AI to understand the project structure, conventions, and patterns to generate accurate, contextual code.
 ---
 
+# Nimara E-commerce - AI Assistant Context
 
-# Nimara E-commerce - Cursor AI Rules
+This file provides comprehensive context for AI coding assistants (GitHub Copilot, Cursor, etc.) working on the Nimara e-commerce project. It enables AI to understand the project structure, conventions, and patterns to generate accurate, contextual code.
 
-You are an expert AI assistant for the Nimara e-commerce project - a Next.js 16 full-stack platform with Saleor headless commerce backend.
+---
 
-## Core Tech Stack
+## Project Type
+
+Full-stack e-commerce platform using Next.js 16 with Saleor headless commerce backend. Built with a monorepo architecture for multi-region, global brands.
+
+---
+
+## Tech Stack
+
+### Frontend
 
 - **Framework:** Next.js 16 (App Router, Server Components, Server Actions)
-- **React:** 19
-- **TypeScript:** Strict mode
-- **Styling:** Tailwind CSS + Shadcn UI
-- **GraphQL:** Saleor API with GraphQL Code Generator
-- **Monorepo:** Turborepo + pnpm workspaces
-- **Auth:** NextAuth.js v5
-- **Payments:** Stripe
-- **Testing:** Vitest + Playwright
+- **React:** Version 19
+- **TypeScript:** Strict mode enabled
+- **Styling:** Tailwind CSS 3.x with utility-first approach
+- **UI Components:** Shadcn UI (built on Radix UI primitives)
+- **Forms:** React Hook Form with Zod validation
+
+### Backend & APIs
+
+- **Commerce Backend:** Saleor GraphQL API
+- **Payment Processing:** Stripe Payment Element
+- **Authentication:** NextAuth.js v5 (Auth.js)
+- **CMS:** Saleor (default) or ButterCMS (optional)
+- **Search:** Saleor (default) or Algolia (optional)
+
+### Monorepo & Tools
+
+- **Monorepo:** Turborepo with pnpm workspaces
+- **Package Manager:** pnpm 9.x
+- **Code Generation:** GraphQL Code Generator
+- **Testing:** Vitest (unit), Playwright (E2E)
+- **Linting:** ESLint with custom configs
+- **Formatting:** Prettier with Tailwind plugin
+
+### Deployment
+
+- **Hosting:** Vercel (multi-environment setup)
+- **Error Tracking:** Sentry
+- **Logging:** Pino structured logging
+
+---
 
 ## Project Structure
 
 ```
-apps/
-  ├── storefront/        # Main customer-facing app
-  ├── stripe/            # Stripe integration app
-  └── automated-tests/   # E2E tests
-packages/
-  ├── domain/            # Business logic (no external deps)
-  ├── features/          # Feature implementations
-  ├── infrastructure/    # External API integrations
-  ├── foundation/        # Core utilities, hooks
-  └── ui/                # Shared UI components
+nimara-ecommerce/
+├── apps/
+│   ├── storefront/        # Main customer-facing Next.js app
+│   ├── stripe/            # Stripe integration Next.js app
+│   ├── automated-tests/   # Playwright E2E test suite
+│   └── docs/              # Documentation site (Nextra)
+├── packages/
+│   ├── domain/            # Business logic and entities (no external deps)
+│   ├── features/          # Feature implementations (cart, checkout, products)
+│   ├── infrastructure/    # External API integrations (Saleor, Stripe)
+│   ├── foundation/        # Core utilities, hooks, helpers
+│   ├── ui/                # Shared UI components (Shadcn-based)
+│   ├── translations/      # i18n message catalogs
+│   ├── codegen/           # GraphQL code generation config
+│   ├── config/            # Shared configurations
+│   └── tsconfig/          # TypeScript configurations
+└── terraform/             # Infrastructure as Code
 ```
 
-**Package dependencies:**
+**Package Dependencies:**
 
-- `domain` & `foundation` are leaf packages
-- `infrastructure` depends on `domain` + `foundation`
-- `features` depends on all packages
+- `domain` & `foundation` are leaf packages (no internal dependencies)
+- `infrastructure` depends on `domain` and `foundation`
+- `features` depends on `domain`, `infrastructure`, `foundation`, and `ui`
 - Apps can depend on any package
 
-## Critical Rules
+---
 
-### 1. Server Components First (MOST IMPORTANT!)
+## Key Principles
 
-- **Default:** ALL components are Server Components
-- **Only use `'use client'` when you need:**
-  - Event handlers (onClick, onChange, onSubmit)
-  - React hooks (useState, useEffect, useContext, useReducer)
-  - Browser APIs (window, localStorage, document)
-  - Third-party client libraries
-- **Benefits:** Better performance, SEO, smaller bundle
-- **Server Components can:**
-  - Be async functions
-  - Fetch data directly
-  - Access server-only resources
+### 1. Server Components First
 
-### 2. Type Safety
+- **Default:** All components are Server Components
+- **Rule:** Only add `'use client'` when you need:
+  - Interactivity (onClick, onChange, event handlers)
+  - React hooks (useState, useEffect, useContext)
+  - Browser APIs (localStorage, window, document)
+  - Third-party libraries that use browser features
+- **Benefits:** Better performance, SEO, smaller bundle size
 
-- TypeScript strict mode enabled everywhere
-- **GraphQL types:** ALWAYS generated via codegen - NEVER write manually
-- After schema changes: `pnpm run codegen`
-- **Validation:** Use Zod schemas for user input
-- **Public functions:** Must have explicit return types
+### 2. Type Safety First
 
-### 3. File Naming
+- **TypeScript strict mode** is enabled across all packages
+- **GraphQL types** are generated via codegen - never write them manually
+- **Validation** uses Zod schemas for runtime type checking
+- **Public functions** must have explicit return types
 
-- **Components:** PascalCase (`ProductCard.tsx`)
-- **Utilities:** camelCase (`formatPrice.ts`)
-- **Types:** PascalCase + `.types.ts` (`Product.types.ts`)
-- **GraphQL:** PascalCase + `.graphql` (`GetProducts.graphql`)
-- **Tests:** Same name + `.test.ts`
+### 3. Composition Over Configuration
 
-### 4. Code Style
+- Build complex UIs from simple, focused components
+- Prefer component composition over prop drilling
+- Server Components wrap Client Components for optimal performance
+- Keep components under 200 lines
 
-**Imports order:**
+### 4. Performance Matters
 
-```typescript
-import { Suspense } from "react"; // React/Next.js
-import { useTranslations } from "next-intl"; // External
-import { Product } from "@nimara/domain"; // Internal
-import { formatPrice } from "./utils"; // Relative
-import type { Props } from "./types"; // Types last
-```
+- Leverage Next.js caching (Router Cache, Full Route Cache, Data Cache)
+- Use ISR (Incremental Static Regeneration) for frequently updated content
+- Implement streaming with Suspense boundaries
+- Optimize images with Next/Image component
+- Code-split heavy components with dynamic imports
 
-**Components:**
+### 5. Internationalization Ready
 
-```typescript
-// ✅ Preferred: Functional components with explicit types
-export function ProductCard({ product }: { product: Product }) {
-  return <div>{product.name}</div>;
-}
+- All user-facing text must use translation keys
+- Use `next-intl` for internationalization
+- Support multiple currencies and locales
+- Format dates, numbers, and prices according to locale
 
-// ❌ Avoid: Class components, default exports (except pages)
-```
-
-**Styling:**
-
-```typescript
-// ✅ Preferred: Tailwind utility classes
-<div className="rounded-lg border p-4 shadow-sm hover:shadow-md">
-
-// ❌ Avoid: Inline styles
-```
+---
 
 ## Common Patterns
 
@@ -113,8 +132,11 @@ export function ProductCard({ product }: { product: Product }) {
 **Server Components (default):**
 
 ```typescript
+// app/products/page.tsx
 export default async function ProductsPage() {
-  const products = await getProducts(); // Direct API call
+  // Direct API call in Server Component
+  const products = await getProducts();
+
   return <ProductList products={products} />;
 }
 ```
@@ -122,71 +144,32 @@ export default async function ProductsPage() {
 **Server Actions (mutations):**
 
 ```typescript
+// actions/cart.ts
 "use server";
 
 export async function addToCart(productId: string) {
   const session = await auth();
-  if (!session) return { success: false, error: "Not authenticated" };
+  if (!session) {
+    return { success: false, error: "Not authenticated" };
+  }
 
   const result = await saleorAPI.addToCart(productId);
-  revalidatePath("/cart"); // ALWAYS revalidate after mutations
+  revalidatePath("/cart");
 
   return { success: true, data: result };
 }
 ```
 
-**GraphQL:**
+**GraphQL Queries:**
 
 ```typescript
-// 1. Define in .graphql file: infrastructure/product/queries/GetProducts.graphql
-// 2. Run: pnpm run codegen
-// 3. Use generated types:
-import { GetProductsDocument } from "./queries.generated";
+// 1. Define query in .graphql file
+// infrastructure/product/queries/GetProducts.graphql
 
-const { data } = await saleorClient.query({
-  query: GetProductsDocument,
-  variables: { first: 10 },
-});
-```
+// 2. Run codegen
+// pnpm run codegen
 
-### State Management
-
-- **Server state:** React Server Components (default)
-- **Client state:** `useState`, `useReducer`
-- **URL state:** `searchParams`
-- **Form state:** Server Actions + `useFormState`
-
-### Error Handling
-
-```typescript
-"use server";
-
-export async function updateProfile(data: FormData) {
-  try {
-    const validated = profileSchema.parse(data); // Zod validation
-    await updateUser(validated);
-    revalidatePath("/account");
-    return { success: true };
-  } catch (error) {
-    console.error("Profile update failed:", error);
-    return { success: false, error: "Failed to update profile" };
-  }
-}
-```
-
-## When Adding New Features
-
-1. **Check existing patterns** - Look for similar features first
-2. **Choose correct package:**
-   - `domain` - Pure business logic, entities
-   - `features` - Feature implementations with components
-   - `infrastructure` - External API integrations
-   - `foundation` - Utilities, helpers, hooks
-3. **Add types** in `@nimara/domain` if shared
-4. **Create GraphQL operations:**
-   - Add `.graphql` file in `infrastructure`
-   - Run `pnpm run codegen`
-5. **Add translations** - All user-facing text uses `next-intl`
+// 3. Use generated types
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
