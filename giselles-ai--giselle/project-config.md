@@ -1,153 +1,155 @@
 ---
 trigger: always_on
-description: User request `design mode`, use this rule to enable design mode for all files.
+description: Keep every implementation as small and obvious as possible.
 ---
 
-# Design Mode
+# AGENTS.md - Giselle Development Guide
 
-Design Mode is intended for users who excel in design rather than software development. It enables direct application design by editing Next.js code instead of using tools like Figma.
+## Development Philosophy
 
-- **Avoid destructive changes.**
-- Limit modifications to appearance or behavior only.
-- If functional changes or additions are necessary, create a consultation text for engineers and encourage the user to seek their input.
+### Core Principle: **Less is more**
+Keep every implementation as small and obvious as possible.
 
----
+### Guidelines
+- **Simplicity first** – Prefer the simplest data structures and APIs that work
+- **Avoid needless abstractions** – Refactor only when duplication hurts
+- **Remove dead code early** – `pnpm tidy` scans for unused files/deps and lets you delete them in one command
+- **Minimize dependencies** – Before adding a dependency, ask "Can we do this with what we already have?"
+- **Consistency wins** – Follow existing naming and file-layout patterns; if you must diverge, document why
+- **Explicit over implicit** – Favor clear, descriptive names and type annotations over clever tricks
+- **Fail fast** – Validate inputs, throw early, and surface actionable errors
+- **Let the code speak** – If you need a multi-paragraph comment, refactor until intent is obvious
 
-## How to Start Design Mode
+## Project Overview
 
-The step-by-step procedure below **MUST** be followed in order. Each step **MUST** be completed before proceeding to the next one. No steps should be skipped.
+Giselle is built to design and run AI workflows beyond prompt chains. Not a chat. Not a chain. A system you can run.
 
-### 1. Check Requirements
+### Key Features:
 
-All required tools must be verified in the following order:
+- Visual editor
+- Instant execution
+- No infra headaches
+- Open source — self-host or use our cloud
 
-1. **Node.js Version Check**
-   ```bash
-   node -v
-   ```
-   ✅ REQUIRED: Version must be 22.14.0 or later
-   ❌ If version requirement not met: See `./nodejs.mdc` for installation instructions
+## Architecture
 
-2. **pnpm Version Check**
-   ```bash
-   pnpm -v
-   ```
-   ✅ REQUIRED: Version must be 10.2.1 or later
-   ❌ If version requirement not met: See `./nodejs.mdc` for installation instructions
+### Monorepo Structure
 
-3. **Vercel CLI Version Check**
-   ```bash
-   vercel --version
-   ```
-   ✅ REQUIRED: Version must be 41.6.0 or later
-   ❌ If Vercel CLI is missing: Install with the command below
-   ```bash
-   pnpm add -g vercel
-   ```
+Giselle uses a **Turborepo monorepo** with pnpm workspaces, organized into four main directories:
 
-4. **Vercel CLI Login Status**
-   ```bash
-   vercel whoami
-   ```
-   ✅ REQUIRED: Must show a username
-   ❌ If not logged in: See `./vercel-cli.mdc` for login instructions
-
-5. **Vercel Project Link Check**
-   ```bash
-   [ -f .vercel/project.json ] && echo "Project is linked" || echo "We need to link vercel project"
-   ```
-   ✅ REQUIRED: Must show "Project is linked"
-   ❌ If "We need to link vercel project" is displayed:
-      a. List available teams:
-         ```bash
-         vercel team list
-         ```
-      b. Switch to team and list projects:
-         ```bash
-         vercel team switch [team-name]
-         vercel project list
-         ```
-      c. Link the project:
-         ```bash
-         vercel link --yes --project [project-name]
-         ```
-
-### 2. Clean Your Workspace
-
-IMPORTANT: Complete each step in order:
-
-1. **Preview Files to be Removed**
-   ```bash
-   git clean -fx -n
-   ```
-   ✅ REQUIRED: Review the output and get user approval before proceeding
-   ❌ If the user doesn't want these files removed: Skip the cleaning step but note potential issues
-
-2. **Current Branch Decision**
-   Ask the user if they want to:
-   - Continue in the current branch
-   - Switch to the main branch with:
-     ```bash
-     git checkout main && git pull
-     ```
-
-3. **Install Dependencies**
-   ```bash
-   pnpm i
-   ```
-   ✅ REQUIRED: Wait for installation to complete successfully
-
-4. **Build SDK Dependencies**
-   ```bash
-   pnpm build-sdk
-   ```
-   ✅ REQUIRED: Wait for build to complete successfully
-
-5. **Check Port 3000 Availability - CRITICAL STEP**
-   ```bash
-   lsof -i :3000 || echo "Port 3000 is available"
-   ```
-   ✅ REQUIRED: Must either:
-   - Show "Port 3000 is available" OR
-   - If a process is using port 3000, terminate it:
-     ```bash
-     kill -9 $(lsof -t -i:3000)
-     ```
-   - Verify port is free after termination:
-     ```bash
-     lsof -i :3000 || echo "Port 3000 is now available"
-     ```
-
-### 3. Start Design Mode
-
-After completing ALL previous steps, start the development server:
-
-```bash
-vercel dev
+```
+/workspace
+├── apps/                    # Deployable applications
+│   ├── studio.giselles.ai/  # Giselle Cloud (production)
+│   └── ui.giselles.ai/      # UI component showcase
+├── packages/                # Published SDK packages (@giselles-ai/*)
+├── internal-packages/       # Internal shared packages (@giselle-internal/*)
+└── tools/                   # Development utilities
 ```
 
-The server should start successfully and display:
+### Package Layers
+
+**SDK Packages (`packages/@giselles-ai/*`):**
+- `protocol` — Core domain types and schemas (Workspace, Node, Task, Generation)
+- `giselle` — Engine implementation (tasks, generations, triggers, integrations)
+- `react` — React hooks and components for client integration
+- `nextjs` — Next.js integration with route handlers
+- `language-model` — Language model abstractions and cost calculations
+- `language-model-registry` — Provider-specific model implementations
+- `rag` — RAG pipeline (chunking, embedding, querying)
+- `github-tool` — GitHub integration utilities
+
+**Internal Packages (`internal-packages/@giselle-internal/*`):**
+- `workflow-designer-ui` — Visual workflow editor (React Flow-based)
+- `ui` — Shared UI components (Radix-based)
+
+### Technology Stack
+
+| Layer | Technology |
+|-------|------------|
+| Runtime | Node.js 22+ |
+| Package Manager | pnpm 10+ |
+| Build System | Turborepo |
+| Web Framework | Next.js 16 (App Router) |
+| UI Library | React 19 |
+| Styling | Tailwind CSS 4 |
+| State Management | Zustand (editor), SWR (data fetching) |
+| Validation | Zod v4 |
+| Database | PostgreSQL with Drizzle ORM |
+| Vector Store | pgvector |
+| Formatting/Linting | Biome |
+| Testing | Vitest |
+| AI SDK | Vercel AI SDK |
+
+### Data Flow
+
 ```
-> Ready! Available at http://localhost:3000
+Workspace (JSON) → Protocol Types → Giselle Engine → Task Execution → Generation Output
+                                          ↓
+                          Language Model Registry → AI Provider APIs
 ```
 
----
+### Key Domain Concepts
 
-## Design Mode Checklist Summary
+- **Workspace** — A visual workflow containing nodes and connections
+- **Node** — Either an OperationNode (actions, text generation, triggers) or VariableNode (text, files, vector stores)
+- **Task** — An executable instance of a workflow with sequences of generations
+- **Generation** — A single step execution (created → queued → running → completed/failed)
+- **App** — A published workflow entry point with parameters
 
-Use this checklist to ensure all steps are completed:
+## Development Workflow
 
-- [ ] Node.js version verified (22.14.0+)
-- [ ] pnpm version verified (10.2.1+)
-- [ ] Vercel CLI version verified (41.6.0+)
-- [ ] Vercel CLI login confirmed
-- [ ] Vercel project link confirmed
-- [ ] Workspace files previewed for removal
-- [ ] Branch decision made (current or main)
-- [ ] Dependencies installed
-- [ ] SDK dependencies built
-- [ ] Port 3000 verified as available
-- [ ] Development server started with vercel dev
+TBD
+### Initial Setup
+
+```sh
+pnpm install        # Install all dependencies
+pnpm build-sdk      # Build SDK packages (required before running apps)
+```
+
+### Development Commands
+
+```sh
+# Development
+pnpm dev:studio.giselles.ai  # Start Giselle Cloud
+
+# Build
+pnpm build-sdk               # Build SDK packages
+pnpm -F studio.giselles.ai build  # Build Giselle Cloud
+
+# Quality Checks
+pnpm format                  # Format code with Biome
+pnpm check-types             # Type-check all packages
+pnpm test                    # Run all tests
+pnpm tidy                    # Find unused files/dependencies
+pnpm tidy --fix              # Remove unused files/dependencies
+```
+
+### After Every Code Change
+
+Run these commands in order:
+1. `pnpm format` — Format code
+2. `pnpm build-sdk` — Rebuild SDK packages
+3. `pnpm check-types` — Verify types
+4. `pnpm tidy` — Check for unused code
+5. `pnpm test` — Run tests
+6. Update `.continuity/` per-branch ledger — Reflect the change immediately
+
+### API addition rule (Giselle ↔ HTTP)
+
+When adding a new **public API** to `packages/giselle/src/giselle.ts`, also add the corresponding routing entry to `packages/http/src/router.ts` (typically `jsonRoutes.<name>` using `giselle.<name>.inputSchema`) so the API is reachable through the HTTP layer (e.g., via `NextGiselle`).
+
+### Testing
+
+```sh
+pnpm test                           # Run all tests
+pnpm -F @giselles-ai/giselle test   # Run tests for a specific package
+cd packages/giselle && vitest       # Run tests in watch mode
+vitest run src/tasks/run-task.test.ts  # Run a specific test file
+```
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [giselles-ai/giselle](https://github.com/giselles-ai/giselle) — distributed by [TomeVault](https://tomevault.io).
