@@ -7,11 +7,11 @@ AI Agent Framework, the Pydantic way
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [pydantic/pydantic-ai](https://github.com/pydantic/pydantic-ai).
+Original source: `CLAUDE.md` in [pydantic/pydantic-ai](https://github.com/pydantic/pydantic-ai).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
