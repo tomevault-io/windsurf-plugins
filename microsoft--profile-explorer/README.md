@@ -7,11 +7,11 @@ CPU profiling trace viewer
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [microsoft/profile-explorer](https://github.com/microsoft/profile-explorer).
+Original source: `AGENTS.md` in [microsoft/profile-explorer](https://github.com/microsoft/profile-explorer).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
