@@ -1,205 +1,143 @@
 ---
 trigger: always_on
-description: The gateway core module is the central orchestrator that handles AI provider requests, manages caching, queuing, and provides unified interfaces for chat completion, embeddings, and tool responses.
+description: The provider package defines the core interfaces and base classes that all AI providers must implement. It provides a unified abstraction layer for different AI services.
 ---
 
 
-# Gateway Core Module - Complete Rules & Implementation Guide
+# Provider Package Rules
 
-## Module Overview
+## Package Overview
 
-The gateway core module is the central orchestrator that handles AI provider requests, manages caching, queuing, and provides unified interfaces for chat completion, embeddings, and tool responses.
+The provider package defines the core interfaces and base classes that all AI providers must implement. It provides a unified abstraction layer for different AI services.
 
-## Core Architecture Principles
+## Provider Interface Rules
 
-### 1. Type Safety & Schema Validation
+### 1. ProviderV1 Interface
 
-#### Rules
+- **ALWAYS** implement the `ProviderV1` interface for new providers
+- **ALWAYS** use generic constraints for configuration types
+- **ALWAYS** provide both chat and embedding model support
+- **ALWAYS** implement version tracking with `readonly version = "v1"`
+- **ALWAYS** use descriptive provider names
 
-- **ALWAYS** use Zod schemas for runtime validation
-- **ALWAYS** export both the schema and inferred types
-- **NEVER** use `any` type - use proper generic constraints
-- **ALWAYS** validate input/output at runtime using schemas
+### 2. Model Factory Methods
 
-#### Instructions
+- **ALWAYS** implement `chatModelLiterals()` returning available model names
+- **ALWAYS** implement `chatModelSchemas()` returning Zod schemas
+- **ALWAYS** implement `chatModel(options)` returning configured instances
+- **ALWAYS** implement `embeddingModelLiterals()` returning available model names
+- **ALWAYS** implement `embeddingModelSchemas()` returning Zod schemas
+- **ALWAYS** implement `embeddingModel(options)` returning configured instances
 
-```typescript
-// ✅ CORRECT: Define schema first, then type
-import { z } from 'zod';
+## Model Implementation Rules
 
-const UserConfig = z.object({
-  apiKey: z.string().min(1),
-  model: z.string().min(1),
-  temperature: z.number().min(0).max(2).default(1.0),
-});
-type UserConfigType = z.infer<typeof UserConfig>;
+### 1. Chat Model Implementation
 
-// Export both schema and type
-export { UserConfig, type UserConfigType };
+- **ALWAYS** implement the `ChatModelV1` interface
+- **ALWAYS** provide model schema with name, provider, and capabilities
+- **ALWAYS** implement `completeChat()` method for synchronous responses
+- **ALWAYS** implement `streamChat()` method for streaming responses
+- **ALWAYS** implement `getModelPricing()` for cost calculation
+- **ALWAYS** implement `getCompleteChatUrl()`, `getCompleteChatHeaders()`, `getCompleteChatData()`
+- **ALWAYS** implement `transformCompleteChatResponse()` for response normalization
 
-// ❌ INCORRECT: Using any type
-function processData(data: any): any {
-  return data; // Unsafe and loses type information
-}
+### 2. Embedding Model Implementation
 
-// ✅ CORRECT: Proper typing with validation
-function processData(data: unknown): UserConfigType {
-  return UserConfig.parse(data); // Validates at runtime
-}
-```
+- **ALWAYS** implement the `EmbeddingModelV1` interface
+- **ALWAYS** provide model schema with name, provider, and capabilities
+- **ALWAYS** implement `getEmbeddings()` method
+- **ALWAYS** implement `getEmbeddingsUrl()`, `getEmbeddingsHeaders()`, `getEmbeddingsData()`
+- **ALWAYS** implement `transformEmbeddingsResponse()` for response normalization
 
-### 2. Error Handling
+### 3. Model Schema Definition
 
-#### Rules
+- **ALWAYS** use Zod schemas for model configuration validation
+- **ALWAYS** include model name, provider, and version information
+- **ALWAYS** define input/output token limits
+- **ALWAYS** specify supported features (streaming, tools, etc.)
+- **ALWAYS** include pricing information when available
 
-- **ALWAYS** use custom error classes extending `GatewayError`
-- **ALWAYS** provide meaningful error messages with context
-- **ALWAYS** handle errors gracefully with proper logging
-- **NEVER** let unhandled errors bubble up
+## Configuration Management Rules
 
-#### Instructions
+### 1. Configuration Schemas
 
-```typescript
-// ✅ CORRECT: Custom error class with context
-import { GatewayError } from "./errors";
+- **ALWAYS** use Zod for configuration validation
+- **ALWAYS** provide sensible defaults for optional parameters
+- **ALWAYS** validate API keys and endpoints
+- **ALWAYS** support environment variable overrides
+- **ALWAYS** include configuration examples in documentation
 
-export class ProviderConnectionError extends GatewayError {
-  constructor(
-    message: string,
-    public readonly provider: string,
-    public readonly statusCode: number,
-    public readonly originalError?: Error
-  ) {
-    super(`Failed to connect to ${provider}: ${message} (Status: ${statusCode})`, "PROVIDER_CONNECTION_ERROR");
-  }
-}
+### 2. Configuration Types
 
-// Usage in code
-try {
-  await provider.makeRequest();
-} catch (error) {
-  if (error instanceof HttpError) {
-    throw new ProviderConnectionError("API request failed", "anthropic", error.status, error);
-  }
-  throw error;
-}
-```
+- **ALWAYS** use descriptive type names ending with `OptionsType`
+- **ALWAYS** extend base configuration interfaces when appropriate
+- **ALWAYS** use union types for model-specific options
+- **ALWAYS** provide configuration builders for complex setups
 
-### 3. Logging & Telemetry
+## Error Handling Rules
 
-#### Rules
+### 1. Provider Errors
 
-- **ALWAYS** use the centralized logger from `LoggerManager`
-- **ALWAYS** include relevant context in log messages
-- **ALWAYS** use OpenTelemetry for tracing and metrics
-- **ALWAYS** log at appropriate levels (debug, info, warn, error)
+- **ALWAYS** extend `ProviderError` for provider-specific errors
+- **ALWAYS** include provider name and context in error messages
+- **ALWAYS** handle API rate limits and quotas gracefully
+- **ALWAYS** provide retry guidance when appropriate
+- **ALWAYS** log errors with full context
 
-#### Instructions
+### 2. Validation Errors
 
-```typescript
-// ✅ CORRECT: Centralized logging with context
-import { LoggerManager } from "./plugins/logger";
+- **ALWAYS** validate configuration before making API calls
+- **ALWAYS** provide clear error messages for invalid configurations
+- **ALWAYS** suggest fixes for common configuration issues
+- **ALWAYS** validate model options before instantiation
 
-const logger = LoggerManager.getLogger();
+## Response Transformation Rules
 
-// Structured logging with context
-logger?.info("Processing chat request", {
-  requestId: request.id,
-  model: request.model,
-  provider: request.provider,
-  timestamp: new Date().toISOString(),
-});
+### 1. Chat Response Transformation
 
-// Error logging with full context
-logger?.error("Provider request failed", {
-  error: error.message,
-  stack: error.stack,
-  requestId: request.id,
-  provider: request.provider,
-  statusCode: response.status,
-});
+- **ALWAYS** normalize provider responses to standard format
+- **ALWAYS** handle different response structures consistently
+- **ALWAYS** preserve all relevant information from provider
+- **ALWAYS** implement proper error handling for malformed responses
+- **ALWAYS** support streaming response transformation
 
-// Debug logging for troubleshooting
-logger?.debug("Cache operation", {
-  operation: "get",
-  key: cacheKey,
-  hit: !!cachedResponse,
-  ttl: cachedResponse?.ttl,
-});
-```
+### 2. Embedding Response Transformation
 
-### 4. Testing Standards
+- **ALWAYS** normalize embedding vectors to standard format
+- **ALWAYS** handle different vector dimensions consistently
+- **ALWAYS** preserve metadata and usage information
+- **ALWAYS** implement proper error handling for malformed responses
 
-#### Rules
+## Testing Rules
 
-- **ALWAYS** write comprehensive tests for new functionality
-- **ALWAYS** use Vitest as the testing framework
-- **ALWAYS** mock external dependencies
-- **ALWAYS** test both success and error scenarios
-- **ALWAYS** use descriptive test names and proper assertions
+### 1. Provider Testing
 
-#### Instructions
+- **ALWAYS** test provider instantiation with valid configurations
+- **ALWAYS** test provider instantiation with invalid configurations
+- **ALWAYS** test model factory methods
+- **ALWAYS** test error handling scenarios
+- **ALWAYS** mock external API calls
 
-```typescript
-// ✅ CORRECT: Comprehensive test structure
-import { beforeEach, describe, expect, it, vi } from "vitest";
+### 2. Model Testing
 
-import { Gateway } from "./gateway";
+- **ALWAYS** test model instantiation with valid options
+- **ALWAYS** test model instantiation with invalid options
+- **ALWAYS** test response transformation methods
+- **ALWAYS** test error handling for API failures
+- **ALWAYS** test configuration validation
 
-describe("Gateway.completeChat", () => {
-  let gateway: Gateway;
-  let mockProvider: any;
+## Performance Considerations
 
-  beforeEach(() => {
-    // Setup mocks
-    mockProvider = {
-      completeChat: vi.fn(),
-      getModelPricing: vi.fn(),
-    };
+### 1. Resource Management
 
-    gateway = new Gateway({
-      providers: { anthropic: mockProvider },
-    });
-  });
+- **ALWAYS** implement proper cleanup for resources
+- **ALWAYS** use connection pooling for HTTP clients
+- **ALWAYS** implement request batching when possible
+- **ALWAYS** cache frequently used configurations
 
-  it("should successfully complete chat request", async () => {
-    // Arrange
-    const request = {
-      messages: [{ role: "user", content: "Hello" }],
-      model: "claude-3-sonnet",
-    };
+### 2. Error Recovery
 
-    const expectedResponse = {
-      messages: [{ role: "assistant", content: "Hi there!" }],
-      usage: { promptTokens: 5, completionTokens: 3, totalTokens: 8 },
-    };
-
-    mockProvider.completeChat.mockResolvedValue(expectedResponse);
-
-    // Act
-    const result = await gateway.completeChat(request);
-
-    // Assert
-    expect(result).toEqual(expectedResponse);
-    expect(mockProvider.completeChat).toHaveBeenCalledWith(request);
-  });
-
-  it("should handle provider errors gracefully", async () => {
-    // Arrange
-    const request = { messages: [], model: "invalid-model" };
-    const error = new Error("Model not found");
-    mockProvider.completeChat.mockRejectedValue(error);
-
-    // Act & Assert
-    await expect(gateway.completeChat(request)).rejects.toThrow("Model not found");
-  });
-});
-```
-
-## Gateway Class Rules
-
-### 1. Constructor & Initialization
-
+- **ALWAYS** implement exponential backoff for retries
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
