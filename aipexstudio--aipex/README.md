@@ -7,11 +7,11 @@ AIPex: AI browser automation assistant, no migration and privacy first. Alternat
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [AIPexStudio/AIPex](https://github.com/AIPexStudio/AIPex).
+Original source: `AGENTS.md` in [AIPexStudio/AIPex](https://github.com/AIPexStudio/AIPex).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
