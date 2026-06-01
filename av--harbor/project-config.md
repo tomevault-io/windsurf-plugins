@@ -16,6 +16,8 @@ Harbor is a containerized LLM toolkit — a large Docker Compose project with a 
 - `docs/` — service and user documentation
 - `routines/` — CLI internals rewritten in Deno
 - `.scripts/` — dev scripts in Deno/Bash, run via `harbor dev <script>`
+- `tests/` — container-based test runner (suites, rows, orchestrator); see `tests/README.md`
+- `.scripts/lint/` — bash-compat lint rules (`HARBORxxx`), fixtures, and 3-pass orchestrator
 - `profiles/default.env` — default config distributed to users
 
 ### CLI Reference
@@ -53,6 +55,9 @@ harbor dev scaffold <service_name>      # scaffold a new service
 harbor dev docs                         # regenerate docs
 harbor dev seed                         # seed test data
 harbor dev add-logos [--dry-run]        # resolve and write service logos
+harbor dev test [--suite ...] [--distros ...] [--json]    # container test matrix
+harbor dev lint [--shellcheck|--rules|--compose] [--json] # 3-pass source lint
+harbor dev lint-self-test               # validate lint rules against fixtures
 ```
 
 Dev scripts live in `.scripts/` and must be run via `harbor dev`, not `deno run` directly.
@@ -106,7 +111,18 @@ Resolution order: GitHub homepage favicon → dashboardicons.com → GitHub owne
 - Comments only for non-obvious logic — never restate what the code does
 - No emojis in UI or copy — use Lucide icons instead
 
+### Release Notes
+
+When updating the `## News` / changelog section in the `README.md`, always use a bulleted list format: `- **vx.x.x** - one sentence`. Do not use a table.
+
+<!-- facts:start -->
+## Fact-driven development
+
+This project uses [facts](https://github.com/av/facts) for specification and documentation. All work flows through the fact sheet — it is the source of truth.
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/av)
-> This is a context snippet only. You'll also want the standalone SKILL.md file — [download at TomeVault](https://tomevault.io/claim/av)
-<!-- tomevault:4.0:windsurf_rules:2026-04-07 -->
+> Source: [av/harbor](https://github.com/av/harbor) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-06-01 -->
