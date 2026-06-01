@@ -1,0 +1,180 @@
+---
+trigger: always_on
+description: > **Last Updated:** 2026-05-05
+---
+
+# VerifyWise - Development Guide
+
+> **Last Updated:** 2026-05-05
+
+This document contains cross-cutting rules for the VerifyWise codebase. Directory-scoped guides load automatically when working in each area:
+
+- **Backend:** `Servers/CLAUDE.md` — multi-tenancy, migrations, backend patterns
+- **Frontend:** `Clients/CLAUDE.md` — clean architecture, component patterns
+- **EvalServer:** `EvalServer/CLAUDE.md` — Alembic migrations, FastAPI patterns
+- **AI Gateway:** `AIGateway/CLAUDE.md` — LLM proxy, guardrails, spend tracking
+
+### Custom Agents
+
+- **verifywise-explorer** (`.claude/agents/verifywise-explorer.md`) — Codebase explorer agent that finds conventions, patterns, and relevant code for any task. Auto-delegates when implementing features, fixing bugs, or understanding existing functionality. Invoke explicitly with `@verifywise-explorer` or `claude --agent verifywise-explorer`.
+
+---
+
+## Instructions for Claude
+
+**Keep documentation up to date.**
+
+When making changes to the codebase:
+- **Core architecture changes** (new patterns, conventions, multi-tenancy, migration rules) → Update this CLAUDE.md or the relevant directory CLAUDE.md
+- **Feature-specific changes** (new routes, APIs, middleware, services) → Update the relevant reference doc (see [Detailed References](#detailed-references))
+
+Always update the "Last Updated" date when modifying any CLAUDE.md file.
+
+---
+
+## Related Repositories
+
+| Repository | Location | Purpose |
+|------------|----------|---------|
+| **plugin-marketplace** | `../plugin-marketplace` (sibling directory) | All plugins (30+), framework plugins (SOC 2, GDPR, etc.), integration plugins. See `plugin-marketplace/CLAUDE.md`. |
+
+> Plugin source code is NOT in this repository. Work in the plugin-marketplace repo.
+
+---
+
+## Project Overview
+
+VerifyWise is an AI governance platform supporting EU AI Act, ISO 42001, ISO 27001, NIST AI RMF, and plugin frameworks (SOC 2, GDPR, HIPAA, etc.).
+
+### Tech Stack
+
+| Layer | Technologies |
+|-------|-------------|
+| **Frontend** | React 19, TypeScript, Vite, Material-UI 7, Redux Toolkit, React Query |
+| **Backend** | Node.js 22, Express.js 4, TypeScript, Sequelize 6 |
+| **Database** | PostgreSQL (shared schema, org_id isolation) |
+| **Cache/Queue** | Redis + BullMQ |
+| **Python Services** | FastAPI, Python 3.12 (EvalServer, AI Gateway) |
+
+### Request Flow
+
+```
+Browser → React Component → Redux/React Query → Axios
+    ↓
+Express Router → Middleware Chain → Controller → Service → Utils → PostgreSQL
+```
+
+---
+
+## Authentication & Authorization
+
+### JWT Token Payload
+
+```typescript
+interface TokenPayload {
+  id: number;              // User ID
+  email: string;
+  organizationId: number;
+  tenantId: string;        // Tenant hash
+  roleName: string;        // "Admin" | "Reviewer" | "Editor" | "Auditor"
+  expire: number;            // Unix timestamp (Date.now() + ms)
+}
+```
+
+### Roles
+
+| Role ID | Name | Permissions |
+|---------|------|-------------|
+| 1 | Admin | Full access |
+| 2 | Reviewer | Read + approve/reject |
+| 3 | Editor | Read + write |
+| 4 | Auditor | Read only |
+
+---
+
+## Development Workflow
+
+### Starting Development
+
+```bash
+cd Servers && npm install && npm run watch    # Backend (Terminal 1)
+cd Clients && npm install && npm run dev      # Frontend (Terminal 2)
+cd Servers && npm run worker                  # BullMQ Worker (Terminal 3, optional)
+cd EvalServer/src && alembic upgrade head && uvicorn app:app --port 8000 --workers 4  # EvalServer (Terminal 4, optional)
+```
+
+### Git Workflow
+
+```bash
+# Branch naming
+feature/description    fix/description    docs/description
+
+# Commit format: type(scope): description
+# Types: feat, fix, docs, style, refactor, test, chore
+feat(auth): add password reset functionality
+fix(dashboard): resolve chart rendering issue
+```
+
+### PR Checklist
+
+- [ ] Build passes locally (`cd Servers && npm run build` and `cd Clients && npm run build`)
+- [ ] Self-review completed
+- [ ] Issue number included
+- [ ] No hardcoded values
+- [ ] UI elements use theme references
+- [ ] Tests written/updated
+- [ ] No console.log statements
+- [ ] No sensitive data exposed
+
+---
+
+## Testing
+
+- **Minimum coverage:** 80%
+- **Frontend:** `cd Clients && npm run test` (Vitest)
+- **Backend:** `cd Servers && npm run test` (Jest)
+
+---
+
+## Environment
+
+### Required Services
+
+| Service | Default Port | Required |
+|---------|-------------|----------|
+| PostgreSQL | 5432 | Yes |
+| Redis | 6379 | Yes |
+| Backend | 3000 | Yes |
+| Frontend | 5173 | Yes |
+| EvalServer | 8000 | For LLM Evals |
+| AI Gateway | 8100 | For LLM governance |
+
+---
+
+## Naming Conventions
+
+| Element | Convention | Example |
+|---------|------------|---------|
+| Variables/Functions | camelCase | `getUserData`, `isValid` |
+| Components/Classes | PascalCase | `UserProfile`, `AuthService` |
+| Constants | UPPER_SNAKE_CASE | `MAX_RETRIES` |
+| Files (Components) | PascalCase | `UserProfile.tsx` |
+| Files (Utilities) | camelCase | `formatDate.ts` |
+| Database Tables | snake_case | `user_profiles` |
+| API Endpoints | kebab-case | `/api/user-profiles` |
+
+---
+
+## Detailed References
+
+Read the relevant file BEFORE implementing changes in that area:
+
+| When working on... | Read this file |
+|---------------------|---------------|
+| Adding a new feature (full guide) | `docs/technical/guides/adding-new-feature.md` |
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [verifywise-ai/verifywise](https://github.com/verifywise-ai/verifywise) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-06-01 -->
