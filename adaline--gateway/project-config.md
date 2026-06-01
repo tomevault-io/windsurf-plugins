@@ -1,14 +1,14 @@
 ---
 trigger: always_on
-description: This is a TypeScript-based AI gateway service that provides unified interfaces for multiple AI providers (OpenAI, Anthropic, Google, etc.) with features like caching, queuing, analytics, and telemetry.
+description: The gateway core module is the central orchestrator that handles AI provider requests, manages caching, queuing, and provides unified interfaces for chat completion, embeddings, and tool responses.
 ---
 
 
-# Adaline Gateway Repository - Main Rules
+# Gateway Core Module - Complete Rules & Implementation Guide
 
-## Repository Overview
+## Module Overview
 
-This is a TypeScript-based AI gateway service that provides unified interfaces for multiple AI providers (OpenAI, Anthropic, Google, etc.) with features like caching, queuing, analytics, and telemetry.
+The gateway core module is the central orchestrator that handles AI provider requests, manages caching, queuing, and provides unified interfaces for chat completion, embeddings, and tool responses.
 
 ## Core Architecture Principles
 
@@ -48,14 +48,6 @@ function processData(data: unknown): UserConfigType {
 }
 ```
 
-#### Implementation Steps
-
-1. **Install Zod**: `npm install zod`
-2. **Define Schema**: Create Zod schema with proper constraints
-3. **Infer Type**: Use `z.infer<typeof SchemaName>` for TypeScript types
-4. **Export Both**: Export schema for runtime validation, type for compile-time checking
-5. **Validate Input**: Use `schema.parse()` or `schema.safeParse()` for validation
-
 ### 2. Error Handling
 
 #### Rules
@@ -92,14 +84,6 @@ try {
   throw error;
 }
 ```
-
-#### Implementation Steps
-
-1. **Extend Base Error**: Create custom error class extending `GatewayError`
-2. **Include Context**: Add relevant properties for debugging
-3. **Meaningful Messages**: Provide clear, actionable error messages
-4. **Error Wrapping**: Wrap external errors with custom context
-5. **Proper Logging**: Log errors with full context before re-throwing
 
 ### 3. Logging & Telemetry
 
@@ -144,14 +128,6 @@ logger?.debug("Cache operation", {
 });
 ```
 
-#### Implementation Steps
-
-1. **Get Logger**: Use `LoggerManager.getLogger()` to get logger instance
-2. **Choose Level**: Use appropriate log level (debug, info, warn, error)
-3. **Add Context**: Include relevant metadata in log messages
-4. **Structured Format**: Use objects for structured logging
-5. **Performance**: Use optional chaining to avoid null checks
-
 ### 4. Testing Standards
 
 #### Rules
@@ -185,6 +161,44 @@ describe("Gateway.completeChat", () => {
       providers: { anthropic: mockProvider },
     });
   });
+
+  it("should successfully complete chat request", async () => {
+    // Arrange
+    const request = {
+      messages: [{ role: "user", content: "Hello" }],
+      model: "claude-3-sonnet",
+    };
+
+    const expectedResponse = {
+      messages: [{ role: "assistant", content: "Hi there!" }],
+      usage: { promptTokens: 5, completionTokens: 3, totalTokens: 8 },
+    };
+
+    mockProvider.completeChat.mockResolvedValue(expectedResponse);
+
+    // Act
+    const result = await gateway.completeChat(request);
+
+    // Assert
+    expect(result).toEqual(expectedResponse);
+    expect(mockProvider.completeChat).toHaveBeenCalledWith(request);
+  });
+
+  it("should handle provider errors gracefully", async () => {
+    // Arrange
+    const request = { messages: [], model: "invalid-model" };
+    const error = new Error("Model not found");
+    mockProvider.completeChat.mockRejectedValue(error);
+
+    // Act & Assert
+    await expect(gateway.completeChat(request)).rejects.toThrow("Model not found");
+  });
+});
+```
+
+## Gateway Class Rules
+
+### 1. Constructor & Initialization
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
