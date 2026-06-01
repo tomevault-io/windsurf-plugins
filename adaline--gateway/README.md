@@ -7,13 +7,13 @@ The only fully local production-grade Super SDK that provides a simple, unified,
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [adaline/gateway](https://github.com/adaline/gateway).
+Original source: `.cursor/rules/*.mdc` in [adaline/gateway](https://github.com/adaline/gateway).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
-- **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
