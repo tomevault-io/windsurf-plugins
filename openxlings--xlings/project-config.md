@@ -1,0 +1,134 @@
+---
+trigger: always_on
+description: `xlings` is a universal package management infrastructure tool with OS-like SubOS isolation. Single static binary, C++23 modules throughout, cross-platform (Linux / macOS / Windows).
+---
+
+# AGENTS.md
+
+## Project Overview
+
+`xlings` is a universal package management infrastructure tool with OS-like SubOS isolation. Single static binary, C++23 modules throughout, cross-platform (Linux / macOS / Windows).
+
+Core capabilities:
+- **Package management** — install/remove/search/update with multi-version coexistence
+- **SubOS isolation** — 3 levels (shell / FS sandbox / image), rootless (except image mode)
+- **Decentralized index** — official + third-party + self-hosted package repos
+- **Agent integration** — NDJSON interface (`xlings interface`), SubOS for agent-owned envs
+- **Version view + ref-counting** — N isolated environments share one copy of package payloads
+
+## Repository Structure
+
+```
+src/
+├── main.cpp                         # Entry point
+├── cli.cppm                         # CLI dispatch (positional + flag parsing)
+├── interface.cppm                   # NDJSON programmatic interface (protocol v1.0)
+├── core/
+│   ├── config.cppm                  # 3-layer config (global → subos → project)
+│   ├── subos.cppm                   # SubOS lifecycle (create/use/fork/remove/stop)
+│   ├── subos/keeper.cppm            # Auto-keeper primitives (Linux namespace reuse)
+│   ├── xself.cppm                   # Self-install/update
+│   ├── xself/                       # Self-management submodules
+│   ├── xim/                         # Package management subsystem
+│   │   ├── installer.cppm           # Install orchestration (type dispatch)
+│   │   ├── resolver.cppm            # DAG dependency resolution
+│   │   ├── downloader.cppm          # Parallel download + SHA256
+│   │   ├── index.cppm               # Package index + cache
+│   │   ├── catalog.cppm             # Multi-repo catalog loading
+│   │   └── libxpkg/types/           # Per-type handlers:
+│   │       ├── type.cppm            #   PlanNode, enums, shared types
+│   │       ├── script.cppm          #   type="script" default hooks
+│   │       └── subos.cppm           #   type="subos" default hooks
+│   └── xvm/                         # Version management
+│       ├── db.cppm                  # VersionDB CRUD + JSON
+│       ├── shim.cppm                # Multicall shim dispatch
+│       └── commands.cppm            # xvm commands (use, list, register)
+├── platform.cppm                    # Cross-platform abstractions
+├── platform/                        # Platform implementations
+├── libs/                            # Vendored libs (json, tinyhttps)
+└── ui/                              # TUI (ftxui-based)
+
+tests/
+├── e2e/                             # End-to-end shell tests
+│   ├── project_test_lib.sh          # Shared helpers (find_xlings_bin, run_xlings)
+│   ├── fixtures/                    # Test fixture packages
+│   └── subos_xpkg_*.sh             # SubOS-as-xpkg e2e tests
+└── (unit tests via xmake build xlings_tests)
+
+.agents/
+├── docs/                            # Agent working docs (see .agents/docs/README.md)
+├── skills/                          # Agent skills (this section)
+├── plans/                           # Implementation plans
+└── tasks/                           # Task tracking
+```
+
+## Build System
+
+Single build tool: **xmake** (C++23 modules).
+
+```bash
+# Setup (from repo root):
+xlings install              # installs xmake, cmake, ninja, toolchain from .xlings.json
+xlings use gcc@16.1.0       # switch to glibc-linked dev toolchain
+
+# Build:
+xmake build xlings           # dev binary → build/linux/x86_64/release/xlings
+
+# Test:
+xmake build xlings_tests && xmake run xlings_tests   # unit tests
+XLINGS_BIN=$(find build -path '*/release/xlings' -type f | head -1) \
+  bash tests/e2e/<test>.sh                             # e2e tests
+```
+
+For release packaging (static binary):
+- Linux: `tools/linux_release.sh` (musl-gcc static)
+- macOS: `tools/macos_release.sh` (LLVM)
+- Windows: `tools/windows_release.ps1` (MSVC)
+
+## Key Development Patterns
+
+### CLI argparse
+
+Manual positional parsing in each subcommand's `run()` function (see `subos.cppm` line ~1700). Pattern:
+```cpp
+for (int i = 3; i < argc; ++i) {
+    std::string a = argv[i];
+    if (a == "--flag" && i + 1 < argc) { value = argv[++i]; }
+    else if (!a.empty() && a[0] != '-' && name.empty()) { name = std::move(a); }
+    else { usageError("unknown option: " + a); return 1; }
+}
+```
+
+### Type-specific install dispatch
+
+`installer.cppm` checks `node.pkgType`:
+- 0 = Package (standard: extract + hook)
+- 1 = Script (default_install copies .lua)
+- 4 = Subos (default_install creates skeleton + .xlings.json)
+
+### E2E test pattern
+
+Use `project_test_lib.sh` helpers. Key functions:
+- `find_xlings_bin` — locates built binary
+- `run_xlings "$HOME_DIR" "$ROOT_DIR" <args>` — isolated execution
+- `require_fixture_index` — ensures pkgindex fixture present
+
+### Upstream dependency
+
+`mcpplibs/libxpkg` provides the xpkg loader/executor. Referenced via xmake dep:
+```lua
+add_requires("mcpplibs-xpkg 0.0.41")
+```
+For joint development: `xmake f --local_libxpkg=/path/to/libxpkg`
+
+## Agent Skills
+
+| Skill | Purpose |
+|-------|---------|
+| `xlings-usage` | Complete xlings usage guide (install, subos, project mode, agent workflows) |
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [openxlings/xlings](https://github.com/openxlings/xlings) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-06-01 -->
