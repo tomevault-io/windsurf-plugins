@@ -1,52 +1,169 @@
 ---
 trigger: always_on
-description: General coding rules and best practices for @gravity-ui/graph
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
+# CLAUDE.md
 
-## Type Safety
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-### Avoid `any` Type
-- **Never use the `any` type** in your code. Instead:
-  - Use specific types whenever possible (e.g., `MouseEvent`, `KeyboardEvent`, `HTMLElement`)
-  - Use `void` for function return types when the function doesn't return a value
-  - Use `unknown` only as a last resort when the type is truly unpredictable
-  - Implement appropriate interfaces (e.g., `EventListenerObject`) instead of type casting
-  - Use generics to create flexible but type-safe APIs
+## Project Overview
 
-### Type Casting
-- Avoid type casting with `as any`
-- If type casting is necessary, use `as unknown as TargetType` to make the cast more explicit and safer
-- Prefer type guards (`instanceof`, `typeof`, custom type predicates) over type casting
+@gravity-ui/graph is a graph visualization library that combines Canvas for high-performance rendering with HTML/React for rich interactions. The library automatically switches between rendering modes based on zoom level.
 
-## Code Quality
+## Development Commands
 
-### Function Return Types
-- Always specify return types for functions
-- Use `void` for functions that don't return a value
-- Be explicit about nullable return types (e.g., `string | null`)
+```bash
+# Install dependencies (use npm, not yarn or pnpm)
+npm install
 
-### Error Handling
-- Use specific error types instead of generic `Error`
-- Provide meaningful error messages
-- Handle errors at the appropriate level
+# Development mode (watch TypeScript and CSS)
+npm run dev
 
-### Documentation
-- Document public APIs with JSDoc comments
-- Include parameter descriptions and return type descriptions
-- Document complex logic with inline comments
+# Run Storybook for development
+npm run storybook
 
-## Performance
+# Build for production
+npm run build:publish
 
-### Event Handlers
-- Keep event handlers lightweight
-- Debounce or throttle handlers for frequent events (resize, scroll, mousemove)
-- Clean up event listeners when components are unmounted
+# Type checking
+npm run typecheck
 
-### Memory Management
-- Avoid memory leaks by properly cleaning up resources
-- Use AbortController for managing event listeners
-- Unsubscribe from subscriptions when components are unmounted
+# Linting
+npm run lint
+
+# Testing
+npm run test
+
+# Update snapshots
+npm run test -- --updateSnapshot
+
+# Build Storybook
+npm run build-storybook
+```
+
+## Core Architecture
+
+### Dual Rendering System
+
+The library uses a **hybrid Canvas + React architecture**:
+
+- **Canvas Mode (Zoomed Out)**: Entire graph rendered on Canvas for maximum performance with thousands of elements
+- **React Mode (Zoomed In)**: React components activated for blocks when camera scale reaches threshold
+- **Automatic Switching**: `ReactLayer` manages the transition based on `activationScale` configuration
+
+**Key Files**:
+- `src/components/canvas/layers/graphLayer/GraphLayer.ts` - Main Canvas rendering
+- `src/react-components/layer/ReactLayer.tsx` - React Portal integration
+- `src/react-components/GraphCanvas.tsx` - React wrapper component
+
+### Custom Component Framework
+
+The library implements a **custom component system** (not React) for Canvas rendering:
+
+**Component Hierarchy**:
+1. `CoreComponent` (`src/lib/CoreComponent.ts`) - Tree structure, children management, context propagation
+2. `Component` (`src/lib/Component.ts`) - Lifecycle hooks, state/props management
+3. `GraphComponent` (`src/components/canvas/GraphComponent/`) - HitBox, dragging, ports for graph elements
+4. `Block`, `BlockConnection` - Specific implementations
+
+**Lifecycle Flow**:
+```
+willMount → firstIterate → willRender → render → didRender
+         → willUpdateChildren → didUpdateChildren
+         → propsChanged/stateChanged/contextChanged
+         → unmount
+```
+
+**Update Pattern**: Components call `performRender()` to schedule updates via the scheduler, which batches renders in the next animation frame.
+
+### Layer System
+
+Layers are the primary extension mechanism. Each layer is a Component that manages Canvas and/or HTML rendering:
+
+**Built-in Layers (render order)**:
+1. **BelowLayer** (zIndex: 1) - Background grid
+2. **GraphLayer** (zIndex: 2) - Blocks and connections (Canvas)
+3. **SelectionLayer** (zIndex: 3) - Selection visualization
+4. **ReactLayer** (zIndex: 3) - React components (HTML)
+5. **CursorLayer** (zIndex: 4+) - Dynamic cursor management
+
+**Layer Lifecycle**:
+- `init()` - Create Canvas/HTML elements
+- `attachLayer()` - Attach to DOM, call `afterInit()`
+- `afterInit()` - **IMPORTANT**: Set up ALL event listeners here (NOT in constructor/init)
+- `unmount()` - Clean up via AbortController
+
+**Creating Custom Layers**:
+```typescript
+class MyLayer extends Layer {
+  constructor(props) {
+    super({
+      canvas: { zIndex: 2, respectPixelRatio: true },
+      html: { zIndex: 3, transformByCameraPosition: true },
+      ...props
+    });
+  }
+
+  protected afterInit() {
+    // Subscribe to events using wrapper methods
+    this.onGraphEvent("camera-change", this.handleCameraChange);
+    this.onCanvasEvent("mousedown", this.handleMouseDown);
+    super.afterInit(); // Call at end
+  }
+}
+
+// Add to graph
+graph.addLayer(MyLayer, { customProp: 'value' });
+// Do NOT pass graph, camera, root - these are auto-provided
+```
+
+### Scheduler System
+
+**GlobalScheduler** (`src/lib/Scheduler.ts`) drives all rendering via `requestAnimationFrame`:
+
+- **Priority Queues**: 5 levels (HIGHEST → LOWEST)
+- **Batched Updates**: `performRender()` marks components dirty, actual render happens in next frame
+- **Tree Traversal**: Only dirty components actually call `render()`
+- **Lifecycle**: `graph.start()` begins animation loop, `graph.stop()` pauses
+
+### Reactive State with Preact Signals
+
+The library uses `@preact/signals-core` for reactive state management:
+
+**Store Structure** (`src/store/`):
+```
+RootStore
+├── blocksList: BlockListStore
+│   ├── $blocks: Signal<BlockState[]>
+│   └── blockSelectionBucket
+├── connectionsList: ConnectionsStore
+│   ├── $connections: Signal<ConnectionState[]>
+│   └── connectionSelectionBucket
+├── groupsList: GroupsListStore
+├── settings: GraphEditorSettings
+└── selectionService: SelectionService
+```
+
+**Block State** (`src/store/block/Block.ts`):
+```typescript
+BlockState {
+  $rawState: Signal<TBlock>           // Raw block data
+  $state: computed(() => ...)         // Full state + selection
+  $geometry: computed(() => ...)      // x, y, width, height
+  $selected: computed(() => ...)      // Selection state
+  $anchorStates: Signal<AnchorState[]>
+}
+```
+
+**Port State** (`src/store/connection/port/Port.ts`):
+```typescript
+PortState {
+  $state: Signal<TPort>              // Raw port data (id, x, y, component, lookup)
+  $point: computed(() => ...)         // Effective position (respects delegation)
+  delegate(target): void              // Mirror another port's position
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [gravity-ui/graph](https://github.com/gravity-ui/graph) — distributed by [TomeVault](https://tomevault.io).
