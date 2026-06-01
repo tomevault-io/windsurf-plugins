@@ -1,147 +1,215 @@
 ---
 trigger: always_on
-description: These rules MUST be applied whenever creating, modifying, or generating any documentation in the docs/ directory
+description: TypeScript and ESLint rules that MUST be followed when creating, modifying, or reviewing any file under apps/frontend/, including .ts, .tsx, .js, and .jsx files. Also apply when discussing frontend linting, type safety, or ESLint configuration.
 ---
 
-# Rhesis Documentation Rules
 
-**IMPORTANT**: These rules MUST be applied whenever creating, modifying, or generating any documentation in the `docs/` directory.
+# Frontend TypeScript Linting Rules
 
-## Quick Checklist for Documentation
+## No Explicit `any`
 
-When generating or editing documentation, always:
-- ✅ Escape ALL curly braces in text: `\{id\}`, `\{value\}`, `\{placeholder\}`
-- ✅ Remove decorative emojis (use "Note:", "Warning:", "Tip:" instead)
-- ✅ Follow existing documentation style and structure
-- ✅ Include code examples with language tags (```python, ```typescript, ```bash)
-- ✅ Test that the documentation builds without errors
-- ✅ Link to related documentation pages
+The codebase enforces `@typescript-eslint/no-explicit-any` as a warning. **Never use `any` in new code.** Use `unknown` and narrow, or use the correct library/domain type.
 
-## Documentation Framework and Standards
-
-**Framework**: We use Nextra for documentation, which processes MDX (Markdown + JSX) files.
-
-### Key MDX Syntax Rules
-
-#### Escaping Curly Braces
-**Critical**: MDX interprets anything inside curly braces `{...}` as a JSX expression. Always escape curly braces when you want to display them as literal text:
-
-```mdx
-✅ GOOD: API PUT /test_results/\{id\}
-❌ BAD:  API PUT /test_results/{id}  ← This causes "ReferenceError: id is not defined"
-```
-
-**Rule**: Any placeholder, variable, or example value in curly braces must be escaped: `\{value\}`
-
-**Common scenarios requiring escaping**:
-- API endpoint paths: `/api/users/\{userId\}/profile`, `/posts/\{postId\}/comments/\{commentId\}`
-- Template strings: `"Hello \{name\}"`, `"User \{username\} logged in"`
-- Code examples in headings: `### Using \{variable\} in templates`
-- JSON examples: `\{"key": "value"\}`, `\{"status": "success"\}`
-- Path parameters: `/files/\{filename\}`, `/images/\{imageId\}.jpg`
-- Variable placeholders: `\{count\} items`, `\{total\} users`
-
-**When NOT to escape**:
-- Inside code blocks (fenced with ``` or ~~~) - these are already literal
-- Inside inline code: `` `{id}` `` - backticks make it literal
-
-#### Documentation Style Guidelines
-
-1. **Accessibility and Consistency**:
-   - Remove decorative emojis (🎉, ✨, 🚀, etc.) from documentation
-   - Use text-based indicators instead: "Note:", "Warning:", "Tip:"
-   - Emojis reduce accessibility for screen readers and appear inconsistent across platforms
-
-2. **Follow Existing Style**:
-   - Match the tone, structure, and formatting of existing documentation
-   - Use consistent heading levels and hierarchy
-   - Follow established patterns for code examples, tables, and callouts
-
-3. **Code Examples**:
-   - Always specify language for syntax highlighting: ````python`, ````typescript`, ````bash`
-   - Include file paths in comments when helpful: `# apps/backend/src/...`
-   - Keep examples concise but complete enough to be useful
-
-4. **Structure**:
-   - Start with clear overview/introduction
-   - Use descriptive headings that answer "what", "why", "how"
-   - Include practical examples and common scenarios
-   - Link to related documentation
-
-## Material-UI Icons in MDX Files
-
-**Problem**: MDX files cannot directly import Material-UI icons due to module resolution issues.
-
-**Solution**: Always create a separate JSX component to handle icon imports, then use that component in MDX files.
-
-### Pattern to Follow:
-
-1. **Create a JSX component** in `/docs/src/components/` that imports the MUI icons:
-   ```jsx
-   'use client'
-
-   import React from 'react'
-   import IconName from '@mui/icons-material/IconName'
-   import { InfoCardHorizontal } from './InfoCardHorizontal'
-
-   export const MyComponent = () => {
-     return (
-       <InfoCardHorizontal icon={IconName} title="..." description="..." />
-     )
-   }
-   ```
-
-2. **Register the component** in `/docs/src/mdx-components.js`:
-   ```js
-   import { MyComponent } from './components/MyComponent'
-
-   export function useMDXComponents(components) {
-     return {
-       ...themeComponents,
-       ...components,
-       MyComponent,
-     }
-   }
-   ```
-
-3. **Use in MDX files** without any imports:
-   ```mdx
-   <MyComponent />
-   ```
-
-### Examples:
-- `FeatureOverview.jsx` - Imports MUI icons, exports component
-- `ArchitectureOverview.jsx` - Imports MUI icons, exports component
-- `PlatformFeatures.jsx` - Imports MUI icons, exports component
-
-**Never** try to import `@mui/icons-material/*` directly in `.mdx` files.
-
-## Documentation Directory Structure
-
-```
-docs/
-├── src/                           # Documentation site source
-│   ├── components/               # Reusable JSX components for MDX
-│   ├── app/                      # Next.js app directory
-│   └── mdx-components.js         # MDX component registry
-├── content/                      # All documentation content (MDX files)
-│   ├── _meta.tsx                # Root navigation config
-│   ├── index.mdx                # Home page
-│   ├── getting-started/         # Getting started guides
-│   ├── platform/                # Platform feature documentation
-│   ├── development/             # Development guides
-│   │   ├── backend/            # Backend development
-│   │   ├── frontend/           # Frontend development
-│   │   └── worker/             # Worker service
-│   └── sdk/                     # SDK documentation
-└── README.md                     # Documentation overview
-```
-
-## Navigation Configuration
-
-Each directory should have a `_meta.tsx` file to configure navigation:
+### 1. Metadata and Generic Objects - Use `Record<string, unknown>`
 
 ```typescript
+// BAD
+interface MyEntity {
+  metadata?: Record<string, any>;
+  attributes: Record<string, any>;
+}
+
+// GOOD
+interface MyEntity {
+  metadata?: Record<string, unknown>;
+  attributes: Record<string, unknown>;
+}
+```
+
+Special cases where narrower types are appropriate:
+
+```typescript
+// HTTP headers are always strings
+request_headers?: Record<string, string>;
+
+// OpenTelemetry attributes
+attributes: Record<string, string | number | boolean>;
+
+// Known key-value config
+auth?: Record<string, string | boolean | number>;
+```
+
+### 2. Catch Blocks - Use `unknown` with Type Narrowing
+
+```typescript
+// BAD
+try {
+  await api.fetch();
+} catch (error: any) {
+  setError(error.message);
+}
+
+// GOOD
+try {
+  await api.fetch();
+} catch (error: unknown) {
+  const message = error instanceof Error ? error.message : 'Unknown error';
+  setError(message);
+}
+```
+
+For accessing non-standard properties like `.status` or `.response`:
+
+```typescript
+} catch (error: unknown) {
+  const errObj = error as Error & { status?: number; response?: { data?: { detail?: string } } };
+  if (errObj.status === 404) {
+    // handle not found
+  }
+  const message = errObj instanceof Error ? errObj.message : String(error);
+}
+```
+
+### 3. MUI DataGrid Callbacks - Use Library Types
+
+```typescript
+import type { GridRenderCellParams, GridRowParams, GridCellParams, GridRowModel, GridColDef } from '@mui/x-data-grid';
+import type { SxProps, Theme } from '@mui/material';
+
+// BAD
+columns: any[];
+rows: any[];
+onRowClick?: (params: any) => void;
+getRowId?: (row: any) => string;
+sx?: any;
+
+// GOOD
+columns: GridColDef[];
+rows: GridRowModel[];
+onRowClick?: (params: GridRowParams) => void;
+getRowId?: (row: GridRowModel) => string;
+sx?: SxProps<Theme>;
+```
+
+### 4. Type Assertions - Avoid `as any`
+
+```typescript
+// BAD
+const result = response as any;
+(theme.palette as any)[color];
+
+// GOOD - use intermediate unknown when needed
+const result = response as unknown as MyResponseType;
+(theme.palette as unknown as Record<string, Record<string, string>>)[color];
+```
+
+When accessing window globals:
+
+```typescript
+// BAD
+(window as any).myGlobal = value;
+
+// GOOD
+(window as Window & { myGlobal?: string }).myGlobal = value;
+```
+
+### 5. Function Return Types - Use Typed Promises
+
+```typescript
+// BAD
+async function fetchData(): Promise<any> { ... }
+
+// GOOD
+async function fetchData(): Promise<Record<string, unknown>> { ... }
+
+// BETTER - define a response interface
+interface FetchResponse {
+  data: MyEntity[];
+  total: number;
+}
+async function fetchData(): Promise<FetchResponse> { ... }
+```
+
+### 6. Recharts and Chart Formatters
+
+```typescript
+// BAD
+tickFormatter?: (value: any) => string;
+tooltipFormatter?: (value: any, name: any) => string;
+
+// GOOD
+tickFormatter?: (value: string | number) => string;
+tooltipFormatter?: (value: string | number, name: string) => string;
+```
+
+### 7. Test Files - Disable Per-File
+
+Using `any` in test files for mocks and partial objects is acceptable. Add a file-level disable:
+
+```typescript
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
+import { render } from '@testing-library/react';
+// ... test code using any for mocks
+```
+
+## Handling `unknown` in JSX
+
+When using `Record<string, unknown>` types, `unknown` values can leak into JSX children through `&&` short-circuit operators, causing `TS2769: Type 'unknown' is not assignable to type 'ReactNode'`.
+
+### 1. Extract and Narrow Before JSX
+
+```typescript
+// BAD - unknown leaks into JSX via &&
+{test.metadata?.sources && Array.isArray(test.metadata.sources) && (
+  <Grid>{/* TS error: unknown is not ReactNode */}</Grid>
+)}
+
+// GOOD - extract and narrow before JSX
+const sources: Array<Record<string, string>> = Array.isArray(test.metadata?.sources)
+  ? test.metadata.sources
+  : [];
+
+// Then in JSX:
+{sources.length > 0 && (
+  <Grid>{/* works fine */}</Grid>
+)}
+```
+
+### 2. Guard Against Empty Objects `{}`
+
+API responses typed as `Record<string, unknown>` may return `{}` where you expect a string or array. Always guard:
+
+```typescript
+// BAD - created_at might be {} not string
+<span>{new Date(item.created_at).toLocaleDateString()}</span>
+
+// GOOD
+{typeof item.created_at === 'string' && (
+  <span>{new Date(item.created_at).toLocaleDateString()}</span>
+)}
+```
+
+### 3. Explicitly Type Boolean Conditions
+
+```typescript
+// BAD - isMultiTurn could be unknown, leaks into JSX children
+{test.metadata?.is_multi_turn && <MultiTurnView />}
+
+// GOOD - explicitly typed boolean
+const isMultiTurn: boolean = Boolean(test.metadata?.is_multi_turn);
+{isMultiTurn && <MultiTurnView />}
+```
+
+## Non-Null Assertions
+
+The codebase enforces `@typescript-eslint/no-non-null-assertion` as a warning. Do not use the `!` postfix operator.
+
+```typescript
+// BAD
+const name = user!.name;
+const provider = providers.find(p => p.id === id)!;
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
