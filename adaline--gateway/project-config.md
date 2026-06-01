@@ -1,205 +1,208 @@
 ---
 trigger: always_on
-description: The gateway core module is the central orchestrator that handles AI provider requests, manages caching, queuing, and provides unified interfaces for chat completion, embeddings, and tool responses.
+description: The types package contains shared type definitions, Zod schemas, and interfaces used across the entire Adaline Gateway ecosystem. This package serves as the single source of truth for all data structures.
 ---
 
 
-# Gateway Core Module - Complete Rules & Implementation Guide
+# Types Package Rules & Instructions
 
-## Module Overview
+## Package Overview
 
-The gateway core module is the central orchestrator that handles AI provider requests, manages caching, queuing, and provides unified interfaces for chat completion, embeddings, and tool responses.
+The types package contains shared type definitions, Zod schemas, and interfaces used across the entire Adaline Gateway ecosystem. This package serves as the single source of truth for all data structures.
 
-## Core Architecture Principles
+## Type Definition Rules
 
-### 1. Type Safety & Schema Validation
+### 1. Schema-First Approach
 
-#### Rules
+- **ALWAYS** define Zod schemas first, then derive TypeScript types
+- **ALWAYS** export both the schema and the inferred type
+- **ALWAYS** use descriptive schema names ending with descriptive suffixes
+- **NEVER** define types without corresponding schemas
 
-- **ALWAYS** use Zod schemas for runtime validation
-- **ALWAYS** export both the schema and inferred types
-- **NEVER** use `any` type - use proper generic constraints
-- **ALWAYS** validate input/output at runtime using schemas
+### 2. Naming Conventions
 
-#### Instructions
+- **ALWAYS** use PascalCase for schema names: `ChatResponse`, `MessageContent`
+- **ALWAYS** use PascalCase + `Type` suffix for type names: `ChatResponseType`, `MessageContentType`
+- **ALWAYS** use descriptive names that clearly indicate purpose
+- **ALWAYS** follow the pattern: `{SchemaName}` and `{SchemaName}Type`
+
+## Schema Definition Instructions
+
+### 1. Basic Schema Structure
 
 ```typescript
 // ✅ CORRECT: Define schema first, then type
-import { z } from 'zod';
-
-const UserConfig = z.object({
-  apiKey: z.string().min(1),
-  model: z.string().min(1),
-  temperature: z.number().min(0).max(2).default(1.0),
+const ChatResponse = z.object({
+  messages: z.array(Message()),
+  usage: ChatUsage.optional(),
+  logProbs: ChatLogProbs.optional(),
 });
-type UserConfigType = z.infer<typeof UserConfig>;
+type ChatResponseType = z.infer<typeof ChatResponse>;
 
-// Export both schema and type
-export { UserConfig, type UserConfigType };
+// ❌ INCORRECT: Define type without schema
+type ChatResponseType = {
+  messages: MessageType[];
+  usage?: ChatUsageType;
+  logProbs?: ChatLogProbsType;
+};
+```
 
-// ❌ INCORRECT: Using any type
-function processData(data: any): any {
-  return data; // Unsafe and loses type information
+### 2. Schema Composition
+
+```typescript
+// ✅ CORRECT: Compose schemas from smaller parts
+const ChatUsage = z.object({
+  promptTokens: z.number().nonnegative(),
+  completionTokens: z.number().nonnegative(),
+  totalTokens: z.number().nonnegative(),
+});
+
+const ChatResponse = z.object({
+  messages: z.array(Message()),
+  usage: ChatUsage.optional(),
+});
+
+// ❌ INCORRECT: Duplicate schema definitions
+const ChatResponse = z.object({
+  messages: z.array(Message()),
+  usage: z.object({
+    promptTokens: z.number().nonnegative(),
+    completionTokens: z.number().nonnegative(),
+    totalTokens: z.number().nonnegative(),
+  }).optional(),
+});
+```
+
+### 3. Optional vs Required Fields
+
+```typescript
+// ✅ CORRECT: Use .optional() for truly optional fields
+const Message = z.object({
+  role: z.enum(['user', 'assistant', 'system']), // Required
+  content: z.array(MessageContent()), // Required
+  name: z.string().optional(), // Optional
+  toolCalls: z.array(ToolCall()).optional(), // Optional
+});
+
+// ❌ INCORRECT: Making required fields optional
+const Message = z.object({
+  role: z.enum(['user', 'assistant', 'system']).optional(), // Should be required
+  content: z.array(MessageContent()).optional(), // Should be required
+});
+```
+
+## Type Export Instructions
+
+### 1. Export Pattern
+
+```typescript
+// ✅ CORRECT: Export both schema and type
+export {
+  ChatResponse,
+  ChatUsage,
+  type ChatResponseType,
+  type ChatUsageType,
+};
+
+// ❌ INCORRECT: Export only types
+export type {
+  ChatResponseType,
+  ChatUsageType,
+};
+```
+
+### 2. Index File Organization
+
+```typescript
+// ✅ CORRECT: Re-export from subdirectories
+export * from "./chat";
+export * from "./config";
+export * from "./embedding";
+export * from "./errors";
+export * from "./message";
+export * from "./pricing";
+export * from "./tool";
+export * from "./utils";
+
+// ❌ INCORRECT: Export individual items
+export { ChatResponse, ChatUsage } from "./chat";
+export { ConfigType } from "./config";
+```
+
+## Validation Instructions
+
+### 1. Input Validation
+
+```typescript
+// ✅ CORRECT: Validate input using schemas
+function processChatResponse(data: unknown): ChatResponseType {
+  return ChatResponse.parse(data);
 }
 
-// ✅ CORRECT: Proper typing with validation
-function processData(data: unknown): UserConfigType {
-  return UserConfig.parse(data); // Validates at runtime
+// ❌ INCORRECT: Type assertion without validation
+function processChatResponse(data: unknown): ChatResponseType {
+  return data as ChatResponseType; // Unsafe!
 }
 ```
 
-### 2. Error Handling
-
-#### Rules
-
-- **ALWAYS** use custom error classes extending `GatewayError`
-- **ALWAYS** provide meaningful error messages with context
-- **ALWAYS** handle errors gracefully with proper logging
-- **NEVER** let unhandled errors bubble up
-
-#### Instructions
+### 2. Safe Parsing
 
 ```typescript
-// ✅ CORRECT: Custom error class with context
-import { GatewayError } from "./errors";
-
-export class ProviderConnectionError extends GatewayError {
-  constructor(
-    message: string,
-    public readonly provider: string,
-    public readonly statusCode: number,
-    public readonly originalError?: Error
-  ) {
-    super(`Failed to connect to ${provider}: ${message} (Status: ${statusCode})`, "PROVIDER_CONNECTION_ERROR");
-  }
+// ✅ CORRECT: Use safeParse for error handling
+const result = ChatResponse.safeParse(data);
+if (result.success) {
+  // result.data is ChatResponseType
+  return result.data;
+} else {
+  // result.error contains validation errors
+  throw new ValidationError(result.error.errors);
 }
 
-// Usage in code
+// ❌ INCORRECT: Ignoring validation errors
 try {
-  await provider.makeRequest();
+  return ChatResponse.parse(data);
 } catch (error) {
-  if (error instanceof HttpError) {
-    throw new ProviderConnectionError("API request failed", "anthropic", error.status, error);
-  }
+  // Error handling is missing
   throw error;
 }
 ```
 
-### 3. Logging & Telemetry
+## Schema Design Instructions
 
-#### Rules
-
-- **ALWAYS** use the centralized logger from `LoggerManager`
-- **ALWAYS** include relevant context in log messages
-- **ALWAYS** use OpenTelemetry for tracing and metrics
-- **ALWAYS** log at appropriate levels (debug, info, warn, error)
-
-#### Instructions
+### 1. Union Types
 
 ```typescript
-// ✅ CORRECT: Centralized logging with context
-import { LoggerManager } from "./plugins/logger";
+// ✅ CORRECT: Use discriminated unions for different content types
+const MessageContent = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('text'),
+    text: z.string(),
+  }),
+  z.object({
+    type: z.literal('image'),
+    imageUrl: z.string().url(),
+    altText: z.string().optional(),
+  }),
+]);
 
-const logger = LoggerManager.getLogger();
-
-// Structured logging with context
-logger?.info("Processing chat request", {
-  requestId: request.id,
-  model: request.model,
-  provider: request.provider,
-  timestamp: new Date().toISOString(),
-});
-
-// Error logging with full context
-logger?.error("Provider request failed", {
-  error: error.message,
-  stack: error.stack,
-  requestId: request.id,
-  provider: request.provider,
-  statusCode: response.status,
-});
-
-// Debug logging for troubleshooting
-logger?.debug("Cache operation", {
-  operation: "get",
-  key: cacheKey,
-  hit: !!cachedResponse,
-  ttl: cachedResponse?.ttl,
-});
+// ❌ INCORRECT: Simple union without discrimination
+const MessageContent = z.union([
+  z.string(),
+  z.object({ imageUrl: z.string() }),
+]);
 ```
 
-### 4. Testing Standards
-
-#### Rules
-
-- **ALWAYS** write comprehensive tests for new functionality
-- **ALWAYS** use Vitest as the testing framework
-- **ALWAYS** mock external dependencies
-- **ALWAYS** test both success and error scenarios
-- **ALWAYS** use descriptive test names and proper assertions
-
-#### Instructions
+### 2. Constrained Types
 
 ```typescript
-// ✅ CORRECT: Comprehensive test structure
-import { beforeEach, describe, expect, it, vi } from "vitest";
+// ✅ CORRECT: Use appropriate constraints
+const TokenCount = z.number().int().nonnegative();
+const ModelName = z.string().min(1).max(100);
+const ApiKey = z.string().regex(/^sk-[a-zA-Z0-9]{32,}$/);
 
-import { Gateway } from "./gateway";
-
-describe("Gateway.completeChat", () => {
-  let gateway: Gateway;
-  let mockProvider: any;
-
-  beforeEach(() => {
-    // Setup mocks
-    mockProvider = {
-      completeChat: vi.fn(),
-      getModelPricing: vi.fn(),
-    };
-
-    gateway = new Gateway({
-      providers: { anthropic: mockProvider },
-    });
-  });
-
-  it("should successfully complete chat request", async () => {
-    // Arrange
-    const request = {
-      messages: [{ role: "user", content: "Hello" }],
-      model: "claude-3-sonnet",
-    };
-
-    const expectedResponse = {
-      messages: [{ role: "assistant", content: "Hi there!" }],
-      usage: { promptTokens: 5, completionTokens: 3, totalTokens: 8 },
-    };
-
-    mockProvider.completeChat.mockResolvedValue(expectedResponse);
-
-    // Act
-    const result = await gateway.completeChat(request);
-
-    // Assert
-    expect(result).toEqual(expectedResponse);
-    expect(mockProvider.completeChat).toHaveBeenCalledWith(request);
-  });
-
-  it("should handle provider errors gracefully", async () => {
-    // Arrange
-    const request = { messages: [], model: "invalid-model" };
-    const error = new Error("Model not found");
-    mockProvider.completeChat.mockRejectedValue(error);
-
-    // Act & Assert
-    await expect(gateway.completeChat(request)).rejects.toThrow("Model not found");
-  });
-});
-```
-
-## Gateway Class Rules
-
-### 1. Constructor & Initialization
-
+// ❌ INCORRECT: Overly permissive types
+const TokenCount = z.number(); // Allows negative numbers
+const ModelName = z.string(); // Allows empty strings
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
