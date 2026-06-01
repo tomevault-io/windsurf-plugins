@@ -1,258 +1,225 @@
 ---
 trigger: always_on
-description: Email system using React Email and Mailgun with queue-based sending
+description: Environment configuration and secrets management
 ---
 
 
-# Email System
+# Environment Configuration
 
-## Architecture
+## Configuration Files
 
-- **Templates**: React Email components in [src/email/templates/](mdc:src/email/templates/)
-- **Service**: Email service in [src/email/email.service.ts](mdc:src/email/email.service.ts)
-- **Provider**: Email provider abstraction in [src/lib/email.ts](mdc:src/lib/email.ts) (supports Mailgun & SMTP)
-- **Queue**: Background sending via [src/queues/email.queue.ts](mdc:src/queues/email.queue.ts)
-- **Development**: Preview server for templates
+- `.env.sample` - Template with all available variables
+- `.env` - Local development (gitignored)
+- `.env.local` - Local production build (gitignored)
+- `.env.production` - Production environment (gitignored)
+- [src/config/env.ts](mdc:src/config/env.ts) - Type-safe config with Zod validation
 
-## Email Configuration
+## Configuration Pattern
 
-### Environment Variables
+All environment variables are validated and typed in [env.ts](mdc:src/config/env.ts):
+
+```typescript
+import { z } from 'zod';
+
+const configSchema = z.object({
+  NODE_ENV: z.enum(['development', 'production', 'test']),
+  PORT: z.string().transform(Number),
+  DATABASE_URL: z.string().url(),
+  JWT_SECRET: z.string().min(32),
+  // ... more config
+});
+
+export type Config = z.infer<typeof configSchema>;
+
+export const config: Config = configSchema.parse({
+  NODE_ENV: process.env.NODE_ENV || 'development',
+  PORT: process.env.PORT || '3000',
+  DATABASE_URL: process.env.DATABASE_URL,
+  JWT_SECRET: process.env.JWT_SECRET,
+  // ... more config
+});
+```
+
+## Time Duration Format
+
+All time-based config values use milliseconds internally:
+
+```typescript
+// In .env
+JWT_EXPIRES_IN=7d
+OTP_EXPIRES_IN=10m
+
+// In env.ts - convert to milliseconds
+import ms from "ms";
+
+JWT_EXPIRES_IN: z.string().transform((val) => ms(val)),
+// Converts "7d" → 604800000ms
+```
+
+## Required Environment Variables
+
+### Core
 
 ```bash
-# Option 1: Mailgun (Recommended)
+NODE_ENV=development
+PORT=3000
+```
+
+### Database
+
+```bash
+DATABASE_URL=mongodb://localhost:27017/your-db
+```
+
+### Authentication
+
+```bash
+JWT_SECRET=your-super-secret-key-at-least-32-characters
+JWT_EXPIRES_IN=7d
+OTP_EXPIRES_IN=10m
+OTP_SECRET=your-otp-secret-key
+```
+
+### Redis
+
+```bash
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=
+```
+
+### AWS S3 (File Uploads)
+
+```bash
+AWS_REGION=us-east-1
+AWS_ACCESS_KEY_ID=your-access-key
+AWS_SECRET_ACCESS_KEY=your-secret-key
+AWS_S3_BUCKET=your-bucket-name
+```
+
+### Email (Mailgun)
+
+```bash
 MAILGUN_API_KEY=your-mailgun-api-key
 MAILGUN_DOMAIN=your-domain.com
-MAILGUN_FROM_EMAIL=noreply@your-domain.com
-
-# Option 2: SMTP (Fallback)
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USERNAME=your-email@gmail.com
-SMTP_PASSWORD=your-app-password
-SMTP_FROM=noreply@your-domain.com
-EMAIL_FROM=noreply@your-domain.com
-
-# Note: Provider auto-selects Mailgun if configured, otherwise SMTP
+MAILGUN_FROM=noreply@your-domain.com
 ```
 
-## Creating Email Templates
-
-### Step 1: Create React Component
-
-Create new file in `src/email/templates/TemplateName.tsx`:
-
-```typescript
-import {
-  Html,
-  Head,
-  Body,
-  Container,
-  Section,
-  Text,
-  Button,
-  Hr,
-  Img,
-} from "@react-email/components";
-
-interface TemplateNameProps {
-  name: string;
-  actionUrl: string;
-}
-
-export default function TemplateName({ name, actionUrl }: TemplateNameProps) {
-  return (
-    <Html>
-      <Head />
-      <Body style={styles.body}>
-        <Container style={styles.container}>
-          <Section style={styles.section}>
-            <Img
-              src="https://your-domain.com/logo.png"
-              alt="Logo"
-              width="150"
-              height="50"
-              style={styles.logo}
-            />
-
-            <Text style={styles.heading}>Hello, {name}!</Text>
-
-            <Text style={styles.text}>
-              Your email content goes here.
-            </Text>
-
-            <Button style={styles.button} href={actionUrl}>
-              Click Here
-            </Button>
-
-            <Hr style={styles.hr} />
-
-            <Text style={styles.footer}>
-              © 2025 Your Company. All rights reserved.
-            </Text>
-          </Section>
-        </Container>
-      </Body>
-    </Html>
-  );
-}
-
-const styles = {
-  body: {
-    backgroundColor: "#f6f9fc",
-    fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-  },
-  container: {
-    margin: "0 auto",
-    padding: "20px 0",
-  },
-  section: {
-    backgroundColor: "#ffffff",
-    borderRadius: "8px",
-    padding: "40px",
-  },
-  logo: {
-    margin: "0 auto 20px",
-    display: "block",
-  },
-  heading: {
-    fontSize: "24px",
-    fontWeight: "bold",
-    margin: "20px 0",
-    color: "#1a1a1a",
-  },
-  text: {
-    fontSize: "16px",
-    lineHeight: "24px",
-    color: "#525252",
-    margin: "16px 0",
-  },
-  button: {
-    backgroundColor: "#007bff",
-    color: "#ffffff",
-    padding: "12px 32px",
-    borderRadius: "6px",
-    textDecoration: "none",
-    display: "inline-block",
-    margin: "20px 0",
-  },
-  hr: {
-    borderColor: "#e6e6e6",
-    margin: "30px 0",
-  },
-  footer: {
-    fontSize: "14px",
-    color: "#8c8c8c",
-    textAlign: "center" as const,
-  },
-};
-
-// Preview props for development
-TemplateName.PreviewProps = {
-  name: "John Doe",
-  actionUrl: "https://example.com/action",
-} as TemplateNameProps;
-```
-
-### Step 2: Test Template
+### OAuth (Google)
 
 ```bash
-# Start email development server
-pnpm run email:dev
-
-# Open browser to preview
-# http://localhost:3001
+GOOGLE_CLIENT_ID=your-google-client-id
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+GOOGLE_CALLBACK_URL=http://localhost:3000/api/auth/google/callback
 ```
 
-## Sending Emails
+### Session
 
-### Method 1: Direct Send (Simple)
+```bash
+SESSION_SECRET=your-session-secret-key
+```
+
+### Frontend URL
+
+```bash
+FRONTEND_URL=http://localhost:5173
+```
+
+## Adding New Config Variables
+
+### Step 1: Add to `.env.sample`
+
+```bash
+# New Feature Config
+NEW_API_KEY=your-api-key
+NEW_API_TIMEOUT=30s
+```
+
+### Step 2: Add to config schema
 
 ```typescript
-import { sendEmail } from '@/email/email.service';
-
-await sendEmail({
-  to: 'user@example.com',
-  subject: 'Welcome!',
-  template: 'TemplateName',
-  data: {
-    name: 'John Doe',
-    actionUrl: 'https://example.com/verify',
-  },
+// In src/config/env.ts
+const configSchema = z.object({
+  // ... existing config
+  NEW_API_KEY: z.string().min(1),
+  NEW_API_TIMEOUT: z.string().transform((val) => ms(val)),
 });
 ```
 
-### Method 2: Queue-based (Recommended)
+### Step 3: Parse from environment
 
 ```typescript
-import { emailQueue } from '@/queues/email.queue';
-
-await emailQueue.add('sendEmail', {
-  to: 'user@example.com',
-  subject: 'Welcome!',
-  template: 'TemplateName',
-  data: {
-    name: 'John Doe',
-    actionUrl: 'https://example.com/verify',
-  },
+export const config: Config = configSchema.parse({
+  // ... existing config
+  NEW_API_KEY: process.env.NEW_API_KEY,
+  NEW_API_TIMEOUT: process.env.NEW_API_TIMEOUT || '30s',
 });
 ```
 
-## Email Service Usage
-
-The email service in [email.service.ts](mdc:src/email/email.service.ts) handles:
-
-- Template rendering
-- HTML/text generation
-- Queue job creation
-
-### Function Signature
+### Step 4: Use in code
 
 ```typescript
-interface SendEmailOptions {
-  to: string | string[]; // Recipient(s)
-  subject: string;
-  template: string; // Template name (without .tsx)
-  data: Record<string, any>; // Props for template
-  from?: string; // Optional: override default sender
-  replyTo?: string; // Optional: reply-to address
-  attachments?: Array<{
-    filename: string;
-    content: Buffer | string;
-    contentType?: string;
-  }>;
-}
+import config from '@/config/env';
 
-export const sendEmail = async (options: SendEmailOptions): Promise<void>;
+const apiKey = config.NEW_API_KEY;
+const timeout = config.NEW_API_TIMEOUT; // In milliseconds
 ```
 
-## Queue System
+## Best Practices
 
-Email queue in [email.queue.ts](mdc:src/queues/email.queue.ts) provides:
+### Security
 
-- Async sending (doesn't block API response)
-- Automatic retries on failure
-- Queue monitoring via dashboard
+- NEVER commit actual `.env` files to git
+- Keep secrets in environment variables, not hardcoded
+- Use different secrets for development and production
+- Rotate secrets regularly
 
-### Queue Configuration
+### Validation
 
-```typescript
-// Default options
-{
-  attempts: 3, // Retry up to 3 times
-  backoff: {
-    type: "exponential",
-    delay: 1000, // Start with 1 second delay
-  },
-}
+- Always validate with Zod in env.ts
+- Fail fast if required config is missing
+- Provide sensible defaults where appropriate
+- Use type inference for type safety
+
+### Documentation
+
+- Document all variables in `.env.sample`
+- Add comments explaining what each variable does
+- Provide example values
+- Indicate which variables are required vs optional
+
+### Time Values
+
+- Always use human-readable format in .env (e.g., "7d", "10m", "30s")
+- Convert to milliseconds in env.ts using `ms` package
+- Never use raw milliseconds in .env files
+
+## Docker Setup
+
+For local development with Docker:
+
+```bash
+# Start services
+docker compose up -d
+
+# Services included:
+# - MongoDB (port 27017)
+# - Redis (port 6379)
 ```
 
-### Custom Queue Options
+## Common Mistakes to Avoid
 
-```typescript
-await emailQueue.add(
-  'sendEmail',
+❌ DON'T access `process.env` directly in code
+✅ DO import from `env.ts`
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+❌ DON'T use hardcoded values
+✅ DO use environment variables
+
+❌ DON'T forget to validate new config variables
+✅ DO add Zod validation in env.ts
+
+❌ DON'T commit `.env` files
+✅ DO commit `.env.sample` as template
 
 ---
 > Source: [muneebhashone/typescript-backend-toolkit](https://github.com/muneebhashone/typescript-backend-toolkit) — distributed by [TomeVault](https://tomevault.io).
