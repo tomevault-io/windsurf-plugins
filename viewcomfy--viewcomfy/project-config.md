@@ -1,136 +1,149 @@
 ---
 trigger: always_on
-description: You are a Senior Full Stack Developer and an Expert. You are thoughtful, give nuanced answers, and are brilliant at reasoning. You carefully provide accurate, factual, thoughtful answers, and are a genius at reasoning.
+description: This file is for agentic coding assistants operating in this repo.
 ---
 
-You are a Senior Full Stack Developer and an Expert. You are thoughtful, give nuanced answers, and are brilliant at reasoning. You carefully provide accurate, factual, thoughtful answers, and are a genius at reasoning.
+# AGENTS.md (ViewComfy)
 
-a view_comfy.json file is a json file that defines a how to render a Web UI from the properties inside of it.
+This file is for agentic coding assistants operating in this repo.
+It summarizes how to build/lint/typecheck, how the project is structured, and the
+local code conventions/rules to follow.
 
-the structure of the view_comfy.json file is as follows:
+## Project overview
+- Next.js App Router project (`app/`) with React 19 + TypeScript (strict).
+- UI is largely shadcn/ui + Radix primitives (`components/ui/`).
+- Shared helpers live in `lib/`, app-specific logic in `app/`.
+- Path alias: import from `@/*` maps to repo root (see `tsconfig.json`).
+- OpenAPI-generated client in `src/generated/` with Clerk authentication (see below).
 
-```json
-{
-    "file_type": "view_comfy",
-    "file_version": "1.0.0",
-    "appTitle": "My Awesome App",
-    "appImg": "https://viewcomfy-models-public.s3.us-east-1.amazonaws.com/template_covers/fast_flux_with_cache_cover.png",
-    "version": "0.0.1",
-    "workflows": [
-        {
-            "viewComfyJSON": {
-                "title": "My Awesome Workflow 1",
-                "description": "",
-                "previewImages": [
-                    null,
-                    null,
-                    null
-                ],
-                "inputs": [
-                    {
-                        "title": "CLIP Text Encode (Prompt)",
-                        "inputs": [
-                            {
-                                "title": "CLIP Text Encode (Prompt)",
-                                "placeholder": "CLIP Text Encode (Prompt)",
-                                "value": "photograph of victorian woman with wings, sky clouds, meadow grass\n",
-                                "workflowPath": [
-                                    "6",
-                                    "inputs",
-                                    "text"
-                                ],
-                                "helpText": "Helper Text",
-                                "valueType": "long-text",
-                                "validations": {
-                                    "required": true
-                                },
-                                "key": "6-inputs-text"
-                            }
-                        ],
-                        "key": "6-CLIPTextEncode"
-                    }
-                ],
-                "advancedInputs": [
-                    {
-                        "title": "Load Checkpoint",
-                        "inputs": [
-                            {
-                                "title": "Ckpt_name",
-                                "placeholder": "Ckpt_name",
-                                "value": "512-inpainting-ema.safetensors",
-                                "workflowPath": [
-                                    "14",
-                                    "inputs",
-                                    "ckpt_name"
-                                ],
-                                "helpText": "Helper Text",
-                                "valueType": "select",
-                                "options": [
-                                    {
-                                        "label": "Inpainting EMA",
-                                        "value": "512-inpainting-ema.safetensors"
-                                    },
-                                    {
-                                        "label": "Flux Dev",
-                                        "value": "flux_dev.safetensors"
-                                    }
-                                ],
-                                "validations": {
-                                    "required": true
-                                },
-                                "key": "14-inputs-ckpt_name"
-                            }
-                        ],
-                        "key": "14-CheckpointLoaderSimple"
-                    }
-                ]
-            },
-            "workflowApiJSON": {
-                "3": {
-                    "_meta": {
-                        "title": "KSampler"
-                    },
-                    "inputs": {
-                        "cfg": 8,
-                        "seed": 40741760227630,
-                        "model": [
-                            "14",
-                            0
-                        ],
-                        "steps": 20,
-                        "denoise": 0.87,
-                        "negative": [
-                            "7",
-                            0
-                        ],
-                        "positive": [
-                            "6",
-                            0
-                        ],
-                        "scheduler": "normal",
-                        "latent_image": [
-                            "12",
-                            0
-                        ],
-                        "sampler_name": "dpmpp_2m"
-                    },
-                    "class_type": "KSampler"
-                }
-            }
-        }
-    ]
-}
+## Quick commands
 
+### Install
+```bash
+npm install
+# or (CI-style)
+npm ci
 ```
 
-the structure of the view_comfy.json file is as follows:
+### Dev
+```bash
+npm run dev
+```
+Note: `dev` runs `next dev` with Node inspector enabled.
 
-- "file_type": is always "view_comfy"
-- "file_version": is a string and can have any value
-- "appTitle": is an optional value and defines the title of the app
-- "appImg": is an optional value and is a url to an image.
-- "version": is a string and can have any value
-- "workflows": is an array of objects that contains two objects:
+### Build / start
+```bash
+npm run build
+npm run start
+```
+
+### Lint
+```bash
+npm run lint
+npm run lint-fix
+```
+
+### Lint a single file
+```bash
+npx eslint "components/ui/button.tsx"
+# fix only that file
+npx eslint "components/ui/button.tsx" --fix
+```
+
+### Typecheck (no emit)
+There is no `typecheck` script yet; use `tsc` directly:
+```bash
+npx tsc -p tsconfig.json --noEmit
+```
+
+### Tests
+- There is currently **no** `test` script and no test runner dependency in `package.json`.
+- Treat `npm run lint` + `npx tsc -p tsconfig.json --noEmit` + `npm run build` as the local verification suite.
+
+## CI / Docker builds
+GitHub Actions primarily build Docker images (see `.github/workflows/*`):
+- `viewcomfy-nextjs-build.yml` → `Dockerfile`
+- `viewcomfy-editor-modal-build.yml` → `ViewComfy-modal.dockerfile`
+- `viewcomfy-playground-modal-build copy.yml` → `ViewComfy-modal.dockerfile`
+
+Local Docker (minimal):
+```bash
+docker build -t viewcomfy .
+docker run -it --name viewcomfy-container -p 3000:3000 viewcomfy
+```
+
+## Cursor rules in this repo (MUST FOLLOW)
+Cursor rules are stored in `.cursor/rules/` and marked `alwaysApply: true`.
+If these conflict with your personal defaults, prefer the Cursor rules.
+
+### `.cursor/rules/front-end-cursor-rules.mdc`
+Key requirements (interpret in a React/Next.js context):
+- Fully implement requested functionality; no TODOs/placeholders.
+- Prefer readable, DRY code with early returns.
+- Accessibility: keyboard nav, ARIA labels/roles, focus states.
+- Components: use `React.forwardRef` for interactive UI; define props interfaces; use CVA variants; set `displayName`.
+- Styling: Tailwind + shadcn tokens/CSS vars; use `cn()`; support dark mode via CSS variables.
+- Handlers: name event handlers with `handle*` (e.g., `handleClick`).
+
+### `.cursor/rules/view-comfy-json-rules.mdc`
+These rules apply when editing `view_comfy.json` / “ViewComfy JSON” structures:
+- `view_comfy.json` contains `workflows[]` entries with:
+  - `viewComfyJSON` (safe to edit; controls UI)
+  - `workflowApiJSON` (**DO NOT EDIT**)
+- **Never touch `workflowApiJSON`; only modify `viewComfyJSON`.**
+- When moving/removing inputs, move/remove the entire object (not partial).
+- For `valueType: "select"`, `options[]` is required (label/value pairs).
+
+## Code style (pragmatic, repo-aligned)
+This repo contains a mix of formatting styles across files. Follow these rules:
+- Avoid drive-by formatting changes; keep existing file style unless you are
+  already making substantial edits in that file.
+- Use ESLint to catch issues (`npm run lint`) and `npm run lint-fix` for safe
+  auto-fixes.
+
+### Imports
+Preferred order (match common shadcn/ui patterns in `components/ui/*`):
+1. React imports (`import * as React from "react"`) when needed.
+2. External libraries (Radix, zod, zustand, etc.).
+3. Internal absolute imports via alias (`@/lib/...`, `@/app/...`).
+4. Relative imports (`./...`).
+
+Guidelines:
+- Use type-only imports where it improves clarity (`import type { X } ...`).
+- Prefer `@/` alias over deep relative paths.
+
+### Formatting
+- Use Tailwind utility classes; prefer `cn()` for conditional composition.
+- Prefer small, composable functions and early returns.
+- Keep JSX readable: avoid deeply nested ternaries in render.
+
+### Types
+- TypeScript is `strict: true` (`tsconfig.json`). Don’t weaken types.
+- Prefer:
+  - `interface` for object-shaped props and API shapes.
+  - `type` for unions/literals (`type Status = "a" | "b"`).
+- This repo often prefixes interfaces with `I` (e.g., `IComfyUIError`). Keep
+  consistency within the file/module you touch.
+- ESLint allows `any`, but prefer `unknown` + narrowing in new code.
+- `@ts-ignore` is only allowed with a description (see `eslint.config.mjs`).
+
+### Naming
+- Components: `PascalCase` (e.g., `WorkflowSidebar`).
+- Hooks: `useSomething`.
+- Booleans: `isLoading`, `hasError`, `canEdit`.
+- Handlers: `handleClick`, `handleSubmit`, `handleKeyDown`.
+- Files/folders: follow existing naming in the area you’re editing.
+
+## Error handling patterns
+Prefer existing patterns instead of inventing new ones:
+- API routes often return typed JSON errors via `ErrorResponseFactory`
+  (`app/models/errors.ts`) and `NextResponse.json(...)`.
+- For workflow/Comfy errors, use `ComfyWorkflowError` and/or
+  `ComfyErrorHandler` (`app/helpers/comfy-error-handler.ts`).
+- When catching `unknown`, convert to a structured response rather than
+  returning raw strings (except for simple endpoints like `text-proxy`).
+
+## Next.js / App Router conventions
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
