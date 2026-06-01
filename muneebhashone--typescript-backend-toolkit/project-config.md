@@ -1,228 +1,193 @@
 ---
 trigger: always_on
-description: Routing patterns using MagicRouter for automatic OpenAPI generation
+description: Zod schema patterns for validation and OpenAPI documentation
 ---
 
 
-# Routing with MagicRouter
+# Zod Schema Patterns
 
 ## Core Principle
 
-NEVER use plain Express routing. ALWAYS use MagicRouter from [router.ts](mdc:src/plugins/magic/router.ts).
+Every module should have a schema file that defines request/response validation using Zod schemas.
 
-## Pattern Template
+## Import Pattern
 
 ```typescript
-import MagicRouter from '@/plugins/magic/router';
-import { canAccess } from '@/middlewares/can-access';
-import {
-  handleAction,
-  handleGetById,
-  handleCreate,
-  handleSearch,
-} from './module.controller';
-import {
-  actionSchema,
-  createSchema,
-  idParamsSchema,
-  searchQuerySchema,
-  actionResponseSchema,
-  getMeResponseSchema,
-  createItemResponseSchema,
-  getItemByIdResponseSchema,
-  searchItemsResponseSchema,
-} from './module.schema';
-
-export const MODULE_ROUTER_ROOT = '/module';
-
-const moduleRouter = new MagicRouter(MODULE_ROUTER_ROOT);
-
-// Public route with schema validation and response config
-moduleRouter.post(
-  '/action',
-  {
-    requestType: { body: actionSchema },
-    responses: {
-      200: actionResponseSchema,
-    },
-  },
-  handleAction,
-);
-
-// Protected route with authentication
-moduleRouter.get(
-  '/me',
-  {
-    responses: {
-      200: getMeResponseSchema,
-    },
-  },
-  canAccess(),
-  handleGetById,
-);
-
-// Protected route with schema, auth, and response config
-moduleRouter.post(
-  '/create',
-  {
-    requestType: { body: createSchema },
-    responses: {
-      201: createItemResponseSchema,
-    },
-  },
-  canAccess(),
-  handleCreate,
-);
-
-// Route with params
-moduleRouter.get(
-  '/:id',
-  {
-    requestType: { params: idParamsSchema },
-    responses: {
-      200: getItemByIdResponseSchema,
-    },
-  },
-  handleGetById,
-);
-
-// Route with query params (paginated)
-moduleRouter.get(
-  '/search',
-  {
-    requestType: { query: searchQuerySchema },
-    responses: {
-      200: searchItemsResponseSchema,
-    },
-  },
-  handleSearch,
-);
-
-export default moduleRouter.getRouter();
+import { z } from 'zod';
+import validator from 'validator';
 ```
 
-## MagicRouter API
+## Complete Response Schema Workflow
 
-### Router Instantiation
+**IMPORTANT:** This section shows the complete pattern for defining response schemas, using them in routers, and typing controllers.
 
-```typescript
-const router = new MagicRouter(ROUTER_ROOT);
-```
-
-- Create router instance with root path (e.g., `/auth`, `/user`)
-- Root path used for route grouping and OpenAPI tag generation
-
-### Route Definition Signature
+### Step 1: Define in Schema File (`*.schema.ts`)
 
 ```typescript
-router.method(path, requestType, ...handlers);
-```
-
-**Parameters:**
-
-1. `path`: Route path string (e.g., `/login`, `/:id`)
-2. `requestType`: Schema configuration object
-3. `...handlers`: Middleware functions and controller (spread arguments)
-
-### Request Type Object
-
-```typescript
-{
-  requestType?: {
-    body?: ZodSchema,      // Request body validation
-    params?: ZodSchema,    // URL params validation
-    query?: ZodSchema,     // Query string validation
-  },
-  responses?: {            // NEW: Response schemas per status code
-    200?: ResponseSchema,  // Success response
-    201?: ResponseSchema,  // Created response
-    404?: ResponseSchema,  // Not found response
-    // ... other status codes
-  },
-  contentType?: string,    // 'application/json' | 'multipart/form-data' | etc.
-}
-```
-
-- Use empty object `{}` when no validation needed
-- Can combine `body`, `params`, and `query` in same route
-- **NEW**: Add `responses` object for response schemas (RECOMMENDED)
-
-### Response Configuration (NEW - RECOMMENDED)
-
-**BEST PRACTICE:** Define response schemas in your schema file and import them:
-
-```typescript
-// In module.schema.ts
+import { z } from 'zod';
+import validator from 'validator';
 import { R } from '@/plugins/magic/response.builders';
-import { itemOutSchema } from './module.dto';
+import { itemOutSchema } from './item.dto';
 
+// Request validation schemas
+export const createItemSchema = z.object({
+  name: z.string({ required_error: 'Name is required' }).min(1).max(100),
+  description: z.string().min(10).max(500).optional(),
+  status: z.enum(['active', 'inactive']).default('active'),
+});
+
+export const updateItemSchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+  description: z.string().min(10).max(500).optional(),
+  status: z.enum(['active', 'inactive']).optional(),
+});
+
+// Response schemas using R builders
 export const createItemResponseSchema = R.success(itemOutSchema);
+export const getItemByIdResponseSchema = R.success(itemOutSchema);
 export const getItemsResponseSchema = R.paginated(itemOutSchema);
+export const updateItemResponseSchema = R.success(itemOutSchema);
 
+// Export request types
+export type CreateItemSchemaType = z.infer<typeof createItemSchema>;
+export type UpdateItemSchemaType = z.infer<typeof updateItemSchema>;
+
+// Export response types (PascalCase for types)
 export type CreateItemResponseSchema = z.infer<typeof createItemResponseSchema>;
+export type GetItemByIdResponseSchema = z.infer<typeof getItemByIdResponseSchema>;
 export type GetItemsResponseSchema = z.infer<typeof getItemsResponseSchema>;
-
-// In module.router.ts
-import { createItemResponseSchema, getItemsResponseSchema } from './module.schema';
-
-responses: { 201: createItemResponseSchema }
-responses: { 200: getItemsResponseSchema }
+export type UpdateItemResponseSchema = z.infer<typeof updateItemResponseSchema>;
 ```
 
-**Alternative (inline):** Use response builders directly in router:
+### Step 2: Use in Router (`*.router.ts`)
 
 ```typescript
-import { R } from '@/plugins/magic/response.builders';
+import { MagicRouter } from '@/plugins/magic/router';
+import { canAccess } from '@/middlewares/can-access';
+import { 
+  createItemSchema,
+  updateItemSchema,
+  createItemResponseSchema,
+  getItemsResponseSchema,
+} from './item.schema';
+import { handleCreate, handleGetItems } from './item.controller';
 
-// Standard success response
-responses: { 200: R.success(itemSchema) }
+const router = new MagicRouter();
 
-// Paginated list response
-responses: { 200: R.paginated(itemSchema) }
+router.post('/', {
+  requestType: { body: createItemSchema },
+  responses: { 201: createItemResponseSchema }, // Use response schema
+}, canAccess(), handleCreate);
 
-// Created response
-responses: { 201: R.success(itemSchema) }
-
-// No content response
-responses: { 204: R.noContent() }
-
-// Error response
-responses: { 404: R.error() }
-
-// Multiple status codes
-responses: {
-  200: R.success(itemSchema),
-  404: R.error(),
-}
-
-// Raw response (non-envelope)
-responses: { 200: R.raw(customSchema) }
+router.get('/', {
+  requestType: { query: listQuerySchema },
+  responses: { 200: getItemsResponseSchema }, // Use response schema
+}, canAccess(), handleGetItems);
 ```
 
-**Response Builders:**
-
-- `R.success(schema)` - Standard envelope: `{ success, message?, data? }`
-- `R.paginated(itemSchema)` - Paginated list: `{ success, message?, data: { items, paginator } }`
-- `R.noContent()` - Empty 204 response
-- `R.error(schema?)` - Error envelope (optional custom schema)
-- `R.raw(schema)` - Non-envelope response (e.g., healthcheck)
-
-**Why define in schema files?**
-
-- ✅ Type-safe controller responses with `ResponseExtended<T>`
-- ✅ Centralized response definitions
-- ✅ Easier to maintain and update
-- ✅ Better code organization
-
-### Handler Order
-
-The last handler in the spread is treated as the **controller**. All preceding handlers are **middleware**.
+### Step 3: Type Controller (`*.controller.ts`)
 
 ```typescript
-// Public route
-router.post('/action', { requestType: { body: schema } }, controller);
+import type { Request } from 'express';
+import type { ResponseExtended } from '@/types';
+import type {
+  CreateItemSchemaType,
+  CreateItemResponseSchema,
+} from './item.schema';
+import { createItem } from './item.service';
 
-// With one middleware
+export const handleCreate = async (
+  req: Request<unknown, unknown, CreateItemSchemaType>,
+  res: ResponseExtended<CreateItemResponseSchema>, // Typed response
+) => {
+  const item = await createItem(req.body);
+  
+  return res.created?.({ // Type-safe response
+    success: true,
+    message: 'Item created',
+    data: item,
+  });
+};
+```
+
+**Benefits of this workflow:**
+- ✅ End-to-end type safety from request to response
+- ✅ Accurate OpenAPI documentation generation
+- ✅ Runtime validation (optional)
+- ✅ IDE autocomplete for response structure
+- ✅ Consistent response formats across API
+
+## Schema Structure
+
+Schemas are exported directly, NOT wrapped in request/response objects:
+
+```typescript
+import { z } from 'zod';
+import validator from 'validator';
+
+export const createItemSchema = z.object({
+  name: z.string({ required_error: 'Name is required' }).min(1).max(100),
+  description: z
+    .string({ required_error: 'Description is required' })
+    .min(10)
+    .max(500),
+  status: z.enum(['active', 'inactive']).default('active'),
+  categoryId: z
+    .string({ required_error: 'Category ID is required' })
+    .refine((value) => validator.isMongoId(value), 'Category ID must be valid'),
+});
+
+export const updateItemSchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+  description: z.string().min(10).max(500).optional(),
+  status: z.enum(['active', 'inactive']).optional(),
+});
+```
+
+## Common Patterns
+
+### String Validation with Required Error
+
+```typescript
+z.string({ required_error: 'Field name is required' }).min(1).max(64);
+```
+
+### Email Validation
+
+```typescript
+z.string({ required_error: 'Email is required' }).email({
+  message: 'Email is not valid',
+});
+```
+
+### MongoDB ObjectId Validation
+
+Use validator package, NOT regex:
+
+```typescript
+z.string({ required_error: 'ID is required' })
+  .min(1)
+  .refine((value) => validator.isMongoId(value), 'ID must be valid');
+```
+
+### Alphanumeric Validation
+
+```typescript
+z.string({ required_error: 'Code is required' })
+  .min(4)
+  .max(4)
+  .refine((value) => validator.isAlphanumeric(value), 'Code must be valid');
+```
+
+### Query Parameters with Transform
+
+```typescript
+export const listItemsQuerySchema = z.object({
+  searchString: z.string().optional(),
+  limitParam: z
+    .string()
+    .default('10')
+    .refine(
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
