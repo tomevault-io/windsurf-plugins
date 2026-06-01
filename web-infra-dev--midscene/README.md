@@ -7,11 +7,11 @@ AI-powered, vision-driven UI automation for every platform.
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [web-infra-dev/midscene](https://github.com/web-infra-dev/midscene).
+Original source: `AGENTS.md` in [web-infra-dev/midscene](https://github.com/web-infra-dev/midscene).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
