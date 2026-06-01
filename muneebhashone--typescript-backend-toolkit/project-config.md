@@ -1,193 +1,264 @@
 ---
 trigger: always_on
-description: Zod schema patterns for validation and OpenAPI documentation
+description: Service layer patterns for business logic and data access
 ---
 
 
-# Zod Schema Patterns
+# Service Layer Patterns
 
 ## Core Principle
 
-Every module should have a schema file that defines request/response validation using Zod schemas.
+Services contain business logic, database operations, external API calls, and complex computations. They should be framework-agnostic (no Express req/res).
 
-## Import Pattern
-
-```typescript
-import { z } from 'zod';
-import validator from 'validator';
-```
-
-## Complete Response Schema Workflow
-
-**IMPORTANT:** This section shows the complete pattern for defining response schemas, using them in routers, and typing controllers.
-
-### Step 1: Define in Schema File (`*.schema.ts`)
+## Service Template
 
 ```typescript
-import { z } from 'zod';
-import validator from 'validator';
-import { R } from '@/plugins/magic/response.builders';
-import { itemOutSchema } from './item.dto';
+import { Model } from './module.model';
+import { logger } from '@/plugins/logger';
+import type { CreateInput, UpdateInput } from './module.dto';
 
-// Request validation schemas
-export const createItemSchema = z.object({
-  name: z.string({ required_error: 'Name is required' }).min(1).max(100),
-  description: z.string().min(10).max(500).optional(),
-  status: z.enum(['active', 'inactive']).default('active'),
-});
+/**
+ * Find item by ID
+ */
+export const findById = async (id: string) => {
+  const item = await Model.findById(id);
+  return item;
+};
 
-export const updateItemSchema = z.object({
-  name: z.string().min(1).max(100).optional(),
-  description: z.string().min(10).max(500).optional(),
-  status: z.enum(['active', 'inactive']).optional(),
-});
+/**
+ * Find all items with pagination
+ */
+export const findAll = async (options: {
+  page: number;
+  limit: number;
+  search?: string;
+}) => {
+  const { page, limit, search } = options;
+  const skip = (page - 1) * limit;
 
-// Response schemas using R builders
-export const createItemResponseSchema = R.success(itemOutSchema);
-export const getItemByIdResponseSchema = R.success(itemOutSchema);
-export const getItemsResponseSchema = R.paginated(itemOutSchema);
-export const updateItemResponseSchema = R.success(itemOutSchema);
+  const query = search ? { name: { $regex: search, $options: 'i' } } : {};
 
-// Export request types
-export type CreateItemSchemaType = z.infer<typeof createItemSchema>;
-export type UpdateItemSchemaType = z.infer<typeof updateItemSchema>;
+  const [items, total] = await Promise.all([
+    Model.find(query).skip(skip).limit(limit).lean(),
+    Model.countDocuments(query),
+  ]);
 
-// Export response types (PascalCase for types)
-export type CreateItemResponseSchema = z.infer<typeof createItemResponseSchema>;
-export type GetItemByIdResponseSchema = z.infer<typeof getItemByIdResponseSchema>;
-export type GetItemsResponseSchema = z.infer<typeof getItemsResponseSchema>;
-export type UpdateItemResponseSchema = z.infer<typeof updateItemResponseSchema>;
-```
+  return {
+    data: items,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    },
+  };
+};
 
-### Step 2: Use in Router (`*.router.ts`)
+/**
+ * Create new item
+ */
+export const create = async (data: CreateInput) => {
+  const item = await Model.create(data);
 
-```typescript
-import { MagicRouter } from '@/plugins/magic/router';
-import { canAccess } from '@/middlewares/can-access';
-import { 
-  createItemSchema,
-  updateItemSchema,
-  createItemResponseSchema,
-  getItemsResponseSchema,
-} from './item.schema';
-import { handleCreate, handleGetItems } from './item.controller';
+  logger.info('Item created', { itemId: item._id });
 
-const router = new MagicRouter();
+  return item.toObject();
+};
 
-router.post('/', {
-  requestType: { body: createItemSchema },
-  responses: { 201: createItemResponseSchema }, // Use response schema
-}, canAccess(), handleCreate);
-
-router.get('/', {
-  requestType: { query: listQuerySchema },
-  responses: { 200: getItemsResponseSchema }, // Use response schema
-}, canAccess(), handleGetItems);
-```
-
-### Step 3: Type Controller (`*.controller.ts`)
-
-```typescript
-import type { Request } from 'express';
-import type { ResponseExtended } from '@/types';
-import type {
-  CreateItemSchemaType,
-  CreateItemResponseSchema,
-} from './item.schema';
-import { createItem } from './item.service';
-
-export const handleCreate = async (
-  req: Request<unknown, unknown, CreateItemSchemaType>,
-  res: ResponseExtended<CreateItemResponseSchema>, // Typed response
+/**
+ * Update item
+ */
+export const update = async (
+  id: string,
+  data: UpdateInput,
+  userId?: string,
 ) => {
-  const item = await createItem(req.body);
-  
-  return res.created?.({ // Type-safe response
-    success: true,
-    message: 'Item created',
-    data: item,
+  const item = await Model.findById(id);
+
+  if (!item) {
+    return null;
+  }
+
+  // Business logic: Check permissions
+  if (item.createdBy?.toString() !== userId) {
+    const error = new Error('Forbidden') as any;
+    error.statusCode = 403;
+    throw error;
+  }
+
+  Object.assign(item, data);
+  await item.save();
+
+  logger.info('Item updated', { itemId: id, userId });
+
+  return item.toObject();
+};
+
+/**
+ * Delete item
+ */
+export const remove = async (id: string, userId?: string) => {
+  const item = await Model.findById(id);
+
+  if (!item) {
+    return false;
+  }
+
+  // Business logic: Check permissions
+  if (item.createdBy?.toString() !== userId) {
+    const error = new Error('Forbidden') as any;
+    error.statusCode = 403;
+    throw error;
+  }
+
+  await item.deleteOne();
+
+  logger.info('Item deleted', { itemId: id, userId });
+
+  return true;
+};
+
+/**
+ * Complex business logic example
+ */
+export const performComplexOperation = async (input: {
+  userId: string;
+  data: any;
+}) => {
+  // 1. Validate business rules
+  const user = await UserModel.findById(input.userId);
+  if (!user) {
+    throw new Error('User not found');
+  }
+
+  // 2. Perform operations
+  const result = await Model.create({
+    ...input.data,
+    userId: input.userId,
   });
+
+  // 3. Trigger background jobs if needed
+  await triggerEmailJob(user.email, result);
+
+  // 4. Return result
+  return result;
+};
+
+/**
+ * Trigger background job
+ */
+const triggerEmailJob = async (email: string, data: any) => {
+  const { emailQueue } = await import('@/queues/email.queue');
+  await emailQueue.add('sendNotification', { email, data });
 };
 ```
 
-**Benefits of this workflow:**
-- ✅ End-to-end type safety from request to response
-- ✅ Accurate OpenAPI documentation generation
-- ✅ Runtime validation (optional)
-- ✅ IDE autocomplete for response structure
-- ✅ Consistent response formats across API
+## Key Patterns
 
-## Schema Structure
+### Database Operations
 
-Schemas are exported directly, NOT wrapped in request/response objects:
+Use Mongoose models from `module.model.ts`:
 
 ```typescript
-import { z } from 'zod';
-import validator from 'validator';
+// Find
+const item = await Model.findById(id);
+const items = await Model.find({ status: 'active' });
 
-export const createItemSchema = z.object({
-  name: z.string({ required_error: 'Name is required' }).min(1).max(100),
-  description: z
-    .string({ required_error: 'Description is required' })
-    .min(10)
-    .max(500),
-  status: z.enum(['active', 'inactive']).default('active'),
-  categoryId: z
-    .string({ required_error: 'Category ID is required' })
-    .refine((value) => validator.isMongoId(value), 'Category ID must be valid'),
+// Create
+const item = await Model.create({ name: 'Test' });
+
+// Update
+const item = await Model.findByIdAndUpdate(id, { name: 'New' }, { new: true });
+
+// Delete
+await Model.findByIdAndDelete(id);
+
+// Count
+const count = await Model.countDocuments({ status: 'active' });
+
+// Use .lean() for better performance (returns plain objects)
+const items = await Model.find().lean();
+```
+
+### Pagination Helper
+
+Use pagination utility from [pagination.utils.ts](mdc:src/utils/pagination.utils.ts):
+
+```typescript
+import { getPaginator } from '@/utils/pagination.utils';
+
+const paginatorInfo = getPaginator(limit, page, totalRecords);
+const items = await Model.find()
+  .skip(paginatorInfo.skip)
+  .limit(paginatorInfo.limit);
+```
+
+Or implement manually:
+
+```typescript
+const skip = (page - 1) * limit;
+const items = await Model.find().skip(skip).limit(limit);
+const total = await Model.countDocuments();
+```
+
+### Background Jobs
+
+Queue background tasks using BullMQ:
+
+```typescript
+import { emailQueue } from '@/queues/email.queue';
+
+await emailQueue.add(
+  'jobName',
+  { data },
+  {
+    delay: 5000, // Optional: delay in ms
+    attempts: 3, // Optional: retry attempts
+  },
+);
+```
+
+### Email Sending
+
+Send emails through queue system:
+
+```typescript
+import { sendEmail } from '@/email/email.service';
+
+await sendEmail({
+  to: user.email,
+  subject: 'Welcome',
+  template: 'Welcome',
+  data: { name: user.name },
+});
+```
+
+### File Storage (S3)
+
+Use storage service from [storage.ts](mdc:src/lib/storage.ts):
+
+```typescript
+import { uploadFile, deleteFile, getFileUrl } from '@/lib/storage';
+
+// Upload file (usually in controller, after file is uploaded)
+const { url, key } = await uploadFile({
+  file: uploadedFile,
+  key: `uploads/${userId}/${filename}`,
 });
 
-export const updateItemSchema = z.object({
-  name: z.string().min(1).max(100).optional(),
-  description: z.string().min(10).max(500).optional(),
-  status: z.enum(['active', 'inactive']).optional(),
-});
+// Delete file
+await deleteFile(fileKey);
+
+// Get file URL
+const url = getFileUrl(fileKey);
 ```
 
-## Common Patterns
+### Authentication & Tokens
 
-### String Validation with Required Error
-
-```typescript
-z.string({ required_error: 'Field name is required' }).min(1).max(64);
-```
-
-### Email Validation
+Use auth utilities from the src/utils folder:
 
 ```typescript
-z.string({ required_error: 'Email is required' }).email({
-  message: 'Email is not valid',
-});
-```
-
-### MongoDB ObjectId Validation
-
-Use validator package, NOT regex:
-
-```typescript
-z.string({ required_error: 'ID is required' })
-  .min(1)
-  .refine((value) => validator.isMongoId(value), 'ID must be valid');
-```
-
-### Alphanumeric Validation
-
-```typescript
-z.string({ required_error: 'Code is required' })
-  .min(4)
-  .max(4)
-  .refine((value) => validator.isAlphanumeric(value), 'Code must be valid');
-```
-
-### Query Parameters with Transform
-
-```typescript
-export const listItemsQuerySchema = z.object({
-  searchString: z.string().optional(),
-  limitParam: z
-    .string()
-    .default('10')
-    .refine(
+import { signToken, verifyToken } from '@/utils/jwt.utils';
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
