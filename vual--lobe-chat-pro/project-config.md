@@ -1,124 +1,38 @@
 ---
 trigger: always_on
-description: This document outlines the conventions and best practices for defining PostgreSQL Drizzle ORM schemas within the lobe-chat project.
+description: Explain how group chat works in LobeHub (Multi-agent orchestratoin)
 ---
 
-# Drizzle ORM Schema Style Guide for lobe-chat
 
-This document outlines the conventions and best practices for defining PostgreSQL Drizzle ORM schemas within the lobe-chat project.
+This rule explains how group chat (multi-agent orchestration) works. Not confused with session group, which is a organization method to manage session.
 
-## Configuration
+## Key points
 
-- Drizzle configuration is managed in [drizzle.config.ts](mdc:drizzle.config.ts)
-- Schema files are located in the src/database/schemas/ directory
-- Migration files are output to `src/database/migrations/`
-- The project uses `postgresql` dialect with `strict: true`
+- A supervisor will devide who and how will speak next
+- Each agent will speak just like in single chat (if was asked to speak)
+- Not coufused with session group
 
-## Helper Functions
+## Related Files
 
-Commonly used column definitions, especially for timestamps, are centralized in [src/database/schemas/_helpers.ts](mdc:src/database/schemas/_helpers.ts):
-- `timestamptz(name: string)`: Creates a timestamp column with timezone
-- `createdAt()`, `updatedAt()`, `accessedAt()`: Helper functions for standard timestamp columns
-- `timestamps`: An object `{ createdAt, updatedAt, accessedAt }` for easy inclusion in table definitions
+- src/store/chat/slices/message/supervisor.ts
+- src/store/chat/slices/aiChat/actions/generateAIGroupChat.ts
+- src/prompts/groupChat/index.ts (All prompts here)
 
-## Naming Conventions
+## Snippets
 
-- **Table Names**: Use plural snake_case (e.g., `users`, `agents`, `session_groups`)
-- **Column Names**: Use snake_case (e.g., `user_id`, `created_at`, `background_color`)
+```tsx
+// Detect whether in group chat
+const isGroupSession = useSessionStore(sessionSelectors.isCurrentSessionGroupSession);
 
-## Column Definitions
+// Member actions
+const addAgentsToGroup = useChatGroupStore((s) => s.addAgentsToGroup);
+const removeAgentFromGroup = useChatGroupStore((s) => s.removeAgentFromGroup);
+const persistReorder = useChatGroupStore((s) => s.reorderGroupMembers);
 
-### Primary Keys (PKs)
-- Typically `text('id')` (or `varchar('id')` for some OIDC tables)
-- Often use `.$defaultFn(() => idGenerator('table_name'))` for automatic ID generation with meaningful prefixes
-- **ID Prefix Purpose**: Makes it easy for users and developers to distinguish different entity types at a glance
-- For internal/system tables that users don't need to see, can use `uuid` or auto-increment keys
-- Composite PKs are defined using `primaryKey({ columns: [t.colA, t.colB] })`
-
-### Foreign Keys (FKs)
-- Defined using `.references(() => otherTable.id, { onDelete: 'cascade' | 'set null' | 'no action' })`
-- FK columns are usually named `related_table_singular_name_id` (e.g., `user_id` references `users.id`)
-- Most tables include a `user_id` column referencing `users.id` with `onDelete: 'cascade'`
-
-### Timestamps
-- Consistently use the `...timestamps` spread from [_helpers.ts](mdc:src/database/schemas/_helpers.ts) for `created_at`, `updated_at`, and `accessed_at` columns
-
-### Default Values
-- `.$defaultFn(() => expression)` for dynamic defaults (e.g., `idGenerator()`, `randomSlug()`)
-- `.default(staticValue)` for static defaults (e.g., `boolean('enabled').default(true)`)
-
-### Indexes
-- Defined in the table's second argument: `pgTable('name', {...columns}, (t) => ({ indexName: indexType().on(...) }))`
-- Use `uniqueIndex()` for unique constraints and `index()` for non-unique indexes
-- Naming pattern: `table_name_column(s)_idx` or `table_name_column(s)_unique`
-- Many tables feature a `clientId: text('client_id')` column, often part of a composite unique index with `user_id`
-
-### Data Types
-- Common types: `text`, `varchar`, `jsonb`, `boolean`, `integer`, `uuid`, `pgTable`
-- For `jsonb` fields, specify the TypeScript type using `.$type<MyType>()` for better type safety
-
-## Zod Schemas & Type Inference
-
-- Utilize `drizzle-zod` to generate Zod schemas for validation:
-  - `createInsertSchema(tableName)`
-  - `createSelectSchema(tableName)` (less common)
-- Export inferred types: `export type NewEntity = typeof tableName.$inferInsert;` and `export type EntityItem = typeof tableName.$inferSelect;`
-
-## Relations
-
-- Table relationships are defined centrally in [src/database/schemas/relations.ts](mdc:src/database/schemas/relations.ts) using the `relations()` utility from `drizzle-orm`
-
-## Code Style & Structure
-
-- **File Organization**: Each main database entity typically has its own schema file (e.g., [user.ts](mdc:src/database/schemas/user.ts), [agent.ts](mdc:src/database/schemas/agent.ts))
-- All schemas are re-exported from [src/database/schemas/index.ts](mdc:src/database/schemas/index.ts)
-- **ESLint**: Files often start with `/* eslint-disable sort-keys-fix/sort-keys-fix */`
-- **Comments**: Use JSDoc-style comments to explain the purpose of tables and complex columns, fields that are self-explanatory do not require jsdoc explanations, such as id, user_id, etc.
-
-## Example Pattern
-
-```typescript
-// From src/database/schemas/agent.ts
-export const agents = pgTable(
-  'agents',
-  {
-    id: text('id')
-      .primaryKey()
-      .$defaultFn(() => idGenerator('agents'))
-      .notNull(),
-    slug: varchar('slug', { length: 100 })
-      .$defaultFn(() => randomSlug(4))
-      .unique(),
-    userId: text('user_id')
-      .references(() => users.id, { onDelete: 'cascade' })
-      .notNull(),
-    clientId: text('client_id'),
-    chatConfig: jsonb('chat_config').$type<LobeAgentChatConfig>(),
-    ...timestamps,
-  },
-  // return array instead of object, the object style is deprecated
-  (t) => [
-    uniqueIndex('client_id_user_id_unique').on(t.clientId, t.userId),
-  ],
-);
-
-export const insertAgentSchema = createInsertSchema(agents);
-export type NewAgent = typeof agents.$inferInsert;
-export type AgentItem = typeof agents.$inferSelect;
+// Get group info
+const groupConfig = useChatGroupStore(chatGroupSelectors.currentGroupConfig);
+const currentGroupMemebers = useSessionStore(sessionSelectors.currentGroupAgents);
 ```
-
-## Common Patterns
-
-### 1. userId + clientId Pattern (Legacy)
-Some existing tables include both fields for different purposes:
-
-```typescript
-// Example from agents table (legacy pattern)
-userId: text('user_id')
-  .references(() => users.id, { onDelete: 'cascade' })
-  .notNull(),
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [vual/lobe-chat-pro](https://github.com/vual/lobe-chat-pro) — distributed by [TomeVault](https://tomevault.io).
