@@ -7,11 +7,11 @@ Agente de IA criado pela DIO para apoiar seus estudos.
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [digitalinnovationone/dio-agent](https://github.com/digitalinnovationone/dio-agent).
+Original source: `AGENTS.md` in [digitalinnovationone/dio-agent](https://github.com/digitalinnovationone/dio-agent).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
