@@ -1,119 +1,184 @@
 ---
 trigger: always_on
-description: Apply when navigating or understanding the codebase structure
+description: This rules needs to apply when commiting to git.
 ---
 
 
-# Codebase Directory Structure
+## Branch policy
 
-This document provides detailed directory trees for the main components of the Rhesis platform.
+- **Never commit on `main`.** Work on a feature or fix branch, commit there, and merge via pull request.
+- Before staging or committing, run `git branch --show-current` (or check `git status`). If the branch is `main`, **do not commit**. Tell the user to create and switch to a branch first, for example: `git fetch origin && git checkout main && git pull origin main && git checkout -b feature/short-description`.
+- Do not use `--amend` or other git write operations that would alter history on `main` when asked to commit; the same branch rule applies.
 
----
+## Pre-Commit Workflow
 
-## Backend (`apps/backend/`)
+### 1. Check Current Status
+Before creating commits, always review your current changes:
 
-FastAPI-based REST API with Celery task processing.
+```bash
+# Check which files have been modified
+git status
 
+# See detailed changes in all modified files
+git diff
+
+# See changes in specific files
+git diff <filename>
+
+# See staged vs unstaged changes
+git diff --cached  # Shows staged changes
+git diff HEAD      # Shows all changes (staged + unstaged)
 ```
-apps/backend/
-├── pyproject.toml              # Python package configuration and dependencies (uv)
-├── uv.lock                     # Locked dependency versions
-├── Makefile                    # Build automation: test, lint, format
-├── Dockerfile                  # Production container image
-├── Dockerfile.dev              # Development container with hot-reload
-├── start.sh                    # Container entrypoint script
-├── migrate.sh                  # Database migration runner
-├── CHANGELOG.md                # Version history and release notes
-├── CONTRIBUTING.md             # Development guidelines
-├── README.md                   # Project overview and setup
-│
-└── src/rhesis/backend/         # Main source code
-    │
-    ├── app/                    # FastAPI application core
-    │   ├── main.py             # FastAPI entry point, router registration
-    │   ├── database.py         # SQLAlchemy engine, session management
-    │   ├── dependencies.py     # Dependency injection (auth, db sessions)
-    │   ├── crud.py             # Generic CRUD operations base
-    │   ├── constants.py        # Application-wide constants
-    │   ├── error_handlers.py   # Global exception handlers
-    │   │
-    │   ├── auth/               # Authentication & authorization
-    │   │   ├── oauth.py        # OAuth2 flow implementation
-    │   │   ├── permissions.py  # Role-based permission checks
-    │   │   ├── decorators.py   # Auth decorators for routes
-    │   │   ├── token_utils.py  # JWT token generation/parsing
-    │   │   ├── token_validation.py  # Token verification logic
-    │   │   ├── user_utils.py   # User lookup helpers
-    │   │   ├── auth_utils.py   # General auth utilities
-    │   │   └── url_utils.py    # Auth URL builders
-    │   │
-    │   ├── config/             # Application configuration
-    │   │   └── cascade_config.py  # Cascade delete/update rules
-    │   │
-    │   ├── middleware/         # FastAPI middleware
-    │   │   └── organization_filter.py  # Multi-tenant org filtering
-    │   │
-    │   ├── models/             # SQLAlchemy ORM models (39 files)
-    │   │   ├── base.py         # Base model with common fields
-    │   │   ├── mixins.py       # Reusable mixins (timestamps, soft delete)
-    │   │   ├── user.py, organization.py, project.py
-    │   │   ├── test.py, test_set.py, test_run.py, test_result.py
-    │   │   ├── endpoint.py, prompt.py, metric.py
-    │   │   └── ...             # Other domain models
-    │   │
-    │   ├── schemas/            # Pydantic request/response schemas (43 files)
-    │   │   ├── base.py         # Base schema with common fields
-    │   │   └── ...             # Corresponding schemas for each model
-    │   │
-    │   ├── routers/            # FastAPI route handlers (40 files)
-    │   │   ├── base.py         # Base router with common CRUD endpoints
-    │   │   ├── auth.py         # Authentication endpoints
-    │   │   ├── test.py, test_run.py, telemetry.py
-    │   │   └── ...             # Other resource routers
-    │   │
-    │   ├── services/           # Business logic layer (87 files)
-    │   │   ├── test_execution.py   # Test execution orchestration
-    │   │   ├── test_run.py         # Test run management
-    │   │   ├── organization.py     # Org provisioning
-    │   │   ├── task_management.py  # Celery task management
-    │   │   │
-    │   │   ├── connector/      # External system connectors
-    │   │   │   ├── manager.py, handler.py
-    │   │   │   ├── handlers/   # Connector implementations
-    │   │   │   └── mapping/    # Data mapping between systems
-    │   │   │
-    │   │   ├── endpoint/       # Endpoint testing services
-    │   │   │   ├── service.py  # Endpoint validation and testing
-    │   │   │   └── validation.py
-    │   │   │
-    │   │   ├── invokers/       # Target system invocation
-    │   │   │   ├── base.py     # Base invoker interface
-    │   │   │   ├── rest_invoker.py, sdk_invoker.py, websocket_invoker.py
-    │   │   │   ├── auth/       # Invoker authentication
-    │   │   │   ├── conversation/  # Multi-turn handling
-    │   │   │   └── templating/    # Request/response templating
-    │   │   │
-    │   │   ├── stats/          # Statistics calculation
-    │   │   │   └── calculator.py, test_result.py
-    │   │   │
-    │   │   ├── telemetry/      # Telemetry processing
-    │   │   │   ├── enricher.py, tree_builder.py, linking_service.py
-    │   │   │
-    │   │   └── handlers/       # Document handlers
-    │   │
-    │   ├── templates/          # Jinja2 prompt templates (*.jinja2)
-    │   │
-    │   ├── utils/              # Utility functions (18 files)
-    │   │   ├── crud_utils.py, odata.py, encryption.py, rate_limit.py
-    │   │
-    │
-    ├── alembic/                # Database migrations
-    │   ├── env.py              # Alembic environment config
-    │   ├── versions/           # Migration scripts (115+ files)
-    │   ├── templates/          # SQL templates for migrations
-    │   └── utils/              # Migration utilities
-    │
-    ├── tasks/                  # Celery background tasks
+
+### 2. Review and Analyze Changes
+- Identify what functionality was added, modified, or removed
+- Group related changes by:
+  - Feature additions
+  - Bug fixes
+  - Refactoring
+  - Documentation updates
+  - Configuration changes
+  - Test modifications
+
+### 3. Stage Changes Strategically
+Instead of `git add .`, stage files selectively:
+
+```bash
+# Stage specific files
+git add <file1> <file2>
+
+# Stage parts of files interactively
+git add -p <filename>
+
+# Stage all files of a certain type
+git add *.py
+git add *.md
+
+# Review what's staged
+git diff --cached
+```
+
+## Logical Commit Grouping
+
+### Group Changes By:
+
+1. **Feature Scope**: Each new feature should be its own commit
+2. **Bug Fixes**: Each bug fix should be separate
+3. **Refactoring**: Code improvements without functional changes
+4. **Documentation**: README, comments, or doc updates
+5. **Configuration**: Settings, dependencies, or build changes
+6. **Tests**: New tests or test modifications
+
+### Example Workflow:
+
+```bash
+# 1. Check what changed
+git status
+git diff
+
+# 2. If you have mixed changes, create separate commits:
+
+# Commit 1: Fix a specific bug
+git add src/bug-file.py tests/test-bug-fix.py
+git commit -m "fix(api): resolve timeout issue in user endpoint"
+
+# Commit 2: Add new feature
+git add src/feature-file.py src/feature-helper.py
+git commit -m "feat(auth): add two-factor authentication"
+
+# Commit 3: Update documentation
+git add README.md docs/api.md
+git commit -m "docs: update authentication setup guide"
+
+# Commit 4: Refactor existing code
+git add src/utils.py
+git commit -m "refactor(utils): simplify date formatting functions"
+```
+
+## Conventional Commits Rule
+
+Always follow the Conventional Commits specification for all commit messages.
+
+### Commit Message Format
+```
+<type>[scope]: <description>
+
+[optional body]
+
+[optional footer(s)]
+```
+
+### Commit Types
+- **feat**: A new feature
+- **fix**: A bug fix
+- **docs**: Documentation only changes
+- **style**: Changes that do not affect the meaning of the code (white-space, formatting, missing semi-colons, etc)
+- **refactor**: A code change that neither fixes a bug nor adds a feature
+- **perf**: A code change that improves performance
+- **test**: Adding missing tests or correcting existing tests
+- **build**: Changes that affect the build system or external dependencies
+- **ci**: Changes to CI configuration files and scripts
+- **chore**: Other changes that don't modify src or test files
+- **revert**: Reverts a previous commit
+
+
+### Scope
+**Use only one of these scopes.** Do not invent other scopes (e.g. no `adaptive-testing`, `api`, `auth`).
+
+- **backend**: Changes to the backend code (apps/backend/)
+- **frontend**: Changes to the frontend code (apps/frontend/)
+- **sdk**: Changes to the SDK code (sdk/)
+- **tests**: Changes to the test code (tests/)
+- **dev**: Changes to the development tools and configuration e.g. Makefile, .env files, etc.
+
+### Rules
+1. Use lowercase for type and description
+2. No period at the end of the description
+3. Use imperative mood in the description (e.g., "add" not "adds" or "added")
+4. Limit the description to 50 characters or less
+5. Use scope to specify the component/module affected (e.g., `feat(backend): add login validation`)
+6. Add body and footer if needed for breaking changes or additional context
+7. Use `BREAKING CHANGE:` in footer for breaking changes
+
+### Examples
+- `feat(backend): add user authentication`
+- `fix(frontend): resolve timeout issue in user endpoint`
+- `docs: update installation guide`
+- `refactor(backend): simplify date formatting function`
+- `feat!: remove deprecated API endpoints` (! indicates breaking change)
+
+## Advanced Git Commands for Commit Management
+
+### Splitting Large Changes
+
+```bash
+# If you have too many changes in one file, split them:
+git add -p <filename>  # Interactively stage hunks
+
+# Reset specific files from staging
+git reset <filename>
+
+# Reset specific hunks
+git reset -p <filename>
+```
+
+### Amending and Fixing Commits
+
+```bash
+# Add more changes to the last commit
+git add <forgotten-file>
+git commit --amend
+
+# Change the last commit message
+git commit --amend -m "new commit message"
+
+# Interactive rebase to reorganize recent commits
+git rebase -i HEAD~3  # Edit last 3 commits
+```
+
+
+## Best Practices
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
