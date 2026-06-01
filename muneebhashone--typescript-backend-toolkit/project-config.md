@@ -1,310 +1,256 @@
 ---
 trigger: always_on
-description: Development workflow and commands
+description: Email system using React Email and Mailgun with queue-based sending
 ---
 
 
-# Development Workflow
+# Email System
 
-## Setup
+## Architecture
 
-### Initial Setup
+- **Templates**: React Email components in [src/email/templates/](mdc:src/email/templates/)
+- **Service**: Email service in [src/email/email.service.ts](mdc:src/email/email.service.ts)
+- **Provider**: Email provider abstraction in [src/lib/email.ts](mdc:src/lib/email.ts) (supports Mailgun & SMTP)
+- **Queue**: Background sending via [src/queues/email.queue.ts](mdc:src/queues/email.queue.ts)
+- **Development**: Preview server for templates
 
-```bash
-# 1. Install dependencies
-pnpm install
+## Email Configuration
 
-# 2. Start Docker services (MongoDB + Redis)
-docker compose up -d
-
-# 3. Copy environment template
-cp .env.sample .env
-
-# 4. Edit .env with your values
-nano .env
-
-# 5. (Optional) Seed database
-pnpm run seeder
-
-# 6. Start development server
-pnpm run dev
-```
-
-### Prerequisites
-
-- Node.js (v18+)
-- pnpm (package manager)
-- Docker and Docker Compose
-- MongoDB (via Docker or local)
-- Redis (via Docker or local)
-
-## Development Commands
-
-### Running the Server
+### Environment Variables
 
 ```bash
-# Development with hot reload
-pnpm run dev
+# Option 1: Mailgun (Recommended)
+MAILGUN_API_KEY=your-mailgun-api-key
+MAILGUN_DOMAIN=your-domain.com
+MAILGUN_FROM_EMAIL=noreply@your-domain.com
 
-# Backend only (without email template server)
-pnpm run start:dev
+# Option 2: SMTP (Fallback)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USERNAME=your-email@gmail.com
+SMTP_PASSWORD=your-app-password
+SMTP_FROM=noreply@your-domain.com
+EMAIL_FROM=noreply@your-domain.com
 
-# Production build + start
-pnpm run build && pnpm run start:prod
-
-# Local production (uses .env.local)
-pnpm run start:local
+# Note: Provider auto-selects Mailgun if configured, otherwise SMTP
 ```
 
-### Building
+## Creating Email Templates
 
-```bash
-# Build TypeScript to dist/
-pnpm run build
+### Step 1: Create React Component
 
-# Build uses tsup (configured in build.ts)
-```
-
-### Linting
-
-```bash
-# Check for linting errors
-pnpm run lint
-
-# Auto-fix linting errors
-pnpm run lint:fix
-```
-
-### Database
-
-```bash
-# Run database seeder
-pnpm run seeder
-```
-
-### Email Development
-
-```bash
-# Start email template development server
-pnpm run email:dev
-
-# Access at: http://localhost:3001
-```
-
-## Project Structure
-
-```
-src/
-├── main.ts                 # Application entry point
-├── config/                 # Configuration management
-├── lib/                    # Core libraries (DB, Redis, AWS, etc.)
-├── modules/                # Feature modules (auth, user, etc.)
-│   └── module-name/
-│       ├── module.model.ts
-│       ├── module.controller.ts
-│       ├── module.service.ts
-│       ├── module.router.ts
-│       ├── module.schema.ts
-│       └── module.dto.ts
-├── middlewares/            # Express middlewares
-├── queues/                 # BullMQ background jobs
-├── routes/                 # Route registration
-├── email/                  # Email templates (React Email)
-└── utils/                  # Utility functions
-```
-
-## Key Endpoints
-
-### API Documentation
-
-- Swagger UI: `http://localhost:3000/docs`
-- OpenAPI JSON: `http://localhost:3000/openapi.yml`
-
-### Queue Dashboard
-
-- BullMQ Admin: `http://localhost:3000/queues`
-
-### Health Check
-
-- `GET http://localhost:3000/api/health`
-
-## Development Workflow
-
-### Creating a New Feature
-
-1. Create new module in `src/modules/feature-name/`
-2. Create model, controller, service, router, schema files
-3. Register router in `src/routes/routes.ts`
-4. Test in Swagger UI
-5. (Optional) Add seeder
-
-See [new-module.mdc](mdc:.cursor/rules/new-module.mdc) for detailed steps.
-
-### Making Changes
-
-1. Edit files (hot reload enabled in dev mode)
-2. Check for linter errors: `pnpm run lint`
-3. Fix errors: `pnpm run lint:fix`
-4. Test changes in Swagger UI or API client
-5. Commit changes
-
-### Adding Dependencies
-
-```bash
-# Add runtime dependency
-pnpm add package-name
-
-# Add dev dependency
-pnpm add -D package-name
-```
-
-## Testing the API
-
-### Using Swagger UI
-
-1. Navigate to `http://localhost:3000/docs`
-2. Expand endpoint
-3. Click "Try it out"
-4. Fill in parameters
-5. Execute request
-6. View response
-
-### Using curl
-
-```bash
-# Public endpoint
-curl http://localhost:3000/api/health
-
-# Protected endpoint (requires JWT)
-curl -H "Authorization: Bearer YOUR_JWT_TOKEN" \
-  http://localhost:3000/api/user/profile
-
-# POST request
-curl -X POST http://localhost:3000/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"user@example.com","password":"password123"}'
-```
-
-### Using Postman/Insomnia
-
-1. Import OpenAPI spec from `http://localhost:3000/docs.json`
-2. All endpoints auto-configured
-3. Set Authorization header for protected routes
-
-## Debugging
-
-### Logging
-
-Logs use Pino logger from [logger.ts](mdc:src/plugins/observability/logger.ts):
+Create new file in `src/email/templates/TemplateName.tsx`:
 
 ```typescript
-import { logger } from '@/plugins/logger';
+import {
+  Html,
+  Head,
+  Body,
+  Container,
+  Section,
+  Text,
+  Button,
+  Hr,
+  Img,
+} from "@react-email/components";
 
-logger.info('Info message', { data });
-logger.error('Error message', { error });
-logger.debug('Debug message', { data });
+interface TemplateNameProps {
+  name: string;
+  actionUrl: string;
+}
+
+export default function TemplateName({ name, actionUrl }: TemplateNameProps) {
+  return (
+    <Html>
+      <Head />
+      <Body style={styles.body}>
+        <Container style={styles.container}>
+          <Section style={styles.section}>
+            <Img
+              src="https://your-domain.com/logo.png"
+              alt="Logo"
+              width="150"
+              height="50"
+              style={styles.logo}
+            />
+
+            <Text style={styles.heading}>Hello, {name}!</Text>
+
+            <Text style={styles.text}>
+              Your email content goes here.
+            </Text>
+
+            <Button style={styles.button} href={actionUrl}>
+              Click Here
+            </Button>
+
+            <Hr style={styles.hr} />
+
+            <Text style={styles.footer}>
+              © 2025 Your Company. All rights reserved.
+            </Text>
+          </Section>
+        </Container>
+      </Body>
+    </Html>
+  );
+}
+
+const styles = {
+  body: {
+    backgroundColor: "#f6f9fc",
+    fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+  },
+  container: {
+    margin: "0 auto",
+    padding: "20px 0",
+  },
+  section: {
+    backgroundColor: "#ffffff",
+    borderRadius: "8px",
+    padding: "40px",
+  },
+  logo: {
+    margin: "0 auto 20px",
+    display: "block",
+  },
+  heading: {
+    fontSize: "24px",
+    fontWeight: "bold",
+    margin: "20px 0",
+    color: "#1a1a1a",
+  },
+  text: {
+    fontSize: "16px",
+    lineHeight: "24px",
+    color: "#525252",
+    margin: "16px 0",
+  },
+  button: {
+    backgroundColor: "#007bff",
+    color: "#ffffff",
+    padding: "12px 32px",
+    borderRadius: "6px",
+    textDecoration: "none",
+    display: "inline-block",
+    margin: "20px 0",
+  },
+  hr: {
+    borderColor: "#e6e6e6",
+    margin: "30px 0",
+  },
+  footer: {
+    fontSize: "14px",
+    color: "#8c8c8c",
+    textAlign: "center" as const,
+  },
+};
+
+// Preview props for development
+TemplateName.PreviewProps = {
+  name: "John Doe",
+  actionUrl: "https://example.com/action",
+} as TemplateNameProps;
 ```
 
-### VS Code Debugging
+### Step 2: Test Template
 
-Add to `.vscode/launch.json`:
+```bash
+# Start email development server
+pnpm run email:dev
 
-```json
+# Open browser to preview
+# http://localhost:3001
+```
+
+## Sending Emails
+
+### Method 1: Direct Send (Simple)
+
+```typescript
+import { sendEmail } from '@/email/email.service';
+
+await sendEmail({
+  to: 'user@example.com',
+  subject: 'Welcome!',
+  template: 'TemplateName',
+  data: {
+    name: 'John Doe',
+    actionUrl: 'https://example.com/verify',
+  },
+});
+```
+
+### Method 2: Queue-based (Recommended)
+
+```typescript
+import { emailQueue } from '@/queues/email.queue';
+
+await emailQueue.add('sendEmail', {
+  to: 'user@example.com',
+  subject: 'Welcome!',
+  template: 'TemplateName',
+  data: {
+    name: 'John Doe',
+    actionUrl: 'https://example.com/verify',
+  },
+});
+```
+
+## Email Service Usage
+
+The email service in [email.service.ts](mdc:src/email/email.service.ts) handles:
+
+- Template rendering
+- HTML/text generation
+- Queue job creation
+
+### Function Signature
+
+```typescript
+interface SendEmailOptions {
+  to: string | string[]; // Recipient(s)
+  subject: string;
+  template: string; // Template name (without .tsx)
+  data: Record<string, any>; // Props for template
+  from?: string; // Optional: override default sender
+  replyTo?: string; // Optional: reply-to address
+  attachments?: Array<{
+    filename: string;
+    content: Buffer | string;
+    contentType?: string;
+  }>;
+}
+
+export const sendEmail = async (options: SendEmailOptions): Promise<void>;
+```
+
+## Queue System
+
+Email queue in [email.queue.ts](mdc:src/queues/email.queue.ts) provides:
+
+- Async sending (doesn't block API response)
+- Automatic retries on failure
+- Queue monitoring via dashboard
+
+### Queue Configuration
+
+```typescript
+// Default options
 {
-  "type": "node",
-  "request": "launch",
-  "name": "Debug Dev Server",
-  "runtimeExecutable": "pnpm",
-  "runtimeArgs": ["run", "dev"],
-  "skipFiles": ["<node_internals>/**"]
+  attempts: 3, // Retry up to 3 times
+  backoff: {
+    type: "exponential",
+    delay: 1000, // Start with 1 second delay
+  },
 }
 ```
 
-### MongoDB Debugging
+### Custom Queue Options
 
-```bash
-# Connect to MongoDB
-docker exec -it mongodb mongosh
-
-# List databases
-show dbs
-
-# Use database
-use your-db-name
-
-# List collections
-show collections
-
-# Query data
-db.users.find()
-```
-
-### Redis Debugging
-
-```bash
-# Connect to Redis
-docker exec -it redis redis-cli
-
-# List all keys
-KEYS *
-
-# Get value
-GET key-name
-
-# Monitor commands
-MONITOR
-```
-
-## Common Issues
-
-### Port Already in Use
-
-```bash
-# Find process using port 3000
-lsof -i :3000
-
-# Kill process
-kill -9 PID
-```
-
-### MongoDB Connection Failed
-
-- Check Docker is running: `docker ps`
-- Check connection string in `.env`
-- Restart MongoDB: `docker compose restart mongodb`
-
-### Redis Connection Failed
-
-- Check Docker is running: `docker ps`
-- Check Redis config in `.env`
-- Restart Redis: `docker compose restart redis`
-
-### TypeScript Errors
-
-```bash
-# Check TypeScript errors
-npx tsc --noEmit
-
-# Clean build and rebuild
-rm -rf dist && pnpm run build
-```
-
-### Module Not Found
-
-```bash
-# Clear node_modules and reinstall
-rm -rf node_modules pnpm-lock.yaml
-pnpm install
-```
-
-## Production Deployment
-
-### Build
-
-```bash
-pnpm run build
-```
-
+```typescript
+await emailQueue.add(
+  'sendEmail',
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
