@@ -1,205 +1,143 @@
 ---
 trigger: always_on
-description: enableSystem
+description: This document outlines the guidelines and standards for contributing to the `@omnisat/lasereyes-core` package. Following these rules will ensure consistency, maintainability, and quality throughout the project.
 ---
 
-# create-lasereyes
+# Project Rules for `@omnisat/lasereyes-core`
 
-## Overview
+This document outlines the guidelines and standards for contributing to the `@omnisat/lasereyes-core` package. Following these rules will ensure consistency, maintainability, and quality throughout the project.
 
-`create-lasereyes` is an interactive CLI tool designed to scaffold Next.js projects with LaserEyes integration. LaserEyes is a Bitcoin wallet integration solution that allows developers to quickly build Bitcoin applications with modern front-end frameworks.
+## 🌟 Overview
 
-## Table of Contents
+`@omnisat/lasereyes-core` is a framework-agnostic library designed to provide Bitcoin wallet integration for dApps. It abstracts wallet-specific interactions and offers a unified interface for working with various Bitcoin wallets.
 
-- [Installation](#installation)
-- [Quick Start](#quick-start)
-- [Features](#features)
-- [Project Structure](#project-structure)
-- [Technical Implementation](#technical-implementation)
-- [Templates](#templates)
-- [CI/CD](#cicd)
-- [Configuration Options](#configuration-options)
-- [Dependencies](#dependencies)
-- [Contributing](#contributing)
-- [License](#license)
+## 📋 General Code Guidelines
 
-## Installation
+1. **TypeScript Required**: All code must be written in TypeScript with proper type definitions.
+2. **Clean Code**: Follow clean code principles - meaningful variable names, clear functions, and appropriate comments.
+3. **No `any` Types**: Avoid using `any` type. Use proper typing or `unknown` when necessary.
+4. **ESLint**: All code must pass ESLint checks using the project's configuration.
+5. **Documentation**: All public methods, classes, and interfaces must be documented with TSDoc comments.
+6. **Error Handling**: Implement proper error handling and provide meaningful error messages.
 
-You can use the tool without installation via npx:
+## 🏗️ Project Structure
 
-```bash
-npx create-lasereyes
-```
+1. **Module Organization**:
+   - `/src/client`: Contains the client-facing API
+   - `/src/lib`: Shared utilities and helpers
+   - `/src/constants`: Project constants
+   - `/src/types`: TypeScript type definitions
 
-## Quick Start
+2. **Exports**:
+   - Export only what's necessary in `index.ts`
+   - Internal utilities should not be exposed
 
-1. Run the CLI command:
-   ```bash
-   npx create-lasereyes
-   ```
-2. Follow the interactive prompts to:
-   - Name your project
-   - Select a framework (currently Next.js is fully supported)
-   - Choose options for your project
+## 📐 Architecture Guidelines
 
-3. Navigate to your project directory:
-   ```bash
-   cd your-project-name
-   ```
+1. **Provider Pattern**:
+   - Each wallet provider must implement the `WalletProvider` interface
+   - Providers must handle their specific wallet interactions
+   - All providers should be registered in `LaserEyesClient`
 
-4. Start the development server:
-   ```bash
-   npm run dev
-   ```
+2. **Client Implementation**:
+   - The `LaserEyesClient` should maintain a unified interface
+   - Wallet-specific logic should be abstracted away in providers
+   - Client methods should proxy to the appropriate provider methods
 
-## Features
+3. **Error Management**:
+   - Use consistent error types across providers
+   - Normalize errors from different wallet implementations
 
-- ⚡️ **Next.js Integration** - Creates a modern Next.js project with App Router using React 18
-- 🔐 **LaserEyes Wallet Connect Modal** - Pre-configured Bitcoin wallet integration with support for:
-  - UniSat
-  - Xverse
-  - Oyl
-  - Magic Eden
-  - OKX
-  - Leather
-  - Phantom
-  - Wizz
-  - Orange
-- 🎨 **Styling**
-  - Shadcn UI components
-  - Tailwind CSS integration
-  - Light/Dark Mode toggle
-- 🤖 **AI Assistant Integration** - Cursor.ai editor configuration for better developer experience
-- 🚀 **Framework Support**:
-  - Next.js (App Router) - Fully supported
-  - Vue 3 + Vite - Coming soon
-  - Vanilla JS - Coming soon
+## 🔄 State Management
 
-## Project Structure
+1. **Store Usage**:
+   - Use nanostores for state management
+   - Keep state atomized and focused
+   - Avoid storing sensitive information in state
 
-The repository has the following structure:
+2. **Events**:
+   - Handle wallet connection events appropriately
+   - Propagate events through the client interface
 
-```
-create-lasereyes/
-├── .github/workflows/      # GitHub Actions for CI/CD
-├── src/                    # Source code
-│   ├── bin/                # CLI executable scripts
-│   │   ├── fix-shebang.ts  # Script to fix shebang for executable
-│   │   └── script.ts       # Main CLI script
-│   ├── cli.ts              # CLI implementation
-│   ├── frameworks.ts       # Framework definitions
-│   └── utils.ts            # Utility functions
-├── templates/              # Scaffold templates
-│   ├── next-app/           # Next.js application template
-│   │   ├── src/            # Source files for Next.js
-│   │   │   ├── app/        # Next.js App Router files
-│   │   │   └── components/ # React components
-│   │   └── ...             # Configuration files
-│   └── vue-app/            # Vue application template (coming soon)
-├── package.json            # Package configuration
-└── tsconfig.json           # TypeScript configuration
-```
+## 🧪 Testing Standards
 
-### Generated Project Structure
+1. **Unit Tests**:
+   - All core functionality must have unit tests
+   - Mock external wallet dependencies for testing
+   - Test edge cases and error handling
 
-After running the CLI, your project will have a structure similar to:
+2. **Integration Tests**:
+   - Test integration with mock wallet providers
+   - Ensure proper state management and event propagation
 
-```
-your-project-name/
-├── src/
-│   ├── app/
-│   │   ├── favicon.ico
-│   │   ├── globals.css
-│   │   ├── layout.tsx        # Root layout with providers
-│   │   └── page.tsx          # Home page
-│   ├── components/
-│   │   ├── ui/               # Reusable Shadcn UI Components
-│   │   ├── ConnectWallet.tsx # LaserEyes Wallet Connection Modal
-│   │   ├── DefaultLayout.tsx # LaserEyes Provider Wrapper
-│   │   └── ThemeToggle.tsx   # Light/Dark Mode Toggle
-│   └── lib/
-│       └── utils.ts
-├── .cursorrules              # AI assistant configuration (optional)
-└── package.json              # Project dependencies
-```
+## 🛠️ Development Workflow
 
-## Technical Implementation
+1. **Branching Strategy**:
+   - Feature branches should be created from `main`
+   - Use meaningful branch names: `feature/wallet-integration`, `fix/error-handling`, etc.
 
-### CLI Architecture
+2. **Commits**:
+   - Write clear, descriptive commit messages
+   - Reference issues in commit messages when applicable
 
-The CLI is built using the following technologies:
+3. **Pull Requests**:
+   - PRs should include a clear description of changes
+   - All PRs must pass CI checks before merging
+   - PRs should be reviewed by at least one team member
 
-- **TypeScript** - For type safety and modern JavaScript features
-- **cac** - Command-line argument parsing
-- **prompts** - Interactive CLI prompts
-- **cross-spawn** - Cross-platform process spawning
+## 📦 Package Management
 
-The CLI flow is:
+1. **Dependencies**:
+   - Keep dependencies minimal and up-to-date
+   - Avoid adding dependencies for simple utilities
+   - Consider bundle size impact when adding dependencies
 
-1. Parse command-line arguments and options
-2. Present interactive prompts for project configuration
-3. Create project directory and populate files
-4. Install required dependencies
-5. Set up framework-specific configurations
-6. Configure LaserEyes integration
+2. **Versioning**:
+   - Follow semantic versioning
+   - Document breaking changes in CHANGELOG.md
 
-### Core Components
+## 🌍 Wallet Support Guidelines
 
-#### Wallet Connection
+1. **Adding New Wallets**:
+   - Create a new provider class that extends `WalletProvider`
+   - Implement all required methods
+   - Add wallet constants to the constants file
+   - Register the provider in `LaserEyesClient`
+   - Add tests for the new provider
 
-The `ConnectWallet.tsx` component provides a modal dialog for connecting to various Bitcoin wallets:
+2. **Wallet Features**:
+   - Support basic operations (connect, disconnect, sign)
+   - Implement advanced features when available (inscriptions, runes)
+   - Handle wallet-specific error scenarios
 
-```tsx
-"use client";
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import {
-  LEATHER,
-  MAGIC_EDEN,
-  OKX,
-  OYL,
-  ORANGE,
-  PHANTOM,
-  UNISAT,
-  useLaserEyes,
-  WalletIcon,
-  WIZZ,
-  XVERSE,
-  SUPPORTED_WALLETS,
-  LaserEyesLogo,
-} from "@omnisat/lasereyes";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-```
+## 🌐 Network Support
 
-This component:
-- Detects installed Bitcoin wallets
-- Allows one-click connection
-- Provides wallet installation links
-- Handles wallet connection state
+1. **Multiple Networks**:
+   - Support mainnet, testnet, and other networks
+   - Properly handle network switching
+   - Maintain network state in the client
 
-#### LaserEyes Provider
+## 📊 Data Sources
 
-The `DefaultLayout.tsx` component wraps your application in the necessary providers:
+1. **Data Source Architecture**:
+   - Follow the Data Source Manager pattern for accessing external APIs
+   - All data sources must implement the `DataSource` interface
+   - Use the manager to handle fallbacks between different data sources
 
-```tsx
-"use client";
-import React, { ReactNode } from "react";
-import { LaserEyesProvider } from "@omnisat/lasereyes";
-import { ThemeProvider as NextThemesProvider } from "next-themes";
+2. **Adding New Data Sources**:
+   - Create a new data source class that implements the `DataSource` interface
+   - Implement required methods based on the capabilities of the API
+   - Register the data source in the `DataSourceManager`
+   - Add appropriate normalization functions for the data returned
 
-export default function DefaultLayout({ children }: { children: ReactNode }) {
-  return (
-    <NextThemesProvider
-      attribute="class"
-      defaultTheme="system"
-      enableSystem
+3. **Data Normalization**:
+   - Always normalize responses from different data sources into standard formats
+   - Use helper functions in the normalization module
+   - Handle edge cases where data may be missing or in unexpected formats
+
+4. **Error Handling**:
+   - Implement proper error handling for API failures
+   - Use fallback mechanisms when primary data sources are unavailable
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
