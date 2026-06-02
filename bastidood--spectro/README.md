@@ -7,11 +7,11 @@ A multi-channel confession bot for Discord that supports anonymous replies and c
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [BastiDood/spectro](https://github.com/BastiDood/spectro).
+Original source: `AGENTS.md` in [BastiDood/spectro](https://github.com/BastiDood/spectro).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
