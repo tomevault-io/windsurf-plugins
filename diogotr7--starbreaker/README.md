@@ -7,12 +7,12 @@ Star Citizen game files reverse engineering and analysis toolkit. P4k, dcb, chf,
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `copilot-instructions.md` in [diogotr7/StarBreaker](https://github.com/diogotr7/StarBreaker).
+Original source: `AGENTS.md` in [diogotr7/StarBreaker](https://github.com/diogotr7/StarBreaker).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
+- **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
