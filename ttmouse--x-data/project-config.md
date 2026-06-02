@@ -1,72 +1,41 @@
 ---
 trigger: always_on
-description: Comprehensive reference for Taskmaster MCP tools and CLI commands.
+description: - `chrome-extension/` holds all extension sources: `manifest.json` and the scripts (`background.js`, `content.js`, `popup.js`) plus UI assets (`popup.html`, `style.css`, `icons/`).
 ---
 
+# Repository Guidelines
 
-# Taskmaster Tool & Command Reference
+## Project Structure & Module Organization
+- `chrome-extension/` holds all extension sources: `manifest.json` and the scripts (`background.js`, `content.js`, `popup.js`) plus UI assets (`popup.html`, `style.css`, `icons/`).  
+- `content.js` scrapes tweets, injects the sidebar iframe, and persists data via `chrome.storage.local`.  
+- `popup.js` drives the popup/sidebar UI, rendering cached tweets and wiring controls.  
+- Keep new assets under `chrome-extension/` so they remain web‑accessible via `chrome.runtime.getURL`.
 
-This document provides a detailed reference for interacting with Taskmaster, covering both the recommended MCP tools (for integrations like Cursor) and the corresponding `task-master` CLI commands (for direct user interaction or fallback).
+## Build, Test, and Development Commands
+- Load the extension unpacked in Chrome: `chrome://extensions` → Enable *Developer mode* → *Load unpacked* → select `chrome-extension/`. Reload here after code changes.  
+- For quick validation of script syntax, run `node --check chrome-extension/content.js`. Repeat for other JS files if edited.
 
-**Note:** For interacting with Taskmaster programmatically or via integrated tools, using the **MCP tools is strongly recommended** due to better performance, structured data, and error handling. The CLI commands serve as a user-friendly alternative and fallback. See [`mcp.mdc`](mdc:.cursor/rules/mcp.mdc) for MCP implementation details and [`commands.mdc`](mdc:.cursor/rules/commands.mdc) for CLI implementation guidelines.
+## Coding Style & Naming Conventions
+- JavaScript is ES2020+, 2-space indentation, `const`/`let` only.  
+- Use descriptive camelCase for variables/functions (`scrapeCurrentView`, `toggleSidebarBtn`).  
+- Prefer template literals for DOM snippets and keep inline comments brief.  
+- When touching HTML/CSS, keep class names kebab-case and align with existing BEM-lite structure.
 
-**Important:** Several MCP tools involve AI processing and are long-running operations that may take up to a minute to complete. When using these tools, always inform users that the operation is in progress and to wait patiently for results. The AI-powered tools include: `parse_prd`, `analyze_project_complexity`, `update_subtask`, `update_task`, `update`, `expand_all`, `expand_task`, and `add_task`.
+## Testing Guidelines
+- Manual verification is primary: reload the extension, trigger `Scrape Current View`, confirm the sidebar shows counts/dates, and run auto-scroll on a live analytics page.  
+- For parser tweaks, log to DevTools (`console.log('X Data Scraper:', …)`) and inspect `chrome.storage.local` to ensure cached tweets contain the expected fields.  
+- Snapshot any DOM selectors you rely on inside comments to ease future maintenance.
 
----
+## Commit & Pull Request Guidelines
+- Follow the existing concise style: imperative subject lines (`Add robust timestamp parser`, `Fix sidebar iframe append`).  
+- Include context in the body when a change alters scraping behavior or UX.  
+- Pull requests should describe the feature/fix, list manual verification steps (e.g., “Reloaded extension and scraped @handle feed”), and attach screenshots/GIFs for UI adjustments.
 
-## Initialization & Setup
-
-### 1. Initialize Project (`init`)
-
-*   **MCP Tool:** `initialize_project`
-*   **CLI Command:** `task-master init [options]`
-*   **Description:** `Set up the basic Taskmaster file structure and configuration in the current directory for a new project.`
-*   **Key CLI Options:**
-    *   `--name <name>`: `Set the name for your project in Taskmaster's configuration.`
-    *   `--description <text>`: `Provide a brief description for your project.`
-    *   `--version <version>`: `Set the initial version for your project (e.g., '0.1.0').`
-    *   `-y, --yes`: `Initialize Taskmaster quickly using default settings without interactive prompts.`
-*   **Usage:** Run this once at the beginning of a new project.
-*   **MCP Variant Description:** `Set up the basic Taskmaster file structure and configuration in the current directory for a new project by running the 'task-master init' command.`
-*   **Key MCP Parameters/Options:**
-    *   `projectName`: `Set the name for your project.` (CLI: `--name <name>`)
-    *   `projectDescription`: `Provide a brief description for your project.` (CLI: `--description <text>`)
-    *   `projectVersion`: `Set the initial version for your project (e.g., '0.1.0').` (CLI: `--version <version>`)
-    *   `authorName`: `Author name.` (CLI: `--author <author>`)
-    *   `skipInstall`: `Skip installing dependencies (default: false).` (CLI: `--skip-install`)
-    *   `addAliases`: `Add shell aliases (tm, taskmaster) (default: false).` (CLI: `--aliases`)
-    *   `yes`: `Skip prompts and use defaults/provided arguments (default: false).` (CLI: `-y, --yes`)
-*   **Usage:** Run this once at the beginning of a new project, typically via an integrated tool like Cursor. Operates on the current working directory of the MCP server. 
-*   **Important:** Once complete, you *MUST* parse a prd in order to generate tasks. There will be no tasks files until then. The next step after initializing should be to create a PRD using the example PRD in scripts/example_prd.txt. 
-
-### 2. Parse PRD (`parse_prd`)
-
-*   **MCP Tool:** `parse_prd`
-*   **CLI Command:** `task-master parse-prd [file] [options]`
-*   **Description:** `Parse a Product Requirements Document (PRD) or text file with Taskmaster to automatically generate an initial set of tasks in tasks.json.`
-*   **Key Parameters/Options:**
-    *   `input`: `Path to your PRD or requirements text file that Taskmaster should parse for tasks.` (CLI: `[file]` positional or `-i, --input <file>`)
-    *   `output`: `Specify where Taskmaster should save the generated 'tasks.json' file (default: 'tasks/tasks.json').` (CLI: `-o, --output <file>`)
-    *   `numTasks`: `Approximate number of top-level tasks Taskmaster should aim to generate from the document.` (CLI: `-n, --num-tasks <number>`)
-    *   `force`: `Use this to allow Taskmaster to overwrite an existing 'tasks.json' without asking for confirmation.` (CLI: `-f, --force`)
-*   **Usage:** Useful for bootstrapping a project from an existing requirements document.
-*   **Notes:** Task Master will strictly adhere to any specific requirements mentioned in the PRD (libraries, database schemas, frameworks, tech stacks, etc.) while filling in any gaps where the PRD isn't fully specified. Tasks are designed to provide the most direct implementation path while avoiding over-engineering.
-*   **Important:** This MCP tool makes AI calls and can take up to a minute to complete. Please inform users to hang tight while the operation is in progress. If the user does not have a PRD, suggest discussing their idea and then use the example PRD in scripts/example_prd.txt as a template for creating the PRD based on their idea, for use with parse-prd.
-
----
-
-## Task Listing & Viewing
-
-### 3. Get Tasks (`get_tasks`)
-
-*   **MCP Tool:** `get_tasks`
-*   **CLI Command:** `task-master list [options]`
-*   **Description:** `List your Taskmaster tasks, optionally filtering by status and showing subtasks.`
-*   **Key Parameters/Options:**
-    *   `status`: `Show only Taskmaster tasks matching this status (e.g., 'pending', 'done').` (CLI: `-s, --status <status>`)
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+## Security & Configuration Tips
+- Never ship secrets; the extension only interacts with public X pages.  
+- Keep permissions minimal (currently `activeTab`, `scripting`, `storage`). If you add APIs, justify them in `manifest.json` comments and PR notes.  
+- Test against both `https://x.com` and `https://twitter.com` since the manifest covers both.
 
 ---
 > Source: [ttmouse/X-data](https://github.com/ttmouse/X-data) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-06-02 -->
