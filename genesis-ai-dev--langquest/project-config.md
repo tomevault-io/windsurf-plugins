@@ -1,111 +1,154 @@
 ---
 trigger: always_on
-description: Guidelines for modifying Drizzle schema and creating migrations. Auto-attached when editing Supabase migrations, Drizzle schema files, or db/constants.ts.
+description: Guidelines for creating and updating components following components.build standards
 ---
 
 
-# Database: Drizzle Schema Migration Process
+## Methodology
 
-## ⛔ Hard rule: version bumps come in pairs
+Follow the [components.build](https://www.components.build/) specification for building modern, composable, and accessible UI components. Use the [Composition Pattern](https://www.radix-ui.com/primitives/docs/guides/composition).
 
-**`APP_SCHEMA_VERSION` and `get_schema_info()` change together, or neither changes. There is no third option.**
+## Artifact Taxonomy
 
-Run this check on every migration diff:
+Understand the hierarchy of UI artifacts we work with:
 
-| `APP_SCHEMA_VERSION` bumped? | Migration contains `create or replace function public.get_schema_info()`? | Verdict |
-|---|---|---|
-| ❌ No | ❌ No | ✅ Server-only — Path A |
-| ✅ Yes | ✅ Yes (matching version) | ✅ Client schema change — Path B |
-| ❌ No | ✅ Yes | 🛑 Broken — remove the `get_schema_info()` block |
-| ✅ Yes | ❌ No | 🛑 Broken — add the `get_schema_info()` bump |
+1. **Primitive** - Lowest-level building block providing behavior and accessibility without styling (e.g., Radix UI Primitives)
+2. **Component** - Styled, reusable UI unit that adds visual design to primitives (e.g., shadcn/ui components)
+3. **Pattern** - Specific composition solving a UI/UX problem (e.g., form validation with inline errors)
 
-**Default = Path A.** If you cannot point to a specific client code change (a Drizzle column the app reads/writes, a sync-rules change clients must satisfy, a renamed table the client queries), do not touch `APP_SCHEMA_VERSION` or `get_schema_info()`. Incorrectly bumping either blocks sync for users on current app builds.
+## Core Principles
 
-> **Real incidents this prevents.** `20260529120000_rename_project_language_suggestion_to_languoid.sql` shipped a `get_schema_info()` bump to `2.5 / min 2.4` while `APP_SCHEMA_VERSION` stayed at `2.3` — blocked sync for every user on the current build and required `20260530120000_revert_schema_info_to_2_3.sql` to undo. `20260520210000_invite_bounce_type_and_reason.sql` made the same mistake (server-only `bounce_type`/`bounce_reason` columns, bumped to `2.4` anyway).
+### Composability and Reusability
 
-## Decision: Path A or Path B?
+- Favor composition over inheritance
+- Build components that can be combined and nested
+- Expose clear API via props/slots for customization
+- Make components reusable in different contexts
 
-| Change type | Supabase migration | `APP_SCHEMA_VERSION` | `get_schema_info()` | Drizzle schema | Local `db/migrations/` |
-|---|---|---|---|---|---|
-| Server-only nullable column | ✅ | ❌ | ❌ | ❌ | ❌ |
-| RLS / triggers / functions / indexes | ✅ | ❌ | ❌ | ❌ | ❌ |
-| Client reads/writes new synced column | ✅ | minor bump | ✅ | ✅ | maybe |
-| Destructive client column change | ✅ | major bump | ✅ | ✅ | ✅ |
-| Server RPC transform for legacy uploads | ✅ | with client | ✅ | maybe | ❌ |
+### Accessible by Default
 
-**Path A — server-only:** Postgres changes the client doesn't see. Examples: nullable columns the app never reads, RLS, triggers, indexes, server functions, backfills, invite bounce-tracking columns. Only output: a Supabase SQL migration. Do **not** edit `db/constants.ts`, the Drizzle schemas, or `db/migrations/`.
+- Accessibility is not optional - it's a baseline feature
+- See the detailed [Accessibility](#accessibility) section below for implementation guidelines
 
-**Path B — client schema change:** App code or the client sync contract changes. Examples: client reads/writes a new column, required field, rename/drop a column the client uses, sync-rules change old clients can't satisfy. Coordinate steps 1–6 below.
+### Customizability and Theming
 
-## PowerSync is schemaless
+- Avoid hard-coding visual styles that cannot be overridden
+- Provide mechanisms for theming (CSS variables, className, style props)
+- Come with sensible defaults but allow easy customization
+- Use design tokens for visual values (see [Styling](#styling) section)
 
-PowerSync stores synced data as schemaless JSON; the client Drizzle schema is just a view on top.
+### Lightweight and Performant
 
-> "Updating this client-side schema is immediate when the new version of the app runs, with no client-side migrations required." — [PowerSync: Implementing Schema Changes](https://docs.powersync.com/usage/lifecycle-maintenance/implementing-schema-changes)
+- Minimize dependencies
+- Avoid bloating with unnecessary logic
+- Strive for good rendering and interaction performance
+- Minimize unnecessary re-renders
 
-Practical consequences:
+## Existing Components & Library Selection
 
-- **Adding a nullable column** to a synced table does not need a local SQLite migration. Existing records read `undefined`, equivalent to `NULL`.
-- **Local migrations are needed** only when client code actively reads/writes a column with non-null semantics, when removing/renaming a column the client uses, or when existing local data needs transformation/backfill.
-- Both synced tables and `*_local` tables use the same JSON-storage architecture — the difference is sync scope, not storage mechanism.
+**Decision order when building features:**
 
-## Path A: Server-only Supabase migration
+1. **Check existing UI components** (in order):
+   - [React Native Reusables](https://reactnativereusables.com/docs) - UI components
+   - [React Native Primitives](https://rn-primitives.vercel.app/) - Radix primitives
+   - [RNR Community Resources](https://github.com/founded-labs/react-native-reusables/blob/main/COMMUNITY_RESOURCES.md) - Community examples
 
-```sql
--- Migration: Add server_only_flag to invite (server-side delivery tracking)
--- NO schema version bump — server-only, nullable, not in client Drizzle schema
+2. **Check Expo SDK** - [Expo SDK docs](https://docs.expo.dev/versions/latest/) for native APIs (camera, file system, haptics, etc.)
 
-alter table public.invite
-  add column if not exists server_only_flag text;
+3. **Only then** consider third-party libraries or custom components.
 
-comment on column public.invite.server_only_flag is 'Used by Resend webhook; not synced to client.';
+## Composition Patterns
+
+### Children / Slots
+
+- **Children** (implicit slot): JSX between opening/closing tags
+- **Named slots**: Props like `icon`, `footer`, or `<Component.Slot>` subcomponents
+- **Slot forwarding**: Pass DOM attributes/className/refs through to underlying element
+
+### Render Props (Function-as-Child)
+
+Use when parent must own data/behavior but consumer must fully control markup:
+
+```tsx
+<ParentComponent data={data}>
+  {(item) => <ChildComponent key={item.id} {...item} />}
+</ParentComponent>
 ```
 
-Do **not** include `create or replace function public.get_schema_info()` in this migration.
+### Compound Components
 
-## Path B: Step-by-step (client schema change)
+Use separate component imports to compose complex UI (shadcn-style):
 
-### 1. Modify shared schema definitions
+```tsx
+import {
+  Card,
+  CardHeader,
+  CardContent,
+  CardFooter
+} from '@/components/ui/card';
 
-Edit `db/drizzleSchemaColumns.ts` — its functions are reused by both `drizzleSchema.ts` (synced tables) and `drizzleSchemaLocal.ts` (`*_local` tables).
-
-```typescript
-export function createAssetTable(source: TableSource, refs: {...}) {
-  return tableCreator(source)('asset', {
-    ...getBaseColumns(source),
-    new_field: text(),
-  });
-}
+<Card>
+  <CardHeader>Title</CardHeader>
+  <CardContent>Body</CardContent>
+  <CardFooter>Actions</CardFooter>
+</Card>;
 ```
 
-### 2. Bump `APP_SCHEMA_VERSION` + update `get_schema_info()`
+### Controlled vs. Uncontrolled
 
-These two move together (see hard rule). Format: `MAJOR.MINOR`.
+- **Controlled**: Value driven by props, emits `onChange` (source of truth is parent)
+- **Uncontrolled**: Holds internal state, may expose `defaultValue` and imperative reset
+- Many inputs should support both patterns
 
-- **Minor bump** (`2.0 → 2.1`): additive client changes (new columns/tables the app uses).
-- **Major bump** (`2.0 → 3.0`): destructive client changes (removed/renamed columns, type changes, dropped tables).
+### Polymorphism / asChild
 
-```typescript
-// db/constants.ts
-export const APP_SCHEMA_VERSION = '2.1';
+Use `asChild` prop to allow component to render as a different element:
+
+```tsx
+<Button asChild>
+  <Link href="/">Click me</Link>
+</Button>
 ```
 
-```sql
--- in your Supabase migration
-create or replace function public.get_schema_info()
-returns jsonb
-language sql
-security invoker
-set search_path = public
-as $$
-  select jsonb_build_object(
-    'schema_version', '2.1',
-    'min_required_schema_version', '2.0',
-    'notes', 'Clients must be at least 2.0 to sync.'
-  );
-$$;
-```
+This renders as `<Link>` instead of `<button>`, preserving all Button behavior.
 
+## Accessibility
+
+### Keyboard Navigation
+
+- Document and implement keyboard map for every interactive component
+- Support standard patterns: `Tab`, `Arrow keys`, `Home/End`, `Escape`
+- Ensure all interactive elements are keyboard accessible
+
+### Focus Management
+
+- Rules for initial focus, roving focus, focus trapping
+- Focus return on teardown (e.g., modals)
+- Focus indicators visible and clear
+
+### ARIA Attributes
+
+- Use semantic HTML elements (`<button>`, `<ul>/<li>`, etc.)
+- Augment with ARIA when necessary:
+  - `role` - Communicate semantics (`role="menu"`)
+  - `aria-*` states - State (`aria-checked`, `aria-expanded`)
+  - `aria-*` properties - Relationships (`aria-controls`, `aria-labelledby`)
+
+### Color Contrast
+
+- Ensure sufficient color contrast for text and interactive elements
+- Don't rely solely on color to convey information
+
+## Implementation Notes
+
+### Styling
+
+- Don't use margin (`m-*` properties in tailwind), use `View`s with flex (`flex`), flex gap (`gap-*`), and flex direction (`flex-[row|col]`).
+- Don't concatenate tailwind classnames with template strings, always use the `cn` utility in `utils/styleUtils.ts`.
+- Don't use Tailwind leading-none or anything with a line-height less than 1.3, as it causes text clipping.
+- Don't use `SafeAreaView` around `ScrollView` or `FlatList`. Instead, always use `contentInsetAdjustmentBehavior="automatic"` prop on the scrollable component itself.
+- Use **variants** for discrete style/behavior permutations (e.g., `size="sm|md|lg"`, `tone="neutral|destructive"`). Variants are not separate components.
+- Use **design tokens** (CSS variables) for theming: `--color-bg`, `--radius-md`, `--space-2`
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
