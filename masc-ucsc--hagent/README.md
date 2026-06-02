@@ -7,11 +7,11 @@ Hardware Agent
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [masc-ucsc/hagent](https://github.com/masc-ucsc/hagent).
+Original source: `AGENTS.md` in [masc-ucsc/hagent](https://github.com/masc-ucsc/hagent).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
