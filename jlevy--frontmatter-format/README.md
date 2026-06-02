@@ -7,11 +7,11 @@ A simple convention for YAML metadata on any file
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [jlevy/frontmatter-format](https://github.com/jlevy/frontmatter-format).
+Original source: `CLAUDE.md` in [jlevy/frontmatter-format](https://github.com/jlevy/frontmatter-format).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
