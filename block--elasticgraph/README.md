@@ -7,11 +7,11 @@ Schema-driven, scalable, cloud-native, batteries-included GraphQL, backed by Ela
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [block/elasticgraph](https://github.com/block/elasticgraph).
+Original source: `AGENTS.md` in [block/elasticgraph](https://github.com/block/elasticgraph).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
