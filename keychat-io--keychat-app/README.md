@@ -7,12 +7,12 @@ Keychat is the super app for Bitcoiners. Autonomous IDs, Bitcoin ecash wallet, s
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `copilot-instructions.md` in [keychat-io/keychat-app](https://github.com/keychat-io/keychat-app).
+Original source: `CLAUDE.md` in [keychat-io/keychat-app](https://github.com/keychat-io/keychat-app).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
+- **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
