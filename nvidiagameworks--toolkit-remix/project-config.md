@@ -1,10 +1,10 @@
 ---
 trigger: always_on
-description: Engineering standards — fix root causes, no workarounds, anti-pattern awareness
+description: SPDX Apache-2.0 license header requirement for all Python files
 ---
 
 
-@.agents/rules/engineering-standards.md
+@.agents/rules/license.md
 
 ---
 > Source: [NVIDIAGameWorks/toolkit-remix](https://github.com/NVIDIAGameWorks/toolkit-remix) — distributed by [TomeVault](https://tomevault.io).
