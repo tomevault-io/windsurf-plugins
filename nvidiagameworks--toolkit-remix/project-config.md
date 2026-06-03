@@ -1,10 +1,10 @@
 ---
 trigger: always_on
-description: SPDX Apache-2.0 license header requirement for all Python files
+description: Durable project learnings must be promoted into canonical repo docs or shared agent rules
 ---
 
 
-@.agents/rules/license.md
+@.agents/rules/memory-promotion.md
 
 ---
 > Source: [NVIDIAGameWorks/toolkit-remix](https://github.com/NVIDIAGameWorks/toolkit-remix) — distributed by [TomeVault](https://tomevault.io).
