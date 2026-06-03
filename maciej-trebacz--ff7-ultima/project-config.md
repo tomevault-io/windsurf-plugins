@@ -39,5 +39,5 @@ Key files and components used by the app:
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/maciej-trebacz) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-13 -->
+> Source: [maciej-trebacz/ff7-ultima](https://github.com/maciej-trebacz/ff7-ultima) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-06-03 -->
