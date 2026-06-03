@@ -5,14 +5,14 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `GEMINI.md` in [inmny/Cultiway-Reborn](https://github.com/inmny/Cultiway-Reborn).
+Original source: `AGENTS.md` in [inmny/Cultiway-Reborn](https://github.com/inmny/Cultiway-Reborn).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
+- **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
 From [inmny/Cultiway-Reborn](https://github.com/inmny/Cultiway-Reborn) — a repo with 16+ stars on GitHub.
