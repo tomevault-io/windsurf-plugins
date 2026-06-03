@@ -7,11 +7,11 @@ Complete source code of the official Windscribe iOS application.
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [Windscribe/iOS-App](https://github.com/Windscribe/iOS-App).
+Original source: `CLAUDE.md` in [Windscribe/iOS-App](https://github.com/Windscribe/iOS-App).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
