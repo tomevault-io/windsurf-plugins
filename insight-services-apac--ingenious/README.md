@@ -7,11 +7,11 @@ General-purpose Gen AI Accelerator developed for Insight APAC projects
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [Insight-Services-APAC/ingenious](https://github.com/Insight-Services-APAC/ingenious).
+Original source: `CLAUDE.md` in [Insight-Services-APAC/ingenious](https://github.com/Insight-Services-APAC/ingenious).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
