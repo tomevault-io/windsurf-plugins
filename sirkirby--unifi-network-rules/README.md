@@ -7,11 +7,11 @@ Allows you to manage, backup, and automate your UDM firewall policies, routes, a
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [sirkirby/unifi-network-rules](https://github.com/sirkirby/unifi-network-rules).
+Original source: `CLAUDE.md` in [sirkirby/unifi-network-rules](https://github.com/sirkirby/unifi-network-rules).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
