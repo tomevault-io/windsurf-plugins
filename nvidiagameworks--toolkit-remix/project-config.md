@@ -1,10 +1,10 @@
 ---
 trigger: always_on
-description: Auto-dispatch agent commands for known operations
+description: Pre-completion verification gates — tests, format, lint, version bump, docs
 ---
 
 
-@.agents/rules/commands.md
+@.agents/rules/completion-gates.md
 
 ---
 > Source: [NVIDIAGameWorks/toolkit-remix](https://github.com/NVIDIAGameWorks/toolkit-remix) — distributed by [TomeVault](https://tomevault.io).
