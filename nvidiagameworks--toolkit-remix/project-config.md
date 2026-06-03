@@ -1,10 +1,10 @@
 ---
 trigger: always_on
-description: Python code style — formatting, imports, naming conventions
+description: Auto-dispatch agent commands for known operations
 ---
 
 
-@.agents/rules/code-style.md
+@.agents/rules/commands.md
 
 ---
 > Source: [NVIDIAGameWorks/toolkit-remix](https://github.com/NVIDIAGameWorks/toolkit-remix) — distributed by [TomeVault](https://tomevault.io).
