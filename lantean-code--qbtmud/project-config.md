@@ -1,0 +1,84 @@
+---
+trigger: always_on
+description: > Scope: This file gives high-level context and guardrails for the repository root. Deeper folders may add their own `AGENTS.md` files which take precedence for their subtrees (e.g., `./src/AGENTS.md`, `./test/AGENTS.md`).
+---
+
+# AGENTS.md (root)
+
+> Scope: This file gives high-level context and guardrails for the repository root. Deeper folders may add their own `AGENTS.md` files which take precedence for their subtrees (e.g., `./src/AGENTS.md`, `./test/AGENTS.md`).
+
+## Project overview
+- qbtmud is a drop-in replacement for qBittorrent's default WebUI, aiming for full feature parity with a modern UI.
+- Primary goals: parity with the default WebUI, excellent UX, reliability, and easy installation.
+- Non-goals: diverging from qBittorrent semantics without explicit design approval.
+
+## Repository layout
+- Solution: `Lantean.QBTMud.slnx`
+- Projects:
+  - `Lantean.QBTMud` — Web UI host and published assets.
+  - `Lantean.QBitTorrentClient` — client library for qBittorrent Web API.
+  - `Lantean.QBTMud.Test` — unit tests.
+  - `Lantean.QBitTorrentClient.Test` — unit tests.
+- Config/conventions: `.editorconfig`, `.gitattributes`, `nuget.config`, `global.json` (SDK pin).
+
+## Build, test, publish
+- Prerequisites: .NET 10 SDK (use the version pinned by `global.json` if present).
+  - Agents must verify the pinned SDK is available in the current environment; if `dotnet --info` does not list the required version, install it (e.g., via `dotnet-install.sh`) before running restore/build/test commands.
+  - Agents must include `--artifacts-path=/tmp/artifacts/qbtmud` on all `dotnet` commands (including `dotnet format`).
+- After modifying code or tests:
+  - Run `dotnet format --include <changed files> --artifacts-path=/tmp/artifacts/qbtmud` for the files changed in the current task only.
+  - Do not format unrelated files.
+- Restore & build:
+  - `dotnet restore --artifacts-path=/tmp/artifacts/qbtmud`
+  - `dotnet build  --artifacts-path=/tmp/artifacts/qbtmud`
+- Run tests:
+  - `dotnet test --artifacts-path=/tmp/artifacts/qbtmud`
+- After each behavior-affecting set of changes:
+  - Run `dotnet test --artifacts-path=/tmp/artifacts/qbtmud`.
+  - Behavior-affecting includes edits to production code, test code, project/package/build configuration, or other runtime-impacting assets.
+  - Docs-only/report-only/markdown-only edits do not require restore/build/test unless explicitly requested.
+
+## Coding and test standards
+- Source code rules and generation constraints live in `./src/AGENTS.md` (authoritative for code style, design, docs).
+- Unit test rules live in `./test/AGENTS.md` (authoritative for test structure, naming, mocks, coverage).
+- If rules conflict, the deeper file (closer to the change) wins; otherwise, follow both.
+
+## Line endings
+- Use CRLF line terminators for any files you write or modify.
+- After editing any file that is expected to use CRLF, run `unix2dos <changed files>` to normalize the entire file and eliminate any LF or mixed endings introduced by patching tools.
+- Do not run `unix2dos` on files that are intentionally LF per `.gitattributes` (for example `*.sh`, `*.bash`, `*.py`, and `justfile`).
+- Before finishing, verify every changed CRLF-governed file is `crlf` and not `mixed`.
+
+## Git permissions
+- Agents must not perform git write operations unless the user gives explicit permission in the current conversation.
+- Git write operations include (but are not limited to): `commit`, `push`, `pull`, `merge`, `rebase`, `cherry-pick`, `reset`, `revert`, `checkout`/`switch` that changes branch or files, tag creation/deletion, and branch creation/deletion.
+- Until explicit permission is granted, only read-only git commands are allowed (for example: `git status`, `git diff`, `git log`, `git show`).
+
+## How to work in this repo (for agents)
+1. Read this file, then the relevant folder `AGENTS.md` (e.g., `src` or `test`).
+2. When referencing MudBlazor or qBittorrent source:
+   - Ensure the repos are checked out under `./ref/mudblazor` and `./ref/qBittorrent`.
+   - Check out a tagged release, not a branch (do not use `develop`, `dev`, `master`, or `main`).
+   - MudBlazor must match the installed package version used by this repo.
+   - qBittorrent must match the most recent tag.
+2. Before modifying code:
+   - Confirm SDK target, nullable context, analyzers, and editorconfig rules.
+   - Keep public surface consistent; do not break qBittorrent Web API expectations without approval.
+3. When generating code:
+   - Follow `./src/AGENTS.md` exactly (naming, formatting, docs, DI, async, security).
+   - Prefer minimal, maintainable changes; avoid churn to unrelated files.
+4. When writing tests:
+   - Follow `./test/AGENTS.md` exactly (class/method naming, `_target`, mocks, coverage).
+5. Before opening a PR:
+   - Build succeeds, tests are green.
+   - Public XML docs added/updated.
+   - Changelog notes in the PR description (what changed, why, risks, testing).
+   - Prefer the repository PR template in `.github/PULL_REQUEST_TEMPLATE.md`.
+   - When drafting a PR summary/body, follow the repository template structure and recent merged-PR style.
+   - The target audience for the PR summary/body is the PR reviewer. Write for reviewer context, not for local agent bookkeeping.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [lantean-code/qbtmud](https://github.com/lantean-code/qbtmud) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-06-03 -->
