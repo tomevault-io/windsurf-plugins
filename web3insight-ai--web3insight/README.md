@@ -7,11 +7,11 @@ Discover, analyze, and connect with Web3 developers. Powered by GitHub data and 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [web3insight-ai/web3insight](https://github.com/web3insight-ai/web3insight).
+Original source: `CLAUDE.md` in [web3insight-ai/web3insight](https://github.com/web3insight-ai/web3insight).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
