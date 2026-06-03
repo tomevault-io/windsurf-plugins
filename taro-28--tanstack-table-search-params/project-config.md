@@ -1,11 +1,8 @@
 ---
 trigger: always_on
-description: As this project's AI coding tool, you must follow the additional conventions below, in addition to the built-in functions.
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-# Additional Conventions Beyond the Built-in Functions
-
-As this project's AI coding tool, you must follow the additional conventions below, in addition to the built-in functions.
 
 # CLAUDE.md
 
