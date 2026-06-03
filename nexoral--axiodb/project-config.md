@@ -1,238 +1,125 @@
 ---
 trigger: always_on
-description: **AxioDB** is an embedded NoSQL database for Node.js with MongoDB-style queries. Pure TypeScript/JavaScript, zero native dependencies.
+description: This file provides guidance to Gemini Code Assist when working with code in this repository.
 ---
 
-# AxioDB Core Rules for Cursor IDE
+# GEMINI.md
 
-## Project Context
+This file provides guidance to Gemini Code Assist when working with code in this repository.
 
-**AxioDB** is an embedded NoSQL database for Node.js with MongoDB-style queries. Pure TypeScript/JavaScript, zero native dependencies.
+## Project Overview
 
-## Mandatory Workflows
+**AxioDB** - Embedded NoSQL database for Node.js. Pure TypeScript/JavaScript, zero native dependencies.
 
-### After EVERY Code Change
+- **Stack**: TypeScript (strict) → CommonJS, Node.js ≥20.0.0
+- **Pattern**: Singleton, file-per-document storage
+- **Features**: InMemoryCache, Worker Threads, ACID transactions, Web GUI (27018), TCP (27019)
+
+## Commands
+
 ```bash
-npm run build  # MANDATORY - catch TypeScript errors immediately
+npm run build    # TypeScript → lib/ (MANDATORY after changes)
+npm test        # Run all tests (separate processes)
+npm run lint    # ESLint check
 ```
 
-### For ANY Feature Change
-1. Update tests in `Test/modules/`
-2. Run `npm test` - all tests must pass
-3. Update docs (README.md, Document/, Dockerfile)
-4. Run `npm run lint` - must pass
+## Core Rules (NON-NEGOTIABLE)
 
-## Definition of "Done"
+1. **ALWAYS build**: `npm run build` after EVERY code change
+2. **ALWAYS test**: Add/update tests in `Test/modules/` for ANY feature change
+3. **NEVER incomplete**: Build passes + Tests pass + Docs updated = Done
+4. **Respect existing**: Read files before modifying, follow patterns
+5. **SOLID + DRY**: No hacks, no duplication, modular design
+6. **Update docs**: README.md, Document/, Dockerfile when features change
 
-A task is NOT complete until ALL of these are true:
-- ✅ Code written following standards
-- ✅ `npm run build` passes with zero errors
-- ✅ Tests added/updated in `Test/modules/`
-- ✅ `npm test` passes - all tests green
-- ✅ `npm run lint` passes
-- ✅ Documentation updated (README, Document/, Dockerfile)
-- ✅ No breaking changes (or explicitly noted and approved)
-- ✅ Self-reviewed for performance, security, maintainability
+## Structure
 
-## Architecture Constraints
+```
+source/Services/      # Core: Database, Collection, CRUD, Index, Transaction
+source/engine/        # File operations: FileManager, FolderManager
+source/server/        # HTTP GUI (port 27018, Fastify)
+source/tcp/           # TCP server (port 27019, AxioDBCloud)
+source/client/        # AxioDBCloud TCP client
+source/Helper/        # Utils: Converter, Crypto, Response
+Test/modules/         # crud.test.js, transaction.test.js, read.test.js
+```
 
-### Singleton Pattern (NON-NEGOTIABLE)
+## Key Constraints
+
+- **Singleton**: Only one AxioDB instance per app
+- **Test isolation**: Tests run in separate processes
+- **No `any` types**: Use proper TypeScript types
+- **Backward compatibility**: Maintain unless explicitly approved
+
+## AxioDB Patterns
+
+### Singleton Pattern
 ```typescript
 export class AxioDB {
   private static _instance: AxioDB;
-
   constructor() {
-    if (AxioDB._instance) {
-      throw new Error("Only one instance of AxioDB is allowed.");
-    }
+    if (AxioDB._instance) throw new Error("Only one instance allowed");
     AxioDB._instance = this;
   }
 }
 ```
 
-**Critical Implication**: Tests MUST run in separate child processes. Cannot run tests in parallel due to singleton constraint.
-
-### File-Per-Document Storage
-```
-{RootPath}/{DatabaseName}/{CollectionName}/{documentId}.axiodb
-```
-
-### Dual-Write Pattern (Indexes)
+### Dual-Write (Indexes)
 ```typescript
-// ALWAYS write to BOTH memory AND disk
-await this.indexCache.set(key, data, TTL);  // Memory (speed)
-await this.fileManager.writeFile(path, JSON.stringify(data));  // Disk (durability)
+// Write to memory (speed) + disk (durability)
+await this.indexCache.set(key, data, TTL);
+await this.fileManager.writeFile(path, JSON.stringify(data));
 ```
 
-### Random Cache TTL (5-15 minutes)
+### Random Cache TTL
 ```typescript
-const TTL = Math.floor(Math.random() * (15 - 5 + 1) + 5) * 60 * 1000;
-```
-**Why**: Prevents cache stampede/thundering herd
-
-## TypeScript Standards (STRICT)
-
-### NO `any` Types - EVER
-```typescript
-// ❌ ABSOLUTELY FORBIDDEN
-const result: any = await operation();
-
-// ✅ REQUIRED
-interface OperationResult {
-  success: boolean;
-  data: DocumentData;
-}
-const result: OperationResult = await operation();
+const TTL = Math.floor(Math.random() * (15 - 5 + 1) + 5) * 60 * 1000; // 5-15min
 ```
 
-### Strict Null Checks
-```typescript
-// ✅ GOOD
-function get(id: string): Document | null {
-  return this.cache.get(id) ?? null;
-}
+## TypeScript Standards
 
-const doc = get('123');
-if (doc !== null) {
-  console.log(doc.name);
-}
-```
-
-## SOLID Principles
-
-### Single Responsibility
-Each class/module has ONE reason to change.
-
-### Don't Repeat Yourself (DRY)
-If same logic appears in 2+ files, extract to `Helper/` directory.
-
-### No Hacky Solutions
-```typescript
-// ❌ FORBIDDEN
-setTimeout(() => { /* hope this works */ }, 1000);
-eval(userInput);
-try { risky(); } catch (e) { /* ignore */ }
-
-// ✅ REQUIRED
-await properAsyncOperation();
-const sanitized = validateAndSanitize(userInput);
-try { await risky(); } catch (error) {
-  logger.error('Operation failed', error);
-  return ResponseHelper.error('Failed', StatusCodes.ERROR);
-}
-```
+- No `any` types - use proper interfaces
+- Strict mode compliance
+- Error handling with try-catch
+- ResponseHelper for responses
 
 ## Testing Requirements
 
-### Location
-```
-Test/modules/
-├── crud.test.js          # CRUD operations
-├── transaction.test.js   # Transactions, WAL, savepoints
-└── read.test.js          # Read optimizations, caching
-```
-
-### Coverage Required
-- Happy path (success scenarios)
-- Edge cases (empty, null, undefined, large data)
-- Error cases (validation failures, file errors, conflicts)
-- Concurrent operations
-- Backward compatibility
-
-### Test Execution
-```bash
-npm test                           # All tests
-npm test crud                      # CRUD tests only
-node Test/modules/crud.test.js     # Direct execution
-```
+- Location: `Test/modules/`
+- Files: `crud.test.js`, `transaction.test.js`, `read.test.js`
+- Coverage: Happy path, edge cases, errors, concurrent operations
+- Run in separate processes (singleton constraint)
 
 ## Documentation Requirements
 
-### README.md
-Update when:
-- New public API methods
-- Feature additions
-- Behavior changes
-- Configuration changes
+Update when features change:
+- `README.md` - Public API changes
+- `Document/` - Feature documentation (React site)
+- `Dockerfile` - Deployment changes
+- JSDoc comments for public methods
 
-### Document/ (React Docs Site)
-```bash
-cd Document
-npm run dev    # localhost:5173
-# Edit src/pages/
-npm run build  # Verify builds
-```
+## Security
 
-Update for ALL new features with:
-- Feature overview
-- Code examples (tested!)
-- API reference
-- Best practices
-- Common pitfalls
+- Validate all input
+- Sanitize file paths (prevent traversal)
+- Encrypt sensitive data (AES-256)
+- No stack traces to users
 
-### Dockerfile
-Update when:
-- Port numbers change
-- Environment variables added
-- Build process changes
-- Startup command changes
+## Performance
 
-### JSDoc Comments
-Required for ALL public methods:
-```typescript
-/**
- * Method description.
- *
- * @param {Type} paramName - Description
- * @returns {Promise<Type>} Description
- * @throws {Error} When something fails
- *
- * @example
- * const result = await method(param);
- */
-```
+- Use InMemoryCache for frequent reads
+- Batch operations with Promise.all
+- Avoid unnecessary file I/O
+- Use Map for O(1) lookups
 
-## Performance Standards
+## Definition of "Done"
 
-### 1. Use InMemoryCache
-```typescript
-const cached = this.cache.get(key);
-if (cached) return cached;
-
-const data = await this.readFromDisk(id);
-this.cache.set(key, data, TTL);
-return data;
-```
-
-### 2. Batch Operations
-```typescript
-// ✅ PARALLEL
-await Promise.all(docs.map(d => this.insert(d)));
-
-// ❌ SEQUENTIAL (slow)
-for (const d of docs) { await this.insert(d); }
-```
-
-### 3. Use Map for O(1) Lookups
-```typescript
-// ✅ O(1)
-const map = new Map<string, Document>();
-const found = map.get(id);
-
-// ❌ O(n)
-const found = array.find(d => d.id === id);
-```
-
-### 4. Avoid Unnecessary File I/O
-```typescript
-// ✅ Read once
-const docs = await this.loadAll();
-const filtered = docs.filter(d => d.age > 25);
-
-// ❌ Multiple reads
-for (const id of ids) {
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- ✅ Code follows standards
+- ✅ `npm run build` passes
+- ✅ Tests added/updated in `Test/modules/`
+- ✅ `npm test` passes
+- ✅ Docs updated (README, Document/, Dockerfile)
+- ✅ No breaking changes (unless approved)
 
 ---
 > Source: [nexoral/AxioDB](https://github.com/nexoral/AxioDB) — distributed by [TomeVault](https://tomevault.io).
