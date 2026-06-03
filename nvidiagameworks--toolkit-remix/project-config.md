@@ -1,10 +1,10 @@
 ---
 trigger: always_on
-description: Pre-completion verification gates — tests, format, lint, version bump, docs
+description: Engineering standards — fix root causes, no workarounds, anti-pattern awareness
 ---
 
 
-@.agents/rules/completion-gates.md
+@.agents/rules/engineering-standards.md
 
 ---
 > Source: [NVIDIAGameWorks/toolkit-remix](https://github.com/NVIDIAGameWorks/toolkit-remix) — distributed by [TomeVault](https://tomevault.io).
