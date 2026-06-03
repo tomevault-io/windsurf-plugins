@@ -3,7 +3,6 @@ trigger: always_on
 description: Modible Project Standards
 ---
 
-
 Modible Project Standards
 
 Version Numbers
@@ -41,7 +40,6 @@ Svelte Components
 Use .svelte extension for Svelte components
 Use TypeScript syntax in <script> tags:
 svelteCopy
-
 <script lang="ts">
   // TypeScript code here
 </script>
@@ -57,9 +55,9 @@ Typing
 Use TypeScript for type definitions
 Create interfaces or types for component props:
 typescriptCopy
-interface MyComponentProps {
-someValue: string;
-optionalValue?: number;
+interface MyComponentProps { 
+  someValue: string; 
+  optionalValue?: number;
 }
 
 Imports
@@ -81,7 +79,6 @@ Utilize Tailwind's utility classes directly in the markup
 For complex components, consider using Tailwind's @apply directive in a scoped <style> block
 Use dynamic classes with template literals when necessary:
 svelteCopy
-
 <div class={`bg-blue-500 p-4 ${isActive ? 'opacity-100' : 'opacity-50'}`}></div>
 
 File Structure
@@ -130,8 +127,8 @@ Maintain up-to-date README files for the project and major components
 Use JSDoc comments for functions and complex logic
 Keep inline comments concise and meaningful
 
-I'm using svelte 5 instead of svelte 4 here is an overview of the changes.
 
+I'm using svelte 5 instead of svelte 4 here is an overview of the changes.
 # .cursorrunes for Svelte 5
 
 ## Overview of Changes
@@ -145,8 +142,6 @@ Snippets, along with render tags, help create reusable chunks of markup inside y
 In Svelte 5, event handlers are treated as standard HTML properties rather than Svelte-specific directives, simplifying their use and integrating them more closely with the rest of the properties in the component.
 
 ### Svelte 4 vs. Svelte 5:
-
-**Before (Svelte 4):**
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
