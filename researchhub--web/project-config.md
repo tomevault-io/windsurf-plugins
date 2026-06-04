@@ -1,90 +1,177 @@
 ---
 trigger: always_on
-description: This is a document that provides key PR reviewing as if they were a senior engineer
+description: This document outlines the architectural patterns and best practices for services in the ResearchHub codebase.
 ---
 
-# Key Learnings from Senior Engineer Code Review
+ # ResearchHub Services Architecture
 
-1. **Leverage React Providers for Global State**
+This document outlines the architectural patterns and best practices for services in the ResearchHub codebase.
 
-   - Using context providers (like the ExchangeRateContext) is an effective way to share data application-wide.
-   - Encapsulating fetch logic within these providers or in dedicated hooks can simplify the rest of the codebase and improve maintainability.
+## Service Structure
 
-2. **Separate Concerns Between Services and View Layer**
+1. **Class-based Organization**:
+   - Organize services as static TypeScript classes
+   - Group related API endpoints in domain-specific services
+   - Name services with the `Service` suffix (e.g., `NoteService`, `ReactionService`)
 
-   - Keep the "services" layer focused on fetching and basic data transformations.
-   - Avoid placing view-specific formatting (e.g., icon lookup or UI-ready strings) inside services—this leads to entanglement and potential reusability issues.
-   - Move highly UI-related transforms (for example, mapping distribution types to icons) into a dedicated "lib" or the "view layer" (e.g., inside component utilities or dedicated functions).
+   ```typescript
+   export class FeatureService {
+     private static readonly BASE_PATH = '/api';
+     
+     static async getItem(id: string): Promise<Item> {
+       // Implementation
+     }
+     
+     static async createItem(params: CreateItemParams): Promise<Item> {
+       // Implementation
+     }
+   }
+   ```
 
-3. **Use Dedicated Transformers Carefully**
+2. **API Client Pattern**:
+   - Use the central `ApiClient` for all HTTP requests
+   - Abstract HTTP methods (GET, POST, PATCH, DELETE) behind ApiClient methods
+   - Handle authentication, headers, and base URL configuration in ApiClient
 
-   - Keep data transformations minimal and "model-oriented" in services, returning clean, typed data.
-   - Perform purely presentational transformations (e.g., formatting numeric values or currency strings) within the view layer to reduce the likelihood of unnecessary re-fetching or tight coupling.
+   ```typescript
+   static async getItem(id: string): Promise<Item> {
+     const response = await ApiClient.get<ItemResponse>(`${this.BASE_PATH}/items/${id}`);
+     return transformItem(response);
+   }
+   ```
 
-4. **Consider Creating Custom Hooks for Data Fetching**
+3. **Method Naming**:
+   - Use descriptive, action-based names for service methods
+   - Follow CRUD naming conventions: get, create, update, delete
+   - Use domain-specific verbs for specialized actions (e.g., `publish`, `flag`, `vote`)
 
-   - Custom hooks (like "useUserBalance") can abstract away internal fetch logic and state management, similar to how "useSession" works in Next.js.
-   - This pattern improves readability, makes the code more composable, and centralizes asynchronous logic behind a well-defined interface.
+## Type Definitions
 
-5. **Watch Out for Unnecessary Re-Renders and Side Effects**
+1. **Request/Response Types**:
+   - Define clear interface types for API request parameters
+   - Name request parameter interfaces with `Params` suffix (e.g., `CreateNoteParams`)
+   - Use descriptive interface names that indicate the action
 
-   - Multiple data retrieval triggers can cause performance issues or data inconsistencies if not handled carefully.
-   - Use checks to ensure that data is only fetched when needed. Employ memoization or context effectively to prevent repetitive fetch calls.
+   ```typescript
+   export interface CreateItemParams {
+     title: string;
+     description: string;
+     categoryId: number;
+     tags?: string[];
+   }
+   ```
 
-6. **Embrace a Layered Architecture**
+2. **API Path Variables**:
+   - Store API path variables as private static readonly class properties
+   - Use uppercase for constant path variables
+   - Keep path construction logic inside service methods
 
-   - A "service" layer for API interactions.
-   - A "types/model" layer to define and represent data structures.
-   - A "view/presentation" layer (React components) that handles all UI and formatting.
-   - This structure is analogous to classic architectural patterns (e.g., "MVC") and ensures a more scalable and maintainable application over time.
+   ```typescript
+   private static readonly BASE_PATH = '/api';
+   private static readonly ITEMS_PATH = `${this.BASE_PATH}/items`;
+   ```
 
-7. **Balance Raw Data vs. Derived Data**
+## Error Handling
 
-   - Keep a reference to the raw data (unformatted, untransformed) for potential debugging and logic needs.
-   - Derive only what's necessary for display in the UI to avoid confusion or data loss.
+1. **Service-specific Errors**:
+   - Define service-specific error classes
+   - Extend the base Error class with additional properties
+   - Provide meaningful error messages and error codes
 
-8. **Consistent, Incremental Refinement**
+   ```typescript
+   export class ServiceNameError extends Error {
+     constructor(
+       message: string,
+       public readonly code?: string
+     ) {
+       super(message);
+       this.name = 'ServiceNameError';
+     }
+   }
+   ```
 
-   - Small refactors—such as relocating formatting functions and hooking into contexts—can make a significant difference in clarity and scalability.
-   - Regular feedback loops and code reviews help solidify best practices and ensure the application remains well-structured as it grows.
+2. **Error Propagation**:
+   - Catch and transform HTTP errors within service methods
+   - Provide consistent error formats for consumers
+   - Include relevant error details and status codes
 
-9. **Minimal Client-Side Caching and Centralized Data**
+   ```typescript
+   try {
+     return await ApiClient.post<ItemResponse>(
+       `${this.BASE_PATH}/items`,
+       params
+     );
+   } catch (error) {
+     if (error instanceof ApiError) {
+       throw new ServiceNameError(
+         `Failed to create item: ${error.message}`,
+         error.status.toString()
+       );
+     }
+     throw new ServiceNameError('An unexpected error occurred');
+   }
+   ```
 
-   - Use React Context for global or shared data rather than implementing multiple fetch calls or storing redundant data in each component.
-   - Avoid heavy local caching or memoization beyond what React already provides; excessive caching can introduce staleness bugs and complicate the code.
-   - Avoid React Query.
-   - Fetch data once (for instance, in a provider) and rely on that single source of truth across your application.
-   - Keep caching boundaries small: if data is needed by multiple components, lifting it into Context makes sense; otherwise, store it locally.
-   - Be mindful of Next.js server/client boundaries; avoid turning everything into a client-side component, as it diminishes server-rendering advantages.
+## Data Transformation
 
-10. **Keep File and Folder Names Consistent**
+1. **Transformation Pattern**:
+   - Transform API responses to match client-side data models
+   - Use transformer functions to convert snake_case to camelCase
+   - Ensure all transformed data includes proper TypeScript types
 
-    - Use a clear and consistent naming scheme for files and folders. For example, if you have a component for an item in a list, call it `TransactionListItem.tsx`, not `TransactionItem.tsx`.
-    - For directories, use lowercase (e.g., `services`, `skeletons`) and consider capitalization for React component files.
+   ```typescript
+   static async getItem(id: string): Promise<Item> {
+     const response = await ApiClient.get<ItemResponse>(`${this.BASE_PATH}/items/${id}`);
+     return transformItem(response);
+   }
+   ```
 
-11. **Use Descriptive Names That Reflect Purpose**
+2. **Transformer Organization**:
+   - Keep transformer functions with relevant type definitions
+   - Maintain consistent transformation patterns across services
+   - Preserve raw response data for debugging purposes
 
-    - Choose intuitive front-end labels that reflect the actual functionality; avoid ambiguous terms.
-    - If you have a button that exports data, label it "Export CSV" or "Export," rather than something vague like "export by year."
+## Request Parameters
 
-12. **DTO vs. "Plain" Types**
+1. **Parameter Formatting**:
+   - Accept camelCase parameters in service methods
+   - Convert camelCase to snake_case for API requests when needed
+   - Handle URL parameter encoding for GET requests
 
-    - In service files, use type names like `SomethingApiResponse` or `SomethingDto` to indicate it's a direct mapping from an API payload.
-    - For app-wide types (after you've transformed them), use straightforward names like `Transaction` or `Notification` that don't reference the API layer.
+   ```typescript
+   static async getItems(params: GetItemsParams): Promise<ItemsResponse> {
+     const queryParams = new URLSearchParams();
+     
+     if (params.categoryId) {
+       queryParams.append('category_id', params.categoryId.toString());
+     }
+     
+     if (params.sortBy) {
+       queryParams.append('sort_by', params.sortBy);
+     }
+     
+     const url = `${this.ITEMS_PATH}?${queryParams.toString()}`;
+     const response = await ApiClient.get<ItemsApiResponse>(url);
+     return transformItemsResponse(response);
+   }
+   ```
 
-13. **Keep Function Names Action-Oriented**
+2. **Optional Parameters**:
+   - Use optional parameters with sensible defaults
+   - Validate required parameters before making API calls
+   - Provide clear error messages for missing required parameters
 
-    - Use verbs and descriptive phrases, like `markAllAsRead()` instead of `mark()`.
-    - For fetching or transforming data, name them accordingly, e.g. `getTransactions()` or `transformTransaction()`.
-
-14. **Use Short but Unambiguous Events or Handlers**
-
-    - Handlers should be clear about which user action they handle, such as `onClickDeposit` or `handleDeposit`.
-    - Keep them concise: `onClose`, `onClick`, `handleSubmit`, etc.
-
-15. **Simplify Type Organization and API Integration**
-
-    - Avoid using `.dto` files for API types unless specifically needed (e.g., authentication).
+   ```typescript
+   static async searchItems(query: string, options: SearchOptions = {}): Promise<SearchResults> {
+     if (!query) {
+       throw new ServiceNameError('Search query is required');
+     }
+     
+     const queryParams = new URLSearchParams({
+       q: query,
+       page: (options.page || 1).toString(),
+       limit: (options.limit || 20).toString(),
+     });
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
