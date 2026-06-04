@@ -1,97 +1,172 @@
 ---
 trigger: always_on
-description: This document provides a comprehensive reference of table compositions in the ResearchHub database.
+description: This document outlines the design system and styling guidelines used in the ResearchHub codebase.
 ---
 
-# ResearchHub Database Tables (Cursor Rule)
+ # ResearchHub Design System
 
-This document provides a comprehensive reference of table compositions in the ResearchHub database.
+This document outlines the design system and styling guidelines used in the ResearchHub codebase.
 
-## User Management
+## Styling Approach
 
-### nonprofit_org
+ResearchHub uses Tailwind CSS as the primary styling solution, complemented by CSS modules for complex components when necessary.
 
-**Description**: Nonprofit organizations that can receive donations.
+1. **Tailwind CSS**:
+   - Use Tailwind utility classes for most styling needs
+   - Follow the "utility-first" approach
+   - Use Tailwind's built-in responsive classes for responsive design
 
-| Column               | Type                     | Description                        |
-| ----- | --- | ---- |
-| id                   | integer                  | Primary key                        |
-| name                 | character varying(255)   | Name of the nonprofit              |
-| ein                  | character varying(20)    | Employer Identification Number     |
-| endaoment_org_id     | character varying(100)   | Unique ID in Endaoment system      |
-| base_wallet_address  | character varying(42)    | Blockchain wallet address          |
-| created_date         | timestamp with time zone | Creation timestamp                 |
-| updated_date         | timestamp with time zone | Last update timestamp              |
+2. **CSS Modules**:
+   - Use CSS modules for complex components that require custom animations or styles that are difficult to achieve with Tailwind
+   - Name CSS module files with the `.module.css` extension
 
-### nonprofit_fundraise_link
+3. **Styling Utilities**:
+   - Use the `cn()` utility function for conditional class name composition
+   - Use `class-variance-authority` (cva) for component variants
 
-**Description**: Join table connecting nonprofits and fundraising campaigns.
+## Color System
 
-| Column         | Type                       | Description                          |
-| ----- | ----- | --- |
-| id             | integer                    | Primary key                          |
-| nonprofit_id   | integer                    | Foreign key to nonprofit_org         |
-| fundraise_id   | integer                    | Foreign key to purchase_fundraise    |
-| note           | text                       | Notes about this specific link       |
-| created_date   | timestamp with time zone   | Creation timestamp                   |
-| updated_date   | timestamp with time zone   | Last update timestamp                |
+1. **Color Palette**:
+   - Use the color tokens defined in the Tailwind configuration
+   - Primary colors: Shades of indigo and blue
+   - Secondary colors: Gray scale and orange/yellow for accent
+   - Semantic colors: Success (green), warning (yellow), error (red), info (blue)
 
-### user_user
+   ```tsx
+   // Use semantic color tokens
+   <div className="bg-primary-600 text-white">Primary button</div>
+   <div className="bg-gray-100 text-gray-800">Secondary button</div>
+   <div className="bg-red-100 text-red-800">Error state</div>
+   ```
 
-**Description**: Core user account table.
+2. **Color Usage**:
+   - Use primary colors for primary actions and branding
+   - Use gray scale for UI structure, backgrounds, and secondary elements
+   - Use semantic colors consistently for their respective meanings
+   - Maintain appropriate contrast ratios for accessibility (4.5:1 minimum)
 
-| Column         | Type                       | Description                          |
-| -------------- | -------------------------- | ------------------------------------ |
-| id             | integer                    | Primary key                          |
-| username       | character varying          | Unique username                      |
-| email          | character varying          | User's email address                 |
-| password       | character varying          | Hashed password                      |
-| first_name     | character varying          | User's first name                    |
-| last_name      | character varying          | User's last name                     |
-| is_active      | boolean                    | Whether the account is active        |
-| date_joined    | timestamp with time zone   | When the user joined                 |
-| reputation     | integer                    | User's reputation score              |
-| is_staff       | boolean                    | Whether user has staff privileges    |
-| is_superuser   | boolean                    | Whether user has superuser privileges|
+## Typography
 
-### user_author
+1. **Font Family**:
+   - Primary font: Inter (sans-serif)
+   - Heading font: Cal Sans for titles and large headings
+   - Monospace font: For code blocks and technical content
 
-**Description**: Author profile information linked to users.
+2. **Font Sizes**:
+   - Follow the Tailwind CSS font size scale
+   - Use relative units (rem) for font sizes to support user preferences
 
-| Column             | Type                   | Description                         |
-| ------------------ | ---------------------- | ----------------------------------- |
-| id                 | integer                | Primary key                         |
-| first_name         | character varying      | Author's first name                 |
-| last_name          | character varying      | Author's last name                  |
-| user_id            | integer                | Foreign key to user_user            |
-| orcid              | character varying      | ORCID identifier                    |
-| scopus_author_id   | character varying      | Scopus author identifier            |
-| google_scholar_id  | character varying      | Google Scholar identifier           |
-| twitter            | character varying      | Twitter handle                      |
-| linkedin           | character varying      | LinkedIn profile URL                |
-| website            | character varying      | Personal website URL                |
+   ```tsx
+   <h1 className="text-3xl font-semibold text-gray-900">Page Title</h1>
+   <h2 className="text-xl font-medium text-gray-800">Section Heading</h2>
+   <p className="text-base text-gray-700">Body text</p>
+   <span className="text-sm text-gray-500">Caption text</span>
+   ```
 
-### user_userverification
+3. **Font Weights**:
+   - Regular (400) for body text
+   - Medium (500) for semi-emphasis
+   - Semibold (600) for headings and emphasis
+   - Bold (700) for strong emphasis
 
-**Description**: User verification information.
+4. **Line Heights**:
+   - Use appropriate line heights for readability
+   - Body text: `leading-normal` (1.5)
+   - Headings: `leading-tight` (1.25)
+   - Single-line elements: `leading-none` (1)
 
-| Column         | Type                       | Description                          |
-| -------------- | -------------------------- | ------------------------------------ |
-| id             | integer                    | Primary key                          |
-| first_name     | text                       | User's first name                    |
-| last_name      | text                       | User's last name                     |
-| status         | text                       | Verification status                  |
-| verified_by    | text                       | Verification method                  |
-| external_id    | text                       | External identifier                  |
-| created_date   | timestamp with time zone   | Creation timestamp                   |
-| updated_date   | timestamp with time zone   | Last update timestamp                |
-| user_id        | integer                    | Foreign key to user_user             |
+## Spacing
 
-### user_follow
+1. **Spacing Scale**:
+   - Follow the Tailwind CSS spacing scale
+   - Use consistent spacing for margins and padding
+   - Use the spacing scale for gaps, grid gaps, and other spacing properties
 
-**Description**: User following relationships.
+   ```tsx
+   <div className="p-4">
+     <div className="mb-6">
+       <h2 className="mb-2">Section Title</h2>
+       <p>Content</p>
+     </div>
+   </div>
+   ```
 
-| Column         | Type                       | Description                          |
+2. **Layout Spacing**:
+   - Page margins: px-4 sm:px-6 md:px-8 lg:px-12
+   - Section spacing: my-8 md:my-12 lg:my-16
+   - Component spacing: p-4 for cards, p-2 for smaller components
+
+## Components
+
+1. **Base Components**:
+   - Use the components in the `components/ui` directory as the foundation
+   - Common components include Button, Input, Card, Badge, and more
+   - All components are built with accessibility in mind
+
+2. **Component Variants**:
+   - Components have consistent variants using `class-variance-authority`
+   - Common variants include size, color, and emphasis level
+
+   ```tsx
+   // Button with variants
+   <Button variant="primary" size="md">Primary Action</Button>
+   <Button variant="secondary" size="sm">Secondary Action</Button>
+   ```
+
+3. **Component Composition**:
+   - Build complex UI by composing smaller components
+   - Use the children prop for flexible content
+   - Use render props for complex rendering logic
+
+## Icons
+
+1. **Icon System**:
+   - Use Lucide icons as the primary icon set
+   - Use Font Awesome for additional icons when necessary
+   - Keep icons consistent in style and usage
+
+   ```tsx
+   import { User, Settings, Bell } from 'lucide-react';
+
+   <Button>
+     <User className="w-4 h-4 mr-2" />
+     Profile
+   </Button>
+   ```
+
+2. **Icon Sizing**:
+   - Use consistent sizing: sm (16px), md (20px), lg (24px)
+   - Adjust stroke width for better visibility at different sizes
+   - Maintain proper alignment with text using flex layout
+
+## Responsive Design
+
+1. **Breakpoints**:
+   - Follow Tailwind's breakpoint system:
+     - sm: 640px
+     - md: 768px
+     - lg: 1024px
+     - xl: 1280px
+     - 2xl: 1536px
+     - custom: wide (1200px), 3xl (1600px)
+
+2. **Mobile-first Approach**:
+   - Start with mobile layouts and progressively enhance for larger screens
+   - Use responsive utilities to adapt layout, typography, and spacing
+
+   ```tsx
+   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+     {/* Content */}
+   </div>
+   ```
+
+3. **Responsive Components**:
+   - Design components to adapt to different screen sizes
+   - Use responsive variants for component properties
+   - Test all components across different breakpoints
+
+## Accessibility
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
