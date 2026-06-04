@@ -1,198 +1,184 @@
 ---
 trigger: always_on
-description: This document outlines the architectural patterns and best practices for TypeScript types in the ResearchHub codebase.
+description: This document outlines the TypeScript standards and conventions used in the ResearchHub codebase.
 ---
 
- # ResearchHub Types Architecture
+ # ResearchHub TypeScript Standards
 
-This document outlines the architectural patterns and best practices for TypeScript types in the ResearchHub codebase.
-
-## Type Organization
-
-1. **Domain-specific Files**:
-   - Organize types by domain in dedicated files (e.g., `feed.ts`, `note.ts`)
-   - Group related interfaces, types, and enums together
-   - Export all types needed by consumers
-
-   ```typescript
-   // feed.ts
-   export interface FeedEntry { /* ... */ }
-   export type FeedActionType = 'upvote' | 'comment' | 'create';
-   export enum ContentType { /* ... */ }
-   ```
-
-2. **Naming Conventions**:
-   - Use PascalCase for interfaces, types, and enums
-   - Use descriptive names that convey purpose and structure
-   - Add appropriate suffixes to indicate usage (e.g., `Response`, `Params`)
-
-   ```typescript
-   // Good naming examples
-   export interface NoteApiResponse { /* ... */ }
-   export type ContentType = 'paper' | 'post' | 'bounty';
-   export enum FundingRequestStatus { /* ... */ }
-   ```
-
-## Interface Structure
-
-1. **API Response Interfaces**:
-   - Define interfaces for all API responses
-   - Include API-specific naming (e.g., snake_case properties)
-   - Use the `ApiResponse` suffix for clarity
-
-   ```typescript
-   export interface NoteApiResponse {
-     id: string;
-     title: string;
-     content: string;
-     created_by: string;
-     created_at: string;
-     updated_at: string;
-     // Other API properties
-   }
-   ```
-
-2. **Application Model Interfaces**:
-   - Create client-side model interfaces with camelCase properties
-   - Include all properties needed by UI components
-   - Add optional properties for partial data scenarios
-
-   ```typescript
-   export interface Note {
-     id: string;
-     title: string;
-     content: string;
-     createdBy: string;
-     createdAt: Date;
-     updatedAt: Date;
-     isEditable?: boolean;
-     // Other client-side properties
-   }
-   ```
-
-3. **Extension Patterns**:
-   - Use interface extension to build upon base interfaces
-   - Create specialized interfaces for specific use cases
-   - Avoid deep inheritance hierarchies (prefer composition)
-
-   ```typescript
-   export interface BaseNote {
-     id: string;
-     title: string;
-   }
-   
-   export interface NoteWithContent extends BaseNote {
-     content: string;
-     collaborators: User[];
-   }
-   
-   export interface NoteListItem extends BaseNote {
-     excerpt: string;
-     updatedAt: Date;
-   }
-   ```
+This document outlines the TypeScript standards and conventions used in the ResearchHub codebase.
 
 ## Type Definitions
 
-1. **Union Types**:
-   - Use union types for values with a finite set of options
-   - Define clear, specific union types for related values
-   - Add documentation for non-obvious union types
+1. **Interfaces vs Types**:
+   - Use `interface` for object shapes that may be extended
+   - Use `type` for unions, primitives, and complex types that won't be extended
+   - Prefer interfaces for public API definitions
 
    ```typescript
-   // Simple union of string literals
-   export type ContentType = 'paper' | 'post' | 'bounty' | 'funding_request';
-   
-   // Union of interfaces
-   export type Content = Paper | Post | Bounty | FundingRequest;
+   // Use interface for object shapes that might be extended
+   interface UserProfile {
+     id: string;
+     name: string;
+     email: string;
+   }
+
+   // Use type for unions and more complex types
+   type Status = 'idle' | 'loading' | 'success' | 'error';
+   type ButtonVariant = 'primary' | 'secondary' | 'ghost';
    ```
 
-2. **Enums**:
-   - Use enums for fixed sets of related values
-   - Prefer string enums for better debugging and serialization
-   - Document enum values with JSDoc comments
+2. **Naming Conventions**:
+   - Use PascalCase for type names and interfaces
+   - Use descriptive names that indicate the purpose
+   - Append `Props` to component prop interfaces
+   - Prefix enum names with 'E' (e.g., `EButtonSize`)
+
+3. **Organization**:
+   - Place shared types in the `types/` directory
+   - Keep component-specific types in the component file
+   - Group related types together
+
+## Type Safety
+
+1. **Strict Type Checking**:
+   - Enable strict mode in `tsconfig.json`
+   - Avoid using `any` type when possible
+   - Use specific types instead of generic `object` type
+
+2. **Null and Undefined**:
+   - Use optional chaining (`?.`) for potentially undefined properties
+   - Use nullish coalescing (`??`) for default values
+   - Be explicit about nullable types with union types
+
+   ```typescript
+   function getUser(id?: string): User | null {
+     if (!id) return null;
+     // ...
+   }
+
+   // Handling nullable values
+   const username = user?.name ?? 'Guest';
+   ```
+
+3. **Type Assertions**:
+   - Use type assertions (`as Type`) sparingly
+   - Prefer type guards to narrow types safely
+   - Document why type assertions are necessary when used
+
+4. **Type Guards**:
+   - Use type predicates for custom type guards
+
+   ```typescript
+   function isUser(obj: any): obj is User {
+     return obj && typeof obj === 'object' && 'id' in obj && 'name' in obj;
+   }
+   ```
+
+## Generic Types
+
+1. **Using Generics**:
+   - Use generics to create reusable utility types
+   - Use descriptive type parameter names (T, U, etc. are acceptable for simple cases)
+   - Constrain generics when possible using extends
+
+   ```typescript
+   // Generic function with constraint
+   function getProperty<T, K extends keyof T>(obj: T, key: K): T[K] {
+     return obj[key];
+   }
+   ```
+
+2. **Common Generic Patterns**:
+   - Use `React.FC<Props>` for functional components (optional, as explicit return types are preferred)
+   - Use built-in generic types like `Partial<T>`, `Pick<T, K>`, and `Omit<T, K>`
+
+## API Types
+
+1. **Request/Response Types**:
+   - Define specific types for API requests and responses
+   - Use descriptive names that indicate the purpose
+   - Keep related request/response types together
+
+   ```typescript
+   interface GetUserRequest {
+     userId: string;
+   }
+
+   interface GetUserResponse {
+     user: User;
+     lastLogin: string;
+   }
+   ```
+
+2. **Data Transformations**:
+   - Define transformation functions between API and UI models
+   - Document any assumptions or edge cases
+
+## Event Handlers
+
+1. **Event Types**:
+   - Use specific event types from React
+   - Define clear callback types for custom events
+
+   ```typescript
+   // React event handler
+   const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+     // ...
+   };
+
+   // Custom event handler
+   interface TabChangeEvent {
+     previousIndex: number;
+     newIndex: number;
+   }
+
+   type TabChangeHandler = (event: TabChangeEvent) => void;
+   ```
+
+## Error Handling
+
+1. **Error Types**:
+   - Define custom error types with meaningful properties
+   - Use union types to represent different error states
+
+   ```typescript
+   type APIError = {
+     code: string;
+     message: string;
+     status: number;
+   };
+
+   type LoadingState<T> = 
+     | { status: 'idle' }
+     | { status: 'loading' }
+     | { status: 'success'; data: T }
+     | { status: 'error'; error: APIError };
+   ```
+
+## Documentation
+
+1. **JSDoc Comments**:
+   - Use JSDoc comments for functions, interfaces, and complex types
+   - Document parameters, return types, and exceptions
+   - Include examples for complex functions
 
    ```typescript
    /**
-    * Status of a funding request
+    * Fetches a user by ID from the API
+    * @param id - The unique identifier of the user
+    * @returns A promise that resolves to the user or null if not found
+    * @throws {APIError} When the API request fails
+    * @example
+    * ```
+    * const user = await fetchUser('123');
+    * ```
     */
-   export enum FundingRequestStatus {
-     DRAFT = 'draft',
-     SUBMITTED = 'submitted',
-     APPROVED = 'approved',
-     REJECTED = 'rejected',
-     FUNDED = 'funded',
-     COMPLETED = 'completed',
+   async function fetchUser(id: string): Promise<User | null> {
+     // ...
    }
    ```
 
-3. **Literal Types**:
-   - Use literal types for specific, known values
-   - Combine literals into union types for better type checking
-   - Use const assertions for object literals when appropriate
-
-   ```typescript
-   // Literal type with union
-   type ButtonSize = 'sm' | 'md' | 'lg' | 'xl';
-   
-   // Const assertion for object literal
-   const ROUTES = {
-     HOME: '/',
-     FEED: '/feed',
-     PROFILE: '/profile',
-   } as const;
-   
-   type Route = typeof ROUTES[keyof typeof ROUTES];
-   ```
-
-## Type Transformations
-
-1. **Transformer Pattern**:
-   - Use transformer functions to convert between API and client models
-   - Maintain consistent transformation patterns across the application
-   - Preserve raw data for debugging when needed
-
-   ```typescript
-   // Using the transformer utility
-   import { createTransformer } from '../types/transformer';
-   
-   export const transformNote = createTransformer<NoteApiResponse, Note>((data) => ({
-     id: data.id,
-     title: data.title,
-     content: data.content,
-     createdBy: data.created_by,
-     createdAt: new Date(data.created_at),
-     updatedAt: new Date(data.updated_at),
-     // Transform other properties
-   }));
-   ```
-
-2. **Partial Types**:
-   - Use `Partial<Type>` for optional update operations
-   - Define specific input types for partial updates
-   - Document which fields are required vs. optional
-
-   ```typescript
-   export interface UpdateNoteParams {
-     id: string; // Required
-     title?: string; // Optional update fields
-     content?: string;
-     collaborators?: string[];
-   }
-   
-   // Or using utility types
-   export type UpdateNoteParams = {
-     id: string; // Required
-   } & Partial<Pick<Note, 'title' | 'content' | 'collaborators'>>;
-   ```
-
-## Type Utilities
-
-1. **Pick and Omit**:
-   - Use `Pick` to create a type with a subset of properties
-   - Use `Omit` to create a type without specific properties
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+These TypeScript standards ensure code quality, readability, and maintainability throughout the ResearchHub application.
 
 ---
 > Source: [ResearchHub/web](https://github.com/ResearchHub/web) — distributed by [TomeVault](https://tomevault.io).
