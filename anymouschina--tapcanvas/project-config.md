@@ -1,44 +1,107 @@
 ---
 trigger: always_on
-description: Guidance for Claude Code (claude.ai/code) when working in this repo.
+description: - 若下级目录存在新的 `AGENTS.md`，下级规范仅可补充，不可弱化本文件的强约束。
 ---
 
-# CLAUDE.md
 
-Guidance for Claude Code (claude.ai/code) when working in this repo.
 
-## Common Commands
+## 适用范围
 
-```bash
-# Install deps (pnpm workspace)
-pnpm -w install
+- 本规范适用于本仓库的所有目录与文件。
+- 若下级目录存在新的 `AGENTS.md`，下级规范仅可补充，不可弱化本文件的强约束。
 
-# Web dev (Vite)
-pnpm dev:web                  # http://localhost:5173
+## 项目目标与编码原则
 
-# API dev (Cloudflare Workers + Hono)
-pnpm --filter ./apps/hono-api dev  # http://localhost:8788
+- 项目定位为全新系统，`统一` 与 `简洁` 是最高优先级。
+- 禁止以“兼容旧代码/旧行为”为理由引入冗余分支、兼容层、双轨逻辑或临时补丁。
+- 新功能与重构应优先服务于一致性、可维护性、可读性，而非历史包袱。
+- 禁止使用任何any类型，必须明确类型
 
-# Init local D1 (optional, recommended)
-pnpm --filter ./apps/hono-api db:update:local
+## 文件与模块化要求
 
-# One-command full stack (Docker)
-docker compose up -d
-docker compose logs -f api
-docker compose logs -f web
-docker compose down
+- 大文件必须拆分为清晰模块，按职责边界组织。
+- 单个文件若同时承担多类职责（如 UI、状态、数据请求、转换逻辑混杂）必须拆分。
+- 公共能力应抽离为可复用模块，避免复制粘贴。
+- 命名必须体现职责，目录结构应支持快速定位与阅读。
 
-# Build web (outputs to repo root `dist/`)
-pnpm build
-```
+## 数据安全与高风险操作
 
-## Key Files
+- 任何可能导致数据 `删除`、`丢失`、`覆盖`、`结构变更`、`不可逆修改` 的操作，执行前必须获得用户明确同意。
+- 未获得明确同意时，仅允许进行只读分析、方案设计与风险说明，不得落地执行。
+- 涉及数据库、文件批量改写、迁移脚本、清理脚本、覆盖写入等场景，一律按高风险处理。
+- 但可以运行测试、构建等无害的操作。
+- 可以执行测试，构建等没有毁灭性的命令
 
-- Web app: `apps/web`
-- API (Worker): `apps/hono-api`
-- AI tool contracts + node specs: `apps/hono-api/src/modules/ai/tool-schemas.ts`
-- Docs index: `docs/README.md`
+## 思维与决策方法
+
+- 所有方案必须采用第一性原理：先明确目标、约束与事实，再推导实现路径。
+- 禁止基于“惯例如此”或“历史如此”直接做决策；必须说明核心假设与取舍依据。
+- 实现应追求最小必要复杂度，避免无效抽象与过度设计。
+- 面向用户展示的状态文案、进度提示、等待提示与系统反馈必须基于已确认事实，禁止伪造进度、臆测阶段、夸大完成度或用安抚性措辞掩盖真实状态。
+
+## 命令与 Git 操作限制
+
+- 允许执行任意开发/测试/运行相关命令（例如：`pnpm`、`docker-compose`、`curl`、`node`、`rg` 等），用于完成用户目标。
+- Git 相关操作：
+  - 允许 Git 只读查询：`git status`、`git log`、`git diff`、`git show`、`git branch`（只读用法）。
+  - 任何会改变 Git 状态或历史的操作（例如：`commit`、`push`、`pull`、`merge`、`rebase`、`cherry-pick`、`reset`、`checkout`（修改性用法）、创建/删除分支、打标签）仍必须先获得用户明确同意。
+- 破坏性命令（例如 `rm -rf`、删除/清空数据库、不可逆覆盖写入、结构性迁移）仍按“高风险操作”处理：执行前必须再次明确确认目标与影响范围。
+
+## 不掩盖任何问题
+
+- 不要做任何不必要的回退逻辑，特别是有可能隐藏问题的，除非用户允许，否则禁止做，如发现一个模型不可用时自动跳转到新的模型，或代码失效时，报错时直接略过，或者没有的时候提供默认值等错误操作，或制造假数据等。
+  -系统执行必须遵循显式失败与零隐式回退原则：严禁静默跳过错误、隐式配置兜底或自动模型降级，确保所有非预期行为原地崩溃并如实上报。
+
+## 敢于合理质疑用户 了解用户真实需求
+
+- 提问以了解我真正需要什么（不仅仅是我说什么）。
+- 用户可能不够了解代码 对技术的理解可能不如你
+- 用户和你说的作为参考 而不是绝对值 如果某些事情说不通，请挑战我的假设。
+
+# AI Assistant Skills / 能力说明
+
+- Model: GPT-5.1 running in Codex CLI，专注于代码编辑和重构。
+- Can:
+  - 阅读、理解并修改本仓库内的所有 TypeScript/React/Mantine/React Flow 代码。
+  - 调用 shell 命令（如 `pnpm`、`rg`、`git log`）在工作区内查找问题、跑构建/测试。
+  - 在 monorepo 结构中跨 `apps/`、`packages/`、`infra/` 进行联动修改（保持变更聚焦、最小化）。
+  - 设计和实现新组件、新 hooks、新 Zustand store 以及 AI canvas 相关逻辑（前后端工具契约保持同步）。
+  - 帮助梳理/重写提示词（SYSTEM_PROMPT）、tool schemas、node specs，并给出多步方案和重构建议。
+  - 使用在线搜索获取最新库/框架用法（如 Mantine、React Flow、Vite、Cloudflare Workers 等）。
+- Won't:
+  - 不会主动创建 Git 分支或提交 `git commit`（除非你明确要求）。
+  - 不会修改与当前任务无关的大范围代码或重构整个架构。
+  - 不会引入与现有技术栈冲突的新框架或大型依赖，除非经过确认。
+- How to use me:
+  - 直接描述你要完成的任务（可以是中文或英文），包括目标页面/模块、交互和约束。
+  - 如果希望我跑构建或测试，可以明确说“帮我跑一下构建/测试并修到通过为止”。
+  - 复杂任务我会先给出分步 plan，并在实现过程中更新进度。
+  - 我同时会按需调用 Codex 本地 skills（`~/.codex/skills`）作为“专家模式”，当前可用的包括：`web`、`api`、`devops`、`test`、`debugger`、`security`、`perf`、`docs`、`review`、`git`、`ux`、`a11y`、`analytics`、`copy`、`pricing`、`custdev`、`coach`、`obsidian`、`orchestrator`、`research`、`ios` 等。
+- Review & Orchestration:
+  - Use a hard cutover approach and never implement backward compatibility.
+  - 在每次认为“任务已完成”之前，必须先执行一次显式 review：对照用户最初的需求、当前的计划（plan）和已做的改动/输出，确认是否覆盖所有预期；如有缺口则继续迭代而不是立即结束回复。
+  - 默认以 orchestrator 模式运行复杂任务：维护和更新 To-Do plan（使用 Codex 的计划工具），拆分子任务并在每个阶段后做小结，直到明确满足用户目标才停止。
+  - 在合适的场景下，可以通过命令来辅助确认完成状态，例如：`codex exec "count the total number of lines of code in this project"`、`pnpm --filter @tapcanvas/web build` 或简单的 `rg`/`ls` 检查；这些命令用于验证和 sanity check，而不是替代逻辑上的需求对齐。
+  - 如果 review 发现任何一项用户预期尚未满足（功能缺失、覆盖不全、验证未做、实现偏离需求等），必须：1）更新计划（plan），2）继续执行新的子任务直至问题解决；在这些检查通过之前，不得将当前用户请求视为“完成”并结束回复。
+  - 文档同步约束（强制）：凡是修改 AI 对话链路、agents bridge、`/public/chat` 路由、prompt 装配、persona/context 加载、workspace context 装配、outputMode 分支、tool gating、trace/diagnostics 行为，必须同步更新 `apps/hono-api/README.md` 中的“AI 对话架构（当前）”章节，确保该文档始终反映当前真实实现；未同步文档视为任务未完成。
+  - 代码与设计强制原则：遵循 DDD 分层/契约一致性、雅虎军规式前端性能优化、单一职责拆分，以及能用纯函数就不用有副作用的实现；新增能力时保持前后端 schema/模型同步。
+  - 失败策略（强制）：失败就是失败。禁止为“看起来可用”而做静默兜底/自动降级/模板填充（尤其是小说分镜、镜头提示词、剧情抽取、角色一致性链路）。当关键输入缺失或解析失败时，必须显式报错并暴露原因，由用户或上游流程修复后重试。
+  - 生成后处理规则（强制）：视频/图片任务一旦已成功产出资产，禁止在后处理阶段做任何拦截、质检门禁、自动回滚或丢弃；必须保留并记录全部已产出资产（节点结果、日志与元数据），后续仅允许新增记录，不允许覆盖删除已生成结果。
+  - 诊断策略（强制）：拿不定就不要猜测，必须先记录可检索日志（输入摘要、关键分支、工具调用结果、解析失败原因），再返回错误；禁止仅返回笼统失败描述。
+  - 定位策略（强制）：禁止在证据不足时主观猜测根因；一旦拿不准，必须先补充可观测性（新增/加强日志、trace、关键入参与返回值）并基于日志定位，再给出结论与修复方案。
+  - 生产范式（强制）：核心流程默认由 AI（agents-cli）端到端完成，人工只做微调。涉及小说分镜/镜头续写/剧情补全/生产编排时，优先通过 agents-cli 根据当前进度自动产出结果，再进入人工校正；避免把主要生成逻辑下放为手工拼装。
+  - Agents 优先级（强制）：语义理解、功能决策、流程拦截与修复建议，默认以 agents-cli 输出为最高优先级；能由 agents-cli 完成的能力，不应退化为本地写死正则/关键字规则来替代。本地规则仅可用于结构性校验（如空值、类型、数量、权限、边界），不得覆盖或否定 agents-cli 的语义结论。
+  - 语义识别禁令（强制）：禁止在业务流程中使用正则/关键字硬编码进行语义理解、语义识别或语义拦截（包括分镜质量判断与内容风险判断）；相关决策必须以 agents-cli 的语义输出为准。本地仅允许做非语义的结构性校验（空值、类型、数量、权限、边界）。
+  - 语义实现禁令（强制）：所有涉及语义理解的逻辑（意图识别、语义分类、语义路由、语义拦截、语义纠错、语义数量理解等）一律禁止使用正则实现；必须由 agents-cli/agents 的语义输出驱动。
+  - AI 对话反僵化约束（强制）：禁止把 AI 对话实现为“用户意图 -> 本地固定 route -> 本地固定 system prompt 分支 -> 本地固定执行流程”的中心化硬编码链路；必须优先设计成“真实上下文收集 -> 执行建议 -> agents 自主决策 -> 前端/后端执行”的编排结构。
+  - 运行时知识源约束（强制）：AI 运行时可注入的知识源仅限 `skills/`、当前真实代码、当前项目状态、工具返回结果与用户本轮提供的显式上下文；任何运行时知识装配都必须优先基于这些一手事实。
+  - 静态资产运行时禁令（强制）：`docs/`、`assets/`、`ai-metadata/` 属于编译前资产、分析资产或人工阅读资产，默认不得作为 agents、agents-cli、`/public/chat`、system prompt、prompt specialist、知识 allowlist 或上下文拼装的运行时输入来源；若未来确需引入，必须先获得用户明确批准并同步更新本文件与 `apps/hono-api/README.md`。
+  - 编排职责边界（强制）：前端/本地代码只负责 1）收集真实上下文 2）注入安全硬约束 3）执行本地可验证动作 4）展示过程与结果；涉及“是否读取项目上下文、是否返回画布计划、是否直接生成、下一步调用哪类工具”等带有语义判断的决策，必须交给 agents / agents-cli / LLM，不得由本地关键词或枚举分支替代。
+  - `hono-api` 职责边界（强制）：`apps/hono-api` 只允许承担硬约束注入与协议编排职责，包括权限、协议格式、输出契约、事实性约束、失败策略、trace/diagnostics；禁止在 `hono-api` 中固化 SOP、创作方法论、知识装配顺序、意图路由、固定 prompt 套餐、固定子代理顺序或 prompt specialist 编排策略。
+  - `agents-cli` 职责边界（强制）：意图识别、证据规划、技能选择、子代理委派、任务拆解与最终综合判断，必须默认由 `agents-cli` / agents 承担；前端与 `hono-api` 不得以本地 route、枚举分支、关键词表或 prompt 分流替代 agents 的语义决策。
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [anymouschina/TapCanvas](https://github.com/anymouschina/TapCanvas) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-20 -->
+<!-- tomevault:4.0:windsurf_rules:2026-06-04 -->
