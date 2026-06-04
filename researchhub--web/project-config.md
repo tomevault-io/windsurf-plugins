@@ -1,191 +1,189 @@
 ---
 trigger: always_on
-description: This document outlines the architectural patterns and best practices for state management in the ResearchHub codebase.
+description: This document outlines the testing standards and best practices used in the ResearchHub codebase.
 ---
 
- # ResearchHub State Management Architecture
+ # ResearchHub Testing Standards
 
-This document outlines the architectural patterns and best practices for state management in the ResearchHub codebase.
+This document outlines the testing standards and best practices used in the ResearchHub codebase.
 
-## State Management Hierarchy
+## Testing Framework
 
-1. **Tiered State Strategy**:
-   - **Local Component State**: For UI-specific, ephemeral state
-   - **Custom Hooks**: For reusable, domain-specific state logic
-   - **Context Providers**: For shared, application-wide state
-   - **URL/Router State**: For navigation and shareable state
+ResearchHub uses the following testing stack:
 
-   ```typescript
-   // Local component state
-   const [isOpen, setIsOpen] = useState(false);
-   
-   // Custom hook for domain logic
-   const { data, isLoading, error } = useDocument(documentId);
-   
-   // Global context
-   const { notificationData, unreadCount } = useNotifications();
-   
-   // Router state
-   const { params } = useParams();
+1. **Jest** - For test running and assertions
+2. **React Testing Library** - For testing React components
+3. **MSW (Mock Service Worker)** - For mocking API requests
+4. **Cypress** - For end-to-end testing
+
+## Test Types
+
+1. **Unit Tests**:
+   - Test individual functions and components in isolation
+   - Mock all external dependencies
+   - Focus on testing the logic rather than implementation details
+
+2. **Integration Tests**:
+   - Test multiple components or functions working together
+   - Test interactions between components
+   - Test API calls with mocked responses using MSW
+
+3. **End-to-End Tests**:
+   - Test entire workflows from the user's perspective
+   - Use Cypress to interact with the application
+   - Focus on critical user paths
+
+## Test File Organization
+
+1. **File Naming**:
+   - Unit and integration tests: `ComponentName.test.tsx` or `functionName.test.ts`
+   - End-to-end tests: `feature-name.spec.ts`
+
+2. **File Location**:
+   - Co-locate unit and integration tests with the code they're testing
+   - Place end-to-end tests in a dedicated `cypress/integration` directory
+
+   ```
+   components/
+   ├── Button/
+   │   ├── Button.tsx
+   │   └── Button.test.tsx
+   utils/
+   ├── formatDate.ts
+   └── formatDate.test.ts
    ```
 
-## React Context
+## Unit Testing Standards
 
-1. **When to Use Context**:
-   - Use for state that needs to be accessed by multiple components across different parts of the component tree
-   - Appropriate for authentication, theme, notifications, and user preferences
-   - Not recommended for state that changes frequently (can cause re-renders)
-   - Avoid nesting too many contexts to prevent "wrapper hell"
+1. **Component Testing**:
+   - Focus on testing behavior, not implementation details
+   - Test user interactions (clicks, input changes, etc.)
+   - Test rendering logic and conditional rendering
+   - Test accessibility features
 
-   ```typescript
-   // Good use case for context: authentication state
-   const { status, data: session } = useSession();
-   const { showAuthModal } = useAuthModalContext();
-   
-   // Good use case for context: notifications
-   const { unreadCount } = useNotifications();
-   ```
+   ```tsx
+   import { render, screen, fireEvent } from '@testing-library/react';
+   import { Button } from './Button';
 
-2. **Context Structure**:
-   - Create a dedicated file for each context (`contexts/FeatureContext.tsx`)
-   - Define a clear interface for the context value
-   - Include both state and actions that modify that state
-   - Provide meaningful default values
+   describe('Button', () => {
+     it('renders with correct text', () => {
+       render(<Button>Click me</Button>);
+       expect(screen.getByRole('button', { name: /click me/i })).toBeInTheDocument();
+     });
 
-   ```typescript
-   interface FeatureContextType {
-     data: DataType[];
-     isLoading: boolean;
-     error: Error | null;
-     actions: {
-       fetchData: () => Promise<void>;
-       updateItem: (id: string, data: Partial<DataType>) => Promise<void>;
-       deleteItem: (id: string) => Promise<void>;
-     };
-   }
-   
-   const FeatureContext = createContext<FeatureContextType>({
-     data: [],
-     isLoading: false,
-     error: null,
-     actions: {
-       fetchData: async () => {},
-       updateItem: async () => {},
-       deleteItem: async () => {},
-     },
+     it('calls onClick when clicked', () => {
+       const handleClick = jest.fn();
+       render(<Button onClick={handleClick}>Click me</Button>);
+       fireEvent.click(screen.getByRole('button'));
+       expect(handleClick).toHaveBeenCalledTimes(1);
+     });
+
+     it('is disabled when disabled prop is true', () => {
+       render(<Button disabled>Click me</Button>);
+       expect(screen.getByRole('button')).toBeDisabled();
+     });
    });
    ```
 
-## Context Providers
+2. **Utility Function Testing**:
+   - Test all edge cases
+   - Test with a variety of inputs
+   - Test error handling
 
-1. **Provider Implementation**:
-   - Use the 'use client' directive for client-side contexts
-   - Implement useState or useReducer for state management
-   - Use useCallback for functions passed to children
-   - Handle loading and error states consistently
+   ```tsx
+   import { formatCurrency } from './formatCurrency';
 
-   ```typescript
-   'use client';
-   
-   export function FeatureProvider({ children }: { children: ReactNode }) {
-     const [data, setData] = useState<DataType[]>([]);
-     const [isLoading, setIsLoading] = useState(false);
-     const [error, setError] = useState<Error | null>(null);
-     
-     const fetchData = useCallback(async () => {
-       setIsLoading(true);
-       setError(null);
-       try {
-         const result = await FeatureService.getData();
-         setData(result);
-       } catch (err) {
-         setError(err instanceof Error ? err : new Error('Failed to fetch data'));
-       } finally {
-         setIsLoading(false);
-       }
-     }, []);
-     
-     // Additional action functions using useCallback
-     
-     const value = {
-       data,
-       isLoading,
-       error,
-       actions: {
-         fetchData,
-         // Other actions
-       },
-     };
-     
-     return (
-       <FeatureContext.Provider value={value}>
-         {children}
-       </FeatureContext.Provider>
-     );
-   }
-   ```
+   describe('formatCurrency', () => {
+     it('formats positive numbers correctly', () => {
+       expect(formatCurrency(1000)).toBe('$1,000.00');
+       expect(formatCurrency(1000.5)).toBe('$1,000.50');
+     });
 
-2. **Context Consumer Hooks**:
-   - Create a custom hook for accessing each context
-   - Include type checking and error handling
-   - Use descriptive names for hooks (`useFeatureContext`)
+     it('formats negative numbers correctly', () => {
+       expect(formatCurrency(-1000)).toBe('-$1,000.00');
+     });
 
-   ```typescript
-   export function useFeatureContext() {
-     const context = useContext(FeatureContext);
-     if (!context) {
-       throw new Error('useFeatureContext must be used within a FeatureProvider');
-     }
-     return context;
-   }
-   ```
+     it('handles zero correctly', () => {
+       expect(formatCurrency(0)).toBe('$0.00');
+     });
 
-## State Modeling
-
-1. **State Object Patterns**:
-   - Group related state in a single object
-   - Include loading, error, and data states for async operations
-   - Define clear interfaces for state objects
-
-   ```typescript
-   interface FeatureState {
-     data: DataType[];
-     isLoading: boolean;
-     error: Error | null;
-     page: number;
-     hasMore: boolean;
-   }
-   
-   const [state, setState] = useState<FeatureState>({
-     data: [],
-     isLoading: false,
-     error: null,
-     page: 1,
-     hasMore: true,
+     it('throws an error for non-numeric input', () => {
+       expect(() => formatCurrency('abc' as any)).toThrow();
+     });
    });
-   
-   // Update state immutably
-   setState((prev) => ({
-     ...prev,
-     data: [...prev.data, newItem],
-   }));
    ```
 
-2. **State Updates**:
-   - Use functional updates for state that depends on previous state
-   - Maintain immutability in all state updates
-   - Group related state updates where possible
+3. **Hook Testing**:
+   - Use `renderHook` from `@testing-library/react-hooks`
+   - Test initial values, updates, and edge cases
 
-   ```typescript
-   // Prefer this functional update pattern
-   setData((prevData) => [...prevData, newItem]);
-   
-   // For multiple related state updates
-   const handleSuccess = (result) => {
-     setData(result.data);
-     setHasMore(result.hasMore);
-     setPage(result.page);
-     setError(null);
+   ```tsx
+   import { renderHook, act } from '@testing-library/react-hooks';
+   import { useCounter } from './useCounter';
+
+   describe('useCounter', () => {
+     it('initializes with default value', () => {
+       const { result } = renderHook(() => useCounter());
+       expect(result.current.count).toBe(0);
+     });
+
+     it('initializes with provided value', () => {
+       const { result } = renderHook(() => useCounter(10));
+       expect(result.current.count).toBe(10);
+     });
+
+     it('increments the counter', () => {
+       const { result } = renderHook(() => useCounter());
+       act(() => {
+         result.current.increment();
+       });
+       expect(result.current.count).toBe(1);
+     });
+   });
+   ```
+
+## Integration Testing Standards
+
+1. **Component Integration**:
+   - Test groups of components working together
+   - Test state changes and their effects on the UI
+   - Use context providers when necessary
+
+   ```tsx
+   import { render, screen, fireEvent } from '@testing-library/react';
+   import { TodoList } from './TodoList';
+   import { TodoProvider } from '@/contexts/TodoContext';
+
+   describe('TodoList', () => {
+     it('adds a new todo when form is submitted', () => {
+       render(
+         <TodoProvider>
+           <TodoList />
+         </TodoProvider>
+       );
+
+       // Fill in the form
+       fireEvent.change(screen.getByLabelText(/new todo/i), {
+         target: { value: 'Test todo' },
+       });
+
+       // Submit the form
+       fireEvent.click(screen.getByRole('button', { name: /add/i }));
+
+       // Check that the todo was added
+       expect(screen.getByText('Test todo')).toBeInTheDocument();
+     });
+   });
+   ```
+
+2. **API Mocking**:
+   - Use MSW to mock API requests
+   - Test success and error scenarios
+   - Test loading states
+
+   ```tsx
+   import { rest } from 'msw';
+   import { setupServer } from 'msw/node';
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
