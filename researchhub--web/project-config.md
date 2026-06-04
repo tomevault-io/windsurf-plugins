@@ -1,221 +1,80 @@
 ---
 trigger: always_on
-description: This document outlines the architectural patterns and best practices for custom React hooks in the ResearchHub codebase.
+description: Full list of all available API endpoints
 ---
 
- # ResearchHub Hooks Architecture
+health/
+^api/ ^non-profit/search/$ [name='nonprofit-orgs-search']
+^api/ ^non-profit/create/$ [name='nonprofit-create']
+^api/ ^non-profit/link-to-fundraise/$ [name='nonprofit-link-to-fundraise']
+^api/ ^paper/discussion/file/$ [name='discussion_file_upload-list']
+^api/ ^paper/discussion/file\.(?P<format>[a-z0-9]+)/?$ [name='discussion_file_upload-list']
+^api/ ^new_feature_release/$ [name='new_feature_release-list']
+^api/ ^new_feature_release\.(?P<format>[a-z0-9]+)/?$ [name='new_feature_release-list']
+^api/ ^new_feature_release/clicked/$ [name='new_feature_release-clicked']
+^api/ ^new_feature_release/clicked\.(?P<format>[a-z0-9]+)/?$ [name='new_feature_release-clicked']
+^api/ ^new_feature_release/(?P<pk>[^/.]+)/$ [name='new_feature_release-detail']
+^api/ ^new_feature_release/(?P<pk>[^/.]+)\.(?P<format>[a-z0-9]+)/?$ [name='new_feature_release-detail']
+^api/ ^paper/$ [name='paper-list']
+^api/ ^paper\.(?P<format>[a-z0-9]+)/?$ [name='paper-list']
+^api/ ^paper/check_url/$ [name='paper-check-url']
+^api/ ^paper/check_url\.(?P<format>[a-z0-9]+)/?$ [name='paper-check-url']
+^api/ ^paper/check_user_vote/$ [name='paper-check-user-vote']
+^api/ ^paper/check_user_vote\.(?P<format>[a-z0-9]+)/?$ [name='paper-check-user-vote']
+^api/ ^paper/create_researchhub_paper/$ [name='paper-create-researchhub-paper']
+^api/ ^paper/create_researchhub_paper\.(?P<format>[a-z0-9]+)/?$ [name='paper-create-researchhub-paper']
+^api/ ^paper/doi_search_via_openalex/$ [name='paper-doi-search-via-openalex']
+^api/ ^paper/doi_search_via_openalex\.(?P<format>[a-z0-9]+)/?$ [name='paper-doi-search-via-openalex']
+^api/ ^paper/fetch_publications_by_doi/$ [name='paper-fetch-publications-by-doi']
+^api/ ^paper/fetch_publications_by_doi\.(?P<format>[a-z0-9]+)/?$ [name='paper-fetch-publications-by-doi']
+^api/ ^paper/following/$ [name='paper-following']
+^api/ ^paper/following\.(?P<format>[a-z0-9]+)/?$ [name='paper-following']
+^api/ ^paper/pdf_coverage/$ [name='paper-pdf-coverage']
+^api/ ^paper/pdf_coverage\.(?P<format>[a-z0-9]+)/?$ [name='paper-pdf-coverage']
+^api/ ^paper/retrieve_by_doi/$ [name='paper-retrieve-by-doi']
+^api/ ^paper/retrieve_by_doi\.(?P<format>[a-z0-9]+)/?$ [name='paper-retrieve-by-doi']
+^api/ ^paper/search_by_url/$ [name='paper-search-by-url']
+^api/ ^paper/search_by_url\.(?P<format>[a-z0-9]+)/?$ [name='paper-search-by-url']
+^api/ ^paper/(?P<pk>[^/.]+)/$ [name='paper-detail']
+^api/ ^paper/(?P<pk>[^/.]+)\.(?P<format>[a-z0-9]+)/?$ [name='paper-detail']
+^api/ ^paper/(?P<pk>[^/.]+)/assign_moderator/$ [name='paper-assign-moderator']
+^api/ ^paper/(?P<pk>[^/.]+)/assign_moderator\.(?P<format>[a-z0-9]+)/?$ [name='paper-assign-moderator']
+^api/ ^paper/(?P<pk>[^/.]+)/censor/$ [name='paper-censor']
+^api/ ^paper/(?P<pk>[^/.]+)/censor\.(?P<format>[a-z0-9]+)/?$ [name='paper-censor']
+^api/ ^paper/(?P<pk>[^/.]+)/censor_pdf/$ [name='paper-censor-pdf']
+^api/ ^paper/(?P<pk>[^/.]+)/censor_pdf\.(?P<format>[a-z0-9]+)/?$ [name='paper-censor-pdf']
+^api/ ^paper/(?P<pk>[^/.]+)/downvote/$ [name='paper-downvote']
+^api/ ^paper/(?P<pk>[^/.]+)/downvote\.(?P<format>[a-z0-9]+)/?$ [name='paper-downvote']
+^api/ ^paper/(?P<pk>[^/.]+)/edit_file_extract/$ [name='paper-edit-file-extract']
+^api/ ^paper/(?P<pk>[^/.]+)/edit_file_extract\.(?P<format>[a-z0-9]+)/?$ [name='paper-edit-file-extract']
+^api/ ^paper/(?P<pk>[^/.]+)/eligible_reward_summary/$ [name='paper-eligible-reward-summary']
+^api/ ^paper/(?P<pk>[^/.]+)/eligible_reward_summary\.(?P<format>[a-z0-9]+)/?$ [name='paper-eligible-reward-summary']
+^api/ ^paper/(?P<pk>[^/.]+)/endorse/$ [name='paper-endorse']
+^api/ ^paper/(?P<pk>[^/.]+)/endorse\.(?P<format>[a-z0-9]+)/?$ [name='paper-endorse']
+^api/ ^paper/(?P<pk>[^/.]+)/flag/$ [name='paper-flag']
+^api/ ^paper/(?P<pk>[^/.]+)/flag\.(?P<format>[a-z0-9]+)/?$ [name='paper-flag']
+^api/ ^paper/(?P<pk>[^/.]+)/follow/$ [name='paper-follow']
+^api/ ^paper/(?P<pk>[^/.]+)/follow\.(?P<format>[a-z0-9]+)/?$ [name='paper-follow']
+^api/ ^paper/(?P<pk>[^/.]+)/is_following/$ [name='paper-is-following']
+^api/ ^paper/(?P<pk>[^/.]+)/is_following\.(?P<format>[a-z0-9]+)/?$ [name='paper-is-following']
+^api/ ^paper/(?P<pk>[^/.]+)/neutralvote/$ [name='paper-neutralvote']
+^api/ ^paper/(?P<pk>[^/.]+)/neutralvote\.(?P<format>[a-z0-9]+)/?$ [name='paper-neutralvote']
+^api/ ^paper/(?P<pk>[^/.]+)/pdf_extract/$ [name='paper-pdf-extract']
+^api/ ^paper/(?P<pk>[^/.]+)/pdf_extract\.(?P<format>[a-z0-9]+)/?$ [name='paper-pdf-extract']
+^api/ ^paper/(?P<pk>[^/.]+)/restore_paper/$ [name='paper-restore-paper']
+^api/ ^paper/(?P<pk>[^/.]+)/restore_paper\.(?P<format>[a-z0-9]+)/?$ [name='paper-restore-paper']
+^api/ ^paper/(?P<pk>[^/.]+)/unfollow/$ [name='paper-unfollow']
+^api/ ^paper/(?P<pk>[^/.]+)/unfollow\.(?P<format>[a-z0-9]+)/?$ [name='paper-unfollow']
+^api/ ^paper/(?P<pk>[^/.]+)/upvote/$ [name='paper-upvote']
+^api/ ^paper/(?P<pk>[^/.]+)/upvote\.(?P<format>[a-z0-9]+)/?$ [name='paper-upvote']
+^api/ ^paper/(?P<pk>[^/.]+)/user_vote/$ [name='paper-user-vote']
+^api/ ^paper/(?P<pk>[^/.]+)/user_vote\.(?P<format>[a-z0-9]+)/?$ [name='paper-user-vote']
+^api/ ^paper_submission/$ [name='paper_submission-list']
+^api/ ^paper_submission\.(?P<format>[a-z0-9]+)/?$ [name='paper_submission-list']
+^api/ ^paper_submission/create_from_doi/$ [name='paper_submission-create-from-doi']
 
-This document outlines the architectural patterns and best practices for custom React hooks in the ResearchHub codebase.
-
-## Hook Structure
-
-1. **Naming Convention**:
-   - Prefix all hooks with `use` (e.g., `useVote`, `useFeed`, `useNote`)
-   - Use camelCase for hook names
-   - Name hooks based on their primary functionality or domain
-
-2. **Client Components**:
-   - Add the 'use client' directive at the top of client hooks
-   - Hooks that use browser-specific APIs should always have 'use client'
-
-   ```typescript
-   'use client';
-   
-   import { useState } from 'react';
-   
-   export const useFeature = () => {
-     // Hook implementation
-   };
-   ```
-
-3. **Hook Return Types**:
-   - For simple hooks, return an object with named properties
-   - For hooks with actions, use tuple pattern: `[state, action]`
-   - Explicitly define return types with TypeScript interfaces
-
-   ```typescript
-   // Object return pattern
-   interface UseFeatureReturn {
-     data: Data[];
-     isLoading: boolean;
-     error: Error | null;
-     refresh: () => void;
-   }
-   
-   // Tuple return pattern
-   type UseFeatureState = { data: Data | null; isLoading: boolean; error: Error | null };
-   type UseFeatureAction = (params: ActionParams) => Promise<void>;
-   type UseFeatureReturn = [UseFeatureState, UseFeatureAction];
-   ```
-
-## State Management
-
-1. **State Organization**:
-   - Group related state variables in a state object
-   - Manage loading, error, and data states consistently
-   - Use descriptive state variable names
-
-   ```typescript
-   const useFeature = () => {
-     const [data, setData] = useState<Data | null>(null);
-     const [isLoading, setIsLoading] = useState(false);
-     const [error, setError] = useState<Error | null>(null);
-     
-     // Hook implementation
-     
-     return { data, isLoading, error };
-   };
-   ```
-
-2. **Error Handling**:
-   - Always include error state in hooks that make API calls
-   - Parse and transform API errors to meaningful user-facing messages
-   - Implement consistent error handling patterns across hooks
-
-   ```typescript
-   try {
-     const response = await ServiceName.method(params);
-     setData(response);
-   } catch (err) {
-     const { data = {} } = err instanceof ApiError ? JSON.parse(err.message) : {};
-     const errorMsg = data?.detail || 'Default error message';
-     setError(errorMsg);
-   } finally {
-     setIsLoading(false);
-   }
-   ```
-
-## Hook Composition
-
-1. **Separation of Concerns**:
-   - Create single-purpose hooks that handle one specific feature
-   - Compose multiple hooks together for complex functionality
-   - Keep each hook focused on a specific domain
-
-   ```typescript
-   // In a component:
-   const { data: user } = useUser(userId);
-   const { posts, isLoading: postsLoading } = usePosts(userId);
-   const { comments, isLoading: commentsLoading } = useComments(userId);
-   ```
-
-2. **Data Fetching Patterns**:
-   - Initialize data fetching in `useEffect`
-   - Provide refetch/refresh functions for manual updates
-   - Handle loading and error states consistently
-
-   ```typescript
-   const [data, setData] = useState<Data[]>([]);
-   const [isLoading, setIsLoading] = useState(true);
-   const [error, setError] = useState<Error | null>(null);
-   
-   useEffect(() => {
-     fetchData();
-   }, [dependencies]);
-   
-   const fetchData = async () => {
-     setIsLoading(true);
-     setError(null);
-     try {
-       const result = await ServiceName.getData(params);
-       setData(result);
-     } catch (error) {
-       setError(error);
-     } finally {
-       setIsLoading(false);
-     }
-   };
-   ```
-
-3. **Pagination and Infinite Scrolling**:
-   - Implement consistent pagination patterns
-   - Track page number, hasMore flag, and loading states
-   - Append to existing data rather than replacing on loadMore
-
-   ```typescript
-   const loadMore = async () => {
-     if (!hasMore || isLoading) return;
-     
-     try {
-       const nextPage = page + 1;
-       const result = await Service.getData({ page: nextPage, ...otherParams });
-       setData((prev) => [...prev, ...result.items]);
-       setHasMore(result.hasMore);
-       setPage(nextPage);
-     } catch (error) {
-       console.error('Error loading more:', error);
-     }
-   };
-   ```
-
-## Performance Optimization
-
-1. **Don't memoize**:
-   - Properly manage dependency arrays to prevent unnecessary re-renders
-
-2. **Debouncing and Throttling**:
-   - Debounce input handlers and search functions
-   - Implement throttling for scroll events and frequent updates
-   - Clean up debounced/throttled functions in `useEffect` return
-
-   ```typescript
-   const debouncedSave = useRef(
-     debounce((content: string) => {
-       saveToServer(content);
-     }, 500)
-   ).current;
-   
-   useEffect(() => {
-     return () => {
-       debouncedSave.cancel();
-     };
-   }, [debouncedSave]);
-   ```
-
-## API Integration
-
-1. **Service Integration**:
-   - Use service classes for API calls (never make direct fetch calls in hooks)
-   - Abstract API interaction details away from component logic
-   - Transform API responses to match the expected UI data structure
-
-   ```typescript
-   // Good
-   const data = await NoteService.getNote(noteId);
-   
-   // Avoid
-   const data = await fetch(`/api/notes/${noteId}`).then(res => res.json());
-   ```
-
-2. **Optimistic Updates**:
-   - Implement optimistic updates for better user experience
-   - Store previous state for rollback in case of errors
-   - Update UI immediately, then confirm with API response
-
-   ```typescript
-   const addItem = async (newItem: Item) => {
-     // Optimistically update UI
-     const previousItems = [...items];
-     setItems((prev) => [...prev, { ...newItem, id: 'temp-id' }]);
-     
-     try {
-       // Actual API call
-       const savedItem = await ItemService.addItem(newItem);
-       // Update with real data from server
-       setItems((prev) => prev.map(item => 
-         item.id === 'temp-id' ? savedItem : item
-       ));
-     } catch (error) {
-       // Rollback on error
-       setItems(previousItems);
-       setError(error);
-     }
-   };
-   ```
-
-These patterns ensure consistent, maintainable, and performant hooks throughout the ResearchHub application.
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/ResearchHub)
-> This is a context snippet only. You'll also want the standalone SKILL.md file — [download at TomeVault](https://tomevault.io/claim/ResearchHub)
-<!-- tomevault:4.0:windsurf_rules:2026-04-08 -->
+> Source: [ResearchHub/web](https://github.com/ResearchHub/web) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-06-04 -->
