@@ -7,11 +7,11 @@ Provides your CSM Node Operator events to the telegram chats
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [skhomuti/csm-sentinel](https://github.com/skhomuti/csm-sentinel).
+Original source: `CLAUDE.md` in [skhomuti/csm-sentinel](https://github.com/skhomuti/csm-sentinel).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
