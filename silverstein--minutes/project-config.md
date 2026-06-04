@@ -1,122 +1,126 @@
 ---
 trigger: always_on
-description: This project uses **bd** (beads) for issue tracking. Run `bd onboard` to get started.
+description: > Your AI remembers every conversation you've had.
 ---
 
-# Agent Instructions
+# CLAUDE.md — Minutes
 
-This project uses **bd** (beads) for issue tracking. Run `bd onboard` to get started.
-In this repo, beads is **local-only**: use it for structured issue tracking on your machine, but do not expect a shared Dolt remote.
+> Your AI remembers every conversation you've had.
 
-## Quick Reference
+## Project Overview
+
+**Minutes** — open-source, privacy-first conversation memory layer for AI assistants. Captures any audio (meetings, voice memos, brain dumps), transcribes locally with whisper.cpp or parakeet.cpp, diarizes speakers, and outputs searchable markdown with structured action items and decisions. Built with Rust + Tauri v2 + Node.js (MCP).
+
+**Four input modes, one pipeline:**
+- **Live recording**: `minutes record` / `minutes stop` — for meetings, calls, conversations
+- **Live transcript**: `minutes live` / `minutes stop` — real-time transcription with delta reads for AI coaching mid-meeting
+- **Notetaking**: `minutes note "important point"` — timestamped annotations during recording
+- **Folder watcher**: `minutes watch` — auto-processes voice memos from iPhone/iCloud
+
+## Quick Start
 
 ```bash
-bd ready              # Find available work
-bd show <id>          # View issue details
-bd update <id> --claim  # Claim work atomically
-bd close <id>         # Complete work
+cd ~/Sites/minutes
+cargo build                          # Build Rust workspace
+cargo test -p minutes-core --no-default-features  # Fast tests (no whisper model)
+cargo run --bin minutes -- setup --model tiny      # Download whisper model
+cargo run --bin minutes -- setup --diarization     # Download speaker diarization models (~34MB)
+cargo run --bin minutes -- record    # Start recording
+cargo run --bin minutes -- stop      # Stop and process
 ```
 
-## GitHub Discussions
+## Full Build (CLI + Tauri App)
 
-This repo has GitHub Discussions enabled (`silverstein/minutes`). Issues are for bugs and feature requests. Discussions are for usage questions, setup help, and community show-and-tell.
-
-**Agent guidelines:**
-- When triaging an issue that's really a "how do I...?" question, suggest converting it to a Discussion rather than closing it
-- When a user's bug report turns out to be a config/setup issue, answer it and note that Discussions is the better venue for follow-ups
-- After shipping a feature or fix, check if any open Q&A discussions are resolved by the change — post a reply pointing to the release
-- When writing user-facing error messages or help text, link to Discussions (not Issues) for support: `https://github.com/silverstein/minutes/discussions`
-- Don't file Discussions as work items — they're community conversations, not tracked tasks
-
-## Portable Agent Skills (`.agents/skills/minutes/`, `.opencode/skills/`)
-
-This repo maintains skill outputs in **three locations**:
-
-- `.claude/plugins/minutes/` — Claude Code plugin (uses `${CLAUDE_PLUGIN_ROOT}`)
-- `.agents/skills/minutes/` — Agent-agnostic mirror for Codex, Gemini, and other agents (uses `$MINUTES_SKILLS_ROOT`)
-- `.opencode/skills/` — OpenCode-native mirror (one-level discovery path + matching `.opencode/commands/`)
-
-**What lives where:**
-- `SKILL.md` files are mirrored 1:1. Content is identical except for path variables and platform-specific references (e.g., "open in desktop app" in the plugin version becomes a CLI command in the agents version).
-- `_runtime/hooks/lib/` contains `minutes-learn.mjs` and `minutes-learn-cli.mjs` — the behavioral learning system. These must stay byte-identical across `.agents/skills/minutes/_runtime/hooks/lib/` and `.opencode/skills/_runtime/hooks/lib/`.
-- Bundled scripts (`scripts/tag_apply.py`, `scripts/graph_build.py`, etc.) are mirrored into both portable trees.
-- `.opencode/commands/*.md` provides native `/minutes-*` slash commands for OpenCode and is generated from the same canonical skill sources.
-
-**When you modify a skill or runtime hook:**
 ```bash
-# Preferred workflow: edit the canonical source under tooling/skills/sources/<name>/skill.md
-# then regenerate every host surface from one place.
-cd tooling/skills
-npm run build
-npm run compile
-
-# Verify generated outputs are current:
-npm run compile:dry
-npm run check
+./scripts/build.sh                   # Builds everything and installs CLI
+./scripts/build.sh --install         # Same + copies .app to /Applications
+./scripts/install-dev-app.sh         # Canonical signed dev app install to ~/Applications/Minutes Dev.app
+# Or manually:
+export CXXFLAGS="-I$(xcrun --show-sdk-path)/usr/include/c++/v1"
+cargo build --release -p minutes-cli           # CLI binary
+cargo tauri build --bundles app                # Tauri .app bundle
+cp target/release/minutes ~/.local/bin/minutes # Install CLI
+open target/release/bundle/macos/Minutes.app   # Launch app
 ```
 
-**Why multiple trees?** Claude Code plugins use `${CLAUDE_PLUGIN_ROOT}` and plugin metadata. Codex/Gemini consume the `.agents/skills/minutes/` mirror. OpenCode only auto-discovers `skills/*/SKILL.md` one directory deep and has its own `.opencode/commands/` surface, so it needs a flattened generated tree.
+**Hard rule for macOS desktop packaging and dogfooding:**
 
-## Non-Interactive Shell Commands
-
-**ALWAYS use non-interactive flags** with file operations to avoid hanging on confirmation prompts.
-
-Shell commands like `cp`, `mv`, and `rm` may be aliased to include `-i` (interactive) mode on some systems, causing the agent to hang indefinitely waiting for y/n input.
-
-**Use these forms instead:**
-```bash
-# Force overwrite without prompting
-cp -f source dest           # NOT: cp source dest
-mv -f source dest           # NOT: mv source dest
-rm -f file                  # NOT: rm file
-
-# For recursive operations
-rm -rf directory            # NOT: rm -r directory
-cp -rf source dest          # NOT: cp -r source dest
-```
-
-**Other commands that may prompt:**
-- `scp` - use `-o BatchMode=yes` for non-interactive
-- `ssh` - use `-o BatchMode=yes` to fail instead of prompting
-- `apt-get` - use `-y` flag
-- `brew` - use `HOMEBREW_NO_AUTO_UPDATE=1` env var
-
-## macOS Desktop Identity Rule
-
-For any local desktop work that touches macOS privacy / TCC-sensitive features
-(Microphone, Screen Recording, Input Monitoring, Accessibility, call capture,
-global hotkeys), do **not** dogfood by repeatedly replacing
-`/Applications/Minutes.app` with ad-hoc local rebuilds.
-
-Use the dedicated development app identity instead:
+- If the work touches TCC-sensitive features, do **not** keep replacing `/Applications/Minutes.app` with local rebuilds.
+- Use `./scripts/install-dev-app.sh` and test `~/Applications/Minutes Dev.app`.
+- If a stable local codesigning identity exists, export `MINUTES_DEV_SIGNING_IDENTITY` before running the script.
+- On this machine, the preferred identity is:
+  - `Developer ID Application: Mathieu Silverstein (63TMLKT8HN)`
+- Example:
 
 ```bash
 export MINUTES_DEV_SIGNING_IDENTITY="Developer ID Application: Mathieu Silverstein (63TMLKT8HN)"
 ./scripts/install-dev-app.sh
 ```
 
-Canonical dogfood target:
+**IMPORTANT**: After any code change, you must rebuild ALL affected targets:
+- CLI changes: `cargo build --release -p minutes-cli && cp target/release/minutes ~/.local/bin/minutes`
+- Tauri changes: `cargo tauri build --bundles app` then relaunch the appropriate app bundle
+- TCC-sensitive desktop work (hotkeys, Screen Recording, Input Monitoring, Accessibility): `./scripts/install-dev-app.sh`
+- MCP server changes: `cd crates/mcp && npm run build` (compiles TS server + builds UI, then restart MCP client sessions)
+- MCP App UI only: `cd crates/mcp && npm run build:ui` (rebuild just the dashboard HTML)
+- All Rust + app: `./scripts/build.sh` (add `--install` to copy .app to /Applications)
+- **Don't forget the MCP server** — it's TypeScript, not Rust. `./scripts/build.sh` does NOT rebuild it. Always run `cd crates/mcp && npm run build` after touching `crates/mcp/src/index.ts` or `crates/mcp/ui/`.
 
-- `~/Applications/Minutes Dev.app`
+## Desktop Identity Rules
 
-Why:
+For macOS permission-sensitive development, there are now two distinct desktop app identities:
 
-- macOS TCC permissions attach to the effective app identity and signature
-- ad-hoc local rebuilds of `/Applications/Minutes.app` can trigger repeated or misleading permission prompts
-- the signed dev app is the stable local identity for permission-sensitive testing
+- Production app:
+  - name: `Minutes.app`
+  - bundle id: `com.useminutes.desktop`
+  - canonical install path: `/Applications/Minutes.app`
+- Development app:
+  - name: `Minutes Dev.app`
+  - bundle id: `com.useminutes.desktop.dev`
+  - canonical install path: `~/Applications/Minutes Dev.app`
 
-<!-- BEGIN BEADS INTEGRATION profile:full hash:d4f96305 -->
-## Issue Tracking with bd (beads)
+Use the dev app for any work involving:
 
-**IMPORTANT**: This project uses **bd (beads)** for ALL issue tracking. Do NOT use markdown TODOs, task lists, or other tracking methods.
+- dictation hotkeys / Input Monitoring
+- Screen Recording prompts
+- AppleScript / Accessibility automation
+- any repeated TCC permission prompt investigation
 
-### Why bd?
+Do not trust results from:
 
-- Dependency-aware: Track blockers and relationships between issues
-- Git-friendly: Dolt-backed local history for issue state
+- `./Minutes.app`
+- raw `target/debug/minutes-app`
+- raw `target/release/minutes-app`
+- repo-local bundle outputs launched directly from `target/`
+
+Those identities are not stable enough for TCC debugging.
+
+Native hotkey sanity check:
+
+```bash
+./scripts/diagnose-desktop-hotkey.sh "$HOME/Applications/Minutes Dev.app"
+```
+
+See [docs/DESKTOP-DEVELOPMENT.md](/Users/silverbook/Sites/minutes/docs/DESKTOP-DEVELOPMENT.md) for the full workflow.
+
+For dictation shortcut work:
+
+- prioritize the `Standard shortcut (recommended)` path first
+- treat the raw-key `Caps Lock` / `fn` path as advanced and permission-heavy
+- do not call the raw-key path “done” just because the monitor is active; require visible feedback or logged event delivery
+
+### Open-source contributor note
+
+This repo is public, so local scripts must not assume the maintainer's Apple
+certificate or local notarization credentials.
+
+- `./scripts/install-dev-app.sh` works without Apple credentials by falling
+  back to ad-hoc signing
+- for more stable TCC-sensitive testing, contributors can export
+  `MINUTES_DEV_SIGNING_IDENTITY` to any consistent local codesigning identity
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [silverstein/minutes](https://github.com/silverstein/minutes) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-19 -->
+<!-- tomevault:4.0:windsurf_rules:2026-06-04 -->
