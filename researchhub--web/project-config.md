@@ -1,166 +1,214 @@
 ---
 trigger: always_on
-description: When applying buttons or styles that depend on screen size, or mobile, or having issues with staging compared to local
+description: This document outlines the performance optimization strategies used in the ResearchHub codebase.
 ---
 
-# Mobile Optimization Strategy
+ # ResearchHub Performance Optimization
 
-This document outlines the mobile optimization strategy developed for ResearchHub landing page components to address environment-specific responsive layout issues.
+This document outlines the performance optimization strategies used in the ResearchHub codebase.
 
-## Problem Context
+## React Optimization
 
-### Root Issue Identified
-- **Problem**: Responsive Tailwind classes (`sm:`, `md:`, etc.) weren't compiling properly on staging despite JavaScript correctly detecting screen sizes
-- **Symptoms**: 
-  - Buttons stacked vertically and went full-width on staging
-  - Same code displayed correctly on localhost
-  - Debug tools showed correct screen size detection but wrong visual rendering
-- **Root Cause**: Environment-specific CSS compilation/loading issue affecting responsive class generation
 
-## Core Solution Strategy
+2. **Hook Optimization**:
+   - Use `useCallback()` for functions passed as props
+   - Always specify dependencies correctly in dependency arrays
 
-Replace responsive breakpoints with environment-agnostic approaches that work consistently across all deployment environments.
+   ```tsx
 
-### 1. Button Standardization
-```tsx
-// ❌ Avoid: Custom responsive button implementations
-<button className="px-6 py-3 sm:px-8 sm:py-4 md:w-auto w-full">
+   // Event handler passed as prop
+   const handleEdit = useCallback((id: string) => {
+     // Edit logic
+   }, [/* dependencies */]);
+   ```
 
-// ✅ Preferred: Use existing Button component with cva variants
-<Button size="lg" className="bg-gradient-to-r from-primary-600 to-primary-400">
-```
+3. **State Management**:
+   - Split large state objects into smaller, more focused pieces
+   - Use context selectors to prevent unnecessary re-renders
+   - Consider using libraries like Zustand or Jotai for complex state management
 
-**Benefits:**
-- Leverages class-variance-authority (cva) for consistent styling
-- Eliminates dependency on responsive class compilation
-- Ensures uniform behavior across environments
+## Next.js Optimization
 
-### 2. Natural Flex-Wrapping Over Breakpoints
-```tsx
-// ❌ Avoid: Responsive grid systems
-<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
+1. **Image Optimization**:
+   - Use Next.js `Image` component for all images
+   - Specify width and height to prevent layout shifts
+   - Use appropriate loading strategies (`lazy` for below-the-fold content)
 
-// ✅ Preferred: Natural flex-wrapping with constraints
-<div className="flex flex-wrap gap-4 justify-center">
-  <div className="flex-1 min-w-64 max-w-80">
-```
+   ```tsx
+   import Image from 'next/image';
 
-**Benefits:**
-- Uses intrinsic sizing for natural responsive behavior
-- Eliminates breakpoint dependencies
-- Provides predictable layout across screen sizes
+   // Good usage
+   <Image 
+     src="/profile.jpg" 
+     width={640} 
+     height={480} 
+     alt="User profile" 
+     loading="lazy" 
+   />
+   ```
 
-### 3. Fixed Typography Over Responsive Text
-```tsx
-// ❌ Avoid: Responsive text sizing
-<h2 className="text-3xl sm:text-4xl md:text-5xl">
+2. **Code Splitting**:
+   - Use dynamic imports for large components and libraries
+   - Implement page-level code splitting with Next.js's built-in features
 
-// ✅ Preferred: Fixed sizes appropriate for content hierarchy
-<h2 className="text-4xl font-bold">
-```
+   ```tsx
+   // Dynamic import for a large component
+   const HeavyChart = dynamic(() => import('@/components/HeavyChart'), {
+     loading: () => <LoadingSpinner />,
+     ssr: false, // If not needed on the server
+   });
+   ```
 
-**Benefits:**
-- Ensures consistent typography rendering
-- Removes compilation dependencies
-- Maintains readability without environment risks
+3. **Server Components**:
+   - Use React Server Components for data fetching and rendering static content
+   - Keep client components small and focused on interactive elements
 
-## Implementation Patterns
+4. **Font Optimization**:
+   - Use Next.js font optimization to reduce CLS
+   - Preload critical fonts
 
-### Dual Button Layout (Fund Feature Pattern)
-```tsx
-// For features with primary + secondary actions
-<div className="flex flex-wrap gap-4 justify-center items-start max-w-2xl mx-auto">
-  <div className="flex-1 min-w-64 max-w-80 text-center">
-    <Button size="lg" className="w-full bg-gradient-to-r from-primary-600 to-primary-400">
-      Primary Action
-    </Button>
-    <p className="text-sm text-gray-500 mt-2">Description</p>
-  </div>
-  <div className="flex-1 min-w-64 max-w-80 text-center">
-    <Button variant="outlined" size="lg" className="w-full">
-      Secondary Action
-    </Button>
-    <p className="text-sm text-gray-500 mt-2">Description</p>
-  </div>
-</div>
-```
+   ```tsx
+   import { Inter } from 'next/font/google';
 
-### Single Button Layout
-```tsx
-// For features with single action
-<div className="text-center">
-  <Button size="lg" className="bg-gradient-to-r from-primary-600 to-primary-400">
-    Single Action
-  </Button>
-  <p className="text-sm text-gray-500 mt-2">Description</p>
-</div>
-```
+   const inter = Inter({
+     subsets: ['latin'],
+     display: 'swap',
+   });
+   ```
 
-### Benefits Grid Layout
-```tsx
-// Replace responsive grids with flex-wrap
-<div className="flex flex-wrap gap-4 max-w-xl mx-auto px-4 justify-center">
-  {benefits.map((benefit, index) => (
-    <div key={index} className="flex items-center space-x-3 text-left min-w-60">
-      <div className="w-2 h-2 rounded-full bg-gradient-to-r from-primary-600 to-primary-400 flex-shrink-0" />
-      <span className="text-gray-700 text-base">{benefit}</span>
-    </div>
-  ))}
-</div>
-```
+## Rendering Optimization
 
-### Navigation Tabs
-```tsx
-// Environment-agnostic tab navigation
-<div className="inline-flex p-1 bg-gray-100 rounded-full overflow-x-auto">
-  {features.map((feature, index) => (
-    <button
-      key={feature.id}
-      className={`px-6 py-3 rounded-full font-medium transition-all duration-300 text-base whitespace-nowrap flex-shrink-0 ${
-        activeFeature === index
-          ? 'bg-gradient-to-r from-primary-600 to-primary-400 text-white shadow-lg'
-          : 'text-gray-600 hover:text-gray-900 hover:bg-white/50'
-      }`}
-    >
-      {feature.title}
-    </button>
-  ))}
-</div>
-```
+1. **List Virtualization**:
+   - Implement virtualization for long lists (>50 items)
+   - Consider using libraries like `react-window` or `react-virtualized`
 
-## Mobile-Specific Optimizations
+   ```tsx
+   import { FixedSizeList } from 'react-window';
 
-### Icon Layout Prevention
-```tsx
-// ❌ Avoid: Horizontal layouts that can distort icons on mobile
-<div className="flex items-center space-x-4">
-  <Icon name="icon" size={64} />
-  <div>Content</div>
-</div>
+   const VirtualizedList = ({ items }) => (
+     <FixedSizeList
+       height={500}
+       width="100%"
+       itemCount={items.length}
+       itemSize={50}
+     >
+       {({ index, style }) => (
+         <div style={style}>
+           {items[index].name}
+         </div>
+       )}
+     </FixedSizeList>
+   );
+   ```
 
-// ✅ Preferred: Vertical layouts for mobile-friendly icons
-<div className="flex flex-col items-center space-y-4">
-  <div className="w-16 h-16 flex-shrink-0">
-    <Icon name="icon" size={32} />
-  </div>
-  <div>Content</div>
-</div>
-```
+2. **Debouncing and Throttling**:
+   - Debounce search inputs and form fields that trigger API calls
+   - Throttle scroll and resize event handlers
 
-### Compact Data Display
-```tsx
-// For price/data displays that need to fit on mobile
-<div className="p-4 flex flex-wrap items-start justify-center gap-6">
-  <div className="text-center">
-    <div className="text-sm text-gray-500 mb-2 font-medium h-5 flex items-center justify-center">
-      Label
-    </div>
-    <div className="text-2xl font-bold">$0.33</div>
-  </div>
-  
-  <div className="h-12 w-px bg-gray-300 self-center"></div>
-  
-  <div className="text-center">
+   ```tsx
+   import { useState, useEffect } from 'react';
+   import { debounce } from 'lodash-es';
+
+   const SearchInput = () => {
+     const [value, setValue] = useState('');
+     
+     useEffect(() => {
+       const handleSearch = debounce((term: string) => {
+         // Perform search
+       }, 300);
+       
+       if (value) handleSearch(value);
+       
+       return () => {
+         handleSearch.cancel();
+       };
+     }, [value]);
+     
+     return (
+       <input 
+         type="text" 
+         value={value} 
+         onChange={(e) => setValue(e.target.value)} 
+       />
+     );
+   };
+   ```
+
+3. **Lazy Loading**:
+   - Implement lazy loading for below-the-fold content
+   - Use intersection observer for efficient detection
+
+   ```tsx
+   import { useEffect, useRef, useState } from 'react';
+
+   const LazyLoadedComponent = () => {
+     const [isVisible, setIsVisible] = useState(false);
+     const ref = useRef(null);
+     
+     useEffect(() => {
+       const observer = new IntersectionObserver(
+         ([entry]) => {
+           if (entry.isIntersecting) {
+             setIsVisible(true);
+             observer.disconnect();
+           }
+         },
+         { rootMargin: '100px' }
+       );
+       
+       if (ref.current) {
+         observer.observe(ref.current);
+       }
+       
+       return () => {
+         observer.disconnect();
+       };
+     }, []);
+     
+     return (
+       <div ref={ref}>
+         {isVisible ? <HeavyComponent /> : <Placeholder />}
+       </div>
+     );
+   };
+   ```
+
+## Network Optimization
+
+
+1. **Optimistic Updates**:
+   - Implement optimistic UI updates for better user experience
+   - Always handle failure cases gracefully
+
+   ```tsx
+   import { useMutation, useQueryClient } from '@tanstack/react-query';
+
+   const UpdateButton = ({ user }) => {
+     const queryClient = useQueryClient();
+     
+     const mutation = useMutation({
+       mutationFn: updateUser,
+       onMutate: async (newUser) => {
+         await queryClient.cancelQueries(['user', user.id]);
+         const previousUser = queryClient.getQueryData(['user', user.id]);
+         queryClient.setQueryData(['user', user.id], newUser);
+         return { previousUser };
+       },
+       onError: (err, newUser, context) => {
+         queryClient.setQueryData(
+           ['user', user.id], 
+           context.previousUser
+         );
+       },
+       onSettled: () => {
+         queryClient.invalidateQueries(['user', user.id]);
+       },
+     });
+     
+     return (
+       <button onClick={() => mutation.mutate({ ...user, name: 'New Name' })}>
+         Update Name
+       </button>
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
