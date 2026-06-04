@@ -1,79 +1,187 @@
 ---
 trigger: always_on
-description: Full list of all available API endpoints
+description: This document outlines the component patterns and best practices used in the ResearchHub codebase.
 ---
 
-health/
-^api/ ^non-profit/search/$ [name='nonprofit-orgs-search']
-^api/ ^non-profit/create/$ [name='nonprofit-create']
-^api/ ^non-profit/link-to-fundraise/$ [name='nonprofit-link-to-fundraise']
-^api/ ^paper/discussion/file/$ [name='discussion_file_upload-list']
-^api/ ^paper/discussion/file\.(?P<format>[a-z0-9]+)/?$ [name='discussion_file_upload-list']
-^api/ ^new_feature_release/$ [name='new_feature_release-list']
-^api/ ^new_feature_release\.(?P<format>[a-z0-9]+)/?$ [name='new_feature_release-list']
-^api/ ^new_feature_release/clicked/$ [name='new_feature_release-clicked']
-^api/ ^new_feature_release/clicked\.(?P<format>[a-z0-9]+)/?$ [name='new_feature_release-clicked']
-^api/ ^new_feature_release/(?P<pk>[^/.]+)/$ [name='new_feature_release-detail']
-^api/ ^new_feature_release/(?P<pk>[^/.]+)\.(?P<format>[a-z0-9]+)/?$ [name='new_feature_release-detail']
-^api/ ^paper/$ [name='paper-list']
-^api/ ^paper\.(?P<format>[a-z0-9]+)/?$ [name='paper-list']
-^api/ ^paper/check_url/$ [name='paper-check-url']
-^api/ ^paper/check_url\.(?P<format>[a-z0-9]+)/?$ [name='paper-check-url']
-^api/ ^paper/check_user_vote/$ [name='paper-check-user-vote']
-^api/ ^paper/check_user_vote\.(?P<format>[a-z0-9]+)/?$ [name='paper-check-user-vote']
-^api/ ^paper/create_researchhub_paper/$ [name='paper-create-researchhub-paper']
-^api/ ^paper/create_researchhub_paper\.(?P<format>[a-z0-9]+)/?$ [name='paper-create-researchhub-paper']
-^api/ ^paper/doi_search_via_openalex/$ [name='paper-doi-search-via-openalex']
-^api/ ^paper/doi_search_via_openalex\.(?P<format>[a-z0-9]+)/?$ [name='paper-doi-search-via-openalex']
-^api/ ^paper/fetch_publications_by_doi/$ [name='paper-fetch-publications-by-doi']
-^api/ ^paper/fetch_publications_by_doi\.(?P<format>[a-z0-9]+)/?$ [name='paper-fetch-publications-by-doi']
-^api/ ^paper/following/$ [name='paper-following']
-^api/ ^paper/following\.(?P<format>[a-z0-9]+)/?$ [name='paper-following']
-^api/ ^paper/pdf_coverage/$ [name='paper-pdf-coverage']
-^api/ ^paper/pdf_coverage\.(?P<format>[a-z0-9]+)/?$ [name='paper-pdf-coverage']
-^api/ ^paper/retrieve_by_doi/$ [name='paper-retrieve-by-doi']
-^api/ ^paper/retrieve_by_doi\.(?P<format>[a-z0-9]+)/?$ [name='paper-retrieve-by-doi']
-^api/ ^paper/search_by_url/$ [name='paper-search-by-url']
-^api/ ^paper/search_by_url\.(?P<format>[a-z0-9]+)/?$ [name='paper-search-by-url']
-^api/ ^paper/(?P<pk>[^/.]+)/$ [name='paper-detail']
-^api/ ^paper/(?P<pk>[^/.]+)\.(?P<format>[a-z0-9]+)/?$ [name='paper-detail']
-^api/ ^paper/(?P<pk>[^/.]+)/assign_moderator/$ [name='paper-assign-moderator']
-^api/ ^paper/(?P<pk>[^/.]+)/assign_moderator\.(?P<format>[a-z0-9]+)/?$ [name='paper-assign-moderator']
-^api/ ^paper/(?P<pk>[^/.]+)/censor/$ [name='paper-censor']
-^api/ ^paper/(?P<pk>[^/.]+)/censor\.(?P<format>[a-z0-9]+)/?$ [name='paper-censor']
-^api/ ^paper/(?P<pk>[^/.]+)/censor_pdf/$ [name='paper-censor-pdf']
-^api/ ^paper/(?P<pk>[^/.]+)/censor_pdf\.(?P<format>[a-z0-9]+)/?$ [name='paper-censor-pdf']
-^api/ ^paper/(?P<pk>[^/.]+)/downvote/$ [name='paper-downvote']
-^api/ ^paper/(?P<pk>[^/.]+)/downvote\.(?P<format>[a-z0-9]+)/?$ [name='paper-downvote']
-^api/ ^paper/(?P<pk>[^/.]+)/edit_file_extract/$ [name='paper-edit-file-extract']
-^api/ ^paper/(?P<pk>[^/.]+)/edit_file_extract\.(?P<format>[a-z0-9]+)/?$ [name='paper-edit-file-extract']
-^api/ ^paper/(?P<pk>[^/.]+)/eligible_reward_summary/$ [name='paper-eligible-reward-summary']
-^api/ ^paper/(?P<pk>[^/.]+)/eligible_reward_summary\.(?P<format>[a-z0-9]+)/?$ [name='paper-eligible-reward-summary']
-^api/ ^paper/(?P<pk>[^/.]+)/endorse/$ [name='paper-endorse']
-^api/ ^paper/(?P<pk>[^/.]+)/endorse\.(?P<format>[a-z0-9]+)/?$ [name='paper-endorse']
-^api/ ^paper/(?P<pk>[^/.]+)/flag/$ [name='paper-flag']
-^api/ ^paper/(?P<pk>[^/.]+)/flag\.(?P<format>[a-z0-9]+)/?$ [name='paper-flag']
-^api/ ^paper/(?P<pk>[^/.]+)/follow/$ [name='paper-follow']
-^api/ ^paper/(?P<pk>[^/.]+)/follow\.(?P<format>[a-z0-9]+)/?$ [name='paper-follow']
-^api/ ^paper/(?P<pk>[^/.]+)/is_following/$ [name='paper-is-following']
-^api/ ^paper/(?P<pk>[^/.]+)/is_following\.(?P<format>[a-z0-9]+)/?$ [name='paper-is-following']
-^api/ ^paper/(?P<pk>[^/.]+)/neutralvote/$ [name='paper-neutralvote']
-^api/ ^paper/(?P<pk>[^/.]+)/neutralvote\.(?P<format>[a-z0-9]+)/?$ [name='paper-neutralvote']
-^api/ ^paper/(?P<pk>[^/.]+)/pdf_extract/$ [name='paper-pdf-extract']
-^api/ ^paper/(?P<pk>[^/.]+)/pdf_extract\.(?P<format>[a-z0-9]+)/?$ [name='paper-pdf-extract']
-^api/ ^paper/(?P<pk>[^/.]+)/restore_paper/$ [name='paper-restore-paper']
-^api/ ^paper/(?P<pk>[^/.]+)/restore_paper\.(?P<format>[a-z0-9]+)/?$ [name='paper-restore-paper']
-^api/ ^paper/(?P<pk>[^/.]+)/unfollow/$ [name='paper-unfollow']
-^api/ ^paper/(?P<pk>[^/.]+)/unfollow\.(?P<format>[a-z0-9]+)/?$ [name='paper-unfollow']
-^api/ ^paper/(?P<pk>[^/.]+)/upvote/$ [name='paper-upvote']
-^api/ ^paper/(?P<pk>[^/.]+)/upvote\.(?P<format>[a-z0-9]+)/?$ [name='paper-upvote']
-^api/ ^paper/(?P<pk>[^/.]+)/user_vote/$ [name='paper-user-vote']
-^api/ ^paper/(?P<pk>[^/.]+)/user_vote\.(?P<format>[a-z0-9]+)/?$ [name='paper-user-vote']
-^api/ ^paper_submission/$ [name='paper_submission-list']
-^api/ ^paper_submission\.(?P<format>[a-z0-9]+)/?$ [name='paper_submission-list']
-^api/ ^paper_submission/create_from_doi/$ [name='paper_submission-create-from-doi']
+ # ResearchHub Component Patterns
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+This document outlines the component patterns and best practices used in the ResearchHub codebase.
+
+## Component Structure
+
+All React components in ResearchHub should follow these guidelines:
+
+1. **Use Functional Components**:
+   - Always use functional components with hooks, not class components
+   - Use arrow function syntax for component definitions
+
+   ```tsx
+   const MyComponent = () => {
+     // Component logic here
+     return <div>Component content</div>;
+   };
+   ```
+
+2. **Type Definitions**:
+   - Define prop types using TypeScript interfaces
+   - Place the interface directly above the component
+   - Use descriptive names for interfaces (e.g., `ButtonProps`, `UserProfileProps`)
+
+   ```tsx
+   interface MyComponentProps {
+     title: string;
+     isActive?: boolean;
+     onClick: () => void;
+   }
+
+   const MyComponent = ({ title, isActive = false, onClick }: MyComponentProps) => {
+     // Component logic here
+   };
+   ```
+
+3. **Client Components**:
+   - Add the 'use client' directive at the top of client components
+   - Keep server components as the default when possible for better performance
+
+   ```tsx
+   'use client';
+
+   import { useState } from 'react';
+
+   const ClientComponent = () => {
+     const [state, setState] = useState(false);
+     // Component logic here
+   };
+   ```
+
+## Component Organization
+
+1. **Order within components**:
+   - Imports
+   - Type definitions
+   - Helper functions/constants
+   - Main component
+   - Exports
+
+2. **Props destructuring**:
+   - Always destructure props in the function parameters
+   - Provide default values inline when appropriate
+
+   ```tsx
+   const Button = ({ 
+     variant = 'default',
+     size = 'md',
+     children,
+     ...props
+   }: ButtonProps) => {
+     // Component logic
+   };
+   ```
+
+## Styling Approach
+
+1. **Tailwind CSS**:
+   - Use Tailwind CSS utility classes for styling
+   - For complex components, use Tailwind's composition patterns
+   - Use the `cn()` utility for conditional class names
+
+   ```tsx
+   import { cn } from '@/utils/styles';
+
+   const Button = ({ className, variant }: ButtonProps) => {
+     return (
+       <button 
+         className={cn(
+           "px-4 py-2 rounded-md",
+           variant === 'primary' ? 'bg-primary-600 text-white' : 'bg-gray-200 text-gray-800',
+           className
+         )}
+       >
+         {children}
+       </button>
+     );
+   };
+   ```
+
+2. **Variants with class-variance-authority**:
+   - Use `class-variance-authority` (cva) for components with multiple variants
+   - Define all variants in a single `cva` call
+   - Reference the variant styles in the component
+
+   ```tsx
+   const buttonVariants = cva(
+     'rounded-md font-medium transition-colors',
+     {
+       variants: {
+         variant: {
+           default: 'bg-primary-600 text-white hover:bg-primary-700',
+           secondary: 'bg-gray-200 text-gray-800 hover:bg-gray-300',
+         },
+         size: {
+           sm: 'px-2 py-1 text-sm',
+           md: 'px-4 py-2',
+           lg: 'px-6 py-3 text-lg',
+         },
+       },
+       defaultVariants: {
+         variant: 'default',
+         size: 'md',
+       },
+     }
+   );
+   ```
+
+## State Management
+
+1. **Local State**:
+   - Use `useState` for component-specific state
+   - Use `useReducer` for complex state logic
+
+2. **Shared State**:
+   - Use React Context for state that needs to be shared across multiple components
+   - Create dedicated context providers in the `contexts/` directory
+
+3. **Derived State**:
+   - Use `useMemo` for expensive computations
+   - Use `useCallback` for functions that are passed as props to prevent unnecessary re-renders
+
+## Component Composition
+
+1. **Component Props**:
+   - Accept a `className` prop for styling customization
+   - Use the spread operator for passing additional props
+
+   ```tsx
+   const Button = ({ className, children, ...props }: ButtonProps) => {
+     return (
+       <button className={cn("default-styles", className)} {...props}>
+         {children}
+       </button>
+     );
+   };
+   ```
+
+2. **Composition Patterns**:
+   - Use the children prop for component composition
+   - Use render props for complex rendering logic
+   - Use compound components for related UI elements
+
+## Performance Optimization
+
+1. **Memoization**:
+   - Use `React.memo` for pure functional components that render often
+   - Use `useMemo` for expensive calculations
+   - Use `useCallback` for event handlers that are passed to child components
+
+2. **Code Splitting**:
+   - Use dynamic imports for large components
+   - Use Next.js's built-in code splitting features
+
+3. **Rendering Optimization**:
+   - Avoid unnecessary re-renders by using proper dependency arrays in hooks
+   - Implement virtualization for long lists with many items
+
+These patterns ensure consistent, maintainable, and performant components throughout the ResearchHub application.
 
 ---
 > Source: [ResearchHub/web](https://github.com/ResearchHub/web) — distributed by [TomeVault](https://tomevault.io).
