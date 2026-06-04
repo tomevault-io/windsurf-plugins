@@ -7,13 +7,13 @@ Beautifully designed components that you can copy and paste into your apps. Fram
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `.cursor/rules/*.mdc` in [shipbase/ui](https://github.com/shipbase/ui).
+Original source: `AGENTS.md` in [shipbase/ui](https://github.com/shipbase/ui).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
+- **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
