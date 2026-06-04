@@ -1,166 +1,197 @@
 ---
 trigger: always_on
-description: 本文档为 `nkuwiki` 项目的 Python 后端开发提供统一的编码和设计规范。
+description: 测试和部署规范
 ---
 
-# Python 编码规范
+# 测试和部署规范
 
-本文档为 `nkuwiki` 项目的 Python 后端开发提供统一的编码和设计规范。
+## 测试框架规范
 
-## 1. 基础规范
-
-### 1.1. 代码风格
-- **PEP 8**: 严格遵循 [PEP 8](mdc:https:/www.python.org/dev/peps/pep-0008) 代码风格指南。
-- **格式化工具**: 使用 **Ruff** 进行代码的自动化格式化与检查，以统一风格并替代 `black`, `isort`, `flake8`。
-- **行长度**: 最大行长度限制为 **88个字符**。
-- **缩进**: 使用 **4个空格** 进行缩进，禁止使用Tab。
-
-### 1.2. 类型提示 (强制)
-- 所有函数、方法的参数和返回值都**必须**有明确的类型提示。
-- 使用 `from typing import ...` 导入所有类型。
-
+### 1. 单元测试
 ```python
-from typing import List, Dict, Optional, Any
-from pathlib import Path
+# tests/test_etl/test_crawler.py
+import pytest
+import asyncio
+from unittest.mock import Mock, patch, AsyncMock
+from etl.crawler.webpage_spider.counselor.spiders.wiki import WikiSpider
 
-def process_data(items: List[Dict[str, Any]]) -> Optional[Path]:
-    # ...
-    return Path("/path/to/result")
+class TestWikiSpider:
+    """Wiki爬虫测试类"""
+    
+    @pytest.fixture
+    def spider(self):
+        """创建爬虫实例"""
+        spider = WikiSpider()
+        spider.settings = Mock()
+        return spider
+    
+    @pytest.fixture
+    def mock_response(self):
+        """模拟响应对象"""
+        response = Mock()
+        response.url = "https://example.com/test"
+        response.status = 200
+        response.css = Mock()
+        return response
+    
+    def test_extract_title_success(self, spider, mock_response):
+        """测试标题提取成功场景"""
+        # 设置模拟数据
+        mock_response.css.return_value.get.return_value = "测试标题"
+        
+        # 执行测试
+        title = spider.extract_title(mock_response)
+        
+        # 验证结果
+        assert title == "测试标题"
+        mock_response.css.assert_called()
+    
+    def test_extract_title_fallback(self, spider, mock_response):
+        """测试标题提取回退机制"""
+        # 设置模拟数据 - 没有找到标题
+        mock_response.css.return_value.get.return_value = None
+        mock_response.url = "https://example.com/test-page"
+        
+        # 执行测试
+        title = spider.extract_title(mock_response)
+        
+        # 验证回退到URL
+        assert title == "test-page"
+    
+    def test_clean_text(self, spider):
+        """测试文本清理功能"""
+        # 测试数据
+        dirty_text = "  这是一个    测试\n\n文本  \t  "
+        
+        # 执行清理
+        clean_text = spider.clean_text(dirty_text)
+        
+        # 验证结果
+        assert clean_text == "这是一个 测试 文本"
+        assert not clean_text.startswith(' ')
+        assert not clean_text.endswith(' ')
+    
+    def test_should_follow_allowed_domain(self, spider):
+        """测试域名白名单过滤"""
+        spider.allowed_domains = ['example.com']
+        
+        # 允许的域名
+        assert spider.should_follow('https://example.com/page') == True
+        
+        # 不允许的域名
+        assert spider.should_follow('https://other.com/page') == False
+    
+    def test_should_follow_blocked_extensions(self, spider):
+        """测试文件扩展名过滤"""
+        # 被阻止的文件类型
+        assert spider.should_follow('https://example.com/file.pdf') == False
+        assert spider.should_follow('https://example.com/doc.docx') == False
+        
+        # 允许的页面
+        assert spider.should_follow('https://example.com/page.html') == True
+    
+    @pytest.mark.asyncio
+    async def test_parse_content_integration(self, spider, mock_response):
+        """集成测试：解析页面内容"""
+        # 设置复杂的模拟响应
+        mock_response.css.side_effect = [
+            Mock(get=Mock(return_value="测试标题")),  # 标题提取
+            Mock(css=Mock(return_value=Mock(getall=Mock(return_value=["测试", "内容"])))),  # 内容提取
+        ]
+        
+        # 执行解析
+        result = spider.parse_content(mock_response)
+        
+        # 验证结果结构
+        assert 'url' in result
+        assert 'title' in result
+        assert 'content' in result
+        assert result['title'] == "测试标题"
 ```
 
-### 1.3. 命名规范
-- **变量和函数**: 小写字母和下划线 (`snake_case`)。示例: `user_name`, `get_user_profile`。
-- **类名**: 大驼峰式 (`CamelCase`)。示例: `DocumentProcessor`, `QdrantIndexer`。
-- **常量**: 大写字母和下划线 (`SCREAMING_SNAKE_CASE`)。示例: `MAX_RETRIES`, `DEFAULT_TIMEOUT`。
-- **私有成员**: 以单个下划线开头 (`_internal_method`)。
-- **单数优先**: 优先使用单数形式命名。例如，使用 `/user` 而不是 `/users`。即使是返回列表的端点，也遵循此约定，如 `GET /insight` 返回洞察列表。
-
-## 2. 模块与导入
-
-### 2.1. 导入顺序
-不同来源的模块导入应按以下顺序分组，并用空行隔开：
-1.  **标准库**: `os`, `sys`, `datetime`, `asyncio`, `typing`
-2.  **第三方库**: `fastapi`, `llama_index`, `aiofiles`
-3.  **项目内模块**: `config`, `core.utils`, `etl.load`
-
+### 2. API测试
 ```python
-# 1. 标准库
-import json
-from pathlib import Path
-from typing import List
+# tests/test_api/test_knowledge_search.py
+import pytest
+from fastapi.testclient import TestClient
+from unittest.mock import patch, Mock
+from app import app
 
-# 2. 第三方库
-from fastapi import APIRouter, Query
+client = TestClient(app)
 
-# 3. 项目内模块
-from config import Config
-from core.utils.logger import register_logger
-from etl.load import db_core
-```
+class TestKnowledgeSearchAPI:
+    """知识搜索API测试"""
+    
+    @pytest.fixture
+    def mock_search_service(self):
+        """模拟搜索服务"""
+        with patch('api.routes.knowledge.search.search_service') as mock:
+            yield mock
+    
+    def test_search_success(self, mock_search_service):
+        """测试搜索成功场景"""
+        # 设置模拟返回
+        mock_search_service.search.return_value = [
+            {
+                "title": "测试文档",
+                "content": "这是测试内容",
+                "score": 0.95,
+                "url": "https://example.com/test"
+            }
+        ]
+        
+        # 发送请求
+        response = client.post("/api/knowledge/advanced-search", json={
+            "query": "测试查询",
+            "openid": "test_user"
+        })
+        
+        # 验证响应
+        assert response.status_code == 200
+        data = response.json()
+        assert data["code"] == 200
+        assert len(data["data"]) == 1
+        assert data["data"][0]["title"] == "测试文档"
+    
+    def test_search_empty_query(self):
+        """测试空查询参数"""
+        response = client.post("/api/knowledge/advanced-search", json={
+            "query": "",
+            "openid": "test_user"
+        })
+        
+        assert response.status_code == 422  # 参数验证错误
+    
+    def test_search_missing_openid(self):
+        """测试缺少openid参数"""
+        response = client.post("/api/knowledge/advanced-search", json={
+            "query": "测试查询"
+        })
+        
+        assert response.status_code == 422
+    
+    def test_search_service_error(self, mock_search_service):
+        """测试搜索服务异常"""
+        # 设置服务抛出异常
+        mock_search_service.search.side_effect = Exception("搜索服务异常")
+        
+        response = client.post("/api/knowledge/advanced-search", json={
+            "query": "测试查询",
+            "openid": "test_user"
+        })
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["code"] == 500
+        assert "错误" in data["message"]
+    
+    @pytest.mark.parametrize("query,expected_count", [
+        ("南开大学", 5),
+        ("计算机科学", 3),
+        ("*模式", 2),  # 通配符查询
 
-### 2.2. 导入方式
-- **推荐**: 明确导入需要的模块或函数。`from core.utils.logger import register_logger`。
-- **禁止**: 禁止使用通配符导入 (`from module import *`)。
-
-## 3. 日志规范 (强制)
-
-### 3.1. 日志器创建
-- 每个模块都必须创建自己独立的日志记录器。
-- **必须**使用项目提供的 `register_logger` 工具函数。
-- 推荐使用模块的 `__name__` 作为日志记录器的名称。
-
-```python
-from core.utils.logger import register_logger
-
-# api/routes/knowledge/insight.py
-logger = register_logger('api.routes.knowledge.insight')
-
-# etl/daily_pipeline.py
-logger = register_logger('etl.daily_pipeline')
-```
-
-### 3.2. 日志级别
-- `logger.debug()`: 用于记录详细的调试信息，如变量值、函数入口/出口。
-- `logger.info()`: 用于记录关键的业务流程节点，如服务启动、任务完成。
-- `logger.warning()`: 用于记录可预期的、非致命的异常情况，如配置缺失但有默认值。
-- `logger.error()`: 用于记录导致操作失败的错误，应包含异常信息。
-- `logger.exception()`: 在 `except` 块中使用，它会自动附加当前的异常堆栈信息。
-
-## 4. 项目核心实践
-
-### 4.1. 配置管理
-- 所有配置项（如数据库凭据、API密钥、路径等）都**必须**通过全局 `Config` 对象（`config.py`）进行管理。
-- **禁止**在代码中硬编码任何配置值。
-- **ETL模块特例**：为了集中管理和方便复用，ETL相关的配置常量在 `etl/__init__.py` 中统一定义。在ETL模块内部，应直接 `from etl import DB_HOST, RAW_PATH` 来使用这些常量。
-
-```python
-# 通用配置获取
-from config import Config
-config = Config()
-api_key = config.get("core.agent.coze.api_key")
-
-# ETL模块内配置使用
-from etl import DB_HOST, EMBEDDING_MODEL_PATH
-print(f"数据库地址: {DB_HOST}, 模型路径: {EMBEDDING_MODEL_PATH}")
-```
-
-### 4.2. 数据库操作 (强制)
-- 所有数据库交互都**必须**通过 `etl.load.db_core` 中的异步函数进行。
-- `db_core` 基于 `aiomysql` 封装了数据库连接池管理和异步执行，能有效防止阻塞事件循环。
-- **严禁**在其他模块中直接创建数据库连接或执行原生SQL查询。
-- 更详细的规范请参考 `.cursor/rules/database-operations.mdc`。
-
-```python
-# 正确用法
-from etl.load import db_core
-
-async def get_user(user_id: int):
-    result = await db_core.query_records(
-        "wxapp_users",
-        conditions={"id": user_id},
-        limit=1
-    )
-    return result.get("data")[0] if result.get("data") else None
-```
-
-### 4.3. 异步编程
-- 对于所有I/O密集型操作（文件读写、网络请求、数据库访问），**必须**使用 `async/await` 范式。
-- 使用 `aiofiles` 进行异步文件操作，使用 `httpx` 或 `aiohttp` 进行异步网络请求。
-
-### 4.4. 异常处理
-- 倾向于捕获**具体的异常类型** (`ValueError`, `ConnectionError`)，而不是宽泛的 `Exception`。
-- 在 `except` 块中记录详细的错误日志，最好使用 `logger.exception()`。
-- 考虑为项目定义一些自定义异常类，以更好地区分不同类型的业务错误。
-
-```python
-# 自定义异常示例
-class InsightGenerationError(Exception):
-    """当生成洞察失败时抛出"""
-    pass
-```
-
-## 5. 文档字符串
-
-- 推荐使用 Google 风格的文档字符串，它清晰、可读，并能被 `Sphinx` 等工具良好地解析。
-
-```python
-def retrieve_documents(query: str, top_k: int = 10) -> List[Dict]:
-    """根据查询检索相关文档。
-
-    Args:
-        query (str): 用户的查询语句。
-        top_k (int): 需要返回的文档数量。
-
-    Returns:
-        List[Dict]: 包含文档内容和元数据的字典列表。
-
-    Raises:
-        ConnectionError: 如果无法连接到向量数据库。
-    """
-    # ... 实现 ...
-    pass
-```
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [NKU-WIKI/nkuwiki](https://github.com/NKU-WIKI/nkuwiki) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-20 -->
+<!-- tomevault:4.0:windsurf_rules:2026-06-04 -->
