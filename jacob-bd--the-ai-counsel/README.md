@@ -7,11 +7,11 @@ The AI Counsel — Collective AI Intelligence through multi-model deliberation a
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [jacob-bd/the-ai-counsel](https://github.com/jacob-bd/the-ai-counsel).
+Original source: `CLAUDE.md` in [jacob-bd/the-ai-counsel](https://github.com/jacob-bd/the-ai-counsel).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
