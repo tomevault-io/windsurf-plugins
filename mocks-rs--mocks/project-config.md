@@ -1,282 +1,203 @@
 ---
 trigger: always_on
-description: Development commands and quality checks for mocks project
+description: Architecture patterns specific to mocks CLI tool
 ---
 
 
-# Development Workflow for Mocks Project
+# Mocks Architecture Patterns
 
-This rule defines essential development commands, quality checks, and workflow patterns for the mocks CLI tool.
+This rule defines architecture-specific patterns for the mocks CLI tool, focusing on dynamic routing, shared state management, and storage abstraction.
 
-## Build and Run Commands
+## Dynamic Routing Implementation
 
-### Basic Build Operations
-```bash
-# Debug build (fast compilation, includes debug info)
-cargo build
+### JSON Structure to HTTP Endpoints
+The core feature of mocks is converting JSON file structure into REST API endpoints automatically.
 
-# Release build (optimized, smaller binary)
-cargo build --release
-
-# Check compilation without building binary
-cargo check
-
-# Build documentation
-cargo doc --open
+```rust
+// Convert JSON keys to resource paths
+fn convert_to_resource_paths(value: &Value) -> Vec<String> {
+    let mut paths = vec![];
+    
+    if let Value::Object(obj) = value {
+        for (key, _) in obj {
+            // Handle nested paths like "api/v1/users" -> "/api/v1/{resource}"
+            if let Some(last_slash) = key.rfind('/') {
+                let (prefix, _) = key.split_at(last_slash + 1);
+                paths.push(format!("/{prefix}{{resource}}"));
+            } else {
+                paths.push("/{resource}".to_string());
+            }
+        }
+    }
+    
+    // Sort by depth (deeper paths first)
+    paths.sort_by(|a, b| {
+        let a_count = a.matches('/').count();
+        let b_count = b.matches('/').count();
+        b_count.cmp(&a_count)
+    });
+    
+    paths
+}
 ```
 
-### Running the Application
-```bash
-# Run with default settings
-cargo run -- run storage.json
+### Router Creation with Dynamic Paths
+```rust
+fn create_router(state: SharedState, value: &Value) -> Router {
+    // Base routers for health check and CRUD operations
+    let hc_router = Router::new().route("/", get(hc));
+    let storage_router = Router::new()
+        .route("/", get(get_all).post(post).put(put_one).patch(patch_one))
+        .route("/{id}", get(get_one).put(put).patch(patch).delete(delete));
 
-# Run with custom host and port
-cargo run -- run -H 127.0.0.1 -p 8080 storage.json
+    let mut router = Router::new().nest("/_hc", hc_router);
 
-# Run without file modifications (read-only mode)
-cargo run -- run --no-overwrite storage.json
+    // Add dynamic resource paths
+    let resource_paths = convert_to_resource_paths(value);
+    for path in resource_paths {
+        router = router.nest(&path, storage_router.clone().with_state(state.clone()));
+    }
 
-# Initialize new storage file
-cargo run -- init storage.json
-
-# Initialize empty storage file
-cargo run -- init --empty storage.json
-
-# View help information
-cargo run -- --help
-cargo run -- run --help
-cargo run -- init --help
+    router
+}
 ```
 
-### Environment Variables
-```bash
-# Disable colored output
-NO_COLOR=1 cargo run -- run storage.json
-
-# Enable debug file overwrite tracking
-MOCKS_DEBUG_OVERWRITTEN_FILE=1 cargo run -- run storage.json
+### Resource Discovery Pattern
+```rust
+impl Storage {
+    /// Get all available resource names from storage data
+    pub fn resources(&self) -> Vec<String> {
+        if let Value::Object(obj) = &self.data {
+            obj.keys().cloned().collect()
+        } else {
+            vec![]
+        }
+    }
+    
+    /// Check if a resource exists in storage
+    pub fn has_resource(&self, resource: &str) -> bool {
+        if let Value::Object(obj) = &self.data {
+            obj.contains_key(resource)
+        } else {
+            false
+        }
+    }
+}
 ```
 
-## Testing Commands
+## Shared State Management
 
-### Unit and Integration Tests
-```bash
-# Run all tests
-cargo test
+### AppState Design Pattern
+```rust
+// Define shared application state
+pub struct AppState {
+    pub storage: Storage,
+}
 
-# Run tests with output
-cargo test -- --nocapture
+pub type SharedState = Arc<Mutex<AppState>>;
 
-# Run specific test
-cargo test test_parse_socket_addr
-
-# Run tests in specific module
-cargo test storage::tests
-
-# Run tests with specific pattern
-cargo test "test_*_operation"
-
-# Run tests in parallel (default) or single-threaded
-cargo test -- --test-threads=1
+impl AppState {
+    pub fn new(storage: Storage) -> SharedState {
+        Arc::new(Mutex::new(AppState { storage }))
+    }
+}
 ```
 
-### End-to-End Testing
-```bash
-# Run E2E tests with runn
-cd runn-e2e
-runn run runbooks/test.yml --verbose
-
-# Run specific E2E test
-runn run runbooks/test_post.yml
-
-# Run E2E tests with debug output
-RUST_LOG=debug runn run runbooks/test.yml
+### Thread-Safe State Access
+```rust
+// Pattern for accessing shared state in handlers
+pub async fn get_all(
+    State(state): State<SharedState>,
+    Path(resource): Path<String>,
+) -> Result<Json<Value>, StatusCode> {
+    let state = state.lock().await;
+    match select_all(&state.storage.data, &resource) {
+        Ok(data) => Ok(Json(data)),
+        Err(_) => Err(StatusCode::NOT_FOUND),
+    }
+}
 ```
 
-### Coverage Generation
-```bash
-# Install coverage tool (one-time setup)
-cargo install cargo-llvm-cov --locked
-
-# Generate coverage report (HTML)
-cargo llvm-cov --html
-
-# Generate coverage report (terminal output)
-cargo llvm-cov
-
-# Coverage for specific test
-cargo llvm-cov --test integration_tests
-
-# Coverage with specific output format
-cargo llvm-cov --lcov --output-path coverage.lcov
+### State Mutation with Atomic Operations
+```rust
+pub async fn post(
+    State(state): State<SharedState>,
+    Path(resource): Path<String>,
+    Json(input): Json<Value>,
+) -> Result<Json<Value>, StatusCode> {
+    let mut state = state.lock().await;
+    
+    // Perform atomic storage operation
+    match insert(&mut state.storage.data, &resource, input) {
+        Ok(result) => {
+            // Write back to file if overwrite is enabled
+            if state.storage.overwrite {
+                if let Err(_) = Writer::new(&state.storage.file)
+                    .write(&state.storage.data) {
+                    return Err(StatusCode::INTERNAL_SERVER_ERROR);
+                }
+            }
+            Ok(Json(result))
+        }
+        Err(_) => Err(StatusCode::BAD_REQUEST),
+    }
+}
 ```
 
-## Code Quality Commands
+## Storage Abstraction Layer
 
-### Formatting
-```bash
-# Format all code
-cargo fmt
-
-# Check if code is formatted without making changes
-cargo fmt -- --check
-
-# Format specific file
-cargo fmt src/main.rs
-
-# Format with specific config
-cargo fmt -- --config imports_granularity=Crate
+### Storage Interface Pattern
+```rust
+impl Storage {
+    /// Create a new Storage instance with validation
+    pub fn new(path: &str, overwrite: bool) -> Result<Storage, MocksError> {
+        let data = Reader::new(path).read()?;
+        
+        // Validate storage structure
+        Self::validate_storage_structure(&data)?;
+        
+        Ok(Storage {
+            file: path.to_string(),
+            data,
+            overwrite,
+        })
+    }
+    
+    fn validate_storage_structure(data: &Value) -> Result<(), MocksError> {
+        match data {
+            Value::Object(_) => Ok(()),
+            _ => Err(MocksError::InvalidJson(
+                "Storage must be a JSON object".to_string()
+            )),
+        }
+    }
+}
 ```
 
-### Linting with Clippy
-```bash
-# Run clippy with default settings
-cargo clippy
+### Reader/Writer Abstraction
+```rust
+// File reading abstraction
+pub struct Reader {
+    path: String,
+}
 
-# Run clippy with strict warnings (project standard)
-cargo clippy -- -D warnings
+impl Reader {
+    pub fn new(path: &str) -> Self {
+        Self {
+            path: path.to_string(),
+        }
+    }
+    
+    pub fn read(&self) -> Result<Value, MocksError> {
+        let content = fs::read_to_string(&self.path)
+            .map_err(|e| MocksError::FailedReadFile(e.to_string()))?;
+        
+        serde_json::from_str(&content)
+            .map_err(|e| MocksError::InvalidJson(e.to_string()))
+    }
+}
 
-# Run clippy on all targets
-cargo clippy --all-targets -- -D warnings
-
-# Run clippy with specific lint levels
-cargo clippy -- -W clippy::pedantic -D warnings
-
-# Fix clippy suggestions automatically (where possible)
-cargo clippy --fix
-```
-
-### MSRV (Minimum Supported Rust Version) Checks
-```bash
-# Install MSRV checker (one-time setup)
-cargo install cargo-msrv --locked
-
-# Find minimum supported Rust version
-cargo msrv find
-
-# Verify current MSRV (1.78.0 for this project)
-cargo msrv verify
-
-# List Rust versions for testing
-cargo msrv list
-```
-
-## Security and Dependency Management
-
-### Security Auditing
-```bash
-# Install cargo-audit (one-time setup)
-cargo install cargo-audit --locked
-
-# Run security audit
-cargo audit
-
-# Audit with JSON output
-cargo audit --json
-
-# Fix security vulnerabilities (where possible)
-cargo audit fix
-```
-
-### Dependency Management
-```bash
-# Update dependencies
-cargo update
-
-# Add new dependency
-cargo add serde_json
-
-# Add development dependency
-cargo add --dev tempfile
-
-# Remove dependency
-cargo remove unused_crate
-
-# Check for outdated dependencies
-cargo outdated
-```
-
-## Performance and Optimization
-
-### Benchmarking
-```bash
-# Run benchmarks (if any exist)
-cargo bench
-
-# Profile with perf (Linux)
-cargo build --release
-perf record --call-graph=dwarf target/release/mocks run storage.json
-perf report
-
-# Memory profiling with valgrind
-cargo build --release
-valgrind --tool=massif target/release/mocks run storage.json
-```
-
-### Binary Size Optimization
-```bash
-# Build with size optimization
-RUSTFLAGS="-C target-cpu=native" cargo build --release
-
-# Strip binary (reduce size)
-strip target/release/mocks
-
-# Check binary size
-ls -lh target/release/mocks
-
-# Analyze binary composition
-cargo bloat --release
-```
-
-## Development Environment Setup
-
-### Required Tools
-```bash
-# Install required tools for development
-cargo install cargo-llvm-cov --locked
-cargo install cargo-msrv --locked
-cargo install cargo-audit --locked
-cargo install cargo-outdated --locked
-cargo install cargo-bloat --locked
-
-# Install runn for E2E testing
-go install github.com/k1LoW/runn/cmd/runn@latest
-# or
-brew install k1LoW/tap/runn
-```
-
-### Git Hooks Setup
-```bash
-# Create pre-commit hook for quality checks
-cat > .git/hooks/pre-commit << 'EOF'
-#!/bin/bash
-set -e
-
-echo "Running pre-commit checks..."
-
-# Format check
-cargo fmt -- --check
-
-# Lint check
-cargo clippy -- -D warnings
-
-# Test check
-cargo test
-
-echo "All checks passed!"
-EOF
-
-chmod +x .git/hooks/pre-commit
-```
-
-## Continuous Integration Workflow
-
-### Local CI Simulation
-```bash
-# Run the same checks as CI locally
-#!/bin/bash
-set -e
-
+// File writing abstraction with atomic operations
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
