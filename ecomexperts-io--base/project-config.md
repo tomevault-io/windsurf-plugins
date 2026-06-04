@@ -1,174 +1,169 @@
 ---
 trigger: always_on
-description: Writing JavaScript inside `.js` files, or within the `{% javascript %}` or `{% script %}` or <script> </script> tags in `.liquid` files.
+description: Liquid syntax standards
 ---
 
-# JavaScript Standards
 
-## General Principles
+# Liquid Syntax Standards
 
-- **Zero external dependencies** - Use native browser APIs
-- **Avoid mutation** - Use `const` over `let` unless necessary  
-- **Use `for (const item of items)`** over `items.forEach()`
-- **Add new lines before blocks** with `{` and `}`
-- **Use vanilla Web Components** - Extend HTMLElement directly for custom elements
+## Valid Tags with Parameters
 
-## Async Operations and Request Management
+**Control Flow:**
 
-**Always use async/await over .then() chaining:**
+- `if condition` / `endif` - Conditional logic
+- `unless condition` / `endunless` - Negative conditional
+- `case variable` / `when value` / `endcase` - Switch statement
+- `for item in array` / `endfor` - Loop with optional `limit:`, `offset:`
 
-```javascript
-async renderSection(hasDifferentProductUrl, productUrl) {
-  this.abortController?.abort();
-  this.abortController = new AbortController();
+**Variable Assignment:**
 
-  try {
-    const response = await fetch(`${productUrl}?option_values=${this.selectedOptionValues}&section_id=${this.dataset.section}`, {
-      signal: this.abortController.signal,
-    });
-    
-    const responseText = await response.text();
-    const html = new DOMParser().parseFromString(responseText, 'text/html');
-    const variant = this.getSelectedVariant(html);
-    
-    if (hasDifferentProductUrl) {
-      const productInfo = html.querySelector('product-info');
-      this.replaceWith(productInfo);
-      productInfo.updateURL(variant?.id);
-    } else {
-      this.updateMedia(variant?.featured_media?.id);
-      this.updateURL(variant?.id);
-      this.updateVariantInputs(variant?.id);
-      this.updateSourceFromDestination(html, `price-${this.dataset.section}`);
-    }
-  } catch (error) {
-    if (error.name === 'AbortError') {
-      console.log('Fetch aborted by user');
-    } else {
-      console.error(error);
-    }
-  }
-}
-```
+- `assign variable = value` - Create variable
+- `capture variable` / `endcapture` - Capture output
+- `increment variable` - Add 1 to counter
+- `decrement variable` - Subtract 1 from counter
 
-## Web Components Pattern
+**Template Inclusion:**
 
-**Use vanilla Web Components with HTMLElement:**
+- `render 'snippet-name'` - Include snippet
+- `render 'snippet-name', param: value` - With parameters
+- `section 'section-name'` - Include section
 
-```javascript
-if (!customElements.get('product-info')) {
-  class ProductInfo extends HTMLElement {
-    // Property declarations with initialization
-    abortController = undefined;
-    swiper = null;
+**Forms:**
 
-    constructor() {
-      super();
-      // Minimal constructor - defer setup to connectedCallback
-    }
+- `form 'cart'` / `endform` - Cart form
+- `form 'product'` / `endform` - Product form
+- `form 'customer_login'` / `endform` - Login form
 
-    setupEventListeners() {
-      this.variantSelector?.addEventListener('change', this.onVariantChange.bind(this));
-      this.quantitySelector.addEventListener('change', this.onQuantitySelectorEvent.bind(this));
-      this.quantitySelector.querySelector('button[name="plus"]').addEventListener('click', this.onQuantitySelectorEvent.bind(this));
-      this.quantitySelector.querySelector('button[name="minus"]').addEventListener('click', this.onQuantitySelectorEvent.bind(this));
-      document.getElementById('swiper-script').addEventListener('load', this.initSwiper.bind(this));
-      document.addEventListener('liquid-ajax-cart:request-end', this.onCartUpdate.bind(this));
-    }
+**Other:**
 
-    connectedCallback() {
-      this.setupEventListeners();
-      if (typeof Swiper !== 'undefined') {
-        this.initSwiper();
-      }
-    }
+- `paginate collection.products by 12` / `endpaginate` - Paginate results
+- `liquid` / `endliquid` - Multiline Liquid block
+- `comment` / `endcomment` - Block comments
+- `raw` / `endraw` - Output without processing
 
-    disconnectedCallback() {
-      this.abortController?.abort();
-      this.swiper?.destroy();
-    }
+## Valid Filters
 
-    // Getter methods for DOM element access
-    get variantSelector() {
-      return this.querySelector('variant-selector');
-    }
+**Array Filters:**
 
-    get quantitySelector() {
-      return this.querySelector('quantity-selector');
-    }
+- `compact` - Remove nil values: `array | compact`
+- `concat` - Join arrays: `array | concat: array`
+- `find` - Find object: `array | find: property, value`
+- `where` - Filter objects: `array | where: property, value`
+- `map` - Extract property: `array | map: property`
+- `sort` - Sort array: `array | sort`
+- `reverse` - Reverse order: `array | reverse`
+- `first` - First item: `array | first`
+- `last` - Last item: `array | last`
+- `size` - Count items: `array | size`
 
-    // Event handlers with descriptive names
-    onVariantChange(e) {
-      const hasDifferentProductUrl = e.target?.dataset?.productUrl ? 
-        (e.target?.dataset?.productUrl !== this.dataset.url) : false;
-      const productUrl = e.target?.dataset?.productUrl || this.dataset.url;
-      this.renderSection(hasDifferentProductUrl, productUrl);
-    }
+**String Filters:**
 
-    // Public methods for external component communication
-    updateMedia(variantFeaturedMediaId) {
-      if (!variantFeaturedMediaId) return;
-      var index = this.querySelector(`.swiper-slide[data-media-id="${variantFeaturedMediaId}"]`).dataset.mediaIndex;
-      this.swiper?.slideTo(index);
-    }
+- `escape` - HTML escape: `string | escape`
+- `truncate` - Limit length: `string | truncate: 150`
+- `handleize` - URL handle: `string | handleize`
+- `replace` - Replace text: `string | replace: 'old', 'new'`
+- `split` - Split string: `string | split: 'delimiter'`
+- `upcase` - Uppercase: `string | upcase`
+- `downcase` - Lowercase: `string | downcase`
+- `capitalize` - Capitalize: `string | capitalize`
 
-    // Arrow function for helper methods
-    updateSourceFromDestination = (html, id) => {
-      const source = html.getElementById(`${id}`);
-      const destination = this.querySelector(`#${id}`);
-      if (source && destination) {
-        destination.innerHTML = source.innerHTML;
-      }
-    };
-  }
+**Money Filters:**
 
-  customElements.define('product-info', ProductInfo);
-}
-```
+- `money` - Format price: `price | money`
+- `money_with_currency` - With symbol: `price | money_with_currency`
+- `money_without_currency` - No symbol: `price | money_without_currency`
 
-**HTML integration with Liquid templates:**
+**Media Filters:**
+
+- `image_url` - Responsive image: `image | image_url: width: 800`
+- `image_tag` - Complete img tag: `image | image_tag`
+- `asset_url` - Theme asset: `'style.css' | asset_url`
+
+## Syntax Rules
+
+- Use `{% liquid %}` for multiline code blocks
+- Use `{% # comment %}` for inline comments
+- Never invent new filters, tags, or objects
+- Follow proper tag closing order (last opened, first closed)
+- Use object dot notation: `product.title` not `product['title']`
+- Respect object scope and availability
+
+## Inline Variables Pattern
+
+For props that are relatively straightforward, prefer to inline the liquid instead of declaring extra variables. In smaller components it doesn't make a big difference, but in bigger ones it helps not having to scroll up and down to know what is being applied where.
+
+**✅ Do this (inline approach):**
 
 ```liquid
-<product-info
-  data-url="{{ product.url}}"
-  data-section="{{ section.id }}"
-  class="color-{{ section.settings.color_scheme }} section-{{ section.id }}-padding"
+<div
+  class='component component--{{ settings.style_modifier }}'
+  style='
+    color: {{ settings.text_color }};
+    {% if settings.show_border %}
+      border: 1px solid {{ settings.border_color }};
+    {% endif %}
+  '
 >
-  <!-- Component content with nested custom elements -->
-  <variant-selector id="variant-selector-{{ section.id }}" data-picker-type="{{ block.settings.picker_type }}">
-    <!-- Variant selection UI -->
-  </variant-selector>
-  
-  <quantity-selector>
-    <!-- Quantity controls -->
-  </quantity-selector>
-</product-info>
+  <h2>{{ 'sections.component.title' | t }}</h2>
 
-<!-- Load component script -->
-<script src="{{ 'component-product-info.js' | asset_url }}" defer="defer"></script>
+  {{ content | truncate: settings.max_length | default: 200 }}
+
+  <a
+    href='{{ link_url }}'
+    class='link--{{ settings.link_style | default: 'primary' }}'
+  >
+    {{ 'general.read_more' | t }}
+  </a>
+</div>
 ```
 
-## Early Returns and Conditional Logic
+**❌ Don't do this (variable declaration approach):**
 
-**Use early returns over nested conditionals:**
+```liquid
+{% liquid
+  assign component_class = 'component component--' | append: settings.style_modifier
+  assign text_color = settings.text_color
+  assign truncate_length = settings.max_length | default: 200
+  assign link_class = 'link--' | append: settings.link_style | default: 'primary'
+%}
 
-```javascript
-// Good
-const processOrder = (order) => {
-  if (!order) return;
-  if (!order.items.length) return;
-  if (order.status !== 'pending') return;
+{% capture component_style %}
+  color: {{ text_color }};
+  {% if settings.show_border %}
+    border: 1px solid {{ settings.border_color }};
+  {% endif %}
+{% endcapture %}
 
-  // Process the order
-  updateOrderStatus(order.id, 'processing');
-  sendConfirmationEmail(order.email);
-};
+<div
+  class='{{ component_class }}'
+  style='{{ component_style }}'
+>
+  <h2>{{ 'sections.component.title' | t }}</h2>
 
-// Avoid
-const processOrder = (order) => {
-  if (order) {
+  {{ content | truncate: truncate_length }}
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+  <a
+    href='{{ link_url }}'
+    class='{{ link_class }}'
+  >
+    {{ 'general.read_more' | t }}
+  </a>
+</div>
+```
+
+**Exceptions:**
+
+- When Liquid filter parameters require string values and complex logic cannot be inlined
+- When the same complex calculation is used multiple times
+- When the logic is extremely complex and would harm readability
+- When you need to build a string incrementally with conditional parts
+
+**Benefits:**
+
+- Easier to understand what's being applied where
+- No need to scroll up and down to find variable definitions
+- Reduces cognitive load in larger components
+- Makes the code more maintainable
 
 ---
 > Source: [EcomExperts-io/Base](https://github.com/EcomExperts-io/Base) — distributed by [TomeVault](https://tomevault.io).
