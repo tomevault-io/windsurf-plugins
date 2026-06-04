@@ -1,139 +1,151 @@
 ---
 trigger: always_on
-description: cd /Users/bardi/Projetos/hapai
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-# hapai — Prompt Orquestrador (Cole no Claude Code CLI)
+# CLAUDE.md
 
-## Como usar
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## What is hapai
+
+hapai is a deterministic guardrails system for AI coding assistants (Claude Code, Cursor, Copilot). It enforces security rules via shell-based hooks that intercept tool calls and block violations **before execution** — not probabilistic prompts that can be ignored. Pure Bash, only external dependency is `jq`.
+
+The system combines:
+- **Hook enforcement** — Shell scripts that run before/after tool execution
+- **Svelte 5 Analytics Dashboard** — Real-time guardrail event visualization
+- **Cloud integration** — BigQuery + Cloud Storage + GitHub Pages deployment
+- **Multi-tool exporters** — Export guardrails to Cursor, Copilot, Windsurf, etc.
+
+## Prerequisites
+
+Before working on this codebase, ensure:
+- **jq 1.6+** — Required for all hook scripts and validation. Install: `brew install jq`
+- **Node.js 20+ + npm** — Required only for dashboard development (`infra/gcp/dashboard/`)
+- **Bash 4+** — All scripts use `set -euo pipefail` and POSIX-compatible tools
+- **Git** — Version control and release tagging
+- **Tested platforms** — macOS and Linux. CI runs on both via `ci.yml`. WSL supported via installer detection.
+
+## Development Environment Setup
+
+**Complete setup for contributing:**
 
 ```bash
-cd /Users/bardi/Projetos/hapai
-claude
+# 1. Clone the repository
+git clone https://github.com/renatobardi/hapai.git
+cd hapai
+
+# 2. Verify prerequisites
+jq --version      # Should be 1.6+
+bash --version    # Should be 4+
+node --version    # Should be 20+ (only if developing dashboard)
+
+# 3. Install for development with hooks enabled
+HAPAI_DEV=1 bash install.sh
+
+# 4. Validate installation
+hapai validate
+
+# 5. Run full test suite to verify everything works
+bash tests/run-tests.sh
+
+# 6. For dashboard development, install Node dependencies
+cd infra/gcp/dashboard && npm ci && cd ../..
+
+# You're ready to develop!
 ```
 
-Então cole o bloco abaixo inteiro no chat. O Claude Code vai lançar os subagentes
-em paralelo automaticamente usando a ferramenta Task interna.
+**Development setup notes:**
+- `HAPAI_DEV=1` installs hooks to `~/.hapai/hooks/` and registers them in `~/.claude/settings.json`
+- Project-local `hapai.yaml` overrides user-global `~/.hapai/hapai.yaml` — useful for testing
+- All hook changes take effect immediately; no reinstall needed
+- Dashboard requires `.env` file with Firebase credentials (see Dashboard section)
 
----
+## Quick Commands
 
-## PROMPT ORQUESTRADOR — cole inteiro no Claude Code
+Common tasks when developing hapai:
+
+```bash
+# Run all tests (bash assertions, no framework)
+bash tests/run-tests.sh
+
+# Test a specific guardrail
+bash tests/run-tests.sh 2>&1 | grep -A 30 "guard-branch"
+
+# Test individual hook in isolation
+echo '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git commit -m test"}}' | \
+  bash hooks/pre-tool-use/guard-branch.sh
+
+# Validate installation
+hapai validate
+
+# Check active hooks and audit counts
+hapai status
+
+# View recent audit log entries
+hapai audit
+
+# Dashboard development (local)
+cd infra/gcp/dashboard && npm ci && npm run dev
+
+# Dashboard production build
+cd infra/gcp/dashboard && npm run build
+
+# Test CLI installation locally
+HAPAI_DEV=1 bash install.sh
+```
+
+### Testing Individual Hooks
+
+Hooks read Claude Code's hook JSON format from stdin. The correct schema:
+
+```bash
+# PreToolUse — Bash command
+echo '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git commit -m test"}}' | \
+  bash hooks/pre-tool-use/guard-branch.sh
+echo "Exit: $?"  # 0=allow, 2=deny
+
+# PreToolUse — file write
+echo '{"hook_event_name":"PreToolUse","tool_name":"Write","tool_input":{"file_path":".env","content":"SECRET=1"}}' | \
+  bash hooks/pre-tool-use/guard-files.sh
+```
+
+To test with a clean isolated state:
+
+```bash
+export HAPAI_HOME="$(mktemp -d)"
+mkdir -p "$HAPAI_HOME/state"
+cp hapai.defaults.yaml "$HAPAI_HOME/hapai.yaml"
+echo '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"rm -rf /"}}' | \
+  bash hooks/pre-tool-use/guard-destructive.sh
+```
+
+## Architecture
+
+### Directory Structure
 
 ```
-Você é o orquestrador de um plano de fixes para o repositório hapai.
-Seu trabalho é lançar subagentes em paralelo usando a ferramenta Task,
-aguardar cada wave completar, e depois lançar a próxima wave.
-
-Contexto do projeto:
-- hapai é um sistema de guardrails determinísticos para AI coding assistants
-- Stack: Bash puro nos hooks + Svelte 5 dashboard + GCP
-- Repo: /Users/bardi/Projetos/hapai
-- Branch protegida: main — nunca commitar direto nela
-- Commits: conventional commits, sem Co-Authored-By, sem mencionar AI/Claude
-- Testes: bash tests/run-tests.sh
-
-Diagnóstico já feito — problemas identificados:
-
-P0-A: bin/hapai linha 19 define HAPAI_ROOT como pai do binário. Quando instalado em
-/usr/local/bin/hapai, HAPAI_ROOT=/usr/local — hooks não existem lá. Fix: após linha 19,
-adicionar fallback para HAPAI_HOME quando HAPAI_ROOT/hooks não existir.
-Também: ensure_jq() hardcoded para "brew install jq" mesmo em Linux.
-Também: cmd_sync faz source de _lib.sh sem guard de existência.
-
-P0-B: install.sh — quando instala em ~/.local/bin (fallback sem sudo), PATH não é
-atualizado. Usuário fica sem acesso ao binário. Fix: detectar shell e appendar ao rc file.
-Também: macOS tem Bash 3.2 por padrão — o warn atual não bloqueia, mas deveria dar
-exit 1 com instrução clara de "brew install bash".
-Também: post_install não verifica se hooks foram realmente copiados.
-
-P0-C: templates/settings.hooks.json — guard-branch.sh está registrado 3 vezes para
-"Bash(gh api*)" (linhas 33-48). Causa triple-execution por operação. Fix: manter apenas 1.
-
-P1-A: infra/gcp/functions/main.py — CORS origins hardcoded para renatobardi.github.io.
-Quem faz self-host do dashboard tem CORS bloqueado. Fix: ler de env var CORS_ORIGINS.
-
-P1-B: Documentação de comunidade open-source faltando: CONTRIBUTING.md, issue templates,
-PR template, e badges no README.
-
----
-
-WAVE 1 — Lance estes 3 subagentes em PARALELO (use Task para todos de uma vez):
-
-Task A — "fix/hapai-root-standalone":
-  Crie a branch fix/hapai-root-standalone a partir de main.
-  
-  Arquivo: bin/hapai
-  
-  Fix 1 — Após linha 19 (HAPAI_ROOT="..."), inserir:
-    # Fallback: if running as installed binary (not inside repo), use HAPAI_HOME
-    if [[ ! -d "$HAPAI_ROOT/hooks" ]]; then
-      if [[ -d "$HAPAI_HOME/hooks" ]]; then
-        HAPAI_ROOT="$HAPAI_HOME"
-      else
-        echo "hapai: hooks not found at $HAPAI_ROOT or $HAPAI_HOME" >&2
-        echo "Run: curl -fsSL https://raw.githubusercontent.com/renatobardi/hapai/main/install.sh | bash" >&2
-        exit 1
-      fi
-    fi
-  
-  Fix 2 — Função ensure_jq() (~linha 53), substituir a mensagem de erro fixa por:
-    local os_hint
-    case "$(uname -s | tr '[:upper:]' '[:lower:]')" in
-      darwin*) os_hint="brew install jq" ;;
-      linux*)  os_hint="apt-get install -y jq  # ou: dnf install jq / pacman -S jq" ;;
-      *)       os_hint="see https://jqlang.github.io/jq/download/" ;;
-    esac
-    log_error "jq is required but not installed. Install: $os_hint"
-    exit 1
-  
-  Fix 3 — Função cmd_sync (~linha 823), antes do "source", adicionar:
-    if [[ ! -f "$HAPAI_ROOT/hooks/_lib.sh" ]]; then
-      log_error "hooks/_lib.sh not found. Run: hapai install --global"
-      exit 1
-    fi
-  
-  Após editar: rodar bash tests/run-tests.sh e confirmar que passa.
-  Commitar os 3 fixes juntos: "fix(bin): HAPAI_ROOT fallback for standalone install, OS-aware jq hint, _lib guard"
-  NÃO abrir PR — apenas commitar na branch.
-
-Task B — "fix/installer-robustness":
-  Crie a branch fix/installer-robustness a partir de main.
-  
-  Arquivo: install.sh
-  
-  Fix 1 — Função install_from_github, no bloco que instala em ~/.local/bin (quando cp
-  para /usr/local/bin falha e sudo não está disponível), após o cp e o log_warn de PATH,
-  adicionar o auto-fix de PATH:
-    local shell_rc=""
-    case "$(basename "${SHELL:-bash}")" in
-      zsh)  shell_rc="$HOME/.zshrc" ;;
-      bash) shell_rc="$HOME/.bashrc" ;;
-      fish) shell_rc="$HOME/.config/fish/config.fish" ;;
-    esac
-    if [[ -n "$shell_rc" ]] && [[ -f "$shell_rc" ]]; then
-      if ! grep -q 'HOME/.local/bin' "$shell_rc" 2>/dev/null; then
-        printf '\n# hapai — added by installer\nexport PATH="$HOME/.local/bin:$PATH"\n' >> "$shell_rc"
-        log_ok "Added ~/.local/bin to PATH in $shell_rc"
-        log_warn "Restart your terminal or run: source $shell_rc"
-      fi
-    fi
-  
-  Fix 2 — Função check_deps, substituir o bloco do bash version check por:
-    local bash_major="${BASH_VERSINFO[0]:-3}"
-    if [[ "$bash_major" -lt 4 ]]; then
-      local os
-      os="$(detect_os)"
-      if [[ "$os" == "darwin" ]]; then
-        log_error "Bash ${BASH_VERSION} detected. hapai requires Bash 4+."
-        log_info "macOS ships with Bash 3.2 (GPL license constraint). Fix:"
-        log_info "  brew install bash"
-        log_info "Then re-run:"
-        log_info '  /opt/homebrew/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/renatobardi/hapai/main/install.sh)"'
-        exit 1
-      else
+hapai/
+├── bin/hapai                    # CLI entry point (command dispatcher)
+├── hooks/                       # All guardrail scripts (pure Bash)
+│   ├── _lib.sh                 # Shared library (YAML parsing, JSON I/O, audit, state)
+│   ├── _pr-review-agent.sh     # Background PR reviewer (claude CLI, Haiku model)
+│   ├── _pr-fix-agent.sh        # Optional auto-fixer (Sonnet model)
+│   ├── pre-tool-use/           # Block before Claude Code execution
+│   │   ├── guard-*.sh          # Individual guardrails (branch, commit, files, etc.)
+│   │   └── flow-dispatcher.sh  # Sequential hook chains from config
+│   ├── post-tool-use/          # Run after Claude Code execution
+│   │   ├── auto-*.sh           # Automations (format, lint, checkpoint)
+│   │   └── audit-trail.sh      # Audit logging and PR review
+│   ├── stop/                   # Run at session end (cleanup, cost tracking)
+│   ├── session-start/          # Load context, scan TODOs/issues on session init
+│   ├── user-prompt-submit/     # Warn on production keywords before any tool runs
+│   ├── pre-compact/            # Backup transcript before context compaction
+│   ├── notification/           # Sound alerts on guardrail events
+│   ├── permission-request/     # Auto-allow read-only operations
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [renatobardi/hapai](https://github.com/renatobardi/hapai) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-03 -->
+<!-- tomevault:4.0:windsurf_rules:2026-06-04 -->
