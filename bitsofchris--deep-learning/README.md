@@ -7,11 +7,11 @@ A collection of resources, notes, and code as I learn to build deep neural netwo
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [bitsofchris/deep-learning](https://github.com/bitsofchris/deep-learning).
+Original source: `AGENTS.md` in [bitsofchris/deep-learning](https://github.com/bitsofchris/deep-learning).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
