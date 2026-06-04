@@ -1,279 +1,164 @@
 ---
 trigger: always_on
-description: When building generic functions, you may need to use any inside the function
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
+# CLAUDE.md
 
-# Any inside generic functions
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-When building generic functions, you may need to use any inside the function
-body.
+## Project Overview
 
-This is because TypeScript often cannot match your runtime logic to the logic
-done inside your types.
+The SettleMint SDK is a comprehensive blockchain development toolkit and platform integration suite. It provides developers with tools to build, deploy, and manage blockchain applications using the SettleMint platform's infrastructure and services.
 
-One example:
+### Technology Stack
 
-```ts
-const youSayGoodbyeISayHello = <TInput extends "hello" | "goodbye">(
-  input: TInput
-): TInput extends "hello" ? "goodbye" : "hello" => {
-  if (input === "goodbye") {
-    return "hello"; // Error!
-  } else {
-    return "goodbye"; // Error!
-  }
-};
-```
+**Core Technologies**
+- Runtime: Bun (fast JavaScript runtime)
+- Package Manager: Bun workspaces with Turbo
+- Language: TypeScript (strict mode)
+- Code Quality: Biome for linting and formatting
+- Testing: Vitest for unit/integration tests
+- Documentation: TypeDoc
+- GraphQL: Apollo Client, GraphQL Code Generator
+- Blockchain: Viem, Ethers, Foundry, Hardhat support
 
-On the type level (and the runtime), this function returns `goodbye` when the
-input is `hello`.
+**Monorepo Structure**
+- sdk/ - All SDK packages (13 packages total)
+- test/ - End-to-end tests
+- docs/ - Documentation
+- scripts/ - Build and utility scripts
+- fixtures/ - Test fixtures
 
-There is no way to make this work concisely in TypeScript.
+**SDK Packages**
+- @settlemint/sdk-cli - Command-line interface
+- @settlemint/sdk-js - Core JavaScript SDK
+- @settlemint/sdk-portal - Smart contract portal API
+- @settlemint/sdk-viem - Ethereum interface (Viem)
+- @settlemint/sdk-blockscout - Blockchain explorer
+- @settlemint/sdk-eas - Ethereum Attestation Service
+- @settlemint/sdk-hasura - GraphQL/PostgreSQL
+- @settlemint/sdk-ipfs - Decentralized storage
+- @settlemint/sdk-minio - S3-compatible storage
+- @settlemint/sdk-thegraph - Blockchain indexing
+- @settlemint/sdk-next - Next.js components
+- @settlemint/sdk-mcp - Model Context Protocol
+- @settlemint/sdk-utils - Shared utilities
 
-So using `any` is the most concise solution:
+**Key Features**
+- Multi-chain blockchain support
+- Smart contract deployment and verification
+- Platform service integration
+- Developer tooling and scaffolding
+- GraphQL API generation
+- TypeScript type generation
+- Comprehensive CLI tools
+- Example applications
 
-```ts
-const youSayGoodbyeISayHello = <TInput extends "hello" | "goodbye">(
-  input: TInput
-): TInput extends "hello" ? "goodbye" : "hello" => {
-  if (input === "goodbye") {
-    return "hello" as any;
-  } else {
-    return "goodbye" as any;
-  }
-};
-```
+## Essential Commands
 
-Outside of generic functions, use `any` extremely sparingly.
-
-# Default exports
-
-Unless explicitly required by the framework, do not use default exports.
-
-```ts
-// BAD
-export default function myFunction() {
-  return <div>Hello</div>;
-}
-```
-
-```ts
-// GOOD
-export function myFunction() {
-  return <div>Hello</div>;
-}
-```
-
-Default exports create confusion from the importing file.
-
-```ts
-// BAD
-import myFunction from "./myFunction";
-```
-
-```ts
-// GOOD
-import { myFunction } from "./myFunction";
-```
-
-There are certain situations where a framework may require a default export. For
-instance, Next.js requires a default export for pages.
-
-```tsx
-// This is fine, if required by the framework
-export default function MyPage() {
-  return <div>Hello</div>;
-}
-```
-
-# Discriminated unions
-
-Proactively use discriminated unions to model data that can be in one of a few
-different shapes.
-
-For example, when sending events between environments:
-
-```ts
-type UserCreatedEvent = {
-  type: "user.created";
-  data: { id: string; email: string };
-};
-
-type UserDeletedEvent = {
-  type: "user.deleted";
-  data: { id: string };
-};
-
-type Event = UserCreatedEvent | UserDeletedEvent;
-```
-
-Use switch statements to handle the results of discriminated unions:
-
-```ts
-const handleEvent = (event: Event) => {
-  switch (event.type) {
-    case "user.created":
-      console.log(event.data.email);
-      break;
-    case "user.deleted":
-      console.log(event.data.id);
-      break;
-  }
-};
-```
-
-Use discriminated unions to prevent the 'bag of optionals' problem.
-
-For example, when describing a fetching state:
-
-```ts
-// BAD - allows impossible states
-type FetchingState<TData> = {
-  status: "idle" | "loading" | "success" | "error";
-  data?: TData;
-  error?: Error;
-};
-
-// GOOD - prevents impossible states
-type FetchingState<TData> =
-  | { status: "idle" }
-  | { status: "loading" }
-  | { status: "success"; data: TData }
-  | { status: "error"; error: Error };
-```
-
-# Enums
-
-Do not introduce new enums into the codebase. Retain existing enums.
-
-If you require enum-like behaviour, use an `as const` object:
-
-```ts
-const backendToFrontendEnum = {
-  xs: "EXTRA_SMALL",
-  sm: "SMALL",
-  md: "MEDIUM",
-} as const;
-
-type LowerCaseEnum = keyof typeof backendToFrontendEnum; // "xs" | "sm" | "md"
-
-type UpperCaseEnum = (typeof backendToFrontendEnum)[LowerCaseEnum]; // "EXTRA_SMALL" | "SMALL" | "MEDIUM"
-```
-
-Remember that numeric enums behave differently to string enums. Numeric enums
-produce a reverse mapping:
-
-```ts
-enum Direction {
-  Up,
-  Down,
-  Left,
-  Right,
-}
-
-const direction = Direction.Up; // 0
-const directionName = Direction[0]; // "Up"
-```
-
-This means that the enum `Direction` above will have eight keys instead of four.
-
-```ts
-enum Direction {
-  Up,
-  Down,
-  Left,
-  Right,
-}
-
-Object.keys(Direction).length; // 8
-```
-
-# Import type
-
-Use import type whenever you are importing a type.
-
-Prefer top-level `import type` over inline `import { type ... }`.
-
-```ts
-// BAD
-import { type User } from "./user";
-```
-
-```ts
-// GOOD
-import type { User } from "./user";
-```
-
-The reason for this is that in certain environments, the first version's import
-will not be erased. So you'll be left with:
-
-```ts
-// Before transpilation
-import { type User } from "./user";
-
-// After transpilation
-import "./user";
-```
-
-# Installing packages
-
-When installing libraries, do not rely on your own training data.
-
-Your training data has a cut-off date. You're probably not aware of all of the
-latest developments in the JavaScript and TypeScript world.
-
-This means that instead of picking a version manually (via updating the
-`package.json` file), you should use a script to install the latest version of a
-library.
-
+### Development Workflow
 ```bash
-bun add -D @typescript-eslint/eslint-plugin
+# Setup
+bun install                  # Install dependencies (root)
+bun install --frozen-lockfile # CI-safe install
+
+# Development
+bun run dev                  # Start development (turbo)
+bun run dev:cli             # Develop CLI package
+bun run dev:portal          # Develop portal package
+
+# Building
+bun run build               # Build all packages
+bun run build:cli          # Build CLI package
+bun run build:sdk          # Build SDK packages
+
+# Testing
+bun test                    # Run all tests
+bun test:unit              # Run unit tests
+bun test:e2e               # Run e2e tests
+bun test:coverage          # Generate coverage report
+
+# Code Quality
+bun run lint               # Run Biome linter
+bun run lint:fix          # Fix linting issues
+bun run format            # Format with Biome
+bun run typecheck         # Run TypeScript checks
+
+# Documentation
+bun run docs              # Generate TypeDoc docs
+bun run docs:build       # Build documentation
+
+# Publishing
+bun run changeset         # Create changeset
+bun run version          # Version packages
+bun run release          # Release packages
 ```
 
-This will ensure you're always using the latest version.
+### Package Development
+```bash
+# Work on specific packages
+cd sdk/cli && bun run dev    # CLI development
+cd sdk/js && bun test        # Test JS SDK
+cd sdk/portal && bun build   # Build portal
 
-Prefer to install packages, not in the root, but in the mono repo packages
-
-# Interface extends
-
-ALWAYS prefer interfaces when modelling inheritance.
-
-The `&` operator has terrible performance in TypeScript. Only use it where
-`interface extends` is not possible.
-
-```ts
-// BAD
-
-type A = {
-  a: string;
-};
-
-type B = {
-  b: string;
-};
-
-type C = A & B;
+# Run package scripts
+turbo run build --filter=@settlemint/sdk-cli
+turbo run test --filter=@settlemint/sdk-*
 ```
 
-```ts
-// GOOD
+## Architecture & Code Organization
 
-interface A {
-  a: string;
-}
-
-interface B {
-  b: string;
-}
-
-interface C extends A, B {
-  // Additional properties can be added here
-}
+### Repository Structure
+```
+/
+├── sdk/                      # SDK packages (monorepo)
+│   ├── cli/                  # CLI tool (@settlemint/sdk-cli)
+│   ├── js/                   # Core SDK (@settlemint/sdk-js)
+│   ├── portal/               # Portal API (@settlemint/sdk-portal)
+│   ├── viem/                 # Viem integration (@settlemint/sdk-viem)
+│   ├── blockscout/           # Explorer integration
+│   ├── eas/                  # Attestation service
+│   ├── hasura/               # GraphQL/PostgreSQL
+│   ├── ipfs/                 # IPFS integration
+│   ├── minio/                # S3 storage
+│   ├── thegraph/             # Subgraph integration
+│   ├── next/                 # Next.js components
+│   ├── mcp/                  # MCP interface
+│   └── utils/                # Shared utilities
+├── test/                     # E2E tests
+├── docs/                     # Documentation
+├── scripts/                  # Build scripts
+├── fixtures/                 # Test fixtures
+├── turbo.json               # Turbo config
+├── biome.json               # Biome config
+└── package.json             # Root package
 ```
 
-# Jsdoc
+### Key Architecture Patterns
 
+1. **Monorepo Structure**
+   - Bun workspaces for package management
+   - Turbo for build orchestration
+   - Shared dependencies and tooling
+   - Independent package versioning
+
+2. **TypeScript-First Development**
+   - Strict TypeScript configuration
+   - Type generation for GraphQL
+   - Shared type definitions in utils
+   - Runtime validation with Zod
+
+3. **SDK Design Principles**
+   - Each package is independently usable
+   - Minimal dependencies between packages
+   - Consistent API design across packages
+   - Comprehensive TypeScript types
+
+4. **Platform Integration**
+   - GraphQL for API communication
+   - RESTful endpoints where appropriate
+   - WebSocket support for real-time data
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
