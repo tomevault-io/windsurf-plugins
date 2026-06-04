@@ -1,0 +1,196 @@
+---
+trigger: always_on
+description: This document provides critical guidelines for AI agents (like Claude, GPT, etc.) working on the Collector codebase.
+---
+
+# Guidelines for AI Agents Working on Collector
+
+This document provides critical guidelines for AI agents (like Claude, GPT, etc.) working on the Collector codebase.
+
+## Development Environment Setup
+
+### Go Installation
+
+This project requires the Go version specified in `go.mod` (currently **Go 1.25**).
+
+**Installing/Upgrading Go:**
+
+```bash
+# Check required version in go.mod
+head -3 go.mod
+
+# Download and install Go from official source (example for 1.25)
+cd /tmp
+wget https://go.dev/dl/go1.25.linux-amd64.tar.gz
+sudo rm -rf /usr/local/go
+sudo tar -C /usr/local -xzf go1.25.linux-amd64.tar.gz
+rm go1.25.linux-amd64.tar.gz
+
+# Verify installation
+/usr/local/go/bin/go version
+```
+
+**Note:** Go versions are available at `https://go.dev/dl/go{VERSION}.linux-amd64.tar.gz`
+
+Replace `{VERSION}` with the version from go.mod (e.g., `1.25`, `1.24.11`, etc.)
+
+**Update PATH:**
+```bash
+export PATH=/usr/local/go/bin:$PATH
+```
+
+## ⚠️ CRITICAL: Test Requirements
+
+### You MUST Run All Tests Before Claiming Completion
+
+```bash
+./RUN_ALL_TESTS_BEFORE_SUBMIT.sh
+```
+
+**Any test failure is YOUR responsibility to fix. NO EXCEPTIONS.**
+
+- ❌ **NEVER** claim a task is complete if tests are failing
+- ❌ **NEVER** say "these failures are pre-existing" without verification
+- ❌ **NEVER** run only a subset of tests and assume everything works
+- ❌ **NEVER** skip integration tests or backup validation tests
+
+### Test Script Details
+
+The `RUN_ALL_TESTS_BEFORE_SUBMIT.sh` script runs:
+
+1. **Build Verification** - Ensures all packages build cleanly
+2. **Code Quality Checks** - `go vet` and `go fmt` validation
+3. **Unit Tests** - All package tests (`pkg/collection`, `pkg/registry`, `pkg/dispatch`, `pkg/db/sqlite`)
+4. **Integration Tests** - End-to-end multi-collector scenarios
+5. **Backup System Validation** - Backup functionality and near-zero downtime verification
+6. **Concurrency Tests** - Race detection across all packages
+7. **Durability Tests** - Database consistency and recovery
+8. **Benchmarks** - Performance regression detection
+9. **Coverage Report** - Test coverage metrics (should be >70%)
+
+## Testing Philosophy
+
+### When Making Changes
+
+1. **Before starting work:**
+   ```bash
+   ./RUN_ALL_TESTS_BEFORE_SUBMIT.sh
+   ```
+   Establish baseline - all tests should pass
+
+2. **During development:**
+   - Run relevant package tests frequently
+   - Use `go test -tags sqlite_fts5 ./pkg/collection -short` for quick feedback
+   - Fix any breakage immediately
+
+3. **Before claiming completion:**
+   ```bash
+   ./RUN_ALL_TESTS_BEFORE_SUBMIT.sh
+   ```
+   ALL tests must pass - no excuses
+
+### If Tests Fail
+
+1. **Investigate thoroughly** - Read the error messages
+2. **Identify root cause** - Is it your change or pre-existing?
+3. **Fix the issue** - Don't work around it
+4. **Verify fix** - Run the full test suite again
+5. **Only then** mark task as complete
+
+### Stashing to Check Pre-Existing Issues
+
+If you suspect a failure is pre-existing:
+
+```bash
+# Save your changes
+git stash
+
+# Run tests on clean state
+./RUN_ALL_TESTS_BEFORE_SUBMIT.sh
+
+# If tests pass, the issue IS from your changes
+# If tests fail, you still need to fix them (don't make things worse)
+
+# Restore your changes
+git stash pop
+```
+
+## Code Quality Standards
+
+### TODOs AND FIXMEs DISCOURAGED
+
+- ❌ PREFER NOT to leave `TODO` comments in code
+- ❌ PREFER NOT to `FIXME` comments
+- ❌ PREFER NOT to placeholder implementations
+- ✅ Implement it properly or document it as a known limitation
+- ✅ Finish your implementation later in the same session
+
+### Interface Usage
+
+- ✅ Prefer interfaces over concrete types
+- ✅ Use `FileSystem` interface, not `*local.FileSystem`
+- ✅ Use `Store` interface, not `*sqlite.Store`
+- ✅ Make code testable and mockable
+
+### Error Handling
+
+- ✅ Always handle errors explicitly
+- ✅ Provide context in error messages
+- ✅ Use `fmt.Errorf("context: %w", err)` for wrapping
+- ❌ Never ignore errors with `_ = err`
+
+## Common Pitfalls
+
+### 1. Filesystem vs Database Paths
+
+```go
+// ❌ WRONG: Using FS.Stat() for database files
+size, err := collection.FS.Stat(ctx, collection.Store.Path())
+
+// ✅ CORRECT: Use os.Stat() for database files
+info, err := os.Stat(collection.Store.Path())
+size := info.Size()
+```
+
+The `FS` interface is for file attachments, not database files.
+
+NOTE FROM MAINTAINER: This seems wrong. I'm going to let the LLMs claim this is true, because it's their fault if it is. But we should probably resolve this if possible. We do actually want both files and databases to be on the FS interface.
+
+### 2. API Signature Mismatches
+
+```go
+// ❌ WRONG: Old API signature
+services, err := registryServer.ListServices(ctx, namespace)
+
+// ✅ CORRECT: Use proper request/response messages
+resp, err := registryServer.ListServices(ctx, &pb.ListServicesRequest{
+    Namespace: namespace,
+})
+services := resp.Services
+// ❌ ULTRABAD: Mixing API signatures
+// Too unspeakable to show an example here
+```
+
+### 3. Proto Field Names
+
+```go
+// ❌ WRONG: Assuming field name
+if resp.Valid { ... }
+
+// ✅ CORRECT: Check the proto definition
+if resp.IsValid { ... }  // Proto uses is_valid, generates IsValid
+```
+
+### 4. Type Assertions
+
+```go
+// ❌ WRONG: Hardcoded type assertion
+srcFS.fs.(*local.FileSystem)
+
+// ✅ CORRECT: Use interface
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [accretional/collector](https://github.com/accretional/collector) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-06-04 -->
