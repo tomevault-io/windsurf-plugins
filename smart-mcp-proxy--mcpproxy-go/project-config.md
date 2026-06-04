@@ -1,50 +1,117 @@
 ---
 trigger: always_on
-description: - `cmd/mcpproxy` hosts the core daemon entrypoint; `cmd/mcpproxy-tray` builds the CGO-based tray binary.
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-# Repository Guidelines
+# CLAUDE.md
 
-## Project Structure & Module Organization
-- `cmd/mcpproxy` hosts the core daemon entrypoint; `cmd/mcpproxy-tray` builds the CGO-based tray binary.
-- Runtime logic, HTTP handlers, storage, and upstream orchestration live in `internal/` (`internal/runtime`, `internal/httpapi`, `internal/upstream`, `internal/storage`).
-- Vue/Tailwind assets are kept in `frontend/`; bundled static output is embedded from `web/`.
-- Integration and regression assets reside under `tests/` and `scripts/`; Go unit tests sit beside source files.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Build, Test, and Development Commands
-- `make build` — compile the proxy and tray binaries for the host platform.
-- `go build ./cmd/mcpproxy` — quick core rebuild; `GOOS=darwin CGO_ENABLED=1 go build ./cmd/mcpproxy-tray` validates the macOS tray target.
-- `npm install && npm run build` inside `frontend/` — install web deps and emit production assets.
-- `scripts/run-web-smoke.sh` — spin up the proxy and execute the Playwright smoke suite.
-- `scripts/verify-api.sh` — exercise the `/api/v1` REST surface with curated curl calls.
 
-## Coding Style & Naming Conventions
-- Run `gofmt` (tabs, goimports defaults) on all Go sources; prefer descriptive package-level names (`runtime`, `upstream`, `storage`).
-- TypeScript/Vue files follow Prettier defaults (`npm run lint`); components use `PascalCase.vue`, composables use `useThing.ts`.
-- Configuration and DTO structs live in shared packages (`internal/contracts`, `internal/httpapi`); avoid anonymous maps between layers.
+## Autonomous Operation Constraints
+When operating to complete a task, adhere strictly to the following constraints to ensure zero-interruption execution:
 
-## Testing Guidelines
-- Unit tests: `go test ./internal/...` (set `GOCACHE`/`GOMODCACHE` to workspace paths when sandboxed).
-- Targeted suites: `go test ./internal/server -run TestMCP -v` for lifecycle checks; `npm run test:unit` for frontend units.
-- End-to-end: `scripts/run-e2e-tests.sh` after ensuring `@modelcontextprotocol/server-everything` is warmed and reachable.
-- Name Go tests `TestFeatureScenario`; snapshot or fixture data belong under `tests/` with explicit prefixes.
+### Must-Do (Defaults & Assumptions)
+- **Zero Interruption Policy**: If a decision is needed and no explicit instruction exists, you MUST make an informed, safe assumption based on idiomatic Go best practices and document it in the PR/commit. Do NOT ask for human clarification mid-task.
+- **Test-Driven Progress**: You must write a failing Go test (`_test.go`) for every sub-task before implementing the feature.
+- **Graceful Fallbacks**: If an API or dependency lacks documentation, use mock interfaces or a simplified implementation rather than blocking the task.
+- **Continuous Logging**: Document every step completed in an `execution_log.md` within the current working directory to maintain state.
 
-## Commit & Pull Request Guidelines
-- Use concise, imperative commit messages (e.g., `Fix upstream disable locking`); avoid AI co-author tags.
-- PR descriptions should summarize impact, list verification commands, and link relevant P# items or issues; attach UI screenshots or log excerpts when behavior changes.
-- Keep change scopes bounded to one surface (runtime vs. tray vs. web); document follow-up ideas in `IMPROVEMENTS.md`.
+### Must-Nots
+- **Do NOT ask for plan approval**: Once a plan/spec is generated, begin execution immediately.
+- **Do NOT stop for code style choices**: Run `gofmt` or `goimports` and strictly follow standard Go conventions.
 
-## Security & Configuration Tips
-- Never hardcode secrets; load them via the tray secure store or environment lookups in `internal/secret`.
-- When editing configs, prefer `runtime.SaveConfiguration()` flows so disk state and in-memory state stay aligned; regenerated files land in `~/.mcpproxy/`.
+### Escalation Triggers (Stop Conditions)
+Only halt execution and ask a human IF:
+1. You need to perform destructive data operations or delete core proxy logic that cannot be mocked.
+2. A required environment variable is missing from `.env` and cannot be mocked for the scope of the task.
+3. You are stuck in an error loop for the same `go test` failing after 5 consecutive attempts.
 
-## Active Technologies
-- Go 1.24 (toolchain go1.24.10) + BBolt (storage), Chi router (HTTP), Zap (logging), regexp (stdlib), existing ActivityService (026-pii-detection)
-- BBolt database (`~/.mcpproxy/config.db`) - ActivityRecord.Metadata extension (026-pii-detection)
 
-## Recent Changes
-- 026-pii-detection: Added Go 1.24 (toolchain go1.24.10) + BBolt (storage), Chi router (HTTP), Zap (logging), regexp (stdlib), existing ActivityService
+
+## Project Overview
+
+MCPProxy is a Go-based desktop application that acts as a smart proxy for AI agents using the Model Context Protocol (MCP). It provides intelligent tool discovery, massive token savings, and built-in security quarantine against malicious MCP servers.
+
+## Editions (Personal & Server)
+
+MCPProxy is built in two editions from the same codebase using Go build tags:
+
+| Edition | Build Command | Binary | Distribution |
+|---------|--------------|--------|-------------|
+| **Personal** (default) | `go build ./cmd/mcpproxy` | `mcpproxy` | macOS DMG, Windows installer, Linux tar.gz |
+| **Server** | `go build -tags server ./cmd/mcpproxy` | `mcpproxy-server` | Docker image, .deb package, Linux tar.gz |
+
+> Every feature decision should ask: "Does this make the personal edition so good that developers tell their teammates about it?"
+
+### Key Directories
+
+| Directory | Purpose |
+|-----------|---------|
+| `cmd/mcpproxy/edition.go` | Default edition = "personal" |
+| `cmd/mcpproxy/edition_teams.go` | Build-tagged override for server edition |
+| `cmd/mcpproxy/teams_register.go` | Server feature registration entry point |
+| `internal/teams/` | Server-only code (all files have `//go:build server`) |
+| `internal/teams/auth/` | OAuth authentication, session management, JWT tokens, middleware |
+| `internal/teams/users/` | User/session models, BBolt store, user server management |
+| `internal/teams/workspace/` | Per-user workspace manager for personal upstream servers |
+| `internal/teams/multiuser/` | Multi-user router, tool filtering, activity isolation |
+| `internal/teams/api/` | Server REST API endpoints (user, admin, auth) |
+| `native/macos/MCPProxy/` | Swift macOS tray app (SwiftUI, macOS 13+) |
+| `native/macos/MCPProxyUITest/` | Swift MCP server for UI testing (accessibility + screenshots) |
+| `native/windows/` | Future C# tray app (placeholder) |
+
+### Edition Detection
+
+The binary self-identifies its edition:
+- `mcpproxy version` → `MCPProxy v0.21.0 (personal) darwin/arm64`
+- `/api/v1/status` → `{"edition": "personal", ...}`
+
+## Server Multi-User Authentication (Spec 024)
+
+Server edition supports OAuth-based multi-user authentication with Google, GitHub, or Microsoft identity providers.
+
+### Server Configuration
+
+```json
+{
+  "teams": {
+    "enabled": true,
+    "admin_emails": ["admin@company.com"],
+    "oauth": {
+      "provider": "google",
+      "client_id": "xxx.apps.googleusercontent.com",
+      "client_secret": "GOCSPX-xxx",
+      "tenant_id": "",
+      "allowed_domains": ["company.com"]
+    },
+    "session_ttl": "24h",
+    "bearer_token_ttl": "24h",
+    "workspace_idle_timeout": "30m",
+    "max_user_servers": 20
+  }
+}
+```
+
+### Server API Endpoints
+
+| Endpoint | Auth | Description |
+|----------|------|-------------|
+| `GET /api/v1/auth/login` | Public | Initiate OAuth login flow |
+| `GET /api/v1/auth/callback` | Public | OAuth callback (creates session) |
+| `GET /api/v1/auth/me` | Session/JWT | Get current user profile |
+| `POST /api/v1/auth/token` | Session | Generate JWT bearer token for MCP |
+| `POST /api/v1/auth/logout` | Session | Invalidate session |
+| `GET /api/v1/user/servers` | Session/JWT | List user's servers (personal + shared) |
+| `POST /api/v1/user/servers` | Session/JWT | Add personal upstream server |
+| `GET /api/v1/user/activity` | Session/JWT | User's activity log |
+| `GET /api/v1/user/diagnostics` | Session/JWT | Server health for user's servers |
+| `GET /api/v1/admin/users` | Admin | List all users |
+| `POST /api/v1/admin/users/{id}/disable` | Admin | Disable a user |
+| `GET /api/v1/admin/activity` | Admin | All users' activity logs |
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [smart-mcp-proxy/mcpproxy-go](https://github.com/smart-mcp-proxy/mcpproxy-go) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-04 -->
+<!-- tomevault:4.0:windsurf_rules:2026-06-04 -->
