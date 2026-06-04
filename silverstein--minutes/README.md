@@ -7,11 +7,11 @@ Every meeting, every idea, every voice note — searchable by your AI. Open-sour
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [silverstein/minutes](https://github.com/silverstein/minutes).
+Original source: `CLAUDE.md` in [silverstein/minutes](https://github.com/silverstein/minutes).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
