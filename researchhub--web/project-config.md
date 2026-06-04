@@ -1,172 +1,166 @@
 ---
 trigger: always_on
-description: This document outlines the design system and styling guidelines used in the ResearchHub codebase.
+description: When applying buttons or styles that depend on screen size, or mobile, or having issues with staging compared to local
 ---
 
- # ResearchHub Design System
+# Mobile Optimization Strategy
 
-This document outlines the design system and styling guidelines used in the ResearchHub codebase.
+This document outlines the mobile optimization strategy developed for ResearchHub landing page components to address environment-specific responsive layout issues.
 
-## Styling Approach
+## Problem Context
 
-ResearchHub uses Tailwind CSS as the primary styling solution, complemented by CSS modules for complex components when necessary.
+### Root Issue Identified
+- **Problem**: Responsive Tailwind classes (`sm:`, `md:`, etc.) weren't compiling properly on staging despite JavaScript correctly detecting screen sizes
+- **Symptoms**: 
+  - Buttons stacked vertically and went full-width on staging
+  - Same code displayed correctly on localhost
+  - Debug tools showed correct screen size detection but wrong visual rendering
+- **Root Cause**: Environment-specific CSS compilation/loading issue affecting responsive class generation
 
-1. **Tailwind CSS**:
-   - Use Tailwind utility classes for most styling needs
-   - Follow the "utility-first" approach
-   - Use Tailwind's built-in responsive classes for responsive design
+## Core Solution Strategy
 
-2. **CSS Modules**:
-   - Use CSS modules for complex components that require custom animations or styles that are difficult to achieve with Tailwind
-   - Name CSS module files with the `.module.css` extension
+Replace responsive breakpoints with environment-agnostic approaches that work consistently across all deployment environments.
 
-3. **Styling Utilities**:
-   - Use the `cn()` utility function for conditional class name composition
-   - Use `class-variance-authority` (cva) for component variants
+### 1. Button Standardization
+```tsx
+// ❌ Avoid: Custom responsive button implementations
+<button className="px-6 py-3 sm:px-8 sm:py-4 md:w-auto w-full">
 
-## Color System
+// ✅ Preferred: Use existing Button component with cva variants
+<Button size="lg" className="bg-gradient-to-r from-primary-600 to-primary-400">
+```
 
-1. **Color Palette**:
-   - Use the color tokens defined in the Tailwind configuration
-   - Primary colors: Shades of indigo and blue
-   - Secondary colors: Gray scale and orange/yellow for accent
-   - Semantic colors: Success (green), warning (yellow), error (red), info (blue)
+**Benefits:**
+- Leverages class-variance-authority (cva) for consistent styling
+- Eliminates dependency on responsive class compilation
+- Ensures uniform behavior across environments
 
-   ```tsx
-   // Use semantic color tokens
-   <div className="bg-primary-600 text-white">Primary button</div>
-   <div className="bg-gray-100 text-gray-800">Secondary button</div>
-   <div className="bg-red-100 text-red-800">Error state</div>
-   ```
+### 2. Natural Flex-Wrapping Over Breakpoints
+```tsx
+// ❌ Avoid: Responsive grid systems
+<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
 
-2. **Color Usage**:
-   - Use primary colors for primary actions and branding
-   - Use gray scale for UI structure, backgrounds, and secondary elements
-   - Use semantic colors consistently for their respective meanings
-   - Maintain appropriate contrast ratios for accessibility (4.5:1 minimum)
+// ✅ Preferred: Natural flex-wrapping with constraints
+<div className="flex flex-wrap gap-4 justify-center">
+  <div className="flex-1 min-w-64 max-w-80">
+```
 
-## Typography
+**Benefits:**
+- Uses intrinsic sizing for natural responsive behavior
+- Eliminates breakpoint dependencies
+- Provides predictable layout across screen sizes
 
-1. **Font Family**:
-   - Primary font: Inter (sans-serif)
-   - Heading font: Cal Sans for titles and large headings
-   - Monospace font: For code blocks and technical content
+### 3. Fixed Typography Over Responsive Text
+```tsx
+// ❌ Avoid: Responsive text sizing
+<h2 className="text-3xl sm:text-4xl md:text-5xl">
 
-2. **Font Sizes**:
-   - Follow the Tailwind CSS font size scale
-   - Use relative units (rem) for font sizes to support user preferences
+// ✅ Preferred: Fixed sizes appropriate for content hierarchy
+<h2 className="text-4xl font-bold">
+```
 
-   ```tsx
-   <h1 className="text-3xl font-semibold text-gray-900">Page Title</h1>
-   <h2 className="text-xl font-medium text-gray-800">Section Heading</h2>
-   <p className="text-base text-gray-700">Body text</p>
-   <span className="text-sm text-gray-500">Caption text</span>
-   ```
+**Benefits:**
+- Ensures consistent typography rendering
+- Removes compilation dependencies
+- Maintains readability without environment risks
 
-3. **Font Weights**:
-   - Regular (400) for body text
-   - Medium (500) for semi-emphasis
-   - Semibold (600) for headings and emphasis
-   - Bold (700) for strong emphasis
+## Implementation Patterns
 
-4. **Line Heights**:
-   - Use appropriate line heights for readability
-   - Body text: `leading-normal` (1.5)
-   - Headings: `leading-tight` (1.25)
-   - Single-line elements: `leading-none` (1)
+### Dual Button Layout (Fund Feature Pattern)
+```tsx
+// For features with primary + secondary actions
+<div className="flex flex-wrap gap-4 justify-center items-start max-w-2xl mx-auto">
+  <div className="flex-1 min-w-64 max-w-80 text-center">
+    <Button size="lg" className="w-full bg-gradient-to-r from-primary-600 to-primary-400">
+      Primary Action
+    </Button>
+    <p className="text-sm text-gray-500 mt-2">Description</p>
+  </div>
+  <div className="flex-1 min-w-64 max-w-80 text-center">
+    <Button variant="outlined" size="lg" className="w-full">
+      Secondary Action
+    </Button>
+    <p className="text-sm text-gray-500 mt-2">Description</p>
+  </div>
+</div>
+```
 
-## Spacing
+### Single Button Layout
+```tsx
+// For features with single action
+<div className="text-center">
+  <Button size="lg" className="bg-gradient-to-r from-primary-600 to-primary-400">
+    Single Action
+  </Button>
+  <p className="text-sm text-gray-500 mt-2">Description</p>
+</div>
+```
 
-1. **Spacing Scale**:
-   - Follow the Tailwind CSS spacing scale
-   - Use consistent spacing for margins and padding
-   - Use the spacing scale for gaps, grid gaps, and other spacing properties
+### Benefits Grid Layout
+```tsx
+// Replace responsive grids with flex-wrap
+<div className="flex flex-wrap gap-4 max-w-xl mx-auto px-4 justify-center">
+  {benefits.map((benefit, index) => (
+    <div key={index} className="flex items-center space-x-3 text-left min-w-60">
+      <div className="w-2 h-2 rounded-full bg-gradient-to-r from-primary-600 to-primary-400 flex-shrink-0" />
+      <span className="text-gray-700 text-base">{benefit}</span>
+    </div>
+  ))}
+</div>
+```
 
-   ```tsx
-   <div className="p-4">
-     <div className="mb-6">
-       <h2 className="mb-2">Section Title</h2>
-       <p>Content</p>
-     </div>
-   </div>
-   ```
+### Navigation Tabs
+```tsx
+// Environment-agnostic tab navigation
+<div className="inline-flex p-1 bg-gray-100 rounded-full overflow-x-auto">
+  {features.map((feature, index) => (
+    <button
+      key={feature.id}
+      className={`px-6 py-3 rounded-full font-medium transition-all duration-300 text-base whitespace-nowrap flex-shrink-0 ${
+        activeFeature === index
+          ? 'bg-gradient-to-r from-primary-600 to-primary-400 text-white shadow-lg'
+          : 'text-gray-600 hover:text-gray-900 hover:bg-white/50'
+      }`}
+    >
+      {feature.title}
+    </button>
+  ))}
+</div>
+```
 
-2. **Layout Spacing**:
-   - Page margins: px-4 sm:px-6 md:px-8 lg:px-12
-   - Section spacing: my-8 md:my-12 lg:my-16
-   - Component spacing: p-4 for cards, p-2 for smaller components
+## Mobile-Specific Optimizations
 
-## Components
+### Icon Layout Prevention
+```tsx
+// ❌ Avoid: Horizontal layouts that can distort icons on mobile
+<div className="flex items-center space-x-4">
+  <Icon name="icon" size={64} />
+  <div>Content</div>
+</div>
 
-1. **Base Components**:
-   - Use the components in the `components/ui` directory as the foundation
-   - Common components include Button, Input, Card, Badge, and more
-   - All components are built with accessibility in mind
+// ✅ Preferred: Vertical layouts for mobile-friendly icons
+<div className="flex flex-col items-center space-y-4">
+  <div className="w-16 h-16 flex-shrink-0">
+    <Icon name="icon" size={32} />
+  </div>
+  <div>Content</div>
+</div>
+```
 
-2. **Component Variants**:
-   - Components have consistent variants using `class-variance-authority`
-   - Common variants include size, color, and emphasis level
-
-   ```tsx
-   // Button with variants
-   <Button variant="primary" size="md">Primary Action</Button>
-   <Button variant="secondary" size="sm">Secondary Action</Button>
-   ```
-
-3. **Component Composition**:
-   - Build complex UI by composing smaller components
-   - Use the children prop for flexible content
-   - Use render props for complex rendering logic
-
-## Icons
-
-1. **Icon System**:
-   - Use Lucide icons as the primary icon set
-   - Use Font Awesome for additional icons when necessary
-   - Keep icons consistent in style and usage
-
-   ```tsx
-   import { User, Settings, Bell } from 'lucide-react';
-
-   <Button>
-     <User className="w-4 h-4 mr-2" />
-     Profile
-   </Button>
-   ```
-
-2. **Icon Sizing**:
-   - Use consistent sizing: sm (16px), md (20px), lg (24px)
-   - Adjust stroke width for better visibility at different sizes
-   - Maintain proper alignment with text using flex layout
-
-## Responsive Design
-
-1. **Breakpoints**:
-   - Follow Tailwind's breakpoint system:
-     - sm: 640px
-     - md: 768px
-     - lg: 1024px
-     - xl: 1280px
-     - 2xl: 1536px
-     - custom: wide (1200px), 3xl (1600px)
-
-2. **Mobile-first Approach**:
-   - Start with mobile layouts and progressively enhance for larger screens
-   - Use responsive utilities to adapt layout, typography, and spacing
-
-   ```tsx
-   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-     {/* Content */}
-   </div>
-   ```
-
-3. **Responsive Components**:
-   - Design components to adapt to different screen sizes
-   - Use responsive variants for component properties
-   - Test all components across different breakpoints
-
-## Accessibility
-
+### Compact Data Display
+```tsx
+// For price/data displays that need to fit on mobile
+<div className="p-4 flex flex-wrap items-start justify-center gap-6">
+  <div className="text-center">
+    <div className="text-sm text-gray-500 mb-2 font-medium h-5 flex items-center justify-center">
+      Label
+    </div>
+    <div className="text-2xl font-bold">$0.33</div>
+  </div>
+  
+  <div className="h-12 w-px bg-gray-300 self-center"></div>
+  
+  <div className="text-center">
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
