@@ -7,11 +7,11 @@ Deterministic guardrails for AI coding assistants. Enforce rules via Bash hooks 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [renatobardi/hapai](https://github.com/renatobardi/hapai).
+Original source: `CLAUDE.md` in [renatobardi/hapai](https://github.com/renatobardi/hapai).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
