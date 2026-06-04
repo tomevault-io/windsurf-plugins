@@ -7,11 +7,11 @@ A compile-time URL validation macro. Parses and checks URLs at compile-time, con
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [DenisGorbachev/url-macro](https://github.com/DenisGorbachev/url-macro).
+Original source: `AGENTS.md` in [DenisGorbachev/url-macro](https://github.com/DenisGorbachev/url-macro).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
