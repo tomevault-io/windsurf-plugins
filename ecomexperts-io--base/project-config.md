@@ -1,186 +1,173 @@
 ---
 trigger: always_on
-description: Development standards and best practices for creating/configuring/styling theme blocks, including static and nested blocks, schema configuration, CSS, and usage examples
+description: Writing CSS, whether inside .css files or in the `{% stylesheet %}…{% endstylesheet %}` or `{% style %}…{% endstyle %}` or in <style> </style> tags
 ---
 
-# Theme Blocks Development Standards
 
-Follow [Shopify's theme blocks documentation](mdc:https:/shopify.dev/docs/storefronts/themes/architecture/blocks/theme-blocks/quick-start?framework=liquid.txt).
+# CSS Standards
 
-## Theme Block Fundamentals
+## Specificity Rules
 
-Theme blocks are reusable components defined at the theme level that can be:
-- Nested under sections and blocks
-- Configured using settings in the theme editor
-- Given presets and added by merchants
-- Used as [static blocks](mdc:https:/shopify.dev/docs/storefronts/themes/architecture/blocks/theme-blocks/static-blocks#statically-vs-dynamically-rendered-theme-blocks) by theme developers
+- **Never** use IDs as selectors
+- **Avoid** using elements as selectors
+- **Avoid** using `!important` at all costs - if you must use it, comment why in the code
+- Use a `0 1 0` specificity wherever possible, meaning a single `.class` selector.
+- In cases where you must use higher specificity due to a parent/child relationship, try to keep the specificity to a maximum of `0 4 0`
+  - Note that this can sometimes be impossible due to the `0 1 0` specificity of pseudo-classes like `:hover`. There may be situations where `.parent:hover .child` is the only way to achieve the desired effect.
+- **Avoid** complex selectors. A selector should be easy to understand at a glance. Don't over do it with pseudo selectors (:has, :where, :nth-child, etc).
 
-Blocks render in the editor and storefront when they are referenced in [template files](mdc:.cursor/rules/templates.mdc).
+See [MDN](mdc:https:/developer.mozilla.org/en-US/docs/Web/CSS/Specificity) for more a comprehensive list of specificity rules.
 
-### Basic Block Structure
-```liquid
-{% doc %}
-  Block description and usage examples
+## CSS Variables
 
-  @example
-  {% content_for 'block', type: 'block-name', id: 'unique-id' %}
-{% enddoc %}
+CSS variables, a.k.a. custom properties, are a powerful tool for reducing redundancy and making it easier to update values across a component.
 
-<div {{ block.shopify_attributes }} class="block-name">
-  <!-- Block content using block.settings -->
-</div>
+- If you need to hardcode a value, set it to a variable and use that variable in the declaration. Example: a touch target size. `--touch-target-size: 44px;`
+- **Never** hardcode colors, always use the color schemes
 
-{% stylesheet %}
-  /*
-    Scoped CSS for this block
+### Global Variables
 
-    Use BEM structure
-    CSS written in here should be for components that are exclusively in this block.  If the CSS will be used elsewhere, it should instead be written in [assets/base.css](mdc:@assets/base.css)
-  */
-{% endstylesheet %}
+Global variables should be scoped to the `:root` selector in `snippets/theme-styles-variables.liquid`.
 
-{% schema %}
-{
-  "name": "Block Name",
-  "settings": [],
-  "presets": []
-}
-{% endschema %}
-```
+**Example of global variables**
 
-### Static Block Usage
-
-Static blocks are theme blocks that are rendered directly in Liquid templates by developers, rather than being dynamically added through the theme editor. This allows for predetermined block placement with optional default settings.
-
-**Basic Static Block Syntax:**
-```liquid
-{% content_for 'block', type: 'text', id: 'header-announcement' %}
-```
-
-**Example: Product Template with Mixed Static and Dynamic Blocks**
-```liquid
-<!-- templates/product.liquid -->
-<div class="product-page">
-  {% comment %} Static breadcrumb block {% endcomment %}
-  {% content_for 'block', type: 'breadcrumb', id: 'product-breadcrumb' %}
-
-  <div class="product-main">
-    <div class="product-media">
-      {% comment %} Static product gallery block {% endcomment %}
-      {% content_for 'block', type: 'product-gallery', id: 'main-gallery', settings: {
-        enable_zoom: true,
-        thumbnails_position: "bottom"
-      } %}
-    </div>
-
-    <div class="product-info">
-      {% comment %} Static product info blocks {% endcomment %}
-      {% content_for 'block', type: 'product-title', id: 'product-title' %}
-      {% content_for 'block', type: 'product-price', id: 'product-price' %}
-      {% content_for 'block', type: 'product-form', id: 'product-form' %}
-
-      {% comment %} Dynamic blocks area for additional content {% endcomment %}
-      <div class="product-extra-content">
-        {% content_for 'blocks' %}
-      </div>
-    </div>
-  </div>
-
-  {% comment %} Static related products block {% endcomment %}
-  {% content_for 'block', type: 'related-products', id: 'related-products', settings: {
-    heading: "You might also like",
-    limit: 4
-  } %}
-</div>
-```
-
-**Key Points about Static Blocks:**
-- They have a fixed `id` that makes them identifiable in the theme editor
-- Settings can be overridden in the theme editor despite having defaults
-- They appear in the theme editor as locked blocks that can't be removed or reordered
-- Useful for consistent layout elements that should always be present
-- Can be mixed with dynamic block areas using `{% content_for 'blocks' %}`
-
-## Schema Configuration
-
-See [schemas.mdc](mdc:.cursor/rules/schemas.mdc) for rules on schemas
-
-### Advanced Schema Features
-
-#### Exclude wrapper
-
-```json
-{
-  "tag": null  // No wrapper - must include {{ block.shopify_attributes }} for proper editor function
+```css
+/* in snippets/theme-styles-variables.liquid */
+:root {
+    --page-width: 1400px;
+     --font-body--family: {{ settings.type_body_font.family }}, {{ settings.type_body_font.fallback_families }}; /* Referencing a theme setting */
+     --font-{{ preset_name_dash }}--family: {{ settings[preset_font] | prepend: 'var(--font-' | append: '--family)' }}; /* Using Liquid to set a variable */
 }
 ```
 
-## Block Implementation Patterns
+### Scoped Variables
 
-### Accessing Block Data
+Be sure to scope your CSS variables to the component they are being used in, if they are not meant to be global. Scoped variables can reference global variables.
 
-**Block Settings:**
-```liquid
-{{ block.settings.text }}
-{{ block.settings.heading | escape }}
-{{ block.settings.image | image_url: width: 800 }}
+**Example of scoped variables**
+
+```css
+/* in assets/facets.css */
+.facets {
+  --drawer-padding: var(--padding-md); /* Referencing a global variable */
+  --facets-upper-z-index: 3;
+  --facets-open-z-index: 4;
+
+  --facets-clear-shadow: 0px -4px 14px 0px rgb(var(--color-foreground-rgb) / var(--opacity-10)); /* Referencing a Color Scheme variable */
+}
 ```
 
-**Block Properties:**
-```liquid
-{{ block.id }}           // Unique block identifier
-{{ block.type }}         // Block type name
-{{ block.shopify_attributes }}  // Required for theme editor
+### Namespace Your CSS Variables
+
+Namespace your variables to avoid collisions unless you explicitly want them to bleed through to other components.
+
+✅ Do this:
+
+```css
+.component {
+  --component-padding: ...;
+  --component-aspect-ratio: ...;
+}
 ```
 
-**Section Context:**
-```liquid
-{{ section.id }}         // Parent section ID
-{{ section.settings.heading | escape }}
-{{ section.settings.image | image_url: width: 800 }}
+❌ Don't do this:
+
+```css
+.component {
+  --padding: ...;
+  --aspect-ratio: ...;
+}
 ```
 
-## Nested Blocks Implementation
+### Semantic Color Variables
 
-### Rendering Nested Blocks
-```liquid
-<div class="block-container" {{ block.shopify_attributes }}>
-  <h2>{{ block.settings.heading | escape }}</h2>
+Use semantic naming for better maintainability:
 
-  <div class="nested-blocks">
-    {% content_for 'blocks' %}
-  </div>
-</div>
+```css
+:root {
+  /* Base colors */
+  --color-primary: {{ settings.colors_accent_1 }};
+  --color-secondary: {{ settings.colors_accent_2 }};
+
+  /* Semantic colors */
+  --color-text-primary: rgb(var(--color-foreground));
+  --color-text-secondary: rgb(var(--color-foreground) / 0.75);
+  --color-text-disabled: rgb(var(--color-foreground) / 0.38);
+
+  /* Interactive states */
+  --color-interactive-default: rgb(var(--color-accent));
+  /* color-mix isn't supported in earlier version of iOS <16.2 so limit its usage to progressive enhancement */
+  --color-interactive-hover: color-mix(in srgb, rgb(var(--color-accent)) 90%, black);
+  --color-interactive-pressed: color-mix(in srgb, rgb(var(--color-accent)) 80%, black);
+  --color-interactive-disabled: rgb(var(--color-accent) / 0.38);
+}
 ```
 
-### Nesting with Layout Control
-```liquid
-<div
-  class="group {{ block.settings.layout_direction }}"
-  style="--gap: {{ block.settings.gap }}px;"
-  {{ block.shopify_attributes }}
+### Design Token System
+
+Establish consistent spacing and typography scales:
+
+```css
+:root {
+  /* Spacing scale */
+  --space-3xs: 0.25rem; /* 4px */
+  --space-2xs: 0.5rem; /* 8px */
+  --space-xs: 0.75rem; /* 12px */
+  --space-sm: 1rem; /* 16px */
+  --space-md: 1.5rem; /* 24px */
+  --space-lg: 2rem; /* 32px */
+  --space-xl: 3rem; /* 48px */
+  --space-2xl: 4rem; /* 64px */
+  --space-3xl: 6rem; /* 96px */
+
+  /* Typography scale */
+  --font-size-xs: 0.75rem; /* 12px */
+  --font-size-sm: 0.875rem; /* 14px */
+  --font-size-base: 1rem; /* 16px */
+  --font-size-lg: 1.125rem; /* 18px */
+  --font-size-xl: 1.25rem; /* 20px */
+  --font-size-2xl: 1.5rem; /* 24px */
+  --font-size-3xl: 1.875rem; /* 30px */
+}
+```
+
+## Scoping CSS to Instances of Sections and Blocks
+
+Reset CSS variable values inline on a `style` attribute with a section/block settings. This has a couple benefits:
+
+- Less CSS in Liquid which allows us to use the `{% stylesheet %}` tag for all CSS.
+- Reduces redundancy in CSS selectors and number of selectors in the HTML, i.e. `.selector--{{ block.id }}` pattern.
+
+✅ Do this:
+
+```html
+<section
+  style="
+    --background-color: {{ settings.background_color }};
+    --padding: {{ settings.padding }}px;
+  "
 >
-  {% content_for 'blocks' %}
-</div>
+  ...
+</section>
+
+<button style="--button-color: {{ settings.button_color }};">...</button>
 ```
 
-### Presets with Nested Blocks
-```json
-{
-  "presets": [
-    {
-      "name": "t:names.two_column_layout",
-      "category": "Layout",
-      "settings": {
-        "layout_direction": "horizontal"
-      },
-      "blocks": [
-        {
-          "type": "text",
-          "settings": {
-            "text": "Column 1 content"
-          }
-        },
+❌ Don't do this:
+
+```html
+{% style %} .selector--{{ block.id }} { --button-color: {{ settings.button_color }}; } {% endstyle %}
+
+<button class="selector--{{ block.id }}">...</button>
+```
+
+### Redundancy
+
+Use variables to reduce property assignment redundancy.
+
+```css
+/* Do this */
+.button {
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
