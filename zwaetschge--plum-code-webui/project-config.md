@@ -1,109 +1,99 @@
 ---
 trigger: always_on
-description: Notes on the multi-provider integration in Plum Code WebUI.
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-# AGENTS.md
+# CLAUDE.md
 
-Notes on the multi-provider integration in Plum Code WebUI.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Goals implemented
+## Repository
 
-- Multi-provider CLI support (Claude Code, Codex, OpenCode) with per-session provider selection
-- Provider switching inside a session restarts the underlying CLI cleanly
-- Shared settings across providers (default working directory, tools list, settings UI)
-- Per-CLI auth + state directories that survive container rebuilds
-- Branding: Plum Code WebUI login, provider-specific visuals + logos
-- ComfyUI MCP server for inline image generation (replaces the earlier Gemini image path)
-- Android-builder MCP server for native app workflows on real devices
+Web UI for Claude Code CLI (with multi-provider support for Codex and OpenCode). pnpm monorepo deployed as a single Docker container on Unraid.
 
-## Provider summary
+## Commands
 
-| Provider | CLI | Process model | Config home |
-|----------|-----|---------------|-------------|
-| Claude Code | `claude` | persistent stream-json | `~/.claude` |
-| Codex (OpenAI) | `codex` | per-turn — manager respawns on `turn.completed` | `~/.codex` |
-| OpenCode | `opencode` | persistent, model routing for GLM (`z-ai/glm-*`), Kimi, and 75+ LLMs | `~/.opencode` |
+```bash
+pnpm install                # install workspace deps
+pnpm dev                    # run backend + frontend in parallel (tsx watch + vite)
+pnpm build                  # build all packages (tsc for backend/shared, vite for frontend)
+pnpm typecheck              # tsc --noEmit across workspace
+pnpm lint                   # eslint
+pnpm format                 # prettier --write
+pnpm format:check           # prettier --check (CI)
 
-All three CLIs ship inside the container; their config dirs are bind-mounted from `${CONFIG_DIR}` (default `./config`) so OAuth tokens and provider state persist across `docker compose up --build`.
+./scripts/install.sh        # interactive installer (prereq check, .env gen, build, up, claude /login). Re-runnable; --reset wipes .env, --skip-login skips OAuth bootstrap, --non-interactive uses defaults.
+./scripts/start-webui.sh    # dev helper: generates ephemeral SESSION_SECRET/JWT_SECRET, kills stale PIDs, logs to .logs/, writes PIDs to .pids/
 
-## Provider switching behavior
+# Backend-specific (run from packages/backend)
+pnpm db:migrate             # apply SQLite migrations (better-sqlite3)
+pnpm db:seed                # seed dev data
+```
 
-- Switching provider inside a session restarts the CLI process cleanly
-- UI shows provider badges per session in the dashboard and sidebar
-- The previous "handover summary" / handoff-protocol injection has been removed — provider switches start a fresh CLI context
+Dev ports: backend `3006`, frontend `5173`. Docker maps `4545:3001` (container listens on 3001).
 
-## Permission approval behavior
+Node `>=20`, pnpm `>=9` (packageManager pinned to `pnpm@9.15.0`).
 
-- Permission approvals do not resend the full user prompt
-- A short "resume" hint is sent instead, to avoid duplicate responses
+## Architecture
 
-## OpenCode notes
+### Packages
 
-- OpenCode handles GLM, Kimi, and other LLMs through its own model routing — there is no separate GLM provider in the WebUI
-- Default model: `z-ai/glm-5.1` (override with `CLI_PROVIDER_OPENCODE_DEFAULT_MODEL`)
-- Available model menu: empty = auto-discover from the installed CLI (override with `CLI_PROVIDER_OPENCODE_MODELS=…`)
-- Debug stream events with `OPENCODE_DEBUG_EVENTS=1`
+| Package | Purpose |
+|---------|---------|
+| `packages/backend` | Express + Socket.IO server, SQLite via better-sqlite3, spawns Claude/Codex/OpenCode CLIs as child processes |
+| `packages/frontend` | React 18 + Vite SPA, Radix UI, Tailwind, Zustand, Socket.IO client |
+| `packages/shared` | TypeScript types shared between backend and frontend |
+| `packages/desktop` | Desktop shell wrapper |
+| `packages/android` | Android client |
 
-## Shared agents / skills / plugins
+### Backend
 
-- Skills live in `~/.claude/skills/<name>/SKILL.md`
-- Agents live in `~/.claude/agents/<name>.md`
-- The WebUI auto-syncs external skill packs from these directories (in order):
-  - `/mnt/user/AI/Skills` (primary)
-  - `/mnt/unraid/AI/Skills` (fallback)
-  - `WEBUI_SKILLS_DIRS` (comma-separated overrides)
-- `.skill.zip` files are unpacked into `~/.claude/skills`
-- The managed block in `AGENTS.md` and `CLAUDE.md` is appended/updated on each session — custom text outside the managed block is preserved
+Entry: `packages/backend/src/index.ts`. Routes live in `src/routes/` (~30 modules — sessions, auth, providers, files, git, github, mcp, etc.). Services in `src/services/` — the critical one is `src/services/claude/ClaudeProcessManager.ts`, which owns all CLI lifecycle.
 
-## Built-in MCP servers
+**CLI process model** (`ClaudeProcessManager`):
+- Spawns Claude CLI with `--print --verbose --output-format stream-json --input-format stream-json --include-partial-messages --dangerously-skip-permissions`.
+- Also manages Codex (with per-turn respawn after `turn.completed`) and OpenCode processes.
+- Parses stream-json events and forwards them over Socket.IO.
+- Message queue accepts input while the CLI is working; interrupts via SIGINT.
 
-Both registered in `config/claude/settings.json` → `mcpServers`. Loaded at CLI spawn — only available in **new** sessions.
+**Key Socket.IO events** (server → client):
+- `session:output` — streaming text deltas
+- `session:message` — persisted messages
+- `session:thinking` — thinking indicator (boolean)
+- `session:tool_use` — tool lifecycle (started/completed/error)
+- `session:agent` — subagent (Task tool) activity
+- `session:status` — session state changes
 
-### `comfyui-images`
+**Auth**: Express session + JWT, Passport strategies for GitHub and Google OAuth, plus a Basic Auth guard stored in SQLite (`app_config` table).
 
-- Script: `scripts/mcp-servers/comfyui.mjs`
-- Tool: `generate_image` — submits to a LoRA Tester ComfyUI Flux server, polls for completion, downloads the PNG, saves to `data/generated/<uuid>.png`, returns `display_markdown` so Claude can render the image inline
-- Targets (override via env vars `COMFYUI_API_URL`, `COMFYUI_BACKEND_URL`, `COMFYUI_OUTPUT_DIR`, `COMFYUI_PUBLIC_PREFIX`):
-  - LoRA Tester backend: `http://192.168.1.126:8850`
-  - ComfyUI direct: `http://192.168.1.23:8188`
-- Defaults: `cfg=1.0`, `sampler=euler`, `megapixels=0.5`, `steps=6`, `aspect_ratio=1:1`
+**Security middleware** (`src/index.ts`): strict Helmet CSP (no `unsafe-inline` scripts), `trust proxy` configurable via `TRUST_PROXY`, per-bucket rate limiters in `src/middleware/rateLimiter.ts` (key = `userId` or `req.ip`, never raw `X-Forwarded-For`). CORS origins from `FRONTEND_URL` + `CORS_ALLOWED_ORIGINS`.
 
-### `android-builder`
+### Frontend
 
-- Script: `scripts/mcp-servers/android-builder.mjs`
-- ~25 tools across project lifecycle, build, install/launch, ADB device management, emulator, on-device testing
-- Backend: `http://host.docker.internal:4000` (the `android-app-creator-backend` running on the host)
-- Persistent device registry: pair a phone once via `adb_pair_wifi` + `adb_connect_wifi`, the backend stores it in `/app/data/known-devices.json` and auto-reconnects on startup
-- See `~/.claude/skills/android-build/SKILL.md` for the full workflow — never call `adb` or `gradle` from `Bash`
+Entry: `packages/frontend/src/main.tsx`. Main chat view: `src/pages/SessionPage.tsx`. Tool rendering: `src/components/chat/ToolExecutionCard.tsx` — detects `Task`/`Agent` tools as subagents and renders them with a distinct border-left accent, tinted background, and "SUBAGENT" badge. Subagent icon mapping lives in the same file (`agentTypeMap`).
 
-## Auth allowlist
+Store: `src/stores/useSessionStore.ts` (Zustand) holds per-session `toolExecutions`, `activity`, and `activeAgent` state.
 
-`AUTH_ALLOWED_EMAILS` (comma-separated) is the single source of truth for who can log in:
+WebSocket client: `src/services/socket.ts`.
 
-- Enforced for OAuth (GitHub, Google) via `findOrCreateUser` in `src/auth/passport.ts` — throws `EmailNotAllowedError`, callback redirects to `/connect?error=email_not_allowed`
-- Enforced for basic-auth in `src/routes/basic-auth.ts` — returns `403 EMAIL_NOT_ALLOWED`
-- Empty = no allowlist (only safe behind a private network or SSO proxy)
-- First user matching `SEED_ADMIN_EMAIL` (or the first allowlist entry if unset) gets `role=admin` on first login
+## Deployment
 
-## Paths and mounts (container)
+Compose is split into two files:
+- **`docker-compose.yml`** — portable, in git. Single `claude-code-webui` service on `${WEBUI_PORT:-4545}:3001`. Volumes use env-var-driven defaults (`${DATA_DIR:-./data}`, `${CONFIG_DIR:-./config}`, `${WORKSPACE_DIR:-./workspace}`). Safe to publish.
+- **`docker-compose.override.yml`** — site-specific, **gitignored**. Holds Traefik labels for `code.zwaetschge-webui.ch`/`preview.code.zwaetschge-webui.ch`, the `group_add: 281` Unraid docker GID, absolute `/mnt/user/appdata/...` host paths, the `repair-bot` sidecar, the docker.sock mount, and the external `brian_traefik-public` network. Compose merges both automatically — `docker compose up -d --build` Just Works.
 
-- Logos: `LOGOS_DIR=/app/logos` (override file mounts `/mnt/user/appdata/claude-code-webui/logos`)
-- CLI homes (mounted from `${CONFIG_DIR}/<cli>`):
-  - Claude Code → `/home/node/.claude`
-  - Codex → `/home/node/.codex`
-  - OpenCode → `/home/node/.opencode`
-  - npm-global → `/home/node/.npm-global`
-- Workspace: `${WORKSPACE_DIR}` → `/workspace` (configurable via `ALLOWED_BASE_PATHS`)
+A template for other operators lives at `docker-compose.override.yml.example`.
 
-## Environment overrides
+```bash
+./scripts/install.sh                # interactive: collects env, builds, starts, runs claude /login
+docker compose up -d --build        # if you already have .env + an override
+```
 
-- `WEBUI_CONFIG_HOME` or `CLAUDE_CONFIG_HOME`: override the shared Claude config home
-- `WEBUI_SKILLS_DIRS` or `CLAUDE_SKILLS_DIRS`: extra skill pack folders
-- `CLI_PROVIDER_CLAUDE_MODELS`, `CLI_PROVIDER_CODEX_MODELS`, `CLI_PROVIDER_OPENCODE_MODELS`: override the model menu per provider (empty = auto-discover)
+**docker.sock mount lives in the override file**, not the portable compose. Mounting it grants the in-container CLI full host Docker access — required for the repair-bot self-rebuild flow but not safe to ship as a default.
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [zwaetschge/plum-code-webui](https://github.com/zwaetschge/plum-code-webui) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-03 -->
+<!-- tomevault:4.0:windsurf_rules:2026-06-04 -->
