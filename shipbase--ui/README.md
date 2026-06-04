@@ -2,6 +2,8 @@
 
 > Sourced from [shipbase/ui](https://github.com/shipbase/ui) and converted for every major platform by [TomeVault](https://tomevault.io)
 
+Beautifully designed components that you can copy and paste into your apps. Framework agnostic. Accessible. Customizable.
+
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
