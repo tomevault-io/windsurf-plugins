@@ -1,173 +1,172 @@
 ---
 trigger: always_on
-description: Writing CSS, whether inside .css files or in the `{% stylesheet %}…{% endstylesheet %}` or `{% style %}…{% endstyle %}` or in <style> </style> tags
+description: Writing JavaScript inside `.js` files, or within the `{% javascript %}` or `{% script %}` or <script> </script> tags in `.liquid` files.
 ---
 
+# JavaScript Standards
 
-# CSS Standards
+## General Principles
 
-## Specificity Rules
+- **Zero external dependencies** - Use native browser APIs
+- **Avoid mutation** - Use `const` over `let` unless necessary  
+- **Use `for (const item of items)`** over `items.forEach()`
+- **Add new lines before blocks** with `{` and `}`
+- **Use vanilla Web Components** - Extend HTMLElement directly for custom elements
 
-- **Never** use IDs as selectors
-- **Avoid** using elements as selectors
-- **Avoid** using `!important` at all costs - if you must use it, comment why in the code
-- Use a `0 1 0` specificity wherever possible, meaning a single `.class` selector.
-- In cases where you must use higher specificity due to a parent/child relationship, try to keep the specificity to a maximum of `0 4 0`
-  - Note that this can sometimes be impossible due to the `0 1 0` specificity of pseudo-classes like `:hover`. There may be situations where `.parent:hover .child` is the only way to achieve the desired effect.
-- **Avoid** complex selectors. A selector should be easy to understand at a glance. Don't over do it with pseudo selectors (:has, :where, :nth-child, etc).
+## Async Operations and Request Management
 
-See [MDN](mdc:https:/developer.mozilla.org/en-US/docs/Web/CSS/Specificity) for more a comprehensive list of specificity rules.
+**Always use async/await over .then() chaining:**
 
-## CSS Variables
+```javascript
+async renderSection(hasDifferentProductUrl, productUrl) {
+  this.abortController?.abort();
+  this.abortController = new AbortController();
 
-CSS variables, a.k.a. custom properties, are a powerful tool for reducing redundancy and making it easier to update values across a component.
-
-- If you need to hardcode a value, set it to a variable and use that variable in the declaration. Example: a touch target size. `--touch-target-size: 44px;`
-- **Never** hardcode colors, always use the color schemes
-
-### Global Variables
-
-Global variables should be scoped to the `:root` selector in `snippets/theme-styles-variables.liquid`.
-
-**Example of global variables**
-
-```css
-/* in snippets/theme-styles-variables.liquid */
-:root {
-    --page-width: 1400px;
-     --font-body--family: {{ settings.type_body_font.family }}, {{ settings.type_body_font.fallback_families }}; /* Referencing a theme setting */
-     --font-{{ preset_name_dash }}--family: {{ settings[preset_font] | prepend: 'var(--font-' | append: '--family)' }}; /* Using Liquid to set a variable */
+  try {
+    const response = await fetch(`${productUrl}?option_values=${this.selectedOptionValues}&section_id=${this.dataset.section}`, {
+      signal: this.abortController.signal,
+    });
+    
+    const responseText = await response.text();
+    const html = new DOMParser().parseFromString(responseText, 'text/html');
+    const variant = this.getSelectedVariant(html);
+    
+    if (hasDifferentProductUrl) {
+      const productInfo = html.querySelector('product-info');
+      this.replaceWith(productInfo);
+      productInfo.updateURL(variant?.id);
+    } else {
+      this.updateMedia(variant?.featured_media?.id);
+      this.updateURL(variant?.id);
+      this.updateVariantInputs(variant?.id);
+      this.updateSourceFromDestination(html, `price-${this.dataset.section}`);
+    }
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      console.log('Fetch aborted by user');
+    } else {
+      console.error(error);
+    }
+  }
 }
 ```
 
-### Scoped Variables
+## Web Components Pattern
 
-Be sure to scope your CSS variables to the component they are being used in, if they are not meant to be global. Scoped variables can reference global variables.
+**Use vanilla Web Components with HTMLElement:**
 
-**Example of scoped variables**
+```javascript
+if (!customElements.get('product-info')) {
+  class ProductInfo extends HTMLElement {
+    // Property declarations with initialization
+    abortController = undefined;
+    swiper = null;
 
-```css
-/* in assets/facets.css */
-.facets {
-  --drawer-padding: var(--padding-md); /* Referencing a global variable */
-  --facets-upper-z-index: 3;
-  --facets-open-z-index: 4;
+    constructor() {
+      super();
+      // Minimal constructor - defer setup to connectedCallback
+    }
 
-  --facets-clear-shadow: 0px -4px 14px 0px rgb(var(--color-foreground-rgb) / var(--opacity-10)); /* Referencing a Color Scheme variable */
+    setupEventListeners() {
+      this.variantSelector?.addEventListener('change', this.onVariantChange.bind(this));
+      this.quantitySelector.addEventListener('change', this.onQuantitySelectorEvent.bind(this));
+      this.quantitySelector.querySelector('button[name="plus"]').addEventListener('click', this.onQuantitySelectorEvent.bind(this));
+      this.quantitySelector.querySelector('button[name="minus"]').addEventListener('click', this.onQuantitySelectorEvent.bind(this));
+      document.getElementById('swiper-script').addEventListener('load', this.initSwiper.bind(this));
+      document.addEventListener('liquid-ajax-cart:request-end', this.onCartUpdate.bind(this));
+    }
+
+    connectedCallback() {
+      this.setupEventListeners();
+      if (typeof Swiper !== 'undefined') {
+        this.initSwiper();
+      }
+    }
+
+    disconnectedCallback() {
+      this.abortController?.abort();
+      this.swiper?.destroy();
+    }
+
+    // Getter methods for DOM element access
+    get variantSelector() {
+      return this.querySelector('variant-selector');
+    }
+
+    get quantitySelector() {
+      return this.querySelector('quantity-selector');
+    }
+
+    // Event handlers with descriptive names
+    onVariantChange(e) {
+      const hasDifferentProductUrl = e.target?.dataset?.productUrl ? 
+        (e.target?.dataset?.productUrl !== this.dataset.url) : false;
+      const productUrl = e.target?.dataset?.productUrl || this.dataset.url;
+      this.renderSection(hasDifferentProductUrl, productUrl);
+    }
+
+    // Public methods for external component communication
+    updateMedia(variantFeaturedMediaId) {
+      if (!variantFeaturedMediaId) return;
+      var index = this.querySelector(`.swiper-slide[data-media-id="${variantFeaturedMediaId}"]`).dataset.mediaIndex;
+      this.swiper?.slideTo(index);
+    }
+
+    // Arrow function for helper methods
+    updateSourceFromDestination = (html, id) => {
+      const source = html.getElementById(`${id}`);
+      const destination = this.querySelector(`#${id}`);
+      if (source && destination) {
+        destination.innerHTML = source.innerHTML;
+      }
+    };
+  }
+
+  customElements.define('product-info', ProductInfo);
 }
 ```
 
-### Namespace Your CSS Variables
+**HTML integration with Liquid templates:**
 
-Namespace your variables to avoid collisions unless you explicitly want them to bleed through to other components.
-
-✅ Do this:
-
-```css
-.component {
-  --component-padding: ...;
-  --component-aspect-ratio: ...;
-}
-```
-
-❌ Don't do this:
-
-```css
-.component {
-  --padding: ...;
-  --aspect-ratio: ...;
-}
-```
-
-### Semantic Color Variables
-
-Use semantic naming for better maintainability:
-
-```css
-:root {
-  /* Base colors */
-  --color-primary: {{ settings.colors_accent_1 }};
-  --color-secondary: {{ settings.colors_accent_2 }};
-
-  /* Semantic colors */
-  --color-text-primary: rgb(var(--color-foreground));
-  --color-text-secondary: rgb(var(--color-foreground) / 0.75);
-  --color-text-disabled: rgb(var(--color-foreground) / 0.38);
-
-  /* Interactive states */
-  --color-interactive-default: rgb(var(--color-accent));
-  /* color-mix isn't supported in earlier version of iOS <16.2 so limit its usage to progressive enhancement */
-  --color-interactive-hover: color-mix(in srgb, rgb(var(--color-accent)) 90%, black);
-  --color-interactive-pressed: color-mix(in srgb, rgb(var(--color-accent)) 80%, black);
-  --color-interactive-disabled: rgb(var(--color-accent) / 0.38);
-}
-```
-
-### Design Token System
-
-Establish consistent spacing and typography scales:
-
-```css
-:root {
-  /* Spacing scale */
-  --space-3xs: 0.25rem; /* 4px */
-  --space-2xs: 0.5rem; /* 8px */
-  --space-xs: 0.75rem; /* 12px */
-  --space-sm: 1rem; /* 16px */
-  --space-md: 1.5rem; /* 24px */
-  --space-lg: 2rem; /* 32px */
-  --space-xl: 3rem; /* 48px */
-  --space-2xl: 4rem; /* 64px */
-  --space-3xl: 6rem; /* 96px */
-
-  /* Typography scale */
-  --font-size-xs: 0.75rem; /* 12px */
-  --font-size-sm: 0.875rem; /* 14px */
-  --font-size-base: 1rem; /* 16px */
-  --font-size-lg: 1.125rem; /* 18px */
-  --font-size-xl: 1.25rem; /* 20px */
-  --font-size-2xl: 1.5rem; /* 24px */
-  --font-size-3xl: 1.875rem; /* 30px */
-}
-```
-
-## Scoping CSS to Instances of Sections and Blocks
-
-Reset CSS variable values inline on a `style` attribute with a section/block settings. This has a couple benefits:
-
-- Less CSS in Liquid which allows us to use the `{% stylesheet %}` tag for all CSS.
-- Reduces redundancy in CSS selectors and number of selectors in the HTML, i.e. `.selector--{{ block.id }}` pattern.
-
-✅ Do this:
-
-```html
-<section
-  style="
-    --background-color: {{ settings.background_color }};
-    --padding: {{ settings.padding }}px;
-  "
+```liquid
+<product-info
+  data-url="{{ product.url}}"
+  data-section="{{ section.id }}"
+  class="color-{{ section.settings.color_scheme }} section-{{ section.id }}-padding"
 >
-  ...
-</section>
+  <!-- Component content with nested custom elements -->
+  <variant-selector id="variant-selector-{{ section.id }}" data-picker-type="{{ block.settings.picker_type }}">
+    <!-- Variant selection UI -->
+  </variant-selector>
+  
+  <quantity-selector>
+    <!-- Quantity controls -->
+  </quantity-selector>
+</product-info>
 
-<button style="--button-color: {{ settings.button_color }};">...</button>
+<!-- Load component script -->
+<script src="{{ 'component-product-info.js' | asset_url }}" defer="defer"></script>
 ```
 
-❌ Don't do this:
+## Early Returns and Conditional Logic
 
-```html
-{% style %} .selector--{{ block.id }} { --button-color: {{ settings.button_color }}; } {% endstyle %}
+**Use early returns over nested conditionals:**
 
-<button class="selector--{{ block.id }}">...</button>
-```
+```javascript
+// Good
+const processOrder = (order) => {
+  if (!order) return;
+  if (!order.items.length) return;
+  if (order.status !== 'pending') return;
 
-### Redundancy
+  // Process the order
+  updateOrderStatus(order.id, 'processing');
+  sendConfirmationEmail(order.email);
+};
 
-Use variables to reduce property assignment redundancy.
-
-```css
-/* Do this */
-.button {
+// Avoid
+const processOrder = (order) => {
+  if (order) {
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
