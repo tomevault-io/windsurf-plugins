@@ -1,187 +1,129 @@
 ---
 trigger: always_on
-description: This document outlines the component patterns and best practices used in the ResearchHub codebase.
+description: This document provides architectural and relationship information about the ResearchHub PostgreSQL database, complementing the detailed table specifications in `database-tables.cursor-rules`.
 ---
 
- # ResearchHub Component Patterns
+# ResearchHub Database Architecture (Cursor Rule)
 
-This document outlines the component patterns and best practices used in the ResearchHub codebase.
+This document provides architectural and relationship information about the ResearchHub PostgreSQL database, complementing the detailed table specifications in `database-tables.cursor-rules`.
 
-## Component Structure
+## System Architecture Overview
 
-All React components in ResearchHub should follow these guidelines:
+ResearchHub's database design implements a domain-driven approach centered around research content, with several key architectural patterns:
 
-1. **Use Functional Components**:
-   - Always use functional components with hooks, not class components
-   - Use arrow function syntax for component definitions
+1. **Unified Document Model**: Content (papers, posts, notes) is abstracted through a unified document system
+2. **Polymorphic Relationships**: Generic relations support flexible content relationships
+3. **Reputation Economy**: A complete transaction system for academic reputation
+4. **Hub-based Organization**: Content categorization through research fields
+5. **User Identity System**: Separates user accounts from author profiles
+6. **Nonprofit Integration**: Supports fundraising for nonprofit organizations through the Endaoment service
 
-   ```tsx
-   const MyComponent = () => {
-     // Component logic here
-     return <div>Component content</div>;
-   };
-   ```
+## Entity Relationship Diagram (Conceptual)
 
-2. **Type Definitions**:
-   - Define prop types using TypeScript interfaces
-   - Place the interface directly above the component
-   - Use descriptive names for interfaces (e.g., `ButtonProps`, `UserProfileProps`)
+```
+[USER SYSTEM]                     [CONTENT SYSTEM]                     [ORGANIZATION SYSTEM]
++----+                  +---+                 +----+
+| user_user   | <----> | paper_paper      | <----> | hub_hub     |
++----+                  +---+                 +----+
+       |                                |                                   |
+       v                                v                                   v
++----+                  +---+                 +----+
+| user_author | <----> | discussion_thread | <----> | topic_topic |
++----+                  +---+                 +----+
+       |                                |                                   |
+       v                                v                                   |
++----+                  +---+                      |
+| user_action | <----> | reputation_score  | <----+
++----+                  +---+
 
-   ```tsx
-   interface MyComponentProps {
-     title: string;
-     isActive?: boolean;
-     onClick: () => void;
-   }
+[NONPROFIT SYSTEM]
++---------------+                 +---------------+
+| nonprofit_org | <-------------> | purchase_fundraise |
++---------------+                 +---------------+
+       |                                |
+       v                                v
++------------------------+
+| nonprofit_fundraise_link |
++------------------------+
+```
 
-   const MyComponent = ({ title, isActive = false, onClick }: MyComponentProps) => {
-     // Component logic here
-   };
-   ```
+## Domain Models
 
-3. **Client Components**:
-   - Add the 'use client' directive at the top of client components
-   - Keep server components as the default when possible for better performance
+### Content Domain
 
-   ```tsx
-   'use client';
+The content model centers around unified documents that can represent different types of content:
 
-   import { useState } from 'react';
+1. **Papers** (`paper_paper`): Research papers, which can be:
+   - Imported from external sources with DOIs
+   - Uploaded directly by users
+   - Created as preprints within the system
 
-   const ClientComponent = () => {
-     const [state, setState] = useState(false);
-     // Component logic here
-   };
-   ```
+2. **Discussions** (`discussion_thread`): Conversations that can be:
+   - Attached to papers
+   - Created as standalone discussions
+   - Function as comments on other content
 
-## Component Organization
+3. **Posts** (`researchhub_document_researchhubpost`): User-generated content that can be:
+   - Research summaries
+   - Commentary
+   - Blog-style posts
 
-1. **Order within components**:
-   - Imports
-   - Type definitions
-   - Helper functions/constants
-   - Main component
-   - Exports
+All content connects through the `researchhub_document_researchhubunifieddocument` table, which establishes a polymorphic pattern allowing different content types to be treated uniformly in many contexts.
 
-2. **Props destructuring**:
-   - Always destructure props in the function parameters
-   - Provide default values inline when appropriate
+### User Domain
 
-   ```tsx
-   const Button = ({ 
-     variant = 'default',
-     size = 'md',
-     children,
-     ...props
-   }: ButtonProps) => {
-     // Component logic
-   };
-   ```
+The user model separates identity from academic profile:
 
-## Styling Approach
+1. **User Accounts** (`user_user`): Authentication and platform identity
+2. **Author Profiles** (`user_author`): Academic identity and credentials
+3. **Verification** (`user_userverification`): Processes for validating academic credentials
 
-1. **Tailwind CSS**:
-   - Use Tailwind CSS utility classes for styling
-   - For complex components, use Tailwind's composition patterns
-   - Use the `cn()` utility for conditional class names
+This separation enables:
+- One user to manage multiple author profiles
+- Author identity verification without affecting user account access
+- Academic metrics separate from platform activity metrics
 
-   ```tsx
-   import { cn } from '@/utils/styles';
+### Reputation Domain
 
-   const Button = ({ className, variant }: ButtonProps) => {
-     return (
-       <button 
-         className={cn(
-           "px-4 py-2 rounded-md",
-           variant === 'primary' ? 'bg-primary-600 text-white' : 'bg-gray-200 text-gray-800',
-           className
-         )}
-       >
-         {children}
-       </button>
-     );
-   };
-   ```
+The reputation system implements a complete economic model:
 
-2. **Variants with class-variance-authority**:
-   - Use `class-variance-authority` (cva) for components with multiple variants
-   - Define all variants in a single `cva` call
-   - Reference the variant styles in the component
+1. **Scoring** (`reputation_score`): Point values representing academic impact
+2. **Transactions** (`reputation_distribution`): Movement of reputation between users
+3. **Incentives** (`reputation_bounty`): Rewards for valuable contributions
+4. **Escrow** (`reputation_escrow`): Holding system for reputation in process
 
-   ```tsx
-   const buttonVariants = cva(
-     'rounded-md font-medium transition-colors',
-     {
-       variants: {
-         variant: {
-           default: 'bg-primary-600 text-white hover:bg-primary-700',
-           secondary: 'bg-gray-200 text-gray-800 hover:bg-gray-300',
-         },
-         size: {
-           sm: 'px-2 py-1 text-sm',
-           md: 'px-4 py-2',
-           lg: 'px-6 py-3 text-lg',
-         },
-       },
-       defaultVariants: {
-         variant: 'default',
-         size: 'md',
-       },
-     }
-   );
-   ```
+### Organization Domain
 
-## State Management
+Content is organized through multiple taxonomies:
 
-1. **Local State**:
-   - Use `useState` for component-specific state
-   - Use `useReducer` for complex state logic
+1. **Hubs** (`hub_hub`): Primary research field categorization
+2. **Topics** (`topic_topic`): Finer-grained subject matter classification
+3. **Concepts** (`researchhub_document_unifieddocumentconcepts`): Specific concepts within content
 
-2. **Shared State**:
-   - Use React Context for state that needs to be shared across multiple components
-   - Create dedicated context providers in the `contexts/` directory
+## Key Relationships
 
-3. **Derived State**:
-   - Use `useMemo` for expensive computations
-   - Use `useCallback` for functions that are passed as props to prevent unnecessary re-renders
+### Content to Users
 
-## Component Composition
+Content links to users through multiple relationship types:
 
-1. **Component Props**:
-   - Accept a `className` prop for styling customization
-   - Use the spread operator for passing additional props
+1. **Authorship**: `paper_authorship` connects papers to authors
+2. **Creation**: Most content has a `created_by_id` reference to `user_user`
+3. **Interaction**: `discussion_vote`, `user_action` track user interactions with content
 
-   ```tsx
-   const Button = ({ className, children, ...props }: ButtonProps) => {
-     return (
-       <button className={cn("default-styles", className)} {...props}>
-         {children}
-       </button>
-     );
-   };
-   ```
+### Content Organization
 
-2. **Composition Patterns**:
-   - Use the children prop for component composition
-   - Use render props for complex rendering logic
-   - Use compound components for related UI elements
+Content is organized through:
 
-## Performance Optimization
+1. **Hub Assignment**: `researchhub_document_researchhubunifieddocument_hubs` junction table
+2. **Topic Association**: `topic_unifieddocumenttopics` relevancy-scored connections
+3. **Hierarchy**: Topics belong to subfields, which belong to fields
 
-1. **Memoization**:
-   - Use `React.memo` for pure functional components that render often
-   - Use `useMemo` for expensive calculations
-   - Use `useCallback` for event handlers that are passed to child components
+### Polymorphic Relationships
 
-2. **Code Splitting**:
-   - Use dynamic imports for large components
-   - Use Next.js's built-in code splitting features
+The system uses Django's ContentType framework for polymorphic relationships:
 
-3. **Rendering Optimization**:
-   - Avoid unnecessary re-renders by using proper dependency arrays in hooks
-   - Implement virtualization for long lists with many items
 
-These patterns ensure consistent, maintainable, and performant components throughout the ResearchHub application.
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [ResearchHub/web](https://github.com/ResearchHub/web) — distributed by [TomeVault](https://tomevault.io).
