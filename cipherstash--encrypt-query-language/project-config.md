@@ -1,0 +1,122 @@
+---
+trigger: always_on
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+---
+
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Development Commands
+
+This project uses `mise` for task management. Common commands:
+
+- `mise run build` (alias: `mise r b`) - Build SQL into single release file
+- `mise run test` (alias: `mise r test`) - Build, reset and run tests
+- `mise run postgres:up` - Start PostgreSQL container
+- `mise run postgres:down` - Stop PostgreSQL containers
+- `mise run reset` - Reset database state
+- `mise run clean` (alias: `mise r k`) - Clean release files
+
+### Documentation
+- `mise run docs:generate` - Generate API documentation (requires doxygen)
+  - Outputs XML (primary) and HTML (preview) formats
+  - XML suitable for downstream processing/website integration
+  - See `docs/api/README.md` for XML format details
+- `mise run docs:generate:markdown` - Convert XML to Markdown API reference
+  - Generates single-file API reference: `docs/api/markdown/API.md`
+  - Includes 84 documented functions with parameters, return values, and source links
+- `mise run docs:validate` - Validate documentation coverage and tags
+- `mise run docs:package` - Package XML docs for distribution (~230KB archive)
+
+### Testing
+- Run all tests: `mise run test`
+- Run SQLx tests directly: `mise run test:sqlx`
+- Run SQLx tests in watch mode: `mise run test:sqlx:watch`
+- Tests are located in `tests/sqlx/` using Rust and SQLx framework
+
+### Build System
+- Dependencies are resolved using `-- REQUIRE:` comments in SQL files
+- Build outputs to `release/` directory:
+  - `cipherstash-encrypt.sql` - Main installer
+  - `cipherstash-encrypt-supabase.sql` - Supabase-compatible (excludes operator classes)
+  - `cipherstash-encrypt-protect.sql` - ProtectJS variant (excludes config management)
+  - Corresponding uninstallers for each variant
+
+#### Build Variants
+| Variant | Excludes | Use Case |
+|---------|----------|----------|
+| Main | Nothing | Full EQL with all features |
+| Supabase | Operator classes | Supabase compatibility |
+| Protect | `src/config/*`, `src/encryptindex/*` | ProtectJS (no database-side config) |
+
+## Project Architecture
+
+This is the **Encrypt Query Language (EQL)** - a PostgreSQL extension for searchable encryption. Key architectural components:
+
+### Core Structure
+- **Schema**: All EQL functions/types are in `eql_v2` PostgreSQL schema
+- **Main Type**: `eql_v2_encrypted` - composite type for encrypted columns (stored as JSONB)
+- **Configuration**: `eql_v2_configuration` table tracks encryption configs
+- **Index Types**: Various encrypted index types (blake3, hmac_256, bloom_filter, ore variants)
+
+### Directory Structure
+- `src/` - Modular SQL components with dependency management
+- `src/encrypted/` - Core encrypted column type implementation
+- `src/operators/` - SQL operators for encrypted data comparisons
+- `src/config/` - Configuration management functions
+- `src/blake3/`, `src/hmac_256/`, `src/bloom_filter/`, `src/ore_*` - Index implementations
+- `tasks/` - mise task scripts
+- `tests/sqlx/` - Rust/SQLx test framework (PostgreSQL 14-17 support)
+- `release/` - Generated SQL installation files
+
+### Key Concepts
+- **Dependency System**: SQL files declare dependencies via `-- REQUIRE:` comments
+- **Encrypted Data**: Stored as JSONB payloads with metadata
+- **Index Terms**: Transient types for search operations (blake3, hmac_256, etc.)
+- **Operators**: Support comparisons between encrypted and plain JSONB data
+- **CipherStash Proxy**: Required for encryption/decryption operations
+
+### Testing Infrastructure
+- Tests are written in Rust using SQLx, located in `tests/sqlx/`
+- Tests run against PostgreSQL 14, 15, 16, 17 using Docker containers
+- Use `mise run test --postgres 14|15|16|17` to test against a specific version
+- Container configuration in `tests/docker-compose.yml`
+- SQL test fixtures and helpers in `tests/test_helpers.sql`
+- Database connection: `localhost:7432` (cipherstash/password)
+
+## Project Learning & Retrospectives
+
+Valuable lessons and insights from completed work:
+
+- **SQLx Test Migration (2025-10-24)**: See `docs/retrospectives/2025-10-24-sqlx-migration-retrospective.md`
+  - Migrated 40 SQL assertions to Rust/SQLx (100% coverage)
+  - Key insights: Blake3 vs HMAC differences, batch-review pattern effectiveness, coverage metric definitions
+  - Lessons: TDD catches setup issues, infrastructure investment pays off, code review after each batch prevents compound errors
+
+## Documentation Standards
+
+### Doxygen Comments
+
+All SQL functions and types must be documented using Doxygen-style comments:
+
+- **Comment Style**: Use `--!` prefix for Doxygen comments (not `--`)
+- **Required Tags**:
+  - `@brief` - Short description (required for all functions/files)
+  - `@param` - Parameter description (required for functions with parameters)
+  - `@return` - Return value description (required for functions with non-void returns)
+- **Optional Tags**:
+  - `@throws` - Exception conditions
+  - `@note` - Important notes or caveats
+  - `@warning` - Warning messages (e.g., for DDL-executing functions)
+  - `@see` - Cross-references to related functions
+  - `@example` - Usage examples
+  - `@internal` - Mark internal/private functions
+  - `@file` - File-level documentation
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [cipherstash/encrypt-query-language](https://github.com/cipherstash/encrypt-query-language) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-06-04 -->
