@@ -7,11 +7,11 @@ Dartmouth undergraduate course on large language models and chatbots
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [ContextLab/llm-course](https://github.com/ContextLab/llm-course).
+Original source: `CLAUDE.md` in [ContextLab/llm-course](https://github.com/ContextLab/llm-course).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
