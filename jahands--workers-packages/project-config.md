@@ -1,222 +1,34 @@
 ---
 trigger: always_on
-description: Cursor rule guidelines (ALWAYS read before adding/updating rules)
+description: ALWAYS read this guide when running inline python scripts. This should be used when the user says "use inline python" or "run inline python
 ---
 
-<cursor-rules-guide>
+<python-inline-scripts>
 
-<title>Cursor Rules - Organization and Format</title>
+<title>Python Inline Scripts with uv</title>
 
-<location>
-<description>All cursor rules should be placed in the `.cursor/rules/` directory with the `.mdc` extension.</description>
+<IMPORTANT>
+- NEVER add stdlib modules like json, os, re, etc. to dependencies OR THE SCRIPT WILL FAIL
+- ALWAYS assume Python 3.12+
+</IMPORTANT>
 
-<requirements type="dont">
-- `.cursorrules` file in the root (deprecated)
-- Rules in other locations
-- Rules with other extensions
-</requirements>
+<example>
+uv run --no-project -q --script - < <(cat <<'EOF'
+# /// script
+# # ONLY add dependencies array if you need PyPi packages
+# dependencies = [
+#   "httpx"
+# ]
+# requires-python = ">=3.12"
+# ///
 
-<requirements type="do">
-- `.cursor/rules/{descriptive-name}.mdc`
-- One rule per file
-- Clear, focused rules
-</requirements>
-</location>
-
-<file-naming>
-<requirements>
-- Use kebab-case: `my-rule-name.mdc`
-- Be descriptive but concise
-- Group related rules with common prefixes
-</requirements>
-
-<examples>
-- `github-actions-runners.mdc`
-- `docker-compose.mdc`
-- `development-workflow.mdc`
-</examples>
-</file-naming>
-
-<frontmatter-requirement>
-<critical>EVERY .mdc file MUST start with frontmatter - files without it won't work</critical>
-
-<template>
-```yaml
----
-description: What this rule does (LLMs read this to decide relevance)
-globs:
-alwaysApply: false
----
-```
-</template>
-
-<notes>
-- description: Required - determines when LLMs read the rule
-- globs: Keep empty for new rules
-- alwaysApply: Keep false for new rules
-</notes>
-</frontmatter-requirement>
-
-<rule-format>
-<description>Rules must be written for LLM optimization. Prioritize machine readability over human readability.</description>
-
-<critical>START WITH THE SIMPLEST STRUCTURE THAT CLEARLY CONVEYS YOUR RULE</critical>
-
-<decision-tree>
-Ask yourself:
-1. Can I express this rule as a simple list of do's and don'ts? → Use simple template
-2. Does this rule involve multiple interconnected concepts? → Consider complex template
-3. Am I adding sections just because the template has them? → Remove those sections
-4. Am I about to add a second example? → Stop. One is usually enough.
-
-Remember: Empty sections add tokens but no value. Less structure often communicates more clearly.
-</decision-tree>
-
-<simplicity-first>
-<principle>Start with the absolute minimum. You can always add more if truly needed.</principle>
-<warning>If you're thinking "maybe I should add..." - DON'T. Only add what's essential.</warning>
-<rule-of-thumb>If your simple rule exceeds 50 lines, you're probably over-structuring it.</rule-of-thumb>
-</simplicity-first>
-
-<rule-complexity-principle>
-Use the minimum XML structure needed for clarity. Most rules only need:
-- A title
-- A list of requirements
-- Maybe some examples
-
-That's it. Don't add sections unless they add real value.
-</rule-complexity-principle>
-
-<simple-template>
-<description>Use this template for 90% of rules - formatting, naming conventions, simple behaviors</description>
-```yaml
----
-description: Brief description for LLM rule selection
-globs:
-alwaysApply: false
----
-```
-
-```xml
-<rule-name>
-
-<title>Rule Title</title>
-
-<rules>
-- First requirement
-- Second requirement  
-- Third requirement
-</rules>
-
-<examples>
-<example type="good">
-```typescript
-// Good code example
-```
+import httpx
+print(httpx.get("https://api.github.com/zen").text)
+EOF
+)
 </example>
-</examples>
 
-</rule-name>
-```
-
-<stop-here>For most rules, you're done. Only add more sections if the rule is genuinely complex.</stop-here>
-
-<example-guidelines>
-<critical>ONE EXAMPLE IS USUALLY ENOUGH - Don't add more unless each shows a fundamentally different pattern</critical>
-- Simple formatting rules: ONE concise example (<15 lines)
-- If you're thinking "I should also show..." - DON'T
-- Only add bad examples if the mistake is non-obvious
-- Never show variations of the same concept
-- Trust the LLM to generalize from one clear example
-- Multiple examples are ONLY for rules with distinct subcategories
-</example-guidelines>
-</simple-template>
-
-<complex-template>
-<description>ONLY use this template for complex architectural patterns, multi-faceted systems, or rules requiring extensive context</description>
-```yaml
----
-description: Brief description for LLM rule selection
-globs:
-alwaysApply: false
----
-```
-
-```xml
-<rule-name>
-
-<title>Rule Title</title>
-
-<context>
-<applies-to>Where this rule applies</applies-to>
-</context>
-
-<overview>High-level explanation</overview>
-
-<key-concepts>
-- Important concept
-- Another concept
-</key-concepts>
-
-<rules>
-<rule>
-<name>Rule name</name>
-<requirements>
-- Requirement
-- Another requirement
-</requirements>
-</rule>
-</rules>
-
-<examples>
-<example type="good">
-```typescript
-// Code
-```
-</example>
-</examples>
-
-</rule-name>
-```
-</complex-template>
-
-<xml-tag-guidelines>
-
-<formatting-rules>
-- No markdown headers (#, ##, ###)
-- No text formatting (**bold**, *italic*)
-- No emojis or Unicode symbols
-- No redundant labels
-- Use attributes for categorization
-- Consistent patterns throughout
-- Exception: Use markdown code blocks (```)
-- Exception: Use markdown tables for comparisons
-- Exception: Use backticks for inline code, commands, and technical terms
-- XML tags only
-- Every section needs an XML tag
-- Use dash lists within tags
-- Consistent nesting
-- Semantic names
-- Lowercase with hyphens
-- Attributes for metadata
-- Specific over generic
-- No redundant text
-- No markdown formatting inside XML
-- No visual elements
-- No generic tags like section, div, content
-- No human-oriented formatting
-</formatting-rules>
-
-<xml-benefits>
-- Unambiguous parsing
-- Explicit hierarchy
-- Consistent extraction
-- No formatting ambiguity
-</xml-benefits>
-
-<common-mistakes>
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+</python-inline-scripts>
 
 ---
 > Source: [jahands/workers-packages](https://github.com/jahands/workers-packages) — distributed by [TomeVault](https://tomevault.io).
