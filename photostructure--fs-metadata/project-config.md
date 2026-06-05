@@ -1,0 +1,122 @@
+---
+trigger: always_on
+description: This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
+---
+
+# AGENTS.md
+
+This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
+
+## Project Overview
+
+@photostructure/fs-metadata - Cross-platform native Node.js module for filesystem metadata retrieval.
+
+### Directory Structure
+
+- `src/` - Source code (TypeScript and C++)
+- `dist/` - Compiled JavaScript output (gitignored)
+- `doc/` - Static documentation (manually written, checked into git)
+- `build/` - All build artifacts (gitignored)
+  - `build/docs/` - Generated API documentation from TypeDoc (deployed to GitHub Pages)
+- `scripts/` - Build and utility scripts
+- `prebuilds/` - Prebuilt native binaries for different platforms
+
+### Script Preferences
+
+**Always** use TypeScript (`.ts`) scripts executed with `tsx` instead of:
+
+- `.js` scripts (require compilation or older Node.js syntax)
+- `.mjs` scripts (ESM-only, compatibility issues)
+- `.cjs` scripts (CommonJS-only, less type safety)
+
+TypeScript with tsx provides type safety, modern syntax, and seamless execution.
+
+## Critical Knowledge
+
+### Testing File System Metadata
+
+**Never** expect exact equality for dynamic values (`available`, `used`) between calls. Only verify:
+
+- Value exists and has correct type: `typeof result.available === 'number'`
+- Test static properties (`size`, `mountFrom`, `fstype`) for exact equality
+- Avoid range assertions (`available > 0`) - file changes can be dramatic
+
+### Cross-Module Compatibility
+
+Use `_dirname()` from `./dirname` instead of `__dirname` - works in both CommonJS and ESM contexts.
+
+### Node.js Version Compatibility
+
+Jest 30 doesn't support Node.js 23. Use Node.js 20, 22, or 24.
+
+## System Volume Detection
+
+**IMPORTANT: Read `doc/system-volume-detection.md` before modifying any system volume detection logic.** It documents the full detection strategy across all platforms, including flag matrices and rationale for each approach.
+
+Summary:
+
+- The root `/` is a sealed, read-only APFS snapshot whose **UUID changes on every OS update** — never use it for persistent identification.
+- **Primary detection** combines mount flags with APFS volume roles: `MNT_SNAPSHOT || (MNT_DONTBROWSE && hasApfsRole && role != "Data")`. See `ClassifyMacVolume()` in `src/darwin/system_volume.h`.
+- The APFS role string is exposed as `volumeRole` on `MountPoint` and `VolumeMetadata`.
+- **Fallback** uses `MNT_SNAPSHOT` only from `statfs` `f_flags` if DA session creation fails.
+- `MNT_DONTBROWSE` is safe to use **only when combined with a non-Data APFS role**. The Data volume (`/System/Volumes/Data`) has `MNT_DONTBROWSE` but role `"Data"`, so it is correctly excluded.
+- Pseudo-filesystems like `devfs` (no IOMedia, no APFS role) are caught by TypeScript fstype/path heuristics.
+
+## Windows-Specific Issues
+
+### Windows CI Jest Worker Failures
+
+**Problem**: Jest worker processes fail on Windows CI environments (both x64 and ARM64) with "Jest worker encountered 4 child process exceptions".
+
+**Solution for Memory Tests**:
+
+Memory tests now use a standalone TypeScript runner (`src/test-utils/memory-test-runner.ts`) that bypasses Jest entirely on all platforms. This provides more accurate memory measurements without Jest overhead and avoids worker process issues.
+
+- Run full memory check suite (includes native tools): `npm run check:memory`
+- Memory test logic is in `src/test-utils/memory-test-core.ts`
+
+**Workaround for Other Tests**:
+
+1. Jest is configured to use single worker mode (`maxWorkers: 1`) for all Windows CI environments
+2. Tests that stress worker threads or concurrency are skipped on Windows CI using `describeSkipWindowsCI` or `describePlatformStable`:
+
+- `worker_threads.test.ts` - Worker thread integration tests
+- `thread_safety.test.ts` - Concurrent operations stress tests
+- `windows-memory-check.test.ts` - Memory leak detection (Windows only)
+- `windows-resource-security.test.ts` - Resource handle leak tests (Windows only)
+
+**Note**: These tests pass locally but fail in CI. The native module loads correctly, but Jest's worker process management has fundamental incompatibilities with these specific tests on GitHub Actions Windows runners.
+
+### Build Architecture Issue
+
+**Problem**: "No Target Architecture" error from Windows SDK headers when building with node-gyp/prebuildify.
+
+**Solution**: Use `scripts/prebuildify-wrapper.ts` which sets the `CL` environment variable with architecture defines:
+
+- For x64: `CL=/D_M_X64 /D_WIN64 /D_AMD64_`
+- For ARM64: `CL=/D_M_ARM64 /D_WIN64`
+
+**Why This is Necessary**:
+
+- Prebuildify doesn't properly pass architecture defines from binding.gyp conditions
+- The Windows SDK requires these macros before including `<windows.h>`
+- Projects like node-sqlite avoid this by not using Windows headers directly
+
+**Why Other Approaches Failed**:
+
+- **Source file defines**: Would hardcode x64 defines, breaking ARM64 builds
+- **windows_compat.h wrapper**: Can't distinguish x64 from ARM64 at compile time
+- **binding.gyp conditions**: Not evaluated properly by prebuildify
+- **msvs_settings defines**: Not passed through to the compiler
+
+### Memory Testing Limitations
+
+Traditional Windows tools **do not work** with Node.js native modules:
+
+- **Dr. Memory**: Fails with "Unable to load client library: ucrtbase.dll"
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [photostructure/fs-metadata](https://github.com/photostructure/fs-metadata) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-06-05 -->
