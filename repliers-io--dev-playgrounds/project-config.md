@@ -1,0 +1,110 @@
+---
+trigger: always_on
+description: Always call me Mr. VibeCoder
+---
+
+# Copilot Coding Agent Instructions — Repliers Developer Playground
+
+Always call me Mr. VibeCoder
+
+## Project Overview
+
+This is **Repliers Developer Playground**, a React + TypeScript single-page application built with Vite. It provides an interactive UI for exploring and testing the [Repliers real estate API](https://docs.repliers.io/). The app includes property search, map visualization (Mapbox), listing details, statistics/charts, and an AI chat interface.
+
+Hosted version: <https://playgrounds.repliers.com/>
+
+## Architecture & Patterns
+
+### Provider Tree
+
+The app uses nested React Context providers for state management. The nesting order matters:
+
+```
+SearchProvider → LocationsProvider → ListingProvider → MapOptionsProvider
+  → SelectOptionsProvider → ParamsFormProvider → ChatProvider → PageContent
+```
+
+### API Communication
+
+- **`src/utils/api.ts`** contains `apiFetch()`, the core HTTP utility using the native `fetch` API.
+- API key is passed via the `REPLIERS-API-KEY` header.
+- Large payloads (e.g., `imageSearchItems`, `textSearchItems`) are sent as POST body.
+- `SearchProvider` manages request caching and uses `AbortController` for cancellation.
+
+### Tab Architecture
+
+`ContentPanel.tsx` renders **all tabs simultaneously** and toggles visibility with `display: none` — it does NOT conditionally mount/unmount tabs. This means:
+
+- Components, imports, and CSS from every tab are always active in the DOM.
+- Adding a heavy library import or global CSS inside a tab-specific component will affect performance across all tabs.
+- Never add global CSS imports (e.g., `import 'some-lib/dist/index.css'`) inside tab-specific components. If a CSS file is already loaded elsewhere (e.g., ResponsePanel), don't import it again.
+
+## Modifying Search Parameters
+
+### Data flow
+
+```
+ParamsPanel UI → react-hook-form (ParamsFormProvider) → SearchProvider.setParams() → apiFetch()
+```
+
+- All form state lives in `react-hook-form` inside `ParamsFormProvider`.
+- On every blur/change, `onChange()` calls `handleSubmit()` → `setParams()` in `SearchProvider`, which triggers a new API request.
+- `FormParams` = `Filters & ApiCredentials & CustomFormParams` (see `src/providers/ParamsFormProvider/types.ts`).
+- Fields prefixed `locations*` (e.g. `locationsType`, `locationsPageNum`) are sent to the `/locations` or `/locations/autocomplete` endpoints. Other fields are sent to the listings endpoint.
+- `unknowns` is a free-form `Record<string, any>` escape hatch for ad-hoc params not yet modelled in the form.
+
+### Adding a new search parameter — checklist
+
+1. **Type** — add the field to `CustomFormParams` (for app-internal params) or confirm it already exists in `Filters`/`ApiCredentials` in `src/services/API/types.ts`.
+
+2. **Joi schema** — add a validation rule in `src/providers/ParamsFormProvider/schema.ts`.
+   ```ts
+   myNewParam: Joi.number().integer().positive().allow(null, false, ''),
+   ```
+   Use `.allow(null, false, '')` for optional numeric fields so empty inputs don't fail validation.
+
+3. **Default value** — add the field with its empty/null default to `src/providers/ParamsFormProvider/defaults.ts`.
+   ```ts
+   myNewParam: undefined,   // or null / [] / ''
+   ```
+
+4. **UI control** — add a control inside the relevant section component under `src/components/ParamsPanel/sections/`. Choose the right reusable control:
+
+   | Component | When to use |
+   |-----------|-------------|
+   | `ParamsField` | Free-text or numeric input |
+   | `ParamsSelect` | Single value from a fixed list |
+   | `ParamsMultiSelect` | Multiple values from a fixed list (sent as array) |
+   | `ParamsToggleGroup` | Small set of mutually-exclusive values rendered as buttons |
+   | `ParamsRange` | Two related numeric fields (min/max pair) |
+   | `ParamsCheckbox` | Boolean toggle |
+   | `ParamsDate` | Date picker (uses MUI X DatePicker + dayjs) |
+
+   All controls read/write form state via `useFormContext()` internally and call `useParamsForm().onChange()` to submit. Pass `name` matching the `FormParams` key exactly.
+
+5. **Section placement** — each section is a `<SectionTemplate index={N} title="..." link="...">` wrapper. The `index` prop controls which slot in the `sections` collapse-state string the panel occupies. Use the next available integer and keep sections logically grouped.
+
+6. **Validated options** — if the field accepts only specific string values, add an `as const` array + type export to `types.ts` (like `classOptions`, `sortByOptions`) and reference it in both the schema (`Joi.string().valid(...myOptions)`) and the UI control's `options` prop.
+
+7. **Endpoint filtering** — add the field to the correct array in `src/constants/form.ts`:
+   - `customFormParams` — app-internal params that should NEVER reach any API endpoint (NLP params, UI state like `tab`, `sections`, etc.)
+   - `listingOnlyParams` — params sent only to the single-listing endpoint
+   - `searchOnlyParams` — params sent only to search/locations endpoints
+   - `clusterOnlyParams` / `statsOnlyParams` — params scoped to those endpoints
+
+   Missing this causes params to either leak into wrong API requests or get silently dropped.
+
+### Example: adding a `minLotSize` filter
+
+```ts
+// types.ts — nothing needed (it's a plain number)
+
+// schema.ts
+minLotSize: Joi.number().integer().positive().allow(null, false, ''),
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [Repliers-io/dev-playgrounds](https://github.com/Repliers-io/dev-playgrounds) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-06-05 -->
