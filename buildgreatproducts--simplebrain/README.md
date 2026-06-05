@@ -7,11 +7,11 @@ A simple second brain that you can extend and customise
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [BuildGreatProducts/SimpleBrain](https://github.com/BuildGreatProducts/SimpleBrain).
+Original source: `CLAUDE.md` in [BuildGreatProducts/SimpleBrain](https://github.com/BuildGreatProducts/SimpleBrain).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
