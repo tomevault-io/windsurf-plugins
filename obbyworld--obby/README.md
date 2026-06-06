@@ -7,11 +7,11 @@ Modern IRC Client for the web, desktop and mobile.
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [obbyworld/obby](https://github.com/obbyworld/obby).
+Original source: `CLAUDE.md` in [obbyworld/obby](https://github.com/obbyworld/obby).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
