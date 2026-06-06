@@ -1,167 +1,185 @@
 ---
 trigger: always_on
-description: Follow these rules when working on file storage.
+description: Use specification and guidelines as you build the app.
 ---
 
-# Storage Rules
+# Project Instructions
 
-Follow these rules when working with Supabase Storage.
+Use specification and guidelines as you build the app.
 
-It uses Supabase Storage for file uploads, downloads, and management.
+Write the complete code for every step. Do not get lazy.
 
-## General Rules
+Your goal is to completely finish whatever I ask for.
 
-- Always use environment variables for bucket names to maintain consistency across environments
-- Never hardcode bucket names in the application code
-- Always handle file size limits and allowed file types at the application level
-- Use the `upsert` method instead of `upload` when you want to replace existing files
-- Always implement proper error handling for storage operations
-- Use content-type headers when uploading files to ensure proper file handling
+You will see <ai_context> tags in the code. These are context tags that you should use to help you understand the codebase.
 
-## Organization
+## Overview
 
-### Buckets
+This is a web app template.
 
-- Name buckets in kebab-case: `user-uploads`, `profile-images`
-- Create separate buckets for different types of files (e.g., `profile-images`, `documents`, `attachments`)
-- Document bucket purposes in a central location
-- Set appropriate bucket policies (public/private) based on access requirements
-- Implement RLS (Row Level Security) policies for buckets that need user-specific access
-- Make sure to let me know instructions for setting up RLS policies on Supabase since you can't do this yourself, including the SQL scripts I need to run in the editor
+## Tech Stack
 
-### File Structure
+- Frontend: Next.js, Tailwind, Shadcn, Framer Motion
+- Backend: Postgres, Supabase, Drizzle ORM, Server Actions
+- Auth: Supabase Auth
+- Payments: Stripe
+- Analytics: PostHog
+- Deployment: Vercel
 
-- Organize files in folders based on their purpose and ownership
-- Use predictable, collision-resistant naming patterns
-- Structure: `{bucket}/{userId}/{purpose}/{filename}`
-- Example: `profile-images/123e4567-e89b/avatar/profile.jpg`
-- Include timestamps in filenames when version history is important
-- Example: `documents/123e4567-e89b/contracts/2024-02-13-contract.pdf`
+## Project Structure
 
-## Actions
+- `actions` - Server actions
+  - `db` - Database related actions
+  - Other actions
+- `app` - Next.js app router
+  - `api` - API routes
+  - `route` - An example route
+    - `_components` - One-off components for the route
+    - `layout.tsx` - Layout for the route
+    - `page.tsx` - Page for the route
+- `components` - Shared components
+  - `ui` - UI components
+  - `utilities` - Utility components
+- `db` - Database
+  - `schema` - Database schemas
+- `lib` - Library code
+  - `hooks` - Custom hooks
+- `prompts` - Prompt files
+- `public` - Static assets
+- `types` - Type definitions
 
-- When importing storage actions, use `@/actions/storage`
-- Name files like `example-storage-actions.ts`
-- Include Storage at the end of function names `Ex: uploadFile -> uploadFileStorage`
-- Follow the same ActionState pattern as DB actions
+## Rules
 
-Example of a storage action:
+Follow these rules when building the app.
+
+### General Rules
+
+- Use `@` to import anything from the app unless otherwise specified
+- Use kebab case for all files and folders unless otherwise specified
+- Don't update shadcn components unless otherwise specified
+
+#### Env Rules
+
+- If you update environment variables, update the `.env.example` file
+- All environment variables should go in `.env.local`
+- Do not expose environment variables to the frontend
+- Use `NEXT_PUBLIC_` prefix for environment variables that need to be accessed from the frontend
+- You may import environment variables in server actions and components by using `process.env.VARIABLE_NAME`
+
+#### Type Rules
+
+Follow these rules when working with types.
+
+- When importing types, use `@/types`
+- Name files like `example-types.ts`
+- All types should go in `types`
+- Make sure to export the types in `types/index.ts`
+- Prefer interfaces over type aliases
+- If referring to db types, use `@/db/schema` such as `SelectTodo` from `todos-schema.ts`
+
+An example of a type:
+
+`types/actions-types.ts`
 
 ```ts
+export type ActionState<T> =
+  | { isSuccess: true; message: string; data: T }
+  | { isSuccess: false; message: string; data?: never }
+```
+
+And exporting it:
+
+`types/index.ts`
+
+```ts
+export * from "./actions-types"
+```
+
+### Frontend Rules
+
+Follow these rules when working on the frontend.
+
+It uses Next.js, Tailwind, Shadcn, and Framer Motion.
+
+#### General Rules
+
+- Use `lucide-react` for icons
+- useSidebar must be used within a SidebarProvider
+
+#### Components
+
+- Use divs instead of other html tags unless otherwise specified
+- Separate the main parts of a component's html with an extra blank line for visual spacing
+- Always tag a component with either `use server` or `use client` at the top, including layouts and pages
+
+##### Organization
+
+- All components be named using kebab case like `example-component.tsx` unless otherwise specified
+- Put components in `/_components` in the route if one-off components
+- Put components in `/components` from the root if shared components
+
+##### Data Fetching
+
+- Fetch data in server components and pass the data down as props to client components.
+- Use server actions from `/actions` to mutate data.
+
+##### Server Components
+
+- Use `"use server"` at the top of the file.
+- Implement Suspense for asynchronous data fetching to show loading states while data is being fetched.
+- If no asynchronous logic is required for a given server component, you do not need to wrap the component in `<Suspense>`. You can simply return the final UI directly since there is no async boundary needed.
+- If asynchronous fetching is required, you can use a `<Suspense>` boundary and a fallback to indicate a loading state while data is loading.
+- Server components cannot be imported into client components. If you want to use a server component in a client component, you must pass the as props using the "children" prop
+- params in server pages should be awaited such as `const { courseId } = await params` where the type is `params: Promise<{ courseId: string }>`
+
+Example of a server layout:
+
+```tsx
 "use server"
 
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
-import { ActionState } from "@/types"
-
-export async function uploadFileStorage(
-  bucket: string,
-  path: string,
-  file: File
-): Promise<ActionState<{ path: string }>> {
-  try {
-    const supabase = createClientComponentClient()
-    
-    const { data, error } = await supabase
-      .storage
-      .from(bucket)
-      .upload(path, file, {
-        upsert: false,
-        contentType: file.type
-      })
-
-    if (error) throw error
-
-    return {
-      isSuccess: true,
-      message: "File uploaded successfully",
-      data: { path: data.path }
-    }
-  } catch (error) {
-    console.error("Error uploading file:", error)
-    return { isSuccess: false, message: "Failed to upload file" }
-  }
+export default async function ExampleServerLayout({
+  children
+}: {
+  children: React.ReactNode
+}) {
+  return children
 }
 ```
 
-## File Handling
+Example of a server page (with async logic):
 
-### Upload Rules
+```tsx
+"use server"
 
-- Always validate file size before upload
-- Implement file type validation using both extension and MIME type
-- Generate unique filenames to prevent collisions
-- Set appropriate content-type headers
-- Handle existing files appropriately (error or upsert)
+import { Suspense } from "react"
+import { SomeAction } from "@/actions/some-actions"
+import SomeComponent from "./_components/some-component"
+import SomeSkeleton from "./_components/some-skeleton"
 
-Example validation:
+export default async function ExampleServerPage() {
+  return (
+    <Suspense fallback={<SomeSkeleton className="some-class" />}>
+      <SomeComponentFetcher />
+    </Suspense>
+  )
+}
 
-```ts
-const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
-const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"]
-
-function validateFile(file: File): boolean {
-  if (file.size > MAX_FILE_SIZE) {
-    throw new Error("File size exceeds limit")
-  }
-  
-  if (!ALLOWED_TYPES.includes(file.type)) {
-    throw new Error("File type not allowed")
-  }
-  
-  return true
+async function SomeComponentFetcher() {
+  const { data } = await SomeAction()
+  return <SomeComponent className="some-class" initialData={data || []} />
 }
 ```
 
-### Download Rules
+Example of a server page (no async logic required):
 
-- Always handle missing files gracefully
-- Implement proper error handling for failed downloads
-- Use signed URLs for private files
+```tsx
+"use server"
 
-### Delete Rules
+import SomeClientComponent from "./_components/some-client-component"
 
-- Implement soft deletes when appropriate
-- Clean up related database records when deleting files
-- Handle bulk deletions carefully
-- Verify ownership before deletion
-- Always delete all versions/transforms of a file
+// In this case, no asynchronous work is being done, so no Suspense or fallback is required.
 
-## Security
-
-### Bucket Policies
-
-- Make buckets private by default
-- Only make buckets public when absolutely necessary
-- Use RLS policies to restrict access to authorized users
-- Example RLS policy:
-
-```sql
-CREATE POLICY "Users can only access their own files"
-ON storage.objects
-FOR ALL
-USING (auth.uid()::text = (storage.foldername(name))[1]);
-```
-
-### Access Control
-
-- Generate short-lived signed URLs for private files
-- Implement proper CORS policies
-- Use separate buckets for public and private files
-- Never expose internal file paths
-- Validate user permissions before any operation
-
-## Error Handling
-
-- Implement specific error types for common storage issues
-- Always provide meaningful error messages
-- Implement retry logic for transient failures
-- Log storage errors separately for monitoring
-
-## Optimization
-
-- Implement progressive upload for large files
-- Clean up temporary files and failed uploads
-- Use batch operations when handling multiple files
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [BrianCoombs/pickflick](https://github.com/BrianCoombs/pickflick) — distributed by [TomeVault](https://tomevault.io).
