@@ -7,11 +7,11 @@ heuristic learning quant
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [toddwyl/hl-quant](https://github.com/toddwyl/hl-quant).
+Original source: `CLAUDE.md` in [toddwyl/hl-quant](https://github.com/toddwyl/hl-quant).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
