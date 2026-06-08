@@ -7,12 +7,12 @@ Multi-provider AI agent CLI written in Rust
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [FerroxLabs/wayland-core](https://github.com/FerroxLabs/wayland-core).
+Original source: `copilot-instructions.md` in [FerroxLabs/wayland-core](https://github.com/FerroxLabs/wayland-core).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **GitHub Copilot** — `copilot-instructions.md`
+- **Codex** — `AGENTS.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
