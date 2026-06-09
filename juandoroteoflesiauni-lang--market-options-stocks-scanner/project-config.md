@@ -1,198 +1,190 @@
 ---
 trigger: always_on
-description: Reglas específicas para desarrollo Python/FastAPI en el backend de trading
+description: Reglas de base de datos, migraciones y caché para la terminal de trading
 ---
 
 
-# 🐍 PYTHON/FASTAPI — TRADING TERMINAL BACKEND
+# 🗄️ BASE DE DATOS Y PERSISTENCIA — TRADING TERMINAL
 
-## CONFIGURACIÓN DEL PROYECTO PYTHON
+## PRINCIPIOS DE ACCESO A DATOS
 
-### Estructura de dependencias:
-```
-requirements.txt          ← Producción
-requirements-dev.txt      ← Solo desarrollo
-```
-
-```txt
-# requirements.txt
-fastapi==0.111.0
-uvicorn[standard]==0.29.0
-sqlalchemy[asyncio]==2.0.29
-asyncpg==0.29.0
-alembic==1.13.1
-pydantic==2.7.1
-pydantic-settings==2.2.1
-python-jose[cryptography]==3.3.0
-passlib[bcrypt]==1.7.4
-redis[asyncio]==5.0.4
-httpx==0.27.0
-structlog==24.1.0
-python-binance==1.0.19
-slowapi==0.1.9
-
-# requirements-dev.txt
-pytest==8.1.1
-pytest-asyncio==0.23.6
-pytest-cov==5.0.0
-black==24.4.2
-ruff==0.4.2
-mypy==1.10.0
-```
+- **Nunca** SQL raw en services o endpoints → usar SQLAlchemy ORM
+- **Siempre** async para no bloquear el event loop
+- **Decimal** para todos los valores monetarios (nunca float)
+- **UUID** como primary key (no autoincrement entero)
+- **Timestamps** en UTC siempre
 
 ---
 
-## ⚙️ CONFIGURACIÓN (Settings Pattern)
+## 🔌 CONEXIÓN Y SESIÓN
 
 ```python
-# core/config.py — PATRÓN OBLIGATORIO
+# core/database.py
 
-from pydantic_settings import BaseSettings
-from pydantic import validator
-from typing import Optional
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from sqlalchemy.orm import DeclarativeBase
+from core.config import settings
 
-class Settings(BaseSettings):
-    """
-    Todas las configuraciones vienen de variables de entorno.
-    Nunca valores hardcodeados aquí.
-    """
-    # Base de datos
-    DATABASE_URL: str
-    REDIS_URL: str = "redis://localhost:6379/0"
-    
-    # Seguridad
-    SECRET_KEY: str
-    JWT_ALGORITHM: str = "HS256"
-    JWT_EXPIRE_MINUTES: int = 60
-    
-    # APIs de Trading
-    BINANCE_API_KEY: Optional[str] = None
-    BINANCE_API_SECRET: Optional[str] = None
-    MT5_LOGIN: Optional[str] = None
-    MT5_PASSWORD: Optional[str] = None
-    MT5_SERVER: Optional[str] = None
-    
-    # App
-    ENVIRONMENT: str = "development"
-    DEBUG: bool = False
-    ALLOWED_ORIGINS: str = "http://localhost:5173"
-    
-    @validator('SECRET_KEY')
-    def secret_key_must_be_strong(cls, v):
-        if len(v) < 32:
-            raise ValueError('SECRET_KEY debe tener al menos 32 caracteres')
-        return v
-    
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
+# Motor async — una sola instancia global
+engine = create_async_engine(
+    settings.DATABASE_URL,
+    echo=settings.DEBUG,          # Solo SQL logs en modo debug
+    pool_size=10,                 # Conexiones en el pool
+    max_overflow=20,              # Conexiones extra bajo demanda
+    pool_pre_ping=True,           # Verificar conexiones antes de usar
+)
 
-settings = Settings()  # Singleton — importar este objeto
+AsyncSessionLocal = async_sessionmaker(
+    engine,
+    class_=AsyncSession,
+    expire_on_commit=False        # Importante para async
+)
+
+class Base(DeclarativeBase):
+    """Base para todos los modelos SQLAlchemy."""
+    pass
+
+# Dependency para FastAPI
+async def get_db() -> AsyncSession:
+    async with AsyncSessionLocal() as session:
+        try:
+            yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
+        finally:
+            await session.close()
 ```
 
 ---
 
-## 🗄️ MODELOS DE BASE DE DATOS
+## 📋 PATRÓN REPOSITORY
 
 ```python
-# models/order.py — SQLAlchemy async
+# repositories/base_repo.py — Repository base genérico
 
-from sqlalchemy import Column, String, Numeric, Enum, DateTime, ForeignKey
-from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import relationship
-from datetime import datetime
-import uuid
-import enum
-
+from typing import Generic, TypeVar, Type, Optional, List
+from uuid import UUID
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, update, delete
 from core.database import Base
 
-class OrderStatus(str, enum.Enum):
-    PENDING = "pending"
-    OPEN = "open"
-    FILLED = "filled"
-    CANCELLED = "cancelled"
-    REJECTED = "rejected"
+ModelType = TypeVar("ModelType", bound=Base)
 
-class Order(Base):
-    __tablename__ = "orders"
+class BaseRepository(Generic[ModelType]):
+    """Repository base con operaciones CRUD comunes."""
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    def __init__(self, model: Type[ModelType]):
+        self.model = model
     
-    symbol = Column(String(20), nullable=False, index=True)
-    side = Column(String(4), nullable=False)          # BUY / SELL
-    order_type = Column(String(20), nullable=False)   # MARKET / LIMIT
-    status = Column(String(20), nullable=False, default=OrderStatus.PENDING)
+    async def get_by_id(self, db: AsyncSession, id: UUID) -> Optional[ModelType]:
+        result = await db.execute(select(self.model).where(self.model.id == id))
+        return result.scalar_one_or_none()
     
-    quantity = Column(Numeric(precision=20, scale=8), nullable=False)
-    price = Column(Numeric(precision=20, scale=8), nullable=True)
-    fill_price = Column(Numeric(precision=20, scale=8), nullable=True)
+    async def get_all(
+        self, 
+        db: AsyncSession, 
+        skip: int = 0, 
+        limit: int = 100
+    ) -> List[ModelType]:
+        result = await db.execute(select(self.model).offset(skip).limit(limit))
+        return list(result.scalars().all())
     
-    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
-    updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
-    filled_at = Column(DateTime(timezone=True), nullable=True)
+    async def create(self, db: AsyncSession, obj_data: dict) -> ModelType:
+        db_obj = self.model(**obj_data)
+        db.add(db_obj)
+        await db.flush()   # flush, no commit (lo hace el middleware)
+        await db.refresh(db_obj)
+        return db_obj
     
-    exchange_order_id = Column(String(100), nullable=True, unique=True)
-    
-    # Relaciones
-    user = relationship("User", back_populates="orders")
-    
-    def __repr__(self):
-        return f"<Order {self.id}: {self.side} {self.quantity} {self.symbol} @ {self.price}>"
-```
-
----
-
-## 🔗 ENDPOINTS FASTAPI
-
-```python
-# api/v1/orders.py — Patrón completo de endpoint
-
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from api.deps import get_current_user, get_db
-from schemas.order_schema import OrderCreate, OrderResponse, OrderListResponse
-from services.order_service import OrderService
-from core.exceptions import InsufficientFundsError, RiskViolationError
-from core.logger import logger
-
-router = APIRouter(prefix="/orders", tags=["orders"])
-order_service = OrderService()
-
-@router.post("/", response_model=OrderResponse, status_code=status.HTTP_201_CREATED)
-async def create_order(
-    order_data: OrderCreate,
-    current_user = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
-):
-    """
-    Crear nueva orden de trading.
-    
-    Valida riesgo, verifica fondos y envía al exchange.
-    """
-    try:
-        order = await order_service.create_order(
-            db=db,
-            order_data=order_data,
-            user_id=current_user.id
+    async def update(
+        self, 
+        db: AsyncSession, 
+        id: UUID, 
+        update_data: dict
+    ) -> Optional[ModelType]:
+        await db.execute(
+            update(self.model)
+            .where(self.model.id == id)
+            .values(**update_data)
         )
-        logger.info("order.created", order_id=str(order.id), user_id=str(current_user.id))
-        return order
+        return await self.get_by_id(db, id)
+    
+    async def delete(self, db: AsyncSession, id: UUID) -> bool:
+        result = await db.execute(
+            delete(self.model).where(self.model.id == id)
+        )
+        return result.rowcount > 0
+
+
+# repositories/order_repo.py — Específico para órdenes
+
+from sqlalchemy import select, and_, desc
+from typing import Optional, List
+from uuid import UUID
+from datetime import datetime, date
+
+from repositories.base_repo import BaseRepository
+from models.order import Order, OrderStatus
+
+class OrderRepository(BaseRepository[Order]):
+    
+    def __init__(self):
+        super().__init__(Order)
+    
+    async def get_open_orders(
+        self, 
+        db: AsyncSession, 
+        user_id: UUID
+    ) -> List[Order]:
+        """Obtener todas las órdenes abiertas de un usuario."""
+        result = await db.execute(
+            select(Order)
+            .where(and_(
+                Order.user_id == user_id,
+                Order.status.in_([OrderStatus.PENDING, OrderStatus.OPEN])
+            ))
+            .order_by(desc(Order.created_at))
+        )
+        return list(result.scalars().all())
+    
+    async def get_by_symbol(
+        self,
+        db: AsyncSession,
+        user_id: UUID,
+        symbol: str,
+        limit: int = 50
+    ) -> List[Order]:
+        """Historial de órdenes por símbolo."""
+        result = await db.execute(
+            select(Order)
+            .where(and_(
+                Order.user_id == user_id,
+                Order.symbol == symbol
+            ))
+            .order_by(desc(Order.created_at))
+            .limit(limit)
+        )
+        return list(result.scalars().all())
+    
+    async def get_daily_volume_usd(
+        self, 
+        db: AsyncSession, 
+        user_id: UUID, 
+        date: date
+    ) -> float:
+        """
+        Calcular volumen total operado en un día.
+        Usado por RiskService para límites diarios.
+        """
+        from sqlalchemy import func, cast, Date
         
-    except InsufficientFundsError as e:
-        raise HTTPException(
-            status_code=status.HTTP_402_PAYMENT_REQUIRED,
-            detail=str(e)
-        )
-    except RiskViolationError as e:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=str(e)
-        )
-    except Exception as e:
-        logger.error("order.creation.failed", error=str(e), user_id=str(current_user.id))
-        raise HTTPException(
+        result = await db.execute(
+            select(func.sum(Order.quantity * Order.fill_price))
+            .where(and_(
+                Order.user_id == user_id,
+                Order.status == OrderStatus.FILLED,
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
