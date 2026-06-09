@@ -1,256 +1,197 @@
 ---
 trigger: always_on
-description: Reglas de Git y control de versiones — punto de recuperación ante errores del vibecoding
+description: Reglas de componentes UI para la terminal de trading — gráficos, órdenes, portfolio
 ---
 
 
-# 🔀 GIT WORKFLOW — TRADING TERMINAL
+# 🖥️ UI COMPONENTS — TRADING TERMINAL
 
-## GIT ES TU RED DE SEGURIDAD
+## DISEÑO DE LA TERMINAL DE TRADING
 
-En vibecoding, la IA puede equivocarse y romper cosas.
-Git es la única forma de volver a un estado funcional.
-**Hacer commit frecuente = poder deshacer errores de la IA.**
-
----
-
-## 📋 CONVENCIÓN DE COMMITS (Conventional Commits)
-
-```bash
-# Formato: tipo(módulo): descripción corta en español
-
-# Tipos:
-feat:     Nueva funcionalidad
-fix:      Corrección de bug
-refactor: Reorganización sin cambiar comportamiento
-test:     Agregar/modificar tests
-docs:     Documentación
-style:    Formato, espacios (sin cambios de lógica)
-chore:    Tareas de mantenimiento
-security: Cambios de seguridad
-
-# Ejemplos:
-git commit -m "feat(orders): implementar creación de órdenes MARKET"
-git commit -m "fix(auth): corregir expiración de JWT en zona horaria UTC"
-git commit -m "security(api): agregar rate limiting en endpoints de órdenes"
-git commit -m "test(risk): agregar tests para validación de tamaño de posición"
-```
-
----
-
-## 🌿 ESTRATEGIA DE BRANCHES
-
-```
-main
-├── Es el código en producción
-├── NUNCA commitear directamente
-└── Solo recibe merges de develop
-
-develop
-├── Código integrado y testeado
-├── Base para nuevas features
-└── Merge a main cuando el módulo está completo
-
-feature/[nombre-del-módulo]
-├── Desarrollo de cada módulo
-├── Ejemplos:
-│   ├── feature/auth-jwt
-│   ├── feature/order-management
-│   ├── feature/realtime-feed
-│   └── feature/portfolio-tracker
-└── Merge a develop cuando está testeado
-```
-
-### Comandos de gestión de branches:
-```bash
-# Crear branch para nuevo módulo
-git checkout develop
-git pull
-git checkout -b feature/nombre-del-modulo
-
-# Cuando el módulo está listo
-git checkout develop
-git merge feature/nombre-del-modulo
-git push
-
-# Ver estado actual
-git status
-git log --oneline -10
+### Tema visual obligatorio:
+```css
+/* design-tokens.css — Variables globales */
+:root {
+  /* Colores base — Tema oscuro como Bloomberg/TradingView */
+  --bg-primary: #0d1117;
+  --bg-secondary: #161b22;
+  --bg-panel: #1c2128;
+  --bg-card: #21262d;
+  
+  /* Colores de trading */
+  --color-buy: #00c851;        /* Verde — Compra */
+  --color-sell: #ff4444;       /* Rojo — Venta */
+  --color-neutral: #f0c040;    /* Amarillo — Neutro/Pendiente */
+  
+  /* Texto */
+  --text-primary: #e6edf3;
+  --text-secondary: #8b949e;
+  --text-muted: #484f58;
+  
+  /* Bordes */
+  --border-default: #30363d;
+  --border-accent: #388bfd;
+  
+  /* Tipografía */
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace; /* Para precios */
+  --font-ui: 'Inter', system-ui, sans-serif;
+}
 ```
 
 ---
 
-## ⏱️ CUÁNDO HACER COMMIT
+## 📊 COMPONENTES DE PRECIOS — Reglas Críticas
 
-```
-✅ Hacer commit:
-- Al terminar cada archivo nuevo
-- Al hacer pasar un test
-- Antes de un refactor grande
-- Al final de cada sesión de trabajo
-- Cuando algo funciona (¡aunque sea parcial!)
+```typescript
+// ✅ CORRECTO — Precio con color dinámico y fuente monoespaciada
 
-❌ NO hacer commit:
-- Código que no compila/tiene errores de sintaxis
-- Con secrets o API keys (verificar .gitignore)
-- Con console.log de debug masivos
-- Cuando los tests están fallando
-```
+interface PriceDisplayProps {
+  price: number;
+  previousPrice?: number;
+  decimals?: number;
+  showChange?: boolean;
+}
 
----
+const PriceDisplay: React.FC<PriceDisplayProps> = ({
+  price,
+  previousPrice,
+  decimals = 2,
+  showChange = false
+}) => {
+  const isUp = previousPrice !== undefined && price > previousPrice;
+  const isDown = previousPrice !== undefined && price < previousPrice;
+  const changeColor = isUp ? 'text-[#00c851]' : isDown ? 'text-[#ff4444]' : 'text-[#e6edf3]';
+  
+  return (
+    <span 
+      className={`font-mono font-semibold tabular-nums ${changeColor}`}
+      aria-label={`Precio: ${price.toFixed(decimals)}`}
+    >
+      {price.toFixed(decimals)}
+    </span>
+  );
+};
 
-## 🆘 COMANDOS DE EMERGENCIA
-
-```bash
-# Ver qué archivos cambiaron
-git status
-git diff
-
-# DESHACER cambios en un archivo (volver al último commit)
-git checkout -- nombre-del-archivo.py
-
-# DESHACER TODOS los cambios no commiteados (¡irreversible!)
-git checkout -- .
-
-# Volver al commit anterior (sin perder los cambios - safe)
-git reset HEAD~1 --soft
-
-# Volver al commit anterior (perdiendo cambios - destructivo)
-git reset HEAD~1 --hard
-
-# Ver historial
-git log --oneline -20
-
-# Volver a un commit específico (solo para ver)
-git checkout [hash-del-commit]
-
-# Crear branch desde un commit anterior (para recuperar código)
-git checkout -b recovery/[descripcion] [hash-del-commit]
+// REGLAS DE PRECIOS EN UI:
+// 1. SIEMPRE usar font-mono para precios (alineación de dígitos)
+// 2. SIEMPRE tabular-nums para evitar saltos visuales
+// 3. Verde para subida, rojo para bajada
+// 4. Decimales fijos según el instrumento (BTC=2, FOREX=5)
 ```
 
 ---
 
-## 🗂️ .GITIGNORE COMPLETO PARA TRADING TERMINAL
+## 📋 FORMULARIO DE ÓRDENES
 
-```gitignore
-# ============================================================
-# TRADING TERMINAL — .gitignore
-# ============================================================
+```typescript
+// components/orders/OrderForm.tsx
 
-# === SECRETOS (NUNCA COMMITEAR) ===
-.env
-.env.local
-.env.production
-.env.staging
-*.pem
-*.key
-*.p12
-secrets/
-credentials/
+interface OrderFormState {
+  side: 'BUY' | 'SELL';
+  orderType: 'MARKET' | 'LIMIT' | 'STOP_LIMIT';
+  quantity: string;
+  price: string;
+  stopPrice: string;
+}
 
-# === PYTHON ===
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-.venv/
-venv/
-env/
-ENV/
-*.egg-info/
-dist/
-build/
-.pytest_cache/
-.coverage
-htmlcov/
+const OrderForm: React.FC<{ symbol: string; onOrderPlaced: (id: string) => void }> = ({
+  symbol,
+  onOrderPlaced
+}) => {
+  const [state, setState] = useState<OrderFormState>({
+    side: 'BUY',
+    orderType: 'MARKET',
+    quantity: '',
+    price: '',
+    stopPrice: ''
+  });
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  
+  // Validación del formulario
+  const validateForm = (): string | null => {
+    const qty = parseFloat(state.quantity);
+    if (isNaN(qty) || qty <= 0) return 'Cantidad debe ser un número positivo';
+    if (state.orderType === 'LIMIT' && !state.price) return 'Precio requerido para orden LIMIT';
+    return null;
+  };
+  
+  const handleSubmit = async () => {
+    setError(null);
+    const validationError = validateForm();
+    if (validationError) { setError(validationError); return; }
+    
+    setIsLoading(true);
+    try {
+      const order = await orderService.placeOrder({
+        symbol,
+        side: state.side,
+        orderType: state.orderType,
+        quantity: state.quantity,
+        price: state.price || undefined
+      });
+      onOrderPlaced(order.orderId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al enviar orden');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  return (
+    <div className="bg-[#1c2128] border border-[#30363d] rounded-lg p-4">
+      {/* Selector BUY/SELL */}
+      <div className="grid grid-cols-2 gap-1 mb-4">
+        <button
+          onClick={() => setState(s => ({ ...s, side: 'BUY' }))}
+          className={`py-2 rounded font-semibold transition-colors ${
+            state.side === 'BUY' 
+              ? 'bg-[#00c851] text-black' 
+              : 'bg-[#21262d] text-[#8b949e] hover:bg-[#00c851]/20'
+          }`}
+        >
+          COMPRAR
+        </button>
+        <button
+          onClick={() => setState(s => ({ ...s, side: 'SELL' }))}
+          className={`py-2 rounded font-semibold transition-colors ${
+            state.side === 'SELL' 
+              ? 'bg-[#ff4444] text-white' 
+              : 'bg-[#21262d] text-[#8b949e] hover:bg-[#ff4444]/20'
+          }`}
+        >
+          VENDER
+        </button>
+      </div>
+      
+      {/* Campo Cantidad */}
+      <div className="mb-3">
+        <label className="block text-[#8b949e] text-xs mb-1">Cantidad</label>
+        <input
+          type="number"
+          value={state.quantity}
+          onChange={e => setState(s => ({ ...s, quantity: e.target.value }))}
+          placeholder="0.00"
+          min="0"
+          step="any"
+          className="w-full bg-[#21262d] border border-[#30363d] text-[#e6edf3] 
+                     font-mono rounded px-3 py-2 focus:border-[#388bfd] outline-none"
+        />
+      </div>
+      
+      {/* Error */}
+      {error && (
+        <div role="alert" className="text-[#ff4444] text-sm mb-3 p-2 bg-[#ff4444]/10 rounded">
+          ⚠️ {error}
+        </div>
+      )}
+      
+      {/* Submit */}
+      <button
+        onClick={handleSubmit}
+        disabled={isLoading}
 
-# === NODE / FRONTEND ===
-node_modules/
-dist/
-.next/
-.nuxt/
-*.local
-
-# === BASES DE DATOS LOCALES ===
-*.sqlite
-*.db
-*.db-journal
-
-# === IDEs ===
-.idea/
-.vscode/settings.json     # Solo settings personales, no compartir
-*.swp
-*.swo
-.DS_Store
-Thumbs.db
-
-# === LOGS ===
-*.log
-logs/
-!logs/.gitkeep            # Mantener carpeta pero no los logs
-
-# === TRADING ESPECÍFICO ===
-backtest_results/
-trading_data/
-market_cache/
-```
-
----
-
-## 🔄 WORKFLOW COMPLETO DE SESIÓN
-
-```bash
-# === INICIO DE SESIÓN ===
-git status                           # Ver estado actual
-git pull                             # Traer cambios remotos
-git checkout feature/modulo-actual   # Ir al branch del módulo
-
-# === DURANTE EL DESARROLLO ===
-# ... La IA escribe código ...
-git add [archivo-específico]         # Agregar archivo específico
-git commit -m "feat(módulo): ..."    # Commit descriptivo
-
-# === FIN DE SESIÓN ===
-git status                           # Verificar nada quedó sin commitear
-git add .
-git commit -m "wip(módulo): checkpoint final de sesión"
-git push                             # Subir al remoto
-
-# === CUANDO UN MÓDULO ESTÁ COMPLETO ===
-git checkout develop
-git merge feature/nombre-del-modulo
-git push
-git branch -d feature/nombre-del-modulo  # Borrar branch terminado
-```
-
----
-
-## 📝 CHANGELOG
-
-Mantener `CHANGELOG.md` actualizado:
-
-```markdown
-# Changelog
-
-## [Unreleased]
-
-### Agregado
-- feat(auth): Sistema de autenticación JWT con refresh tokens
-- feat(orders): Endpoint para crear órdenes MARKET y LIMIT
-
-### Modificado  
-- refactor(risk): Extraer validaciones a RiskService separado
-
-### Corregido
-- fix(websocket): Memory leak en reconexión automática
-
-## [0.1.0] - 2025-06-01
-
-### Agregado
-- Estructura inicial del proyecto
-- Configuración de entorno de desarrollo
-```
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [juandoroteoflesiauni-lang/Market-options-stocks-Scanner](https://github.com/juandoroteoflesiauni-lang/Market-options-stocks-Scanner) — distributed by [TomeVault](https://tomevault.io).
