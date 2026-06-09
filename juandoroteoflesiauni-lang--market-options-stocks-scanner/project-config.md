@@ -1,195 +1,198 @@
 ---
 trigger: always_on
-description: Reglas de componentes UI para la terminal de trading — gráficos, órdenes, portfolio
+description: Reglas específicas para desarrollo Python/FastAPI en el backend de trading
 ---
 
 
-# 🖥️ UI COMPONENTS — TRADING TERMINAL
+# 🐍 PYTHON/FASTAPI — TRADING TERMINAL BACKEND
 
-## DISEÑO DE LA TERMINAL DE TRADING
+## CONFIGURACIÓN DEL PROYECTO PYTHON
 
-### Tema visual obligatorio:
-```css
-/* design-tokens.css — Variables globales */
-:root {
-  /* Colores base — Tema oscuro como Bloomberg/TradingView */
-  --bg-primary: #0d1117;
-  --bg-secondary: #161b22;
-  --bg-panel: #1c2128;
-  --bg-card: #21262d;
-  
-  /* Colores de trading */
-  --color-buy: #00c851;        /* Verde — Compra */
-  --color-sell: #ff4444;       /* Rojo — Venta */
-  --color-neutral: #f0c040;    /* Amarillo — Neutro/Pendiente */
-  
-  /* Texto */
-  --text-primary: #e6edf3;
-  --text-secondary: #8b949e;
-  --text-muted: #484f58;
-  
-  /* Bordes */
-  --border-default: #30363d;
-  --border-accent: #388bfd;
-  
-  /* Tipografía */
-  --font-mono: 'JetBrains Mono', 'Fira Code', monospace; /* Para precios */
-  --font-ui: 'Inter', system-ui, sans-serif;
-}
+### Estructura de dependencias:
+```
+requirements.txt          ← Producción
+requirements-dev.txt      ← Solo desarrollo
+```
+
+```txt
+# requirements.txt
+fastapi==0.111.0
+uvicorn[standard]==0.29.0
+sqlalchemy[asyncio]==2.0.29
+asyncpg==0.29.0
+alembic==1.13.1
+pydantic==2.7.1
+pydantic-settings==2.2.1
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+redis[asyncio]==5.0.4
+httpx==0.27.0
+structlog==24.1.0
+python-binance==1.0.19
+slowapi==0.1.9
+
+# requirements-dev.txt
+pytest==8.1.1
+pytest-asyncio==0.23.6
+pytest-cov==5.0.0
+black==24.4.2
+ruff==0.4.2
+mypy==1.10.0
 ```
 
 ---
 
-## 📊 COMPONENTES DE PRECIOS — Reglas Críticas
+## ⚙️ CONFIGURACIÓN (Settings Pattern)
 
-```typescript
-// ✅ CORRECTO — Precio con color dinámico y fuente monoespaciada
+```python
+# core/config.py — PATRÓN OBLIGATORIO
 
-interface PriceDisplayProps {
-  price: number;
-  previousPrice?: number;
-  decimals?: number;
-  showChange?: boolean;
-}
+from pydantic_settings import BaseSettings
+from pydantic import validator
+from typing import Optional
 
-const PriceDisplay: React.FC<PriceDisplayProps> = ({
-  price,
-  previousPrice,
-  decimals = 2,
-  showChange = false
-}) => {
-  const isUp = previousPrice !== undefined && price > previousPrice;
-  const isDown = previousPrice !== undefined && price < previousPrice;
-  const changeColor = isUp ? 'text-[#00c851]' : isDown ? 'text-[#ff4444]' : 'text-[#e6edf3]';
-  
-  return (
-    <span 
-      className={`font-mono font-semibold tabular-nums ${changeColor}`}
-      aria-label={`Precio: ${price.toFixed(decimals)}`}
-    >
-      {price.toFixed(decimals)}
-    </span>
-  );
-};
-
-// REGLAS DE PRECIOS EN UI:
-// 1. SIEMPRE usar font-mono para precios (alineación de dígitos)
-// 2. SIEMPRE tabular-nums para evitar saltos visuales
-// 3. Verde para subida, rojo para bajada
-// 4. Decimales fijos según el instrumento (BTC=2, FOREX=5)
-```
-
----
-
-## 📋 FORMULARIO DE ÓRDENES
-
-```typescript
-// components/orders/OrderForm.tsx
-
-interface OrderFormState {
-  side: 'BUY' | 'SELL';
-  orderType: 'MARKET' | 'LIMIT' | 'STOP_LIMIT';
-  quantity: string;
-  price: string;
-  stopPrice: string;
-}
-
-const OrderForm: React.FC<{ symbol: string; onOrderPlaced: (id: string) => void }> = ({
-  symbol,
-  onOrderPlaced
-}) => {
-  const [state, setState] = useState<OrderFormState>({
-    side: 'BUY',
-    orderType: 'MARKET',
-    quantity: '',
-    price: '',
-    stopPrice: ''
-  });
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  
-  // Validación del formulario
-  const validateForm = (): string | null => {
-    const qty = parseFloat(state.quantity);
-    if (isNaN(qty) || qty <= 0) return 'Cantidad debe ser un número positivo';
-    if (state.orderType === 'LIMIT' && !state.price) return 'Precio requerido para orden LIMIT';
-    return null;
-  };
-  
-  const handleSubmit = async () => {
-    setError(null);
-    const validationError = validateForm();
-    if (validationError) { setError(validationError); return; }
+class Settings(BaseSettings):
+    """
+    Todas las configuraciones vienen de variables de entorno.
+    Nunca valores hardcodeados aquí.
+    """
+    # Base de datos
+    DATABASE_URL: str
+    REDIS_URL: str = "redis://localhost:6379/0"
     
-    setIsLoading(true);
-    try {
-      const order = await orderService.placeOrder({
-        symbol,
-        side: state.side,
-        orderType: state.orderType,
-        quantity: state.quantity,
-        price: state.price || undefined
-      });
-      onOrderPlaced(order.orderId);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al enviar orden');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-  
-  return (
-    <div className="bg-[#1c2128] border border-[#30363d] rounded-lg p-4">
-      {/* Selector BUY/SELL */}
-      <div className="grid grid-cols-2 gap-1 mb-4">
-        <button
-          onClick={() => setState(s => ({ ...s, side: 'BUY' }))}
-          className={`py-2 rounded font-semibold transition-colors ${
-            state.side === 'BUY' 
-              ? 'bg-[#00c851] text-black' 
-              : 'bg-[#21262d] text-[#8b949e] hover:bg-[#00c851]/20'
-          }`}
-        >
-          COMPRAR
-        </button>
-        <button
-          onClick={() => setState(s => ({ ...s, side: 'SELL' }))}
-          className={`py-2 rounded font-semibold transition-colors ${
-            state.side === 'SELL' 
-              ? 'bg-[#ff4444] text-white' 
-              : 'bg-[#21262d] text-[#8b949e] hover:bg-[#ff4444]/20'
-          }`}
-        >
-          VENDER
-        </button>
-      </div>
-      
-      {/* Campo Cantidad */}
-      <div className="mb-3">
-        <label className="block text-[#8b949e] text-xs mb-1">Cantidad</label>
-        <input
-          type="number"
-          value={state.quantity}
-          onChange={e => setState(s => ({ ...s, quantity: e.target.value }))}
-          placeholder="0.00"
-          min="0"
-          step="any"
-          className="w-full bg-[#21262d] border border-[#30363d] text-[#e6edf3] 
-                     font-mono rounded px-3 py-2 focus:border-[#388bfd] outline-none"
-        />
-      </div>
-      
-      {/* Error */}
-      {error && (
-        <div role="alert" className="text-[#ff4444] text-sm mb-3 p-2 bg-[#ff4444]/10 rounded">
-          ⚠️ {error}
-        </div>
-      )}
-      
-      {/* Submit */}
-      <button
-        onClick={handleSubmit}
-        disabled={isLoading}
+    # Seguridad
+    SECRET_KEY: str
+    JWT_ALGORITHM: str = "HS256"
+    JWT_EXPIRE_MINUTES: int = 60
+    
+    # APIs de Trading
+    BINANCE_API_KEY: Optional[str] = None
+    BINANCE_API_SECRET: Optional[str] = None
+    MT5_LOGIN: Optional[str] = None
+    MT5_PASSWORD: Optional[str] = None
+    MT5_SERVER: Optional[str] = None
+    
+    # App
+    ENVIRONMENT: str = "development"
+    DEBUG: bool = False
+    ALLOWED_ORIGINS: str = "http://localhost:5173"
+    
+    @validator('SECRET_KEY')
+    def secret_key_must_be_strong(cls, v):
+        if len(v) < 32:
+            raise ValueError('SECRET_KEY debe tener al menos 32 caracteres')
+        return v
+    
+    class Config:
+        env_file = ".env"
+        case_sensitive = True
+
+settings = Settings()  # Singleton — importar este objeto
+```
+
+---
+
+## 🗄️ MODELOS DE BASE DE DATOS
+
+```python
+# models/order.py — SQLAlchemy async
+
+from sqlalchemy import Column, String, Numeric, Enum, DateTime, ForeignKey
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
+from datetime import datetime
+import uuid
+import enum
+
+from core.database import Base
+
+class OrderStatus(str, enum.Enum):
+    PENDING = "pending"
+    OPEN = "open"
+    FILLED = "filled"
+    CANCELLED = "cancelled"
+    REJECTED = "rejected"
+
+class Order(Base):
+    __tablename__ = "orders"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    
+    symbol = Column(String(20), nullable=False, index=True)
+    side = Column(String(4), nullable=False)          # BUY / SELL
+    order_type = Column(String(20), nullable=False)   # MARKET / LIMIT
+    status = Column(String(20), nullable=False, default=OrderStatus.PENDING)
+    
+    quantity = Column(Numeric(precision=20, scale=8), nullable=False)
+    price = Column(Numeric(precision=20, scale=8), nullable=True)
+    fill_price = Column(Numeric(precision=20, scale=8), nullable=True)
+    
+    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
+    filled_at = Column(DateTime(timezone=True), nullable=True)
+    
+    exchange_order_id = Column(String(100), nullable=True, unique=True)
+    
+    # Relaciones
+    user = relationship("User", back_populates="orders")
+    
+    def __repr__(self):
+        return f"<Order {self.id}: {self.side} {self.quantity} {self.symbol} @ {self.price}>"
+```
+
+---
+
+## 🔗 ENDPOINTS FASTAPI
+
+```python
+# api/v1/orders.py — Patrón completo de endpoint
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from api.deps import get_current_user, get_db
+from schemas.order_schema import OrderCreate, OrderResponse, OrderListResponse
+from services.order_service import OrderService
+from core.exceptions import InsufficientFundsError, RiskViolationError
+from core.logger import logger
+
+router = APIRouter(prefix="/orders", tags=["orders"])
+order_service = OrderService()
+
+@router.post("/", response_model=OrderResponse, status_code=status.HTTP_201_CREATED)
+async def create_order(
+    order_data: OrderCreate,
+    current_user = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Crear nueva orden de trading.
+    
+    Valida riesgo, verifica fondos y envía al exchange.
+    """
+    try:
+        order = await order_service.create_order(
+            db=db,
+            order_data=order_data,
+            user_id=current_user.id
+        )
+        logger.info("order.created", order_id=str(order.id), user_id=str(current_user.id))
+        return order
+        
+    except InsufficientFundsError as e:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail=str(e)
+        )
+    except RiskViolationError as e:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(e)
+        )
+    except Exception as e:
+        logger.error("order.creation.failed", error=str(e), user_id=str(current_user.id))
+        raise HTTPException(
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
