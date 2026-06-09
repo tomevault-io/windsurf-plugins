@@ -1,189 +1,174 @@
 ---
 trigger: always_on
-description: Reglas para integración con exchanges — Binance, MT5 y adaptadores genéricos
+description: Reglas de manejo de errores y logging — prevenir fallos silenciosos en trading
 ---
 
 
-# 🔗 INTEGRACIÓN CON EXCHANGES — TRADING TERMINAL
+# 🚨 MANEJO DE ERRORES Y LOGGING — TRADING TERMINAL
 
-## PRINCIPIO: ADAPTADOR UNIVERSAL
+## FILOSOFÍA: FAIL LOUDLY, NOT SILENTLY
 
-El sistema NUNCA debe depender directamente de la API de un exchange específico.
-Todos los exchanges se acceden a través de un adaptador que implementa la misma interfaz.
-Esto permite cambiar de Binance a MT5 sin tocar el resto del código.
+En trading, un error silencioso puede significar:
+- Orden que se envió pero no se registró
+- Pérdida calculada incorrectamente
+- Precio desactualizado sin que el usuario lo sepa
+
+**Cada error DEBE ser visible: al usuario, en los logs, o ambos.**
 
 ---
 
-## 🏗️ INTERFAZ BASE DEL EXCHANGE
+## 🐍 JERARQUÍA DE EXCEPCIONES (Python)
 
 ```python
-# adapters/base_exchange.py
+# core/exceptions.py — Mapa completo de excepciones del dominio
 
-from abc import ABC, abstractmethod
-from decimal import Decimal
-from typing import AsyncIterator
-from dataclasses import dataclass
-from datetime import datetime
+class TradingError(Exception):
+    """Base de todas las excepciones. Nunca usar directamente."""
+    def __init__(self, message: str, code: str = "TRADING_ERROR"):
+        self.message = message
+        self.code = code
+        super().__init__(message)
 
-@dataclass
-class OrderResult:
-    order_id: str
-    symbol: str
-    side: str
-    order_type: str
-    quantity: Decimal
-    fill_price: Decimal
-    status: str
-    timestamp: datetime
-    exchange: str
+# ── Errores de autenticación ──────────────────────────
+class UnauthorizedError(TradingError):
+    """JWT inválido, expirado, o usuario sin permisos."""
+    def __init__(self, message: str = "No autorizado"):
+        super().__init__(message, "UNAUTHORIZED")
 
-@dataclass
-class Ticker:
-    symbol: str
-    price: Decimal
-    bid: Decimal
-    ask: Decimal
-    volume_24h: Decimal
-    change_24h_pct: Decimal
-    timestamp: datetime
+# ── Errores de validación ──────────────────────────────
+class ValidationError(TradingError):
+    """Input del usuario es inválido."""
+    def __init__(self, message: str, field: str = ""):
+        self.field = field
+        super().__init__(message, "VALIDATION_ERROR")
 
-@dataclass
-class Balance:
-    asset: str
-    free: Decimal
-    locked: Decimal
-    
-    @property
-    def total(self) -> Decimal:
-        return self.free + self.locked
+class InvalidSymbolError(ValidationError):
+    """El símbolo de trading no existe o no está disponible."""
+    pass
 
-class BaseExchangeAdapter(ABC):
-    """
-    Interfaz que TODOS los exchanges deben implementar.
-    
-    Si agregas un exchange nuevo, implementa esta clase.
-    No modifiques el código que llama a esta interfaz.
-    """
-    
-    @abstractmethod
-    async def get_ticker(self, symbol: str) -> Ticker:
-        """Obtener precio actual y datos de mercado."""
-        ...
-    
-    @abstractmethod
-    async def get_balances(self) -> list[Balance]:
-        """Obtener todos los balances de la cuenta."""
-        ...
-    
-    @abstractmethod
-    async def place_order(
-        self,
-        symbol: str,
-        side: str,          # "BUY" o "SELL"
-        order_type: str,    # "MARKET" o "LIMIT"
-        quantity: Decimal,
-        price: Decimal | None = None
-    ) -> OrderResult:
-        """Enviar orden al exchange."""
-        ...
-    
-    @abstractmethod
-    async def cancel_order(self, symbol: str, order_id: str) -> bool:
-        """Cancelar orden pendiente."""
-        ...
-    
-    @abstractmethod
-    async def get_order_status(self, symbol: str, order_id: str) -> OrderResult:
-        """Consultar estado de una orden."""
-        ...
-    
-    @abstractmethod
-    async def stream_prices(self, symbol: str) -> AsyncIterator[Ticker]:
-        """Stream de precios en tiempo real."""
-        ...
+# ── Errores financieros ────────────────────────────────
+class InsufficientFundsError(TradingError):
+    """No hay fondos suficientes para la operación."""
+    def __init__(self, required: float, available: float):
+        super().__init__(
+            f"Fondos insuficientes: necesitas ${required:.2f}, tienes ${available:.2f}",
+            "INSUFFICIENT_FUNDS"
+        )
+        self.required = required
+        self.available = available
+
+class RiskViolationError(TradingError):
+    """La operación viola las reglas de gestión de riesgo."""
+    def __init__(self, message: str, rule: str = ""):
+        self.rule = rule
+        super().__init__(message, "RISK_VIOLATION")
+
+# ── Errores de órdenes ─────────────────────────────────
+class OrderNotFoundError(TradingError):
+    """La orden no existe o no pertenece al usuario."""
+    pass
+
+class OrderAlreadyCancelledError(TradingError):
+    """La orden ya fue cancelada y no se puede modificar."""
+    pass
+
+class OrderExecutionError(TradingError):
+    """Error al ejecutar la orden en el exchange."""
+    pass
+
+# ── Errores de exchange ────────────────────────────────
+class ExchangeConnectionError(TradingError):
+    """Error de conexión con el exchange."""
+    pass
+
+class ExchangeRateLimitError(TradingError):
+    """Se alcanzó el límite de solicitudes del exchange."""
+    pass
 ```
 
 ---
 
-## 🟡 ADAPTADOR BINANCE
+## 🔧 HANDLERS GLOBALES DE ERRORES (FastAPI)
 
 ```python
-# adapters/binance_adapter.py
+# main.py — Registrar handlers en el app de FastAPI
 
-from binance import AsyncClient
-from binance.exceptions import BinanceAPIException
-from decimal import Decimal
-from typing import AsyncIterator
-import asyncio
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from adapters.base_exchange import BaseExchangeAdapter, OrderResult, Ticker, Balance
-from core.config import settings
-from core.exceptions import ExchangeConnectionError, OrderExecutionError
-from core.logger import logger
+app = FastAPI()
 
-class BinanceAdapter(BaseExchangeAdapter):
-    """Adaptador para Binance Spot Trading."""
+@app.exception_handler(TradingError)
+async def trading_error_handler(request: Request, exc: TradingError) -> JSONResponse:
+    """Handler para todas las excepciones de negocio."""
+    # Determinar HTTP status según el tipo de error
+    status_map = {
+        "UNAUTHORIZED":       401,
+        "INSUFFICIENT_FUNDS": 402,
+        "VALIDATION_ERROR":   422,
+        "RISK_VIOLATION":     422,
+        "TRADING_ERROR":      500,
+    }
+    status_code = status_map.get(exc.code, 500)
     
-    def __init__(self):
-        self._client: AsyncClient | None = None
+    logger.warning("trading.error",
+                   code=exc.code,
+                   message=exc.message,
+                   path=str(request.url),
+                   method=request.method)
     
-    async def _get_client(self) -> AsyncClient:
-        """Lazy initialization del cliente."""
-        if self._client is None:
-            try:
-                self._client = await AsyncClient.create(
-                    api_key=settings.BINANCE_API_KEY,
-                    api_secret=settings.BINANCE_API_SECRET,
-                    testnet=settings.ENVIRONMENT != "production"  # Testnet en dev!
-                )
-            except Exception as e:
-                raise ExchangeConnectionError(f"No se pudo conectar a Binance: {e}")
-        return self._client
+    return JSONResponse(
+        status_code=status_code,
+        content={
+            "error": {
+                "code": exc.code,
+                "message": exc.message,
+                # NUNCA incluir stack trace en response al cliente
+            }
+        }
+    )
+
+@app.exception_handler(RequestValidationError)
+async def validation_error_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+    """Handler para errores de validación de Pydantic."""
+    errors = []
+    for error in exc.errors():
+        errors.append({
+            "field": ".".join(str(loc) for loc in error["loc"]),
+            "message": error["msg"],
+        })
     
-    async def get_ticker(self, symbol: str) -> Ticker:
-        client = await self._get_client()
-        try:
-            data = await client.get_ticker(symbol=symbol)
-            return Ticker(
-                symbol=symbol,
-                price=Decimal(data['lastPrice']),
-                bid=Decimal(data['bidPrice']),
-                ask=Decimal(data['askPrice']),
-                volume_24h=Decimal(data['volume']),
-                change_24h_pct=Decimal(data['priceChangePercent']),
-                timestamp=datetime.fromtimestamp(data['closeTime'] / 1000)
-            )
-        except BinanceAPIException as e:
-            logger.error("binance.ticker.error", symbol=symbol, error=str(e))
-            raise ExchangeConnectionError(f"Error obteniendo precio de {symbol}: {e}")
+    return JSONResponse(
+        status_code=422,
+        content={"error": {"code": "VALIDATION_ERROR", "fields": errors}}
+    )
+
+@app.exception_handler(Exception)
+async def generic_error_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Handler de último recurso — captura errores inesperados."""
+    logger.critical("unhandled.exception",
+                    exc_type=type(exc).__name__,
+                    exc_message=str(exc),
+                    path=str(request.url),
+                    exc_info=True)  # Incluye stack trace en los LOGS (no en response)
     
-    async def get_balances(self) -> list[Balance]:
-        client = await self._get_client()
-        try:
-            account = await client.get_account()
-            return [
-                Balance(
-                    asset=b['asset'],
-                    free=Decimal(b['free']),
-                    locked=Decimal(b['locked'])
-                )
-                for b in account['balances']
-                if Decimal(b['free']) > 0 or Decimal(b['locked']) > 0
-            ]
-        except BinanceAPIException as e:
-            raise ExchangeConnectionError(f"Error obteniendo balances: {e}")
-    
-    async def place_order(
-        self,
-        symbol: str,
-        side: str,
-        order_type: str,
-        quantity: Decimal,
-        price: Decimal | None = None
-    ) -> OrderResult:
-        client = await self._get_client()
-        try:
-            params = {
+    return JSONResponse(
+        status_code=500,
+        content={"error": {"code": "INTERNAL_ERROR", "message": "Error interno del servidor"}}
+    )
+```
+
+---
+
+## 📊 SISTEMA DE LOGGING (structlog)
+
+```python
+# core/logger.py — Logger estructurado para producción
+
+import logging
+import structlog
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
