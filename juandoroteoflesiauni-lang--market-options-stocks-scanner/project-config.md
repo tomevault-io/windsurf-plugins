@@ -1,177 +1,177 @@
 ---
 trigger: always_on
-description: Activo en archivos del bus de eventos, fases async, workers y WebSocket. Event-driven: ningún motor espera activamente datos.
+description: Reglas de testing — asegurar que el código funciona antes de operar con dinero real
 ---
 
 
-# ⚡ ASYNC EVENT ENGINE — MOTOR EVENT-DRIVEN v3.0
+# 🧪 TESTING — TRADING TERMINAL
 
-## PRINCIPIO CENTRAL
-Los motores (Fase B/C) **nunca esperan activamente** datos.
-Se suscriben al Event Bus y **reaccionan** cuando llegan snapshots.
-Toda espera activa (`while True: check_for_data()`) es un anti-patrón.
+## FILOSOFÍA: CÓDIGO SIN TEST = CÓDIGO ROTO
 
-## ARQUITECTURA DEL BUS
+En una terminal de trading, un bug puede significar pérdida de dinero.
+**Cada función de lógica de negocio DEBE tener al menos un test.**
 
+---
+
+## 🐍 TESTS BACKEND (Python/Pytest)
+
+### Estructura de tests:
 ```
-MarketDataHub (Phase A output)
-        │ publish(MarketSnapshot)
-        ▼
-┌─────────────────────────┐
-│  Standard Queue          │  asyncio.Queue(maxsize=10_000)
-│  Fase B/C consumers      │  Drop-Oldest si se llena
-└──────────┬──────────────┘
-           │
-    ┌──────┴──────┐
-    ▼             ▼
- Phase B        Phase C
-    │             │
-    └──────┬──────┘
-           │ publish(OptionContract)
-           ▼
-┌─────────────────────────┐
-│  Priority Queue          │  asyncio.Queue(maxsize=1_000)
-│  Phase D EXCLUSIVO       │  CRITICAL log si se llena
-└──────────┬──────────────┘
-           ▼
-      Phase D Monitor → ExecutionSignal → Frontend
+tests/
+├── unit/                    ← Tests de funciones individuales (rápidos)
+│   ├── test_risk_service.py
+│   ├── test_order_service.py
+│   └── test_calculators.py
+├── integration/             ← Tests de flujos completos (más lentos)
+│   ├── test_order_flow.py
+│   └── test_auth_flow.py
+├── fixtures/                ← Datos de prueba compartidos
+│   └── trading_fixtures.py
+└── conftest.py              ← Configuración global de pytest
 ```
 
-## WORKER PATTERN — Aislamiento de fallos
-
+### Template de test unitario:
 ```python
-class MicrostructureEngine:
-    """Phase B: consume snapshots, calcula VPIN/OFI. ZERO imports de red."""
+# tests/unit/test_risk_service.py
+import pytest
+from decimal import Decimal
+from unittest.mock import AsyncMock, patch
 
-    async def run(self) -> None:
-        """Loop principal. Falla individual → log + continúa. Bus nunca para."""
-        async for snapshot in self._bus.consume():
-            try:
-                await self._process_snapshot(snapshot)
-            except Exception:
-                logger.error(
-                    "Phase B: fallo en snapshot — continuando [PD-6]",
-                    extra={"ticker": snapshot.ticker},
-                    exc_info=True,
-                )
-                # ← El bus continúa. Un fallo no mata el worker.
+from app.services.risk_service import RiskService
+from app.schemas.order_schema import OrderCreate
+from app.core.exceptions import RiskViolationError, InsufficientFundsError
 
-    async def _process_snapshot(self, snapshot: MarketSnapshot) -> None:
-        """CPU-bound → ProcessPoolExecutor para no bloquear event loop."""
-        loop = asyncio.get_running_loop()
-        enriched = await loop.run_in_executor(
-            self._executor,
-            calculate_vpin_ofi_sync,  # función pura, sin async
-            snapshot,
-        )
-```
-
-## BACKPRESSURE — CONFIGURACIÓN OBLIGATORIA
-
-```python
-# Cola estándar: Drop-Oldest cuando está llena
-async def publish(self, snapshot: MarketSnapshot) -> None:
-    if self._standard_queue.full():
-        dropped = self._standard_queue.get_nowait()
-        logger.warning(
-            "EventBus: BACKPRESSURE — descartando snapshot más viejo",
-            extra={"dropped_ticker": dropped.ticker},
-        )
-    await self._standard_queue.put(snapshot)
-
-# Cola priority: si se llena → CRITICAL (Phase D no puede procesar)
-if self._priority_queue.full():
-    logger.critical(
-        "PRIORITY QUEUE LLENA — Phase D tiene latencia crítica. INVESTIGAR."
-    )
-```
-
-## GESTIÓN DE TAREAS — Cada worker en su propia task
-
-```python
-async def main() -> None:
-    bus = EventBus()
-    executor = ProcessPoolExecutor(max_workers=4)
+class TestRiskService:
+    """Tests del servicio de gestión de riesgo."""
     
-    # Cada motor en task aislada → si una falla, las demás siguen
-    tasks = [
-        asyncio.create_task(phase_b.run(), name="phase_b_worker"),
-        asyncio.create_task(phase_c.run(), name="phase_c_worker"),
-        asyncio.create_task(phase_d.run(), name="phase_d_worker"),
-    ]
+    @pytest.fixture
+    def risk_service(self):
+        return RiskService()
     
-    # Signal handlers para clean shutdown
-    loop = asyncio.get_running_loop()
-    for sig in (signal.SIGINT, signal.SIGTERM):
-        loop.add_signal_handler(
-            sig, lambda s=sig: asyncio.create_task(shutdown(s, tasks, executor))
+    @pytest.fixture
+    def mock_portfolio(self):
+        return {
+            "available_usd": Decimal("5000"),
+            "total_value": Decimal("10000")
+        }
+    
+    # ========== HAPPY PATH ==========
+    
+    async def test_valid_order_passes_validation(self, risk_service, mock_portfolio):
+        """Orden válida dentro de límites debe pasar."""
+        order = OrderCreate(
+            symbol="BTCUSDT",
+            side="BUY",
+            order_type="MARKET",
+            quantity=Decimal("0.01")
         )
+        current_price = Decimal("40000")
+        
+        # No debe lanzar excepción
+        await risk_service.validate_order(order, mock_portfolio, current_price)
     
-    await asyncio.gather(*tasks, return_exceptions=True)
-
-async def shutdown(sig, tasks, executor):
-    logger.info("Shutdown: %s. Deteniendo workers...", sig.name)
-    for task in tasks:
-        task.cancel()
-    await asyncio.gather(*tasks, return_exceptions=True)
-    executor.shutdown(wait=True)
-    logger.info("Shutdown limpio completo.")
+    # ========== CASOS BORDE ==========
+    
+    async def test_order_exceeding_max_size_raises_error(self, risk_service, mock_portfolio):
+        """Orden > $10,000 debe ser rechazada."""
+        order = OrderCreate(
+            symbol="BTCUSDT",
+            side="BUY",
+            order_type="MARKET",
+            quantity=Decimal("1.0")  # 1 BTC a $40k = $40,000
+        )
+        
+        with pytest.raises(RiskViolationError) as exc_info:
+            await risk_service.validate_order(order, mock_portfolio, Decimal("40000"))
+        
+        assert "excede límite" in str(exc_info.value)
+    
+    async def test_insufficient_funds_raises_error(self, risk_service):
+        """Orden sin fondos suficientes debe ser rechazada."""
+        poor_portfolio = {
+            "available_usd": Decimal("100"),
+            "total_value": Decimal("100")
+        }
+        order = OrderCreate(
+            symbol="BTCUSDT",
+            side="BUY",
+            order_type="MARKET",
+            quantity=Decimal("0.1")  # $4,000
+        )
+        
+        with pytest.raises(InsufficientFundsError):
+            await risk_service.validate_order(order, poor_portfolio, Decimal("40000"))
+    
+    async def test_negative_quantity_raises_error(self, risk_service, mock_portfolio):
+        """Cantidad negativa debe ser rechazada por Pydantic."""
+        with pytest.raises(ValueError):
+            OrderCreate(
+                symbol="BTCUSDT",
+                side="BUY", 
+                order_type="MARKET",
+                quantity=Decimal("-1.0")
+            )
 ```
 
-## PROHIBICIONES CRÍTICAS
+---
 
-```python
-# ❌ PROHIBIDO — bloquea el event loop
-time.sleep(1)
-# ✅ CORRECTO
-await asyncio.sleep(1)
+## ⚡ TESTS FRONTEND (Vitest + Testing Library)
 
-# ❌ PROHIBIDO — CPU pesado en el event loop
-async def process(snapshot):
-    result = heavy_matrix_computation(snapshot)  # bloquea el loop
-# ✅ CORRECTO
-async def process(snapshot):
-    result = await loop.run_in_executor(executor, heavy_matrix_computation, snapshot)
+### Template de test de componente:
+```typescript
+// components/orders/__tests__/OrderForm.test.tsx
 
-# ❌ PROHIBIDO — estado mutable compartido entre tasks
-shared_list = []   # race condition sin lock
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { vi } from 'vitest';
+import OrderForm from '../OrderForm';
+import * as orderService from '@/services/orderService';
 
-# ❌ PROHIBIDO — excepción no capturada mata el bus
-async def worker():
-    snapshot = await queue.get()
-    process_unsafe(snapshot)   # Si falla → bus se detiene
-# ✅ CORRECTO — envuelve en try/except, log y continúa
+// Mock del servicio
+vi.mock('@/services/orderService');
 
-# ❌ PROHIBIDO — Phase B/C importan librerías de red
-# backend/phases/phase_b/engine.py
-import httpx   # RECHAZAR — viola aislamiento de motor
-```
-
-## THRESHOLDS — En config/, no aquí
-
-```python
-# ❌ PROHIBIDO
-queue = asyncio.Queue(maxsize=10_000)   # número mágico
-
-# ✅ CORRECTO
-from config.phase_thresholds import PhaseThresholds
-thresholds = PhaseThresholds()
-queue = asyncio.Queue(maxsize=thresholds.event_bus_max_queue_size)
-```
-
-## LOGGING DE MONITORING — OBLIGATORIO
-
-```python
-# Loggear en cada transición de fase:
-logger.info("Transición de fase", extra={
-    "from_phase": "A",
-    "to_phase": "B",
-    "candidate_count": len(candidates),
-    "duration_ms": elapsed_ms,
-})
-
-# Loggear estado del bus periódicamente:
-logger.info("Estado EventBus", extra={
+describe('OrderForm', () => {
+  const mockOnOrderPlaced = vi.fn();
+  
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+  
+  // ========== RENDER ==========
+  
+  it('renders all required fields', () => {
+    render(<OrderForm symbol="BTCUSDT" onOrderPlaced={mockOnOrderPlaced} />);
+    
+    expect(screen.getByLabelText(/cantidad/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /comprar/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /vender/i })).toBeInTheDocument();
+  });
+  
+  // ========== INTERACCIONES ==========
+  
+  it('submits buy order with correct data', async () => {
+    const user = userEvent.setup();
+    vi.mocked(orderService.placeOrder).mockResolvedValue({ orderId: '123' });
+    
+    render(<OrderForm symbol="BTCUSDT" onOrderPlaced={mockOnOrderPlaced} />);
+    
+    await user.type(screen.getByLabelText(/cantidad/i), '0.01');
+    await user.click(screen.getByRole('button', { name: /comprar/i }));
+    
+    await waitFor(() => {
+      expect(orderService.placeOrder).toHaveBeenCalledWith({
+        symbol: 'BTCUSDT',
+        side: 'BUY',
+        quantity: 0.01,
+        orderType: 'MARKET'
+      });
+    });
+  });
+  
+  // ========== VALIDACIONES UI ==========
+  
+  it('shows error for negative quantity', async () => {
+    const user = userEvent.setup();
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
