@@ -1,190 +1,189 @@
 ---
 trigger: always_on
-description: Reglas de base de datos, migraciones y caché para la terminal de trading
+description: Reglas para integración con exchanges — Binance, MT5 y adaptadores genéricos
 ---
 
 
-# 🗄️ BASE DE DATOS Y PERSISTENCIA — TRADING TERMINAL
+# 🔗 INTEGRACIÓN CON EXCHANGES — TRADING TERMINAL
 
-## PRINCIPIOS DE ACCESO A DATOS
+## PRINCIPIO: ADAPTADOR UNIVERSAL
 
-- **Nunca** SQL raw en services o endpoints → usar SQLAlchemy ORM
-- **Siempre** async para no bloquear el event loop
-- **Decimal** para todos los valores monetarios (nunca float)
-- **UUID** como primary key (no autoincrement entero)
-- **Timestamps** en UTC siempre
+El sistema NUNCA debe depender directamente de la API de un exchange específico.
+Todos los exchanges se acceden a través de un adaptador que implementa la misma interfaz.
+Esto permite cambiar de Binance a MT5 sin tocar el resto del código.
 
 ---
 
-## 🔌 CONEXIÓN Y SESIÓN
+## 🏗️ INTERFAZ BASE DEL EXCHANGE
 
 ```python
-# core/database.py
+# adapters/base_exchange.py
 
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
-from sqlalchemy.orm import DeclarativeBase
-from core.config import settings
+from abc import ABC, abstractmethod
+from decimal import Decimal
+from typing import AsyncIterator
+from dataclasses import dataclass
+from datetime import datetime
 
-# Motor async — una sola instancia global
-engine = create_async_engine(
-    settings.DATABASE_URL,
-    echo=settings.DEBUG,          # Solo SQL logs en modo debug
-    pool_size=10,                 # Conexiones en el pool
-    max_overflow=20,              # Conexiones extra bajo demanda
-    pool_pre_ping=True,           # Verificar conexiones antes de usar
-)
+@dataclass
+class OrderResult:
+    order_id: str
+    symbol: str
+    side: str
+    order_type: str
+    quantity: Decimal
+    fill_price: Decimal
+    status: str
+    timestamp: datetime
+    exchange: str
 
-AsyncSessionLocal = async_sessionmaker(
-    engine,
-    class_=AsyncSession,
-    expire_on_commit=False        # Importante para async
-)
+@dataclass
+class Ticker:
+    symbol: str
+    price: Decimal
+    bid: Decimal
+    ask: Decimal
+    volume_24h: Decimal
+    change_24h_pct: Decimal
+    timestamp: datetime
 
-class Base(DeclarativeBase):
-    """Base para todos los modelos SQLAlchemy."""
-    pass
+@dataclass
+class Balance:
+    asset: str
+    free: Decimal
+    locked: Decimal
+    
+    @property
+    def total(self) -> Decimal:
+        return self.free + self.locked
 
-# Dependency para FastAPI
-async def get_db() -> AsyncSession:
-    async with AsyncSessionLocal() as session:
-        try:
-            yield session
-            await session.commit()
-        except Exception:
-            await session.rollback()
-            raise
-        finally:
-            await session.close()
+class BaseExchangeAdapter(ABC):
+    """
+    Interfaz que TODOS los exchanges deben implementar.
+    
+    Si agregas un exchange nuevo, implementa esta clase.
+    No modifiques el código que llama a esta interfaz.
+    """
+    
+    @abstractmethod
+    async def get_ticker(self, symbol: str) -> Ticker:
+        """Obtener precio actual y datos de mercado."""
+        ...
+    
+    @abstractmethod
+    async def get_balances(self) -> list[Balance]:
+        """Obtener todos los balances de la cuenta."""
+        ...
+    
+    @abstractmethod
+    async def place_order(
+        self,
+        symbol: str,
+        side: str,          # "BUY" o "SELL"
+        order_type: str,    # "MARKET" o "LIMIT"
+        quantity: Decimal,
+        price: Decimal | None = None
+    ) -> OrderResult:
+        """Enviar orden al exchange."""
+        ...
+    
+    @abstractmethod
+    async def cancel_order(self, symbol: str, order_id: str) -> bool:
+        """Cancelar orden pendiente."""
+        ...
+    
+    @abstractmethod
+    async def get_order_status(self, symbol: str, order_id: str) -> OrderResult:
+        """Consultar estado de una orden."""
+        ...
+    
+    @abstractmethod
+    async def stream_prices(self, symbol: str) -> AsyncIterator[Ticker]:
+        """Stream de precios en tiempo real."""
+        ...
 ```
 
 ---
 
-## 📋 PATRÓN REPOSITORY
+## 🟡 ADAPTADOR BINANCE
 
 ```python
-# repositories/base_repo.py — Repository base genérico
+# adapters/binance_adapter.py
 
-from typing import Generic, TypeVar, Type, Optional, List
-from uuid import UUID
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, delete
-from core.database import Base
+from binance import AsyncClient
+from binance.exceptions import BinanceAPIException
+from decimal import Decimal
+from typing import AsyncIterator
+import asyncio
 
-ModelType = TypeVar("ModelType", bound=Base)
+from adapters.base_exchange import BaseExchangeAdapter, OrderResult, Ticker, Balance
+from core.config import settings
+from core.exceptions import ExchangeConnectionError, OrderExecutionError
+from core.logger import logger
 
-class BaseRepository(Generic[ModelType]):
-    """Repository base con operaciones CRUD comunes."""
-    
-    def __init__(self, model: Type[ModelType]):
-        self.model = model
-    
-    async def get_by_id(self, db: AsyncSession, id: UUID) -> Optional[ModelType]:
-        result = await db.execute(select(self.model).where(self.model.id == id))
-        return result.scalar_one_or_none()
-    
-    async def get_all(
-        self, 
-        db: AsyncSession, 
-        skip: int = 0, 
-        limit: int = 100
-    ) -> List[ModelType]:
-        result = await db.execute(select(self.model).offset(skip).limit(limit))
-        return list(result.scalars().all())
-    
-    async def create(self, db: AsyncSession, obj_data: dict) -> ModelType:
-        db_obj = self.model(**obj_data)
-        db.add(db_obj)
-        await db.flush()   # flush, no commit (lo hace el middleware)
-        await db.refresh(db_obj)
-        return db_obj
-    
-    async def update(
-        self, 
-        db: AsyncSession, 
-        id: UUID, 
-        update_data: dict
-    ) -> Optional[ModelType]:
-        await db.execute(
-            update(self.model)
-            .where(self.model.id == id)
-            .values(**update_data)
-        )
-        return await self.get_by_id(db, id)
-    
-    async def delete(self, db: AsyncSession, id: UUID) -> bool:
-        result = await db.execute(
-            delete(self.model).where(self.model.id == id)
-        )
-        return result.rowcount > 0
-
-
-# repositories/order_repo.py — Específico para órdenes
-
-from sqlalchemy import select, and_, desc
-from typing import Optional, List
-from uuid import UUID
-from datetime import datetime, date
-
-from repositories.base_repo import BaseRepository
-from models.order import Order, OrderStatus
-
-class OrderRepository(BaseRepository[Order]):
+class BinanceAdapter(BaseExchangeAdapter):
+    """Adaptador para Binance Spot Trading."""
     
     def __init__(self):
-        super().__init__(Order)
+        self._client: AsyncClient | None = None
     
-    async def get_open_orders(
-        self, 
-        db: AsyncSession, 
-        user_id: UUID
-    ) -> List[Order]:
-        """Obtener todas las órdenes abiertas de un usuario."""
-        result = await db.execute(
-            select(Order)
-            .where(and_(
-                Order.user_id == user_id,
-                Order.status.in_([OrderStatus.PENDING, OrderStatus.OPEN])
-            ))
-            .order_by(desc(Order.created_at))
-        )
-        return list(result.scalars().all())
+    async def _get_client(self) -> AsyncClient:
+        """Lazy initialization del cliente."""
+        if self._client is None:
+            try:
+                self._client = await AsyncClient.create(
+                    api_key=settings.BINANCE_API_KEY,
+                    api_secret=settings.BINANCE_API_SECRET,
+                    testnet=settings.ENVIRONMENT != "production"  # Testnet en dev!
+                )
+            except Exception as e:
+                raise ExchangeConnectionError(f"No se pudo conectar a Binance: {e}")
+        return self._client
     
-    async def get_by_symbol(
+    async def get_ticker(self, symbol: str) -> Ticker:
+        client = await self._get_client()
+        try:
+            data = await client.get_ticker(symbol=symbol)
+            return Ticker(
+                symbol=symbol,
+                price=Decimal(data['lastPrice']),
+                bid=Decimal(data['bidPrice']),
+                ask=Decimal(data['askPrice']),
+                volume_24h=Decimal(data['volume']),
+                change_24h_pct=Decimal(data['priceChangePercent']),
+                timestamp=datetime.fromtimestamp(data['closeTime'] / 1000)
+            )
+        except BinanceAPIException as e:
+            logger.error("binance.ticker.error", symbol=symbol, error=str(e))
+            raise ExchangeConnectionError(f"Error obteniendo precio de {symbol}: {e}")
+    
+    async def get_balances(self) -> list[Balance]:
+        client = await self._get_client()
+        try:
+            account = await client.get_account()
+            return [
+                Balance(
+                    asset=b['asset'],
+                    free=Decimal(b['free']),
+                    locked=Decimal(b['locked'])
+                )
+                for b in account['balances']
+                if Decimal(b['free']) > 0 or Decimal(b['locked']) > 0
+            ]
+        except BinanceAPIException as e:
+            raise ExchangeConnectionError(f"Error obteniendo balances: {e}")
+    
+    async def place_order(
         self,
-        db: AsyncSession,
-        user_id: UUID,
         symbol: str,
-        limit: int = 50
-    ) -> List[Order]:
-        """Historial de órdenes por símbolo."""
-        result = await db.execute(
-            select(Order)
-            .where(and_(
-                Order.user_id == user_id,
-                Order.symbol == symbol
-            ))
-            .order_by(desc(Order.created_at))
-            .limit(limit)
-        )
-        return list(result.scalars().all())
-    
-    async def get_daily_volume_usd(
-        self, 
-        db: AsyncSession, 
-        user_id: UUID, 
-        date: date
-    ) -> float:
-        """
-        Calcular volumen total operado en un día.
-        Usado por RiskService para límites diarios.
-        """
-        from sqlalchemy import func, cast, Date
-        
-        result = await db.execute(
-            select(func.sum(Order.quantity * Order.fill_price))
-            .where(and_(
-                Order.user_id == user_id,
-                Order.status == OrderStatus.FILLED,
+        side: str,
+        order_type: str,
+        quantity: Decimal,
+        price: Decimal | None = None
+    ) -> OrderResult:
+        client = await self._get_client()
+        try:
+            params = {
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
