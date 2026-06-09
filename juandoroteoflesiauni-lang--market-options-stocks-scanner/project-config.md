@@ -1,179 +1,256 @@
 ---
 trigger: always_on
-description: Reglas de testing — asegurar que el código funciona antes de operar con dinero real
+description: Reglas de Git y control de versiones — punto de recuperación ante errores del vibecoding
 ---
 
 
-# 🧪 TESTING — TRADING TERMINAL
+# 🔀 GIT WORKFLOW — TRADING TERMINAL
 
-## FILOSOFÍA: CÓDIGO SIN TEST = CÓDIGO ROTO
+## GIT ES TU RED DE SEGURIDAD
 
-En una terminal de trading, un bug puede significar pérdida de dinero.
-**Cada función de lógica de negocio DEBE tener al menos un test.**
+En vibecoding, la IA puede equivocarse y romper cosas.
+Git es la única forma de volver a un estado funcional.
+**Hacer commit frecuente = poder deshacer errores de la IA.**
 
 ---
 
-## 🐍 TESTS BACKEND (Python/Pytest)
+## 📋 CONVENCIÓN DE COMMITS (Conventional Commits)
 
-### Estructura de tests:
-```
-tests/
-├── unit/                    ← Tests de funciones individuales (rápidos)
-│   ├── test_risk_service.py
-│   ├── test_order_service.py
-│   └── test_calculators.py
-├── integration/             ← Tests de flujos completos (más lentos)
-│   ├── test_order_flow.py
-│   └── test_auth_flow.py
-├── fixtures/                ← Datos de prueba compartidos
-│   └── trading_fixtures.py
-└── conftest.py              ← Configuración global de pytest
-```
+```bash
+# Formato: tipo(módulo): descripción corta en español
 
-### Template de test unitario:
-```python
-# tests/unit/test_risk_service.py
-import pytest
-from decimal import Decimal
-from unittest.mock import AsyncMock, patch
+# Tipos:
+feat:     Nueva funcionalidad
+fix:      Corrección de bug
+refactor: Reorganización sin cambiar comportamiento
+test:     Agregar/modificar tests
+docs:     Documentación
+style:    Formato, espacios (sin cambios de lógica)
+chore:    Tareas de mantenimiento
+security: Cambios de seguridad
 
-from app.services.risk_service import RiskService
-from app.schemas.order_schema import OrderCreate
-from app.core.exceptions import RiskViolationError, InsufficientFundsError
-
-class TestRiskService:
-    """Tests del servicio de gestión de riesgo."""
-    
-    @pytest.fixture
-    def risk_service(self):
-        return RiskService()
-    
-    @pytest.fixture
-    def mock_portfolio(self):
-        return {
-            "available_usd": Decimal("5000"),
-            "total_value": Decimal("10000")
-        }
-    
-    # ========== HAPPY PATH ==========
-    
-    async def test_valid_order_passes_validation(self, risk_service, mock_portfolio):
-        """Orden válida dentro de límites debe pasar."""
-        order = OrderCreate(
-            symbol="BTCUSDT",
-            side="BUY",
-            order_type="MARKET",
-            quantity=Decimal("0.01")
-        )
-        current_price = Decimal("40000")
-        
-        # No debe lanzar excepción
-        await risk_service.validate_order(order, mock_portfolio, current_price)
-    
-    # ========== CASOS BORDE ==========
-    
-    async def test_order_exceeding_max_size_raises_error(self, risk_service, mock_portfolio):
-        """Orden > $10,000 debe ser rechazada."""
-        order = OrderCreate(
-            symbol="BTCUSDT",
-            side="BUY",
-            order_type="MARKET",
-            quantity=Decimal("1.0")  # 1 BTC a $40k = $40,000
-        )
-        
-        with pytest.raises(RiskViolationError) as exc_info:
-            await risk_service.validate_order(order, mock_portfolio, Decimal("40000"))
-        
-        assert "excede límite" in str(exc_info.value)
-    
-    async def test_insufficient_funds_raises_error(self, risk_service):
-        """Orden sin fondos suficientes debe ser rechazada."""
-        poor_portfolio = {
-            "available_usd": Decimal("100"),
-            "total_value": Decimal("100")
-        }
-        order = OrderCreate(
-            symbol="BTCUSDT",
-            side="BUY",
-            order_type="MARKET",
-            quantity=Decimal("0.1")  # $4,000
-        )
-        
-        with pytest.raises(InsufficientFundsError):
-            await risk_service.validate_order(order, poor_portfolio, Decimal("40000"))
-    
-    async def test_negative_quantity_raises_error(self, risk_service, mock_portfolio):
-        """Cantidad negativa debe ser rechazada por Pydantic."""
-        with pytest.raises(ValueError):
-            OrderCreate(
-                symbol="BTCUSDT",
-                side="BUY", 
-                order_type="MARKET",
-                quantity=Decimal("-1.0")
-            )
+# Ejemplos:
+git commit -m "feat(orders): implementar creación de órdenes MARKET"
+git commit -m "fix(auth): corregir expiración de JWT en zona horaria UTC"
+git commit -m "security(api): agregar rate limiting en endpoints de órdenes"
+git commit -m "test(risk): agregar tests para validación de tamaño de posición"
 ```
 
 ---
 
-## ⚡ TESTS FRONTEND (Vitest + Testing Library)
+## 🌿 ESTRATEGIA DE BRANCHES
 
-### Template de test de componente:
-```typescript
-// components/orders/__tests__/OrderForm.test.tsx
+```
+main
+├── Es el código en producción
+├── NUNCA commitear directamente
+└── Solo recibe merges de develop
 
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { vi } from 'vitest';
-import OrderForm from '../OrderForm';
-import * as orderService from '@/services/orderService';
+develop
+├── Código integrado y testeado
+├── Base para nuevas features
+└── Merge a main cuando el módulo está completo
 
-// Mock del servicio
-vi.mock('@/services/orderService');
+feature/[nombre-del-módulo]
+├── Desarrollo de cada módulo
+├── Ejemplos:
+│   ├── feature/auth-jwt
+│   ├── feature/order-management
+│   ├── feature/realtime-feed
+│   └── feature/portfolio-tracker
+└── Merge a develop cuando está testeado
+```
 
-describe('OrderForm', () => {
-  const mockOnOrderPlaced = vi.fn();
-  
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-  
-  // ========== RENDER ==========
-  
-  it('renders all required fields', () => {
-    render(<OrderForm symbol="BTCUSDT" onOrderPlaced={mockOnOrderPlaced} />);
-    
-    expect(screen.getByLabelText(/cantidad/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /comprar/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /vender/i })).toBeInTheDocument();
-  });
-  
-  // ========== INTERACCIONES ==========
-  
-  it('submits buy order with correct data', async () => {
-    const user = userEvent.setup();
-    vi.mocked(orderService.placeOrder).mockResolvedValue({ orderId: '123' });
-    
-    render(<OrderForm symbol="BTCUSDT" onOrderPlaced={mockOnOrderPlaced} />);
-    
-    await user.type(screen.getByLabelText(/cantidad/i), '0.01');
-    await user.click(screen.getByRole('button', { name: /comprar/i }));
-    
-    await waitFor(() => {
-      expect(orderService.placeOrder).toHaveBeenCalledWith({
-        symbol: 'BTCUSDT',
-        side: 'BUY',
-        quantity: 0.01,
-        orderType: 'MARKET'
-      });
-    });
-  });
-  
-  // ========== VALIDACIONES UI ==========
-  
-  it('shows error for negative quantity', async () => {
-    const user = userEvent.setup();
+### Comandos de gestión de branches:
+```bash
+# Crear branch para nuevo módulo
+git checkout develop
+git pull
+git checkout -b feature/nombre-del-modulo
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+# Cuando el módulo está listo
+git checkout develop
+git merge feature/nombre-del-modulo
+git push
+
+# Ver estado actual
+git status
+git log --oneline -10
+```
+
+---
+
+## ⏱️ CUÁNDO HACER COMMIT
+
+```
+✅ Hacer commit:
+- Al terminar cada archivo nuevo
+- Al hacer pasar un test
+- Antes de un refactor grande
+- Al final de cada sesión de trabajo
+- Cuando algo funciona (¡aunque sea parcial!)
+
+❌ NO hacer commit:
+- Código que no compila/tiene errores de sintaxis
+- Con secrets o API keys (verificar .gitignore)
+- Con console.log de debug masivos
+- Cuando los tests están fallando
+```
+
+---
+
+## 🆘 COMANDOS DE EMERGENCIA
+
+```bash
+# Ver qué archivos cambiaron
+git status
+git diff
+
+# DESHACER cambios en un archivo (volver al último commit)
+git checkout -- nombre-del-archivo.py
+
+# DESHACER TODOS los cambios no commiteados (¡irreversible!)
+git checkout -- .
+
+# Volver al commit anterior (sin perder los cambios - safe)
+git reset HEAD~1 --soft
+
+# Volver al commit anterior (perdiendo cambios - destructivo)
+git reset HEAD~1 --hard
+
+# Ver historial
+git log --oneline -20
+
+# Volver a un commit específico (solo para ver)
+git checkout [hash-del-commit]
+
+# Crear branch desde un commit anterior (para recuperar código)
+git checkout -b recovery/[descripcion] [hash-del-commit]
+```
+
+---
+
+## 🗂️ .GITIGNORE COMPLETO PARA TRADING TERMINAL
+
+```gitignore
+# ============================================================
+# TRADING TERMINAL — .gitignore
+# ============================================================
+
+# === SECRETOS (NUNCA COMMITEAR) ===
+.env
+.env.local
+.env.production
+.env.staging
+*.pem
+*.key
+*.p12
+secrets/
+credentials/
+
+# === PYTHON ===
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+ENV/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# === NODE / FRONTEND ===
+node_modules/
+dist/
+.next/
+.nuxt/
+*.local
+
+# === BASES DE DATOS LOCALES ===
+*.sqlite
+*.db
+*.db-journal
+
+# === IDEs ===
+.idea/
+.vscode/settings.json     # Solo settings personales, no compartir
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# === LOGS ===
+*.log
+logs/
+!logs/.gitkeep            # Mantener carpeta pero no los logs
+
+# === TRADING ESPECÍFICO ===
+backtest_results/
+trading_data/
+market_cache/
+```
+
+---
+
+## 🔄 WORKFLOW COMPLETO DE SESIÓN
+
+```bash
+# === INICIO DE SESIÓN ===
+git status                           # Ver estado actual
+git pull                             # Traer cambios remotos
+git checkout feature/modulo-actual   # Ir al branch del módulo
+
+# === DURANTE EL DESARROLLO ===
+# ... La IA escribe código ...
+git add [archivo-específico]         # Agregar archivo específico
+git commit -m "feat(módulo): ..."    # Commit descriptivo
+
+# === FIN DE SESIÓN ===
+git status                           # Verificar nada quedó sin commitear
+git add .
+git commit -m "wip(módulo): checkpoint final de sesión"
+git push                             # Subir al remoto
+
+# === CUANDO UN MÓDULO ESTÁ COMPLETO ===
+git checkout develop
+git merge feature/nombre-del-modulo
+git push
+git branch -d feature/nombre-del-modulo  # Borrar branch terminado
+```
+
+---
+
+## 📝 CHANGELOG
+
+Mantener `CHANGELOG.md` actualizado:
+
+```markdown
+# Changelog
+
+## [Unreleased]
+
+### Agregado
+- feat(auth): Sistema de autenticación JWT con refresh tokens
+- feat(orders): Endpoint para crear órdenes MARKET y LIMIT
+
+### Modificado  
+- refactor(risk): Extraer validaciones a RiskService separado
+
+### Corregido
+- fix(websocket): Memory leak en reconexión automática
+
+## [0.1.0] - 2025-06-01
+
+### Agregado
+- Estructura inicial del proyecto
+- Configuración de entorno de desarrollo
+```
 
 ---
 > Source: [juandoroteoflesiauni-lang/Market-options-stocks-Scanner](https://github.com/juandoroteoflesiauni-lang/Market-options-stocks-Scanner) — distributed by [TomeVault](https://tomevault.io).
