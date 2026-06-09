@@ -1,174 +1,238 @@
 ---
 trigger: always_on
-description: Reglas de manejo de errores y logging — prevenir fallos silenciosos en trading
+description: Reglas de despliegue, Docker y configuración de producción para la terminal de trading
 ---
 
 
-# 🚨 MANEJO DE ERRORES Y LOGGING — TRADING TERMINAL
+# 🚀 DESPLIEGUE Y PRODUCCIÓN — TRADING TERMINAL
 
-## FILOSOFÍA: FAIL LOUDLY, NOT SILENTLY
+## ⚠️ REGLA FUNDAMENTAL: TESTNET ANTES DE PRODUCCIÓN
 
-En trading, un error silencioso puede significar:
-- Orden que se envió pero no se registró
-- Pérdida calculada incorrectamente
-- Precio desactualizado sin que el usuario lo sepa
+```
+DESARROLLO    → localhost + Binance Testnet + DB local
+STAGING       → Servidor + Binance Testnet + DB real (datos fake)
+PRODUCCIÓN    → Servidor + Binance Mainnet + DB real (DINERO REAL)
 
-**Cada error DEBE ser visible: al usuario, en los logs, o ambos.**
-
----
-
-## 🐍 JERARQUÍA DE EXCEPCIONES (Python)
-
-```python
-# core/exceptions.py — Mapa completo de excepciones del dominio
-
-class TradingError(Exception):
-    """Base de todas las excepciones. Nunca usar directamente."""
-    def __init__(self, message: str, code: str = "TRADING_ERROR"):
-        self.message = message
-        self.code = code
-        super().__init__(message)
-
-# ── Errores de autenticación ──────────────────────────
-class UnauthorizedError(TradingError):
-    """JWT inválido, expirado, o usuario sin permisos."""
-    def __init__(self, message: str = "No autorizado"):
-        super().__init__(message, "UNAUTHORIZED")
-
-# ── Errores de validación ──────────────────────────────
-class ValidationError(TradingError):
-    """Input del usuario es inválido."""
-    def __init__(self, message: str, field: str = ""):
-        self.field = field
-        super().__init__(message, "VALIDATION_ERROR")
-
-class InvalidSymbolError(ValidationError):
-    """El símbolo de trading no existe o no está disponible."""
-    pass
-
-# ── Errores financieros ────────────────────────────────
-class InsufficientFundsError(TradingError):
-    """No hay fondos suficientes para la operación."""
-    def __init__(self, required: float, available: float):
-        super().__init__(
-            f"Fondos insuficientes: necesitas ${required:.2f}, tienes ${available:.2f}",
-            "INSUFFICIENT_FUNDS"
-        )
-        self.required = required
-        self.available = available
-
-class RiskViolationError(TradingError):
-    """La operación viola las reglas de gestión de riesgo."""
-    def __init__(self, message: str, rule: str = ""):
-        self.rule = rule
-        super().__init__(message, "RISK_VIOLATION")
-
-# ── Errores de órdenes ─────────────────────────────────
-class OrderNotFoundError(TradingError):
-    """La orden no existe o no pertenece al usuario."""
-    pass
-
-class OrderAlreadyCancelledError(TradingError):
-    """La orden ya fue cancelada y no se puede modificar."""
-    pass
-
-class OrderExecutionError(TradingError):
-    """Error al ejecutar la orden en el exchange."""
-    pass
-
-# ── Errores de exchange ────────────────────────────────
-class ExchangeConnectionError(TradingError):
-    """Error de conexión con el exchange."""
-    pass
-
-class ExchangeRateLimitError(TradingError):
-    """Se alcanzó el límite de solicitudes del exchange."""
-    pass
+NUNCA pasar directamente de DESARROLLO a PRODUCCIÓN.
 ```
 
 ---
 
-## 🔧 HANDLERS GLOBALES DE ERRORES (FastAPI)
+## 🐳 DOCKERFILE — BACKEND
 
-```python
-# main.py — Registrar handlers en el app de FastAPI
+```dockerfile
+# backend/Dockerfile
 
-from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
-from fastapi.exceptions import RequestValidationError
-from starlette.exceptions import HTTPException as StarletteHTTPException
+# ── Etapa 1: Builder ────────────────────────────────
+FROM python:3.11-slim as builder
 
-app = FastAPI()
+WORKDIR /app
 
-@app.exception_handler(TradingError)
-async def trading_error_handler(request: Request, exc: TradingError) -> JSONResponse:
-    """Handler para todas las excepciones de negocio."""
-    # Determinar HTTP status según el tipo de error
-    status_map = {
-        "UNAUTHORIZED":       401,
-        "INSUFFICIENT_FUNDS": 402,
-        "VALIDATION_ERROR":   422,
-        "RISK_VIOLATION":     422,
-        "TRADING_ERROR":      500,
-    }
-    status_code = status_map.get(exc.code, 500)
+# Instalar dependencias del sistema
+RUN apt-get update && apt-get install -y \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copiar e instalar dependencias Python
+COPY requirements.txt .
+RUN pip install --no-cache-dir --user -r requirements.txt
+
+# ── Etapa 2: Runtime (imagen final) ─────────────────
+FROM python:3.11-slim as runtime
+
+# Crear usuario no-root para seguridad
+RUN groupadd -r trading && useradd -r -g trading trading
+
+WORKDIR /app
+
+# Copiar dependencias del builder
+COPY --from=builder /root/.local /root/.local
+
+# Copiar código fuente
+COPY . .
+
+# Cambiar al usuario no-root
+USER trading
+
+# Variables de entorno de runtime (NO secrets aquí)
+ENV PYTHONPATH=/app \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+# Puerto que expone la app
+EXPOSE 8000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import httpx; httpx.get('http://localhost:8000/health')" || exit 1
+
+# Comando de inicio (sin --reload en producción)
+CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
+```
+
+---
+
+## 🐳 DOCKERFILE — FRONTEND
+
+```dockerfile
+# frontend/Dockerfile
+
+# ── Etapa 1: Build ──────────────────────────────────
+FROM node:20-alpine as builder
+
+WORKDIR /app
+
+COPY package*.json .
+RUN npm ci --only=production
+
+COPY . .
+RUN npm run build
+
+# ── Etapa 2: Nginx para servir el build ─────────────
+FROM nginx:alpine as runtime
+
+# Copiar build de React
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+# Configuración de Nginx para SPA (Single Page App)
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
+```
+
+---
+
+## ⚙️ NGINX — Configuración para SPA + Proxy API
+
+```nginx
+# frontend/nginx.conf
+
+server {
+    listen 80;
+    server_name _;
     
-    logger.warning("trading.error",
-                   code=exc.code,
-                   message=exc.message,
-                   path=str(request.url),
-                   method=request.method)
+    root /usr/share/nginx/html;
+    index index.html;
     
-    return JSONResponse(
-        status_code=status_code,
-        content={
-            "error": {
-                "code": exc.code,
-                "message": exc.message,
-                # NUNCA incluir stack trace en response al cliente
-            }
+    # Compresión
+    gzip on;
+    gzip_types text/plain application/javascript application/json text/css;
+    
+    # Frontend — SPA fallback
+    location / {
+        try_files $uri $uri/ /index.html;
+        
+        # Caché de archivos estáticos con hash en nombre
+        location ~* \.(js|css|png|jpg|svg|woff2)$ {
+            expires 1y;
+            add_header Cache-Control "public, immutable";
         }
-    )
-
-@app.exception_handler(RequestValidationError)
-async def validation_error_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
-    """Handler para errores de validación de Pydantic."""
-    errors = []
-    for error in exc.errors():
-        errors.append({
-            "field": ".".join(str(loc) for loc in error["loc"]),
-            "message": error["msg"],
-        })
+    }
     
-    return JSONResponse(
-        status_code=422,
-        content={"error": {"code": "VALIDATION_ERROR", "fields": errors}}
-    )
-
-@app.exception_handler(Exception)
-async def generic_error_handler(request: Request, exc: Exception) -> JSONResponse:
-    """Handler de último recurso — captura errores inesperados."""
-    logger.critical("unhandled.exception",
-                    exc_type=type(exc).__name__,
-                    exc_message=str(exc),
-                    path=str(request.url),
-                    exc_info=True)  # Incluye stack trace en los LOGS (no en response)
+    # Proxy al backend API
+    location /api/ {
+        proxy_pass http://backend:8000/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # Timeouts — importantes para operaciones largas
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+    }
     
-    return JSONResponse(
-        status_code=500,
-        content={"error": {"code": "INTERNAL_ERROR", "message": "Error interno del servidor"}}
-    )
+    # Proxy WebSocket
+    location /ws/ {
+        proxy_pass http://backend:8000/ws/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_read_timeout 86400s;  # 24h — para WS de larga duración
+    }
+    
+    # Health check endpoint
+    location /nginx-health {
+        return 200 "healthy";
+        add_header Content-Type text/plain;
+    }
+}
 ```
 
 ---
 
-## 📊 SISTEMA DE LOGGING (structlog)
+## 🐳 DOCKER COMPOSE — PRODUCCIÓN
 
-```python
-# core/logger.py — Logger estructurado para producción
+```yaml
+# docker-compose.prod.yml
 
-import logging
-import structlog
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: runtime
+    env_file: .env.production
+    environment:
+      ENVIRONMENT: production
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - trading_net
+    # NUNCA exponer el puerto directamente — solo a través de Nginx
+  
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - backend
+    networks:
+      - trading_net
+  
+  postgres:
+    image: postgres:15-alpine
+    env_file: .env.production
+    restart: unless-stopped
+    volumes:
+      - postgres_prod_data:/var/lib/postgresql/data
+    networks:
+      - trading_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # NUNCA exponer el puerto de Postgres en producción
+  
+  redis:
+    image: redis:7-alpine
+    command: redis-server --requirepass ${REDIS_PASSWORD} --appendonly yes
+    restart: unless-stopped
+    volumes:
+      - redis_prod_data:/data
+    networks:
+      - trading_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  postgres_prod_data:
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
