@@ -1,10 +1,10 @@
 ---
 trigger: always_on
-description: USE WHEN in BDD verify phase OR all scenarios marked [x]. Evidence gate — cross-scenario refactor, then /verify and /audit.
+description: Collaborative brainstorming and rubber-ducking — divergence-first thinking partner. Use when the user wants to explore options, weigh approaches, or think through uncertainty before committing to a direction ('brainstorm', 'rubber duck', 'help me think', 'explore options', 'what are the tradeoffs').
 ---
 
 
-@.claude/skills/bdd/VERIFY.md
+@.claude/skills/brainstorm/SKILL.md
 
 ---
 > Source: [TheMostlyGreat/mythos](https://github.com/TheMostlyGreat/mythos) — distributed by [TomeVault](https://tomevault.io).
