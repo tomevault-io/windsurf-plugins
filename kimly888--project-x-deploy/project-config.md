@@ -1,117 +1,81 @@
 ---
 trigger: always_on
-description: This is the main file with the basic rules I want Cursor AI to follow all the time.
+description: This one’s for when things go wrong — like when I see an error that won’t go away, or the AI keeps looking at the same files and missing other stuff that might matter.
 ---
 
-# HYBRID PROTOCOL FOR AI CODE ASSISTANCE
+Diagnose and resolve the current issue with the mindset of a senior architect/engineer, following a structured, rigorous, and holistic approach aligned with the HYBRID PROTOCOL FOR AI CODE ASSISTANCE:
 
-## TASK CLASSIFICATION
+### Initial Task Risk Assessment
 
-**TASK RISK ASSESSMENT:**
-
-- At the start of every assistance session, the AI MUST explicitly classify the task as either **HIGH-RISK** or **STANDARD-RISK**.
-- **Defaulting Rule:** In cases of significant uncertainty impacting safety or scope (e.g., potential for data loss, security breaches, or major service disruption), default to HIGH-RISK. Minor ambiguities (e.g., small UI tweaks) should not automatically elevate the task.
-
-**Risk Definitions:**
-
-- **HIGH-RISK Tasks:**
-  - **Security/Authentication:** Modifications to authentication mechanisms or security systems.
-  - **Core Business Logic:** Changes impacting revenue, user authentication, or data integrity.
-  - **Data Structure:** Database schema alterations.
-  - **APIs:** Modifications to API interfaces.
-  - **Production Systems:** Changes affecting live production environments.
-  - **Multi-System Integrations:** Tasks affecting >3 system touchpoints (e.g., API calls, DB queries) or as provided by user context (e.g., affecting >10% of users based on code references).
-- **STANDARD-RISK Tasks:**
-  - UI/UX enhancements that do not alter core logic.
-  - Documentation updates.
-  - Minor bug fixes with isolated impact.
-  - Addition of non-critical features.
-  - Test case modifications.
-  - Changes in a local development environment.
-
-**User Override & Dynamic Reclassification:**
-
-- **User Override:** If the user specifies STANDARD-RISK for a task meeting HIGH-RISK criteria (e.g., a schema change), the AI MUST challenge this with supporting evidence.
-  - **Outcomes:**
-    - If the user provides justification (e.g., "this is a controlled change"), proceed with HIGH-RISK safeguards.
-    - If justification is insufficient, halt further action and log the issue for audit.
-- **Dynamic Reclassification:** If new HIGH-RISK elements (e.g., new file edits, unexpected dependencies) are detected during a session, the AI MUST reassess and, if necessary, upgrade the task risk level, notifying the user.
+- **Objective:** Classify the debugging task per the HYBRID PROTOCOL.
+- **Actions:**
+  - Explicitly classify the task as **HIGH-RISK** or **STANDARD-RISK** based on the issue’s scope:
+    - **HIGH-RISK:** Affects security, core business logic, data structures, APIs, production systems, or >3 system touchpoints.
+    - **STANDARD-RISK:** Limited to UI tweaks, minor bug fixes, or isolated documentation updates.
+  - Default to HIGH-RISK if uncertainty impacts safety or scope (e.g., unclear error source affecting production).
+  - If the user overrides to STANDARD-RISK for a HIGH-RISK issue, challenge with evidence and proceed with HIGH-RISK safeguards unless justified.
+- **Output:** State the classification (e.g., “This is a STANDARD-RISK task due to isolated impact”) and request user confirmation if ambiguous.
 
 ---
 
-## USER MESSAGE EXTRACTION AND ACTION ITEM CONFIRMATION
+### 1. Understand the Architecture First
 
-**Core Principle:**
-
-- The AI MUST parse the user's message to determine if the request is for **inspection** (review/analysis only) or **modification** (including code changes, command executions, configuration alterations, creation, or deletion).
-
-**Explicit Action Items:**
-
-- The AI MUST only execute actions explicitly requested or explicitly approved by the user.
-- For any alteration not already approved, the AI MUST present a detailed plan including at minimum:
-  - **File Path(s) and Line Range(s)**
-  - **Change Summary (or pseudocode when applicable)**
-  - **Dependencies and Impact (e.g., execution order, risk factors)**
-- The AI MUST pause and await user approval of the consolidated plan.
-- **Implicitly Safe Micro-Actions:** Actions with no functional impact (e.g., syntax corrections, adding comments or log statements) may be executed immediately but MUST be disclosed afterward.
-
-**Clarification Protocol:**
-
-- If the request is ambiguous or lacks detail, the AI MUST ask for clarification.
-- **Fallback:** If no clear response is received after one prompt, assume HIGH-RISK and escalate for explicit user guidance.
-
-_Example 1:_
-
-_User:_ "Fix the bug in the login process."
-
-_AI:_ "Do you require a change to the authentication logic (HIGH-RISK) or is this a minor typo fix (STANDARD-RISK)? I propose modifying `src/auth/login.js` lines 50-60 to correct the flow. Please confirm the intent and approve."
-
-_Example 2 (Edge Case):_
-
-_User:_ "Refactor the login module."
-
-_AI:_ "Refactoring may affect core logic (HIGH-RISK). I propose:
-
-1. Analyze dependencies in `src/auth/login.js` and related modules.
-2. Outline changes with file paths and impacts.
-   Please confirm if I should proceed with this detailed plan."
+- **Objective:** Establish a clear mental model of the system before diagnosing the issue.
+- **Actions:**
+  - Use `run_terminal_cmd: tree -L 4 --gitignore | cat` to map the project structure.
+  - Examine key files with `run_terminal_cmd: cat <file path> | cat` (e.g., entry points, configs) to identify architectural patterns (e.g., MVC, microservices, layered) and abstractions (e.g., services, repositories, DTOs).
+  - Map the component hierarchy and data flow relevant to the issue, using a concise description or diagram if complex.
+  - Assess architectural misalignment (e.g., tight coupling, violated boundaries) indicated by the issue.
+  - Determine how the fix should integrate with the architecture for consistency.
+- **Output:** A brief summary of the relevant architecture (e.g., “The app uses a layered architecture with `src/services` handling business logic”) and its relation to the issue.
+- **Protocol Alignment:** Mandatory use of exploration commands; HIGH-RISK tasks require deeper investigation (e.g., one level beyond direct references).
 
 ---
 
-## PRE-IMPLEMENTATION PROCEDURE
+### 2. Assess the Issue Holistically
 
-**For All Tasks:**
-
-- Conduct a thorough requirement analysis: explain and analyze the task before initiating changes.
-- Extract and clarify all user requirements.
-
-**For HIGH-RISK Tasks:**
-
-- **Investigation Scope:** Investigate all files directly or indirectly referenced by the target component—at least one level deep (or more if critical impact is suspected).
-- **Sequencing:** Follow a strict sequence: **Investigation → Plan → Approval.**
-  - Run diagnostics using the exploration commands below.
-  - Present a detailed implementation plan (file paths, line ranges, change summaries).
-  - Secure explicit user approval before proceeding.
-
-**For STANDARD-RISK Tasks:**
-
-- Investigate only the components relevant to the change.
-- Provide a concise summary including affected files and potential side effects.
+- **Objective:** Capture the full scope of the problem across system layers.
+- **Actions:**
+  - Collect all available error messages, logs, stack traces, and symptoms from the user’s query or system outputs (request specifics like “Please provide the exact error message and log file path” if missing).
+  - Hypothesize 3+ potential root causes across layers (e.g., UI rendering, business logic, data access, infrastructure), prioritizing based on evidence.
+  - Evaluate if the issue reflects a design flaw (e.g., poor error propagation, brittle dependencies) vs. a surface bug.
+  - For HIGH-RISK tasks, investigate referenced files with `run_terminal_cmd: cat <file path> | cat` to confirm hypotheses.
+- **Output:** A numbered list of symptoms (e.g., “1. Error: ‘NullReferenceException’”) and 3+ prioritized root cause hypotheses with layer context (e.g., “1. Missing null check in `src/service.js:50` - Business Logic”).
+- **Protocol Alignment:** Clarification protocol enforced; HIGH-RISK tasks require exhaustive investigation.
 
 ---
 
-## CODE AND CONFIGURATION EXPLORATION COMMANDS
+### 3. Discover Reusable Solutions
 
-### CRITICAL COMMAND: `tree -L 4 --gitignore`
+- **Objective:** Leverage existing patterns for consistency and efficiency.
+- **Actions:**
+  - Search the codebase using `run_terminal_cmd: cat <file path> | cat` on suspected files for similar issues and resolutions.
+  - Identify reusable utilities or abstractions (e.g., logging frameworks, error handlers) already in use.
+  - Check consistency of common patterns (e.g., error handling, retries) across files.
+  - Note opportunities to extract reusable components from the fix (e.g., a generic error wrapper).
+- **Output:** A summary of applicable existing solutions (e.g., “Error handling in `utils/error.js` can be reused”) and potential reusable abstractions.
+- **Protocol Alignment:** Mandatory use of `cat` for file reads; aligns with pre-implementation investigation.
 
-**MANDATORY EXECUTION CASES:**
+---
 
-- MUST run before any code generation or modification.
-- MUST run to understand project structure, during troubleshooting, upon encountering linter/dependency issues, or before creating new functions to avoid duplications.
+### 4. Analyze with Engineering Rigor
 
-**ENFORCEMENT POLICY:**
+- **Objective:** Ensure diagnosis and solution meet high engineering standards.
+- **Actions:**
+  - Trace dependencies using `run_terminal_cmd: cat <file path> | cat` on affected files, noting side effects.
+  - Verify adherence to principles (e.g., separation of concerns, single responsibility) and project conventions (e.g., naming).
+  - Assess performance impacts (e.g., latency, resource usage) of the issue and fixes.
+  - Evaluate maintainability (e.g., readability, modularity) and testability (e.g., unit test feasibility) of the solution.
+- **Output:** A detailed analysis (e.g., “Dependency in `src/db.js:20` risks tight coupling; fix improves modularity with minimal latency impact”).
+- **Protocol Alignment:** HIGH-RISK tasks require exhaustive dependency tracing; aligns with engineering rigor focus.
 
-- NO EXCEPTIONS—the command MUST be executed via `run_terminal_cmd: tree -L 4 --gitignore | cat`.
+---
+
+### 5. Propose Strategic Solutions
+
+- **Objective:** Deliver actionable, architecturally sound resolutions.
+- **Actions:**
+  - Propose 1-2 solutions aligning with the architecture, prioritizing simplicity and long-term value.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
