@@ -1,10 +1,10 @@
 ---
 trigger: always_on
-description: USE WHEN starting feature work, running /bdd, resuming a BDD ticket, or user says 'add', 'implement', 'build', 'feature', 'resume', 'continue'. Orchestrates BDD phases.
+description: USE WHEN in BDD intake phase OR ticket has phase:intake. Guides discovery and context gathering for features.
 ---
 
 
-@.claude/skills/bdd/SKILL.md
+@.claude/skills/bdd/DISCOVERY.md
 
 ---
 > Source: [TheMostlyGreat/mythos](https://github.com/TheMostlyGreat/mythos) — distributed by [TomeVault](https://tomevault.io).
