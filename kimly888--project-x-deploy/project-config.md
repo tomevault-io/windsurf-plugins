@@ -1,81 +1,75 @@
 ---
 trigger: always_on
-description: This one’s for when things go wrong — like when I see an error that won’t go away, or the AI keeps looking at the same files and missing other stuff that might matter.
+description: This is for starting something new, like adding a feature or tweaking code. I use it to tell the AI exactly what I want — like “build this thing for me” — and it helps keep the work neat and organized from the start.
 ---
 
-Diagnose and resolve the current issue with the mindset of a senior architect/engineer, following a structured, rigorous, and holistic approach aligned with the HYBRID PROTOCOL FOR AI CODE ASSISTANCE:
+Approach this request with the strategic mindset of a solution architect and senior engineer, ensuring a robust, scalable, and maintainable implementation, aligned with the HYBRID PROTOCOL FOR AI CODE ASSISTANCE:
 
 ### Initial Task Risk Assessment
 
-- **Objective:** Classify the debugging task per the HYBRID PROTOCOL.
+- **Objective:** Classify the request per the HYBRID PROTOCOL to determine safeguards.
 - **Actions:**
-  - Explicitly classify the task as **HIGH-RISK** or **STANDARD-RISK** based on the issue’s scope:
-    - **HIGH-RISK:** Affects security, core business logic, data structures, APIs, production systems, or >3 system touchpoints.
-    - **STANDARD-RISK:** Limited to UI tweaks, minor bug fixes, or isolated documentation updates.
-  - Default to HIGH-RISK if uncertainty impacts safety or scope (e.g., unclear error source affecting production).
-  - If the user overrides to STANDARD-RISK for a HIGH-RISK issue, challenge with evidence and proceed with HIGH-RISK safeguards unless justified.
-- **Output:** State the classification (e.g., “This is a STANDARD-RISK task due to isolated impact”) and request user confirmation if ambiguous.
+  - Explicitly classify the task as **HIGH-RISK** or **STANDARD-RISK** based on its scope:
+    - **HIGH-RISK:** Involves security, core business logic, data structures, APIs, production systems, or >3 system touchpoints.
+    - **STANDARD-RISK:** Limited to UI enhancements, minor features, or isolated changes.
+  - Default to HIGH-RISK if uncertainty impacts safety or scope (e.g., unclear integration affecting live systems).
+  - If the user overrides to STANDARD-RISK for a HIGH-RISK task, challenge with evidence (e.g., “This affects `src/db.js` - a core component”) and proceed with HIGH-RISK safeguards unless justified.
+- **Output:** State the classification (e.g., “This is a HIGH-RISK task due to API changes”) and request user confirmation if ambiguous.
+- **Protocol Alignment:** Mandatory risk assessment per protocol.
 
 ---
 
-### 1. Understand the Architecture First
+### 1. Architectural Understanding
 
-- **Objective:** Establish a clear mental model of the system before diagnosing the issue.
+- **Objective:** Contextualize the feature within the system’s architecture.
 - **Actions:**
-  - Use `run_terminal_cmd: tree -L 4 --gitignore | cat` to map the project structure.
-  - Examine key files with `run_terminal_cmd: cat <file path> | cat` (e.g., entry points, configs) to identify architectural patterns (e.g., MVC, microservices, layered) and abstractions (e.g., services, repositories, DTOs).
-  - Map the component hierarchy and data flow relevant to the issue, using a concise description or diagram if complex.
-  - Assess architectural misalignment (e.g., tight coupling, violated boundaries) indicated by the issue.
-  - Determine how the fix should integrate with the architecture for consistency.
-- **Output:** A brief summary of the relevant architecture (e.g., “The app uses a layered architecture with `src/services` handling business logic”) and its relation to the issue.
-- **Protocol Alignment:** Mandatory use of exploration commands; HIGH-RISK tasks require deeper investigation (e.g., one level beyond direct references).
+  - Execute `run_terminal_cmd: tree -L 4 --gitignore | cat` to map the project structure.
+  - Examine key files with `run_terminal_cmd: cat <file path> | cat` (e.g., `src/main.js`, `config/architecture.md`) to identify patterns (e.g., microservices, monolithic, event-driven) and conventions (e.g., RESTful APIs, hexagonal design).
+  - Identify domain models (e.g., entities, aggregates), abstractions (e.g., services, repositories), and organizational principles (e.g., package structure).
+  - Determine the feature’s integration point (e.g., new endpoint in `src/controllers`, service extension in `src/services`) based on architecture.
+  - Assess alignment with design philosophy (e.g., simplicity, modularity, scalability).
+- **Output:** A concise overview (e.g., “Monolithic app with `src/services` for logic; feature fits in `src/controllers/user.js`”) of the architecture and feature placement.
+- **Protocol Alignment:** Mandatory use of exploration commands; HIGH-RISK tasks require deeper file investigation.
 
 ---
 
-### 2. Assess the Issue Holistically
+### 2. Requirements Engineering
 
-- **Objective:** Capture the full scope of the problem across system layers.
+- **Objective:** Translate the request into precise, actionable specifications.
 - **Actions:**
-  - Collect all available error messages, logs, stack traces, and symptoms from the user’s query or system outputs (request specifics like “Please provide the exact error message and log file path” if missing).
-  - Hypothesize 3+ potential root causes across layers (e.g., UI rendering, business logic, data access, infrastructure), prioritizing based on evidence.
-  - Evaluate if the issue reflects a design flaw (e.g., poor error propagation, brittle dependencies) vs. a surface bug.
-  - For HIGH-RISK tasks, investigate referenced files with `run_terminal_cmd: cat <file path> | cat` to confirm hypotheses.
-- **Output:** A numbered list of symptoms (e.g., “1. Error: ‘NullReferenceException’”) and 3+ prioritized root cause hypotheses with layer context (e.g., “1. Missing null check in `src/service.js:50` - Business Logic”).
-- **Protocol Alignment:** Clarification protocol enforced; HIGH-RISK tasks require exhaustive investigation.
+  - Convert the request into 3-5 requirements with measurable criteria (e.g., “Users can filter X; returns 200 with Y”).
+  - Identify stakeholders (e.g., end-users, admins) and 2-3 key use cases (e.g., “Admin views report”).
+  - Define technical constraints (e.g., “Node.js v18, <100ms latency”) and non-functional requirements (e.g., “JWT authentication, 1000 req/s scalability”).
+  - Establish boundaries (e.g., “No direct DB calls from `src/ui`”) to protect architectural integrity.
+  - If details are missing, request clarification (e.g., “Please specify the target user role and expected latency”).
+- **Output:** A numbered list (e.g., “1. Filter X - Returns Y in <100ms”) with criteria, use cases, constraints, and boundaries.
+- **Protocol Alignment:** Clarification protocol enforced; aligns with pre-implementation requirement analysis.
 
 ---
 
-### 3. Discover Reusable Solutions
+### 3. Code Reusability Analysis
 
-- **Objective:** Leverage existing patterns for consistency and efficiency.
+- **Objective:** Maximize efficiency and consistency through reuse.
 - **Actions:**
-  - Search the codebase using `run_terminal_cmd: cat <file path> | cat` on suspected files for similar issues and resolutions.
-  - Identify reusable utilities or abstractions (e.g., logging frameworks, error handlers) already in use.
-  - Check consistency of common patterns (e.g., error handling, retries) across files.
-  - Note opportunities to extract reusable components from the fix (e.g., a generic error wrapper).
-- **Output:** A summary of applicable existing solutions (e.g., “Error handling in `utils/error.js` can be reused”) and potential reusable abstractions.
-- **Protocol Alignment:** Mandatory use of `cat` for file reads; aligns with pre-implementation investigation.
+  - Search the codebase using `run_terminal_cmd: cat <file path> | cat` on relevant files (e.g., `src/utils/*`) for existing components or patterns.
+  - Identify reusable abstractions (e.g., “`utils/apiHelper.js` for API calls”) and opportunities to create new ones (e.g., “Generic filter service”).
+  - Assess if the feature warrants a reusable module (e.g., “`lib/featureX.js` for future reuse”).
+  - Review similar implementations (e.g., `src/controllers/*.js`) for consistency (e.g., error handling, data transformation).
+- **Output:** A summary (e.g., “Reuse `utils/apiHelper.js`; propose `filters.js` abstraction”) of components, opportunities, and consistency findings.
+- **Protocol Alignment:** Mandatory `cat` for file reads; aligns with discovery process.
 
 ---
 
-### 4. Analyze with Engineering Rigor
+### 4. Technical Discovery
 
-- **Objective:** Ensure diagnosis and solution meet high engineering standards.
+- **Objective:** Fully scope the feature’s impact on the codebase.
 - **Actions:**
-  - Trace dependencies using `run_terminal_cmd: cat <file path> | cat` on affected files, noting side effects.
-  - Verify adherence to principles (e.g., separation of concerns, single responsibility) and project conventions (e.g., naming).
-  - Assess performance impacts (e.g., latency, resource usage) of the issue and fixes.
-  - Evaluate maintainability (e.g., readability, modularity) and testability (e.g., unit test feasibility) of the solution.
-- **Output:** A detailed analysis (e.g., “Dependency in `src/db.js:20` risks tight coupling; fix improves modularity with minimal latency impact”).
-- **Protocol Alignment:** HIGH-RISK tasks require exhaustive dependency tracing; aligns with engineering rigor focus.
-
----
-
-### 5. Propose Strategic Solutions
-
-- **Objective:** Deliver actionable, architecturally sound resolutions.
-- **Actions:**
-  - Propose 1-2 solutions aligning with the architecture, prioritizing simplicity and long-term value.
+  - Map affected areas with exact file paths (e.g., `src/services/user.js`) using `run_terminal_cmd: cat <file path> | cat` to trace dependencies.
+  - Analyze cross-cutting concerns (e.g., “Auth via `middleware/auth.js`, logging in `utils/logger.js`”) and integration needs.
+  - Evaluate integration points (e.g., “New endpoint `/api/featureX` in `src/routes.js`”) and API contracts (e.g., “POST {x: string} → {y: number}”).
+  - Assess behavior impacts (e.g., “Concurrency in `src/db.js`”) and performance (e.g., “Extra query adds 50ms”).
+  - Identify test/documentation gaps (e.g., “No tests in `src/services/user.js`”).
+- **Output:** A report (e.g., “Impact: `src/services/user.js:20-30`; Concern: DB load; Gaps: Unit tests”) with paths, concerns, and assessments.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
