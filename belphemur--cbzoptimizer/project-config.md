@@ -1,0 +1,175 @@
+---
+trigger: always_on
+description: CBZOptimizer is a Go-based command-line tool designed to optimize CBZ (Comic Book Zip) and CBR (Comic Book RAR) files by converting images to modern formats (primarily WebP) with configurable quality settings. The tool reduces the size of comic book archives while maintaining acceptable image quality.
+---
+
+# CBZOptimizer - GitHub Copilot Instructions
+
+## Project Overview
+
+CBZOptimizer is a Go-based command-line tool designed to optimize CBZ (Comic Book Zip) and CBR (Comic Book RAR) files by converting images to modern formats (primarily WebP) with configurable quality settings. The tool reduces the size of comic book archives while maintaining acceptable image quality.
+
+**Key Features:**
+- Convert CBZ/CBR files to optimized CBZ format
+- WebP image encoding with quality control
+- Parallel chapter processing
+- File watching for automatic optimization
+- Optional page splitting for large images
+- Timeout handling for problematic files
+
+## Technology Stack
+
+- **Language:** Go 1.25+
+- **CLI Framework:** Cobra + Viper
+- **Logging:** zerolog (structured logging)
+- **Image Processing:** go-webpbin/v2 for WebP encoding
+- **Archive Handling:** mholt/archives for CBZ/CBR processing
+- **Testing:** testify + gotestsum
+
+## Project Structure
+
+```
+.
+├── cmd/
+│   ├── cbzoptimizer/         # Main CLI application
+│   │   ├── commands/         # Cobra commands (optimize, watch)
+│   │   └── main.go          # Entry point
+│   └── encoder-setup/        # WebP encoder setup utility
+│       └── main.go          # Encoder initialization (build tag: encoder_setup)
+├── internal/
+│   ├── cbz/                 # CBZ/CBR file operations
+│   │   ├── cbz_loader.go   # Load and parse comic archives
+│   │   └── cbz_creator.go  # Create optimized archives
+│   ├── manga/              # Domain models
+│   │   ├── chapter.go      # Chapter representation
+│   │   ├── page.go         # Page image handling
+│   │   └── page_container.go # Page collection management
+│   └── utils/              # Utility functions
+│       ├── optimize.go     # Core optimization logic
+│       └── errs/           # Error handling utilities
+└── pkg/
+    └── converter/          # Image conversion abstractions
+        ├── converter.go    # Converter interface
+        ├── webp/          # WebP implementation
+        │   ├── webp_converter.go    # WebP conversion logic
+        │   └── webp_provider.go     # WebP encoder provider
+        ├── errors/        # Conversion error types
+        └── constant/      # Shared constants
+```
+
+## Building and Testing
+
+### Prerequisites
+
+Before building or testing, the WebP encoder must be set up:
+
+```bash
+# Build the encoder-setup utility
+go build -tags encoder_setup -o encoder-setup ./cmd/encoder-setup
+
+# Run encoder setup (downloads and configures libwebp 1.6.0)
+./encoder-setup
+```
+
+This step is **required** before running tests or building the main application.
+
+### Build Commands
+
+```bash
+# Build the main application
+go build -o cbzconverter ./cmd/cbzoptimizer
+
+# Build with version information
+go build -ldflags "-s -w -X main.version=1.0.0 -X main.commit=abc123 -X main.date=2024-01-01" -o cbzconverter ./cmd/cbzoptimizer
+```
+
+### Testing
+
+```bash
+# Install test runner
+go install gotest.tools/gotestsum@latest
+
+# Run all tests with coverage
+gotestsum --format testname -- -race -coverprofile=coverage.txt -covermode=atomic ./...
+
+# Run specific package tests
+go test -v ./internal/cbz/...
+go test -v ./pkg/converter/...
+
+# Run integration tests
+go test -v ./internal/utils/...
+```
+
+### Linting
+
+```bash
+# Install golangci-lint if not available
+go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+
+# Run linter
+golangci-lint run
+```
+
+## Code Conventions
+
+### Go Style
+
+- **Follow standard Go conventions:** Use `gofmt` and `goimports`
+- **Package naming:** Short, lowercase, single-word names
+- **Error handling:** Always check errors explicitly; use structured error wrapping with `fmt.Errorf("context: %w", err)`
+- **Context usage:** Pass `context.Context` as first parameter for operations that may be cancelled
+
+### Logging
+
+Use **zerolog** for all logging:
+
+```go
+import "github.com/rs/zerolog/log"
+
+// Info level with structured fields
+log.Info().Str("file", path).Int("pages", count).Msg("Processing file")
+
+// Debug level for detailed diagnostics
+log.Debug().Str("file", path).Uint8("quality", quality).Msg("Optimization parameters")
+
+// Error level with error wrapping
+log.Error().Str("file", path).Err(err).Msg("Failed to load chapter")
+```
+
+**Log Levels (in order of verbosity):**
+- `panic` - System panic conditions
+- `fatal` - Fatal errors requiring exit
+- `error` - Error conditions
+- `warn` - Warning conditions
+- `info` - General information (default)
+- `debug` - Debug-level messages
+- `trace` - Trace-level messages
+
+### Error Handling
+
+- Use the custom `errs` package for deferred error handling:
+  ```go
+  import "github.com/belphemur/CBZOptimizer/v2/internal/utils/errs"
+  
+  func processFile() (err error) {
+      defer errs.Wrap(&err, "failed to process file")
+      // ... implementation
+  }
+  ```
+
+- Define custom error types in `pkg/converter/errors/` for specific error conditions
+- Always provide context when wrapping errors
+
+### Testing
+
+- Use **testify** for assertions:
+  ```go
+  import "github.com/stretchr/testify/assert"
+  
+  func TestSomething(t *testing.T) {
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [Belphemur/CBZOptimizer](https://github.com/Belphemur/CBZOptimizer) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-06-10 -->
