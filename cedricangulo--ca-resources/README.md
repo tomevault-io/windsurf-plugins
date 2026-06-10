@@ -7,12 +7,12 @@ Website that provides valuable resources and guides to improve productivity.
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `copilot-instructions.md` in [cedricangulo/ca-resources](https://github.com/cedricangulo/ca-resources).
+Original source: `CLAUDE.md` in [cedricangulo/ca-resources](https://github.com/cedricangulo/ca-resources).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
+- **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
