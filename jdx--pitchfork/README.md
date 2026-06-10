@@ -7,11 +7,11 @@ Daemons with DX
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [jdx/pitchfork](https://github.com/jdx/pitchfork).
+Original source: `CLAUDE.md` in [jdx/pitchfork](https://github.com/jdx/pitchfork).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
