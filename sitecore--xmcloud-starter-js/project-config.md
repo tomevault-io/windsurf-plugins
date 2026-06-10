@@ -1,109 +1,149 @@
 ---
 trigger: always_on
-description: - [Repository Overview](#repository-overview)
+description: JavaScript/TypeScript-specific rules, naming conventions, and layout for XM Cloud development
 ---
 
-# Project Context
 
-## Table of Contents
+# JavaScript/TypeScript Rules
 
-- [Repository Overview](#repository-overview)
-- [Technology Stack](#technology-stack)
-- [Development Principles](#development-principles)
-- [Upstream, forks, and pull request scope](#upstream-forks-and-pull-request-scope)
-- [Constraints and Guidelines](#constraints-and-guidelines)
-- [Code Style](#code-style)
-- [General Coding Principles](#general-coding-principles)
-- [JavaScript/TypeScript Rules](#javascripttypescript-rules)
-- [Sitecore XM Cloud Rules](#sitecore-xm-cloud-rules)
-- [Next.js Development Patterns](#nextjs-development-patterns)
-- [Testing Patterns](#testing-patterns)
-- [Safety Rules](#safety-rules)
+## Naming Conventions
 
-## Repository Overview
+Variables and Functions:
+- Use camelCase: `handleClick()`, `isActive`, `prefersReducedMotion`
+- Boolean variables: prefix with `is`, `has`, `can`, `should`
+- Event handlers: prefix with `handle` or `on`: `handleClick`, `handleKeyDown`
+- State variables: descriptive names like `activeIndex`, `isExpanding`
 
-This is the **XM Cloud Front End Application Starter Kits** repository containing multiple Next.js starter applications and SPA examples for Sitecore XM Cloud development.
+Components (React):
+- Use PascalCase: `ArticleHeader`, `ProductListing`, `VerticalImageAccordion`
+- Main component files: `Hero.tsx`, `ProductListing.tsx`
+- Component directories: kebab-case like `article-header/`, `product-listing/`
 
-**Repository Structure:**
-- `/examples/` - Contains starter front-end applications (Next.js and SPA)
-- `/authoring/` - Sitecore content items, templates, and deployment configurations  
-- `/local-containers/` - Docker setup for local development environments
-- `xmcloud.build.json` - Primary configuration for XM Cloud deployment
+Constants and Variables:
+- Use UPPER_SNAKE_CASE: `USER_ZIPCODE`, `DEFAULT_TIMEOUT`
+- Environment variables: `SITECORE_EDGE_CONTEXT_ID`, `NEXT_PUBLIC_DEFAULT_SITE_NAME`
+- Dictionary keys: `dictionaryKeys.HERO_SubmitCTALabel`
 
-**Available Examples:**
-- `basic-nextjs` - Simple Next.js starter with basic XM Cloud integration
-- `kit-nextjs-article-starter` - **Solterra & Co.** - Editorial-style template for lifestyle brands
-- `kit-nextjs-location-finder` - **Alaris** - Car brand template with location finder functionality
-- `kit-nextjs-product-listing` - **SYNC** - Product-focused template for audio gear companies
-- `kit-nextjs-skate-park` - Simple demo site showcasing component examples
-- `basic-spa` - SPA starter kit with Angular and Node proxy
+File Naming Patterns:
+- Utilities: `NoDataFallback.tsx`, `date-utils.ts`
+- Main components: `ComponentName.tsx`
 
-Each starter demonstrates:
-- Tailwind-based styling with Shadcn/ui components
-- Personalized homepage via URL parameters
-- Modular component architecture with variants
-- Localization support for English (en) and Canadian English (en-CA)
+Types and Interfaces:
+- Component props: `HeroProps`, `ArticleHeaderProps`, `ProductListingProps`
+- Field interfaces: `ArticleHeaderFields`, `HeroFields`
+- Parameter interfaces: `ArticleHeaderParams`, `VerticalImageAccordionParams`
+- Use `{ [key: string]: any; // eslint-disable-line }` for flexible params
 
-## Technology Stack
+## Code Layout and Organization
 
-**Core Technologies:**
-- **Next.js 14+** - React framework with App Router and Pages Router support
-- **TypeScript** - Strict type safety throughout all components
-- **Sitecore XM Cloud** - Headless content management and delivery
-- **Sitecore Content SDK** - Modern SDK for XM Cloud integration
-- **Tailwind CSS** - Utility-first CSS with container queries (@container)
-- **Shadcn/ui** - Modern component library with accessibility features
+Directory Structure:
+```
+src/
+  components/          # React components organized by feature
+    hero/             # Component directories with variants
+      Hero.tsx        # Main component file with props and variants
+    article-header/   # Component with complex structure
+    product-listing/  # Multi-variant component
+    ui/              # Shadcn/ui components
+    image/           # Reusable image wrapper
+    button-component/ # Button variations
+  lib/                # Configuration and utilities
+    component-props/  # Shared component props
+    constants.ts      # Application constants
+    utils.ts          # Common utilities
+  utils/              # Helper functions and utilities
+    NoDataFallback.tsx # Standard fallback component
+    date-utils.ts     # Date formatting utilities
+  hooks/              # Custom React hooks
+  variables/          # Constants and dictionary keys
+  styles/             # Styling files (global CSS)
+```
 
-**Additional Libraries:**
-- **Framer Motion** - Animation library for interactive components
-- **Lucide React** - Icon library for consistent iconography  
-- **next-localization** - Internationalization with dictionary support
-- **change-case** - String case transformation utilities
+File Organization:
+- Component directories contain main file, variants, and props
+- Main component file should contain variants and props following the Locality of Behavior pattern
+- Using `.dev.tsx` files for variant implementations is discouraged unless maintainability becomes dificult for the componenent and seperation can not be avoided
+- Shared utilities in dedicated directories within each starter (starters are independent; copy utilities into the starter, do not share across starters)
+- Group UI components in `ui/` subdirectory
 
-**Development Tools:**
-- **Docker** - Containerized local development with Sitecore CM
-- **Node.js LTS** - JavaScript runtime environment
-- **npm** - Package management across all starter applications
+## Error Handling
 
-## Development Principles
+API Calls:
+- Always wrap XM Cloud API calls in try/catch blocks
+- Throw custom errors with context: `XMCloudFetchError`, `ComponentRenderError`
+- Handle edge cases with guard clauses
 
-**Multi-Starter Architecture:**
-- Each example is a standalone application
-- Shared patterns and conventions across all starters
-- Independent deployment and development workflows
-- Common XM Cloud integration patterns
+```typescript
+async function fetchLayoutData(path: string): Promise<LayoutData> {
+  if (!path) {
+    throw new Error('Path is required for layout data fetch');
+  }
+  
+  try {
+    const response = await sitecoreLayoutService.getRouteData(path);
+    return response.sitecore.route;
+  } catch (error) {
+    throw new XMCloudFetchError(`Failed to fetch layout data for path: ${path}`, error);
+  }
+}
+```
 
-**Content-First Development:**
-- Components are designed around Sitecore data structures
-- Field-driven rendering with proper fallbacks
-- Support for both connected and disconnected development modes
-- Proper handling of content authoring scenarios
+## Security
 
-## Upstream, forks, and pull request scope
+Input Validation:
+- Sanitize user inputs before processing
+- Validate data at application boundaries
+- Use type guards for runtime type checking
+- Escape content when rendering to prevent XSS
 
-The official **upstream** repository (this project’s public GitHub home) keeps a **small, fixed** set of starters in `examples/` as **reference examples**, not a catalog of every vertical. Before treating work as an **upstream pull request**, confirm whether the target is **upstream** or a **user fork** / **template** copy.
+Environment Variables:
+- Never hardcode sensitive values in source code
+- Use environment variables for all configuration
+- Validate environment variables at application startup
+- Use different .env files for different environments
 
-- **Fits upstream PRs:** **Improvements, bug fixes, and broadly useful features** in **existing** starters; **documentation** and **tooling** aligned with the repo’s contribution policy.
-- **Not for upstream PRs:** **New example sites**, **additional** starters, or **product-specific** extensions for one org that should live in a **fork** or separate repo. Use **Use this template** or maintain a **fork** for that work.
-- **Fork or standalone copy:** Add starters and customize freely; do not frame that work as an official upstream change unless maintainers have agreed otherwise.
+```typescript
+// Environment validation example
+const requiredEnvVars = [
+  'SITECORE_EDGE_CONTEXT_ID',
+  'NEXT_PUBLIC_DEFAULT_SITE_NAME',
+  'SITECORE_EDITING_SECRET'
+];
 
-Authoritative human policy: **[CONTRIBUTING.md](CONTRIBUTING.md)** — especially **[What we do not accept](CONTRIBUTING.md#what-we-do-not-accept)**. For Cursor, see **`.cursor/rules/project-context.mdc`**.
+requiredEnvVars.forEach(envVar => {
+  if (!process.env[envVar]) {
+    throw new Error(`Missing required environment variable: ${envVar}`);
+  }
+});
+```
 
-## Constraints and Guidelines
+## Performance
 
-**File Organization:**
-- Each starter maintains its own `src/` directory structure
-- Shared utilities should be copied, not shared (no monorepo linking)
-- Configuration files specific to each starter application
-- Independent package.json for each example
+Optimization Patterns:
+- Cache XM Cloud API responses using React Query or similar caching solutions
+- Use React.memo for expensive components
+- Lazy-load non-critical modules: `const Component = lazy(() => import('./Component'))`
+- Use useCallback and useMemo for expensive operations
+- Implement proper loading states for data fetching
 
-**Development Workflow:**
+Next.js Specific:
+- Use Next.js Image component for optimized images
+- Implement proper ISR (Incremental Static Regeneration) patterns
+- Use dynamic imports for code splitting
+- Optimize bundle size with proper imports
 
-DMZ git flow will be implemented in the future to support better development practices, scaling, efficiency and developer productivity.
-Below is an outline of the planned workflow and processes that will be followed:
+TypeScript:
+- Enable strict mode in tsconfig.json
+- Prefer type assertions over any: `value as LayoutData`
+- Use discriminated unions for complex state management
+- Define proper interfaces for XM Cloud data structures
 
-- Has a shared main repo (`upstream repository`) with two key branches: `main` and `dmz`
-- Each contributor uses their own fork as their workspace
+## Documentation
+
+Import Patterns:
+- Use `type` imports for TypeScript types: `import type React from 'react'`
+- Import Sitecore components: `import { Text, RichText, Image, useSitecore } from '@sitecore-content-sdk/nextjs'`
+- Import utilities: `import { cn } from '@/lib/utils'`
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
