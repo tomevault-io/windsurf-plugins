@@ -7,11 +7,11 @@ A CLI tool to download genomic analysis files from the Varvis API. Supports auth
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [LaborBerlin/varvis-download](https://github.com/LaborBerlin/varvis-download).
+Original source: `AGENTS.md` in [LaborBerlin/varvis-download](https://github.com/LaborBerlin/varvis-download).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
