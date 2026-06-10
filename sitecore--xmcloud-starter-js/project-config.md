@@ -1,98 +1,111 @@
 ---
 trigger: always_on
-description: Core coding principles and universal standards for XM Cloud starter applications
+description: - [Repository Overview](#repository-overview)
 ---
 
+# Project Context
 
-# General Coding Principles
+## Table of Contents
 
-## Universal Standards
+- [Repository Overview](#repository-overview)
+- [Technology Stack](#technology-stack)
+- [Development Principles](#development-principles)
+- [Upstream, forks, and pull request scope](#upstream-forks-and-pull-request-scope)
+- [Constraints and Guidelines](#constraints-and-guidelines)
+- [Code Style](#code-style)
+- [General Coding Principles](#general-coding-principles)
+- [JavaScript/TypeScript Rules](#javascripttypescript-rules)
+- [Sitecore XM Cloud Rules](#sitecore-xm-cloud-rules)
+- [Next.js Development Patterns](#nextjs-development-patterns)
+- [Testing Patterns](#testing-patterns)
+- [Safety Rules](#safety-rules)
 
-DRY Principle:
-- Don't Repeat Yourself - extract common functionality within a starter
-- Create reusable utilities and helper functions
-- Use composition over inheritance
-- Share types and interfaces across components within the same starter
-- Apply DRY within each starter only; do not share code or packages across starters (each starter is self-contained; copy utilities as needed)
+## Repository Overview
 
-SOLID Principles:
-- Single Responsibility: each function/component has one purpose
-- Open/Closed: extend functionality through composition
-- Dependency Inversion: depend on abstractions, not implementations
+This is the **XM Cloud Front End Application Starter Kits** repository containing multiple Next.js starter applications and SPA examples for Sitecore XM Cloud development.
 
-Code Clarity:
-- Write self-documenting code with clear intent
-- Use meaningful names that express business concepts
-- Prefer explicit over implicit behavior
-- Make dependencies and requirements obvious
+**Repository Structure:**
+- `/examples/` - Contains starter front-end applications (Next.js and SPA)
+- `/authoring/` - Sitecore content items, templates, and deployment configurations  
+- `/local-containers/` - Docker setup for local development environments
+- `xmcloud.build.json` - Primary configuration for XM Cloud deployment
 
-## Architecture Patterns
+**Available Examples:**
+- `basic-nextjs` - Simple Next.js starter with basic XM Cloud integration
+- `kit-nextjs-article-starter` - **Solterra & Co.** - Editorial-style template for lifestyle brands
+- `kit-nextjs-location-finder` - **Alaris** - Car brand template with location finder functionality
+- `kit-nextjs-product-listing` - **SYNC** - Product-focused template for audio gear companies
+- `kit-nextjs-skate-park` - Simple demo site showcasing component examples
+- `basic-spa` - SPA starter kit with Angular and Node proxy
 
-Starter Independence:
-- Each starter under `examples/` is a standalone, self-contained application
-- Copy shared utilities and components into the starter when needed; do not create shared packages or symlinks across starters
-- This keeps each starter independently runnable and maintainable
+Each starter demonstrates:
+- Tailwind-based styling with Shadcn/ui components
+- Personalized homepage via URL parameters
+- Modular component architecture with variants
+- Localization support for English (en) and Canadian English (en-CA)
 
-Modular Design:
-- Organize code into focused, cohesive components
-- Minimize coupling between modules
-- Use clear interfaces between layers
-- Follow established Next.js and XM Cloud patterns consistently
+## Technology Stack
 
-Data Flow:
-- Prefer unidirectional data flow
-- Validate inputs at component boundaries
-- Transform data at appropriate layers
-- Handle errors close to their source
+**Core Technologies:**
+- **Next.js 14+** - React framework with App Router and Pages Router support
+- **TypeScript** - Strict type safety throughout all components
+- **Sitecore XM Cloud** - Headless content management and delivery
+- **Sitecore Content SDK** - Modern SDK for XM Cloud integration
+- **Tailwind CSS** - Utility-first CSS with container queries (@container)
+- **Shadcn/ui** - Modern component library with accessibility features
 
-Testing:
-- Write testable code with minimal dependencies
-- Use dependency injection for better testability
-- Mock external services and XM Cloud APIs
-- Test behavior, not implementation details
+**Additional Libraries:**
+- **Framer Motion** - Animation library for interactive components
+- **Lucide React** - Icon library for consistent iconography  
+- **next-localization** - Internationalization with dictionary support
+- **change-case** - String case transformation utilities
 
-## Development Standards
+**Development Tools:**
+- **Docker** - Containerized local development with Sitecore CM
+- **Node.js LTS** - JavaScript runtime environment
+- **npm** - Package management across all starter applications
 
-Pull request scope (upstream vs fork):
-- If work may become a **PR** to the **official upstream** repository, read **Upstream repository, forks, and pull request scope** in `project-context` rules. Upstream welcomes **improvements, bug fixes, and broadly useful features** in **existing** starters; it does **not** accept **new example sites**, **additional** starters, or **bespoke extensions** meant for a single org—those belong in the user’s **own fork** or **template** copy. Always confirm which repository the user is targeting before planning those kinds of changes.
+## Development Principles
 
-Version Control:
-- Write descriptive commit messages
-- Keep commits focused and atomic
-- Use branching strategies appropriate to team size
-- Review code before merging to dev branch
+**Multi-Starter Architecture:**
+- Each example is a standalone application
+- Shared patterns and conventions across all starters
+- Independent deployment and development workflows
+- Common XM Cloud integration patterns
 
-Documentation:
-- Document public APIs and component interfaces
-- Include usage examples for complex functionality
-- Keep documentation close to code
-- Update documentation with code changes
+**Content-First Development:**
+- Components are designed around Sitecore data structures
+- Field-driven rendering with proper fallbacks
+- Support for both connected and disconnected development modes
+- Proper handling of content authoring scenarios
 
-Performance:
-- Optimize for readability first, performance second
-- Profile before optimizing
-- Cache expensive operations appropriately
-- Consider memory usage and cleanup in React components
+## Upstream, forks, and pull request scope
 
-## Quality Assurance
+The official **upstream** repository (this project’s public GitHub home) keeps a **small, fixed** set of starters in `examples/` as **reference examples**, not a catalog of every vertical. Before treating work as an **upstream pull request**, confirm whether the target is **upstream** or a **user fork** / **template** copy.
 
-Code Review:
-- Review for logic, readability, and maintainability
-- Check error handling and edge cases
-- Verify tests cover new functionality
-- Ensure documentation is updated
+- **Fits upstream PRs:** **Improvements, bug fixes, and broadly useful features** in **existing** starters; **documentation** and **tooling** aligned with the repo’s contribution policy.
+- **Not for upstream PRs:** **New example sites**, **additional** starters, or **product-specific** extensions for one org that should live in a **fork** or separate repo. Use **Use this template** or maintain a **fork** for that work.
+- **Fork or standalone copy:** Add starters and customize freely; do not frame that work as an official upstream change unless maintainers have agreed otherwise.
 
-Continuous Integration:
-- All tests must pass before merging
-- Linting and formatting checks must pass
-- Build process must complete successfully
-- No breaking changes without proper migration
+Authoritative human policy: **[CONTRIBUTING.md](CONTRIBUTING.md)** — especially **[What we do not accept](CONTRIBUTING.md#what-we-do-not-accept)**. For Cursor, see **`.cursor/rules/project-context.mdc`**.
 
-Referenced:
-@examples/kit-nextjs-article-starter/src/components/
-@examples/kit-nextjs-location-finder/src/components/
-@examples/kit-nextjs-product-listing/src/components/
-@examples/basic-nextjs/src/components/
+## Constraints and Guidelines
+
+**File Organization:**
+- Each starter maintains its own `src/` directory structure
+- Shared utilities should be copied, not shared (no monorepo linking)
+- Configuration files specific to each starter application
+- Independent package.json for each example
+
+**Development Workflow:**
+
+DMZ git flow will be implemented in the future to support better development practices, scaling, efficiency and developer productivity.
+Below is an outline of the planned workflow and processes that will be followed:
+
+- Has a shared main repo (`upstream repository`) with two key branches: `main` and `dmz`
+- Each contributor uses their own fork as their workspace
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [Sitecore/xmcloud-starter-js](https://github.com/Sitecore/xmcloud-starter-js) — distributed by [TomeVault](https://tomevault.io).
