@@ -7,11 +7,11 @@ The open-source legal AI agent. Documents stay on your machine; redlines land in
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [sure-scale/doc-haus](https://github.com/sure-scale/doc-haus).
+Original source: `CLAUDE.md` in [sure-scale/doc-haus](https://github.com/sure-scale/doc-haus).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
