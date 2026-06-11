@@ -7,11 +7,11 @@ A responsive social links profile card built with HTML and CSS as part of a Fron
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [Vanveekoo/social-links-profile](https://github.com/Vanveekoo/social-links-profile).
+Original source: `AGENTS.md` in [Vanveekoo/social-links-profile](https://github.com/Vanveekoo/social-links-profile).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
