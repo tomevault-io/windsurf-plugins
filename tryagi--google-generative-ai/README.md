@@ -7,11 +7,11 @@ C# SDK for the Google Gemini API -- chat completions, embeddings, and vision
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [tryAGI/Google_Generative_AI](https://github.com/tryAGI/Google_Generative_AI).
+Original source: `CLAUDE.md` in [tryAGI/Google_Generative_AI](https://github.com/tryAGI/Google_Generative_AI).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
