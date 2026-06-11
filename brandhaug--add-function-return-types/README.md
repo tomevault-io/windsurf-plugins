@@ -7,11 +7,11 @@ A CLI tool to add explicit return types to TypeScript functions
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [brandhaug/add-function-return-types](https://github.com/brandhaug/add-function-return-types).
+Original source: `AGENTS.md` in [brandhaug/add-function-return-types](https://github.com/brandhaug/add-function-return-types).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
