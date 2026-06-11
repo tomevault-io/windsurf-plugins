@@ -7,13 +7,13 @@ Training application for VAT invoicing
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `.cursor/rules/*.mdc` in [Les84Brest/vat-invoice](https://github.com/Les84Brest/vat-invoice).
+Original source: `CLAUDE.md` in [Les84Brest/vat-invoice](https://github.com/Les84Brest/vat-invoice).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
+- **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
