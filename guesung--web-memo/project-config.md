@@ -1,196 +1,205 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: ├── chrome-extension/     # Chrome extension core
 ---
 
-# CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+# Web Memo Technical Architecture
 
-## 🚨 CRITICAL: Subagent (Task Tool) Usage Policy
+## 🏗 **Project Structure**
 
-**MANDATORY**: Before starting ANY non-trivial task, you MUST evaluate whether to use subagents (Task tool). This is NOT optional.
-
-### When to Use Subagents (REQUIRED)
-
-| Scenario | Required Subagent Type |
-|----------|----------------------|
-| Codebase exploration / "where is X?" | `Explore` |
-| Multi-file search or pattern finding | `Explore` |
-| Understanding code architecture | `Explore` |
-| Implementation planning | `Plan` |
-| Complex multi-step tasks | `general-purpose` |
-| Code quality improvements | `refactoring-expert` |
-| Frontend code refactoring | `frontend-refactor-kr` |
-| Security review | `security-engineer` |
-| Performance optimization | `performance-engineer` |
-| System design decisions | `system-architect` |
-| Creating PRs with proper workflow | `git-pr-workflow` |
-
-### Execution Rules
-
-1. **ALWAYS check subagent applicability FIRST** before doing any work yourself
-2. **Explore agent is MANDATORY** for:
-   - Any question about "where is X in the codebase?"
-   - Any search across multiple directories
-   - Understanding how a feature works
-   - Finding all usages of a function/component
-3. **Plan agent is MANDATORY** for:
-   - Any feature implementation with 3+ steps
-   - Architectural changes
-   - Refactoring across multiple files
-4. **Run subagents in PARALLEL** when possible to maximize efficiency
-5. **DO NOT** manually search/grep when Explore agent can do it faster
-
-### Anti-Patterns (NEVER DO THESE)
-
+### **Monorepo Organization**
 ```
-❌ Manually running multiple Grep/Glob commands to find code
-   → Use Explore agent instead
-
-❌ Starting implementation without planning for complex tasks
-   → Use Plan agent first
-
-❌ Running subagents sequentially when they could run in parallel
-   → Launch multiple Task tools in single message
-
-❌ Ignoring specialized agents (security, performance, etc.)
-   → Match task type to appropriate agent
+web-memo/
+├── chrome-extension/     # Chrome extension core
+├── pages/               # Extension pages (popup, side-panel, options)
+├── packages/            # Shared utilities and components
+├── shared/             # Common types and utilities
+├── supabase/           # Database and authentication
+└── e2e/               # End-to-end testing
 ```
 
-### Decision Flowchart
-
-```
-Task received
-    │
-    ├─ "Where is X?" or "Find all Y" → Explore agent (MANDATORY)
-    │
-    ├─ Complex implementation (3+ steps) → Plan agent (MANDATORY)
-    │
-    ├─ Code quality/refactoring → refactoring-expert or frontend-refactor-kr
-    │
-    ├─ Security concerns → security-engineer
-    │
-    ├─ Performance issues → performance-engineer
-    │
-    ├─ PR creation → git-pr-workflow
-    │
-    └─ Simple, single-file change → Do it yourself
-```
-
-**Remember**: Using subagents is FASTER and MORE ACCURATE than doing everything yourself. When in doubt, USE A SUBAGENT.
-
----
-
-## Development Commands
-
-**Package Manager**: This project uses `pnpm` (version 10.23.0) and requires Node.js >=22.17.0.
-
-### Core Development Commands
-```bash
-# Install dependencies
-pnpm i
-
-# Development (all packages)
-pnpm dev
-
-# Development (extension only)
-pnpm dev:extension
-
-# Development (web app only) 
-pnpm dev:web
-
-# Production build
-pnpm build
-
-# Build extension only
-pnpm build:extension
-
-# Build web app only
-pnpm build:web
-```
-
-### Quality & Testing
-```bash
-# Code formatting (Biome)
-pnpm format
-
-# Linting
-pnpm lint
-pnpm lint:fix
-
-# Type checking
-pnpm type-check
-
-# Unit tests (Vitest)
-pnpm test:jest
-
-# E2E tests (Playwright)
-pnpm test:e2e
-
-# View E2E test report
-pnpm test-report:e2e
-```
-
-### Extension Development
-```bash
-# Build extension for Firefox
-pnpm build:extension -- --firefox
-
-# Package extension for distribution
-pnpm package
-
-# Create distributable zip
-pnpm zip
-
-# Update version across all packages
-pnpm update-version
-```
-
-### Database & Types
-```bash
-# Generate Supabase types
-pnpm generate-supabase-type
-```
-
-## Project Architecture
-
-### Monorepo Structure (Turborepo)
-
-**Apps:**
-- **`apps/chrome-extension/`** - Chrome Extension Manifest V3 core application
-- **`apps/web/`** - Next.js 14.2.10 web application
-- **`apps/mobile/`** - React Native/Expo mobile application
-
-**Pages (Extension UI):**
-- **`pages/`** - Extension UI pages (popup, side-panel, options, content-ui, devtools)
-
-**Shared Packages:**
-- **`packages/shared/`** - Shared utilities, hooks, types, and business logic
-- **`packages/ui/`** - Shared UI components library (shadcn/ui based)
-- **`packages/env/`** - Environment variable management
-- **`packages/tailwind-config/`** - Shared TailwindCSS configuration
-- **`packages/tsconfig/`** - Shared TypeScript configurations
-- **`packages/vite-config/`** - Shared Vite build configuration
-- **`packages/hmr/`** - Hot Module Replacement utilities for extension
-- **`packages/zipper/`** - Extension packaging utilities
-- **`packages/dev-utils/`** - Development utilities
-- **`packages/supabase-edge-functions/`** - Supabase Edge Functions
-
-**Testing & Infrastructure:**
-- **`e2e/`** - Playwright end-to-end testing suite
-
-### Core Technologies
+### **Key Technologies**
 - **Frontend**: React 18.3.1, TypeScript 5.5.3, TailwindCSS 3.4.x
+- **Build Tools**: Vite 5.3.3, Turbo 2.1.1
 - **State Management**: TanStack Query v5.59.0, React Hook Form 7.53.2
-- **Build Tools**: Vite 5.3.3 (extension), Next.js 14.2.10 (web), Turbo 2.1.1
-- **Backend**: Supabase (authentication, database, real-time)
-- **Testing**: Playwright 1.47.0, Vitest 2.1.5
-- **Code Quality**: Biome 2.0.0 (formatting/linting)
+- **Testing**: Playwright 1.47.0, Vitest
 
-### Extension Architecture (Manifest V3)
+## 🔧 **Development Patterns**
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+### **Component Architecture**
+```typescript
+// ✅ DO: Use functional components with clear interfaces
+interface MemoCardProps {
+  memo: Memo;
+  onEdit: (id: string) => void;
+  onDelete: (id: string) => void;
+}
+
+function MemoCard({ memo, onEdit, onDelete }: MemoCardProps) {
+  // Component logic
+}
+```
+
+### **State Management**
+```typescript
+// ✅ DO: Use TanStack Query for server state
+function useMemos() {
+  return useQuery({
+    queryKey: ['memos'],
+    queryFn: fetchMemos,
+  });
+}
+
+// ✅ DO: Use React Hook Form for form state
+function MemoForm() {
+  const { register, handleSubmit, formState: { errors } } = useForm<MemoFormData>();
+  // Form logic
+}
+```
+
+## 📱 **Chrome Extension Specifics**
+
+### **Manifest V3 Compliance**
+```typescript
+// ✅ DO: Follow Manifest V3 patterns
+const manifest = {
+  manifest_version: 3,
+  permissions: ['storage', 'activeTab'],
+  host_permissions: ['<all_urls>'],
+  background: { service_worker: 'background.js' }
+};
+```
+
+### **Content Script Integration**
+```typescript
+// ✅ DO: Handle cross-origin restrictions gracefully
+function injectContentScript(tabId: number) {
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      files: ['content.js']
+    });
+  } catch (error) {
+    // Handle restricted pages (chrome://, etc.)
+    console.warn('Cannot inject script on this page:', error);
+  }
+}
+```
+
+## 🎨 **UI/UX Guidelines**
+
+### **Responsive Design**
+```typescript
+// ✅ DO: Use TailwindCSS responsive classes
+<div className="w-full md:w-96 lg:w-[500px]">
+  <div className="p-4 sm:p-6 lg:p-8">
+    {/* Content */}
+  </div>
+</div>
+```
+
+### **Accessibility**
+```typescript
+// ✅ DO: Include proper ARIA labels and keyboard navigation
+<button
+  aria-label="Save memo"
+  onKeyDown={(e) => e.key === 'Enter' && handleSave()}
+  className="focus:ring-2 focus:ring-blue-500 focus:outline-none"
+>
+  Save
+</button>
+```
+
+## 🧪 **Testing Strategy**
+
+### **E2E Testing with Playwright**
+```typescript
+// ✅ DO: Test critical user flows
+test('create memo from side panel', async ({ page }) => {
+  await page.goto('https://example.com');
+  await page.click('[data-testid="side-panel-toggle"]');
+  await page.fill('[data-testid="memo-input"]', 'Test memo');
+  await page.click('[data-testid="save-memo"]');
+
+  await expect(page.locator('[data-testid="memo-list"]')).toContainText('Test memo');
+});
+```
+
+### **Unit Testing with Vitest**
+```typescript
+// ✅ DO: Test utility functions and hooks
+describe('useMemos', () => {
+  it('should fetch memos successfully', async () => {
+    const { result } = renderHook(() => useMemos());
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+  });
+});
+```
+
+## 🔒 **Security & Performance**
+
+### **Data Validation**
+```typescript
+// ✅ DO: Validate all user inputs
+import { z } from 'zod';
+
+const MemoSchema = z.object({
+  title: z.string().min(1).max(200),
+  content: z.string().min(1).max(10000),
+  url: z.string().url(),
+});
+
+function validateMemo(data: unknown) {
+  return MemoSchema.parse(data);
+}
+```
+
+### **Performance Optimization**
+```typescript
+// ✅ DO: Implement proper memoization
+const MemoList = memo(function MemoList({ memos }: { memos: Memo[] }) {
+  // Component logic
+});
+
+// ✅ DO: Use React Query for caching
+const { data: memos } = useQuery({
+  queryKey: ['memos'],
+  queryFn: fetchMemos,
+  cacheTime: 10 * 60 * 1000,
+});
+```
+
+## 📦 **Package Management**
+
+### **Dependencies**
+```json
+// ✅ DO: Use pnpm for consistent package management
+{
+  "packageManager": "pnpm@9.5.0",
+  "engines": {
+    "node": ">=18.12.0"
+  }
+}
+```
+
+### **Workspace Configuration**
+```json
+// ✅ DO: Configure Turborepo for monorepo management
+{
+  "turbo": {
+    "pipeline": {
+      "build": {
+        "dependsOn": ["^build"],
+        "outputs": ["dist/**"]
+      }
+    }
+  }
+}
+```
 
 ---
 > Source: [guesung/Web-Memo](https://github.com/guesung/Web-Memo) — distributed by [TomeVault](https://tomevault.io).
