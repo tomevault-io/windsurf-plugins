@@ -7,11 +7,11 @@ Analyze any website and extract its complete design system — colors, typograph
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [jomvick/design-oracle](https://github.com/jomvick/design-oracle).
+Original source: `CLAUDE.md` in [jomvick/design-oracle](https://github.com/jomvick/design-oracle).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
