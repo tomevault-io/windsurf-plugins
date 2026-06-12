@@ -1,173 +1,237 @@
 ---
 trigger: always_on
-description: - Next.js 14.2.10 (for web application)
+description: handleSubmit,
 ---
 
 
-## Core Technologies
-- **Frontend**
-  - TypeScript
-  - React 18.3.1
-  - Next.js 14.2.10 (for web application)
-  - Vite 5.3.3 (for Chrome extension)
-  - TailwindCSS 3.4.x
+# Frontend Design Guideline
 
-- **Backend & Database**
-  - Supabase
-    - Authentication
-    - Database
-    - Type generation
+This document summarizes key frontend design principles and rules, showcasing
+recommended patterns. Follow these guidelines when writing frontend code.
 
-## Project Structure
-- **Monorepo Structure (Turborepo)**
-  - `chrome-extension/` - Chrome extension application
-  - `pages/` - Chrome extension Pages (Side Panel, Content UI, etc)
-  - `shared/` - Shared utilities and types
-  - `packages/` - Shared packages
-  - `supabase/` - Supabase configuration and types
-  - `scripts/` - Development scripts
-  - `tests/` - Test files
+# Readability
 
-## State Management & Data Fetching
-- TanStack Query (React Query) v5.59.0
-- React Hook Form 7.53.2
+Improving the clarity and ease of understanding code.
 
-## UI & Styling
-- TailwindCSS
-- Framer Motion 11.11.8
-- Lucide React 0.456.0
-- Next Themes
-- Driver.js (for tutorials/guides)
+## Naming Magic Numbers
 
-## Development Tools
-- TypeScript 5.5.3
-- Biome 2.0.0
-- Sentry (error tracking)
+**Rule:** Replace magic numbers with named constants for clarity.
 
-## Testing
-- Vitest
-- Playwright 1.47.0
+**Reasoning:**
 
-## Build & Development
-- Turbo 2.1.1
-- Vite 5.3.3
-- Cross-env (environment variables)
-- Rimraf (file system operations)
+- Improves clarity by giving semantic meaning to unexplained values.
+- Enhances maintainability.
 
-## Chrome Extension Specific
-- Chrome Extension Manifest V3
-- Firefox Compatibility Support
-  - Conditional logic using `__FIREFOX__` environment variable
-- HMR (Hot Module Replacement) support
+#### Recommended Pattern:
 
-## Development Workflow
-- Git-based version control
-- pnpm 9.5.0 package manager
-- Node.js >=18.12.0
-- GitHub Actions CI/CD
-- Automated version updates (`update_version.sh`)
-- Code quality checks
-- Automated testing
-- Cross-browser testing
-- Error tracking and monitoring
+```typescript
+const ANIMATION_DELAY_MS = 300;
 
-## Utilities
-- dayjs (date handling)
-- es-hangul (Korean text processing)
-- youtube-transcript (YouTube caption handling)
-- OpenAI API integration
+async function onLikeClick() {
+  await postLike(url);
+  await delay(ANIMATION_DELAY_MS); // Clearly indicates waiting for animation
+  await refetchPostLike();
+}
+```
 
-## Environment Configuration
-- Environment variables managed through `.env` file
-- Supabase project configuration
-- Sentry error tracking setup
-- Cross-browser build configuration
+## Abstracting Implementation Details
 
-This documentation accurately reflects the current project structure and technologies in use. Each section is based on the actual `package.json` and project structure, including the specific versions currently in use.
+**Rule:** Abstract complex logic/interactions into dedicated components/HOCs.
 
-The project follows modern web development practices and employs a comprehensive set of tools for development, testing, and deployment. The monorepo structure using Turborepo allows for efficient code sharing and management between the Chrome extension and web application components.
-## Core Technologies
-- **Frontend**
-  - TypeScript
-  - React 18.3.1
-  - Next.js 14.2.10 (for web application)
-  - Vite 5.3.3 (for Chrome extension)
-  - TailwindCSS 3.4.x
+**Reasoning:**
 
-- **Backend & Database**
-  - Supabase
-    - Authentication
-    - Database
-    - Type generation
+- Reduces cognitive load by separating concerns.
+- Improves readability, testability, and maintainability of components.
 
-## Project Structure
-- **Monorepo Structure (Turborepo)**
-  - `chrome-extension/` - Chrome extension application
-  - `pages/` - Chrome extension Pages (Side Panel, Content UI, etc)
-  - `shared/` - Shared utilities and types
-  - `packages/` - Shared packages
-  - `supabase/` - Supabase configuration and types
-  - `scripts/` - Development scripts
-  - `tests/` - Test files
+#### Recommended Pattern 1: Auth Guard
 
-## State Management & Data Fetching
-- TanStack Query (React Query) v5.59.0
-- React Hook Form 7.53.2
+(Login check abstracted to a wrapper/guard component)
 
-## UI & Styling
-- TailwindCSS
-- Framer Motion 11.11.8
-- Lucide React 0.456.0
-- Next Themes
-- Driver.js (for tutorials/guides)
+```tsx
+// App structure
+function App() {
+  return (
+    <AuthGuard>
+      {" "}
+      {/* Wrapper handles auth check */}
+      <LoginStartPage />
+    </AuthGuard>
+  );
+}
 
-## Development Tools
-- TypeScript 5.5.3
-- Biome 2.0.0
-- Sentry (error tracking)
+// AuthGuard component encapsulates the check/redirect logic
+function AuthGuard({ children }) {
+  const status = useCheckLoginStatus();
+  useEffect(() => {
+    if (status === "LOGGED_IN") {
+      location.href = "/home";
+    }
+  }, [status]);
 
-## Testing
-- Vitest
-- Playwright 1.47.0
+  // Render children only if not logged in, otherwise render null (or loading)
+  return status !== "LOGGED_IN" ? children : null;
+}
 
-## Build & Development
-- Turbo 2.1.1
-- Vite 5.3.3
-- Cross-env (environment variables)
-- Rimraf (file system operations)
+// LoginStartPage is now simpler, focused only on login UI/logic
+function LoginStartPage() {
+  // ... login related logic ONLY ...
+  return <>{/* ... login related components ... */}</>;
+}
+```
 
-## Chrome Extension Specific
-- Chrome Extension Manifest V3
-- Firefox Compatibility Support
-  - Conditional logic using `__FIREFOX__` environment variable
-- HMR (Hot Module Replacement) support
+#### Recommended Pattern 2: Dedicated Interaction Component
 
-## Development Workflow
-- Git-based version control
-- pnpm 9.5.0 package manager
-- Node.js >=18.12.0
-- GitHub Actions CI/CD
-- Automated version updates (`update_version.sh`)
-- Code quality checks
-- Automated testing
-- Cross-browser testing
-- Error tracking and monitoring
+(Dialog logic abstracted into a dedicated `InviteButton` component)
 
-## Utilities
-- dayjs (date handling)
-- es-hangul (Korean text processing)
-- youtube-transcript (YouTube caption handling)
-- OpenAI API integration
+```tsx
+export function FriendInvitation() {
+  const { data } = useQuery(/* ... */);
 
-## Environment Configuration
-- Environment variables managed through `.env` file
-- Supabase project configuration
-- Sentry error tracking setup
-- Cross-browser build configuration
+  return (
+    <>
+      {/* Use the dedicated button component */}
+      <InviteButton name={data.name} />
+      {/* ... other UI ... */}
+    </>
+  );
+}
 
-This documentation accurately reflects the current project structure and technologies in use. Each section is based on the actual `package.json` and project structure, including the specific versions currently in use.
+// InviteButton handles the confirmation flow internally
+function InviteButton({ name }) {
+  const handleClick = async () => {
+    const canInvite = await overlay.openAsync(({ isOpen, close }) => (
+      <ConfirmDialog
+        title={`Share with ${name}`}
+        // ... dialog setup ...
+      />
+    ));
 
-The project follows modern web development practices and employs a comprehensive set of tools for development, testing, and deployment. The monorepo structure using Turborepo allows for efficient code sharing and management between the Chrome extension and web application components.
+    if (canInvite) {
+      await sendPush();
+    }
+  };
+
+  return <Button onClick={handleClick}>Invite</Button>;
+}
+```
+
+## Separating Code Paths for Conditional Rendering
+
+**Rule:** Separate significantly different conditional UI/logic into distinct
+components.
+
+**Reasoning:**
+
+- Improves readability by avoiding complex conditionals within one component.
+- Ensures each specialized component has a clear, single responsibility.
+
+#### Recommended Pattern:
+
+(Separate components for each role)
+
+```tsx
+function SubmitButton() {
+  const isViewer = useRole() === "viewer";
+
+  // Delegate rendering to specialized components
+  return isViewer ? <ViewerSubmitButton /> : <AdminSubmitButton />;
+}
+
+// Component specifically for the 'viewer' role
+function ViewerSubmitButton() {
+  return <TextButton disabled>Submit</TextButton>;
+}
+
+// Component specifically for the 'admin' (or non-viewer) role
+function AdminSubmitButton() {
+  useEffect(() => {
+    showAnimation(); // Animation logic isolated here
+  }, []);
+
+  return <Button type="submit">Submit</Button>;
+}
+```
+
+## Simplifying Complex Ternary Operators
+
+**Rule:** Replace complex/nested ternaries with `if`/`else` or IIFEs for
+readability.
+
+**Reasoning:**
+
+- Makes conditional logic easier to follow quickly.
+- Improves overall code maintainability.
+
+#### Recommended Pattern:
+
+(Using an IIFE with `if` statements)
+
+```typescript
+const status = (() => {
+  if (ACondition && BCondition) return "BOTH";
+  if (ACondition) return "A";
+  if (BCondition) return "B";
+  return "NONE";
+})();
+```
+
+## Reducing Eye Movement (Colocating Simple Logic)
+
+**Rule:** Colocate simple, localized logic or use inline definitions to reduce
+context switching.
+
+**Reasoning:**
+
+- Allows top-to-bottom reading and faster comprehension.
+- Reduces cognitive load from context switching (eye movement).
+
+#### Recommended Pattern A: Inline `switch`
+
+```tsx
+function Page() {
+  const user = useUser();
+
+  // Logic is directly visible here
+  switch (user.role) {
+    case "admin":
+      return (
+        <div>
+          <Button disabled={false}>Invite</Button>
+          <Button disabled={false}>View</Button>
+        </div>
+      );
+    case "viewer":
+      return (
+        <div>
+          <Button disabled={true}>Invite</Button> {/* Example for viewer */}
+          <Button disabled={false}>View</Button>
+        </div>
+      );
+    default:
+      return null;
+  }
+}
+```
+
+#### Recommended Pattern B: Colocated simple policy object
+
+```tsx
+function Page() {
+  const user = useUser();
+  // Simple policy defined right here, easy to see
+  const policy = {
+    admin: { canInvite: true, canView: true },
+    viewer: { canInvite: false, canView: true },
+  }[user.role];
+
+  // Ensure policy exists before accessing properties if role might not match
+  if (!policy) return null;
+
+  return (
+    <div>
+      <Button disabled={!policy.canInvite}>Invite</Button>
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [guesung/Web-Memo](https://github.com/guesung/Web-Memo) — distributed by [TomeVault](https://tomevault.io).
