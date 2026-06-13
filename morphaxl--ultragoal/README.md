@@ -7,11 +7,11 @@ Tell Claude Code what you want once. It works until the job is verifiably done �
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [morphaxl/ultragoal](https://github.com/morphaxl/ultragoal).
+Original source: `CLAUDE.md` in [morphaxl/ultragoal](https://github.com/morphaxl/ultragoal).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
