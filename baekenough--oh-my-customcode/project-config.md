@@ -179,4 +179,4 @@ oh-my-customcode는 소프트웨어 컴파일과 동일한 구조를 따릅니�
 
 ---
 > Source: [baekenough/oh-my-customcode](https://github.com/baekenough/oh-my-customcode) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-10 -->
+<!-- tomevault:4.0:windsurf_rules:2026-06-13 -->
