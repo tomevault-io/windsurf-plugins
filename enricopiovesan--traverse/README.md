@@ -7,11 +7,11 @@ Contract-driven runtime for portable business capabilities — spec-governed, WA
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [enricopiovesan/Traverse](https://github.com/enricopiovesan/Traverse).
+Original source: `AGENTS.md` in [enricopiovesan/Traverse](https://github.com/enricopiovesan/Traverse).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
