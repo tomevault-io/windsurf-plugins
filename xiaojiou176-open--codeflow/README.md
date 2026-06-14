@@ -7,11 +7,11 @@ OpenVibeCoding is the command tower for AI engineering: plan, delegate, track, r
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [xiaojiou176-open/codeflow](https://github.com/xiaojiou176-open/codeflow).
+Original source: `AGENTS.md` in [xiaojiou176-open/codeflow](https://github.com/xiaojiou176-open/codeflow).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
