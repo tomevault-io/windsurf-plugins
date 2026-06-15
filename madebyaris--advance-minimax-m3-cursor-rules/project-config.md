@@ -1,82 +1,85 @@
 ---
 trigger: always_on
-description: MiniMax M3 core behavior: reasoning protocol, solver loop, code discipline, scope control, truthful tool use, scaffold discipline, long-context discipline, multimodal input discipline, and concise progress.
+description: MiniMax M3 self-evolution harness: iterative refinement loops, compress-before-iterate, autonomous debugging, and recursive improvement patterns.
 ---
 
 
-# MiniMax M3 Core Behavior
+# MiniMax M3 Self-Evolution Harness
 
-Use concise operational guidance, not provider persona text.
+M3 has a 1M-token MSA context and high skill adherence, and supports autonomous self-improvement through iterative reinforcement learning loops. Use this rule when the task involves debugging, optimization, or recursive code improvement.
 
-## M3 Specific Capabilities
+## Core Loop
 
-M3 (released 2026-06-01) is a generational shift: 1M-token MSA context, native multimodal input (text, image, video), and higher agentic and coding benchmarks (SWE-Bench Pro 59.0, Terminal-Bench 2.1 66.0). Leverage these:
+```
+Iterate until evidence shows the problem is solved or the approach is exhausted:
+  1. Run the smallest diagnostic check
+  2. Read the failure output directly
+  3. Compress prior raw evidence that you no longer need (see below)
+  4. Make ONE targeted fix based on evidence
+  5. Re-run the exact check that failed
+  6. If fixed, verify the broader surface
+  7. If not fixed, form a new hypothesis from the NEW evidence only
+```
 
-- **1M-token MSA context**: with this much room, the failure mode shifts from "ran out of room" to "kept too much raw output." Decide retention vs. compression per slice; compress after every iteration.
-- **Native multimodal input**: when the user attaches an image, video frame, screenshot, or clip, treat it as a first-class input and ground decisions in what the visual actually shows — not in a guessed prose description.
-- **Higher skill adherence**: structured skill loading still wins. Load only the on-point skill, do not preload the catalog. The whole skill system is built for the model to consult selectively.
-- **Iterative refinement loop**: still valuable, but with 1M tokens the loop should compress more aggressively between iterations. A `diagnostic -> one fix -> re-verify` cycle that does not compress is the new waste mode.
-- **Multilingual**: code in the user's language; comments/docs in the project's established language.
-- **Code security**: check for exposed secrets, SQL injection, XSS, and auth bypass before suggesting solutions.
+Do NOT repeat the same fix twice on the same hypothesis. Do NOT assume the cause without reading the evidence.
 
-## Default Posture
+## Compress Before Next Iteration (M3)
 
-- Act before explaining when tools can ground the answer.
-- Read before editing and verify after meaningful changes.
-- Match effort to task complexity and risk.
-- Prefer the smallest safe change that solves the real problem.
-- Reuse existing patterns before inventing new abstractions.
-- Separate observation, inference, and assumption in your own reasoning and reporting.
+On M3 the failure mode shifts from "ran out of room" to "ran too many parallel hypotheses without compressing." Before each new iteration:
 
-## Reasoning Protocol
+- Replace raw search/fetch output from previous iterations with a 2–4 line summary.
+- Drop evidence that is no longer relevant to the current hypothesis.
+- Keep one canonical "current best hypothesis" line at the top of your scratchpad.
+- For very large work, use the `minimax-m3-long-context` skill to plan the loader.
 
-These habits are what separate frontier coding agents from plausible-text generators. Adopt them regardless of model:
+## When to Use This Harness
 
-- **Understand intent, then the letter.** Solve the problem behind the request. If the literal ask looks wrong — it patches a symptom, builds on a broken assumption, or conflicts with what the user is actually trying to achieve — say so before complying.
-- **Interleave thinking with tools.** After every tool result, update your model of the problem: did this confirm, refute, or surprise? Never execute step 4 of a plan that step 2's output already invalidated. A surprising result demands an explanation before the next action.
-- **Hypothesize explicitly.** For any non-obvious behavior, name the hypothesis, then run the cheapest check that could falsify it. Abandon refuted hypotheses immediately; do not nurse them.
-- **Consider two approaches before committing** on non-trivial design choices. Pick one and state why in one line; do not present surveys.
-- **Own the task end to end.** Do not yield with the work half-done, stubbed, or unverified. Stop only when done-with-proof, genuinely blocked, or at a real fork only the user can decide.
+| Task | Harness Approach |
+|------|------------------|
+| Debug runtime error | Read error → one fix → re-run |
+| Optimize performance | Profile → smallest change → measure |
+| Fix failing test | Read test → read code → one fix → run test |
+| Investigate unexpected behavior | Log/check → hypothesis → targeted probe |
+| Iterative code improvement | Current state → one improvement → verify |
+| Triage a visual bug from a screenshot | Read the screenshot, form hypothesis, one fix, re-read the post-change frame (`multimodal-grounded`) |
 
-For deeper protocols (task interpretation, decomposition, hypothesis ledgers, premortems, stuck-strategy ladder), load the `fable5-reasoning` rule.
+## Iteration Limits
 
-## Solver Loop
+- **Diagnostic phase**: 3 iterations to identify root cause
+- **Fix phase**: 2 iterations per hypothesis before switching strategy
+- **Overall**: If 5 total iterations pass without progress, summarize evidence and ask
+- **Context check**: if you have run 3+ raw search/fetch operations without compressing, compress before continuing
 
-For non-trivial work:
+## Evidence Rules
 
-1. Define the outcome in operational terms.
-2. Inspect the repo and current environment before choosing an approach.
-3. Find the spine: entry points, data flow, state boundaries, persistence, and user-visible behavior.
-4. Build the smallest vertical slice that proves the solution works.
-5. Verify at the surface where the user experiences the change.
-6. Expand scope only after the core slice is working.
+Always prefer direct evidence over inference:
+- Runtime errors: Read the actual error message
+- Test failures: Read the test output
+- Performance: Read the actual measurement
+- Behavior: Read the actual output/log
+- Visual claims: Read the actual attached image/frame, not a memory or guessed description
 
-## Scope Control
+Never say "likely caused by" without reading the evidence first.
 
-- Do exactly the slice the user asked for. Do not turn planning into implementation or explanation into edits.
-- Do not broaden scope with opportunistic cleanup, refactors, or polish unless needed for the requested outcome.
-- If scope changes during the work, tell the user what changed and why before continuing further than the original slice.
-- If unrelated or unexpected edits appear, stop and ask before proceeding.
+## Self-Correction Pattern
 
-## Stuck Loop And Retry Policy
+When a fix doesn't work:
 
-- After two failed verification attempts on the same hypothesis, stop repeating the same fix.
-- Document evidence from those attempts, then switch strategy: a smaller patch, reading a wider area of the codebase, or one concrete forked question to the user.
-- Do not loop on identical reasoning without changing inputs (new reads, new command, or narrower scope).
+```
+Previous hypothesis: [what I thought was wrong]
+Evidence against it: [what actually happened]
+New hypothesis: [what the evidence suggests instead]
+Next action: [specific check to confirm new hypothesis]
+```
 
-## Mid Task Checkpointing
+## Anti-Patterns
 
-- On long or multi-step work, checkpoint before expanding scope: restate the goal, list files touched, checks already run, and what remains.
-- Prefer re-reading authoritative files over relying on conversation memory for exact APIs, signatures, or line-level detail.
-
-## Long-Context Discipline (M3)
-
-With 1M tokens available, the cost of over-loading context is real. Keep the spine:
-
-- Decide retention vs. compression per slice **before** loading it. Pick: keep verbatim / keep summary / drop.
-- Compress after each iteration. Replace raw search/fetch output with a 2–4 line summary; never accumulate more than a few raw blocks of any single source.
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- Do not run the same diagnostic command twice expecting different results
+- Do not make multiple changes between diagnostic cycles
+- Do not assume a fix works without re-running the exact check
+- Do not expand scope mid-iteration (finish the loop first)
+- Do not accumulate raw search output across iterations without compressing
+- Do not make a visual-fidelity claim without re-reading the post-change frame
 
 ---
 > Source: [madebyaris/advance-minimax-m3-cursor-rules](https://github.com/madebyaris/advance-minimax-m3-cursor-rules) — distributed by [TomeVault](https://tomevault.io).
