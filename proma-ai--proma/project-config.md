@@ -1,11 +1,11 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 ---
 
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 
 **重要提示：**
 - 当功能发生变化时，请保持此文件和 `README.md` 同步更新。请更新文档以反映当前状态，但是需要经过我的允许后再修改。
@@ -28,11 +28,11 @@ Bun workspace monorepo：
 ```
 proma-v2/
 ├── packages/
-│   ├── shared/     # 共享类型、IPC 通道常量、配置、工具函数 (v0.1.15)
-│   ├── core/       # AI Provider 适配器、代码高亮服务 (v0.2.2)
-│   └── ui/         # 共享 UI 组件 (CodeBlock, MermaidBlock) (v0.1.3)
+│   ├── shared/     # 共享类型、IPC 通道常量、配置、工具函数 (v0.1.20)
+│   ├── core/       # AI Provider 适配器、代码高亮服务 (v0.2.9)
+│   └── ui/         # 共享 UI 组件 (CodeBlock, MermaidBlock) (v0.1.6)
 └── apps/
-    └── electron/   # Electron 桌面应用 (v0.9.5)
+    └── electron/   # Electron 桌面应用 (v0.10.7)
         └── src/
             ├── main/       # 主进程 + 服务层 (main/lib/)
             ├── preload/    # IPC 上下文桥接
@@ -45,26 +45,26 @@ proma-v2/
 
 ### 包职责详解
 
-#### @proma/shared (v0.1.15)
+#### @proma/shared (v0.1.20)
 - **导出模块**：`./types`、`./config`、`./utils`、`./constants/permission-rules`
 - **关键类型**：`AgentMessage`、`ChatMessage`、`Channel`、`PermissionRequest`、`FeishuConfig`
 - **依赖**：无运行时依赖（仅 TypeScript）
 
-#### @proma/core (v0.2.2)
+#### @proma/core (v0.2.9)
 - **导出模块**：`./providers`、`./highlight`、`./types`、`./utils`
 - **关键功能**：Provider 适配器注册表、代码高亮（Shiki）
 - **依赖**：`@proma/shared`、`shiki`
-- **Peer 依赖**：`@anthropic-ai/claude-agent-sdk`、`@anthropic-ai/sdk`、`@modelcontextprotocol/sdk`
+- **Peer 依赖**：`@anthropic-ai/Codex-agent-sdk`、`@anthropic-ai/sdk`、`@modelcontextprotocol/sdk`
 
-#### @proma/ui (v0.1.3)
+#### @proma/ui (v0.1.6)
 - **关键组件**：共享 React UI 组件库
-- **依赖**：`@proma/core`、`beautiful-mermaid`、`shiki`、Radix UI
+- **依赖**：`@proma/core`、`beautiful-mermaid`、`mermaid`、`shiki`
 - **Peer 依赖**：`react@^18.3.0`、`react-dom@^18.3.0`
 
-#### @proma/electron (v0.9.5)
+#### @proma/electron (v0.10.7)
 - **职责**：Electron 桌面应用主体，集成所有包
 - **关键依赖**：
-  - `@anthropic-ai/claude-agent-sdk@0.3.143` - Agent SDK
+  - `@anthropic-ai/Codex-agent-sdk@0.2.120` - Agent SDK
   - `@larksuiteoapi/node-sdk` - 飞书集成
   - Radix UI、TipTap、Tailwind CSS
   - 文件解析：`pdf-parse`、`officeparser`、`word-extractor`
@@ -140,7 +140,7 @@ bun run generate:icons    # 生成应用图标
 | **构建工具** | Vite | 6.0.3 |
 | **打包工具** | esbuild | 0.24.0+ |
 | **分发工具** | Electron Builder | 25.1.8 |
-| **Agent SDK** | @anthropic-ai/claude-agent-sdk | 0.3.143 |
+| **Agent SDK** | @anthropic-ai/Codex-agent-sdk | 0.2.120 |
 | **飞书 SDK** | @larksuiteoapi/node-sdk | 最新 |
 
 ## 核心架构
