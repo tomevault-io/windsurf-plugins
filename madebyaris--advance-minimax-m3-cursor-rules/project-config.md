@@ -1,74 +1,147 @@
 ---
 trigger: always_on
-description: Fable 5 reasoning protocols: task interpretation, risk-first decomposition, approach selection, interleaved thinking, hypothesis ledgers, premortems, calibration, and the stuck-strategy ladder. Load for complex, ambiguous, or long-horizon tasks, for debugging strategy, or whenever progress stalls.
+description: Language-agnostic programming patterns: SOLID, design patterns, clean code, and architecture. Load when refactoring, designing abstractions, or reviewing structure — not for everyday syntax.
 ---
 
 
-# Fable 5 Reasoning Protocols
+# Language-Agnostic Programming Patterns
 
-The always-on core defines the short Reasoning Protocol. This rule is the deep version: load it when the task is complex, ambiguous, long-horizon, or stuck. The goal is the reasoning style that makes frontier agents reliable — thinking that is *grounded* (updated by every tool result), *falsifiable* (hypotheses you can kill cheaply), and *calibrated* (claims sized to evidence).
+Universal principles for structure, naming, architecture, and testing — applicable across all languages.
 
-These protocols are model-agnostic. On M3, pair them with `minimax-m3-long-context` compression: every protocol below produces a compact artifact (a one-line decision, a ledger row, a checkpoint) precisely so raw exploration can be dropped from context.
+Load this rule when refactoring modules, designing abstractions, reviewing architecture, or choosing patterns. For day-to-day coding workflow (read-before-edit, CI discovery, minimal diff, verification), the always-on core **Code Discipline** section is canonical — do not duplicate it here. For the judgment layer — root-cause method, simplicity taste, test integrity — load `fable5-coding-craft` alongside this rule.
 
-## Task Interpretation: Three Readings
+---
 
-Before planning, read the request three ways:
+## Pattern Judgment (Read First)
 
-1. **Literal** — exactly what was typed.
-2. **Intent** — the problem the user is trying to solve. ("Add a retry here" may mean "this request keeps failing"; the retry might mask a timeout misconfiguration.)
-3. **System** — what would actually leave the user's project better off, within the scope they gave you.
+Everything below is vocabulary, not a checklist. Frontier-quality code applies patterns *reactively* — when the code's actual pain demands them — never proactively because a situation pattern-matches a textbook example.
 
-Work at the intent reading by default. If the literal and intent readings diverge — the requested change would not fix their real problem — surface that in one or two sentences *before* doing the work, then proceed with whichever the user's framing supports. Never silently substitute your own goal for theirs.
+- Every pattern has a cost: indirection, a new concept for readers, more files to trace through. Apply one only when the pain it removes is already present, not predicted.
+- The strongest signal for an abstraction is the **third occurrence** of real duplication with identical reasons to change. Two similar blocks that change for different reasons are not duplication — unifying them couples things that must stay free.
+- SOLID violations matter when they cause observed friction (a class you cannot test, a switch you keep re-editing). A small concrete class that "violates SRP" but has never needed to change is fine code — leave it alone.
+- The best architecture for most changes is the one the repo already has. Pattern fluency is mostly for *reading* existing designs and for naming the structure a refactor is already growing toward.
+- When reviewing, flag pattern *overuse* with the same severity as pattern absence: a Strategy with one strategy, a Factory with one product, or an interface with one implementation is indirection without payoff.
 
-Close the interpretation step by writing (for yourself) one operational sentence: *"Done means ___, proven by ___."* If you cannot fill in the second blank, you do not understand the task yet.
+---
 
-## Decomposition: Vertical And Risk-First
+## Change Discipline
 
-- Slice vertically, not horizontally. Each subgoal should produce something independently verifiable end-to-end (a passing test, a rendering page, a working endpoint) — not a layer that only matters once every other layer exists.
-- Front-load the riskiest unknown. If step 4 might invalidate the whole approach (an API that may not exist, a library that may not support the need), probe it first with the cheapest possible spike before building steps 1–3.
-- Keep the plan falsifiable: each step has an observable success signal. "Set up the service" is not a step; "service responds 200 on /health" is.
-- Re-plan when reality disagrees. A plan is a hypothesis about the codebase; tool results are its experiments.
+- Solve the requested problem with the smallest vertical slice; expand only after it works.
+- Prefer extending existing modules over creating parallel implementations.
+- When adding a dependency, confirm the repo does not already solve the same need.
+- Keep public surfaces stable unless the task explicitly requires a breaking change.
+- Leave the codebase in a compilable, testable state after each meaningful step.
 
-## Approach Selection
+---
 
-For any non-trivial design choice:
+## SOLID Principles
 
-1. Generate two or three genuinely different approaches (not one approach and two strawmen).
-2. Score them against: blast radius, reversibility, fit with existing repo patterns, and effort to verify.
-3. Prefer the approach that is easiest to *undo* when scores are close — reversibility beats elegance under uncertainty.
-4. Commit with a one-line rationale, then stop relitigating. Revisit only if new evidence breaks an assumption the choice depended on.
+### Single Responsibility Principle (SRP)
+A class/module should have only one reason to change.
 
-The output is a decision, not a survey. Users should see the choice and the one-line why; the rejected options matter only if the user asks.
+**Apply when:**
+- A function does multiple unrelated things
+- A class has too many dependencies
+- Changes in one area affect unrelated code
 
-## Interleaved Thinking Loop
-
-The core failure mode of weaker agents is *open-loop execution*: making a plan, then running it blind. Run closed-loop instead. After **every** tool result:
-
-```text
-Observe  → what did this actually return? (not what I expected it to return)
-Update   → which of my beliefs does this confirm, refute, or complicate?
-Decide   → is the next planned step still the right step?
+**Example Pattern:**
+```
+Bad:  UserService handles auth, profile, notifications, and billing
+Good: AuthService, ProfileService, NotificationService, BillingService
 ```
 
-Two hard rules:
+### Open/Closed Principle (OCP)
+Open for extension, closed for modification.
 
-- **The surprise rule.** Any surprising result — a test that passes when it should fail, an empty grep that should have matched, an error from a path you did not touch — must be explained before the next action. Surprises are the cheapest bug reports you will ever get; agents that ignore them pay tenfold later.
-- **The stale-plan rule.** Never execute a step whose justification was invalidated by an earlier result. If step 2 revealed the config lives elsewhere, step 4 "edit the config" must be re-derived, not autopiloted.
+**Apply when:**
+- Adding new features requires modifying existing code
+- Switch statements grow with each new type
+- Core logic changes for edge cases
 
-## Hypothesis Ledger (Debugging Strategy)
-
-For any non-obvious bug, run an explicit ledger instead of intuition-hopping:
-
-```text
-H1: [cause] — discriminating check: [cheapest test that gives a different answer if H1 is true vs false] — status: open/confirmed/refuted
-H2: ...
+**Example Pattern:**
+```
+Bad:  if type == "email" ... elif type == "sms" ... elif type == "push" ...
+Good: NotificationStrategy interface with EmailStrategy, SMSStrategy, PushStrategy
 ```
 
-- Order checks by discrimination-per-cost, not by which hypothesis feels likeliest. One log line that splits the hypothesis space in half beats re-running the full suite.
-- Use differential reasoning first: it worked before / it works over there — **what is different?** (version, input, environment, timing, data). Diffs shrink the search space faster than reading code does.
-- Bisect when the space is large: git history (`git bisect`), input minimization (shrink the failing case), or layer isolation (does the bug exist below the UI? below the API?).
-- A refuted hypothesis is progress — record what killed it and move on. Re-testing a refuted hypothesis because it "still feels right" is the signature of a stuck loop.
+### Liskov Substitution Principle (LSP)
+Subtypes must be substitutable for their base types.
 
+**Apply when:**
+- Derived classes override behavior in unexpected ways
+- Code checks for specific types before operating
+- Inheritance creates illogical hierarchies
+
+**Example Pattern:**
+```
+Bad:  Square extends Rectangle but can't independently set width/height
+Good: Both Square and Rectangle implement Shape interface
+```
+
+### Interface Segregation Principle (ISP)
+Clients shouldn't depend on interfaces they don't use.
+
+**Apply when:**
+- Classes implement methods they don't need
+- Interfaces have too many methods
+- Changes affect many unrelated implementations
+
+**Example Pattern:**
+```
+Bad:  Animal interface with fly(), swim(), walk() - Penguin can't fly
+Good: Flyable, Swimmable, Walkable interfaces
+```
+
+### Dependency Inversion Principle (DIP)
+Depend on abstractions, not concretions.
+
+**Apply when:**
+- High-level modules import low-level modules directly
+- Changing database/service requires code changes
+- Testing requires real dependencies
+
+**Example Pattern:**
+```
+Bad:  UserService directly imports MySQLDatabase
+Good: UserService depends on DatabaseInterface, injected at runtime
+```
+
+## Common Design Patterns
+
+### Creational Patterns
+
+#### Factory Pattern
+Use when object creation logic is complex or needs to be centralized.
+
+```
+When to use:
+- Multiple similar objects with different configurations
+- Object creation depends on runtime conditions
+- Hiding complex initialization logic
+```
+
+#### Builder Pattern
+Use for constructing complex objects step by step.
+
+```
+When to use:
+- Objects with many optional parameters
+- Complex configuration requirements
+- Need for immutable objects with many fields
+```
+
+#### Singleton Pattern
+Use sparingly for truly global, single-instance resources.
+
+```
+When to use:
+- Configuration managers
+- Connection pools
+- Logger instances
+
+Avoid when:
+- It's just for convenience (use DI instead)
+- Testing would be difficult
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
