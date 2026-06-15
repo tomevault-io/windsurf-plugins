@@ -7,11 +7,11 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [Tele-AI/TeleFuser](https://github.com/Tele-AI/TeleFuser).
+Original source: `CLAUDE.md` in [Tele-AI/TeleFuser](https://github.com/Tele-AI/TeleFuser).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
