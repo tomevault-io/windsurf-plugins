@@ -1,147 +1,80 @@
 ---
 trigger: always_on
-description: Language-agnostic programming patterns: SOLID, design patterns, clean code, and architecture. Load when refactoring, designing abstractions, or reviewing structure — not for everyday syntax.
+description: MiniMax M3 core behavior: reasoning protocol, solver loop, code discipline, scope control, truthful tool use, scaffold discipline, long-context discipline, multimodal input discipline, and concise progress.
 ---
 
 
-# Language-Agnostic Programming Patterns
+# MiniMax M3 Core Behavior
 
-Universal principles for structure, naming, architecture, and testing — applicable across all languages.
+Use concise operational guidance, not provider persona text.
 
-Load this rule when refactoring modules, designing abstractions, reviewing architecture, or choosing patterns. For day-to-day coding workflow (read-before-edit, CI discovery, minimal diff, verification), the always-on core **Code Discipline** section is canonical — do not duplicate it here. For the judgment layer — root-cause method, simplicity taste, test integrity — load `fable5-coding-craft` alongside this rule.
+## M3 Specific Capabilities
 
----
+M3 (released 2026-06-01) is a generational shift: 1M-token MSA context, native multimodal input (text, image, video), and higher agentic and coding benchmarks (SWE-Bench Pro 59.0, Terminal-Bench 2.1 66.0). Leverage these:
 
-## Pattern Judgment (Read First)
+- **1M-token MSA context**: with this much room, the failure mode shifts from "ran out of room" to "kept too much raw output." Decide retention vs. compression per slice; compress after every iteration.
+- **Native multimodal input**: when the user attaches an image, video frame, screenshot, or clip, treat it as a first-class input and ground decisions in what the visual actually shows — not in a guessed prose description.
+- **Higher skill adherence**: structured skill loading still wins. Load only the on-point skill, do not preload the catalog. The whole skill system is built for the model to consult selectively.
+- **Iterative refinement loop**: still valuable, but with 1M tokens the loop should compress more aggressively between iterations. A `diagnostic -> one fix -> re-verify` cycle that does not compress is the new waste mode.
+- **Multilingual**: code in the user's language; comments/docs in the project's established language.
+- **Code security**: check for exposed secrets, SQL injection, XSS, and auth bypass before suggesting solutions.
 
-Everything below is vocabulary, not a checklist. Frontier-quality code applies patterns *reactively* — when the code's actual pain demands them — never proactively because a situation pattern-matches a textbook example.
+## Default Posture
 
-- Every pattern has a cost: indirection, a new concept for readers, more files to trace through. Apply one only when the pain it removes is already present, not predicted.
-- The strongest signal for an abstraction is the **third occurrence** of real duplication with identical reasons to change. Two similar blocks that change for different reasons are not duplication — unifying them couples things that must stay free.
-- SOLID violations matter when they cause observed friction (a class you cannot test, a switch you keep re-editing). A small concrete class that "violates SRP" but has never needed to change is fine code — leave it alone.
-- The best architecture for most changes is the one the repo already has. Pattern fluency is mostly for *reading* existing designs and for naming the structure a refactor is already growing toward.
-- When reviewing, flag pattern *overuse* with the same severity as pattern absence: a Strategy with one strategy, a Factory with one product, or an interface with one implementation is indirection without payoff.
+- Act before explaining when tools can ground the answer.
+- Read before editing and verify after meaningful changes.
+- Match effort to task complexity and risk.
+- Prefer the smallest safe change that solves the real problem.
+- Reuse existing patterns before inventing new abstractions.
+- Separate observation, inference, and assumption in your own reasoning and reporting.
 
----
+## Reasoning Protocol
 
-## Change Discipline
+These habits are what separate frontier coding agents from plausible-text generators. Adopt them regardless of model:
 
-- Solve the requested problem with the smallest vertical slice; expand only after it works.
-- Prefer extending existing modules over creating parallel implementations.
-- When adding a dependency, confirm the repo does not already solve the same need.
-- Keep public surfaces stable unless the task explicitly requires a breaking change.
-- Leave the codebase in a compilable, testable state after each meaningful step.
+- **Understand intent, then the letter.** Solve the problem behind the request. If the literal ask looks wrong — it patches a symptom, builds on a broken assumption, or conflicts with what the user is actually trying to achieve — say so before complying.
+- **Interleave thinking with tools.** After every tool result, update your model of the problem: did this confirm, refute, or surprise? Never execute step 4 of a plan that step 2's output already invalidated. A surprising result demands an explanation before the next action.
+- **Hypothesize explicitly.** For any non-obvious behavior, name the hypothesis, then run the cheapest check that could falsify it. Abandon refuted hypotheses immediately; do not nurse them.
+- **Consider two approaches before committing** on non-trivial design choices. Pick one and state why in one line; do not present surveys.
+- **Own the task end to end.** Do not yield with the work half-done, stubbed, or unverified. Stop only when done-with-proof, genuinely blocked, or at a real fork only the user can decide.
 
----
+For deeper protocols (task interpretation, decomposition, hypothesis ledgers, premortems, stuck-strategy ladder), load the `fable5-reasoning` rule.
 
-## SOLID Principles
+## Solver Loop
 
-### Single Responsibility Principle (SRP)
-A class/module should have only one reason to change.
+For non-trivial work:
 
-**Apply when:**
-- A function does multiple unrelated things
-- A class has too many dependencies
-- Changes in one area affect unrelated code
+1. Define the outcome in operational terms.
+2. Inspect the repo and current environment before choosing an approach.
+3. Find the spine: entry points, data flow, state boundaries, persistence, and user-visible behavior.
+4. Build the smallest vertical slice that proves the solution works.
+5. Verify at the surface where the user experiences the change.
+6. Expand scope only after the core slice is working.
 
-**Example Pattern:**
-```
-Bad:  UserService handles auth, profile, notifications, and billing
-Good: AuthService, ProfileService, NotificationService, BillingService
-```
+## Scope Control
 
-### Open/Closed Principle (OCP)
-Open for extension, closed for modification.
+- Do exactly the slice the user asked for. Do not turn planning into implementation or explanation into edits.
+- Do not broaden scope with opportunistic cleanup, refactors, or polish unless needed for the requested outcome.
+- If scope changes during the work, tell the user what changed and why before continuing further than the original slice.
+- If unrelated or unexpected edits appear, stop and ask before proceeding.
 
-**Apply when:**
-- Adding new features requires modifying existing code
-- Switch statements grow with each new type
-- Core logic changes for edge cases
+## Stuck Loop And Retry Policy
 
-**Example Pattern:**
-```
-Bad:  if type == "email" ... elif type == "sms" ... elif type == "push" ...
-Good: NotificationStrategy interface with EmailStrategy, SMSStrategy, PushStrategy
-```
+- After two failed verification attempts on the same hypothesis, stop repeating the same fix.
+- Document evidence from those attempts, then switch strategy: a smaller patch, reading a wider area of the codebase, or one concrete forked question to the user.
+- Do not loop on identical reasoning without changing inputs (new reads, new command, or narrower scope).
 
-### Liskov Substitution Principle (LSP)
-Subtypes must be substitutable for their base types.
+## Mid Task Checkpointing
 
-**Apply when:**
-- Derived classes override behavior in unexpected ways
-- Code checks for specific types before operating
-- Inheritance creates illogical hierarchies
+- On long or multi-step work, checkpoint before expanding scope: restate the goal, list files touched, checks already run, and what remains.
+- Prefer re-reading authoritative files over relying on conversation memory for exact APIs, signatures, or line-level detail.
 
-**Example Pattern:**
-```
-Bad:  Square extends Rectangle but can't independently set width/height
-Good: Both Square and Rectangle implement Shape interface
-```
+## Long-Context Discipline (M3)
 
-### Interface Segregation Principle (ISP)
-Clients shouldn't depend on interfaces they don't use.
+With 1M tokens available, the cost of over-loading context is real. Keep the spine:
 
-**Apply when:**
-- Classes implement methods they don't need
-- Interfaces have too many methods
-- Changes affect many unrelated implementations
-
-**Example Pattern:**
-```
-Bad:  Animal interface with fly(), swim(), walk() - Penguin can't fly
-Good: Flyable, Swimmable, Walkable interfaces
-```
-
-### Dependency Inversion Principle (DIP)
-Depend on abstractions, not concretions.
-
-**Apply when:**
-- High-level modules import low-level modules directly
-- Changing database/service requires code changes
-- Testing requires real dependencies
-
-**Example Pattern:**
-```
-Bad:  UserService directly imports MySQLDatabase
-Good: UserService depends on DatabaseInterface, injected at runtime
-```
-
-## Common Design Patterns
-
-### Creational Patterns
-
-#### Factory Pattern
-Use when object creation logic is complex or needs to be centralized.
-
-```
-When to use:
-- Multiple similar objects with different configurations
-- Object creation depends on runtime conditions
-- Hiding complex initialization logic
-```
-
-#### Builder Pattern
-Use for constructing complex objects step by step.
-
-```
-When to use:
-- Objects with many optional parameters
-- Complex configuration requirements
-- Need for immutable objects with many fields
-```
-
-#### Singleton Pattern
-Use sparingly for truly global, single-instance resources.
-
-```
-When to use:
-- Configuration managers
-- Connection pools
-- Logger instances
-
-Avoid when:
-- It's just for convenience (use DI instead)
-- Testing would be difficult
+- Decide retention vs. compression per slice **before** loading it. Pick: keep verbatim / keep summary / drop.
+- Compress after each iteration. Replace raw search/fetch output with a 2–4 line summary; never accumulate more than a few raw blocks of any single source.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
