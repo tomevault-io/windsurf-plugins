@@ -1,131 +1,139 @@
 ---
 trigger: always_on
-description: Temper reference: build
+description: Temper reference: check
 ---
 
 
 
-# Build: Execute Plan with Quality Gates
+# Check: Stack-Aware Validation Pipeline
 
-**Goal:** Implement the approved plan, task by task, with TDD and graduated quality gates.
+**Goal:** Run the project's full validation pipeline. Auto-detects stack and runs the right commands.
 
 ## Active Skills
 
 - **Context Engineering** — load hierarchical context at stage start (rules → arch → source → errors, under 2K lines/task)
 - **Temper Core** — stack detection, pack resolution, quality gates
-- **Source-Driven Development** — before writing framework-specific code: detect installed version → fetch current docs → cite sources → surface API conflicts. Skip for plain logic or known patterns
-
-## Prerequisites
-
-- Approved plan exists (from `/temper:plan`)
-- OR: user provides inline instructions for trivial tasks
 
 ## Execution
 
 ### Context Loading
 
 This stage may run in two modes:
-- **Standalone** (`/temper:build`) — runs in current context, handles its own gate
-- **Agent subprocess** (from `/temper`) — starts with CLEAN context, only loads what's listed below
+- **Standalone** (`/temper:check`) — runs in current context, handles its own gate
+- **Agent subprocess** (from `/temper`) — starts with CLEAN context, no prior files needed
 
-**Subprocess mode override:** When running as an Agent subprocess, do NOT show AskUserQuestion gates or clear context. Return the build summary to the orchestrator. The orchestrator handles all gate decisions and context transitions.
+**Subprocess mode override:** When running as an Agent subprocess, do NOT show AskUserQuestion gates or clear context. Return the check summary to the orchestrator. The orchestrator handles all gate decisions and context transitions.
 
-In both modes, the build methodology is identical.
+In both modes, the check methodology is identical.
 
 Files to load at start:
-1. `.temper/specs/{feature}/tasks.md`
-2. `.temper/specs/{feature}/intent.md` (if exists)
-3. `$CLAUDE_PLUGIN_ROOT/.claude-plugin/reference/build.md` (this file)
-4. `.temper/specs/{feature}/review-context.json` (if exists — loaded when re-entering from feedback loop)
-5. `.temper/specs/{feature}/check-context.json` (if exists — loaded when re-entering from Check failure)
+1. `$CLAUDE_PLUGIN_ROOT/.claude-plugin/reference/check.md` (this file)
+2. `.temper/specs/{feature}/review-context.json` (if exists — review findings for context)
 
-### Step 1: Load Plan
+### Step 1: Detect Stack
 
-```
-1. Check for .temper/build-state.json
-   - If found: Validate it before offering resume:
-     a. Parseable JSON — if malformed, warn and offer "Start over / Delete / Cancel"
-     b. Valid stage — must be "plan_complete" or "build_complete" (with last_task_completed)
-     c. Spec directory exists — .temper/specs/{spec}/ must exist on disk
-     d. Artifacts exist — tasks.md and intent.md (if listed) must exist
-     e. Timestamp — if updated > 30 days ago, warn about staleness
-   - If valid: Ask user "Resume from Task {last_task_completed + 1}? [Y/n]" (skip in subprocess mode — use build-state.json directly)
-   - If invalid: Show what's wrong, offer "Start over / Delete saved state / Cancel"
-2. Check for active plan in .temper/specs/*/tasks.md
-3. If multiple specs exist, ask user which to execute (skip in subprocess mode — use spec from build-state.json or orchestrator args)
-4. Load tasks.md + quickstart.md (quickstart.md may not exist for Simple features — skip if absent)
-5. Read plan.md for architecture decisions and blast radius (skip if no plan.md — Simple/Medium features)
-6. Read all files listed in plan's "Prerequisites" or "Must Read" sections (skip if no plan.md)
-7. Read active pack rules from .claude/packs/ (enabled packs only, skip if directory doesn't exist)
-8. Read stack file from .claude/packs/stacks/{detected-stack}.md (skip if file doesn't exist)
-9. Load .temper/specs/{feature}/intent.md if it exists
-   - Parse scenario names and Given/When/Then blocks
-   - If no intent.md: proceed with current behavior (unchanged)
-```
+For stack detection order, apply the temper-core skill. Detection produces a stack identifier that determines which validation commands to run.
 
-**Build State Schema:**
+Stack-specific validation commands:
 
-```json
-{
-  "stage": "build_complete",
-  "spec": "{feature-name}",
-  "spec_path": ".temper/specs/{feature-name}",
-  "original_args": "{user's original feature description}",
-  "next_stage": "review",
-  "artifacts": ["intent.md", "tasks.md"],
-  "started": "2026-03-10T10:00:00Z",
-  "last_task_completed": 3,
-  "tasks": [
-    { "id": 1, "status": "completed", "timestamp": "..." },
-    { "id": 2, "status": "completed", "timestamp": "..." },
-    { "id": 3, "status": "in_progress", "timestamp": "..." }
-  ],
-  "deviations": {
-    "unplanned_files": [],
-    "skipped_tasks": [],
-    "approach_changes": []
-  },
-  "updated": "{ISO timestamp}"
-}
-```
+   pom.xml OR build.gradle → Java/Spring Boot
+     compile: ./mvnw compile OR ./gradlew compileJava
+     test:    ./mvnw test OR ./gradlew test
+     build:   ./mvnw package OR ./gradlew build
 
-**If no plan exists (trivial task):**
+   package.json → Node.js (check scripts section for commands)
+     Read package.json scripts:
+     test:  npm test (or whatever "test" script runs)
+     build: npm run build (or whatever "build" script runs)
+     lint:  npm run lint (if exists)
+     type:  npx tsc --noEmit (if tsconfig.json exists)
+
+   pyproject.toml OR setup.py → Python
+     test:  pytest
+     lint:  ruff check . (or flake8, pylint)
+     type:  mypy . (if configured)
+     build: python -m build
+
+   go.mod → Go
+     test:  go test ./...
+     lint:  golangci-lint run
+     build: go build ./...
+
+   Cargo.toml → Rust
+     test:  cargo test
+     lint:  cargo clippy
+     build: cargo build
+
+Company preset OVERRIDES auto-detected commands.
+
+### Step 2: Run Validation Levels (in order, stop on BLOCK-level failure)
+
+NOTE: "Stop on failure" means halt the pipeline at the current level. Levels marked WARN continue to the next level. Only STOP/IMMEDIATELY/BLOCK results halt the pipeline.
 
 ```
-1. User gave direct instructions → treat as single-task build
-2. Detect stack (same as /temper:check Step 1)
-3. Read active pack rules
-4. Read related existing code before implementing
-5. Skip Step 2 (branch) — user decides if feature branch needed
-```
+Level 0: ENVIRONMENT
+  Purpose: Verify not hitting production
+  How: Check all .env* files (.env, .env.local, .env.production, etc.) for production indicators
+       Verify DATABASE_URL and similar connection strings don't contain "production"
+  If no .env files found: SKIP (not all projects use .env)
+  If production detected: STOP IMMEDIATELY
 
-### Step 2: Verify Branch
+Level 1: COMPILE/BUILD
+  Purpose: Code compiles without errors
+  Command: {detected compile command}
+  On failure: STOP, show error output, suggest fix
 
-> Note: When running as an Agent subprocess from `/temper`, the orchestrator may have already created the branch at the plan gate. `git branch --show-current` will confirm.
+Level 2: UNIT TESTS
+  Purpose: All unit tests pass
+  Command: {detected test command}
+  On failure: STOP, show failing test names, suggest fix
+  Report: tests run, passed, failed, duration
 
-```
-1. Run: git branch --show-current
-2. If on main/master:
-   - Check if git pack is enabled in .claude/temper.config
-   - If git pack enabled: auto-create feature/{spec-slug} branch
-   - If no git pack: ask user to create feature branch
-   - Suggest name: feature/{ticket}-{description}
-3. If already on feature branch: proceed
-```
+Level 3: INTEGRATION TESTS (if available)
+  Purpose: Integration tests pass
+  Command: {detected integration test command, if separate from unit}
+  On failure: STOP, show failing tests
+  If no integration tests configured: SKIP
 
-### Step 3: Execute Tasks (in order)
+Level 4: COVERAGE (if available)
+  Purpose: Meets threshold
+  Command: {detected coverage command}
+  Threshold: from temper.config (default 80%) or company preset
+  On failure: WARN (not block by default), show coverage %
+  If no coverage tool configured: SKIP
 
-For each task in tasks.md:
+Level 4.5: SCENARIO VERIFICATION (Live Execution)
+  Purpose: Execute each Gherkin scenario's matching test individually, showing real pass/fail
+  Confidence: [PROVEN] — mechanical test runner output
+  Prerequisite: intent.md exists at .temper/specs/{spec}/intent.md
+    If running standalone: resolve {spec} by listing .temper/specs/ directories and
+    using the most recently modified one. If build-state.json exists, read spec from there.
+    If no specs found → SKIP Level 4.5 entirely.
+  Config: check.live-scenarios in temper.config (default: prompt)
+    Valid values: prompt | always | never
+    prompt → ask user whether to run live verification
+    always → always run live verification
+    never  → skip live verification, use heuristic analysis only (v3.0.0 behavior)
+    Any other value → treated as "prompt" (safe default)
+  How:
+    STEP 1 — Extract scenarios:
+      Read intent.md → extract all Gherkin scenarios (name + Given/When/Then)
 
-**a. Read context** - Read existing files, understand patterns, check adjacent code
-**b. Write test first (priority order — first match wins)**
+    STEP 2 — Match scenarios to tests:
+      For each scenario, find the matching test file:
+      a. If MCP code-review-graph available: call query_graph_tool to find test
+         by scenario name annotation → [PROVEN] match
+      b. Fallback: grep test files for scenario name (snake_case or camelCase)
+         → [HEURISTIC] match
+      c. If no match found → UNMATCHED
 
-   1. **intent.md exists** → scenario-driven testing (regardless of TDD pack)
-      - Each test maps to a Gherkin scenario by name
-      - Given block → test setup
-      - When block → action under test
-      - Then block → assertions
-      - One test per scenario minimum (some scenarios may need multiple tests)
+    STEP 3 — Gate (prompt mode only):
+      Show matched/unmatched counts. Ask user:
+      "Run live verification for {N} matched scenarios? [Y/n]"
+      If user declines → skip to heuristic-only analysis (v3.0.0 behavior)
+
+    STEP 4 — Execute each matched test individually:
+      For each matched scenario + test, run the test individually:
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
