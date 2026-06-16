@@ -1,112 +1,113 @@
 ---
 trigger: always_on
-description: AIF Pipeline CLI command reference. Maps natural language requests to correct CLI commands.
+description: How to compose Scene Optimizer preset JSON files. Covers operation catalog, ordering, Python processors, and parameter guidance.
 ---
 
 
-# AIF Pipeline CLI Reference
+# Scene Optimizer Preset Composition
 
-The `aif-pipeline` CLI provides a unified interface for CAD-to-USD asset processing. All commands require `uv run` prefix or an activated virtual environment.
+Scene Optimizer presets are JSON arrays of operation objects that define a processing pipeline for USD assets. This guide covers how to compose them.
 
-## Command Lookup
+## Agent Behavior
 
-### Setup & Configuration
+When a user asks to create or modify a preset:
 
-| User Intent | Command |
-|---|---|
-| Set up / configure Kit path | `aif-pipeline config add <name> --from <kit-project-root>` |
-| Switch to a different Kit version | `aif-pipeline config use <name>` |
-| Show current configuration | `aif-pipeline config show` |
-| List all configurations | `aif-pipeline config list` |
-| Edit configuration | `aif-pipeline config edit` |
-| Set a specific config value | `aif-pipeline config set <key> <value>` |
-| Create project-specific config | `aif-pipeline config add --project --from <kit-root>` |
-| Use a config for one command only | `aif-pipeline --config <name> <command> ...` |
+1. **Start from the canonical template** - read `so/generic/generic_preset.json` as a baseline rather than building from scratch.
+2. **Ask what problems they are solving** - map their issues to operations using the catalog below.
+3. **Follow operation ordering strictly** - the ordering rules in this file prevent data corruption (e.g., running `deduplicateGeometry` before splitting GeomSubsets produces wrong results silently).
+4. **Check vendor presets first** - for vendor equipment, look in `so/vertiv/`, `so/spt/`, `so/trane/` for existing presets before creating a new one.
+5. **Prefer external scripts** - when adding `pythonScript` operations, use the library pattern (loading from `so/generic/lib/`) over base64-embedded scripts for maintainability.
 
-The `--from` flag takes the **Kit project root** (the directory containing `repo.bat`/`repo.sh` or the NGC extract root). Do not pass `_build/` or subdirectories.
+When a user asks to fix a specific validation failure with a preset:
 
-### CAD Conversion
+1. Look up the fix operation in `.cursor/rules/usd-universal.mdc` (Quick Rule-to-Operation Lookup table).
+2. Create a minimal preset with just the needed operations, respecting the ordering rules below.
+3. If only one or two operations are needed, a targeted preset is better than running the full generic preset.
 
-**Agent behavior:** When a user asks to convert CAD files:
+## Preset Structure
 
-1. Determine CAD format to select the correct spec file (see table below).
-2. Check Kit config (`aif-pipeline config show`) - conversion requires Kit.
-3. If no Kit config exists, guide setup with `aif-pipeline config add` first.
-4. Confirm input directory, output directory, and spec before running.
+A preset is a JSON array where each element is an operation:
 
-| User Intent | Command |
-|---|---|
-| Convert CAD files to USD | `aif-pipeline convert INPUT OUTPUT --spec <spec.json>` |
-| Convert with parallelism | `aif-pipeline convert INPUT OUTPUT --spec <spec.json> --concurrent 64` |
-| Resume interrupted conversion | `aif-pipeline convert INPUT OUTPUT --spec <spec.json> --skip-existing` |
-
-**Spec file by CAD format:**
-
-| Format | Extensions | Spec File |
-|---|---|---|
-| Creo/PTC | `.prt`, `.asm` | `scripts/data/creo_spec.json` |
-| JT | `.jt` | `scripts/data/jt_spec.json` |
-| DGN | `.dgn` | `scripts/data/dgn_spec.json` |
-
-### Scene Optimization
-
-**Agent behavior:** When a user asks to optimize assets:
-
-1. Ask if they have a vendor-specific preset or want the generic one (`so/generic/generic_preset.json`).
-2. Ask if they want non-destructive (separate output directory) or in-place.
-3. Check Kit config (`aif-pipeline config show`) - optimization requires Kit.
-4. For custom presets, read `.cursor/rules/scene-optimizer-presets.mdc` for the operation catalog and ordering rules.
-
-| User Intent | Command |
-|---|---|
-| Optimize assets (non-destructive) | `aif-pipeline optimize INPUT OUTPUT --preset <preset.json>` |
-| Optimize assets in-place | `aif-pipeline optimize INPUT --preset <preset.json>` |
-| Optimize with specific preset | `aif-pipeline optimize INPUT OUTPUT --preset so/generic/generic_preset.json` |
-| Optimize with dynamic preset | `aif-pipeline optimize INPUT OUTPUT --preset <preset.json> --dynamic-preset` |
-
-Preset paths are relative to the repo root. Common presets:
-- `so/generic/generic_preset.json` — general-purpose CAD asset optimization
-- `so/spt/gb300/gb300.json` — GB300 rack optimization
-- Vendor presets in `so/vertiv/<model>/`, `so/trane/`
-
-**Dynamic preset** (`--dynamic-preset`): Injects native mesh paths per file, letting Scene Optimizer tailor operations to each asset's specific geometry. Useful when the generic preset is too aggressive or too conservative for mixed-complexity assets.
-
-### Validation
-
-**Agent behavior:** When a user asks to "validate" assets:
-
-1. Check for an active Kit config (`aif-pipeline config show`). If Kit is already configured, offer both paths directly.
-2. Ask whether they want **Kit-based** or **OAV standalone** validation.
-3. If no Kit config exists, note that Kit validation needs setup first (`aif-pipeline config add`) and suggest OAV as the ready-to-use option.
-4. Present the available options for the chosen path and let them choose before running any command.
-
-- **Kit validation** — requires Kit and GPU; runs built-in + Scene Optimizer C-accelerated rules
-- **OAV standalone** — no Kit/GPU; runs custom AIF rules from `oav/aif_validators/`
-
-| User Intent | Command |
-|---|---|
-| Validate assets (Kit-based) | `aif-pipeline validate INPUT OUTPUT` |
-| Pre-metadata validation | `aif-pipeline validate INPUT OUTPUT --stage pre` |
-| Post-metadata validation | `aif-pipeline validate INPUT OUTPUT --stage post` |
-| Validate and auto-fix | `aif-pipeline validate INPUT OUTPUT --fix --output-assets FIXED_DIR` |
-| Validate against a feature | `aif-pipeline validate INPUT OUTPUT --feature minimal_placeable_visual` |
-| Per-rule timing diagnostics | `aif-pipeline validate INPUT OUTPUT --fine-grained` |
-
-OAV standalone validation (no Kit/GPU required):
-```bash
-uv run --directory oav validate --category AIF /path/to/asset.usd
-uv run --directory oav validate --rule AIFMetadataChecker /path/to/asset.usd
+```json
+[
+    { "operation": "editStageMetrics", "metersPerUnit": 1.0, "upAxis": 2 },
+    { "operation": "meshCleanup", "paths": [], "mergeVertices": true },
+    { "operation": "generateNormals", "paths": [], "sharpnessAngle": 60.0 }
+]
 ```
 
-### Metadata
+Each operation object must have an `"operation"` key. Additional keys are operation-specific parameters. The full parameter reference is in `so_operations.json` (97KB).
 
-| User Intent | Command |
-|---|---|
-| Create metadata template | `aif-pipeline metadata create --type <type> --output <file>` |
-| Apply metadata to USD | `aif-pipeline metadata apply INPUT --output OUTPUT --prim <name>` |
-| Convert electrical CSV to USDC | `aif-pipeline metadata electrical INPUT OUTPUT --prim <name>` |
+## Operation Catalog
 
-Equipment types: `cdu` (81 props), `crah` (51 props), `ups` (51 props), `gb300_rack` (28 props)
+### Stage Operations
+
+| Operation | Purpose | Key Parameters |
+|-----------|---------|----------------|
+| `editStageMetrics` | Set units, up-axis, collapse xforms | `metersPerUnit`, `upAxis` (2=Z), `collapseXforms`, `ignoreKitCameras` |
+
+### Geometry Cleanup
+
+| Operation | Purpose | Key Parameters |
+|-----------|---------|----------------|
+| `meshCleanup` | Fix topology issues | `mergeVertices`, `tolerance`, `removeDegenerateFaces`, `removeDuplicateFaces`, `removeIsolatedVertices`, `makeManifold`, `contractDegenerateEdges`, `mergeBoundaries`, `mergeNeighbors` |
+| `generateNormals` | Generate surface normals | `sharpnessAngle` (degrees), `replaceExisting`, `binding` (0=vertex), `weightmode`, `gpuThreshold` |
+| `computeExtents` | Compute bounding extents | `paths` |
+| `removeSmallGeometry` | Remove tiny geometry | `removeMethod`, `detectionMethod`, `threshold` |
+| `manifoldMeshes` | Make meshes watertight | `paths` |
+
+### Geometry Optimization
+
+| Operation | Purpose | Key Parameters |
+|-----------|---------|----------------|
+| `decimateMeshes` | Reduce polygon count | `reductionFactor`, `maxMeanError`, `pinBoundaries`, `allowCutAndGlue`, `cpuVertexCountThreshold`, `gpuVertexCountThreshold`, `guideDecimation` |
+| `deduplicateGeometry` | Instance identical meshes | `tolerance`, `duplicateMethod` (2=hierarchy), `fuzzy`, `allowScaling`, `considerDeepTransforms`, `useGpu`, `ignoreAttributes` |
+| `merge` | Merge meshes into one | `paths` |
+| `remeshMeshes` | Remesh geometry | `paths` |
+| `triangulateMeshes` | Convert to triangles | `paths` |
+| `subdivideMeshes` | Subdivide surfaces | `paths` |
+| `diceMeshes` | Subdivide/dice geometry | `paths` |
+| `splitMeshes` | Split meshes by criteria | `paths` |
+| `boxClip` | Clip meshes by box | `paths` |
+
+### Hierarchy Operations
+
+| Operation | Purpose | Key Parameters |
+|-----------|---------|----------------|
+| `pruneLeaves` | Remove empty leaf nodes | `pruneMode` (1=empty), `filterInactive` |
+| `flattenHierarchy` | Flatten prim hierarchy | `paths` |
+| `findFlatHierarchies` | Detect flat hierarchies | `paths` |
+| `pivot` | Adjust pivot points | `paths` |
+
+### Material Operations
+
+| Operation | Purpose | Key Parameters |
+|-----------|---------|----------------|
+| `optimizeMaterials` | Deduplicate/consolidate materials | `optimizeMaterialsMode` (0=consolidate, 2=deduplicate), `materialsPath`, `analysisCheckPrimvars` |
+| `optimizePrimvars` | Clean up primvar data | `mode`, `simplify`, `removeIfBound`, `primvars`, `primvarPaths` |
+
+### Analysis Operations (non-destructive)
+
+| Operation | Purpose |
+|-----------|---------|
+| `findCoincidingMeshes` | Identify overlapping meshes |
+| `findHiddenMeshes` | Locate hidden geometry |
+| `fitPrimitives` | Fit primitive shapes to meshes |
+
+### Other Operations
+
+| Operation | Purpose |
+|-----------|---------|
+| `pythonScript` | Run custom Python code |
+| `removeAttributes` | Remove prim attributes |
+| `generateAtlasUVs` | Generate texture atlas UVs |
+| `generateProjectionUVs` | Generate projected UVs |
+| `organizePrototypes` | Organize instanced prototypes |
+| `optimizeSkelRoots` | Optimize skeleton roots |
+| `optimizeTimeSamples` | Reduce time samples |
+| `primitivesToMeshes` | Convert primitives to meshes |
+| `utilityFunction` | Execute utility functions |
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
