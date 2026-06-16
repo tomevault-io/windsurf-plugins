@@ -1,151 +1,177 @@
 ---
 trigger: always_on
-description: Temper reference: orchestrator-patterns
+description: Temper reference: pack
 ---
 
 
 
-# Orchestrator Shared Patterns
+# Pack: Quality Pack Manager
 
-**Used by:** `.claude/commands/temper.md`, `.claude/commands/fix.md`
-
-This file contains shared orchestration patterns. Both `/temper` and `/temper:fix` delegate to these patterns instead of duplicating them.
+**Goal:** Display all defined quality packs with their enable/disable status, link targets, phase scoping, and connection health. Allow users to toggle packs, create new packs, quick-create launcher packs, and configure links and phases.
 
 ---
 
-## $CLAUDE_PLUGIN_ROOT Resolution
+## Pack Resolution: Three-Tier System (v4.3.0)
 
-All references use `$CLAUDE_PLUGIN_ROOT` to locate plugin files. Resolve it as follows:
-
-1. If `$CLAUDE_PLUGIN_ROOT` is set and points to an existing directory → use it
-2. If unset → walk up from the command file location looking for `.claude-plugin/manifest.json`
-3. If still not found → fall back to `~/.claude/plugins/temper` (default install location)
-4. If fallback doesn't exist → warn user: "Cannot locate Temper plugin. Set CLAUDE_PLUGIN_ROOT or reinstall."
-
-The resolved path is used as `$CLAUDE_PLUGIN_ROOT` throughout the command.
-
----
-
-## Gate Options Pattern
-
-Every stage gate uses exactly 2 explicit options plus the built-in "Other" free-text input:
+Quality packs resolve from three tiers in priority order. Higher tiers shadow lower ones.
 
 ```
-AskUserQuestion:
-  question: "What would you like to do with this {stage}?"
-  options:
-    - label: "{continue_label} (Recommended)"
-      description: "{continue_description}"
-    - label: "Save for later"
-      description: "Save state and stop. Run {command} later to continue."
-  multiSelect: false
+Priority 1 (highest) → .claude/packs/{name}/rules.md           (project-local)
+Priority 2           → ~/.claude/packs/{name}/rules.md          (global / user-wide)
+Priority 3 (lowest)  → $CLAUDE_PLUGIN_ROOT/.claude/packs/{name}/rules.md  (built-in)
 ```
 
-**Users type change requests directly via the "Other" option.** AskUserQuestion always provides an "Other" free-text input. When a user selects "Other" and types a change request:
-1. Make the requested change
-2. **STOP** — re-show the AskUserQuestion gate with the same options
-3. Do NOT interpret the change input as approval to proceed
+**Why:** Teams ship project-specific packs in the repo. Users create global packs across all projects. Built-in packs provide defaults.
 
----
+**Resolution:** When the same pack name exists in multiple tiers, only the highest-priority version is loaded. Project-local always wins over global, which always wins over built-in.
 
-## Gate Enforcement Rules
+### Pack Discovery Algorithm
 
-After handling a change request (via "Other" free-text input), you **MUST** re-show the AskUserQuestion gate before proceeding:
-
-1. User selects "Other" and types their change request
-2. You make the requested change
-3. **STOP HERE** — re-show the AskUserQuestion gate with the same 2 options
-4. Do NOT interpret the user's change input as approval to proceed to the next stage
-
-The user must **explicitly select the "Continue" option** from the gate to proceed.
-
----
-
-## Resume Validation
-
-Before showing the saved state, validate `.temper/build-state.json`:
-
-1. **Parseable JSON** — if malformed, show error and ask user
-2. **Valid stage** — must be one of the stages defined by the command
-3. **Spec directory exists** — `.temper/specs/{spec}/` must exist on disk
-4. **Artifacts exist** — all files listed in `artifacts` array must exist
-5. **Timestamp** — if `updated` > 30 days ago, warn user about staleness
-
-If any check fails:
-- Show what's wrong: "Saved state is invalid: {reason}"
-- Ask user: "Start over / Delete saved state / Cancel?"
-
----
-
-## Nested Invocation Protection
-
-When `{command} "{new item}"` is called while `.temper/build-state.json` already exists for a different item:
+Scan all three tiers, deduplicate by name (highest priority wins):
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│ SAVED STATE FOUND                                           │
-├─────────────────────────────────────────────────────────────┤
-│ {Item type}: {name}                                         │
-│    Stopped: After {stage}                                   │
-│    Files: {N} changed                                       │
-│                                                             │
-│ Starting '{new item}' will overwrite this session.          │
-└─────────────────────────────────────────────────────────────┘
-```
+Step 1: Scan built-in packs
+  For each directory in $CLAUDE_PLUGIN_ROOT/.claude/packs/ (excluding stacks/):
+    - If {name}/rules.md exists → add to manifest with scope: "built-in"
 
-Use AskUserQuestion:
-```
-AskUserQuestion:
-  question: "A saved session exists for '{existing}'. What would you like to do?"
-  options:
-    - label: "Resume existing session (Recommended)"
-      description: "Continue from {next_stage} stage."
-    - label: "Overwrite and start new"
-      description: "Delete existing session, start from scratch."
-  multiSelect: false
+Step 2: Scan global packs
+  For each directory in ~/.claude/packs/ (excluding stacks/):
+    - If {name}/rules.md exists → add to manifest with scope: "global"
+    - If name already in manifest → replace (global shadows built-in)
+
+Step 3: Scan project-local packs
+  For each directory in .claude/packs/ (excluding stacks/):
+    - If {name}/rules.md exists → add to manifest with scope: "project"
+    - If name already in manifest → replace (project shadows all)
 ```
 
 ---
 
-## Agent Failure Handling
+## Cached Pack Manifest (v4.4.0)
 
-If an agent subprocess returns a failure or blocker:
-1. Show the failure details to the user
-2. Ask: "Retry / Save for later?" (user can type changes via "Other")
-3. Do NOT silently proceed to the next stage
+Pack discovery results are cached to `.temper/pack-manifest.json` for instant subsequent loads.
+
+### Cache Behavior
+
+- **First run:** Full filesystem scan of all three tiers → write manifest
+- **Subsequent runs:** Load from cache (near-instant)
+- **Cache is rebuilt when:**
+  1. `temper.config` file modified (project or global) — check mtime
+  2. Pack directories added or removed in any tier — check directory listing
+  3. Manifest `version` field doesn't match expected schema version
+  4. Any pack's `rules.md` file modified — check mtime of each rules_path
+
+### Manifest Structure
+
+```json
+{
+  "version": 1,
+  "last_built": "2026-04-20T10:00:00Z",
+  "config_mtime": "2026-04-20T09:30:00Z",
+  "packs": [
+    {
+      "name": "quality",
+      "enabled": true,
+      "scope": "built-in",
+      "phases": "all",
+      "link": null,
+      "connected": null,
+      "rules_path": "$CLAUDE_PLUGIN_ROOT/.claude/packs/quality/rules.md",
+      "rule_summary": "Code quality: method length, DRY, naming"
+    },
+    {
+      "name": "tdd",
+      "enabled": true,
+      "scope": "built-in",
+      "phases": ["build"],
+      "link": null,
+      "connected": null,
+      "rules_path": "$CLAUDE_PLUGIN_ROOT/.claude/packs/tdd/rules.md",
+      "rule_summary": "TDD: RED-GREEN-REFACTOR enforcement"
+    }
+  ]
+}
+```
+
+### Manifest Operations
+
+**Read manifest:**
+1. Check `.temper/pack-manifest.json` exists
+2. If not: run full discovery, write manifest, return
+3. If exists: load, check staleness conditions
+4. If stale: run full discovery, overwrite manifest, return
+5. If fresh: return cached manifest
+
+**Invalidate manifest:**
+- After toggling packs (enabled status changed)
+- After creating a new pack
+- After modifying pack link or phases config
 
 ---
 
-## Context Efficiency Table
+## Pack Configuration Schema (v4.3.0)
 
-Each subprocess starts genuinely clean. No theater.
+### Extended Config Format
 
-| Transition | Method | Context Loaded | Size |
-|-----------|--------|----------------|------|
-| Stage 1 → 2 | New Agent subprocess | spec artifacts + related files | ~5-15KB |
-| Stage 2 → 3 | New Agent subprocess | changed files (git diff) | ~20-50KB |
-| Stage 3 → 4 | New Agent subprocess | methodology + spec context | ~5KB |
-| Stage 4 → Commit | Direct (no subprocess) | Nothing | 0KB |
+The `packs:` field in `.claude/temper.config` now supports objects with `name`, `link`, and `phases`:
+
+```yaml
+packs:
+  - name: quality                        # Simple format (no link, all phases)
+  - name: tdd
+    phases: [build]                      # Only during build phase
+  - name: security
+    phases: [review, check]              # Only during review and check
+  - name: api-standards
+    link: plugin://my-api-linter         # Links to an installed plugin
+  - name: sec-review
+    link: skill://security-review        # Links to a skill
+  - name: git                            # Simple format
+```
+
+### Backward Compatibility
+
+Simple string format still works:
+```yaml
+packs:
+  - quality
+  - tdd
+```
+This is equivalent to:
+```yaml
+packs:
+  - name: quality
+  - name: tdd
+```
+
+### Parsing Note
+
+When reading `packs:`, each entry can be either a **string scalar** (simple format) or a **mapping** with `name` key (extended format). Parser must check type:
+- If string → treat as `{name: <value>, phases: "all", link: null}`
+- If mapping → read `name` (required), `phases` (default: "all"), `link` (default: null)
 
 ---
 
-## MCP Tool-First Pattern
+## Phase Scoping (v4.3.0)
 
-When MCP (Model Context Protocol) servers are available, Temper uses their tools to produce **proven** findings instead of heuristic grep-based analysis. This is progressive enhancement: everything works exactly as before when no MCP servers are installed.
+Packs can be restricted to specific Temper phases. Only packs scoped to the current phase are loaded.
 
-### tools.mode Behavior
+### Available Phases
 
-Configured in `.claude/temper.config` under `tools.mode`:
+`plan`, `design`, `build`, `review`, `check`, `fix`
 
-| Mode | Behavior |
-|------|----------|
-| `auto` (default) | Try MCP tool first. If unavailable, fall back to grep-based heuristic analysis. |
-| `heuristic-only` | Never call MCP tools. Always use grep-based analysis. Forces `[HEURISTIC]` labels. |
-| `require` | Fail if MCP tools are unavailable. Do NOT proceed with heuristic fallback. |
+### Default Behavior
 
-### Evidence Labels
+If `phases` is omitted or set to `all`, the pack activates during every phase.
 
-Every finding in review, check, plan, and fix carries one of:
+### Phase Filtering
+
+When a stage starts:
+1. Read current phase from the command being executed (e.g., `/temper:build` → phase = "build")
+2. Filter manifest packs: only include packs where `phases` is "all" or contains the current phase
+3. Load filtered packs' rules + any linked context
+
+---
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
