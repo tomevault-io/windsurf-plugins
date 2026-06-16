@@ -1,51 +1,80 @@
 ---
 trigger: always_on
-description: 执行任何 f2s-* 技能前强制读取 flow2spec.config.json，确定 subAgent 与 switchAgentVerification 实际值
+description: Flow2Spec 统一知识库入口，按 .Knowledge 渐进式读取
 ---
 
 
-# f2s 技能前置强制步骤
+# Flow2Spec 统一入口规则
 
-**执行任何 `f2s-*` 技能的第一个动作，必须用 Read 工具读取项目根 `flow2spec.config.json`**，获取 `subAgent` 与 `switchAgentVerification` 的实际值，再决定后续编排方式。
+本项目知识库已统一到 `.Knowledge/`，请按以下顺序读取，避免无范围检索。
 
-```
-必须执行：Read("flow2spec.config.json")  ← 技能正文任何步骤之前
-```
+## 项目根 CLI 开关（必须按需读取）
 
-| 读取结果 | 行为 |
-|---------|------|
-| `subAgent: true` | 先显式判断当前技能是否满足拆子前提 / 规模阈值；满足时按技能 SKILL.md 的 B/C 模式派子 agent，并在回复或执行记录中写明「本次是否拆子、拆给谁、为什么」；不满足时主 agent 继续完成，但也必须输出不拆原因 |
-| `subAgent: false` | 全部在主 agent 内完成，不得拆子 agent |
-| `switchAgentVerification: true` | 子 agent 落盘的由主 agent 校验；主 agent 落盘的由子 agent 校验（须 subAgent=true 且已拆子任务） |
-| `switchAgentVerification: false` | 落盘侧自验，不交叉 |
-| 文件不存在 | 所有字段均视为 `false` |
+业务仓库**项目根** `flow2spec.config.json`（`flow2spec init` 在文件缺失时补齐）含布尔字段 **`subAgent`**、**`switchAgentVerification`**（**切换 agent 校验**），默认 `false`。执行任意 **`f2s-*` 技能**或与 Flow2Spec 初始化相关的说明前，须读取该文件；技能或规则中凡写「仅当 `subAgent` / `switchAgentVerification` 为 true」的步骤，**必须按文件实际值决定是否执行**；缺失字段或文件不存在时均视为 `false`。
 
-**Claude Code**：`f2s-config-session` 在 `SessionStart` 注入一次配置摘要；`f2s-config-inject` 在 `PreToolUse` 仅作为守门提示，提醒调用 `f2s-*` Skill 前首步必须 `Read("flow2spec.config.json")`。两者都**不替代**本条 Read 要求。
+> **`init` 与择路**：**`flow2spec init`** 会把统一入口写入当前仓库；**Cursor / Claude** 读取配置根 **`rules/f2s-flow2spec-unified-entry.*`**，**Codex** 读取 **`.codex/topics/f2s-flow2spec-unified-entry.md`**。两处正文同源，按当前工具读取对应入口即可；技能引「统一入口」时，在 **Codex** 以 **`.codex/topics/f2s-flow2spec-unified-entry.md`** 为准。
 
-**Cursor**：配置读取仍走文本约束（本规则 `alwaysApply`），不依赖 hook 自动读取配置。
+### 两字段语义（模板约定）
 
-**Codex**：`SessionStart` 会注入一次配置摘要；进入 `f2s-*` Skill 正文前仍必须 `Read("flow2spec.config.json")`，且当 `subAgent=true` 时，主 agent **必须先显式判断**当前技能是否满足拆子前提 / 阈值，再决定是否派子；即使判断不拆，也必须输出不拆原因。Codex **没有** Claude 的 `PreToolUse Skill` 守门，不能把“拆子判断”留给隐式心证。
+- **`subAgent`**：`f2s-*` 技能若规定某步骤「用子 agent 执行」，则 **`true`** 时按技能使用子 agent，**`false`** 时在主 agent 内完成。用户可在对话中要求「**仅当**本项为 **`true`** 时，由主 agent **动态判断**哪些子任务适合交给子 agent」——**仅当配置为 `true` 时该要求有效**；配置为 `false` 时凡依赖拆子 agent 的该段说明**不生效**，全部在主 agent 完成。`subAgent=true` 时，主 agent 必须在技能正文前段显式判断本次是否拆子；即使判断不拆，也必须输出不拆原因。**各 `f2s-*` 在工作哪一阶段必须或建议使用子 agent** 由技能正文逐步约定；技能未写明时不默认拆子。
+- **`switchAgentVerification`（切换 agent 校验）**：落盘或变更后的**验证/复核**（对照清单、diff、自检）**不是**「一律在主 agent」；默认以**落盘侧所在 agent 为「当前 agent」**，在该会话内完成校验（**子 agent 落盘的就在子 agent 内验，主 agent 落盘的就在主 agent 内验**）。**仅当**① 配置 **`switchAgentVerification` 为 `true`**，**且** ② **当前 `f2s-*` 技能正文**对该步骤**明确写出**「当 **`switchAgentVerification`** 为 **`true`**」时，才启用**交叉校验**：**子 agent 落盘的 → 由主 agent 校验**；**主 agent 落盘的 → 由子 agent 校验**（**须**已存在子 agent 会话，即 **`subAgent` 为 `true`** 且实际拆出子任务；若 **`subAgent` 为 `false`**，无子侧可承接，**「主落盘→子验」不发生**，校验**全部在主 agent 内**完成）。配置为 `false`、或技能未写依赖本项、或用户仅泛泛要求「给对方验」的：**不**启用交叉，仍在**落盘侧 agent**内完成验证。
 
-### changeTracking（变更追踪）
+### Git worktree 与子任务工作目录卫生（`subAgent: true` 或并行子任务时必读）
 
-| 字段 | 生效技能 | 行为 |
-|------|---------|------|
-| `changeTracking.feat: true` | `f2s-kb-feat` | **步骤 0 必须执行**：创建或续作 `.task/active/` 变更追踪任务 |
-| `changeTracking.feat: false` | `f2s-kb-feat` | 步骤 0 跳过，不创建 `.task/` 目录 |
-| `changeTracking.fix: true` | `f2s-kb-fix` | **步骤 0 必须执行**：创建或续作 `.task/active/` 变更追踪任务 |
-| `changeTracking.fix: false` | `f2s-kb-fix` | 步骤 0 跳过，不创建 `.task/` 目录 |
-| `changeTracking.implement: true` | `f2s-implement-tech-design` | **步骤 2.5 写入任务清单、步骤 2.6 随实现同步打钩 `task.md`、步骤 5 满足归档门禁后归档** |
-| `changeTracking.implement: false` | `f2s-implement-tech-design` | 步骤 2.5、2.6 和步骤 5 的变更追踪部分跳过 |
+部分环境会为子 agent / 并行尝试创建 **独立 `git worktree`** 或等价隔离目录。规则如下：
 
-### intentRecognition（意图识别）
+1. **谁创建谁收尾**：子侧创建则子侧在返回前尽量清理；若子会话已结束无法清理，**主 agent 合并结果后**必须执行清理，**禁止**依赖「稍后自动回收」。
+2. **收尾动作（必须）**：对**仅为本次子任务**添加的 worktree，在合并或丢弃该子任务结果后执行 `git worktree remove <path>`（工作区干净仍失败时再用 `git worktree remove --force <path>`，**须确认**该路径无他人未提交修改）；随后 `git worktree list` 自检，**禁止**留下已知孤儿路径。
+3. **中断 / 用户换题前**：若本会话曾添加 worktree，在结束前**必须**完成上述移除或在 `task.md`「## 备注」写明残留路径与删除命令，并视情况写入 **`user-todos.md`** 请用户本地执行（见 `f2s-task`）。
+4. **禁止**：子任务已结束、主分支已继续开发，仍长期保留仅用于尝试的 worktree 目录（易造成混淆提交、磁盘堆积）。
 
-| 字段 | 行为 |
-|------|------|
-| `intentRecognition: true` | 启用意图识别：高置信操作意图按 `rules/f2s-intent-routing.*` 自动进入对应 Skill；讨论 / 评估 / 低置信输入不得自动调用 |
-| `intentRecognition: false` | 不启用自动分流；仅显式 `$f2s-*` / 明确要求执行某技能时进入对应 Skill |
-| 字段不存在 | 视为 `false` |
+## 读取顺序（必须）
 
-**禁止在未读该文件的情况下进入技能正文的任何执行步骤。**
+1. 先读 `.Knowledge/manifest-routing.json`，优先按 `taskToTopicRules` 路由；按需根据 `matcherPath` 读取 matcher 分片获取 `includeAny` 关键词；无法命中时进入补召回阶段。
+   - 若命中主题在 `topicDependencies` 中存在依赖，先读依赖主题，再读主主题。
+   - 路由清单仅通过 `f2s-*` 技能流程维护，不依赖额外 CLI 子命令。
+2. `.Knowledge/index.md` 按需读取，仅用于确认主题语义与边界。
+3. 再读 `.Knowledge/topics/<topic>.md`（**路由摘要**：主题 id、路径约定、下一步指针）；若主题为 **`implement-tech-design`** 或 **`f2s-doc-routing`**，**必须继续读取**配置根 **`rules/f2s-implement-tech-design.*` / `rules/f2s-stock-docs-vs-req-docs.*` 全文**作为执行依据（`.Knowledge/topics` 内同名文件不重复长文）。
+4. 若需要背景，再读 `.Knowledge/stock-docs/<doc>.md`。
+5. 仅在前四步不足时下钻业务源码。
+6. 命中后必须执行 `match -> expand -> verify -> act`：
+   - `match`：先取主候选；
+   - `expand`：展开 `topicDependencies`，并保留次高候选做补充校验；
+   - `verify`：执行前做缺口检查（关键主题/边界/上下文是否缺失）；
+   - `act`：仅在置信度足够时执行；低置信度必须先澄清。
+7. 仅在以下条件之一成立时，允许执行跨 matcher 全量补检索（top-k）：
+   - `taskToTopicRules` 无命中；
+   - 主候选与次候选分差过小（低置信度）；
+   - 缺口检查失败（关键主题/依赖/上下文缺失）；
+   - 用户明确要求“全量检查/不要遗漏”。
+
+## 任务分流
+
+- 技术方案实现：先读 `.Knowledge/topics/f2s-implement-tech-design.md`（摘要），再读 **`rules/f2s-implement-tech-design.*` 全文**；需求文档默认位于 `.Knowledge/req-docs/`。
+- 目录边界判断：先读 `.Knowledge/topics/f2s-stock-docs-vs-req-docs.md`（摘要），再读 **`rules/f2s-stock-docs-vs-req-docs.*` 全文**。
+
+## 机读事实源口径（规则层）
+
+- `taskToTopicRules`：任务路由第一优先级。
+- `taskToTopicRules[].matcherPath`：匹配词分片直链路径，按需读取单个 matcher 文件。
+- `taskToTopicRules[].matcherId`：matcher 的稳定标识，需与 matcher 分片内 `id` 一致。
+- `topicDependencies`：主主题命中后先加载依赖主题。
+- `topicMetadata`：主题治理元数据，只影响阅读预期，不参与 matcher 命中，不决定是否读取 topic，不改变执行强制性；执行强制性始终以 `AGENTS.md`、rules、skills 与 topic 正文中的明确要求为准。读到 `topicMetadata[topicId].primary` / `tags` 时：`config` 关注配置项、开关、默认值、初始化参数；`policy` 优先检查正文中的必须/禁止/门禁/流程约束；`feature` 作为已落地业务/产品能力背景；`module` 作为目录、包、模块边界与工程结构背景。`confidence` 仅允许 `manual` / `inferred`；无明确分类证据时不写 metadata。
+- `matcherPath(includeAny)`：任务关键词匹配词表。
+- `fallbackTopic`：任务与关键词都未命中时必须读取，但仅作低置信度兜底，不是最终执行依据。
+- `.Knowledge/manifest-routing.json + matcherPath 分片文件` 是机读事实源（关键词仅在 `matchers/*.json`）。
+- `.Knowledge/index.md` 不是机读事实源，仅作人读导航与语义边界校验。
+- 进入 `fallbackTopic` 后，必须先补召回或澄清，再决定是否执行改动。
+
+## 知识缺口与对策（分场景）
+
+| 情况 | 对策 |
+| --- | --- |
+| **1a 库里有文档但未配路由** | 用 `f2s-kb-build` / `f2s-kb-sync` / `f2s-kb-add` 补 `taskToTopicRules`、`matcherPath` 分片、`topicPaths`；扩充 `includeAny` 覆盖用户常用说法。Agent 侧：走 `fallbackTopic` 分诊并提示「需补路由」，**不**靠全仓扫文件代替配置。 |
+| **1b 命中了但上下文不够** | 先 `expand`（`topicDependencies` + 次高候选），再 `verify` 点名缺哪份 `stock-docs`/`req-docs` 或哪段 topic；仍不足则 **向用户要文档或路径**，不要无门槛跨 matcher 全量补检索。**Agent 若需下钻源码**：须先对用户做**可见的缺口说明**（已读 KB、缺什么、拟读哪 1～2 个文件），见 **`f2s-knowledge-preflight`**「缺口闸门」；**禁止**无说明地连续 `Grep`/乱序探源。 |
+| **2 库里没有对应文档** | 一次读完 routing + 已命中 matcher + 相关 topic 后，在回复中 **明确承认知识库无覆盖**，再选：下钻业务代码 / 请用户补充 `req-docs` 或 PRD。**禁止**用反复读清单假装「再找一遍就会有」。**下钻源码前**同样须满足 **`f2s-knowledge-preflight`**「缺口闸门」的可见说明。 |
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [Lands-1203/Flow2Spec](https://github.com/Lands-1203/Flow2Spec) — distributed by [TomeVault](https://tomevault.io).
