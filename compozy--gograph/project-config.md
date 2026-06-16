@@ -1,140 +1,66 @@
 ---
 trigger: always_on
-description: <critical_requirement>
+description: Comprehensive reference for Taskmaster MCP tools and CLI commands.
 ---
 
-# Task Completion Workflow with Zen MCP
+# Taskmaster Tool & Command Reference
 
-<critical_requirement>
-**MANDATORY:** Before marking any task as complete, you MUST follow this exact workflow to ensure code quality:
-</critical_requirement>
+This document provides a detailed reference for interacting with Taskmaster, covering both the recommended MCP tools, suitable for integrations like Cursor, and the corresponding `task-master` CLI commands, designed for direct user interaction or fallback.
 
-<workflow_overview>
-**Enhanced Quality Assurance Steps:**
-1. **Task Definition Validation** - Verify alignment with task, PRD, and tech spec
-2. **Rules Analysis & Code Review** - Analyze applicable rules and perform comprehensive review
-3. **Issue Resolution** - Address all identified problems
-4. **Pre-Commit Validation** - Final validation before commit
-5. **Task Completion** - Mark task as complete only after successful validation
-</workflow_overview>
+**Note:** For interacting with Taskmaster programmatically or via integrated tools, using the **MCP tools is strongly recommended** due to better performance, structured data, and error handling. The CLI commands serve as a user-friendly alternative and fallback.
 
-## 1. Task Definition Validation
+**Important:** Several MCP tools involve AI processing... The AI-powered tools include `parse_prd`, `analyze_project_complexity`, `update_subtask`, `update_task`, `update`, `expand_all`, `expand_task`, and `add_task`.
 
-<mandatory_step>
-**FIRST:** Verify the implementation aligns with requirements:
-</mandatory_step>
+**🏷️ Tagged Task Lists System:** Task Master now supports **tagged task lists** for multi-context task management. This allows you to maintain separate, isolated lists of tasks for different features, branches, or experiments. Existing projects are seamlessly migrated to use a default "master" tag. Most commands now support a `--tag <name>` flag to specify which context to operate on. If omitted, commands use the currently active tag.
 
-- **Task Definition:** Review the specific task file (e.g., `tasks/prd-[feature-slug]/[task_number]_task.md`)
-- **PRD Alignment:** Check against the Product Requirements Document (`tasks/prd-[feature-slug]/_prd.md`)
-- **Tech Spec Compliance:** Ensure implementation follows the Technical Specification (`tasks/prd-[feature-slug]/_techspec.md`)
+---
 
-```
-Verify that task [task_number] implementation fully satisfies:
-1. The specific requirements defined in the task file
-2. The business objectives from the PRD
-3. The technical specifications and architecture requirements
-4. All acceptance criteria and success metrics
-```
+## Initialization & Setup
 
-## 2. Rules Analysis & Code Review with Zen MCP
+### 1. Initialize Project (`init`)
 
-<mandatory_step>
-**Analyze applicable rules first, then perform comprehensive code review:**
-</mandatory_step>
+*   **MCP Tool:** `initialize_project`
+*   **CLI Command:** `task-master init [options]`
+*   **Description:** `Set up the basic Taskmaster file structure and configuration in the current directory for a new project.`
+*   **Key CLI Options:**
+    *   `--name <name>`: `Set the name for your project in Taskmaster's configuration.`
+    *   `--description <text>`: `Provide a brief description for your project.`
+    *   `--version <version>`: `Set the initial version for your project, e.g., '0.1.0'.`
+    *   `-y, --yes`: `Initialize Taskmaster quickly using default settings without interactive prompts.`
+*   **Usage:** Run this once at the beginning of a new project.
+*   **MCP Variant Description:** `Set up the basic Taskmaster file structure and configuration in the current directory for a new project by running the 'task-master init' command.`
+*   **Key MCP Parameters/Options:**
+    *   `projectName`: `Set the name for your project.` (CLI: `--name <name>`)
+    *   `projectDescription`: `Provide a brief description for your project.` (CLI: `--description <text>`)
+    *   `projectVersion`: `Set the initial version for your project, e.g., '0.1.0'.` (CLI: `--version <version>`)
+    *   `authorName`: `Author name.` (CLI: `--author <author>`)
+    *   `skipInstall`: `Skip installing dependencies. Default is false.` (CLI: `--skip-install`)
+    *   `addAliases`: `Add shell aliases tm and taskmaster. Default is false.` (CLI: `--aliases`)
+    *   `yes`: `Skip prompts and use defaults/provided arguments. Default is false.` (CLI: `-y, --yes`)
+*   **Usage:** Run this once at the beginning of a new project, typically via an integrated tool like Cursor. Operates on the current working directory of the MCP server.
+*   **Important:** Once complete, you *MUST* parse a prd in order to generate tasks. There will be no tasks files until then. The next step after initializing should be to create a PRD using the example PRD in .taskmaster/templates/example_prd.txt.
+*   **Tagging:** Use the `--tag` option to parse the PRD into a specific, non-default tag context. If the tag doesn't exist, it will be created automatically. Example: `task-master parse-prd spec.txt --tag=new-feature`.
 
-### 2.1 Rules Analysis
-```
-Analyze all Cursor rules that apply to the changed files for task [task_number]:
-- Identify which .cursor/rules/*.mdc files are relevant to the implementation
-- List the specific coding standards, patterns, and requirements that apply
-- Check for any rule violations or areas needing attention
-```
+### 2. Parse PRD (`parse_prd`)
 
-### 2.2 Multi-Model Code Review
+*   **MCP Tool:** `parse_prd`
+*   **CLI Command:** `task-master parse-prd [file] [options]`
+*   **Description:** `Parse a Product Requirements Document, PRD, or text file with Taskmaster to automatically generate an initial set of tasks in tasks.json.`
+*   **Key Parameters/Options:**
+    *   `input`: `Path to your PRD or requirements text file that Taskmaster should parse for tasks.` (CLI: `[file]` positional or `-i, --input <file>`)
+    *   `output`: `Specify where Taskmaster should save the generated 'tasks.json' file. Defaults to '.taskmaster/tasks/tasks.json'.` (CLI: `-o, --output <file>`)
+    *   `numTasks`: `Approximate number of top-level tasks Taskmaster should aim to generate from the document.` (CLI: `-n, --num-tasks <number>`)
+    *   `force`: `Use this to allow Taskmaster to overwrite an existing 'tasks.json' without asking for confirmation.` (CLI: `-f, --force`)
+*   **Usage:** Useful for bootstrapping a project from an existing requirements document.
+*   **Notes:** Task Master will strictly adhere to any specific requirements mentioned in the PRD, such as libraries, database schemas, frameworks, tech stacks, etc., while filling in any gaps where the PRD isn't fully specified. Tasks are designed to provide the most direct implementation path while avoiding over-engineering.
+*   **Important:** This MCP tool makes AI calls and can take up to a minute to complete. Please inform users to hang tight while the operation is in progress. If the user does not have a PRD, suggest discussing their idea and then use the example PRD in `.taskmaster/templates/example_prd.txt` as a template for creating the PRD based on their idea, for use with `parse-prd`.
 
-<mandatory_step>
-Use the criteria from [`review-checklist.mdc`](mdc:.cursor/rules/review-checklist.mdc) as the basis for all code reviews:
-</mandatory_step>
+---
 
-<critical>
-**MANDATORY REQUIREMENTS:**
-- **ALWAYS** check dependent files APIs before write tests to avoid write wrong code
-- **ALWAYS** verify against PRD and tech specs - NEVER make assumptions
-- **NEVER** use workarounds, especially in tests - implement proper solutions
-- **MUST** follow all established project standards:
-    - Architecture patterns: `.cursor/rules/architecture.mdc`
-    - Go coding standards: `.cursor/rules/go-coding-standards.mdc`
-    - Testing requirements: `.cursor/rules/testing-standards.mdc`
-    - API standards: `.cursor/rules/api-standards.mdc`
-    - Security & quality: `.cursor/rules/quality-security.mdc`
-- **MUST** run `make lint` and `make test` before completing ANY subtask
-- **MUST** follow `.cursor/rules/task-review.mdc` workflow for parent tasks
-**Enforcement:** Violating these standards results in immediate task rejection.
-</critical>
+## AI Model Configuration
 
-```
-Use zen for codereview with gemini-2.5-pro-preview-05-06 to analyze the implementation for task [task_number]: [task_title].
-Focus on the review checklist criteria: code quality, security, adherence to project standards, error handling, testing patterns, and maintainability.
-Apply the specific rules identified in step 2.1 during the review.
-```
-
-```
-Use zen with o3 to perform a logical review of the implementation for task [task_number]: [task_title].
-Analyze the logic, edge cases, and potential issues while considering the applicable coding standards and rules.
-```
-
-### 2.3 Rules-Specific Review
-```
-Use zen with gemini-2.5-pro-preview-05-06 to review task [task_number] implementation specifically against the identified Cursor rules:
-- Verify compliance with project-specific coding standards
-- Check adherence to architectural patterns and design principles
-- Validate implementation follows the established conventions
-- Ensure all rule-based requirements are met
-```
-
-## 3. Fix Review Issues
-
-<mandatory_fixes>
-Address ALL issues identified:
-- Fix critical and high-severity issues immediately
-- Address medium-severity issues unless explicitly justified
-- Document any decisions to skip low-severity issues
-</mandatory_fixes>
-
-## 4. Pre-Commit Validation
-
-<mandatory_step>
-**Execute codereview validation with proper parameters:**
-</mandatory_step>
-
-**Required Parameters:**
-- `path`: Current workspace directory (absolute path)
-- `model`: Use `gemini-2.5-pro-preview-05-06` for comprehensive analysis
-- `prompt`: Original task requirements and context
-
-**Example Implementation:**
-```
-Execute codereview validation for task [task_number]:
-- Path: /path/to/workspace
-- Model: gemini-2.5-pro-preview-05-06
-- Context: Implementation of [task_title] as defined in task requirements
-- Review: Comprehensive validation of all staged and unstaged changes
-```
-
-**Validation Focus:**
-- Verify implementation matches task requirements
-- Check for bugs, security issues, and incomplete implementations
-- Ensure changes follow project coding standards
-- Validate test coverage and error handling
-- Confirm no code duplication or logic redundancy
-
-## 5. Mark Task Complete
-
-**ONLY AFTER** successful validation, update the Markdown task file:
-
-```markdown
-- [x] 1.0 [task_title] ✅ COMPLETED
-  - [x] 1.1 Implementation completed
+### 2. Manage Models (`models`)
+*   **MCP Tool:** `models`
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
