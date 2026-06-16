@@ -7,11 +7,11 @@ AgenticFlowX is a VS Code workflow layer for AI coding. It gives you chat-first 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [AgenticFlowX/agenticflowx](https://github.com/AgenticFlowX/agenticflowx).
+Original source: `CLAUDE.md` in [AgenticFlowX/agenticflowx](https://github.com/AgenticFlowX/agenticflowx).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
