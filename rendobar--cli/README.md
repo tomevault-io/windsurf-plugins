@@ -7,11 +7,11 @@ Rendobar CLI: serverless media processing from your terminal. Run FFmpeg jobs in
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [rendobar/cli](https://github.com/rendobar/cli).
+Original source: `AGENTS.md` in [rendobar/cli](https://github.com/rendobar/cli).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
