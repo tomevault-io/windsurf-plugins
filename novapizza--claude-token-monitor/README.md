@@ -5,11 +5,11 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [novapizza/claude-token-monitor](https://github.com/novapizza/claude-token-monitor).
+Original source: `CLAUDE.md` in [novapizza/claude-token-monitor](https://github.com/novapizza/claude-token-monitor).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
