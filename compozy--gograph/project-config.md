@@ -1,66 +1,156 @@
 ---
 trigger: always_on
-description: Comprehensive reference for Taskmaster MCP tools and CLI commands.
+description: Comprehensive testing standards and patterns for Compozy Go development - enforces mandatory t.Run patterns, testify usage, and mock standards
 ---
 
-# Taskmaster Tool & Command Reference
+# Testing Standards for Compozy Go Development
 
-This document provides a detailed reference for interacting with Taskmaster, covering both the recommended MCP tools, suitable for integrations like Cursor, and the corresponding `task-master` CLI commands, designed for direct user interaction or fallback.
+<critical>
+**MANDATORY REQUIREMENTS:**
+- **ALWAYS** check dependent files APIs before write tests to avoid write wrong code
+- **ALWAYS** verify against PRD and tech specs - NEVER make assumptions
+- **NEVER** use workarounds, especially in tests - implement proper solutions
+- **MUST** follow all established project standards:
+    - Architecture patterns: `.cursor/rules/architecture.mdc`
+    - Go coding standards: `.cursor/rules/go-coding-standards.mdc`
+    - Testing requirements: `.cursor/rules/testing-standards.mdc`
+    - API standards: `.cursor/rules/api-standards.mdc`
+    - Security & quality: `.cursor/rules/quality-security.mdc`
+- **MUST** run `make lint` and `make test` before completing ANY subtask
+- **MUST** follow `.cursor/rules/task-review.mdc` workflow for parent tasks
+**Enforcement:** Violating these standards results in immediate task rejection.
+</critical>
 
-**Note:** For interacting with Taskmaster programmatically or via integrated tools, using the **MCP tools is strongly recommended** due to better performance, structured data, and error handling. The CLI commands serve as a user-friendly alternative and fallback.
+## Core Testing Requirements
 
-**Important:** Several MCP tools involve AI processing... The AI-powered tools include `parse_prd`, `analyze_project_complexity`, `update_subtask`, `update_task`, `update`, `expand_all`, `expand_task`, and `add_task`.
+<requirements type="mandatory">
+**MANDATORY testing patterns for all Go code:**
+- Use `t.Run("Should describe expected behavior")` pattern for all tests
+- Use `stretchr/testify` for assertions and mocks
+- Follow table-driven test patterns when appropriate
+- Achieve >85% coverage for business logic packages
+</requirements>
 
-**🏷️ Tagged Task Lists System:** Task Master now supports **tagged task lists** for multi-context task management. This allows you to maintain separate, isolated lists of tasks for different features, branches, or experiments. Existing projects are seamlessly migrated to use a default "master" tag. Most commands now support a `--tag <name>` flag to specify which context to operate on. If omitted, commands use the currently active tag.
+## Testing Requirements
 
----
+<requirements type="mandatory">
+- **ALL tests MUST use `t.Run("Should...")` pattern** - no direct test implementation without t.Run wrapper
+- Test function names: `func TestModuleName_MethodName(t *testing.T)`
+- Each test case within t.Run with descriptive "Should..." names
+- MUST use `stretchr/testify` for assertions and mocks
+- **STANDARDIZE ON TESTIFY MOCK:** Replace existing custom mocks with `testify/mock` implementations
+</requirements>
 
-## Initialization & Setup
+## Anti-Patterns to Avoid
 
-### 1. Initialize Project (`init`)
+<anti_patterns type="prohibited_patterns">
+**NEVER USE TESTIFY SUITE PATTERNS:**
+- ❌ **PROHIBITED:** `suite.Suite` embedding or any suite-based test structures
+- ❌ **PROHIBITED:** Suite methods like `s.Equal()`, `s.NoError()`, `s.True()`, `s.False()`, `s.T()`
+- ❌ **PROHIBITED:** `testsuite.WorkflowTestSuite` or similar suite embeddings
+- ❌ **PROHIBITED:** Suite lifecycle methods like `SetupTest()`, `TearDownTest()`, `AfterTest()`
 
-*   **MCP Tool:** `initialize_project`
-*   **CLI Command:** `task-master init [options]`
-*   **Description:** `Set up the basic Taskmaster file structure and configuration in the current directory for a new project.`
-*   **Key CLI Options:**
-    *   `--name <name>`: `Set the name for your project in Taskmaster's configuration.`
-    *   `--description <text>`: `Provide a brief description for your project.`
-    *   `--version <version>`: `Set the initial version for your project, e.g., '0.1.0'.`
-    *   `-y, --yes`: `Initialize Taskmaster quickly using default settings without interactive prompts.`
-*   **Usage:** Run this once at the beginning of a new project.
-*   **MCP Variant Description:** `Set up the basic Taskmaster file structure and configuration in the current directory for a new project by running the 'task-master init' command.`
-*   **Key MCP Parameters/Options:**
-    *   `projectName`: `Set the name for your project.` (CLI: `--name <name>`)
-    *   `projectDescription`: `Provide a brief description for your project.` (CLI: `--description <text>`)
-    *   `projectVersion`: `Set the initial version for your project, e.g., '0.1.0'.` (CLI: `--version <version>`)
-    *   `authorName`: `Author name.` (CLI: `--author <author>`)
-    *   `skipInstall`: `Skip installing dependencies. Default is false.` (CLI: `--skip-install`)
-    *   `addAliases`: `Add shell aliases tm and taskmaster. Default is false.` (CLI: `--aliases`)
-    *   `yes`: `Skip prompts and use defaults/provided arguments. Default is false.` (CLI: `-y, --yes`)
-*   **Usage:** Run this once at the beginning of a new project, typically via an integrated tool like Cursor. Operates on the current working directory of the MCP server.
-*   **Important:** Once complete, you *MUST* parse a prd in order to generate tasks. There will be no tasks files until then. The next step after initializing should be to create a PRD using the example PRD in .taskmaster/templates/example_prd.txt.
-*   **Tagging:** Use the `--tag` option to parse the PRD into a specific, non-default tag context. If the tag doesn't exist, it will be created automatically. Example: `task-master parse-prd spec.txt --tag=new-feature`.
+**USE DIRECT ASSERTIONS INSTEAD:**
+- ✅ **REQUIRED:** `assert.Equal(t, expected, actual)`
+- ✅ **REQUIRED:** `require.NoError(t, err)`
+- ✅ **REQUIRED:** `assert.True(t, condition)`
+- ✅ **REQUIRED:** Individual test functions with `*testing.T` parameter
+</anti_patterns>
 
-### 2. Parse PRD (`parse_prd`)
+<anti_patterns type="bad_examples">
+```go
+// ❌ NEVER DO THIS - Suite pattern is prohibited
+type MyTestSuite struct {
+    suite.Suite
+    // other fields
+}
 
-*   **MCP Tool:** `parse_prd`
-*   **CLI Command:** `task-master parse-prd [file] [options]`
-*   **Description:** `Parse a Product Requirements Document, PRD, or text file with Taskmaster to automatically generate an initial set of tasks in tasks.json.`
-*   **Key Parameters/Options:**
-    *   `input`: `Path to your PRD or requirements text file that Taskmaster should parse for tasks.` (CLI: `[file]` positional or `-i, --input <file>`)
-    *   `output`: `Specify where Taskmaster should save the generated 'tasks.json' file. Defaults to '.taskmaster/tasks/tasks.json'.` (CLI: `-o, --output <file>`)
-    *   `numTasks`: `Approximate number of top-level tasks Taskmaster should aim to generate from the document.` (CLI: `-n, --num-tasks <number>`)
-    *   `force`: `Use this to allow Taskmaster to overwrite an existing 'tasks.json' without asking for confirmation.` (CLI: `-f, --force`)
-*   **Usage:** Useful for bootstrapping a project from an existing requirements document.
-*   **Notes:** Task Master will strictly adhere to any specific requirements mentioned in the PRD, such as libraries, database schemas, frameworks, tech stacks, etc., while filling in any gaps where the PRD isn't fully specified. Tasks are designed to provide the most direct implementation path while avoiding over-engineering.
-*   **Important:** This MCP tool makes AI calls and can take up to a minute to complete. Please inform users to hang tight while the operation is in progress. If the user does not have a PRD, suggest discussing their idea and then use the example PRD in `.taskmaster/templates/example_prd.txt` as a template for creating the PRD based on their idea, for use with `parse-prd`.
+func (s *MyTestSuite) TestSomething() {
+    s.Equal("expected", "actual")  // ❌ WRONG
+    s.NoError(err)                 // ❌ WRONG
+    s.T().Run("test", func(t *testing.T) { ... }) // ❌ WRONG
+}
 
----
+// ✅ DO THIS INSTEAD - Direct test functions
+func TestSomething_Method(t *testing.T) {
+    t.Run("Should behave correctly", func(t *testing.T) {
+        assert.Equal(t, "expected", "actual")  // ✅ CORRECT
+        require.NoError(t, err)                // ✅ CORRECT
+    })
+}
+```
+</anti_patterns>
 
-## AI Model Configuration
+## Table-Driven Tests
 
-### 2. Manage Models (`models`)
-*   **MCP Tool:** `models`
+<guidelines type="table_tests">
+- AVOID table-driven tests for 2-3 cases
+- ONLY use when 5+ similar variations exist
+- Each table test case must still use "Should..." naming
+</guidelines>
+
+## Test Organization
+
+<organization_rules>
+- Place `*_test.go` files alongside implementation files
+- Each test MUST be independent and repeatable
+- Mock external dependencies **only when necessary** using `testify/mock`
+- Use project test helpers: `utils.SetupTest()`, `utils.SetupFixture()`
+- Test both success and error paths
+- Ensure test coverage for all exported functions
+</organization_rules>
+
+## Mock Standards
+
+<when_to_mock>
+**WHEN TO USE MOCKS:**
+- External services (HTTP clients, databases, file systems)
+- Dependencies that are slow, unreliable, or have side effects
+- Complex interfaces that would make tests brittle or slow
+- **NOT REQUIRED** for simple functions, pure logic, or internal utilities
+</when_to_mock>
+
+<pattern type="mock_implementation">
+```go
+// Define mock interface
+type MockService struct {
+    mock.Mock
+}
+
+func (m *MockService) DoSomething(ctx context.Context, param string) error {
+    args := m.Called(ctx, param)
+    return args.Error(0)
+}
+
+// Usage in tests
+func TestComponent_Method(t *testing.T) {
+    t.Run("Should use mocked service", func(t *testing.T) {
+        mockService := new(MockService)
+        mockService.On("DoSomething", mock.Anything, "test").Return(nil)
+
+        component := NewComponent(mockService)
+        err := component.Method("test")
+
+        assert.NoError(t, err)
+        mockService.AssertExpectations(t)
+    })
+}
+```
+</pattern>
+
+<refactoring_priorities>
+- Replace custom mocks with testify/mock implementations
+- Migrate interface-based mocks to use `mock.Mock` embedding
+- Standardize mock setup and assertion patterns across the codebase
+</refactoring_priorities>
+
+<example type="test_structure">
+```go
+func TestService_Method(t *testing.T) {
+    t.Run("Should succeed with valid input", func(t *testing.T) {
+        // arrange, act, assert
+    })
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
