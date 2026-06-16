@@ -7,14 +7,14 @@ Local-first context firewall for coding agents
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `.cursor/rules/*.mdc` in [nik1t7n/context-firewall](https://github.com/nik1t7n/context-firewall).
+Original source: `GEMINI.md` in [nik1t7n/context-firewall](https://github.com/nik1t7n/context-firewall).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
-- **Gemini CLI** — `GEMINI.md`
+- **Cursor** — `project-config.mdc`
 - **Windsurf** — `project-config.md`
 
 From [nik1t7n/context-firewall](https://github.com/nik1t7n/context-firewall) — a repo with 14+ stars on GitHub.
