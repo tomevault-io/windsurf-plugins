@@ -7,12 +7,12 @@ Jandal AI — Local-first Android AI assistant with on-device LLM inference, sem
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `copilot-instructions.md` in [NickMonrad/kernel-ai-assistant](https://github.com/NickMonrad/kernel-ai-assistant).
+Original source: `AGENTS.md` in [NickMonrad/kernel-ai-assistant](https://github.com/NickMonrad/kernel-ai-assistant).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
+- **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
