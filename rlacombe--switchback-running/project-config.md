@@ -1,9 +1,9 @@
 ---
 trigger: always_on
-description: <!-- Generated from COMPANION.md + agents/claude.md — do not edit directly -->
+description: <!-- Generated from COMPANION.md + agents/gemini.md — do not edit directly -->
 ---
 
-<!-- Generated from COMPANION.md + agents/claude.md — do not edit directly -->
+<!-- Generated from COMPANION.md + agents/gemini.md — do not edit directly -->
 
 # Ultrarunning Training Companion
 
@@ -63,5 +63,5 @@ Anchor advice in these frameworks when relevant:
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/rlacombe) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-13 -->
+> Source: [rlacombe/switchback-running](https://github.com/rlacombe/switchback-running) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-06-16 -->
