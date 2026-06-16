@@ -1,134 +1,128 @@
 ---
 trigger: always_on
-description: Temper reference: design
+description: Temper reference: fix
 ---
 
 
 
-# Design: System Design Phase
+# Fix: Root Cause Analysis + Structured Fix
 
-**Goal:** Produce system design artifacts for complex/medium features. Skipped for simple/trivial features.
-
-**When active:** `phases.design: true` in temper.config AND feature complexity >= medium.
+**Goal:** Investigate root cause, write a regression test that proves the bug, implement the minimal fix, review the fix, validate. Never guess — investigate first.
 
 ## Active Skills
 
 - **Context Engineering** — load hierarchical context at stage start (rules → arch → source → errors, under 2K lines/task)
 - **Temper Core** — stack detection, pack resolution, quality gates
+- **Source-Driven Development** — before writing framework-specific code: detect installed version → fetch current docs → cite sources → surface API conflicts
+
+## Usage
+
+```
+/temper:fix "users get 500 error on checkout"
+/temper:fix "JIRA-123"
+/temper:fix "#456"
+```
+
+## Bug: $ARGUMENTS
 
 ## Execution
 
 ### Context Loading
 
 This stage may run in two modes:
-- **Standalone** (`/temper:design`) — runs in current context, handles its own gate
+- **Standalone** (`/temper:fix`) — the command file (`.claude/commands/fix.md`) acts as the orchestrator, running this methodology across 4 Agent subprocess stages (RCA -> Fix -> Review -> Check)
 - **Agent subprocess** (from `/temper`) — starts with CLEAN context, only loads what's listed below
 
-**Subprocess mode override:** When running as an Agent subprocess, do NOT show AskUserQuestion gates or clear context. Return the design summary to the orchestrator. The orchestrator handles all gate decisions and context transitions.
+**This reference file describes the methodology** for each stage. The **command file** handles the orchestrator routing, stage gates, and state management. When running as a subprocess, only the steps relevant to the current stage are executed.
 
-In both modes, the design methodology is identical.
+**Subprocess mode override:** When running as an Agent subprocess, do NOT show AskUserQuestion gates or clear context. Return the summary to the orchestrator. The orchestrator handles all gate decisions and context transitions.
+
+In both modes, the fix methodology is identical.
 
 **Context loading strategy:** Apply the context-engineering skill for hierarchical loading (rules -> arch -> source -> errors, under 2K lines/task). The file list below specifies WHAT to load; the skill specifies HOW and WHEN.
 
-Files to load at start:
-1. `.temper/specs/{feature}/intent.md`
-2. `.temper/specs/{feature}/plan.md`
-3. `$CLAUDE_PLUGIN_ROOT/.claude-plugin/reference/design.md` (this file)
+### Step 1: Detect Input Type
 
-### Step 1: Analyze Plan
+Same as /temper:plan Phase 0 — detect Jira, GitHub, or direct description.
 
-Read intent.md and plan.md to understand:
-- Feature scope and success criteria
-- Planned file changes
-- Risk level and complexity
+**Extract from ticket/description:**
 
-### Step 2: System Design Exploration
+- Symptom (error message, wrong behavior, crash)
+- Trigger (which user action, endpoint, data)
+- Reproducibility (always, intermittent, specific conditions)
+- When it started (recent deploy, specific date, always existed)
 
-For MEDIUM complexity features:
-- Identify the primary system components involved
-- Map data flow between components
-- Define key interfaces
+### Step 1.5: Load Enabled Packs
 
-For COMPLEX complexity features:
-- Full system architecture diagram
-- API contract definitions (request/response shapes)
-- Database schema changes (if applicable)
-- Integration points with external systems
-- Error handling strategy
+Read `.claude/temper.config` to get the list of enabled packs. For each enabled pack, load `.claude/packs/{pack}/rules.md`.
 
-### Step 3: Generate Design Artifacts
+If stack detected, also load `.claude/packs/stacks/{detected-stack}.md` for stack-specific patterns.
 
-Write `.temper/specs/{feature}/design.md` using the template from `$CLAUDE_PLUGIN_ROOT/templates/design.md`.
-
-### Step 4: Design Summary
+These rules are applied during:
+- **RCA** — check if the bug violates any pack rules (e.g., security pack: was input validation skipped?)
+- **Fix approach validation** — validate the proposed fix doesn't introduce new pack violations (Step 3.5)
+- **Fix implementation** — ensure the fix doesn't introduce new pack violations
+- **Validation** — `/temper:check` validates against all enabled pack rules
 
 ```
-+--------------------------------------------------------------+
-| DESIGN -- {Feature Name}                                     |
-+--------------------------------------------------------------+
-| SYSTEM ARCHITECTURE                                          |
-|    Components: {N} new, {N} modified, {N} existing          |
-|    Data flow: {brief description}                            |
-|                                                              |
-| API CONTRACTS (if applicable)                                |
-|    + POST /api/{endpoint} -- {request shape} -> {response}   |
-|    ~ GET /api/{endpoint} -- {change description}             |
-|                                                              |
-| DATABASE CHANGES (if applicable)                             |
-|    + {table} -- {columns}                                    |
-|    ~ {table} -- {change}                                     |
-|                                                              |
-| INTEGRATION POINTS                                           |
-|    {external system} -- {how it connects}                    |
-|                                                              |
-| DECISION LOG                                                 |
-|    1. {decision} -- {rationale}                              |
-+--------------------------------------------------------------+
+Loading enabled packs: quality, tdd, security, git
+Loading stack-specific rules: {detected-stack}
+  quality: {N} BLOCK, {N} WARN rules
+  tdd: {N} BLOCK, {N} WARN rules
+  security: {N} BLOCK, {N} WARN rules
+  git: {N} WARN, {N} SUGGEST rules
+  {stack}: {N} patterns to follow
 ```
 
-### Stage Gate
+### Step 2: Root Cause Analysis (via Explore subagent)
 
-Use AskUserQuestion with these options:
-
-```
-AskUserQuestion:
-  question: "What next?"
-  options:
-    - label: "Continue to Build (Recommended)"
-      description: "Proceed to build with the approved design."
-    - label: "Walk through design step by step"
-      description: "Interactive walkthrough of design decisions."
-    - label: "Save for later"
-      description: "Save design and stop."
-  multiSelect: false
-```
-
-| Response | Action |
-|----------|--------|
-| **Continue to Build** | Save design.md, proceed to build |
-| **Walk through design** | Interactive section-by-section review (see below) |
-| **Save for later** | Save state, stop |
-| **Other** (free-text) | Edit design, re-show gate |
-
-#### Step-by-Step Walkthrough
-
-When the user selects "Walk through design step by step", present the design as an interactive, section-by-section flow.
-
-**Walkthrough sections (dynamic — only show sections present in design.md):**
-
-Read `design.md` and detect which sections exist. Present only sections that have content. The available sections:
-
-1. **Architecture Overview** — System components, data flow diagram, what's new vs modified vs existing (always shown)
-2. **API Contracts** — Request/response shapes, endpoint changes, backward compatibility notes (shown if design.md has API contract content)
-3. **Database Changes** — Schema changes, migration strategy, impact on existing data (shown if design.md has database content)
-4. **Integration Points** — External system connections, error handling strategy, retry/fallback logic (shown if design.md has integration content)
-5. **Decision Log** — Each architectural decision with rationale and alternatives considered (always shown)
-
-**After each section, use AskUserQuestion:**
+Launch an Explore subagent:
 
 ```
-AskUserQuestion:
-  question: "What would you like to do?"
+Investigate a bug and find the root cause. Understand WHY it happens, not just WHERE.
+
+BUG DESCRIPTION:
+{ticket content or user description}
+
+MULTI-HYPOTHESIS INVESTIGATION:
+
+1. LIST ALL PLAUSIBLE CAUSES (max 5):
+   Based on symptom, generate hypotheses with confidence + evidence:
+
+   | # | Hypothesis | Confidence | Evidence |
+   |---|------------|------------|----------|
+   | 1 | {cause}    | HIGH/MED/LOW | {why you think this} |
+   | 2 | {cause}    | HIGH/MED/LOW | {why you think this} |
+...
+
+SKIP CONDITION: If only ONE plausible cause exists OR you have an exact stack trace pointing to a specific line, proceed directly to Step 2 investigation. Otherwise, continue with multi-hypothesis approach.
+
+2. INVESTIGATE TOP HYPOTHESIS:
+   - Start with highest confidence hypothesis
+   - SEARCH for related code (error messages, stack traces, domain keywords)
+   - TRACE the execution path (entry point → ... → failure point)
+   - Write a quick regression test to CONFIRM/DENY the hypothesis
+
+   MCP CALL CHAIN (during execution path tracing):
+   If code-review-graph MCP server is available and tools.mode is not heuristic-only:
+   1. Call query_graph_tool with the suspected function name:
+      - Request both callers (who calls this function) and callees (what this function calls)
+      - Returns full call chain: entry point → intermediates → failing function
+   2. Call get_affected_flows_tool for user-facing flows through the suspected function:
+      - Returns which API endpoints / user actions reach the failing code
+      - Identifies blast radius in terms of user-facing behavior
+   3. Evidence: [PROVEN] call chain (AST-level, mechanically verified)
+   If MCP unavailable:
+      Use grep-based call chain tracing → [HEURISTIC]
+
+3. IF HYPOTHESIS DENIED:
+   - Fall back to next highest confidence hypothesis
+   - Repeat investigation
+   - Max 3 hypothesis attempts before asking user for more context
+
+4. CHECK common root causes:
+   Off-by-one, null/undefined, wrong operator (= vs ==, && vs ||),
+   race condition, type coercion, incorrect ordering, missing switch case,
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
