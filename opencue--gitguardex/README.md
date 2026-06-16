@@ -7,11 +7,11 @@ Run many Codex & Claude agents in parallel without them overwriting each other. 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [opencue/gitguardex](https://github.com/opencue/gitguardex).
+Original source: `AGENTS.md` in [opencue/gitguardex](https://github.com/opencue/gitguardex).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
