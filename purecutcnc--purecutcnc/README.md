@@ -7,14 +7,14 @@ PureCutCNC is a 2.5D CAD / CAM workspace for designing parts, defining machining
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `.cursor/rules/*.mdc` in [PureCutCNC/purecutcnc](https://github.com/PureCutCNC/purecutcnc).
+Original source: `GEMINI.md` in [PureCutCNC/purecutcnc](https://github.com/PureCutCNC/purecutcnc).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
-- **Gemini CLI** — `GEMINI.md`
+- **Cursor** — `project-config.mdc`
 - **Windsurf** — `project-config.md`
 
 Quality verified by TomeVault's automated analysis pipeline. Source: [github.com/PureCutCNC/purecutcnc](https://github.com/PureCutCNC/purecutcnc)
