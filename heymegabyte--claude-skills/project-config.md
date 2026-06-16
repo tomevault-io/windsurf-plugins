@@ -1,9 +1,9 @@
 ---
 trigger: always_on
-description: Load CONVENTIONS.md for stack defaults. Load _router.md for skill routing.
+description: Emdash Skills — 14-category product-building OS for Windsurf.
 ---
 
-# Emdash Skills for GitHub Copilot
+# Emdash Skills for Windsurf
 
 Load CONVENTIONS.md for stack defaults. Load _router.md for skill routing.
 14 categories (01-14), 94 reference docs, 18 agents.
