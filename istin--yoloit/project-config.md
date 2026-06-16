@@ -1,43 +1,98 @@
 ---
 trigger: always_on
-description: CodeGraph MCP usage guide — when to use which tool
+description: This guide outlines non-obvious developer commands, compilation pipelines, strict coding standards, and agent operational gotchas for this codebase.
 ---
 
-<!-- CODEGRAPH_START -->
-## CodeGraph
+# YoLoIT Agent Guidance (`AGENTS.md`)
 
-This project has a CodeGraph MCP server (`codegraph_*` tools) configured. CodeGraph is a tree-sitter-parsed knowledge graph of every symbol, edge, and file. Reads are sub-millisecond and return structural information grep cannot.
+This guide outlines non-obvious developer commands, compilation pipelines, strict coding standards, and agent operational gotchas for this codebase.
 
-### When to prefer codegraph over native search
+---
 
-Use codegraph for **structural** questions — what calls what, what would break, where is X defined, what is X's signature. Use native grep/read only for **literal text** queries (string contents, comments, log messages) or after you already have a specific file open.
+## ⚡ Non-Obvious Commands & Local Workflows
 
-| Question | Tool |
-|---|---|
-| "Where is X defined?" / "Find symbol named X" | `codegraph_search` |
-| "What calls function Y?" | `codegraph_callers` |
-| "What does Y call?" | `codegraph_callees` |
-| "How does X reach/become Y? / trace the flow from X to Y" | `codegraph_trace` (one call = the whole path, incl. callback/React/JSX dynamic hops) |
-| "What would break if I changed Z?" | `codegraph_impact` |
-| "Show me Y's signature / source / docstring" | `codegraph_node` |
-| "Give me focused context for a task/area" | `codegraph_context` |
-| "See several related symbols' source at once" | `codegraph_explore` |
-| "What files exist under path/" | `codegraph_files` |
-| "Is the index healthy?" | `codegraph_status` |
+- **Interactive macOS Launch & Hot-Reload**:
+  - Run: `./run.sh` (starts Flutter with a FIFO pipe at `/tmp/yoloit_flutter_stdin`).
+  - Hot Reload: `./hot_reload.sh` (triggers hot-reload on the running instance by writing `r` to the pipe).
+- **Dual Target & Web Client Compilation**:
+  - Desktop app uses `lib/main.dart`.
+  - Collaboration web client uses `lib/main_web.dart` and must be built via:
+    `flutter build web --release --target lib/main_web.dart`
+- **Windows Build Patch**:
+  - Windows builds have a known Cargokit symlink resolution bug. **Always** run this patch before compiling on Windows:
+    `.\windows\flutter\tools\patch_cargokit.ps1`
+- **Git Submodules**:
+  - Submodules are used for `packages/mermaid_renderer_flutter` and `third_party/flutter_local_models`. Initialize them using:
+    `git submodule update --init --recursive --depth=1`
 
-### Rules of thumb
+---
 
-- **Answer directly — don't delegate exploration.** For "how does X work" / architecture questions, answer with 2-3 codegraph calls: `codegraph_context` first, then ONE `codegraph_explore` for the source of the symbols it surfaces. For a specific **flow** ("how does X reach Y") start with `codegraph_trace` from→to — one call returns the whole path with dynamic hops bridged — then ONE `codegraph_explore` for the bodies; don't rebuild the path with `codegraph_search` + `codegraph_callers`. Codegraph IS the pre-built index, so spawning a separate file-reading sub-task/agent — or running a grep + read loop — repeats work codegraph already did and costs more for the same answer.
-- **Trust codegraph results.** They come from a full AST parse. Do NOT re-verify them with grep — that's slower, less accurate, and wastes context.
-- **Don't grep first** when looking up a symbol by name. `codegraph_search` is faster and returns kind + location + signature in one call.
-- **Don't chain `codegraph_search` + `codegraph_node`** when you just want context — `codegraph_context` is one call.
-- **Don't loop `codegraph_node` over many symbols** — one `codegraph_explore` call returns several symbols' source grouped in a single capped call, while each separate node/Read call re-reads the whole context and costs far more.
-- **Index lag — check the staleness banner, don't guess a wait.** When a codegraph response starts with "⚠️ Some files referenced below were edited since the last index sync…", the listed files are pending re-index — Read those specific files for accurate content. Files NOT in that banner are fresh and codegraph is authoritative for them. `codegraph_status` also lists pending files under "Pending sync".
+## 🛠️ YoLoIT CLI & App Development Workflows
 
-### If `.codegraph/` doesn't exist
+- **CLI-First Development Philosophy**:
+  - All features, actions, and state mutations must be designed **CLI-first**. Everything in the application—including managing and interacting with widgets on the boards—must be fully controllable via the `yoloit` CLI.
+  - New functionality must expose commands that map seamlessly to both the terminal CLI and LLM Tools.
+  - Every command must include a clear, concise, and **human-friendly description** so both humans and agents can easily discover, understand, and use them.
+- **Long-Running Dev Processes**:
+  - Never run long-running servers or builders directly in the chat foreground. Use the `yoloit` CLI:
+    `yoloit panel:create "<board>" board.run "Run"` to create a runner panel, then:
+    `yoloit do "<board>" "<panel>" run '{"id":"..."}'` to start the process persistently.
+- **Multi-Step Board Mutations**:
+  - Prefer `yoloit board:apply` with a YAML specification instead of sending many imperative single commands.
+- **Custom JS App (Widget) Development**:
+  - Always run `yoloit app:dev-skill` first to read the JavaScript API and UI rules.
+  - **No Local Install Needed**: Develop `widget.js` and `manifest.json` in the current working directory, and control/test them directly:
+    `yoloit app:run .` (open) | `yoloit app:reload .` (hot-reload) | `yoloit app:logs .` (stream console)
 
-The MCP server returns "not initialized." Ask the user: *"I notice this project doesn't have CodeGraph initialized. Want me to run `codegraph init -i` to build the index?"*
-<!-- CODEGRAPH_END -->
+---
+
+## 🧭 CodeGraph Usage: CLI Only
+
+- **Do not rely on the CodeGraph MCP server for this repository.**
+  - The repo is large enough that the CodeGraph file watcher can hit macOS file descriptor limits (`EMFILE: too many open files, watch`) and make MCP startup time out.
+  - Prefer explicit `codegraph` CLI calls from the terminal. They are deterministic, easy to retry, and do not block Codex startup.
+- **Use CodeGraph CLI for structural code questions before falling back to text search:**
+  - Symbol or API context: `codegraph context "task or area"`
+  - Symbol lookup: `codegraph query "SymbolName"`
+  - Callers: `codegraph callers "SymbolName"`
+  - Callees: `codegraph callees "SymbolName"`
+  - Impact analysis: `codegraph impact "SymbolName"`
+  - File list from index: `codegraph files`
+  - Index health: `codegraph status --json`
+- **Keep the index fresh manually:**
+  - Run `codegraph sync` after meaningful edits before asking structural questions.
+  - If the index looks stale or locked, run `codegraph status` first and follow its output; do not start or debug the MCP server.
+- **When using CLI output in answers or implementation work:**
+  - Treat CodeGraph CLI results as the structural source of truth for definitions, call relationships, and impact.
+  - Use `rg` only for literal text, comments, log messages, config keys, and after CodeGraph has already identified specific files.
+
+---
+
+## 📦 Repomix Code Snapshots
+
+A pre-configured `repomix.config.json` lives at the repo root. It excludes `third_party`, `packages` (submodules), generated Dart files (`.g.dart`, `.freezed.dart`, `.mocks.dart`), and training data (`assets/command_catalog/**/*.jsonl`).
+
+- **Install** (one-time): `npm install -g repomix`
+- **Full project snapshot**: `repomix .`
+  - Output: `snapshots/repomix-output.xml` (~500K tokens, ~2 MB, ~1.5s)
+- **Dart-only snapshot**:
+  ```bash
+  find lib test -name '*.dart' ! -name '*.g.dart' ! -name '*.freezed.dart' ! -name '*.mocks.dart' | repomix --stdin --compress --output snapshots/dart-only.xml
+  ```
+- **Single / multiple specific files** (e.g., after `rg`/`codegraph` search):
+  ```bash
+  # One file
+  echo 'lib/features/board/ui/board_view.dart' | repomix --stdin --compress --output snapshots/target.xml
+
+  # Several files
+  printf 'lib/app.dart\nlib/main.dart\n' | repomix --stdin --compress --output snapshots/target.xml
+  ```
+  > ⚠️ Multiple `--include` flags do **not** work reliably — always use `--stdin` for specific file lists.
+- **Tips**:
+  - `--compress` uses Tree-sitter to keep signatures and replace method bodies with `⋮----`. It captures **all** methods (public, private, protected).
+  - `snapshots/` is `.gitignore`d — never commit generated XML files.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [IstiN/yoloit](https://github.com/IstiN/yoloit) — distributed by [TomeVault](https://tomevault.io).
