@@ -1,112 +1,108 @@
 ---
 trigger: always_on
-description: How to compose Scene Optimizer preset JSON files. Covers operation catalog, ordering, Python processors, and parameter guidance.
+description: AIF (AI Factory) digital twin profile for USD assets. Covers AIF-specific metadata, connection points, equipment templates, payload structure, and optimization strategy.
 ---
 
 
-# Scene Optimizer Preset Composition
+# AIF Digital Twin Profile
 
-Scene Optimizer presets are JSON arrays of operation objects that define a processing pipeline for USD assets. This guide covers how to compose them.
+This profile defines AIF-specific conventions that go beyond SimReady core requirements. It builds on the quality rules in `.cursor/rules/usd-universal.mdc` (which cover core quality and SimReady compliance).
+
+**What's here vs universal rules:**
+- Universal rules cover geometry quality, material quality, and SimReady compliance (Z-up, meters, single root, origin, etc.)
+- This file covers AIF-only concerns: metadata (`aif:core:*`, `aif:spec:*`), connection points, equipment templates, payload structure, and AIF optimization strategy
 
 ## Agent Behavior
 
-When a user asks to create or modify a preset:
+### Metadata Requests
 
-1. **Start from the canonical template** - read `so/generic/generic_preset.json` as a baseline rather than building from scratch.
-2. **Ask what problems they are solving** - map their issues to operations using the catalog below.
-3. **Follow operation ordering strictly** - the ordering rules in this file prevent data corruption (e.g., running `deduplicateGeometry` before splitting GeomSubsets produces wrong results silently).
-4. **Check vendor presets first** - for vendor equipment, look in `so/vertiv/`, `so/spt/`, `so/trane/` for existing presets before creating a new one.
-5. **Prefer external scripts** - when adding `pythonScript` operations, use the library pattern (loading from `so/generic/lib/`) over base64-embedded scripts for maintainability.
+When a user asks about AIF metadata or equipment properties:
 
-When a user asks to fix a specific validation failure with a preset:
+1. **Determine equipment type** by asking what equipment they are working with:
+   - CDU (Coolant Distribution Unit) - 81 properties
+   - CRAH (Computer Room Air Handler) - 51 properties
+   - UPS (Uninterruptible Power Supply) - 51 properties
+   - GB300 Rack - 28 properties (pre-filled with NVIDIA values)
+2. **Guide through the workflow:** create template, edit JSON, apply to USD, compose as sublayer, validate.
+   - CLI commands are in `.cursor/rules/aif-pipeline-cli.mdc` under Metadata.
+3. **After applying metadata,** validate with: `uv run --directory oav validate --rule AIFMetadataChecker <asset>`
 
-1. Look up the fix operation in `.cursor/rules/usd-universal.mdc` (Quick Rule-to-Operation Lookup table).
-2. Create a minimal preset with just the needed operations, respecting the ordering rules below.
-3. If only one or two operations are needed, a targeted preset is better than running the full generic preset.
+### Connection Point Requests
 
-## Preset Structure
+When a user asks about connection points:
 
-A preset is a JSON array where each element is an operation:
+1. Confirm optimization is complete first - connection points should be authored against final geometry.
+2. Walk through the connection point workflow in the section below.
+3. Key naming conventions must match: `<vendor>_<type>_<subtype>_<N>` (e.g., `vertiv_liq_supply_1`).
+4. Connection point prims must have `Purpose = guide` and be saved as `<AssetName>_ConnectionPoints.usd`.
 
-```json
-[
-    { "operation": "editStageMetrics", "metersPerUnit": 1.0, "upAxis": 2 },
-    { "operation": "meshCleanup", "paths": [], "mergeVertices": true },
-    { "operation": "generateNormals", "paths": [], "sharpnessAngle": 60.0 }
-]
+### AIF Validation Failures
+
+When `AIFMetadataChecker` or other AIF-specific rules fail:
+
+- **"No properties sublayer found"** - Create and compose a `*_Properties.usda` sublayer using the metadata workflow above.
+- **"Missing required attributes"** - Check which `aif:core:*` attributes are missing from the required list below, update the metadata JSON, and re-apply.
+- **"Equipment-specific validation failed"** - The `aif:core:assetClass` value does not match the `aif:spec:*` properties present. Ensure the spec properties match the template for the declared asset class.
+- **`AIFHierarchyHasRootChecker` failed** - Multiple root prims exist; restructure so there is a single root (excluding `/Render`).
+- **`AIFRootIsXformableChecker` failed** - Default prim is not an Xform type; change it to `UsdGeom.Xform`.
+- **`AIFAssetAtOriginChecker` failed** - Root prim has a non-identity transform; zero out translation/rotation/scale.
+
+## AIF Hierarchy Structure
+
+A complete AIF asset composes these layers:
+
+```
+/<DefaultPrim>              (Xform, equipment root)
+├── <Geometry>              (Xform or Mesh prims - CAD-converted geometry)
+├── ConnectionPoints/       (Scope - thermal, electrical, airflow interfaces)
+│   ├── <vendor>_liq_supply_*     (Plane/Disk, Purpose=guide)
+│   ├── <vendor>_liq_return_*     (Plane/Disk, Purpose=guide)
+│   ├── <vendor>_electrical_*     (Plane/Disk, Purpose=guide)
+│   ├── <vendor>_airvent_intake_* (Plane/Disk, Purpose=guide)
+│   └── <vendor>_airvent_outflow_*(Plane/Disk, Purpose=guide)
+└── [sublayers]
+    ├── <Model>_Properties.usda   (AIF metadata layer)
+    └── <Model>_ConnectionPoints.usd (connection point layer)
 ```
 
-Each operation object must have an `"operation"` key. Additional keys are operation-specific parameters. The full parameter reference is in `so_operations.json` (97KB).
+## Metadata Properties
 
-## Operation Catalog
+AIF metadata uses two namespaces applied as a separate USDA property layer.
 
-### Stage Operations
+### `aif:core:` — Common Properties (all equipment)
 
-| Operation | Purpose | Key Parameters |
-|-----------|---------|----------------|
-| `editStageMetrics` | Set units, up-axis, collapse xforms | `metersPerUnit`, `upAxis` (2=Z), `collapseXforms`, `ignoreKitCameras` |
+Applied to the equipment root prim. Key properties:
 
-### Geometry Cleanup
+| Property | Type | Description |
+|---|---|---|
+| `aif:core:manufacturer` | string | Equipment manufacturer name |
+| `aif:core:modelNumber` | string | Equipment model number |
+| `aif:core:overallGeometryDimensions` | float3 | Overall geometry W x D x H (mm) |
+| `aif:core:weight` | float | Weight in kilograms |
+| `aif:core:height` / `width` / `depth` | float | Individual dimensions in mm |
+| `aif:core:assetClass` | string | Class of AI Factory equipment |
+| `aif:core:assetVersion` | string | Design revision of digital twin asset |
+| `aif:core:assetCreationDate` | string | ISO 8601 date (YYYY-MM-DD) |
+| `aif:core:assetDescription` | string | Human-readable description |
+| `aif:core:sceneOptimizerVersion` | string | SO version (tool-managed, excluded from validation) |
+| `aif:core:assetValidatorVersion` | string | Validator version (tool-managed, excluded from validation) |
 
-| Operation | Purpose | Key Parameters |
-|-----------|---------|----------------|
-| `meshCleanup` | Fix topology issues | `mergeVertices`, `tolerance`, `removeDegenerateFaces`, `removeDuplicateFaces`, `removeIsolatedVertices`, `makeManifold`, `contractDegenerateEdges`, `mergeBoundaries`, `mergeNeighbors` |
-| `generateNormals` | Generate surface normals | `sharpnessAngle` (degrees), `replaceExisting`, `binding` (0=vertex), `weightmode`, `gpuThreshold` |
-| `computeExtents` | Compute bounding extents | `paths` |
-| `removeSmallGeometry` | Remove tiny geometry | `removeMethod`, `detectionMethod`, `threshold` |
-| `manifoldMeshes` | Make meshes watertight | `paths` |
+All numeric values use SI units (meters, kilograms, Kelvin, watts) unless noted.
 
-### Geometry Optimization
+### `aif:spec:` — Equipment-Specific Properties
 
-| Operation | Purpose | Key Parameters |
-|-----------|---------|----------------|
-| `decimateMeshes` | Reduce polygon count | `reductionFactor`, `maxMeanError`, `pinBoundaries`, `allowCutAndGlue`, `cpuVertexCountThreshold`, `gpuVertexCountThreshold`, `guideDecimation` |
-| `deduplicateGeometry` | Instance identical meshes | `tolerance`, `duplicateMethod` (2=hierarchy), `fuzzy`, `allowScaling`, `considerDeepTransforms`, `useGpu`, `ignoreAttributes` |
-| `merge` | Merge meshes into one | `paths` |
-| `remeshMeshes` | Remesh geometry | `paths` |
-| `triangulateMeshes` | Convert to triangles | `paths` |
-| `subdivideMeshes` | Subdivide surfaces | `paths` |
-| `diceMeshes` | Subdivide/dice geometry | `paths` |
-| `splitMeshes` | Split meshes by criteria | `paths` |
-| `boxClip` | Clip meshes by box | `paths` |
+Vary by equipment type. Create templates with:
 
-### Hierarchy Operations
+```bash
+aif-pipeline metadata create --type <type> --output <file>.json
+```
 
-| Operation | Purpose | Key Parameters |
-|-----------|---------|----------------|
-| `pruneLeaves` | Remove empty leaf nodes | `pruneMode` (1=empty), `filterInactive` |
-| `flattenHierarchy` | Flatten prim hierarchy | `paths` |
-| `findFlatHierarchies` | Detect flat hierarchies | `paths` |
-| `pivot` | Adjust pivot points | `paths` |
-
-### Material Operations
-
-| Operation | Purpose | Key Parameters |
-|-----------|---------|----------------|
-| `optimizeMaterials` | Deduplicate/consolidate materials | `optimizeMaterialsMode` (0=consolidate, 2=deduplicate), `materialsPath`, `analysisCheckPrimvars` |
-| `optimizePrimvars` | Clean up primvar data | `mode`, `simplify`, `removeIfBound`, `primvars`, `primvarPaths` |
-
-### Analysis Operations (non-destructive)
-
-| Operation | Purpose |
-|-----------|---------|
-| `findCoincidingMeshes` | Identify overlapping meshes |
-| `findHiddenMeshes` | Locate hidden geometry |
-| `fitPrimitives` | Fit primitive shapes to meshes |
-
-### Other Operations
-
-| Operation | Purpose |
-|-----------|---------|
-| `pythonScript` | Run custom Python code |
-| `removeAttributes` | Remove prim attributes |
-| `generateAtlasUVs` | Generate texture atlas UVs |
-| `generateProjectionUVs` | Generate projected UVs |
-| `organizePrototypes` | Organize instanced prototypes |
-| `optimizeSkelRoots` | Optimize skeleton roots |
-| `optimizeTimeSamples` | Reduce time samples |
-| `primitivesToMeshes` | Convert primitives to meshes |
-| `utilityFunction` | Execute utility functions |
+| Type | Description | Total Properties |
+|------|-------------|-----------------|
+| `cdu` | Coolant Distribution Unit | 81 (20 common + 61 specific) |
+| `crah` | Computer Room Air Handler | 51 (20 common + 31 specific) |
+| `ups` | Uninterruptible Power Supply | 51 (20 common + 31 specific) |
+| `gb300_rack` | NVIDIA DGX GB300 Rack | 28 (20 common + 8 specific, pre-filled) |
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
