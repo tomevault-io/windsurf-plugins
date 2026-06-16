@@ -7,11 +7,11 @@ Coding Agent 的团队治理层：让全队的 Agent 遵守同一套持续进化
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [Fioooooooo/FylloCode](https://github.com/Fioooooooo/FylloCode).
+Original source: `CLAUDE.md` in [Fioooooooo/FylloCode](https://github.com/Fioooooooo/FylloCode).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
