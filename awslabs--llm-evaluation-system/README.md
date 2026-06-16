@@ -7,11 +7,11 @@ Agentic AI-guided evaluation system for comparing LLMs with multi-judge jury sco
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [awslabs/llm-evaluation-system](https://github.com/awslabs/llm-evaluation-system).
+Original source: `CLAUDE.md` in [awslabs/llm-evaluation-system](https://github.com/awslabs/llm-evaluation-system).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
