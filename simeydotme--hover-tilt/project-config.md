@@ -1,105 +1,210 @@
 ---
 trigger: always_on
-description: Maintain llms.txt file when documentation changes are made
+description: Important styling considerations for the HoverTilt web component
 ---
 
 
-# llms.txt Maintenance Rule
+# Web Component Shadow DOM Styling Rules
 
-When modifying documentation files in this project, ensure the `apps/docs/public/llms.txt` file stays synchronized with the documentation structure.
+When creating demos or documentation examples for the HoverTilt web component, follow these critical styling rules to ensure the component works correctly.
 
-## What is llms.txt?
+## Prefer CSS Variables Over data-is-active
 
-The `llms.txt` file (located at `apps/docs/public/llms.txt`) follows the [llmstxt.org specification](https://llmstxt.org/) and helps Large Language Models understand this project's documentation. It provides a curated, LLM-friendly overview of the Hover Tilt component library.
+The HoverTilt component exposes CSS variables (like `--hover-tilt-opacity`) to slotted content via `::slotted(*)`. This is the **preferred way** to make slotted content respond to the component's state.
 
-## When to Update llms.txt
+### ✅ Recommended: Use CSS Variables
 
-Update the `llms.txt` file when you:
-
-1. **Add a new documentation page** — Add a corresponding entry in the appropriate section (Docs, Examples, or Optional)
-2. **Remove a documentation page** — Remove the corresponding link from llms.txt
-3. **Rename a page or change its URL/slug** — Update the URL in llms.txt
-4. **Significantly change a page's content or purpose** — Update the description for that link
-5. **Add new major features or props** — Update the "Key Technical Details" or "Quick Start" sections if needed
-6. **Change the sidebar structure in astro.config.mjs** — Reflect structural changes in llms.txt sections
-7. **Modify the component's public API** — When props are added, removed, or changed in `HoverTilt.svelte` or `types/index.ts`, update the "Component Props Reference" section in llms.txt
-
-## llms.txt Structure
-
-The file follows this structure:
-
-```markdown
-# Hover Tilt
-
-> Brief summary of what the project is
-
-## Key Technical Details
-- Package info, import paths, key concepts
-
-## Quick Start
-- Installation and basic usage code examples
-
-## Component Props Reference
-- Tables of all props with Type, Default, and Description
-- Interaction Props (tiltFactor, scaleFactor, springOptions, etc.)
-- Aesthetic Props (shadow, glareIntensity, glareMask, etc.)
-- Common Prop Combinations (practical usage examples)
-
-## Docs
-- [Page Title](URL): Brief description of what the page covers
-
-## Examples  
-- [Example Title](URL): What the example demonstrates
-
-## Optional
-- [Advanced Topic](URL): Secondary resources that can be skipped for basic understanding
+```css
+/* ✅ BEST - Use the CSS variable directly */
+.my-element {
+  transform: translateZ(calc(var(--hover-tilt-opacity, 0) * 50px));
+}
 ```
 
-## Section Guidelines
+The `--hover-tilt-opacity` variable animates from 0 to 1 when active, so you don't need to check `data-is-active` at all.
 
-- **Docs section**: Core documentation essential for using the component (Getting Started, Usage, API Reference)
-- **Examples section**: Live demos and code examples
-- **Optional section**: Advanced topics, bespoke demos, and supplementary content
-- **Component Props Reference**: Complete props API in table format (synced with `HoverTilt.svelte` and `types/index.ts`)
+### When You Need data-is-active
 
-## Updating the Component Props Reference
+Only use `data-is-active` if you need **discrete state changes** (on/off) rather than animated values (0 to 1).
 
-When modifying props in `HoverTilt.svelte` or `types/index.ts`:
+The `data-is-active` attribute is set on the **container element inside the shadow DOM**:
 
-1. **Adding a prop**: Add a new row to the appropriate table (Interaction Props or Aesthetic Props)
-2. **Removing a prop**: Remove the corresponding row from the table
-3. **Changing a prop**: Update the Type, Default, or Description as needed
-4. **Renaming a prop**: Update the prop name and ensure both Svelte (camelCase) and Web Component (kebab-case) formats are correct
-
-Props table format:
-```markdown
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `propName` | `type` | `default` | Brief description of what it does. |
+```css
+/* ✅ CORRECT - Access via ::part(container) with exact value match */
+hover-tilt::part(container)[data-is-active="true"] .my-element {
+  background-color: red; /* Discrete state change */
+}
 ```
 
-Source files for props:
-- `packages/hover-tilt/src/lib/components/HoverTilt.svelte` — Props destructured from `$props()` and `<svelte:options>` attribute mappings
-- `packages/hover-tilt/src/lib/types/index.ts` — `HoverTiltProps` interface with JSDoc comments
+### ❌ Common Mistakes
 
-## Link Format
+```css
+/* ❌ WRONG - This won't work with web components */
+hover-tilt[data-is-active] .my-element {
+  transform: translateZ(50px);
+}
 
-Each link entry should follow this format:
-```markdown
-- [Human-readable title](https://hover-tilt.simey.me/path/): Concise description explaining what the page covers
+/* ❌ WRONG - Missing exact value match */
+hover-tilt::part(container)[data-is-active] .my-element {
+  transform: translateZ(50px);
+}
+
+/* ❌ UNNECESSARY - Use CSS variable instead */
+hover-tilt::part(container)[data-is-active="true"] .my-element {
+  transform: translateZ(50px); /* Use --hover-tilt-opacity instead! */
+}
 ```
 
-The site URL is `https://hover-tilt.simey.me`.
+## Shadow DOM Structure
 
-## Current Documentation Structure
+The web component renders with this structure:
 
-Reference for the current docs structure (from astro.config.mjs sidebar):
+```txt
+<hover-tilt>                          ← Host element (Light DOM)
+  ├── #shadow-root
+  │     └── <div part="container">    ← Container with data-is-active
+  │           └── <div part="tilt">   ← Tilt layer with transforms
+  │                 └── <slot />      ← Your content goes here
+  └── slotted content                 ← Light DOM content
+```
 
-- Getting Started: `/getting-started/`, `/usage/`
-- Options: `/options/props/`, `/options/css/`
-- Examples: `/examples/web-component/`, `/examples/props/`
-- Advanced: `/advanced/shadows/`, `/advanced/custom-shadow/`, `/advanced/custom-gradient/`, `/advanced/glare-masks/`
-- Bespoke: `/bespoke/credit-cards/`, `/bespoke/pokemon-cards/`, `/bespoke/stacked-3d/`
+## Styling Shadow DOM Elements
+
+Use the `::part()` pseudo-element to style internal shadow DOM elements:
+
+```css
+/* Target the container */
+hover-tilt::part(container) {
+  border-radius: 1rem;
+  perspective: 800px;
+}
+
+/* Target the tilt layer */
+hover-tilt::part(tilt) {
+  opacity: 0.9;
+}
+
+/* Target container when active */
+hover-tilt::part(container)[data-is-active="true"] {
+  /* styles here */
+}
+```
+
+## Styling Slotted Content
+
+Your slotted content is in the **Light DOM** and can be styled normally with class selectors:
+
+```html
+<hover-tilt class="my-component">
+  <div class="my-content">
+    <!-- This is Light DOM, style it normally -->
+  </div>
+</hover-tilt>
+```
+
+```css
+.my-content {
+  /* ✅ This works - slotted content is in Light DOM */
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+```
+
+## CSS Variables in Web Components
+
+CSS variables from the component are exposed to slotted content via `::slotted(*)` internally. You can use them directly in your slotted content:
+
+```css
+.my-element {
+  /* These CSS variables are available to slotted content */
+  opacity: var(--hover-tilt-opacity, 0);
+  transform: translateZ(calc(var(--hover-tilt-opacity, 0) * 50px));
+}
+```
+
+## Common Patterns for Active State
+
+When you need slotted elements to respond to the component's active state, use CSS variables:
+
+```html
+<hover-tilt class="stacked-demo">
+  <div class="content">
+    <h1 class="text">Hello</h1>
+    <img class="icon" src="icon.svg" />
+  </div>
+</hover-tilt>
+```
+
+```css
+.stacked-3d::part(tilt) {
+  /* by default, the will-change list is: transform, box-shadow, opacity */
+  will-change: transform, box-shadow, mask;
+  /* we remove the 'opacity' property from the will-change list, because when 'opacity'
+    is set; the 3d context becomes "flat" and will not allow parallax effects. */
+}
+
+.stacked-3d::part(tilt)::before {
+  /* make sure the glare is on top of the content */
+  z-index: 1;
+}
+
+.content {
+  /* Enable 3D space */
+  transform-style: preserve-3d;
+}
+
+/* ✅ BEST APPROACH - Use CSS variables directly */
+.text {
+  transform: translateZ(calc(var(--hover-tilt-opacity, 0) * 40px));
+  transition: transform 0.4s ease-out;
+}
+
+.icon {
+  transform: translateZ(calc(var(--hover-tilt-opacity, 0) * 80px));
+  transition: transform 0.4s ease-out;
+}
+```
+
+The `--hover-tilt-opacity` variable (and others) are automatically available to slotted content!
+
+## Svelte Component vs Web Component
+
+These styling differences are **specific to the web component**. The Svelte component has different styling considerations:
+
+### Svelte Component
+
+```svelte
+<HoverTilt class="my-tilt">
+  <div class="content">...</div>
+</HoverTilt>
+
+<style>
+  /* ✅ Can use :global() to target data-is-active */
+  :global([data-is-active="true"]) .content {
+    transform: translateZ(50px);
+  }
+</style>
+```
+
+### Web Component
+
+```html
+<hover-tilt class="my-tilt">
+  <div class="content">...</div>
+</hover-tilt>
+
+<style>
+  /* ✅ Must use ::part(container) */
+  .my-tilt::part(container)[data-is-active="true"] .content {
+    transform: translateZ(50px);
+  }
+</style>
+```
+
+## Documentation Reference
+
+Full styling documentation is available at:
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [simeydotme/hover-tilt](https://github.com/simeydotme/hover-tilt) — distributed by [TomeVault](https://tomevault.io).
