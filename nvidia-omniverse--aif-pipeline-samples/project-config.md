@@ -1,110 +1,77 @@
 ---
 trigger: always_on
-description: Known USD issue patterns encountered during CAD-to-USD asset processing. Reference when troubleshooting.
+description: USD quality rules for diagnosing and fixing asset issues. Covers core geometry/material quality, SimReady compliance, and the full validation rule catalog.
 ---
 
 
-# USD Issues Catalog
+# USD Quality Rules
 
-Known issue patterns encountered during CAD-to-USD asset processing. Each entry is tagged by tier: `[core]` applies to all SimReady assets, `[aif]` is specific to AI Factory digital twin workflows.
-
-This catalog grows over time. When you encounter a new pattern, add it here following the template below.
+Three tiers: **Core Quality** (valid, clean USD), **SimReady Compliance** (standardized assets per the SimReady spec), and **AIF-specific** (covered in `.cursor/rules/usd-aif-profile.mdc`).
 
 ## Agent Behavior
 
-When troubleshooting an issue:
+When a user reports a USD quality issue or a validation rule failure:
 
-1. **Check this catalog first** - scan for a matching symptom in the entries below.
-2. If it matches, follow the documented Fix and Prevention steps.
-3. If the issue is a validation rule failure, cross-reference with `.cursor/rules/usd-universal.mdc` symptom-to-fix tables for the specific rule-to-operation mapping.
-4. If the issue is an infrastructure/runtime error (Kit not found, timeout, OOM), see the "Runtime and Infrastructure Errors" section at the bottom of this file.
+1. **Identify the rule name** from their validation output (e.g., `NormalsExistChecker`, `ExtentsChecker`).
+2. **Check the Quick Lookup** table below first for the most common failures.
+3. **For less common rules,** scan the Symptom-to-Fix tables in the sections that follow.
+4. **If multiple fixes are needed,** compose them into a preset respecting the operation ordering in `.cursor/rules/scene-optimizer-presets.mdc`.
+5. **Re-validate** after applying fixes to confirm resolution.
+6. If a rule is not in these tables, check `.cursor/rules/usd-issues-catalog.mdc` for known patterns.
 
----
+### Quick Rule-to-Operation Lookup
 
-### [core] Dangling material bindings after CAD conversion
+For the most common validation failures, here are direct fixes:
 
-**Symptom:** Render errors, materials appear missing, OAV warnings about unresolved material paths.
+| Failed Rule | Fix Operation | Key Parameters |
+|---|---|---|
+| `NormalsExistChecker` / `AIFNormalsValidChecker` | `generateNormals` | `sharpnessAngle: 60.0, replaceExisting: true` |
+| `NormalsWindingsChecker` | `generateNormals` | `replaceExisting: true` |
+| `ExtentsChecker` / `ZeroExtentChecker` | `computeExtents` | `paths: []` (all prims) |
+| `UpAxisZChecker` / `AIFMetersPerUnitChecker` | `editStageMetrics` | `upAxis: 2, metersPerUnit: 1.0` |
+| `ValidateTopologyChecker` | `meshCleanup` | `removeDegenerateFaces: true, contractDegenerateEdges: true` |
+| `UsdDanglingMaterialBinding` | pythonScript | `validate_fix_material_binding_api.py` |
+| `AIFAssetAtOriginChecker` | pythonScript | `transform_stage.py` with identity transform |
+| `AIFHierarchyHasRootChecker` | pythonScript | `group.py` to create single root |
+| `AIFMetadataChecker` | Not an SO fix | See metadata workflow in `.cursor/rules/usd-aif-profile.mdc` |
+| `AIFGeomShallBeMeshChecker` | `primitivesToMeshes` | Convert non-mesh geometry to meshes |
 
-**Root cause:** CAD converters create material references that can become invalid after hierarchy restructuring or deduplication. Material prims may be removed while bindings on meshes still reference them.
+## Symptom → Fix Reference
 
-**Detection:** OAV validation, `optimizeMaterials` analysis mode, visual inspection (meshes render with default grey material).
+Use these tables to map a problem to its Scene Optimizer fix. For the full validation rule catalog, see the end of this file.
 
-**Fix:** `optimizeMaterials` operation with `optimizeMaterialsMode: 2` (deduplicate), or the `validate_fix_material_binding_api.py` library script to repair the binding API itself.
+### Geometry Issues
 
-**Prevention:** Always run `optimizeMaterials` after any hierarchy restructuring. Place material operations after geometry dedup in presets.
+| Symptom | Detection Rule | Fix (SO Operation) | Parameters |
+|---|---|---|---|
+| Degenerate/zero-area faces | `ZeroAreaFacesChecker`, `ValidateTopologyChecker` | `meshCleanup` | `removeDegenerateFaces: true, contractDegenerateEdges: true` |
+| Non-manifold edges | `NonManifoldChecker` | `meshCleanup` | `makeManifold: true` |
+| Duplicate faces | `DuplicateFaceChecker` | `meshCleanup` | `removeDuplicateFaces: true` |
+| Isolated/unreferenced vertices | `IsolatedVerticesChecker`, `UnusedMeshTopologyChecker` | `meshCleanup` | `removeIsolatedVertices: true` |
+| Colocated vertices | `ColocatedVerticesChecker` | `meshCleanup` | `mergeVertices: true, tolerance: 0.0` |
+| Missing normals | `NormalsExistChecker` | `generateNormals` | `sharpnessAngle: 60.0, replaceExisting: true` |
+| Invalid normals (NaN/Inf) | `AIFNormalsValidChecker` | `generateNormals` | `replaceExisting: true` |
+| Inconsistent winding | `NormalsWindingsChecker`, `WindingsChecker` | `generateNormals` | `replaceExisting: true` |
+| Zero/missing extents | `ExtentsChecker`, `ZeroExtentChecker` | `computeExtents` | `paths: []` (all prims) |
+| High vertex count | `HighVertexCountChecker` | `decimateMeshes` | `maxMeanError: 0.0001, pinBoundaries: true` |
+| Subdivision scheme undefined | `SubdivisionSchemeChecker` | Set explicitly | USD defaults to Catmull-Clark if not set |
+| Non-indexed primvars | `IndexedPrimvarChecker` | `optimizePrimvars` | Use indexed format for storage optimization |
+| Unused primvars/UVs | `UnusedPrimvarChecker`, `UnusedUVsChecker` | `optimizePrimvars` | `mode: 1, simplify: true` |
+| Coinciding/overlapping meshes | `CoincidingGeometryChecker` | pythonScript: `remove_coinciding_meshes.py` | tolerance=0.001 |
+| Occluded meshes | `OccludedMeshesChecker` | Review manually or remove | Optional GPU-accelerated analysis |
+| Invisible prims | `InvisiblePrimsChecker` | Deactivate instead of hide | Invisible prims still consume resources |
+| Sparse meshes needing splitting | `SparseMeshChecker` | `splitMeshes` or `diceMeshes` | Needs dicing, splitting, or clustering |
+| Meshes replaceable by primitives | `PrimitiveFitChecker` | `fitPrimitives` | Replace with USD primitive prims |
+| Points precision error | `PointsPrecisionErrorChecker` | Fix source data | Points must have precision for <1.0 unit increments |
+| Extreme extents (>2^38) | `AlmostExtremeExtentChecker` | Fix transforms/scale | RTX limit is 2^40 |
+| Meshes with GeomSubsets blocking dedup | Manual analysis | pythonScript: `split_non_composed_by_geom_subsets.py` | **Must run before dedup** |
 
----
+### Material Issues
 
-### [core] Missing normals after CAD conversion
-
-**Symptom:** Faceted rendering, OAV `NormalsExistChecker` failure, visual artifacts on smooth surfaces.
-
-**Root cause:** Many CAD formats (STEP, JT) do not export surface normals. The CAD converter produces meshes without normal attributes.
-
-**Detection:** OAV `NormalsExistChecker`, `AIFNormalsValidChecker`. Visual: surfaces look faceted when they should be smooth.
-
-**Fix:** `generateNormals` operation with `sharpnessAngle: 60.0, replaceExisting: true`. Adjust sharpness angle for sharper (lower value) or smoother (higher value) results.
-
-**Prevention:** Always include `generateNormals` in presets. Place it after `decimateMeshes` since decimation changes geometry.
-
----
-
-### [core] Duplicate hierarchy branches from CAD assemblies
-
-**Symptom:** Identical subtrees repeated in the prim hierarchy (for example, 48 identical rack units in a server rack). High prim count, slow load times.
-
-**Root cause:** CAD assembly files contain multiple instances of the same component, but the converter expands them into full separate hierarchies rather than using USD instancing.
-
-**Detection:** Visual inspection of hierarchy tree - look for repeated display names. High prim/mesh counts relative to unique geometry.
-
-**Fix:** The `deduplicate_hierarchies_by_display_name.py` library script (from `so/generic/lib/`) identifies and deduplicates matching branches. For mesh-level dedup, use the `deduplicateGeometry` operation with `duplicateMethod: 2, fuzzy: true`.
-
-**Prevention:** Run hierarchy deduplication early in the preset pipeline (before mesh-level operations).
-
----
-
-### [core] Wrong stage metrics (Y-up or non-meter units)
-
-**Symptom:** Assets appear sideways or at wrong scale. OAV `UpAxisZChecker` or `AIFMetersPerUnitChecker` failure.
-
-**Root cause:** CAD tools commonly use Y-up orientation and millimeter or inch units. The converter may preserve source metrics.
-
-**Detection:** OAV validation. Visual: asset is rotated 90 degrees or appears tiny/enormous.
-
-**Fix:** `editStageMetrics` operation with `upAxis: 2` (Z-up) and `metersPerUnit: 1.0`.
-
-**Prevention:** Always make `editStageMetrics` the first operation in every preset.
-
----
-
-### [core] Zero or missing extents on boundable prims
-
-**Symptom:** OAV `ExtentsChecker` failure. Bounding box queries return incorrect results, selection and framing in viewport may fail.
-
-**Root cause:** Extents are not automatically recomputed after geometry operations (decimation, cleanup, dedup). Some CAD converters omit them entirely.
-
-**Detection:** OAV `ExtentsChecker`.
-
-**Fix:** `computeExtents` operation with `paths: []` (all prims).
-
-**Prevention:** Always make `computeExtents` the last operation in every preset.
-
----
-
-### [core] Degenerate geometry surviving conversion
-
-**Symptom:** Visual artifacts, validation warnings about degenerate faces or non-manifold edges. Possible crashes during decimation.
-
-**Root cause:** CAD models often contain construction geometry, zero-area faces, or self-intersecting geometry that persists through conversion.
-
-**Detection:** OAV `ValidateTopologyChecker`. The `meshCleanup` operation reports statistics on what it fixed.
-
-**Fix:** `meshCleanup` with `removeDegenerateFaces: true, contractDegenerateEdges: true, removeIsolatedVertices: true, removeDuplicateFaces: true`. Follow with `removeSmallGeometry` for sub-threshold remnants.
-
-**Prevention:** Always run `meshCleanup` before `decimateMeshes` in presets - decimation on degenerate input can produce worse results.
-
----
-
+| Symptom | Detection Rule | Fix (SO Operation) | Parameters |
+|---|---|---|---|
+| Dangling material bindings | `UsdDanglingMaterialBinding` | pythonScript: `validate_fix_material_binding_api.py` | Checks 4 relationship types |
+| Missing MaterialBindingAPI | `UsdMaterialBindingApi` | pythonScript: `validate_fix_material_binding_api.py` | Auto-applies API schema |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
