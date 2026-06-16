@@ -1,13 +1,15 @@
 ---
 trigger: always_on
-description: Temper reference: check
+description: Temper reference: design
 ---
 
 
 
-# Check: Stack-Aware Validation Pipeline
+# Design: System Design Phase
 
-**Goal:** Run the project's full validation pipeline. Auto-detects stack and runs the right commands.
+**Goal:** Produce system design artifacts for complex/medium features. Skipped for simple/trivial features.
+
+**When active:** `phases.design: true` in temper.config AND feature complexity >= medium.
 
 ## Active Skills
 
@@ -19,121 +21,114 @@ description: Temper reference: check
 ### Context Loading
 
 This stage may run in two modes:
-- **Standalone** (`/temper:check`) — runs in current context, handles its own gate
-- **Agent subprocess** (from `/temper`) — starts with CLEAN context, no prior files needed
+- **Standalone** (`/temper:design`) — runs in current context, handles its own gate
+- **Agent subprocess** (from `/temper`) — starts with CLEAN context, only loads what's listed below
 
-**Subprocess mode override:** When running as an Agent subprocess, do NOT show AskUserQuestion gates or clear context. Return the check summary to the orchestrator. The orchestrator handles all gate decisions and context transitions.
+**Subprocess mode override:** When running as an Agent subprocess, do NOT show AskUserQuestion gates or clear context. Return the design summary to the orchestrator. The orchestrator handles all gate decisions and context transitions.
 
-In both modes, the check methodology is identical.
+In both modes, the design methodology is identical.
+
+**Context loading strategy:** Apply the context-engineering skill for hierarchical loading (rules -> arch -> source -> errors, under 2K lines/task). The file list below specifies WHAT to load; the skill specifies HOW and WHEN.
 
 Files to load at start:
-1. `$CLAUDE_PLUGIN_ROOT/.claude-plugin/reference/check.md` (this file)
-2. `.temper/specs/{feature}/review-context.json` (if exists — review findings for context)
+1. `.temper/specs/{feature}/intent.md`
+2. `.temper/specs/{feature}/plan.md`
+3. `$CLAUDE_PLUGIN_ROOT/.claude-plugin/reference/design.md` (this file)
 
-### Step 1: Detect Stack
+### Step 1: Analyze Plan
 
-For stack detection order, apply the temper-core skill. Detection produces a stack identifier that determines which validation commands to run.
+Read intent.md and plan.md to understand:
+- Feature scope and success criteria
+- Planned file changes
+- Risk level and complexity
 
-Stack-specific validation commands:
+### Step 2: System Design Exploration
 
-   pom.xml OR build.gradle → Java/Spring Boot
-     compile: ./mvnw compile OR ./gradlew compileJava
-     test:    ./mvnw test OR ./gradlew test
-     build:   ./mvnw package OR ./gradlew build
+For MEDIUM complexity features:
+- Identify the primary system components involved
+- Map data flow between components
+- Define key interfaces
 
-   package.json → Node.js (check scripts section for commands)
-     Read package.json scripts:
-     test:  npm test (or whatever "test" script runs)
-     build: npm run build (or whatever "build" script runs)
-     lint:  npm run lint (if exists)
-     type:  npx tsc --noEmit (if tsconfig.json exists)
+For COMPLEX complexity features:
+- Full system architecture diagram
+- API contract definitions (request/response shapes)
+- Database schema changes (if applicable)
+- Integration points with external systems
+- Error handling strategy
 
-   pyproject.toml OR setup.py → Python
-     test:  pytest
-     lint:  ruff check . (or flake8, pylint)
-     type:  mypy . (if configured)
-     build: python -m build
+### Step 3: Generate Design Artifacts
 
-   go.mod → Go
-     test:  go test ./...
-     lint:  golangci-lint run
-     build: go build ./...
+Write `.temper/specs/{feature}/design.md` using the template from `$CLAUDE_PLUGIN_ROOT/templates/design.md`.
 
-   Cargo.toml → Rust
-     test:  cargo test
-     lint:  cargo clippy
-     build: cargo build
-
-Company preset OVERRIDES auto-detected commands.
-
-### Step 2: Run Validation Levels (in order, stop on BLOCK-level failure)
-
-NOTE: "Stop on failure" means halt the pipeline at the current level. Levels marked WARN continue to the next level. Only STOP/IMMEDIATELY/BLOCK results halt the pipeline.
+### Step 4: Design Summary
 
 ```
-Level 0: ENVIRONMENT
-  Purpose: Verify not hitting production
-  How: Check all .env* files (.env, .env.local, .env.production, etc.) for production indicators
-       Verify DATABASE_URL and similar connection strings don't contain "production"
-  If no .env files found: SKIP (not all projects use .env)
-  If production detected: STOP IMMEDIATELY
++--------------------------------------------------------------+
+| DESIGN -- {Feature Name}                                     |
++--------------------------------------------------------------+
+| SYSTEM ARCHITECTURE                                          |
+|    Components: {N} new, {N} modified, {N} existing          |
+|    Data flow: {brief description}                            |
+|                                                              |
+| API CONTRACTS (if applicable)                                |
+|    + POST /api/{endpoint} -- {request shape} -> {response}   |
+|    ~ GET /api/{endpoint} -- {change description}             |
+|                                                              |
+| DATABASE CHANGES (if applicable)                             |
+|    + {table} -- {columns}                                    |
+|    ~ {table} -- {change}                                     |
+|                                                              |
+| INTEGRATION POINTS                                           |
+|    {external system} -- {how it connects}                    |
+|                                                              |
+| DECISION LOG                                                 |
+|    1. {decision} -- {rationale}                              |
++--------------------------------------------------------------+
+```
 
-Level 1: COMPILE/BUILD
-  Purpose: Code compiles without errors
-  Command: {detected compile command}
-  On failure: STOP, show error output, suggest fix
+### Stage Gate
 
-Level 2: UNIT TESTS
-  Purpose: All unit tests pass
-  Command: {detected test command}
-  On failure: STOP, show failing test names, suggest fix
-  Report: tests run, passed, failed, duration
+Use AskUserQuestion with these options:
 
-Level 3: INTEGRATION TESTS (if available)
-  Purpose: Integration tests pass
-  Command: {detected integration test command, if separate from unit}
-  On failure: STOP, show failing tests
-  If no integration tests configured: SKIP
+```
+AskUserQuestion:
+  question: "What next?"
+  options:
+    - label: "Continue to Build (Recommended)"
+      description: "Proceed to build with the approved design."
+    - label: "Walk through design step by step"
+      description: "Interactive walkthrough of design decisions."
+    - label: "Save for later"
+      description: "Save design and stop."
+  multiSelect: false
+```
 
-Level 4: COVERAGE (if available)
-  Purpose: Meets threshold
-  Command: {detected coverage command}
-  Threshold: from temper.config (default 80%) or company preset
-  On failure: WARN (not block by default), show coverage %
-  If no coverage tool configured: SKIP
+| Response | Action |
+|----------|--------|
+| **Continue to Build** | Save design.md, proceed to build |
+| **Walk through design** | Interactive section-by-section review (see below) |
+| **Save for later** | Save state, stop |
+| **Other** (free-text) | Edit design, re-show gate |
 
-Level 4.5: SCENARIO VERIFICATION (Live Execution)
-  Purpose: Execute each Gherkin scenario's matching test individually, showing real pass/fail
-  Confidence: [PROVEN] — mechanical test runner output
-  Prerequisite: intent.md exists at .temper/specs/{spec}/intent.md
-    If running standalone: resolve {spec} by listing .temper/specs/ directories and
-    using the most recently modified one. If build-state.json exists, read spec from there.
-    If no specs found → SKIP Level 4.5 entirely.
-  Config: check.live-scenarios in temper.config (default: prompt)
-    Valid values: prompt | always | never
-    prompt → ask user whether to run live verification
-    always → always run live verification
-    never  → skip live verification, use heuristic analysis only (v3.0.0 behavior)
-    Any other value → treated as "prompt" (safe default)
-  How:
-    STEP 1 — Extract scenarios:
-      Read intent.md → extract all Gherkin scenarios (name + Given/When/Then)
+#### Step-by-Step Walkthrough
 
-    STEP 2 — Match scenarios to tests:
-      For each scenario, find the matching test file:
-      a. If MCP code-review-graph available: call query_graph_tool to find test
-         by scenario name annotation → [PROVEN] match
-      b. Fallback: grep test files for scenario name (snake_case or camelCase)
-         → [HEURISTIC] match
-      c. If no match found → UNMATCHED
+When the user selects "Walk through design step by step", present the design as an interactive, section-by-section flow.
 
-    STEP 3 — Gate (prompt mode only):
-      Show matched/unmatched counts. Ask user:
-      "Run live verification for {N} matched scenarios? [Y/n]"
-      If user declines → skip to heuristic-only analysis (v3.0.0 behavior)
+**Walkthrough sections (dynamic — only show sections present in design.md):**
 
-    STEP 4 — Execute each matched test individually:
-      For each matched scenario + test, run the test individually:
+Read `design.md` and detect which sections exist. Present only sections that have content. The available sections:
+
+1. **Architecture Overview** — System components, data flow diagram, what's new vs modified vs existing (always shown)
+2. **API Contracts** — Request/response shapes, endpoint changes, backward compatibility notes (shown if design.md has API contract content)
+3. **Database Changes** — Schema changes, migration strategy, impact on existing data (shown if design.md has database content)
+4. **Integration Points** — External system connections, error handling strategy, retry/fallback logic (shown if design.md has integration content)
+5. **Decision Log** — Each architectural decision with rationale and alternatives considered (always shown)
+
+**After each section, use AskUserQuestion:**
+
+```
+AskUserQuestion:
+  question: "What would you like to do?"
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
