@@ -1,119 +1,7 @@
 ---
 trigger: always_on
-description: **If you are migrating existing SpacetimeDB 1.0 code to 2.0, apply `spacetimedb-migration-2.0.mdc` first.** It documents breaking changes (reducer callbacks → event tables, `name`→`accessor`, `sender()` method, etc.) and should be considered before other rules.
+description: ⛔ MANDATORY: Read this ENTIRE file before writing ANY SpacetimeDB TypeScript code. Contains critical SDK patterns and HALLUCINATED APIs to avoid.
 ---
-
-# SpacetimeDB Rules (All Languages)
-
-## Migrating from 1.0 to 2.0?
-
-**If you are migrating existing SpacetimeDB 1.0 code to 2.0, apply `spacetimedb-migration-2.0.mdc` first.** It documents breaking changes (reducer callbacks → event tables, `name`→`accessor`, `sender()` method, etc.) and should be considered before other rules.
-
----
-
-## Language-Specific Rules
-
-| Language | Rule File |
-|----------|-----------|
-| **TypeScript/React** | `spacetimedb-typescript.mdc` (MANDATORY) |
-| **Rust** | `spacetimedb-rust.mdc` (MANDATORY) |
-| **C#** | `spacetimedb-csharp.mdc` (MANDATORY) |
-| **Migrating 1.0 → 2.0** | `spacetimedb-migration-2.0.mdc` |
-
----
-
-## Core Concepts
-
-1. **Reducers are transactional** — they do not return data to callers
-2. **Reducers must be deterministic** — no filesystem, network, timers, or random
-3. **Read data via tables/subscriptions** — not reducer return values
-4. **Auto-increment IDs are not sequential** — gaps are normal, don't use for ordering
-5. **`ctx.sender` is the authenticated principal** — never trust identity args
-
----
-
-## Feature Implementation Checklist
-
-When implementing a feature that spans backend and client:
-
-1. **Backend:** Define table(s) to store the data
-2. **Backend:** Define reducer(s) to mutate the data
-3. **Client:** Subscribe to the table(s)
-4. **Client:** Call the reducer(s) from UI — **don't forget this step!**
-5. **Client:** Render the data from the table(s)
-
-**Common mistake:** Building backend tables/reducers but forgetting to wire up the client to call them.
-
----
-
-## Index System
-
-SpacetimeDB automatically creates indexes for:
-- Primary key columns
-- Columns marked as unique
-
-You can add explicit indexes on non-unique columns for query performance.
-
-**Index names must be unique across your entire module (all tables).** If two tables have indexes with the same declared name → conflict error.
-
-**Schema ↔ Code coupling:**
-- Your query code references indexes by name
-- If you add/remove/rename an index in the schema, update all code that uses it
-- Removing an index without updating queries causes runtime errors
-
----
-
-## Commands
-
-```bash
-# Login to allow remote database deployment e.g. to maincloud
-spacetime login
-
-# Start local SpacetimeDB
-spacetime start
-
-# Publish module
-spacetime publish <db-name> --module-path <module-path>
-
-# Clear and republish
-spacetime publish <db-name> --clear-database -y --module-path <module-path>
-
-# Generate client bindings
-spacetime generate --lang <lang> --out-dir <out> --module-path <module-path>
-
-# View logs
-spacetime logs <db-name>
-```
-
----
-
-## Deployment
-
-- Maincloud is the spacetimedb hosted cloud and the default location for module publishing
-- The default server marked by *** in `spacetime server list` should be used when publishing
-- If the default server is maincloud you should publish to maincloud
-- Publishing to maincloud is free of charge
-- When publishing to maincloud the database dashboard will be at the url: https://spacetimedb.com/@<username>/<database-name>
-- The database owner can view utilization and performance metrics on the dashboard
-
----
-
-## Debugging Checklist
-
-1. Is SpacetimeDB server running? (`spacetime start`)
-2. Is the module published? (`spacetime publish`)
-3. Are client bindings generated? (`spacetime generate`)
-4. Check server logs for errors (`spacetime logs <db-name>`)
-5. **Is the reducer actually being called from the client?**
-
----
-
-## Editing Behavior
-
-- Make the smallest change necessary
-- Do NOT touch unrelated files, configs, or dependencies
-- Do NOT invent new SpacetimeDB APIs — use only what exists in docs or this repo
-- Do NOT add restrictions the prompt didn't ask for — if "users can do X", implement X for all users
 
 
 # SpacetimeDB TypeScript SDK
@@ -161,6 +49,81 @@ const [items, isLoading] = useTable(tables.item);
 
 ---
 
+## 1) Common Mistakes Table
+
+### Server-side errors
+
+| Wrong | Right | Error |
+|-------|-------|-------|
+| Missing `package.json` | Create `package.json` | "could not detect language" |
+| Missing `tsconfig.json` | Create `tsconfig.json` | "TsconfigNotFound" |
+| Entrypoint not at `src/index.ts` | Use `src/index.ts` | Module won't bundle |
+| `indexes` in COLUMNS (2nd arg) | `indexes` in OPTIONS (1st arg) | "reading 'tag'" error |
+| Index without `algorithm` | `algorithm: 'btree'` | "reading 'tag'" error |
+| `filter({ ownerId })` | `filter(ownerId)` | "does not exist in type 'Range'" |
+| `.filter()` on unique column | `.find()` on unique column | TypeError |
+| `insert({ ...without id })` | `insert({ id: 0n, ... })` | "Property 'id' is missing" |
+| `const id = table.insert(...)` | `const row = table.insert(...)` | `.insert()` returns ROW, not ID |
+| `.unique()` + explicit index | Just use `.unique()` | "name is used for multiple entities" |
+| Index on `.primaryKey()` column | Don't — already indexed | "name is used for multiple entities" |
+| Same index name in multiple tables | Prefix with table name | "name is used for multiple entities" |
+| `.indexName.filter()` after removing index | Use `.iter()` + manual filter | "Cannot read properties of undefined" |
+| Import spacetimedb from index.ts | Import from schema.ts | "Cannot access before initialization" |
+| Multi-column index `.filter()` | **⚠️ BROKEN** — use single-column | PANIC or silent empty results |
+| `JSON.stringify({ id: row.id })` | Convert BigInt first: `{ id: row.id.toString() }` | "Do not know how to serialize a BigInt" |
+| `ScheduleAt.Time(timestamp)` | `ScheduleAt.time(timestamp)` (lowercase) | "ScheduleAt.Time is not a function" |
+| `ctx.db.foo.myIndexName.filter()` | Use exact name: `ctx.db.foo.my_index_name.filter()` | "Cannot read properties of undefined" |
+| `.iter()` in views | Use index lookups | Severe performance issues (re-evaluates on any change) |
+| `ctx.db` in procedures | `ctx.withTx(tx => tx.db...)` | Procedures need explicit transactions |
+| `ctx.myTable` in procedure tx | `tx.db.myTable` | Wrong context variable |
+
+### Client-side errors
+
+| Wrong | Right | Error |
+|-------|-------|-------|
+| `@spacetimedb/sdk` | `spacetimedb` | 404 / missing subpath |
+| `conn.reducers.foo("val")` | `conn.reducers.foo({ param: "val" })` | Wrong reducer syntax |
+| Inline `connectionBuilder` | `useMemo(() => ..., [])` | Reconnects every render |
+| `const rows = useTable(table)` | `const [rows, isLoading] = useTable(table)` | Tuple destructuring |
+| Optimistic UI updates | Let subscriptions drive state | Desync issues |
+| `<SpacetimeDBProvider builder={...}>` | `connectionBuilder={...}` | Wrong prop name |
+
+---
+
+## 2) Table Definition (CRITICAL)
+
+**`table()` takes TWO arguments: `table(OPTIONS, COLUMNS)`**
+
+```typescript
+import { schema, table, t } from 'spacetimedb/server';
+
+// ❌ WRONG — indexes in COLUMNS causes "reading 'tag'" error
+export const Task = table({ name: 'task' }, {
+  id: t.u64().primaryKey().autoInc(),
+  ownerId: t.identity(),
+  indexes: [{ name: 'by_owner', algorithm: 'btree', columns: ['ownerId'] }]  // ❌ WRONG!
+});
+
+// ✅ RIGHT — indexes in OPTIONS (first argument)
+export const Task = table({ 
+  name: 'task',
+  public: true,
+  indexes: [{ name: 'by_owner', algorithm: 'btree', columns: ['ownerId'] }]
+}, {
+  id: t.u64().primaryKey().autoInc(),
+  ownerId: t.identity(),
+  title: t.string(),
+  createdAt: t.timestamp(),
+});
+```
+
+### Column types
+```typescript
+t.identity()           // User identity (primary key for per-user tables)
+t.u64()                // Unsigned 64-bit integer (use for IDs)
+t.string()             // Text
+t.bool()               // Boolean
+t.timestamp()          // Timestamp (use ctx.timestamp for current time)
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
