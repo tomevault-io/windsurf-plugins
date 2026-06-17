@@ -1,241 +1,159 @@
 ---
 trigger: always_on
-description: This document explains how to integrate Sainsbury's CLI into AI agent frameworks.
+description: Multi-supermarket UK grocery automation. Search, basket, delivery, and checkout across Sainsbury's, Ocado, and Tesco. Available as CLI, MCP server, or agent skill.
 ---
 
-## Agent Integration Guide
 
-This document explains how to integrate Sainsbury's CLI into AI agent frameworks.
+# UK Grocery CLI - Agent Skills
 
----
+Unified grocery automation across UK supermarkets. Use via CLI, MCP server, or as agent skills.
 
-## Supported Frameworks
-
-- ✅ **OpenClaw** / **Clawdbot** - Skills system
-- ✅ **Pi Agent** / **Mom** - Slack bot with skills
-- ✅ **Claude Desktop** - MCP server (future)
-- ✅ **Custom agents** - Any framework that can call bash
+**Location:** `{baseDir}`
 
 ---
 
-## Quick Integration
+## Per-Supermarket Skills
 
-### 1. Add as Skill
+Each supermarket has a dedicated skill file with provider-specific commands, authentication, and API details:
 
-Copy to your agent's skills directory:
+| Supermarket | Skill File | Status |
+|-------------|-----------|--------|
+| **Sainsbury's** | [`skills/sainsburys.md`](skills/sainsburys.md) | Full coverage |
+| **Tesco** | [`skills/tesco.md`](skills/tesco.md) | Full coverage + staples |
+| **Ocado** | [`skills/ocado.md`](skills/ocado.md) | Search & basket working |
+
+---
+
+## Quick Start
 
 ```bash
-cp -r sainsburys-cli /path/to/agent/skills/
+cd {baseDir}
+npm install
+npx playwright install chromium
 ```
 
-### 2. Agent Calls Commands
+### CLI Usage
 
-```typescript
-// From your agent code
-await bash("cd skills/sainsburys-cli && npm run groc search 'milk'");
+```bash
+# Search any supermarket
+npm run groc -- --provider sainsburys search "milk"
+npm run groc -- --provider tesco search "milk"
+npm run groc -- --provider ocado search "milk"
+
+# Compare across all stores
+npm run groc compare "organic eggs" --json
+
+# Provider is a flag - all commands work the same way
+npm run groc -- --provider <store> basket
+npm run groc -- --provider <store> add <id> --qty 2
+npm run groc -- --provider <store> slots
+npm run groc -- --provider <store> checkout --dry-run
 ```
 
-### 3. Parse JSON Responses
+### MCP Server Usage
 
-```typescript
-const stdout = await bash("cd skills/sainsburys-cli && npm run groc search 'milk' --json");
-const results = JSON.parse(stdout);
-
-results.products.forEach(product => {
-  console.log(`${product.name} - £${product.retail_price.price}`);
-});
+```bash
+# Start MCP server (stdio transport)
+npx tsx src/mcp-server.ts
+# Or after build:
+node dist/mcp-server.js
 ```
 
----
-
-## Skill File Format
-
-The `SKILL.md` follows the open skills format used by OpenClaw, Pi, and other agent frameworks.
-
-### Frontmatter
-
-```yaml
----
-name: sainsburys-groceries
-description: AI-powered meal planning and grocery ordering
-license: MIT
-compatibility: Node.js 18+, TypeScript, Playwright
-metadata:
-  author: zish
-  version: "2.0.0"
-allowed-tools: Bash({baseDir}/node:*), Bash(npm:run:groc:*)
----
-```
-
-### Triggers
-
-Agent should load this skill when user:
-- Mentions meal planning or groceries
-- Asks "what's for dinner?"
-- Wants to order food/shopping
-- Talks about recipes or cooking
-- Mentions Sainsbury's
-
----
-
-## Natural Language Workflow
-
-### User Intent Detection
-
-```typescript
-const intents = {
-  mealPlanning: ["plan meals", "what should I cook", "dinner ideas"],
-  shopping: ["add to basket", "order groceries", "buy milk"],
-  delivery: ["book slot", "delivery Tuesday", "checkout"],
-  query: ["what's in my basket", "show orders", "search for bread"]
-};
-
-if (userMessage.match(/plan meals|what.*cook|dinner ideas/i)) {
-  await startMealPlanning();
-}
-```
-
-### Meal Planning Flow
-
-```typescript
-async function startMealPlanning() {
-  // 1. Ask constraints
-  await ask("How many people? Budget? Dietary restrictions?");
-  
-  // 2. Suggest meals
-  const meals = await suggestMeals({
-    people: 2,
-    budget: 50,
-    dietary: ["halal"]
-  });
-  
-  // 3. Get approval
-  await showMeals(meals);
-  const approved = await waitForApproval();
-  
-  // 4. Generate shopping list
-  const ingredients = extractIngredients(approved);
-  
-  // 5. Search products
-  for (const ingredient of ingredients) {
-    const result = await bash(`cd skills/sainsburys-cli && npm run groc search "${ingredient}" --json`);
-    const products = JSON.parse(result);
-    const best = pickBestMatch(products, ingredient);
-    shoppingList.push(best);
-  }
-  
-  // 6. Show list and add to basket
-  await showShoppingList(shoppingList);
-  if (await confirm("Add to basket?")) {
-    for (const item of shoppingList) {
-      await bash(`cd skills/sainsburys-cli && npm run groc add ${item.product_uid} --qty ${item.quantity}`);
+Claude Desktop config (`claude_desktop_config.json`):
+```json
+{
+  "mcpServers": {
+    "uk-grocery": {
+      "command": "node",
+      "args": ["/path/to/uk-grocery-cli/dist/mcp-server.js"]
     }
   }
-  
-  // 7. Checkout
-  await bash(`cd skills/sainsburys-cli && npm run groc basket --json`);
-  // ... show basket, book slot, checkout
 }
 ```
 
 ---
 
-## Block Kit Integration (Slack Bots)
+## MCP Tools Reference
 
-For Slack agents like Pi/Mom, use Block Kit for rich UIs.
+All tools accept a `provider` parameter (`sainsburys`, `ocado`, `tesco`). Default: `sainsburys`.
 
-### Shopping List
+### Core Tools (all providers)
 
-```javascript
-async function showShoppingList(items, total) {
-  const blocks = [
-    {
-      "type": "header",
-      "text": {"type": "plain_text", "text": "🛒 Your Shopping List"}
-    },
-    {
-      "type": "section",
-      "text": {
-        "type": "mrkdwn",
-        "text": `*Total: £${total}* (${items.length} items)`
-      }
-    },
-    {"type": "divider"},
-    ...buildItemSections(items),
-    {
-      "type": "actions",
-      "elements": [
-        {
-          "type": "button",
-          "text": {"type": "plain_text", "text": "Add All to Basket"},
-          "action_id": "add_to_basket",
-          "style": "primary"
-        },
-        {
-          "type": "button",
-          "text": {"type": "plain_text", "text": "Modify List"},
-          "action_id": "modify_list"
-        }
-      ]
-    }
-  ];
-  
-  await sendBlocks(blocks);
-}
+| Tool | Description |
+|------|-------------|
+| `grocery_login` | Login to supermarket account |
+| `grocery_status` | Check login status across all providers |
+| `grocery_search` | Search products |
+| `grocery_compare` | Compare prices across all stores |
+| `grocery_basket_view` | View basket contents |
+| `grocery_basket_add` | Add product to basket |
+| `grocery_basket_remove` | Remove from basket |
+| `grocery_basket_update` | Update item quantity |
+| `grocery_basket_clear` | Clear basket |
+| `grocery_slots` | List delivery slots |
+| `grocery_book_slot` | Book delivery slot |
+| `grocery_checkout` | Checkout (dry_run=true by default) |
+| `grocery_orders` | View order history |
+| `grocery_providers` | List providers and login status |
 
-function buildItemSections(items) {
-  const categories = groupByCategory(items);
-  const sections = [];
-  
-  for (const [category, products] of Object.entries(categories)) {
-    const itemsText = products
-      .map(p => `• ${p.name} - £${p.price}`)
-      .join('\n');
-    
-    sections.push({
-      "type": "section",
-      "fields": [
-        {
-          "type": "mrkdwn",
-          "text": `*${category}*\n${itemsText}`
-        }
-      ]
-    });
-  }
-  
-  return sections;
-}
+### Tesco-Specific Tools
+
+| Tool | Description |
+|------|-------------|
+| `tesco_staples` | View, update, or auto-add repeat-purchase staples |
+
+---
+
+## When to Use This Skill
+
+Trigger when users:
+- Want to plan meals or order groceries
+- Ask about product prices or availability
+- Want to compare prices across supermarkets
+- Need to manage a shopping basket
+- Want to book delivery slots or checkout
+- Ask about weekly shop, meal prep, or grocery budget
+
+---
+
+## Example Agent Workflows
+
+### Meal Planning
+```bash
+# Search ingredients across stores
+npm run groc compare "chicken breast" --json
+npm run groc compare "basmati rice" --json
+
+# Add to cheapest provider
+npm run groc -- --provider tesco add PRODUCT_ID --qty 1
+npm run groc -- --provider tesco basket --json
+npm run groc -- --provider tesco checkout --dry-run
 ```
 
-### Basket Summary
+### Restock Staples (Tesco)
+```bash
+npm run groc -- --provider tesco staples --add
+npm run groc -- --provider tesco basket --json
+npm run groc -- --provider tesco checkout --dry-run
+```
 
-```javascript
-async function showBasket(basket) {
-  const blocks = [
-    {
-      "type": "section",
-      "text": {
-        "type": "mrkdwn",
-        "text": `*🛒 Your Basket*\n\n*${basket.total_quantity} items* | *£${basket.total_cost}*`
-      }
-    },
-    {"type": "divider"}
-  ];
-  
-  // Group items
-  basket.products.slice(0, 10).forEach(item => {
-    blocks.push({
-      "type": "section",
-      "text": {
-        "type": "mrkdwn",
-        "text": `*${item.quantity}x* ${item.name}\n£${item.unit_price} each`
-      },
-      "accessory": {
-        "type": "button",
-        "text": {"type": "plain_text", "text": "Remove"},
+### Price Comparison
+```bash
+npm run groc compare "organic milk" --json
+# Returns results from all providers with prices
+```
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+---
+
+## Documentation
+
+- [`skills/sainsburys.md`](skills/sainsburys.md) - Sainsbury's skill details
+- [`skills/tesco.md`](skills/tesco.md) - Tesco skill details
+- [`skills/ocado.md`](skills/ocado.md) - Ocado skill details
+- [`AGENTS.md`](AGENTS.md) - Full agent integration guide
+- [`docs/SMART-SHOPPING.md`](docs/SMART-SHOPPING.md) - Smart shopping decisions
+- [`API-REFERENCE.md`](API-REFERENCE.md) - API endpoint documentation
 
 ---
 > Source: [abracadabra50/uk-grocery-cli](https://github.com/abracadabra50/uk-grocery-cli) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-02 -->
+<!-- tomevault:4.0:windsurf_rules:2026-06-17 -->
