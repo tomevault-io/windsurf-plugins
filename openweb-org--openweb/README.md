@@ -7,14 +7,14 @@ Agent-native way to access any website. Bridging agent CLI and web GUI through A
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `GEMINI.md` in [openweb-org/openweb](https://github.com/openweb-org/openweb).
+Original source: `AGENTS.md` in [openweb-org/openweb](https://github.com/openweb-org/openweb).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
+- **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
 Available for 6 platforms including Claude Code, Cursor, Windsurf, and more. Source: [github.com/openweb-org/openweb](https://github.com/openweb-org/openweb)
