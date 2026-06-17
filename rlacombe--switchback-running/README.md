@@ -7,14 +7,14 @@ Ultrarunning training companion agent powered by Intervals.icu.
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `GEMINI.md` in [rlacombe/switchback-running](https://github.com/rlacombe/switchback-running).
+Original source: `AGENTS.md` in [rlacombe/switchback-running](https://github.com/rlacombe/switchback-running).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
+- **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
 From [rlacombe/switchback-running](https://github.com/rlacombe/switchback-running) — a repo with 10+ stars on GitHub.
