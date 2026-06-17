@@ -4,166 +4,336 @@ description: FC 语言完整语法和 API 参考
 ---
 
 
-# FC 语言 Import 映射表
+# FC 语言完整编程参考
 
-使用原则：每次使用函数前，查询此表补充 import 语句
+基于 Free Fire Craftland 官方文档: https://ffcraftland.garena.com/en/docs/api
 
 ---
 
-## 核心规则
+## 核心语法差异（重要）
 
-### 必须 Import 的情况
-1. 非 StdLibrary 的函数 - 必须查表并添加 import
-2. 非 StdLibrary 的事件 - 必须查表并添加 import（重要！）
-3. List、Map 操作 - 必须 import 对应库
-4. 数学计算函数 - 必须 import "Math.fcc"
-5. 物理检测函数 - 必须 import "Physics.fcc"
-6. 战斗相关函数 - 必须 import "Combat.fcc"
+### 组件访问语法
 
-### 无需 Import 的情况
-1. StdLibrary 内置函数 - 如 LogInfo(), WaitForMillisecond(), GetAllPlayers()
-2. StdLibrary 内置事件 - 如 OnAwake(), OnGameStart(), OnUpdate(), OnDestroy()
-3. 语言关键字和基本类型 - 如 Vector3, Quaternion, bool, int
-4. 编辑器生成的枚举/资源 - 使用 import "EditorGenLib.fcc"
-
-### 事件 Import 示例
+**正确模式：**
 ```fc
-// 错误：缺少 import
-graph ButtonHandler {
-    event OnTapped(player entity<Player>) {  // 错误：OnTapped 需要 import "Hud.fcc"
-        LogInfo("Button tapped")
+thisEntity<Transform>.Position = Vector3{0, 1, 0}
+player<Player>.Health = 100.0
+enterEntity<Entity>.Name
+```
+
+**错误模式（禁止）：**
+```fc
+thisEntity.Transform.Position      // 错误：不能用点号
+player.Health                      // 错误：缺少尖括号
+entity<Transform>.Position         // 错误：entity是类型不是实例
+```
+
+**记忆口诀：** 实例<组件>.属性
+
+**高频组件：**
+```fc
+thisEntity<Transform>.Position    // Vector3
+thisEntity<Transform>.Rotation    // Quaternion
+player<Player>.Health             // float
+player<Player>.Name               // string
+thisEntity<Entity>.Active         // bool
+```
+
+**类型转换示例：**
+```fc
+event OnEntityEnter(enterEntity entity<Entity>) {
+    if HasComponent(enterEntity, typeof(Player)) {
+        var player = enterEntity<Player>
+        var playerName = player<Player>.Name
+        LogInfo("玩家进入: " + playerName)
     }
 }
+```
 
-// 正确：添加 import
+---
+
+## 目录
+
+1. 核心概念
+2. 语法参考
+3. 类型系统
+4. 内置库API参考
+5. 组件系统
+6. 事件系统
+7. 编程模式
+
+---
+
+## 核心概念
+
+### FC 语言设计理念
+FC（Free Fire Code Language）是面向数据设计的 DSL，用于 Free Fire UGC 游戏开发。
+
+特点：
+- 面向数据设计（而非面向对象）
+- 实体-组件架构（Entity-Component）
+- 强类型系统
+- 异步编程支持
+- 跨平台兼容
+
+### 文件类型
+
+| 扩展名 | 类型 | 用途 |
+|--------|------|------|
+| .fcc | 库定义文件 | 定义组件、类型、API、事件、枚举 |
+| .fcg | 脚本逻辑文件 | 编写 graph、变量、函数、事件处理 |
+
+### 平台声明
+
+```fc
+// 客户端脚本
+[platform_client]
+graph ClientScript { }
+
+// 服务端脚本（默认）
+[platform_server]
+graph ServerScript { }
+```
+
+---
+
+## 语法参考
+
+### 导入系统
+
+```fc
+// 导入内置库
 import "StdLibrary.fcc" as std
-import "Hud.fcc" as hud                      // 添加 import
+import "List.fcc" as list
+import "Math.fcc" as math
 
-graph ButtonHandler {
-    event OnTapped(player entity<Player>) {  // 正确
-        LogInfo("Button tapped")
+// 导入编辑器生成库
+import "EditorGenLib.fcc" as gen
+
+// 导入用户自定义库
+import "MyCustomLib.fcc" as MyLib
+```
+
+### 变量声明
+
+```fc
+// 局部变量
+var num int = 10
+var name = "Player"     // 类型推断
+var pos Vector3         // 未初始化
+
+// 脚本成员变量
+graph MyGraph {
+    PlayerCount int = 0
+    GameStarted bool = false
+}
+```
+
+### 函数定义
+
+```fc
+// 普通函数
+func Add(a int, b int) int {
+    return a + b
+}
+
+// 异步函数
+async func DelayedAction(delay int, out var result string) {
+    WaitForMillisecond(delay)
+    result = "完成"
+}
+
+// 无返回值函数
+func LogMessage(msg string) {
+    LogInfo(msg)
+}
+```
+
+### 流程控制
+
+```fc
+// 条件语句
+if health > 50 {
+    LogInfo("健康")
+} else if health > 20 {
+    LogInfo("一般")
+} else {
+    LogInfo("危险")
+}
+
+// for 循环（左闭右开区间）
+for i = 0, 10, 1 {
+    LogInfo("计数: " + i)
+}
+
+// for range 循环
+for index, value in myList {
+    LogInfo("索引: " + index + ", 值: " + value)
+}
+
+// while 循环
+while playerCount < maxPlayers {
+    SpawnPlayer()
+    playerCount = playerCount + 1
+}
+```
+
+### 异步编程
+
+```fc
+graph AsyncExample {
+    event OnGameStart() {
+        // 等待异步完成
+        wait DelayedSpawn(3000, out var success)
+        
+        // 异步执行，不等待
+        start BackgroundTask()
+    }
+    
+    async func DelayedSpawn(delay int, out var success bool) {
+        WaitForMillisecond(delay)
+        success = true
     }
 }
 ```
 
 ---
 
-## 函数到库映射表
+## 类型系统
 
-### List 操作（List.fcc）
+### 基本类型
+
+| 类型 | 描述 | 示例 |
+|------|------|------|
+| bool | 布尔类型 | true, false |
+| int | 32位整型 | 42, -10 |
+| int64 | 64位整型 | 9223372036854775807 |
+| float | 单精度浮点 | 3.14, -0.5 |
+| string | 字符串 | "Hello World" |
+| LocString | 本地化字符串 | 多语言文本 |
+
+### 数学类型
+
 ```fc
-import "List.fcc" as list
+// 向量类型
+var pos2D Vector2 = Vector2{1.0, 2.0}
+var pos3D Vector3 = Vector3{1.0, 2.0, 3.0}
 
-New()           → list.New(length, capacity)
-Append()        → list.Append(targetList, value)
-Length()        → list.Length(targetList)
-RemoveAt()      → list.RemoveAt(targetList, index)
-Clear()         → list.Clear(targetList)
-Reverse()       → list.Reverse(targetList)
-Clone()         → list.Clone(targetList)
-Insert()        → list.Insert(targetList, index, value)
-Shuffle()       → list.Shuffle(targetList)
-IsEqual()       → list.IsEqual(listA, listB)
-Contain()       → list.Contain(targetList, value)
-AppendRange()   → list.AppendRange(targetList, sourceList)
-Remove()        → list.Remove(targetList, value)
-IndexOf()       → list.IndexOf(targetList, value)
-LastIndexOf()   → list.LastIndexOf(targetList, value)
-Max()           → list.Max(targetList, out isSuccess, out result)
-Min()           → list.Min(targetList, out isSuccess, out result)
+// 四元数（旋转）
+var rotation Quaternion = Quaternion{0.0, 0.0, 0.0, 1.0}
+
+// 访问分量
+var x = pos3D.X
+var y = pos3D.Y
+var z = pos3D.Z
 ```
 
-### Map 操作（Map.fcc）
-```fc
-import "Map.fcc" as map
+### 容器类型
 
-New()           → map.New()
-Remove()        → map.Remove(targetMap, key)
-Clear()         → map.Clear(targetMap)
-Length()        → map.Length(targetMap)
-ContainKey()    → map.ContainKey(targetMap, key)    // 也可用内置的 ContainKey()
-GetAllKeys()    → map.GetAllKeys(targetMap)
+```fc
+// 列表
+var numbers List<int> = List<int>{}
+numbers.Add(1)
+numbers.Add(2)
+
+// 映射
+var playerScores Map<string, int> = Map<string, int>{}
+playerScores["Player1"] = 100
+playerScores["Player2"] = 85
 ```
 
-### 数学运算（Math.fcc）
+### 实体类型
+
+```fc
+// 泛型实体类型
+var player entity<Player>
+var box entity<LevelObject>
+
+// 访问组件
+var playerName = player<Entity>.Name
+var boxPosition = box<Transform>.Position
+
+// 当前实体
+var currentPos = thisEntity<Transform>.Position
+```
+
+---
+
+## 内置库 API 参考
+
+### 核心库 (StdLibrary)
+
+```fc
+// 日志函数
+LogInfo(content object)
+LogWarning(content object)
+LogError(content object)
+
+// 时间函数
+WaitForMillisecond(time int)
+WaitForSecond(time float)
+WaitForFrame(frameCount int)
+
+// 时间获取
+GetCurrentTimestamp() int64
+GetGameTime() float
+```
+
+### 数学库 (Math)
+
 ```fc
 import "Math.fcc" as math
 
-// 常量
-NaturalConstantType.Pi  → 3.14159265
-NaturalConstantType.E   → 2.71828183
-
 // 随机数
-RandomInt()             → math.RandomInt(min, max)
-RandomFloat()           → math.RandomFloat(min, max)
-CreateRandomSeed()      → math.CreateRandomSeed(seed)
-Next()                  → math.Next(randomGen, min, max)
+math.RandomInt(min, max) int
+math.RandomFloat(min, max) float
 
 // 基础数学
-Abs()                   → math.Abs(value)
-Sqrt()                  → math.Sqrt(value)
-Negate()                → math.Negate(value)
-Floor()                 → math.Floor(value)
-Ceil()                  → math.Ceil(value)
-Round()                 → math.Round(value)
-Max()                   → math.Max(a, b)
-Min()                   → math.Min(a, b)
-Clamp()                 → math.Clamp(value, min, max)
-Lerp()                  → math.Lerp(a, b, t)
+math.Abs(value) Number
+math.Sqrt(value) float
+math.Max(a, b) Number
+math.Min(a, b) Number
+math.Clamp(value, min, max) Number
 
 // 三角函数
-Sin()                   → math.Sin(degree)
-Cos()                   → math.Cos(degree)
-Tan()                   → math.Tan(degree)
-ASin()                  → math.ASin(value)
-ACos()                  → math.ACos(value)
-ATan2()                 → math.ATan2(y, x)
-
-// 幂运算
-Exponentiation()        → math.Exponentiation(base, exponent)
-Logarithm()             → math.Logarithm(baseValue, realNumber)
+math.Sin(degree) float
+math.Cos(degree) float
+math.Tan(degree) float
 
 // Vector3 运算
-Dot()                   → math.Dot(vecA, vecB)
-Cross()                 → math.Cross(vecA, vecB)
-Normalize()             → math.Normalize(vec)
-Magnitude()             → math.Magnitude(vec)
-Distance()              → math.Distance(vecA, vecB)
-Angle()                 → math.Angle(vecA, vecB)
-Projection()            → math.Projection(vecA, vecB)
-LerpVector3()           → math.LerpVector3(vecA, vecB, t)
-SlerpVector3()          → math.SlerpVector3(vecA, vecB, t)
-Vector3Reflect()        → math.Vector3Reflect(direction, normal)
-
-// Vector2 运算
-Vector2Dot()            → math.Vector2Dot(vecA, vecB)
-Vector2Distance()       → math.Vector2Distance(vecA, vecB)
-Vector2Angle()          → math.Vector2Angle(vecA, vecB)
-Vector2Normalize()      → math.Vector2Normalize(vec)
-Vector2Magnitude()      → math.Vector2Magnitude(vec)
-Vector2Reflect()        → math.Vector2Reflect(direction, normal)
+math.Dot(vecA, vecB) float
+math.Cross(vecA, vecB) Vector3
+math.Normalize(vec) Vector3
+math.Distance(vecA, vecB) float
+math.LerpVector3(a, b, t) Vector3
 
 // 四元数运算
-QuaternionToEulerAngle()    → math.QuaternionToEulerAngle(quat)
-EulerAngleToQuaternion()    → math.EulerAngleToQuaternion(euler)
-AxisAngleToQuaternion()     → math.AxisAngleToQuaternion(axis, angle)
-QuaternionToAxisAngle()     → math.QuaternionToAxisAngle(quat, out axis, out angle)
-MultiplyQuaternion()        → math.MultiplyQuaternion(quatA, quatB)
-LookRotation()              → math.LookRotation(forward, upward)
-SlerpQuaternion()           → math.SlerpQuaternion(quatA, quatB, t)
-QuaternionAngle()           → math.QuaternionAngle(quatA, quatB)
-QuaternionDot()             → math.QuaternionDot(quatA, quatB)
-QuaternionInverse()         → math.QuaternionInverse(quat)
-QuaternionFromToRotation()  → math.QuaternionFromToRotation(from, to)
-QuaternionRotateTowards()   → math.QuaternionRotateTowards(from, to, maxDegrees)
-RotateVector()              → math.RotateVector(vec, deltaQuat)
-
-// 方向转换
-DirectionToEulerAngle()     → math.DirectionToEulerAngle(direction)
+math.QuaternionToEulerAngle(quat) Vector3
+math.EulerAngleToQuaternion(euler) Quaternion
+math.LookRotation(forward, upward) Quaternion
 ```
 
-### 字符串操作（Strings.fcc）
+### 物理库 (Physics)
+
 ```fc
+import "Physics.fcc" as physics
+
+// 射线检测
+physics.SingleRaycast(startPos, direction, distance, layerMask, includeTrigger, out hitEntity, out hitPoint, out hitDistance, out hitNormal)
+
+// 区域检测
+physics.BoxOverlap(halfExtents, center, rotation, layerMask, includeTrigger, out hitEntities)
+physics.SphereOverlap(radius, center, layerMask, includeTrigger, out hitEntities)
+
+// 区域判断
+physics.IsInsideSphere(entity, center, radius) bool
+physics.IsInsideBox(entity, center, length, width, height, rotation) bool
+
+// 刚体力学
+physics.AddForce(target, force, forceMode)
+physics.AddTorque(target, torque, forceMode)
+```
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
