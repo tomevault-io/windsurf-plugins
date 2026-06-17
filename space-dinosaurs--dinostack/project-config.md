@@ -1,38 +1,67 @@
 ---
 trigger: always_on
-description: Agentic engineering delegation model, risk classification, task decomposition, and worktree lifecycle. Core rules for when to act directly vs. spawn Workers and Skeptics.
+description: Code quality gates, tool discipline, package management, and browser verification for software engineering tasks.
 ---
 
 
-## Activation preflight
+## Documentation Lookups
 
-Run this check once at the top of the first skill invocation in a session (and at the top of every `/`-command in `content/commands/`). It is fast, silent when active, and governs whether the methodology runs at all in the current project. Keep it to three file reads with no subagent spawn and no LLM reasoning. **Exception:** Step 6 (Scaffolding-sync check) is the single authorized side-effecting exception to this invariant. It calls `bin/agentic-migrate` as a bounded shell-out; the binary is methodology-owned, failure is swallowed, and it never blocks activation.
+**When investigating, diagnosing, or reasoning about library, framework, or SDK behavior, look up current documentation using Context7 before forming conclusions.** Training data may be outdated - API signatures, configuration options, default behaviors, and error messages change across versions.
 
-1. **Read the global mode, profile, and preset.** Load `~/.claude/agentic-engineering.json`. If missing or unreadable, assume `mode=opt-out`, `profile=default`, and `preset=null` (back-compat). Expected shape: `{ "mode": "opt-out" | "opt-in", "profile": "relaxed" | "default" | "strict", "preset": "lean" | "standard" | "strict" | null, "set_at": "<ISO8601>" }`. Any `mode` value other than `opt-in` is treated as `opt-out`. Any `profile` value other than `relaxed` or `strict` is treated as `default`. The `preset` field is optional; when present and non-null, it RESOLVES to a profile via the preset table below and overrides the direct `profile` field. When `preset` is null or missing, the direct `profile` field is used (back-compat).
+Use Context7 (`resolve-library-id` -> `query-docs`) for:
+- Verifying API signatures, method parameters, or return types
+- Checking configuration options or default values
+- Understanding error messages or behavioral changes across versions
+- Any assumption about library behavior that influences a diagnosis or recommendation
 
-   Also read the **effective identity** for this session. Check `<cwd>/.agentic/identity.yml` first, then fall back to `~/.agentic/identity.yml`. Use the first file that exists, resolving by the 4-tier confirmation ordering: project-confirmed > global-confirmed > project-provisional > global-provisional > none. In practice this is a two-file read: if the project file exists and is confirmed (no `provisional: true`), use it. If the project file is provisional, also read the global file; if the global is confirmed, prefer the global. Otherwise use the project file. Record `developer_id` and `provisional` from whichever file wins. Absent file or absent `provisional` field = confirmed identity (Python `.get('provisional', False)`; JS `provisional === true`). **This is a read-only field parse - no prompt, no shell-out, no LLM reasoning. The "fast, silent" preflight invariant is preserved.** When `provisional: true` is recorded on the effective identity, the conductor surfaces a non-blocking confirmation notice at its first user-facing turn (see §Session Context and Memory in `content/rules/conventions.md`).
+Do not rely on training knowledge for library-specific details when Context7 is available. This applies to all agents: investigators, debuggers, architects, and engineers.
 
-   **Preset table (session-wide risk profile preset):**
+## Tool Discipline
 
-   | Preset    | Resolves to profile |
-   |-----------|---------------------|
-   | lean      | relaxed             |
-   | standard  | default             |
-   | strict    | strict              |
+**Never use Bash to read files, list directories, or search content.** Use the dedicated tools - they don't trigger permission prompts and give better output:
+- Read files: `Read` tool (never `cat`, `head`, `tail`, `sed`)
+- List/find files: `Glob` tool (never `ls`, `find`)
+- Search content: `Grep` tool (never `grep`, `rg`)
 
-   Note: this session-wide `preset` field is distinct from the per-spawn `Preset:` declaration introduced in the Tier declaration section below. The session-wide preset is a tone setting; the per-spawn preset is a capability bundle. Both terms use "preset" intentionally - context disambiguates.
-2. **Read the project marker.** Look for a root `AGENTS.md` in the current working directory. If the project uses the Claude Code `@AGENTS.md` import pattern, `CLAUDE.md` will point at it - resolve through to the actual `AGENTS.md`. If neither file exists, treat marker as `none`.
-3. **Scan for marker lines.** Case-insensitive, whole-line match (allow leading or trailing whitespace, and an optional markdown list prefix `- `):
-   - `agentic-engineering: opt-in`
-   - `agentic-engineering: opt-out`
-   If both appear, the one that appears FIRST wins; print a one-line warning: `agentic-engineering: both opt-in and opt-out markers found in AGENTS.md - using the first one (<value>). Remove the duplicate.`
-   Also scan for `agentic-engineering-profile: <value>`. If present, it overrides the global profile. Valid values: `relaxed`, `default`, `strict`. Any other value falls back to the global profile.
-   Also scan for `agentic-engineering-preset: <value>`. If present, it overrides the resolved global preset for this project. Valid values: `lean`, `standard`, `strict`. The project preset is resolved through the same preset table (above) to a profile; that resolved profile overrides any direct `agentic-engineering-profile:` line in the same file (preset wins on collision because it is the higher-level knob). Any other value falls back to the global preset/profile resolution.
-4. **Activation decision.**
-   - `mode=opt-out` AND `marker=opt-out` - skill no-ops silently; fall back to default Claude Code behavior for this session.
-   - `mode=opt-in` AND `marker != opt-in` - skill no-ops silently; fall back to default behavior.
-   - Any other combination (including `marker=none` with `mode=opt-out`, or `marker=opt-in` with `mode=opt-in`) - proceed with the methodology.
-5. **First-activation notice (one-time, per-project, TTY-only).** Triggered only when Step 4 resolved to active (any proceed branch). Otherwise skip this step entirely.
+Reserve `Bash` exclusively for: builds, installs, git operations, network calls, process management, and anything no dedicated tool covers.
+
+Exception: `sg` (AST-grep) for structural symbol-level searches is run via Bash - no dedicated harness tool wraps it. Check availability with `which sg 2>/dev/null` before use.
+
+## Context Window Management
+
+**When `ctx_execute` or `ctx_batch_execute` MCP tools are available, prefer them over raw `Bash` for any operation expected to produce more than ~20 lines of output.** Raw Bash output enters the context window in full; context-mode tools sandbox execution into isolated subprocesses and only let stdout enter context - reducing context consumption by up to 98%.
+
+Key tools and their uses:
+- `ctx_execute(language, code)` - run a single script; only stdout enters context
+- `ctx_execute_file(path, language, code)` - analyze a file for inspection only; use `Read` instead when you intend to subsequently `Edit` the file
+
+> Never use `ctx_execute` or `ctx_execute_file` to create or modify files - these tools are for analysis, processing, and computation only. Use the native `Write`/`Edit` tools for all file writes.
+
+- `ctx_batch_execute(commands, queries)` - run multiple commands and search results in one call; replaces 10-30 Bash + search steps
+- `ctx_index(content, source)` / `ctx_search(queries)` - build and query a knowledge base from arbitrary content
+- `ctx_fetch_and_index(url, source)` - fetch a URL, index it, cache for 24 hours
+
+> When ctx tools are available, prefer `ctx_fetch_and_index` over `WebFetch` for URL fetches - `WebFetch` pulls full page content into context.
+
+**Raw Bash remains appropriate per the Tool Discipline rule above** - `git`, builds, installs, process management, and any operation that needs direct filesystem side effects.
+
+**Platform support:** fully supported on Claude Code, Cursor, Codex CLI, OpenCode, Kimi, and oh-my-pi. The tools are available when `ctx_execute` is present as a callable tool in the session. When unavailable, fall back to the `Read`/`Grep`/`Glob` discipline above.
+
+## Module Manifests
+
+**Non-trivial modules should carry a manifest header.** Any source file that exports a public symbol consumed by another module, is over ~50 lines of non-trivial logic, or implements a side-effecting operation (network, disk, database, external service) is encouraged to include a manifest comment or docstring at the top of the file. See `content/rules/module-manifest.md` for required fields, examples, and exemptions. Skeptic applies tiered enforcement: missing manifests are **Minor** (does not block sign-off), stale manifests are **Major** (blocks sign-off absent a compelling documented reason to defer), and stale manifests whose inaccuracy could mislead a caller on a correctness or security path are **Critical**. See `content/rules/module-manifest.md` for the full policy.
+
+## DRY and Abstraction
+
+**Do not Repeat Yourself. Engineers must actively scan their own output for duplication before declaring work complete.**
+
+- **Repeated logic** — any block that appears more than once with identical or near-identical structure must be extracted into a helper, utility, or shared component.
+- **Copy-paste with tweaks** — copying code and changing only names or constants is a strong signal for abstraction, not a valid implementation strategy.
+- **Existing utilities first** — before writing new code, grep the codebase for functions that already solve the sub-problem. Prefer calling an existing utility over reimplementing it.
+- **Follow established patterns** — if the codebase has a convention for this class of problem (validation schemas, error wrappers, React hooks, data transformers), use it.
+- **Intentional exceptions** — if duplication is genuinely appropriate (the two paths are about to diverge significantly, or extraction would obscure meaning), state the reason explicitly in the output.
+
+The Skeptic review layer enforces this: duplication and missed abstractions are **Major** findings that block sign-off unless justified.
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
