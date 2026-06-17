@@ -3,41 +3,25 @@ trigger: always_on
 description: 当用户输入中明确提及 MVU 时, 你应该参考本文件
 ---
 
-# MVU 变量框架
+# MVU 角色卡文件夹
 
-MVU 变量框架是一个独立的酒馆助手脚本. 它作用于消息楼层变量, 允许酒馆角色卡作者在世界书中设置消息楼层变量, 在世界书或聊天记录中初始化消息楼层变量, 及用 AI 输出更新消息楼层变量.
+MVU 角色卡文件夹提供了一种存储酒馆角色卡内容的文件结构:
 
-`@types/iframe/exported.mvu.d.ts` 中定义了 MVU 变量框架的接口. 如果提及到 "MVU 变量" 而非仅仅提及 "变量", 则应该优先使用 MVU 变量框架的接口.
+- `角色卡/脚本/*/` 中是角色卡的所有脚本项目
+- `角色卡/界面/*/` 中是角色卡的所有前端界面项目
+- `角色卡/世界书/*/` 中是角色卡的世界书条目, 即角色卡的设定提示词, 编写角色卡其他内容时需要参考它来了解角色世界设定
+- `角色卡/schema.ts` 中是用 zod 4 库书写的角色卡 MVU 变量结构定义
+  - 提供给脚本、前端界面导入使用
+  - 会在 `pnpm build` 或 `pnpm watch` 时生成对应的 json schema 文件 `角色卡/schema.json`, 便于编写变量初始值文件 initvar.yaml `# yaml-language-server: $schema=schema文件路径`
+- `角色卡/界面/store.ts` 中是 pinia 预先写好的获取角色卡消息楼层 MVU 变量方式, 提供给所有前端界面导入使用
 
-## 使用
+当玩家要求编写 MVU 角色卡的脚本、前端界面时, 除了参考`初始模板/脚本`或`初始模板/前端界面`外, 你还应该参考`初始模板/角色卡`中的脚本和前端界面模板.
 
-对于使用了 MVU 的脚本或前端界面, **你必须在代码加载时, 在顶部执行以下代码**:
+**要区分单独的脚本、前端界面和为 MVU 角色卡增补脚本、前端界面, 如果用户只是想要编写单独的脚本、前端界面, 则不应参考这个文件.**
 
-- 使用 `await waitGlobalInitialized('Mvu');` 等待 MVU 变量框架初始化完成, **从而能够使用 `Mvu` 这个对象** (接下来的示例中, 我会在开头都等待 MVU 变量框架初始化来提醒你这一点, 但**你在实际编写时只需要在代码顶部等待一次)**;
-- 如果是前端界面, 使用 `await waitUntil(() => _.has(getVariables({type: 'message'}), 'stat_data'));` 等待所在消息楼层变量有被正确设置, **从而能够使用消息楼层变量**;
-- 如果是脚本, 合理使用 `waitUntil` 等待变量被正确设置.
+## MVU 变量结构
 
-## 数据存储
-
-MVU 将变量数据存储在 `_.get(某楼层变量, 'stat_data')` 中, 如 `_.get(Mvu.getMvuData({type: 'message', message_id: 5}), 'stat_data')`.
-
-```ts
-await waitGlobalInitialized('Mvu');
-
-// 获取第 5 楼的 MVU 变量
-const variables = Mvu.getMvuData({ type: 'message', message_id: 5 });
-const stat_data = _.get(variables, 'stat_data');
-
-// 获取倒数第二楼的 MVU 变量
-const variables = Mvu.getMvuData({ type: 'message', message_id: -2 });
-const stat_data = _.get(variables, 'stat_data');
-
-// 在前端界面中, 获取前端界面所在楼层的 MVU 变量
-const variables = Mvu.getMvuData({ type: 'message', message_id: getCurrentMessageId() });
-const stat_data = _.get(variables, 'stat_data');
-```
-
-此外, 你应该总是查找用户是否在编写区域内提供了变量结构定义 `schema.ts`, 其内使用 zod 4 定义了 stat_data 字段的类型, 例如:
+MVU 使用 zod 4 库书写变量结构定义, 这对应于`角色卡/schema.ts`, 例如:
 
 ```ts
 export const Schema = z.object({
@@ -45,182 +29,39 @@ export const Schema = z.object({
 });
 ```
 
-则获取 MVU 变量时应该:
+你应该要求用户提供变量结构文件或者自行编写, 它应该遵循以下要求:
 
-```ts
-await waitGlobalInitialized('Mvu');
-const variables = Mvu.getMvuData({ type: 'message', message_id: getCurrentMessageId() });
-const stat_data = Schema.parse(_.get(variables, 'stat_data'));
+```yaml
+rule:
+  - libraries: "`z` from zod and `_` from lodash are available by default, so you can use them directly and should prefer to use them; don't import them in the generated code"
+  - zod 4: stick to use zod 4.x, never ever use `.passthrough` or `.strict`!
+  - idempotent operation: the schema is intended to parse the updates of the world status incrementally, thus, the output of `Schema.parse(input)` must be a valid input of `Schema.parse` itself; that is, you should use z.transform carefully, keeping `Schema.parse(Schema.parse(input))` equal to `Schema.parse(input)`
+  - for number schema: prefer `z.coerce.number()` over `z.number()` whenever you expect a number since it will try to convert the input to a number if it's not a number; but don't use other `z.coerce.xxx()` such as `z.coerce.boolean()`, just use `z.boolean()` directly
+  - prefer object schema over array schema: "the array index is hard to understand and maintain, so you should use `物品栏: z.record(z.string().describe('物品名'), z.object({ 描述: z.string(), ... }))` instead of `物品栏: z.array(z.object({ 名称: z.string(), 描述: z.string(), ... }))`"
+  - for object schema:
+      - fixed required keys + the same type: use `z.record(z.enum(['key1', 'key2', ...]), ${value type})`
+        fixed optional keys + the same type: use `z.partialRecord(z.enum(['key1', 'key2', ...]), ${value type})`
+        dynamic optional keys + the same type: use `z.record(z.string(), ${value type})`
+        fixed required keys + different types: 'use `z.object({ key1: ${type1}, key2: ${type2}, ... })`'
+        dynamic keys but some keys are required + the same type: 'use `z.intersection(z.object({ requiredKey1: ${type1}, requiredKey2: ${type2}, ... }), z.record(z.string(), ${value type}))`'
+      - on clearable object: 'if the object is clearable by JSON patch `{ "op": "remove", "path": "/path/to/object" }`, set `z.object({ ...prefault for every field }).prefault({})` instead of `z.object({ ... }).optional()` for better compatibility with the incremental update'
+  - for special format (rare to happen): prefer `z.templateLiteral` over regex or manual parsing
+  - for restrictions: when accepting a update that breaks the schema, users are tend to expect the update takes some effect instead of being discarded completely; therefore, you should try your best to use `z.transform` to convert the broken input to a valid input. For example, if Explorer requests a value to be between 0 and 100, prefer `z.number().transform(value => _.clamp(value, 0, 100))` over `z.number().min(0).max(100)`; if an object could only contain 10 keys, when a new key comes, discard the oldest key instead. **but only impose these restrictions when Explorer requests**
+  - on default value:
+      - prefer `z.prefault` over `z.default`
+      - if a `z.object` or the whole Schema is complicated enough, set `.prefault('${suitable default value}')` or `.or(z.literal('待初始化')).prefault('待初始化')` for every field of it
+      - don't set `z.prefault` for other situatioins unless Explorer requests it
+  - when to describe: use `z.describe` only when there's no field name to explain the usage of the schema such as the key type of `z.record`; in contrast, you should never use `z.describe` if the field name has already explained the usage well
+  - determine the order of keys: 'if Explorer requests you to do something with the insertion time of keys, prefer to use `_(data).entries()` which almost always lists keys in insertion order, e.g. you can remove old keys with a simple `_(data).entries().takeRight(10)`; when keys are already additionally sorted inside `z.transform`, you should use `$time: z.coerce.number().prefault(() => Date.now())` to automatically assign a timestamp'
+  - don't repeat yourself: merge the same variable schemas whenever possible, but don't define extra variables to do so - you can only define schema inside `export const Schema = z.object({ ... })`
+  - type of functions:
+      - '`registerMvuSchema = (schema: z.ZodObject | (() => z.ZodObject)) => void`, the function input `() => z.ZodObject` could be used when the schema is not ready at the time of registering, or the schema depends on runtime data/function'
+      - '`z.transform(value => value)`'
+      - '`z.prefault/z.catch(value | () => value)`'
+  - REPEAT: DON'T mark any variable as optional or impose any restriction to the schema unless Explorer requests them
 ```
 
-如果编写区域内没有 `schema.ts`, 应该让用户将变量结构定义发送给你, 并去除开头的 `import` 和结尾的 `$(...)`:
-
-```ts
-// ⬇️应该去除
-import { registerMvuSchema } from 'https://testingcf.jsdelivr.net/gh/StageDog/tavern_resource/dist/util/mvu_zod.js';
-
-export const Schema = z.object({
-  好感度: z.coerce.number().transform(value => _.clamp(value, 0, 100)),
-});
-
-// ⬇️应该去除
-$(() => {
-  registerMvuSchema(Schema);
-});
-```
-
-## 自行解析变量
-
-当酒馆因用户输入或 AI 输出等而产生新消息楼层时, MVU 会自动解析消息字符串中的 MVU 命令, 并根据它更新消息楼层变量. 但通过 `generate` 等接口自行生成 AI 输出时, 不会产生新消息楼层, 因此不会自动解析 MVU 命令.
-
-为此, MVU 提供了 `parseMessage` 接口用于自行解析包含 MVU 命令的消息字符串. 它读取旧变量情况和一个消息字符串, 得到更新后的变量结果.
-
-为了更好的细粒度控制, 解析不会将结果写回消息楼层. 如果需要写回, 则应执行 `Mvu.replaceMvuData`.
-
-```ts
-await waitGlobalInitialized('Mvu');
-
-// 获取旧变量
-const old_data = Mvu.getMvuData({ type: 'message', message_id: getCurrentMessageId() });
-
-// 请求 AI 生成
-const content = await generate({ user_input: '你好' });
-
-// 解析生成结果
-const new_data = await Mvu.parseMessage(content, old_data);
-
-// 将更新后的变量写回楼层
-await Mvu.replaceMvuData(new_data, { type: 'message', message_id: getCurrentMessageId() });
-```
-
-## 事件
-
-MVU 还提供了一些事件 (`Mvu.events.xxx`), 用于监听变量变化并在那时调整变量或执行其他功能.
-
-### COMMAND_PARSED: 变量更新命令解析完成
-
-通过监听 "变量更新命令解析完成" 事件 (`Mvu.events.COMMAND_PARSED`), 你可以获取到对应的变量更新命令, 并对其进行修复.
-
-例如, 修复 gemini 在中文间加入的 `-`, 如将`角色.络-络`修复为`角色.络络`:
-
-```js
-await waitGlobalInitialized('Mvu');
-eventOn(Mvu.events.COMMAND_PARSED, commands => {
-  commands.forEach(command => {
-    command.args[0] = command.args[0].replaceAll('-', '');
-  });
-});
-```
-
-又比如, 将繁体字修复为简体字, 如将`絡絡`修复为`络络`:
-
-```js
-import { toSimplified } from 'chinese-simple2traditional';
-
-await waitGlobalInitialized('Mvu');
-eventOn(Mvu.events.COMMAND_PARSED, commands => {
-  commands.forEach(command => {
-    command.args[0] = toSimplified(command.args[0]);
-  });
-});
-```
-
-### VARIABLE_UPDATE_ENDED: 变量更新结束
-
-通过监听 "变量更新结束" 事件 (`Mvu.events.VARIABLE_UPDATE_ENDED`), 你可以获取到更新前后的变量, 可以对更新结果进行额外处理.
-
-比如, 我们可以这样弹窗显示更新前后的变量值:
-
-```js
-await waitGlobalInitialized('Mvu');
-eventOn(Mvu.events.VARIABLE_UPDATE_ENDED, (new_variables, old_variables) => {
-  toastr.info(`更新前的白娅依存度是: ${_.get(old_variables, 'stat_data.白娅.依存度')}`);
-  toastr.info(`更新后的白娅依存度是: ${_.get(new_variables, 'stat_data.白娅.依存度')}`);
-});
-```
-
-或者, 我们可以这样修改更新后的变量值:
-
-```js
-await waitGlobalInitialized('Mvu');
-eventOn(Mvu.events.VARIABLE_UPDATE_ENDED, variables => {
-  // 不管更新成了多少, 强行把白娅依存度改成 0
-  _.set(variables, 'stat_data.白娅.依存度', 0);
-});
-```
-
-由此我们可以做非常多功能.
-
-其中一些是在 `schema.ts` 中能用 zod 4 直接做到的:
-
-::::{tabs}
-
-:::{tab} 限制依存度在 0 和 100 之间
-
-```js
-await waitGlobalInitialized('Mvu');
-eventOn(Mvu.events.VARIABLE_UPDATE_ENDED, variables => {
-  _.update(variables, 'stat_data.白娅.依存度', value => _.clamp(value, 0, 100));
-});
-```
-
-:::
-
-:::{tab} 如果数量不为正数应该直接删除物品
-
-```js
-await waitGlobalInitialized('Mvu');
-eventOn(Mvu.events.VARIABLE_UPDATE_ENDED, variables => {
-  _.update(variables, 'stat_data.主角.物品栏', data => _.pickBy(data, ({数量}) => 数量 > 0));
-});
-```
-
-:::
-
-:::{tab} 称号有数量上限，依存度越高越多
-
-```js
-await waitGlobalInitialized('Mvu');
-eventOn(Mvu.events.VARIABLE_UPDATE_ENDED, variables => {
-  _.update(variables, 'stat_data.白娅.称号', data =>
-    _(data)
-      .entries()
-      .takeRight(Math.ceil(_.get(variables, 'stat_data.白娅.依存度') / 10))
-      .value(),
-  );
-});
-```
-
-:::
-
-:::{tab} 记录好感度第一次超过 30
-
-```js
-await waitGlobalInitialized('Mvu');
-eventOn(Mvu.events.VARIABLE_UPDATE_ENDED, variables => {
-  if (_.get(variables, 'stat_data.白娅.依存度') > 30) {
-    _.set(variables, 'stat_data.$flag.白娅依存度突破30', true);
-  }
-});
-```
-
-:::
-
-:::{tab} 青空莉死了!
-
-```js
-await waitGlobalInitialized('Mvu');
-eventOn(Mvu.events.VARIABLE_UPDATE_ENDED, variables => {
-  if (_.get(variables, 'stat_data.青空莉.死亡') === true) {
-    // 删除所有与青空莉相关的变量
-    _.unset(variables, 'stat_data.青空莉');
-  }
-});
-```
-
-:::
-
-::::
+如果用户提供了 `export const Schema`, 你应该区分用户提供的是直接的 `schema.ts` 还是变量结构脚本. 具体地,
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
