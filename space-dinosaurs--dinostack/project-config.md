@@ -1,67 +1,47 @@
 ---
 trigger: always_on
-description: Code quality gates, tool discipline, package management, and browser verification for software engineering tasks.
+description: Writing style, project structure conventions, session context and memory handling, and git workflow including protected branches and worktree-per-feature.
 ---
 
 
-## Documentation Lookups
+## Writing Style
 
-**When investigating, diagnosing, or reasoning about library, framework, or SDK behavior, look up current documentation using Context7 before forming conclusions.** Training data may be outdated - API signatures, configuration options, default behaviors, and error messages change across versions.
+Never use em dashes (--). Use a regular hyphen (-) instead in all generated text, copy, comments, documentation, and commit messages.
 
-Use Context7 (`resolve-library-id` -> `query-docs`) for:
-- Verifying API signatures, method parameters, or return types
-- Checking configuration options or default values
-- Understanding error messages or behavioral changes across versions
-- Any assumption about library behavior that influences a diagnosis or recommendation
+## Project Structure Convention
 
-Do not rely on training knowledge for library-specific details when Context7 is available. This applies to all agents: investigators, debuggers, architects, and engineers.
+`AGENTS.md` is the canonical project-instructions file across Claude Code, Codex, Cursor, and other tools. Claude Code reads it via a one-line `CLAUDE.md` containing `@AGENTS.md`. Always structure projects with a lean root `AGENTS.md` and deeper context in subdirectory `AGENTS.md` files co-located with the code they describe.
 
-## Tool Discipline
+- **Root `AGENTS.md`** - one-paragraph summary, resolved architecture decisions, cross-cutting conventions, repo structure map. Keep it under ~40 lines. This limit applies to project root AGENTS.md files. The global `~/.claude/CLAUDE.md` is exempt.
+- **Subdirectory `AGENTS.md`** (e.g. `backend/AGENTS.md`, `contracts/AGENTS.md`) - loaded only when working in that directory. Can be as detailed as needed without polluting other contexts.
+- **`.claude/settings.json`** - project-scoped MCP servers and shared config (safe to commit).
+- **`.claude/settings.local.json`** - secrets and local env values (always gitignored).
 
-**Never use Bash to read files, list directories, or search content.** Use the dedicated tools - they don't trigger permission prompts and give better output:
-- Read files: `Read` tool (never `cat`, `head`, `tail`, `sed`)
-- List/find files: `Glob` tool (never `ls`, `find`)
-- Search content: `Grep` tool (never `grep`, `rg`)
+When starting a new project, run `/init-project` to scaffold this structure automatically.
 
-Reserve `Bash` exclusively for: builds, installs, git operations, network calls, process management, and anything no dedicated tool covers.
+## Session Context and Memory
 
-Exception: `sg` (AST-grep) for structural symbol-level searches is run via Bash - no dedicated harness tool wraps it. Check availability with `which sg 2>/dev/null` before use.
+**Session startup:** Read `.agentic/context.md` as the first action of every session - standalone, never in parallel with other tool calls.
 
-## Context Window Management
+**Meta-divergence sweep at session start.** After reading `.agentic/context.md`, the conductor sweeps `.agentic/events.jsonl` for `meta_review_complete` events whose `original_task_id` is not present in `.agentic/.meta-divergence-surfaced`. For each such event with non-empty `data.divergence.critical_missed` or `data.divergence.major_missed`, emit at the next user-facing turn boundary:
 
-**When `ctx_execute` or `ctx_batch_execute` MCP tools are available, prefer them over raw `Bash` for any operation expected to produce more than ~20 lines of output.** Raw Bash output enters the context window in full; context-mode tools sandbox execution into isolated subprocesses and only let stdout enter context - reducing context consumption by up to 98%.
+```
+META-DIVERGENCE: meta-Skeptic identified [Critical|Major] '<finding-title>' that original Skeptic missed on <task_id>. Original sign-off stands; review recommended before merging.
+[phase: meta-divergence-critical]
+```
 
-Key tools and their uses:
-- `ctx_execute(language, code)` - run a single script; only stdout enters context
-- `ctx_execute_file(path, language, code)` - analyze a file for inspection only; use `Read` instead when you intend to subsequently `Edit` the file
+Then append `original_task_id` to the tracker file. The sweep is a standalone scan - not parallel with other startup tool calls. Tracker file format is one `original_task_id` per line, append-only, gitignored under the `.agentic/` umbrella. File-absent equals empty set. This catches divergences whose meta-Skeptic completed asynchronously after the originating session ended.
 
-> Never use `ctx_execute` or `ctx_execute_file` to create or modify files - these tools are for analysis, processing, and computation only. Use the native `Write`/`Edit` tools for all file writes.
+**Pagination (vicious loop defense):** The sweep MUST NOT read the full `.agentic/events.jsonl` on every boot. It reads only events with `ts` strictly greater than the timestamp stored in `.agentic/.meta-divergence-last-sweep` (ISO8601 UTC, single line, file-absent = first run). On first run (no tracker file), the scan is capped to the most recent 100 lines of the events file. After the sweep completes, the conductor writes the current ISO8601 UTC timestamp to the tracker file (atomic: tmp + `mv`). This prevents the vicious loop where growing telemetry consumes ever more context on every session start. See `content/references/skeptic-protocol.md` Section 14 "Session-start sweep pagination" for the full procedure.
 
-- `ctx_batch_execute(commands, queries)` - run multiple commands and search results in one call; replaces 10-30 Bash + search steps
-- `ctx_index(content, source)` / `ctx_search(queries)` - build and query a knowledge base from arbitrary content
-- `ctx_fetch_and_index(url, source)` - fetch a URL, index it, cache for 24 hours
+**Session context** is auto-written by the Stop hook to `.agentic/context.md` after every agent turn. (Legacy fallback: `~/.claude/projects/[hash]/context.md` - used only when `.agentic/context.md` does not exist.) `/wrap` is available for richer on-demand summarization. Update `MEMORY.md` (root `<cwd>/MEMORY.md`) at the end of any session where stable facts were learned. Close the session cleanly so the Stop hook can finish writing `context.md`: in the terminal CLI, use `/exit` rather than ctrl+c; in the desktop or web app, just close the window or tab normally rather than force-quitting.
 
-> When ctx tools are available, prefer `ctx_fetch_and_index` over `WebFetch` for URL fetches - `WebFetch` pulls full page content into context.
+**Knowledge-file routing (three distinct stores):**
+- `<cwd>/MEMORY.md` - canonical durable facts; committed; auto-injected by Claude Code; written by `/wrap`, wrap-ticket, `/memory-update`.
+- `.agentic/memory.md` - `/wrap`-internal rolling scratch only; gitignored; NOT auto-injected; NOT the same as root `MEMORY.md`.
+- `.agentic/learnings.md` - structured fix-pattern learnings; committed; written by `learning-extractor` (mechanically) and `learnings-agent` (discretionary).
 
-**Raw Bash remains appropriate per the Tool Discipline rule above** - `git`, builds, installs, process management, and any operation that needs direct filesystem side effects.
-
-**Platform support:** fully supported on Claude Code, Cursor, Codex CLI, OpenCode, Kimi, and oh-my-pi. The tools are available when `ctx_execute` is present as a callable tool in the session. When unavailable, fall back to the `Read`/`Grep`/`Glob` discipline above.
-
-## Module Manifests
-
-**Non-trivial modules should carry a manifest header.** Any source file that exports a public symbol consumed by another module, is over ~50 lines of non-trivial logic, or implements a side-effecting operation (network, disk, database, external service) is encouraged to include a manifest comment or docstring at the top of the file. See `content/rules/module-manifest.md` for required fields, examples, and exemptions. Skeptic applies tiered enforcement: missing manifests are **Minor** (does not block sign-off), stale manifests are **Major** (blocks sign-off absent a compelling documented reason to defer), and stale manifests whose inaccuracy could mislead a caller on a correctness or security path are **Critical**. See `content/rules/module-manifest.md` for the full policy.
-
-## DRY and Abstraction
-
-**Do not Repeat Yourself. Engineers must actively scan their own output for duplication before declaring work complete.**
-
-- **Repeated logic** — any block that appears more than once with identical or near-identical structure must be extracted into a helper, utility, or shared component.
-- **Copy-paste with tweaks** — copying code and changing only names or constants is a strong signal for abstraction, not a valid implementation strategy.
-- **Existing utilities first** — before writing new code, grep the codebase for functions that already solve the sub-problem. Prefer calling an existing utility over reimplementing it.
-- **Follow established patterns** — if the codebase has a convention for this class of problem (validation schemas, error wrappers, React hooks, data transformers), use it.
-- **Intentional exceptions** — if duplication is genuinely appropriate (the two paths are about to diverge significantly, or extraction would obscure meaning), state the reason explicitly in the output.
-
-The Skeptic review layer enforces this: duplication and missed abstractions are **Major** findings that block sign-off unless justified.
+**Per-developer session log:** `.agentic/session-log/<developer_id>.jsonl` - per-developer session rollup written by the Stop hook. Committed to git via the `.agentic/session-log/` carve-out in `.gitignore` when `commit_telemetry: true` (default) and identity is confirmed; the commit happens at `/implement-ticket` Phase 8 as a SEPARATE commit on the PR branch. Teammates receive it on pull after squash merge. See `content/references/events-log.md` "Per-developer session log". Aggregated via `agentic-cost team`.
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
