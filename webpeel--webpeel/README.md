@@ -7,12 +7,12 @@ The web data layer for AI agents — fetch, search, crawl, extract, screenshot, 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `copilot-instructions.md` in [webpeel/webpeel](https://github.com/webpeel/webpeel).
+Original source: `AGENTS.md` in [webpeel/webpeel](https://github.com/webpeel/webpeel).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
+- **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
