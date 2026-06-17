@@ -1,0 +1,26 @@
+# nexus-agents
+
+> Tome by [nexus-substrate](https://github.com/nexus-substrate/nexus-agents) — distributed by [TomeVault](https://tomevault.io)
+
+Governance substrate for your AI coding agents — adversarial review, drift-detected rules, immutable audit, closed-loop telemetry
+
+## Windsurf Config
+
+The `project-config.md` file in this directory is the project config converted for Windsurf.
+Original source: `.cursor/rules/*.mdc` in [nexus-substrate/nexus-agents](https://github.com/nexus-substrate/nexus-agents).
+
+## Also available for
+
+- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
+- **GitHub Copilot** — `copilot-instructions.md`
+- **Gemini CLI** — `GEMINI.md`
+- **Windsurf** — `project-config.md`
+
+Quality verified by TomeVault's automated analysis pipeline. Source: [github.com/nexus-substrate/nexus-agents](https://github.com/nexus-substrate/nexus-agents)
+
+---
+
+Explore more instruction files on [TomeVault](https://tomevault.io) — the open index of AI config files for every platform.
+
+<!-- genome:t-e-q -->
