@@ -7,14 +7,14 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `GEMINI.md` in [prompt-templates/-Legacy-ai-session-governance](https://github.com/prompt-templates/-Legacy-ai-session-governance).
+Original source: `AGENTS.md` in [prompt-templates/-Legacy-ai-session-governance](https://github.com/prompt-templates/-Legacy-ai-session-governance).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
+- **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
 Quality verified by TomeVault's automated analysis pipeline. Source: [github.com/prompt-templates/-Legacy-ai-session-governance](https://github.com/prompt-templates/-Legacy-ai-session-governance)
