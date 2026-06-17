@@ -7,11 +7,11 @@ Self-hosted tunneling and node management platform / 开箱即用的内网穿透
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [zsio/netsgo](https://github.com/zsio/netsgo).
+Original source: `CLAUDE.md` in [zsio/netsgo](https://github.com/zsio/netsgo).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
