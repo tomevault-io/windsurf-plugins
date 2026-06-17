@@ -1,47 +1,95 @@
 ---
 trigger: always_on
-description: Writing style, project structure conventions, session context and memory handling, and git workflow including protected branches and worktree-per-feature.
+description: Module manifest conventions: how to declare, register, and document modules so the codebase stays navigable and agents can discover interfaces without reading full implementations.
 ---
 
 
-## Writing Style
+# Module Manifests
 
-Never use em dashes (--). Use a regular hyphen (-) instead in all generated text, copy, comments, documentation, and commit messages.
+## What it is
 
-## Project Structure Convention
+A module manifest is a short header block at the top of a non-trivial source file. It lives in the code itself so that comprehension travels with the code — not in Architect plans that get discarded after merge, not in wikis that drift, not in PR descriptions nobody reads six months later. This is the self-describing layer of the system: a reader should be able to open a file and immediately understand what it does, what it depends on, and what breaks if it misbehaves.
 
-`AGENTS.md` is the canonical project-instructions file across Claude Code, Codex, Cursor, and other tools. Claude Code reads it via a one-line `CLAUDE.md` containing `@AGENTS.md`. Always structure projects with a lean root `AGENTS.md` and deeper context in subdirectory `AGENTS.md` files co-located with the code they describe.
+## When required
 
-- **Root `AGENTS.md`** - one-paragraph summary, resolved architecture decisions, cross-cutting conventions, repo structure map. Keep it under ~40 lines. This limit applies to project root AGENTS.md files. The global `~/.claude/CLAUDE.md` is exempt.
-- **Subdirectory `AGENTS.md`** (e.g. `backend/AGENTS.md`, `contracts/AGENTS.md`) - loaded only when working in that directory. Can be as detailed as needed without polluting other contexts.
-- **`.claude/settings.json`** - project-scoped MCP servers and shared config (safe to commit).
-- **`.claude/settings.local.json`** - secrets and local env values (always gitignored).
+**Required** for any source file that meets one or more of these criteria:
 
-When starting a new project, run `/init-project` to scaffold this structure automatically.
+- Exports a public symbol (function, class, type, constant) consumed by another module
+- Over ~50 lines of non-trivial logic
+- Implements a side-effecting operation: network call, disk I/O, database access, external service interaction, or any operation that cannot be safely retried without thought
 
-## Session Context and Memory
+**Exempt:**
 
-**Session startup:** Read `.agentic/context.md` as the first action of every session - standalone, never in parallel with other tool calls.
+- Test files and test fixtures
+- Generated files (migration outputs, protobuf outputs, GraphQL codegen, etc.)
+- One-off scripts not imported by anything else
+- Trivial pure utility files (thin wrappers, simple formatters, constants-only files)
 
-**Meta-divergence sweep at session start.** After reading `.agentic/context.md`, the conductor sweeps `.agentic/events.jsonl` for `meta_review_complete` events whose `original_task_id` is not present in `.agentic/.meta-divergence-surfaced`. For each such event with non-empty `data.divergence.critical_missed` or `data.divergence.major_missed`, emit at the next user-facing turn boundary:
+**Modified files:** a manifest must be updated when changes meaningfully alter purpose, public API, upstream dependencies, or failure/retry semantics. A manifest that no longer reflects the file is worse than no manifest — it is active misinformation.
 
+## Required fields
+
+Every manifest must cover these six fields. Omit a field only if it genuinely does not apply (e.g., "Performance: standard" is acceptable shorthand; leaving a failure modes field blank is not):
+
+| Field | What to say |
+|---|---|
+| **Purpose** | One sentence. What this module does and why it exists. |
+| **Public API** | The exports or entry points a caller should use. Not an exhaustive type dump — the canonical surface. |
+| **Upstream dependencies** | What this module imports, calls, or consumes that it does not own. External libraries, internal modules, environment variables, config values. |
+| **Downstream consumers** | Who uses this module. Best-effort: list known callers. "Unknown at creation" is acceptable for new modules; update it when consumers are identified. |
+| **Failure modes** | How this module fails, and what the caller needs to know about retrying or recovering. Idempotency guarantees or lack thereof. |
+| **Performance** | Expected latency, throughput, or memory profile if non-obvious. Omit or write "standard" if there is nothing a caller needs to know. |
+
+## Format
+
+Use the idiomatic comment or docstring syntax for the language. Do not invent a schema or force a rigid structure — the fields are required, the exact syntax is per-language.
+
+**TypeScript / JavaScript:**
+
+```typescript
+/**
+ * Purpose: Validates and normalizes incoming webhook payloads before they
+ *          enter the processing pipeline.
+ *
+ * Public API: validateWebhook(raw: unknown): WebhookPayload
+ *
+ * Upstream deps: zod (schema validation), ./types (WebhookPayload type)
+ *
+ * Downstream consumers: src/handlers/webhook.ts, src/workers/ingest.ts
+ *
+ * Failure modes: throws WebhookValidationError on malformed input — callers
+ *                must catch and return 400, not 500. No side effects; safe to
+ *                retry or call multiple times on the same input.
+ *
+ * Performance: ~0.2 ms per call; zod parse is synchronous, no I/O.
+ */
 ```
-META-DIVERGENCE: meta-Skeptic identified [Critical|Major] '<finding-title>' that original Skeptic missed on <task_id>. Original sign-off stands; review recommended before merging.
-[phase: meta-divergence-critical]
+
+**Python:**
+
+```python
+"""
+Purpose: Resolves feature flag values for a given user context, with local
+         cache to avoid repeated network calls within a request lifecycle.
+
+Public API: get_flag(flag_name: str, context: UserContext) -> bool
+
+Upstream deps: flagsmith SDK, app.cache (RequestScopeCache), config.FLAGSMITH_URL
+
+Downstream consumers: app.views.experiment, app.middleware.ab_test
+
+Failure modes: falls back to flag default on SDK timeout or network error —
+               never raises; callers can rely on always receiving a bool.
+               Cache is request-scoped; not safe to share across threads.
+
+Performance: first call per flag per request hits network (~50 ms);
+             subsequent calls within the same request hit local cache (<1 ms).
+"""
 ```
 
-Then append `original_task_id` to the tracker file. The sweep is a standalone scan - not parallel with other startup tool calls. Tracker file format is one `original_task_id` per line, append-only, gitignored under the `.agentic/` umbrella. File-absent equals empty set. This catches divergences whose meta-Skeptic completed asynchronously after the originating session ended.
+## Why
 
-**Pagination (vicious loop defense):** The sweep MUST NOT read the full `.agentic/events.jsonl` on every boot. It reads only events with `ts` strictly greater than the timestamp stored in `.agentic/.meta-divergence-last-sweep` (ISO8601 UTC, single line, file-absent = first run). On first run (no tracker file), the scan is capped to the most recent 100 lines of the events file. After the sweep completes, the conductor writes the current ISO8601 UTC timestamp to the tracker file (atomic: tmp + `mv`). This prevents the vicious loop where growing telemetry consumes ever more context on every session start. See `content/references/skeptic-protocol.md` Section 14 "Session-start sweep pagination" for the full procedure.
-
-**Session context** is auto-written by the Stop hook to `.agentic/context.md` after every agent turn. (Legacy fallback: `~/.claude/projects/[hash]/context.md` - used only when `.agentic/context.md` does not exist.) `/wrap` is available for richer on-demand summarization. Update `MEMORY.md` (root `<cwd>/MEMORY.md`) at the end of any session where stable facts were learned. Close the session cleanly so the Stop hook can finish writing `context.md`: in the terminal CLI, use `/exit` rather than ctrl+c; in the desktop or web app, just close the window or tab normally rather than force-quitting.
-
-**Knowledge-file routing (three distinct stores):**
-- `<cwd>/MEMORY.md` - canonical durable facts; committed; auto-injected by Claude Code; written by `/wrap`, wrap-ticket, `/memory-update`.
-- `.agentic/memory.md` - `/wrap`-internal rolling scratch only; gitignored; NOT auto-injected; NOT the same as root `MEMORY.md`.
-- `.agentic/learnings.md` - structured fix-pattern learnings; committed; written by `learning-extractor` (mechanically) and `learnings-agent` (discretionary).
-
-**Per-developer session log:** `.agentic/session-log/<developer_id>.jsonl` - per-developer session rollup written by the Stop hook. Committed to git via the `.agentic/session-log/` carve-out in `.gitignore` when `commit_telemetry: true` (default) and identity is confirmed; the commit happens at `/implement-ticket` Phase 8 as a SEPARATE commit on the PR branch. Teammates receive it on pull after squash merge. See `content/references/events-log.md` "Per-developer session log". Aggregated via `agentic-cost team`.
+Comprehension should live in the code. An Architect plan describes what was decided; it does not travel with the file when the file is moved, refactored, or read by an engineer three months later who was not in that session. A module manifest embeds the essential context — the "why does this exist and what breaks if I change it" — directly in the artifact that persists. This is the self-describing layer of the dark code framework: systems that communicate their own structure rather than requiring external documentation to make sense of them.
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
