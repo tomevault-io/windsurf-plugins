@@ -1,86 +1,119 @@
 ---
 trigger: always_on
-description: Monet is an Electron video editor with terminal-first AI agent control. You have three interfaces:
+description: `editorctl` is the Monet CLI. Always try it directly first — Monet keeps it on `PATH` for every shell it spawns and persists the bin dir to `~/.zshrc` / `~/.bash_profile` so it survives subshells and PATH-rewriting wrappers. **If `command -v editorctl` returns nothing**, fall back in order:
 ---
 
-# Monet — Claude Agent Guide
+# AI Video Editor — Agent Control Reference
 
-Monet is an Electron video editor with terminal-first AI agent control. You have three interfaces:
-1. **MCP tools** (`video_editor_*`) — live timeline control via the MCP server
-2. **CLI** (`editorctl`) — direct commands from this terminal
-3. **HTTP API** — POST to `http://localhost:51847`
+## ⚠️ FINDING `editorctl` — MANDATORY (read this first)
 
-## Remotion — React-based Video Composition
+`editorctl` is the Monet CLI. Always try it directly first — Monet keeps it on `PATH` for every shell it spawns and persists the bin dir to `~/.zshrc` / `~/.bash_profile` so it survives subshells and PATH-rewriting wrappers. **If `command -v editorctl` returns nothing**, fall back in order:
 
-Remotion is installed and ready. Use it to create animated videos, title cards, lower thirds, slideshows, and anything that's easier to express in React than to FFmpeg-filter.
+1. `"$HOME/Library/Application Support/Monet/bin/editorctl"` — macOS install (most users)
+2. `node /Applications/Monet.app/Contents/Resources/app.asar.unpacked/out/cli/cli/editorctl.js …`
+3. `node ./out/cli/cli/editorctl.js …` — dev tree
 
-### File layout
+Never give up after the first "command not found". Prefer `editorctl` over raw `curl localhost:51847` — it always exposes the current command surface and arg shapes.
+
+## ⚠️ OUTPUT FILE NAMING — MANDATORY (read this first)
+
+**Never reuse a filename when editing or regenerating a video or image.** The asset cache holds the previous file by path, so writing to the same name silently shows stale content. Every edit/regenerate must produce a **new unique filename** (e.g. `clip_v1.mp4`, `clip_v2.mp4`, or a timestamp suffix). Applies to all video renders, image generations, canvas exports, and thumbnails. If a target path already exists, append `_v2`, `_v3`, … — do not overwrite.
+
+## ⚠️ AUDIO ON MULTI-CLIP TIMELINES — MANDATORY
+
+When adding audio to a timeline with **more than one video clip**, audio cuts at every clip boundary. Required flow:
+
+1. Tell the user: *"To keep audio from cutting between clips, I'll merge all video clips into one combined video first, then add the audio. OK to proceed?"*
+2. Wait for confirmation — do not auto-merge.
+3. Concatenate all clips into a single new file (unique filename per the rule above).
+4. Replace the multi-clip video track with that merged clip, then add the audio.
+
+Single-clip timelines: skip the merge.
+
+---
+
+## ⚠️ CANVAS MODE — MANDATORY RULES (read this first)
+
+When `activeView=canvas` is reported by the hook or `editorctl get-state`:
+
+**There are EXACTLY 3 canvas options. No others exist.**
+1. **Paper.js** — code drawing with vector graphics (`canvas-run-paperjs`)
+2. **Matter.js** — physics and animation (`canvas-run-matterjs`)
+3. **GPT image 2** — AI-generated image (`generate-image` + `canvas-add-image`)
+
+**REMOVED — do NOT offer these under any name:**
+- ~~Design mode~~ — removed
+- ~~Editable layers~~ — removed
+- ~~Figma-style layout~~ — removed
+- ~~Node-based design~~ — removed
+- ~~Direct canvas design~~ — removed
+
+When the user asks for something visual in canvas mode, present ONLY these three options using these EXACT labels. Copy them verbatim. Do not invent a fourth option or rephrase option 1 as anything design-related.
+
+---
+
+**API Bridge:** `POST http://localhost:51847` — JSON body `{"command":"<name>","args":{...}}`
+
+```python
+import urllib.request, json
+
+def call(command, **args):
+    data = json.dumps({"command": command, "args": args}).encode()
+    req = urllib.request.Request(
+        "http://localhost:51847", data=data,
+        headers={"Content-Type": "application/json"}, method="POST"
+    )
+    return json.loads(urllib.request.urlopen(req).read())["result"]
+
+call("ping")   # → {"status":"ok","version":"1.0.0","port":51847}
+call("help")   # → full command list
 ```
-remotion/
-  src/
-    index.ts          # Entry point (do not edit)
-    Root.tsx          # Register new compositions here
-    compositions/
-      TitleCard.tsx   # Animated title card (props: title, subtitle, colors)
-      Slideshow.tsx   # Image slideshow (props: images[], frameDuration, transitionDuration)
-```
 
-### Workflow
+---
 
-**1. Preview in Remotion Studio**
-```bash
-npm run remotion:studio
-# Opens http://localhost:3000 — live preview as you edit
-```
+## Commands
 
-**2. Add a new composition**
-- Create `remotion/src/compositions/MyComp.tsx`
-- Export a `myCompSchema` (zod) and `MyComp` component
-- Register it in `remotion/src/Root.tsx` with a `<Composition>` entry
+### Project / Settings
+| Command | Args | Returns |
+|---------|------|---------|
+| `get_project` | — | Full project JSON |
+| `get_settings` | — | Model + provider config |
 
-**3. Render via MCP (auto-imports into Monet)**
-```
-video_editor_render_remotion {
-  compositionId: "TitleCard",
-  props: { title: "Episode 1", subtitle: "The Beginning" }
-}
+### Assets
+| Command | Args | Returns |
+|---------|------|---------|
+| `list_assets` | — | `[{id, name, path, type, duration, semantic}]` |
+| `get_asset` | `assetId` | Single asset with semantic + transcript |
+| `import_files` | `paths: string[]` | Imported asset records |
+| `transcribe_asset` | `assetId`, `language?` | `{segments}` via Whisper |
+| `embed_assets` | `all?: bool` | `{embedded, total}` via text-embedding-3-small |
+| `search_media` | `query, limit?` | Cosine similarity search (falls back to keyword) |
+| `search_spoken` | `query, limit?` | Substring search within transcribed segments |
 
-video_editor_render_remotion_still {
-  compositionId: "KineticText",
-  frame: 45,
-  props: { text: "Hello World" }
-}
-```
-The rendered MP4/PNG is saved to `remotion-renders/` and **automatically imported** as a project asset.
+### Sequences & Tracks
+| Command | Args | Returns |
+|---------|------|---------|
+| `list_sequences` | — | All sequences |
+| `create_sequence` | `name` | New sequence |
+| `activate_sequence` | `sequenceId` | Activated sequence |
+| `get_tracks` | — | `[{id, name, kind, clipCount}]` for active sequence |
+| `add_track` | `kind: video\|audio\|caption` | Updated sequence |
 
-**4. Render via CLI**
-```bash
-npx remotion render remotion/src/index.ts TitleCard out.mp4 --props '{"title":"Hello"}'
-```
+### Clips
+| Command | Args | Returns |
+|---------|------|---------|
+| `list_clips` | `sequenceId?` | All clips sorted by startTime, with trackKind |
+| `add_clip` | `assetId, trackId, startTime, duration?, inPoint?` | `{clipId, clip}` |
+| `remove_clip` | `clipId` | `{success}` |
+| `move_clip` | `clipId, startTime` | `{success}` |
+| `trim_clip` | `clipId, inPoint?, duration?, startTime?` | Updated clip |
+| `split_clip` | `clipId, time` | Updated sequence |
+| `duplicate_clip` | `clipId, offsetSeconds?` | `{clipId, clip}` |
+| `update_clip_label` | `clipId, label` | `{success}` |
 
-### Built-in compositions
 
-| ID | Description | Key props |
-|----|-------------|-----------|
-| `TitleCard` | Animated title with spring entrance | `title`, `subtitle`, `backgroundColor`, `textColor`, `accentColor` |
-| `Slideshow` | Image crossfade slideshow | `images` (array of absolute paths), `frameDuration`, `transitionDuration` |
-| `VideoWithTitle` | Video file with animated title overlay | `videoSrc` (abs path), `title`, `subtitle`, `titlePosition`, `overlayOpacity` |
-| `AudioVisualizer` | Waveform/bar visualizer from audio file | `audioSrc` (abs path), `barCount`, `barColor`, `barColorPeak`, `mirror` |
-| `LowerThird` | Animated name/title lower third | `name`, `title`, `accentColor`, `position` (left/center/right) |
-| `AnimatedCaptions` | Word-by-word highlighted captions | `words` [{word, startFrame, endFrame}], `highlightColor`, `fontSize`, `position` |
-| `KineticText` | Staggered kinetic word animation | `text`, `animationStyle` (rise/fall/scale/blur), `staggerFrames`, `fontSize` |
-
-### Tips
-- Duration is in **frames** (30fps by default). 150 frames = 5 seconds.
-- Use `useCurrentFrame()` and `spring()` for animation.
-- `durationInFrames` can be overridden per render call.
-- Rendered videos land in `remotion-renders/` as MP4 — drag into the Monet timeline or use `video_editor_render_remotion` which auto-imports.
-- Zod schemas on compositions let you pass typed props from MCP.
-
-## Other editor capabilities
-
-See `AGENT_CAPABILITIES.md` for the full MCP tool list and `SKILL.md` for detailed API reference.
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [Monet-AI-Editor/Monet](https://github.com/Monet-AI-Editor/Monet) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-28 -->
+<!-- tomevault:4.0:windsurf_rules:2026-06-17 -->
