@@ -7,11 +7,11 @@ Cross platform desktop accessibility library
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [xa11y/xa11y](https://github.com/xa11y/xa11y).
+Original source: `CLAUDE.md` in [xa11y/xa11y](https://github.com/xa11y/xa11y).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
