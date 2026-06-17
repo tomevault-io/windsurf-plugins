@@ -1,70 +1,44 @@
 ---
 trigger: always_on
-description: 当用户输入中明确提及 MVU 时, 你应该参考本文件
+description: 当需要编写前端界面时, 你应该参考本文件
 ---
 
-# MVU 角色卡文件夹
+# 前端界面
 
-MVU 角色卡文件夹提供了一种存储酒馆角色卡内容的文件结构:
+如果 `src/xxx` 文件夹中既有 `index.ts` 文件也有 `index.html` 文件, 则它是一个前端界面项目.
 
-- `角色卡/脚本/*/` 中是角色卡的所有脚本项目
-- `角色卡/界面/*/` 中是角色卡的所有前端界面项目
-- `角色卡/世界书/*/` 中是角色卡的世界书条目, 即角色卡的设定提示词, 编写角色卡其他内容时需要参考它来了解角色世界设定
-- `角色卡/schema.ts` 中是用 zod 4 库书写的角色卡 MVU 变量结构定义
-  - 提供给脚本、前端界面导入使用
-  - 会在 `pnpm build` 或 `pnpm watch` 时生成对应的 json schema 文件 `角色卡/schema.json`, 便于编写变量初始值文件 initvar.yaml `# yaml-language-server: $schema=schema文件路径`
-- `角色卡/界面/store.ts` 中是 pinia 预先写好的获取角色卡消息楼层 MVU 变量方式, 提供给所有前端界面导入使用
+前端界面以无沙盒 iframe 的形式在酒馆消息楼层中前台显示, 有一个自己的界面, 你可以在其中添加静态内容、样式、脚本等.
 
-当玩家要求编写 MVU 角色卡的脚本、前端界面时, 除了参考`初始模板/脚本`或`初始模板/前端界面`外, 你还应该参考`初始模板/角色卡`中的脚本和前端界面模板.
+## index.html 中应该写什么
 
-**要区分单独的脚本、前端界面和为 MVU 角色卡增补脚本、前端界面, 如果用户只是想要编写单独的脚本、前端界面, 则不应参考这个文件.**
+前端界面的 index.html 仅可填写静态 `<body>` 内容, 不得引用项目中其他文件, 所有非内嵌样式、代码、额外的外部依赖都应通过 Typescript 文件导入. 具体来说:
 
-## MVU 变量结构
-
-MVU 使用 zod 4 库书写变量结构定义, 这对应于`角色卡/schema.ts`, 例如:
-
-```ts
-export const Schema = z.object({
-  好感度: z.coerce.number().transform(value => _.clamp(value, 0, 100)),
-});
+```html
+<head>
+  <!-- 保留一个什么都没有的 <head> 标签, webpack 打包时会在这里插入样式、脚本等 -->
+</head>
+<body>
+  <!-- 这里写 <div>、<span> 等静态内容, 也可以只写 <div id="app"></div> 交给 vue 来渲染 -->
+</body>
 ```
 
-你应该要求用户提供变量结构文件或者自行编写, 它应该遵循以下要求:
+- 禁止在 `index.html` 中用 `<link rel="stylesheet" href="./index.css">` 导入样式, 而应该
+  - (优先) 设计 vue 组件, 在 vue 组件中用 `<style lang="scss">` 书写.
+  - 或在 Typescript 文件中用 `import './index.css'` 导入, 这样导入的样式将会经过打包最小化后插入到 `<head>` 部分;
+- 禁止在 `index.html` 中用 `<script src="./index.ts">` 来引用 `index.ts` 或其他本地脚本. `index.ts` 及它导入的文件会由 webpack 直接加入到最终打包好的 `dist/**/index.html` 中.
+- 在 `index.html` 中填入 `<img>` 标签时, 禁止使用 `src=""` 占位. 要么引用实际的图片, 要么不要有这个属性, 否则会导致 webpack 打包错误.
 
-```yaml
-rule:
-  - libraries: "`z` from zod and `_` from lodash are available by default, so you can use them directly and should prefer to use them; don't import them in the generated code"
-  - zod 4: stick to use zod 4.x, never ever use `.passthrough` or `.strict`!
-  - idempotent operation: the schema is intended to parse the updates of the world status incrementally, thus, the output of `Schema.parse(input)` must be a valid input of `Schema.parse` itself; that is, you should use z.transform carefully, keeping `Schema.parse(Schema.parse(input))` equal to `Schema.parse(input)`
-  - for number schema: prefer `z.coerce.number()` over `z.number()` whenever you expect a number since it will try to convert the input to a number if it's not a number; but don't use other `z.coerce.xxx()` such as `z.coerce.boolean()`, just use `z.boolean()` directly
-  - prefer object schema over array schema: "the array index is hard to understand and maintain, so you should use `物品栏: z.record(z.string().describe('物品名'), z.object({ 描述: z.string(), ... }))` instead of `物品栏: z.array(z.object({ 名称: z.string(), 描述: z.string(), ... }))`"
-  - for object schema:
-      - fixed required keys + the same type: use `z.record(z.enum(['key1', 'key2', ...]), ${value type})`
-        fixed optional keys + the same type: use `z.partialRecord(z.enum(['key1', 'key2', ...]), ${value type})`
-        dynamic optional keys + the same type: use `z.record(z.string(), ${value type})`
-        fixed required keys + different types: 'use `z.object({ key1: ${type1}, key2: ${type2}, ... })`'
-        dynamic keys but some keys are required + the same type: 'use `z.intersection(z.object({ requiredKey1: ${type1}, requiredKey2: ${type2}, ... }), z.record(z.string(), ${value type}))`'
-      - on clearable object: 'if the object is clearable by JSON patch `{ "op": "remove", "path": "/path/to/object" }`, set `z.object({ ...prefault for every field }).prefault({})` instead of `z.object({ ... }).optional()` for better compatibility with the incremental update'
-  - for special format (rare to happen): prefer `z.templateLiteral` over regex or manual parsing
-  - for restrictions: when accepting a update that breaks the schema, users are tend to expect the update takes some effect instead of being discarded completely; therefore, you should try your best to use `z.transform` to convert the broken input to a valid input. For example, if Explorer requests a value to be between 0 and 100, prefer `z.number().transform(value => _.clamp(value, 0, 100))` over `z.number().min(0).max(100)`; if an object could only contain 10 keys, when a new key comes, discard the oldest key instead. **but only impose these restrictions when Explorer requests**
-  - on default value:
-      - prefer `z.prefault` over `z.default`
-      - if a `z.object` or the whole Schema is complicated enough, set `.prefault('${suitable default value}')` or `.or(z.literal('待初始化')).prefault('待初始化')` for every field of it
-      - don't set `z.prefault` for other situatioins unless Explorer requests it
-  - when to describe: use `z.describe` only when there's no field name to explain the usage of the schema such as the key type of `z.record`; in contrast, you should never use `z.describe` if the field name has already explained the usage well
-  - determine the order of keys: 'if Explorer requests you to do something with the insertion time of keys, prefer to use `_(data).entries()` which almost always lists keys in insertion order, e.g. you can remove old keys with a simple `_(data).entries().takeRight(10)`; when keys are already additionally sorted inside `z.transform`, you should use `$time: z.coerce.number().prefault(() => Date.now())` to automatically assign a timestamp'
-  - don't repeat yourself: merge the same variable schemas whenever possible, but don't define extra variables to do so - you can only define schema inside `export const Schema = z.object({ ... })`
-  - type of functions:
-      - '`registerMvuSchema = (schema: z.ZodObject | (() => z.ZodObject)) => void`, the function input `() => z.ZodObject` could be used when the schema is not ready at the time of registering, or the schema depends on runtime data/function'
-      - '`z.transform(value => value)`'
-      - '`z.prefault/z.catch(value | () => value)`'
-  - REPEAT: DON'T mark any variable as optional or impose any restriction to the schema unless Explorer requests them
-```
+## 图标使用
 
-如果用户提供了 `export const Schema`, 你应该区分用户提供的是直接的 `schema.ts` 还是变量结构脚本. 具体地,
+你可以任意使用 fontawesome 的免费图标.
 
+## iframe 适配要求
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- 当对前端界面高度进行调整时, 禁止使用 `vh` 单位等会受宿主高度影响的单位, 而是使用 `width` 和 `aspect-ratio` 来让高度根据宽度动态调整.
+- 避免使用会强制撑高父容器的元素 (如 `min-height`、`overflow: auto`).
+- 页面必须有外部支撑, 主体内容不能使用 `position: absolute` 等会脱离文档流的样式.
+- 页面整体应适配容器宽度，不产生横向滚动条.
+- 如果样式更适合卡片形状，则不要有背景颜色，除非用户有明确要求.
 
 ---
 > Source: [HerSophia/ST-GTS-Calculator](https://github.com/HerSophia/ST-GTS-Calculator) — distributed by [TomeVault](https://tomevault.io).
