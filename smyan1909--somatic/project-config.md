@@ -1,87 +1,93 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: Use SoMatic when you need to operate a native desktop UI with screenshots, mouse, and keyboard.
 ---
 
-# CLAUDE.md
+# SoMatic
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Use SoMatic when you need to operate a native desktop UI with screenshots, mouse, and keyboard.
 
-## What This Project Does
+## How images reach you
 
-SoMatic is an agent-first CLI for native desktop UI automation using Set-of-Marks (SoM) screenshot technology. It exposes a JSON-only command interface (`somatic <command>`) that AI agents use to control native desktop UIs — clicking, typing, scrolling, and capturing annotated screenshots where UI elements are numbered for reference.
+**MCP path:** annotated screenshots arrive **inline** as image content in the tool response — you see the image directly, no extra step needed.
 
-Mark resolution is purely id → coordinate. Marks carry no captions or OCR text; agents act on numbered boxes and the click path looks up the center of the chosen mark from a cached session JSON.
+**CLI path:** `somatic screenshot --annotate` writes the annotated PNG to disk and returns its path in `screenshot.annotated_path`. Use the `Read` tool on that path to see the image. The JSON output is text only — use `Read` to get the actual image.
 
-## Commands
+## Operating Loop
 
-```bash
-# Install Python package (run once)
-pip install -e .[dev,vision,mcp]
+1. **At the start of a session, run `vision_init` (MCP) or `somatic vision init` (CLI).** This loads the YOLO ONNX model into a background daemon. First-ever run may take 1–3 minutes; subsequent runs are near-instant. Require `"started": true` (or `"already_running": true`) before continuing.
 
-# Run all tests
-python -m pytest
+2. **Always begin a task by taking an annotated screenshot and visually inspecting it.**
+   - MCP: call `screenshot_annotated` — the image arrives inline.
+   - CLI: run `somatic screenshot --annotate`, then `Read` the path at `screenshot.annotated_path`.
 
-# Run a single test file
-python -m pytest tests/test_yolo_onnx_provider.py
+3. **Scan the image before acting.** Check every region — taskbar, dock, desktop icons, system tray, open windows — and identify which numbered mark corresponds to the element you want.
 
-# Run a single test by name
-python -m pytest tests/test_cli.py::test_wait_outputs_json -q
+4. **Prefer clicks on visible elements over keyboard navigation.** If the target is already present in the annotated screenshot (a taskbar icon, a tab, a button, a link), click its mark id. Do **not** open Start menu / Run / search when the thing you want is already on screen.
 
-# npm postinstall / shim validation
-node bin/somatic.js doctor
-npm run pack:check
-```
+5. **Use the keyboard for what keyboards are for, not as a shortcut around looking.** Keyboard is the right tool for:
+   - typing free-form text (`type_text "hello"`)
+   - key chords that aren't UI elements (`hotkey ctrl s`, `press enter`, `hotkey alt tab`)
+   - launching something that genuinely isn't visible anywhere (then use Win+S, type, screenshot the results, click the best match by mark id — don't blind-press Enter)
 
-The `[vision]` extra installs `onnxruntime`, `numpy`, `huggingface-hub`, plus `ultralytics`+`torch` (used only by the first-run `.pt → .onnx` conversion fallback).
+6. Inspect the JSON returned by the screenshot tool: `marks` contains `id`, `bbox`, `center`, and `confidence`. There are no captions — refer to elements by id and verify visually.
 
-## Architecture
+7. **Click by mark id. `click <id>` automatically clicks the center of that mark's bounding box — you never need to calculate or look up any pixel coordinates.**
+   - `click 4` → clicks the center of mark 4's bbox automatically
+   - `move 7` → moves the cursor to the center of mark 7's bbox automatically
+   - `scroll -5 --target 2` → scrolls near mark 2 automatically
+   - **NEVER extract `center` or `bbox` from the JSON and pass raw pixel coordinates like `click 540,320`. That defeats the purpose of mark ids. `click <id>` does it for you.**
 
-SoMatic has **three agent-facing surfaces** that share the same underlying modules, plus two long-lived background processes that they orchestrate:
+8. When YOLO **doesn't** annotate the exact target — empty text inputs, fields that follow a labelled icon, gaps between buttons — use `click_near` with a `dx`/`dy` offset from the nearest visible mark:
+   - `click_near 12 --dx 300 --dy 0` (300 px to the right of mark 12's center, automatically)
 
-1. **Plain CLI** (`somatic <command>`) — universal fallback for any harness that can shell out. JSON to stdout; for screenshots the JSON now includes `image_b64`/`annotated_image_b64` so the bytes can be fed to the model without a separate Read step.
-2. **MCP server** (`somatic mcp serve` or `python -m somatic.mcp_server`) — for Claude Code / Cursor / Continue. Tools mirror the CLI verbs; screenshot tools emit MCP `ImageContent` + `TextContent` so the agent sees the image inline. Ships a `skill` MCP prompt that loads the operating loop.
-3. **Vision daemon** (`vision_init` / `vision_stop`) — long-lived background process that holds the YOLO ONNX model. Both the CLI and MCP server talk to it over HTTP on `127.0.0.1:8765`.
-4. **Headless session** (`headless start` / `headless stop`, Linux only) — long-lived Xvfb + WM + optional VNC + optional apps. When active, every other CLI invocation transparently inherits `DISPLAY` / `XAUTHORITY` / `DBUS_SESSION_BUS_ADDRESS` via `headless.apply_active_env()` at the top of `main()`. The vision daemon is auto-restarted under the headless display so screenshots come from the virtual desktop.
+9. Use raw coordinates only as a last resort when **no mark and no nearby anchor exists at all**:
+   - `click 640,420`
 
-A thin Node.js shim (`bin/somatic.js`) spawns the Python CLI for npm-installed users; it's a pure passthrough.
+10. **Re-screenshot after every consequential action.** Mark IDs are reassigned per screenshot — never apply an id from one screenshot to another screenshot's state.
 
-```
-bin/somatic.js          Node shim — resolves Python, sets PYTHONPATH=src/, spawns
-scripts/postinstall.js  npm postinstall: creates .venv, pip installs .[vision]
-src/somatic/            MIT-licensed runtime. ZERO AGPL imports (CI-enforced).
-  cli.py                Argparse dispatcher — calls headless.apply_active_env() first
-  mcp_server.py         FastMCP wrapper exposing the same surface as MCP tools+prompt
-  skill.py              Single source of truth for SKILL.md content (used by CLI+MCP)
-  licenses.py           Static MIT/AGPL notices used by `somatic license` + MCP prompt
-  SKILL.md              Packaged operating-loop guidance (shipped in the wheel)
-  automation.py         PyAutoGUI wrappers (click, click_near, type, move, drag, scroll, hotkey…)
-  screenshot.py         Capture + annotation; embeds base64 PNG bytes in response
-  marks.py              Mark dataclass, session cache (JSON file), normalize_marks()
-  vision_client.py      HTTP client for the local vision daemon (GET /health, POST /parse)
-  vision_daemon.py      Background process: loads ONNX model, serves on 127.0.0.1:8765
-  providers/yolo_onnx.py  Pure inference; SHA256-verified HF download; no .pt→.onnx convert
-  headless.py           Xvfb session lifecycle, state-file glue, env overlay
-  doctor.py             Platform diagnostics (dependency checks, failsafe tests)
-  paths.py              XDG-compliant runtime paths (cache, data, screenshots, PID files)
-  jsonio.py             command_response(), SomaticError, fail() — all CLI output goes here
-tools/                  AGPL-3.0-licensed boundary. NOT shipped in npm or PyPI.
-  LICENSE.AGPL          Full AGPL-3.0 text
-  README.md             License-boundary explanation
-  requirements.txt      ultralytics + torch (AGPL-3.0 deps)
-  convert_yolo_to_onnx.py  Maintainer/power-user .pt → .onnx conversion
-tests/                  Including test_license_boundary.py which CI-enforces the MIT/AGPL split
-```
+11. **At the end of the session, run `vision_stop`** to free the model's memory.
 
-### Licensing boundary
+12. If something goes wrong, run `doctor` and `vision_status`.
 
-The repo follows the FFmpeg licensing strategy:
+## Decision Rule: Click, Click-Near, or Type?
 
-- The published artifacts (`npm install -g @somatic-cli/cli` and PyPI wheel/sdist) are pure MIT.
-- The model weights are AGPL-3.0 (inherited from upstream YOLO). They are downloaded at runtime from a separately-licensed Hugging Face repository via `somatic vision init`; SoMatic never bundles them.
+When choosing how to advance the task, ask: *what does the latest annotated screenshot show?*
+
+- **Target visible as a mark →** `click <id>`. SoMatic resolves the id to the bbox center for you. Don't calculate coordinates. Don't open a launcher.
+- **Target NOT visible as a mark but adjacent to one →** `click_near <id> --dx ... --dy ...`. SoMatic resolves the anchor id to its center and applies your offset. (Common for text inputs that sit next to a `+` or send button.)
+- **Target's container visible but not the target itself →** click into the container first, re-screenshot, then act on the new marks.
+- **Target genuinely invisible →** keyboard shortcut (Win+S to search, Ctrl+L to focus URL bar, etc.). After the keypress, screenshot again before doing anything else.
+
+**Anti-patterns — never do these:**
+
+- ❌ `click 540,320` when you could use `click 4` — marks are already positioned at the right place
+- ❌ Reading `center` from the marks JSON and passing those pixels to `click` — `click <id>` does this automatically
+- ❌ Calculating coordinates by eyeballing the annotated image — `click <id>` is always more accurate
+
+## Command Rules
+
+- Treat command output as JSON, not prose.
+- Use `--dry-run` before risky pointer or keyboard actions when planning a move.
+- If a screenshot tool returns `vision_unavailable`, call `vision_init` and retry.
+- Don't pre-emptively press Escape or click empty space to "clear state" — trust what the last screenshot shows.
+
+## Common Commands
+
+CLI form:
+
+```sh
+somatic doctor
+somatic vision init
+somatic vision status
+somatic screenshot --annotate              # returns annotated_path; use Read to view
+somatic click <id>
+somatic click <x,y>
+somatic click-near <id> --dx 100 --dy 0
+somatic type "text"
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [Smyan1909/SoMatic](https://github.com/Smyan1909/SoMatic) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-06-17 -->
