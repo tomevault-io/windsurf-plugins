@@ -7,11 +7,11 @@ Delegate dev loops to Claude Code, Codex CLI, or any AI coder. Runs autonomously
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [sublang-ai/boss](https://github.com/sublang-ai/boss).
+Original source: `CLAUDE.md` in [sublang-ai/boss](https://github.com/sublang-ai/boss).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
