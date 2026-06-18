@@ -7,14 +7,14 @@ Rust-based ACL-aware HTTP/HTTPS proxy with a flexible URL policy engine. Support
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `GEMINI.md` in [kcosr/acl-proxy](https://github.com/kcosr/acl-proxy).
+Original source: `AGENTS.md` in [kcosr/acl-proxy](https://github.com/kcosr/acl-proxy).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
+- **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
 Available for 6 platforms including Claude Code, Cursor, Windsurf, and more. Source: [github.com/kcosr/acl-proxy](https://github.com/kcosr/acl-proxy)
