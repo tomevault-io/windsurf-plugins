@@ -7,11 +7,11 @@ Claude Code + Codex 双平台 AI dotfiles：统一管理 skills/agents/hooks，�
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [codingSamss/all-my-ai-needs](https://github.com/codingSamss/all-my-ai-needs).
+Original source: `CLAUDE.md` in [codingSamss/all-my-ai-needs](https://github.com/codingSamss/all-my-ai-needs).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
