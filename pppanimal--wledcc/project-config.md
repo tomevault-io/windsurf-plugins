@@ -1,0 +1,85 @@
+---
+trigger: always_on
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+---
+
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Rules
+
+- Always use `async def` for Flet event handlers.
+- Use `/plan` mode before changes that touch more than one function, affect more than ~10 lines, or involve architectural decisions. Skip it for targeted 1–3 line fixes where the location and change are fully specified in the request.
+- When editing files, provide only the changed lines (diff format) — do not rewrite the whole file.
+- **Logging:** When adding new behavior, instrument it with `self.log(message, color, debug=False)`. Use `debug=True` for verbose or high-frequency messages. Include the function name and key values so a failure is self-explaining in the log without needing extra print statements. Use `self.log_unique(key, message)` for messages that would otherwise spam on repeat. After completing an edit or feature, ask the user whether any log entries added for that task should be removed or cleaned up.
+- **DRY / reuse first:** Before writing a new code, consider making a helper instead, check if an existing one already does the job. Avoid duplicating large blocks of logic — if multiple features, modes, or controls share similar behavior and one needs a small variation, add a parameter or a one-line override rather than copying the whole helper block. Use judgment: a tiny amount of duplication is fine if sharing it would require over-engineering. The goal is to avoid unnecessary duplication, not abstraction for its own sake.
+- **No magic values:** Do not hardcode colors, sizes, timeouts, URLs, port numbers, or other tuneable constants inline. Define them as named constants near the top of the file (or in a dedicated constants block) and reference them by name. One place to change, easy to find.
+- **Write for humans:** Keep code readable and linear. Prefer flat, explicit logic over clever one-liners or deeply nested callbacks. A new contributor should be able to read a function top-to-bottom and understand it without tracing five layers of indirection. Avoid spaghetti — if a function is doing too many unrelated things, split it; if two functions are doing the same thing, merge them.
+- **Time-based effects, never frame-based:** All animations, lerps, oscillators, and timers must use elapsed wall-clock seconds (`dt = now - last_ts`), not frame counts. Use `alpha = 1.0 - math.exp(-rate * dt)` for exponential smoothing where `rate` is in units of 1/second. This keeps behaviour identical at 30 fps and 60 fps.
+
+## Project Overview
+
+**WLEDCC (WLED Command Center+)** is a Windows desktop GUI application for controlling networked LED lighting systems. It manages WLED devices (WiFi LED controllers), integrates with LedFx (music-reactive effects engine), and includes a built-in audio spectrum analyzer.
+
+## Development Commands
+
+**Run the app:**
+```powershell
+python WLEDCC.py
+```
+
+**Install dependencies:**
+```powershell
+pip install flet numpy soundcard psutil pywin32 requests zeroconf Pillow flux_led
+```
+
+**Build distributable (both EXEs + installer):**
+```powershell
+.\NewBuilderALL.bat
+```
+This runs PyInstaller with `WLEDCCALL.spec` (produces `dist/WLEDCC.exe` and `dist/SA.exe`), then Inno Setup with `WLEDCC_setupALL.iss`.
+
+**Build EXEs only (no installer):**
+```powershell
+pyinstaller WLEDCCALL.spec
+```
+
+There are no automated tests in this project.
+
+## Architecture
+
+### Entry Points
+- **`WLEDCC.py`** — Main application (~10,500 lines). Single `WLEDApp` class wraps all UI, networking, threading, and device logic.
+- **`SA.py`** — Standalone spectrum analyzer (~6,000 lines). `SpectrumController` is a self-contained, reusable engine that `WLEDApp` embeds.
+
+### Threading Model
+`WLEDApp` spawns multiple daemon threads that must coordinate carefully — Flet UI updates from background threads **must** use `page.run_task()`, not direct `.update()` calls:
+
+| Thread | Purpose |
+|---|---|
+| `unified_poll_loop` | Central WLED + LedFx device polling (adaptive interval) |
+| `brightness_worker` | Debounced slider → device brightness updates |
+| `ledfx_monitor_loop` | Monitors LedFx process via psutil |
+| `_custom_launcher_monitor_loop` | Monitors custom-card processes |
+| `LogFlush` | Drains thread-safe log queue to UI |
+| `UIHeartbeat` / `UIWatchdog` | Freeze detection; writes `ui_watchdog.log` |
+| `rainbow_loop` | Title/border color animations |
+
+### Device Control Hierarchy
+1. **WLED Direct** — HTTP API (`/json/state`, `/json/info`) to device IP
+2. **LedFx Live** — Device in live-stream mode; LedFx sends UDP effect data
+3. **MagicHome Static** — UDP color/mode packets via `flux_led`
+4. **MagicHome Live (MHBridge)** — WLEDCC bridges LedFx effect stream → MagicHome UDP protocol
+
+Discovery uses mDNS (`zeroconf`) for `_http._tcp` services. Device state is cached in `%APPDATA%\Roaming\WLEDCC\wledcc_cache.json` with backup rotation.
+
+### Spectrum Analyzer (`SA.py`)
+`SpectrumController` runs its own audio capture and rendering loop (numpy FFT over `soundcard` input) independently of the Flet event loop. `_PilCanvas` handles PIL-based neon rendering. Idle effect modes (Aurora, Pulse, Text, games) stored in `_spec_idle_*` state.
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [PPPAnimal/WLEDCC](https://github.com/PPPAnimal/WLEDCC) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-06-17 -->
