@@ -1,200 +1,190 @@
 ---
 trigger: always_on
-description: This repository is a small Bun + TypeScript CLI/daemon.
+description: A Cashu ecash wallet CLI for Bitcoin and Lightning payments. Use when managing Cashu tokens, sending/receiving payments via Lightning (bolt11) or ecash, handling HTTP 402 X-Cashu payment requests, or viewing wallet history.
 ---
 
-# AGENTS.md
 
-This repository is a small Bun + TypeScript CLI/daemon.
-Agents should optimize for: minimal diffs, strict types, Bun-native APIs, and predictable CLI UX.
+# Cocod - Cashu Wallet CLI
 
-## Ground Rules (Repo Policy)
+Cocod is a Cashu wallet for managing ecash tokens and making Bitcoin/Lightning payments. It uses the Cashu protocol for privacy-preserving ecash transactions.
 
-- Runtime: Bun (not Node). Prefer Bun APIs over Node/polyfills.
-- Module system: ESM (`"type": "module"` in `package.json`).
-- TypeScript is the linter: `tsc --noEmit` is the primary check.
-- No Cursor/Copilot rule files were found (`.cursor/rules/**`, `.cursorrules`, `.github/copilot-instructions.md`).
-- Also follow `CLAUDE.md` (Bun defaults, preferred APIs, testing conventions).
+If a web/API request returns HTTP `402 Payment Required` with an `X-Cashu` header, use this skill to parse and settle the request with cocod.
 
-## Project Shape
+## Agent Safety Policy (Required)
 
-- `src/index.ts`: entrypoint for the `cocod` binary (shebang: `#!/usr/bin/env bun`).
-- `src/cli.ts` + `src/cli-shared.ts`: Commander-based CLI.
-- `src/daemon.ts`: background daemon implemented with `Bun.serve()` on a UNIX socket.
-- `src/routes.ts`: HTTP route handlers for the daemon (endpoints like /balance, /receive, /init, etc.).
-- `src/utils/`:
-  - `state.ts`: DaemonStateManager and wallet state logic
-  - `wallet.ts`: Wallet initialization helpers
-  - `crypto.ts`: Mnemonic encryption/decryption
-  - `config.ts`: Configuration paths, env vars, and types
-- IPC: CLI talks to daemon via `fetch()` with Bun's `RequestInit.unix` option.
+When acting as an AGENT with this skill:
 
-Key paths/env:
+- Always ask for explicit user permission before running any command/flow that can spend wallet funds, unless the user has already clearly instructed you to execute that spend action.
+- Prefer preview/inspection commands before execution whenever available. For example, run `cocod x-cashu parse <request>` to inspect costs and requirements before `cocod x-cashu handle <request>`.
+- Treat `~/.cocod` as sensitive. Never log, print, or expose its contents (including config, mnemonic material, wallet state, sockets, and pid files) unless the user explicitly requests a specific safe subset.
+- Always surface issues and errors encountered while using the CLI or this skill. Do not hide failures behind partial success messaging.
+- Do not manually work around CLI issues, missing behavior, or unexpected command failures without explicit user permission.
 
-- Socket: `COCOD_SOCKET` (default `~/.cocod/cocod.sock`).
-- PID file: `COCOD_PID` (default `~/.cocod/cocod.pid`).
-- Wallet config: `~/.cocod/config.json` (generated; do not commit).
+## What is Cashu?
+
+Cashu is a Chaumian ecash protocol that lets you hold and transfer Bitcoin-backed tokens privately. It enables unlinkable transactions using blind signatures.
+
+## Installation
+
+```bash
+# Install cocod CLI
+bun install -g cocod
+```
+
+## Version Compatibility
+
+This skill is version-pinned to an exact `cocod` CLI release.
+
+- `metadata.skill_version` must match the npm package version.
+- `metadata.requires_cocod_version` is pinned to that exact same version.
+
+Check your installed CLI version:
+
+```bash
+cocod --version
+```
+
+If the version does not match the pinned values in this file, update `cocod` before using this skill.
+
+## Quick Start
+
+```bash
+# Initialize your wallet (generates mnemonic automatically)
+cocod init
+
+# Or with a custom mint
+cocod init --mint-url https://mint.example.com
+
+# Check balance
+cocod balance
+```
 
 ## Commands
 
-All commands run from repo root (`/home/egge/projects/cocod`).
+### Core Wallet
 
-### Install
+```bash
+# Check daemon and wallet status
+cocod status
 
-```sh
-bun install
+# Initialize wallet with optional mnemonic
+cocod init [mnemonic] [--passphrase <passphrase>] [--mint-url <url>]
+
+# Unlock encrypted wallet (only required when initialised with passphrase)
+cocod unlock <passphrase>
+
+# Get wallet balance
+cocod balance
+
+# Test daemon connection
+cocod ping
 ```
 
-### Run the CLI (foreground)
+### Receiving Payments
 
-- Entrypoint:
+```bash
+# Receive Cashu token
+cocod receive cashu <token>
 
-```sh
-bun src/index.ts --help
+# Create Lightning invoice to receive
+cocod receive bolt11 <amount> [--mint-url <url>]
 ```
 
-- Via npm-style script (use `--` to pass args):
+### Sending Payments
 
-```sh
-bun run start -- --help
+AGENT rule: commands in this section spend wallet funds. Ask for permission first unless the user already explicitly requested the spend action.
+
+```bash
+# Create Cashu token to send to someone
+cocod send cashu <amount> [--mint-url <url>]
+
+# Pay a Lightning invoice
+cocod send bolt11 <invoice> [--mint-url <url>]
 ```
 
-- Common commands:
+### HTTP 402 Web Payments (NUT-24)
 
-```sh
-bun src/index.ts balance
-bun src/index.ts ping
-bun src/index.ts mint list
+Use these commands when a server responds with HTTP `402` and an `X-Cashu` payment request.
+
+AGENT rule: `cocod x-cashu handle <request>` can spend funds. Prefer `cocod x-cashu parse <request>` first to preview amount/requirements, then ask permission before handling unless already instructed.
+
+```bash
+# Parse an encoded X-Cashu request from a 402 response header
+cocod x-cashu parse <request>
+
+# Settle the request and get an X-Cashu payment header value
+cocod x-cashu handle <request>
 ```
 
-### Start the daemon
+Typical flow:
 
-The daemon can be started explicitly, but the CLI also auto-starts it when needed.
+1. Read `X-Cashu` from the `402` response.
+2. Run `cocod x-cashu parse <request>` to inspect amount and mint requirements.
+3. Run `cocod x-cashu handle <request>` to generate payment token header value.
+4. Retry the original web request with returned `X-Cashu: cashuB...` header.
 
-```sh
-bun run daemon
+### Mints
+
+```bash
+# Add a mint URL
+cocod mints add <url>
+
+# List configured mints
+cocod mints list
+
+# Get mint information
+cocod mints info <url>
 ```
 
-### Build / bundle
+### Lightning Address (NPC)
 
-There is no required build step (the CLI runs directly via Bun + TypeScript).
+Lightning Addresses are email-style identifiers (like `name@npubx.cash`) that let others pay you over Lightning. If you have not purchased a username, NPC provides a free address from your Nostr npub; purchasing a username gives you a human-readable handle. Buying a username is a two-step flow so you can review the required sats before confirming payment.
 
-- Optional: produce a bundled artifact:
+AGENT rule: `cocod npc username <name> --confirm` is a spend action. Ask permission before running `--confirm` unless already instructed.
 
-```sh
-bun build src/index.ts --outdir dist --target bun
+```bash
+# Get your NPC Lightning Address
+cocod npc address
+
+# Reserve/buy an NPC username (two-step)
+cocod npc username <name>
+cocod npc username <name> --confirm
 ```
 
-### Lint / typecheck
+### History
 
-This repo currently uses TypeScript as the main lint gate.
+```bash
+# View wallet history
+cocod history
 
-```sh
-bun run lint
+# With pagination
+cocod history --offset 0 --limit 20
+
+# Watch for real-time updates
+cocod history --watch
+
+# Limit with watch
+cocod history --limit 50 --watch
 ```
 
-If you need to run tsc directly:
+### Daemon Control
 
-```sh
-bunx tsc --noEmit
+```bash
+# Start the background daemon (started automatically when not running when required)
+cocod daemon
+
+# Stop the daemon
+cocod stop
 ```
 
-### Tests
+## Examples
 
-Bun's test runner is the expected choice.
+**Initialize with encryption:**
 
-- Run all tests:
-
-```sh
-bun test
-```
-
-- Run a single test file:
-
-```sh
-bun test path/to/file.test.ts
-```
-
-- Run a single test by name (recommended when adding tests):
-
-```sh
-bun test -t "ping returns pong"
-```
-
-Notes:
-
-- Prefer test files named `*.test.ts` and colocated near the code they test.
-- Use `import { test, expect } from "bun:test";`.
-
-## Code Style
-
-There is a formatter config at `.prettierrc`. Match existing style and avoid drive-by reformatting.
-
-### Formatting
-
-- Indentation: 2 spaces.
-- Quotes: double quotes for strings.
-- Semicolons: use them consistently (match surrounding file).
-- Line length: keep lines reasonably short; wrap long function signatures.
-
-### Imports
-
-- Order:
-  1. external packages
-  2. blank line
-  3. local relative imports
-- Prefer `import type { ... }` for type-only imports.
-- Prefer named imports; avoid default imports unless the package is default-first.
-- Keep relative imports extensionless (match current code). Only include `.js` when required by ESM packages.
-
-### Types and strictness
-
-`tsconfig.json` enables strict TypeScript plus `noUncheckedIndexedAccess`.
-
-- Avoid `any`. Use `unknown` at boundaries and narrow.
-- Validate untrusted inputs (CLI args, request bodies, env vars).
-- When indexing objects, handle `undefined` explicitly (e.g., `balance[mintUrl] || 0`).
-- Prefer explicit return types on exported functions and non-trivial helpers.
-- Use discriminated unions / literal types for protocol-like payloads.
-
-### Naming
-
-- Files: kebab-case for multiword modules (e.g., `cli-shared.ts`).
-- Types/interfaces: `PascalCase`.
-- Functions/variables: `camelCase`.
-- Constants: `UPPER_SNAKE_CASE` for configuration-like values.
-- CLI commands: lowercase; nouns/verbs consistent with existing Commander usage.
-
-### Error handling
-
-General:
-
-- Only `process.exit()` from true CLI entrypoints.
-- Prefer throwing `Error` (or subclasses) from library-ish functions.
-- In `catch`, treat the error as `unknown`; derive a safe message:
-  - `error instanceof Error ? error.message : String(error)`.
-
-Daemon (`src/daemon.ts`):
-
-- Return JSON with either `{ output: string }` or `{ error: string }`.
-- Use proper HTTP status codes for failures (e.g., 400 for bad input, 404 unknown endpoint, 500 unexpected).
-- Do not swallow errors silently; if you intentionally suppress errors (e.g., delete stale files), add a short comment.
-
-CLI (`src/cli-shared.ts`):
-
-- Print user-facing errors to stderr (`console.error`).
-- Exit with code 1 for expected failures.
-- For daemon connectivity issues, prefer actionable messages (socket path, how to start daemon).
-
-### Bun-specific guidance (from `CLAUDE.md`)
-
-- Use `bun <file>` / `bun run <script>` (not `node`, `ts-node`, `npm`).
-- Use `bun test` (not jest/vitest).
-- Use `Bun.serve()` routes/websocket support (not express).
-- Prefer `Bun.file` for file IO; Bun loads `.env` automatically (avoid `dotenv`).
+```bash
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [Egge21M/cocod](https://github.com/Egge21M/cocod) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-25 -->
+<!-- tomevault:4.0:windsurf_rules:2026-06-17 -->
