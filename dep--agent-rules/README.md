@@ -7,11 +7,11 @@ Centralize your agent instructions, commands, skills, and handle symlinking.
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [dep/agent-rules](https://github.com/dep/agent-rules).
+Original source: `CLAUDE.md` in [dep/agent-rules](https://github.com/dep/agent-rules).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
