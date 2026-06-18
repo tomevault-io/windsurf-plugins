@@ -7,11 +7,11 @@ Real-time aircraft & drone identification using AR, ADS-B, Remote ID, and WiFi d
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [lnxgod/friendorfoe](https://github.com/lnxgod/friendorfoe).
+Original source: `CLAUDE.md` in [lnxgod/friendorfoe](https://github.com/lnxgod/friendorfoe).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
