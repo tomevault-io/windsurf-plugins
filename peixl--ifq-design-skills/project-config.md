@@ -1,93 +1,96 @@
 ---
 trigger: always_on
-description: This skill uses runtime-agnostic verbs. Translate them to your runtime's actual tools:
+description: Use this skill whenever the user asks for an HTML-first visual design deliverable or design judgment: interactive prototype, slide deck, motion demo, infographic, dashboard, landing page, whitepaper, changelog, business card, social cover, brand system, design critique, multi-variant exploration, or export to MP4, GIF, PPTX, PDF, or SVG. It is optimized to make AI agents do the routing, template selection, verification, and export prep so humans spend less time prompt-engineering. Do not use for
 ---
 
-# AGENTS.md — IFQ Design Skills
 
-> Any AI coding agent reading this file: **this repo IS a skill**, not an app. Your job when invoked in this workspace is to treat [`SKILL.md`](SKILL.md) as the operating manual and follow it. This AGENTS.md exists so Codex CLI, OpenCode, sst, and any other AGENTS.md-aware runtime finds the skill without extra configuration.
+# IFQ Design Skills
 
-## First-contact protocol (60 seconds · any runtime)
+One prompt in -> shippable HTML out, with optional MP4 / GIF / PPTX / PDF / SVG export. This root file is a short router for OpenClaw, ClawHub, skills.sh, Hermes, Codex, Claude Code, Cursor, OpenCode, and other AgentSkills-compatible hosts. Load deeper files only when the task requires them.
 
-When you land in this repo with a design-ish user request:
+## 30-Second Load Path
 
-1. **Read** [`SKILL.md`](SKILL.md) as the short root router (≈ first 120 lines). That alone tells you trigger boundaries, capabilities, permissions, tier policy, and the three-move loop.
-2. **Route** via [`references/modes.md`](references/modes.md) → pick one of the 12 modes → read [`assets/templates/INDEX.json`](assets/templates/INDEX.json) → fork the template into the user's working directory. **Never start from a blank HTML.**
-3. **Verify lite** with `npm run verify:lite -- <file>` then `npm run preview -- <file>` (both zero-install · Tier 0).
-4. Only escalate to Tier 1 (`python scripts/verify.py`) or Tier 2 (`npm run install:export` + ffmpeg) when the user explicitly asks for headless screenshots, MP4/GIF, PDF, or PPTX.
+1. Confirm the request is a visual deliverable built from HTML. If it is not, exit this skill.
+2. Pick the mode from [references/modes.md](references/modes.md), then read [assets/templates/INDEX.json](assets/templates/INDEX.json).
+3. Fork a listed template into the user's workspace. Never start from a blank HTML file.
+4. Inline [assets/ifq-brand/ifq-tokens.css](assets/ifq-brand/ifq-tokens.css) and weave at least 3 IFQ ambient marks from [references/ifq-brand-spec.md](references/ifq-brand-spec.md).
+5. Verify with `npm run verify:lite -- <file.html>`, then `npm run preview -- <file.html>`.
 
-If the user's request is **not** a visual design deliverable, exit this skill cleanly and hand back to your default agent — do not force-fit.
+## Human + Agent Promise
 
-## What this repo is
+- Humans get a finished artifact path: HTML first, optional export only when requested, and no hidden setup.
+- Agents get a short route: mode, template, must-read references, tier policy, and verification command.
+- Maintainers get regression pressure: 12 mode evals, scanner-clean scripts, and marketplace metadata checks.
+- Marketplaces get a readable package: one-line install, zero required env vars, explicit permissions, and no silent installs.
 
-A design engine packaged as a skill. One prompt in → a shippable HTML / MP4 / GIF / PPTX / PDF / SVG out, with the IFQ ambient brand layer woven into the layout.
+## First-Run Success Path
 
-Full protocol: [`SKILL.md`](SKILL.md). Start there. Everything below is just the TL;DR for agents landing here cold.
+After install, make the first interaction produce a visible artifact in one turn:
 
-## When to engage the skill
+1. Accept a natural-language visual request without turning it into setup work.
+2. Route it to one mode and one template; name both in the final evidence.
+3. Write the HTML file into the user's workspace with labeled assumptions for unresolved facts.
+4. Run `npm run verify:lite -- <file.html>` when shell is available, then preview or screenshot with host browser tooling when available.
+5. Report the file path, route, template, verification result, and only caveats that affect use.
 
-Whenever the user asks for **a visual deliverable built from HTML** — prototype, slide deck, motion demo, infographic, dashboard, landing page, whitepaper, changelog, business card, social cover, brand system — or wants exports (MP4 / GIF / PPTX / PDF / SVG) from the same source, or wants design variants, or wants a design critique.
+Do not ask for account login, global install, export dependencies, or broad environment changes during the first-run path.
 
-Do **not** engage for: production web apps, SEO-critical marketing sites, backend systems, or pure copy/text rewriting.
+## Output Boundary
 
-## Zero-install core loop
+- Core output is verified local HTML, plus SVG/static companions or export-ready source structure when the task needs them.
+- MP4/GIF/PDF/PPTX helpers are full-repo optional automation. Prepare the HTML source first; install or run export tooling only after explicit user intent.
+- Never claim an export file, screenshot, marketplace status, or security result exists until the relevant command or live check has actually passed.
 
-```bash
-# write HTML into the project, then:
-npm run preview -- path/to/design.html       # prints a file:// URL (no child process)
-npm run verify:lite -- path/to/design.html   # pure Node placeholder scan
+## Use When
+
+- Interactive prototype, hi-fi mockup, clickable app flow, dashboard, landing page, whitepaper, report, infographic, slide deck, changelog, card, invitation, social cover, or brand system.
+- Motion demo or launch animation, especially when the user also wants MP4/GIF output.
+- Design critique, brand diagnosis, or 3 differentiated style directions before implementation.
+- The user asks for PDF/PPTX/SVG export from an HTML-first source.
+
+## Do Not Use When
+
+- The real task is production frontend engineering, backend work, SEO-critical site implementation, or a CSS bug inside an existing app.
+- The user only wants copy editing with no visual artifact.
+- The deliverable must round-trip through Word, Google Docs, or a locked corporate template.
+
+## Tier Policy
+
+| Tier | Default? | Requirements | Use for |
+|---|---:|---|---|
+| Tier 0 | yes | Node >= 18.17 | HTML, preview, lite verification, smoke tests |
+| Tier 1 | opt-in | Python + Playwright + Chromium | headless screenshots, console capture, multi-viewport checks |
+| Tier 2 | opt-in | `npm run install:export`; MP4/GIF also need `ffmpeg` | MP4, GIF, PDF, editable PPTX export |
+
+Do not install optional dependencies unless the user explicitly needs screenshots or export formats.
+
+## Routing Decision Tree
+
+```
+User request arrives
+  │
+  ├─ Is it a visual design deliverable? ─── No → Exit skill, hand back to default agent
+  │
+  ├─ Can you match a mode trigger? ─── Yes (confidence >70%) → fork template → deliver → verify
+  │                                      (one-turn: name assumptions, no questions)
+  │
+  ├─ Can you match a mode trigger? ─── Yes (confidence ≤70%) → design-direction-advisor.md lightweight
+  │                                      (3 text-only directions, no demos, wait for user pick)
+  │
+  ├─ Does it mention a concrete product/tech/event? ─── Yes → fact-and-asset-protocol.md + web fact-check
+  │
+  ├─ Is it a mobile app prototype? ─── Yes → app-prototype-rules.md + ios_frame.jsx / android_frame.jsx
+  │
+  └─ Is it motion/video? ─── Yes → animation-pitfalls.md + animations.md + video-export.md
 ```
 
-Works on macOS / Linux / Windows without a single `npm install`.
+Read [references/modes.md](references/modes.md) for full mode protocol. The Quick Reference table above is the speed layer.
 
-## On-demand tiers (install only when needed)
+## Quick Reference (Agent Speed Table)
 
-| User asked for… | Run once |
-|---|---|
-| MP4 / GIF / PDF / PPTX export | `npm run install:export` (pulls playwright + pdf-lib + pptxgenjs + sharp + Chromium) |
-| MP4 / GIF specifically | plus `brew install ffmpeg` or `apt install ffmpeg` |
-| Automated headless multi-viewport screenshots + console capture | `pip install playwright && python -m playwright install chromium` |
-
-Never push these on the user if they only asked for HTML. `playwright` lives under `optionalDependencies` on purpose.
-
-## Safety posture (scanner-clean)
-
-- Zero Node/Python `child_process` / `spawn` / `exec` APIs in `scripts/**`; shell export helpers may call `ffmpeg` / `ffprobe` only when explicitly invoked for export.
-- Zero `eval` / `new Function` anywhere.
-- No outbound network calls from any script at runtime.
-- Built-in templates use local-first fonts and do not load Google Fonts unless the user explicitly opts in.
-- The skill never writes outside the user's workspace; it never installs anything silently.
-- Full capability / permission declaration lives in `SKILL.md` frontmatter as single-line JSON `metadata` (`metadata.openclaw.requires`, capability signals, and security signals) — permission-aware runtimes (OpenClaw, Hermes) can grant scopes from there.
-
-## Agent runtime pointers
-
-| Runtime | How this skill is wired |
-|---|---|
-| **Claude Code** | symlink / clone into `~/.claude/skills/ifq-design-skills`; frontmatter auto-discovery. |
-| **Codex CLI (OpenAI)** | reads this `AGENTS.md`; follow the pointer to `SKILL.md`. |
-| **OpenCode (sst/opencode)** | reads this `AGENTS.md` automatically on session start. |
-| **OpenClaw** | register under `plugins.allow` in `openclaw.json`, restart gateway. |
-| **Hermes** | `hermes skills install github:peixl/ifq-design-skills`. |
-| **Cursor** | pin `@ifq-design-skills/SKILL.md` at start of chat. |
-| **CodeBuddy (Tencent)** | reads this `AGENTS.md` from the workspace; pin `@SKILL.md` in chat to load the root router, then follow its reference map. |
-
-Full install matrix with per-agent tool mapping: [`references/agent-compatibility.md`](references/agent-compatibility.md).
-
-## Neutral verbs (do not hard-code tool names)
-
-This skill uses runtime-agnostic verbs. Translate them to your runtime's actual tools:
-
-| Neutral verb | What it means |
-|---|---|
-| **read file** | open a file and read its contents |
-| **write file** | create or overwrite a file |
-| **run command** | execute a shell command |
-| **web search** | search the open web (for `#0 fact-verification` — see SKILL.md) |
-| **preview** | `npm run preview -- <file>` — prints a `file://` URL for you to hand to a browser tool or the user |
-| **verify (lite)** | `npm run verify:lite -- <file>` — zero-dep placeholder scan |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [peixl/ifq-design-skills](https://github.com/peixl/ifq-design-skills) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-02 -->
+<!-- tomevault:4.0:windsurf_rules:2026-06-17 -->
