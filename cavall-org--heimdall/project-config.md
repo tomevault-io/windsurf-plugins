@@ -1,8 +1,7 @@
 ---
 trigger: always_on
-description: Heimdall runtime guardrails
+description: Heimdall is the agentic interface to Ketcher for molecule operations. Three
 ---
-
 
 # Heimdall runtime guardrails
 
