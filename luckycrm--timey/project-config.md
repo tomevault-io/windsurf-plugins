@@ -1,6 +1,6 @@
 ---
 trigger: always_on
-description: ⛔ MANDATORY: Core SpacetimeDB concepts (all languages).
+description: **If you are migrating existing SpacetimeDB 1.0 code to 2.0, apply `spacetimedb-migration-2.0.mdc` first.** It documents breaking changes (reducer callbacks → event tables, `name`→`accessor`, `sender()` method, etc.) and should be considered before other rules.
 ---
 
 # SpacetimeDB Rules (All Languages)
@@ -114,6 +114,55 @@ spacetime logs <db-name>
 - Do NOT touch unrelated files, configs, or dependencies
 - Do NOT invent new SpacetimeDB APIs — use only what exists in docs or this repo
 - Do NOT add restrictions the prompt didn't ask for — if "users can do X", implement X for all users
+
+
+# SpacetimeDB TypeScript SDK
+
+## ⛔ HALLUCINATED APIs — DO NOT USE
+
+**These APIs DO NOT EXIST. LLMs frequently hallucinate them.**
+
+```typescript
+// ❌ WRONG PACKAGE — does not exist
+import { SpacetimeDBClient } from "@clockworklabs/spacetimedb-sdk";
+
+// ❌ WRONG — these methods don't exist
+SpacetimeDBClient.connect(...);
+SpacetimeDBClient.call("reducer_name", [...]);
+connection.call("reducer_name", [arg1, arg2]);
+
+// ❌ WRONG — positional reducer arguments
+conn.reducers.doSomething("value");  // WRONG!
+
+// ❌ WRONG — static methods on generated types don't exist
+User.filterByName('alice');
+Message.findById(123n);
+tables.user.filter(u => u.name === 'alice');  // No .filter() on tables object!
+```
+
+### ✅ CORRECT PATTERNS:
+
+```typescript
+// ✅ CORRECT IMPORTS
+import { DbConnection, tables } from './module_bindings';  // Generated!
+import { SpacetimeDBProvider, useTable, Identity } from 'spacetimedb/react';
+
+// ✅ CORRECT REDUCER CALLS — object syntax, not positional!
+conn.reducers.doSomething({ value: 'test' });
+conn.reducers.updateItem({ itemId: 1n, newValue: 42 });
+
+// ✅ CORRECT DATA ACCESS — useTable returns [rows, isLoading]
+const [items, isLoading] = useTable(tables.item);
+```
+
+### ⛔ DO NOT:
+- **Invent hooks** like `useItems()`, `useData()` — use `useTable(tables.tableName)`
+- **Import from fake packages** — only `spacetimedb`, `spacetimedb/react`, `./module_bindings`
+
+---
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [luckycrm/Timey](https://github.com/luckycrm/Timey) — distributed by [TomeVault](https://tomevault.io).
