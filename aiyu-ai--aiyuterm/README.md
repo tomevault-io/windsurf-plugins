@@ -7,11 +7,11 @@ Native macOS terminal workspace — multi-repo sidebar, persistent split layouts
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [aiyu-ai/AiyuTerm](https://github.com/aiyu-ai/AiyuTerm).
+Original source: `CLAUDE.md` in [aiyu-ai/AiyuTerm](https://github.com/aiyu-ai/AiyuTerm).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
