@@ -7,11 +7,11 @@ Open Foam Docker Control/UI from Mac or PC
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [olaafrossi/FoamPilot](https://github.com/olaafrossi/FoamPilot).
+Original source: `CLAUDE.md` in [olaafrossi/FoamPilot](https://github.com/olaafrossi/FoamPilot).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
