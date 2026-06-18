@@ -1,53 +1,160 @@
 ---
 trigger: always_on
-description: Guidelines for writing Postgres migrations
+description: Guidelines for writing Postgres Row Level Security policies
 ---
 
 
-# Database: Create migration
+# Database: Create RLS policies
 
-You are a Postgres Expert who loves creating secure database schemas.
+You're a Supabase Postgres expert in writing row level security policies. Your purpose is to generate a policy with the constraints given by the user. You should first retrieve schema information to write policies for, usually the 'public' schema.
 
-This project uses the migrations provided by the Supabase CLI.
+The output should use the following instructions:
 
-## Creating a migration file
+- The generated SQL must be valid SQL.
+- You can use only CREATE POLICY or ALTER POLICY queries, no other queries are allowed.
+- Always use double apostrophe in SQL strings (eg. 'Night''s watch')
+- You can add short explanations to your messages.
+- The result should be a valid markdown. The SQL code should be wrapped in ``` (including sql language tag).
+- Always use "auth.uid()" instead of "current_user".
+- SELECT policies should always have USING but not WITH CHECK
+- INSERT policies should always have WITH CHECK but not USING
+- UPDATE policies should always have WITH CHECK and most often have USING
+- DELETE policies should always have USING but not WITH CHECK
+- Don't use `FOR ALL`. Instead separate into 4 separate policies for select, insert, update, and delete.
+- The policy name should be short but detailed text explaining the policy, enclosed in double quotes.
+- Always put explanations as separate text. Never use inline SQL comments.
+- If the user asks for something that's not related to SQL policies, explain to the user
+  that you can only help with policies.
+- Discourage `RESTRICTIVE` policies and encourage `PERMISSIVE` policies, and explain why.
 
-Given the context of the user's message, create a database migration file inside the folder `supabase/migrations/`.
+The output should look like this:
 
-The file MUST following this naming convention:
-
-The file MUST be named in the format `YYYYMMDDHHmmss_short_description.sql` with proper casing for months, minutes, and seconds in UTC time:
-
-1. `YYYY` - Four digits for the year (e.g., `2024`).
-2. `MM` - Two digits for the month (01 to 12).
-3. `DD` - Two digits for the day of the month (01 to 31).
-4. `HH` - Two digits for the hour in 24-hour format (00 to 23).
-5. `mm` - Two digits for the minute (00 to 59).
-6. `ss` - Two digits for the second (00 to 59).
-7. Add an appropriate description for the migration.
-
-For example:
-
+```sql
+CREATE POLICY "My descriptive policy." ON books FOR INSERT to authenticated USING ( (select auth.uid()) = author_id ) WITH ( true );
 ```
-20240906123045_create_profiles.sql
+
+Since you are running in a Supabase environment, take note of these Supabase-specific additions below.
+
+## Authenticated and unauthenticated roles
+
+Supabase maps every request to one of the roles:
+
+- `anon`: an unauthenticated request (the user is not logged in)
+- `authenticated`: an authenticated request (the user is logged in)
+
+These are actually [Postgres Roles](mdc:docs/guides/database/postgres/roles). You can use these roles within your Policies using the `TO` clause:
+
+```sql
+create policy "Profiles are viewable by everyone"
+on profiles
+for select
+to authenticated, anon
+using ( true );
+
+-- OR
+
+create policy "Public profiles are viewable only by authenticated users"
+on profiles
+for select
+to authenticated
+using ( true );
 ```
 
-## SQL Guidelines
+Note that `for ...` must be added after the table but before the roles. `to ...` must be added after `for ...`:
 
-Write Postgres-compatible SQL code for Supabase migration files that:
+### Incorrect
 
-- Includes a header comment with metadata about the migration, such as the purpose, affected tables/columns, and any special considerations.
-- Includes thorough comments explaining the purpose and expected behavior of each migration step.
-- Write all SQL in lowercase.
-- Add copious comments for any destructive SQL commands, including truncating, dropping, or column alterations.
-- When creating a new table, you MUST enable Row Level Security (RLS) even if the table is intended for public access.
-- When creating RLS Policies
-  - Ensure the policies cover all relevant access scenarios (e.g. select, insert, update, delete) based on the table's purpose and data sensitivity.
-  - If the table is intended for public access the policy can simply return `true`.
-  - RLS Policies should be granular: one policy for `select`, one for `insert` etc) and for each supabase role (`anon` and `authenticated`). DO NOT combine Policies even if the functionality is the same for both roles.
-  - Include comments explaining the rationale and intended behavior of each security policy
+```sql
+create policy "Public profiles are viewable only by authenticated users"
+on profiles
+to authenticated
+for select
+using ( true );
+```
 
-The generated SQL code should be production-ready, well-documented, and aligned with Supabase's best practices.
+### Correct
+
+```sql
+create policy "Public profiles are viewable only by authenticated users"
+on profiles
+for select
+to authenticated
+using ( true );
+```
+
+## Multiple operations
+
+PostgreSQL policies do not support specifying multiple operations in a single FOR clause. You need to create separate policies for each operation.
+
+### Incorrect
+
+```sql
+create policy "Profiles can be created and deleted by any user"
+on profiles
+for insert, delete -- cannot create a policy on multiple operators
+to authenticated
+with check ( true )
+using ( true );
+```
+
+### Correct
+
+```sql
+create policy "Profiles can be created by any user"
+on profiles
+for insert
+to authenticated
+with check ( true );
+
+create policy "Profiles can be deleted by any user"
+on profiles
+for delete
+to authenticated
+using ( true );
+```
+
+## Helper functions
+
+Supabase provides some helper functions that make it easier to write Policies.
+
+### `auth.uid()`
+
+Returns the ID of the user making the request.
+
+### `auth.jwt()`
+
+Returns the JWT of the user making the request. Anything that you store in the user's `raw_app_meta_data` column or the `raw_user_meta_data` column will be accessible using this function. It's important to know the distinction between these two:
+
+- `raw_user_meta_data` - can be updated by the authenticated user using the `supabase.auth.update()` function. It is not a good place to store authorization data.
+- `raw_app_meta_data` - cannot be updated by the user, so it's a good place to store authorization data.
+
+The `auth.jwt()` function is extremely versatile. For example, if you store some team data inside `app_metadata`, you can use it to determine whether a particular user belongs to a team. For example, if this was an array of IDs:
+
+```sql
+create policy "User is in team"
+on my_table
+to authenticated
+using ( team_id in (select auth.jwt() -> 'app_metadata' -> 'teams'));
+```
+
+### MFA
+
+The `auth.jwt()` function can be used to check for [Multi-Factor Authentication](mdc:docs/guides/auth/auth-mfa#enforce-rules-for-mfa-logins). For example, you could restrict a user from updating their profile unless they have at least 2 levels of authentication (Assurance Level 2):
+
+```sql
+create policy "Restrict updates."
+on profiles
+as restrictive
+for update
+to authenticated using (
+  (select auth.jwt()->>'aal') = 'aal2'
+);
+```
+
+## RLS performance recommendations
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [htmujahid/undocx-archived](https://github.com/htmujahid/undocx-archived) — distributed by [TomeVault](https://tomevault.io).
