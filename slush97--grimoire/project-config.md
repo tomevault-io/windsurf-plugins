@@ -1,0 +1,105 @@
+---
+trigger: always_on
+description: Mod manager and companion tool for Deadlock (Valve hero shooter). Electron desktop app (Windows/Linux).
+---
+
+# Grimoire
+
+Mod manager and companion tool for Deadlock (Valve hero shooter). Electron desktop app (Windows/Linux).
+
+## What It Does
+
+- **Browse & Install Mods** from GameBanana (download queue, archive extraction for ZIP/7Z/RAR)
+- **Import GameBanana Collections** by URL
+- **One-Click Install** via custom protocol handler (`gb1click://`)
+- **Catalog Sync** - background mirror of the GameBanana mod index into local SQLite for fast offline browse + FTS5 search
+- **Manage Installed Mods** - enable/disable, reorder priority, delete
+- **Hero Locker** - organize cosmetic skins by hero
+- **Crosshair Designer** - real-time preview, save/load presets, apply to autoexec
+- **Autoexec Manager** - console command editor for autoexec.cfg
+- **Mod Profiles** - save/switch mod configurations
+- **Portable Profile Export/Import** - share profiles via `mp1:` share codes or `.modprofile.json` files (Grimoire-only format; see `docs/profile-spec.md`)
+- **Conflict Detection** - identify overlapping file paths between mods
+- **Player Stats** - MMR tracking, match history, hero stats, leaderboards (via deadlock-api.com)
+- **Deadworks Server Browser** - browse/join community dedicated servers; auto-downloads required map/addon content before connecting (gated behind `experimentalDeadworksServers`; see `docs/deadworks-servers.md`)
+- **Auto-Update** - GitHub releases integration
+
+## Tech Stack
+
+- **Electron 35** + **electron-vite** (Vite-based build)
+- **React 19** + **React Router 7** + **TypeScript 5.9**
+- **TailwindCSS 4** + **Lucide React** (icons)
+- **Zustand** (state management)
+- **better-sqlite3** (two SQLite databases: mods-cache.db, stats.db)
+- **pnpm** (package manager)
+
+## Project Structure
+
+```
+electron/
+  main/
+    index.ts          # Entry point, window creation, app lifecycle
+    ipc/              # IPC channel handlers (mods, gamebanana, system, settings, profiles, conflicts, modDatabase, crosshairPresets, stats, updater, launch)
+    services/         # Business logic (mods, download, extract, gamebanana, modDatabase, statsDatabase, stats, deadlock, steamDetect, vpk, conflicts, profiles, portableProfile, searchService, syncService, security, autoexec, metadata, settings, rateLimiter, updater, system, launch, launchOptions, oneClickInstall, dev)
+  preload/
+    index.ts          # Context-isolated IPC API (contextBridge)
+src/
+  App.tsx             # Root component with React Router
+  pages/              # Installed, Browse, Locker, LockerHero, Conflicts, Profiles, Settings, Crosshair, Autoexec, Stats
+  components/         # Layout, Sidebar, WelcomeModal, ModThumbnail, ModDetailsModal, ImportCollectionModal, MultiVpkPickerModal, VariantPickerModal, AudioPreviewPlayer, DownloadQueueIndicator, SyncIndicator, UpdateModal, common/ui, locker/, crosshair/, profiles/
+  stores/             # Zustand stores (appStore, statsStore, crosshairStore)
+  lib/                # api.ts (IPC wrapper), appSettings, assetPath, lockerUtils, dates
+  types/              # mod.ts, gamebanana.ts, deadlock-stats.ts, portableProfile.ts, electron.d.ts
+docs/                 # profile-spec, gamebanana_api_reference, deadlock-api-architecture, social-architecture, social-architecture-decisions, design-overhaul-brief
+```
+
+## Architecture
+
+Electron multi-process: Main (Node.js backend) <-> Preload (context bridge) <-> Renderer (React UI).
+
+- UI calls `window.electronAPI.*` methods exposed by preload
+- Main process handles file I/O, SQLite, external APIs, archive extraction
+- Renderer uses Zustand stores for state, React Router for navigation
+- Context isolation enabled, nodeIntegration disabled
+
+## Dev Commands
+
+```bash
+pnpm install                                      # Install dependencies
+pnpm exec electron-rebuild -f -w better-sqlite3   # Rebuild native SQLite module
+pnpm dev                                          # Dev server with HMR (localhost:5173)
+pnpm build                                        # Build bundles
+pnpm lint                                         # ESLint
+pnpm package:linux                                # Package for Linux (AppImage + deb)
+pnpm package:win                                  # Package for Windows (NSIS + portable)
+```
+
+## Databases (runtime, in app userData dir)
+
+- **mods-cache.db** - GameBanana mod catalog cache with FTS5 search. Tables: `mods`, `mods_fts`, `sync_state`
+- **stats.db** - Player stats. Tables: `players`, `mmr_snapshots`, `match_history`, `hero_stats_snapshots`, `aggregated_stats`, `stats_settings`
+
+Both use WAL mode with foreign keys enabled.
+
+## Key Config Files
+
+- `electron.vite.config.ts` - Three Vite builds: main (Node), preload (CJS), renderer (React)
+- `electron-builder.yml` - Packaging targets and auto-update config
+- `tsconfig.json` / `tsconfig.app.json` / `tsconfig.node.json` - TypeScript configs (strict mode)
+- `eslint.config.js` - ESLint 9 flat config with TypeScript + React plugins
+
+## No Tests
+
+No test framework or test files. Quality relies on TypeScript strict mode and ESLint.
+
+## Documentation
+
+Design docs and references live in `docs/`:
+
+- `profile-spec.md` - The portable profile format (`mp1:` share codes, `.modprofile.json`). Read this before touching `electron/main/services/portableProfile.ts` or the import/export UI.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [Slush97/grimoire](https://github.com/Slush97/grimoire) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-06-17 -->
