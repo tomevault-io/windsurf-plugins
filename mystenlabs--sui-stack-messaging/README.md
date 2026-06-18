@@ -7,11 +7,11 @@ End-to-end encrypted Messaging tooling on Sui, powered by Seal threshold encrypt
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [MystenLabs/sui-stack-messaging](https://github.com/MystenLabs/sui-stack-messaging).
+Original source: `CLAUDE.md` in [MystenLabs/sui-stack-messaging](https://github.com/MystenLabs/sui-stack-messaging).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
