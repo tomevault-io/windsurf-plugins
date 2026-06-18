@@ -2,15 +2,14 @@
 
 > Sourced from [Smyan1909/SoMatic](https://github.com/Smyan1909/SoMatic) and converted for every major platform by [TomeVault](https://tomevault.io)
 
-Agent-first CLI for native UI automation with Set-of-Marks screenshots. MCP server + headless Xvfb support included.
-
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [Smyan1909/SoMatic](https://github.com/Smyan1909/SoMatic).
+Original source: `` in [Smyan1909/SoMatic](https://github.com/Smyan1909/SoMatic).
 
 ## Also available for
 
+- **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
