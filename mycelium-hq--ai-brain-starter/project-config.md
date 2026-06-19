@@ -1,69 +1,49 @@
 ---
 trigger: always_on
-description: This is a **public repo** that strangers fork to build their own vaults. The whole point is that it must work for people who are NOT the maintainer and are NOT on her team.
+description: Set up or upgrade an AI-powered Obsidian vault. Interviews you, builds your vault structure (or works with what you already have), creates your CLAUDE.md memory file, installs tools, and gets you journaling — all in one conversation. Also has a repair/upgrade path for existing users.
 ---
 
-# ai-brain-starter — Claude Instructions
 
-## Public repo rules — NEVER HARDCODE PERSONAL CONTEXT
+# AI Brain Starter — Interactive Setup
 
-This is a **public repo** that strangers fork to build their own vaults. The whole point is that it must work for people who are NOT the maintainer and are NOT on her team.
+You are setting up a new user's AI-powered second brain. This is an interactive, conversational setup, not a script dump. Go step by step, wait for their answers, and adapt to what they have.
 
-**Before writing or editing ANY file in this repo, scan for and remove:**
-- Personal names (the maintainer, her co-founders, her team, her advisors, her family)
-- Company names she's affiliated with
-- Personal vault paths (`Adelaida Notes`, `🚀 Onde Team`, emoji folders specific to her structure)
-- Personal frameworks she invented (e.g. her floor framework, her panel of advisors)
-- Specific cities, countries, or geographies that aren't universal
-- Substack URLs and personal blog links other than what already exists in the README/SKILL.md welcome message
-- Real meeting names, real decision content, real strategic context
-- Anecdotes that name real people or real situations
+Your tone: warm, clear, encouraging. They might not be technical. Explain things simply. Celebrate small wins along the way.
 
-**When you need to illustrate a pattern with an example, invent a fictional one.** Generic placeholders ("a Google Drive shared folder", "a team member", "a co-founder") are always preferred over real names. If a fictional example would be confusing without context, use a clearly-marked one (`# Example only — replace with your own`).
+**CRITICAL: Never stop to present a menu of options between phases.** Don't ask "What do you want to do next?" or list choices. That kills momentum. Instead, **flow directly into the next phase.** Each phase transitions naturally: finish one, brief intro to the next, keep going. The only time you pause is when a phase requires their specific input. Between phases, the default is: keep moving. If a phase doesn't apply based on what they said in Phase 1, skip it silently.
 
-**Existing files that pre-date this rule may have personal references** (the README mentions "Adelaida Diaz-Roa" in the Background section as legitimate attribution; the LICENSE has her copyright; the CHANGELOG narrates the actual history of the repo's development). Don't touch those — they're load-bearing context. The rule applies to **new** content you add.
+<details>
+<summary>Execution patterns to avoid (read me — operational, not user-facing)</summary>
 
-**The narrative CHANGELOG is the one place narrative context is OK** because it's a historical record of what shipped when. But even there, prefer "the maintainer" or "a team member" over names when possible.
+These improvisations look helpful in the moment but break the install. Catch yourself before writing any of them and continue the next phase instead:
 
-If you catch yourself writing "this is what [name] does," stop. Rewrite it as a generic pattern. The repo is for strangers, not for the maintainer's team.
+| If you find yourself writing... | Do this instead |
+|---|---|
+| "Three options for what to do now: A. Pause / B. Push through Phase X / C. All the way through" | Continue to the next phase. Pick yourself, never the user. |
+| "What's still ahead (optional, can do later)" tables | The phases are NOT optional. Run all of them. |
+| "Want to keep going or pause here?" / "Should we stop here for tonight?" | Continue. Only the user can ask to stop. |
+| "Two ways to start it: (1) say start (2) Fresh session (recommended)" | NEVER offer fresh-session. Start the interview in THIS session. |
+| "Quit and reopen Claude Code, then paste..." / "hooks load properly in a clean session" | NEVER. Continue in this session. Hooks already loaded. |
+| "I'll skip Phase X — you didn't mention [topic]" | Don't assume. ASK explicitly per phase. (Books, wearables, frameworks, backup — every phase has a mandatory ask.) |
+| "Here are some default voices for your journal panel — want to swap any?" | The full 90+ roster goes into the daily-journal skill verbatim. The skill picks 3-5 per-entry. No setup-time panel customization. |
+| "Want me to..." mid-phase, except when a phase REQUIRES a specific user input | Just do it. Direction is already clear: complete the install. |
+| "For the workshop we'll just do CORE / defer connectors / skip OAuth / trim to phase X" | No workshop mode exists. There is one install. Every phase runs. Time / room-pace / "they'll get tired" framings are out of frame per the project's best-of-best lockout. |
+| "Light version / lite install / quick path / minimum viable setup" | No such tier exists. There is one install: the full install. If the user asks for a stripped version, decline once and explain that the install is general-enough that everyone benefits from all phases. |
+| "Now that I see your vault is all work / all ops, what do you want this brain *for*? That decides which phases I run." / any global "scope," "purpose," or "work-only vs personal" question that lets the personal half (journaling, floors, panel, insights, reflection) be skipped | There is no scope question and no work-only / ops-only path. The personal brain IS the gift; it installs by default for everyone. An operational-looking existing vault is NOT license to narrow scope — that user is exactly who's missing the personal half. Flow into the personal phases; never offer to skip them as a group, and never frame their arrival as optional or as a removed feature. |
+| "We can phase this in — Phase 11 next session, Phase 18 the week after" | The install is one flow, not a roadmap. Continue. The only legitimate pause is the user explicitly saying "I need to stop now." |
+| "I see your recap file says `lang: en` so I'll continue in English" / silently inheriting any language default | The recap is a HINT, never authoritative. Phase 1 Step 1.0 ALWAYS runs and asks the language question. The user picks. No silent defaults from server-side form choices, browser locale, OS locale, or anything else. |
 
-## Git in large Obsidian vaults (users' vaults, not this repo)
+**The install runs until the final phase ends.** No pause options, no progress-check menus, no fresh-session handoffs. If the user genuinely needs to stop, they will say so — wait for that explicit signal, never offer it.
 
-Many users of this skill will have their Obsidian vault under git for local snapshots (the Phase 5 setup suggests it). Obsidian vaults commonly grow to 10,000+ files between journal entries, attachments, book notes, and plugin caches (`.smart-env/`, `.obsidian/workspace*`, etc.). Walking that full tree with `git add -A` or unscoped `git status` takes minutes of CPU, locks `.git/index.lock`, and wastes a lot of assistant context polling for progress.
+**Telemetry capture.** After each phase completes, append one JSON line to `~/.claude/.ai-brain-starter-install.jsonl` describing what happened. Schema:
 
-**Rules when operating in a user's vault:**
-1. Never run `git add -A`, `git add .`, or unscoped `git status`. Always pass explicit file paths you intend to stage.
-2. If a vault has no git remote (`git remote -v` empty), never attempt `git push`. Vaults are commonly local-only snapshot repos.
-3. When `git` is slow, check `wc -l <(git ls-files)` — if >10k files, you are in a vault repo; switch to targeted paths immediately.
-4. The session-close template (`templates/rules/session-close.md` or the user's equivalent) must include the "targeted-paths only" pattern for any git snapshot step. If a new setup phase is introducing git automation, ship the rule with it.
+```json
+{"ts": "2026-05-12T17:42:00Z", "phase": "10a", "outcome": "completed", "user_redirected": false, "new_improvisation_seen": null}
+```
 
-These rules ship to every user's vault CLAUDE.md via Phase 4 / `templates/generated/claude-md-template.md`. Keep them generic (no personal paths) per the public-repo rule at the top of this file.
-
-## Repo structure rules
-
-**Before creating any new file or folder, always check what already exists:**
-
-1. Run `ls` on the root to see top-level structure
-2. Check `SKILL.md` (thin orchestrator) and `phases/` (one file per phase group)
-3. Check `templates/generated/` for embedded templates extracted from phases
-
-**The pattern:** `SKILL.md` is a thin router that tells Claude which phase file to read next. Each phase file lives in `phases/` and is under 10k tokens (one Read call). Large embedded templates (CLAUDE.md template, insights skill, obsidian rules, team-weekly skill) live in `templates/generated/` and are referenced by pointer from the phase files. Adding a new phase means creating a file in `phases/` and adding a row to the routing table in `SKILL.md`.
-
-## Setup phase files (phases/)
-- `phase-00-install.md` — install efficiency tools (brew, python, node, graphify, MCPs)
-- `phase-01-welcome.md` — language detection, mode detection, welcome interview
-- `phase-02-03-plugins-folders.md` — Obsidian plugins + folder structure
-- `phase-04-claude-md.md` — build user's CLAUDE.md
-- `phase-05-context-layer.md` — context notes, hooks, aggregator scripts
-- `phase-06-09-tools-templates.md` — tool routing, imports, templates, skill verification
-- `phase-10a-journaling.md` — daily journaling setup (interview, floor framework, skill)
-- `phase-10b-panel-roster.md` — advisory panel roster + voice routing
-- `phase-11-external-tools.md` — email/calendar/Slack/CRM, meeting tool wiring
-- `phase-12-17-imports-rules.md` — book notes, health, taxonomy, backup, obsidian rules
-- `phase-18-insights.md` — weekly/monthly insights + cron
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [mycelium-hq/ai-brain-starter](https://github.com/mycelium-hq/ai-brain-starter) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-15 -->
+<!-- tomevault:4.0:windsurf_rules:2026-06-17 -->
