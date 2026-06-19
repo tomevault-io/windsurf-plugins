@@ -1,206 +1,215 @@
 ---
 trigger: always_on
-description: cli/      # Citty-based CLI, 100+ commands
+description: Control Figma via CLI — create shapes, frames, text, components, set styles, layout, variables, export images. Use when asked to create/modify Figma designs or automate design tasks.
 ---
 
-# Development Guide
 
-## Architecture
+# figma-use
 
-```
-packages/
-  cli/      # Citty-based CLI, 100+ commands
-  plugin/   # RPC handlers (built on-demand by CLI via esbuild)
-```
-
-CLI communicates directly with Figma via Chrome DevTools Protocol (CDP). No proxy server, no manual plugin installation.
-
-## Build & Test
+CLI for Figma. Two modes: commands and JSX.
 
 ```bash
-bun install
-bun run build           # Build CLI bundle
-bun test                # Run integration tests
+# Commands
+figma-use create frame --width 400 --height 300 --fill "#FFF" --layout VERTICAL --gap 16
+figma-use create icon mdi:home --size 32 --color "#3B82F6"
+figma-use set fill 1:23 "$Colors/Primary"
 
-# Figma must be running with:
+# JSX (props directly on elements, NOT style={{}})
+echo '<Frame p={24} bg="#3B82F6" rounded={12}>
+  <Text size={18} color="#FFF">Hello</Text>
+</Frame>' | figma-use render --stdin --x 100 --y 100
+```
+
+## Before You Start
+
+```bash
+figma-use status  # Check connection
+```
+
+If not connected — start Figma with remote debugging:
+
+```bash
+# macOS
 open -a Figma --args --remote-debugging-port=9222
+
+# Windows
+"%LOCALAPPDATA%\Figma\Figma.exe" --remote-debugging-port=9222
+
+# Linux
+figma --remote-debugging-port=9222
 ```
 
-## Feature Completion Checklist
+> Figma 126+ blocks remote debugging. Run `figma-use patch` once to fix, then restart Figma. Click **Always Allow** on the keychain prompt. Re-run after Figma updates.
+>
+> **Can't patch?** Use `figma-use daemon start --pipe` — launches Figma with debug pipe, no patching needed.
 
-When implementing a new feature, ensure ALL of these are done before committing:
+Start Figma with `--remote-debugging-port=9222` and you're ready.
 
-### 1. Implementation
+## Two Modes
 
-- [ ] CLI command in `packages/cli/src/commands/`
-- [ ] RPC handler in `packages/plugin/src/rpc.ts` (if needed)
-- [ ] Export from `packages/cli/src/commands/index.ts`
-
-### 2. Tests
-
-- [ ] Add test file in `packages/cli/tests/commands/`
-- [ ] Test happy path and edge cases
-- [ ] Run `bun test` to verify all tests pass
-
-### 3. Documentation
-
-- [ ] **CHANGELOG.md** — add entry under `## [Unreleased]` or new version section
-- [ ] **README.md** — update if it's a user-facing feature
-- [ ] **SKILL.md** — update if it changes how agents should use the tool
-- [ ] **REFERENCE.md** — update command reference if adding/changing commands
-
-### 4. Review Before Commit
+**Imperative** — single operations:
 
 ```bash
-bun test                        # All tests pass?
-bun run build                   # Build succeeds?
-git diff                        # Review all changes
-git diff --cached               # Review staged changes
+figma-use create frame --width 400 --height 300 --fill "#FFF" --radius 12
+figma-use set fill <id> "#FF0000"
+figma-use node move <id> --x 100 --y 200
 ```
 
-## Adding Commands
+**Declarative** — render JSX trees:
 
-1. Create `packages/cli/src/commands/my-command.ts`:
-
-```typescript
-import { defineCommand } from 'citty'
-import { sendCommand } from '../client.ts'
-import { printResult } from '../output.ts'
-
-export default defineCommand({
-  meta: { description: 'My command' },
-  args: {
-    id: { type: 'string', required: true },
-    json: { type: 'boolean', description: 'Output as JSON' }
-  },
-  async run({ args }) {
-    const result = await sendCommand('my-command', { id: args.id })
-    printResult(result, args.json)
-  }
-})
+```bash
+echo '<Frame p={24} gap={16} flex="col" bg="#FFF" rounded={12}>
+  <Text size={24} weight="bold" color="#000">Title</Text>
+  <Text size={14} color="#666">Description</Text>
+</Frame>' | figma-use render --stdin --x 100 --y 200
 ```
 
-2. Export from `packages/cli/src/commands/index.ts`
+stdin supports both pure JSX and full module syntax with imports:
 
-3. Add handler in `packages/plugin/src/rpc.ts`:
+```tsx
+import { Frame, Text, defineComponent } from 'figma-use/render'
 
-```typescript
-case 'my-command': {
-  const { id } = args as { id: string }
-  const node = await figma.getNodeByIdAsync(id)
-  return serializeNode(node)
+const Button = defineComponent(
+  'Button',
+  <Frame bg="#3B82F6" p={12} rounded={6}>
+    <Text color="#FFF">Click</Text>
+  </Frame>
+)
+
+export default () => (
+  <Frame flex="row" gap={8}>
+    <Button />
+    <Button />
+  </Frame>
+)
+```
+
+**Elements:** `Frame`, `Rectangle`, `Ellipse`, `Text`, `Line`, `Star`, `Polygon`, `Vector`, `Group`, `Icon`, `Image`, `Instance`
+
+Use `<Instance>` to create component instances:
+
+```tsx
+<Frame flex="row" gap={8}>
+  <Instance component="59763:10626" />
+  <Instance component="59763:10629" />
+</Frame>
+```
+
+⚠️ **Always use `--x` and `--y`** to position renders. Don't stack everything at (0, 0).
+
+## Icons
+
+150k+ icons from Iconify by name:
+
+```bash
+figma-use create icon mdi:home
+figma-use create icon lucide:star --size 48 --color "#F59E0B"
+figma-use create icon heroicons:bell-solid --component  # as Figma component
+```
+
+In JSX:
+
+```tsx
+<Icon name="mdi:home" size={24} color="#3B82F6" />
+```
+
+## Images
+
+Load images from URL:
+
+```tsx
+<Image src="https://example.com/photo.jpg" w={200} h={150} />
+```
+
+## Export JSX
+
+Convert Figma nodes back to JSX code:
+
+```bash
+figma-use export jsx <id>           # Minified
+figma-use export jsx <id> --pretty  # Formatted
+
+# Format options
+figma-use export jsx <id> --pretty --semi --tabs
+
+# Match vector shapes to Iconify icons (requires: npm i whaticon)
+figma-use export jsx <id> --match-icons
+figma-use export jsx <id> --match-icons --icon-threshold 0.85 --prefer-icons lucide,tabler
+```
+
+Round-trip workflow:
+
+```bash
+# Export → edit → re-render
+figma-use export jsx <id> --pretty > component.tsx
+# ... edit the file ...
+figma-use render component.tsx --x 500 --y 0
+```
+
+Compare two nodes as JSX:
+
+```bash
+figma-use diff jsx <from-id> <to-id>
+```
+
+## Export Storybook (Experimental)
+
+Export all components on current page as Storybook stories:
+
+```bash
+figma-use export storybook                      # Output to ./stories/
+figma-use export storybook --out ./src/stories  # Custom output dir
+figma-use export storybook --match-icons        # Match vectors to Iconify icons
+figma-use export storybook --no-semantic-html   # Disable semantic HTML conversion
+```
+
+**Semantic HTML:** By default, components are converted to semantic HTML elements based on their names:
+
+- `Input/*`, `TextField/*` → `<input type="text">`
+- `Textarea/*` → `<textarea>`
+- `Checkbox/*` → `<input type="checkbox">`
+- `Radio/*` → `<input type="radio">`
+- `Button/*` → `<button>`
+- `Select/*`, `Dropdown/*` → `<select>`
+
+Use `--no-semantic-html` to disable this and keep `<Frame>` elements.
+
+Generates `.stories.tsx` files:
+
+- **ComponentSets** → React component with props + stories with args
+- **VARIANT properties** → Union type props (`variant?: 'Primary' | 'Secondary'`)
+- **TEXT properties** → Editable string props (`label?: string`)
+- Components grouped by `/` prefix → `Button/Primary`, `Button/Secondary` → `Button.stories.tsx`
+
+Example output for Button with variant and label:
+
+```tsx
+// Button.tsx
+export interface ButtonProps {
+  label?: string
+  variant?: 'Primary' | 'Secondary'
+}
+export function Button({ label, variant }: ButtonProps) {
+  if (variant === 'Primary')
+    return (
+      <Frame>
+        <Text>{label}</Text>
+      </Frame>
+    )
+  // ...
+}
+
+// Button.stories.tsx
+export const Primary: StoryObj<typeof Button> = {
+  args: { label: 'Click', variant: 'Primary' }
 }
 ```
 
-4. Add test in `packages/cli/tests/commands/`
+## Variables as Tokens
 
-## How CDP Works
-
-1. CLI connects to `localhost:9222` (Figma's debug port)
-2. First call builds `packages/plugin/src/rpc.ts` with esbuild and injects it
-3. Commands execute via `Runtime.evaluate` with full Plugin API access
-4. WebSocket closes after each command to allow process exit
-
-## Conventions
-
-- Commands: kebab-case (`create-rectangle`, `set-fill-color`)
-- Colors: hex format `#RGB`, `#RRGGBB`, `#RRGGBBAA`, or `var:VariableName` / `$VariableName`
-- Output: human-readable by default, `--json` for machine parsing
-- Inline styles: create commands accept `--fill`, `--stroke`, `--radius`, etc.
-- Terminal colors: use `picocolors` (`import pc from 'picocolors'`), never hardcode ANSI escapes
-
-## No Inline Eval
-
-**Never use `sendCommand('eval', { code: '...' })` in CLI commands.**
-
-Instead, create a proper command in `packages/plugin/src/rpc.ts`:
-
-```typescript
-// ❌ Bad: inline eval
-await sendCommand('eval', {
-  code: `
-    const node = await figma.getNodeByIdAsync('${id}')
-    figma.createComponentFromNode(node)
-  `
-})
-
-// ✅ Good: dedicated command
-await sendCommand('convert-to-component', { id })
-```
-
-## Release
-
-⚠️ **NEVER commit and release in one step!**
-
-### Pre-release Checklist
-
-- [ ] All tests pass (`bun test`)
-- [ ] Build succeeds (`bun run build`)
-- [ ] CHANGELOG.md updated with all changes
-- [ ] README.md updated if needed
-- [ ] SKILL.md updated if agent-facing changes
-
-### Release Steps
-
-```bash
-# 1. Review and commit changes
-git add -A
-git diff --cached --name-only  # Review file list
-git diff --cached              # Review actual changes
-git commit -m "feat: description"
-
-# 2. Version bump (separate commit)
-# Edit package.json version
-git add -A && git commit -m "v0.X.Y"
-git tag v0.X.Y
-
-# 3. Push
-git push && git push --tags
-
-# 4. Create GitHub release
-gh release create v0.X.Y --title "v0.X.Y — Short Description" --notes "## Changes
-- Feature 1
-- Feature 2"
-
-# 5. Publish (requires passkey - user must run)
-npm publish
-```
-
-### Commit Message Conventions
-
-- `feat:` — new feature
-- `fix:` — bug fix
-- `docs:` — documentation only
-- `refactor:` — code change that neither fixes nor adds
-- `test:` — adding tests
-- `chore:` — maintenance tasks
-
-## Testing Storybook Export
-
-After running `export storybook`, verify all stories render correctly:
-
-### Quick Check (single story)
-
-```bash
-bunx agent-browser open "http://localhost:6006/iframe.html?viewMode=story&id=button--primary"
-bunx agent-browser eval "document.getElementById('storybook-root').innerHTML"
-bunx agent-browser close
-```
-
-### Full Test (all stories)
-
-```bash
-# Start Storybook first
-cd <storybook-project> && npm run storybook &
-
-# Test all stories
-PASS=0; FAIL=0
-for f in stories/*.stories.tsx; do
-  # Extract component name (lowercase, spaces to dashes)
-  title=$(grep "title:" "$f" | sed "s/.*title: ['\"]//;s/['\"].*//" | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [dannote/figma-use](https://github.com/dannote/figma-use) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-20 -->
+<!-- tomevault:4.0:windsurf_rules:2026-06-17 -->
