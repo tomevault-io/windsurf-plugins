@@ -1,43 +1,177 @@
 ---
 trigger: always_on
-description: dbt uses a separate virtualenv (.venv-dbt), not the main .venv
+description: **MANDATORY RULE:** When creating ANY documentation, guides, or markdown files:
 ---
 
+# GitHub Copilot Instructions for Open Navigator
 
-# dbt isolated environment (this repo)
+## 🚨 CRITICAL: Documentation Standards
 
-- **Do not** assume `dbt` is on `PATH` or installed in the main **`.venv`**. It usually is not.
-- dbt is kept in a **dedicated venv** at **`.venv-dbt/`** because `dbt-postgres` conflicts with protobuf/pathspec used elsewhere (`requirements-dbt.txt` explains this). **Do not** `pip install` dbt into `.venv` alongside the main app requirements.
+### ⚠️ ALWAYS Use Docusaurus Format - NO EXCEPTIONS
 
-**First-time setup (repo root):**
+**MANDATORY RULE:** When creating ANY documentation, guides, or markdown files:
 
+**✅ DO THIS:**
+- Create ALL documentation in `website/docs/` subdirectories
+- Add YAML frontmatter to every documentation file
+- Use kebab-case filenames
+- Place in appropriate subdirectory
+
+**❌ NEVER DO THIS:**
+- ❌ Create `.md` files in project root (except README.md, LICENSE, CONTRIBUTING.md)
+- ❌ Create files like `VARIABLE_MIGRATION.md`, `DOCKER_BUILD_TROUBLESHOOTING.md` in root
+- ❌ Create `UPPERCASE_FILE.md` files anywhere
+- ❌ Skip frontmatter in documentation files
+
+### Documentation File Location Rules
+
+When creating or editing documentation:
+
+1. **Location**: ALWAYS place documentation in `website/docs/` with appropriate subdirectories
+   - Deployment guides → `website/docs/deployment/`
+   - How-to guides → `website/docs/guides/`
+   - Data sources → `website/docs/data-sources/`
+   - Case studies → `website/docs/case-studies/`
+   - Integration docs → `website/docs/integrations/`
+   - Development guides → `website/docs/development/`
+
+2. **Frontmatter**: ALWAYS include YAML frontmatter at the top:
+   ```markdown
+   ---
+   sidebar_position: 1
+   ---
+   
+   # Document Title
+   ```
+
+3. **File naming**: ALWAYS use kebab-case (lowercase with hyphens)
+   - ✅ `huggingface-spaces.md`
+   - ✅ `variable-migration.md`
+   - ✅ `docker-troubleshooting.md`
+   - ❌ `HUGGINGFACE_DEPLOYMENT.md`
+   - ❌ `HuggingFaceSpaces.md`
+   - ❌ `VARIABLE_MIGRATION.md`
+
+4. **Root directory**: Keep root directory clean
+   - ✅ Only keep these in root: README.md, LICENSE, CONTRIBUTING.md
+   - ✅ Move ALL other docs to `website/docs/`
+   - ❌ Don't create new `.md` files in project root
+
+### Examples
+
+**When asked to create troubleshooting documentation:**
 ```bash
-./scripts/datasources/openstates/setup_dbt_venv.sh
+# ❌ WRONG
+/home/developer/projects/open-navigator/DOCKER_BUILD_TROUBLESHOOTING.md
+
+# ✅ CORRECT
+/home/developer/projects/open-navigator/website/docs/deployment/docker-troubleshooting.md
 ```
 
-**Run dbt (repo root):**
-
-The real project lives under **`dbt_project/`**. Prefer **`./scripts/dbt.sh`** (runs inside `dbt_project/` and sets **`DBT_PROFILES_DIR`** so `dbt_project/profiles.yml` is used, not `~/.dbt`).
-
-If you run **`.venv-dbt/bin/dbt` from the repo root** (root `dbt_project.yml` for Cursor), you **must** point profiles at the same place or dbt will use **`~/.dbt/profiles.yml`** and load seeds / build models on the **wrong database** (overrides never show up in Neon):
-
+**When asked to create a migration guide:**
 ```bash
-export DBT_PROFILES_DIR="$(pwd)/dbt_project"
-.venv-dbt/bin/dbt seed --select jurisdiction_website_url_overrides
-.venv-dbt/bin/dbt run --select int_jurisdiction_websites
+# ❌ WRONG
+/home/developer/projects/open-navigator/VARIABLE_MIGRATION.md
+
+# ✅ CORRECT
+/home/developer/projects/open-navigator/website/docs/deployment/variable-migration.md
 ```
 
-Or use **`./scripts/dbt-root.sh`** (same as above, from repo root). For the nested project only:
-
+**When asked to document a new feature:**
 ```bash
-.venv-dbt/bin/dbt run --project-dir dbt_project --select <model>
+# ❌ WRONG
+/home/developer/projects/open-navigator/NEW_FEATURE.md
+
+# ✅ CORRECT
+/home/developer/projects/open-navigator/website/docs/guides/new-feature.md
 ```
 
-Use **`.venv-dbt/bin/dbt`** (or `python` from that venv) for `dbt run`, `dbt compile`, `dbt test`, etc. Add `--profiles-dir` if the project’s `profiles.yml` is not next to `dbt_project`.
+### Sidebar Organization
 
-When changing **`models` / `seeds` / `snapshots` / `vars`** in `dbt_project/dbt_project.yml`, mirror the same blocks in the root **`dbt_project.yml`** wrapper (or only edit the nested file and copy those sections over).
+The documentation uses audience-based navigation in `website/sidebars.ts`:
 
-When suggesting commands to the user, **prefer the full path** `.venv-dbt/bin/dbt` so copy-paste works without activating a venv.
+- **🚀 Getting Started**: Landing pages (intro, dashboard)
+- **📊 For Policy Makers & Advocates**: Non-technical content
+- **🛠️ For Developers & Technical Users**: Technical content including:
+  - Setup & Installation
+  - Data Sources (Technical)
+  - How-To Guides
+  - Integrations
+  - Deployment (uses `autogenerated` for `deployment/` directory)
+  - Development
+
+When creating docs in a directory with `autogenerated`, they'll automatically appear in sidebar.
+
+## 🚨 CRITICAL: Data Pipeline Architecture
+
+### ⚠️ ALWAYS Prefer dbt for Data Transformations
+
+**MANDATORY RULE:** When working with data transformations, migrations, or table creation:
+
+**✅ DO THIS - Use dbt:**
+- ✅ Create dbt models for ALL data transformations
+- ✅ Use dbt sources to reference raw tables
+- ✅ Use dbt incremental models for ongoing data processing
+- ✅ Define table schemas in dbt .sql files
+- ✅ Use dbt macros for reusable logic
+- ✅ Document transformations in dbt .yml files
+- ✅ Use dbt for cross-database syncing (local → Neon)
+- ✅ Leverage dbt's built-in testing and documentation
+
+**❌ NEVER DO THIS - Avoid Python for Transformations:**
+- ❌ Write Python scripts to transform data (use dbt models instead)
+- ❌ Use Python for JSONB extraction (use dbt incremental models)
+- ❌ Create tables manually with psql (define in dbt models)
+- ❌ Write custom SQL in Python strings (use dbt .sql files)
+- ❌ Build ETL pipelines in Python (use dbt + Airflow/Dagster)
+
+**When Python IS Appropriate:**
+- ✅ API calls and data ingestion (loading from external sources)
+- ✅ Web scraping and file downloads
+- ✅ Complex business logic that can't be expressed in SQL
+- ✅ Orchestration and scheduling (Airflow, Dagster)
+- ✅ Machine learning and AI processing (Gemini, embeddings)
+
+**Architecture:**
+```
+External Data → Python (Ingest) → Bronze Tables → dbt (Transform) → Marts
+```
+
+**Example - Wrong vs Right:**
+
+❌ **WRONG - Python for transformation:**
+```python
+# scripts/transform_youtube_data.py
+import psycopg2
+conn = psycopg2.connect(...)
+cursor.execute("""
+    INSERT INTO event
+    SELECT * FROM bronze.bronze_event_youtube
+    WHERE event_date >= '2026-01-01'
+""")
+```
+
+✅ **CORRECT - dbt for transformation:**
+```sql
+-- dbt_project/models/marts/event.sql
+{{ config(materialized='incremental') }}
+
+SELECT *
+FROM {{ source('bronze', 'bronze_event_youtube') }}
+WHERE event_date >= '2026-01-01'
+{% if is_incremental() %}
+    AND loaded_at > (SELECT MAX(loaded_at) FROM {{ this }})
+{% endif %}
+```
+
+**Why dbt is Better:**
+- 🔄 Automatic dependency management
+- 📊 Built-in data quality tests
+- 📝 Self-documenting (YAML + SQL)
+- 🚀 Incremental processing (only new data)
+- 🔍 Easy to debug and version control
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [getcommunityone/open-navigator](https://github.com/getcommunityone/open-navigator) — distributed by [TomeVault](https://tomevault.io).
