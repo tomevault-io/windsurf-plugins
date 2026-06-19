@@ -1,111 +1,85 @@
 ---
 trigger: always_on
-description: Python CLI for the DiscoLike B2B company discovery API. Wraps all endpoints with cost tracking, dual output, and agent-native design.
+description: >
 ---
 
-# discolike-cli
 
-Python CLI for the DiscoLike B2B company discovery API. Wraps all endpoints with cost tracking, dual output, and agent-native design.
+# DiscoLike Account List Builder
 
-## Quick Start
+End-to-end account sourcing workflow. From a seed domain or ICP description to a validated, normalized prospect list ready for Clay enrichment and outbound campaigns.
 
-```bash
-pip install -e ".[dev]"
-export DISCOLIKE_API_KEY="dk_..."
-discolike --version
-```
+**This skill is CLI-first.** All DiscoLike operations use the `discolike` CLI (installed via `pip install -e discolike-cli/`). The CLI handles cost tracking, caching (90-day extract, 7-day profiles), budget guardrails, and output formatting automatically.
 
-## Architecture
+## Core Rules (Non-Negotiable)
 
-- **Entry point:** `src/discolike/cli.py` (Click group)
-- **HTTP client:** `src/discolike/client.py` (httpx with retry/backoff)
-- **Models:** `src/discolike/types.py` (Pydantic v2 for all API shapes)
-- **Cost tracking:** `src/discolike/cost.py` (per-call + session totals)
-- **Output:** `src/discolike/output.py` (Rich tables / JSON / CSV)
-- **Cache:** `src/discolike/cache.py` (SQLite at ~/.discolike/cache.db)
-- **Commands:** `src/discolike/commands/` (one file per command group)
-- **Exporters:** `src/discolike/exporters/` (CSV/JSON writers)
+These four rules were learned the hard way. Violating any of them produces bad lists while feeling productive. Read them before touching any phase.
 
-## Key Patterns
+### Rule 1: Semantic overlap trap — never phrase-negate target language
 
-1. **Shared filters:** `count` and `discover` share filter options via Click decorator
-2. **stderr for progress, stdout for data:** never mix progress with parseable output
-3. **Exit codes 0-6:** each maps to a specific failure mode (see PRD US-016)
-4. **Cost on every call:** displayed in footer (table) or `_meta.cost` (JSON)
-5. **Cache with TTL:** account-status (1h), extract (90d), profile/score (7d)
+**Target ICP language overlaps with noise language because they serve the same persona.** If you're building a list of marketing SaaS (products sold to marketers), the targets will have "marketing" all over their sites because they talk to marketers. Negate "marketing" and you kill your targets along with the agencies.
 
-## Dev Commands
+The pattern is universal:
+- Marketing SaaS targets mention "marketing" (sell to marketers)
+- Carbon accounting SaaS targets mention "sustainability consulting" (sell to sustainability teams)
+- HR tech targets mention "recruitment" (sell to recruiters)
+- Sales enablement SaaS targets mention "outbound" and "SDRs" (sell to sales ops)
+- Legal tech targets mention "legal services" (sell to law firms)
 
-```bash
-pytest tests/ -v --cov=discolike    # Run tests
-ruff check src tests                 # Lint
-mypy src                             # Type check
-```
+The target and the noise share vocabulary because they exist in the same market. Keyword exclusion cannot distinguish "a marketing agency" from "a SaaS that sells to marketing agencies."
 
-## Testing
+**Before proposing any `--negate-phrase`, ask: could a target company's homepage contain this word in a legitimate context? If yes, the exclusion is too broad.** Use semantic classification (DiscoGen or validate) instead — it discriminates by business model, not vocabulary.
 
-- Mock httpx with `respx` library
-- CLI tests via `click.testing.CliRunner`
-- Fixtures in `tests/fixtures/` (real API response shapes)
-- No live API calls in CI (gated behind DISCOLIKE_API_KEY env var)
+**Safe exclusion hierarchy (most safe → least safe):**
+1. Domain-level exclusions (exact match, zero overlap risk)
+2. Category-level exclusions (NLP-classified, smarter than keywords)
+3. Semantic qualification via DiscoGen/validate (the right tool for most exclusions)
+4. Phrase exclusions (only when the phrase has zero possible target overlap — rare)
 
-## API Reference
+### Rule 2: Inclusion-first — let the data surface the problem
 
-- Auth header: `x-discolike-key`
-- Base URL: `https://api.discolike.com/v1/`
-- Full field reference: `reference/discolike-field-reference.md`
-- Workflow reference: `reference/discolike-workflow.md`
-- Official docs: https://api.discolike.com/v1/docs/
+Start every discovery run with positive filters only. No `--negate-phrase`, no `--negate-icp-text`, no `--negate-domain` in the first call. Pull 50 records. Analyze what's actually noise. THEN apply targeted exclusions based on what you observed.
 
-## PRD
+The reason: upfront exclusions are guesses about what will be wrong. They often kill good results silently (a commercial EPC that mentions "residential" once gets dropped). The data itself is a better feedback signal than your priors.
 
-Full product requirements: `PRD.md` (16 user stories, functional requirements, architecture)
+**Autonomous exclusion loop (Phase 4):**
 
-<!-- GSD:project-start source:PROJECT.md -->
-## Project
+1. **Round 0:** Inclusion-only filters. Pull 50 records. No negations.
+2. **Data conversation (up to 4 autonomous iterations):**
+   - Analyze batch. Identify dominant noise pattern.
+   - Propose ONE targeted exclusion OR ONE semantic classification question as a hypothesis.
+   - Re-run discover (or run DiscoGen for classification).
+   - Verify the problem is reduced. If yes, lock in that action.
+   - If the problem shifted, propose the next hypothesis.
+3. **Cap at 4 iterations.** Terminate early if fit rate is at target or diminishing returns hit.
+4. **Report to user** with final batch + iteration trail summary. User decides whether to proceed to full pull.
 
-**DiscoLike CLI v2 — OLM Feedback Loop & AI Discovery**
+**One prompt per round, one action per round.** Don't try to do multiple things per iteration — it makes the feedback signal muddy.
 
-Upgrade the DiscoLike CLI from a one-shot discovery tool into a full discovery-to-action pipeline. Adds the OLM feedback loop (query plan confirmation and iterative refinement), ICP validation, AI-powered enrichment via DiscoGen, and auto-segmentation. Paired with an interactive multi-dimensional discovery skill that guides users through building precise lookalike queries across product, buyer, industry, size, and geo dimensions.
+Each iteration costs ~$0.22 for discover 50. Four iterations = ~$1. Cheap compared to the cost of bad upfront exclusions killing good results.
 
-**Core Value:** The feedback loop between Claude Code's client context and DiscoLike's search model — both models iterate on the query plan until convergence, then run full TAM queries with confidence.
+### Rule 3: Capital signal, not size — don't tight-filter on employees
 
-### Constraints
+Employee count is a bad proxy for outbound fit. A 15-person Series A startup with $10M raised is a better outbound buyer than a 100-person bootstrapped consulting firm. We care about capital, not headcount.
 
-- **API**: Build against documented endpoints only — no undocumented/beta endpoints
-- **Async operations**: DiscoGen, Validate ICP, and Segment are all async (task_id → poll → results). Need consistent async task management pattern
-- **Rate limits**: 5 req/min on discover (Starter), 2 req/min on segment. Feedback loop iterations consume quota
-- **Cost awareness**: Every API call costs money. Feedback loop iterations should be explicit about cumulative cost
-- **Backwards compatibility**: Existing `discover` command behavior unchanged without `--confirm` flag
-<!-- GSD:project-end -->
+Three reasons:
+1. **DiscoLike's employee data is weak for small companies** (buckets are coarse, often stale, frequently missing).
+2. **Capital ≠ size.** Funded startups and manufacturers with working capital are real buyers regardless of headcount.
+3. **Tight filters exclude ideal targets** (well-funded 20-person startups, 40-person commercial EPCs with project financing).
 
-<!-- GSD:stack-start source:research/STACK.md -->
-## Technology Stack
+**Use `--employees "1,1500"` as a loose upper cap** (only excludes massive enterprises). Don't set a minimum. Push capital qualification DOWNSTREAM to Clay enrichment where funding data actually lives (Crunchbase, PitchBook, company filings).
 
-## Existing Stack (Do Not Revisit)
-| Technology | Version | Role |
-|------------|---------|------|
-| Python | 3.11+ | Runtime |
-| Click | 8.1.x | CLI framework |
-| httpx | 0.27+ | HTTP client (sync) |
-| Rich | 13.x | Tables, progress, console output |
-| Pydantic v2 | 2.x | API response models |
-| PyYAML | 6.x | Config |
-| SQLite | stdlib | Local cache |
-## New Stack Additions
-### 1. Interactive Prompts — questionary 2.1.1
-- **vs. Click's built-in prompts** — Click's `click.prompt()` and `click.confirm()` are adequate for single yes/no gates but have no multi-select, no styled selection menus, and no in-place edit flow. Building an iterative query review UI on raw Click would require 200+ lines of custom prompt logic. questionary collapses that to ~20 lines.
-- **vs. InquirerPy** — InquirerPy has richer styling options but its last PyPI release was 2023. Maintenance is inactive. questionary 2.1.1 shipped August 2025 and is actively maintained.
-- **vs. python-inquirer** — Unix-only (blessed library dependency), experimental Windows. Disqualified — this CLI runs on Windows (confirmed from env context).
-- **vs. prompt_toolkit directly** — questionary IS a thin wrapper over prompt_toolkit 3.x. Using raw prompt_toolkit for this problem would be over-engineering. questionary exposes exactly the API shape needed: `select`, `checkbox`, `text`, `confirm`.
-# Query plan field-by-field review
-# Phrase match multi-select (accept/drop individual phrases)
-# Free-text edit for icp_text override
-# Final confirm before full TAM query (rate limit + cost gate)
-### 2. Async Task Polling — no new library, pure stdlib pattern
+**Also important:** don't pre-filter by business model. Consultants with direct B2B sales motions ARE valid targets. Manufacturers with direct commercial sales ARE valid targets. The real filter is "direct B2B motion vs channel/distributor" — answered by DiscoGen during validation, not by upfront assumptions about "SaaS is our sweet spot."
+
+### Rule 4: Realistic benchmarks — 60-70% is the target, not 80%
+
+| Fit rate | Interpretation |
+|---|---|
+| 60-70% strong fit | **Normal outcome. Proceed.** |
+| >70% | Unusually clean list. Usually means inclusions are very tight. |
+| 40-60% | Needs refinement. Run another iteration. |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [LeadGrowGTM/discolike-cli](https://github.com/LeadGrowGTM/discolike-cli) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-16 -->
+<!-- tomevault:4.0:windsurf_rules:2026-06-17 -->
