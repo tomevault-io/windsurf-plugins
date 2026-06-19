@@ -1,0 +1,149 @@
+---
+trigger: always_on
+description: >
+---
+
+
+# Groundswell 🌊
+
+> *A groundswell forms deep in the ocean — far from the shore, far from the noise. By the time it arrives, it carries enormous energy with perfect form. The surfer who reads it early, waits patiently, and paddles with purpose is the one who rides it all the way in.*
+
+**Groundswell** helps developers do the same with engineering tasks. It guides you through reading conditions deep beneath the surface, choosing the right wave, preparing until you're truly ready, and dropping in with clarity and force — so every execution is backed by the full energy of deep thinking.
+
+---
+
+## The Groundswell Metaphor
+
+| Ocean | Groundswell Skill |
+|-------|------------------|
+| 🌊 **Read the deep conditions** | Understand the tech context and task type |
+| 🎯 **Choose your wave** | Align on the goal — find the right problem to solve |
+| 🚣 **Paddle into position** | Remove ambiguity — prepare until truly ready |
+| 🏄 **Drop in** | Synthesize, confirm, and commit to action |
+
+---
+
+## Phases
+
+```
+Phase 0: Read the Conditions   — tech context & task classification  [single pass, no gate]
+Phase 1: Choose Your Wave      — purpose alignment                   [HARD GATE: score ≥ 8.5]
+Phase 2: Paddle Into Position  — ambiguity removal                   [HARD GATE: score ≥ 8.5]
+Phase 3: Drop In               — synthesis & decision                [confirm → A/B/C/D]
+```
+
+All progress is saved to `./{title}.groundswell.json`. This JSON is the **single source of truth** — always load it at the start and update it after every round.
+
+---
+
+## CRITICAL: Hard Gate Rule (Non-Negotiable)
+
+**A surfer who drops in before they're ready wipes out. The gates exist for the same reason.**
+
+The Hard Gate applies in **two directions**:
+
+1. **External**: If the user attempts to skip Phase 1 or Phase 2 before the threshold is met.
+2. **Internal**: If the agent is tempted to award 8.5+ simply because several rounds have passed, the conversation feels long, or it seems "close enough."
+
+**Both are wipeouts. Both are blocked.**
+
+### When score < 9, regardless of round count:
+
+1. **Do NOT proceed under any circumstances.**
+2. Show current score, gap to threshold, and exactly what is still missing.
+3. Immediately continue with the next round — do not wait for user confirmation.
+
+### Hard Gate Response Template
+
+```
+⛔ Not ready to drop in yet.
+
+Current score: {score}/10
+Required score: 9/10
+Gap: {9 - score} points remaining
+
+The groundswell isn't here yet. What's still forming:
+{specific list of what was not answered or was too vague}
+
+Paddling out without this risks:
+{wrong direction, wasted effort, building the wrong thing}
+
+Let's keep paddling. Next round:
+[immediately present next round questions]
+```
+
+**No exceptions. No workarounds. Score must reach 8.5 before moving forward.**
+
+### Anti-Fatigue Rule (Critical)
+
+**There is NO maximum number of rounds.** Rounds continue indefinitely until the score threshold is met.
+
+The agent MUST NOT:
+- Inflate a score because "we've done enough rounds"
+- Award 8.5+ because "the user seems ready to move on"
+- Round up a borderline score to exit the loop faster
+- Assume that more rounds = diminishing returns = acceptable to proceed
+
+**Round count is irrelevant. Only the evidence in the answers determines the score.**
+
+---
+
+## CRITICAL: Context Persistence Rule
+
+Before doing ANYTHING, check if a session file already exists:
+
+```bash
+ls ./*.groundswell.json 2>/dev/null | head -1
+```
+
+- **EXISTS** → Load it, read current phase and round, RESUME from where it left off. Summarize state to the user before proceeding.
+- **NOT FOUND** → Run Phase 0 to initialize.
+
+**Never restart a session that has already begun. A wave doesn't reset — it keeps rolling.**
+
+---
+
+## CRITICAL: Title Auto-Generation Rule
+
+The agent derives the session title automatically. **Never ask the user for a title.**
+
+1. Extract the core noun phrase from the user's first message (e.g., "add user authentication to the API" → `user-auth-api`)
+2. Slugify: lowercase, words joined by hyphens, max 5 words
+3. Save as `./{title}.groundswell.json`
+4. If a file with that name already exists (different task), append date suffix: `{title}-{MMDD}`
+
+---
+
+## CRITICAL: Insight Accumulation Rule
+
+After every round of Q&A (in any phase), extract and record from the user's answers:
+
+- **Insights**: Non-obvious things that reframe the problem or change solution direction
+- **Discoveries**: Facts, constraints, or context that emerged through questioning
+- **Signals**: Recurring themes, emphases, or hesitations suggesting hidden priorities
+
+> *Just like how a groundswell carries energy from storms thousands of miles away — every answer carries information beneath its surface. Capture it all.*
+
+Stored in each round record and in the top-level `accumulated_insights` array. These feed directly into Phase 3's synthesis. Nothing learned in Q&A should be lost.
+
+---
+
+## JSON Schema
+
+```json
+{
+  "title": "<auto-generated slug>",
+  "created_at": "<ISO timestamp>",
+  "updated_at": "<ISO timestamp>",
+  "current_phase": 0,
+  "task_type": "feature_development | architecture_design | performance_improvement | bug_fix | refactoring | security | other",
+  "tech_context": {
+    "language": "<e.g. TypeScript, Python, Go>",
+    "frameworks": ["<e.g. NestJS, React, FastAPI>"],
+    "infra": "<e.g. AWS ECS, k8s, on-prem>",
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [Kyungpyo-Kim/groundswell](https://github.com/Kyungpyo-Kim/groundswell) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-06-17 -->
