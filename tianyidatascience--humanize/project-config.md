@@ -1,70 +1,97 @@
 ---
 trigger: always_on
-description: 这个仓库是一个通用的中文文案 humanize skill，不绑定单一 agent。
+description: Use this skill when the user wants to generate or optimize Chinese communication copy so it sounds more human, more natural, less templated, and less like polished AI writing. 中文文案去 AI 味和人味优化 skill，适合自媒体文案、客户邮件、微信回复、售后沟通、面试跟进、上级汇报、产品宣传和社群通知。The user normally only needs to provide the task and constraints. If they also provide an original draft, the skill switches to rewrite mode automatically.
 ---
 
-# Agent 使用说明
 
-这个仓库是一个通用的中文文案 humanize skill，不绑定单一 agent。
+> Important: all `scripts/` paths are relative to this skill directory.
+> Preferred entrypoint: `cd {this_skill_dir} && python3 humanize.py --text "{entire_user_request}" --output-root ./runs`
+> Lower-level scripts still work via: `cd {this_skill_dir} && python3 scripts/...`
+> The runtime and model cache live under `${COPAW_WORKING_DIR:-~/.copaw}/models/humanize/`.
+> In agent shell calls, prefer one-line commands. Do not paste backslash-continued multi-line commands. Always set the shell tool timeout to at least `120` seconds for `python3 humanize.py`.
+> 用户可见输出硬规则：如果 `python3 humanize.py ...` 打印 `=== HUMANIZE_FINAL_RESPONSE_BEGIN ===` / `=== HUMANIZE_FINAL_RESPONSE_END ===`，这两个标记中间的 markdown 就是最终答案。必须原样粘贴给用户，不能总结、不能改写、不能只给最终文案、不能写“已经帮你优化完成了”。用户要看的就是完整过程。
+> Final relay rule: if `python3 humanize.py ...` prints `=== HUMANIZE_FINAL_RESPONSE_BEGIN ===` / `=== HUMANIZE_FINAL_RESPONSE_END ===`, return exactly the markdown between them as the final answer. Do not summarize it, do not paraphrase it, and do not add any explanation.
+> Fallback relay rule: if the shell output is truncated or the final response block is not visible, open the latest `user-visible.md` in the run directory and return that markdown exactly.
+> Invocation rule: do not build helper JSON or temporary Python snippets to call this skill. Invoke `python3 humanize.py` directly.
+> Forbidden invocation: do not call `copaw skills run humanize`, `python -m skills.humanize...`, or any package-style wrapper. Do not pass `--mode`; rewrite mode is inferred automatically from the full `--text` request or `--original`. They are not the canonical entrypoint for this skill.
+> Preservation rule: pass the user's full request verbatim via `--text` by default. If the request contains `原文`, `原稿`, `正文`, `draft`, or a long draft body, never reinterpret it into separate `--task` / `--constraints` arguments and never drop the original draft.
+> Compatibility rule: this skill is not CoPaw-only. CoPaw / OpenClaw / Hermes style agents should use the same `SKILL.md + python3 humanize.py --text ...` flow. The CoPaw installer is only a convenience sync script for the currently known CoPaw workspace path, not a separate skill protocol. Claude Code and other local coding agents can invoke the same CLI after reading this `SKILL.md`.
 
-CoPaw / OpenClaw 这类 agent 的使用方式本质相同：读取 `SKILL.md`，在 skill 目录里执行 CLI。仓库里的 `scripts/install_to_copaw.py` 只是把文件同步到当前已知的 CoPaw workspace 路径，不代表 CoPaw 使用另一套协议。
+# Humanize
 
-适用环境：
+## What This Skill Does
 
-- CoPaw
-- OpenClaw
-- Claude Code
-- 任何能读取 `SKILL.md` 并执行本地 shell 命令的 agent
+This skill is a practical AutoResearch-style loop for one narrow job:
+optimize Chinese communication copy until it reads more like something a real
+person would send.
 
-## 规范入口
+The user normally only needs to define:
 
-默认只调用这个命令：
+- `task`: what situation this message is for
+- `constraints`: hard limits such as length, phrases to keep, or phrases to avoid
 
-```bash
-python3 humanize.py --text "{完整用户请求}" --output-root ./runs
-```
+Optional:
 
-如果在 skill 目录外执行，先进入仓库根目录：
+- `original draft`: only when the user wants rewrite mode instead of generate mode
 
-```bash
-cd /path/to/humanize
-python3 humanize.py --text "{完整用户请求}" --output-root ./runs
-```
+This skill then:
 
-## 不要这样做
+1. Bootstraps a local runtime and downloads the default local scorer model
+2. Normalizes the user's input into a spec and session mode
+3. Creates a run folder with the spec and drafts
+4. Generates a baseline when the user did not provide one
+5. In rewrite mode, adds `direct-rewrite` from the current main model to the candidate pool
+6. Generates heuristic challenger drafts such as `heuristic-natural` and `heuristic-balanced`
+7. Scores every candidate in one unified pool with the official local scorer
+8. If the best candidate improves but fails the quality gate, repairs best-so-far with `direct-repair` plus heuristic repair candidates
+9. Persists a small strategy state so the next run starts from the better policy bias
+10. Records each round in JSON and renders a visible report so the process is inspectable
 
-- 不要手写 `challenger.txt` 来绕过官方流程。
-- 不要自己主观挑 winner。
-- 不要传 `--mode rewrite`，rewrite 会自动从 `--text` 或 `--original` 推断。
-- 不要把用户的长 `原文` 丢掉，只传一个总结后的 `--task`。
-- 不要在命令成功后再附加一版手工改写。
-
-## 输出规则
-
-如果命令输出：
+V2 product rule:
 
 ```text
-=== HUMANIZE_FINAL_RESPONSE_BEGIN ===
-...
-=== HUMANIZE_FINAL_RESPONSE_END ===
+humanize is not competing against the main model's direct rewrite.
+It includes the main model's direct rewrite in the candidate pool,
+then uses the local scorer + repair loop to choose the steadier version.
 ```
 
-最终回复用户时，只返回两个 marker 中间的 markdown。
+## First Run
 
-## 生成模型
-
-默认优先使用可检测到的宿主 active model；当前仓库已内置 CoPaw active model 桥接。
-
-如果当前 agent 没有提供可检测的 active model，可以配置本地 OpenAI-compatible endpoint：
+Before the first evaluation, bootstrap the local runtime:
 
 ```bash
-export HUMANIZE_GENERATION_BACKEND=local
-export HUMANIZE_LLM_BASE_URL=http://127.0.0.1:54841/v1
-export HUMANIZE_LLM_MODEL=<your-local-model-id>
+cd {this_skill_dir} && python3 scripts/bootstrap_runtime.py
 ```
 
-没有生成模型时，系统会降级到 `heuristic-only`，常见模板化文案仍可跑完整流程。
+This installs a dedicated venv under CoPaw's working directory and downloads
+the default scorer model:
+
+- `BAAI/bge-reranker-v2-m3`
+
+## Inputs You Need From The User
+
+Always collect or infer these before you start iterating:
+
+- `task`
+- `hard_constraints.min_chars` / `hard_constraints.max_chars` when length matters
+- `hard_constraints.must_include` when facts must be preserved
+- `hard_constraints.banned_phrases` for phrases the user dislikes
+
+Optional:
+
+- `original draft`
+
+Default assumptions for V1:
+
+- `goal`: built in, unless the user explicitly overrides it
+- `max_rounds`: defaults to `3`, and stops early when the quality gate passes
+- `style_notes`: infer from the task and constraints unless the user adds special tone requirements
+- `session_mode`: `generate` unless the user provides an original draft
+
+If the user does not explicitly give a spec file, create one in the run folder.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [TianyiDataScience/humanize](https://github.com/TianyiDataScience/humanize) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-06-17 -->
