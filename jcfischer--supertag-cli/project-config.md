@@ -1,138 +1,132 @@
 ---
 trigger: always_on
-description: **When implementing specs in `.specify/specs/`, invoke the SpecFlow skill.**
+description: description: Complete Tana integration via MCP. USE WHEN user mentions Tana, tana search, tana notes, my notes, my knowledge base, find in Tana, create in Tana, OR needs to search, query, or write to Tana workspace. Provides full-text search, semantic search, node creation, and workspace management.
 ---
 
-# Supertag CLI - Claude Code Context
+# Supertag CLI Skill
 
-## SpecFlow Development
+---
+name: supertag
+description: Complete Tana integration via MCP. USE WHEN user mentions Tana, tana search, tana notes, my notes, my knowledge base, find in Tana, create in Tana, OR needs to search, query, or write to Tana workspace. Provides full-text search, semantic search, node creation, and workspace management.
+---
 
-**When implementing specs in `.specify/specs/`, invoke the SpecFlow skill.**
+## Overview
 
-This project uses spec-driven development. Specs are stored in `.specify/specs/<feature-id>/` with:
-- `spec.md` - What and Why (requirements)
-- `plan.md` - How (technical design)
-- `tasks.md` - Work items with TDD enforcement
+Supertag CLI provides complete Tana workspace integration through:
+- **MCP Server** (`supertag-mcp`) - AI tool integration for Claude, ChatGPT, Cursor, etc.
+- **CLI** (`supertag`) - Command-line queries, writes, and management
+- **Webhook Server** - HTTP API for automation and Tana Commands
 
-**Triggers:** "work on F-XXX", "implement F-XXX", "/specflow"
+## MCP Tools Reference
 
-## Documentation Locations
+### Progressive Disclosure (Start Here)
 
-**When releasing a new version, update ALL of these:**
+The MCP server supports progressive disclosure - a two-tier tool discovery pattern that reduces upfront token cost from ~2000 tokens to ~1000 tokens.
 
-| File | Purpose | Location |
-|------|---------|----------|
-| `CHANGELOG.md` | Internal version history (detailed) | `./CHANGELOG.md` |
-| `README.md` | Technical documentation, CLI usage, MCP setup | `./README.md` |
-| `SKILL.md` | PAI skill documentation with USE WHEN triggers | `./SKILL.md` |
-| `CHANGELOG.md` | Public release notes (customer-facing) | `~/work/web/invisible-store/tana/CHANGELOG.md` |
-| `USER-GUIDE.md` | Customer-facing user guide | `~/work/web/invisible-store/tana/USER-GUIDE.md` |
-| Marketing description | Store listing and marketing copy | `~/work/web/invisible-store/tana/index.html` |
+**Workflow:**
+1. Call `tana_capabilities` to get a lightweight overview of all tools
+2. Call `tana_tool_schema` to load full schemas for specific tools you need
+3. Execute tools with validated parameters
 
-## Release Checklist
+### tana_capabilities
+Get a lightweight overview of available tools, categorized by function.
 
-**IMPORTANT: Update CHANGELOG.md BEFORE running release.sh**
+**Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `category` | string | No | Filter to specific category (query, explore, transcript, mutate, system) |
 
-1. Update `CHANGELOG.md` - Change `[Unreleased]` to `[X.Y.Z] - YYYY-MM-DD`
-2. Update version number in `package.json`
-3. Run `bun run typecheck` - Ensure TypeScript type checks pass
-4. Run `bun run test:full` - Ensure all tests pass
-5. Run `./release.sh X.Y.Z --push` to build, tag, and push
-6. Update public `CHANGELOG.md` at `~/work/web/invisible-store/tana/CHANGELOG.md`
-7. Update store listing if features changed
+**Categories:**
+- **query**: tana_search, tana_semantic_search, tana_tagged, tana_field_values, tana_batch_get, tana_query, tana_timeline, tana_recent, tana_table
+- **explore**: tana_node, tana_related, tana_stats, tana_supertags, tana_supertag_info
+- **transcript**: tana_transcript_list, tana_transcript_show, tana_transcript_search
+- **mutate**: tana_create, tana_batch_create, tana_update_node, tana_tag_add, tana_tag_remove, tana_create_tag, tana_set_field, tana_set_field_option, tana_trash_node, tana_done, tana_undone
+- **system**: tana_sync, tana_cache_clear, tana_capabilities, tana_tool_schema
 
-**Note:** The release script updates `package.json` version automatically if you pass a version argument. Step 2 can be skipped if using `./release.sh X.Y.Z`.
+**Example:**
+```
+What tools does the Tana MCP server provide?
+Show me query tools for searching content
+```
 
-## PR Checklist
+### tana_tool_schema
+Load the full JSON schema for a specific tool. Use after `tana_capabilities` to get detailed parameter information.
 
-**IMPORTANT: Run these checks before pushing a PR:**
+**Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `tool` | string | Yes | Tool name (e.g., "tana_search") |
 
-1. Run `bun run typecheck` - TypeScript types must pass
-2. Run `bun run test` - Fast tests must pass (1741+ tests)
-3. Push and verify CI passes (GitHub Actions runs full test suite)
+**Example:**
+```
+Get the full schema for tana_search
+What parameters does tana_create accept?
+```
 
-## Key Architecture
+### tana_search
+Full-text search across Tana workspace using FTS5 indexing.
 
-- **Main CLI**: `supertag` - query, write, sync, server, workspaces
-- **Export CLI**: `supertag-export` - Playwright browser automation
-- **MCP Server**: `supertag-mcp` - AI tool integration via Model Context Protocol
+**Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `query` | string | Yes | Search query |
+| `limit` | number | No | Max results (default: 20) |
+| `includeAncestor` | boolean | No | Include containing project/meeting context (default: true) |
+| `createdAfter` | string | No | Filter by creation date (YYYY-MM-DD) |
+| `createdBefore` | string | No | Filter by creation date |
+| `updatedAfter` | string | No | Filter by update date |
+| `updatedBefore` | string | No | Filter by update date |
+| `workspace` | string | No | Workspace alias (default: main) |
+| `select` | array | No | Fields to include in response (e.g., ["id", "name", "tags"]) |
 
-## Important Technical Notes
+**Example:**
+```
+Search my Tana for "authentication implementation"
+Find notes about API design created after 2025-01-01
+```
 
-### Tana Input API Inline References
+### tana_semantic_search
+Vector similarity search using embeddings. Finds conceptually related content without exact keyword matches.
 
-**Two ways to create references via Input API:**
+**Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `query` | string | Yes | Natural language query |
+| `limit` | number | No | Max results (default: 20) |
+| `minSimilarity` | number | No | Threshold 0-1 (higher = stricter) |
+| `includeContents` | boolean | No | Include full node details |
+| `includeAncestor` | boolean | No | Include ancestor context (default: true) |
+| `depth` | number | No | Child traversal depth (0-3) |
+| `workspace` | string | No | Workspace alias |
+| `select` | array | No | Fields to include in response (e.g., ["nodeId", "name", "similarity"]) |
 
-1. **Inline reference in text** (within node name or child text):
-   ```html
-   <span data-inlineref-node="NODE_ID">Display Text</span>
-   ```
-   Example payload:
-   ```json
-   {"name": "Meeting with <span data-inlineref-node=\"abc123\">John Doe</span> today"}
-   ```
+**Example:**
+```
+Find notes semantically related to "knowledge management systems"
+Search for concepts similar to "distributed architecture"
+```
 
-2. **Child reference node** (entire child is a reference):
-   ```json
-   {"children": [{"dataType": "reference", "id": "NODE_ID"}]}
-   ```
+### tana_tagged
+Find all nodes with a specific supertag applied.
 
-**IMPORTANT:** Do NOT end a node with an inline reference - always add text after the closing `</span>` tag.
-- ✅ `"Meeting with <span data-inlineref-node=\"id\">John</span> today"`
-- ❌ `"Meeting with <span data-inlineref-node=\"id\">John</span>"`
+**Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| tagname` | string | Yes | Supertag name (e.g., "todo", "meeting") |
+| `limit` | number | No | Max results (default: 20) |
+| `orderBy` | string | No | Sort order (default: "created") |
+| `caseInsensitive` | boolean | No | Case-insensitive matching |
+| `createdAfter` | string | No | Filter by creation date |
+| `createdBefore` | string | No | Filter by creation date |
+| `workspace` | string | No | Workspace alias |
+| `select` | array | No | Fields to include in response (e.g., ["id", "name", "created"]) |
 
-**Note:** Tana Paste syntax (`[[Node Name]]`, `[[text^id]]`) does NOT work in Input API - use the HTML span syntax above.
-
-See `src/mcp/tools/create.ts` for implementation.
-
-### Config Namespace
-Uses `supertag` namespace (not `tana`) to avoid conflicts with official Tana app:
-- Config: `~/.config/supertag/config.json`
-- Data: `~/.local/share/supertag/`
-- Cache: `~/.cache/supertag/`
-
-### Export Format
-Tana exports now wrap data in `storeData` object. The schema registry handles both formats.
-
-### Export Location
-Tana JSON exports are stored at: `~/Documents/Tana-Export/main/`
-Files are named: `{workspaceId}@{date}.json` (e.g., `M9rkJkwuED@2025-12-12.json`)
-
-### Entity Detection (_flags)
-Based on Tana developer insights from Odin Urdland:
-- **Entity flag**: `props._flags % 2 === 1` (LSB set = entity) - NOTE: uses `_flags` with underscore prefix
-- **User override**: `props._entityOverride` (takes precedence if present)
-- Entities are "interesting" nodes: tagged items, library items, "Create new" items
-- Export contains ~13,735 entities with `_flags=1` out of 1.3M total nodes
-
-**Entity Detection Priority** (in order):
-1. `props._entityOverride` - Explicit user override (if true/false, use that)
-2. `props._flags % 2 === 1` - Automatic entity flag from Tana
-3. `props._ownerId.endsWith('_STASH')` - Library items (inferred)
-4. Has tag in `tag_applications` table - Tagged items (inferred)
-
-**Key Files:**
-- `src/db/entity.ts` - Entity detection functions (`isEntity`, `isEntityById`, `findNearestEntityAncestor`)
-- `src/types/tana-dump.ts` - Zod schema with `_flags` and `.passthrough()` to preserve props
-- `tests/entity-detection.test.ts` - Comprehensive entity detection tests
-
-### Field/Tuple Structures
-
-Tana stores field values in tuple nodes. There are **two patterns**:
-
-1. **Standard Field Tuples** (extracted ✅):
-   - Parent → Tuple → [Label, Value1, Value2, ...]
-   - May or may not have `_sourceId`
-   - Up to 50 children
-
-2. **Mega-Tuple Flat Structure** (not extracted ❌):
-   - Single tuple with 50-1000+ children
-   - Field labels: `"  - FieldName:"` (indentation in name)
-   - Values: `"    - Value text"` (more indentation)
-   - Labels and values are siblings, not parent-child
+**Example:**
+```
+Find all my todos in Tana
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [jcfischer/supertag-cli](https://github.com/jcfischer/supertag-cli) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-25 -->
+<!-- tomevault:4.0:windsurf_rules:2026-06-17 -->
