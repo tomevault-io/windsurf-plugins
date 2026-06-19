@@ -7,11 +7,11 @@ Orbit is durable, intent-tracked agentic project management for developers
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [danieljhkim/orbit](https://github.com/danieljhkim/orbit).
+Original source: `AGENTS.md` in [danieljhkim/orbit](https://github.com/danieljhkim/orbit).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
