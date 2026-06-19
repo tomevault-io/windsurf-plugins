@@ -1,109 +1,122 @@
 ---
 trigger: always_on
-description: Coding rules for Supabase Edge Functions
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
+# CLAUDE.md
 
-# Writing Supabase Edge Functions
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-You're an expert in writing TypeScript and Deno JavaScript runtime. Generate **high-quality Supabase Edge Functions** that adhere to the following best practices:
+## Project Overview
 
-## Guidelines
+Undocx is a **Google Docs-like realtime collaborative rich text editor** built with Next.js 16 (App Router), Lexical.dev, Supabase Realtime, and shadcn UI. The application provides a fully-featured document editing experience with real-time collaboration, advanced formatting, tables, images, and comments. The project includes two editor implementations: a basic markdown editor at `/editor-md` and a full-featured collaborative rich text editor at `/editor` with real-time synchronization powered by Supabase.
 
-1. Try to use Web APIs and Deno’s core APIs instead of external dependencies (eg: use fetch instead of Axios, use WebSockets API instead of node-ws)
-2. If you are reusing utility methods between Edge Functions, add them to `supabase/functions/_shared` and import using a relative path. Do NOT have cross dependencies between Edge Functions.
-3. Do NOT use bare specifiers when importing dependecnies. If you need to use an external dependency, make sure it's prefixed with either `npm:` or `jsr:`. For example, `@supabase/supabase-js` should be written as `npm:@supabase/supabase-js`.
-4. For external imports, always define a version. For example, `npm:@express` should be written as `npm:express@4.18.2`.
-5. For external dependencies, importing via `npm:` and `jsr:` is preferred. Minimize the use of imports from @`deno.land/x` , `esm.sh` and @`unpkg.com` . If you have a package from one of those CDNs, you can replace the CDN hostname with `npm:` specifier.
-6. You can also use Node built-in APIs. You will need to import them using `node:` specifier. For example, to import Node process: `import process from "node:process". Use Node APIs when you find gaps in Deno APIs.
-7. Do NOT use `import { serve } from "https://deno.land/std@0.168.0/http/server.ts"`. Instead use the built-in `Deno.serve`.
-8. Following environment variables (ie. secrets) are pre-populated in both local and hosted Supabase environments. Users don't need to manually set them:
-   - SUPABASE_URL
-   - SUPABASE_PUBLISHABLE_OR_ANON_KEY
-   - SUPABASE_SERVICE_ROLE_KEY
-   - SUPABASE_DB_URL
-9. To set other environment variables (ie. secrets) users can put them in a env file and run the `supabase secrets set --env-file path/to/env-file`
-10. A single Edge Function can handle multiple routes. It is recommended to use a library like Express or Hono to handle the routes as it's easier for developer to understand and maintain. Each route must be prefixed with `/function-name` so they are routed correctly.
-11. File write operations are ONLY permitted on `/tmp` directory. You can use either Deno or Node File APIs.
-12. Use `EdgeRuntime.waitUntil(promise)` static method to run long-running tasks in the background without blocking response to a request. Do NOT assume it is available in the request / execution context.
+## Development Commands
 
-## Example Templates
+### Running the Application
 
-### Simple Hello World Function
-
-```tsx
-interface reqPayload {
-  name: string
-}
-
-console.info('server started')
-
-Deno.serve(async (req: Request) => {
-  const { name }: reqPayload = await req.json()
-  const data = {
-    message: `Hello ${name} from foo!`,
-  }
-
-  return new Response(JSON.stringify(data), {
-    headers: { 'Content-Type': 'application/json', Connection: 'keep-alive' },
-  })
-})
+```bash
+npm run dev          # Start Next.js development server on http://localhost:3000
+npm run build        # Build production bundle
+npm start            # Start production server
+npm run lint         # Run ESLint
 ```
 
-### Example Function using Node built-in API
+### Supabase Local Development
 
-```tsx
-import { randomBytes } from 'node:crypto'
-import { createServer } from 'node:http'
-import process from 'node:process'
-
-const generateRandomString = (length) => {
-  const buffer = randomBytes(length)
-  return buffer.toString('hex')
-}
-
-const randomString = generateRandomString(10)
-console.log(randomString)
-
-const server = createServer((req, res) => {
-  const message = `Hello`
-  res.end(message)
-})
-
-server.listen(9999)
+```bash
+npm run supabase     # Access Supabase CLI
 ```
 
-### Using npm packages in Functions
+**Important Supabase Ports (Local Development):**
 
-```tsx
-import express from 'npm:express@4.18.2'
+- API: `http://127.0.0.1:54321`
+- Studio: `http://127.0.0.1:54323`
+- Database: `localhost:54322`
+- Inbucket (Email testing): `http://127.0.0.1:54324`
 
-const app = express()
+Environment variables required:
 
-app.get(/(.*)/, (req, res) => {
-  res.send('Welcome to Supabase')
-})
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY`
 
-app.listen(8000)
+## Architecture
+
+### Tech Stack
+
+- **Frontend Framework**: Next.js 16 (App Router) with React
+- **Rich Text Editor**: Lexical.dev - Extensible text editor framework
+- **UI Components**: shadcn UI (Radix UI primitives + Tailwind CSS)
+- **Backend & Realtime**: Supabase (Authentication, Realtime Database, Storage)
+- **Styling**: Tailwind CSS with CSS variables for theming
+- **TypeScript**: Full type safety across the application
+
+### Authentication & Middleware
+
+The app uses a custom middleware pattern with Supabase SSR:
+
+1. **Middleware Proxy Pattern**: Instead of a traditional `middleware.ts`, this project uses `proxy.ts` with the same export config. The middleware refreshes Supabase sessions and redirects unauthenticated users to `/auth/login`.
+
+2. **Supabase Client Patterns**:
+   - **Server Components**: Use `lib/supabase/server.ts` - creates a new client per request (required for Fluid compute)
+   - **Client Components**: Use `lib/supabase/client.ts`
+   - **Middleware**: Uses inline `createServerClient` in `lib/supabase/middleware.ts`
+
+**CRITICAL**: When working with Supabase server client:
+
+- Never store the client in a global variable
+- Always create a new client within each function
+- Do not run code between `createServerClient` and `supabase.auth.getClaims()` as this can cause random logouts
+
+### Editor Architecture (Lexical)
+
+The rich text editor (`/editor`) is built with a plugin-based architecture using Lexical. **All Lexical editor-related components are organized under `components/editor/`** in a structured, modular way.
+
+**Core Editor Wrapper:**
+
+- `components/blocks/editor-x/editor.tsx` - Main editor wrapper (LexicalComposer)
+- `components/blocks/editor-x/editor-header.tsx` - Editor header with document actions
+- `components/blocks/editor-x/plugins.tsx` - Plugin orchestration and layout
+- `components/blocks/editor-x/nodes.ts` - Custom node registrations
+
+**Editor Directory Structure (`components/editor/`):**
+
 ```
+components/editor/
+├── context/              # Shared state management
+│   └── toolbar-context.tsx    - ToolbarContext for plugin communication
+├── editor-hooks/         # Custom React hooks
+│   ├── use-debounce.ts        - Debouncing utility
+│   ├── use-modal.tsx          - Modal state management
+│   └── use-update-toolbar.ts  - Toolbar state updates
+├── editor-ui/            # Reusable UI components
+│   ├── code-button.tsx        - Code language selector
+│   ├── color-picker.tsx       - Color selection UI
+│   ├── content-editable.tsx   - Editable content wrapper
+│   ├── image-component.tsx    - Image display component
+│   └── image-resizer.tsx      - Image resize handles
+├── nodes/                # Custom Lexical nodes
+│   └── image-node.tsx         - Image node implementation
+├── plugins/              # Lexical plugins (core functionality)
+│   ├── toolbar/              - Top toolbar plugins
+│   │   ├── toolbar-plugin.tsx              - Main toolbar container
+│   │   ├── block-format-toolbar-plugin.tsx - Block type dropdown
+│   │   ├── font-format-toolbar-plugin.tsx  - Bold, italic, etc.
+│   │   ├── font-family-toolbar-plugin.tsx  - Font selection
+│   │   ├── font-size-toolbar-plugin.tsx    - Font size picker
+│   │   ├── font-color-toolbar-plugin.tsx   - Text color
+│   │   ├── font-background-toolbar-plugin.tsx - Highlight color
+│   │   ├── element-format-toolbar-plugin.tsx  - Alignment
+│   │   ├── link-toolbar-plugin.tsx         - Link insertion
+│   │   ├── image-toolbar-plugin.tsx        - Image insertion
+│   │   ├── table-toolbar-plugin.tsx        - Table insertion
+│   │   ├── horizontal-rule-toolbar-plugin.tsx - HR insertion
+│   │   ├── code-language-toolbar-plugin.tsx   - Code block language
+│   │   ├── block-insert-plugin.tsx         - Insert dropdown
+│   │   └── history-toolbar-plugin.tsx      - Undo/redo
+│   ├── picker/               - Slash command menu items
 
-### Generate embeddings using built-in @Supabase.ai API
-
-```tsx
-const model = new Supabase.ai.Session('gte-small')
-
-Deno.serve(async (req: Request) => {
-  const params = new URL(req.url).searchParams
-  const input = params.get('text')
-  const output = await model.run(input, { mean_pool: true, normalize: true })
-  return new Response(JSON.stringify(output), {
-    headers: {
-      'Content-Type': 'application/json',
-      Connection: 'keep-alive',
-    },
-  })
-})
-```
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [htmujahid/undocx-archived](https://github.com/htmujahid/undocx-archived) — distributed by [TomeVault](https://tomevault.io).
