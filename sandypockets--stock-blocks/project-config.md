@@ -1,106 +1,132 @@
 ---
 trigger: always_on
-description: > **Audience**: GitHub Copilot for PR reviews
+description: - **Added support for multiple property names in stock block configurations**
 ---
 
-# Stock Blocks Plugin - Copilot PR Review Instructions
+# Obsidian community plugin
 
-> **Audience**: GitHub Copilot for PR reviews  
-> **Project**: Obsidian Stock Blocks Plugin - displays stock prices, charts & sparklines  
-> **Source of truth**: Always read **AGENTS.md** first for general Obsidian plugin conventions
+## Recent Changes
 
-## Stock Blocks Plugin Context
+### Multiple Property Names Support
+- **Added support for multiple property names in stock block configurations**
+- Stock lists now accept `tickers`, `symbols`, or `stocks` (any of these work identically)
+- Stock charts now accept `symbol`, `symbols`, `stock`, `stocks`, `ticker`, or `tickers` (any of these work identically)
+- Updated configuration parser in `src/utils/config-parser.ts`
+- Updated documentation in README.md, demo.md, and settings tab
+- All examples now show the flexibility of property names
+- Created test examples in `test-examples.md` to verify functionality
 
-This is a **zero-dependency** Obsidian plugin that displays stock data in two formats:
-- `stock-block-list`: Multi-stock compact tables with sparklines  
-- `stock-block`: Single-stock detailed charts (candlestick, line, sparkline)
+## Project overview
 
-### Critical Files & Components
-When reviewing PRs, examine these in priority order:
-1. **Core Architecture**: `main.ts`, `AGENTS.md` (plugin lifecycle & conventions)
-2. **Configuration Parsing**: `src/utils/config-parser.ts` (backwards compatibility is CRITICAL)
-3. **Data Layer**: `src/services/stock-data.ts` (network calls, caching, API handling)  
-4. **UI Components**: `src/components/stock-list.ts`, `src/components/stock-chart.ts`
-5. **Settings**: `src/components/settings-tab.ts`, `src/settings.ts`
-6. **Documentation**: `README.md`, `demo.md` (must reflect behavior changes)
-7. **Build & Release**: `manifest.json`, `versions.json`, `package.json`, `esbuild.config.mjs`
+- Target: Obsidian Community Plugin (TypeScript → bundled JavaScript).
+- Entry point: `main.ts` compiled to `main.js` and loaded by Obsidian.
+- Required release artifacts: `main.js`, `manifest.json`, and optional `styles.css`.
 
-## Stock Blocks Specific Review Checklist
+## Environment & tooling
 
-### 1) Summarize the change
-- **Required**: 3–6 bullets referencing **file paths** and **user-facing impact**
-- **Focus areas**: Config parsing changes, new stock data sources, chart rendering modifications, settings changes
-- **Risk callouts**: Plugin lifecycle (`onload`/`onunload`), network calls (Yahoo Finance API), data caching, file I/O
+- Node.js: use current LTS (Node 18+ recommended).
+- **Package manager: npm** (required for this sample - `package.json` defines npm scripts and dependencies).
+- **Bundler: esbuild** (required for this sample - `esbuild.config.mjs` and build scripts depend on it). Alternative bundlers like Rollup or webpack are acceptable for other projects if they bundle all external dependencies into `main.js`.
+- Types: `obsidian` type definitions.
 
-### 2) Stock Blocks Core Functionality & Safety
+**Note**: This sample project has specific technical dependencies on npm and esbuild. If you're creating a plugin from scratch, you can choose different tools, but you'll need to replace the build configuration accordingly.
 
-**Configuration Parsing (`src/utils/config-parser.ts`):**
-- **CRITICAL**: Multiple property name aliases must remain supported without breaking existing notes
-- **Stock lists**: `tickers | symbols | stocks | ticker | symbol | stock` (all must work identically)
-- **Stock charts**: `symbol | symbols | stock | stocks | ticker | tickers` (all must work identically)  
-- Parser changes must be **backwards-compatible** and **idempotent**
-- Test edge cases: empty values, malformed YAML, mixed property names, case variations
+### Install
 
-**Data Service (`src/services/stock-data.ts`):**
-- All network calls go through `requestUrl()` (Obsidian API) - never direct fetch/axios
-- Caching logic must handle Yahoo Finance rate limits gracefully
-- Error handling for network timeouts, API failures, invalid symbols
-- Data validation for price/OHLC data before rendering
-- Memory cleanup for large datasets
+```bash
+npm install
+```
 
-**Component Architecture:**
-- Stock components registered via `this.addChild()` for proper cleanup
-- Refresh callbacks properly dispose previous renders
-- Canvas/SVG elements are cleaned up in component destruction
-- Settings changes trigger appropriate component re-renders
+### Dev (watch)
 
-### 3) Stock Blocks Testing Patterns
-- **Config Examples**: If config parsing changed, require demonstration notes showing:
-  - Multiple property name variations working identically
-  - Edge cases: empty tickers, malformed inputs, huge lists (50+ symbols)
-  - Mixed old/new syntax in same vault
-- **Chart Rendering**: Verify charts render correctly with various data scenarios:
-  - Stocks with gaps/weekends (business days vs calendar days)
-  - Very recent IPOs with limited history  
-  - Symbols with special characters or international exchanges
-- **Performance**: Test with 20+ symbols in one list, ensure no blocking behavior
+```bash
+npm run dev
+```
 
-### 4) Build, lint, and scripts (Stock Blocks specific)
-- **Package Manager**: npm only (project has npm-specific scripts)
-- **Required Scripts**: 
-  - Dev: `npm run dev` (esbuild watch mode)
-  - Build: `npm run build` (TypeScript check + production esbuild bundle)
-  - Lint: `npm run lint` and `npm run lint:fix` (ESLint with TypeScript)
-  - Version: `npm run version` (automated version bumping with git staging)
-- **Bundler**: esbuild (config in `esbuild.config.mjs`) - changes must maintain zero-dependency principle
-- **Zero Dependencies**: Runtime dependencies forbidden - everything must bundle into `main.js`
+### Production build
 
-### 5) Release artifacts & versioning (Stock Blocks specific)
-**If version bump detected:**
-- `manifest.json` version follows SemVer (**no leading `v`**)
-- `versions.json` updated with matching entry
-- Version bump scripts (`version-bump.mjs`, `update-version.mjs`) handle automation correctly
-- **Required release assets**: `main.js`, `manifest.json`, `styles.css`, `SHA256SUMS` (security verification)
-- **Never change**: `id: "stock-blocks"` in manifest (breaks existing installations)
+```bash
+npm run build
+```
 
-### 6) Stock Blocks Documentation & UX
-**Documentation consistency:**
-- `README.md`: Must reflect any config changes, especially property aliases
-- `demo.md`: Should show practical examples of changed features
-- Settings UI: Copy matches documentation, uses sentence case
+## Linting
 
-**User Experience:**
-- Error messages reference Yahoo Finance specifically when relevant
-- Loading states for network requests
-- Graceful degradation when API is unavailable
-- Settings descriptions explain stock market concepts clearly
+- To use eslint install eslint from terminal: `npm install -g eslint`
+- To use eslint to analyze this project use this command: `eslint main.ts`
+- eslint will then create a report with suggestions for code improvement by file and line number.
+- If your source code is in a folder, such as `src`, you can use eslint with this command to analyze all files in that folder: `eslint ./src/`
 
-### 7) Privacy, security, compliance (Stock Blocks specific)
-**Network & Data Security:**
-- **Default behavior**: Plugin works offline with cached data
+## File & folder conventions
+
+- **Organize code into multiple files**: Split functionality across separate modules rather than putting everything in `main.ts`.
+- Source lives in `src/`. Keep `main.ts` small and focused on plugin lifecycle (loading, unloading, registering commands).
+- **Example file structure**:
+  ```
+  src/
+    main.ts           # Plugin entry point, lifecycle management
+    settings.ts       # Settings interface and defaults
+    commands/         # Command implementations
+      command1.ts
+      command2.ts
+    ui/              # UI components, modals, views
+      modal.ts
+      view.ts
+    utils/           # Utility functions, helpers
+      helpers.ts
+      constants.ts
+    types.ts         # TypeScript interfaces and types
+  ```
+- **Do not commit build artifacts**: Never commit `node_modules/`, `main.js`, or other generated files to version control.
+- Keep the plugin small. Avoid large dependencies. Prefer browser-compatible packages.
+- Generated output should be placed at the plugin root or `dist/` depending on your build setup. Release artifacts must end up at the top level of the plugin folder in the vault (`main.js`, `manifest.json`, `styles.css`).
+
+## Manifest rules (`manifest.json`)
+
+- Must include (non-exhaustive):  
+  - `id` (plugin ID; for local dev it should match the folder name)  
+  - `name`  
+  - `version` (Semantic Versioning `x.y.z`)  
+  - `minAppVersion`  
+  - `description`  
+  - `isDesktopOnly` (boolean)  
+  - Optional: `author`, `authorUrl`, `fundingUrl` (string or map)
+- Never change `id` after release. Treat it as stable API.
+- Keep `minAppVersion` accurate when using newer APIs.
+- Canonical requirements are coded here: https://github.com/obsidianmd/obsidian-releases/blob/master/.github/workflows/validate-plugin-entry.yml
+
+## Testing
+
+- Manual install for testing: copy `main.js`, `manifest.json`, `styles.css` (if any) to:
+  ```
+  <Vault>/.obsidian/plugins/<plugin-id>/
+  ```
+- Reload Obsidian and enable the plugin in **Settings → Community plugins**.
+
+## Commands & settings
+
+- Any user-facing commands should be added via `this.addCommand(...)`.
+- If the plugin has configuration, provide a settings tab and sensible defaults.
+- Persist settings using `this.loadData()` / `this.saveData()`.
+- Use stable command IDs; avoid renaming once released.
+
+## Versioning & releases
+
+- Bump `version` in `manifest.json` (SemVer) and update `versions.json` to map plugin version → minimum app version.
+- Create a GitHub release whose tag exactly matches `manifest.json`'s `version`. Do not use a leading `v`.
+- Attach `manifest.json`, `main.js`, and `styles.css` (if present) to the release as individual assets.
+- After the initial release, follow the process to add/update your plugin in the community catalog as required.
+
+## Release note inputs
+
+Release notes are generated from GitHub PR titles and commit subjects. Keep PR titles and commit subjects descriptive, action-oriented, and focused on the real change. Version-bump-only commits are filtered from release notes.
+
+## Security, privacy, and compliance
+
+Follow Obsidian's **Developer Policies** and **Plugin Guidelines**. In particular:
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/sandypockets) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-10 -->
+> Source: [sandypockets/stock-blocks](https://github.com/sandypockets/stock-blocks) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-06-18 -->
