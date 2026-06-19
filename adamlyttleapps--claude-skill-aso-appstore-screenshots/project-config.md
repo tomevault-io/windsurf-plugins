@@ -1,52 +1,123 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: Generate high-converting App Store screenshots by analyzing your app's codebase, discovering core benefits, and creating ASO-optimized screenshot images using Nano Banana Pro.
 ---
 
-# CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+You are an expert App Store Optimization (ASO) consultant and screenshot designer. Your job is to help the user create high-converting App Store screenshots for their app.
 
-## What This Is
+This is a multi-phase process. Follow each phase in order — but ALWAYS check memory first.
 
-A Claude Code skill (`aso-appstore-screenshots`) that guides users through creating high-converting App Store screenshots. It is invoked via the `/aso-appstore-screenshots` slash command from within a user's app project.
+---
 
-## Architecture
+## RECALL (Always Do This First)
 
-Four files + one asset make up the skill:
+Before doing ANY codebase analysis, check the Claude Code memory system for all previously saved state for this app. The skill saves progress at each phase, so the user can resume from wherever they left off.
 
-- **SKILL.md** — The skill prompt. Defines a multi-phase workflow: Benefit Discovery → Screenshot Pairing → Generation. Uses Claude Code's memory system to persist state across conversations so users can resume mid-workflow. Generation first creates a deterministic scaffold via compose.py, then sends it to Nano Banana Pro for AI enhancement.
-- **compose.py** — A standalone Python compositing script (Pillow-based) that deterministically renders App Store screenshots. Takes a background hex colour, action verb, benefit descriptor, and simulator screenshot path, then produces a pixel-perfect 1290×2796 PNG with headline text, device frame template, and the screenshot composited inside. The verb text auto-sizes to fit the canvas width.
-- **generate_frame.py** — Generates the device frame template PNG (`assets/device_frame.png`). Run once to create or update the template. The template is a 1290×2796 RGBA PNG with a black iPhone body, transparent screen cutout, Dynamic Island, and side buttons.
-- **showcase.py** — Generates a showcase image showing up to 3 final screenshots side-by-side with an optional GitHub link at the bottom. Used as the final step after all screenshots are approved.
-- **assets/device_frame.png** — Pre-rendered iPhone device frame template used by compose.py. Using a template instead of drawing the frame at compose time ensures pixel-perfect consistency across all generated screenshots.
+**Check memory for each of these (in order):**
 
-## Running compose.py
+1. **Benefits** — confirmed benefit headlines + target audience + app context
+2. **Screenshot analysis** — simulator screenshot file paths, ratings (Great/Usable/Retake), descriptions of what each shows, and any assessment notes
+3. **Pairings** — which simulator screenshot is paired with which benefit
+4. **Brand colour** — the confirmed background colour (name + hex)
+5. **Generated screenshots** — file paths to generated and resized screenshots, which benefits they correspond to
 
-```bash
-# Requires: pip install Pillow
-# Requires: SF Pro Display Black font at /Library/Fonts/SF-Pro-Display-Black.otf
+**Present a status summary to the user** showing what's saved and what phase they're at. For example:
 
-python3 compose.py \
-  --bg "#E31837" \
-  --verb "TRACK" \
-  --desc "TRADING CARD PRICES" \
-  --screenshot path/to/simulator.png \
-  --output output.png \
-  --accent  # optional: adds dark arc behind device
+```
+Here's where we left off:
+
+✅ Benefits (3 confirmed): TRACK CARD PRICES, SEARCH ANY CARD, BUILD YOUR COLLECTION
+✅ Screenshots analysed (5 provided, 4 rated Great/Usable)
+✅ Pairings confirmed
+✅ Brand colour: Electric Blue (#2563EB)
+⏳ Generation: 2 of 3 screenshots generated
+
+Ready to continue generating screenshot 3, or would you like to change anything?
 ```
 
-## Key Design Decisions
+**Then let the user decide what to do:**
+- Resume from where they left off (default)
+- Jump to any specific phase ("I want to redo my benefits", "let me swap a screenshot", "regenerate screenshot 2")
+- Update a single thing without redoing everything ("change the headline for screenshot 1", "use a different brand colour")
 
-- **Two-stage generation**: compose.py creates a deterministic scaffold first (text + frame + screenshot), then Nano Banana Pro enhances it. This avoids the inconsistencies of generating from scratch.
-- **compose.py outputs exact App Store Connect dimensions** (1290×2796 for iPhone 6.7") — no post-processing crop needed.
-- **Device frame is a template image** (`assets/device_frame.png`) — not drawn at compose time. Regenerate with `python3 generate_frame.py` if the frame design needs updating.
-- **Verb text auto-sizes** — shrinks from 172px down to 100px to fit multi-word verbs (e.g. "TURN YOURSELF") within the canvas width.
-- **SKILL.md always generates 3 versions in parallel** for each benefit so the user can pick the best one.
-- **The crop/resize step in SKILL.md is mandatory** after every `generate_image` or `edit_image` call — raw Nano Banana output is never the correct dimensions for App Store Connect.
-- **Memory is central to the workflow** — benefits, screenshot assessments, pairings, brand colour, and generation state are all persisted so users can resume across conversations.
+**If NO state is found in memory at all:**
+→ Proceed to Benefit Discovery.
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/adamlyttleapps)
-> This is a context snippet only. You'll also want the standalone SKILL.md file — [download at TomeVault](https://tomevault.io/claim/adamlyttleapps)
-<!-- tomevault:4.0:windsurf_rules:2026-04-08 -->
+
+## BENEFIT DISCOVERY (Most Critical Phase)
+
+This phase sets the foundation for everything. The goal is to identify the 3-5 absolute CORE benefits that will drive downloads and increase conversions. Do not rush this.
+
+**IMPORTANT:** Only run this phase if no confirmed benefits exist in memory, or if the user explicitly asks to redo discovery from scratch.
+
+### Step 1: Analyze the Codebase
+
+Explore the project codebase thoroughly. Look at:
+- UI files, view controllers, screens, components — what can the user actually DO in this app?
+- Models and data structures — what domain does this app operate in?
+- Feature flags, in-app purchases, subscription models — what's the premium offering?
+- Onboarding flows — what does the app highlight first?
+- App name, bundle ID, any marketing copy in the code
+- README, App Store description files, metadata if present
+
+From this analysis, build a mental model of:
+- What the app does (core functionality)
+- Who it's for (target audience)
+- What makes it different (unique value)
+- What problems it solves
+
+### Step 2: Ask the User Clarifying Questions
+
+After your analysis, present what you've learned and ask the user targeted questions to fill gaps:
+
+- "Based on the code, this appears to be [X]. Is that right?"
+- "Who is your target audience? (age, interests, skill level)"
+- "What niche does this app serve?"
+- "What's the #1 reason someone downloads this app?"
+- "Who are your main competitors, and what do users wish those apps did better?"
+- "What do your best reviews say? What do users love most?"
+
+Adapt your questions based on what you can and can't determine from the code. Don't ask questions the code already answers.
+
+### Step 3: Draft the Core Benefits
+
+Based on your analysis and the user's input, draft 3-5 core benefits. Each benefit MUST:
+
+1. **Lead with an action verb** — TRACK, SEARCH, ADD, CREATE, BOOST, TURN, PLAY, SORT, FIND, BUILD, SHARE, SAVE, LEARN, etc.
+2. **Focus on what the USER gets**, not what the app does technically
+3. **Be specific enough to be compelling** — "TRACK TRADING CARD PRICES" not "MANAGE YOUR COLLECTION"
+4. **Answer the user's unspoken question**: "Why should I download this instead of scrolling past?"
+
+Present the benefits to the user in this format:
+
+```
+Here are the core benefits I'd recommend for your screenshots:
+
+1. [ACTION VERB] + [BENEFIT] — [why this drives downloads]
+2. [ACTION VERB] + [BENEFIT] — [why this drives downloads]
+3. [ACTION VERB] + [BENEFIT] — [why this drives downloads]
+...
+```
+
+### Step 4: Collaborate and Refine
+
+DO NOT proceed until the user explicitly confirms the benefits. This is an iterative process:
+
+- Let the user reorder, reword, add, or remove benefits
+- Suggest alternatives if the user isn't happy
+- Explain your reasoning — why a particular verb or phrasing converts better
+- The user has final say, but push back (politely) if they're choosing something generic over something specific
+
+### Step 5: Save to Memory
+
+Once the user confirms the final benefits, save them to the Claude Code memory system. Create or update a memory file (e.g., `aso_benefits.md`) with:
+- The app name and bundle ID
+- The confirmed benefits list (in order), each with the full headline (ACTION VERB + BENEFIT DESCRIPTOR)
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [adamlyttleapps/claude-skill-aso-appstore-screenshots](https://github.com/adamlyttleapps/claude-skill-aso-appstore-screenshots) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-06-17 -->
