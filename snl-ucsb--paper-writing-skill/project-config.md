@@ -1,64 +1,64 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: Research paper writing assistant that enforces Arpit Gupta's editorial principles, voice profile, and writing workflow. MANDATORY TRIGGERS: Use this skill whenever the user mentions writing a paper, drafting a section, revising a section, editing a paper, reviewing a draft, rewriting an introduction, writing an evaluation, polishing prose, compressing text, or any task involving .tex files, Overleaf, conference submissions, or paper deadlines. Also trigger when the user mentions any paper by nam
 ---
 
-# CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+# Paper Writing Skill
 
-## What This Repo Is
+## How This Skill Works
 
-A Claude Code **skill** (invoked via `/paper-writing`) that encodes the writing methodology of the [Systems and Networking Lab (SNL)](https://github.com/SNL-UCSB) at UC Santa Barbara. Part of a [three-skill family](https://github.com/SNL-UCSB) (literature-survey, data-visualization, paper-writing) that compresses the operational middle of the research pipeline. It is not a traditional codebase — there is no build system, no tests, and no application code. The repo contains markdown files that Claude reads at runtime to enforce editorial rules, rhetorical move sequences, and a structured writing pipeline.
+This skill encodes the writing methodology of the [Systems and Networking Lab (SNL)](https://github.com/SNL-UCSB) at UC Santa Barbara, derived from forensic analysis of 6 papers (8 submissions), 7,600+ Overleaf edits, 100+ tex file versions, and 5 peer review processes. See [*The Paper Behind the Paper*](https://sites.cs.ucsb.edu/~arpitgupta/blog/the-paper-behind-the-paper.html) for the full analysis. It works out of the box — the default rules are calibrated and battle-tested.
 
-## Installation
+### Three Layers
 
-```bash
-./setup
-```
+1. **The pipeline (fixed)**: A five-stage writing workflow. Does not change between users or papers.
 
-This copies skill files into `~/.claude/skills/paper-writing/`. Always edit files in this repo, then re-run `./setup` to propagate changes.
+2. **The voice and editorial rules (defaults provided, customizable)**: Sentence-level style, structural rules, compression patterns, section checklists. These ship with the SNL lab's rules as defaults. Students may customize by editing files in `author_profile/` — see the README for what to change.
 
-## Architecture
+3. **The project context (per paper)**: Identity sentence, venue, contribution claims, locked decisions. Lives in a `project_context.md` in the paper's working directory.
 
-**SKILL.md** is the main entry point Claude reads when `/paper-writing` is invoked. It defines:
-- The three-layer model: fixed pipeline → customizable voice/editorial rules → per-paper project context
-- The five-stage writing pipeline: Brainstorming → Architecture → Section Drafts → Integration → Compression
-- The mandatory style audit gate (runs on every tex edit)
-- Section checklist and rhetorical move dispatch tables
+### How This Skill Connects to the Research Pipeline
 
-**author_profile/** contains the editorial rules (source of truth for all style enforcement):
-- `editorial_principles.md` — 14 cross-paper principles with evidence from forensic revision analysis
-- `voice_profile.md` — sentence-level style rules (~21-word mean, zero hedging, claim-first, banned words)
-- `compression_patterns.md` — 7 compression operations with before/after examples
-- `rhetorical_moves.md` — cross-section move sequences
-- `intervention_types.md` — 7 advisor intervention types for draft review
+This skill does not operate in isolation. It is part of a three-skill family, and the artifacts from the other two skills are direct inputs to the writing process:
 
-**writing_checklists/** contains post-draft structural checklists (intro, evaluation, design, related work). These run automatically after every section draft.
+**From the [literature-survey-skill](https://github.com/SNL-UCSB/literature-survey-skill):**
+- **Gap analysis** → feeds Brainstorming Phase 1 (Problem Discovery). The gaps the survey identified — missing quadrants, shared assumptions that break, unexplored combinations — are the structural limitations that motivate your paper.
+- **Writing craft extractions** (Pass 3+) → feed the Architecture stage and section drafting. The introduction anatomy, evaluation architecture, and design craft you extracted from the best papers in your area are the models for your own paper's structure.
+- **Competitive positioning** → feeds Brainstorming Phase 4. The invariant matrix and dependency graph from synthesis show exactly where your paper sits relative to existing work.
 
-**section_rhetorical_moves/** contains detailed per-section move sequences with concrete examples from accepted/rejected papers.
+**From the [data-visualization-skill](https://github.com/SNL-UCSB/data-visualization-skill):**
+- **Exploration** (`exploration_log.md`) → feeds Brainstorming Phase 3 (Evaluation Design). The exploration forced you to look at your data from multiple angles before forming hypotheses. The surprises you found — distributions you didn't expect, subgroups that behaved differently — shape what claims are defensible and where the real contribution lives.
+- **Brainstorm** (`braindump.md`) → feeds the figure/table plan. Each braindump articulates what question a figure answers, what you expected to see, and what would surprise you. These are the hypotheses your evaluation must validate.
+- **Plan + Execute** (`plot_context.md`) → feeds the Architecture stage's figure/table plan. Each plot_context records intent, variable mappings, plot type rationale, and design decisions — ready-made entries for the paper's figure plan.
+- **Analyze** (WALTER narrations) → feeds Evaluation Move 4 (Takeaway Synthesis). The WALTER Result — "what is the takeaway? does it connect back to the hypothesis?" — is a first draft of the Takeaway paragraph for that experiment cluster.
 
-**brainstorming_guide.md** defines the 34-question, 6-phase brainstorming workflow that produces a `project_context.md`.
+The three skills create a closed loop: the literature survey reveals the gap and teaches you how accepted papers communicate; data visualization forces you to understand what your evidence actually shows and what hypotheses it validates; paper writing turns both into a publishable argument. **If the student has artifacts from the other skills, Claude MUST load them.**
 
-**figure_synthesis_guide.md** defines the 3-mode workflow (spec → generate → critique) for non-data figures — architecture diagrams, pipeline illustrations, concept diagrams, comparison schematics. Uses a hybrid approach: AI image generation prompts (Gemini/DALL-E) for visually rich figures, TikZ for precise structural figures.
+### When This Skill Triggers, Claude MUST:
 
-**figure_templates/** contains supporting files for figure synthesis:
-- `venue_styles.md` — column widths, fonts, color palette, and styling blocks for NSDI/SIGCOMM/IMC
-- `prompt_templates.md` — AI image generation prompt skeletons per archetype (architecture overview, concept illustration, comparison schematic, deployment diagram)
-- `tikz_skeletons.md` — TikZ starter templates per archetype (pipeline flow, component detail, taxonomy)
-- `figure_spec_template.md` — per-figure spec template (filled during spec mode, consumed during generate mode)
+1. Read this SKILL.md (already loaded)
+2. Read ALL files in `author_profile/` — these are the source of truth for editorial rules
+3. Ask which paper the user is working on
+4. Look for a `project_context.md` in the paper's working directory
+5. If found, read it and treat it as binding constraints
+6. If not found, run the **Structured Brainstorming** workflow below to create one
+7. Check for artifacts from sibling skills — survey paper notes with craft extractions, `exploration_log.md`, `braindump.md`, `plot_context.md`, WALTER narrations. If found, load them as reference material for the relevant pipeline stages
 
-**examples/** contains the `project_context.md` template and a real completed example (NetBurst).
+---
 
-## Key Design Decisions
+## Structured Brainstorming — The Skill's Centerpiece
 
-- **Introduction-twice** is the most impactful principle. The introduction is written twice: Draft 0 (framing scaffold) before the evaluation, then the final introduction rewritten from scratch after the evaluation. Section drafts follow: Draft 0 Introduction → Evaluation → Design → Background → Related Work → Final Introduction → Abstract.
-- **`project_context.md`** is generated per-paper in the user's working directory (not in this repo). It should be gitignored.
-- The `setup` script copies a specific subset of files (SKILL.md, brainstorming_guide.md, figure_synthesis_guide.md, author_profile/, writing_checklists/, section_rhetorical_moves/, figure_templates/, examples/) — it intentionally excludes README.md and setup itself.
-- Voice rules ship as defaults from the SNL lab. Students customize by editing `author_profile/` files after installation.
-- **Signposting through claims**: section preambles are encouraged when they state the section's conclusion, but banned when content-free ("In this section, we describe...").
-- **Topic-sentence-first drafting**: before writing full prose for any section, write all topic sentences and verify they form a coherent argument. This intermediate scaffolding step sits between Architecture (section outline) and full drafting.
+**The biggest obstacle for students isn't writing — it's that their ideas live as unstructured intuitions.** They know something is interesting but can't articulate what or why. The brainstorming process transforms scattered thinking into a precise project context that drives every section of the paper.
+
+### How It Works
+
+Claude MUST read `brainstorming_guide.md` and walk the student through its 6 phases interactively. The phases are:
+
+| Phase | Focus | Key outcome |
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [SNL-UCSB/paper-writing-skill](https://github.com/SNL-UCSB/paper-writing-skill) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-16 -->
+<!-- tomevault:4.0:windsurf_rules:2026-06-17 -->
