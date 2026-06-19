@@ -1,108 +1,153 @@
 ---
 trigger: always_on
-description: agentskill is a single-repo Python CLI published from the `agsk` package metadata and exposed as the `agentskill` console command. It analyzes one or more repositories, emits structured analyzer output, and also supports direct `AGENTS.md` generation and in-place update flows. The codebase is organized around packaged runtime modules under `agentskill/`, thin direct wrappers under `scripts/`, reference specs and fixture repositories at the repo root, and a separate `tests/` tree that exercises a
+description: Let any agent produce code indistinguishable from the existing codebase.
 ---
 
-# AGENTS.md
 
-## 1. Overview
+# SKILL.md — agentskill
 
-agentskill is a single-repo Python CLI published from the `agsk` package metadata and exposed as the `agentskill` console command. It analyzes one or more repositories, emits structured analyzer output, and also supports direct `AGENTS.md` generation and in-place update flows. The codebase is organized around packaged runtime modules under `agentskill/`, thin direct wrappers under `scripts/`, reference specs and fixture repositories at the repo root, and a separate `tests/` tree that exercises analyzer internals, generation/update flows, and CLI entrypoints.
+> **Operational spec for agentskill.**
+> This file governs _when_ to invoke, _what_ to run, and _in what order_.
+> For _how_ to generate `AGENTS.md`, read [`SYSTEM.md`](./SYSTEM.md) — it is the behavioral bible.
+> These two files are complementary. Neither is sufficient alone.
 
-## 2. Repository Structure
+---
 
-```text
-agentskill/
-  agentskill/
-    main.py                 # packaged CLI entry point; argument parsing and dispatch only
-    commands/               # analyzer implementations
-    lib/                    # orchestration, output, reference, generation, and update helpers
-    common/                 # shared low-level helpers and registries
-  pyproject.toml            # packaging, pytest, ruff, coverage config
-  README.md                 # user-facing overview and command reference
-  SYSTEM.md                 # synthesis spec for generated AGENTS.md files
-  SKILL.md                  # operational workflow for the skill
-  AGENTS.md                 # conventions for this repo
-  LICENSE                   # MIT license text
-  references/
-    GOTCHAS.md              # extraction and synthesis failure modes
-  examples/
-    python/                 # fixture repository used by analyzer tests
-    javascript/             # fixture repository for JS/TS detection paths
-    mixed/                  # multi-language fixture repository
-    ...                     # additional per-language example repos
-  scripts/
-    analyze.py              # thin direct-execution wrapper to packaged CLI
-    scan.py                 # thin direct-execution wrapper
-    measure.py              # thin direct-execution wrapper
-    config.py               # thin direct-execution wrapper
-    git.py                  # thin direct-execution wrapper
-    graph.py                # thin direct-execution wrapper
-    symbols.py              # thin direct-execution wrapper
-    tests.py                # thin direct-execution wrapper
-    generate.py             # thin direct-execution wrapper to packaged CLI
-    update.py               # thin direct-execution wrapper to packaged CLI
-  tests/                    # pytest suite; separate tree, not colocated
-    conftest.py             # sys.path test bootstrap
-    test_support.py         # shared repo/setup helpers for tests
+## Purpose
+
+Analyze one or more code repositories. Extract exact coding conventions. Synthesize a precise, forensic `AGENTS.md` that allows any agent to produce code indistinguishable from the existing codebase.
+
+---
+
+## Generation Modes
+
+agentskill supports two generation modes. The mode determines who authors the
+final document:
+
+### AI-led generation (skill mode — this file)
+
+The model synthesizes the final `AGENTS.md` itself. CLI analyzer commands are
+used **only for evidence gathering** — to extract repository facts that the
+model cannot derive reliably from reading source files alone.
+
+**In skill mode, never call `agentskill generate` to produce the final
+`AGENTS.md`.** The model is the author. Analyzer output is the raw material,
+not the finished product.
+
+### CLI static generation (operator mode)
+
+The user runs `agentskill generate` directly. The packaged runtime emits
+markdown automatically. This is appropriate for deterministic direct generation
+without an LLM in the loop.
+
+**Use CLI generation only in non-LLM static/operator workflows where the user
+explicitly wants tool-generated markdown rather than AI-authored synthesis.**
+
+---
+
+## Rule: AI Authorship
+
+> **The model authors the final document in skill mode.**
+
+- Do not use `agentskill generate` or `python scripts/generate.py` to produce
+  the final `AGENTS.md` when operating as a skill or in any AI-assisted
+  workflow.
+- Use analyzer commands (`analyze`, `scan`, `measure`, `config`, `git`, `graph`,
+  `symbols`, `tests`) to gather repository facts.
+- The final generated markdown must be synthesized by the AI from analyzer
+  evidence, direct source file reads, and supporting documentation.
+- Treat analyzer outputs as evidence, not as the final authored document.
+
+---
+
+## Trigger Phrases
+
+Invoke this skill when the user says any of the following — or a close paraphrase:
+
+- _"Generate an AGENTS.md"_
+- _"Extract my coding style"_
+- _"Analyze my repo for conventions"_
+- _"Create a style guide from my code"_
+- _"Update my AGENTS.md"_
+- _"My agent doesn't write code the way I do — fix it"_
+
+Do **not** invoke this skill for general code review, refactoring, or style advice not tied to generating `AGENTS.md`.
+
+---
+
+## File Ecosystem
+
+| File                     | Role                                                                                   |
+| ------------------------ | -------------------------------------------------------------------------------------- |
+| `SKILL.md` _(this file)_ | Operational spec: workflow, scripts, fallbacks, uncertainty handling                   |
+| `SYSTEM.md`              | Behavioral spec: what to generate, section by section, and how to evaluate it          |
+| `references/GOTCHAS.md`  | Extraction errors to avoid; update this file whenever a new failure mode is discovered |
+| `examples/`              | Analyzer fixtures plus reference `AGENTS.md` examples; consult when handling an unfamiliar repo shape |
+
+> **Maintenance rule:** If SYSTEM.md and SKILL.md ever contradict each other, SYSTEM.md wins. Fix SKILL.md to match.
+
+> **Availability rule:** If this skill was downloaded from ClawHub, or if `examples/` is unavailable locally, do not consult `examples/`; skip it to avoid execution errors.
+
+---
+
+## Workflow
+
+Execute these steps **in order**. Do not skip steps. Do not reorder steps.
+
+---
+
+### Step 1 — Collect
+
+Ask the user for repo path(s). Accept one or more. Confirm before proceeding.
+
+```
+Provide the path(s) to your repository or repositories.
+One path per repo. Multiple repos are supported.
 ```
 
-- New analyzer logic goes in `agentskill/commands/`, not in entrypoint wrappers.
-- Shared CLI plumbing, generation, reference adaptation, and update flows belong in `agentskill/lib/`; low-level reusable helpers belong in `agentskill/common/`.
-- Files under `scripts/*.py` stay as thin wrappers around packaged command entrypoints such as `agentskill.commands.<name>.main` or `agentskill.main`.
-- New tests go in `tests/` as `test_<subject>.py`; this repo does not colocate tests beside source files.
-- New fixture repos or language-shape examples belong in `examples/`, not mixed into `references/`.
-- Specs and extraction notes belong in `README.md`, `SYSTEM.md`, `SKILL.md`, and `references/`, not inside runtime modules.
-- Keep the repo root small: metadata, docs/spec files, and no business logic outside `agentskill/`.
+If the user provides a monorepo, note this explicitly — steps 3 and 4 of SYSTEM.md apply.
 
-## 5. Commands and Workflows
+---
+
+### Step 2 — Scan
+
+Run the scan script to get the directory tree and source file inventory.
 
 ```bash
-# Install editable package with dev tooling
-python -m pip install -e '.[dev]'
-
-# Optional local hooks
-pre-commit install
-
-# Run all analyzers
-agentskill analyze <repo> --pretty
-
-# Generate or update markdown
-agentskill generate <repo>
-agentskill generate <repo> --out AGENTS.md
-agentskill generate <repo> --interactive
-agentskill update <repo>
-agentskill update <repo> --section testing
-agentskill update <repo> --force
-
-# Run individual analyzers through the installed CLI
-agentskill scan <repo> --pretty
-agentskill measure <repo> --lang python --pretty
-agentskill config <repo> --pretty
-agentskill git <repo> --pretty
-agentskill graph <repo> --pretty
-agentskill symbols <repo> --pretty
-agentskill tests <repo> --pretty
-
-# Direct wrapper execution
-python scripts/analyze.py <repo> --pretty
-python scripts/scan.py <repo> --pretty
-python scripts/generate.py <repo>
-python scripts/update.py <repo>
-
-# Local checks
-ruff format .
-ruff check .
-mypy
-pytest
+python scripts/scan.py <repo>
 ```
 
-- `python -m pip install -e '.[dev]'` is the documented development install path; use it instead of reconstructing the dev dependency list manually.
-- `agentskill analyze <repo> --pretty` is the canonical aggregate analyzer workflow.
-- `agentskill generate <repo>` is the fresh-draft path; `agentskill update <repo>` is the in-place merge/preservation path.
+**Outputs:** annotated directory tree, source files grouped by language with line counts.
+
+**Use the output to decide what to read** — largest files first, entry points and core modules before tests.
+
+> **If the script fails:** Manually walk the directory tree using available file tools. Note in your working context that the scan was manual — this affects reliability of the file inventory for large repos.
+
+---
+
+### Step 3 — Measure
+
+Run the measurement script to get exact formatting metrics.
+
+```bash
+python scripts/measure.py <repo>
+python scripts/measure.py <repo> --lang python   # single language
+```
+
+**Outputs:** per-language indentation unit and size, line length percentiles (p95 and p99), blank line distributions between top-level definitions and between methods, trailing newline convention.
+
+> **If the script fails:** Proceed without exact measurements. Mark all formatting measurements in the generated `AGENTS.md` as `[tentative]` and note that manual inspection was used. Do not estimate percentiles — state the observable range instead.
+
+---
+
+### Step 4 — Config
+
+Run the config script to detect formatters, linters, and their exact settings.
+
+```bash
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [airscripts/agentskill](https://github.com/airscripts/agentskill) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-04 -->
+<!-- tomevault:4.0:windsurf_rules:2026-06-17 -->
