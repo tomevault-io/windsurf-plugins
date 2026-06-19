@@ -1,94 +1,151 @@
 ---
 trigger: always_on
-description: Instructions for AI contributors working on the GoAI codebase.
+description: > Instructions for AI coding agents helping developers use the GoAI SDK.
 ---
 
-# AGENTS.md - GoAI
+# GoAI SDK - AI Agent Skill
 
-Instructions for AI contributors working on the GoAI codebase.
+> Instructions for AI coding agents helping developers use the GoAI SDK.
+> Load this file when a user's project imports `github.com/zendev-sh/goai`.
 
-## Commands
+## Overview
 
-```bash
-go build ./...          # Build
-go test ./...           # Test all packages
-go test -cover ./...    # Test with coverage
-golangci-lint run       # Lint
-go test ./provider/openai/  # Test single package
+GoAI is a Go SDK for AI applications. One unified API across 25+ LLM providers. Inspired by the Vercel AI SDK, adapted to Go idioms (generics, interfaces, channels).
+
+- **Package**: `github.com/zendev-sh/goai`
+- **Go version**: 1.25+
+- **Dependencies**: stdlib + `golang.org/x/oauth2` for Vertex AI. Optional `observability/otel` submodule adds OTel SDK (separate go.mod, not pulled unless imported).
+- **Docs**: https://goai.sh
+- **GoDoc**: https://pkg.go.dev/github.com/zendev-sh/goai
+
+## Quick Reference
+
 ```
-
-## Architecture
-
-GoAI is a Go SDK for AI applications - one API across 24+ LLM providers. Inspired by Vercel AI SDK, adapted to Go idioms.
-
+go get github.com/zendev-sh/goai@latest
 ```
-goai/
-├── generate.go             # GenerateText, StreamText
-├── object.go               # GenerateObject[T], StreamObject[T]
-├── embed.go                # Embed, EmbedMany
-├── image.go                # GenerateImage
-├── options.go              # WithPrompt, WithTools, etc.
-├── schema.go               # SchemaFrom[T] - JSON Schema from Go structs
-├── errors.go               # APIError, ContextOverflowError
-├── retry.go                # Exponential backoff (errors.As, not type assertion)
-├── caching.go              # Prompt cache control (copies msgs, no mutation)
-├── types.go                # Tool struct
-├── messages.go             # Message builders
-├── hooks.go                # Telemetry hooks
-├── partial_json.go         # Partial JSON parser for streaming
-├── provider/
-│   ├── provider.go         # LanguageModel, EmbeddingModel, ImageModel interfaces
-│   ├── types.go            # Message, Part, Usage, StreamChunk
-│   ├── token.go            # TokenSource, CachedTokenSource (lock-free fetch)
-│   ├── openai/             # OpenAI (Chat Completions + Responses API)
-│   ├── anthropic/          # Anthropic (Messages API)
-│   ├── google/             # Google Gemini (REST)
-│   ├── bedrock/            # AWS Bedrock (Converse API + SigV4 + EventStream, RWMutex for fallback; InvokeModel API for embeddings)
-│   ├── vertex/             # Vertex AI
-│   ├── azure/              # Azure OpenAI
-│   ├── cohere/             # Cohere (Chat v2 + Embed)
-│   ├── minimax/            # MiniMax (Anthropic-compat, delegates to anthropic/)
-│   ├── compat/             # Generic OpenAI-compatible
-│   └── <13 more>/          # Mostly OpenAI-compat (some via compat/ or anthropic/ wrappers)
-│ # tools.go files: 5 files with provider-defined tools: anthropic/ (10 tools), openai/ (4 tools), google/ (3 tools), xai/ (2 tools), groq/ (1 tool)
-├── internal/
-│   ├── openaicompat/       # Shared codec for 13+ providers
-│   ├── gemini/             # Schema sanitization (Vertex, Google)
-│   ├── sse/                # SSE parser
-│   └── httpc/              # HTTP helpers + ParseDataURL
-├── mcp/                    # MCP (Model Context Protocol) client
-├── observability/
-│   ├── langfuse/           # Langfuse observability integration
-│   └── otel/               # OpenTelemetry tracing and metrics (separate go.mod)
-├── examples/               # 26 runnable examples (including 7 MCP examples)
-└── bench/                  # Performance benchmarks (GoAI vs Vercel AI SDK)
-```
-
-## Key Rules
-
-1. **Keep dependencies minimal** - core: direct `golang.org/x/oauth2`, indirect `cloud.google.com/go/compute/metadata` for ADC. Optional submodules (`observability/otel`) use separate `go.mod`.
-2. **Vercel AI SDK is the reference** - check Vercel source before modifying provider behavior
-3. **90% test coverage** per package - mock HTTP servers, not internals
-4. **Interface compliance checks** - provider structs should include compile-time checks (type name may vary, e.g. `*chatCompletionsModel`)
-5. **errors.As, not type assertion** - always `errors.As(err, &apiErr)`, never `err.(*APIError)`
-6. **No input mutation** - functions must copy slices/maps before modifying (see `applyCaching`)
-7. **Lock-free network calls** - never hold a mutex during I/O (see `CachedTokenSource`)
-8. **Shared utilities in internal/** - `parseDataURL` lives in `httpc`, not duplicated per provider
-
-## Adding Providers
-
-OpenAI-compatible providers use `internal/openaicompat`. Pattern:
 
 ```go
-var _ provider.LanguageModel = (*chatModel)(nil)
-
-func Chat(modelID string, opts ...Option) provider.LanguageModel { ... }
-func (m *chatModel) DoGenerate(ctx, params) (*provider.GenerateResult, error) { ... }
-func (m *chatModel) DoStream(ctx, params) (*provider.StreamResult, error) { ... }
+import (
+    "github.com/zendev-sh/goai"
+    "github.com/zendev-sh/goai/provider/openai"     // or any provider
+)
 ```
 
-Provider options should be idiomatic and consistent where applicable. Common options are `WithAPIKey`, `WithTokenSource`, `WithBaseURL`, `WithHTTPClient`, `WithHeaders`; provider-specific exceptions are acceptable (for example `azure.WithEndpoint`, `ollama` without auth options).
+## Core API
+
+### 7 Top-Level Functions
+
+| Function                                      | Purpose                         | Returns                     |
+| --------------------------------------------- | ------------------------------- | --------------------------- |
+| `goai.GenerateText(ctx, model, opts...)`      | Non-streaming text generation   | `(*TextResult, error)`      |
+| `goai.StreamText(ctx, model, opts...)`        | Streaming text via channels     | `(*TextStream, error)`      |
+| `goai.GenerateObject[T](ctx, model, opts...)` | Typed structured output (JSON)  | `(*ObjectResult[T], error)` |
+| `goai.StreamObject[T](ctx, model, opts...)`   | Streaming structured output     | `(*ObjectStream[T], error)` |
+| `goai.Embed(ctx, model, text, opts...)`       | Single text embedding           | `(*EmbedResult, error)`     |
+| `goai.EmbedMany(ctx, model, texts, opts...)`  | Batch embeddings (auto-chunked) | `(*EmbedManyResult, error)` |
+| `goai.GenerateImage(ctx, model, imgOpts...)`  | Image generation                | `(*ImageResult, error)`     |
+
+### Model Constructors
+
+Each provider has `Chat()`, and optionally `Embedding()` and `Image()`:
+
+```go
+// Language models
+openai.Chat("gpt-4o")
+anthropic.Chat("claude-sonnet-4-20250514")
+google.Chat("gemini-2.5-flash")
+bedrock.Chat("anthropic.claude-sonnet-4-20250514-v1:0")
+azure.Chat("gpt-4o", azure.WithEndpoint("https://my-resource.openai.azure.com"))
+vertex.Chat("gemini-2.5-flash", vertex.WithProject("my-project"), vertex.WithLocation("us-central1"))
+groq.Chat("llama-3.3-70b-versatile")
+ollama.Chat("llama3.2")
+
+// Embedding models
+openai.Embedding("text-embedding-3-small")
+google.Embedding("text-embedding-004")
+cohere.Embedding("embed-english-v3.0")
+ollama.Embedding("nomic-embed-text")
+
+// Image models
+openai.Image("gpt-image-1")
+google.Image("imagen-4.0-generate-001")
+```
+
+### Auth - Auto-Resolved from Environment
+
+Providers auto-read API keys from env vars. No explicit config needed:
+
+| Provider  | Env Var                                                      |
+| --------- | ------------------------------------------------------------ |
+| OpenAI    | `OPENAI_API_KEY`                                             |
+| Anthropic | `ANTHROPIC_API_KEY`                                          |
+| Google    | `GOOGLE_GENERATIVE_AI_API_KEY` or `GEMINI_API_KEY`           |
+| Bedrock   | `AWS_ACCESS_KEY_ID` + `AWS_SECRET_ACCESS_KEY` + `AWS_REGION` |
+| Azure     | `AZURE_OPENAI_API_KEY`                                       |
+| Vertex AI | Application Default Credentials (ADC)                        |
+| xAI       | `XAI_API_KEY`                                                |
+| Groq      | `GROQ_API_KEY`                                               |
+| Cohere    | `COHERE_API_KEY`                                             |
+| Mistral   | `MISTRAL_API_KEY`                                            |
+| DeepSeek  | `DEEPSEEK_API_KEY`                                           |
+
+Or set explicitly:
+
+```go
+model := openai.Chat("gpt-4o", openai.WithAPIKey("sk-..."))
+```
+
+Most providers support these options (Bedrock uses AWS credential options; Ollama requires no auth):
+
+```go
+provider.WithAPIKey(key)         // static API key
+provider.WithTokenSource(ts)     // dynamic auth (OAuth, service accounts)
+provider.WithBaseURL(url)        // override endpoint (Azure uses WithEndpoint)
+provider.WithHeaders(h)          // custom HTTP headers
+provider.WithHTTPClient(c)       // custom HTTP transport
+```
+
+---
+
+## Patterns and Examples
+
+### 1. Basic Text Generation
+
+```go
+result, err := goai.GenerateText(ctx, openai.Chat("gpt-4o"),
+    goai.WithSystem("You are a helpful assistant."),
+    goai.WithPrompt("What is Go?"),
+)
+if err != nil {
+    return err
+}
+fmt.Println(result.Text)
+```
+
+### 2. Streaming
+
+```go
+stream, err := goai.StreamText(ctx, openai.Chat("gpt-4o"),
+    goai.WithPrompt("Write a poem about Go."),
+)
+if err != nil {
+    return err
+}
+// Option A: text-only channel
+for text := range stream.TextStream() {
+    fmt.Print(text)
+}
+// Option B: raw chunks (mutually exclusive with TextStream)
+// for chunk := range stream.Stream() { ... }
+
+// Always available after streaming completes:
+result := stream.Result()
+fmt.Printf("\nTokens: %d in, %d out\n", result.TotalUsage.InputTokens, result.TotalUsage.OutputTokens)
+```
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [zendev-sh/goai](https://github.com/zendev-sh/goai) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-06-17 -->
