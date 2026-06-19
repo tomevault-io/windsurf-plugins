@@ -1,126 +1,152 @@
 ---
 trigger: always_on
-description: AgentRecall gives you persistent memory across sessions via 10 MCP tools.
+description: >-
 ---
 
-# AgentRecall — Codex Agent Instructions
 
-AgentRecall gives you persistent memory across sessions via 10 MCP tools.
+# AgentRecall v3.4.22 — Usage Guide
 
-**Semi-manual mode: only use these tools when the user explicitly asks. Do not load memory automatically at session start.**
+AgentRecall is a persistent memory system. Default surface: **5 tools** (two verbs + three essentials). Full surface: 18 tools via `npx agent-recall-mcp --full`. This guide describes how and when to use them.
+
+**Two-verb model:** `session_start` (inhale — load context) and `session_end` (exhale — save and compound). Everything else is available but secondary; most agents never need more than the default 5. See [Automaticity Law](#why-5-default-tools) below.
+
+## Setup
+
+AgentRecall requires the MCP server to be running. If tool calls fail with "unknown tool", the human needs to install it first.
+
+### Installation (human runs once)
+
+**Claude Code:**
+```bash
+claude mcp add --scope user agent-recall -- npx -y agent-recall-mcp
+```
+
+**Cursor** (`.cursor/mcp.json`):
+```json
+{ "mcpServers": { "agent-recall": { "command": "npx", "args": ["-y", "agent-recall-mcp"] } } }
+```
+
+**VS Code / GitHub Copilot** (`.vscode/mcp.json`):
+```json
+{ "servers": { "agent-recall": { "command": "npx", "args": ["-y", "agent-recall-mcp"] } } }
+```
+
+**Windsurf** (`~/.codeium/windsurf/mcp_config.json`):
+```json
+{ "mcpServers": { "agent-recall": { "command": "npx", "args": ["-y", "agent-recall-mcp"] } } }
+```
+
+**Codex:**
+```bash
+codex mcp add agent-recall -- npx -y agent-recall-mcp
+```
+
+**Hermes Agent** (`~/.hermes/config.yaml`):
+```yaml
+mcp_servers:
+  agent-recall:
+    command: npx
+    args: ["-y", "agent-recall-mcp"]
+```
+
+**Roo Code** (`.roo/mcp.json`):
+```json
+{ "mcpServers": { "agent-recall": { "command": "npx", "args": ["-y", "agent-recall-mcp"] } } }
+```
+
+**Any MCP-compatible agent:**
+```
+command: npx
+args: ["-y", "agent-recall-mcp"]
+transport: stdio
+```
 
 ---
 
 ## Tools
 
-| Tool | When to call |
-|------|-------------|
-| `session_start` | User says: "load my context", "what was I working on", "load memory for X" |
-| `session_end` | User says: "save this session", "save to memory", "wrap up" |
-| `recall` | User says: "recall X", "what do I know about X", "any past notes on X" |
-| `remember` | User says: "remember this", "save this decision", "note this down" |
-| `check` | User says: "check this against memory", or before irreversible actions (deploy, publish, delete) |
-| `digest` | User says: "summarize my project", "give me a quick brief on X" |
-| `project_board` | User says: "show my projects", "list all projects", "what projects do I have" |
-| `project_status` | User says: "project status for X", "how is project X going", "status of [project]" |
-| `bootstrap_scan` | User says: "scan my notes", "import existing notes", "bootstrap from [path]" |
-| `bootstrap_import` | User says: "import these notes", "load notes from [path]" (used after `bootstrap_scan`) |
+AgentRecall's default surface provides **5 tools**. Start the server with `--full` to enable the complete 18-tool surface.
+
+**Default tools (always available):** `session_start`, `session_end`, `remember`, `recall`, `check`
+
+**Full-mode only (`--full`):** `memory_query`, `check_action`, `register_rule`, `pipeline_open`, `pipeline_close`, `pipeline_list`, `pipeline_current`, `pipeline_show`, `skill_write`, `skill_recall`, `skill_list`, `dashboard_export`, `session_end_reflect`, `project_board`, `project_status`, `digest`, `bootstrap_scan`, `bootstrap_import`
 
 ---
 
-## Trigger Phrases → Actions
+### Default tools
 
-**Load context:**
-> "load my context" / "what was I working on" / "load AgentRecall for [project]"
-→ Call `session_start(project="[slug or auto]")`
-→ Show: project intention, last session summary, top insights, watch_for corrections
+### `session_start`
 
-**Save session:**
-> "save this session" / "save to memory" / "wrap up"
-→ Call `session_end(summary="...", insights=[...], trajectory="...")`
-→ Confirm: "Saved to ~/.agent-recall/projects/[slug]/journal/[date].md"
+**When:** Beginning of a session, to load prior context.
 
-**Recall specific knowledge:**
-> "recall [topic]" / "what do I know about [X]" / "any past notes on [X]"
-→ Call `recall(query="[topic]")`
-→ Show results inline
+**What it returns:**
+- `project` — detected project name
+- `identity` — who the user is (1-2 lines)
+- `insights` — top 5 awareness insights (title + confirmation count + severity)
+- `active_rooms` — top 5 palace rooms by salience (with staleness flag + last_updated)
+  _(Palace = your project's long-term knowledge store, organized into topic rooms like "architecture", "goals", "blockers". Salience = relevance score 0-1 based on recency, access frequency, and connections. Rooms with stale=true haven't been updated in 7+ days.)_
+- `cross_project` — insights from other projects matching current context
+- `recent` — today/yesterday journal briefs
+- `watch_for` — predictive warnings from past correction patterns + decision calibration
+- `corrections` — P0 behavioral rules (max 10, always loaded, never expire)
+- `resume` — structured re-entry briefing: `last_date`, `last_trajectory`, `sessions_count`
 
-**Save a decision manually:**
-> "remember this" / "save this decision" / "note: [X]"
-→ Call `remember(content="[X]")`
+**How to use the response:**
+1. Read `identity` to calibrate your tone and approach
+2. Read `insights` — these are battle-tested lessons. Follow them.
+3. Read `watch_for` — these are patterns where you've been wrong before on this project. Adjust your approach.
+4. Read `recent` to understand where the last session left off
+5. Present a brief to the human: project name, last session summary, relevant insights
 
-**Checkpoint (mid-session):**
-> "checkpoint" / "quick save"
-→ Call `session_end` with a lightweight summary: "Checkpoint: just completed X, next is Y"
+**Example call:**
+```
+session_start({ project: "auto" })
+```
 
-**View all projects:**
-> "show my projects" / "list all projects" / "what projects do I have"
-→ Call `project_board()`
-→ Show: all tracked projects with last-active date and intention
+### `remember`
 
-**Project status:**
-> "project status for [X]" / "how is project [X] going" / "status of [project]"
-→ Call `project_status(project="[slug]")`
-→ Show: current trajectory, recent insights, open watch_for items
+**When:** You learn something worth keeping. A decision, a bug fix, an insight, a session note.
 
-**Bootstrap from existing notes:**
-> "scan my notes" / "bootstrap from [path]" / "import existing notes from [path]"
-→ Call `bootstrap_scan(path="[path]")` first to preview what will be imported
-→ Then call `bootstrap_import(path="[path]")` to commit the import
-→ Confirm: files imported and project slugs created
+**What it does:** Auto-classifies your content and routes it to the right store:
+- Bug fix / lesson → knowledge store
+- Architecture / decision → palace room
+- Cross-project pattern → awareness system
+- Session activity → journal
 
----
+You do NOT need to decide where it goes. Just describe what to remember.
 
-## Token Cost Guide
+**How to use:**
+```
+remember({
+  content: "We decided to use GraphQL instead of REST because the frontend needs flexible queries",
+  context: "architecture decision"    // optional hint, improves routing
+})
+```
 
-| Action | Approx tokens | When |
-|--------|--------------|------|
-| `session_start` | ~800–1200 | Once per session, only if needed |
-| `recall` | ~200–400 | On demand |
-| `remember` | ~100 | On demand |
-| `session_end` | ~400–600 | Once at end |
-| `check` | ~150 | Before risky actions |
+**Returns:** `routed_to` (which store), `classification` (content type), `auto_name` (semantic slug generated)
 
-**Skip `session_start` entirely** for short, self-contained sessions with no prior context needed.
+### `recall`
 
----
+**When:** You need to find something from past sessions. A decision, a pattern, a lesson.
 
-## MCP Tool → CLI Equivalent
+**What it does:** Searches ALL stores at once using Reciprocal Rank Fusion (RRF) — each source (palace, journal, insights) ranks internally, then positions merge so no single source dominates. Journal entries decay fast via Ebbinghaus curve (S=2 days); palace entries are near-permanent (S=9999). Returns ranked results with stable IDs.
 
-If you don't have MCP available, use the `ar` CLI instead:
+**How to use:**
+```
+recall({ query: "authentication design", limit: 5 })
+```
 
-| MCP Tool | CLI Command | Notes |
-|----------|-------------|-------|
-| `session_start` | `ar cold-start` | Loads context for current project |
-| `remember` | `ar write "<content>"` | Freeform journal entry. `ar capture "<question>" "<answer>"` for Q&A format |
-| `recall` | `ar recall "<query>"` | Search palace + journal. Alias: `ar insight "<query>"` |
-| `session_end` | `ar saveall` | Batch-saves all today's sessions; or `ar write "<summary>"` for manual entry |
-| `check` | *(no CLI equivalent)* | MCP only — correction tracking via hook-correction hook |
-| `digest` | `ar digest recall "<query>"` | Also: `ar digest store`, `ar digest list`. MCP preferred for atomic store+retrieve |
-| `project_board` | `ar projects` | Partial equivalent — lists project slugs but less detail than MCP |
-| `project_status` | *(no CLI equivalent)* | MCP only — returns structured status with trajectory + insights |
-| `bootstrap_scan` | `ar bootstrap` | Preview scan of notes at the given path |
-| `bootstrap_import` | `ar bootstrap --import` | Commit the import after scanning |
+**Feedback:** After using results, rate them. Ratings use a Bayesian Beta model — the mathematically optimal estimate of true usefulness:
+```
+recall({
+  query: "auth patterns",
+  feedback: [
+    { id: "abc123", useful: true },   // Beta(2,1) → ×1.33 next time
+    { id: "def456", useful: false }   // Beta(1,2) → ×0.67 next time
+  ]
 
-> Note: `ar remember` does not exist. Use `ar write` for freeform notes or `ar capture` for Q&A pairs.
-
----
-
-## Project Slugs
-
-Projects live at `~/.agent-recall/projects/<slug>/`. Common slugs:
-- Run `session_start(project="auto")` to let AgentRecall detect from context
-- Or use the explicit slug: `session_start(project="novada-site")`
-
----
-
-## Notes for the Agent
-
-- Never call `session_start` or `session_end` without the user asking
-- For `session_end`, extract 1–3 non-obvious insights from the conversation — not "fixed a bug" but "API returns null on session expiry — always null-check"
-- If the user says "save" without context, confirm: "Save to AgentRecall? Which project?"
-- Palace is selective — only store decisions, patterns, goal hierarchy. Not full transcripts.
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [Goldentrii/AgentRecall-MCP](https://github.com/Goldentrii/AgentRecall-MCP) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-27 -->
+<!-- tomevault:4.0:windsurf_rules:2026-06-17 -->
