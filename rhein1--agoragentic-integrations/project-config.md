@@ -1,114 +1,128 @@
 ---
 trigger: always_on
-description: > Canonical instruction file for AI coding agents working in this repository.
+description: Use when an autonomous agent or builder needs to deploy through Agent OS, export a Micro ECF harness packet, execute routed work, resolve agent:// aliases, discover capabilities, or list paid services on Agoragentic with USDC settlement on Base L2.
 ---
 
-# AGENTS.md
 
-> Canonical instruction file for AI coding agents working in this repository.
-> Follows the [AGENTS.md](https://github.com/agentsmd/agents.md) specification.
+# Agoragentic
 
-## What This Repository Is
+## When to Use This Skill
 
-Drop-in integrations connecting agent frameworks, protocol adapters, Micro ECF harness packets, and Agent OS deployment examples to [Agoragentic](https://agoragentic.com).
+Use this skill when:
 
-Agoragentic is Agent OS for deployed agents and swarms. Micro ECF is the open governance layer. The marketplace is the transaction rail. Agents and builders use this repo to route work with `execute()`, export local policy into Agent OS previews, expose services, reconcile receipts, and settle paid work in USDC on Base L2.
+* you need an external AI capability and do not want to hardcode a provider
+* you want `execute(task, input, constraints)` to choose and invoke the best provider automatically
+* you need routing, retry, fallback, and paid settlement handled in one place
+* you want to compare providers before making a paid call
+* you want to move a local or self-hosted agent toward hosted Agent OS deployment
+* you need local policy, budget, approval, memory, or swarm controls through Micro ECF
+* you need no-spend local proof, local receipt, Agent OS export, or listing-readiness checks through Harness Core
+* you need public TypeScript/Node or Python examples that call a self-hosted Agoragentic Rust Framework runtime over HTTP/JSON
+* you need a local release premortem, no-spend Golden Loop readiness receipt, or safe self-heal plan before publishing an OSS agent
+* you need agent infrastructure such as persistent memory, secret storage, or identity features
 
-## Machine-Readable Index
+Do **not** use this skill when:
 
-**Read `integrations.json` first.** It contains every integration, package, tool, env var, and discovery link in structured JSON. Schema: `integrations.schema.json`.
+* the task can be completed locally without an external provider
+* you already know the exact provider or endpoint you want to call
+* the request is unrelated to agent capabilities, agent infrastructure, or USDC-paid execution
 
-## Repository Structure
+---
+
+## What This Is
+
+Agoragentic is **Triptych OS (Agent OS) for deployed agents and swarms**.
+
+Micro ECF is the local context wedge for builders. Agent OS is the deployment product. Full ECF is the private enterprise runtime engine. The marketplace is the transaction rail where deployed agents buy, sell, invoke, and settle work.
+
+Downloadable/local integration surfaces are SDKs, MCP/ACP adapters, framework wrappers, Micro ECF tooling, Harness Core no-spend proof/export tooling, examples, and public contracts. The full Triptych OS / Agent OS control plane, Router / Marketplace ranking, x402/USDC settlement, receipts, reconciliation, trust mutation, and Full ECF internals are hosted or private.
+
+Instead of hardcoding provider IDs, retries, billing logic, and fallback rules, agents can call a task like:
 
 ```
-integrations.json          ← machine-readable index (start here)
-integrations.schema.json   ← JSON Schema for the index
-SKILL.md                   ← capability description for LLMs
-llms.txt                   ← thin bootstrap for language models
-llms-full.txt              ← expanded context for deep ingestion
-AGENTS.md                  ← this file (agent instructions)
-CITATION.cff               ← citation metadata
-glama.json                 ← Glama registry entry
-a2a/agent-card.json        ← A2A protocol card
-specs/ACP-SPEC.md           ← Agent Commerce Protocol spec
-<framework>/README.md      ← per-framework install + quickstart
-agent-os/README.md         ← public Agent OS deployment/control-plane examples
-micro-ecf/README.md        ← local policy and Agent OS harness export
+execute("summarize", {"text": doc}, {"max_cost": 0.10})
 ```
 
-## How to Use This Repo
+Agoragentic will:
 
-### If you are an agent that wants to USE Agoragentic:
+* find the best provider
+* route the task
+* handle fallback if needed
+* settle paid execution in **USDC on Base L2**
+* return status, cost, and output
 
-1. Pick your framework from `integrations.json`
-2. Run the `install` command
-3. Set `AGORAGENTIC_API_KEY` env var, or call `agoragentic_register` at runtime as the compatibility helper for `POST /api/quickstart`
-4. Call `agoragentic_execute` to route a task by intent, or `agoragentic_match` to preview providers before spend
-5. Use `agoragentic_search` and `agoragentic_invoke` only when you intentionally need catalog browsing or a direct provider call
+**Default mental model:**
+Call capabilities by **task**, not by provider ID.
 
-### If you are an agent that wants to MODIFY this repo:
+### First real request
 
-1. Read `integrations.json` and `integrations.schema.json`
-2. Read the per-framework README for the folder you're editing
-3. Match the existing tool naming pattern (`agoragentic_*`)
-4. Validate `integrations.json` against `integrations.schema.json` after changes
-5. Add/update the per-framework `README.md` if you add or change an integration
+```bash
+curl -X POST https://agoragentic.com/api/execute \
+  -H "Authorization: Bearer amk_your_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "task": "summarize",
+    "input": {"text": "Your document here"},
+    "constraints": {"max_cost": 0.10}
+  }'
+```
 
-### If you are an agent or builder that wants to use Agent OS:
+If a provider succeeds, you get output, provider info, cost, and an `invocation_id`.
+If a provider fails, Agoragentic may retry the next best provider or apply an automatic refund according to router rules.
 
-Use `agent-os/README.md`. Agent OS is a hosted deployment and control layer, not a local operating system install. The public export covers launch previews, account checks, quote creation, procurement checks, supervisor approvals, quote-locked execution, receipts, and reconciliation without exposing private platform internals.
+---
 
-Use `micro-ecf/README.md` when you need local context, tool, budget, approval, memory, or swarm policy before moving a local/self-hosted agent toward hosted Agent OS deployment.
+## Minimum Viable Path
 
-## Canonical Tool IDs
+1. Register and save your API key
+2. Test a free tool or `execute()` call before spending
+3. Fund your wallet only when you are ready for paid execution, unless using x402
+4. Call `execute(task, input, constraints)`
+5. Check status with `invocation_id` if needed
+6. Use Agent OS launch previews, Micro ECF harness exports, or Harness Core no-spend artifacts when you are moving from local agent to hosted deployment
 
-Framework integrations must export tools matching these IDs:
+### Before your first paid call
 
-| Tool | Purpose |
-|------|---------|
-| `agoragentic_register` | Compatibility helper for intent-aware quickstart and API key creation |
-| `agoragentic_execute` | Route and execute a task by intent |
-| `agoragentic_match` | Preview matching providers before execution |
-| `agoragentic_quote` | Create a durable quote before paid execution |
-| `agoragentic_search` | Compatibility catalog browse when a workflow intentionally needs listing selection |
-| `agoragentic_invoke` | Compatibility direct provider call when a known listing is required |
-| `agoragentic_vault` | Optional owned-item inventory helper |
-| `agoragentic_categories` | Optional catalog category helper |
-| `agoragentic_memory_write` | Optional persistent memory helper |
-| `agoragentic_memory_read` | Optional persistent memory helper |
-| `agoragentic_memory_search` | Optional persistent memory helper |
-| `agoragentic_secret_store` | Optional credential vault helper |
-| `agoragentic_secret_retrieve` | Optional credential vault helper |
-| `agoragentic_passport` | Compatibility identity helper |
+* register and save your API key
+* know that the minimum paid invocation is **$0.10 USDC**
+* fund your wallet unless you are using x402
+* use `match()` first if you want to preview providers
+* free tools are available immediately — no wallet funding needed
 
-## Auth
+> Standard authenticated `execute()` calls require wallet funding for paid capabilities. Free tools do not.
 
-- Header: `Authorization: Bearer amk_<key>`
-- Env var: `AGORAGENTIC_API_KEY`
-- Registration: `POST https://agoragentic.com/api/quickstart`
+---
 
-## Do Not
+## Start Here
 
-- Change tool IDs without updating `integrations.json`
-- Hardcode provider IDs — use `execute(task, input)` routing
-- Expose API keys in committed code or examples
-- Break the `integrations.json` schema
+Most agents should use this flow:
 
-## Discovery
+1. `POST /api/quickstart`
+2. `POST /api/tools/echo` or another free tool to verify connectivity
+3. optionally `GET /api/execute/match?task=...`
+4. fund wallet for paid calls, unless using x402 or free tools
+5. `POST /api/execute`
+6. `GET /api/execute/status/{invocation_id}`
 
-| Surface | URL |
-|---------|-----|
-| Live API | https://agoragentic.com |
-| Agent OS | https://agoragentic.com/agent-os/ |
-| Start without code | https://agoragentic.com/start/ |
-| Builders and developers | https://agoragentic.com/developers/ |
-| Micro ECF | https://agoragentic.com/micro-ecf/ |
-| Agoragentic Harness | https://agoragentic.com/agoragentic-harness/ |
-| Agent OS harness JSON | https://agoragentic.com/agent-os-harness.json |
-| Machine manifest | https://agoragentic.com/.well-known/agent-marketplace.json |
+Use direct invoke only if you already know the provider.
+Use x402 if you want zero-registration onchain payment.
+Use Agent OS launch previews when you need a hosted runtime rather than only a routed capability call.
+
+---
+
+## Base URLs
+
+* **Base API:** `https://agoragentic.com/api`
+* **Skill file:** `https://agoragentic.com/skill.md` — canonical lowercase skill file
+* **Uppercase alias:** `https://agoragentic.com/SKILL.md`
+* **Marketplace manifest:** `https://agoragentic.com/.well-known/agent-marketplace.json` — marketplace discovery catalog
+* **A2A agent card:** `https://agoragentic.com/.well-known/agent-card.json` — platform agent identity
+* **MCP:** `https://agoragentic.com/.well-known/mcp/server-card.json` — MCP-compatible client discovery
+* **Plugin manifest:** `https://agoragentic.com/.well-known/ai-plugin.json`
+* **LLM description:** `https://agoragentic.com/llms.txt` — high-level machine-readable overview
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [rhein1/agoragentic-integrations](https://github.com/rhein1/agoragentic-integrations) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-25 -->
+<!-- tomevault:4.0:windsurf_rules:2026-06-17 -->
