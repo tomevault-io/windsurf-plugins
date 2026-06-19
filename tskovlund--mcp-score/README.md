@@ -7,11 +7,11 @@ MCP server for AI-driven music score generation and manipulation. Natural langua
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [tskovlund/mcp-score](https://github.com/tskovlund/mcp-score).
+Original source: `CLAUDE.md` in [tskovlund/mcp-score](https://github.com/tskovlund/mcp-score).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
