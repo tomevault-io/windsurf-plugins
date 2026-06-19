@@ -1,133 +1,117 @@
 ---
 trigger: always_on
-description: This skill was built from the following upstream sources. Use `check_upstream.py`
+description: Expert SurrealDB 3 architect and developer skill. SurrealQL mastery, multi-model data modeling (document, graph, vector, time-series, geospatial), schema design, security, deployment, performance tuning, SDK integration (JS, Python, Go, Rust, Java, .NET, C, PHP, Swift, Kotlin, Ruby), Surrealism WASM extensions, SurrealML scope coverage (preview), SurrealMCP for AI agent hosts, LangChain Python integration, editor tooling (LSP, tree-sitter, CodeMirror, VS Code/JetBrains/Neovim/Zed), and ecosystem
 ---
 
-# Agent Briefing: surrealdb
 
-Structured reference for AI agents. Minimal prose, maximum signal.
+# SurrealDB 3 Skill
 
-## Quick Start
+Expert-level SurrealDB 3 architecture, development, and operations. Covers SurrealQL, multi-model data modeling, graph traversal, vector search, security, deployment, performance tuning, SDK integration, and the wider SurrealDB ecosystem, including SurrealKit, SurrealMCP, n8n, CodeMirror, and agent-skill surfaces.
+
+## For AI Agents
+
+Get a full capabilities manifest, decision trees, and output contracts:
 
 ```bash
-# Check if configured
-uv run {baseDir}/scripts/onboard.py --check
-
-# Get full capabilities manifest (JSON)
 uv run {baseDir}/scripts/onboard.py --agent
 ```
 
-## Capabilities
+See [AGENTS.md]({baseDir}/AGENTS.md) for the complete structured briefing.
 
-| Command | Script | What It Does | When to Use |
-|---------|--------|-------------|-------------|
-| `doctor` | `scripts/doctor.py` | Health check: CLI, connectivity, version, storage | First run, troubleshooting, verifying environment |
-| `doctor --check` | `scripts/doctor.py` | Quick pass/fail (exit code only) | CI pipelines, pre-flight checks |
-| `schema introspect` | `scripts/schema.py` | Full schema dump (tables, fields, indexes, events) | Understanding existing database structure |
-| `schema tables` | `scripts/schema.py` | List tables with field counts and indexes | Quick overview of database contents |
-| `schema table <name>` | `scripts/schema.py` | Inspect a single table in detail | Debugging a specific table definition |
-| `schema export` | `scripts/schema.py` | Export schema as SurrealQL or JSON | Reproducible deployments, version control |
-| `onboard --agent` | `scripts/onboard.py` | JSON capabilities manifest | Agent self-discovery, integration setup |
-| `onboard --check` | `scripts/onboard.py` | Verify prerequisites | First run, CI |
+| Command | What It Does |
+|---------|-------------|
+| `uv run {baseDir}/scripts/doctor.py` | Health check: verify surreal CLI, connectivity, versions |
+| `uv run {baseDir}/scripts/doctor.py --check` | Quick pass/fail check (exit code only) |
+| `uv run {baseDir}/scripts/schema.py introspect` | Dump full schema of a running SurrealDB instance |
+| `uv run {baseDir}/scripts/schema.py tables` | List all tables with field counts and indexes |
+| `uv run {baseDir}/scripts/onboard.py --agent` | JSON capabilities manifest for agent integration |
 
-## Decision Trees
+## Prerequisites
 
-### "User wants to create a SurrealDB project"
+- **surreal CLI** -- `brew install surrealdb/tap/surreal` (macOS) or see [install docs](https://surrealdb.com/docs/surrealdb/installation)
+- **Python 3.10+** -- Required for skill scripts
+- **uv** -- `brew install uv` (macOS) or `pip install uv` or see [uv docs](https://docs.astral.sh/uv/getting-started/installation/)
 
-```
-1. Run doctor to verify environment:
-   uv run {baseDir}/scripts/doctor.py
+Optional:
 
-2. Is surreal CLI installed?
-   NO  -> brew install surrealdb/tap/surreal (or see https://surrealdb.com/install)
-   YES -> Continue
+- **Docker** -- For containerized SurrealDB instances (`docker run surrealdb/surrealdb:v3`)
+- **SDK of choice** -- JavaScript, Python, Go, Rust, Java, Kotlin, .NET, C, PHP, Swift, or Ruby
 
-3. Choose storage engine (LOCAL DEV -- use scoped credentials in production):
-   Development     -> surreal start memory --user root --pass root
-   Single-node     -> surreal start rocksdb://data/mydb.db --user root --pass root
-   Time-travel     -> surreal start surrealkv://data/mydb --user root --pass root
-   Distributed     -> surreal start tikv://... --user root --pass root
+> **Security note**: This skill documents package-manager and container installs
+> only. Prefer auditable installs through Homebrew, apt/dnf, Cargo, npm, or
+> Docker rather than remote one-line shell installers.
 
-4. Design schema:
-   -> Reference rules/data-modeling.md for table/field patterns
-   -> Reference rules/graph-queries.md if domain has relationships
-   -> Reference rules/vector-search.md if semantic search needed
+## Quick Start
 
-5. Apply schema (local dev credentials -- use scoped users in production):
-   surreal import --endpoint $SURREAL_ENDPOINT --user root --pass root \
-     --ns <ns> --db <db> schema.surql
+> **Credential warning**: Examples below use `root/root` for **local development
+> only**. Never use default credentials against production or shared instances.
+> Create scoped, least-privilege users for non-local environments.
 
-6. Verify:
-   uv run {baseDir}/scripts/schema.py introspect
-```
+```bash
+# Start SurrealDB in-memory for LOCAL DEVELOPMENT ONLY
+surreal start memory --user root --pass root --bind 127.0.0.1:8000
 
-### "User has a data modeling question"
+# Start with persistent RocksDB storage (local dev)
+surreal start rocksdb://data/mydb.db --user root --pass root
 
-```
-What kind of data?
-  Documents/records    -> rules/data-modeling.md (record IDs, field types, schema modes)
-  Relationships/graphs -> rules/graph-queries.md (RELATE, edge tables, traversal)
-  Vector embeddings    -> rules/vector-search.md (vector fields, HNSW indexes, similarity)
-  Time-series          -> rules/data-modeling.md (datetime fields, range queries, aggregations)
-  Geospatial           -> rules/data-modeling.md (geometry types, geo functions, spatial indexes)
-  Mixed/multi-model    -> rules/data-modeling.md + relevant specialized rules
+# Start with SurrealKV (time-travel queries supported, local dev)
+surreal start surrealkv://data/mydb --user root --pass root
 
-Need schema validation?
-  YES -> DEFINE TABLE ... SCHEMAFULL (strict, all fields must be defined)
-  PARTIAL -> DEFINE TABLE ... SCHEMALESS (flexible, defined fields are validated)
+# Connect via CLI REPL (local dev)
+surreal sql --endpoint http://localhost:8000 --user root --pass root --ns test --db test
+
+# Import a SurrealQL file
+surreal import --endpoint http://localhost:8000 --user root --pass root --ns test --db test schema.surql
+
+# Export the database
+surreal export --endpoint http://localhost:8000 --user root --pass root --ns test --db test backup.surql
+
+# Check version
+surreal version
+
+# Run the skill health check
+uv run {baseDir}/scripts/doctor.py
 ```
 
-### "User needs to optimize performance"
+## Environment Variables
 
-```
-1. Check current schema and indexes:
-   uv run {baseDir}/scripts/schema.py introspect
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `SURREAL_ENDPOINT` | SurrealDB server URL | `http://localhost:8000` |
+| `SURREAL_USER` | Root or namespace username | `root` |
+| `SURREAL_PASS` | Root or namespace password | `root` |
+| `SURREAL_NS` | Default namespace | `test` |
+| `SURREAL_DB` | Default database | `test` |
 
-2. Identify bottleneck type:
-   Slow queries        -> rules/performance.md (EXPLAIN, index strategies)
-   High write latency  -> rules/performance.md (batch operations, storage engine)
-   Memory pressure     -> rules/deployment.md (resource limits, storage engine selection)
-   Connection issues   -> rules/sdks.md (connection pooling, WebSocket vs HTTP)
+These map directly to the `surreal sql` CLI flags (`--endpoint`, `--user`, `--pass`, `--ns`, `--db`) and are recognized by official SurrealDB SDKs.
 
-3. Index audit:
-   Missing index on filtered field  -> DEFINE INDEX ... ON TABLE ... FIELDS ...
-   Full-text search slow             -> DEFINE INDEX ... SEARCH ANALYZER ...
-   Vector search slow                -> DEFINE INDEX ... HNSW DIMENSION ... DIST ...
+## Core Capabilities
 
-4. Storage engine review:
-   Memory       -> Fast but volatile, development only
-   RocksDB      -> General purpose, good read/write balance
-   SurrealKV    -> Time-travel queries, versioned data
-   TiKV         -> Distributed, horizontal scaling
-```
+### SurrealQL Mastery
 
-### "User wants to write WASM extensions"
+Full coverage of the SurrealQL query language: `CREATE`, `SELECT`, `UPDATE`, `UPSERT`, `DELETE`, `RELATE`, `INSERT`, `LIVE SELECT`, `DEFINE`, `REMOVE`, `INFO`, subqueries, transactions, futures, and all built-in functions (array, crypto, duration, geo, math, meta, object, parse, rand, string, time, type, vector).
 
-```
-1. Reference rules/surrealism.md for Surrealism module system
-2. Prerequisites: Rust toolchain, wasm32-unknown-unknown target
-3. Workflow:
-   a. Create Rust project with surrealism SDK
-   b. Implement custom functions/analyzers
-   c. Compile to WASM
-   d. Deploy to SurrealDB instance
-   e. Use in SurrealQL queries via custom function syntax
-```
+See: `rules/surrealql.md`
 
-### "User wants to deploy / serve an ML model"
+### Multi-Model Data Modeling
 
-```
-1. Reference rules/surrealml.md
-2. Prerequisites: `surrealml` PyPI package 0.0.4 (extras: [sklearn] / [torch] /
-   [tensorflow]); SurrealML is preview-stage and the SurrealQL invocation
-   surface is unstable as of 2026-05-05.
-3. The v1.4.0 documentation for `DEFINE MODEL`, `INFO FOR MODEL`,
-   `ml::name<version>(...)`, `surreal ml import`, `db.upload_ml(...)`, and
-   `SurMlFile.from_<framework>(...)` was retracted in v1.4.1 -- those
-   surfaces were not present in current upstream. Treat anything beyond the
+Design schemas that leverage SurrealDB's multi-model capabilities -- document collections, graph edges, relational references, vector embeddings, time-series data, and geospatial coordinates -- all in a single database with a single query language.
+
+See: `rules/data-modeling.md`
+
+### Graph Queries
+
+First-class graph traversal without JOINs. `RELATE` creates typed edges between records. Traverse with `->` (outgoing), `<-` (incoming), and `<->` (bidirectional) operators. Filter, aggregate, and recurse at any depth.
+
+See: `rules/graph-queries.md`
+
+### Vector Search
+
+Built-in vector similarity search using HNSW indexes (the v3 vector index type; brute-force is available as a fallback during index build/rebuild). Define vector fields, create indexes with configurable distance metrics (cosine, euclidean, manhattan, minkowski), and query with `vector::similarity::*` functions. Build RAG pipelines and semantic search directly in SurrealQL.
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [24601/surreal-skills](https://github.com/24601/surreal-skills) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-09 -->
+<!-- tomevault:4.0:windsurf_rules:2026-06-17 -->
