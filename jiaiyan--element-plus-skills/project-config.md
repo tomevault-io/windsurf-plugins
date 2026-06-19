@@ -1,209 +1,137 @@
 ---
 trigger: always_on
-description: This document provides detailed information about all agents (skills) available in the Element Plus Skills Library.
+description: Element Plus Skills Library - A comprehensive skill library for AI agents to understand and utilize Element Plus UI components. Invoke when user needs to work with Element Plus components, theming, i18n, dark mode, or design specifications.
 ---
 
-# Element Plus Skills - Agents Documentation
 
-This document provides detailed information about all agents (skills) available in the Element Plus Skills Library.
+# Element Plus Skills Library
 
-## 📋 Agent Index
+A comprehensive skill library for Element Plus UI framework, designed for AI agents to understand and utilize Element Plus components effectively.
 
-| Category | Skills Count | Description |
-|----------|--------------|-------------|
-| [Basic Components](#basic-components-agents) | 14 | UI elements for basic interactions |
-| [Form Components](#form-components-agents) | 24 | Form inputs and data collection |
-| [Data Display](#data-display-agents) | 17 | Data visualization and presentation |
-| [Navigation](#navigation-agents) | 8 | Navigation and routing components |
-| [Feedback](#feedback-agents) | 12 | User feedback and notifications |
-| [Layout](#layout-agents) | 4 | Page layout and structure |
-| [Utility](#utility-agents) | 5 | Utility and helper components |
-| [Design Specs](#design-specifications-agents) | 5 | Design system specifications |
-| [Foundation](#foundation-agents) | 6 | Core setup and configuration |
+## When to Invoke
 
----
+Invoke this skill when:
+- User needs to implement any Element Plus component
+- User asks about Element Plus configuration or setup
+- User wants to customize themes or use dark mode
+- User needs internationalization (i18n) support
+- User asks about design specifications (colors, borders, typography)
+- User encounters issues with Element Plus components
 
-## Basic Components Agents
+## Skill Library Overview
 
-### el-affix
+This library contains **88 skills** organized into the following categories:
 
-**Description**: Fixes elements to a specific visible area for sticky navigation.
+| Category | Count | Description | Path Pattern |
+|----------|-------|-------------|--------------|
+| Component Skills | 77 | Individual component documentation | `./components/el-{name}/SKILL.md` |
+| Design Specifications | 5 | Border, Color, Layout, Typography, Overview | `./element-plus-design-{name}/SKILL.md` |
+| Foundation Skills | 6 | Quickstart, Theming, i18n, Dark Mode, SSR, Components | `./element-plus-{name}/SKILL.md` |
 
-**Use Cases**:
-- Sticky navigation headers
-- Fixed toolbars while scrolling
-- Persistent action buttons
-- Floating sidebars
+## How to Locate Skills
 
-**Parameters**:
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| offset | number | 0 | Offset distance from top/bottom |
-| position | string | 'top' | Position: 'top' or 'bottom' |
-| target | string | - | Target container CSS selector |
-| z-index | number | 100 | z-index of affix element |
+### 1. Component Skills (77 skills)
 
-**Example**:
-```vue
-<el-affix :offset="120">
-  <el-button type="primary">Fixed Button</el-button>
-</el-affix>
+All component skills follow the naming convention `el-{component-name}` and are located in the `components/` directory.
+
+**Path Pattern:**
+```
+./components/el-{component-name}/SKILL.md
 ```
 
----
+**Examples:**
+- Button: `./components/el-button/SKILL.md`
+- Form: `./components/el-form/SKILL.md`
+- Table: `./components/el-table/SKILL.md`
+- Dialog: `./components/el-dialog/SKILL.md`
 
-### el-alert
+### 2. Design Specification Skills (5 skills)
 
-**Description**: Displays important alert messages on the page.
+Design skills provide guidance on Element Plus design system.
 
-**Use Cases**:
-- System notifications
-- Status messages
-- Warning displays
-- Important information
+| Skill Name | Path | Description |
+|------------|------|-------------|
+| Border | `./element-plus-design-border/SKILL.md` | Border styles, radius, shadows |
+| Color | `./element-plus-design-color/SKILL.md` | Color palette and semantics |
+| Layout | `./element-plus-design-layout/SKILL.md` | 24-column grid system |
+| Typography | `./element-plus-design-typography/SKILL.md` | Font conventions |
+| Overview | `./element-plus-design-overview/SKILL.md` | Design system overview |
 
-**Parameters**:
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| title | string | - | Alert title (required) |
-| type | string | 'info' | Type: primary, success, warning, info, error |
-| description | string | - | Descriptive text |
-| closable | boolean | true | Whether alert can be dismissed |
-| show-icon | boolean | false | Whether to display type icon |
+### 3. Foundation Skills (6 skills)
 
-**Example**:
-```vue
-<el-alert title="Success" type="success" description="Operation completed" show-icon />
+Foundation skills cover core setup and configuration.
+
+| Skill Name | Path | Description |
+|------------|------|-------------|
+| Quickstart | `./element-plus-quickstart/SKILL.md` | Installation and setup |
+| Theming | `./element-plus-theming/SKILL.md` | Theme customization |
+| i18n | `./element-plus-i18n/SKILL.md` | Internationalization |
+| Dark Mode | `./element-plus-dark-mode/SKILL.md` | Dark mode implementation |
+| SSR | `./element-plus-ssr/SKILL.md` | Server-side rendering |
+| Components | `./element-plus-components/SKILL.md` | Component overview index |
+
+## Skill Invocation Guide
+
+### Step 1: Identify User Intent
+
+Analyze the user's request to determine which skill category is needed:
+
+| User Request Pattern | Skill Category | Example Skill |
+|---------------------|----------------|---------------|
+| "Create a button/form/table..." | Component | `el-button`, `el-form`, `el-table` |
+| "How to set up Element Plus" | Foundation | `element-plus-quickstart` |
+| "Customize theme colors" | Foundation | `element-plus-theming` |
+| "Add multi-language support" | Foundation | `element-plus-i18n` |
+| "Implement dark mode" | Foundation | `element-plus-dark-mode` |
+| "What colors are available?" | Design | `element-plus-design-color` |
+| "How does the grid work?" | Design | `element-plus-design-layout` |
+
+### Step 2: Locate the Skill File
+
+Use the path patterns above to locate the appropriate skill file:
+
+```markdown
+# For component skills
+./components/el-{component-name}/SKILL.md
+
+# For design skills
+./element-plus-design-{name}/SKILL.md
+
+# For foundation skills
+./element-plus-{name}/SKILL.md
 ```
 
----
+### Step 3: Read and Apply Skill Content
 
-### el-anchor
+Each skill file contains:
+- **When to Invoke**: Specific conditions for using the skill
+- **Features**: Component capabilities and options
+- **API Reference**: Attributes, events, slots, exposes
+- **Usage Examples**: Code snippets for common patterns
+- **Best Practices**: Recommended implementation guidelines
 
-**Description**: Anchor navigation for quick page section navigation.
+## Component Skill Index
 
-**Use Cases**:
-- Table of contents
-- Document navigation
-- Section anchors
-- Quick page navigation
+### Basic Components (14)
 
-**Parameters**:
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| container | string/HTMLElement | - | Scroll container |
-| offset | number | 0 | Scroll offset |
-| direction | string | 'vertical' | Direction: 'vertical' or 'horizontal' |
-
-**Example**:
-```vue
-<el-anchor>
-  <el-anchor-link href="#section1" title="Section 1" />
-  <el-anchor-link href="#section2" title="Section 2" />
-</el-anchor>
-```
-
----
-
-### el-avatar
-
-**Description**: Displays user avatars with images, icons, or characters.
-
-**Use Cases**:
-- User profile pictures
-- Team member displays
-- Entity representations
-- Avatar groups
-
-**Parameters**:
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| src | string | - | Image source URL |
-| icon | string/Component | - | Icon component |
-| size | number/string | - | Size: number or 'large'/'default'/'small' |
-| shape | string | - | Shape: 'circle' or 'square' |
-
-**Example**:
-```vue
-<el-avatar :size="50" src="avatar.jpg" />
-<el-avatar :icon="UserFilled" />
-```
-
----
-
-### el-backtop
-
-**Description**: Back-to-top button for long page navigation.
-
-**Use Cases**:
-- Long page navigation
-- Quick scroll to top
-- Improved user experience
-
-**Parameters**:
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| target | string | - | Target to trigger scroll |
-| visibility-height | number | 200 | Min height to show button |
-| right | number | 40 | Right distance |
-| bottom | number | 40 | Bottom distance |
-
-**Example**:
-```vue
-<el-backtop :bottom="100" />
-```
-
----
-
-### el-badge
-
-**Description**: Displays numbers or status marks on buttons and icons.
-
-**Use Cases**:
-- Notification counts
-- Status indicators
-- Unread message badges
-- Attention markers
-
-**Parameters**:
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| value | string/number | - | Display value |
-| max | number | 99 | Maximum value |
-| is-dot | boolean | false | Display as a dot |
-| type | string | 'danger' | Badge type |
-
-**Example**:
-```vue
-<el-badge :value="12">
-  <el-button>Comments</el-button>
-</el-badge>
-```
-
----
-
-### el-breadcrumb
-
-**Description**: Displays page location for easier navigation.
-
-**Use Cases**:
-- Page navigation paths
-- Category hierarchies
-- Document structures
-
-**Parameters**:
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| separator | string | '/' | Separator character |
-| separator-icon | string/Component | - | Icon for separator |
-
-**Example**:
-```vue
-<el-breadcrumb separator="/">
-  <el-breadcrumb-item :to="{ path: '/' }">Home</el-breadcrumb-item>
+| Component | Skill Path | Description |
+|-----------|------------|-------------|
+| Affix | `./components/el-affix/SKILL.md` | Sticky positioning |
+| Alert | `./components/el-alert/SKILL.md` | Alert messages |
+| Anchor | `./components/el-anchor/SKILL.md` | Anchor navigation |
+| Avatar | `./components/el-avatar/SKILL.md` | User avatars |
+| Backtop | `./components/el-backtop/SKILL.md` | Back to top button |
+| Badge | `./components/el-badge/SKILL.md` | Badges and marks |
+| Breadcrumb | `./components/el-breadcrumb/SKILL.md` | Breadcrumb navigation |
+| Button | `./components/el-button/SKILL.md` | Buttons |
+| Card | `./components/el-card/SKILL.md` | Card containers |
+| Carousel | `./components/el-carousel/SKILL.md` | Image carousels |
+| Collapse | `./components/el-collapse/SKILL.md` | Collapsible panels |
+| Divider | `./components/el-divider/SKILL.md` | Dividing lines |
+| Icon | `./components/el-icon/SKILL.md` | SVG icons |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [jiaiyan/element-plus-skills](https://github.com/jiaiyan/element-plus-skills) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-16 -->
+<!-- tomevault:4.0:windsurf_rules:2026-06-17 -->
