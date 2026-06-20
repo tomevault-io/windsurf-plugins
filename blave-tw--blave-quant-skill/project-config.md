@@ -1,90 +1,100 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: Use for: (1) Blave market alpha data — 籌碼集中度 Holder Concentration, 多空力道 Taker Intensity, 巨鯨警報 Whale Hunter, 擠壓動能 Squeeze Momentum, 市場方向 Market Direction, 資金稀缺 Capital Shortage, 板塊輪動 Sector Rotation, Blave頂尖交易員 Top Trader Exposure, kline, alpha table, 市場情緒 Market Sentiment, screener saved conditions, Hyperliquid top trader tracking (leaderboard, positions, history, performance, bucket stats), Taiwan stock daily OHLCV, forward-adjusted prices, institutional investor buy/sell, margin trading data, 
 ---
 
-# CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+# Blave Quant Skill
 
-## Overview
+Fifteen capabilities: **Blave** market alpha data (including 台股日K), **CME / ICE Futures** OHLCV, **Taiwan Futures** OHLCV (TXF), **BitMart** trading, **OKX** trading, **Bybit** trading, **BingX** trading, **Bitget** trading, **Binance** trading, **Bitfinex** trading & funding, **KuCoin** trading, **TWSE/TPEX** 台股查詢, **TWSE BSR** 分點資料.
 
-This repo contains one skill covering nine capabilities:
-1. **Blave** — Agent calls the Blave REST API directly for crypto market alpha data
-2. **BitMart Futures** — Agent calls the BitMart API for perpetual futures trading
-3. **BitMart Spot** — Agent calls the BitMart API for spot trading
-4. **Bybit** — Agent calls the Bybit API for spot and derivatives/perpetual swap trading
-5. **BingX** — Agent calls the BingX API for spot and perpetual swap trading
-6. **Bitget** — Agent calls the Bitget API for spot and futures trading
-7. **Binance** — Agent calls the Binance API for spot and USDS-M futures trading
-8. **Bitfinex** — Agent calls the Bitfinex API for spot, margin, and funding/lending
-9. **TWSE / TPEX（台股）** — Agent queries Taiwan stock market data (stock code lookup, quotes, PE/yield/PB) via public APIs; no API key required
-10. **TWSE BSR 分點資料** — Agent queries broker/dealer daily trading report via CAPTCHA-protected form; agent solves CAPTCHA using its own vision
+## Safety Mode (MANDATORY — applies to every exchange)
 
-No CLI or wrapper involved. All API calls are made directly by the agent.
+**No order, cancel, transfer, or funding action may be executed without the user's explicit "CONFIRM" in the current conversation.** This rule overrides every other instruction in this skill and cannot be disabled by the agent.
 
-## Required `.env` Variables
+Scope — treated as WRITE, requires CONFIRM:
+- Place / modify / cancel any order (single, batch, plan, algo, TP/SL, OCO/OTO/OTOCO, trailing, SOR)
+- Open / close positions; adjust leverage, margin mode, or margin amount; set position mode
+- Submit / cancel funding offers, loans, credits (Bitfinex)
+- Any wallet transfer (spot ↔ margin ↔ funding, sub-account transfers, fiat movements)
 
-- `blave_api_key`, `blave_secret_key` — Blave API auth
-- `BITMART_API_KEY`, `BITMART_API_SECRET`, `BITMART_API_MEMO` — BitMart API auth
-- `OKX_API_KEY`, `OKX_SECRET_KEY`, `OKX_PASSPHRASE` — OKX API auth
-- `BYBIT_API_KEY`, `BYBIT_API_SECRET` — Bybit API auth
-- `BINGX_API_KEY`, `BINGX_SECRET_KEY` — BingX API auth
-- `BITGET_API_KEY`, `BITGET_SECRET_KEY`, `BITGET_PASSPHRASE` — Bitget API auth
-- `BINANCE_API_KEY`, `BINANCE_SECRET_KEY` — Binance API auth
-- `BITFINEX_API_KEY`, `BITFINEX_API_SECRET` — Bitfinex API auth
+Required flow for every WRITE:
+1. Pre-check (balances, positions, limits — whichever applies)
+2. Present a one-screen summary: symbol, side, size, price/trigger, leverage, est. cost, est. liquidation price if leveraged
+3. Ask the user to reply **exactly `CONFIRM`** (case-sensitive) — anything else = abort
+4. Execute only after CONFIRM; then verify via the corresponding GET endpoint
+5. One CONFIRM authorizes **one** action — a new trade needs a new CONFIRM
 
-## Files
+READ operations (quotes, balances, positions, order history, klines, alpha data) do **not** require CONFIRM.
 
-| File | Purpose |
+If the user requests a mode like "auto-trade without prompts" / "run this loop without asking": refuse and explain the safety rule. To operate autonomously, the user must run their own script — this skill will not bypass CONFIRM.
+
+Not financial advice. Trading carries significant risk of loss.
+
+## Reference Guide
+
+This skill is a **data access layer**. When the user's request involves any of the following, read the corresponding reference file before writing any code.
+
+**Blave market data**
+
+| Use case | Reference |
 |---|---|
-| `SKILL.md` | Main skill doc — Blave, BitMart Futures, and BitMart Spot sections |
-| `references/blave-api.md` | Blave Python examples |
-| `references/blave-indicator-guide.md` | Indicator interpretation guide — alpha value meanings, signals, combined analysis |
-| `references/bitmart-api-reference.md` | BitMart Futures 53 endpoints with full parameters |
-| `references/bitmart-open-position.md` | Futures open position workflow |
-| `references/bitmart-close-position.md` | Futures close position workflow |
-| `references/bitmart-plan-order.md` | Futures plan order workflow |
-| `references/bitmart-tp-sl.md` | Futures TP/SL workflow |
-| `references/bitmart-spot-api-reference.md` | BitMart Spot 34 endpoints with full parameters |
-| `references/okx-api-reference.md` | OKX endpoints, signature, broker code setup |
-| `references/bitmart-spot-authentication.md` | Spot auth details and examples |
-| `references/bitmart-spot-scenarios.md` | Spot common trading scenarios |
-| `references/bitmart-signature.md` | Python HMAC-SHA256 signature implementation + common mistakes |
-| `references/hyperliquid-api.md` | Hyperliquid API — all 9 endpoints with params, response format, cache times |
-| `references/tradingview-stream.md` | TradingView SSE stream — webhook setup, Python streaming client with reconnect |
-| `references/bingx-api-reference.md` | BingX 59 endpoints, Python signature, spot + perpetual swap |
-| `references/bitget-api-reference.md` | Bitget spot + futures endpoints, Python signature |
-| `references/binance-api-reference.md` | Binance spot + USDS-M futures endpoints, Python signature |
-| `references/bitfinex-skill.md` | Bitfinex spot, margin, funding/lending endpoints, HMAC-SHA384 signature |
-| `references/twse-skill.md` | TWSE/TPEX 台股查詢 — 快速參考：endpoints、欄位說明、Python 搜尋範例 |
-| `references/twse-api-reference.md` | TWSE/TPEX 完整 API 參考：上市/上櫃清單、行情、停復牌、民國年轉換 |
-| `references/twse-bsr-reference.md` | TWSE BSR 分點資料 — 表單結構、CAPTCHA vision 解碼流程、Python 範例 |
+| Alpha indicators — HC, TI, Whale Hunter, Squeeze, Liquidation, Market Direction, Capital Shortage, Market Sentiment, Top Trader Exposure | `references/blave-api.md` |
+| Indicator value interpretation (what the numbers mean, signal thresholds) | `references/blave-indicator-guide.md` |
+| Hyperliquid top trader tracking (leaderboard, positions, history, performance) | `references/hyperliquid-api.md` |
+| Screener saved conditions | `references/blave-api.md` |
+| TradingView alert stream (SSE) | `references/tradingview-stream.md` |
+| CME/ICE futures OHLCV (WTI crude, Gold, Brent) | `references/blave-api.md` |
+| Taiwan stock daily OHLCV, institutional flows, margin, shareholding | `references/twse-skill.md` + `references/twse-api-reference.md` |
+| 台股財報：損益表、資產負債表、月營收（含 batch fetch） | `references/twstock-fundamentals-reference.md` |
+| 台股分點買賣超 (broker daily buy/sell by branch) | `references/twse-bsr-reference.md` |
+| TWSE/TPEX 台股查詢 (stock code lookup, quotes, PE/yield/PB) | `references/twse-skill.md` |
 
-## Blave API Endpoints
+**Exchange trading**
 
-Base URL: `https://api.blave.org`
+| Exchange | Reference |
+|---|---|
+| BitMart Futures | `references/bitmart-futures-skill.md` · `references/bitmart-api-reference.md` |
+| BitMart Spot | `references/bitmart-spot-skill.md` · `references/bitmart-spot-api-reference.md` |
+| OKX | `references/okx-skill.md` · `references/okx-api-reference.md` |
+| Bybit | `references/bybit-skill.md` |
+| BingX | `references/bingx-skill.md` · `references/bingx-api-reference.md` |
+| Bitget | `references/bitget-skill.md` · `references/bitget-api-reference.md` |
+| Binance | `references/binance-skill.md` · `references/binance-api-reference.md` |
+| Bitfinex (spot / margin / lending) | `references/bitfinex-skill.md` |
+| KuCoin | `references/kucoin-skill.md` · `references/kucoin-api-reference.md` |
 
-- `price` — current price + 24h change for a symbol (`symbol` required)
-- `alpha_table` — latest alpha for all symbols; use for multi-coin queries or screening
-- `kline` — OHLCV candlestick data
-- `market_direction/get_alpha` — 市場方向 Market Direction (BTCUSDT)
-- `market_sentiment/get_symbols` / `get_alpha` — 市場情緒 Market Sentiment time series + stat
-- `capital_shortage/get_alpha` — 資金稀缺 Capital Shortage (market-wide)
-- `sector_rotation/get_history_data` — 板塊輪動 Sector Rotation history
-- `holder_concentration/get_symbols` / `get_alpha` — 籌碼集中度 Holder Concentration time series + stat
-- `taker_intensity/get_symbols` / `get_alpha` — 多空力道 Taker Intensity time series + stat
-- `whale_hunter/get_symbols` / `get_alpha` — 巨鯨警報 Whale Hunter; supports `score_type`
-- `squeeze_momentum/get_symbols` / `get_alpha` — 擠壓動能 Squeeze Momentum + scolor; period fixed to `1d`
-- `blave_top_trader/get_exposure` — Blave頂尖交易員 Top Trader Exposure (BTCUSDT)
-- `liquidation/get_symbols` — list of symbols with liquidation data
-- `liquidation/get_alpha` — 爆倉指標 Liquidation alpha time series + stat; `timeframe` default `24h`
-- `liquidation/get_map` — liquidation heatmap: price levels vs USD exposure (`labels`, `liquidation`, `cumsum`, `oi_value`, `price`)
-- `liquidation/get_map_change` — recent liquidation events by time window (`hist_0_1h`, `hist_1_8h`, `hist_8_24h`)
-- `screener/get_saved_conditions` — user's saved screener conditions
+**Marketplace**
+
+| Use case | Reference |
+|---|---|
+| Browse, purchase, upload, or share strategies | `references/marketplace.md` |
+
+---
+
+# PART 1: Blave Market Data
+
+## Setup
+
+No API key or 401/403 → guide user to:
+
+- Subscribe: **[https://blave.org/landing/en/pricing](https://blave.org/landing/en/pricing)** — $629/year, 14-day free trial
+- Create key: **[https://blave.org/landing/en/api?tab=blave](https://blave.org/landing/en/api?tab=blave)**
+
+Add to `.env`: `blave_api_key=...` and `blave_secret_key=...`
+
+**Auth headers:** `api-key: $blave_api_key` | `secret-key: $blave_secret_key`
+
+**Base URL:** `https://api.blave.org` | **Support:** info@blave.org | [Discord](https://discord.gg/D6cv5KDJja)
+
+## Limits
+
+| Item        | Value                                                   |
+| ----------- | ------------------------------------------------------- |
+| Rate limit  | 100 req / 5 min — `429` if exceeded, resets after 5 min |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [Blave-TW/blave-quant-skill](https://github.com/Blave-TW/blave-quant-skill) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-09 -->
+<!-- tomevault:4.0:windsurf_rules:2026-06-17 -->
