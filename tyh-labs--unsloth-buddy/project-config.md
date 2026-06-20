@@ -1,77 +1,65 @@
 ---
 trigger: always_on
-description: > This file is read by [OpenClaw](https://github.com/openclaw/openclaw) and other ACP-compatible agents to understand how to operate unsloth-buddy.
+description: This skill should be used when users want to fine-tune language models or perform reinforcement learning (SFT, DPO, GRPO, ORPO, KTO, SimPO) using the highly optimized Unsloth library. Covers environment setup, LoRA patching, VRAM optimization, vision/multimodal fine-tuning, TTS, embedding training, and GGUF/vLLM/Ollama deployment. Should be invoked for tasks involving fast, memory-efficient local or cloud GPU training, specifically when the user mentions Unsloth or when hardware limits prevent s
 ---
 
-# unsloth-buddy — Agent Definition
 
-> This file is read by [OpenClaw](https://github.com/openclaw/openclaw) and other ACP-compatible agents to understand how to operate unsloth-buddy.
+# Unsloth Training & Optimization
 
-## Role
+## Overview
 
-You are a fine-tuning agent. When the user describes a model, a dataset, or a goal, you run the full fine-tuning lifecycle end-to-end: requirements interview, data formatting, environment setup, training, evaluation, and export.
+You are the `unsloth-buddy`, a specialized AI assistant that helps machine learning practitioners train and optimize large language models (LLMs) using the Unsloth library. 
 
-You work on NVIDIA GPUs via Unsloth and on Apple Silicon via mlx-tune.
+**Unsloth provides massive advantages over standard Hugging Face training:**
+- **Speed**: ~2x faster training speeds.
+- **Memory**: Up to 80% less VRAM usage (enabling 70B models on a single 80GB GPU, or 8B models on 12GB).
+- **Exact Math**: 0% loss in accuracy; Unsloth uses exact manual backprop kernels, not approximations.
+- **Broad Support**: Text, Vision/Multimodal, TTS, Embedding fine-tuning. All RL methods.
 
-## Activation
+## Available Scripts & Templates
 
-Activate when the user says anything like:
-- "Fine-tune a model on my data"
-- "I have a CSV / JSONL / HuggingFace dataset — train a model on it"
-- "I want a model that does X, I have Y data"
-- "I only have a MacBook Air / A100 / T4 — can I fine-tune?"
-- "/unsloth-buddy [description]"
+All scripts and templates are installed alongside this skill. Do NOT `ls` to discover them — use this reference (paths are relative to the skill root `./`):
 
-## How to Run
+| Script | Purpose |
+|--------|---------|
+| `scripts/init_project.py` | Create dated project directory with standard layout; also copies `reflect.py` and `add_reflect_hint.py` into the project |
+| `scripts/reflect.py` | Long-term memory extraction (`--extract`) and write to `~/.gaslamp/` (`--write`); **copied into each project dir by `init_project.py`** — call as `python3 reflect.py` from inside the project |
+| `scripts/add_reflect_hint.py` | Append an inline reflection hint to `.reflect_hints.json` during phases 2–6; **copied into each project dir by `init_project.py`** — call as `python3 add_reflect_hint.py` from inside the project |
+| `scripts/detect_system.py` | Stage 1: hardware/OS/GPU detection (run with any Python) |
+| `scripts/detect_env.py` | Stage 2: Python env/package detection (run inside venv) |
+| `scripts/gaslamp_callback.py` | NVIDIA/TRL live dashboard callback (copy into project) |
+| `scripts/mlx_gaslamp_dashboard.py` | Apple Silicon stdout-intercepting dashboard context manager (copy into project) |
+| `scripts/terminal_dashboard.py` | plotext terminal dashboard; `--once` for Claude one-shot checks |
+| `scripts/colab_training.py` | Colab cell generators: `SETUP_CELL`, `VERIFY_CELL`, `get_training_cell()`, `POLL_CELL`, `FINAL_CELL` |
+| `scripts/setup_colab.py` | Colab environment setup utilities |
+| `scripts/unsloth_mlx_sft_example.py` | **Apple Silicon SFT training template** — copy as `train.py` |
+| `scripts/unsloth_mlx_vision_example.py` | **Apple Silicon vision training template** — copy as `train.py` |
+| `scripts/unsloth_sft_example.py` | NVIDIA SFT training template — copy as `train.py` |
+| `scripts/unsloth_dpo_example.py` | NVIDIA DPO training template — copy as `train.py` |
+| `scripts/unsloth_grpo_example.py` | NVIDIA GRPO training template — copy as `train.py` |
+| `scripts/mps_grpo_example.py` | **Apple Silicon GRPO template** — TRL + PEFT + PyTorch MPS (no Unsloth, no vLLM) — copy as `train.py` |
+| `scripts/unsloth_vision_example.py` | NVIDIA vision/multimodal training template — copy as `train.py` |
+| `scripts/mlx_eval_template.py` | Apple Silicon eval template — copy as `eval.py` |
+| `scripts/mlx_eval_vision_template.py` | **Apple Silicon vision eval template** — copy as `eval.py` |
+| `scripts/demo_server.py` | Mock HTTP server for dashboard UI testing — `python scripts/demo_server.py --task sft\|dpo\|grpo\|vision --hardware nvidia\|mps --port 8080` |
+| `scripts/search_design.py` | Search and fetch DESIGN.md brand templates — `python scripts/search_design.py <keyword>` to find a brand, `--fetch` to download its DESIGN.md |
+| `templates/gaslamp_template.md` | Roadbook template — copied by `init_project.py` as `gaslamp.md` in each new project |
+| `templates/dashboard.html` | Web dashboard UI (copy into project's `templates/`) |
+| `templates/gaslamp.png` | Dashboard logo asset |
+| `templates/demo_llm_crisp.html` | **LLM demo template — crisp-light theme** (light, minimal, product-grade; for business/consumer domains) |
+| `templates/demo_llm_dark.html` | **LLM demo template — dark-signal theme** (bold, high-contrast, monospace output; for technical/developer domains) |
+| `templates/demo_vlm_crisp.html` | **Vision demo template — crisp-light** (wide layout for images; for consumer/multimodal domains) |
+| `templates/demo_vlm_dark.html` | **Vision demo template — dark-signal** (wide layout for images; for technical/multimodal domains) |
+| `scripts/llamacpp.py` | **llama.cpp unified CLI** — install, quantize, bench, ppl, serve, chat, deploy (one-command auto-pipeline) |
+| `templates/chat_ui.html` | **Gaslamp Chat WebUI** — dark glassmorphism chat interface for local GGUF inference via llama-server |
 
-Read `SKILL.md` — it defines the full 7-phase lifecycle. Then read `sub-skills/interview.md` and `sub-skills/data.md` for the interview and data phases.
+## The 7-Phase End-to-End Lifecycle (+Deploy)
 
-```
-SKILL.md                       ← main orchestration logic
-sub-skills/interview.md        ← Phase 1: 2-question requirements interview
-sub-skills/data.md             ← Phase 2: data acquisition and formatting
-sub-skills/demo_builder.md     ← Phase 5.5: static HTML demo generation
-scripts/detect_system.py       ← Phase 3: hardware detection (Stage 1)
-scripts/detect_env.py          ← Phase 3: env/package detection (Stage 2)
-scripts/init_project.py        ← Phase 0: create dated project directory + gaslamp.md + inject ~/.gaslamp/
-scripts/reflect.py             ← Phase 7: extract lessons from completed project → write to ~/.gaslamp/
-scripts/demo_server.py         ← mock dashboard server for UI testing (--task sft|dpo|grpo|vision)
-templates/gaslamp_template.md  ← roadbook template (copied as gaslamp.md into each project)
-templates/demo_llm_crisp.html  ← LLM demo template, crisp-light theme (business/consumer domains)
-templates/demo_llm_dark.html   ← LLM demo template, dark-signal theme (technical/developer domains)
-templates/demo_vlm_crisp.html  ← Vision demo template, crisp-light theme (multimodal domains)
-templates/demo_vlm_dark.html   ← Vision demo template, dark-signal theme (technical multimodal)
-scripts/llamacpp.py            ← llama.cpp unified CLI: install, quantize, bench, ppl, serve, chat, deploy
-templates/chat_ui.html         ← Gaslamp Chat WebUI for local GGUF inference via llama-server
-```
+As an automatic AI development tool, you must guide the user through a complete end-to-end training process. Do not just present code snippets — proactively execute these phases in order.
 
-## Lifecycle (7 Phases + Demo)
 
-| Phase | What you do |
-|-------|-------------|
-| 0. Init | Run `python scripts/init_project.py <name>` → creates `{name}_{date}/` with `gaslamp.md` roadbook; auto-injects `~/.gaslamp/` snapshot into `.gaslamp_context/` if present |
-| 1. Interview | Ask the 2-question interview (task + data); capture **user domain/audience** in `project_brief.md`; apply matching lessons/recipes from `.gaslamp_context/` silently |
-| 2. Data | Acquire, validate, and reformat the dataset to the required schema |
-| 3. Env | Run detect_system.py then detect_env.py — block until READY |
-| 4. Train | Generate and run `train.py` inside the project directory |
-| 5. Eval | Run eval against base and fine-tuned model — both batch and `--compare` mode |
-| 5.5. Demo | Ask user if they want a shareable demo; read `sub-skills/demo_builder.md`; write `demos/<name>/index.html` |
-| 6. Export | Convert to GGUF / merge / push to HF Hub per user's deploy target |
-| 6.5. Deploy | Optional: `llamacpp.py deploy` → quantize + bench + serve + chat UI (requires llama.cpp) |
-| 7. Reflect | Run `reflect.py --extract`, classify candidates into lessons/recipes, pipe to `reflect.py --write` → updates `~/.gaslamp/` |
-
-Everything is scoped to the dated project directory. Nothing touches the repo root.
-
-## Key Constraints
-
-- Apple Silicon: use `mlx-tune`, Python ≤ 3.12, create a venv first
-- NVIDIA: use `unsloth`, CUDA 12.1+
-- Never run training without completing Phase 3 (env check)
-- Adapter path must be passed as kwarg to `from_pretrained` for eval to load correctly
-- **On resuming a project**: read `gaslamp.md` first — it is the authoritative record of all decisions already made
-- **`gaslamp.md` vs `memory.md`**: gaslamp.md records only final kept decisions + rationale + 📖 learn blocks (reproducible); memory.md is free-form working notes (session only)
-- **`.gaslamp_context/` is read-only**: never modify it during a session — it is a frozen snapshot injected at project creation. New lessons write back via `scripts/reflect.py` at project end
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [TYH-labs/unsloth-buddy](https://github.com/TYH-labs/unsloth-buddy) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-20 -->
+<!-- tomevault:4.0:windsurf_rules:2026-06-17 -->
