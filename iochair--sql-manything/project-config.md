@@ -1,219 +1,123 @@
 ---
 trigger: always_on
-description: This file is for coding agents working inside this repository. Human-facing positioning lives in `README.md`. Agent-facing priority is installation, repeatable runs, and not breaking query-trace semantics.
+description: A* source-code search over SQL-ManyThing SQLite index. Four canonical SQL templates (DISCOVER→TRACE_DEPS→EXTRACT→EXTRACT_BLOCK) + Abstraction Frame with budget tracking. No substr guessing, no whole-file reads.
 ---
 
-# SQL-ManyThing Agent Guide
 
-This file is for coding agents working inside this repository. Human-facing positioning lives in `README.md`. Agent-facing priority is installation, repeatable runs, and not breaking query-trace semantics.
+# SQL-ManyThing
 
-## Mental Model
+Indexes a source tree into a SQLite DB. Query model: Abstraction Frame → DISCOVER → EXTRACT → EXTRACT_BLOCK, with optional TRACE_DEPS for candidate disambiguation.
 
-SQL-ManyThing has three phases:
+**Reading order is execution order.** Start at §0, follow steps in sequence. Do not jump to SQL templates before writing a Frame.
 
-```text
-Phase 1: build .srcidx/source.db with files + files_fts
-Phase 2: add enrichment into the same DB
-Phase 3: install sqlite wrapper + query log so agent queries are recorded and reused
-```
+## §0 When to Use
 
-Agents should keep query-time work in SQL. Do not switch between generic shell search and SQL unless setup is broken.
+**Use when:**
+- A project has `.srcidx/source.db` (if not, see §1.3 to create one). Query via `/manything/<project>/source.db`.
+- The user asks for code search, tracing, implementation lookup, or architecture inspection.
+- You need precise, offset-based extraction without whole-file reads.
 
-## Repository Layout
+**Do NOT use when:**
+- No index exists for the project.
+- You're looking at <100 files total — `code_search` / `code_extract` is faster.
+- The target is logs, config, markdown, or non-code text — use `search_files` / `read_file`.
+- You need a single function from a known file — `code_extract` is 1 call.
 
-```text
-scripts/
-├── phase1/manything_build_db.py
-├── phase2/enrich_cymbal.py
-├── phase2/enrich_graphify.py
-├── phase2/enrich_java_build.py
-├── phase2/uht_enrich.py
-├── phase3/manything_query_log.py
-├── phase3/sqlite3_wrapper.sh
-├── phase3/SQL-ManyThing-query-log
-└── verify/verify_ue_uht_sql.py
+## §1 Pre-flight — Know Your DB Before You Query
 
-references/
-├── phase1/
-├── phase2/
-├── phase3/
-├── platforms/
-└── unreal/
-```
+Before ANY query, check what tables are available. Not every project is fully enriched.
 
-## Install Phase 3 Locally
-
-Run from repo root:
+### 1.1 Schema check
 
 ```bash
-python3 scripts/phase3/manything_query_log.py init
-mkdir -p ~/.local/bin
-cp scripts/phase3/sqlite3_wrapper.sh ~/.local/bin/sqlite3
-cp scripts/phase3/SQL-ManyThing-query-log ~/.local/bin/SQL-ManyThing-query-log
-chmod +x ~/.local/bin/sqlite3 ~/.local/bin/SQL-ManyThing-query-log
+sqlite3 /manything/<project>/source.db "
+SELECT name FROM sqlite_master
+WHERE type='table' AND name IN ('files','files_fts','v_enriched','enrich_file_deps','enrich_file_refs','enrich_depth_segments')
+ORDER BY name;"
 ```
 
-Ensure `~/.local/bin` is before `/usr/bin`:
+| Tables present | Capabilities |
+|---|---|
+| `files` + `files_fts` only | FTS5 search only. No v_enriched — skip EXTRACT/EXTRACT_BLOCK. Use `files.content` or fall back to `read_file`. |
+| + `v_enriched` | Full DISCOVER → EXTRACT → EXTRACT_BLOCK chain. |
+| + `enrich_file_deps` | TRACE_DEPS available. |
+| + `enrich_depth_segments` | `block_content_full` + `scope_end_offset` for complete body extraction. |
+| + `enrich_file_refs` (no deps) | Raw #include/import strings — query refs table directly. |
+
+### 1.2 File count
 
 ```bash
-export PATH="$HOME/.local/bin:$PATH"
+sqlite3 /manything/<project>/source.db "SELECT count(*) AS file_count FROM files;"
 ```
 
-Register aliases in exactly this format:
+| File count | Strategy |
+|---|---|
+| <10K | Fast LIKE scans OK |
+| 10K–50K | Prefer FTS5 for discovery; narrow LIKE with `file_path` |
+| >50K | FTS5 only for discovery; NEVER run unfiltered `block_content LIKE '%X%'` without `file_path` |
 
+### 1.3 Setup: Phase 1 → 2 → 3
+
+A fully enriched project goes through three phases. After Phase 1 each phase is optional — stop when you have the tables you need (§1.1).
+
+**Phase 1 — Create the index** (`references/phase1/phase1-setup.md`):
 ```bash
-echo 'MANYTHING_myproject="/path/to/project"' >> ~/.hermes/manything/aliases.sh
+python3 scripts/phase1/manything_build_db.py /path/to/project
 ```
+This creates `.srcidx/source.db` with `files` + `files_fts`. Enough for FTS5-only search.
 
-The wrapper expects `MANYTHING_<project>`, not `SQLMANYTHING_<project>`.
-
-## Verify Phase 3
-
-Do not use `ls /manything/<project>/source.db`. `/manything/...` is not a filesystem path. It is a sqlite wrapper virtual path.
-
-Correct verification:
-
+**Phase 2 — Enrich with structure + dependencies** (`references/phase2/enrich-covercheck-workflow.md`):
 ```bash
-sqlite3 /manything/myproject/source.db "SELECT COUNT(*) FROM files"
-SQL-ManyThing-query-log import
-sqlite3 :trace "SELECT COUNT(*) FROM query_log"
-sqlite3 :trace ".tables"
+# Universal workflow (all languages, always applicable):
+python3 scripts/phase2/enrich_depth_segments.py /path/to/project --batch 500
+python3 scripts/phase2/enrich_file_refs.py       /path/to/project --batch 500
+python3 scripts/phase2/flatten_file_deps.py      /path/to/project
+python3 scripts/phase2/create_enriched_view.py   /path/to/project
 ```
+This adds `v_enriched`, `enrich_file_deps`, `enrich_file_refs`, `enrich_depth_segments` — the full DISCOVER→EXTRACT→EXTRACT_BLOCK chain. If re-running on a previously enriched DB, see `references/old-format-cleanup.md`.
 
-Expected trace tables:
+Optional enrichments (not needed for most queries):
+- `enrich_cymbal.py` — symbol definitions via cymbal CLI (Python/Go/JS only; needs `cymbal` binary)
+- `enrich_graphify.py` — AST graph for Python + Markdown (does not cover TSX/JSX)
+- `enrich_java_build.py` — Java-specific
 
-```text
-query_log query_notes query_trace
-```
+On Windows, `scripts/phase2/run_phase2_universal_windows.bat` runs all 4 steps. On Linux/WSL/macOS, run the Python scripts directly as shown above.
 
-`query_trace` does not belong inside any project `.srcidx/source.db`.
-
-## Build Phase 1
-
-General git repo:
-
+**Phase 3 — Install the sqlite3 wrapper** (enables `/manything/` paths + `:trace`):
 ```bash
-python3 scripts/phase1/manything_build_db.py /path/to/project --git --ext .ts,.tsx,.js,.jsx,.json,.md
+# Cross-platform (Windows/Linux/macOS):
+python3 scripts/phase3/install.py
+
+# Or bash-only (Linux/WSL/macOS):
+./install.sh
 ```
+This places a `sqlite3` wrapper in `~/.local/bin/` that intercepts `/manything/<project>/source.db` and `:trace`. On Windows, `install.py` also copies `sqlite3-real.exe` and creates a `.cmd` wrapper. Ensure `~/.local/bin` is before `/usr/bin` in PATH.
 
-Directory with explicit `.gitignore`:
-
+After Phase 3, register the project:
 ```bash
-python3 scripts/phase1/manything_build_db.py /path/to/project --gitignore /path/to/project/.gitignore
+echo 'MANYTHING_<project>="/path/to/project"' >> ~/.hermes/manything/aliases.sh
 ```
+Then proceed with §1.1 schema check.
 
-Installed Unreal Engine core profile:
+See `references/phase3/phase3-design-rationale.md` for architecture details.
 
-```bash
-python3 scripts/phase1/manything_build_db.py /path/to/Engine \
-  --gitignore /path/to/Engine/.gitignore \
-  --profile unreal-installed-core
-```
+### 1.4 Trace — search past queries (`:trace`)
 
-Profile behavior:
+The sqlite3 wrapper logs every `/manything/` query to `~/.hermes/manything/query_log.db`. Use `:trace` as a virtual database name to search past queries — it resolves to the global query log automatically.
 
-```text
-unreal-installed-core:
-  keep .h,.cpp,.cs,.usf,.ush,.hlsl,.py,.ini,.uplugin
-  skip ThirdParty/Content/Platforms/ScriptModules high-noise paths
-
-unreal-installed-full:
-  keep broad source/data extensions
-  intended only for deep ThirdParty/data exploration
-```
-
-## Windows / WSL Guidance
-
-When indexing a large Windows-hosted tree, prefer Windows Python for Phase 1. WSL DrvFs writes are slow.
-
-Template:
-
-```text
-templates/run_phase1_unreal_windows.bat
-```
-
-Copy these into a Windows-side run directory:
-
-```text
-run_phase1_unreal_windows.bat
-manything_build_db.py
-.gitignore
-```
-
-Then run the BAT from Windows.
-
-WSL can still query the resulting DB:
-
-```bash
-sqlite3 /mnt/d/Path/To/Engine/.srcidx/source.db "SELECT COUNT(*) FROM files"
-```
-
-## Phase 2 Enrichment
-
-cymbal symbols:
-
-```bash
-python3 scripts/phase2/enrich_cymbal.py /path/to/project
-```
-
-graph/document enrichment:
-
-```bash
-python3 scripts/phase2/enrich_graphify.py /path/to/project
-```
-
-Java build enrichment:
-
-```bash
-python3 scripts/phase2/enrich_java_build.py /path/to/project
-```
-
-Unreal Installed Build UHT enrichment:
-
-```bash
-python3 scripts/phase2/uht_enrich.py \
-  --db /path/to/Engine/.srcidx/source.db \
-  --uht-dir /path/to/Engine/Intermediate/Build/Win64/UnrealEditor/Inc \
-  --source-prefix Engine/ \
-  --batch 500
-```
-
-For installed Unreal Engine, run UHT enrich as the primary Phase 2 path. Do not use cymbal/graphify as the main Unreal reflection strategy.
-
-## Query-Time Rules for Agents
-
-Before first query:
-
-```bash
-SQL-ManyThing-query-log import
-sqlite3 :trace "
-WITH intent(term) AS (
-  VALUES ('files'), ('ext'), ('path'), ('symbols'), ('file_enrich'),
-         ('graph'), ('README'), ('package'), ('src')
-)
-SELECT id, project, tag, note, substr(sql_text, 1, 180) AS sql_preview
-FROM query_trace
-WHERE project='<project>'
-  AND (tag IS NOT NULL OR EXISTS (
-    SELECT 1 FROM intent WHERE lower(sql_text) LIKE '%' || lower(term) || '%'
-  ))
-ORDER BY tag IS NULL, id DESC
-LIMIT 12;"
-```
-
-Expand natural-language intent into SQL-facing terms using world knowledge. For example, "implementation overview" should search terms like:
-
-```text
-files, ext, path, symbols, file_enrich, graph, README, package, src, layout, prepare, measure, benchmark
-```
-
-If a trace row is useful, tag it with SQL, not a separate CLI command:
-
+**Search by project + keyword:**
 ```bash
 sqlite3 :trace "
-INSERT INTO query_notes (log_id, note, tag, created_at)
-VALUES (<id>, '<reuse note>', 'useful_pattern', strftime('%s','now'));
-"
+SELECT id, sql_text, tag FROM query_trace
+WHERE project = '<project>'
+  AND sql_text LIKE '%<keyword>%'
+ORDER BY id DESC LIMIT 10;"
+```
+
+**Tag a useful query pattern** (agent discovers a reusable SQL shape):
+```sql
+INSERT INTO query_notes(log_id, note, tag, created_at)
+VALUES (<id>, 'brief description of the pattern', '<short_tag>', strftime('%s','now'));
 ```
 
 
@@ -221,4 +125,4 @@ VALUES (<id>, '<reuse note>', 'useful_pattern', strftime('%s','now'));
 
 ---
 > Source: [IOchair/SQL-ManyThing](https://github.com/IOchair/SQL-ManyThing) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-26 -->
+<!-- tomevault:4.0:windsurf_rules:2026-06-17 -->
