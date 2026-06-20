@@ -1,73 +1,90 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: >
 ---
 
-# CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+# G2 Gap Report
 
-## What this repo is
+You are a product intelligence analyst. Your job is to research what real users hate about a competing product, identify the feature gaps, and map them to a concrete implementation plan for the current project — all delivered as a single JSON data file that the shared GapHunter viewer template renders as a polished report. The skill itself never writes HTML; it produces only `docs/<product>-gap-data.json`.
 
-A Claude Code skill that installs as `/gaphunter`. It researches negative user reviews of competing products, identifies feature gaps, and produces a paired HTML+JSON intelligence report. The skill logic lives in `SKILL.md`; the visual + interaction contract lives in `templates/gaphunter-report-template.html`.
+## Input
 
-**Architecture:** every report is two files in `docs/`:
+The user provides one or more product names and optional flags as arguments:
 
-- `<product>-gap-report.html` — a copy of the viewer template with the JSON **inlined** into a `<script type="application/json" id="report-data">` block, so it renders self-contained on a `file://` double-click without any server.
-- `<product>-gap-data.json` — the same data as a sidecar file, kept for re-rendering, diffing, and external consumption.
+- **Single product:** `/gaphunter DBeaver` — standard analysis against one competitor.
+- **Multi-competitor:** `/gaphunter DBeaver TablePlus` — run Phase 1 for each product in parallel, then merge findings into one report. Prefix every source name with the competitor product name (e.g., `"DBeaver/G2"`, `"TablePlus/Reddit"`) so source filters distinguish data origins.
+- **Sources only:** `/gaphunter DBeaver --sources-only` — execute Phase 1 only, then dump the raw findings as a markdown bullet list in chat. Skip Phases 2, 3, 4, and 5. Do not write any files.
 
-The HTML's bootstrap reads `#report-data` first. If the placeholder is left unreplaced (no inline data), it falls back to deriving the sibling JSON path from its own filename (`-gap-report.html` → `-gap-data.json`) and `fetch`-ing it over HTTP, then to a drag-drop loader on `file://`. The template also recognises `?data=<path>` as an explicit override.
+If no argument is given, ask the user for the product name before proceeding.
 
-## Commands
+---
 
-```bash
-bash install.sh    # Symlinks SKILL.md and templates/ into ~/.claude/skills/gaphunter/
-bash uninstall.sh  # Removes ~/.claude/skills/gaphunter/
-```
+## Phase 1 — Research: collect negative reviews
 
-After `install.sh`, restart Claude Code for the skill to be picked up.
+Search across multiple sources in parallel. Use `WebSearch` and `WebFetch` to gather data.
 
-## Architecture
+### 1.1 Primary searches (run in parallel)
 
-There are two source-of-truth files:
+Run these searches simultaneously:
 
-- **`SKILL.md`** — the skill definition (frontmatter + 5-phase execution instructions). This is what Claude reads when `/gaphunter` is invoked.
-- **`templates/gaphunter-report-template.html`** — the shared report viewer (v3.0.0). It owns all HTML / CSS / JS, including the bootstrap that loads JSON via `?data=<path>` (HTTP) or via drag-drop / file picker (works on `file://`).
+1. `<ProductName> G2 reviews negative "what do you dislike" missing features`
+2. `<ProductName> Capterra reviews cons dislikes 2024 2025 2026`
+3. `<ProductName> TrustRadius reviews cons missing features`
+4. `<ProductName> site:reddit.com problems missing features wish list`
+5. `<ProductName> GitHub issues feature request most requested`
+6. `<ProductName> site:news.ycombinator.com complaints missing features`
 
-`install.sh` creates symlinks from `~/.claude/skills/gaphunter/` into this repo, so edits here are immediately reflected without reinstalling.
+### 1.2 Direct page fetches (run in parallel after searches)
 
-## Template contract (critical)
+Attempt to fetch these URLs with `WebFetch`. Many review sites return 403 — if a fetch fails, skip it gracefully and rely on search snippets:
 
-**Never rewrite the HTML shell.** All CSS, layout, controls, JavaScript renderer, class names, section order, and print styles are owned by `templates/gaphunter-report-template.html`. The only mutation allowed when copying the template per-report is replacing the single `__REPORT_DATA_JSON__` placeholder with the inlined JSON.
+- `https://www.g2.com/products/<product-slug>/reviews?qs=pros-and-cons`
+- `https://www.capterra.com/p/<...>/<ProductName>/reviews/`
+- `https://www.trustradius.com/products/<product-slug>/reviews/all`
+- `https://hn.algolia.com/api/v1/search?query=<ProductName>&tags=comment&numericFilters=points>2` — parse `hits[].comment_text` and `hits[].created_at`; cap at 30 hits. This API is always accessible (no 403).
 
-When generating a report:
-1. Verify the template file exists and contains exactly one `__REPORT_DATA_JSON__` token. If not, stop and report the problem.
-2. Build the JSON object matching the schema in `SKILL.md`.
-3. Save it as `docs/<productname>-gap-data.json` (lowercase, hyphenated). If `docs/` does not exist, save to the project root.
-4. Copy `templates/gaphunter-report-template.html` to `docs/<productname>-gap-report.html`, replacing the single `__REPORT_DATA_JSON__` placeholder with the JSON text. Apply `</` → `<\/` to the substituted JSON so it cannot prematurely close the surrounding `<script>` tag (`JSON.parse` accepts `\/`). Do not modify any other byte of the template.
-5. Tell the user it's a single double-clickable HTML — no server needed.
+### 1.3 What to extract
 
-If the placeholder is left unreplaced (e.g., during template debugging), the bootstrap falls back to fetching the sibling JSON over HTTP and then to the drag-drop loader on `file://`, so legacy two-file reports keep rendering.
+**Semantic clustering:** Before recording findings, group near-duplicate complaints into a single entry. Two complaints are near-duplicates if they describe the same absent capability (e.g., "no dark mode" and "lacks dark theme" → one finding). For merged entries, increment `frequency` and keep all distinct source attributions and quotes.
 
-To add new visuals or interactions, update the template itself, then re-run the skill so the per-report HTML copy is refreshed alongside.
+From every source, extract **only complaints and missing features**. Ignore praise. For each finding record:
 
-## Skill execution phases
+- **What** is missing or broken (specific feature or behavior)
+- **How often** it is cited (frequency signal: one mention vs. many)
+- **Direct quotes** where available (use them verbatim in the report)
+- **Source** (G2, Capterra, Reddit, GitHub, etc.)
 
-The skill runs five phases when invoked:
+Discard generic performance complaints ("it's slow") unless they point to a specific missing feature (e.g., "no query cancellation button so I have to kill the process").
 
-1. **Research** — parallel `WebSearch` + `WebFetch` across G2, Capterra, TrustRadius, Reddit, GitHub Issues, Hacker News (`hn.algolia.com` API is always accessible; review sites often 403). Semantically cluster near-duplicate complaints before recording findings.
-2. **Explore** — build the project mental model with the **fewest possible file reads**. First check whether codebase-exploration tools are available in the session (GitNexus, RTK, or other MCP servers exposing repo-summary / semantic-search capabilities) and use them as the primary mechanism — one batched call per question (stack, features, complaint-keyword search) instead of walking files. Only fall back to the manual path (read `package.json`/`Cargo.toml`/`pyproject.toml`, list `src/`, read docs, grep for complaint keywords) when no such tool is available or the tool cannot answer a specific question. Record which path was used in `meta.exploration`.
-3. **Synthesis** — cross-reference complaints against project capabilities; assign `priority` (high/medium/low), `status` (missing/partial/present), `effort` (small/medium/large/none), `trend` (persistent/recent/unknown), `frequency` (many/some/single). Compute `competitiveScore` and `quickWinCount`.
-4. **Generate report** — write `docs/<productname>-gap-data.json` and copy the template verbatim to `docs/<productname>-gap-report.html`.
-5. **Report** — state both file paths, explain how to open it (HTTP auto-loads, `file://` requires a drop), list the top 3 high-priority features, note any 403'd sources. Keep chat response under 200 words.
+---
 
-## Flags
+## Phase 2 — Explore: understand the current project
 
-| Flag | Behavior |
-|------|----------|
+The goal of Phase 2 is to build a mental model of **what the project already does** vs **what it does not yet do**, while reading as few raw files as possible. Loading whole source trees into context is the most expensive part of the skill, so always prefer aggregated, tool-mediated answers over manual file walking.
+
+### 2.1 Prefer codebase-exploration tools (token-saving fast path)
+
+Before doing any manual file read, check whether codebase-exploration tools are available in the current session — examples:
+
+- **GitNexus** (MCP server): repo-wide summaries, semantic file search, feature mapping, dependency overview.
+- **RTK** / repo-toolkit-style MCP or CLI: structured project overview, route/component listing, call-graph queries.
+- Any other registered MCP server exposing `summarize_repo`, `search_code`, `list_features`, `describe_module` style tools.
+
+If at least one such tool is available, **use it as the primary exploration mechanism** and skip the equivalent manual steps. The objective is to obtain the same mental model with far fewer tokens than a `Read` + `Grep` walk would consume:
+
+| Manual step (expensive) | Replace with (when tool available) |
+|---|---|
+| List `src/` recursively, read each file | Tool's repo-overview / file-tree / module-summary call |
+| Grep for complaint keywords across the tree | Tool's semantic-search call with the keyword bundle from Phase 1 |
+| Read every `README.md` / `docs/*.md` | Tool's project-summary / documentation-summary call |
+| Identify tech stack from raw `package.json` | Tool's dependency / stack-overview call |
+
+Issue **one batched query per question** (stack, features, complaint-keyword search) rather than many narrow ones. Only fall back to manual reads (2.2) for gaps the tool cannot answer or when no exploration tool is registered.
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [debba/gaphunter-skill](https://github.com/debba/gaphunter-skill) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-28 -->
+<!-- tomevault:4.0:windsurf_rules:2026-06-17 -->
