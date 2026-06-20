@@ -1,104 +1,165 @@
 ---
 trigger: always_on
-description: This file provides context for AI coding agents (Claude Code, Copilot, Cursor, etc.) working on the Agentspan SDK.
+description: Agentspan is a distributed, durable runtime for AI agents. Agents survive crashes, scale across machines, and pause for human approval. Use Python SDK.
 ---
 
-# AGENTS.md — Guide for AI Agents Working on This Codebase
+# Agentspan — Build Durable AI Agents
 
-This file provides context for AI coding agents (Claude Code, Copilot, Cursor, etc.) working on the Agentspan SDK.
+Agentspan is a distributed, durable runtime for AI agents. Agents survive crashes, scale across machines, and pause for human approval. Use Python SDK.
 
-## Project Overview
+## Two Use Cases
 
-The `agentspan` Python SDK compiles Python `Agent` definitions into durable [Conductor](https://github.com/conductor-oss/conductor) executions. Agents survive process crashes, tools scale as distributed workers, and human-in-the-loop approvals can pause for days.
+**Developer building agents:** Define → deploy → serve → trigger by name. Long-lived, versioned, monitored.
 
-**Package name (PyPI):** `agentspan`
-**npm package:** `@agentspan-ai/agentspan`
-**Import path:** `from agentspan.agents import ...`
-**Python:** 3.10+
-**License:** MIT
+**Autonomous agent building ephemeral agents:** Define → `rt.run(agent, prompt)` → get result → move on. No deploy. No serve. One call.
 
-## Architecture
+## Quickstart (Ephemeral — for autonomous agents)
 
-### Core Design Principles
+```python
+from agentspan.agents import Agent, AgentRuntime
 
-1. **Everything is an Agent.** One class for single agents, multi-agent teams, and nested hierarchies. No Team, Network, or Swarm classes.
-2. **Server-first execution.** Tools execute as distributed Conductor tasks. The agent survives process crashes.
-3. **Compile, don't interpret.** Agent definitions are compiled into static Conductor workflow JSON at registration time.
-4. **Zero config for simple cases.** `Agent + tool + run` works in 5 lines.
-5. **Conductor-native.** Every SDK concept maps directly to a Conductor primitive.
+agent = Agent(name="helper", model="openai/gpt-4o", instructions="You are a helpful assistant.")
 
-### Compilation Pipeline
-
-```
-Agent(Python) → AgentCompiler.compile() → ConductorWorkflow(JSON) → execute on server
+with AgentRuntime() as rt:
+    result = rt.run(agent, "What is quantum computing?")
+    print(result.output["result"])   # String output
+    # Or: result.print_result()      # Pretty-printed
 ```
 
-When `run(agent, prompt)` is called:
-1. Agent is compiled into a Conductor workflow definition
-2. Worker processes are started for `@tool` functions
-3. Agent is executed on the Conductor server
-4. Result is extracted and returned as `AgentResult`
+`rt.run()` handles deploy + workers + execution internally. The agent is ephemeral — created for this task, discarded after.
 
-### Key Source Files
+## Production Pattern (for developers)
 
-| File | Purpose |
-|---|---|
-| `src/agentspan/agents/agent.py` | `Agent` class — the single orchestration primitive |
-| `src/agentspan/agents/tool.py` | `@tool` decorator, `ToolDef`, `http_tool()`, `mcp_tool()` |
-| `src/agentspan/agents/run.py` | Top-level `run()`, `start()`, `stream()`, `run_async()`, `plan()` with singleton runtime |
-| `src/agentspan/agents/result.py` | `AgentResult`, `AgentHandle`, `AgentStatus`, `AgentEvent`, `EventType` |
-| `src/agentspan/agents/guardrail.py` | `Guardrail`, `GuardrailResult`, `RegexGuardrail`, `LLMGuardrail` |
-| `src/agentspan/agents/memory.py` | `ConversationMemory` — session message history |
-| `src/agentspan/agents/semantic_memory.py` | `SemanticMemory`, `MemoryStore`, `MemoryEntry` — long-term memory |
-| `src/agentspan/agents/termination.py` | `TerminationCondition` and composable subclasses (`&`, `|` operators) |
-| `src/agentspan/agents/handoff.py` | `HandoffCondition`, `OnToolResult`, `OnTextMention`, `OnCondition` |
-| `src/agentspan/agents/code_executor.py` | `CodeExecutor` — Local, Docker, Jupyter, Serverless |
-| `src/agentspan/agents/ext.py` | `UserProxyAgent`, `GPTAssistantAgent` |
-| `src/agentspan/agents/tracing.py` | Optional OpenTelemetry integration |
-| `src/agentspan/agents/__init__.py` | Public API surface — all exports |
-| `src/agentspan/agents/compiler/agent_compiler.py` | Single agent compilation (DoWhile loops, tool dispatch) |
-| `src/agentspan/agents/compiler/multi_agent_compiler.py` | Multi-agent strategies (handoff, sequential, parallel, router) |
-| `src/agentspan/agents/compiler/tool_compiler.py` | `@tool` → TaskDef + ToolSpec + dispatch registration |
-| `src/agentspan/agents/compiler/_dispatch.py` | Universal dispatch worker (fuzzy parsing, circuit breaker) |
-| `src/agentspan/agents/runtime/runtime.py` | `AgentRuntime` — compile + execute + stream |
-| `src/agentspan/agents/runtime/worker_manager.py` | Auto-register `@tool` as Conductor workers |
-| `src/agentspan/agents/runtime/config.py` | `AgentConfig` — environment variable configuration |
-| `src/agentspan/agents/_internal/model_parser.py` | Parse `"provider/model"` strings |
-| `src/agentspan/agents/_internal/schema_utils.py` | JSON Schema generation from type hints |
+```python
+from agentspan.agents import Agent, AgentRuntime
 
-### Conductor Primitive Mapping
+agent = Agent(name="helper", model="openai/gpt-4o", instructions="...")
 
-| SDK Concept | Conductor Primitive |
-|---|---|
-| `Agent` | `ConductorWorkflow` |
-| `@tool` function | Task definition + `@worker_task` |
-| `http_tool` | `HttpTask` (server-side) |
-| `mcp_tool` | `ListMcpTools` + `CallMcpTool` |
-| Agentic loop | `DoWhileTask` |
-| LLM call | `LlmChatComplete` (system task) |
-| Handoff | `InlineSubWorkflowTask` |
-| Sequential | Chain of `SubWorkflowTask` |
-| Parallel | `ForkTask` + `JoinTask` |
-| Human approval | `WaitTask` |
-| Conversation state | `workflow.variables` |
+if __name__ == "__main__":
+    with AgentRuntime() as rt:
+        # Deploy to server. CLI alternative (recommended for CI/CD):
+        #   agentspan deploy my_module
+        rt.deploy(agent)   # Push definition to server (idempotent)
+        rt.serve(agent)    # Start workers, poll for tasks (blocks forever)
+```
 
-## Coding Conventions
+Trigger from outside: `agentspan run helper "What is quantum computing?"`
 
-### Style
+## Configuration
 
-- **Linter:** ruff (`target-version = "py310"`, `line-length = 100`)
-- **Type checker:** mypy (`python_version = "3.10"`, `ignore_missing_imports = true`)
-- **Imports:** isort via ruff (`"I"` rule)
-- **Python target:** 3.10+ (use `from __future__ import annotations` for newer typing syntax)
+```python
+# Default: reads AGENTSPAN_SERVER_URL from environment
+rt = AgentRuntime()
 
-### Module-Level Patterns
+# Explicit:
+from agentspan.agents import AgentConfig
+config = AgentConfig(server_url="http://localhost:6767/api", api_key="...")
+rt = AgentRuntime(config=config)
+```
 
-- Every module uses `logging.getLogger("agentspan.agents.xxx")` for structured logging
-- The dispatch worker (`_dispatch.py`) deliberately does NOT use `from __future__ import annotations` because Conductor's worker framework needs real type objects for parameter resolution
-- The dispatch worker uses `object` type annotations (not `dict`/`list`) to avoid Conductor's `convert_from_dict_or_list()` issues
+Environment variables: `AGENTSPAN_SERVER_URL`, `AGENTSPAN_AUTH_KEY`, `AGENTSPAN_AUTH_SECRET`
+
+## Agent
+
+```python
+Agent(
+    name="my_agent",                    # Required. Unique. Alphanumeric + underscore/hyphen.
+    model="openai/gpt-4o",             # "provider/model" format
+    instructions="You are a ...",       # System prompt (str, callable, or PromptTemplate)
+    tools=[my_tool],                    # List of @tool functions
+    max_turns=25,                       # Max LLM iterations
+    timeout_seconds=0,                  # 0 = no timeout
+    max_tokens=None,                    # Max output tokens per LLM call
+    temperature=None,                   # LLM temperature
+    output_type=MyPydanticModel,        # Structured output (Pydantic model)
+    planner=False,                      # Enable planning-first behavior
+    thinking_budget_tokens=None,        # Extended reasoning token budget
+    credentials=["API_KEY"],            # Credentials resolved from server
+    metadata={"team": "backend"},       # Custom metadata
+)
+```
+
+Model formats: `"openai/gpt-4o"`, `"anthropic/claude-sonnet-4-6"`, `"google_gemini/gemini-2.5-flash"`, `"claude-code/opus"`
+
+### @agent Decorator
+
+```python
+from agentspan.agents import agent
+
+@agent(model="openai/gpt-4o", tools=[search])
+def researcher():
+    """You are a research assistant. Find and summarize information."""
+
+# Use like: rt.run(researcher, "Find info about quantum computing")
+```
+
+The docstring becomes the instructions.
+
+## AgentResult
+
+```python
+result = rt.run(agent, "prompt")
+
+result.output            # Dict: {"result": "..."} or agent-specific shape
+result.output["result"]  # The text output (string)
+result.status            # "COMPLETED", "FAILED", "TERMINATED", "TIMED_OUT"
+result.execution_id      # Execution ID
+result.error             # Error message if failed, else None
+result.token_usage       # {"input_tokens": N, "output_tokens": N, ...}
+result.finish_reason     # "stop", "length", "error", "cancelled", "timeout", "guardrail"
+result.is_success        # True if COMPLETED
+result.is_failed         # True if FAILED/TERMINATED
+result.sub_results       # List of sub-agent results (multi-agent)
+result.print_result()    # Pretty-print the output
+```
+
+## Error Handling
+
+```python
+result = rt.run(agent, "prompt")
+
+if result.is_success:
+    print(result.output["result"])
+elif result.is_failed:
+    print(f"Failed: {result.error}")
+    print(f"Status: {result.status}")   # FAILED, TERMINATED, TIMED_OUT
+    print(f"Reason: {result.finish_reason}")
+```
+
+For autonomous agents building ephemeral agents — always check `result.is_success` before using `result.output`.
+
+## Tools
+
+```python
+from agentspan.agents import tool
+
+@tool
+def search(query: str) -> str:
+    """Search the web for information."""
+    return f"Results for: {query}"
+
+@tool(approval_required=True, credentials=["API_KEY"])
+def delete_file(path: str) -> str:
+    """Delete a file. Requires human approval."""
+    os.remove(path)
+    return f"Deleted {path}"
+```
+
+Tool functions must have type hints and a docstring. The schema is generated automatically.
+
+### ToolContext (dependency injection + shared state)
+
+```python
+from agentspan.agents import tool, ToolContext
+
+@tool
+def lookup(query: str, context: ToolContext) -> str:
+    """Search with context."""
+    wf_id = context.execution_id
+    session = context.session_id
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [agentspan-ai/agentspan](https://github.com/agentspan-ai/agentspan) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-29 -->
+<!-- tomevault:4.0:windsurf_rules:2026-06-17 -->
