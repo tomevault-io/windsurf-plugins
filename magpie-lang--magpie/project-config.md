@@ -1,83 +1,219 @@
 ---
 trigger: always_on
-description: Magpie is a Rust workspace (`Cargo.toml` at repo root) with compiler/tooling crates in `crates/`. Core flow is split across frontend crates (`magpie_lex`, `magpie_parse`, `magpie_ast`), analysis crates (`magpie_sema`, `magpie_hir`, `magpie_types`, `magpie_own`), and backend crates (`magpie_mpir`, `magpie_arc`, `magpie_codegen_llvm`, `magpie_codegen_wasm`). CLI entrypoint is `crates/magpie_cli/src/main.rs`.
+description: Comprehensive guide for writing Magpie (.mp) programs, debugging compiler errors, and using the Magpie CLI. Designed for agents who have never seen Magpie before.
 ---
 
-# Repository Guidelines
 
-## Project Structure & Module Organization
-Magpie is a Rust workspace (`Cargo.toml` at repo root) with compiler/tooling crates in `crates/`. Core flow is split across frontend crates (`magpie_lex`, `magpie_parse`, `magpie_ast`), analysis crates (`magpie_sema`, `magpie_hir`, `magpie_types`, `magpie_own`), and backend crates (`magpie_mpir`, `magpie_arc`, `magpie_codegen_llvm`, `magpie_codegen_wasm`). CLI entrypoint is `crates/magpie_cli/src/main.rs`.  
-Pipeline orchestration is centered in `magpie_driver`; runtime and platform/tooling crates (for example `magpie_rt`, `magpie_pkg`, `magpie_memory`, `magpie_web`, `magpie_gpu`) are also workspace-critical. Use root `Cargo.toml` workspace members as the source of truth for full crate inventory.  
-Language fixtures live in `tests/fixtures/*.mp`, integration tests in `tests/integration_test.rs`, and standard library modules in `std/std.*/*.mp`.
+# Magpie Language Programming Guide
 
-## Build, Test, and Development Commands
-Use Cargo from repo root:
+Use this skill whenever you write, debug, or review Magpie `.mp` programs.
 
-```bash
-cargo build -p magpie_cli              # build CLI
-cargo build --workspace                # build all crates
-cargo run -p magpie_cli -- --help      # inspect CLI
-cargo test --workspace                 # full test suite
-cargo test --test integration_test     # fixture-driven integration tests
-cargo test -p magpie_parse snapshot_hello_parser_output
+---
+
+## 0) Non-negotiable Rules
+
+1. **Binary-first:** treat compiler diagnostics as ground truth.
+   - Run `magpie explain <CODE>` for any error code you don't recognize.
+   - Use `--output json` for machine-readable diagnostics.
+2. **Diagnose by error code first**, then apply the smallest fix.
+3. **Smallest reproducer first** -- one tiny `.mp` file, then grow.
+4. **Change one dimension at a time** (syntax, then types, then ownership, then backend).
+5. **Prove fixes with commands and exit codes.**
+
+---
+
+## 1) What is Magpie
+
+Magpie is a compiled, SSA-based language with explicit ownership, ARC memory management, and first-class GPU support. Programs are written in a low-level IR-like textual format (CSNF).
+
+Key characteristics:
+- **SSA form** -- every value is defined once, used by name (`%x`, `%y`)
+- **Explicit ownership** -- you manually `borrow.shared`, `borrow.mut`, `share`, `clone.shared`
+- **ARC-managed heap** -- the compiler inserts reference counting; you manage ownership transitions
+- **Block-structured** -- functions contain labeled basic blocks (`bb0:`, `bb1:`) with explicit terminators
+- **No implicit conversions** -- types must match exactly; `const` suffixes must match declared types
+- **5 GPU backends** -- SPIR-V, Metal (MSL), PTX (CUDA), HIP (AMD), WGSL (WebGPU)
+
+How Magpie differs from familiar languages:
+- There are no expressions or statements -- only SSA instructions and terminators
+- Control flow uses `br`, `cbr`, `switch` -- not `if/else/for/while`
+- Variables are SSA locals (`%name`) -- assigned exactly once
+- Functions are `@name` -- always prefixed with `@`
+- Types are `TName` -- user-defined types start with `T`
+- Comments use `;` (not `//` or `#`); doc comments use `;;`
+
+---
+
+## 2) Module Structure
+
+Every `.mp` file must have a strict header in exactly this order:
+
+```mp
+module <module.path>
+exports { <exported symbols> }
+imports { <import groups> }
+digest "<hex string>"
 ```
 
-For CLI usage, global flags must come before subcommands:
+**The order is mandatory.** Swapping any header line causes a parse error (`MPP0002`).
 
-```bash
-cargo run -p magpie_cli -- --entry tests/fixtures/hello.mp --emit mpir,llvm-ir build
+### Minimal template (copy-paste this to start any program)
+
+```mp
+module demo.main
+exports { @main }
+imports { }
+digest "0000000000000000"
+
+fn @main() -> i32 {
+bb0:
+  ret const.i32 0
+}
 ```
 
-Toolchain notes (important for backend/link workflows):
-- `lli` is needed for common `magpie run` LLVM-IR execution flow.
-- `clang` (and often `llc`) is needed for `--emit exe` / native linking.
-- Missing native tools usually surface as link diagnostics such as `MPLINK01` / `MPLINK02`.
-- In `--llm` mode, builds may auto-run formatting unless `--no-auto-fmt`; expect possible source rewrites when this mode is enabled.
+### Exports
 
-CLI path resolution pitfall:
-- `--entry` is resolved relative to the current working directory (CWD), not always the repo root.
-- If a command fails to find sources, check CWD first before changing code.
+List functions (`@name`) and types (`TName`) the module makes visible:
 
-## Coding Style & Naming Conventions
-Workspace is Rust 2021 with MSRV 1.80. Follow standard Rust formatting (`cargo fmt`) and keep code idiomatic: `snake_case` for functions/tests, `PascalCase` for types, `SCREAMING_SNAKE_CASE` for constants.  
-MSRV source of truth is root `Cargo.toml` (`workspace.package.rust-version`) if other docs drift.
-Crate names follow `magpie_*`. Keep crate boundaries clean: avoid cross-crate leakage of responsibilities.  
-For `.mp` sources, keep the header order strict: `module`, `exports`, `imports`, `digest`.
-For user-visible/compiler-emitted output (diagnostics, JSON, graphs, symbol lists), preserve deterministic ordering and canonical forms; avoid introducing iteration-order nondeterminism.
+```mp
+exports { @main, @helper, TPoint }
+```
 
-## Testing Guidelines
-Prefer focused unit tests in crate-local `#[cfg(test)]` modules and end-to-end behavior checks in `tests/integration_test.rs`.  
-Parser output stability is validated with `insta` snapshots in `crates/magpie_parse/src/snapshots/`.  
-When changing language behavior, update or add fixtures under `tests/fixtures/` and run both targeted crate tests and `cargo test --workspace`.
+### Imports
 
-Verification matrix (run what matches your change):
-- Parser/grammar/AST changes: `cargo test -p magpie_parse` and `cargo test --test integration_test`.
-- Driver/codegen/emit changes: `cargo test -p magpie_driver`, plus a fixture build such as  
-  `cargo run -p magpie_cli -- --entry tests/fixtures/feature_harness.mp --emit mpir,llvm-ir --output json build`.
-- CLI behavior/flag parsing changes: `cargo run -p magpie_cli -- --help` and at least one end-to-end command with global flags before subcommands.
-- `.mp` source edits in fixtures/std examples: run `cargo run -p magpie_cli -- fmt --fix-meta` before verification so digest/meta stay canonical.
-- Parser snapshot-affecting changes: run parser snapshot tests and review snapshot updates under `crates/magpie_parse/src/snapshots/`.
+Group imports by source module:
 
-Cross-crate impact checklist:
-- If you change public types/contracts in a crate, run tests for likely dependents (at minimum `magpie_driver` and `magpie_cli`, plus directly affected crates).
-- Do not assume a crate-local green test run is sufficient for workspace-level compiler changes.
+```mp
+imports { std.io::{@println}, util.math::{@sum, TVector} }
+```
 
-Snapshot update policy:
-- Treat snapshot diffs as code changes, not mechanical updates.
-- In PR notes, state why changed snapshots are correct and what behavior changed.
+Use imported functions with their full qualified path in calls:
 
-Preferred staged verification (fast failure localization):
-1. `parse` (syntax/header correctness)
-2. `lint` (policy/quality)
-3. `mpir verify` (IR invariants)
-4. `build` with required emits
+```mp
+call_void std.io.@println { args=[%msg] }
+```
 
-Diagnostic triage rule:
-- Prefer `--output json` for machine-readable diagnostics.
-- Use `cargo run -p magpie_cli -- explain <CODE>` for remediation details.
+### Digest
+
+A hex string for content hashing. Use `"0000000000000000"` as a placeholder during development.
+
+---
+
+## 3) Functions
+
+### Function kinds
+
+```mp
+fn @name(%param: Type) -> ReturnType { ... }
+async fn @name(%param: Type) -> ReturnType { ... }
+unsafe fn @name(%param: Type) -> ReturnType { ... }
+gpu fn @name(%param: Type) -> unit target(msl) { ... }
+```
+
+### Parameters and return types
+
+```mp
+fn @add(%a: i64, %b: i64) -> i64 {
+bb0:
+  %r: i64 = i.add { lhs=%a, rhs=%b }
+  ret %r
+}
+```
+
+Parameters are SSA names (`%name: Type`). Return type follows `->`.
+
+### Meta blocks (optional)
+
+```mp
+fn @compute(%x: i64) -> i64 meta {
+  uses { @helper, @util }
+  effects { io, alloc }
+  cost { time=5, space=2 }
+} {
+bb0:
+  %r: i64 = call @helper { x=%x }
+  ret %r
+}
+```
+
+### Basic blocks and terminators
+
+Every function body contains one or more blocks. Each block has a label (`bbN:`) and ends with exactly one terminator.
+
+```
+bb0:              ; block label (bb followed by a number)
+  <instructions>  ; zero or more SSA assignments or void ops
+  <terminator>    ; exactly one: ret, br, cbr, switch, or unreachable
+```
+
+#### Terminators
+
+| Terminator | Syntax | Description |
+|---|---|---|
+| `ret` | `ret %value` or `ret const.i32 0` | Return a value |
+| `ret` (void) | `ret` | Return unit (for `-> unit` functions) |
+| `br` | `br bb1` | Unconditional branch |
+| `cbr` | `cbr %cond bb_true bb_false` | Conditional branch (`%cond` must be `bool`) |
+| `switch` | `switch %val { case 0 -> bb1 case 1 -> bb2 } else bb3` | Multi-way branch |
+| `unreachable` | `unreachable` | Mark unreachable code path |
+
+#### Branching example
+
+```mp
+fn @abs(%x: i64) -> i64 {
+bb0:
+  %neg: bool = icmp.slt { lhs=%x, rhs=const.i64 0 }
+  cbr %neg bb1 bb2
+
+bb1:
+  %zero: i64 = const.i64 0
+  %r: i64 = i.sub { lhs=%zero, rhs=%x }
+  ret %r
+
+bb2:
+  ret %x
+}
+```
+
+#### Phi nodes (merging values from multiple predecessors)
+
+```mp
+fn @max(%a: i64, %b: i64) -> i64 {
+bb0:
+  %cond: bool = icmp.sgt { lhs=%a, rhs=%b }
+  cbr %cond bb1 bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %result: i64 = phi i64 { [bb1:%a], [bb2:%b] }
+  ret %result
+}
+```
+
+`phi` selects a value based on which predecessor block was taken. **Borrow values cannot appear in phi nodes** (`MPO0102`).
+
+---
+
+## 4) Type System
+
+### 4.1 Primitive types
+
+| Category | Types |
+|---|---|
+| Signed integers | `i1 i8 i16 i32 i64 i128` |
+| Unsigned integers | `u1 u8 u16 u32 u64 u128` |
+| Floats | `f16 f32 f64 bf16` |
+| Boolean | `bool` |
+| Unit | `unit` |
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [magpie-lang/magpie](https://github.com/magpie-lang/magpie) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-24 -->
+<!-- tomevault:4.0:windsurf_rules:2026-06-17 -->
