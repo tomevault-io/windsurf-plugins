@@ -1,44 +1,102 @@
 ---
 trigger: always_on
-description: **Last Updated:** 2026-03-13
+description: Complete API for Google NotebookLM - full programmatic access including features not in the web UI. Create notebooks, add sources, generate all artifact types, download in multiple formats. Activates on explicit /notebooklm or intent like "create a podcast about X
 ---
 
-# Repository Guidelines
 
-**Status:** Active
-**Last Updated:** 2026-03-13
+# NotebookLM Automation
 
-## Project Structure & Module Organization
+Complete programmatic access to Google NotebookLM—including capabilities not exposed in the web UI. Create notebooks, add sources (URLs, YouTube, PDFs, audio, video, images), chat with content, generate all artifact types, and download results in multiple formats.
 
-`src/notebooklm/` contains the async client and typed APIs. Internal feature modules use `_` prefixes such as `_sources.py` and `_artifacts.py`; `src/notebooklm/cli/` holds Click commands, and `src/notebooklm/rpc/` handles protocol encoding and decoding. Tests are split by scope: `tests/unit/`, `tests/integration/`, and `tests/e2e/`. Recorded HTTP fixtures live in `tests/cassettes/`. Examples are in `docs/examples/`, and diagnostics live in `scripts/`.
+## Installation
 
-## Build, Test, and Development Commands
-
-Use `uv` for local work:
-
+**From PyPI (Recommended for AI agents — Python-version-aware):**
 ```bash
-uv sync --extra dev --extra browser
-uv run pytest
-uv run ruff check src/ tests/
-uv run ruff format src/ tests/
-uv run mypy src/notebooklm
-uv run pre-commit run --all-files
+pip install "notebooklm-py[browser]"   # mandatory; errors must propagate
+
+# [cookies] (rookiepy) is optional and known to FAIL TO BUILD on Python 3.13+.
+# Skip it deliberately on 3.13+ rather than swallowing the error — that lets
+# *real* install failures (typos, network, PyPI outages) surface for the agent.
+if python -c "import sys; sys.exit(0 if sys.version_info < (3, 13) else 1)"; then
+    pip install "notebooklm-py[cookies]"   # errors propagate
+else
+    echo "Skipping [cookies] on Python 3.13+ (rookiepy unavailable). Use 'notebooklm login' interactively."
+fi
 ```
 
-Run `uv run pytest tests/e2e -m readonly` only after `notebooklm login` and setting test notebook env vars.
+> Full install matrix (extras, headless servers, contributor flow): [Installation guide on GitHub](https://github.com/teng-lin/notebooklm-py/blob/main/docs/installation.md).
 
-## Coding Style & Naming Conventions
+**From GitHub (use latest release tag, NOT main branch):**
+```bash
+# Get the latest release tag (requires curl + jq)
+if ! command -v jq >/dev/null; then
+    echo "jq is required to read the latest release tag" >&2
+    exit 1
+fi
+LATEST_TAG=$(
+    curl -fsSL https://api.github.com/repos/teng-lin/notebooklm-py/releases/latest |
+    jq -r '.tag_name'
+)
+# Includes [browser] so the interactive `notebooklm login` flow works.
+pip install "notebooklm-py[browser] @ git+https://github.com/teng-lin/notebooklm-py@${LATEST_TAG}"
+```
 
-Target Python 3.10+, 4-space indentation, and double quotes. Ruff enforces formatting and import order with a 100-character line length. Keep module and test file names in `snake_case`; prefer descriptive Click command names that match existing groups such as `source`, `artifact`, and `research`. Preserve the internal/public split: `_*.py` for implementation, exported types in `src/notebooklm/__init__.py`.
+⚠️ **DO NOT install from main branch** (`pip install git+https://github.com/teng-lin/notebooklm-py`). The main branch may contain unreleased/unstable changes. Always use PyPI or a specific release tag, unless you are testing unreleased features.
 
-## Testing Guidelines
+**Skill install methods:**
 
-Put pure logic in `tests/unit/`, VCR-backed flows in `tests/integration/`, and authenticated NotebookLM coverage in `tests/e2e/`. Name tests `test_<behavior>.py` and record cassettes with `NOTEBOOKLM_VCR_RECORD=1 uv run pytest tests/integration/test_vcr_*.py -v`. Coverage is expected to stay at or above the configured 90% threshold.
+- `notebooklm skill install` installs this skill into the supported local agent directories managed by the CLI.
+- `npx skills add teng-lin/notebooklm-py` installs this skill from the GitHub repository into compatible agent skill directories.
+- If you are already reading this file inside an agent skill directory, the skill is already installed. You only need the Python package and authentication below.
 
-## Commit, PR, and Agent Notes
+**CLI-managed install:**
+```bash
+notebooklm skill install
+```
 
-Follow the existing commit style: `feat(cli): ...`, `fix(cli): ...`, `refactor(test): ...`, `style: ...`. PRs should include a short summary, linked issue when relevant, and the commands run locally. For Codex or other parallel agents, prefer `--json`, pass explicit notebook IDs instead of relying on `notebooklm use`, and isolate runs with `NOTEBOOKLM_HOME=/tmp/<agent-id>` when multiple agents share one machine.
+## Prerequisites
+
+**IMPORTANT:** Before using any command, you MUST authenticate:
+
+```bash
+notebooklm login          # Opens browser for Google OAuth
+notebooklm list           # Verify authentication works
+```
+
+If commands fail with authentication errors, re-run `notebooklm login`.
+
+### CI/CD, Multiple Accounts, and Parallel Agents
+
+For automated environments, multiple accounts, or parallel agent workflows:
+
+| Variable | Purpose |
+|----------|---------|
+| `NOTEBOOKLM_HOME` | Custom config directory (default: `~/.notebooklm`) |
+| `NOTEBOOKLM_PROFILE` | Active profile name (default: `default`) |
+| `NOTEBOOKLM_AUTH_JSON` | Inline auth JSON - no file writes needed |
+
+**CI/CD setup:** Set `NOTEBOOKLM_AUTH_JSON` from a secret containing your `storage_state.json` contents.
+
+**Multiple accounts:** Use named profiles (`notebooklm profile create work`, then `notebooklm -p work login`). Alternatively, use different `NOTEBOOKLM_HOME` directories per account.
+
+**Parallel agents:** The CLI stores notebook context per profile (`~/.notebooklm/profiles/<profile>/context.json`, with a legacy fallback to `~/.notebooklm/context.json` for the implicit default profile). Multiple concurrent agents that share a profile and use `notebooklm use` can overwrite each other's context — use one of the isolation strategies below.
+
+**Solutions for parallel workflows:**
+1. **Always use explicit notebook ID** (recommended): Pass `-n <notebook_id>` / `--notebook <notebook_id>` on notebook-scoped commands instead of relying on `use`
+2. **Per-agent isolation via profiles:** `export NOTEBOOKLM_PROFILE=agent-$ID` (each profile gets its own context file)
+3. **Per-agent isolation via home:** Set unique `NOTEBOOKLM_HOME` per agent: `export NOTEBOOKLM_HOME=/tmp/agent-$ID`
+4. **Use full UUIDs:** Avoid partial IDs in automation (they can become ambiguous)
+
+## Agent Setup Verification
+
+Before starting workflows, verify auth is in place. **Use `--test --json` (not bare `--json`)** — bare `--json` only proves the cookie file parses; `--test` makes a network call and proves the cookies still authenticate against Google.
+
+1. `notebooklm auth check --test --json` → require BOTH `"status": "ok"` AND `"checks.token_fetch": true`. Bare `"status": "ok"` (without `--test`) is a false-positive trap — a stale cookie file passes the parse check.
+2. `notebooklm list --json` → expect valid JSON (may be empty for new accounts).
+3. **If auth fails or is missing → run `notebooklm login` first.** This is the primary auth path: opens a browser, the user signs in to Google once, and the resulting `storage_state.json` is reused on every subsequent run. Works on any environment with a display.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [teng-lin/notebooklm-py](https://github.com/teng-lin/notebooklm-py) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-20 -->
+<!-- tomevault:4.0:windsurf_rules:2026-06-17 -->
