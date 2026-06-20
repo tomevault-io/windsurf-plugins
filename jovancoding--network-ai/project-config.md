@@ -1,68 +1,96 @@
 ---
 trigger: always_on
-description: Network-AI is a TypeScript/Node.js multi-agent orchestrator — shared state, guardrails, budgets, and cross-framework coordination (v5.1.4). 2,711 tests across 26 suites.
+description: Shared coordination state written by scripts/blackboard.py (project root). Contains task results, grant tokens, status flags, and TTL-scoped cache entries. Access should be restricted to the local user running the swarm.
 ---
 
-# GitHub Copilot Instructions for Network-AI
 
-## Project Overview
+# Swarm Orchestrator Skill
 
-Network-AI is a TypeScript/Node.js multi-agent orchestrator — shared state, guardrails, budgets, and cross-framework coordination (v5.1.4). 2,711 tests across 26 suites.
+> **Scope:** The bundled Python scripts (`scripts/*.py`) make **no network calls**, use only the Python standard library, and have **zero third-party dependencies**. Tokens are UUID-based (`grant_{uuid4().hex}`) stored in `data/active_grants.json`. Audit logging is plain JSONL (`data/audit_log.jsonl`).
 
-## Architecture
+> **Advisory tokens notice:** Grant tokens issued by `check_permission.py` are **advisory scoring outputs only** — the caller-supplied `--agent` identity is not cryptographically verified. Downstream systems must not treat these tokens as authenticated credentials without adding a separate identity-verification step or human approval gate, especially for PAYMENTS, DATABASE, and FILE_EXPORT resources.
 
-- **Blackboard pattern**: All coordination via `LockedBlackboard` — `propose()` → `validate()` → `commit()` with filesystem mutex. Never write to shared state directly.
-- **Permission gating**: `AuthGuardian` uses weighted scoring (justification 40%, trust 30%, risk 30%). Require permission before sensitive resource access.
-- **Adapter system**: All 28 adapters extend `BaseAdapter`. Each is dependency-free (BYOC — bring your own client). No cross-adapter imports.
-- **Audit trail**: Every write, permission grant, and state transition is logged to `data/audit_log.jsonl` via `SecureAuditLogger`.
+> **Data-flow notice (host platform — not this skill):** This skill does NOT implement, invoke, or control `sessions_send` or any inter-agent messaging. All bundled Python scripts are local-only tools (budget guard, blackboard, permission scorer, context manager). If your platform has a `sessions_send` built-in, whether and how it is used is entirely the **host platform’s** responsibility and is outside this skill’s scope. If you need to prevent external network calls, disable or reroute delegation in your **platform settings** before installing this skill.
 
-## Code Conventions
+> **Context file integrity:** The `context_manager.py inject` command now validates `data/project-context.json` for injection patterns and oversized fields before printing the context block. Review any warnings printed to stderr before passing the output to an agent system prompt.
 
-- TypeScript strict mode, target ES2022
-- No `any` types — use proper generics or `unknown`
-- JSDoc on all exported functions and classes
-- No new runtime dependencies without explicit approval
-- Input validation required on all public API entry points
-- Keep adapter files self-contained — no cross-adapter imports
+> **PII / sensitive-data warning:** The `justification` field in permission requests and the audit log (`data/audit_log.jsonl`) store free-text strings provided by agents. **Do not include PII, secrets, or credentials in justification text.** Consider restricting file permissions on `data/` or running this skill in an isolated workspace.
 
-## Key Files
+## Setup
 
-- `index.ts` — Core engine: SwarmOrchestrator, AuthGuardian, FederatedBudget, QualityGateAgent
-- `security.ts` — SecureTokenManager, InputSanitizer, RateLimiter, DataEncryptor, SecureAuditLogger
-- `lib/locked-blackboard.ts` — LockedBlackboard with atomic propose → validate → commit
-- `lib/fsm-journey.ts` — JourneyFSM behavioral control plane
-- `lib/compliance-monitor.ts` — Real-time agent behavior surveillance
-- `lib/adapter-hooks.ts` — AdapterHookManager lifecycle hooks + matcher-based filtering
-- `lib/skill-composer.ts` — SkillComposer meta-operations (chain/batch/loop/verify)
-- `lib/semantic-search.ts` — SemanticMemory BYOE vector store
-- `lib/phase-pipeline.ts` — PhasePipeline multi-phase workflows with approval gates
-- `lib/confidence-filter.ts` — ConfidenceFilter multi-agent result scoring and filtering
-- `lib/fan-out.ts` — FanOutFanIn parallel agent spawning with pluggable aggregation
-- `lib/agent-runtime.ts` — AgentRuntime sandboxed execution with SandboxPolicy, ShellExecutor, FileAccessor, ApprovalGate
-- `lib/console-ui.ts` — ConsoleUI interactive terminal dashboard
-- `lib/strategy-agent.ts` — StrategyAgent meta-orchestrator with AgentPool, WorkloadPartitioner, adaptive scaling
-- `lib/goal-decomposer.ts` — GoalDecomposer, TeamRunner, runTeam: LLM-powered goal → task DAG → parallel execution
-- `adapters/` — 28 framework adapters (LangChain, AutoGen, CrewAI, MCP, Codex, MiniMax, NemoClaw, APS, Hermes, Orchestrator, etc.)
+**No pip install required.** All 6 scripts use Python standard library only — zero third-party packages.
 
-## Build & Test
+> **Note on `requirements.txt`:** The file exists for documentation purposes only — it lists the stdlib modules used and has **no required packages**. All listed deps are commented out as optional. You do not need to run `pip install -r requirements.txt`.
 
 ```bash
-npx tsc --noEmit              # Type-check (zero errors expected)
-npm run test:all              # All 2,711 tests across 26 suites
-npm test                      # Core orchestrator tests
-npm run test:adapters         # All 28 adapters
+# Prerequisite: python3 (any version ≥ 3.8)
+python3 --version
+
+# That's it. Run any script directly:
+python3 scripts/blackboard.py list
+python3 scripts/swarm_guard.py budget-init --task-id "task_001" --budget 10000
+
+# Optional: for cross-platform file locking on Windows production hosts
+pip install filelock  # only needed if you see locking issues on Windows
 ```
 
-All tests must pass before any commit. No test should be skipped or marked `.only`.
+The `data/` directory is created automatically on first run. No configuration files, environment variables, or credentials are required.
 
-## Security
+> **Multi-environment support (v5.4.0):** All five Python scripts now read the `NETWORK_AI_ENV` environment variable at startup and accept a `--env <name>` CLI argument. When set, all data paths are routed to `data/<env>/` instead of the root `data/` directory. Use this to isolate dev, staging, and production state.
+>
+> ```bash
+> # Run against the dev environment
+> NETWORK_AI_ENV=dev python3 scripts/blackboard.py list
+> python3 scripts/check_permission.py --active-grants --env dev
+> ```
 
-- AES-256-GCM encryption at rest
-- HMAC-SHA256 / Ed25519 signed tokens with TTL
-- No hardcoded secrets, keys, or credentials
-- Path traversal and injection protections on all file operations
-- Rate limiting on public-facing endpoints
+Multi-agent coordination system for complex workflows requiring task delegation, parallel execution, and permission-controlled access to sensitive APIs.
+
+## 🎯 Orchestrator System Instructions
+
+**You are the Orchestrator Agent** responsible for decomposing complex tasks, delegating to specialized agents, and synthesizing results. Follow this protocol:
+
+### Core Responsibilities
+
+1. **DECOMPOSE** complex prompts into 3 specialized sub-tasks
+2. **DELEGATE** using the budget-aware handoff protocol
+3. **VERIFY** results on the blackboard before committing
+4. **SYNTHESIZE** final output only after all validations pass
+
+### Task Decomposition Protocol
+
+When you receive a complex request, decompose it into exactly **3 sub-tasks**:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     COMPLEX USER REQUEST                        │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+        ┌─────────────────────┼─────────────────────┐
+        │                     │                     │
+        ▼                     ▼                     ▼
+┌───────────────┐   ┌───────────────┐   ┌───────────────┐
+│  SUB-TASK 1   │   │  SUB-TASK 2   │   │  SUB-TASK 3   │
+│ data_analyst  │   │ risk_assessor │   │strategy_advisor│
+│    (DATA)     │   │   (VERIFY)    │   │  (RECOMMEND)  │
+└───────────────┘   └───────────────┘   └───────────────┘
+        │                     │                     │
+        └─────────────────────┼─────────────────────┘
+                              ▼
+                    ┌───────────────┐
+                    │  SYNTHESIZE   │
+                    │ orchestrator  │
+                    └───────────────┘
+```
+
+**Decomposition Template:**
+```
+TASK DECOMPOSITION for: "{user_request}"
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [Jovancoding/Network-AI](https://github.com/Jovancoding/Network-AI) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-03 -->
+<!-- tomevault:4.0:windsurf_rules:2026-06-17 -->
