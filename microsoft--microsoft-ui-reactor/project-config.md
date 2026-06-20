@@ -1,118 +1,116 @@
 ---
 trigger: always_on
-description: Reactor is a declarative, component-based C# framework for building WinUI 3 desktop apps. It renders real WinUI controls via a virtual element tree and reconciler — similar to React's programming model but targeting native Windows UI.
+description: >
 ---
 
-# Copilot Instructions — Microsoft.UI.Reactor
 
-Reactor is a declarative, component-based C# framework for building WinUI 3 desktop apps. It renders real WinUI controls via a virtual element tree and reconciler — similar to React's programming model but targeting native Windows UI.
+# Reactor — Getting Started
 
-## Build, Test, Lint
+> **Prefer the plugin.** This file is preserved for environments that don't
+> support the Copilot CLI / Claude plugin loading model. If you have a plugin
+> SDK available, install / load the `reactor` plugin (under
+> `plugins/reactor/` in source, or `agentkit/plugins/reactor/` in the NuGet).
+> The plugin splits this content into focused per-skill files and is materially
+> cheaper to load than this monolith.
 
-```bash
-# Build (platform defaults to machine arch for apps; libraries are AnyCPU)
-dotnet build Reactor.slnx
 
-# Unit tests — xUnit, headless, fast (~2200 tests incl. 590 Yoga fixtures)
-dotnet test tests/Reactor.Tests
 
-# Single test class
-dotnet test tests/Reactor.Tests --filter "FullyQualifiedName~ReconcilerMountUpdateTests"
+Reactor is a **React-inspired functional projection for WinUI 3**. You write
+functions that return lightweight element descriptions; a reconciler diffs
+old vs new trees and patches real WinUI controls. State changes trigger
+re-renders automatically. No XAML. No data binding. No ViewModels.
 
-# Selftests — real WinUI window, in-process (~10s)
-dotnet test tests/Reactor.SelfTests
+## Which mode are you in? (read this first)
 
-# Raw TAP output (faster iteration, supports --filter prefix)
-dotnet run --project tests/Reactor.AppTests.Host -- --self-test --filter "Flex"
+Reactor ships as a NuGet package — apps reference it as
+`<PackageReference Include="Microsoft.UI.Reactor" Version="…" />` (or
+`#:package Microsoft.UI.Reactor@…` for single-file). The package carries
+the framework, the analyzers, and an **agent kit** (signatures index +
+this SKILL.md). Two paths:
 
-# E2E — Appium/WinAppDriver (requires WinAppDriver installed)
-dotnet test tests/Reactor.AppTests
+| Mode | How to detect | Bootstrap |
+|---|---|---|
+| **Selfhost** — you're in a Reactor source clone (`src/Reactor/Reactor.csproj` exists) | The repo's `local-nupkgs/` folder is the package source — see `nuget.config` at repo root. | Build `mur` once, then **`mur pack-local`** to populate `local-nupkgs/Microsoft.UI.Reactor.0.0.0-local.nupkg`. Re-run after framework changes. |
+| **Consumer** — you're in an app that depends on Microsoft.UI.Reactor | No `src/Reactor/` next to your project. | Nothing extra — the package already carries the analyzers and agent kit. If `mur` is on PATH, `mur --skill` and `mur --api` print the embedded docs. Otherwise read `<package-cache>/microsoft.ui.reactor/<version>/agentkit/`. |
 
-# Single E2E class
-dotnet test tests/Reactor.AppTests --filter "ClassName=Reactor.AppTests.Tests.AccessibilityTests"
+If you're in selfhost and `local-nupkgs/` is empty, restore will fail with
+"package Microsoft.UI.Reactor 0.0.0-local was not found." Run `mur pack-local`
+to fix it.
+
+### Bootstrap (selfhost, fresh clone)
+
+```powershell
+# Build the CLI; on first build the SignaturesGen project also writes
+# skills/reactor.api.txt as part of its AfterBuild target.
+dotnet build src/Reactor.Cli -p:Platform=ARM64
+
+# `mur` mirrors itself to <repo>/bin/<arch>/. Add that to PATH or invoke directly.
+.\bin\arm64\mur.exe pack-local
 ```
 
-CI runs unit tests + selftests + full solution build on every PR. .NET 10 SDK, `windows-latest` runner.
+After this, any project under the clone resolves
+`Microsoft.UI.Reactor 0.0.0-local` from `local-nupkgs/` automatically (the
+repo-level `nuget.config` configures it). A consumer **outside** the clone
+needs a project-local `nuget.config` pointing at the absolute path of
+`<repo>/local-nupkgs/`.
 
-Full testing guide — tier selection, NativeAOT runs, code coverage — in [`TESTING.md`](TESTING.md).
+## Where to find docs (`mur --skill`, `mur --api`)
 
-## Architecture
+The `mur` CLI ships these embedded — works from any directory:
 
-### Virtual DOM model
+| Command | What it prints | Source |
+|---|---|---|
+| `mur --skill` | This SKILL.md | embedded in `mur` |
+| `mur --api`   | The signatures index (≈12K tokens, every factory/modifier/hook/Theme token/enum) | embedded in `mur` |
+| `mur --regen-api` | Rebuilds `skills/reactor.api.txt` from a freshly-built `Reactor.dll` (selfhost only) | rebuilds `tools/Reactor.SignaturesGen` |
+| `mur check <path>` | **Is** the build (same exit code as `dotnet build`); adds one-line diagnostics with skill pointers for known REACTOR_* IDs and `→ try:` did-you-mean suggestions | wraps MSBuild |
 
-UI is described as **immutable C# records** (`Element` subclasses), not WinUI controls. The reconciler diffs old vs. new element trees and patches only what changed on real controls.
+A consumer who doesn't have `mur` can read the same files directly from the
+NuGet cache:
 
 ```
-Component.Render() → Element tree (records)
-                        ↓
-                   Reconciler
-                   ├── Mount  → creates WinUI controls
-                   └── Update → diffs & patches controls
+%USERPROFILE%\.nuget\packages\microsoft.ui.reactor\<version>\agentkit\
+├─ SKILL.md                  ← this file
+├─ reactor.api.txt           ← signatures index
+└─ skills\
+   ├─ async.md, design.md, commanding.md, navigation.md, forms.md,
+   │  input.md, charts.md, dsl-reference.md, devtools.md, perf-tips.md
+   └─ recipes\
+      ├─ index.md            ← intent → recipe map
+      └─ <name>.cs           ← paste-ready single-file programs
 ```
 
-### Reconciler is split across partial classes
+When SKILL.md or a recipe references `skills/foo.md`, a consumer agent
+reads it from `agentkit/skills/foo.md` in the package cache. Selfhost
+agents read it from `<repo>/skills/foo.md`.
 
-- `Reconciler.cs` — orchestration, child reconciliation, unmount, helpers
-- `Reconciler.Mount.cs` — `MountXxx()` handler per control type
-- `Reconciler.Update.cs` — `UpdateXxx()` handler per control type
+## API signatures index — load this before grepping source
 
-### Hooks follow React rules
+[`skills/reactor.api.txt`](skills/reactor.api.txt) is a generated, alphabetized
+flat list of every public Factory, Modifier, Hook, Theme token (with WinUI
+resource key), and enum in Reactor. **Load this when you need to confirm a
+signature.** It replaces grepping `src/Reactor/Elements/*.cs` and walking the
+sub-skills' tables.
 
-Hooks (`UseState`, `UseEffect`, `UseReducer`, `UseMemo`, etc.) are tracked by call order in `RenderContext`. They must be called unconditionally, in the same order every render — no conditional hooks. Pass `threadSafe: true` for cross-thread state updates.
+- **Local / selfhost:** the file is committed at `skills/reactor.api.txt`.
+  Run `mur --api` to print it. Run `mur --regen-api` after framework changes.
+- **NuGet consumer:** the same file ships in the package at
+  `<package-cache>/microsoft.ui.reactor/<version>/agentkit/reactor.api.txt`
+  (typically `%USERPROFILE%\.nuget\packages\microsoft.ui.reactor\<version>\agentkit\reactor.api.txt`).
+  If `mur` is on PATH, `mur --api` prints the embedded copy.
 
-### Echo suppression for value controls
+## Recipes — paste-ready snippets indexed by intent
 
-Echo handling is a documented hybrid (spec-047 §8.3). Synchronous, exact-comparable, single-controlled-value round-trips (ComboBox, FlipView, GridView, ListBox, Pivot, PipsPager, RadioButtons, SelectorBar, TabView, TemplatedFlipView, ToggleSwitch, TextBox) use a value-diff arm (`ReactorState.PendingEchoMatch` + `ArmExpectedEcho`/`ShouldSuppressEcho`, opt-in `valueDiffEcho`). `ChangeEchoSuppressor` is **retained** as the suppress-counter fallback for the rest: doubles (Slider/NumberBox value), NumberBox coercion, CalendarView collection diff, deferred/coercion strings (AutoSuggest/Password/RichEdit), Expander, CheckBox path-B, the `ApplySetters` suppression scope, and the public `WriteSuppressed` primitive. Authors keep using the stable `WriteSuppressed` primitive (or declare `.Controlled` / `valueDiffEcho` on a descriptor) — never the suppressor directly.
+[`skills/recipes/`](skills/recipes/) holds compilable single-file recipes for
+the most common Reactor patterns. **Load a recipe instead of synthesizing
+from skill prose.** See [`skills/recipes/index.md`](skills/recipes/index.md)
+for the intent → recipe map. Available today: list-add-delete, sidebar-nav,
+form-with-validation, async-fetch-list, themed-card, canvas-positioning,
+named-styles, calendar-multiselect.
 
-### Element pooling
-
-`ElementPool` recycles WinUI controls. Poolable types track one-time event wiring via `ConditionalWeakTable<FrameworkElement, PoolableWireFlags>` to avoid double-subscribing across rent/return cycles.
-
-### Per-element state via attached DP
-
-`ReactorAttached.StateProperty` stores `ReactorState` (Element pointer + `ModifierEventHandlerState` — the routed-input family, lazily allocated — + per-control `ControlEventStateBox` for control-intrinsic events) on native elements — not `FrameworkElement.Tag` or a CWT.
-
-## Key Conventions
-
-### Elements are immutable records
-
-```csharp
-public record MyControlElement(string Label, Action? OnClick = null) : Element;
-```
-
-Use `with` expressions for variations. Never mutate.
-
-### Factory methods over constructors
-
-The DSL entry point is `using static Microsoft.UI.Reactor.Factories;`. Factory methods return Element records, never WinUI controls:
-
-```csharp
-TextBlock("hello")       // not new TextBlockElement("hello")
-Button("+", () => ...)   // not new ButtonElement(...)
-VStack(child1, child2)   // layout containers
-```
-
-`Factories` is `public static partial class` — factory methods can be added from multiple files.
-
-### Fluent modifiers preserve concrete types
-
-Extension methods use `<T> where T : Element` to maintain the concrete type through chains:
-
-```csharp
-Text("Hello").Bold().Margin(16).Set(tb => tb.TextWrapping = TextWrapping.Wrap)
-// Still TextBlockElement throughout the chain
-```
-
-### Adding a new WinUI control
-
-The legacy Element-record + `MountXxx`/`UpdateXxx` dispatch-switch path is gone. The current path:
-
-1. **Element record** in `src/Reactor/Core/Element.cs`
-2. **Authoring shape** — a `ControlDescriptor<TElement, TControl>` (the primary path) or a hand-coded `IElementHandler<TElement, TControl>` for irregular controls.
-3. **Register** it in `RegisterV1BuiltInHandlers`.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [microsoft/microsoft-ui-reactor](https://github.com/microsoft/microsoft-ui-reactor) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-14 -->
+<!-- tomevault:4.0:windsurf_rules:2026-06-17 -->
