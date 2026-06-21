@@ -1,0 +1,105 @@
+---
+trigger: always_on
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+---
+
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## The Spirit of Nudge
+
+Nudge is a **collaborative partner**, not a rule enforcer. It helps you remember coding conventions so you can focus on the user's actual problem. Internalize these points:
+
+1. **Nudge is on your side.** When it sends a message, that's a colleague tapping your shoulder, not a reprimand.
+2. **Direct does not mean hostile.** Messages are blunt because that's what cuts through when you're focused. Trust the feedback.
+3. **Don't route around it.** If you're tempted to work around a Nudge message, pause. Either follow the rule, or flag that the rule needs fixing.
+
+For the full philosophy (why Nudge exists, the "collaborative memory layer" framing, the rally copilot analogy), see [README.md](README.md).
+
+### Working on Nudge Itself
+
+Nudge is dogfooded here. Your experience using it is direct feedback:
+
+- **Rule feels unclear?** That's signal to improve the wording. Mention it.
+- **Rule feels wrong?** Let's fix the rule, not route around it.
+
+## Build and Test Commands
+
+```bash
+# Build
+cargo build -p nudge
+
+# Run all tests
+cargo test -p nudge
+
+# Run a specific test
+cargo test -p nudge test_name
+
+# Run the CLI
+cargo run -p nudge -- claude hook      # Respond to Claude hook (reads JSON from stdin)
+cargo run -p nudge -- claude setup     # Install hooks, bundled skills, and commands for Claude
+cargo run -p nudge -- claude skills install # Install the bundled Claude skills
+cargo run -p nudge -- codex hook       # Respond to Codex hook (reads JSON from stdin)
+cargo run -p nudge -- codex setup      # Install hooks and bundled skills for Codex
+cargo run -p nudge -- codex skills install # Install the bundled Codex skills
+cargo run -p nudge -- learn add        # Record a repo-local learned incident note
+cargo run -p nudge -- learn search     # Search learned incident notes
+cargo run -p nudge -- learn embeddings # Manage local learned-note embeddings
+cargo run -p nudge -- test             # Test a rule against sample input
+cargo run -p nudge -- validate         # Validate rule config files
+cargo run -p nudge -- check            # Check project files against rules (for CI)
+```
+
+## Architecture
+
+### CLI Structure
+
+```
+nudge claude hook   - Receives hook JSON on stdin, evaluates rules, outputs response
+nudge claude setup  - Writes hook configuration and installs the bundled skills and commands for Claude
+nudge claude skills install - Installs the bundled skills into .claude/skills
+nudge codex hook    - Receives hook JSON on stdin, evaluates rules, outputs response
+nudge codex setup   - Writes hook configuration and installs the bundled skills for Codex
+nudge codex skills install - Installs the bundled skills into .agents/skills
+nudge learn add     - Record a repo-local learned incident note in .nudge/learned
+nudge learn list    - List repo-local learned incident notes
+nudge learn search  - Search learned incident notes with BM25 or configured local embeddings
+nudge learn embeddings - Enable, rebuild, or inspect local learned-note embeddings
+nudge test          - Test a specific rule against sample input
+nudge validate      - Validate and display parsed rule configs
+nudge check         - Check project files against rules (CI/linter mode)
+```
+
+### Module Layout
+
+- `src/main.rs` - CLI entry point using clap
+- `src/agent.rs` - Provider adapters for Claude Code and Codex CLI
+- `src/hook.rs` - Normalized hook event model
+- `src/hook/evaluate.rs` - Provider-neutral rule evaluation
+- `src/hook/response.rs` - Provider-specific response rendering
+- `src/hook/apply_patch.rs` - Codex apply_patch normalization
+- `src/learn.rs` - Repo-local learned incident notes and BM25 retrieval
+- `src/learn/embeddings.rs` - Local FastEmbed embedding cache and hybrid retrieval
+- `src/skills.rs` - Bundled skill and Claude command assets plus installation helpers
+- `src/cmd/command_install.rs` - Shared command/prompt install reporting
+- `src/cmd/claude/hook.rs` - Hook command: deserializes input, evaluates rules, emits response
+- `src/cmd/claude/setup.rs` - Setup command: configures hooks in settings.local.json
+- `src/cmd/claude/skills.rs` - Skills command: installs the bundled skills into .claude/skills
+- `src/cmd/codex/hook.rs` - Hook command: deserializes input, evaluates rules, emits response
+- `src/cmd/codex/setup.rs` - Setup command: configures hooks in hooks.json
+- `src/cmd/codex/skills.rs` - Skills command: installs the bundled skills into .agents/skills
+- `src/cmd/learn.rs` - CLI for adding, listing, and searching learned notes
+- `src/cmd/test.rs` - Test command: test a rule against sample input
+- `src/cmd/validate.rs` - Validate command: parse and display rule configs
+- `src/cmd/check.rs` - Check command: validate project files against rules for CI
+- `packages/nudge/skills/nudge/` - Source files for the bundled Nudge router skill compiled into the binary
+- `packages/nudge/skills/nudge-learnings/` - Source files for the bundled Nudge learnings skill compiled into the binary
+- `packages/nudge/commands/` - Source files for bundled Claude Nudge slash commands compiled into the binary
+- `src/rules.rs` - Rule loading from config files
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [attunehq/nudge](https://github.com/attunehq/nudge) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-06-21 -->
