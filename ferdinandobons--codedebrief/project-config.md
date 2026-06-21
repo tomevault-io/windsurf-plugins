@@ -1,8 +1,7 @@
 ---
 trigger: always_on
-description: Keep CodeDebrief synchronized
+description: <!-- codedebrief:instructions:start -->
 ---
-
 
 <!-- codedebrief:instructions:start -->
 ## CodeDebrief
