@@ -7,11 +7,11 @@ A beautiful, zero-config terminal system monitor for macOS
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [hyf0/machud](https://github.com/hyf0/machud).
+Original source: `CLAUDE.md` in [hyf0/machud](https://github.com/hyf0/machud).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
