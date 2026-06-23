@@ -7,11 +7,11 @@ Unified Lua5.x/LuaJIT/Luau bindings for .NET and Unity
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [nuskey8/NuLua](https://github.com/nuskey8/NuLua).
+Original source: `CLAUDE.md` in [nuskey8/NuLua](https://github.com/nuskey8/NuLua).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
