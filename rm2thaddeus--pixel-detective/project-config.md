@@ -1,197 +1,141 @@
 ---
 trigger: always_on
-description: These testing patterns specifically target the 5 critical failure modes identified in Sprint 10.
+description: when asked to use MCP tools, follow the below guidelines
 ---
 
-# Sprint 10 Testing Patterns - Prevention Through Testing
 
-## 🎯 GOAL: Catch Sprint 10 Issues Before They Become Problems
+# MCP Interaction Rule for Pixel Detective
 
-These testing patterns specifically target the 5 critical failure modes identified in Sprint 10.
+**Repository:** [Pixel_Detective](mdc:https:/github.com/rm2thaddeus/Pixel_**Branches:**
+- main
+- development
 
-### 🔥 HYDRATION ERROR TESTING
+## Available MCP Servers & Capabilities
 
-#### Pre-Commit Hydration Testing
+### 1. **GitHub MCP (`mcp_github_*`)**
+- **Primary Use**: Version control, repository management, collaboration workflows
+- **Capabilities**:
+  - Search code, repositories, commits, issues, and PRs
+  - Read, create, update, or delete files
+  - Manage issues (create, list, comment, update) and pull requests (create, list, merge, update)
+  - Manage branches and tags
+- **When to Use**: All code commits, file operations, issue tracking, PR management
+
+### 2. **Supabase MCP (`mcp_supabase_*`)**
+- **Primary Use**: Database interactions, backend data management
+- **Capabilities**:
+  - Execute raw SQL queries
+  - Manage database schemas, tables, and data (CRUD operations)
+  - Seed databases and perform migrations/rollbacks
+- **When to Use**: Database schema changes, data seeding, backend data operations
+
+### 3. **Browser Tools MCP (`mcp_browser-tools_*`)**
+- **Primary Use**: Frontend debugging, web analysis, performance optimization
+- **Capabilities**:
+  - Capture console logs (standard and errors) and network logs
+  - Take screenshots for visual debugging
+  - Run comprehensive audits (accessibility, performance, SEO, best practices, Next.js)
+  - Wipe logs for clean debugging sessions
+- **When to Use**: Debugging frontend issues, performance analysis, accessibility compliance
+
+#### **Browser Tools MCP Setup & Troubleshooting**
+
+**⚠️ CRITICAL SETUP REQUIREMENTS:**
+Browser Tools MCP requires **three components** to function properly:
+
+1. **Chrome Extension** - Captures browser data
+2. **Browser Tools Server** - Node.js middleware (port 3025)
+3. **Browser Tools MCP** - The MCP server itself
+
+**Setup Verification Steps:**
 ```bash
-# MANDATORY before any theme/client-side commits
-#!/bin/bash
-echo "🧪 Testing for hydration issues..."
+# 1. Check Node.js version (requires v18+)
+node --version
 
-# 1. Production build test (catches 90% of hydration issues)
-npm run build
-if [ $? -ne 0 ]; then
-  echo "❌ Build failed - fix before committing"
-  exit 1
-fi
+# 2. Start Browser Tools Server
+npx @agentdeskai/browser-tools-server@latest
 
-# 2. Start production server and test both themes
-npm start &
-SERVER_PID=$!
-sleep 5
-
-# 3. Check for hydration errors in browser console
-# Use Browser Tools MCP if available
-mcp_browser-tools_takeScreenshot || echo "⚠️ MCP not available, manual test required"
-
-kill $SERVER_PID
-echo "✅ Hydration test complete"
+# 3. Verify server is running
+netstat -an | findstr 3025  # Windows
+# or
+lsof -i :3025  # Mac/Linux
 ```
 
-#### Component-Level Hydration Testing
-```tsx
-// Test file: __tests__/hydration.test.tsx
-import { renderToString } from 'react-dom/server';
-import { render } from '@testing-library/react';
+**Chrome Extension Installation:**
+1. Clone repository: `git clone https://github.com/AgentDeskAI/browser-tools-mcp.git`
+2. Open Chrome → `chrome://extensions/`
+3. Enable "Developer mode"
+4. Click "Load unpacked"
+5. Select folder: `browser-tools-mcp/chrome-extension`
+6. Verify "BrowserToolsMCP" appears in extensions
 
-describe('Hydration Safety', () => {
-  test('Theme Provider renders consistently', () => {
-    const ThemeWrapper = ({ children }) => (
-      <ChakraProvider theme={theme}>{children}</ChakraProvider>
-    );
-    
-    // Server render
-    const serverHTML = renderToString(<ThemeWrapper><App /></ThemeWrapper>);
-    
-    // Client render
-    const { container } = render(<ThemeWrapper><App /></ThemeWrapper>);
-    
-    // Should match (simplified check)
-    expect(container.innerHTML).toContain('expected-theme-class');
-  });
-  
-  test('No browser APIs in initial render', () => {
-    // Mock browser APIs to undefined
-    Object.defineProperty(window, 'localStorage', { value: undefined });
-    Object.defineProperty(window, 'innerWidth', { value: undefined });
-    
-    // Should not throw during render
-    expect(() => {
-      render(<App />);
-    }).not.toThrow();
-  });
-});
-```
+**Connection Verification:**
+1. Open any webpage (e.g., https://example.com)
+2. Open Chrome DevTools (F12)
+3. Look for "BrowserTools" tab in DevTools
+4. Verify connection status shows "Connected"
 
-### 🔥 CIRCULAR IMPORT TESTING
+**Common Error Patterns:**
+- `"Failed to discover browser connector server"` → Browser Tools Server not running
+- `"Chrome extension not connected"` → Extension not installed or not connected
+- `"Error taking screenshot"` → Extension installed but not connected to active tab
 
-#### Backend Import Validation
-```python
-# backend/tests/test_imports.py
-import ast
-import os
-from pathlib import Path
-
-def test_no_main_imports_in_routers():
-    """Ensure routers never import from main.py"""
-    router_dir = Path("backend/routers")
-    violations = []
-    
-    for py_file in router_dir.glob("*.py"):
-        with open(py_file, 'r') as f:
-            content = f.read()
-            
-        # Parse AST to find imports
-        tree = ast.parse(content)
-        for node in ast.walk(tree):
-            if isinstance(node, ast.ImportFrom):
-                if node.module and "main" in node.module:
-                    violations.append(f"{py_file}: {ast.unparse(node)}")
-    
-    assert not violations, f"Found main.py imports in routers: {violations}"
-
-def test_dependency_injection_usage():
-    """Ensure routers use Depends() pattern"""
-    router_dir = Path("backend/routers")
-    
-    for py_file in router_dir.glob("*.py"):
-        if py_file.name == "__init__.py":
-            continue
-            
-        with open(py_file, 'r') as f:
-            content = f.read()
-            
-        # Should use Depends() for shared resources
-        assert "Depends(" in content, f"{py_file} should use dependency injection"
-        assert "from ..dependencies import" in content, f"{py_file} should import from dependencies"
-```
-
-#### Live Import Testing
+**Debugging Commands:**
 ```bash
-# test-circular-imports.sh
-#!/bin/bash
-echo "🧪 Testing for circular imports..."
+# Test MCP connection
+mcp_browser-tools_wipeLogs  # Should return "All logs cleared successfully"
 
-# Test each router can be imported independently
-for router in backend/routers/*.py; do
-  if [ "$(basename "$router")" != "__init__.py" ]; then
-    echo "Testing $router..."
-    python -c "import $(echo $router | sed 's/backend\///g' | sed 's/\.py//g' | sed 's/\//./g')" 2>&1
-    if [ $? -ne 0 ]; then
-      echo "❌ Import failed for $router"
-      exit 1
-    fi
-  fi
-done
+# Test server connection  
+mcp_browser-tools_getConsoleLogs  # Should return [] if no logs
 
-echo "✅ All router imports successful"
+# Test full functionality (requires extension)
+mcp_browser-tools_takeScreenshot  # Should capture screenshot or show specific error
 ```
 
-### 🔥 MCP INTEGRATION TESTING
+**Node.js Version Issues:**
+- Browser Tools MCP requires Node.js v18+ (uses native fetch API)
+- If using nvm: `nvm alias default 20` to set default version
+- Verify with: `node --version` before starting server
 
-#### MCP Setup Verification
-```bash
-# test-mcp-setup.sh
-#!/bin/bash
-echo "🧪 Testing MCP setup..."
+### 4. **Browser Control MCP (`mcp_browser-control-*`)**
+- **Primary Use**: Web navigation, content extraction, browser automation
+- **Capabilities**:
+  - Open/close tabs and manage browser sessions
+  - List open tabs and browser history
+  - Retrieve full web page content and extract links
+  - Find and highlight specific text within web pages
+- **When to Use**: Web scraping, content analysis, automated testing workflows
 
-# 1. Node.js version check
-NODE_VERSION=$(node --version | sed 's/v//' | cut -d. -f1)
-if [ "$NODE_VERSION" -lt 18 ]; then
-  echo "❌ Node.js version $NODE_VERSION < 18"
-  exit 1
-fi
+### 5. **Context7 MCP (`mcp_context7_*`)**
+- **Primary Use**: Documentation lookup, API reference, library guidance
+- **Capabilities**:
+  - Resolve library/package names to documentation IDs
+  - Fetch up-to-date library documentation and API references
+- **When to Use**: When implementing new libraries, troubleshooting API usage, code examples
 
-# 2. Browser Tools server test
-curl -f http://localhost:3025/health > /dev/null 2>&1
-if [ $? -ne 0 ]; then
-  echo "❌ Browser Tools server not responding on port 3025"
-  echo "Run: npx @agentdeskai/browser-tools-server@latest"
-  exit 1
-fi
+### 6. **Docker MCP (`docker-mcp`)**
+- **Primary Use**: Container management, Docker Compose operations, containerized development
+- **Capabilities**:
+  - Create and manage Docker containers
+  - Deploy and manage Docker Compose stacks
+  - Retrieve container logs for debugging
+  - List and monitor container status
+- **When to Use**: Containerized applications, microservices, development environment setup
 
-# 3. Basic MCP connectivity
-mcp_browser-tools_wipeLogs
-if [ $? -ne 0 ]; then
-  echo "❌ MCP basic connectivity failed"
-  exit 1
-fi
+### 7. **Mindmap MCP (`mindmap`)**
+- **Primary Use**: Visual planning, architecture documentation, sprint planning
+- **Capabilities**:
+  - Create structured mind maps for complex features and requirements
+  - Generate visual representations of system architecture
+  - Support sprint planning and PRD (Product Requirement Document) generation
+  - Create project roadmaps and feature breakdowns
+- **When to Use**: Sprint planning, complex feature planning, architecture documentation, PRD generation
 
-echo "✅ MCP setup verification complete"
-```
+## Best Practices for MCP Interactions
 
-### 🔥 REACT QUERY PATTERN TESTING
-
-#### API State Management Linting
-```bash
-# lint-api-patterns.sh
-#!/bin/bash
-echo "🧪 Checking API state management patterns..."
-
-# Check for forbidden manual API patterns
-MANUAL_FETCH=$(grep -r "useEffect.*fetch" frontend/src/ || true)
-MANUAL_AXIOS=$(grep -r "useEffect.*axios" frontend/src/ || true)
-MANUAL_API=$(grep -r "useEffect.*api\." frontend/src/ || true)
-
-if [ ! -z "$MANUAL_FETCH" ] || [ ! -z "$MANUAL_AXIOS" ] || [ ! -z "$MANUAL_API" ]; then
-  echo "❌ Found manual API calls in useEffect:"
-  echo "$MANUAL_FETCH"
-  echo "$MANUAL_AXIOS"
-  echo "$MANUAL_API"
-  echo "Use React Query instead!"
-  exit 1
-fi
-
-# Check for React Query usage
+### **Pre-Action Context Gathering**
+1. **Always establish context first**:
+   - Verify current working directory (`pwd`)
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
