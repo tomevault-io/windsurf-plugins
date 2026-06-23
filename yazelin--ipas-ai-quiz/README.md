@@ -7,11 +7,11 @@ iPAS AI 應用規劃師線上模擬考練習(611 題歷屆考古題,純前端 + 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [yazelin/ipas-ai-quiz](https://github.com/yazelin/ipas-ai-quiz).
+Original source: `CLAUDE.md` in [yazelin/ipas-ai-quiz](https://github.com/yazelin/ipas-ai-quiz).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
