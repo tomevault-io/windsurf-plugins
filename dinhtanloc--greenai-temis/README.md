@@ -7,11 +7,11 @@ A project for Internal competition
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [dinhtanloc/GreenAI-Temis](https://github.com/dinhtanloc/GreenAI-Temis).
+Original source: `CLAUDE.md` in [dinhtanloc/GreenAI-Temis](https://github.com/dinhtanloc/GreenAI-Temis).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
