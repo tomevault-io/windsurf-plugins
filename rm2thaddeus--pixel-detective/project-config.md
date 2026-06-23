@@ -1,128 +1,183 @@
 ---
 trigger: always_on
-description: This document provides comprehensive guidelines for AI agents working on the Pixel Detective project, which consists of two production-ready applications:
+description: Rules selection patterns for development
 ---
 
-# AI Agent Guidelines - Pixel Detective Project
+# Auto-Activation Configuration - Universal Rule Application
 
-## 🎯 **Overview**
+## 🎯 **Mandatory Rule Auto-Activation**
 
-This document provides comprehensive guidelines for AI agents working on the Pixel Detective project, which consists of two production-ready applications:
-
-1. **Pixel Detective** - AI-powered media search engine
-2. **Dev Graph** - Temporal knowledge graph for code evolution
-
-**Key Principle**: This entire codebase was built through AI-assisted development. Every change should maintain this philosophy and code quality standards.
+This configuration ensures critical rules are **automatically applied** without manual intervention.
 
 ---
 
-## 📋 **Quick Navigation Guide**
+## **Universal Auto-Activation Rules**
 
-This root-level AGENTS.md serves as a **navigation hub**. For detailed development guidelines, consult the appropriate subdirectory documentation:
+### **PowerShell Syntax Auto-Activation (Windows Users)**
+```yaml
+rule_name: "powershell-syntax"
+activation_trigger: "ALWAYS"
+conditions:
+  - user_os: "win32"
+  - shell_detected: "PowerShell"
+  - tool_usage: "run_terminal_cmd"
+  
+activation_mode: "preventive"
+description: "Automatically prevents PowerShell syntax errors"
+mandatory: true
+bypass_allowed: false
 
-### **🎨 Pixel Detective (Media Search)**
-
-**When working on:** Media search, image ingestion, CLIP/BLIP models, vector search, UMAP visualization
-
-**Primary Documentation:**
-- [`backend/AGENTS.md`](backend/AGENTS.md) - Backend service development (Ingestion, ML Inference, GPU-UMAP)
-- [`frontend/AGENTS.md`](frontend/AGENTS.md) - Frontend development (Next.js, React, Chakra UI)
-- [`backend/ARCHITECTURE.md`](backend/ARCHITECTURE.md) - Backend system design
-- [`frontend/ARCHITECTURE.md`](frontend/ARCHITECTURE.md) - Frontend architecture
-
-**Quick Reference:**
-- Backend services: 3 FastAPI microservices (ports 8001, 8002, 8003)
-- Frontend: Next.js 14 with App Router (port 3000)
-- Database: Qdrant vector database (port 6333)
-- AI Models: CLIP (embeddings), BLIP (captions), RAPIDS cuML (UMAP)
-
-### **🗺️ Dev Graph (Code Knowledge Graph)**
-
-**When working on:** Git history ingestion, knowledge graph, Neo4j, code symbol extraction, relationship derivation
-
-**Primary Documentation:**
-- [`developer_graph/AGENTS.md`](developer_graph/AGENTS.md) - Dev Graph module development
-- [`developer_graph/architecture.md`](developer_graph/architecture.md) - System architecture and data model
-- [`developer_graph/routes/AGENTS.md`](developer_graph/routes/AGENTS.md) - API route handlers
-- [`dev_graph_audit/AGENTS.md`](dev_graph_audit/AGENTS.md) - Data quality and auditing
-
-**Quick Reference:**
-- Backend: FastAPI service (port 8080)
-- Frontend: Next.js UI at `tools/dev-graph-ui` (port 3001)
-- Database: Neo4j graph database (ports 7687/7474)
-- Pipeline: 8-stage unified ingestion system
-
-### **📚 Cross-Cutting Documentation**
-
-**For project-wide concerns:**
-- [`README.md`](README.md) - Project overview, quick start, features
-- [`Architecture.MD`](Architecture.MD) - Legacy architecture reference
-- [`docs/architecture.md`](docs/architecture.md) - Current system architecture for both apps
-- [`DEVELOPER_GUIDE.md`](DEVELOPER_GUIDE.md) - Developer onboarding
-- [`.cursor/rules/`](.cursor/rules/) - Context-specific coding guidelines
-
----
-
-## 🏗️ **Repository Structure**
-
+auto_behaviors:
+  - split_compound_commands: true
+  - quote_all_paths: true
+  - add_workspace_navigation: true
+  - validate_powershell_compatibility: true
 ```
-pixel-detective/
-├── 🎨 Pixel Detective (Media Search)
-│   ├── frontend/                          # Next.js UI (port 3000)
-│   │   ├── src/app/                      # App router pages
-│   │   ├── src/components/               # React components
-│   │   ├── AGENTS.md                     # ← Frontend development guide
-│   │   └── ARCHITECTURE.md
-│   │
-│   └── backend/                          # FastAPI services
-│       ├── ingestion_orchestration_fastapi_app/  # Port 8002
-│       ├── ml_inference_fastapi_app/              # Port 8001
-│       ├── gpu_umap_service/                      # Port 8003
-│       ├── AGENTS.md                     # ← Backend development guide
-│       └── ARCHITECTURE.md
-│
-├── 🗺️ Dev Graph (Code Knowledge Graph)
-│   ├── tools/dev-graph-ui/              # Next.js UI (port 3001)
-│   │   └── src/
-│   │
-│   ├── developer_graph/                  # FastAPI API (port 8080)
-│   │   ├── api.py                        # Main application
-│   │   ├── routes/                       # API endpoints
-│   │   │   └── AGENTS.md                # ← Route handler guide
-│   │   ├── AGENTS.md                     # ← Dev Graph module guide
-│   │   └── architecture.md               # ← Data model & pipeline
-│   │
-│   └── dev_graph_audit/                  # Analysis reports
-│       └── AGENTS.md                     # ← Audit guide
-│
-├── 📚 Shared Resources
-│   ├── docs/                            # Project documentation
-│   │   ├── architecture.md              # ← System architecture (both apps)
-│   │   ├── sprints/                     # Sprint planning & retrospectives
-│   │   └── reference_guides/            # Technical guides
-│   ├── .cursor/rules/                   # AI coding guidelines
-│   │   ├── projectrules.mdc
-│   │   ├── backend/                     # Backend-specific rules
-│   │   └── frontend/                    # Frontend-specific rules
-│   ├── utils/                           # Shared Python utilities
-│   ├── database/                        # Database connectors
-│   └── config.py                        # Global configuration
-│
-└── 🔧 DevOps & Scripts
-    ├── docker-compose.yml               # Service orchestration
-    ├── start_pixel_detective.{ps1,bat}  # Launch media search
-    ├── start_dev_graph.{ps1,bat}        # Launch knowledge graph
-    └── scripts/                         # Automation scripts
+
+### **Sprint Lessons Auto-Activation (All Users)**
+```yaml
+rule_name: "sprint-lessons-learned"
+activation_trigger: "development_work"
+conditions:
+  - work_type: ["frontend", "backend", "fullstack"]
+  - file_modifications: true
+  
+activation_mode: "contextual"
+description: "Always check Sprint 10 lessons before development"
+mandatory: true
+bypass_allowed: false
+```
+
+### **MCP Setup Auto-Activation (Frontend Work)**
+```yaml
+rule_name: "mcp-browser-tools-setup"
+activation_trigger: "frontend_context"
+conditions:
+  - file_patterns: ["frontend/**/*", "**/*.tsx", "**/*.jsx"]
+  - work_type: ["frontend", "debugging", "testing"]
+  
+activation_mode: "contextual"
+description: "Verify MCP setup before frontend work"
+mandatory: true
+bypass_allowed: false
 ```
 
 ---
 
-## 🚀 **Getting Started as an AI Agent**
+## **AI Assistant Integration Instructions**
 
-### **Step 1: Identify Your Task Context**
+### **Automatic Rule Loading Protocol**
+```markdown
+# AI assistants MUST follow this sequence:
 
+1. **Detect User Environment**
+   - Check user OS (win32 → PowerShell rule mandatory)
+   - Check file context (frontend → MCP setup required)
+   - Check work type (development → Sprint lessons required)
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+2. **Auto-Load Mandatory Rules**
+   - Load rules based on environment detection
+   - Apply rules BEFORE generating any commands
+   - Cannot proceed without mandatory rule compliance
+
+3. **Seamless Integration**
+   - Mandatory rules work WITH context-specific rules
+   - No rule conflicts or overrides
+   - Transparent to user (they don't see rule activation)
+```
+
+### **Rule Activation Hierarchy**
+```yaml
+# Rules are applied in this order:
+Level 1: Environment Rules (OS-specific, mandatory)
+  - PowerShell syntax (Windows)
+  - Shell compatibility (Linux/Mac)
+  
+Level 2: Context Rules (work-specific, mandatory)
+  - Sprint lessons (all development)
+  - MCP setup (frontend work)
+  
+Level 3: Specific Rules (task-specific, contextual)
+  - Feature implementation patterns
+  - Debugging workflows
+  - Testing patterns
+```
+
+---
+
+## **User Experience Benefits**
+
+### **Invisible Protection**
+- **PowerShell errors**: Prevented automatically, user never sees them
+- **Sprint mistakes**: Lessons applied automatically, no repeated failures
+- **MCP issues**: Setup verified automatically, tools always work
+
+### **Zero Configuration Required**
+- **Auto-detection**: Rules activate based on environment
+- **Smart defaults**: Always-safe behavior without user input
+- **Seamless operation**: Works transparently with existing workflow
+
+### **Consistency Guarantee**
+- **Same behavior**: Identical experience across all AI assistants
+- **Reliable patterns**: Bulletproof command generation
+- **Error prevention**: Issues caught before they occur
+
+---
+
+## **Implementation Verification**
+
+### **PowerShell Rule Test**
+```bash
+# Test: AI should automatically do this when user asks for git commands:
+✅ Auto-detect: Windows + PowerShell environment
+✅ Auto-apply: PowerShell syntax rule
+✅ Auto-generate: Separate run_terminal_cmd calls
+✅ Auto-quote: All paths properly quoted
+✅ Auto-navigate: Workspace directory included
+
+# Result: Commands that always work, no && errors possible
+```
+
+### **Sprint Lessons Test**
+```bash
+# Test: AI should automatically do this for any development work:
+✅ Auto-detect: Development file modifications
+✅ Auto-apply: Sprint lessons learned
+✅ Auto-check: Hydration patterns (frontend)
+✅ Auto-check: Dependency injection (backend)
+✅ Auto-prevent: Known failure patterns
+
+# Result: Sprint 10 mistakes never repeated
+```
+
+### **MCP Setup Test**
+```bash
+# Test: AI should automatically do this for frontend work:
+✅ Auto-detect: Frontend file context
+✅ Auto-apply: MCP browser tools setup
+✅ Auto-verify: 3-component setup protocol
+✅ Auto-ensure: Tools ready before debugging
+
+# Result: MCP tools always work when needed
+```
+
+---
+
+## **Success Metrics**
+
+### **Error Prevention Effectiveness**
+- **PowerShell errors**: 0% occurrence (100% prevention)
+- **Sprint 10 mistakes**: 0% repetition (100% learning application)
+- **MCP failures**: 0% setup issues (100% verification)
+
+### **User Experience Quality**
+- **Invisible operation**: User never needs to think about rules
+- **Consistent results**: Same quality output every time
+- **Reduced friction**: No manual rule management required
+
+---
+
+*This auto-activation system ensures that critical rules are always applied, providing bulletproof protection without user intervention. The PowerShell rule, Sprint lessons, and MCP setup are now impossible to bypass or forget.*
 
 ---
 > Source: [rm2thaddeus/Pixel_Detective](https://github.com/rm2thaddeus/Pixel_Detective) — distributed by [TomeVault](https://tomevault.io).
