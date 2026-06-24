@@ -7,11 +7,11 @@ NeoBot: AI CRM workspace built on Next.js
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [Sethzy/neobot-ai-crm](https://github.com/Sethzy/neobot-ai-crm).
+Original source: `AGENTS.md` in [Sethzy/neobot-ai-crm](https://github.com/Sethzy/neobot-ai-crm).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
