@@ -1,103 +1,86 @@
 ---
 trigger: always_on
-description: Guidance for AI/code agents working in this repository. This file is the
+description: Component organization and architecture guidelines
 ---
 
-# AGENTS.md
+# Component Organization
 
-Guidance for AI/code agents working in this repository. This file is the
-current project map after multiple RAW workflow, UI, runtime, planning, and
-verification refactors. Keep changes aligned with this app, not generic Vite or
-image-editor assumptions.
+Follow this component architecture for consistent project structure:
 
-## Non-Negotiables
+## Directory Structure
 
-- Use `pnpm` only.
-- Do not read, write, or commit `.env` files, secrets, credentials, or private
-  tokens.
-- Do not edit generated files such as `src/generated-routes.ts`. Change routes
-  by adding or renaming files under `src/pages/`.
-- Use the `~/` alias for imports from `src`.
-- Stay inside the shared app runtime patterns: do not recreate the QueryClient,
-  Jotai store, router plumbing, or provider stack outside the existing
-  providers.
-- Do not use `window.location` or other ad hoc navigation paths when existing
-  router utilities cover the case.
-- For animation, use `m` from `motion/react` inside the existing `LazyMotion`
-  setup in `src/providers/root-providers.tsx`. Prefer presets in
-  `src/lib/spring`.
-- Do not describe or reintroduce the RAW runtime as `libraw-wasm`. The current
-  runtime boundary is `@lumaforge/luma-raw-runtime`.
-- Do not add catalogs, batch workflows, accounts, cloud upload requirements,
-  local daemons, native helper apps, or broad desktop-editor panels unless the
-  user explicitly asks for that product shift.
-- Keep commits prompt, focused, and minimal. Do not add AI co-authorship
-  metadata.
+**Base UI Components**: `src/components/ui/`
+- Reusable primitives (buttons, inputs, modals, etc.)
+- Generic components that can be used across any application
+- Based on Radix UI primitives with custom styling
+- Examples: `Button`, `Input`, `Select`, `Tooltip`, `Accordion`
 
-## Product Boundary
+**Common Components**: `src/components/common/`
+- App-specific shared components
+- Components used across multiple features but specific to this app
+- Examples: `ErrorElement`, `Footer`, `LoadRemixAsyncComponent`, `NotFound`
 
-- LumaForge is a browser-local RAW photo lab for a narrow workflow:
-  `single RAW file -> preview -> look or LUT -> compare -> JPEG export`.
-- Preview may optimize for responsiveness through embedded, quick, bounded HQ,
-  WebGL, or CPU-degraded stages.
-- Export is the authoritative full-resolution path. If the runtime cannot prove
-  the declared pipeline can be reproduced, fail closed instead of exporting a
-  degraded or preview-only result.
-- HQ preview export is a fallback or compromise, not the primary promise.
-- Color and LUT work is contract work. Preserve input gamut, transfer/log curve,
-  LUT intent, scene-referred working assumptions, and output handling.
+**Module Components**: `src/modules/`
+- Feature-specific components organized by domain
+- Business logic components that belong to specific features
+- Examples: `src/modules/feed/`, `src/modules/auth/`, `src/modules/user/`
 
-## Current Architecture
+## Component Placement Rules
 
-- `src/pages/(main)/raw.tsx` is the `/raw` route entry. Route files drive
-  `src/generated-routes.ts`; never edit the generated file directly.
-- `src/providers/root-providers.tsx` owns `LazyMotion`, React Query, Jotai,
-  i18n, error boundary, router stability, settings sync, context menu, and
-  toasts. Preserve provider order unless a concrete bug requires changing it.
-- `src/modules/raw-processor/RawProcessorView.tsx` is a thin composition layer.
-  Keep orchestration in hooks/controllers and domain logic in services.
-- `src/modules/raw-processor/hooks/useRawProcessorViewController.ts` bridges
-  route/runtime state, hidden file pickers, runtime readiness, reset
-  confirmation, CPU preview state, and workflow actions for the view.
-- `src/modules/raw-processor/hooks/useRawWorkflow.ts` and
-  `hooks/stages/*` are the workflow state machine boundary. Stage hooks are
-  grouped by `ingest`, `preview`, `look`, `compare`, and `export`.
-- `src/modules/raw-processor/services/*` contains scriptable domain behavior:
-  `ingest`, `preview`, `look`, `compare`, and `export`. Prefer adding tested
-  logic here before growing React components.
-- `src/modules/raw-processor/model/*` defines session/workflow/export result
-  shapes. Keep model changes small and contract-like.
-- `src/modules/raw-processor/state/*` contains Jotai atoms for workflow and tool
-  state. Prefer these over introducing a second state model.
-- `src/modules/raw-processor/components/RawWorkflowToolProvider.tsx` is the
-  context bridge from workflow state/actions to tool surfaces.
-- `src/modules/raw-processor/components/RawToolSurface.tsx` switches desktop vs
-  mobile surfaces by viewport. Respect that split.
-- `src/modules/raw-processor/components/tools/*` is the desktop command rail:
-  Adjust, Tone, Color, Compare, Export, File Facts, Histogram, LUT contract, and
-  shared tool chrome.
-- `src/modules/raw-processor/components/mobile/*` is the mobile photo-first
-  shell: persistent topbar, bottom mode dock, mobile LUT browser, mobile export,
-  compare panel, Adjust list panels, and scrub HUD.
-- `src/modules/raw-processor/raw-lab.css`,
-  `raw-lab.surface.css`, and `raw-lab.effects.css` hold `/raw` surface and
-  effect CSS that cannot reasonably live as Tailwind utilities.
-- `src/lib/gl` is the WebGL2 interactive preview renderer.
-- `src/lib/preview` is the CPU/degraded preview worker path and capability
-  helpers.
-- `src/lib/export` is the worker-driven full-resolution export path.
-- `src/lib/raw` adapts the app to `@lumaforge/luma-raw-runtime`.
-- `src/lib/runtime` owns capability and export policy decisions.
-- `src/lib/lut` and `src/lib/profiles` parse LUTs and resolve profile/catalog
-  contracts.
-- `packages/luma-color-runtime` is pure TypeScript color math: tone,
-  temperature/tint color balance, LUT contracts, transfer/gamut transforms,
-  graph resolution, row-band processing, and GLSL helpers.
-- `packages/luma-raw-runtime` is the browser RAW metadata/decode/runtime
-  boundary, including worker protocol, native artifacts, processed-window facts,
-  HDR analysis, fixtures, benchmarks, and native verification.
+**Universal Components** → `src/components/ui/`
+- If the component could be used in any React app
+- Pure UI components without business logic
+- Reusable across different domains
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+**Feature Components** → `src/modules/{domain}/`
+- If the component is specific to a business domain/feature
+- Contains domain-specific logic or data handling
+- Examples: `FeedTimeline`, `UserProfile`, `AuthForm`
+
+**App-Specific Shared** → `src/components/common/`
+- If the component is used across features but specific to this app
+- Contains app-specific logic but used in multiple places
+
+## Path Aliases
+
+Use `~/` for `src/` imports (configured in tsconfig):
+
+```typescript
+// Good
+import { Button } from '~/components/ui/button'
+import { UserProfile } from '~/modules/user/UserProfile'
+
+// Avoid
+import { Button } from '../../../components/ui/button'
+```
+
+## Component Examples
+
+```typescript
+// Universal UI component - goes in src/components/ui/
+// File: src/components/ui/button/Button.tsx
+export function Button({ children, ...props }) {
+  return <button className="..." {...props}>{children}</button>
+}
+
+// Feature component - goes in src/modules/
+// File: src/modules/feed/FeedTimeline.tsx
+export function FeedTimeline() {
+  // Feed-specific logic and UI
+}
+
+// App-specific shared - goes in src/components/common/
+// File: src/components/common/AppHeader.tsx
+export function AppHeader() {
+  // App-specific header with navigation
+}
+```
+
+## Module Architecture Principle
+
+**If a component is specific to a business domain/feature, place it in the corresponding module directory.**
+
+This keeps the codebase organized and makes it easy to find domain-specific functionality.
 
 ---
 > Source: [ChrAlpha/LumaForge](https://github.com/ChrAlpha/LumaForge) — distributed by [TomeVault](https://tomevault.io).
