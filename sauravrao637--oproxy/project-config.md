@@ -1,0 +1,129 @@
+---
+trigger: always_on
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+---
+
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Commands
+
+```bash
+# Build
+cargo build
+cargo build --release
+
+# Build the React UI assets required by Rust include_str! routes
+corepack enable
+yarn --cwd src/design install --frozen-lockfile
+yarn --cwd src/design build
+
+# Run all Rust tests with release warning policy
+RUSTFLAGS="-D warnings" cargo test
+
+# Run a single test by name
+cargo test <test_name>
+
+# Run tests in a specific module
+cargo test middleware::plugins::jwt_inspector
+
+# Lint
+cargo clippy -- -D warnings
+
+# Run the proxy. A clean checkout will build src/design/dist automatically
+# if Node/Yarn are available; explicit UI build is still faster in CI.
+cargo run
+```
+
+> **Critical:** run the full test suite before release, not only `cargo test --lib`. Browser tests live under `tests/browser` and use Playwright.
+
+## Architecture
+
+### Three-layer separation
+
+1. **Transport** (`main.rs`, `core/engine.rs`) — hyper accept loop, CONNECT handling, MITM TLS, reqwest forwarding  
+2. **Traffic manipulation** (`middleware/`) — inspect, rewrite, throttle, pause, mock  
+3. **Control plane** (`management.rs`, `api/`, `storage.rs`) — axum REST API, web UI, JSON persistence
+
+### Request lifecycle
+
+```
+hyper accept loop (main.rs)
+  ├─ CONNECT request → mitm_intercept() or TCP tunnel (copy_bidirectional)
+  └─ all other requests → proxy_dispatch_layer (axum middleware)
+       ├─ Host == localhost → axum router (management UI / API)
+       └─ else → ProxyEngine::handle_request()
+            1. Buffer body (up to max_body_bytes)
+            2. Run Request Middleware Chain (insertion order)
+            3. Strip internal headers, resolve target URL
+            4. Forward via reqwest
+            5. Run Response Middleware Chain (reverse order)
+            6. Return to client
+```
+
+### Middleware system
+
+New traffic features = implement `Middleware` trait. No engine changes needed.
+
+```rust
+#[async_trait]
+pub trait Middleware: Send + Sync {
+    fn name(&self) -> &str;
+    async fn on_request(&self, ctx: &mut RequestContext) -> MiddlewareAction;
+    async fn on_response(&self, ctx: &mut ResponseContext) -> MiddlewareAction;
+}
+// MiddlewareAction: Continue | StopAndReturn | Pause
+```
+
+`StopAndReturn` returns 403 by default. To return a custom response (mock, Lua abort), embed a JSON payload in `ctx.headers["x-oproxy-mock-response"]` before returning `StopAndReturn`. The engine reads and serves it.
+
+**Middleware chain insertion order** (`runtime/state.rs`):
+1. AccessControl (block/allow rules)
+2. CaptureFilter (skip recording for filtered hosts)
+3. DnsOverride (rewrite upstream host)
+4. MapRemote (routing table)
+5. Throttling (latency/bandwidth)
+6. Rewrite (request/response mutations)
+7. Breakpoint (pause on match)
+8. JwtInspector / GraphQLInspector / GrpcInspector (payload inspection)
+9. Inspection (record session)
+10. MapLocal (serve local files) ← short-circuits to file instead of forwarding
+11. Mock (return canned responses)
+12. Lua (custom request/response logic)
+13. Inspection response-pass (record response)
+
+Plugins running before step 9 record the original request. Steps 10–12 can short-circuit with `StopAndReturn`, preventing upstream forwarding.
+
+### Internal middleware ↔ engine side-channel
+
+Middleware plugins exchange data with each other and the engine through **typed,
+in-memory fields** on `RequestContext` / `ResponseContext` (all `#[serde(skip)]`, so
+they never serialise into recordings/exports and can never leak to the upstream
+server). This replaces the former `x-oproxy-*` pseudo-header protocol — there is no
+JSON-in-header encoding, no base64 round-trip for binary mock bodies, and a client
+can no longer spoof these by sending matching headers (the engine defensively strips
+any client-supplied `x-oproxy-*` request header before forwarding).
+
+| Field | Set by | Read by | Purpose |
+|---|---|---|---|
+| `RequestContext.skip_recording: bool` | CaptureFilterMiddleware | InspectionMiddleware | Skip session recording for filtered hosts |
+| `RequestContext.session_id: Option<String>` | InspectionMiddleware | engine.rs | Correlate response to exact request session |
+| `RequestContext.destination: Option<String>` | RoutingMiddleware / DnsOverride / MITM | engine.rs | Override upstream target URL |
+| `RequestContext.inspector: InspectorData` | JWT / GraphQL / gRPC inspectors | InspectionMiddleware | Parsed inspector data → `Exchange.inspector_data` |
+| `RequestContext.mock_response: Option<InterceptedResponse>` | Mock / Rewrite / Lua abort / Breakpoint timeout | engine.rs on StopAndReturn | Short-circuit response returned instead of forwarding |
+
+`InterceptedResponse { status: u16, headers, body: Bytes, tags: Vec<String> }` carries
+the body as raw `Bytes`, so binary mock payloads survive without base64. The MITM TLS
+layer passes its target via `engine.handle_request_with_destination(req, dest)` rather
+than a header. `ResponseContext.tags: Vec<String>` carries session tags (e.g. `"mock"`)
+to attach when the exchange is recorded.
+
+### Binary body forwarding
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [sauravrao637/oproxy](https://github.com/sauravrao637/oproxy) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-06-24 -->
