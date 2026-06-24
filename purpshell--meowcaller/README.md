@@ -7,11 +7,11 @@ WhatsApp VoIP Go library for whatsmeow
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [purpshell/meowcaller](https://github.com/purpshell/meowcaller).
+Original source: `AGENTS.md` in [purpshell/meowcaller](https://github.com/purpshell/meowcaller).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
