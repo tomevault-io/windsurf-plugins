@@ -7,11 +7,11 @@ A modern X11 server written from scratch in Rust.
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [joske/yserver](https://github.com/joske/yserver).
+Original source: `CLAUDE.md` in [joske/yserver](https://github.com/joske/yserver).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
