@@ -7,11 +7,11 @@ Obsidian plugin – highlight journal timestamps with custom colors and readonly
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [zhaohongxuan/journal-partner](https://github.com/zhaohongxuan/journal-partner).
+Original source: `CLAUDE.md` in [zhaohongxuan/journal-partner](https://github.com/zhaohongxuan/journal-partner).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
