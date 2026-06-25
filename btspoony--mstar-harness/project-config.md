@@ -1,41 +1,110 @@
 ---
 trigger: always_on
-description: Maintenance guardrails for Morning Star harness repository in Cursor
+description: This repository is maintained as a **harness/configuration project**, not an application repo.
 ---
 
+# Morning Star Harness Maintenance Guide
 
-# Morning Star Repository Maintenance Rule (Cursor)
+This repository is maintained as a **harness/configuration project**, not an application repo.
+Use this document as the primary maintenance contract for contributors and agents.
 
-This rule applies when maintaining the Morning Star harness repository in Cursor.
+## Scope
 
-## Source of Truth
+- Default intent in this workspace: maintain Morning Star harness behavior, docs, and host adapters.
+- Repository layout uses a monorepo-style split: `packages/opencode` for the publishable OpenCode plugin (`@mstar-harness/opencode`), `packages/cli` (`@mstar-harness/cli`) for the standalone CLI.
+- Do not treat this repo like a product feature/codebase task unless explicitly requested.
+- Runtime execution rules for users/agents live in `mstar-*` skills; this file defines **maintenance behavior**.
 
-- `AGENTS.md` is the canonical maintenance policy.
-- Runtime behavior remains in `mstar-*` skills.
-- Avoid duplicating long maintenance prose across runtime skill files.
+## Maintenance Goals
 
-## What This Rule Adds (Cursor-specific)
+- Keep one coherent harness behavior across hosts.
+- Keep prompts/rules minimal, explicit, and non-duplicated.
+- Prefer stable defaults and small, reviewable changes.
+- Preserve user safety boundaries for global config and secrets.
 
-- Keep Cursor host guidance aligned with OpenCode host guidance.
-- Use `.cursor/skills/mstar-routing-eval/` only for routing/prompt/rule regression work, not normal feature implementation.
-- If routing/gate semantics changed, include routing-eval updates and evidence.
+## Core Rules
 
-## Required Maintenance Behavior
+- **Single source by topic**: keep each rule in one authoritative place; avoid copy-paste rule drift.
+- **Execution vs maintenance split**:
+  - Skills/role prompts describe runtime behavior.
+  - `AGENTS.md` describes repository maintenance policy.
+- **Surgical edits**: only change what the task requires; avoid opportunistic refactors.
+- **Read before edit**: inspect current content before patching; verify after patching.
 
-- Read before edit, and keep edits surgical.
-- Keep skill descriptions trigger-accurate.
-- Use skill-creator guidance for new skills or major rewrites.
-- Sync bilingual docs when onboarding or install behavior changes.
-- Any change to installation/usage wording in `README.md` MUST be mirrored in `README_CN.md` in the same change set (and vice versa).
-- Never modify secrets or user-owned credential files.
+## Cursor + OpenCode + Codex Sync Policy
 
-## Quick Validation
+When a change affects shared harness behavior, treat OpenCode, Cursor, and Codex as host surfaces of one system.
 
-- Before publishing the Cursor plugin: `.cursor/LOCAL-VALIDATION.md`.
-- Lint/typecheck as relevant to edited files.
-- Confirm docs and install snippets remain runnable.
-- If either README changed, verify both `README.md` and `README_CN.md` were reviewed and updated for parity.
-- Summarize host-specific divergence explicitly if introduced.
+- Update shared semantics first (core harness contract), then host-specific adapters.
+- Keep host wording consistent on:
+  - load order expectations
+  - dispatch/delegation boundaries
+  - gate/evidence language
+- If behavior must diverge by host, document the reason explicitly and keep the divergence minimal.
+- For plugin-facing changes, ensure both hosts remain installable and understandable from current docs.
+- Do not maintain long host-specific checklists in many files; keep intent centralized and examples lightweight.
+
+## What To Do
+
+- Do align changes with the current harness invariants before editing downstream docs/prompts.
+- Do update bilingual docs together when user-facing behavior changes.
+- Do keep CLI implementation changes inside `packages/cli` and OpenCode plugin packaging inside `packages/opencode`.
+- Do keep role shells thin and maintain richer role behavior in role-skill references.
+- Do keep commit scope coherent (one concern per commit when possible).
+- Do verify any changed command/config snippets are still runnable.
+
+## What Not To Do
+
+- Do not edit user secrets or local credential files.
+- Do not silently change security-sensitive defaults.
+- Do not introduce parallel “maintenance manuals” inside skill bodies.
+- Do not scatter the same rule text across multiple files just for discoverability.
+- Do not require manual file-by-file index maintenance when explore/search can discover structure.
+
+## Change Workflow (Lightweight)
+
+1. Clarify the maintenance intent and affected behavior surface.
+2. Apply minimal edits in the right canonical layer.
+3. Sync host adapters/docs only where behavior or onboarding changed.
+4. Run lightweight validation (lint/typecheck/doc link sanity as relevant).
+5. Summarize what changed, why, and any intentional host-specific divergence.
+
+## AI Agent Quality Gate
+
+Before opening PRs or proposing "done", an agent must:
+
+1. Confirm the change solves a real, observed maintenance problem (not a theoretical one).
+2. Check for duplicate or recently rejected attempts before repeating similar work.
+3. Confirm the change belongs in core harness (otherwise recommend a separate plugin/extension path).
+4. Show the complete diff to the human partner and get explicit approval.
+5. Provide verification evidence for any behavior-shaping changes.
+
+If one of these checks fails, stop and report why.
+
+## Changes Usually Rejected
+
+- Unrelated bundled edits in one PR.
+- Speculative fixes without a concrete failure or user impact.
+- Project-specific customizations disguised as core behavior.
+- Style-only rewrites of behavior-shaping prompts/skills without evaluation evidence.
+- Claims that are not supported by code, tests, or reproducible validation.
+
+## Evidence Standard
+
+- Behavior change -> show before/after expectation and at least one concrete verification step.
+- Install/config change -> verify snippets are executable and aligned with current docs.
+- Prompt/skill change -> explain why the wording change improves outcomes, not only readability.
+
+## Skill Maintenance Essentials
+
+- Keep skills as **runtime SSOT**, not maintenance handbooks.
+- Keep `SKILL.md` focused on execution path; move deep detail to `references/` when needed.
+- Treat frontmatter `description` as a trigger contract; update it when scenarios change.
+- Prefer one coherent skill per workflow unit; avoid over-splitting or giant mixed-scope skills.
+- Use default-first guidance (primary path first, exceptions second) to reduce agent ambiguity.
+- Preserve role shell minimalism: role binding stays thin; reusable behavior stays in skill references.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [btspoony/mstar-harness](https://github.com/btspoony/mstar-harness) — distributed by [TomeVault](https://tomevault.io).
