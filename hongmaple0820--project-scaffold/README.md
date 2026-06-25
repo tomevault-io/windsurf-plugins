@@ -7,13 +7,13 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `.cursor/rules/*.mdc` in [hongmaple0820/project-scaffold](https://github.com/hongmaple0820/project-scaffold).
+Original source: `AGENTS.md` in [hongmaple0820/project-scaffold](https://github.com/hongmaple0820/project-scaffold).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
+- **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
