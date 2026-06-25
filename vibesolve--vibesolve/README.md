@@ -7,11 +7,11 @@ Convert plain-English problem description into a Timefold solver prototype
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [vibesolve/vibesolve](https://github.com/vibesolve/vibesolve).
+Original source: `CLAUDE.md` in [vibesolve/vibesolve](https://github.com/vibesolve/vibesolve).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
