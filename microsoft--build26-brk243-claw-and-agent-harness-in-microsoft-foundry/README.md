@@ -7,12 +7,12 @@ Resources for building and deploying agents using Claw and agent harness in Micr
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [microsoft/Build26-BRK243-claw-and-agent-harness-in-microsoft-foundry](https://github.com/microsoft/Build26-BRK243-claw-and-agent-harness-in-microsoft-foundry).
+Original source: `copilot-instructions.md` in [microsoft/Build26-BRK243-claw-and-agent-harness-in-microsoft-foundry](https://github.com/microsoft/Build26-BRK243-claw-and-agent-harness-in-microsoft-foundry).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **GitHub Copilot** — `copilot-instructions.md`
+- **Codex** — `AGENTS.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
