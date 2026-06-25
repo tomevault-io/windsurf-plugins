@@ -7,11 +7,11 @@ Target-as-truth dotfiles manager. Edit your live configs, source repo updates au
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [yukimemi/yui](https://github.com/yukimemi/yui).
+Original source: `AGENTS.md` in [yukimemi/yui](https://github.com/yukimemi/yui).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
