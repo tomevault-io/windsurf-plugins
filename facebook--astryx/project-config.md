@@ -1,0 +1,117 @@
+---
+trigger: always_on
+description: A design system for building internal tools and products.
+---
+
+# XDS
+
+A design system for building internal tools and products.
+
+## Custom Commands
+
+### `/vibe-test [count]` - Run vibeability tests
+
+Tests how well AGENTS.md helps LLMs generate correct XDS component code.
+
+**Usage:**
+
+```
+/vibe-test 5                    # Run 5 stratified sample tests (one-shot)
+/vibe-test                      # Run all 21 tests (one-shot)
+/vibe-test 5 --degradation      # Run 5 tests with degradation curve (10-turn)
+```
+
+**How to execute:**
+
+1. Run `pnpm -F @astryxdesign/vibe-tests interactive --sample <count>` to set up iteration
+2. Spawn parallel subagents (one per test prompt) to:
+   - Read the task file from `results/<iteration>/tasks/{promptId}.json`
+   - Generate code for the prompt using XDS components (AGENTS.md auto-injected)
+   - Self-evaluate for success/escape hatches
+   - Write `.tsx` result to `results/<iteration>/results/{promptId}.tsx`
+   - Write `.json` metadata to `results/<iteration>/results/{promptId}.json`
+3. Trigger `gh workflow run vibe-screenshots.yml` to build previews and capture screenshots
+4. Run `pnpm -F @astryxdesign/vibe-tests aggregate --iteration <id>` to see results
+
+**Degradation mode (--degradation):**
+Tests context retention across 10-turn conversations with filler, distractor, and recovery turns.
+Probes at turns 0, 6, 8, 10 to measure quality degradation. Results show a line graph of each test's progression.
+
+**Result format:**
+
+```json
+{
+  "id": "<iter>-<promptId>",
+  "timestamp": "...",
+  "model": "claude-code-interactive",
+  "persona": "naive",
+  "promptCategory": "...",
+  "trajectoryDepth": 0,
+  "prompt": "...",
+  "response": "<code>",
+  "evaluation": {"success": true, "componentsUsed": [...], "escapeHatches": [...]}
+}
+```
+
+## AI Context
+
+For architectural context, decisions, and research, see the **[GitHub Wiki](https://github.com/facebookexperimental/xds/wiki)**:
+
+- **Decisions** — API Conventions, Why StyleX, StyleX Distribution
+- **Architecture** — System Architecture, Component Authoring Guide
+- **Research** — AI + Design Systems, AI Model Trajectory, Swizzle Ergonomics
+- **Future** — Animation System, RSC Utilities, Distribution Strategy
+
+For component-specific documentation, see the `{Name}.doc.mjs` file in each component directory under `packages/core/src/` (e.g. `Button/Button.doc.mjs`). These are plain JS files with JSDoc type annotations exporting a `ComponentDoc` object (typed via `packages/core/src/docs-types.ts`).
+
+## Documentation Standard
+
+Documentation lives in two places:
+
+1. **File Headers** — Each source file has a structured JSDoc header with `@input`, `@output`, `@position`
+2. **Component Docs** — `{Name}.doc.mjs` files in each component directory (props, features, examples)
+
+**Update Protocol**: When modifying code, update the file's header comment. Look for `SYNC:` comments as reminders.
+
+## Quick Reference
+
+- **Package manager**: pnpm 10 (via corepack — see CONTRIBUTING.md)
+- **Testing**: Vitest (colocated tests)
+- **Components**: `packages/core/`
+- **Storybook**: `apps/storybook/`
+
+## JSDoc Conventions
+
+- **`@example` code fences must use plain ` ``` `, not ` ```tsx `.**
+  Storybook's autodocs parser doesn't handle language-tagged fences in JSDoc correctly — the code block won't render as a proper code block. Always use untagged fences in `@example` blocks.
+
+<!-- STYLEX-CAPS:START -->
+
+[StyleX v0.17.5 CSS Support]|Use CSS-native solutions. Don't build JS workarounds for supported features.
+|AT-RULES: @media, @supports, @container (+named), @starting-style, @scope — YES
+|AT-RULES: @layer, @property (explicit) — NO (compiles but invalid CSS output)
+|PSEUDO-CLS: :hover, :focus, :focus-visible, :focus-within, :active, :disabled — YES
+|PSEUDO-CLS: :first-child, :last-child, :nth-child(), :where(), :is(), :has(), :not() — YES
+|PSEUDO-CLS: :placeholder-shown, :checked, :empty, :modal, :user-valid, :user-invalid — YES
+|PSEUDO-EL: ::before, ::after, ::placeholder, ::selection, ::backdrop, ::marker, ::view-transition-_ — YES
+|COMPOUND: ::backdrop+condition, RTL :is([dir="rtl"] _), nested @media+pseudo — YES
+|VALUES: var(), calc(), clamp(), light-dark(), color-mix(), container-type/name — YES
+|ANIM: transition (shorthand+individual), transitionBehavior:allow-discrete, animation, stylex.keyframes — YES
+|WHEN: stylex.when.ancestor(':hover'/':focus-within'/':active'/':disabled') — YES
+|WHEN: stylex.when.descendant(':hover'), siblingBefore(':checked'), siblingAfter(':checked'), anySibling(':hover') — YES
+|WHEN: stylex.when.ancestor('[data-attr]') — NO (pseudo selectors only, must start with ":")
+|NESTING: CSS nesting with & — NO (use stylex.when.ancestor/descendant/sibling for parent-child state)
+|API: stylex.firstThatWorks() for CSS fallbacks (e.g. display: grid with flex fallback) — YES
+|API: stylex.positionTry() for anchor positioning @position-try — YES
+|API: stylex.types.color/length/etc for typed CSS variables in defineVars — YES
+|API: stylex.defineConsts() for compile-time constants — YES
+|DYNAMIC: Functions in stylex.create for runtime values — YES
+|VARS: stylex.defineVars, stylex.createTheme (require .stylex.ts files) — YES
+|LAYOUT: grid, flex+gap, aspect-ratio, overscrollBehavior, scrollbar-gutter/width — YES
+|PATTERN: dialog entry animation -> @starting-style (not useState+rAF)
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [facebook/astryx](https://github.com/facebook/astryx) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-06-25 -->
