@@ -5,11 +5,11 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [EthanKim88/26-AITU-FINAL-SNAPSHOT](https://github.com/EthanKim88/26-AITU-FINAL-SNAPSHOT).
+Original source: `AGENTS.md` in [EthanKim88/26-AITU-FINAL-SNAPSHOT](https://github.com/EthanKim88/26-AITU-FINAL-SNAPSHOT).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
