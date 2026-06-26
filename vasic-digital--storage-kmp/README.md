@@ -7,11 +7,11 @@ digital.vasic.storage - KMP network storage service interfaces and abstractions
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [vasic-digital/Storage-KMP](https://github.com/vasic-digital/Storage-KMP).
+Original source: `CLAUDE.md` in [vasic-digital/Storage-KMP](https://github.com/vasic-digital/Storage-KMP).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
