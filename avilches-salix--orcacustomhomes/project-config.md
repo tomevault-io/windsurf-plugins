@@ -1,29 +1,174 @@
 ---
 trigger: always_on
-description: The three most important security patterns in Payload CMS
+description: You are an expert Payload CMS developer. When working with Payload projects, follow these rules:
 ---
 
+# Payload CMS Development Rules
 
-# CRITICAL SECURITY PATTERNS
+You are an expert Payload CMS developer. When working with Payload projects, follow these rules:
 
-These are the three most critical security patterns that MUST be followed in every Payload CMS project.
+## Core Principles
 
-## 1. Local API Access Control (MOST IMPORTANT)
+1. **TypeScript-First**: Always use TypeScript with proper types from Payload
+2. **Security-Critical**: Follow all security patterns, especially access control
+3. **Type Generation**: Run `generate:types` script after schema changes
+4. **Transaction Safety**: Always pass `req` to nested operations in hooks
+5. **Access Control**: Understand Local API bypasses access control by default
+6. **Access Control**: Ensure roles exist when modifiyng collection or globals with access controls
 
-**By default, Local API operations bypass ALL access control**, even when passing a user.
+### Code Validation
+
+- To validate typescript correctness after modifying code run `tsc --noEmit`
+- Generate import maps after creating or modifying components.
+
+## Project Structure
+
+```
+src/
+├── app/
+│   ├── (frontend)/          # Frontend routes
+│   └── (payload)/           # Payload admin routes
+├── collections/             # Collection configs
+├── globals/                 # Global configs
+├── components/              # Custom React components
+├── hooks/                   # Hook functions
+├── access/                  # Access control functions
+└── payload.config.ts        # Main config
+```
+
+## Configuration
+
+### Minimal Config Pattern
 
 ```typescript
-// ❌ SECURITY BUG: Passes user but ignores their permissions
+import { buildConfig } from 'payload'
+import { mongooseAdapter } from '@payloadcms/db-mongodb'
+import { lexicalEditor } from '@payloadcms/richtext-lexical'
+import path from 'path'
+import { fileURLToPath } from 'url'
+
+const filename = fileURLToPath(import.meta.url)
+const dirname = path.dirname(filename)
+
+export default buildConfig({
+  admin: {
+    user: 'users',
+    importMap: {
+      baseDir: path.resolve(dirname),
+    },
+  },
+  collections: [Users, Media],
+  editor: lexicalEditor(),
+  secret: process.env.PAYLOAD_SECRET,
+  typescript: {
+    outputFile: path.resolve(dirname, 'payload-types.ts'),
+  },
+  db: mongooseAdapter({
+    url: process.env.DATABASE_URL,
+  }),
+})
+```
+
+## Collections
+
+### Basic Collection
+
+```typescript
+import type { CollectionConfig } from 'payload'
+
+export const Posts: CollectionConfig = {
+  slug: 'posts',
+  admin: {
+    useAsTitle: 'title',
+    defaultColumns: ['title', 'author', 'status', 'createdAt'],
+  },
+  fields: [
+    { name: 'title', type: 'text', required: true },
+    { name: 'slug', type: 'text', unique: true, index: true },
+    { name: 'content', type: 'richText' },
+    { name: 'author', type: 'relationship', relationTo: 'users' },
+  ],
+  timestamps: true,
+}
+```
+
+### Auth Collection with RBAC
+
+```typescript
+export const Users: CollectionConfig = {
+  slug: 'users',
+  auth: true,
+  fields: [
+    {
+      name: 'roles',
+      type: 'select',
+      hasMany: true,
+      options: ['admin', 'editor', 'user'],
+      defaultValue: ['user'],
+      required: true,
+      saveToJWT: true, // Include in JWT for fast access checks
+      access: {
+        update: ({ req: { user } }) => user?.roles?.includes('admin'),
+      },
+    },
+  ],
+}
+```
+
+## Fields
+
+### Common Patterns
+
+```typescript
+// Auto-generate slugs
+import { slugField } from 'payload'
+slugField({ fieldToUse: 'title' })
+
+// Relationship with filtering
+{
+  name: 'category',
+  type: 'relationship',
+  relationTo: 'categories',
+  filterOptions: { active: { equals: true } },
+}
+
+// Conditional field
+{
+  name: 'featuredImage',
+  type: 'upload',
+  relationTo: 'media',
+  admin: {
+    condition: (data) => data.featured === true,
+  },
+}
+
+// Virtual field
+{
+  name: 'fullName',
+  type: 'text',
+  virtual: true,
+  hooks: {
+    afterRead: [({ siblingData }) => `${siblingData.firstName} ${siblingData.lastName}`],
+  },
+}
+```
+
+## CRITICAL SECURITY PATTERNS
+
+### 1. Local API Access Control (MOST IMPORTANT)
+
+```typescript
+// ❌ SECURITY BUG: Access control bypassed
 await payload.find({
   collection: 'posts',
-  user: someUser, // Access control is BYPASSED!
+  user: someUser, // Ignored! Operation runs with ADMIN privileges
 })
 
-// ✅ SECURE: Actually enforces the user's permissions
+// ✅ SECURE: Enforces user permissions
 await payload.find({
   collection: 'posts',
   user: someUser,
-  overrideAccess: false, // REQUIRED for access control
+  overrideAccess: false, // REQUIRED
 })
 
 // ✅ Administrative operation (intentional bypass)
@@ -33,16 +178,9 @@ await payload.find({
 })
 ```
 
-**When to use each:**
-
-- `overrideAccess: true` (default) - Server-side operations you trust (cron jobs, system tasks)
-- `overrideAccess: false` - When operating on behalf of a user (API routes, webhooks)
-
 **Rule**: When passing `user` to Local API, ALWAYS set `overrideAccess: false`
 
-## 2. Transaction Safety in Hooks
-
-**Nested operations in hooks without `req` break transaction atomicity.**
+### 2. Transaction Safety in Hooks
 
 ```typescript
 // ❌ DATA CORRUPTION RISK: Separate transaction
@@ -55,7 +193,7 @@ hooks: {
         // Missing req - runs in separate transaction!
       })
     },
-  ]
+  ],
 }
 
 // ✅ ATOMIC: Same transaction
@@ -68,22 +206,13 @@ hooks: {
         req, // Maintains atomicity
       })
     },
-  ]
+  ],
 }
 ```
 
-**Why This Matters:**
-
-- **MongoDB (with replica sets)**: Creates atomic session across operations
-- **PostgreSQL**: All operations use same Drizzle transaction
-- **SQLite (with transactions enabled)**: Ensures rollback on errors
-- **Without req**: Each operation runs independently, breaking atomicity
-
 **Rule**: ALWAYS pass `req` to nested operations in hooks
 
-## 3. Prevent Infinite Hook Loops
-
-**Hooks triggering operations that trigger the same hooks create infinite loops.**
+### 3. Prevent Infinite Hook Loops
 
 ```typescript
 // ❌ INFINITE LOOP
@@ -97,28 +226,14 @@ hooks: {
         req,
       }) // Triggers afterChange again!
     },
-  ]
+  ],
 }
 
 // ✅ SAFE: Use context flag
 hooks: {
   afterChange: [
-    async ({ doc, req, context }) => {
-      if (context.skipHooks) return
 
-      await req.payload.update({
-        collection: 'posts',
-        id: doc.id,
-        data: { views: doc.views + 1 },
-        context: { skipHooks: true },
-        req,
-      })
-    },
-  ]
-}
-```
-
-**Rule**: Use `req.context` flags to prevent hook loops
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [avilches-salix/orcacustomhomes](https://github.com/avilches-salix/orcacustomhomes) — distributed by [TomeVault](https://tomevault.io).
