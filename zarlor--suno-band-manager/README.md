@@ -7,11 +7,11 @@ AI-powered music production assistant for creating Suno-ready song packages — 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [zarlor/suno-band-manager](https://github.com/zarlor/suno-band-manager).
+Original source: `AGENTS.md` in [zarlor/suno-band-manager](https://github.com/zarlor/suno-band-manager).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
