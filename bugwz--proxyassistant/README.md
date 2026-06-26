@@ -7,11 +7,11 @@ chrome/firefox/edge browser proxy assistant plugin. 谷歌/火狐/微软浏览�
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [bugwz/ProxyAssistant](https://github.com/bugwz/ProxyAssistant).
+Original source: `CLAUDE.md` in [bugwz/ProxyAssistant](https://github.com/bugwz/ProxyAssistant).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
