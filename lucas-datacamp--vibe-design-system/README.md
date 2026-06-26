@@ -7,11 +7,11 @@ Astro + Tailwind 4 + DaisyUI design system scaffold
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [lucas-datacamp/vibe-design-system](https://github.com/lucas-datacamp/vibe-design-system).
+Original source: `CLAUDE.md` in [lucas-datacamp/vibe-design-system](https://github.com/lucas-datacamp/vibe-design-system).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
