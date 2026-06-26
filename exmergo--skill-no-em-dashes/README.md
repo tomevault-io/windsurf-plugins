@@ -7,13 +7,13 @@ A Claude Code skill that produces writing with zero em dashes, and, just as impo
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `.cursor/rules/*.mdc` in [exmergo/skill-no-em-dashes](https://github.com/exmergo/skill-no-em-dashes).
+Original source: `AGENTS.md` in [exmergo/skill-no-em-dashes](https://github.com/exmergo/skill-no-em-dashes).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
+- **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
