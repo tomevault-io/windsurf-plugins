@@ -7,11 +7,11 @@ Your AGENTS.md is probably lying. Detect stale paths, dead npm scripts, outdated
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [giacomo/agents-lint](https://github.com/giacomo/agents-lint).
+Original source: `CLAUDE.md` in [giacomo/agents-lint](https://github.com/giacomo/agents-lint).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
