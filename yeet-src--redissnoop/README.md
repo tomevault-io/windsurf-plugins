@@ -7,11 +7,11 @@ Live, zero-config Redis traffic profiler built on eBPF. Reads plaintext and TLS,
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [yeet-src/redissnoop](https://github.com/yeet-src/redissnoop).
+Original source: `AGENTS.md` in [yeet-src/redissnoop](https://github.com/yeet-src/redissnoop).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
