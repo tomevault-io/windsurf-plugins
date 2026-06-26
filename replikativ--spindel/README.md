@@ -7,11 +7,11 @@ Cross-platform FRP runtime with a git-like memory model.
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [replikativ/spindel](https://github.com/replikativ/spindel).
+Original source: `AGENTS.md` in [replikativ/spindel](https://github.com/replikativ/spindel).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
