@@ -7,11 +7,11 @@ AI-powered Product Management second brain. Capture chaos. Surface patterns. Nev
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [officebeats/beats-pm-kit](https://github.com/officebeats/beats-pm-kit).
+Original source: `CLAUDE.md` in [officebeats/beats-pm-kit](https://github.com/officebeats/beats-pm-kit).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
