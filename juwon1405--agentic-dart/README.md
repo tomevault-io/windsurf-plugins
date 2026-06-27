@@ -7,11 +7,11 @@ Agentic-DART — autonomous detection & response agent. Architecture-first, not 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [Juwon1405/agentic-dart](https://github.com/Juwon1405/agentic-dart).
+Original source: `CLAUDE.md` in [Juwon1405/agentic-dart](https://github.com/Juwon1405/agentic-dart).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
