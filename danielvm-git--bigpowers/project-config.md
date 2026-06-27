@@ -1,155 +1,95 @@
 ---
 trigger: always_on
-description: Create new bigpowers skills with proper structure, progressive disclosure, and bundled resources. Use when user wants to create, write, or build a new skill for the bigpowers lifecycle.
+description: Find deepening opportunities in a codebase, informed by the domain language in specs/tech-architecture/tech-stack.md and the decisions in specs/adr/. Use when the user wants to improve architecture, find refactoring opportunities, consolidate tightly-coupled modules, or make a codebase more testable and AI-navigable.
 ---
 
 
 
-# Craft Skill
+# Deepen Architecture
 
-> **HARD GATE** — Do NOT name a skill without a two-word verb-noun pair. Do NOT merge a new skill without running `sync-skills.sh` — the generated `.cursor/rules/` and `.gemini/` artifacts must match the source SKILL.md.
+Surface architectural friction and propose **deepening opportunities** — refactors that turn shallow modules into deep ones. The aim is testability and AI-navigability.
+
+**Distinct from `define-language` and `model-domain`:** Use this skill to find module-level refactoring opportunities in the codebase. Use `define-language` to produce a canonical glossary of terms. Use `model-domain` to stress-test a plan through a domain-model interview.
+
+> **HARD GATE** — Deep modules must solve a forcing function, not just be "nice abstractions." If you cannot articulate why the abstraction exists, it is premature.
+
+## Glossary
+
+Use these terms exactly in every suggestion. Consistent language is the point — don't drift into "component," "service," "API," or "boundary." Full definitions in [LANGUAGE.md](LANGUAGE.md).
+
+- **Module** — anything with an interface and an implementation (function, class, package, slice).
+- **Interface** — everything a caller must know to use the module: types, invariants, error modes, ordering, config. Not just the type signature.
+- **Implementation** — the code inside.
+- **Depth** — leverage at the interface: a lot of behaviour behind a small interface. **Deep** = high leverage. **Shallow** = interface nearly as complex as the implementation.
+- **Seam** — where an interface lives; a place behaviour can be altered without editing in place. (Use this, not "boundary.")
+- **Adapter** — a concrete thing satisfying an interface at a seam.
+- **Leverage** — what callers get from depth.
+- **Locality** — what maintainers get from depth: change, bugs, knowledge concentrated in one place.
+
+Key principles (see [LANGUAGE.md](LANGUAGE.md) for the full list):
+
+- **Deletion test**: imagine deleting the module. If complexity vanishes, it was a pass-through. If complexity reappears across N callers, it was earning its keep.
+- **The interface is the test surface.**
+- **One adapter = hypothetical seam. Two adapters = real seam.**
+
+This skill is _informed_ by the project's domain model — `specs/tech-architecture/tech-stack.md` and any `specs/adr/`. The domain language gives names to good seams; ADRs record decisions the skill should not re-litigate. See [CONTEXT-FORMAT.md](../model-domain/CONTEXT-FORMAT.md) and [ADR-FORMAT.md](../model-domain/ADR-FORMAT.md).
 
 ## Process
 
-1. **Gather requirements** — ask user about:
-   - What task/domain does the skill cover?
-   - What specific use cases should it handle?
-   - Does it need executable scripts or just instructions?
-   - Any reference materials to include?
-   - What specs/ output does it produce (if any)?
+### 1. Explore
 
-2. **Verify Principles** — Ensure the skill aligns with [PRINCIPLES.md](../docs/PRINCIPLES.md):
-   - Is it atomic (verb-noun)?
-   - Is it "deep" (simple interface, complex internal logic)?
-   - Does it include Hard Gates?
-   - Is it verifiable with a `.feature` file?
+Read existing documentation first:
 
-3. **Draft the skill** — create:
-   - SKILL.md with concise instructions (see [REFERENCE.md](REFERENCE.md) for template)
-   - Additional reference files if content exceeds 100 lines
-   - Utility scripts if deterministic operations needed
+- `specs/tech-architecture/tech-stack.md` (or `specs/tech-architecture/tech-stack.md` + each `specs/tech-architecture/tech-stack.md` in a multi-context repo)
+- Relevant ADRs in `specs/adr/`
 
-   **Auto-skill from library README:** When user provides a library README or API docs URL, extract: triggers, HARD GATEs, verify commands, specs/ output — draft SKILL.md without inventing APIs not in the source.
+If any of these files don't exist, proceed silently — don't flag their absence or suggest creating them upfront.
 
-4. Add `model:` frontmatter (`haiku` | `sonnet` | `opus`) per [model-profiles.md](../docs/references/model-profiles.md).
+Then use the Agent tool with `subagent_type=Explore` to walk the codebase. Don't follow rigid heuristics — explore organically and note where you experience friction:
 
-> **STREAM CONTINUITY** — When writing file content, output in continuous chunks of ~200 lines. Do not pause. Continue immediately until complete. If you need time, emit a placeholder comment rather than going silent.
+- Where does understanding one concept require bouncing between many small modules?
+- Where are modules **shallow** — interface nearly as complex as the implementation?
+- Where have pure functions been extracted just for testability, but the real bugs hide in how they're called?
+- Where do tightly-coupled modules leak across their seams?
+- Which parts of the codebase are untested, or hard to test through their current interface?
 
-5. **Review with user** — present draft and ask:
-   - Does this cover your use cases?
-   - Anything missing or unclear?
-   - Should any section be more/less detailed?
+Apply the **deletion test** to anything you suspect is shallow.
 
-## Naming Rules
+### 2. Module Depth score
 
-Every skill name must be a **two-word verb-noun pair**. See [REFERENCE.md](REFERENCE.md) for full rules, examples, and documented exceptions.
+For each candidate module, assign a **Module Depth score** (1–5, Ousterhout):
 
-## specs/ Output
+| Score | Meaning |
+|-------|---------|
+| 1 | Shallow — interface complexity ≈ implementation |
+| 3 | Balanced |
+| 5 | Deep — small interface, substantial hidden behavior |
 
-If the skill produces written output, it goes in `specs/` at the project root. Document the output file path in the skill body and in CONVENTIONS.md's output files table.
+Include the score in each candidate row. Prioritize score ≤ 2 for deepening.
 
-## Review Checklist
+### 3. Present candidates
 
-After drafting, verify:
+Present a numbered list of deepening opportunities. For each candidate:
 
-- [ ] Name is a two-word verb-noun pair (or follows grill-me exception)
-- [ ] Description includes triggers ("Use when...")
-- [ ] SKILL.md under 100 lines
-- [ ] No time-sensitive info
-- [ ] Consistent terminology with CONVENTIONS.md
-- [ ] specs/ output documented if applicable
-- [ ] `sync-skills.sh` run to propagate to Cursor/Gemini
+- **Files** — which files/modules are involved
+- **Problem** — why the current architecture is causing friction
+- **Solution** — plain English description of what would change
+- **Benefits** — explained in terms of locality and leverage, and how tests would improve
 
----
+**Use `specs/tech-architecture/tech-stack.md` vocabulary for the domain, and [LANGUAGE.md](LANGUAGE.md) vocabulary for the architecture.**
 
-# Craft Skill — Reference
+**ADR conflicts**: if a candidate contradicts an existing ADR, only surface it when the friction is real enough to warrant revisiting the ADR. Mark it clearly. Don't list every theoretical refactor an ADR forbids.
 
-## Naming Rules (full)
+Do NOT propose interfaces yet. Ask the user: "Which of these would you like to explore?"
 
-Every skill name must be a **two-word verb-noun pair**:
-- First word: a verb (survey, model, define, develop, audit…)
-- Second word: a noun from PMBOK 6 / Agile vocabulary (context, domain, language, tdd, code…)
-- Pronounceable in any language, searchable, no noise words, no encodings
-- Exception precedent: `grill-me` — kept for recognizability
+### 4. Grilling loop
 
-Good: `survey-context`, `audit-code`, `validate-fix`
-Bad: `context-surveyor`, `code-auditing-skill`, `fix-validator`
+Once the user picks a candidate, drop into a grilling conversation. Walk the design tree with them — constraints, dependencies, the shape of the deepened module, what sits behind the seam, what tests survive.
 
-Any new naming exception requires an entry in CONVENTIONS.md before the skill is published.
+Side effects happen inline as decisions crystallize:
 
-## Skill Structure
 
-```
-skill-name/
-├── SKILL.md           # Main instructions (required)
-├── REFERENCE.md       # Detailed docs (if needed)
-├── EXAMPLES.md        # Usage examples (if needed)
-└── scripts/           # Utility scripts (if needed)
-    └── helper.sh
-```
-
-## SKILL.md Template
-
-```md
----
-name: skill-name
-description: Brief description of capability. Use when [specific triggers].
----
-
-# Skill Name
-
-## Quick start
-
-[Minimal working example]
-
-## Workflows
-
-[Step-by-step processes with checklists for complex tasks]
-
-## Advanced features
-
-[Link to separate files: See [REFERENCE.md](REFERENCE.md)]
-```
-
-## Description Requirements
-
-The description is **the only thing your agent sees** when deciding which skill to load.
-
-**Format**:
-- Max 1024 chars
-- Write in third person
-- First sentence: what it does
-- Second sentence: "Use when [specific triggers]"
-
-**Good example**:
-```
-Investigate a bug by exploring the codebase to find root cause, then write a TDD-based fix plan to specs/bugs/BUG-*.md. Use when user reports a bug, wants to investigate a problem, or mentions "triage".
-```
-
-## When to Add Scripts
-
-Add utility scripts when:
-- Operation is deterministic (validation, formatting)
-- Same code would be generated repeatedly
-- Errors need explicit handling
-
-## When to Split Files
-
-Split into separate files when:
-- SKILL.md exceeds 100 lines
-- Content has distinct domains
-- Advanced features are rarely needed
-
-## sync-skills.sh Propagation
-
-After adding a new skill directory with SKILL.md, run `scripts/sync-skills.sh` from the bigpowers repo root. This automatically generates:
-- `.cursor/rules/<name>.mdc` — for Cursor
-- `.gemini/extensions/bigpowers/skills/<name>/SKILL.md` — Agent Skill
-- `.gemini/extensions/bigpowers/commands/<name>.toml` — Slash Command
-- `.gemini/extensions/bigpowers/commands/prompts/<name>.md` — Command Prompt
-- Updated `gemini-extension.json`
-
-verify: `bash scripts/sync-skills.sh 2>&1 | grep "skills synced"`
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [danielvm-git/bigpowers](https://github.com/danielvm-git/bigpowers) — distributed by [TomeVault](https://tomevault.io).
