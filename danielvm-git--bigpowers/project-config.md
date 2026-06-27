@@ -1,103 +1,136 @@
 ---
 trigger: always_on
-description: Meta-skill that enforces the 6-phase core loop (discover → elaborate → plan → build → verify → release) with hard gates. Use to coordinate multi-phase projects with guaranteed quality checkpoints. One-time command for the entire project lifecycle.
+description: Scans the active workspace for disposable artifacts—logs, caches, stale build output, and stray draft markdown—and proposes consolidation of scattered assets. Produces a reviewable list, asks for explicit confirmation before any delete or move, and optionally revises .gitignore. Use when the user says \"clean my room\", \"organize workspace\", \"workspace cleanup\", \"remove temp files\", \"organize assets\", \"gitignore\", or wants a safe tidy pass.
 ---
 
 
 
-# Orchestrate
-> **HARD GATE** — **HARD GATE** — Do NOT invoke orchestrate-project unless you have a clear multi-phase workflow. Single-skill tasks should use dedicated skills instead. Orchestrate is for complex, multi-stage work that requires coordination across phases.
+# Organize Workspace
+> **HARD GATE** — **HARD GATE** — Workspace structure must reflect domain structure. If the codebase feels disorganized, flag it. Disorganization != 'just a style thing;' it is a signal of domain misalignment.
 
 
-The orchestrate skill coordinates projects through a prescriptive 6-phase core loop with hard gates, ensuring consistent quality and preventing scope creep.
+## Principles
 
-## Quick Start
+- **Read-only first**: inventory and size (`du`, `ls -la`) before any change.
+- **Never delete or move** without a numbered list and **explicit user approval** (item-level or "approve all").
+- **Prefer `fd` / `ripgrep` / `find`** in that order; avoid blind `rm -rf` on vague globs.
+- **Do not** touch `.git/`, `node_modules/`, `venv/`, `.env*`, or SSH keys; flag them only if the user asked about them.
+- Confirm prompts in the **user's language** if they are not writing in English.
 
-```bash
-# Start a new project (initializes specs/ YAML cockpit and begins discover phase)
-claude /orchestrate --mode standard
+## 1. Establish scope
 
-# Or resume an existing project at the current phase
-claude /orchestrate --mode standard --resume
+- Default: **current project root** (where the user is working) or the path they name.
+- Record OS (macOS vs Linux) for ignore patterns (e.g. `.DS_Store`).
 
-# For low-risk scenarios (hotfixes, refactors on well-tested code)
-claude /orchestrate --mode fast-track
-```
+## 2. Classify candidates (scan)
 
-## The 6-Phase Core Loop
+Group findings under these **buckets**:
 
-1. **DISCOVER** (3-6 hours): Understand problem. Deliverables: `requirements/VISION_LATEST.yaml`, `requirements/SCOPE_LATEST.yaml`, `plans/TECH_STACK_LATEST.md`.
-2. **ELABORATE** (3-6 hours): Research solutions. Deliverables: Prior art in scope YAML, ADRs in `specs/adr/`.
-3. **PLAN** (2-4 hours): Write verifiable plan. Deliverables: `release-plan.yaml`, `epics/eNN-*.yaml` with `verify:` per task.
-4. **BUILD** (1-8 hours): Execute plan. Runs build-epic once per story in WSJF order. Deliverables: Code; update `execution-status.yaml`.
-5. **VERIFY** (1-3 hours): Validate success criteria. Deliverables: UAT evidence, `specs/EVALS-*.md` if used.
-6. **RELEASE** (30 min - 2 hours): Ship to production. Deliverables: Release tag (vX.Y.Z), `state.yaml` `release.last_tag`.
+| Bucket | Examples | Typical action |
+|--------|----------|----------------|
+| **Logs & temp** | `*.log`, `logs/`, `tmp/`, `temp/`, `*.pid` | Delete after confirm |
+| **Build / cache** | `dist/`, `build/`, `.next/`, `coverage/`, `.turbo/` | Delete if rebuildable |
+| **Package caches** | root `.cache/`, `__pycache__/` | Offer delete |
+| **Stray drafts** | root-level `*.md` named `draft`, `scratch`, `temp` | User picks: delete, move to `specs/`, or keep |
+| **Duplicate / dump dirs** | `old/`, `backup/`, `copy/`, `*_backup` | List + ask |
 
-### Checkpoint / resume
+Use quick size hints: `du -sh` per top-level dir; sort large items first.
 
-Track progress via `specs/state.yaml` `project_cycle`:
-- `project_cycle.current_phase`: current phase (1–6)
-- `project_cycle.completed_phases`: completed phase numbers
-- `handoff.next_skill`: skill for the current phase
-- On resume, read `project_cycle.current_phase` and continue from there
+## 3. Assets & data (organize, not only delete)
 
-See [REFERENCE.md](REFERENCE.md) for detailed phase specifications and gate types.
+If the user wants **organization**:
 
-## How Orchestrate Works
+1. Propose a **single convention**, e.g.:
+   - `assets/` — images, fonts, static media
+   - `data/` — JSON, CSV, fixtures, samples
+   - `specs/` — all planning and domain documents
+2. For each cluster of loose files, suggest **one target path** and a short rationale.
+3. Use **git-aware moves** when in a repo: `git mv` if tracked; otherwise `mv` and report.
+4. Never move secrets or production DB dumps into `docs/` or public `assets/`.
 
-1. **Maintains state.yaml** — Tracks current phase, `active_epic`, `active_flow`, decisions, risks.
-2. **Spawns appropriate skills** — Routes by `model:` frontmatter. Decisions pass only via `specs/state.yaml` `handoff` between spawns.
-3. **Methodology lenses** — If `specs/tech-architecture/test.md` or ADRs exist, apply at phase gates.
-4. **Enforces gates** — Hard stops if success criteria not met.
-5. **The Gatekeeper** — Between stories in BUILD: read `specs/execution-status.yaml`; previous story must be `done` before starting the next; use `build-epic` for the 8-step epic cycle.
-6. **Pauses for confirmation** — After each phase, asks "Ready to proceed?".
-7. **Snapshots** — `bash scripts/bp-yaml-snapshot.sh` before major release cuts.
+## 4. Present the plan
 
-## Orchestration Modes
+Output a table or numbered list:
 
-- **Standard**: Enforce all gates. Use for new features and major refactors.
-- **Fast-Track**: Skip negotiable gates. Use for hotfixes and minor improvements.
-- **Ad-Hoc**: Warnings only. Use for prototyping and spikes (non-production).
+- Path
+- Kind (log / build / draft / asset / other)
+- Approx size
+- Proposed action: **delete** | **move to …** | **keep**
 
-See [REFERENCE.md](REFERENCE.md) for full mode behaviors.
+Ask: *"Delete items 1–3? Move 4–5? Skip 6?"*
 
-## Verification
+## 5. Execute after approval
 
-All phases complete with artifacts:
-```bash
-verify: test -f specs/state.yaml && test -f specs/release-plan.yaml && test -f specs/product/SCOPE_LATEST.yaml && ls specs/epics/*.yaml 1>/dev/null && echo "✅ All phases complete"
-```
+- Deletes: on macOS, prefer a Trash-capable tool (e.g. `trash` from Homebrew) if installed; else `rm` with paths echoed back.
+- Moves: create dirs with `mkdir -p` first; one batch at a time.
+- **Verify**: re-run listing on affected parents; if anything failed, report stderr.
+
+## 6. Post-cleanup and `.gitignore` revision
+
+Do this when the repo is under Git and the cleanup surfaced **untracked** noise:
+
+1. **Inventory ignore sources**: root `.gitignore`, `.git/info/exclude`, any subpackage `.gitignore` files.
+2. **Map findings to rules**: for each deleted or recurring artifact class, check whether a pattern already exists; note gaps.
+3. **Propose a patch**: list only **concrete** changes — `+` add / `-` remove / `~` reword — with one-line why.
+4. **User must approve** the exact diff before editing the file.
+5. **Verify**: run `git check-ignore -v <path>` on 2–3 representative paths.
+
+See [REFERENCE.md](REFERENCE.md) for shell patterns, `.gitignore` mechanics, and safety checks.
 
 ---
 
-# Orchestrate Reference: Phases, Modes, and Workflows
+# clean-my-room — reference patterns
 
-Detailed documentation for the `orchestrate-project` meta-skill.
+Optional commands for the agent. Adapt paths; **dry-run** before bulk delete.
 
-## The 6-Phase Core Loop
+## Discover large top-level entries
 
-### PHASE 1: DISCOVER
-- **Goal**: Understand the problem completely and map existing context.
-- **Deliverables**: `requirements/VISION_LATEST.yaml`, `requirements/SCOPE_LATEST.yaml`, `plans/TECH_STACK_LATEST.md`.
-- **Skills**: `survey-context`, `elaborate-spec`, `grill-me`.
-- **Gate**: Confirm ("Is the problem clear?").
+```sh
+du -sh ./* .[!.]* 2>/dev/null | sort -hr | head -30
+```
 
-### PHASE 2: ELABORATE
-- **Goal**: Research solutions and lock architectural design.
-- **Deliverables**: Prior art in scope YAML, ADRs in `specs/adr/`.
-- **Skills**: `grill-me`, `model-domain`, `define-language`, `deepen-architecture`, `design-interface`.
-- **Gate**: Quality ≥94% (via `request-review`) + Confirm ("Are decisions locked?").
+## Find common logs (respect `.gitignore` when using fd)
 
-### PHASE 3: PLAN
-- **Goal**: Write a verifiable implementation plan with success criteria.
-- **Deliverables**: `release-plan.yaml`, `epics/eNN-*.yaml` with `verify:` per task.
-- **Skills**: `scope-work`, `slice-tasks`, `define-success`, `plan-work`.
-- **Gate**: Quality (request-review ≥94%) + slopcheck [SUS]/[SLOP].
+```sh
+fd -t f '\.log$' . 2>/dev/null
+fd 'npm-debug' . 2>/dev/null
+```
 
-### PHASE 4: BUILD
-- **Goal**: Execute the plan story-by-story using the 8-step `build-epic` cycle with TDD and vertical slices.
-- **Deliverables**: Code; `execution-status.yaml` updated per story; `specs/metrics/cycle-times.yaml` row per story.
-- **Skills**: `build-epic` (conductor) → per-story: `survey-context`, `plan-work`, `kickoff-branch`, `develop-tdd`, `verify-work`, `audit-code`, `commit-message`, `release-branch`.
+## Find build-like dirs (review list before `rm -rf`)
+
+```sh
+fd -t d '^(dist|build|out|target|\.next|coverage)$' . --max-depth 3 2>/dev/null
+```
+
+## Stray markdown at repo root (heuristic)
+
+```sh
+ls -1 ./*.md 2>/dev/null
+fd -t f '^(draft|scratch|untitled|TODO|notes)' . --max-depth 1 2>/dev/null
+```
+
+## Git-safe moves
+
+```sh
+git status -sb
+git check-ignore -v <path>   # was ignored?
+# Tracked: git mv old new
+# Untracked: mkdir -p … && mv old new
+```
+
+## `.gitignore` revision (after cleanup)
+
+**Goal:** stop regenerated junk from polluting `git status`, without hiding real source.
+
+1. **Read** root `.gitignore` and, in monorepos, `apps/*/.gitignore` / `packages/*/.gitignore` as needed. Check **`.git/info/exclude`** for machine-only rules that should *not* be committed (keep personal noise there; don’t copy into shared `.gitignore` unless the team agrees).
+2. **Per-path checks** (last match wins; shows which file defined the rule):
+
+   ```sh
+   git check-ignore -v path/to/artifact
+   git status -u --ignored    # optional: see ignored names (noisy)
+   ```
+
+3. **Pattern style**
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
