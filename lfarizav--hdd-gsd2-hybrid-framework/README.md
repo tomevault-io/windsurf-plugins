@@ -5,11 +5,11 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [lfarizav/hdd-gsd2-hybrid-framework](https://github.com/lfarizav/hdd-gsd2-hybrid-framework).
+Original source: `CLAUDE.md` in [lfarizav/hdd-gsd2-hybrid-framework](https://github.com/lfarizav/hdd-gsd2-hybrid-framework).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
