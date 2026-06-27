@@ -1,125 +1,127 @@
 ---
 trigger: always_on
-description: Detect GSD, spec-kit, or BMAD spec artifacts and transform them into bigpowers YAML layout (state.yaml, release-plan.yaml, epics/, requirements/, plans/, ADRs). Use when migrating foreign spec docs.
+description: Grilling session that challenges your plan against the existing domain model, sharpens terminology, and updates specs/tech-architecture/tech-stack.md and specs/adr/ inline as decisions crystallise. Use when user wants to stress-test a plan against their project's domain language and documented decisions.
 ---
 
 
 
-# Migrate Spec
+# Model Domain
 
-Transform existing GSD, spec-kit, or BMAD planning artifacts into the bigpowers `specs/` model. No code is written — the output is a set of bigpowers-format spec files the user can use immediately.
+**Distinct from `define-language` and `deepen-architecture`:** Use this skill to stress-test a plan through a grilling interview that resolves domain model decisions and captures invariants. Use `define-language` to produce a canonical glossary of terms. Use `deepen-architecture` to find module-level refactoring opportunities in code.
 
-## Quick start
+Interview me relentlessly about every aspect of this plan until we reach a shared understanding. Walk down each branch of the design tree, resolving dependencies between decisions one-by-one. For each question, provide your recommended answer.
 
-1. Run this skill from the root of the project being migrated (not the bigpowers repo itself).
-2. The skill auto-detects the source framework and presents its findings before transforming anything.
-3. All output goes to `specs/` at the project root.
+> **HARD GATE** — Capture invariants (what MUST always be true) and state machines (what transitions are legal) for core entities. If these are fuzzy, design will fail.
 
+Ask the questions one at a time, waiting for feedback on each question before continuing.
 
-## Red flags — stop and ask
+If a question can be answered by exploring the codebase, explore the codebase instead.
 
-Before proceeding, check for these rationalization traps:
+## Domain awareness
 
-- **Partial artifact set** — only one fingerprint file found (e.g. just `spec.md` with no `plan.md`). Don't assume it's a complete project. Ask: "I found only X — is this the full set of your spec artifacts?"
-- **Wrong trigger** — user said "migrate my code" or "migrate the database", not "migrate my specs". Confirm before running.
-- **Stale source** — source artifacts have commit dates older than 6 months with no recent activity. Flag: "These specs appear inactive since <date>. Are they still the source of truth?"
-- **Active divergence** — source `state.yaml` or `sprint-status.yaml` shows in-progress work. Flag: "There is active work in flight. Migrating now may lose in-progress context. Proceed?"
+During codebase exploration, also look for existing documentation:
 
-If any red flag fires: surface it, wait for explicit user confirmation before continuing.
+### File structure
 
-
-## Process
-
-### Step 1 — Detect the source framework
-
-Scan for the fingerprints below. Stop at first match; if multiple match, list them and ask the user which is primary.
-
-| Framework | Fingerprints (any one is sufficient) |
-|-----------|--------------------------------------|
-| **GSD** | `.planning/` directory; `.planning/ROADMAP.md`; `.planning/REQUIREMENTS.md` with `REQ-` IDs |
-| **spec-kit** | `.specify/` directory; `spec.md` + `plan.md` at root; `.github/skills/speckit-*/SKILL.md` |
-| **BMAD** | `_bmad/` directory; `_bmad-output/` directory; `prd.md` with `FR-` IDs; `epic-*.md` or `story-*.md` |
-
-If none found: ask the user which framework before proceeding.
-
-→ verify: `ls .planning/ 2>/dev/null && echo "GSD" || ls .specify/ 2>/dev/null && echo "spec-kit" || ls _bmad/ 2>/dev/null && echo "BMAD" || echo "BLOCKED: no known framework detected"`
-
-### Step 2 — Inventory the source artifacts
-
-List every artifact found matching the detected framework. Present the list to the user:
+Most repos have a single context:
 
 ```
-Detected: GSD
-Found:
-  ✓ .planning/ROADMAP.md
-  ✓ .planning/REQUIREMENTS.md  (12 REQ-XX items)
-  ✓ .planning/state.yaml
-  ✓ .planning/phases/01-auth/01-CONTEXT.md
-  ✗ .planning/METHODOLOGY.md  (not present)
-
-Skipping:
-  .planning/phases/01-auth/01-01-SUMMARY.md  (execution record; archived only)
-
-Proceed with migration? [yes / skip <artifact> / abort]
+/
+├── specs/
+│   ├── CONTEXT.md
+│   └── adr/
+│       ├── 0001-event-sourced-orders.md
+│       └── 0002-postgres-for-write-model.md
+└── src/
 ```
 
-→ verify: `find . -maxdepth 4 \( -name "ROADMAP.md" -o -name "spec.md" -o -name "prd.md" -o -name "REQUIREMENTS.md" \) 2>/dev/null | grep -v ".git" | head -15`
+If a `specs/tech-architecture/tech-stack.md` exists, the repo has multiple contexts. The map points to where each one lives:
 
-### Step 3 — Transform (one artifact at a time, show diffs)
-
-Apply the mapping from [REFERENCE.md](./REFERENCE.md) and [REFERENCE-GSD.md](./REFERENCE-GSD.md). For each target file:
-
-1. Show what will be created or appended (title + first 20 lines).
-2. Ask: "Create this? [yes / edit / skip]"
-3. On yes: write to `specs/`.
-
-#### ID Tracking (REQ-XX, FR-XX, UJ-XX)
-
-When source artifacts contain IDs (REQ-XX, FR-XX, UJ-XX), emit them as **first-class YAML fields** in `in_scope` entries, not YAML comments:
-
-```yaml
-# CORRECT — first-class id: field
-in_scope:
-  - id: REQ-001
-    description: "User can register with email/password"
-    source: "REQUIREMENTS.md"
-
-# DEPRECATED — comment-only
-in_scope:
-  - "User can register with email/password"  # REQ-001
+```
+/
+├── specs/
+│   ├── CONTEXT-MAP.md
+│   └── adr/                          ← system-wide decisions
+└── src/
+    ├── ordering/
+    │   └── specs/
+    │       ├── CONTEXT.md
+    │       └── adr/                  ← context-specific decisions
+    └── billing/
+        └── specs/
+            ├── CONTEXT.md
+            └── adr/
 ```
 
-**When source has no IDs:** Prompt the user: "No IDs found. Assign auto-generated IDs? [yes / no]". If yes, emit `REQ-{NNN}` with `# auto-generated` annotation.
+Create files lazily — only when you have something to write. If no `specs/tech-architecture/tech-stack.md` exists, create it when the first term is resolved. If no `specs/adr/` exists, create it when the first ADR is needed.
 
-**When source has MIXED IDs:** Items with IDs get `id:` fields; items without IDs receive auto-generated `REQ-NNN` entries. Document which were auto-generated in a comment block at the top of `in_scope`.
+## During the session
 
-See [REFERENCE.md — in_scope format with ID tracking](./REFERENCE.md#in_scope-format-with-id-tracking) for examples.
+### Challenge against the glossary
 
-#### Traceability Output (FR-XX, UJ-XX)
+When the user uses a term that conflicts with the existing language in `specs/tech-architecture/tech-stack.md`, call it out immediately. "Your glossary defines 'cancellation' as X, but you seem to mean Y — which is it?"
 
-When source has FR-XX or UJ-XX IDs, emit `specs/product/REQUIREMENTS_TRACE.yaml` for end-to-end requirement traceability:
+### Sharpen fuzzy language
 
-```yaml
-trace:
-  - id: FR-001
-    type: functional_requirement
-    description: "User can register with email/password"
-    epic: e02-auth-ui
-    story: e02s01
-    verify: "grep -q 'FR-001' specs/product/SCOPE_LATEST.yaml && echo OK"
-  - id: UJ-001
-    type: user_journey
-    description: "New user completes registration flow"
-    epic: e02-auth-ui
-    story: e02s01
+When the user uses vague or overloaded terms, propose a precise canonical term. "You're saying 'account' — do you mean the Customer or the User? Those are different things."
+
+### Discuss concrete scenarios
+
+When domain relationships are being discussed, stress-test them with specific scenarios. Invent scenarios that probe edge cases and force the user to be precise about the boundaries between concepts.
+
+### Cross-reference with code
+
+When the user states how something works, check whether the code agrees. If you find a contradiction, surface it: "Your code cancels entire Orders, but you just said partial cancellation is possible — which is right?"
+
+### Update specs/tech-architecture/tech-stack.md inline
+
+When a term is resolved, update `specs/tech-architecture/tech-stack.md` right there. Don't batch these up — capture them as they happen. Use the format in [CONTEXT-FORMAT.md](./CONTEXT-FORMAT.md).
+
+Don't couple `specs/tech-architecture/tech-stack.md` to implementation details. Only include terms that are meaningful to domain experts.
+
+### Offer ADRs sparingly
+
+Only offer to create an ADR when all three are true:
+
+1. **Hard to reverse** — the cost of changing your mind later is meaningful
+2. **Surprising without context** — a future reader will wonder "why did they do it this way?"
+3. **The result of a real trade-off** — there were genuine alternatives and you picked one for specific reasons
+
+If any of the three is missing, skip the ADR. Use the format in [ADR-FORMAT.md](./ADR-FORMAT.md).
+
+## Concurrency safety audit
+
+When the plan touches shared state, async, or multi-threaded code:
+
+- [ ] List every **shared mutable** location (globals, singletons, module-level caches).
+- [ ] For each: who reads, who writes, synchronization mechanism (lock, actor, immutable copy).
+- [ ] Flag **race risks** (check-then-act, non-atomic read-modify-write) with severity.
+- [ ] Record findings in `specs/tech-architecture/tech-stack.md` under `## Concurrency` or in an ADR if architectural.
+
+---
+
+# ADR Format
+
+ADRs live in `docs/adr/` and use sequential numbering: `0001-slug.md`, `0002-slug.md`, etc.
+
+Create the `docs/adr/` directory lazily — only when the first ADR is needed.
+
+## Template
+
+```md
+# {Short title of the decision}
+
+{1-3 sentences: what's the context, what did we decide, and why.}
 ```
 
-**Existing trace file:** If `REQUIREMENTS_TRACE.yaml` already exists, prompt: "REQUIREMENTS_TRACE.yaml exists. [overwrite / merge / skip]"
+That's it. An ADR can be a single paragraph. The value is in recording *that* a decision was made and *why* — not in filling out sections.
 
-**No FR-XX/UJ-XX found:** Skip trace file; add note to state.yaml handoff: "No FR-XX/UJ-XX IDs found — traceability file skipped".
+## Optional sections
 
-See [REFERENCE.md — REQUIREMENTS_TRACE.yaml format](./REFERENCE.md#requirements_traceyaml-format) for the complete schema.
+Only include these when they add genuine value. Most ADRs won't need them.
 
+- **Status** frontmatter (`proposed | accepted | deprecated | superseded by ADR-NNNN`) — useful when decisions are revisited
+- **Considered Options** — only when the rejected alternatives are worth remembering
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
