@@ -1,158 +1,123 @@
 ---
 trigger: always_on
-description: \"Package registry publishing for npm, crates.io, PyPI, and Homebrew. Verifies prerequisites, runs the publish command, confirms success, and surfaces actionable error hints on failure.\
+description: \"Streamlined fast-path for trivial data-only fixes — no TDD, no branching ceremony. Collapses 6 skills into 2 for changes that are purely data with no logic risk. Aborts with fallback to investigate-bug if guardrails trigger.\
 ---
 
 
 
-# Publish Package
 
-> **HARD GATE** — Do not attempt to publish without verifying prerequisites. Missing auth tokens, stale builds, or duplicate versions cause CI failures that are hard to debug post-push.
->
-> **HARD GATE** — Always run `--dry-run` first. Package registries are append-only — a bad publish cannot be fully undone on most registries.
+# Quick Fix
 
-Publish packages to language-specific registries. Detects package type from manifest files, verifies publish prerequisites, runs the registry-specific publish command, and confirms the version appears on the registry.
+> **HARD GATE** — ALL entry criteria must pass before invoking quick-fix. If any guardrail triggers during execution, abort immediately and fall back to `investigate-bug`. Do NOT use quick-fix for logic changes, multi-file edits, or diffs > 5 lines.
+
+Fast-track for trivial data-only fixes that do not require the full bug-fix chain.
+
+When a bug fix is purely data — an add-missing-key, a typo correction, a config value update — the standard 6-skill chain (investigate-bug → diagnose-root → develop-tdd → kickoff-branch → verify-work → release-branch) is wasteful overhead. Quick-fix collapses it to 2 skills: **quick-fix** then **release-branch**.
+
+## Entry Criteria (ALL must be true)
+
+Before invoking quick-fix, evaluate every item in this checklist:
+
+1. **Purely data change** — adding a missing key, fixing a typo, updating a config value, correcting a constant
+2. **No logic change** — no function signature, condition, loop, or control flow is modified
+3. **No refactor risk** — the change does not reorganize or rename existing structures
+4. **No API surface change** — no exported symbol, interface, or contract changes
+5. **Verifiable with a single assertion** — one test, one curl, one grep can prove it works
+6. **Affects ≤ 1 file**
+7. **Affects ≤ 5 lines changed**
+
+## Guardrails (HARD ABORT — all must pass)
+
+If ANY guardrail triggers, **abort immediately** and suggest `investigate-bug` instead:
+
+| Guardrail | Check |
+|-----------|-------|
+| **>1 file** | The fix touches more than one file |
+| **>5 lines** | The diff exceeds 5 lines |
+| **Logic change** | Any function signature, condition, or loop is modified |
+| **Complex verify** | The verify command is more than one pipeline |
+| **Test breakage** | Running `npm test` or equivalent breaks any existing test |
+
+> **Fallback:** If any guardrail triggers, tell the user: *"This fix exceeds quick-fix guardrails. Use `investigate-bug` for the full TDD bug-fix chain instead."*
+
+## Fast-Path Workflow
+
+Only 2 skills needed for eligible fixes:
+
+```
+quick-fix  →  apply change, run one-line verify, commit with fix:
+release-branch  →  merge and ship (existing skill)
+```
+
+**Skipped skills (with justification):**
+
+| Skipped skill | Why skipped |
+|---------------|-------------|
+| `investigate-bug` | Root cause is obvious (data gap, not logic error) |
+| `diagnose-root` | No isolation needed — the data point is the root cause |
+| `develop-tdd` | No logic to test — single assertion proves correctness |
+| `kickoff-branch` | Change is so small it does not warrant a separate worktree |
+
+> Justification is included in the `fix:` commit body so the audit trail is preserved.
 
 ## Process
 
-### 1. Detect package type
+### 1. Evaluate entry criteria
 
-Read the project root for manifest files to determine the package type:
+Run the entry criteria checklist above. If any criterion fails → abort, suggest `investigate-bug`.
 
-| Manifest | Registry | Publish command |
-|----------|----------|----------------|
-| `package.json` | npm | `npm publish --access public` |
-| `Cargo.toml` | crates.io | `cargo publish` |
-| `setup.py` / `pyproject.toml` | PyPI | `twine upload dist/*` or `flit publish` |
-| `Formula/<name>.rb` | Homebrew | `brew bump-formula-pr` |
-| Multiple detected | Polyglot | Error: specify registry with `--registry <npm|crates.io|pypi|brew>` |
+### 2. Apply the fix
 
-If no manifest is found, prompt the user to specify the type or pass `--type <npm|crates.io|pypi|brew>`.
+Make the data change — add the missing key, fix the typo, update the value. Keep it to ≤5 lines in 1 file.
 
-### 2. Verify prerequisites
+### 3. Verify
 
-Before attempting any publish, run all applicable checks:
+Run the single-assertion verify command. Example:
 
-**npm (`package.json`):**
 ```bash
-# Check auth token exists
-if [ -z "${NPM_TOKEN:-}" ]; then
-  if [ ! -f ~/.npmrc ] || ! grep -q "_authToken" ~/.npmrc; then
-    echo "FAIL: NPM_TOKEN not set. Set via: export NPM_TOKEN=<token> or add //registry.npmjs.org/:_authToken=<token> to .npmrc"
-    exit 1
-  fi
-fi
-
-# Check version not already published
-PACKAGE_NAME=$(node -p "require('./package.json').name")
-CURRENT_VER=$(node -p "require('./package.json').version")
-if npm view "$PACKAGE_NAME@$CURRENT_VER" version 2>/dev/null; then
-  echo "FAIL: Version $CURRENT_VER already published for $PACKAGE_NAME. Bump version first."
-  exit 1
-fi
-
-# Check build artifacts are fresh
-if [ -d dist ] || [ -d lib ]; then
-  LATEST_BUILD=$(find dist lib 2>/dev/null -name "*.js" -o -name "*.cjs" -o -name "*.mjs" | xargs ls -t 2>/dev/null | head -1)
-  PACKAGE_MODIFIED=$(stat -f %m package.json 2>/dev/null || stat -c %Y package.json 2>/dev/null)
-  if [ -n "$LATEST_BUILD" ] && [ -n "$PACKAGE_MODIFIED" ]; then
-    BUILD_TIME=$(stat -f %m "$LATEST_BUILD" 2>/dev/null || stat -c %Y "$LATEST_BUILD" 2>/dev/null)
-    if [ "$BUILD_TIME" -lt "$PACKAGE_MODIFIED" ]; then
-      echo "WARNING: Build artifacts may be stale (package.json modified after last build). Run npm run build first."
-    fi
-  fi
-fi
-
-# Check CHANGELOG is updated
-if [ -f CHANGELOG.md ]; then
-  if ! grep -q "$CURRENT_VER" CHANGELOG.md 2>/dev/null; then
-    echo "WARNING: Version $CURRENT_VER not found in CHANGELOG.md. Update changelog before publish."
-  fi
-fi
+grep -q "Bosnia" src/flags.js && echo "FIX VERIFIED" || echo "FIX FAILED"
 ```
 
-**crates.io (`Cargo.toml`):**
-```bash
-# Check auth token exists
-if [ -z "${CARGO_REGISTRY_TOKEN:-}" ]; then
-  if [ ! -f ~/.cargo/config.toml ] || ! grep -q "token" ~/.cargo/config.toml; then
-    echo "FAIL: CARGO_REGISTRY_TOKEN not set. Set via: export CARGO_REGISTRY_TOKEN=<token> or add to ~/.cargo/config.toml"
-    exit 1
-  fi
-fi
+### 4. Commit
 
-# Check version not already published
-CRATE_NAME=$(grep '^name' Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
-CURRENT_VER=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
-if cargo search "$CRATE_NAME" 2>/dev/null | grep -q "^${CRATE_NAME}.*\"$CURRENT_VER\""; then
-  echo "FAIL: Version $CURRENT_VER already published for $CRATE_NAME. Bump version in Cargo.toml first."
-  exit 1
-fi
+```bash
+git add <file>
+git commit -m "fix(<scope>): <description>"
+git commit --amend -m "fix(<scope>): <description>
+
+Skipped skills (justified for data-only change):
+- investigate-bug: root cause is a data gap, not a logic error
+- diagnose-root: the missing data point is the root cause
+- develop-tdd: single assertion proves correctness
+- kickoff-branch: change is too small for a separate worktree"
 ```
 
-**PyPI (`setup.py` / `pyproject.toml`):**
-```bash
-# Check auth token exists
-if [ -z "${TWINE_PASSWORD:-}" ] && [ -z "${POETRY_PYPI_TOKEN_PYPI:-}" ]; then
-  if [ ! -f ~/.pypirc ]; then
-    echo "FAIL: PyPI token not configured. Set TWINE_PASSWORD or create ~/.pypirc"
-    exit 1
-  fi
-fi
+### 5. Release
 
-# Check for build artifacts
-if [ ! -d dist ] || [ -z "$(ls dist/*.whl 2>/dev/null)" ]; then
-  echo "WARNING: No .whl files found in dist/. Run: python -m build"
-fi
+Invoke `release-branch` to merge and ship.
+
+## Verify
+
+```bash
+test -f quick-fix/SKILL.md && echo "OK: skill file exists" || echo "FAIL: no skill file"
+grep -q "name: quick-fix" quick-fix/SKILL.md && echo "OK: frontmatter" || echo "FAIL: frontmatter"
+grep -qi "data.only\|trivial\|fast.path\|guardrail\|abort" quick-fix/SKILL.md && echo "OK: entry criteria and guardrails"
+grep -q "quick-fix" SKILL-INDEX.md && echo "OK: in SKILL-INDEX"
 ```
 
-### 3. Run publish
+## Example
 
-After all prerequisite checks pass, run the registry-specific command:
+### Bosnia flag missing from FLAGS dictionary
 
-```bash
-# npm
-npm publish --access public
-
-# crates.io
-cargo publish
-
-# PyPI
-python -m twine upload dist/*  # or: poetry publish
-
-# Homebrew (opens PR, does not publish directly)
-brew bump-formula-pr --url=<tarball-url> <formula-name>
+```gherkin
+Given a bug where FLAGS dictionary is missing entry "Bosnia"
+And no logic depends on the missing entry (purely a data gap)
+When the agent invokes quick-fix
+Then the missing entry is added to the dictionary
+And a one-line verify confirms the key exists: grep -q "Bosnia" src/flags.js
+And a fix: commit is created with the skipped-skills rationale in the body
+And the change is ready for release-branch
 ```
-
-### 4. Verify publish success
-
-After publish, confirm the version appears on the registry:
-
-```bash
-# npm
-npm view "$PACKAGE_NAME" versions --json 2>/dev/null | grep -q "\"$CURRENT_VER\"" && echo "OK: npm publish confirmed"
-
-# crates.io
-cargo search "$CRATE_NAME" 2>/dev/null | grep -q "^${CRATE_NAME}.*\"$CURRENT_VER\"" && echo "OK: crates.io publish confirmed"
-
-# PyPI
-pip index versions "$PACKAGE_NAME" 2>/dev/null | grep -q "$CURRENT_VER" && echo "OK: PyPI publish confirmed"
-```
-
-### 5. Error handling
-
-On failure, surface actionable hints:
-
-```bash
-# Generic failure handler
-if [ $? -ne 0 ]; then
-  case "$REGISTRY" in
-    npm)
-      echo "FAIL: npm publish failed."
-      echo "  Common causes:"
-      echo "  - NPM_TOKEN not set in secrets: add to GitHub repo secrets"
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [danielvm-git/bigpowers](https://github.com/danielvm-git/bigpowers) — distributed by [TomeVault](https://tomevault.io).
