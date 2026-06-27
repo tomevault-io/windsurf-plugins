@@ -1,75 +1,127 @@
 ---
 trigger: always_on
-description: \"Derives the tech-stack doc from scratch by scanning the codebase — analyzes stack, architecture, and gray areas (error handling, API shapes) and persists findings into specs/tech-architecture/tech-stack.md. Run when the tech doc doesn't exist yet; use survey-context to consume it once it does.\
+description: Detect GSD, spec-kit, or BMAD spec artifacts and transform them into bigpowers YAML layout (state.yaml, release-plan.yaml, epics/, requirements/, plans/, ADRs). Use when migrating foreign spec docs.
 ---
 
 
 
-# Map Codebase
+# Migrate Spec
 
-Perform a deep architectural and structural analysis of the codebase. Unlike `survey-context` which identifies "where we are", `map-codebase` identifies "what we are dealing with" and "how things are done".
+Transform existing GSD, spec-kit, or BMAD planning artifacts into the bigpowers `specs/` model. No code is written — the output is a set of bigpowers-format spec files the user can use immediately.
 
-> **Use this vs survey-context:** `map-codebase` BUILDS the tech-stack doc by scanning the codebase from scratch. `survey-context` READS existing specs/tech-architecture docs without re-deriving them. Run `map-codebase` when `specs/tech-architecture/tech-stack.md` doesn't exist yet; run `survey-context` when it does.
+## Quick start
 
-> **HARD GATE** — Cold analysis only. Do NOT assume architectural patterns without reading the code. If the codebase structure surprises you, call out the delta.
+1. Run this skill from the root of the project being migrated (not the bigpowers repo itself).
+2. The skill auto-detects the source framework and presents its findings before transforming anything.
+3. All output goes to `specs/` at the project root.
+
+
+## Red flags — stop and ask
+
+Before proceeding, check for these rationalization traps:
+
+- **Partial artifact set** — only one fingerprint file found (e.g. just `spec.md` with no `plan.md`). Don't assume it's a complete project. Ask: "I found only X — is this the full set of your spec artifacts?"
+- **Wrong trigger** — user said "migrate my code" or "migrate the database", not "migrate my specs". Confirm before running.
+- **Stale source** — source artifacts have commit dates older than 6 months with no recent activity. Flag: "These specs appear inactive since <date>. Are they still the source of truth?"
+- **Active divergence** — source `state.yaml` or `sprint-status.yaml` shows in-progress work. Flag: "There is active work in flight. Migrating now may lose in-progress context. Proceed?"
+
+If any red flag fires: surface it, wait for explicit user confirmation before continuing.
+
 
 ## Process
 
-### 1. Identify Core Stack & Dependencies
-- Scan `package.json`, `Cargo.toml`, `requirements.txt`, etc.
-- Identify primary framework, runtime, and critical libraries (ORM, Auth, State, UI).
-- Note version constraints and any deprecated or unusual dependencies.
+### Step 1 — Detect the source framework
 
-### 2. Map High-Level Architecture
-- Identify the entry points (CLI, Web, API).
-- Map the primary data flow (e.g., Controller → Service → Repository).
-- Identify where business logic lives vs. where I/O lives.
-- Look for established patterns (e.g., hexagonal, layered, feature-folders).
+Scan for the fingerprints below. Stop at first match; if multiple match, list them and ask the user which is primary.
 
-### 3. Analyze "Gray Areas" (The "How")
-Search for patterns and anti-patterns in these categories:
-- **Error Handling:** Are exceptions caught early or bubbled? Is there a global error handler? Are error messages structured?
-- **API Shapes:** Is it REST, GraphQL, or RPC? What is the casing (camelCase, snake_case)? How are responses structured?
-- **Type Safety:** Is it strictly typed? Are there many `any` or `unsafe` blocks? Are interfaces used for DIP?
-- **Observability:** Is there structured logging? Are there health checks? Where do logs go?
-- **Testing:** What is the test coverage strategy? Are mocks used? Where do tests live?
+| Framework | Fingerprints (any one is sufficient) |
+|-----------|--------------------------------------|
+| **GSD** | `.planning/` directory; `.planning/ROADMAP.md`; `.planning/REQUIREMENTS.md` with `REQ-` IDs |
+| **spec-kit** | `.specify/` directory; `spec.md` + `plan.md` at root; `.github/skills/speckit-*/SKILL.md` |
+| **BMAD** | `_bmad/` directory; `_bmad-output/` directory; `prd.md` with `FR-` IDs; `epic-*.md` or `story-*.md` |
 
-### 4. Identify Planning "Signals"
-Look for signals that will influence upcoming plans:
-- **Consistency Gaps:** "Half the project uses async/await, the other half uses Promises."
-- **Debt Hotspots:** "The `AuthManager` is 1500 lines and handles both JWT and session logic."
-- **Integration Points:** "We need to talk to the Stripe API, but there's no wrapper yet."
-- **Conventions:** "The team always uses functional components over classes."
+If none found: ask the user which framework before proceeding.
 
-### 5. Persist to specs/tech-architecture/tech-stack.md
-Compile all findings into `specs/tech-architecture/tech-stack.md`. This file serves as the project's "Long-Term Memory".
+→ verify: `ls .planning/ 2>/dev/null && echo "GSD" || ls .specify/ 2>/dev/null && echo "spec-kit" || ls _bmad/ 2>/dev/null && echo "BMAD" || echo "BLOCKED: no known framework detected"`
 
-```markdown
-# Project Context
+### Step 2 — Inventory the source artifacts
 
-## Stack
-- [Framework/Language]
-- [Key Libraries]
+List every artifact found matching the detected framework. Present the list to the user:
 
-## Architecture
-- [Pattern Description]
-- [Data Flow]
+```
+Detected: GSD
+Found:
+  ✓ .planning/ROADMAP.md
+  ✓ .planning/REQUIREMENTS.md  (12 REQ-XX items)
+  ✓ .planning/state.yaml
+  ✓ .planning/phases/01-auth/01-CONTEXT.md
+  ✗ .planning/METHODOLOGY.md  (not present)
 
-## Conventions (Observed)
-- [Error Handling Pattern]
-- [API Design]
-- [Type System]
+Skipping:
+  .planning/phases/01-auth/01-01-SUMMARY.md  (execution record; archived only)
 
-## Signals / Active Considerations
-- [Gap 1]
-- [Hotspot 2]
+Proceed with migration? [yes / skip <artifact> / abort]
 ```
 
-## When to Use
-- When first joining a project.
-- Before a major refactor or architectural change.
-- When `survey-context` reveals a lack of domain knowledge.
-- To refresh `specs/tech-architecture/tech-stack.md` after significant changes.
+→ verify: `find . -maxdepth 4 \( -name "ROADMAP.md" -o -name "spec.md" -o -name "prd.md" -o -name "REQUIREMENTS.md" \) 2>/dev/null | grep -v ".git" | head -15`
+
+### Step 3 — Transform (one artifact at a time, show diffs)
+
+Apply the mapping from [REFERENCE.md](./REFERENCE.md) and [REFERENCE-GSD.md](./REFERENCE-GSD.md). For each target file:
+
+1. Show what will be created or appended (title + first 20 lines).
+2. Ask: "Create this? [yes / edit / skip]"
+3. On yes: write to `specs/`.
+
+#### ID Tracking (REQ-XX, FR-XX, UJ-XX)
+
+When source artifacts contain IDs (REQ-XX, FR-XX, UJ-XX), emit them as **first-class YAML fields** in `in_scope` entries, not YAML comments:
+
+```yaml
+# CORRECT — first-class id: field
+in_scope:
+  - id: REQ-001
+    description: "User can register with email/password"
+    source: "REQUIREMENTS.md"
+
+# DEPRECATED — comment-only
+in_scope:
+  - "User can register with email/password"  # REQ-001
+```
+
+**When source has no IDs:** Prompt the user: "No IDs found. Assign auto-generated IDs? [yes / no]". If yes, emit `REQ-{NNN}` with `# auto-generated` annotation.
+
+**When source has MIXED IDs:** Items with IDs get `id:` fields; items without IDs receive auto-generated `REQ-NNN` entries. Document which were auto-generated in a comment block at the top of `in_scope`.
+
+See [REFERENCE.md — in_scope format with ID tracking](./REFERENCE.md#in_scope-format-with-id-tracking) for examples.
+
+#### Traceability Output (FR-XX, UJ-XX)
+
+When source has FR-XX or UJ-XX IDs, emit `specs/product/REQUIREMENTS_TRACE.yaml` for end-to-end requirement traceability:
+
+```yaml
+trace:
+  - id: FR-001
+    type: functional_requirement
+    description: "User can register with email/password"
+    epic: e02-auth-ui
+    story: e02s01
+    verify: "grep -q 'FR-001' specs/product/SCOPE_LATEST.yaml && echo OK"
+  - id: UJ-001
+    type: user_journey
+    description: "New user completes registration flow"
+    epic: e02-auth-ui
+    story: e02s01
+```
+
+**Existing trace file:** If `REQUIREMENTS_TRACE.yaml` already exists, prompt: "REQUIREMENTS_TRACE.yaml exists. [overwrite / merge / skip]"
+
+**No FR-XX/UJ-XX found:** Skip trace file; add note to state.yaml handoff: "No FR-XX/UJ-XX IDs found — traceability file skipped".
+
+See [REFERENCE.md — REQUIREMENTS_TRACE.yaml format](./REFERENCE.md#requirements_traceyaml-format) for the complete schema.
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [danielvm-git/bigpowers](https://github.com/danielvm-git/bigpowers) — distributed by [TomeVault](https://tomevault.io).
