@@ -7,11 +7,11 @@ Spec-driven development for Claude Code — author validated, ISO/IEC/IEEE 29148
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [agent-ix/quoin](https://github.com/agent-ix/quoin).
+Original source: `CLAUDE.md` in [agent-ix/quoin](https://github.com/agent-ix/quoin).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
