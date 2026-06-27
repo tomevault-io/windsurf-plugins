@@ -7,11 +7,11 @@ Run your own background coding agents on Kubernetes - isolated pods, injected cr
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [dam-agents/dam](https://github.com/dam-agents/dam).
+Original source: `CLAUDE.md` in [dam-agents/dam](https://github.com/dam-agents/dam).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
