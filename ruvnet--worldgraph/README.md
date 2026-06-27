@@ -7,12 +7,12 @@ Privacy-aware environmental digital twin for ambient/RF sensing in Rust — a ty
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `copilot-instructions.md` in [ruvnet/worldgraph](https://github.com/ruvnet/worldgraph).
+Original source: `AGENTS.md` in [ruvnet/worldgraph](https://github.com/ruvnet/worldgraph).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
+- **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
