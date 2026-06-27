@@ -1,186 +1,97 @@
 ---
 trigger: always_on
-description: \"CI pipeline setup with pre-built templates and local validation. Generates GitHub Actions workflows, validates YAML syntax and permissions, supports dry-run via act/gh. The CI equivalent of wire-observability.\
+description: Add structured JSON logging, observability commands, and idempotent setup scripts to a project. Use when a project needs production-readiness instrumentation, when user wants structured logging, or as a production-readiness gate at any phase of development.
 ---
 
 
 
-# Wire CI
+# Wire Observability
+> **HARD GATE** — **HARD GATE** — Observability is not optional. Before shipping, verify: structured logging is in place, key metrics are instrumented, error cases emit signals. 'We'll add metrics later' becomes 'never.'
 
-> **HARD GATE** — Do not ship a project without CI. Run this skill before first merge to main or when adding CI to an existing project.
->
-> **HARD GATE** — CI that is untestable locally will break every cycle. Always run `--validate` after generating workflows and `--dry-run` before pushing.
 
-Generate, validate, and test CI workflows. Detects your project type, produces platform-appropriate GitHub Actions configurations, and provides local verification to catch auth, permissions, and syntax issues before they reach CI.
+Add structured logging, observability commands, and idempotent setup scripts. Can be invoked at any phase — recommended at the end of the first working slice, before the first deploy.
 
 ## What this sets up
 
-1. **CI workflow** — `.github/workflows/ci.yaml` with test, lint, typecheck, build steps
-2. **Release workflow** — `.github/workflows/release.yaml` with semantic-release (if applicable)
-3. **`--validate` mode** — checks YAML syntax, workflow permissions, required secrets, and common pitfalls
-4. **`--dry-run` mode** — runs workflows locally via `act` or `gh workflow run` to prove correctness before push
-5. **Failure pattern documentation** — common CI failure categories and their fixes
+1. **Structured JSON logging** — machine-readable logs for debugging and observability
+2. **Observability commands** — how to check the system's health documented in CLAUDE.md
+3. **Idempotent setup scripts** — scripts that can be run repeatedly without side effects
 
 ## Process
 
-### 1. Detect project type
+### 1. Assess current state
 
-Read the project root for manifest files to determine which template to use:
+Check what's already in place:
+- Is there a logging library? (pino, winston, structlog, zap, slog, etc.)
+- Is logging JSON or plain text?
+- Is there a health check endpoint or command?
+- Are there setup scripts? Are they idempotent?
 
-| Manifest | Type | Template |
-|----------|------|----------|
-| `Cargo.toml` | Rust | Rust CI: test, clippy, fmt, build |
-| `package.json` | Node | Node CI: test, lint, typecheck, build |
-| `setup.py` / `pyproject.toml` | Python | Python CI: pytest, ruff/mypy/flake8, build |
-| `go.mod` | Go | Go CI: test, vet, staticcheck, build |
-| `CMakeLists.txt` | C/C++ | C/C++ CI: cmake build, ctest |
-| Multiple detected | Polyglot | Combined workflows or error if ambiguous |
+### 2. Add structured JSON logging
 
-If no manifest is found, prompt the user to specify the type or pass `--type <rust|node|python|go|cpp>`.
+**For user-facing CLI output:** plain text is fine.
+**For everything else:** structured JSON.
 
-### 2. Generate CI workflow
-
-Create `.github/workflows/ci.yaml` with standard steps derived from the project type and its manifest:
-
-**Rust template (`Cargo.toml`):**
-```yaml
-name: CI
-on: [push, pull_request]
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions-rust/toolchain@v1
-        with:
-          toolchain: stable
-          components: clippy, rustfmt
-      - run: cargo fmt --all -- --check
-      - run: cargo clippy -- -D warnings
-      - run: cargo test
-      - run: cargo build --release
+Structured log entry format:
+```json
+{
+  "level": "info",
+  "timestamp": "2025-01-15T10:23:45.123Z",
+  "message": "User created",
+  "userId": "usr_abc123",
+  "requestId": "req_xyz789"
+}
 ```
 
-**Node template (`package.json`):**
-```yaml
-name: CI
-on: [push, pull_request]
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-      - run: npm ci
-      - run: npm test
-      - run: npm run lint 2>/dev/null || true
-      - run: npm run typecheck 2>/dev/null || true
-      - run: npm run build 2>/dev/null || true
+Guidelines:
+- Include `level`, `timestamp`, `message` in every entry
+- Add context fields relevant to the operation (userId, requestId, traceId)
+- Log at boundaries: HTTP requests in/out, DB queries, external API calls, background job start/end
+- Log errors with stack traces: `logger.error({ err, context }, "Operation failed")`
+- **Never log secrets, passwords, tokens, or PII**
+
+### 3. Document observability commands in CLAUDE.md
+
+Add an "Observability" section to the project's CLAUDE.md:
+
+```markdown
+## Observability
+
+| What | Command |
+|------|---------|
+| View logs | `<log tail command>` |
+| Health check | `<health check command>` |
+| Check DB connection | `<db ping command>` |
+| View metrics | `<metrics command>` |
 ```
 
-**Python template (`setup.py` / `pyproject.toml`):**
-```yaml
-name: CI
-on: [push, pull_request]
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: pip
-      - run: pip install -e ".[dev]" || pip install -e .
-      - run: pip install pytest ruff mypy
-      - run: ruff check .
-      - run: mypy . 2>/dev/null || true
-      - run: pytest
-```
+### 4. Write idempotent setup scripts
 
-**Go template (`go.mod`):**
-```yaml
-name: CI
-on: [push, pull_request]
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: stable
-          cache: true
-      - run: go vet ./...
-      - run: go test ./...
-      - run: go build ./...
-```
+An idempotent script can be run multiple times and always produces the same result (no errors on re-run).
 
-**C/C++ template (`CMakeLists.txt`):**
-```yaml
-name: CI
-on: [push, pull_request]
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - run: cmake -B build
-      - run: cmake --build build
-      - run: ctest --test-dir build
-```
-
-### 3. Generate release workflow (if semantic-release detected)
-
-If the project has semantic-release configured (in `package.json`, `.releaserc`, or `release.config.js`), also generate `.github/workflows/release.yaml`:
-
-```yaml
-name: Release
-on:
-  push:
-    branches: [main]
-jobs:
-  release:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      issues: write
-      pull-requests: write
-      id-token: write
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-      - run: npm ci
-      - run: npm run build 2>/dev/null || true
-      - run: npx semantic-release
-        env:
-          GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: \${{ secrets.NPM_TOKEN }}
-```
-
-> **NPM_TOKEN is required** for publishing to npm. Without it, semantic-release will fail at the publish step. See `--validate` to check this.
-
-### 4. Validate workflows (`--validate`)
-
-Run `wire-ci --validate` to check all generated workflow files:
+Pattern: check if the thing already exists before creating it.
 
 ```bash
-# Validate YAML syntax
-for f in .github/workflows/*.yaml; do
-  python3 -c "import yaml; yaml.safe_load(open('$f'))" || echo "FAIL: $f has YAML syntax errors"
-done
+#!/usr/bin/env bash
+set -euo pipefail
 
-# Check permissions block presence
+# Idempotent: only create if not exists
+if ! psql -c "SELECT 1 FROM pg_database WHERE datname = 'myapp'" | grep -q 1; then
+  createdb myapp
+  echo "Database created"
+else
+  echo "Database already exists, skipping"
+fi
+```
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+Place setup scripts in `scripts/setup.sh` (or language-appropriate equivalent). Document the command in CLAUDE.md under Commands.
+
+### 5. Verify
+
+- [ ] Run the app and confirm JSON logs appear in the correct format
+- [ ] Run `scripts/setup.sh` twice — second run should produce no errors
+- [ ] Health check command returns success
+- [ ] No sensitive data in log output
 
 ---
 > Source: [danielvm-git/bigpowers](https://github.com/danielvm-git/bigpowers) — distributed by [TomeVault](https://tomevault.io).
