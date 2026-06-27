@@ -1,130 +1,156 @@
 ---
 trigger: always_on
-description: \"PLANNING SPINE STEP 3 of 3 — Plan the work: write detailed implementation tasks into the active epic capsule (specs/epics/eNN-slug/). Produces countable-story-format .md specs and runnable -tasks.yaml files. Use after slice-tasks (step 2). Not a substitute for scope-work (step 1) or slice-tasks (step 2).\
+description: \"Package registry publishing for npm, crates.io, PyPI, and Homebrew. Verifies prerequisites, runs the publish command, confirms success, and surfaces actionable error hints on failure.\
 ---
 
 
 
-# Plan Work
+# Publish Package
 
-> **Spine position:** Step 3 — scope-work → slice-tasks → plan-work.
-
-Produce a detailed, verifiable implementation plan in the **active epic capsule directory** (`specs/epics/eNN-slug/`). Output: a story spec `.md` file (countable-story-format) and a decoupled `eNNsYY-tasks.yaml` with runnable verify commands. "I think it works" is not a step.
-
-> **HARD GATE** — Do NOT proceed with a plan until the task's success criteria are clear. If success is ambiguous, run `define-success` first to convert the task into "step → verify: <cmd>" pairs.
+> **HARD GATE** — Do not attempt to publish without verifying prerequisites. Missing auth tokens, stale builds, or duplicate versions cause CI failures that are hard to debug post-push.
 >
-> **RECURSIVE DISCIPLINE** — This lifecycle applies to EVERY task, including updating these skills. Never skip planning because a task is "meta" or "just documentation."
+> **HARD GATE** — Always run `--dry-run` first. Package registries are append-only — a bad publish cannot be fully undone on most registries.
 
-## Pre-flight
-
-Read: `release-plan.yaml`, `product/SCOPE_LATEST.yaml`, active `epics/<capsule>/epic.yaml`, `tech-architecture/tech-stack.md`, `product/GLOSSARY_LATEST.yaml`.
-
-> **ZOOM-OUT MANDATE** (v1.17.0) — If modifying an existing module: (1) State the module's **purpose**. (2) Name its **callers**. (3) List its **contracts**. Cannot answer all three? Stop — scope is misunderstood.
-
-If this plan touches an existing module, run `assess-impact` first to understand blast radius.
-
-> **DISCOVERY MANDATE** (v1.18.0) — For external API integration, verify the API signature via local docs or search and quote at least one technical detail in the step's context.
-
-> **MULTIPLE INTERPRETATIONS (HARD GATE)** — If the task admits ≥2 valid interpretations, list them and get a user decision before drafting any steps.
-
-> **COMPLEXITY PUSHBACK (HARD GATE)** — Every new abstraction MUST include a one-sentence "Reason for Depth." If it can't be filled non-trivially, the abstraction is premature — use inline code instead.
-
-> **SLOPCHECK (HARD GATE)** — For every external package, tag it `[OK]`, `[SUS]`, or `[SLOP]`. `[SUS]`/`[SLOP]` require human approval before execution.
-
-## Invocation modes
-
-- Default: full plan with zoom-out mandate, impact assessment, slopcheck
-- `--fast`: Skip zoom-out and impact assessment. Use for tasks under 3 BCPs with no module interface changes.
+Publish packages to language-specific registries. Detects package type from manifest files, verifies publish prerequisites, runs the registry-specific publish command, and confirms the version appears on the registry.
 
 ## Process
 
-> **Timing:** `bash scripts/bp-timing.sh start plan-work` at invocation; `bash scripts/bp-timing.sh end plan-work` before handoff.
+### 1. Detect package type
 
-1. **Explore** — Use `Explore` subagent to understand affected modules, existing test patterns, similar prior art, and dependencies.
+Read the project root for manifest files to determine the package type:
 
-2. **Draft steps** — Break implementation into the smallest possible steps where each step leaves the codebase working, has one observable outcome, and can be verified with a single command. Red-flag check: name any rationalization you caught before moving to step 3.
+| Manifest | Registry | Publish command |
+|----------|----------|----------------|
+| `package.json` | npm | `npm publish --access public` |
+| `Cargo.toml` | crates.io | `cargo publish` |
+| `setup.py` / `pyproject.toml` | PyPI | `twine upload dist/*` or `flit publish` |
+| `Formula/<name>.rb` | Homebrew | `brew bump-formula-pr` |
+| Multiple detected | Polyglot | Error: specify registry with `--registry <npm|crates.io|pypi|brew>` |
 
-3. **Write capsule story spec + tasks** — Output two files inside the active epic capsule. See [REFERENCE.md](REFERENCE.md) for file formats and the plan-template.
+If no manifest is found, prompt the user to specify the type or pass `--type <npm|crates.io|pypi|brew>`.
 
-4. **Verify step format** — Every step MUST follow: `N. <What to do> → verify: <runnable command>`. See [REFERENCE.md](REFERENCE.md) for good/bad examples.
+### 2. Verify prerequisites
 
-5. **Review with user** — Confirm step order, granularity, and that verify commands are runnable in this project.
+Before attempting any publish, run all applicable checks:
 
-After writing capsule tasks, suggest `kickoff-branch` (if not already on a feature branch) then `build-epic`, `execute-plan`, or `develop-tdd`.
+**npm (`package.json`):**
+```bash
+# Check auth token exists
+if [ -z "${NPM_TOKEN:-}" ]; then
+  if [ ! -f ~/.npmrc ] || ! grep -q "_authToken" ~/.npmrc; then
+    echo "FAIL: NPM_TOKEN not set. Set via: export NPM_TOKEN=<token> or add //registry.npmjs.org/:_authToken=<token> to .npmrc"
+    exit 1
+  fi
+fi
 
-## Handoff
+# Check version not already published
+PACKAGE_NAME=$(node -p "require('./package.json').name")
+CURRENT_VER=$(node -p "require('./package.json').version")
+if npm view "$PACKAGE_NAME@$CURRENT_VER" version 2>/dev/null; then
+  echo "FAIL: Version $CURRENT_VER already published for $PACKAGE_NAME. Bump version first."
+  exit 1
+fi
 
-Gate: READY -> next: kickoff-branch
-Writes: state.yaml handoff.next_skill = kickoff-branch
+# Check build artifacts are fresh
+if [ -d dist ] || [ -d lib ]; then
+  LATEST_BUILD=$(find dist lib 2>/dev/null -name "*.js" -o -name "*.cjs" -o -name "*.mjs" | xargs ls -t 2>/dev/null | head -1)
+  PACKAGE_MODIFIED=$(stat -f %m package.json 2>/dev/null || stat -c %Y package.json 2>/dev/null)
+  if [ -n "$LATEST_BUILD" ] && [ -n "$PACKAGE_MODIFIED" ]; then
+    BUILD_TIME=$(stat -f %m "$LATEST_BUILD" 2>/dev/null || stat -c %Y "$LATEST_BUILD" 2>/dev/null)
+    if [ "$BUILD_TIME" -lt "$PACKAGE_MODIFIED" ]; then
+      echo "WARNING: Build artifacts may be stale (package.json modified after last build). Run npm run build first."
+    fi
+  fi
+fi
 
----
-
-# Plan Work — Reference
-
-## Output file formats
-
-### Story spec: `specs/epics/<capsule>/eNNsYY-<slug>.md`
-
-Populated countable-story-format with all 20 sections. Minimum maturity: 3 (Countable). Acceptance criteria in §17.
-
-### Task checklist: `specs/epics/<capsule>/eNNsYY-tasks.yaml`
-
-```yaml
-story_id: e01s01
-title: Login
-status: todo
-bcps: 3
-tasks:
-  - id: 1
-    description: "Add login form component tests"
-    verify: "npm test -- login-form.test.tsx"
-    status: todo
+# Check CHANGELOG is updated
+if [ -f CHANGELOG.md ]; then
+  if ! grep -q "$CURRENT_VER" CHANGELOG.md 2>/dev/null; then
+    echo "WARNING: Version $CURRENT_VER not found in CHANGELOG.md. Update changelog before publish."
+  fi
+fi
 ```
 
-Update `specs/epics/<capsule>/epic.yaml` manifest to list the story and its BCPs. Run `bash scripts/sync-status-from-epics.sh` after structural changes.
+**crates.io (`Cargo.toml`):**
+```bash
+# Check auth token exists
+if [ -z "${CARGO_REGISTRY_TOKEN:-}" ]; then
+  if [ ! -f ~/.cargo/config.toml ] || ! grep -q "token" ~/.cargo/config.toml; then
+    echo "FAIL: CARGO_REGISTRY_TOKEN not set. Set via: export CARGO_REGISTRY_TOKEN=<token> or add to ~/.cargo/config.toml"
+    exit 1
+  fi
+fi
 
-## Plan template
-
-```
-### Story [X.Y]: [title] — Implementation Steps
-
-**type:** feat | fix | refactor
-**context:** domain | infra
-**Context**: [One paragraph: what this story implements and why]
-
-## Steps
-
-1. [Step description] (ref: ADR-NNNN or commit SHA) → verify: `<runnable command>`
-2. [Step description] (ref: ADR-NNNN or commit SHA) → verify: `<runnable command>`
-...
-
-## Verification Script (Step-by-Step)
-
-[A human-readable, step-by-step script for the user to verify the story's outcome.]
-
-1. [Action 1: e.g. Start the server]
-2. [Action 2: e.g. Open browser to http://localhost:3000]
-3. [Observation: e.g. Verify that the login modal appears]
-
-## Out of scope
-
-- [Explicit exclusions]
-
-## Risks
-
-- [Anything that could go wrong and how to detect it early]
+# Check version not already published
+CRATE_NAME=$(grep '^name' Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
+CURRENT_VER=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
+if cargo search "$CRATE_NAME" 2>/dev/null | grep -q "^${CRATE_NAME}.*\"$CURRENT_VER\""; then
+  echo "FAIL: Version $CURRENT_VER already published for $CRATE_NAME. Bump version in Cargo.toml first."
+  exit 1
+fi
 ```
 
-## Verify step format rules
+**PyPI (`setup.py` / `pyproject.toml`):**
+```bash
+# Check auth token exists
+if [ -z "${TWINE_PASSWORD:-}" ] && [ -z "${POETRY_PYPI_TOKEN_PYPI:-}" ]; then
+  if [ ! -f ~/.pypirc ]; then
+    echo "FAIL: PyPI token not configured. Set TWINE_PASSWORD or create ~/.pypirc"
+    exit 1
+  fi
+fi
 
-Every step MUST follow this exact format:
-```
-N. <What to do> → verify: <runnable command that proves it worked>
+# Check for build artifacts
+if [ ! -d dist ] || [ -z "$(ls dist/*.whl 2>/dev/null)" ]; then
+  echo "WARNING: No .whl files found in dist/. Run: python -m build"
+fi
 ```
 
-**Good examples:**
+### 3. Run publish
+
+After all prerequisite checks pass, run the registry-specific command:
+
+```bash
+# npm
+npm publish --access public
+
+# crates.io
+cargo publish
+
+# PyPI
+python -m twine upload dist/*  # or: poetry publish
+
+# Homebrew (opens PR, does not publish directly)
+brew bump-formula-pr --url=<tarball-url> <formula-name>
 ```
-1. Add User model with email and name fields → verify: npm test -- user.test.ts
+
+### 4. Verify publish success
+
+After publish, confirm the version appears on the registry:
+
+```bash
+# npm
+npm view "$PACKAGE_NAME" versions --json 2>/dev/null | grep -q "\"$CURRENT_VER\"" && echo "OK: npm publish confirmed"
+
+# crates.io
+cargo search "$CRATE_NAME" 2>/dev/null | grep -q "^${CRATE_NAME}.*\"$CURRENT_VER\"" && echo "OK: crates.io publish confirmed"
+
+# PyPI
+pip index versions "$PACKAGE_NAME" 2>/dev/null | grep -q "$CURRENT_VER" && echo "OK: PyPI publish confirmed"
+```
+
+### 5. Error handling
+
+On failure, surface actionable hints:
+
+```bash
+# Generic failure handler
+if [ $? -ne 0 ]; then
+  case "$REGISTRY" in
+    npm)
+      echo "FAIL: npm publish failed."
+      echo "  Common causes:"
+      echo "  - NPM_TOKEN not set in secrets: add to GitHub repo secrets"
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
