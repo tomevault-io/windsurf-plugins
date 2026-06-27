@@ -1,223 +1,255 @@
 ---
 trigger: always_on
-description: Comprehensive rules to help you write advanced Trigger.dev tasks
+description: Configure your Trigger.dev project with a trigger.config.ts file
 ---
 
-# Trigger.dev Advanced Tasks (v4)
+# Trigger.dev Configuration (v4)
 
-**Advanced patterns and features for writing tasks**
+**Complete guide to configuring `trigger.config.ts` with build extensions**
 
-## Tags & Organization
-
-```ts
-import { task, tags } from "@trigger.dev/sdk";
-
-export const processUser = task({
-  id: "process-user",
-  run: async (payload: { userId: string; orgId: string }, { ctx }) => {
-    // Add tags during execution
-    await tags.add(`user_${payload.userId}`);
-    await tags.add(`org_${payload.orgId}`);
-
-    return { processed: true };
-  },
-});
-
-// Trigger with tags
-await processUser.trigger(
-  { userId: "123", orgId: "abc" },
-  { tags: ["priority", "user_123", "org_abc"] } // Max 10 tags per run
-);
-
-// Subscribe to tagged runs
-for await (const run of runs.subscribeToRunsWithTag("user_123")) {
-  console.log(`User task ${run.id}: ${run.status}`);
-}
-```
-
-**Tag Best Practices:**
-
-- Use prefixes: `user_123`, `org_abc`, `video:456`
-- Max 10 tags per run, 1-64 characters each
-- Tags don't propagate to child tasks automatically
-
-## Batch Triggering v2
-
-Enhanced batch triggering with larger payloads and streaming ingestion.
-
-### Limits
-
-- **Maximum batch size**: 1,000 items (increased from 500)
-- **Payload per item**: 3MB each (increased from 1MB combined)
-- Payloads > 512KB automatically offload to object storage
-
-### Rate Limiting (per environment)
-
-| Tier | Bucket Size | Refill Rate |
-|------|-------------|-------------|
-| Free | 1,200 runs | 100 runs/10 sec |
-| Hobby | 5,000 runs | 500 runs/5 sec |
-| Pro | 5,000 runs | 500 runs/5 sec |
-
-### Concurrent Batch Processing
-
-| Tier | Concurrent Batches |
-|------|-------------------|
-| Free | 1 |
-| Hobby | 10 |
-| Pro | 10 |
-
-### Usage
+## Basic Configuration
 
 ```ts
-import { myTask } from "./trigger/myTask";
+import { defineConfig } from "@trigger.dev/sdk";
 
-// Basic batch trigger (up to 1,000 items)
-const runs = await myTask.batchTrigger([
-  { payload: { userId: "user-1" } },
-  { payload: { userId: "user-2" } },
-  { payload: { userId: "user-3" } },
-]);
+export default defineConfig({
+  project: "<project-ref>", // Required: Your project reference
+  dirs: ["./trigger"], // Task directories
+  runtime: "node", // "node", "node-22", or "bun"
+  logLevel: "info", // "debug", "info", "warn", "error"
 
-// Batch trigger with wait
-const results = await myTask.batchTriggerAndWait([
-  { payload: { userId: "user-1" } },
-  { payload: { userId: "user-2" } },
-]);
-
-for (const result of results) {
-  if (result.ok) {
-    console.log("Result:", result.output);
-  }
-}
-
-// With per-item options
-const batchHandle = await myTask.batchTrigger([
-  {
-    payload: { userId: "123" },
-    options: {
-      idempotencyKey: "user-123-batch",
-      tags: ["priority"],
+  // Default retry settings
+  retries: {
+    enabledInDev: false,
+    default: {
+      maxAttempts: 3,
+      minTimeoutInMs: 1000,
+      maxTimeoutInMs: 10000,
+      factor: 2,
+      randomize: true,
     },
   },
-  {
-    payload: { userId: "456" },
-    options: {
-      idempotencyKey: "user-456-batch",
-    },
+
+  // Build configuration
+  build: {
+    autoDetectExternal: true,
+    keepNames: true,
+    minify: false,
+    extensions: [], // Build extensions go here
   },
-]);
-```
 
-## Debouncing
-
-Consolidate multiple triggers into a single execution by debouncing task runs with a unique key and delay window.
-
-### Use Cases
-
-- **User activity updates**: Batch rapid user actions into a single run
-- **Webhook deduplication**: Handle webhook bursts without redundant processing
-- **Search indexing**: Combine document updates instead of processing individually
-- **Notification batching**: Group notifications to prevent user spam
-
-### Basic Usage
-
-```ts
-await myTask.trigger(
-  { userId: "123" },
-  {
-    debounce: {
-      key: "user-123-update",  // Unique identifier for debounce group
-      delay: "5s",              // Wait duration ("5s", "1m", or milliseconds)
-    },
-  }
-);
-```
-
-### Execution Modes
-
-**Leading Mode** (default): Uses payload/options from the first trigger; subsequent triggers only reschedule execution time.
-
-```ts
-// First trigger sets the payload
-await myTask.trigger({ action: "first" }, {
-  debounce: { key: "my-key", delay: "10s" }
-});
-
-// Second trigger only reschedules - payload remains "first"
-await myTask.trigger({ action: "second" }, {
-  debounce: { key: "my-key", delay: "10s" }
-});
-// Task executes with { action: "first" }
-```
-
-**Trailing Mode**: Uses payload/options from the most recent trigger.
-
-```ts
-await myTask.trigger(
-  { data: "latest-value" },
-  {
-    debounce: {
-      key: "trailing-example",
-      delay: "10s",
-      mode: "trailing",
-    },
-  }
-);
-```
-
-In trailing mode, these options update with each trigger:
-- `payload` — task input data
-- `metadata` — run metadata
-- `tags` — run tags (replaces existing)
-- `maxAttempts` — retry attempts
-- `maxDuration` — maximum compute time
-- `machine` — machine preset
-
-### Important Notes
-
-- Idempotency keys take precedence over debounce settings
-- Compatible with `triggerAndWait()` — parent runs block correctly on debounced execution
-- Debounce key is scoped to the task
-
-## Concurrency & Queues
-
-```ts
-import { task, queue } from "@trigger.dev/sdk";
-
-// Shared queue for related tasks
-const emailQueue = queue({
-  name: "email-processing",
-  concurrencyLimit: 5, // Max 5 emails processing simultaneously
-});
-
-// Task-level concurrency
-export const oneAtATime = task({
-  id: "sequential-task",
-  queue: { concurrencyLimit: 1 }, // Process one at a time
-  run: async (payload) => {
-    // Critical section - only one instance runs
+  // Global lifecycle hooks
+  onStartAttempt: async ({ payload, ctx }) => {
+    console.log("Global task start");
+  },
+  onSuccess: async ({ payload, output, ctx }) => {
+    console.log("Global task success");
+  },
+  onFailure: async ({ payload, error, ctx }) => {
+    console.log("Global task failure");
   },
 });
+```
 
-// Per-user concurrency
-export const processUserData = task({
-  id: "process-user-data",
-  run: async (payload: { userId: string }) => {
-    // Override queue with user-specific concurrency
-    await childTask.trigger(payload, {
-      queue: {
-        name: `user-${payload.userId}`,
-        concurrencyLimit: 2,
-      },
-    });
-  },
-});
+## Build Extensions
 
-export const emailTask = task({
-  id: "send-email",
-  queue: emailQueue, // Use shared queue
-  run: async (payload: { to: string }) => {
+### Database & ORM
+
+#### Prisma
+
+```ts
+import { prismaExtension } from "@trigger.dev/build/extensions/prisma";
+
+extensions: [
+  prismaExtension({
+    schema: "prisma/schema.prisma",
+    version: "5.19.0", // Optional: specify version
+    migrate: true, // Run migrations during build
+    directUrlEnvVarName: "DIRECT_DATABASE_URL",
+    typedSql: true, // Enable TypedSQL support
+  }),
+];
+```
+
+#### TypeScript Decorators (for TypeORM)
+
+```ts
+import { emitDecoratorMetadata } from "@trigger.dev/build/extensions/typescript";
+
+extensions: [
+  emitDecoratorMetadata(), // Enables decorator metadata
+];
+```
+
+### Scripting Languages
+
+#### Python
+
+```ts
+import { pythonExtension } from "@trigger.dev/build/extensions/python";
+
+extensions: [
+  pythonExtension({
+    scripts: ["./python/**/*.py"], // Copy Python files
+    requirementsFile: "./requirements.txt", // Install packages
+    devPythonBinaryPath: ".venv/bin/python", // Dev mode binary
+  }),
+];
+
+// Usage in tasks
+const result = await python.runInline(`print("Hello, world!")`);
+const output = await python.runScript("./python/script.py", ["arg1"]);
+```
+
+### Browser Automation
+
+#### Playwright
+
+```ts
+import { playwright } from "@trigger.dev/build/extensions/playwright";
+
+extensions: [
+  playwright({
+    browsers: ["chromium", "firefox", "webkit"], // Default: ["chromium"]
+    headless: true, // Default: true
+  }),
+];
+```
+
+#### Puppeteer
+
+```ts
+import { puppeteer } from "@trigger.dev/build/extensions/puppeteer";
+
+extensions: [puppeteer()];
+
+// Environment variable needed:
+// PUPPETEER_EXECUTABLE_PATH: "/usr/bin/google-chrome-stable"
+```
+
+#### Lightpanda
+
+```ts
+import { lightpanda } from "@trigger.dev/build/extensions/lightpanda";
+
+extensions: [
+  lightpanda({
+    version: "latest", // or "nightly"
+    disableTelemetry: false,
+  }),
+];
+```
+
+### Media Processing
+
+#### FFmpeg
+
+```ts
+import { ffmpeg } from "@trigger.dev/build/extensions/core";
+
+extensions: [
+  ffmpeg({ version: "7" }), // Static build, or omit for Debian version
+];
+
+// Automatically sets FFMPEG_PATH and FFPROBE_PATH
+// Add fluent-ffmpeg to external packages if using
+```
+
+#### Audio Waveform
+
+```ts
+import { audioWaveform } from "@trigger.dev/build/extensions/audioWaveform";
+
+extensions: [
+  audioWaveform(), // Installs Audio Waveform 1.1.0
+];
+```
+
+### System & Package Management
+
+#### System Packages (apt-get)
+
+```ts
+import { aptGet } from "@trigger.dev/build/extensions/core";
+
+extensions: [
+  aptGet({
+    packages: ["ffmpeg", "imagemagick", "curl=7.68.0-1"], // Can specify versions
+  }),
+];
+```
+
+#### Additional NPM Packages
+
+Only use this for installing CLI tools, NOT packages you import in your code.
+
+```ts
+import { additionalPackages } from "@trigger.dev/build/extensions/core";
+
+extensions: [
+  additionalPackages({
+    packages: ["wrangler"], // CLI tools and specific versions
+  }),
+];
+```
+
+#### Additional Files
+
+```ts
+import { additionalFiles } from "@trigger.dev/build/extensions/core";
+
+extensions: [
+  additionalFiles({
+    files: ["wrangler.toml", "./assets/**", "./fonts/**"], // Glob patterns supported
+  }),
+];
+```
+
+### Environment & Build Tools
+
+#### Environment Variable Sync
+
+```ts
+import { syncEnvVars } from "@trigger.dev/build/extensions/core";
+
+extensions: [
+  syncEnvVars(async (ctx) => {
+    // ctx contains: environment, projectRef, env
+    return [
+      { name: "SECRET_KEY", value: await getSecret(ctx.environment) },
+      { name: "API_URL", value: ctx.environment === "prod" ? "api.prod.com" : "api.dev.com" },
+    ];
+  }),
+];
+```
+
+#### ESBuild Plugins
+
+```ts
+import { esbuildPlugin } from "@trigger.dev/build/extensions";
+import { sentryEsbuildPlugin } from "@sentry/esbuild-plugin";
+
+extensions: [
+  esbuildPlugin(
+    sentryEsbuildPlugin({
+      org: process.env.SENTRY_ORG,
+      project: process.env.SENTRY_PROJECT,
+      authToken: process.env.SENTRY_AUTH_TOKEN,
+    }),
+    { placement: "last", target: "deploy" } // Optional config
+  ),
+];
+```
+
+## Custom Build Extensions
+
+```ts
+import { defineConfig } from "@trigger.dev/sdk";
+
+const customExtension = {
+  name: "my-custom-extension",
+
+  externalsForTarget: (target) => {
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
