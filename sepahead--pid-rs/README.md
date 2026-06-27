@@ -7,11 +7,11 @@ Partial Information Decomposition and continuous mutual-information (KSG / Iˢˣ
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [sepahead/pid-rs](https://github.com/sepahead/pid-rs).
+Original source: `CLAUDE.md` in [sepahead/pid-rs](https://github.com/sepahead/pid-rs).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
