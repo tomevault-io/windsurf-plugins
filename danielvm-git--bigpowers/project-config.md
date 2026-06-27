@@ -1,95 +1,125 @@
 ---
 trigger: always_on
-description: Analyze the blast radius of a proposed change before any code is written. Maps dependents, affected stories, and test coverage. Produces specs/IMPACT.md. Use before plan-work on any non-trivial change, when touching a shared module, or when the user asks \"what does this break?\".
+description: Self-review checklist for the coding agent to run before dispatching a reviewer. Checks CONVENTIONS.md compliance, Boy Scout Rule, test coverage, types, and SOLID. Produces a pass/fail checklist. Use before request-review, before committing, or when user asks for a code quality check.
 ---
 
 
 
-# Assess Impact
+# Audit Code
+> **HARD GATE** — **HARD GATE** — Audit must check for: bugs (correctness), security, performance, and clarity. Do NOT skip security review if the code touches user data, auth, or external APIs.
 
-> **HARD GATE** — Run this skill before `plan-work` whenever a change touches an existing module, symbol, or file used by more than one caller. Skip only for net-new code with no existing dependents.
 
-Find the blast radius of the proposed change before a single line is written.
+Run this self-review before asking anyone else to look at the code. The goal is to catch everything that is clearly wrong or missing — so the reviewer can focus on design and architecture, not hygiene.
+
+**Distinct from `request-review`:** This is the coding agent checking its own work. No second agent is involved. Run this first; run `request-review` after this passes.
 
 ## Modes
 
-- Default: full impact analysis (dependents + affected stories + test coverage mapping)
-- --lightweight: Fast fan-in/fan-out only (<10s). Maps callers and imports without test coverage mapping. Used by build-epic step 2 as a pre-plan gate. Risk score > 7 triggers a mandatory grill-me session before proceeding.
+- Default: full checklist
+- --quick: Run only Supply Chain and Test Coverage. Use for changes under 50 LOC.
+- --gate: Non-interactive mode for automated CI gating (used by build-epic step 6). Exit with non-zero status code (`exit 1`) on ANY checklist failure; `exit 0` only if ALL items pass. Produces a compact pass/fail summary to stderr. On failure, list every ✗ item with reason.
 
-## Process
+## Checklist
 
-### 1. Identify the target
+### Supply Chain & Security
 
-Name the symbol, module, or file being changed. If the user hasn't specified, ask one question: "What exactly are you changing?"
+- [ ] slopcheck run for new dependencies; packages tagged in plan-work: `[OK]`, `[SUS]`, or `[SLOP]`
+- [ ] No `[SLOP]` packages without documented human approval
+- [ ] No secrets in diff (`sk-`, `ghp_`, `AKIA`, `.env` values) — see `guard-git` patterns
+- [ ] OWASP Top 10 spot-check: injection, broken auth, sensitive data exposure, misconfiguration (see `docs/references/security-threats.md`)
 
-### 2. Find dependents
+### Provenance & Metadata
+
+- [ ] New plan artefacts include `type:` and `context:` metadata
+- [ ] Implementation steps reference ADR or commit SHA where decisions were made
+
+### Law of Demeter
+
+- [ ] No method chains through unrelated objects (e.g. `a.getB().getC().doX()`)
+- [ ] Collaborators talk to immediate neighbors only; law violations need explicit justification
+
+### CONVENTIONS.md Compliance
+
+- [ ] All output files are in `specs/` (no docs written to project root)
+- [ ] No `gh issue create` calls anywhere in new/modified skills or scripts
+- [ ] `gh` used only for PRs and repo clone operations
+- [ ] No GitHub REST API called directly (no curl/fetch to api.github.com)
+
+### Scope
+
+- [ ] Changes are limited to what was asked — nothing extra refactored or reorganized
+- [ ] No speculative features added
+- [ ] No files touched outside the stated scope
+- [ ] Changes are surgical: only code strictly required for the task; no refactoring, reorganization, or cleanup outside task scope (Boy Scout Rule applied surgically, not broadly)
+
+### Boy Scout Rule
+
+- [ ] Every file I touched is cleaner than when I found it
+- [ ] No dead code left behind
+- [ ] No commented-out code blocks
+
+### Types and Safety
+
+- [ ] No `any` types introduced (TypeScript) or untyped public functions (Python/Go/etc.)
+- [ ] No `@ts-ignore` or `// eslint-disable` added
+- [ ] No `as unknown as X` casts that bypass type safety
+
+### Test Coverage
+
+- [ ] Every new function has at least one test
+- [ ] Every bug fix has a regression test
+- [ ] Tests verify behavior through public interfaces (not implementation details)
+- [ ] Tests are F.I.R.S.T compliant (use `enforce-first` if unsure)
+
+### SOLID and Heuristics
+
+- [ ] Single Responsibility: no function or module doing two unrelated things
+- [ ] Open/Closed: extended through interfaces, not by modifying stable code
+- [ ] Dependency Inversion: dependencies injected, not imported globally where avoidable
+- [ ] **Chapter 17 Heuristics**: Code is free of smells documented in `audit-code/HEURISTICS.md` (G, N, C, T)
+
+### Code Style (CONVENTIONS.md)
+
+- [ ] Functions: 4–20 lines; split if longer
+- [ ] Functions: descend exactly one level of abstraction (The Stepdown Rule / G34)
+- [ ] Files: under 300 lines (ideally 200–300)
+- [ ] Names: specific and unique (grep returns < 5 hits for each name)
+- [ ] No duplication — shared logic extracted (DRY / G5)
+- [ ] Early returns over nested ifs; max 2 levels of indentation
+- [ ] Conditionals: expressed as positives (G29)
+- [ ] Comments explain WHY, not WHAT
+
+### Agent Readability (Akita's Lens)
+
+- [ ] Functions are small enough to fit in a standard context window (4–20 lines)
+- [ ] Names are unique and specific enough to be `grep`-able (grep returns < 5 hits)
+- [ ] Types are explicit (no `any`, no inferred return types for public APIs)
+- [ ] Code avoids deep nesting (max 2 levels) and uses early returns
+
+### Red Flags
+
+Before reporting, name any rationalization you caught yourself making for skipping a checklist item. Silence is not acceptable — if you skipped an item, state the reason explicitly.
+
+## Output
+
+Report the checklist with ✓ / ✗ per item. For each ✗, describe what needs to be fixed.
+
+If all items pass: suggest running `request-review` for an independent second opinion.
+If any items fail: fix them before proceeding.
+
+### Gate mode output (`--gate`)
+
+In `--gate` mode, print one summary line per checklist section:
 
 ```
-grep -rn "[symbol-name]" . --include="*.ts" | grep -v node_modules
-git log --oneline -10 -- [file-path]
+PASS Supply Chain & Security
+FAIL Provenance & Metadata (2 items)
+PASS Law of Demeter
+...
 ```
 
-→ verify: `grep -rn "[target]" . | wc -l`
 
-### 3. Map to release plan stories
-
-Read `specs/release-plan.yaml + epic capsule directories` (if it exists). For each dependent found in Step 2, identify which story owns that module. List stories that will be affected by the change.
-
-→ verify: `grep -c "Story" specs/release-plan.yaml + epic capsule directories 2>/dev/null || echo "no release plan"`
-
-### 4. List test coverage
-
-Find tests that exercise the target:
-
-```
-grep -rn "[symbol-name]" . --include="*.test.*" --include="*.spec.*"
-```
-
-→ verify: `grep -rn "[target]" . --include="*.test.*" | wc -l`
-
-### 5. Classify risk
-
-| Level | Condition |
-|-------|-----------|
-| Low   | ≤ 2 callers, all covered by tests |
-| Medium | 3–10 callers, partial test coverage |
-| High  | > 10 callers, or shared API/interface, or no tests |
-
-### 6. Write specs/IMPACT.md
-
-```
-## Target
-[symbol or file being changed]
-
-## Dependents ([count])
-- [file]: [caller or usage]
-
-## Affected Stories
-- Story [X.Y]: [title]
-
-## Test Coverage
-- [test file]: covers [scenario]
-- Gap: [untested behavior]
-
-## Risk: Low / Medium / High
-[One-sentence rationale]
-
-## Recommended action
-[Proceed / Add tests first / Discuss design]
-```
-
-→ verify: `grep "Risk:" specs/IMPACT.md`
-
-Suggest `plan-work` once risk is understood and any test gaps are noted.
-
-## Risk score gating
-
-In `--lightweight` mode (used by build-epic step 2), assign a numeric risk score (1–10):
-- Fan-in (how many callers): 0–4 points
-- Fan-out (how many dependencies the module itself uses): 0–3 points  
-- Recent churn (git log --oneline -5 count): 0–3 points
-
-**Risk score > 7**: Gate — require a `grill-me` session before proceeding to implementation. Document the grill-me result in the impact report at `specs/IMPACT-<epic>-<story>.md`.
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [danielvm-git/bigpowers](https://github.com/danielvm-git/bigpowers) — distributed by [TomeVault](https://tomevault.io).
