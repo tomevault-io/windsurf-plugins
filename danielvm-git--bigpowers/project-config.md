@@ -1,101 +1,134 @@
 ---
 trigger: always_on
-description: Generate multiple radically different interface designs for a module using parallel sub-agents, then compare trade-offs. Based on \"Design It Twice\" from A Philosophy of Software Design. Use when user wants to design an API, explore interface options, compare module shapes, or mentions \"design it twice\".
+description: Test-driven development with red-green-refactor loop using vertical slices. Use for features (epic tasks) or bugs (specs/bugs/BUG-*.md).
 ---
 
 
 
-# Design Interface
+# Develop TDD
 
-Based on "Design It Twice" from "A Philosophy of Software Design": your first idea is unlikely to be the best. Generate multiple radically different designs, then compare.
+> **HARD GATE** — Do NOT proceed if on `main` or `master`. Run `kickoff-branch` first to create a feature branch or worktree.
+>
+> **HARD GATE** — Do NOT write code before you have a plan. New feature: `plan-work` → epic capsule tasks. Bug: `investigate-bug` → `specs/bugs/BUG-*.md` (or use `fix-bug` orchestrator).
+>
+> **RECURSIVE DISCIPLINE** — This lifecycle applies to EVERY task, including updating these skills. Never skip planning because a task is "meta" or "just documentation."
 
-> **HARD GATE** — Multiple design options must be explored. Do NOT settle on first idea. Compare trade-offs (UX, complexity, extensibility, performance) before committing.
+## Philosophy
+
+Tests verify behavior through public interfaces, not implementation details. A good test reads like a specification. See [REFERENCE.md](REFERENCE.md) for the horizontal-slice anti-pattern and TDD phase detail.
+
+## Red Flags
+
+If you catch yourself thinking these, stop and reconsider — you are likely deviating from production-grade craft.
+
+| Red Flag | Reality |
+| :--- | :--- |
+| "This is too simple to need tests." | Simple code is where bugs hide. If it's simple, the test is cheap. |
+| "I'll refactor this later." | "Later" is when technical debt becomes bankruptcy. Refactor while Green. |
+| "The tests are already comprehensive." | If you're adding behavior, you need a new test. Coverage ≠ Correctness. |
+| "I'm just fixing a small bug." | Small bugs often indicate deep interface flaws. Investigate root cause. |
+| "I need to mock this internal class." | Mocking internals couples tests to implementation. Mock only I/O. |
+| "This refactor is out of scope." | Leave the code cleaner than you found it (Boy Scout Rule). |
 
 ## Workflow
 
-### 1. Gather Requirements
+> **Timing:** `bash scripts/bp-timing.sh start develop-tdd` at invocation; `bash scripts/bp-timing.sh end develop-tdd` before handoff.
 
-Before designing, understand:
+### 1. Planning
 
-- [ ] What problem does this module solve?
-- [ ] Who are the callers? (other modules, external users, tests)
-- [ ] What are the key operations?
-- [ ] Any constraints? (performance, compatibility, existing patterns)
-- [ ] What should be hidden inside vs exposed?
+- [ ] Read active `specs/epics/*/epic.yaml` story tasks or `specs/bugs/BUG-*.md` — understand verify steps
+- [ ] Confirm interface changes and behaviors to test (prioritize)
+- [ ] Design interfaces for testability — identify [deep modules](deep-modules.md) opportunities
+- [ ] Get user approval on the plan
 
-Ask: "What does this module need to do? Who will use it?"
+Apply the **enforce-first** F.I.R.S.T rubric: Fast, Independent, Repeatable, Self-Validating, Timely.
 
-### 2. Generate Designs (Parallel Sub-Agents)
+### 2. Tracer Bullet
 
-Spawn 3+ sub-agents simultaneously using Task tool. Each must produce a **radically different** approach.
+Write ONE test that confirms ONE thing about the system:
 
 ```
-Prompt template for each sub-agent:
-
-Design an interface for: [module description]
-
-Requirements: [gathered requirements]
-
-Constraints for this design: [assign a different constraint to each agent]
-- Agent 1: "Minimize method count - aim for 1-3 methods max"
-- Agent 2: "Maximize flexibility - support many use cases"
-- Agent 3: "Optimize for the most common case"
-- Agent 4: "Take inspiration from [specific paradigm/library]"
-
-Output format:
-1. Interface signature (types/methods)
-2. Usage example (how caller uses it)
-3. What this design hides internally
-4. Trade-offs of this approach
+RED:    Write test for first behavior → test fails → commit: test(<scope>): ...
+GREEN:  Write minimal code to pass → test passes → commit: feat(<scope>): ...
+REFACTOR (optional): clean up → commit: refactor(<scope>): ...
 ```
 
-### 3. Present Designs
+### 3. Incremental Loop
 
-Show each design with:
+> **STREAM CONTINUITY** — When writing file content, output in continuous chunks of ~200 lines. Do not pause. Emit a placeholder comment rather than going silent.
 
-1. **Interface signature** — types, methods, params
-2. **Usage examples** — how callers actually use it in practice
-3. **What it hides** — complexity kept internal
+For each remaining behavior: RED → GREEN → REFACTOR (optional). One test at a time. Commit after every GREEN phase.
 
-Present designs sequentially so user can absorb each approach before comparison.
+### 4. Visual Slices (UI alternate workflow)
 
-### 4. Compare Designs
+For UI components where behavioral unit testing is brittle: extract logic into a Controller/ViewModel/Hook (pure TDD), then use Visual Slices for the View layer. See [REFERENCE.md](REFERENCE.md) for the full Visual Slices procedure.
 
-After showing all designs, compare them on:
+### 5. Refactor
 
-- **Interface simplicity**: fewer methods, simpler params
-- **General-purpose vs specialized**: flexibility vs focus
-- **Implementation efficiency**: does shape allow efficient internals?
-- **Depth**: small interface hiding significant complexity (good) vs large interface with thin implementation (bad)
-- **Ease of correct use** vs **ease of misuse**
+After all tests pass: extract duplication, deepen modules, apply SOLID principles. **Never refactor while RED.**
 
-Discuss trade-offs in prose, not tables. Highlight where designs diverge most.
+### 6. Verify
 
-### 5. Synthesize
+After every behavior cycle, run the verify command from the active epic task. Show evidence before declaring the step done.
 
-Often the best design combines insights from multiple options. Ask:
+### 6a. CI dry-run sub-step (when modifying workflows)
 
-- "Which design best fits your primary use case?"
-- "Any elements from other designs worth incorporating?"
+If this cycle modified files in `.github/workflows/`, run a CI dry-run before pushing:
 
-## Evaluation Criteria
+```bash
+# 1. Check for workflow file changes
+CHANGED_WORKFLOWS=$(git diff --name-only HEAD | grep '\.github/workflows/' || true)
+if [ -n "$CHANGED_WORKFLOWS" ]; then
+  echo "==> CI dry-run: workflow files changed"
+  echo "    $CHANGED_WORKFLOWS"
 
-From "A Philosophy of Software Design":
+  # 2. Validate YAML syntax
+  if command -v yamllint &>/dev/null; then
+    for f in $CHANGED_WORKFLOWS; do
+      yamllint "$f" && echo "  OK: $f passes YAML lint" || echo "  WARN: $f has YAML issues"
+    done
+  else
+    # Fallback: Python YAML parse
+    for f in $CHANGED_WORKFLOWS; do
+      python3 -c "import yaml; yaml.safe_load(open('$f'))" 2>/dev/null && \
+        echo "  OK: $f YAML syntax valid" || \
+        echo "  FAIL: $f has YAML syntax errors"
+    done
+  fi
 
-**Interface simplicity**: Fewer methods, simpler params = easier to learn and use correctly.
+  # 3. Run actionlint if available
+  if command -v actionlint &>/dev/null; then
+    for f in $CHANGED_WORKFLOWS; do
+      actionlint "$f" && echo "  OK: $f passes actionlint" || echo "  WARN: $f has actionlint issues"
+    done
+  fi
 
-**General-purpose**: Can handle future use cases without changes. But beware over-generalization.
+  # 4. Check common pitfalls
+  for f in $CHANGED_WORKFLOWS; do
+    # Missing permissions block
+    if ! grep -q 'permissions:' "$f"; then
+      echo "  WARNING: $f missing permissions block — add one for security"
+    fi
+    # npm publish without NPM_TOKEN
+    if grep -q 'npm publish\|npx semantic-release' "$f" && ! grep -q 'NPM_TOKEN' "$f"; then
+      echo "  WARNING: $f has npm publish/semantic-release but no NPM_TOKEN in secrets"
+    fi
+    # Hardcoded Node versions
+    if grep -q 'node-version: [0-9]' "$f"; then
+      echo "  NOTE: $f has hardcoded Node version — consider node-version-file: .nvmrc"
+    fi
+  done
 
-**Implementation efficiency**: Does interface shape allow efficient implementation? Or force awkward internals?
+  # 5. Suggest local dry-run
+  if command -v act &>/dev/null; then
+    echo "  SUGGESTION: Run 'act push --dry-run' to test workflows locally"
+  fi
+fi
+```
 
-**Depth**: Small interface hiding significant complexity = deep module (good). Large interface with thin implementation = shallow module (avoid).
+Checklist:
 
-## Anti-Patterns
-
-- Don't let sub-agents produce similar designs — enforce radical difference
-- Don't skip comparison — the value is in contrast
-- Don't implement — this is purely about interface shape
-- Don't evaluate based on implementation effort
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [danielvm-git/bigpowers](https://github.com/danielvm-git/bigpowers) — distributed by [TomeVault](https://tomevault.io).
