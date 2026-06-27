@@ -7,11 +7,11 @@ Github pages for Force Injection
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [ForceInjection/forceinjection.github.io](https://github.com/ForceInjection/forceinjection.github.io).
+Original source: `CLAUDE.md` in [ForceInjection/forceinjection.github.io](https://github.com/ForceInjection/forceinjection.github.io).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
