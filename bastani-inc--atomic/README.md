@@ -7,11 +7,11 @@ Reliable loops for software engineering with Pi extensions, custom models, MCP, 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [bastani-inc/atomic](https://github.com/bastani-inc/atomic).
+Original source: `CLAUDE.md` in [bastani-inc/atomic](https://github.com/bastani-inc/atomic).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
