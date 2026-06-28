@@ -7,11 +7,11 @@ SynthOrg - Framework for building synthetic organizations with autonomous AI age
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [Aureliolo/synthorg](https://github.com/Aureliolo/synthorg).
+Original source: `AGENTS.md` in [Aureliolo/synthorg](https://github.com/Aureliolo/synthorg).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
