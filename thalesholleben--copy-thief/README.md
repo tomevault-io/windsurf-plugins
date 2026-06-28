@@ -7,11 +7,11 @@ Skill do Claude para escrever copy de alta conversao (landing pages, advertoriai
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [thalesholleben/copy-thief](https://github.com/thalesholleben/copy-thief).
+Original source: `CLAUDE.md` in [thalesholleben/copy-thief](https://github.com/thalesholleben/copy-thief).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
