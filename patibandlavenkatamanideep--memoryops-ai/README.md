@@ -7,11 +7,11 @@ Enterprise-shaped memory governance layer for AI assistants: typed capture, poli
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [patibandlavenkatamanideep/memoryops-ai](https://github.com/patibandlavenkatamanideep/memoryops-ai).
+Original source: `CLAUDE.md` in [patibandlavenkatamanideep/memoryops-ai](https://github.com/patibandlavenkatamanideep/memoryops-ai).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
