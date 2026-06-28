@@ -7,14 +7,14 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `GEMINI.md` in [hutao-fmtech/obsidian-knowledge-system](https://github.com/hutao-fmtech/obsidian-knowledge-system).
+Original source: `CLAUDE.md` in [hutao-fmtech/obsidian-knowledge-system](https://github.com/hutao-fmtech/obsidian-knowledge-system).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
+- **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
 Quality verified by TomeVault's automated analysis pipeline. Source: [github.com/hutao-fmtech/obsidian-knowledge-system](https://github.com/hutao-fmtech/obsidian-knowledge-system)
