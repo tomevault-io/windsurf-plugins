@@ -90,4 +90,4 @@ This project is developed from Devcontainer described in `.devcontainer.json` fi
 
 ---
 > Source: [denysdovhan/ha-lun-misto-air](https://github.com/denysdovhan/ha-lun-misto-air) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-04 -->
+<!-- tomevault:4.0:windsurf_rules:2026-06-29 -->
