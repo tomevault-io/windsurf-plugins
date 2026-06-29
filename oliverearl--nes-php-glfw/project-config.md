@@ -3,9 +3,16 @@ trigger: always_on
 description: This document provides guidelines for AI-assisted development of this NES (Nintendo Entertainment System) emulator written in PHP.
 ---
 
-# GitHub Copilot Development Guidelines for NES Emulator
+# Codex Development Guidelines for NES Emulator
 
 This document provides guidelines for AI-assisted development of this NES (Nintendo Entertainment System) emulator written in PHP.
+
+## Agent Document Source of Truth
+
+- `AGENTS.md` is the master agentic development document for this repository.
+- If another agentic development document disagrees with `AGENTS.md`, follow `AGENTS.md`.
+- Keep all other agentic development documents in sync with `AGENTS.md`, including `.cursorrules`, `CLAUDE.md`, `.github/copilot-instructions.md`, and `.junie/guidelines.md`.
+- When changing agent guidance, update `AGENTS.md` first, then update the corresponding Cursor, Claude, Copilot, Junie, and contributor-facing documentation in the same change.
 
 ## Project Overview
 
@@ -161,7 +168,7 @@ final class RamTest extends TestCase
     {
         $ram = new Ram(256);
         $ram->write(100, 0x42);
-        
+
         $this::assertSame(0x42, $ram->read(100));
     }
 }
@@ -182,27 +189,9 @@ final class RamTest extends TestCase
 
 **Example:**
 ```php
-final class SystemIntegrationTest extends IntegrationTestCase
-{
-    #[Test]
-    public function it_completes_full_frame_rendering_cycle(): void
-    {
-        [$cpu, , , , $ppu] = $this->createTestSystem();
-        $renderer = new Renderer();
-        
-        $cpu->reset();
-        
-        $renderingData = false;
-        $iterations = 0;
-        
-        while ($renderingData === false && $iterations < 50000) {
-            $cpuCycles = $cpu->run();
-            $renderingData = $ppu->run($cpuCycles * 3);
-            $iterations++;
-        }
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [oliverearl/nes-php-glfw](https://github.com/oliverearl/nes-php-glfw) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-04 -->
+<!-- tomevault:4.0:windsurf_rules:2026-06-29 -->
