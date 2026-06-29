@@ -1,12 +1,12 @@
 ---
 trigger: always_on
-description: Frontend internationalization requirements for web UI changes
+description: Read GitLab token from local secrets.env
 ---
 
 
-# Frontend Internationalization
+# GitLab Token Source
 
-Canonical rule: `docs/agent-guidelines/frontend-i18n.md`.
+Canonical rule: `docs/agent-guidelines/network-and-secrets.md`.
 
 Follow that file. Do not add duplicated rule text here; update the canonical
 guideline instead.
