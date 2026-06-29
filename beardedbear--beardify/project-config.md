@@ -1,0 +1,116 @@
+---
+trigger: always_on
+description: This file consolidates guidance for AI agents working with this repository. Use the sections below for project information, agent-specific rules, and general guidelines to follow when making code changes.
+---
+
+# AGENTS
+
+This file consolidates guidance for AI agents working with this repository. Use the sections below for project information, agent-specific rules, and general guidelines to follow when making code changes.
+
+## Project Overview
+
+Beardify is a custom Spotify web client built with Vue 3 + TypeScript that enhances the official Spotify experience. The key innovation is the "Collections" feature - transforming regular playlists into album collections using the "#Collection" naming convention.
+
+## Core Technologies
+
+- **Vue 3** with Composition API and `<script setup>` syntax
+- **TypeScript** (strict mode)
+- **Vite 8** for build/dev server
+- **Pinia** for state management with persistence
+- **SCSS** with CSS custom properties for theming
+- **ky v2** for HTTP requests (via `instance()` helper)
+- **Spotify Web API + Web Playback SDK**
+
+## Essential Commands
+
+```bash
+# Development
+bun run dev           # Start dev server (port 3000)
+bun run lint          # Run all linting (TypeScript + ESLint + Stylelint)
+bun run fix           # Auto-fix all linting issues
+bun run build         # Build for production (includes linting)
+bun run preview       # Preview production build
+```
+
+**Always run `bun run lint` before committing changes.**
+
+## General agent guidance
+
+These guidelines apply to all AI agents working on this repository:
+
+- Follow project conventions: Vue 3 Composition API, `<script setup>`, TypeScript strict mode, scoped styles, alphabetical import ordering, and Unix (LF) line endings.
+- Always run `bun run lint` and fix reported issues before committing.
+- Use the `instance()` helper from `src/api.ts` for all Spotify Web API calls (do not call `ky` directly). Exception: `discogs.ts` and external APIs use `ky` or `http` directly because they target non-Spotify endpoints.
+- Use `notification()` helper for user-facing messages and errors.
+- Use `sleep()` from `src/helpers/sleep.ts` for async delays — do not inline `new Promise(resolve => setTimeout(resolve, ms))`.
+- Use `BEARDIFY_USER_AGENT` from `src/helpers/http.ts` as the User-Agent header for external API calls.
+- The `#Collection` naming convention is core business logic. Do not change Collection-related behavior without explicit approval from the maintainers.
+- Do not commit secrets, credentials, or environment variables into the repository.
+- Follow the commit message format in "Commit message formatting (Conventional Commits)" below.
+- Keep changes small and focused; prefer creating a pull request rather than pushing large, sweeping changes directly.
+- When unsure, open an issue or ask a maintainer for clarification.
+
+## Commit message formatting (Conventional Commits)
+
+We follow the Conventional Commits specification. Use the header format:
+`<type>(<scope>): <short summary>`
+
+Rules:
+- Types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `chore`, `build`, `ci`, `revert`
+- Scope: optional but recommended (e.g. `player`, `auth`, `playlist`, `collection`, `api`, `styles`)
+- Summary: imperative mood, concise (<=50 chars), no trailing period; full header line hard cap 72 chars
+- Body (optional): explain the "what" and "why" (not "how"); wrap lines at ~72 chars; leave one blank line between header and body
+- Footer: reference issues (e.g. `Closes #123`) or breaking changes using `BREAKING CHANGE: description`
+
+Examples:
+- `feat(collection): add #Collection marker when creating playlists`
+- `fix(api): handle 429 rate limits on playback requests`
+- `docs: update README with dev commands`
+- `chore(deps): bump pinia to 2.0.0`
+
+Best practices:
+- Run `bun run lint` before committing
+- Prefer "Squash and merge" for pull requests to keep history clean; use the PR title (following the spec) as the commit message when squashing
+- When introducing breaking changes, add `BREAKING CHANGE: ...` in the footer and describe the impact
+
+## Architecture
+
+### Directory Structure
+
+- `src/components/` - Feature-organized Vue components (album/, artist/, player/, etc.)
+- `src/views/` - Route-level components, each with corresponding Pinia store
+- `src/helpers/` - Utility functions
+- `src/@types/` - TypeScript type definitions
+- `src/assets/scss/` - Global SCSS with theming system
+
+### State Management (Pinia)
+
+Each feature has its own store: `AuthStore`, `PlayerStore`, `PlaylistStore`, `SearchStore`, `ConfigStore`. All stores use `pinia-plugin-persistedstate` for persistence.
+
+### Styling System
+
+Uses CSS custom properties with consistent naming:
+
+- `--bg-color-*` (darker, dark, default, light, lighter)
+- `--font-color-*` (dark, default, light)
+- `--primary-color-*` (darker, dark, default, light, lighter)
+
+## Code Conventions
+
+- Use Vue 3 Composition API with `<script setup>` syntax
+- TypeScript strict mode with explicit return types
+- Scoped styles for all Vue components
+- Simple kebab-case naming for CSS classes (e.g., `player-button`, `track-icon`, `section-title`)
+- Alphabetical import sorting (enforced by ESLint perfectionist plugin)
+- Unix line endings (LF)
+
+### ESLint Configuration
+
+- **Explicit function return types**: Warning enforced
+- **No explicit any**: Warning (prefer proper typing)
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [BeardedBear/beardify](https://github.com/BeardedBear/beardify) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-06-29 -->
