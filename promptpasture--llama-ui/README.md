@@ -7,12 +7,12 @@ A minimal interface for AI Companion that runs entirely in your browser.
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [PromptPasture/llama.ui](https://github.com/PromptPasture/llama.ui).
+Original source: `copilot-instructions.md` in [PromptPasture/llama.ui](https://github.com/PromptPasture/llama.ui).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **GitHub Copilot** — `copilot-instructions.md`
+- **Codex** — `AGENTS.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
