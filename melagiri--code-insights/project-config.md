@@ -1,108 +1,134 @@
 ---
 trigger: always_on
-description: > **Primary Claude Code workspace.** All sessions run from this repo root.
+description: > Agent coordination, development ceremony, and code review processes. Linked from [CLAUDE.md](../CLAUDE.md).
 ---
 
-# CLAUDE.md — Code Insights
+# Multi-Agent Orchestration — Code Insights
 
-> **Primary Claude Code workspace.** All sessions run from this repo root.
-> See `docs/` for detailed documentation. This file is the quick reference.
-
----
-
-## Project Overview
-
-**Code Insights** is an open-source CLI tool and embedded dashboard for analyzing AI coding sessions. It parses session history from multiple AI coding tools (Claude Code, Cursor, Codex CLI, Copilot CLI, VS Code Copilot Chat), stores structured data in a local SQLite database, and provides both terminal analytics and a browser-based dashboard with LLM-powered insights.
-
-**Architecture:** Single-repo pnpm workspace monorepo with three packages: CLI, dashboard (Vite + React SPA), and server (Hono API).
-
-**Privacy model:** Fully local-first. No cloud accounts, no sign-ups, no data leaves the machine. SQLite database at `~/.code-insights/data.db`.
+> Agent coordination, development ceremony, and code review processes. Linked from [CLAUDE.md](../CLAUDE.md).
 
 ---
 
-## Development Philosophy (CRITICAL)
+## Agent Suite
 
-**No MVPs, no prototypes, no half-measures.** This product is LIVE with real users. Every feature ships as a full, complete implementation. We do not build "minimum viable" anything — we build the real thing, iterate based on feedback, and revert or update if it doesn't work out.
+| Agent | Model | Domain |
+|-------|-------|--------|
+| `engineer` | sonnet | Implementation across CLI, dashboard, and server — features, fixes, tests |
+| `technical-architect` | opus | Architecture, type alignment, SQLite schema, code review, LLD standards |
+| `ux-engineer` | opus | UX design (wireframes, flows, specs) and UI implementation (React/Tailwind/shadcn) |
+| `product-manager` | sonnet | Task tracking (GitHub Issues), sprint planning, ceremony coordination |
+| `journey-chronicler` | opus | Capture learning moments, breakthroughs, course corrections |
+| `devtools-cofounder` | opus | DevTools strategy, DX critique, competitive positioning (on-demand) |
+| `llm-expert` | opus | LLM integration review, prompt design, token optimization, model selection, cost analysis |
 
-This principle applies to planning, designing, AND implementation:
-- **Planning:** Don't scope down to "MVP facet set" vs "ideal set." Design the complete solution.
-- **Designing:** Don't propose phased rollouts with "ship phase 1, add phase 2 later." Design it right the first time.
-- **Implementing:** Don't cut corners with "we can add this later." Build it now or explicitly decide not to build it.
-
----
-
-## Configuration Hierarchy
-
-| Priority | Source | Scope |
-|----------|--------|-------|
-| 1 (Highest) | This project CLAUDE.md | Code Insights workflows, ceremony, agents |
-| 2 | Session Mode | Educational context, learning mode |
-| 3 | Global ~/.claude/CLAUDE.md | General best practices |
-
-**Key overrides from global config:**
-
-| Behavior | Global Default | Code Insights Override |
-|----------|---------------|----------------------|
-| Planning | Ask first | Sub-agents autonomous in their domain |
-| File Creation | Ask first | Agents create files autonomously in their domain |
-| Review Process | Single reviewer | Triple-layer (TA Insider + Outsider + Synthesis) |
-| PR Merges | Normal | **BLOCKED** — only founder merges |
+Agent definitions live in `.claude/agents/`.
 
 ---
 
-## Documentation Index
+## Orchestrator Role (Main Claude)
 
-| Document | Contents |
-|----------|----------|
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Repository structure, data flow, provider architecture, SQLite schema, type system, API routes, dashboard pages |
-| [docs/AGENTS.md](docs/AGENTS.md) | Agent suite, orchestrator role, development ceremony, team workflow, triple-layer code review, document ownership |
-| [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | Branch discipline, hookify rules, pre-action verification, version bump, configuration, dev notes |
-| [docs/PRODUCT.md](docs/PRODUCT.md) | Product description, features, source tools, insight categories, export, reflect/patterns |
-| [docs/VISION.md](docs/VISION.md) | Philosophy, core beliefs, phase history, non-goals |
-| [docs/ROADMAP.md](docs/ROADMAP.md) | Phase milestones, version table, upcoming work |
+**You CAN:**
+- Edit `CLAUDE.md` directly (you own it)
+- Delegate implementation to the appropriate agent
+- Run agents in parallel IF no dependencies exist
+- Make final decisions when agents disagree
+
+**You MUST NOT:**
+- Implement code directly when an agent should do it
+- Skip the ceremony steps
+- Merge PRs (only the founder does this)
+
+### Unresponsive Agent Protocol
+
+1. **Retry once** — attempt one more communication
+2. **Terminate if still unresponsive** — do not wait indefinitely
+3. **Re-spawn or take over** — either spawn a fresh agent or handle the task directly
+4. **Log the failure** — note which agent failed and at what step
+
+**Do NOT** spawn duplicate agents alongside a stale one. Terminate first, then replace.
+
+### Pre-Spawn Dependency Check (MANDATORY)
+
+Before parallelizing agents, verify:
+
+1. List each agent's **inputs** — What does it need?
+2. List each agent's **outputs** — What does it produce?
+3. Map **dependencies** — Does B need A's output?
+4. Decide: **Sequential or Parallel**
+
+**Safe to Parallelize:** Independent domains, read-only research, CLI bug fix + Dashboard UI fix (if no shared state)
+
+**Must Run Sequentially:** TA (type decision) -> Engineer (implement types), TA (schema decision) -> Engineer (implement), any change touching `types.ts`
 
 ---
 
-## Supported Source Tools
+## Development Ceremony (MANDATORY)
 
-| Source Tool | Provider ID | Provider Class | Data Format | Location |
-|-------------|-------------|---------------|-------------|----------|
-| Claude Code | `claude-code` | `ClaudeCodeProvider` | JSONL | `~/.claude/projects/**/*.jsonl` |
-| Cursor | `cursor` | `CursorProvider` | SQLite (state.vscdb) | Platform-specific |
-| Codex CLI | `codex-cli` | `CodexProvider` | JSONL (rollout files) | `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl` |
-| Copilot CLI | `copilot-cli` | `CopilotCliProvider` | JSONL (events) | `~/.copilot/session-state/{id}/events.jsonl` |
-| VS Code Copilot Chat | `copilot` | `CopilotProvider` | JSON | Platform-specific Copilot Chat storage |
+All feature work follows this 12-step ceremony:
 
----
+```
+Step 1:   Founder assigns task or identifies work
+Step 2:   Orchestrator identifies the right agent(s)
+Step 3:   Dev agent reviews context (source files, types, existing patterns)
+Step 4:   Dev agent clarifies with TA (if schema impact)
+Step 5:   TA reviews approach and gives approval
+Step 6:   Consensus checkpoint (TA + dev agent agree on approach)
+Step 7:   Dev agent: git prechecks + create feature branch
+Step 8:   Dev agent: implement, commit in logical chunks
+Step 9:   Dev agent: pre-PR verification (build, test, functional check, dep audit)
+Step 10:  Pre-review gates (evidence in PR description verified)
+Step 11:  Triple-layer code review (loops until 0 FIX NOW items)
+Step 12:  Founder merges PR
+```
 
-## Commands
+### Step-by-Step Ownership
+
+| Step | Owner | Gate Criteria |
+|------|-------|---------------|
+| 1-2 | Orchestrator | Correct agent identified |
+| 3 | Dev agent | Files reviewed, understanding confirmed |
+| 4 | Dev agent -> TA | Questions resolved, no assumptions |
+| 5 | TA | Explicit approval or changes requested |
+| 6 | TA + Dev agent | Both confirm ready to implement |
+| 7 | Dev agent | Clean repo, feature branch created |
+| 8 | Dev agent | Code implemented |
+| 9 | Dev agent | Build passes, tests pass, functional verification (screenshots, artifacts, curl) |
+| 10 | Orchestrator | PR description has verification evidence, dep audit (if applicable) |
+| 11 | TA + Outsider + LLM Expert (if applicable) | All FIX NOW items resolved (0 remaining) |
+| 12 | **Founder only** | PR merged to main |
+
+### When to Engage TA (Steps 4-5)
+
+**Required:** Adding/modifying SQLite columns or tables, changing type definitions in `types.ts`, modifying data contract, changing config format, adding new server API endpoints
+
+**Not required:** New command flags, parser improvements, terminal UI changes, dashboard component styling, LLM provider additions
+
+### When to Engage LLM Expert
+
+**Required:** Adding/modifying prompt templates (`server/src/llm/`), new LLM-powered features, changing model assignments or token budgets, SSE streaming or structured output schema changes, debugging inconsistent LLM output, cost optimization
+
+**Not required:** CLI commands without LLM, dashboard UI (unless LLM rendering logic), source tool providers, SQLite schema (unless for LLM results storage)
+
+**Proactive dispatch:** Auto-invoke `llm-expert` when conversation touches prompt design, token optimization, model selection, or when engineer writes new code in `server/src/llm/`.
+
+### CI Simulation Gate (Step 8 — BLOCKING)
 
 ```bash
-cd cli
-pnpm install          # Install dependencies
-pnpm dev              # Watch mode (tsc --watch)
-pnpm build            # Compile TypeScript to dist/
+pnpm build    # Must pass across the workspace
+```
 
-# After building, link for local testing:
-npm link
-code-insights                          # Sync + open dashboard (zero-config)
-code-insights init                     # Optional: customize settings
-code-insights sync                     # Sync sessions to SQLite
-code-insights sync --force             # Re-sync all sessions
-code-insights sync --dry-run           # Preview without changes
-code-insights sync -q                  # Quiet mode (for hook usage)
-code-insights sync --source cursor     # Sync only from a specific tool
-code-insights status                   # Show sync statistics
-code-insights open                     # Open dashboard in browser (no server start)
-code-insights dashboard                # Start server + open dashboard (auto-syncs first)
-code-insights dashboard --no-sync      # Start server + open dashboard without syncing
-code-insights install-hook             # Auto-sync + auto-analysis on session end
-code-insights install-hook --sync-only # Install sync hook only (no analysis)
-code-insights uninstall-hook           # Remove all Code Insights hooks
-code-insights config                   # Show current configuration
+**If ANY check fails:** Fix before creating PR. Never rely on CI.
+
+---
+
+## Dynamic Team Workflow
+
+For non-trivial features, use `/start-feature` to spin up a coordinated agent team.
+
+| Command | Purpose | When to Use |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [melagiri/code-insights](https://github.com/melagiri/code-insights) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-29 -->
+<!-- tomevault:4.0:windsurf_rules:2026-06-29 -->
