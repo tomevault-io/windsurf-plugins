@@ -1,0 +1,122 @@
+---
+trigger: always_on
+description: Adhere to the official XPath 3.1 standard at all times:
+---
+
+# XPath
+
+Adhere to the official XPath 3.1 standard at all times:
+
+- XML Path Language (XPath) 3.1: <https://www.w3.org/TR/xpath-31/>
+- XPath Functions and Operators 3.1: <https://www.w3.org/TR/xpath-functions-31/>
+
+The official QT3 test suite can be run with the command `dart run bin/xpath_qt3tests.dart`. Not all of the these over 22,000 integration tests are currently passing, but the goal is that they eventually should. New regressions in the QT3 test suite are not acceptable.
+
+## Overal Design
+
+The core goals of this design are **efficiency**, **compactness**, and **readability**. To achieve this, we avoid heavy wrapper objects and runtime interpreters where possible. Instead, we leverage Dart's strong type system, modern features, and core libraries.
+
+- **Zero-Wrapper**: Map XPath Data Model types map directly to native Dart typesm where possible.
+- **Lazy Sequences**: Use Dart's `Iterable` for all sequences to ensure laziness and low memory footprint.
+- **Functional AST**: Expression nodes are executable functors, reducing the need for a separate interpreter pass for evaluation.
+- **Exceptions**: Use Dart's exception system and human readable error messages to report errors.
+
+## Data Model
+
+Instead of wrapping every integer, string, and node, we use Dart's native types. This allows the XPath engine to interact seamlessly with existing Dart objects.
+
+Type descriptions are implemented as subclasses of [XPathType](definitions/type.dart). Types can check if a Dart Object is of their type with [XPathType.matches]. Types can convert any other object to their type with [XPathType.cast].
+
+### Sequences
+
+Sequences are implemented as an `XPathSequence`, a thin wrapper around a Dart [Iterable]. The impelementation is defined in [sequence.dart](types/sequence.dart).
+
+| XPath Type | Dart Type | Type Implementation
+| --- | --- | ---
+| `sequence` | `XPathSequence` | `xsSequence`
+| `empty-sequence` | `XPathSequence` | `xsEmptySequence`
+
+There are various optimized implementations for specific use-cases. Use the most appropriate implementation for a given use-case.
+
+| XPathSequence | Description
+| --- | ---
+| `XPathSequence.empty` | The empty sequence.
+| `XPathSequence.trueSequence` | The sequence with a single `true` value.
+| `XPathSequence.falseSequence` | The sequence with a single `false` value.
+| `XPathSequence.emptyString` | The sequence with an empty string.
+| `XPathSequence.nan` | The sequence with a NaN value.
+| `XPathSequence.emptyArray` | The sequence with an empty array.
+| `XPathSequence.emptyMap` | The sequence with an empty map.
+| `const XPathSequence.single(value)` | The sequence with a single value.
+| `const XPathSequence(iterable)` | The sequence of an iterable.
+| `XPathSequence.cached(iterable)` | The sequence of an iterable that is at most evaluated once and then cached.
+| `XPathSequence.range(start, stop)` | The sequence of integers from start to stop.
+
+### Nodes
+
+XML nodes are represented by the [XmlNode](../../xml/nodes/node.dart) class and its subtypes.
+
+| XPath Type | Dart Type | Implementation
+| --- | --- | ---
+| `attribute` | `XmlAttribute` | `xsAttribute`
+| `comment` | `XmlComment` | `xsComment`
+| `document` | `XmlDocument` | `xsDocument`
+| `element` | `XmlElement` | `xsElement`
+| `node` | `XmlNode` | `xsNode`
+| `namespace` | `XmlNamespace` | `xsNamespace`
+| `processing-instruction` | `XmlProcessing` | `xsProcessingInstruction`
+| `text` | `XmlText` and `XmlCDATA` | `xsText`
+
+### Functions
+
+| XPath Type | Dart Type | Implementation
+| --- | --- | ---
+| `function(*)` | `XPathFunction` | `xsFunction`
+| `array(*)` | `XPathArray` | `xsArray`
+| `map(*)` | `XPathMap` | `xsMap`
+
+### Dates, Times and Durations
+
+Date and time values are represented by subclasses of `XPathAbstractDateTime`.
+Duration values are represented by subclasses of `XPathAbstractDuration`.
+To convert from a Dart type use the factories `fromDateTime` and `fromDuration`.
+To convert to a Dart type use the converters `toDartTime` and `toDuration`.
+
+| XPath Type | Dart Type | Implementation
+| --- | --- | ---
+| `xs:date` | `XPathDate` | `xsDate`
+| `xs:dateTime` | `XPathDateTime` | `xsDateTime`
+| `xs:dateTimeStamp` | `XPathDateTimeStamp` | `xsDateTimeStamp`
+| `xs:dayTimeDuration` | `XPathDayTimeDuration` | `xsDayTimeDuration`
+| `xs:duration` | `XPathDuration` | `xsDuration`
+| `xs:gDay` | `XPathDay` | `xsDay`
+| `xs:gMonth` | `XPathMonth` | `xsMonth`
+| `xs:gMonthDay` | `XPathMonthDay` | `xsMonthDay`
+| `xs:gYear` | `XPathYear` | `xsYear`
+| `xs:gYearMonth` | `XPathYearMonth` | `xsYearMonth`
+| `xs:time` | `XPathTime` | `xsTime`
+| `xs:yearMonthDuration` | `XPathYearMonthDuration` | `xsYearMonthDuration`
+
+### Numerics
+
+Numeric values are represented by the Dart `num` class and its subtypes.
+
+| XPath Type | Dart Type | Implementation
+| --- | --- | ---
+| `xs:numeric` | `num` | `xsNumeric`
+| `xs:byte` | `int` | `xsByte`
+| `xs:decimal` | `num` | `xsDecimal`
+| `xs:double` | `double` | `xsDouble`
+| `xs:float` | `double` | `xsDouble`
+| `xs:int` | `int` | `xsInt`
+| `xs:integer` | `int` | `xsInteger`
+| `xs:long` | `int` | `xsLong`
+| `xs:negativeInteger` | `int` | `xsNegativeInteger`
+| `xs:nonNegativeInteger` | `int` | `xsNonNegativeInteger`
+| `xs:nonPositiveInteger` | `int` | `xsNonPositiveInteger`
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [renggli/dart-xml](https://github.com/renggli/dart-xml) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-06-29 -->
