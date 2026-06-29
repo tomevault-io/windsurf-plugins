@@ -1,12 +1,12 @@
 ---
 trigger: always_on
-description: Use only port 11435 for local preview and redeploys
+description: Publish releases from local builds instead of GitHub Actions
 ---
 
 
-# Local Preview Port
+# Manual Local Release
 
-Canonical rule: `docs/agent-guidelines/local-preview.md`.
+Canonical rule: `docs/agent-guidelines/release-notes.md`.
 
 Follow that file. Do not add duplicated rule text here; update the canonical
 guideline instead.
