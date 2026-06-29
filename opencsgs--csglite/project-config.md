@@ -1,12 +1,12 @@
 ---
 trigger: always_on
-description: Cross-platform compatibility rules for csghub-lite (macOS, Linux, Windows)
+description: Frontend internationalization requirements for web UI changes
 ---
 
 
-# Cross-Platform Compatibility
+# Frontend Internationalization
 
-Canonical rule: `docs/agent-guidelines/cross-platform.md`.
+Canonical rule: `docs/agent-guidelines/frontend-i18n.md`.
 
 Follow that file. Do not add duplicated rule text here; update the canonical
 guideline instead.
