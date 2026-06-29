@@ -1,12 +1,12 @@
 ---
 trigger: always_on
-description: Multi-platform requirements for Go and install script changes
+description: Python 3.9+ compatibility for Python code and dependencies
 ---
 
 
-# Multi-Platform Support
+# Python Compatibility
 
-Canonical rule: `docs/agent-guidelines/cross-platform.md`.
+Canonical rule: `docs/agent-guidelines/python.md`.
 
 Follow that file. Do not add duplicated rule text here; update the canonical
 guideline instead.
