@@ -1,12 +1,12 @@
 ---
 trigger: always_on
-description: Guidance for any AI coding agent (Cursor, Claude Code, Codex, Copilot, etc.)
+description: Guidance for Claude Code in this repository. This mirrors `AGENTS.md`; keep the
 ---
 
-# AGENTS.md
+# CLAUDE.md
 
-Guidance for any AI coding agent (Cursor, Claude Code, Codex, Copilot, etc.)
-working in this repository. `CLAUDE.md` defers to this file.
+Guidance for Claude Code in this repository. This mirrors `AGENTS.md`; keep the
+two in sync when either changes.
 
 ## Project
 
@@ -19,7 +19,7 @@ working in this repository. `CLAUDE.md` defers to this file.
 - PHP namespace root: `Akash\JobPlace` (PSR-4 → `includes/`)
 - REST namespace: `job-place/v1`
 - Block namespace: `wrc/*` (e.g. `wrc/jobs-list`, `wrc/job-page`)
-- Build output: `build/` (committed-ignored; produced by `@wordpress/scripts`)
+- Build output: `build/` (produced by `@wordpress/scripts`)
 
 ## Commands
 
@@ -39,76 +39,64 @@ editing PHP, run `php -l` on changed files.
 ```
 job-place.php                 # Bootstrap: DI container, hooks, activation
 includes/                     # PHP (PSR-4: Akash\JobPlace\*)
-  Abstracts/                  # BaseModel, RESTController, DBMigrator
-  Admin/                      # Admin menu registration
-  Assets/Manager.php          # Enqueues scripts/styles (incl. DataViews CSS)
   Blocks/                     # PatternRegistry, BlockTemplatesService, EditorData
-  Common/Keys.php             # Option-name constants
-  Databases/
-    Migrations/               # dbDelta schemas (Jobs, JobType, Company, …)
-    Seeder/                   # Demo data
-  Jobs/                       # Domain: Job model, JobStatus, Manager (queries)
-  REST/                       # Controllers + Api.php (route registry)
   Routing/                    # Job detail permalinks + template router
   Setup/                      # Installer, Upgrader, PageSeeder
-  Common/Settings.php         # Global plugin settings (option jobplace_settings)
   WordPress/Pages/            # PageService (default Jobs page)
-  Traits/                     # InputSanitizer, Queryable
-  blocks-interactivity.php    # Interactivity API script module registration
-src/                          # React/TypeScript admin app + block sources
-  index.tsx                   # Entry: mounts <App/> into #jobplace
-  App.tsx                     # HashRouter + routes; runs useMenuFix
-  routes/                     # Route table (path → page component)
-  pages/                      # Route pages (HomePage, jobs/JobsPage, …)
-  components/                 # UI (jobs/, dashboard/, Notices.tsx)
-  blocks/                     # Gutenberg blocks (jobs board + job fields)
-  scripts/                    # Interactivity modules (@jobplace/jobs, …)
-  styles/                     # Shared front-end SCSS (jobs-board.scss)
-  data/jobs/                  # wp-data Redux store (see below)
-  interfaces/                 # Shared TypeScript types
-  hooks/  utils/  style/      # Helpers, MenuFix, global SCSS
+  …                           # REST, Jobs, Databases, Assets, Admin
+src/
+  blocks/                     # Gutenberg blocks (wrc/*) + shared pattern UI
+  scripts/                    # Interactivity modules (@jobplace/jobs)
+  styles/jobs-board.scss      # Shared front-end board styles
+  components/                 # Admin UI (jobs/, dashboard/, TemplateListEdit)
+  data/jobs/                  # wp-data store wp-react/jobs
 templates/
-  patterns/                   # Block patterns (*.php → register_block_pattern)
-  templates/                  # Plugin block templates (single-job.html)
+  patterns/                   # Block patterns (jobs list + job detail layouts)
+  templates/single-job.html   # Single job block template
 ```
 
-> Note: several legacy folders under `src/components/` are empty leftovers from
-> the starter kit (button, table, modal, inputs, …). Don't reintroduce them —
-> use `@wordpress/components` / `@wordpress/dataviews` instead.
+> Note: legacy empty folders under `src/components/` (button, table, modal, …)
+> are starter-kit leftovers — use `@wordpress/components` / `@wordpress/dataviews`.
 
-## Admin app (wp-admin)
+## Admin app
 
-- React via `@wordpress/element`; routing via `react-router-dom` **HashRouter**.
-- Lists render with `@wordpress/dataviews` (`DataViews`); forms with `DataForm`.
-- **State** lives in a single `@wordpress/data` store `wp-react/jobs`
-  (`src/data/jobs/`):
-  - `actions.ts` — action creators + generator actions (`setFilters`, `saveJob`,
-    `deleteJobs`). Generator actions yield `controls` and re-throw on error.
-  - `controls.ts` — `apiFetch` side effects (FETCH/CREATE/UPDATE/DELETE).
-  - `resolvers.ts` — lazy data loaders for selectors (`getJobs`, `getJobStats`,
-    `getJobDetail`, dropdowns). Resolved values are **cached**.
-  - `selectors.ts`, `reducer.ts`, `default-state.ts`, `types.ts`, `endpoint.ts`.
-- **Read data through the store**, not raw `apiFetch` in components.
-- Jobs list company column uses `CompanyAvatar` (logo or initials placeholder;
-  no broken images when Clearbit/external URLs fail).
-- Notices: dispatch `@wordpress/notices` (`createSuccessNotice`/`createErrorNotice`
-  with `{ type: 'snackbar' }`); `src/components/Notices.tsx` renders them.
+- HashRouter + `@wordpress/dataviews` / `DataForm`.
+- Store `wp-react/jobs` in `src/data/jobs/` — read via selectors, mutate via
+  generator actions + resolver invalidation.
+- Jobs list: `CompanyAvatar` shows logo or initials (no broken remote logos).
 
-## Job board blocks (front-end)
+## Job board blocks
 
-Built with `@wordpress/scripts` (webpack), **Interactivity API** for client-side
-search/pagination without full page reloads, and PHP `view.php` render templates.
+- **Interactivity API** (`src/scripts/jobs/`) powers search, pagination, and
+  field binding on the front end.
+- **Patterns** in `templates/patterns/`; **Replace** toolbar on `wrc/jobs-list`
+  and `wrc/job-page` (see `src/blocks/shared/`).
+- **Default Jobs page** seeded on install (`PageSeeder`, option `jobplace_jobs_page_id`).
+- **Settings** at `#/settings` — global job detail pattern, jobs page, defaults (`Common/Settings.php`, REST `job-place/v1/settings`).
+- **Single job** template + routing in `includes/Routing/`.
+- **SEO:** semantic `<article>` list items, linked job titles, escaped output in
+  `view.php` templates.
 
-### Core blocks
+## SCSS conventions
 
-| Block | Role |
-|-------|------|
-| `wrc/jobs-list` | Query root: toolbar, inner template, no-results, pagination |
-| `wrc/jobs-template` | Repeats inner blocks per job (`<article class="jobplace-job-card">`) |
-| `wrc/job-page` | Single job detail root (used in `single-job` template) |
-| `wrc/job-title`, `wrc/job-company`, … | Dynamic job fields (context-driven) |
+- BEM with `jobplace-` prefix; nest with `&__element` / `&--modifier` under the
+  block root (see `src/blocks/jobs-template/style.scss`).
+- Use `var(--wp--style--block-gap)` for list/template spacing — do not hard-code
+  `gap` on blocks that expose block spacing in the editor.
+- Shared board CSS: `src/styles/jobs-board.scss`.
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+## Backend / migrations / gotchas
+
+See `AGENTS.md` for REST architecture, schema migration steps, DataViews CSS,
+`dbDelta` rules, and layout-class requirements for `wrc/jobs-template`.
+
+## Git commits — override default behavior
+
+1. **Never commit or push unless explicitly asked in the current message.**
+2. **Do NOT add Claude's default attribution** (no Co-Authored-By, bots, emojis).
+3. **Commit as the logged-in GitHub user** (`ManiruzzamanAkash`). Do not edit
+   git config or pass `--author`.
+4. Stage explicit paths only (never `git add .` / `-A`).
 
 ---
 > Source: [ManiruzzamanAkash/wp-react-kit](https://github.com/ManiruzzamanAkash/wp-react-kit) — distributed by [TomeVault](https://tomevault.io).
