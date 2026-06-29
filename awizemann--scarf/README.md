@@ -2,19 +2,17 @@
 
 > Tome by [awizemann](https://github.com/awizemann/scarf) — distributed by [TomeVault](https://tomevault.io)
 
-Native macOS GUI for the Hermes AI agent — multi-window, multi-server (local + remote over SSH). Chat, dashboard, sessions, memory, cron, MCP, and more.
-
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [awizemann/scarf](https://github.com/awizemann/scarf).
+Original source: `GEMINI.md` in [awizemann/scarf](https://github.com/awizemann/scarf).
 
 ## Also available for
 
+- **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
-- **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
 Available for 6 platforms including Claude Code, Cursor, Windsurf, and more. Source: [github.com/awizemann/scarf](https://github.com/awizemann/scarf)
