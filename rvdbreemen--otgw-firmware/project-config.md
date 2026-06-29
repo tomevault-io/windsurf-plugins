@@ -1,87 +1,85 @@
 ---
 trigger: always_on
-description: These instructions adapt the repository's Claude guidance for Codex agents. They are project-specific rules for this firmware repository and sit above the generic Backlog.md CLI reference below.
+description: This project uses OpenWolf for context management. Read and follow .wolf/OPENWOLF.md every session. Check .wolf/cerebrum.md before generating code. Check .wolf/anatomy.md before reading files.
 ---
 
-# OTGW-firmware: Codex Agent Instructions
+# OpenWolf
 
-These instructions adapt the repository's Claude guidance for Codex agents. They are project-specific rules for this firmware repository and sit above the generic Backlog.md CLI reference below.
+@.wolf/OPENWOLF.md
 
----
+This project uses OpenWolf for context management. Read and follow .wolf/OPENWOLF.md every session. Check .wolf/cerebrum.md before generating code. Check .wolf/anatomy.md before reading files.
 
-## Task Management
 
-Every meaningful code or documentation change should be backed by a Backlog task before implementation work starts. Use Backlog MCP tools as the primary interface for reading, creating, updating, and completing tasks.
-
-Codex agents must not edit files in `backlog/tasks/` directly. Use Backlog MCP tools such as task view/search/create/edit when available. Use the Backlog CLI commands in the reference below only when the MCP tools are unavailable, missing required capability, or fail for the current operation.
-
-Before marking a task `Done`, run through `docs/guides/pr-checklist.md`. A clean build is the minimum bar; the checklist covers hardware, browser, MQTT, and smoke-test expectations that compile checks do not cover.
-
-After marking a task `Done`, commit the completed task changes and push the branch to its configured upstream. Keep commits narrow: stage only files that belong to the completed task and leave unrelated local changes untouched.
-
-Known issue: `backlog task list` may return empty in this repository. Prefer Backlog MCP search/view; if falling back to CLI, prefer `backlog search "<topic>" --plain` or `backlog task <id> --plain`. Read task files directly only as a read-only fallback, never to modify them.
+# OTGW-firmware: Claude Instructions
 
 ---
 
-## Design Principles
+## Task Management (MANDATORY)
 
-- KISS: choose the simplest solution that works and explain tradeoffs when complexity is optional.
-- YAGNI: do not add behavior for hypothetical future needs.
-- Minimal change surface: keep changes small, focused, and justified by the task.
-- Comments describe the present system. Avoid defensive comments about hypothetical modes or future work; if the concern is real, create a Backlog task.
-- Fix the documentation before renaming identifiers when the identifier is still semantically correct and only the comment or docstring is stale.
+**Every piece of work must have a backlog task before any code is written. No exceptions.**
 
----
+**Always use the `backlog` CLI for task operations on this project. Do NOT use the `mcp__backlog__*` MCP server.** The MCP server indexes only one worktree at a time and serves stale cached state across worktrees (verified 2026-05-05: MCP returned a pre-edit "In Progress" snapshot of TASK-514 long after the CLI marked it Done on disk in another tree). The "Backlog.md: always use the CLI" section near the bottom of this file is the canonical statement; this paragraph is a reminder so the rule is the first thing seen.
 
-## Project Overview
+```bash
+# Before writing any code:
+backlog search "<topic>" --plain           # 1. Find existing task
+backlog task create "Title" -d "..." --ac "..."  # 2. Create if none
+backlog task edit <id> -s "In Progress" -a @claude  # 3. Start it
+backlog task edit <id> --plan "..."        # 4. Write plan, share with user, WAIT for approval
 
-This repository contains ESP8266 and ESP32 firmware for the NodoShop OpenTherm Gateway, including Web UI, MQTT, REST API, TCP serial bridge, Home Assistant integration, OTGW32 support, and SAT-related work.
+# During implementation:
+backlog task edit <id> --check-ac 1        # Mark ACs done as you go
+backlog task edit <id> --append-notes "..."  # Log progress
 
-- Platform: ESP8266 (NodeMCU/Wemos D1 mini, tight RAM budget) and ESP32/OTGW32.
-- Language: Arduino C/C++ in `.ino` files, built as a single translation unit.
-- Serial: reserved for the PIC after initialization. Never write to `Serial` after OTGW init.
-- Debug: use `DebugTln()`, `DebugTf()`, and related debug helpers. They go to Telnet port 23; do not use `Serial.print()`.
-- Branches (model changed 2026-06-20): `dev` is the DEFAULT line and carries the 2.0.0 ESP32-S3-only async + FreeRTOS firmware (epic TASK-865; ESP8266 dropped; former `feature-2.0.0-esp32s3-async`). `otgw-1.x.x` is the 1.5.x/1.6.x maintenance/LTS line (the former `dev`). `main` is ALWAYS the latest public release. Default to the current branch and port fixes between `dev` and `otgw-1.x.x` deliberately.
-
----
-
-## Critical Coding Rules
-
-### PROGMEM strings
-
-Keep string literals in flash wherever practical:
-
-```cpp
-DebugTln(F("Message"));
-DebugTf(PSTR("Value: %d\r\n"), value);
-snprintf_P(buf, size, PSTR("fmt: %s"), str);
+# When done:
+backlog task edit <id> --final-summary "..." # PR description
+backlog task edit <id> -s Done
 ```
 
-Use `strcmp_P()` and `strcasecmp_P()` with `PSTR()` for flash-resident string comparisons. Use `memcmp_P()` for binary data; do not use `strncmp_P()` or `strstr_P()` on binary payloads.
+**CRITICAL: NEVER edit task files in `backlog/tasks/` directly. Always use the `backlog` CLI.**
 
-### JSON
+Two hooks enforce this contract — they fail closed, you don't have to remember:
 
-Do not add ArduinoJson. This firmware builds JSON manually with `snprintf_P()` / `sendJsonMapEntry()` and parses with `parseJsonKVLine()`.
+- `.claude/hooks/backlog-mcp-guard.py` — PreToolUse guard wired in `.claude/settings.json`. Blocks `Edit/Write/MultiEdit` on `backlog/tasks/*.md` (direct file edits are never allowed). Does NOT block `backlog` CLI invocations — CLI is the preferred interface.
+- `.githooks/commit-msg` — git hook that fails the commit if its message references `TASK-NNN` without a matching `backlog/tasks/task-NNN*.md` file in the index. Catches the failure mode where a code commit lands but its task record stays untracked. Install once per clone with `git config core.hooksPath .githooks`. Bypass with `git commit --no-verify` for emergencies (document why in the message).
 
-### String usage
+For the full CLI reference (all commands, AC management, DoD, multi-line input): read `docs/guides/backlog-cli.md`.
 
-Avoid Arduino `String` in hot paths, especially areas covered by ADR-004: SAT, MQTT, REST, OTGW-Core, and OTDirect. Prefer fixed buffers with `strlcpy()` and `snprintf_P()`. `String` is acceptable only in setup or one-off paths where the local pattern already allows it.
+Before marking a task `Done`, run through `docs/guides/pr-checklist.md`. "Builds clean" is the lowest bar; the checklist captures the hardware / browser / MQTT smoke tests that build-clean doesn't see.
 
-### File serving
+**Known bug:** `backlog task list` returns empty. Use `backlog task <id> --plain` or read `backlog/tasks/` directly.
 
-Stream files instead of loading them into RAM. Files larger than roughly 2 KB should use `httpServer.streamFile()`. `index.html` is too large for `readString()` style handling.
+## Task pickup (MANDATORY)
 
-### HTTP and WebSocket
+**When picking up any task from the backlog — whether newly created or already existing — the first action before any code, research, or file reading is:**
 
-Do not add HTTPS or WSS support in firmware. This project targets trusted LAN deployment; REST can sit behind an HTTPS reverse proxy, while WebSocket assumptions remain plain WS.
+```bash
+backlog task edit <id> -s "In Progress" -a @claude
+```
 
-### ESP Platform Abstraction
+This makes the task visible in the correct board column immediately. Skipping this step leaves the task in "To Do" while it is actually being worked on, which creates false visibility for the user and breaks board accuracy.
 
-The 2.0.0 branch carries an explicit platform abstraction. **No `#if(def) ESP8266`, `#if(def) ESP32`, `#if(def) ARDUINO_ARCH_ESP*`, or `#if(def) BOARD_NODOSHOP_ESP*` may appear outside the allowlisted abstraction files.** The allowlist is: `src/OTGW-firmware/platform.h`, `platform_esp8266.h`, `platform_esp32.h`, `boards.h`, and the `OTGW-ModUpdateServer{.h,-esp32.h,-impl.h}` trio.
+## Auto-advance to next task (project policy)
 
-Application code must instead:
+After completing a task (or reaching a blocking state with no self-verifiable ACs remaining), **immediately analyse the backlog and pick up the highest-priority actionable task** without waiting for the user to prompt. Apply the following selection order:
 
-- Call `platformXxx()` shims from `platform_*.h` for any divergent API (heap, hostname, MAC, reset, NTP, LED, JSON tx, WiFi, BLE, ...). If the shim you need does not exist, **add it first** in both `platform_esp8266.h` and `platform_esp32.h` (use an inline no-op stub on the platform where the feature is absent), then call it unguarded from application code.
+1. Highest-priority task with all non-field-validation ACs unblocked (can be started and verified without hardware).
+2. If all open tasks are blocked on field validation or external input, report that state and idle.
+
+Exceptions — do NOT auto-advance:
+- User has explicitly asked you to stop or wait.
+- The next task requires a plan approval checkpoint (per KISS principle: share choices so user decides on complexity).
+- The next task is a cross-worktree master-plan task (requires the one-plan-then-two-agents protocol).
+
+---
+
+## MCP Servers
+
+Two MCP servers are wired into Claude Code for this project:
+
+- **`mcp__backlog__*`** — task management. Started locally by Claude Code itself (stdio).
+- **`mcp__discord-mcp__*`** — Discord I/O for `#dev-sat-mqtt` and the support channels. Runs as a long-lived Docker container (`saseq/discord-mcp`) on `http://localhost:8085/mcp`, pre-loaded with `DISCORD_TOKEN` from the Windows user environment. Most-used tools: `read_messages`, `send_message`, `get_server_info`, `read_private_messages`, `send_private_message`. There is no separate login tool — the container handshakes on its own at startup. For attachment contents (logs, screenshots), see `.claude/commands/backlog_discord.md` (Phase 1b) and `.claude/commands/check_otgw_issues.md` (Phase 1d).
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
