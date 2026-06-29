@@ -1,156 +1,55 @@
 ---
 trigger: always_on
-description: > **Purpose**: This document provides comprehensive context for AI agents working on this Ghidra extension for the Infineon C166 microcontroller architecture.
+description: Ghidra processor extension for the **Infineon C166** 16-bit microcontroller family (C167CR, C167CS, and relatives). The core problem this module solves: C166 uses 16-bit pointers over a 24-bit address space, so addresses must be translated through DPP / EXTP / EXTS paging to land at the right physical location.
 ---
 
-# C166 Ghidra Module - Agent Documentation
+# CLAUDE.md
 
-> **Purpose**: This document provides comprehensive context for AI agents working on this Ghidra extension for the Infineon C166 microcontroller architecture.
+Ghidra processor extension for the **Infineon C166** 16-bit microcontroller family (C167CR, C167CS, and relatives). The core problem this module solves: C166 uses 16-bit pointers over a 24-bit address space, so addresses must be translated through DPP / EXTP / EXTS paging to land at the right physical location.
 
----
+## ⚠️ Before changing any instruction semantics
 
-## ⚠️ Important: Instruction Set Reference
+**Consult `c166ism.md` first.** It is the full C166 Instruction Set Manual (the architectural source of truth): instruction syntax, operation semantics, condition-flag behavior (E, Z, V, C, N), addressing modes, and encodings. Verify behavior against it before editing `c166.sinc` or any flag/address logic — do not infer instruction behavior from existing code alone.
 
-**Before modifying, verifying, or implementing any C166 instruction**, consult:
+For deep architectural detail (switch handling, scripts, every edge case), see `agents.md`. This file is the essentials.
 
-```
-c166ism.md
-```
-
-This file contains the complete **C166 Instruction Set Manual** (converted from PDF). It includes:
-- Instruction syntax and operation semantics
-- Condition flag behavior (E, Z, V, C, N) for each instruction
-- Addressing modes and encoding formats
-- Detailed descriptions and edge cases
-
-**Always verify instruction behavior against this reference** before making changes to `c166.sinc`.
-
----
-
-## Table of Contents
-
-1. [Architecture Overview](#architecture-overview)
-2. [Directory Structure](#directory-structure)
-3. [C166 Memory Model](#c166-memory-model)
-4. [PCode Injection System](#pcode-injection-system)
-5. [Switch Table Handling](#switch-table-handling)
-6. [Analyzers](#analyzers)
-7. [Ghidra Scripts](#ghidra-scripts)
-8. [Edge Cases and Gotchas](#edge-cases-and-gotchas)
-9. [Build and Development](#build-and-development)
-10. [Known Limitations](#known-limitations)
-
----
-
-## Architecture Overview
-
-The C166 is a **16-bit microcontroller** with a **24-bit address space**. The key challenge is that C166 uses a **segmented memory model** where 16-bit pointers are translated to 24-bit physical addresses using **Data Page Pointers (DPP)** or **Extended Page/Segment (EXTP/EXTS)** registers.
-
-### Key Architectural Features
-
-| Feature | Description |
-|---------|-------------|
-| **Word Size** | 16-bit |
-| **Address Space** | 24-bit (16MB) |
-| **Pointer Size** | 16-bit (paged) or 24-bit (far) |
-| **DPP Registers** | DPP0-DPP3 (10-bit page values) |
-| **Paging Formula** | `physical = (DPP << 14) | (offset & 0x3FFF)` |
-
----
-
-## Directory Structure
+## Address translation (the heart of the module)
 
 ```
-GhidraInfineon/
-├── data/
-│   └── languages/
-│       ├── c166.slaspec       # Main SLEIGH entry point
-│       ├── c166.sinc          # SLEIGH instruction definitions
-│       ├── c166.cspec         # Compiler specification (calling conventions, callotherfixup)
-│       ├── c166.ldefs         # Language definitions
-│       ├── c166cr.pspec       # Processor spec for C167CR (includes segmentop)
-│       ├── c167cs.pspec       # Processor spec for C167CS (includes segmentop)
-│       └── c166.sla           # Compiled SLEIGH (auto-generated, delete to rebuild)
-├── src/main/java/ghidrainfineon/
-│   ├── C166AddressAnalyzer.java   # DPP-aware address resolution analyzer
-│   ├── PcodeInject.java           # PCode injection library registration
-│   ├── GetPagedOffset.java        # Injector for static address paging
-│   ├── SwitchLoad.java            # Injector for switch table loads
-│   └── PcodeOpEmitter.java        # Helper for emitting PCode operations
-├── ghidra_scripts/
-│   ├── CreateDPPReference.java    # Manual DPP reference creation script
-│   └── C166SwitchOverride.java    # Manual switch table override script
-├── build.gradle                   # Gradle build configuration
-└── extension.properties           # Ghidra extension metadata
+DPP:   physical = (DPP[offset>>14] << 14) | (offset & 0x3FFF)
+EXTP:  physical = (page    << 14) | (offset & 0x3FFF)   # 14-bit offset
+EXTS:  physical = (segment << 16) | (offset & 0xFFFF)   # full 16-bit offset
 ```
 
-### File Purposes
+EXTP and EXTS temporarily override DPP for a short instruction window. **EXTS uses the full 16-bit offset; EXTP only the low 14 bits** — the most common source of off-by-page bugs. Resolution priority is EXTS → EXTP → DPP, with a raw-offset fallback when no context is known (never synthesize a page from `offset>>14` — that produces phantom xrefs near 0x0).
 
-| File | Purpose |
-|------|---------|
-| **c166.sinc** | Defines all C166 instructions, registers, and pcodeops. This is where `GetPagedOffset`, `segment`, and `c166_switch_load` are defined. |
-| **c166.cspec** | Defines `callotherfixup` entries that map pcodeops to Java injectors. The `dynamic="true"` attribute enables runtime PCode injection. |
-| **c166cr.pspec / c167cs.pspec** | Defines `segmentop` which tells the decompiler how to interpret `segment()` PCode for address calculation. |
-| **PcodeInject.java** | Registers custom PCode injectors (`GetPagedOffset`, `SwitchLoad`) with Ghidra's language system. |
+## Critical gotchas
 
----
+- **The decompiler ignores disassembly references.** Creating a reference in the listing does *not* change decompiler output. To affect decompilation you must emit pcode (`segment()`) or use `JumpTable.writeOverride()`.
+- **SLEIGH changes need a clean rebuild.** After editing `c166.sinc`, delete `data/languages/c166.sla` or the change won't take effect (symptoms: stale behavior, or `Unknown callother name` errors).
+- **DPP values are context-sensitive.** Read them at the instruction's address context, not globally: `program.getProgramContext().getValue(dppReg, addr, false)`.
+- **Prefer SLEIGH builtins for flags** (`carry`, `scarry`, `sborrow`) over hand-rolled bit math.
 
-## C166 Memory Model
+## Key files
 
-### DPP (Data Page Pointer) Translation
+| Task | Files |
+|------|-------|
+| Add / change an instruction | `data/languages/c166.sinc` (then delete `c166.sla`) |
+| Add a pcode injector | `c166.sinc` + `c166.cspec` (`callotherfixup`) + `PcodeInject.java` + new `*.java` injector |
+| Address-translation logic | `src/main/java/ghidrainfineon/C166AddressAnalyzer.java`, `RegOffsetAddr.java`, `GetPagedOffset.java` |
+| Calling conventions / SFR symbols | `c166.cspec`, `c166cr.pspec`, `c167cs.pspec` |
 
-C166 uses a 4-page model for data access:
+## Build
 
-```
-16-bit offset: [15:14] = DPP selector, [13:0] = page offset
-
-DPP0: offsets 0x0000-0x3FFF
-DPP1: offsets 0x4000-0x7FFF  
-DPP2: offsets 0x8000-0xBFFF
-DPP3: offsets 0xC000-0xFFFF
-
-Physical address = (DPP[selector] << 14) | (offset & 0x3FFF)
+```bash
+./gradlew buildExtension          # output: dist/ghidra_<ver>_PUBLIC_<date>_*.zip
 ```
 
-### EXTP/EXTS Override
+Delete `data/languages/c166.sla` first if you touched any SLEIGH file.
 
-The `EXTP` and `EXTS` instructions temporarily override DPP translation:
+## Ghidra scripts
 
-| Instruction | Behavior | Formula |
-|-------------|----------|---------|
-| **EXTP** | Page-based override | `(Extp << 14) | (offset & 0x3FFF)` |
-| **EXTS** | Segment-based override | `(Exts << 16) | (offset & 0xFFFF)` |
-
-**Critical**: EXTS uses the **full 16-bit offset**, while EXTP uses only the **lower 14 bits**.
-
-### Code Addressing
-
-Code addresses use a different model - `jmpi` uses the current code segment:
-
-```
-jmpi [rX]  →  target = (current_IP & 0xFF0000) | rX_value
-```
-
----
-
-## PCode Injection System
-
-### How It Works
-
-1. **SLEIGH** (`c166.sinc`) defines `pcodeop` placeholders:
-   ```sleigh
-   define pcodeop GetPagedOffset;
-   define pcodeop segment;
-   define pcodeop c166_switch_load;
-   ```
-
-2. **Compiler Spec** (`c166.cspec`) maps pcodeops to injectors:
-   ```xml
-   <callotherfixup targetop="c166_switch_load">
-       <pcode dynamic="true">
-           <input name="ptr" size="2"/>
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+Scripts live in `ghidra_scripts/` and **must** carry `@category C166`, a `@keybinding`, and a `@menupath` annotation in their header comments.
 
 ---
 > Source: [keyhana/c166-ghidra-module](https://github.com/keyhana/c166-ghidra-module) — distributed by [TomeVault](https://tomevault.io).
