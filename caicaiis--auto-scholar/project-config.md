@@ -1,111 +1,56 @@
 ---
 trigger: always_on
-description: > Agentic coding guide for auto-scholar: FastAPI + LangGraph backend with Next.js 16 frontend.
+description: > 7-dimension evaluation framework for literature review quality assessment.
 ---
 
-# AGENTS.md — auto-scholar
+# AGENTS.md — backend/evaluation
 
-> Agentic coding guide for auto-scholar: FastAPI + LangGraph backend with Next.js 16 frontend.
+> 7-dimension evaluation framework for literature review quality assessment.
 
-**Generated:** 2026-02-26 | **Commit:** 129b58d | **Branch:** main
+## Overview
 
-## Quick Commands
+Automated + human evaluation of generated reviews. Called via `GET /api/research/evaluate/{thread_id}` and `runner.run_evaluation()`.
 
-```bash
-# Backend
-uv sync --extra dev                        # Install deps
-find backend -name '*.py' -exec python -m py_compile {} +  # Compile check all
-python -m py_compile backend/schemas.py      # Compile check single file
-ruff check backend/                          # Lint all
-ruff check backend/main.py                   # Lint single file
-ruff format backend/ --check                 # Check formatting
-ruff format backend/                         # Auto-format
+## Dimensions
 
-# Backend tests (pytest)
-uv run pytest tests/ -v                             # Run all tests
-uv run pytest tests/test_integration.py -v          # Run single file
-uv run pytest tests/test_integration.py::test_full_workflow -v  # Run single test
-uv run pytest tests/test_exporter.py::test_export_markdown -v   # Another example
-uv run pytest -x                                    # Stop on first failure
-uv run pytest -m "not slow"                         # Skip slow tests
-uv run pytest -m "not integration"                  # Skip integration tests
-uv run pytest --cov=backend tests/                  # With coverage
+| Dimension | Module | Metric |
+|-----------|--------|--------|
+| Citation precision | `citation_metrics.py` | % of `[N]` where 1 ≤ N ≤ approved_count |
+| Citation recall | `citation_metrics.py` | % of approved papers actually cited |
+| Claim support rate | via `claim_verifier.py` | Entailment ratio from verification summary |
+| Section completeness | `section_completeness.py` | Required sections present (aliases in `constants.py`) |
+| Academic style | `academic_style.py` | Hedging ratio, passive voice, citation density |
+| Cost efficiency | `cost_tracker.py` | Token counts, USD cost, per-node timing |
+| Human ratings | `human_ratings.py` | 1-5 scale stored in `data/ratings.json` |
 
-# Frontend
-cd frontend && bun install                   # Install deps
-cd frontend && bun run build                 # Production build
-cd frontend && bun x tsc --noEmit            # Type check
-cd frontend && bun run lint                  # ESLint
+## Key Files
 
-# Frontend tests (vitest + playwright)
-cd frontend && bun test                      # Run unit tests (vitest)
-cd frontend && bun test src/__tests__/store.test.ts  # Single test file
-cd frontend && bun run test:e2e              # Run E2E tests (playwright)
+| File | Lines | Role |
+|------|-------|------|
+| `schemas.py` | ~200 | All evaluation Pydantic models with `@computed_field` properties |
+| `cost_tracker.py` | ~163 | Module-level lists for usage/timing/search records. Pricing table for OpenAI + DeepSeek |
+| `runner.py` | ~76 | Orchestrates all dimensions, merges log-parsed + runtime-tracked cost data |
+| `citation_metrics.py` | ~66 | Regex-based citation extraction (`{cite:N}` and `[N]` formats) |
+| `academic_style.py` | ~71 | Sentence splitting, hedging/passive counting, bilingual (en/zh) |
+| `section_completeness.py` | ~60 | Heading normalization + alias matching from `constants.py` |
+| `human_ratings.py` | ~59 | JSON file storage in `data/ratings.json` |
 
-# Docker
-docker compose up --build                    # Full stack (backend:8000 + frontend:3000)
+## Conventions
 
-# DO NOT run these from agents (long-running):
-# uvicorn backend.main:app --reload --port 8000
-# cd frontend && bun run dev
-```
+- All evaluation functions are synchronous (no async) — they operate on in-memory data
+- `cost_tracker.py` uses module-level mutable lists (`_usage_records`, `_timing_records`) — not thread-safe, reset between runs
+- Bilingual support: most functions accept `language: str` param (`"en"` or `"zh"`)
+- Required sections and hedging patterns defined in `backend/constants.py`, not here
+- Citation patterns: `CITATION_PATTERN` for `{cite:N}`, `NORMALIZED_CITATION_PATTERN` for `[N]`
 
-## Project Structure
+## Adding a New Dimension
 
-```
-auto-scholar/
-├── backend/                    # FastAPI + LangGraph backend
-│   ├── main.py            # REST endpoints (start, stream, approve, status, export, sessions)
-│   ├── workflow.py        # LangGraph graph + QA retry router + reflection loop
-│   ├── nodes.py           # 6 agent nodes (plan, search, extract, draft, QA, reflection) — 948 lines, largest file
-│   ├── state.py           # AgentState TypedDict with Annotated reducers
-│   ├── schemas.py         # Pydantic V2 models — single source of truth for 40+ types
-│   ├── constants.py       # Config constants with trade-off rationale comments
-│   ├── prompts.py         # Centralized LLM prompt templates
-│   ├── config/
-│   │   └── loader.py      # YAML model config loader with ${ENV_VAR:-default} substitution
-│   ├── llm/
-│   │   ├── router.py      # Task-aware model selection (scoring by reasoning/creativity/latency)
-│   │   └── task_types.py  # TaskType enum + per-task requirements
-│   ├── evaluation/        # 7-dimension evaluation framework (see backend/evaluation/AGENTS.md)
-│   └── utils/
-│       ├── llm_client.py  # AsyncOpenAI wrapper + multi-provider fallback chains
-│       ├── scholar_api.py # Semantic Scholar + arXiv + PubMed clients (590 lines)
-│       ├── event_queue.py # SSE debouncing engine (200ms window + semantic boundaries)
-│       ├── exporter.py    # Markdown/DOCX export with 4 citation styles
-│       ├── citations.py   # {cite:N} → [N] normalization
-│       ├── claim_verifier.py  # Batch claim extraction + entailment verification
-│       ├── source_tracker.py  # Circuit breaker for failed sources (3 fails = skip 2min)
-│       ├── http_pool.py   # Connection pooling (limit=50, TTL=300s)
-│       ├── fulltext_api.py    # Unpaywall + OpenAlex PDF URL resolution
-│       ├── charts.py      # Matplotlib chart generation
-│       └── logging.py     # JSON structured logging with thread_id context
-├── config/
-│   └── models.yaml        # Multi-model config (OpenAI, DeepSeek, Ollama) with capability scores
-├── frontend/              # Next.js 16 + React 19
-│   └── src/
-│       ├── app/           # App router (page.tsx — 320 lines, layout.tsx)
-│       ├── components/    # UI components (console/, workspace/, approval/, ui/)
-│       ├── store/         # Zustand state (research.ts — 363 lines)
-│       ├── lib/api/       # API client with SSE + REST
-│       ├── i18n/          # Internationalization (en/zh) via next-intl
-│       ├── types/         # TypeScript types mirroring backend schemas 1:1
-│       └── __tests__/     # Vitest unit tests
-├── tests/                 # Backend pytest tests (34 files, ~7900 lines)
-├── .github/workflows/ci.yml  # 3 parallel jobs: lint, test (matrix 3.11/3.12), frontend
-└── pyproject.toml         # Python >=3.11, pytest asyncio_mode=auto
-```
-
-## WHERE TO LOOK
-
-| Task | Location | Notes |
-|------|----------|-------|
-| Add/modify workflow node | `backend/nodes.py` | 6 agents, uses prompts from `prompts.py` |
-| Change workflow graph | `backend/workflow.py` | LangGraph StateGraph, `_qa_router` for retry logic |
-| Add API endpoint | `backend/main.py` | FastAPI, all routes under `/api/` |
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+1. Create `backend/evaluation/new_dimension.py` with a pure function returning a Pydantic model
+2. Add the result model to `schemas.py`
+3. Add the field to `EvaluationResult` in `schemas.py`
+4. Call the function in `runner.py:run_evaluation()`
+5. Add tests in `tests/test_evaluation.py`
 
 ---
 > Source: [CAICAIIs/Auto-Scholar](https://github.com/CAICAIIs/Auto-Scholar) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-03 -->
+<!-- tomevault:4.0:windsurf_rules:2026-06-29 -->
