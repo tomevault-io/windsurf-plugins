@@ -1,0 +1,122 @@
+---
+trigger: always_on
+description: This is a Kubernetes operator that automates external load-balancer configuration (F5 BigIP, Citrix ADC/Netscaler, HAProxy) for Kubernetes/OpenShift clusters. It watches cluster nodes and dynamically configures VIPs, server pools, and health monitors on external LB hardware via their APIs.
+---
+
+# LBConfig Operator - AI Coding Agent Instructions
+
+## Project Overview
+
+This is a Kubernetes operator that automates external load-balancer configuration (F5 BigIP, Citrix ADC/Netscaler, HAProxy) for Kubernetes/OpenShift clusters. It watches cluster nodes and dynamically configures VIPs, server pools, and health monitors on external LB hardware via their APIs.
+
+**Key Concept**: The operator creates and maintains load balancer configurations that forward traffic to cluster nodes based on their roles (master/infra) or arbitrary labels, enabling external access to cluster services and APIs.
+
+## Architecture
+
+### Component Structure
+
+```
+api/v1                                   # API Objects
+internal/controller/
+├── externalloadbalancer_controller.go   # Main reconciler
+├── backend/                             # Backend management
+│   ├── backend_controller/              # Provider interface & orchestration
+│   ├── backend_loader/                  # Auto-registers all providers via init()
+│   ├── f5/                              # F5 BigIP implementation
+│   ├── netscaler/                       # Citrix ADC implementation
+│   ├── haproxy/                         # HAProxy Dataplane API implementation
+│   └── dummy/                           # Testing provider
+api/v1/       # CRD types
+```
+
+### Provider Plugin Architecture
+
+Backends are **plugin-based** via interface and auto-registration:
+
+1. Each provider implements the `Provider` interface in `backend_controller/backend_controller.go` (CRUD for Monitors, Pools, PoolMembers, VIPs)
+2. Providers call `RegisterProvider(name, providerInstance)` in their `init()` function
+3. `backend_loader/backend_loader.go` imports all providers with `_` imports, triggering registration
+4. Vendor names MUST match the enum in `api/v1/externalloadbalancer_types.go` Provider.Vendor field
+
+**To add a new backend**:
+
+- Create package in `internal/controller/backend/<name>/`
+- Implement `Provider` interface (see dummy or f5 as examples)
+- Add `RegisterProvider("Vendor_Name", new(YourProvider))` in `init()`
+- Add blank import to `backend_loader/backend_loader.go`
+- Add vendor name to `Provider.Vendor` enum in API types
+
+### Reconciliation Flow
+
+1. **Watch**: ExternalLoadBalancer CRs and Node events (via `SetupWithManager`)
+2. **Node Selection**: Filter nodes by `.spec.type` (master/infra) OR `.spec.nodelabels` (custom label matching - all labels must match)
+3. **Backend Orchestration**: `BackendController.HandleMonitors/HandlePool/HandleVIP` calls provider CRUD methods
+4. **Finalizer Cleanup**: On CR deletion, remove LB configurations via `HandleCleanup`
+
+## Development Workflows
+
+### Local Development Cycle
+
+```bash
+# 1. Update CRD manifests after API changes
+make bundle
+
+# 2. Install CRDs to cluster
+make install
+
+# 3. Run operator locally (connects to cluster via kubeconfig)
+make run
+# Sets OTEL_EXPORTER_OTLP_ENDPOINT=localhost:4317 for tracing
+# Ignore Jaeger timeout errors unless you need tracing
+
+# 4. Create test namespace and resources
+kubectl create namespace lbconfig-operator-system
+kubectl create secret generic dummy-creds \
+  --from-literal=username=admin \
+  --from-literal=password=admin \
+  -n lbconfig-operator-system
+kubectl apply -n lbconfig-operator-system -f examples/lb_v1_externalloadbalancer-dummy.yaml
+```
+
+### Testing
+
+- **Unit tests**: `make test` - Uses Ginkgo + envtest (spawns k8s control plane)
+- **E2E tests (full)**: `make e2e-test` - Builds local images, deploys to KIND, runs comprehensive test suite via `hack/e2e-tests.sh`
+- **E2E tests (quick)**: `make e2e-test-quick` - Runs basic smoke tests without comprehensive validation
+- **Scorecard**: `make scorecard-run` - Validates operator with OLM scorecard tests
+
+**E2E Test Flow**:
+
+1. `e2e-build` - Builds operator binary, Docker image, bundle manifests, and bundle image (local arch only)
+   - Uses dev version: sets patch to 0 and adds `-dev` suffix (e.g., `0.5.1` → `v0.5.0-dev`) to distinguish from published releases
+   - Images tagged as `E2E_IMG` and `E2E_BUNDLE_IMG` variables
+2. `testenv-setup` - Creates KIND cluster named `test-operator` if not exists
+3. `testenv-load-images` - Loads locally built dev images into KIND cluster (no registry push needed)
+4. Deploys OLM and operator bundle to cluster
+5. Runs tests defined in `hack/e2e-tests.sh`:
+   - Operator deployment validation
+   - Basic CR lifecycle (creation, status population)
+   - CR updates (VIP changes, port additions)
+   - Metrics endpoint checks
+   - Multiple instance coexistence
+   - Finalizer and deletion behavior
+6. Leaves cluster running for manual inspection
+
+**E2E Test Cleanup**: `make testenv-teardown` destroys the KIND cluster
+
+**Important**: E2E builds use dev versions (patch set to 0, e.g., `0.5.0-dev`) to avoid conflicts with published versions. Never push dev images to registry.
+
+### Build & Release
+
+```bash
+# Build all architectures and push images (amd64, arm64, ppc64le, s390x)
+make dist
+
+# For release:
+git tag -a v$(make print-VERSION) -m "Release v$(make print-VERSION)"
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [carlosedp/lbconfig-operator](https://github.com/carlosedp/lbconfig-operator) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-06-29 -->
