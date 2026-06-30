@@ -1,0 +1,186 @@
+---
+trigger: always_on
+description: Garden is a programming language with a focus on developer tooling and
+---
+
+Garden is a programming language with a focus on developer tooling and
+high quality documentation.
+
+Hello World in Garden looks like this:
+
+```
+println("Hello World")
+```
+
+Remember that Garden does not treat `main` functions specially. You
+can just write expressions in the file directly, such as
+`println("foo")` or `some_func()`.
+
+A function with a unit test looks like this:
+
+```
+fun add_one(i: Int): Int {
+  i + 1
+}
+
+test add_one_to_two {
+  assert(add_one(2) == 3)
+}
+```
+
+The built-in files available are `__fs`, `__random`, `__reflect`,
+`__shell` and `__time`. You can import and use them like this:
+
+```
+import "__fs.gdn" as fs
+
+fs::list_directory(Path{ p: "/"})
+```
+
+Do not make changes to CHANGELOG.md unless the user explicitly
+requests it.
+
+# Commit Messages
+
+Keep commit messages concise and matter-of-fact. State what changed,
+not why it's an improvement. Do not justify the change or describe it
+as a fix/cleanup/refactor in evaluative terms. Do not repeat internal
+implementation details that are visible in the diff. Headings are
+rarely needed — a single short line is usually enough.
+
+# Pull Request Descriptions
+
+Keep PR descriptions short. The same principles as commit messages
+apply: state what changed, not why it's an improvement, and don't
+restate details visible in the diff. A sentence or two of plain prose
+is usually enough.
+
+Do not add headings like Summary, Changes, Note, or Verification, do
+not enumerate every changed file, and do not list the commands you ran
+to check the work. Mention test or build results only when they are
+genuinely noteworthy.
+
+# Writing Error Messages
+
+Error messages in Garden are extensively marked up so they can be
+highlighted in the terminal output. An error message is composed of
+`MessagePart` elements, which can be either `Text` or `Code`:
+
+- `Text` parts are rendered as plain text
+- `Code` parts are highlighted (wrapped in backticks in plain text,
+  or syntax highlighted in color output)
+
+Use the helper macros to construct error messages:
+
+- `msgtext!("Your message here")` - Creates a Text part
+- `msgcode!("{}", variable)` - Creates a Code part
+
+Example error message:
+
+```rust
+use crate::{msgcode, msgtext};
+
+ErrorMessage(vec![
+    msgtext!("Unknown built-in file "),
+    msgcode!("{}", path.display()),
+    msgtext!(". Available files are: __fs, __random, __reflect, __shell, __time."),
+])
+```
+
+This markup ensures that code elements like variable names, types,
+and paths stand out clearly in error messages.
+
+# Writing Static Analysis Checks
+
+Garden's static analysis checks live in `src/checks/` and use the
+`Visitor` trait (`src/parser/visitor.rs`) to traverse the AST. The
+Visitor handles recursion automatically — you only override the
+methods for the AST nodes you care about.
+
+## Adding a New Check
+
+1. Create a new file in `src/checks/` with a struct that holds a
+   `Vec<Diagnostic>` and any state you need.
+2. Implement `Visitor` for your struct, overriding only the relevant
+   `visit_*` methods.
+3. Add a public entry point function that creates the visitor, walks
+   all toplevel items, and returns the diagnostics.
+4. Register the check in `src/checks.rs` by calling your function
+   from `check_toplevel_items_in_env()`.
+
+## Example: A Minimal Check
+
+```rust
+use crate::diagnostics::{Diagnostic, Severity};
+use crate::parser::ast::ToplevelItem;
+use crate::parser::diagnostics::ErrorMessage;
+use crate::parser::visitor::Visitor;
+use crate::{msgcode, msgtext};
+
+struct MyVisitor {
+    diagnostics: Vec<Diagnostic>,
+}
+
+impl Visitor for MyVisitor {
+    fn visit_expr(&mut self, expr: &Expression) {
+        // Your logic here: inspect expr, push to self.diagnostics
+
+        // Call the default to continue recursing into child nodes.
+        self.visit_expr_(&expr.expr_);
+    }
+}
+
+pub(crate) fn check_my_thing(items: &[ToplevelItem]) -> Vec<Diagnostic> {
+    let mut visitor = MyVisitor {
+        diagnostics: vec![],
+    };
+    for item in items {
+        visitor.visit_toplevel_item(item);
+    }
+    visitor.diagnostics
+}
+```
+
+## Key Visitor Methods to Override
+
+- `visit_toplevel_item` — top-level definitions (functions, methods,
+  tests, enums, structs, imports)
+- `visit_fun_info` / `visit_method_info` — function and method bodies
+- `visit_expr` — all expressions (call `visit_expr_` at the end to
+  keep recursing)
+- `visit_expr_while` / `visit_expr_for_in` — loop constructs
+- `visit_expr_let` / `visit_expr_assign` — variable bindings and
+  assignments
+- `visit_expr_variable` — variable references
+- `visit_symbol` / `visit_type_symbol` — identifiers and type names
+- `visit_type_hint` — type annotations
+- `visit_block` — blocks of expressions
+
+Each `visit_*` method has a `_default` variant (e.g.
+`visit_fun_info_default`) that performs the standard recursive
+traversal. Call the `_default` method when you want to add logic
+before or after the default recursion:
+
+```rust
+fn visit_fun_info(&mut self, fun_info: &FunInfo) {
+    // Custom logic before recursion.
+    self.enter_scope();
+
+    // Use the _default method to recurse as normal.
+    self.visit_fun_info_default(fun_info);
+
+    // Custom logic after recursion.
+    self.leave_scope();
+}
+```
+
+See `src/checks/loops.rs` for a concise real example.
+
+# Checking Changes
+- cargo fmt: Format your Rust code
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [Wilfred/garden](https://github.com/Wilfred/garden) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-06-29 -->
