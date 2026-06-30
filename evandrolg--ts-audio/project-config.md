@@ -1,0 +1,158 @@
+---
+trigger: always_on
+description: This is a TypeScript audio library that provides audio playback, playlist management, and Web Audio API integration. The project uses **Bun** as its runtime and package manager, follows strict TypeScript standards, and includes comprehensive testing with Bun's built-in test runner.
+---
+
+# Cursor Rules for ts-audio Project
+
+## Project Overview
+
+This is a TypeScript audio library that provides audio playback, playlist management, and Web Audio API integration. The project uses **Bun** as its runtime and package manager, follows strict TypeScript standards, and includes comprehensive testing with Bun's built-in test runner.
+
+## Code Style & Standards
+
+### TypeScript
+
+- Use strict TypeScript configuration (strict: true, noImplicitAny: true, strictNullChecks: true)
+- Always provide explicit types for function parameters and return values
+- Use interfaces for object shapes and types for unions/primitives
+- Prefer `const` over `let`, use `let` only when reassignment is necessary
+- Use `readonly` for immutable properties
+- Implement proper error handling with typed error objects
+
+### Naming Conventions
+
+- Use PascalCase for classes and interfaces (e.g., `AudioClass`, `EventEmitter`)
+- Use camelCase for variables, functions, and methods (e.g., `audioCtx`, `preloadFile`)
+- Use UPPER_SNAKE_CASE for constants (e.g., `defaultStates`)
+- Use descriptive names that clearly indicate purpose and functionality
+- Prefix private properties with underscore (e.g., `_file`, `_audioCtx`)
+
+### File Organization
+
+- Keep related functionality in dedicated modules (audio/, playlist/, etc.)
+- Use index.ts files for clean public API exports
+- Separate test files in `__tests__` directories
+- Maintain clear separation between core logic and utilities
+
+## Architecture Patterns
+
+### Class Design
+
+- Follow single responsibility principle - each class should have one clear purpose
+- Use composition over inheritance where possible
+- Implement proper encapsulation with private/public methods
+- Use dependency injection for external dependencies (e.g., AudioContext)
+
+### Event Handling
+
+- Use the EventEmitter pattern for decoupled communication
+- Define clear event types and interfaces
+- Implement proper event cleanup and memory management
+- Use typed event data structures
+
+### Audio Implementation
+
+- Leverage Web Audio API (AudioContext, AudioBufferSourceNode)
+- Handle AudioContext state management (suspended, running, closed)
+- Implement proper resource cleanup and disposal
+- Use async/await for audio operations (decodeAudioData, resume)
+
+## Testing Standards
+
+### Bun Testing
+
+- Write comprehensive unit tests for all public methods
+- Use descriptive test names that explain the expected behavior
+- Mock external dependencies using `mock.module()` from `bun:test`
+- Test both success and error scenarios
+- Use beforeEach/afterEach for proper test isolation
+- Verify method calls and state changes
+- Import test utilities from `bun:test`: `describe`, `test`, `expect`, `beforeEach`, `mock`, `spyOn`
+
+### Test Structure
+
+- Group related tests using `describe` blocks
+- Use `test` or `it` for individual test cases
+- Use `mock.module()` for mocking modules (replaces `jest.mock()`)
+- Use `spyOn()` for spying on methods (replaces `jest.spyOn()`)
+- Clear test data setup and verification
+- Tests use happy-dom for browser API simulation
+
+## Error Handling
+
+### Audio Context Errors
+
+- Handle AudioContext state transitions gracefully
+- Implement proper error recovery for suspended contexts
+- Provide meaningful error messages for debugging
+- Use try-catch blocks for audio operations
+
+### Resource Management
+
+- Implement proper cleanup for audio resources
+- Handle file loading failures gracefully
+- Manage memory usage for large audio files
+- Provide fallback behavior when possible
+
+## Performance Considerations
+
+### Audio Preloading
+
+- Implement intelligent preloading strategies
+- Limit concurrent preload operations
+- Use appropriate buffer sizes for different audio formats
+- Consider memory constraints for mobile devices
+
+### Event Optimization
+
+- Minimize event listener overhead
+- Use event delegation where appropriate
+- Implement proper event cleanup to prevent memory leaks
+
+## Documentation
+
+### Code Comments
+
+- Use JSDoc comments for public methods and classes
+- Document complex algorithms and business logic
+- Explain non-obvious implementation details
+- Keep comments up-to-date with code changes
+
+### API Documentation
+
+- Provide clear examples for common use cases
+- Document configuration options and their effects
+- Explain event types and their data structures
+- Include performance considerations and limitations
+
+## Security & Best Practices
+
+### Audio File Handling
+
+- Validate file paths and URLs
+- Implement proper CORS handling for cross-origin audio
+- Sanitize user input for file operations
+- Handle malicious or corrupted audio files gracefully
+
+### Web Audio API
+
+- Respect user gesture requirements for audio playback
+- Implement proper error boundaries
+- Handle browser compatibility issues
+- Provide fallbacks for unsupported features
+
+## Build & Development
+
+### Runtime & Package Manager
+
+- This project uses **Bun** as the JavaScript runtime and package manager
+- Use `bun install` to install dependencies
+- Use `bun test` to run tests
+- Use `bun run <script>` to run package.json scripts
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [EvandroLG/ts-audio](https://github.com/EvandroLG/ts-audio) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-06-29 -->
