@@ -1,133 +1,89 @@
 ---
 trigger: always_on
-description: This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
+description: Intune Hydration Kit is a PowerShell 7 module that bootstraps Microsoft Intune tenants with best-practice baseline configurations. It uses `Invoke-MgGraphRequest` (only `Microsoft.Graph.Authentication` required) to import policies, groups, compliance baselines, enrollment profiles, conditional access, mobile apps, and device filters. If required Graph scopes are missing, instruct the user to grant the missing permissions and stop the operation.
 ---
 
-# AGENTS.md
-
-This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
+# IntuneHydrationKit - Copilot Instructions
 
 ## Project Overview
 
-Intune Hydration Kit is a PowerShell module that bootstraps Microsoft Intune tenants with best-practice defaults. It hydrates tenants with:
-- OpenIntuneBaseline policies (99 bundled JSON templates - no external download required)
-- CIS Baselines (728 bundled benchmark-derived policies)
-- Compliance Baseline Pack (10 multi-platform policies)
-- Enrollment Profiles (Autopilot, Self-Deploy, ESP, macOS DEP, Device Preparation)
-- Dynamic Group Suite (50 groups) and Static Groups (5 groups)
-- Device Filters (24 platform, manufacturer, and VM filters)
-- App Protection Policies (8 MAM policies + 2 BYOD baseline policies)
-- Notification Templates
-- Mobile Apps (8 legacy templates plus 28 WinGet Win32 app templates)
-- Conditional Access Starter Pack (21 policies, all disabled by default)
+Intune Hydration Kit is a PowerShell 7 module that bootstraps Microsoft Intune tenants with best-practice baseline configurations. It uses `Invoke-MgGraphRequest` (only `Microsoft.Graph.Authentication` required) to import policies, groups, compliance baselines, enrollment profiles, conditional access, mobile apps, and device filters. If required Graph scopes are missing, instruct the user to grant the missing permissions and stop the operation.
 
-Uses Microsoft Graph API via `Invoke-MgGraphRequest` (only `Microsoft.Graph.Authentication` module required). Most resources are prefixed with `[IHD] ` for instant identification; mobile apps and WinGet apps append ` - [IHD]`. Created objects are tagged with a hydration kit marker for safe deletion.
+## Build, Test, and Lint
 
-## Build and Test Commands
-
-### InvokeBuild System (Primary)
+Use the InvokeBuild-based bootstrap script (installs dependencies automatically):
 
 ```powershell
-# Bootstrap build environment and run default tasks (Analyze + Test + Build)
-./build.ps1
-
-# Run PSScriptAnalyzer linting only
-./build.ps1 -Task Analyze
-
-# Run Pester tests only
-./build.ps1 -Task Test
-
-# Build module to build/IntuneHydrationKit/
-./build.ps1 -Task Build
-
-# CI task - full validation without publishing (Analyze + Test + Build)
+# Full CI pipeline: Analyze + Test + Build
 ./build.ps1 -Task CI
 
-# Clean build artifacts
-./build.ps1 -Task Clean
-```
+# Run specific tasks
+./build.ps1 -Task Analyze          # PSScriptAnalyzer only
+./build.ps1 -Task Test             # Pester tests only
+./build.ps1 -Task Build            # Build module to build/IntuneHydrationKit/
+./build.ps1 -Task Clean            # Remove build artifacts
 
-### Direct Commands
-
-```powershell
-# Run all Pester tests
-Invoke-Pester -Path ./Tests -Output Detailed
-
-# Run a single test file
-Invoke-Pester -Path ./Tests/Public/Connect-IntuneHydration.Tests.ps1 -Output Detailed
-
-# Lint with ScriptAnalyzer
-Invoke-ScriptAnalyzer -Path . -Recurse
-
-# Import the module locally for development
+# Direct commands (module must be imported first for tests)
 Import-Module ./IntuneHydrationKit.psd1 -Force
+Invoke-Pester -Path ./Tests/Private/Invoke-GraphBatchOperation.Tests.ps1 -Output Detailed
+Invoke-ScriptAnalyzer -Path ./Public/Orchestration/Invoke-IntuneHydration.ps1
 ```
 
-### Running the Module
+PSScriptAnalyzer excludes `PSUseShouldProcessForStateChangingFunctions` and `PSAvoidUsingConvertToSecureStringWithPlainText` (handled manually).
 
-```powershell
-# Setup: Copy and configure settings (schema at settings.schema.json)
-Copy-Item settings.example.json settings.json
-# Edit settings.json with your tenant details
-
-# Dry-run mode (validates without writing to Graph)
-pwsh ./Invoke-IntuneHydration.ps1 -SettingsPath ./settings.json -WhatIf
-
-# Live run with force update
-pwsh ./Invoke-IntuneHydration.ps1 -SettingsPath ./settings.json -Force
-
-# Parameter-based invocation (no settings file)
-Invoke-IntuneHydration -TenantId "guid" -Interactive -Create -All -WhatIf
-
-# Delete all hydration kit resources then recreate
-Invoke-IntuneHydration -Interactive -Delete -TenantId "guid" -All -Force
-Invoke-IntuneHydration -Interactive -Create -TenantId "guid" -All
-```
-
-## Architecture
-
-### Entry Point
-
-- `Invoke-IntuneHydration.ps1` - Wrapper script (backward compatibility for cloned repo)
-- `Public/Orchestration/Invoke-IntuneHydration.ps1` - Main orchestrator function (used when installed from PSGallery)
+## High-Level Architecture
 
 ### Module Structure
+- `IntuneHydrationKit.psm1` - Root module. Defines `$script:` state variables and dot-sources `Public/**/*.ps1` and `Private/**/*.ps1`.
+- `Public/` - 19 exported functions (one file per function). Main entry point: `Invoke-IntuneHydration`.
+- `Private/` - Internal helpers (batch operations, pagination, template loading, result formatting, auth).
+- `Templates/` - JSON templates organized by resource type (OpenIntuneBaseline, Compliance, Enrollment, DynamicGroups, StaticGroups, Filters, ConditionalAccess, AppProtection, MobileApps, Notifications).
 
-- `IntuneHydrationKit.psd1` / `IntuneHydrationKit.psm1` - Module manifest and loader (dot-sources Public/Private)
-- `Public/` - 19 exported public functions (one file per function)
-- `Private/` - 95 internal helper functions
+### Execution Flow (`Invoke-IntuneHydration`)
+High-level flow: authenticate and validate prerequisites, process template-driven imports/deletes by resource type, then generate reports.
+Runs 12 sequential steps:
+1. Authenticate via `Connect-MgGraph`
+2. Pre-flight checks (`Test-IntunePrerequisites`) - Intune license, MDM authority
+3. Create/delete dynamic groups (`Invoke-GroupBatchImport`)
+3b. Create/delete static groups
+4. Import/delete device filters
+5. Import/delete OpenIntuneBaseline policies (routed by `@odata.type` or folder name)
+6. Import/delete compliance templates
+7. Import/delete notification templates
+8. Import/delete app protection policies (MAM)
+9. Import/delete enrollment profiles (Autopilot, ESP, DEP, Device Prep)
+10. Import/delete conditional access policies (always disabled on import)
+11. Import/delete mobile apps
+12. Generate summary report (`Reports/Hydration-Summary.md` + `.json`)
 
-### Module-Level State
+### State & Configuration
+- `$script:HydrationState` - connection status, tenant ID, results (Groups, Policies, Baselines, Profiles, ConditionalAccess, Errors, Warnings)
+- `$script:ImportPrefix = '[IHD] '` - prepended to most resource display names; mobile apps and WinGet apps append ` - [IHD]`
+- `$script:HydrationMarker` / `$script:HydrationMarkerAlt` - description marker for safe deletion
+- Settings file: `settings.json` (validated against `settings.schema.json`)
 
-The module maintains state in script-scoped variables (defined in `IntuneHydrationKit.psm1`):
-- `$script:HydrationState` - Tracks connection status, tenant ID, and results (Groups, Policies, Baselines, Profiles, ConditionalAccess, Errors, Warnings)
-- `$script:LogPath`, `$script:CurrentLogFile`, `$script:VerboseLogging` - Logging state
-- `$script:GraphEnvironment`, `$script:GraphEndpoint` - Graph API configuration
-- `$script:ImportPrefix` - Resource naming prefix, defaults to `'[IHD] '`
-- `$script:MaxBatchSize` - Batch API item limit per request, defaults to `10` (Graph max is 20)
-- `$script:TemplatesPath` - Path to Templates directory
+## Key Conventions
 
-### Templates Directory
+### One File Per Function
+Every function lives in its own `.ps1` file named exactly after the function. Public functions are exported in both the `.psd1` manifest and the `.psm1` `$publicFunctions` array. Keep them in sync.
 
-All JSON templates for import operations:
+### Graph API Batch Pattern
+All imports/deletions that touch Graph use `Invoke-GraphBatchOperation`:
+- Batches up to `$script:MaxBatchSize` (default 10) items per request
+- Retry with exponential backoff for 429 (throttle), 500+, 503
+- POST bodies are sent as raw JSON strings (not hashtables) to avoid PowerShell serialization issues
+- DELETE items need `Id`; POST items need `BodyJson`
+- Batch responses use string IDs (1-indexed) - always parse with `[int]::TryParse()`
 
-- `Templates/OpenIntuneBaseline/` - Bundled baseline security policies (OS/PolicyType/policy.json structure)
-- `Templates/Compliance/` - Platform compliance policies (Windows, iOS, macOS, Android, Linux)
-- `Templates/Enrollment/` - Autopilot, ESP, macOS DEP, and Device Preparation profiles
-- `Templates/DynamicGroups/` - OS, Manufacturer, and Autopilot group definitions
-- `Templates/StaticGroups/` - Assigned groups (Update Ring Pilot, UAT)
-- `Templates/Filters/` - Device filter definitions
-- `Templates/ConditionalAccess/` - CA starter pack (forced disabled on import)
-- `Templates/AppProtection/` - Android and iOS MAM policy templates
-- `Templates/MobileApps/` - macOS, Microsoft Store/M365 fallback, and Windows WinGet app templates
-- WinGet app imports are limited to bundled templates. New apps should be requested by issue or added by PR with template metadata.
-- `Templates/Notifications/` - Notification message templates
+### Idempotency & Dual-Lookup
+Importers check for both prefixed (`[IHD] Name`) and legacy unprefixed (`Name`) display names before creating, to prevent duplicates across runs.
 
-### Build System
+### Template-Scoped Deletion
+Delete operations only remove objects that have BOTH the hydration marker in their description AND a matching template name. If only one condition is met, the object is not deleted. This prevents accidental deletion of manually created resources.
 
-- `build.ps1` - Bootstrap script that installs InvokeBuild and runs tasks
-- `IntuneHydrationKit.build.ps1` - InvokeBuild task definitions (Analyze, Test, Build)
-- `scripts/New-MobileAppTemplate.ps1` - Generate mobile app JSON templates
+### Baseline Import Routing (`Import-IntuneBaseline`)
+Uses two routing strategies:
+- **IntuneManagement path** (`$intuneManagementFolders`): Routes by `@odata.type` via `$odataTypeToEndpoint` map. Used for `IntuneManagement/` and `AppProtection/` subfolders.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
