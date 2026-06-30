@@ -1,101 +1,81 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: Enables `inferTypeFromExpression` and `analyzeValueExpression` to resolve variables assigned from helper function calls (e.g., `candles := formatCandlesFull(records)` → type `[]map[string]any`).
 ---
 
-# CLAUDE.md
+# API Documentation System — Agent Guide
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This package (`core/server/api/`) is the OpenAPI documentation engine for pb-ext. It parses Go source at startup via AST analysis, extracts handler metadata and type schemas, and serves versioned OpenAPI 3.0.3 specs.
 
-## What This Is
+## File Map
 
-pb-ext is a Go library that wraps PocketBase with production-ready features: auto-generated OpenAPI docs, cron job tracking, system monitoring, structured logging, and visitor analytics. It includes a superuser dashboard at `/_/_`.
-
-Users import `github.com/magooney-loon/pb-ext/core` and build their server in `cmd/server/`.
-
-## Build & Run Commands
-
-All operations go through `pb-cli`.
-
-| Command | Purpose |
+### Types
+| File | What it owns |
 |---|---|
-| `pb-cli` | Build frontend + start dev server |
-| `pb-cli --run-only` | Start server only (skip frontend build) |
-| `pb-cli --build-only` | Build frontend to `pb_public/`, no server |
-| `pb-cli --install` | Install all deps, then build + run |
-| `pb-cli --production` | Full production build to `dist/` |
-| `pb-cli --test-only` | Run tests with coverage reports |
-| `go test ./...` | Run all Go tests directly |
-| `go test ./core/server/api/...` | Run tests for a specific package |
-| `go test ./core/server/api/... -run TestHandlerScenario` | Run a single named test |
+| `types_ast.go` | All AST data structures: `ASTParser`, `StructInfo`, `FieldInfo`, `ASTHandlerInfo`, `MapKeyAdd`, `ParamInfo`, `ParseError`, `PocketBasePatterns`, logger interface, `ASTParserInterface` |
+| `types_api.go` | `APIEndpoint`, `APIDocs`, `APIDocsConfig`, `AuthInfo`, `HandlerInfo` — the route/endpoint model |
+| `types_openapi.go` | Full OpenAPI 3.0 type hierarchy: `OpenAPISchema`, `OpenAPIPathItem`, `OpenAPIOperation`, `OpenAPIComponents`, `OpenAPIParameter`, etc. |
 
-The dev server runs at `127.0.0.1:8090` by default. PocketBase admin: `/_/`, pb-ext dashboard: `/_/_`.
+### AST Parser (split by responsibility)
+| File | What it owns |
+|---|---|
+| `ast.go` | Entry points: `NewASTParser`, `DiscoverSourceFiles`, `ParseFile`, `EnhanceEndpoint`, all public interface methods (`GetAllStructs`, `GetAllHandlers`, `ClearCache`, etc.) |
+| `ast_func.go` | Handler/function analysis: `extractHandlers`, `extractFuncReturnTypes`, `extractHelperFuncParams`, `extractParamsFromBody`, `extractQueryParameters`, `analyzeHelperFuncBody`, `isPocketBaseHandler`, `analyzePocketBaseHandler`, `analyzePocketBasePatterns`, `analyzePocketBaseCall`, `trackVariableAssignment`, `handleBindBody`, `handleJSONResponse`, all query/header/path detection helpers |
+| `ast_struct.go` | Struct analysis and schema generation: `extractStructs`, `parseStruct`, `generateStructSchema`, `flattenEmbeddedFields`, `generateFieldSchema`, `generateSchemaForEndpoint`, `generateSchemaFromType`, `deepCopySchema` |
+| `ast_metadata.go` | Value/type resolution: `analyzeMapLiteralSchema`, `parseMapLiteral`, `analyzeValueExpression`, `resolveTypeToSchema`, `schemaFromMakeArg`, `analyzeCompositeLitSchema`, `parseArrayLiteral`, `extractVariableDeclarations`, `extractLocalVariables`, `extractVarDecl`, `resolveTypeAlias`, `NewPocketBasePatterns` |
+| `ast_file.go` | File-level utilities: `newFileSet`, `getModulePath`, `parseImportedPackages`, `parseDirectoryStructs` |
 
-## Architecture
+### Registry
+| File | What it owns |
+|---|---|
+| `registry.go` | `APIRegistry` struct, constructor, `RegisterEndpoint`, helpers |
+| `registry_routes.go` | `RegisterRoute`, `RegisterExplicitRoute`, `BatchRegisterRoutes`, `enhanceEndpointWithAST`, `createEndpointFromAnalysis` |
+| `registry_spec.go` | `GetDocsWithComponents`, `buildPaths`, `endpointToOperation`, `extractPathParameters`, `collectRefsFromSchema` (pruning), `generateOperationId`, `buildTags` |
+
+### Other
+| File | What it owns |
+|---|---|
+| `schema.go` | `SchemaGenerator` — request/response schema inference, `GenerateComponentSchemas`, `promoteHandlerResponseSchemas` |
+| `schema_conversion.go` | Go type → OpenAPI conversion: `ConvertGoTypeToOpenAPISchema`, `ConvertParamInfoToOpenAPIParameter`, validation tag parsing |
+| `version_manager.go` | `APIVersionManager`, `VersionedAPIRouter`, `VersionedRouteChain`, `PrefixedRouter`, multi-version routing, per-version registries, `ServeSwaggerUI` (SwaggerDark CSS via `strings.NewReplacer`) |
+| `discovery.go` | `RouteAnalyzer`, `MiddlewareAnalyzer`, `PathAnalyzer` — runtime route analysis utilities |
+| `debug_dump.go` | `BuildDebugData()` — serves the `/api/docs/debug/ast` endpoint with full pipeline introspection |
+| `utils.go` | String helpers: handler name extraction, camelCase/snake_case, description/tag generation, path conversion |
+| `openapi_embedded_loader.go` | Spec loading from disk, caching, env var override (`PB_EXT_OPENAPI_SPECS_DIR`, `PB_EXT_DISABLE_OPENAPI_SPECS`) |
+| `spec_generator.go` | Spec generation and validation for build-time generation |
+
+### Tests
+| File | What it covers |
+|---|---|
+| `ast_test.go` | Core parser lifecycle, `ParseFile`, `EnhanceEndpoint`, `DiscoverSourceFiles`, benchmarks |
+| `ast_struct_test.go` | Struct/schema/type extraction and JSON schema generation |
+| `ast_func_test.go` | Handler scenarios (46+ handlers), func return type resolution, `funcBodySchemas`, append-based resolution, direct and indirect parameter detection |
+| `ast_file_test.go` | Cross-package struct resolution via import following |
+| `registry_test.go` | `APIRegistry` route registration and OpenAPI output |
+| `schema_test.go` | `SchemaGenerator` and component schema generation |
+| `version_manager_test.go` | `APIVersionManager` and versioned routing |
+| `discovery_test.go` | Route/middleware/path analysis |
+| `utils_test.go` | String helper utilities |
+| `openapi_embedded_loader_test.go` | Spec loading from disk, caching, deep copy, env var handling |
+| `spec_generator_test.go` | Spec generation and validation |
+
+## Pipeline Overview
 
 ```
-core/core.go          — Public facade, re-exports from core/server and core/logging
-core/server/          — Server struct, health dashboard, errors, embedded templates
-core/server/api/      — OpenAPI doc system: registry, versioned routers, Go AST parsing
-core/analytics/       — Visitor analytics: collection, collector, storage, types
-core/jobs/            — Cron job manager, structured logger, API handlers, types
-core/logging/         — Structured logging, request middleware, trace IDs
-core/monitoring/      — System metrics (CPU, memory, disk, network, runtime)
-core/testutil/        — Shared test helpers and fixture specs
-cmd/server/           — Example application (user's app entry point)
-pkg/scripts/          — Build toolchain CLI source (compiled to pb-cli)
-core/server/templates/ — Embedded Go templates for the dashboard UI
-```
-
-**Server lifecycle** (`core/server/server.go`):
-1. `New(opts...)` creates a Server wrapping PocketBase
-2. `OnBootstrap`: initializes JobLogger → JobManager → registers system jobs → JobHandlers
-3. `OnServe`: registers health route, analytics, job routes, static file serving
-4. User code hooks in via `srv.App().OnServe().BindFunc()`
-
-**Key singletons**: `GetJobManager()` returns a package-level `*JobManager` initialized during bootstrap.
-
-## OpenAPI Documentation System
-
-The API doc system uses Go AST parsing at startup to extract endpoint metadata. See `core/server/api/AGENTS.md` for full internals.
-
-**Source file directives:**
-- `// API_SOURCE` at the top of a `.go` file — marks it for AST parsing
-- `// API_DESC <text>` before a handler — sets its OpenAPI description
-- `// API_TAGS <csv>` before a handler — sets its OpenAPI tags
-
-**What is auto-detected from source (no annotations needed):**
-- Request body type (from `c.BindBody(&req)` or `json.Decode`)
-- Response schema (from `c.JSON(status, expr)` — struct, map literal, or helper call)
-- Query, header, and path parameters — direct access (`q.Get("x")`, `PathValue("id")`, `Header.Get("x")`) AND indirect via helper functions that wrap param access
-- Auth requirements (from PocketBase auth pattern detection)
-
-**Indirect parameter extraction**: if a handler calls a helper like `parseTimeParams(e)` that internally reads query params, those params are automatically detected. Generic helpers (`parseIntParam(e, "page", 0)`) resolve the param name from the call site's second string-literal argument.
-
-**Routes** are registered through `api.VersionedAPIRouter` which wraps PocketBase's router. Each API version has its own isolated parser, schema generator, and registry.
-
-**Spec generation**: In dev mode the spec is generated at runtime from AST. In production, pre-built specs are loaded from `core/server/api/specs/`. The `--gen-spec` flag in `cmd/server/main.go` triggers build-time spec generation (used by `pb-cli --production`).
-
-**Debug endpoint:** `GET /api/docs/debug/ast` — full pipeline introspection (structs, handlers, schemas, OpenAPI output). Requires auth.
-
-**Swagger UI** is served with dark mode CSS (SwaggerDark by Amoenus, MIT).
-
-## Cron Jobs
-
-Jobs are registered via `server.GetJobManager().RegisterJob(id, name, desc, cronExpr, func(*JobExecutionLogger))`. The `JobExecutionLogger` provides structured logging methods: `Start`, `Info`, `Progress`, `Success`, `Error`, `Statistics`, `Complete`, `Fail`. Execution logs are stored in the `_job_logs` PocketBase collection and auto-purged after 72 hours.
-
-## Analytics
-
-Request middleware captures visitor data (user agent, device, browser, UTM params). Records are buffered in memory and flushed every 10 minutes (or at 50 items) to the `_analytics` PocketBase collection.
-
-## Example App Patterns
-
-`cmd/server/` is the canonical reference for how to integrate pb-ext:
-- `routes.go` — how to initialize versioned API routers and register routes
-- `handlers.go` — how to use `API_SOURCE`, `API_DESC`, `API_TAGS` directives and define request/response types
+Source files (// API_SOURCE)
+  |
+  v
+ASTParser.DiscoverSourceFiles()
+  |
+  |-- Phase 1: Parse API_SOURCE files
+  |     |
+  |     v
+  |   ASTParser.ParseFile()  (for each API_SOURCE file)
+  |     |-- extractStructs()            two-pass: register all structs, then generate JSONSchemas
+  |     |-- extractVariableDeclarations()  global var tracking
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [magooney-loon/pb-ext](https://github.com/magooney-loon/pb-ext) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-17 -->
+<!-- tomevault:4.0:windsurf_rules:2026-06-29 -->
