@@ -1,0 +1,150 @@
+---
+trigger: always_on
+description: This file defines automatic rules for GitHub Copilot to follow when making changes to the codebase.
+---
+
+# Copilot Rules for Gollama.cpp
+
+This file defines automatic rules for GitHub Copilot to follow when making changes to the codebase.
+
+## Documentation Updates
+
+### Rule: Auto-update Documentation
+When making changes to code, always consider updating relevant documentation files:
+
+1. **README.md Updates**: 
+   - Update feature lists when adding/removing functionality
+   - Update code examples when APIs change
+   - Update supported platforms when adding new platform support
+   - Update version compatibility information
+   - Update installation instructions if dependencies change
+
+2. **CHANGELOG.md Updates**:
+   - Add entries for new features, bug fixes, and breaking changes
+   - Follow semantic versioning principles
+   - Include migration guides for breaking changes
+   - Reference issue/PR numbers
+
+3. **API Documentation**:
+   - Update Go doc comments when function signatures change
+   - Update example code in documentation
+   - Update any inline documentation
+
+4. **Example Documentation**:
+   - Update `examples/*/README.md` when example code changes
+   - Ensure all examples compile and run correctly
+   - Update demo scripts if command-line interfaces change
+
+## CI/CD Updates
+
+### Rule: Auto-update CI Configuration
+When making changes that affect the build process, testing, or deployment:
+
+1. **Go Version Updates**:
+   - Update `GO_VERSION` in `.github/workflows/ci.yml`
+   - Update go.mod files if minimum Go version changes
+   - Update matrix strategy in CI if supporting new Go versions
+
+2. **Dependency Changes**:
+   - Update CI dependencies when adding new system requirements
+   - Update cache keys when dependency structure changes
+   - Add new test steps for new functionality
+
+3. **Platform Support Changes**:
+   - Update CI matrix when adding/removing platform support
+   - Add new OS runners when extending platform compatibility
+   - Update build tags and compilation flags
+
+4. **Library Updates**:
+   - Update `LLAMA_CPP_BUILD` version when upgrading llama.cpp
+   - Update library paths and download URLs
+   - Update build scripts and Makefiles
+
+## Git Operations
+
+### Rule: NO Automatic Git Operations
+**CRITICAL**: Never perform git operations automatically without explicit user request:
+
+1. **Prohibited Actions**:
+   - Do NOT run `git add` without explicit user request
+   - Do NOT run `git commit` without explicit user request
+   - Do NOT run `git push` without explicit user request
+   - Do NOT run `git pull` without explicit user request
+   - Do NOT create branches without explicit user request
+   - Do NOT merge branches without explicit user request
+
+2. **When to Ask**:
+   - Always ask the user if they want to commit changes
+   - Always ask the user if they want to push changes
+   - Always ask the user which files should be staged
+   - Always ask the user for commit messages
+
+3. **Allowed Git Operations**:
+   - Read-only operations like `git status` or `git diff` are acceptable
+   - Informing the user about uncommitted changes is acceptable
+   - Suggesting git commands for the user to run manually is acceptable
+
+## Code Quality Rules
+
+### Rule: Automatic Code Validation
+Before completing any code changes, always run validation tools:
+
+1. **Lint Validation**:
+   - Run `make lint` to check code formatting and style
+   - Fix any linting issues before submitting changes
+   - Ensure code follows Go best practices and project conventions
+
+2. **Security Validation**:
+   - Run `make sec` to perform security analysis
+   - Address any security vulnerabilities or warnings
+   - Verify that new code doesn't introduce security risks
+
+3. **Combined Validation**:
+   - Use the available VS Code task "Validate Changes (lint + sec)" to run both checks
+   - Alternatively run `make lint sec` to execute both validations
+   - Ensure all validation passes before considering code changes complete
+
+### Rule: Maintain Code Standards
+When writing or modifying code:
+
+1. **Go Standards**:
+   - Follow Go naming conventions
+   - Add proper error handling
+   - Include comprehensive tests
+   - Add Go doc comments for exported functions
+
+2. **Test Coverage**:
+   - Add tests for new functionality
+   - Update existing tests when APIs change
+   - Ensure examples have corresponding tests
+
+3. **Version Consistency**:
+   - Keep version numbers synchronized across files
+   - Update version references in documentation
+   - Update download URLs and checksums
+
+### Rule: Testing Conventions
+When adding or updating tests, follow these conventions:
+
+1. **Test Framework**:
+   - Use `github.com/stretchr/testify/suite` for new test suites
+   - Prefer `suite.Suite` with `assert`/`require` helpers over bare `testing.T`
+
+2. **Base Suite Usage**:
+   - Embed the shared `BaseSuite` (defined in `test_base_suite_test.go`) in every suite to ensure consistent setup/teardown
+   - `BaseSuite` responsibilities:
+     - Snapshot and restore global configuration via `GetGlobalConfig`/`SetGlobalConfig`
+     - Snapshot and restore key environment variables used by tests
+     - Call `Cleanup()` after each test to unload the llama library and avoid cross-test state
+
+   Example skeleton:
+   
+   - Define the suite:
+     - `type MyFeatureSuite struct { BaseSuite }`
+   - Register the suite:
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [dianlight/gollama.cpp](https://github.com/dianlight/gollama.cpp) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-06-29 -->
