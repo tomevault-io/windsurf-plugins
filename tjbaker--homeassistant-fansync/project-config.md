@@ -1,44 +1,99 @@
 ---
 trigger: always_on
-description: Fetches Copilot/Bot feedback, PEER REVIEWS it using the local model, and applies only valid fixes.
+description: NOTE: The canonical source for these instructions is .cursorrules in the repo root.
 ---
 
-# PR Peer Reviewer (Model vs. Model)
+# AI Code Style Rules for this repository
 
-When the user triggers this rule with a PR number (e.g., "@fixpr 15"):
+NOTE: The canonical source for these instructions is .cursorrules in the repo root.
+Any changes should be made there; this file syncs automatically via pre-commit hook.
 
-1.  **PRE-FLIGHT**:
-    * Ensure the current local branch matches the branch for PR #<PR_NUMBER>.
-    * If not, ask the user: "Switch to branch [Branch Name]?"
+# Style & Formatting
+- Use Black/Ruff exactly as configured in pyproject.toml (line length 100, Python 3.14).
+- Follow PEP 8 principles; Black/Ruff are authoritative for enforcement.
+- Optimize for clarity and readability; prefer explicit types where helpful.
+- Prefer `X | None` in type annotations; prefer union syntax in `isinstance()` checks (e.g., `int | str`) over tuples.
+- Type Annotations:
+  - Always add type hints to function/method parameters and return types
+  - Use modern Python 3.10+ syntax: `X | None` instead of `Optional[X]`
+  - In tests, annotate fixtures: `hass: HomeAssistant`, `caplog: pytest.LogCaptureFixture`
+  - Add return types even for simple functions: `-> None`, `-> str`, `-> dict[str, Any]`
 
-2.  **GATHER CONTEXT**:
-    * **PR Review Comments (MCP):** Use `pull_request_read` with `get_review_comments` to fetch Copilot review threads.
-    * **Issue Comments (MCP):** Use `get_issue_comments` to fetch non-review comments.
-    * **Workflow Status (CLI):** Run `gh pr checks <PR_NUMBER> --json name,state,workflow,link,completedAt,startedAt`.
-    * **Logs (CLI):** For failed checks, run `gh run view <databaseId> --log-failed`.
+# Imports
+- Organize imports consistent with Ruff isort settings.
+  - known-first-party: ["custom_components"]
+  - Do not force single-line imports.
+  - Group order: standard library, third-party, first-party.
+- Import ABCs (Callable, Iterable, etc.) from collections.abc, not typing.
+- Use X | None instead of Optional[X] (modern Python 3.10+ syntax).
 
-3.  **THE "SECOND OPINION" (Critical Step)**:
-    * **Role:** You are the Senior Engineer. The PR comments come from "Copilot" (a Junior bot).
-    * **Action:** For each Bot comment/suggestion:
-        1.  Read the code at the suggested location.
-        2.  **Evaluate:** Does Copilot's suggestion actually improve the code?
-            * *Reject if:* It introduces a bug, breaks types, or is unnecessary bike-shedding.
-            * *Reject if:* It contradicts the project's existing patterns.
-            * *Accept if:* It fixes a genuine bug, typo, or optimization.
+# Linting
+- Enable Ruff rules: [E, F, I, B, UP] as configured in pyproject.toml.
+- Respect per-file ignores from pyproject:
+  - tests/**/*.py: [E501, F401, I001]
 
-4.  **EXECUTE STRATEGY**:
-    * **Priority 1: Workflow Failures.** (Always fix these first—crashes are not debatable).
-    * **Priority 2: Validated Bot Feedback.** Apply ONLY the suggestions you accepted in Step 3.
-    * **Priority 3: Human Comments.** (Ignore as per user preference, or flag for manual review).
+# License Headers
+- All Python and YAML files MUST include the repository-standard license header at the top:
+  - SPDX identifier and full Apache-2.0 header block used in this repo.
+  - Python: hash-prefixed lines (e.g., `# SPDX-License-Identifier: Apache-2.0`, followed by the Apache block lines).
+  - YAML: hash-prefixed lines at the top of the file.
+  - Markdown: use an HTML comment block with the same content (recommended for docs like tests/README.md).
+- Markdown files must use the lowercase `.md` extension (e.g., `README.md`).
+- JSON does not support comments; do not attempt to add headers there.
+- Tests are code; apply headers to test files (Python) as well.
+- When creating or editing files, ensure the header is present and matches the canonical format already used in the repo.
 
-5.  **VERIFY**:
-    * After applying fixes, run the relevant local test (discover command via `package.json` etc.).
+# Comments
+- Keep comments concise and only when adding non-obvious context.
+- Explain complex logic, non-obvious patterns, or HA-specific requirements.
+- Document type: ignore comments with justification for why they're needed.
 
-6.  **REPORT**:
-    * **✅ Agreed & Fixed:** List Copilot suggestions you implemented.
-    * **🚫 Rejected:** List Copilot suggestions you ignored.
-        * *Requirement:* Provide a 1-sentence technical reason for rejection (e.g., "Copilot suggested a deprecated function" or "Suggestion would cause a circular dependency").
-    * **🚨 CI Fixes:** List build/test errors resolved.
+# Home Assistant Specifics
+- Only support HA 2026.3 and newer, no need for backward compatibility to older versions
+- Use HA async patterns (`async_*` methods); avoid blocking I/O in the event loop.
+  - Use hass.async_add_executor_job for any blocking operations.
+- Prefer CoordinatorEntity for entities with push updates.
+  - For push-based entities, set update_interval=None and push via coordinator.async_set_updated_data.
+  - Use optimistic updates for user commands and reconcile on push ack to avoid UI snap-back.
+- Multi-device model: coordinator data is dict[device_id, dict[str, int | str]], one entity per
+  device; entity unique_id must use self._device_id consistently.
+- Optimistic overlays: apply per-key overlays immediately; guard ~8s; confirm then clear;
+  revert only on explicit failure.
+- Runtime Data (Modern Pattern - HA 2026.2+):
+  - Use ConfigEntry.runtime_data with TypedDict (not hass.data)
+  - Define type alias for better IDE support and type checking:
+    ```python
+    class FanSyncRuntimeData(TypedDict):
+        client: FanSyncClient
+        coordinator: FanSyncCoordinator
+    
+    type FanSyncConfigEntry = ConfigEntry[FanSyncRuntimeData]
+    
+    async def async_setup_entry(hass, entry: FanSyncConfigEntry) -> bool:
+        client = entry.runtime_data.client  # Full IDE autocomplete ✅
+    ```
+  - Pass config_entry to DataUpdateCoordinator.__init__ (recommended pattern)
+- Entity Performance:
+  - Set `should_poll = False` when using coordinator (inherited from CoordinatorEntity)
+  - Use `__slots__` for memory efficiency in high-entity-count scenarios (optional)
+
+# Testing
+- Always add new tests, ensure they pass, and requisite code coverage is met when adding new functionality.
+- Use pytest; do not make real network calls. Patch httpx and async websockets at module paths:
+  - HTTP: Patch `httpx.Client` at `custom_components.fansync.client.*`
+  - WebSocket: Patch `websockets.connect` at `custom_components.fansync.client.websockets.connect` with `new_callable=AsyncMock`
+- Coverage focus in CI is custom_components/fansync; target ≥ 75%.
+- Include tests for: push callback merge, reconnect paths, config flow (happy/error/duplicate),
+  optimistic overlay expiry, and multi-device entity isolation.
+- Test debug logging with caplog to verify messages format correctly.
+- Ensure tests clean up background async tasks (call async_disconnect on FanSyncClient).
+  - This cancels the `_recv_task` (async WebSocket receiver) and closes connections.
+- Use Home Assistant's config flow test helpers (hass.config_entries.flow.async_init) instead of
+  directly instantiating flow classes.
+- Type annotations in tests:
+  - Always annotate test function parameters: `hass: HomeAssistant`, `caplog: pytest.LogCaptureFixture`
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [tjbaker/homeassistant-fansync](https://github.com/tjbaker/homeassistant-fansync) — distributed by [TomeVault](https://tomevault.io).
