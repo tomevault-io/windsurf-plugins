@@ -1,0 +1,13 @@
+---
+trigger: always_on
+description: - A pull request must always upgrade the manifest version
+---
+
+# General Code Review Standards
+
+- A pull request must always upgrade the manifest version
+- make sure no translation files are missing after adding new strings
+
+---
+> Source: [NeoHuncho/vikunja-voice-assistant](https://github.com/NeoHuncho/vikunja-voice-assistant) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-06-29 -->
