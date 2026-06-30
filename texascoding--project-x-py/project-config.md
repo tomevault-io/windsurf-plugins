@@ -1,158 +1,161 @@
 ---
 trigger: always_on
-description: This file provides guidance to Cursor AI when working with code in this repository.
+description: Use when:
 ---
 
-# ProjectX Python SDK - Cursor AI Rules
+# AI Agents for Development
 
-This file provides guidance to Cursor AI when working with code in this repository.
+The ProjectX Python SDK leverages specialized AI agents for development tasks. This guide explains how to work with these agents effectively for SDK development, maintenance, and enhancement.
 
-## 🚨 CRITICAL: Focused Development Rules
+## Agent Overview
 
-**MANDATORY**: This project follows strict development rules located in `.cursor/rules/`:
+The project uses multiple specialized AI agents, each optimized for specific development tasks:
 
-- **[TDD Core Rules](.cursor/rules/tdd_core.md)** - Test-Driven Development enforcement
-- **[Async Testing Rules](.cursor/rules/async_testing.md)** - Async-first testing patterns
-- **[Code Quality Rules](.cursor/rules/code_quality.md)** - Quality standards and validation
-- **[Development Workflow](.cursor/rules/development_workflow.md)** - Process enforcement
+- **python-developer**: Core SDK development and feature implementation
+- **code-standards-enforcer**: Code quality, standards compliance, and IDE diagnostics
+- **code-refactor**: Architecture improvements and code modernization
+- **code-documenter**: Documentation creation and maintenance
+- **code-debugger**: Issue diagnosis and troubleshooting
+- **code-reviewer**: Code review and quality assurance
 
-**READ THESE RULES FIRST** before making any code changes. All rules are MANDATORY and must be followed strictly.
+## Agent Selection Guidelines
 
-## Project Status: v3.2.0 - Enhanced Type Safety Release
+### When to Use Each Agent
 
-**IMPORTANT**: This project uses a fully asynchronous architecture. All APIs are async-only, optimized for high-performance futures trading.
+#### **python-developer**
+**Best for**: Core SDK development and feature implementation
 
-## Development Phase Guidelines
+Use when:
+- Implementing new trading components (OrderManager, PositionManager, etc.)
+- Creating financial indicators with Polars DataFrames
+- Building real-time data processing and WebSocket connections
+- Developing new TradingSuite features
+- Ensuring 100% async architecture compliance
+- Handling Decimal price precision requirements
 
-**IMPORTANT**: This project has reached stable production status. When making changes:
-
-1. **Maintain Backward Compatibility**: Keep existing APIs functional with deprecation warnings
-2. **Deprecation Policy**: Mark deprecated features with warnings, remove after 2 minor versions
-3. **Semantic Versioning**: Follow semver strictly (MAJOR.MINOR.PATCH)
-4. **Migration Paths**: Provide clear migration guides for breaking changes
-5. **Modern Patterns**: Use the latest Python patterns while maintaining compatibility
-6. **Gradual Refactoring**: Improve code quality without breaking existing interfaces
-7. **Async-First**: All new code must use async/await patterns
-
-## Non-Negotiable TDD Requirements
-
-**ALWAYS follow RED-GREEN-REFACTOR cycle:**
-1. 🔴 RED: Write failing test defining expected behavior
-2. 🟢 GREEN: Write minimal code to make test pass
-3. 🔄 REFACTOR: Improve code while keeping tests green
-
-**Tests are the specification. Code must conform to tests, not vice versa.**
-
-Example approach:
-- ✅ DO: Keep old method signatures with deprecation warnings
-- ✅ DO: Provide new improved APIs alongside old ones
-- ✅ DO: Add compatibility shims when necessary
-- ✅ DO: Document migration paths clearly
-- ❌ DON'T: Break existing APIs without major version bump
-- ❌ DON'T: Remove deprecated features without proper notice period
-
-### Deprecation Process
-1. Use the standardized `@deprecated` decorator from `project_x_py.utils.deprecation`
-2. Provide clear reason, version info, and replacement path
-3. Keep deprecated feature for at least 2 minor versions
-4. Remove only in major version releases (4.0.0, 5.0.0, etc.)
-
-Example:
-```python
-from project_x_py.utils.deprecation import deprecated, deprecated_class
-
-# For functions/methods
-@deprecated(
-    reason="Method renamed for clarity",
-    version="3.1.14",  # When deprecated
-    removal_version="4.0.0",  # When it will be removed
-    replacement="new_method()"  # What to use instead
-)
-def old_method(self):
-    return self.new_method()
-
-# For classes
-@deprecated_class(
-    reason="Integrated into TradingSuite",
-    version="3.1.14",
-    removal_version="4.0.0",
-    replacement="TradingSuite"
-)
-class OldManager:
-    pass
+Example scenarios:
+```
+"Implement a new technical indicator for options flow analysis"
+"Add WebSocket reconnection logic with exponential backoff"
+"Create async order placement methods with bracket order support"
+"Build a new risk management component with portfolio-level controls"
 ```
 
-The standardized deprecation utilities provide:
-- Consistent warning messages across the SDK
-- Automatic docstring updates with deprecation info
-- IDE support through the `deprecated` package
-- Metadata tracking for deprecation management
-- Support for functions, methods, classes, and parameters
+#### **code-standards-enforcer**
+**Best for**: Maintaining code quality and standards
 
-## Development Documentation
+**CRITICAL**: Always check IDE diagnostics first with `mcp__ide__getDiagnostics`
 
-### Important: Keep Project Clean - Use External Documentation
+Use when:
+- **Before committing any changes** (proactive quality control)
+- Preparing for pull requests
+- Release validation processes
+- Verifying 100% async architecture compliance
+- Checking TradingSuite patterns adherence
+- Ensuring Polars-only DataFrame usage
+- Validating deprecation compliance
+- Type safety verification with TypedDict/Protocol
 
-**DO NOT create project files for**:
-- Personal development notes
-- Temporary planning documents
-- Testing logs and results
-- Work-in-progress documentation
-- Meeting notes or discussions
+Workflow:
+1. **First**: Check `mcp__ide__getDiagnostics` for modified files
+2. **Fix** any IDE diagnostic errors/warnings
+3. **Then**: Run traditional linting tools (ruff, mypy)
+4. **Verify** with IDE diagnostics again after fixes
 
-**Instead, use**:
-- External documentation tools (Obsidian, Notion, etc.)
-- GitHub Issues for bug tracking
-- GitHub Discussions for architecture decisions
-- Pull Request descriptions for implementation details
-
-This keeps the project repository clean and focused on production code.
-
-## Development Commands
-
-### Package Management (UV)
-```bash
-uv add [package]              # Add a dependency
-uv add --dev [package]        # Add a development dependency
-uv sync                       # Install/sync dependencies
-uv run [command]              # Run command in virtual environment
+Example scenarios:
+```
+"Check code quality before committing new indicator implementation"
+"Validate async patterns in the new order management system"
+"Ensure type safety compliance across all modified files"
+"Verify deprecation warnings are properly implemented"
 ```
 
-### Testing
-```bash
-uv run pytest                # Run all tests
-uv run pytest tests/test_client.py  # Run specific test file
-uv run pytest -m "not slow"  # Run tests excluding slow ones
-uv run pytest --cov=project_x_py --cov-report=html  # Generate coverage report
-uv run pytest -k "async"     # Run only async tests
+#### **code-refactor**
+**Best for**: Architecture improvements and modernization
+
+Use when:
+- Migrating to TradingSuite patterns
+- Optimizing Polars DataFrame operations
+- Consolidating WebSocket handling
+- Modernizing async patterns and removing legacy sync code
+- Transitioning from monolithic to modular architectures
+- Optimizing event system performance
+- Implementing memory management improvements
+
+Example scenarios:
+```
+"Refactor OrderManager to use EventBus for better decoupling"
+"Optimize DataFrame operations in indicators for better performance"
+"Migrate legacy synchronous code to modern async patterns"
+"Consolidate WebSocket connections for improved resource usage"
 ```
 
-### Async Testing Patterns
-```python
-# Test async methods with pytest-asyncio
-import pytest
+#### **code-documenter**
+**Best for**: Documentation creation and maintenance
 
-@pytest.mark.asyncio
-async def test_async_method():
-    async with ProjectX.from_env() as client:
-        await client.authenticate()
-        result = await client.get_bars("MNQ", days=1)
-        assert result is not None
+Use when:
+- Documenting new TradingSuite APIs and features
+- Writing indicator function documentation with usage examples
+- Explaining WebSocket events and data flow patterns
+- Creating migration guides for breaking changes
+- Maintaining README files and examples directory
+- Writing deprecation notices with clear upgrade paths
+- Updating docstrings with comprehensive type hints
+- Creating tutorial notebooks and interactive examples
+
+Example scenarios:
+```
+"Document the new risk management system with usage examples"
+"Create migration guide for v3 to v4 breaking changes"
+"Update API documentation for the enhanced order management system"
+"Write comprehensive examples for the new indicator framework"
 ```
 
-### Code Quality
-```bash
-uv run ruff check .          # Lint code
-uv run ruff check . --fix    # Auto-fix linting issues
-uv run ruff format .         # Format code
-uv run mypy src/             # Type checking
+#### **code-debugger**
+**Best for**: Issue diagnosis and troubleshooting
+
+Use when:
+- Investigating WebSocket disconnection issues
+- Diagnosing order lifecycle failures
+- Troubleshooting real-time data gaps
+- Resolving event system deadlocks
+- Fixing price precision errors
+- Identifying memory leaks and performance bottlenecks
+- Debugging AsyncIO-related issues
+- Tracing SignalR connection problems
+
+Example scenarios:
+```
+"Debug why orders aren't filling after placement"
+"Investigate WebSocket reconnection failures under load"
+"Trace event propagation issues in the real-time system"
+"Diagnose memory leaks in long-running data streams"
 ```
 
-### Building and Distribution
-```bash
+#### **code-reviewer**
+**Best for**: Code review and quality assurance
+
+Use when:
+- Reviewing async patterns and implementations
+- Checking real-time performance characteristics
+- Validating financial data integrity and precision
+- Ensuring API stability and backward compatibility
+- Conducting pre-release code reviews
+- Reviewing pull requests for quality and standards
+
+Example scenarios:
+```
+"Review the new bracket order implementation for correctness"
+"Check real-time data processing for performance issues"
+"Validate the new indicator calculations for accuracy"
+"Review API changes for backward compatibility"
+```
+
+## Agent Command Requirements
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [TexasCoding/project-x-py](https://github.com/TexasCoding/project-x-py) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-06 -->
+<!-- tomevault:4.0:windsurf_rules:2026-06-29 -->
