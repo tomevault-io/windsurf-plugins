@@ -1,0 +1,120 @@
+---
+trigger: always_on
+description: Web3-powered loyalty platform built on Base Mainnet (Chain ID: 8453).
+---
+
+# LoyalSpark — Onchain Loyalty Protocol
+
+## Project Overview
+Web3-powered loyalty platform built on Base Mainnet (Chain ID: 8453).
+Dual-mode: humans via Web UI (Privy-first + SIWE where needed), AI agents via REST API / MCP Server.
+
+## Tech Stack
+- Frontend: React 18, TypeScript, Vite 5, Tailwind CSS 3, shadcn/ui (Radix), Framer Motion, Sonner
+- Onchain: Wagmi v2, Viem, RainbowKit, Base Mainnet (chain id 8453); `ox` where low-level helpers fit
+- Auth & wallets: **Privy** (`@privy-io/react-auth`, `@privy-io/wagmi`) + **SIWE** (nonce + `siwe-verify`) for wallet-linked Supabase sessions
+- Farcaster: `@farcaster/auth-kit`, `miniapp-sdk`, `frame-sdk`, `@farcaster/miniapp-wagmi-connector`
+- Mobile: **Capacitor 8** (iOS/Android) alongside the web app
+- PWA: `vite-plugin-pwa`
+- Backend: Supabase (Deno Edge Functions, Postgres RLS, Realtime)
+- Agent server wallets: Coinbase CDP MPC via `agent-wallet` Edge Function
+- State: TanStack Query v5
+- Routing: React Router DOM v6
+- Forms: React Hook Form + Zod (`@hookform/resolvers`)
+- Data viz: Recharts (dashboards)
+- Agent surface: REST (`agent-api`) + MCP (`loyalty-mcp`)
+
+## Smart Contracts (Base Mainnet)
+- LoyaltyTokenFactory: 0x5F3DdBa12580CFdc6016258774cCc19C4250dA80
+- LoyalSparkERC20 (Implementation): 0xe6BA426C9c51281B929a17444De02c65815E27C3
+
+## Authentication
+- Humans: **Privy** first (email / SMS / OAuth / embedded + external wallets); Supabase session via `privy-auth` + client helpers in `src/lib/privyAuth.ts`
+- Wallet-only path: SIWE message + `siwe-nonce` / `siwe-verify` Edge Functions (still used for wagmi-connected wallet login)
+- Merchant / Customer headers: **Profile** is shown only when `useAuth().user` exists; order is **Theme → Profile (if signed in) → Wallet**. See `docs/development/PORTALS_AND_TEAM.md`.
+- Farcaster Mini App: detect FC context (`@farcaster/miniapp-sdk`) and avoid fighting Mini App lifecycle in auth UI
+- AI Agents: API keys with `lsk_` prefix, hashed in DB (unchanged server rules)
+
+## Project Structure
+src/
+  components/
+    ui/          # shadcn/ui only — do not put business logic here
+    agents/      # AI agent management UI
+    rewards/     # Rewards & vouchers
+    crm/         # CRM & analytics
+    marketing/   # Campaigns
+    automation/  # Marketing automation
+    tiers/       # Customer tiers
+    referral/    # Referral programs
+    roundup/     # DeFi investment (Aave/Compound) — FROZEN
+    marketplace/ # Token trading (DEX) — FROZEN
+    reviews/     # Customer reviews
+    onboarding/  # Welcome flows
+    merchant/    # Merchant shell & tabs (Team, Programs, dashboard, …)
+    team/          # Branches, employees, invite codes, AcceptMerchantInviteCard
+    admin/       # Platform administration
+  hooks/         # ALL Supabase queries must live here, never in components
+  config/        # Contract addresses & ABIs
+  contexts/      # Auth (Privy + SIWE + Farcaster miniapp)
+  integrations/supabase/  # DB client & generated types
+  pages/         # Route-level components only
+  lib/           # Shared utilities
+
+supabase/functions/
+  agent-api/              # REST API for AI agents
+  agent-api-key/          # API key issuance / rotation
+  agent-reports/          # Merchant reporting
+  agent-wallet/           # CDP MPC wallet + server-side mint
+  loyalty-mcp/            # MCP (JSON-RPC) for LLM tools
+  privy-auth/             # Privy → Supabase session bridge
+  siwe-nonce/             # SIWE nonce
+  siwe-verify/            # SIWE verify; nonce consumption via RPC consume_siwe_nonce
+  recipient-api/          # Holder/recipient REST + SIWE register (rwk_)
+  recipient-loyalty-mcp/  # MCP (JSON-RPC) for recipient agents (rwk_)
+  verify-payment/         # Premium / subscription USDC
+  verify-agent-plan-payment/
+  verify-voucher/
+  mpp-gateway/            # MPP pay-per-request → agent-api
+  x402-gateway/           # x402 USDC on Base → agent-api
+  check-premium-expiration/
+  check-program-expiration/
+  sync-mint-history/
+  process-automation/
+  customer-export/
+  get-token-holders/
+  resolve-recipient/
+  frame/                  # Farcaster frame
+  miniapp-webhook/        # Miniapp webhooks
+  tests/                  # Integration (optional env)
+
+## Frozen Modules (do not modify or extend)
+- src/components/marketplace/   — DEX trading, frozen
+- src/components/roundup/       — DeFi investment, frozen
+
+## Active Development Focus
+- Core loop: deploy token → mint → redeem voucher
+- AI Agent API and MCP server
+- Farcaster integration
+- x402 and MPP payment gateways
+
+## Coding Rules
+- TypeScript: `@/*` path alias; avoid `any` in new code; prefer explicit types even though legacy `tsconfig` is not full strict yet
+- All Supabase queries must be in /hooks, never directly in components
+- All env variables via import.meta.env, never hardcoded
+- Never expose Supabase service role key on the client
+- Use TanStack Query for all async data fetching
+- Use React Hook Form + Zod for all forms
+- Follow existing domain folder structure when creating new components
+- RLS must be enabled on every new Supabase table
+- Keep components under 200 lines — split if larger
+
+## LLM workflow
+
+Behavioral rules to reduce over-engineering and unclear edits. **Tradeoff:** bias toward caution over speed; for trivial one-liners, use judgment.
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [aspekt19/unboxed-loyalty-spark](https://github.com/aspekt19/unboxed-loyalty-spark) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-06-30 -->
