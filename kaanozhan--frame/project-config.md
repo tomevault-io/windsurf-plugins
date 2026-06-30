@@ -3,51 +3,11 @@ trigger: always_on
 description: This project is managed with **Frame**. AI assistants should follow the rules below to keep documentation up to date.
 ---
 
-# Frame - Project Instructions
+# TaskFlow - Frame Project
 
 This project is managed with **Frame**. AI assistants should follow the rules below to keep documentation up to date.
 
-> **Note:** This file is named `AGENTS.md` to be AI-tool agnostic. A `CLAUDE.md` symlink is provided for Claude Code compatibility.
-
----
-
-## Core Working Principle
-
-**Only do what the user asks.** Do not go beyond the scope of the request.
-
-- Implement exactly what the user requested — nothing more, nothing less.
-- Do not change business logic, flow, or architecture unless the user explicitly asks for it.
-- If a user asks for a design change, only change the design. Do not refactor, restructure, or modify functionality alongside it.
-- If you have additional suggestions or improvements, **present them as suggestions** to the user. Never implement them without approval.
-- The user's request must be completed first. Additional ideas come after, as proposals.
-
-**Example:** If the user asks for a modal design change, only change the visual appearance. Do not add new IPC channels, modify event flows, or restructure code.
-
----
-
-## 🧭 Project Navigation
-
-**Read these files at the start of each session:**
-
-1. **STRUCTURE.json** - Module map, which file is where
-2. **PROJECT_NOTES.md** - Project vision, past decisions, session notes
-3. **tasks.json** - Pending tasks
-
-**Workflow:**
-1. Read these files to understand the project and capture context
-2. Identify relevant files based on the task
-3. Update STRUCTURE.json after making changes (if new modules/files are added)
-
-**Fast File Lookup:** When searching for files related to a feature or concept, run:
-```bash
-node scripts/find-module.js <keyword>
-```
-This searches STRUCTURE.json's intentIndex and returns the exact files you need. Use this **before** doing manual grep/glob searches. Examples:
-- `node scripts/find-module.js github` → finds githubManager.js + githubPanel.js
-- `node scripts/find-module.js terminal` → finds all terminal-related files
-- `node scripts/find-module.js --list` → lists all features and their files
-
-**Note:** This system doesn't prevent reading code - it just helps you know where to look.
+> **Note:** This is the **sample project** that ships with Frame. It's a fictional codebase used to demonstrate Frame's workflow on realistic content. None of this code runs. When you're ready, open your own project to start real work.
 
 ---
 
@@ -80,46 +40,16 @@ This searches STRUCTURE.json's intentIndex and returns the exact files you need.
 ```json
 {
   "id": "unique-id",
-  "title": "Short and clear title (max 60 characters)",
-  "description": "AI's detailed explanation - what will be done, how it will be done, which files will be affected",
-  "userRequest": "User's original request/prompt - copy exactly",
-  "acceptanceCriteria": "When is this task considered complete? List of concrete criteria",
-  "notes": "Important notes, decisions, alternatives that came up during discussion",
+  "title": "Short and clear title",
+  "description": "Detailed explanation",
   "status": "pending | in_progress | completed",
   "priority": "high | medium | low",
-  "category": "feature | fix | refactor | docs | test",
-  "context": "Session date and context",
+  "context": "Where/how this task originated",
   "createdAt": "ISO date",
   "updatedAt": "ISO date",
   "completedAt": "ISO date | null"
 }
 ```
-
-### Task Content Rules
-
-**title:** Short, action-oriented title
-- ✅ "Add tasks button to terminal toolbar"
-- ❌ "Tasks"
-
-**description:** AI's detailed technical explanation
-- What will be done (what)
-- How it will be done (how) - brief technical approach
-- Which files will be affected
-- Minimum 2-3 sentences
-
-**userRequest:** User's original words
-- Copy the user's prompt/request exactly
-- Important for preserving context
-- In "User said: ..." format
-
-**acceptanceCriteria:** Completion criteria
-- Concrete, testable items
-- "Task is complete when this happens" list
-
-**notes:** Discussion notes (optional)
-- Alternatives considered
-- Important decisions and their reasons
-- Dependencies marked as "we'll do this later"
 
 ### Task Status Updates
 
@@ -129,27 +59,65 @@ This searches STRUCTURE.json's intentIndex and returns the exact files you need.
 
 ---
 
-## PROJECT_NOTES.md Rules
+## Spec-Driven Development (.frame/specs/)
 
-### When to Update?
-- When an important architectural decision is made
-- When a technology choice is made
-- When an important problem is solved and the solution method is noteworthy
-- When an approach is determined together with the user
+Frame supports a structured `spec → plan → tasks → implement` workflow. When the user asks you to define, plan, or implement a feature, prefer this workflow over ad-hoc edits — it preserves intent and keeps `tasks.json` in sync.
 
-### Format
-Free format. Date + title is sufficient:
-```markdown
-### [2026-01-26] Topic title
-Conversation/decision as is, with its context...
+### File layout
+
+Each spec lives in its own folder:
+
+```
+.frame/specs/<slug>/
+  spec.md       — what we're building (Problem, Goal, Constraints, Success Criteria, Out of Scope)
+  plan.md       — how (Architecture, Files, Dependencies, Sequencing)
+  tasks.md      — flat bullet list, "- T01 · description"
+  status.json   — phase + metadata
 ```
 
-### Update Flow
-- Update immediately after a decision is made
-- You can add without asking the user (for important decisions)
+`<slug>` is kebab-case, derived from the spec title.
+
+### Lifecycle phases
+
+`draft` → `specified` → `planned` → `tasks_generated` → `implementing` → `done`
+
+Frame auto-advances phase from filesystem state (file presence). After writing each artifact, update `status.json` so `phase`, `updated_at`, and `last_phase_at` reflect reality — Frame's watcher will reconcile if you forget.
+
+### Slash commands
+
+When the user types a Frame slash command, write **exactly one file** and then update `status.json`:
+
+- `/spec.new <description>` → write `spec.md` (sections: Problem, Goal, Constraints, Success Criteria, Out of Scope). Phase → `specified`.
+- `/spec.plan` → read `spec.md`, write `plan.md` (sections: Architecture, Files, Dependencies, Sequencing). Phase → `planned`.
+- `/spec.tasks` → read `spec.md` + `plan.md`, write `tasks.md` as a flat `- T01 · ...` bullet list (5–12 tasks, imperative voice). Phase → `tasks_generated`.
+
+After `/spec.tasks`, **do not** also write entries to `tasks.json` — Frame's watcher imports them automatically with `source: "spec:<slug>:T<n>"` markers.
+
+### tasks.json linkage
+
+Spec-generated tasks carry a `source` field. Treat them like any other task — start them, complete them, update status. User-set status is preserved across spec re-imports; only title/description sync from `tasks.md`.
+
+### When to suggest a spec (steer the conversation)
+
+Spec-driven is Frame's core way of working, so when a user describes meaningful new work **mid-conversation**, gently steer them toward a spec instead of silently diving into code. Suggest a spec only for **significant work** — don't make this a reflex on every message.
+
+**Suggest a spec for:**
+- A new **feature** or capability ("users should be able to …", "add a … system")
+- A change that will touch **multiple files / modules** or affect architecture
+- Anything that clearly benefits from a **plan and ordered tasks** before coding
+- Work the user describes vaguely/largely that would benefit from being scoped first
+
+**Do NOT suggest a spec for:**
+- Typos, one-line fixes, small tweaks, renames → just do it
+- Small, discrete tracked work → that's a task (`tasks.json`)
+- Questions, debugging, explanations, experiments
+- Anything the user explicitly says to "just do" / "do directly"
+
+Rough ladder: *trivial → just do it · small but worth tracking → task · sizable feature or multi-file change → spec.*
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [kaanozhan/Frame](https://github.com/kaanozhan/Frame) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-20 -->
+<!-- tomevault:4.0:windsurf_rules:2026-06-29 -->
