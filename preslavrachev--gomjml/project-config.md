@@ -1,114 +1,112 @@
 ---
 trigger: always_on
-description: A native Go implementation of the MJML email framework for compiling MJML markup to responsive HTML. 100% feature-complete with all 26 MJML components implemented and thoroughly tested against reference implementation.
+description: This directory contains reference test cases for validating the gomjml compiler against the official MJML specification. Each test case consists of:
 ---
 
-# gomjml - Native Go MJML Compiler
+# MJML Test Data Reference
 
-## Project Overview
-A native Go implementation of the MJML email framework for compiling MJML markup to responsive HTML. 100% feature-complete with all 26 MJML components implemented and thoroughly tested against reference implementation.
+## Purpose
 
-## Current Development Status
-**Branch**: `dev/switch-from-mrml-to-mjml` - Transitioning from MRML-based testing to native reference implementation
+This directory contains reference test cases for validating the gomjml compiler against the official MJML specification. Each test case consists of:
 
-The project is currently transitioning away from using MRML (Rust MJML implementation) as the reference for testing and validation. This shift enables:
-- **Independence**: No external dependencies for testing and validation
-- **Native Control**: Full control over reference implementation and test generation
-- **Performance**: Improved development workflow without external tool dependencies
-- **Consistency**: Direct alignment with MJML specification rather than third-party interpretation
+- **Input**: `.mjml` file containing MJML markup
+- **Expected Output**: `.html` file containing the reference HTML output
 
-## Key Architecture
-- **CLI Application**: `cmd/gomjml/` with compile and test commands
-- **Core Library**: `mjml/` package (importable) with component system
-- **Parser**: `parser/` package for XML/AST processing
-- **Components**: Individual MJML component implementations in `mjml/components/`
+The HTML files were generated using the reference MJML compiler (MRML - Rust implementation) and serve as the ground truth for verifying that our Go implementation produces spec-compliant output.
 
-## Build & Test Commands
-```bash
-# Build CLI (for debugging, always use debug build)
-go build -tags debug -o bin/gomjml ./cmd/gomjml
+## File Structure
 
-# Build production version (no debug output)
-go build -o bin/gomjml ./cmd/gomjml
-
-# Run integration tests (against reference implementation)
-./bin/gomjml test
-
-# Run tests with verbose output
-./bin/gomjml test -v
-
-# Run tests matching pattern
-./bin/gomjml test -pattern "basic"
-
-# Run integration tests with debug build for detailed output
-go test -tags debug -v ./mjml -run TestMJMLAgainstExpected
-
-# Run benchmarks
-./bench.sh
-
-# Test case comparison with htmlcompare utility
-# First build the utility:
-go build -o bin/htmlcompare ./cmd/htmlcompare
-
-# Option 1: Run from mjml/testdata/ (auto-detects location):
-cd mjml/testdata
-../../bin/htmlcompare basic                    # Compare basic.mjml vs basic.html
-../../bin/htmlcompare basic --verbose          # Show more diff context
-
-# Option 2: Run from project root (specify testdata directory):
-./bin/htmlcompare basic --testdata-dir mjml/testdata         # Compare from root
-./bin/htmlcompare mj-button-align --testdata-dir mjml/testdata
-./bin/htmlcompare basic -v --testdata-dir mjml/testdata      # Verbose output
-
-# The utility auto-detects project root, builds debug gomjml, and performs semantic HTML comparison
-
-# Compile MJML to HTML
-./bin/gomjml compile input.mjml -o output.html
-
-# Compile with debug attributes for troubleshooting
-./bin/gomjml compile input.mjml -o output.html --debug
-
-# Debug compile with verbose logging (requires debug build)
-./bin/gomjml-debug compile input.mjml -o output.html
+```
+testdata/
+├── basic.mjml          # Input MJML template
+├── basic.html          # Expected HTML output
+├── mj-button.mjml      # Button component test
+├── mj-button.html      # Expected button HTML
+└── ...                 # Additional test cases
 ```
 
-## Development Guidelines
+## Integration with Tests
 
-### Component Interface & Architecture
-- **Component Interface**: All components implement `Render(w io.StringWriter) error` and `GetTagName() string`
-- **Base Component**: Extend `*BaseComponent` which provides common functionality and attribute handling
-- **Testing**: Integration tests validate against reference implementation
-- **Performance Focus**: Recent commits show memory optimizations and performance improvements
-- **Email Compatibility**: Generates MSO-compatible HTML for Outlook/Gmail/Apple Mail
+These test files are consumed by `mjml/integration_test.go` in the `TestMJMLAgainstExpected` function. The test:
 
-### Component Implementation Standards
+1. Reads each `.mjml` file from the test case list
+2. Compiles it using our Go implementation (`mjml.Render()`)
+3. Compares the output against the corresponding `.html` file
+4. Reports comprehensive differences if outputs don't match
 
-#### HTML Generation
-- **Use HTMLTag Builder**: Use `html.NewHTMLTag()` for generating HTML elements instead of string concatenation
-- **StringWriter Pattern**: All internal rendering methods must use `io.StringWriter` interface for performance
-- **Constants Usage**: Use constants from `mjml/constants` package instead of hardcoded strings:
-  - CSS properties: `constants.CSSFontSize`, `constants.CSSPadding`, etc.
-  - HTML attributes: `constants.AttrClass`, `constants.AttrCellSpacing`, etc.
-  - MJML attributes: `constants.MJMLFontFamily`, `constants.MJMLPadding`, etc.
-  - Common values: `constants.VAlignMiddle`, `constants.AlignCenter`, etc.
-  - Language/Direction: `constants.LangUndetermined`, `constants.DirAuto`, etc.
-  - **🚨 Code Review Check**: Always look for magic strings that should be constants!
+## Test Case Categories
 
-#### Code Structure
-- **Font Tracking**: Always call `c.TrackFontFamily(value)` when processing font-family attributes
-- **Attribute Handling**: 
-  - Use `c.GetAttributeWithDefault(c, name)` directly instead of creating wrapper `getAttribute` methods
-  - Only create custom attribute methods when implementing specific inheritance patterns (like accordion element)
-  - For explicit-only attributes like font-family, use `c.Node.GetAttribute(name)` directly
-- **Individual Padding**: Support individual padding properties (`padding-top`, `padding-bottom`, etc.) alongside general `padding`
-- **MSO Compatibility**: Use MSO conditional comments for Outlook-specific elements: `<!--[if !mso | IE]><!--> ... <!--<![endif]-->`
-- **CSS Class Support**: ALL components MUST support the `css-class` attribute using `c.BuildClassAttribute()` on their main container element
+### Core Components
+- `mjml.mjml/html` - Root document structure
+- `mj-body.mjml/html` - Body container with attributes
+- `mj-section.mjml/html` - Section layouts and styling
+- `mj-column.mjml/html` - Column layouts and responsive behavior
+- `mj-wrapper.mjml/html` - Wrapper components for grouping
 
-#### Example Pattern
-```go
+### Content Components
+- `mj-text.mjml/html` - Text rendering and styling
+- `mj-button.mjml/html` - Button components with various attributes
+- `mj-image.mjml/html` - Image handling and responsive behavior
+- `mj-divider.mjml/html` - Divider styling and positioning
+- `mj-social.mjml/html` - Social media icons and links
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+### Advanced Components
+- `mj-group.mjml/html` - Column grouping and alignment
+- `mj-hero.mjml/html` - Hero sections with background images
+- `mj-navbar.mjml/html` - Navigation components
+- `mj-accordion.mjml/html` - Collapsible content sections
+- `mj-table.mjml/html` - Email-safe table rendering
+
+### Layout Tests
+- `complex-layout.mjml/html` - Multi-section complex layouts
+- `austin-*.mjml/html` - Real-world template examples
+- `wrapper-*.mjml/html` - Various wrapper configurations
+
+## Debugging Failed Tests
+
+When tests fail, the integration test provides detailed analysis:
+
+### 1. Use htmlcompare Utility
+```bash
+# From project root
+./bin/htmlcompare basic --testdata-dir mjml/testdata
+
+# From testdata directory
+../../bin/htmlcompare basic
+```
+
+### 2. Check Debug Files
+Failed tests write temporary files for manual inspection:
+- `/tmp/expected_{testname}.html` - Reference output
+- `/tmp/actual_{testname}.html` - Our implementation output
+
+### 3. Common Difference Types
+- **DOM Structure**: Element count or nesting differences
+- **CSS Properties**: Style attribute ordering or values
+- **MSO Conditionals**: Outlook-specific conditional comments
+- **VML Attributes**: Vector Markup Language attributes for email clients
+- **HTML Entities**: Encoding differences (&amp; vs &)
+
+## Adding New Test Cases
+
+1. **Create MJML file**: Add `{testname}.mjml` with your test case
+2. **Generate reference**: Use MRML to create `{testname}.html`
+3. **Add to test list**: Include in `testCases` array in `integration_test.go`
+4. **Verify**: Run `go test -v ./mjml -run TestMJMLAgainstExpected`
+
+## Reference Implementation
+
+The expected HTML outputs were generated using MRML (Rust MJML implementation), which serves as the canonical reference for MJML specification compliance. This ensures our Go implementation maintains compatibility with the broader MJML ecosystem.
+
+## Performance Testing
+
+Some test cases are also used for benchmarking:
+- `basic.mjml` - Simple performance baseline
+- `complex-layout.mjml` - Complex template performance
+- `austin-*.mjml` - Real-world template performance
+
+Run benchmarks with: `./bench.sh`
 
 ---
 > Source: [preslavrachev/gomjml](https://github.com/preslavrachev/gomjml) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-04 -->
+<!-- tomevault:4.0:windsurf_rules:2026-06-29 -->
