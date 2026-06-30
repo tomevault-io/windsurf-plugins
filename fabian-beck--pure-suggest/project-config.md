@@ -1,125 +1,152 @@
 ---
 trigger: always_on
-description: PUREsuggest is a Vue 3 scientific literature search tool that suggests publications through citation-based recommendations. Users start with seed papers and receive ranked suggestions based on citations, references, and keyword boosting. Features a responsive design with network visualization, filtering capabilities, and BibTeX export.
+description: PUREsuggest is a Vue 3 scientific literature search tool that suggests publications through citation-based recommendations. This is a single-page application built with Vue 3, Vite, Pinia stores, and D3.js network visualization.
 ---
 
-# PUREsuggest Project Overview
+# PUREsuggest - GitHub Copilot Instructions
 
-## Project Description
+PUREsuggest is a Vue 3 scientific literature search tool that suggests publications through citation-based recommendations. This is a single-page application built with Vue 3, Vite, Pinia stores, and D3.js network visualization.
 
-PUREsuggest is a Vue 3 scientific literature search tool that suggests publications through citation-based recommendations. Users start with seed papers and receive ranked suggestions based on citations, references, and keyword boosting. Features a responsive design with network visualization, filtering capabilities, and BibTeX export.
+**ALWAYS follow these instructions first and only fallback to additional search and context gathering if the information here is incomplete or found to be in error.**
 
-## Architecture
+## Bootstrap and Setup
 
-- **Framework**: Vue 3 with Composition API
-- **State Management**: Pinia stores (`session.js`, `interface.js`, `queue.js`, `author.js`, `modal.js`)
-- **UI Framework**: Vuetify 3 + Bulma CSS hybrid approach
-- **Visualization**: D3.js for network diagrams
-- **Build Tool**: Vite
-- **Testing**: Vitest with Happy DOM
+Always run these commands in sequence when working with a fresh clone:
 
-## Key Components
+```bash
+# Install dependencies (NEVER CANCEL - Network restrictions require skip flag)
+PUPPETEER_SKIP_DOWNLOAD=true npm install
+# Takes ~6 seconds. Use timeout of 300+ seconds for safety.
 
-- `App.vue`: Main application layout with grid-based responsive design
-- `NetworkVisComponent.vue`: D3-powered citation network visualization
-- `SelectedPublicationsComponent.vue`: User's selected publications list
-- `SuggestedPublicationsComponent.vue`: Ranked publication suggestions
-- `PublicationComponent.vue`: Individual publication display with metadata
-- `FilterMenuComponent.vue`: Advanced filtering interface
+# Verify linting passes
+npm run lint
+# Takes ~1.5 seconds. Should complete with no errors.
 
-## Core Business Logic
+# Build production version (NEVER CANCEL)
+npm run build
+# Takes ~6 seconds. Set timeout to 300+ seconds. Creates dist/ directory.
+```
 
-- **Domain Models** (`src/core/`):
-  - `Publication.js`: Publication model with metadata fetching and scoring
-  - `Author.js`: Author aggregation and scoring algorithms
-  - `Filter.js`: Publication filtering logic
-  - `PublicationSearch.js`: DOI-based search functionality
-- **Infrastructure** (`src/lib/`):
-  - `Cache.js`: IndexedDB-based caching system
-  - `Keys.js`: Keyboard event handling
-  - `Util.js`: General utility functions
+## Testing Commands
 
-## Services Layer
+**CRITICAL**: Set appropriate timeouts for ALL test commands. NEVER CANCEL builds or tests.
 
-- `SuggestionService.js`: Dedicated service for computing publication suggestions (extracted from session store)
+```bash
+# Run unit tests (NEVER CANCEL)
+npm test
+# Takes ~14 seconds. Runs 436 tests across 36 test files. Set timeout to 300+ seconds.
 
-## Composables (Vue 3)
+# Run performance tests (NEVER CANCEL)
+npm run test:perf
+# Takes ~8 seconds. Browser tests may skip due to missing Chrome - this is expected in sandboxed environments. Set timeout to 300+ seconds.
 
-- `useAppState.js`: Core application logic extracted from stores (session management, suggestions, queuing)
-- `useModalManager.js`: Modal dialog management and state coordination
+# Run all tests (NEVER CANCEL)
+npm run test:all
+# Takes ~22 seconds total. Combines unit and performance tests. Set timeout to 600+ seconds.
+```
 
-## Testing Strategy
+## Development Server
 
-- **Framework**: Vitest with Happy DOM for unit tests
-- **Browser Testing**: Puppeteer for performance testing and UI automation
-- **Test Organization**:
-  - `tests/unit/` - Component and utility tests
-  - `tests/performance/` - Load and rendering benchmarks using Puppeteer
-  - `tests/helpers/` - Shared test utilities and mock factories
-  - `tests/README.md` - Comprehensive testing best practices guide
+```bash
+# Start development server
+npm run dev
+# Starts on port 8080, auto-retries on 8081, 8082 if busy.
+# Access at http://localhost:8080 (or auto-assigned port)
 
-### Running Tests
+# Preview production build
+npm run preview
+# Serves production build on port 4173
+# Access at http://localhost:4173
+```
 
-**Prerequisites**: Development server should be running at http://localhost:8080 for browser-based tests.
+## Validation Scenarios
 
-**Unit Tests**:
-- `npm test` - Run all unit tests once
-- `npm run test:watch` - Run tests in watch mode for development
-- `npm run test:ui` - Launch interactive Vitest UI
-- `npm run test:coverage` - Generate coverage report
+After making changes, ALWAYS test these core user workflows:
 
-**Performance Tests**:
-- `npm run test:perf` - Run performance benchmarks using Puppeteer
-- `npm run test:perf:watch` - Watch mode for performance tests
+### Basic Literature Search Workflow
 
-**All Tests**:
-- `npm run test:all` - Run both unit and performance test suites
+1. **Start application**: `npm run dev` and access web interface
+2. **Add publication by DOI**: Test DOI input field (e.g., "10.1109/TVCG.2024.3456199")
+3. **Verify suggestions appear**: Check that citation-based suggestions are generated
+4. **Test keyword boosting**: Add boost keywords and verify ranking changes
+5. **Apply filters**: Use publication year, author, or citation count filters
+6. **Export functionality**: Test BibTeX export and session save/load
 
-**Testing Best Practices**: See [tests/README.md](tests/README.md) for detailed guidelines on:
-- Behavior-driven testing patterns
-- Mock factories and utilities (`testUtils.js`)
-- Store mocking patterns
-- Anti-patterns to avoid
+### Performance Validation
 
-## Development Commands
+1. **Load testing**: Add multiple publications (10+) and verify responsiveness
+2. **Network visualization**: Ensure D3.js citation network renders without errors
+3. **Memory usage**: Monitor for memory leaks during extended use
 
-- `npm run dev` - Development server (port 8080)
-- `npm run build` - Production build
-- `npm run lint` - ESLint code checking
-- `npm run preview` - Preview production build
+### Component Integration Testing
 
-## Data Flow
+1. **Selected Publications**: Verify publications appear in selection list
+2. **Suggested Publications**: Check ranking and metadata display
+3. **Author details**: Test author modal and co-author information
+4. **Filter menu**: Verify all filter options work correctly
 
-1. **Selection**: Users select publications via DOI or search
-2. **Citation Fetching**: Publications fetch citation/reference metadata
-3. **Suggestion Generation**: Algorithm computes ranked suggestions based on citation overlap
-4. **Keyword Boosting**: Users can boost rankings with keywords
-5. **Filtering**: Advanced filters applied to both selected and suggested publications
-6. **Visualization**: Network diagram shows citation relationships
-7. **Export**: Session state and BibTeX export capabilities
+## Key Project Structure
 
-## State Management (Refactored Architecture)
+### Core Business Logic (`src/core/`)
 
-- **Session Store**: Selected publications, excluded publications, suggestions, filters, boost keywords, active publication
-- **Queue Store**: Temporary queues for batch operations (add/exclude publications)
-- **Author Store**: Independent author aggregation and scoring (extracted from session store)
-- **Interface Store**: UI state, loading states, mobile responsiveness
-- **Modal Store**: Modal dialog states and search provider configuration
-- **useAppState Composable**: Business logic layer coordinating between stores (session management, suggestion computation, queuing operations)
-- **useModalManager Composable**: Modal dialog management and state coordination
+- `Publication.js` - Publication model with metadata fetching and scoring
+- `Author.js` - Author aggregation and scoring algorithms
+- `Filter.js` - Publication filtering logic
+- `PublicationSearch.js` - DOI-based search functionality
 
-## Performance Features
+### Main Components (`src/components/`)
 
-- Lazy loading of publication metadata
-- Pagination for suggestions (`PAGINATION.LOAD_MORE_INCREMENT`)
-- IndexedDB caching with LZ-string compression
-- Performance monitoring with timing logs
-- Memory usage tracking
+- `App.vue` - Main application layout with responsive grid
+- `NetworkVisComponent.vue` - D3-powered citation network visualization
+- `SelectedPublicationsComponent.vue` - User's selected publications list
+- `SuggestedPublicationsComponent.vue` - Ranked publication suggestions
+- `PublicationComponent.vue` - Individual publication display
+- `FilterMenuComponent.vue` - Advanced filtering interface
 
-## API Integration
+### State Management (`src/stores/`)
 
-- Multiple publication databases via DOI resolution
-- Fallback strategies for metadata fetching
+- `session.js` - Selected publications, suggestions, filters, boost keywords
+- `interface.js` - UI state, modals, loading states, mobile responsiveness
+- `queue.js` - Temporary queues for batch operations
+- `author.js` - Author aggregation and scoring
+
+### Services (`src/services/`)
+
+- `SuggestionService.js` - Dedicated service for computing publication suggestions
+
+### Testing (`tests/`)
+
+- `tests/unit/` - Component and utility unit tests (36 files, 436 tests)
+- `tests/performance/` - Load and rendering benchmarks
+
+## Common Build Issues and Solutions
+
+### Puppeteer Installation Failure
+
+```bash
+# Error: Failed to set up chrome-headless-shell
+# Solution: Always use skip flag
+PUPPETEER_SKIP_DOWNLOAD=true npm install
+```
+
+### Port Conflicts
+
+- Development server auto-retries ports 8080 → 8081 → 8082
+- Preview server uses port 4173
+- Check console output for actual assigned port
+
+### Performance Test Browser Failures
+
+- Browser tests skip when Chrome unavailable (expected in sandboxed environments)
+- Performance scale tests still run and provide valuable metrics
+- This is normal and not a blocker
+
+## Development Best Practices
+
+### Code Style and Testing
+
+- ALWAYS run `npm run lint` before committing changes
+- Run `npm test` to ensure unit tests pass (TDD approach recommended)
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
