@@ -1,112 +1,72 @@
 ---
 trigger: always_on
-description: **Workflow for Each Issue:**
+description: shimmy-private/              ← THIS REPO — public-facing CLI/server product (private working copy)
 ---
 
-# ⚠️ CRITICAL SERVER RULE: NEVER cancel background servers with Ctrl+C! Use `&` or separate terminals!
-# If you start a server (shimmy serve, python -m http.server, etc.) and then cancel it, IT WON'T RUN ANYMORE.
-# Either use trailing `&` for background OR use different terminal tabs. You've done this mistake 12+ times today!
+# Agent Instructions — Shimmy
 
-# 📋 CURRENT STATUS - December 7, 2025
+## Repository Architecture
 
-## Active Work: Issue Resolution & Vision Module Development 🎯
+```
+shimmy-private/              ← THIS REPO — public-facing CLI/server product (private working copy)
+public remote: shimmy.git    ← https://github.com/Michael-A-Kuykendall/shimmy.git
+airframe = { version = "0.1" }  ← PUBLIC crates.io dep — no path dep, no cloning needed
+```
 
-### IMMEDIATE PRIORITY: Fix All Open Issues (17 total)
-**Workflow for Each Issue:**
-1. **Create Feature Branch**: `git checkout -b fix/issue-NNN-description`
-2. **Implement Fix**: Make minimal, targeted changes
-3. **Test Thoroughly**: Run local tests + regression suite
-4. **Pass Release Gates**: `./scripts/dry-run-release.sh`
-5. **Create PR**: Push branch, create PR with detailed description
-6. **Merge & Monitor**: Merge PR, ensure CI passes, handle any issues
+- **Shimmy is the product. Airframe is the public GPU engine** (crates.io: https://crates.io/crates/airframe).
+- Both are MIT-licensed. Both are public. No private dependencies.
+- `cargo build` (default features) compiles the full GPU engine — airframe is downloaded from crates.io.
 
-### Open Issues Priority Order:
-1. **Critical (Blockers)**: #152 (Docker build), #140 (GGML assert), #139 (Unicode), #127 (MLX smoke), #114 (Distribution)
-2. **High**: #113 (Open WebUI), #142 (AMD GPU), #147 (Multi-file models)
-3. **Medium**: #145 (Model support), #144 (MLX default), #143 (uvx support)
-4. **Low**: #153 (Swagger), #137 (Demo), #141 (OpenAI response.create), #150 (Server loads model), #151 (How shimmy works)
+## Repository Push Policy
 
-### LONG-TERM: Vision Module Development
-- **Port Seer Tool**: Node.js vision analysis → Rust shimmy-vision feature
-- **Licensing**: Keygen integration for paid vision features
-- **Timeline**: After all issues resolved, implement vision module
+- Two remotes exist:
+  - `origin` → `https://github.com/Michael-A-Kuykendall/shimmy-private.git` (private working copy)
+  - `public` → `https://github.com/Michael-A-Kuykendall/shimmy.git` (public GitHub repo users see)
+- In the submodule context (`shimmy_integration/` inside airframe workspace): push with `git push private <branch>`.
+- In the standalone context (`C:/Users/micha/repos/shimmy-private`): push with `git push origin <branch>` (private) or `git push public <branch>` (public).
+- Do not push unless explicitly requested by the user.
+- To publish to the public shimmy repo, push to the `public` remote.
 
-### Development Workflow Rules:
-- **NEVER work on main**: Always create feature branches
-- **Test before commit**: `./scripts/dev-test.sh` or `cargo test`
-- **Release gates mandatory**: `./scripts/dry-run-release.sh` before PR
-- **Clean commits**: `cargo fmt`, `cargo clippy -- -D warnings`
-- **Detailed PRs**: Include issue link, reproduction steps, test results
+## Test Failures
 
----
+**Zero tolerance. No exceptions.**
 
-# Copilot / AI Assistant Operating Guide for Shimmy
+`cargo test` must finish with 0 failures before any task is considered done.
+There is no such thing as a "pre-existing" failure. Fix it before moving on.
 
-This file teaches any AI assistant how to work effectively inside this repository. Keep replies lean, perform actions directly, and favor incremental verified changes.
+## Architecture (v2.0)
 
-## CRITICAL RULES - NEVER VIOLATE
+- **Engine**: wgpu/WebGPU WGSL pipeline via Airframe (crates.io: `airframe = "0.1"`). Replaces llama.cpp entirely.
+- **Server**: OpenAI-compatible (`/v1/chat/completions`, `/v1/completions`), Ollama-compat (`/api/generate`, `/api/tags`), LM Studio discovery.
+- **No Python in default path.** Default build is `airframe` + `huggingface` features.
+- **WGSL quant coverage**: F32, F16, Q4_0, Q8_0, Q4_K(M/S), Q5_K(M/S), Q6_K.
+- **wgpu 2 GB buffer cap**: Known limit for models with tensors >2 GB. Deferred to v2.1.
 
-### 1. NEVER Print Fake Validation
-**WRONG**: `echo "✅ Build successful"` or `printf "All tests passing"`
-**RIGHT**: Actually check: `ls -lh target/release/shimmy.exe && echo $? && ./shimmy --version`
+## Feature Flags
 
-- Never use echo/printf to print success messages
-- Always verify with actual commands (ls, grep, test exit codes, run the binary)
-- If you can't verify it, say "I cannot verify this yet" - don't fake it
+```toml
+default = ["airframe", "huggingface"]  # Full GPU build; use --no-default-features --features huggingface for CPU-only
+airframe = ["dep:airframe"]            # Airframe native GPU engine (from crates.io)
+gpu = ["airframe", "huggingface"]      # GPU-optimized build
+full = ["airframe", "huggingface", "mlx"]
+fast / coverage = ["huggingface"]      # CI-safe, no GPU hardware required
+# Deprecated stubs (llama.cpp removed in v2.0):
+llama = []  llama-cuda = []  llama-vulkan = []  llama-opencl = []
+```
 
-### 2. NEVER Use `!` in Bash Commands
-**WRONG**: `echo "Build finished!"` or `rg "println!" src/`
-**RIGHT**: `printf "%s\n" "Build finished"` or `rg 'println\!' src/`
+## Scope Control
 
-- Bash interprets `!` as history expansion (event not found error)
-- Use printf instead of echo when printing messages with !
-- **ALWAYS escape ! in regex patterns**: Use `'println\!'` not `"println!"`
-- This happens constantly - CHECK EVERY COMMAND with ! before running
+- Console (`crates/console/`) is scaffolded but unimplemented. Keep isolated from runtime release changes.
+- Vision work is deferred. Keep on dedicated branches.
+- Launch scope is architecture/runtime path only.
 
-### 3. ALWAYS Use `&` for Background Processes
-**WRONG**: Long-running commands without `&` (blocks terminal)
-**RIGHT**: `command args &` (runs in background, keeps terminal available)
+## What NOT To Do
 
-- Use `&` for servers, builds, uploads, or any long-running process
-- This prevents blocking the terminal and allows continued work
-- Essential for workflow efficiency on expensive compute instances
-
-### 4. ZERO TOLERANCE FOR WARNINGS
-**RULE**: Fix ALL warnings immediately when encountered - never proceed with warnings present
-**ACTION**: Stop and fix each warning properly (understand the issue, implement correct solution)
-
-- Warnings indicate poor software engineering that must be corrected
-- No warnings allowed in any build output - achieve completely clean builds
-- Fix warnings at their source, only suppress if genuinely unavoidable (like auto-generated code)
-- This is non-negotiable - warnings = incomplete work that must be finished
-
-### 3. Python Command is `py` NOT `python3`
-**WRONG**: `python3 script.py`
-**RIGHT**: `py script.py`
-
-- Windows uses `py` launcher, not `python3`
-- Check yourself before running Python commands
-
-### 3. Read Documentation BEFORE Trial-and-Error
-**WRONG**: Try random commands, see what works
-**RIGHT**: `fetch_webpage` to get official docs, then execute correct command
-
-- Your training data is 2+ years old
-- APIs change, flags change, behavior changes
-- Read current docs FIRST, especially for: cargo, git, build tools
-- One doc lookup saves 10 failed attempts
-
-## Mission
-Shimmy is a single-binary local inference shim (GGUF + optional LoRA) exposing simple HTTP/SSE/WebSocket endpoints plus a CLI. Goal: fast, frictionless local LLM token streaming that can front other tools (e.g. punch-discovery, RustChain) and act as a drop‑in development aide.
-
-## Core Components
-- `src/engine/llama.rs`: llama.cpp backend via `llama-cpp-2` (feature `llama`).
-- `src/api.rs`: `/api/generate` (POST, JSON) with optional SSE streaming and `/ws/generate` WebSocket streaming.
-- `src/server.rs`: axum server wiring.
-- `src/templates.rs`: prompt template families (ChatML, Llama3, OpenChat).
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- Do NOT add an `airframe/` submodule inside this repo.
+- Do NOT use a path dep for airframe — it is on crates.io as `airframe = { version = "0.1", optional = true }`.
+- Do NOT push without explicit user request.
+- Do NOT mix vision or console feature work into launch-critical runtime changes.
 
 ---
 > Source: [Michael-A-Kuykendall/shimmy](https://github.com/Michael-A-Kuykendall/shimmy) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-04 -->
+<!-- tomevault:4.0:windsurf_rules:2026-06-29 -->
