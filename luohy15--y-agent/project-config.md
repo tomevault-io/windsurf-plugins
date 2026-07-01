@@ -1,6 +1,6 @@
 ---
 trigger: always_on
-description: handles raw/preview toggling and "Add to link" from `pages/`.
+description: Personal AI agent platform: React web UI + FastAPI backend + async worker, deployed as
 ---
 
 # y-agent
@@ -46,7 +46,7 @@ Other top-level dirs: `scripts/` (deploy, DNS, IAM), `template.yaml` / `samconfi
 - **AWS SAM**: Lambda (API / Worker / Admin), SQS, S3 + CloudFront (web + link/RSS content),
   EventBridge schedules (reminders, RSS), DynamoDB
 - **Integrations**: Telegram Bot API, Google OAuth, SSH/Paramiko, EC2 lifecycle (boto3),
-  opencli (Twitter/X, Bilibili), oxylabs (WeChat)
+  oxylabs (WeChat / generic pages), yt-dlp (YouTube), Jina AI reader (Twitter/X)
 
 ## Notable Subsystems
 
@@ -71,30 +71,24 @@ entity + controller + service + CLI slices, and most have a web panel.
 - **RSS** — two-stage pipeline: admin schedules feed jobs → worker scrapes feed XML →
   downloader fetches each item's content → storage on S3 (per-activity key). `y rss` CLI
   for feeds + items.
-- **Link archive** — Chrome bookmark sync, Twitter/X and Bilibili downloads, WeChat via
-  oxylabs. Each link becomes an `activity_id` with content stored on S3; the FileViewer
-  handles raw/preview toggling and "Add to link" from `pages/`.
+- **Link archive** — EC2 is the single source of truth: `~/luohy15/links/<link_id>/{content,summary}.md` is canonical, `content_key`/`summary_content_key` are paths relative to `~/luohy15/` on EC2, API reads via SSH-cat, and S3 is not used for links.
+- **Browser cookies** — `y cookies sync` stores local browser cookies in the API/DB so remote `y link fetch` can pass them to `yt-dlp`.
 - **Reminder** — `reminder` table, `/api/reminder`, `y reminder` CLI. Admin Lambda runs
   `check_reminders` on a schedule and pushes matches to Telegram.
 - **Telegram** — forum topic binding (`tg_topic`), webhook secret verification,
   markdown → HTML conversion, per-topic routing, root-topic callbacks short-circuited
-  at the API layer.
+  at the API layer. Web-only artifact fences are stripped to `[chart]` / `[diagram]`
+  / `[svg]` placeholders before Telegram delivery.
+- **Artifacts** — assistant markdown fences tagged `mermaid`, `vega-lite`, or
+  `artifact-svg` render inline in `MessageBubble` via lazy Mermaid / Vega-Lite / sanitized
+  SVG rendering. Plain `svg` fences remain code blocks.
 - **Image transport** — API image ingestion stores bytes only under
   `/Users/roy/luohy15/assets/images/`: local writes when available, otherwise SSH-push
   to EC2. Workers SSH-fetch local EC2 paths before Telegram delivery. `Message.images`
   may contain EC2 asset paths or deliberate `http(s)://` pass-through URLs, never new
-  `s3://` / CDN refs; legacy `s3://` entries from before 2026-05-17 are warning-skipped.
-- **Dev worktrees** — `dev_worktree` tracks active coding sessions. `y dev wt add/rm` +
-  `y dev commit` handle worktree lifecycle; PID and session state live under
-  `/tmp/dev-sessions/<name>/` so multiple worktrees coexist.
-- **Finance / Email / Calendar** — beancount balance sheet / income statement /
-  portfolio tracker; Gmail sync; full-stack calendar events with timezone-aware filtering.
-
-## Agent Runtime
-
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [luohy15/y-agent](https://github.com/luohy15/y-agent) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-18 -->
+<!-- tomevault:4.0:windsurf_rules:2026-06-29 -->
