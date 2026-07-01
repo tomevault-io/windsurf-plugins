@@ -1,193 +1,177 @@
 ---
 trigger: always_on
-description: - **Starting** a new feature/modification
+description: *Derived from Pine Script v6 Extension analysis and [TradingView Pine Script v6 Reference](mdc:https:/www.tradingview.com/pine-script-reference/v6)*
 ---
 
-# Automatic Versioning Rules - Intelligent & Balanced
+# Comprehensive Pine Script v6 Rules & Best Practices
 
-## Rule: Smart Auto-Versioning (Not Every Change!)
+*Derived from Pine Script v6 Extension analysis and [TradingView Pine Script v6 Reference](mdc:https:/www.tradingview.com/pine-script-reference/v6)*
 
-### 🎯 Version ONLY at Key Points:
+---
 
-#### DO Version When:
-- **Starting** a new feature/modification
-- **Completing** a feature successfully  
-- **Before** major refactoring
-- **After** significant progress (multiple functions added)
-- **Failed** attempt that needs rollback point
-- **Ending** a work session
-- User **explicitly asks** for version
+## 📋 Table of Contents
 
-#### DON'T Version When:
-- Fixing a typo
-- Adjusting a single parameter
-- Adding a comment
-- Minor formatting changes
-- In rapid iteration mode
-- Testing different values
+1. [Version & Script Declaration](mdc:#version--script-declaration)
+2. [Type System & Keywords](mdc:#type-system--keywords)
+3. [Variable Declaration & Assignment](mdc:#variable-declaration--assignment)
+4. [Function Definition & Usage](mdc:#function-definition--usage)
+5. [Object Lifecycle Management](mdc:#object-lifecycle-management)
+6. [Array, Matrix & Map Operations](mdc:#array-matrix--map-operations)
+7. [Pine Script v6 Specific Features](mdc:#pine-script-v6-specific-features)
+8. [Common Error Patterns & Solutions](mdc:#common-error-patterns--solutions)
+9. [Performance & Best Practices](mdc:#performance--best-practices)
+10. [Syntax Rules & Line Continuation](mdc:#syntax-rules--line-continuation)
 
-### 📊 Intelligent Version Detection
+---
 
-```mermaid
-flowchart TD
-    A[User Message Received] --> B{Parse Intent}
-    
-    B -->|"Add [feature]"| C[🆕 START: Version + Track]
-    B -->|"That didn't work"| D[⏪ ROLLBACK: Version before revert]
-    B -->|"Perfect, that works!"| E[✅ SUCCESS: Capture stable state]
-    B -->|"I'm done for now"| F[🔚 END: Final session version]
-    B -->|"Save this" / "Version this"| G[💾 EXPLICIT: User request]
-    B -->|Minor edits/tweaks| H[⚡ CONTINUE: No versioning needed]
-    
-    C --> I[📦 Create Minor Version]
-    D --> J[📦 Create Rollback Point]
-    E --> K[📦 Create Patch Version]
-    F --> L[📦 Create Session Version]
-    G --> M[📦 Create Requested Version]
-    H --> N[🔨 Continue Coding]
-    
-    style C fill:#e8f5e8
-    style D fill:#fff3e0
-    style E fill:#e8f5e8
-    style F fill:#e8f5e8
-    style G fill:#e8f5e8
-    style H fill:#f3e5f5
+## 🔖 Version & Script Declaration
+
+### **Rule V1.1: Version Declaration (MANDATORY)**
+```pine
+//@version=6
+indicator("My Indicator", overlay=true)
 ```
 
-**Trigger Phrase Examples:**
-- 🆕 **Start**: "Add weekly filter to FVG" → Version ONCE at start
-- ⏪ **Rollback**: "That didn't work" → Version before rollback  
-- ✅ **Success**: "Perfect, that works" → Version to capture success
-- 🔚 **End**: "I'm done for now" → Final version
-- 💾 **Explicit**: "Save this" / "Version this" → User request
+**✅ Supported Versions:** `4`, `5`, `6`  
+**🎯 Recommended:** Always use v6 for new scripts  
+**📌 Pattern:** `^(\/\/)(@)(version)(=)([456])`
 
-### 🔄 Workflow Integration
-
-```mermaid
-flowchart LR
-    subgraph "✅ SMART PATTERN - Efficient Versioning"
-        A1[Start Feature] --> B1[📦 Version]
-        B1 --> C1[🔨 Code Code Code]
-        C1 --> D1{Error?}
-        D1 -->|Yes| E1[🔧 Fix]
-        D1 -->|No| F1[🔨 Code More]
-        E1 --> F1
-        F1 --> G1[✅ Complete]
-        G1 --> H1[📦 Final Version]
-    end
-    
-    subgraph "❌ BAD PATTERN - Version Spam"
-        A2[Start] --> B2[📦 Version]
-        B2 --> C2[🔨 Code]
-        C2 --> D2[📦 Version]
-        D2 --> E2[🔧 Tweak]
-        E2 --> F2[📦 Version]
-        F2 --> G2[🔧 Fix]
-        G2 --> H2[📦 Version]
-    end
-    
-    style A1 fill:#e8f5e8
-    style H1 fill:#e8f5e8
-    style A2 fill:#ffebee
-    style B2 fill:#ffebee
-    style D2 fill:#ffebee
-    style F2 fill:#ffebee
-    style H2 fill:#ffebee
+### **Rule V1.2: Script Type Declaration**
+```pine
+// Choose ONE of these script types:
+indicator("Title", overlay=true)    // Technical analysis indicator
+strategy("Title", overlay=true)     // Trading strategy with orders
+library("Title")                    // Reusable functions for export
 ```
 
-**Result Comparison:**
-- ✅ **Smart Pattern**: 2 versions for entire feature (clean history)
-- ❌ **Bad Pattern**: 4+ versions for simple feature (cluttered history)
+**🚨 Critical:** Script declaration must appear after version and before any code
 
-### 📁 Working Directory Management
+---
 
-Keep working directory clean:
-- Version at milestones, not every change
-- Use descriptive version increments:
-  - **patch**: Bug fixes, error corrections
-  - **minor**: New features, enhancements
-  - **major**: Breaking changes, rewrites
+## 🏷️ Type System & Keywords
 
-### 🎮 Practical Examples
+### **Rule T1.1: Type Keywords & Forms**
 
-#### Good Versioning Flow:
-```
-You: "Add weekly filter to FVG"
-Me: [VERSION] fvg_v0.1.0 → fvg_v0.2.0 (minor - new feature)
-    [CODE] Implement filter
-    [ERROR] Fix HTF issue
-    [CODE] Complete implementation
-You: "Great, that works"
-Me: [VERSION] fvg_v0.2.0 → fvg_v0.2.1 (patch - stabilized)
-Total: 2 versions for complete feature
-```
+| **Type** | **Usage** | **Example** |
+|----------|-----------|-------------|
+| `int`, `float`, `bool`, `string`, `color` | Basic types | `int myVar = 10` |
+| `line`, `label`, `box`, `table`, `linefill` | Object IDs (always series) | `line myLine = line.new(...)` |
+| `polyline`, `chart.point` | v6 Objects | `polyline pl = polyline.new()` |
+| `array<type>` or `type[]` | Arrays | `array<float> arr = array.new_float()` |
+| `matrix<type>` | Matrices | `matrix<float> mx = matrix.new_float()` |
+| `map<keyType, valueType>` | Key-value maps | `map<string, float> m = map.new<string, float>()` |
 
-#### Bad Versioning Flow:
-```
-You: "Add weekly filter"
-Me: [VERSION] v0.1.0 → v0.2.0
-    [CODE] Add basic structure
-Me: [VERSION] v0.2.0 → v0.2.1
-    [CODE] Add timeframe check
-Me: [VERSION] v0.2.1 → v0.2.2
-    [ERROR] Fix issue
-Me: [VERSION] v0.2.2 → v0.2.3
-Total: Too many versions for one feature!
+### **Rule T1.2: Type Forms (Simple vs Series)**
+```pine
+// In exported library functions:
+export emaRight(float source, simple int length) =>  // ✅ Correct
+    ta.ema(source, length)
+
+export emaWrong(float source, int length) =>         // ❌ Error
+    ta.ema(source, length)  // length becomes 'series int', not supported
 ```
 
-### 🤖 My Decision Process
+**🎯 Key Point:** Use `simple` for library function parameters that need compile-time constants
 
-```mermaid
-flowchart TD
-    A[User Request Received] --> B{New Feature/Task?}
-    B -->|YES| C[🧠 AI CHOOSES APPROACH<br/>• Version if valuable<br/>• Track if helpful<br/>• Start immediately if simple]
-    B -->|NO| D[Continue Current Work]
-    
-    C --> E[🔨 AI Develops Intelligently<br/>Full tool freedom]
-    D --> F{Making Changes?}
-    
-    F -->|YES| G{Changes SIGNIFICANT?}
-    F -->|NO| H[💭 AI Codes Freely<br/>Any tools needed]
-    
-    G -->|YES| I{User Mentioned<br/>Completion/Save?}
-    G -->|NO| H
-    
-    I -->|YES| J[📦 AI DECIDES VERSION METHOD<br/>• Script if complex tracking needed<br/>• Direct file ops if simpler<br/>• Whatever works best]
-    I -->|NO| K[⏳ Keep Working]
-    
-    H --> L[✅ Continue Development<br/>AI uses optimal tools]
-    J --> L
-    K --> L
-    
-    style A fill:#e3f2fd
-    style C fill:#e8f5e8
-    style J fill:#e8f5e8
-    style H fill:#fff3e0
-    style L fill:#f3e5f5
+### **Rule T1.3: Type Consistency**
+```pine
+// ✅ Correct - same type in both branches
+result = condition ? 1 : 2
+
+// ❌ Error - type mismatch
+result = condition ? 1 : 1.0  // int vs float
 ```
 
-**Quick Decision Reference:**
-- 🆕 NEW task/feature → Always version first
-- 📝 Minor edits → Just code, no version
-- ✅ "That works!" → Version success
-- 🔚 "I'm done" → Final version
+---
 
-### 📝 Version Commit Messages
+## 📝 Variable Declaration & Assignment
 
-When creating versions, use clear indicators:
-```bash
-# Feature start
-./scripts/pine_master.sh develop file minor  # "Starting: [feature name]"
+### **Rule V2.1: Assignment Operators**
 
-# Feature complete  
-./scripts/pine_master.sh develop file patch  # "Completed: [feature name]"
+| **Operator** | **Purpose** | **Usage** |
+|--------------|-------------|-----------|
+| `=` | Initial declaration | `myVar = 10` |
+| `:=` | Reassignment | `myVar := 20` |
+| `+=`, `-=`, `*=`, `/=`, `%=` | Compound operations | `myVar += 5` |
 
-# Failed attempt
-./scripts/pine_tracker.sh rollback file version "Reason for rollback"
+### **Rule V2.2: Variable Scope & Declaration**
+```pine
+// ✅ Correct declaration order
+var globalVar = 0       // Global scope with 'var'
+myVar = 0              // Declare first
+myVar := myVar + 1     // Then reassign
+
+// ❌ Error - undeclared identifier
+myVar := myVar + 1     // Error: 'myVar' not declared
 ```
 
-### 🎯 Key Principles
+### **Rule V2.3: Explicit Typing Requirements**
+```pine
+// Required when initializing with 'na'
+int myInt = na         // ✅ Explicit type needed
+float myFloat = na     // ✅ Explicit type needed
 
+// Optional for normal initialization
+myInt = 10             // ✅ Type inferred
+myFloat = 3.14         // ✅ Type inferred
+```
+
+---
+
+## 🔧 Function Definition & Usage
+
+### **Rule F1.1: Function Definition Syntax**
+```pine
+// Standard function definition
+myFunction(param1, param2) =>
+    result = param1 + param2
+    result  // Return value (last expression)
+
+// Function with default parameters
+myFunction(param1, param2 = 10) =>
+    param1 + param2
+
+// Multi-line function with local variables
+complexFunction(x, y) =>
+    local1 = x * 2
+    local2 = y * 3
+    final = local1 + local2
+    final
+```
+
+### **Rule F1.2: Function Parameter Types**
+```pine
+// Library export functions - specify type forms
+export customTA(series float src, simple int len) =>
+    ta.sma(src, len)
+
+// Method definitions
+method toString(simple int this) =>
+    str.tostring(this)
+```
+
+### **Rule F1.3: Built-in Function Usage**
+```pine
+// ✅ Correct parameter order and types
+line.new(x1, y1, x2, y2, color=color.blue, width=2)
+
+// ✅ Check required vs optional parameters
+request.security(symbol, timeframe, expression)  // All required
+
+// ✅ Use namespaced functions correctly
+ta.sma(close, 20)      // Technical analysis
+math.max(high, low)    // Math operations
+array.push(arr, val)   // Array operations
+```
+
+---
+
+## 🗂️ Object Lifecycle Management
+
+### **Rule O1.1: Object Creation & Deletion**
+```pine
+// ✅ Proper object lifecycle
+if barstate.isconfirmed
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
