@@ -1,100 +1,141 @@
 ---
 trigger: always_on
-description: <!-- OPENSPEC:START -->
+description: Instructions for AI coding assistants using OpenSpec for spec-driven development.
 ---
 
-<!-- OPENSPEC:START -->
 # OpenSpec Instructions
 
-These instructions are for AI assistants working in this project.
+Instructions for AI coding assistants using OpenSpec for spec-driven development.
 
-Always open `@/openspec/AGENTS.md` when the request:
-- Mentions planning or proposals (words like proposal, spec, change, plan)
-- Introduces new capabilities, breaking changes, architecture shifts, or big performance/security work
-- Sounds ambiguous and you need the authoritative spec before coding
+## TL;DR Quick Checklist
 
-Use `@/openspec/AGENTS.md` to learn:
-- How to create and apply change proposals
-- Spec format and conventions
-- Project structure and guidelines
+- Search existing work: `openspec spec list --long`, `openspec list` (use `rg` only for full-text search)
+- Decide scope: new capability vs modify existing capability
+- Pick a unique `change-id`: kebab-case, verb-led (`add-`, `update-`, `remove-`, `refactor-`)
+- Scaffold: `proposal.md`, `tasks.md`, `design.md` (only if needed), and delta specs per affected capability
+- Write deltas: use `## ADDED|MODIFIED|REMOVED|RENAMED Requirements`; include at least one `#### Scenario:` per requirement
+- Validate: `openspec validate [change-id] --strict` and fix issues
+- Request approval: Do not start implementation until proposal is approved
 
-Keep this managed block so 'openspec update' can refresh the instructions.
+## Three-Stage Workflow
 
-<!-- OPENSPEC:END -->
-# General conventions
+### Stage 1: Creating Changes
+Create proposal when you need to:
+- Add features or functionality
+- Make breaking changes (API, schema)
+- Change architecture or patterns  
+- Optimize performance (changes behavior)
+- Update security patterns
 
-## Documentation Folder Guidelines
-- **`docs/` is for end-user documentation**: The docs folder is reserved for user-facing specifications, guides, and API documentation.
-- **LLM content is not welcome**: Do NOT use the docs folder to store LLM-generated notes, temporary files, or work-in-progress content.
-- **Use OpenSpec instead**: For internal development documentation, specifications, and change tracking, use OpenSpec.
-- **Keep docs clean**: The docs folder should only contain polished, finalized content intended for end users and maintainers.
-- **Install script sync**: The `docs/install.sh` file is a copy (not symlink) of `scripts/install.sh` for GitHub Pages. When updating the install script, remember to copy it to docs: `cp scripts/install.sh docs/install.sh`
+Triggers (examples):
+- "Help me create a change proposal"
+- "Help me plan a change"
+- "Help me create a proposal"
+- "I want to create a spec proposal"
+- "I want to create a spec"
 
-## References Folder
-- **Read-only reference**: The `references/` folder is provided as documentation and context for the LLM only.
-- **Do NOT modify**: Never create, edit, delete, or alter any files in the references folder.
-- **Research purposes only**: Use files in this folder to understand concepts, APIs, specifications, and project context.
-- **Preserve as-is**: This folder should remain untouched and serve solely as a knowledge base for reference during development.
-- **Read this folder before implementation**: Read the contents of this folder before you implement any feature. (`references/`)
+Loose matching guidance:
+- Contains one of: `proposal`, `change`, `spec`
+- With one of: `create`, `plan`, `make`, `start`, `help`
 
+Skip proposal for:
+- Bug fixes (restore intended behavior)
+- Typos, formatting, comments
+- Dependency updates (non-breaking)
+- Configuration changes
+- Tests for existing behavior
 
-## LLM Repository Hygiene
-- **Minimize Markdown files**: Do NOT scatter Markdown files throughout the repository.
-- **Keep it bare minimum**: Only create Markdown files if absolutely necessary.
-- **Single temporary file only**: If needed, maintain at most ONE temporary `.md` file (e.g., `_llm_notes.md`) for tracking tasks, notes, and work-in-progress items.
-- **Prefer OpenSpec**: Use OpenSpec for change proposals, specifications, and documentation instead of creating ad-hoc Markdown files.
-- **No pollution**: Resist the urge to create explanatory `.md` files, TODO lists, or documentation snippets scattered across the repo.
+**Workflow**
+1. Review `openspec/project.md`, `openspec list`, and `openspec list --specs` to understand current context.
+2. Choose a unique verb-led `change-id` and scaffold `proposal.md`, `tasks.md`, optional `design.md`, and spec deltas under `openspec/changes/<id>/`.
+3. Draft spec deltas using `## ADDED|MODIFIED|REMOVED Requirements` with at least one `#### Scenario:` per requirement.
+4. Run `openspec validate <id> --strict` and resolve any issues before sharing the proposal.
 
-## Commit message format
-- All commits MUST follow the [Conventional Commits](https://www.conventionalcommits.org/) specification.
-- Format: `<type>[optional scope]: <description>`
-- Common types:
-  - `feat:` – new feature (triggers MINOR version bump)
-  - `fix:` – bug fix (triggers PATCH version bump)
-  - `docs:` – documentation changes
-  - `test:` – add or update tests
-  - `refactor:` – code change that neither fixes a bug nor adds a feature
-  - `chore:` – maintenance tasks, dependency updates
-  - `ci:` – CI/CD configuration changes
-  - `perf:` – performance improvements
-- Use `!` after the type or add `BREAKING CHANGE:` footer for breaking changes (triggers MAJOR version bump).
-- Examples:
-  - `feat(api): add user authentication endpoint`
-  - `fix: resolve memory leak in data processor`
-  - `docs: update installation instructions`
-  - `feat!: remove deprecated API endpoints`
+### Stage 2: Implementing Changes
+Track these steps as TODOs and complete them one by one.
+1. **Read proposal.md** - Understand what's being built
+2. **Read design.md** (if exists) - Review technical decisions
+3. **Read tasks.md** - Get implementation checklist
+4. **Implement tasks sequentially** - Complete in order
+5. **Confirm completion** - Ensure every item in `tasks.md` is finished before updating statuses
+6. **Update checklist** - After all work is done, set every task to `- [x]` so the list reflects reality
+7. **Approval gate** - Do not start implementation until the proposal is reviewed and approved
 
-## Using Context7
-- Before starting any task, check if you have access to [Context7](https://context7.com/) MCP tools.
-- ALWAYS use Context7 automatically for:
-  - Code generation and scaffolding
-  - Setup and configuration steps
-  - Library and API documentation lookups
-- Use Context7 MCP tools to resolve library IDs and fetch docs without waiting for explicit requests.
-- Context7 provides up-to-date documentation and examples—prefer it over outdated knowledge.
-- If Context7 is unavailable, fall back to standard methods and mention it in your response.
+### Stage 3: Archiving Changes
+After deployment, create separate PR to:
+- Move `changes/[name]/` → `changes/archive/YYYY-MM-DD-[name]/`
+- Update `specs/` if capabilities changed
+- Use `openspec archive [change] --skip-specs --yes` for tooling-only changes
+- Run `openspec validate --strict` to confirm the archived change passes checks
 
-## Development workflow
-- Follow this standard workflow for all feature and fix work:
-  1. **Create and switch to a new branch**: `git checkout -b <branch-name>`
-  2. **Make OpenSpec change**: Create a change proposal with `/openspec` or `openspec` command
-  3. **Review the change**: Validate the proposal, tasks, and spec updates using `openspec show <change>`
-  4. **Implement the changes**: Execute the tasks and write the code
-  5. **Commit with conventional commits**: Use proper format (e.g., `feat(api): add new endpoint`)
-     - Commit packages separately if needed: `git add packages/<package_name> && git commit`
-  6. **Archive the OpenSpec change**: Run `openspec archive <change>` to merge
-  7. **Push the branch**: `git push origin <branch-name>` approved updates into specs
-- Always keep the OpenSpec specs and implementation in sync.
-- Don't commit the implementation before the spec change is reviewed and approved.
-- Each package change should have its own descriptive conventional commit.
+## Before Any Task
 
-## Go development
-- This project is written in Go (1.25+).
-- Use `just` as the task runner for common operations:
-  - `just build` - Build the binary
+**Context Checklist:**
+- [ ] Read relevant specs in `specs/[capability]/spec.md`
+- [ ] Check pending changes in `changes/` for conflicts
+- [ ] Read `openspec/project.md` for conventions
+- [ ] Run `openspec list` to see active changes
+- [ ] Run `openspec list --specs` to see existing capabilities
+
+**Before Creating Specs:**
+- Always check if capability already exists
+- Prefer modifying existing specs over creating duplicates
+- Use `openspec show [spec]` to review current state
+- If request is ambiguous, ask 1–2 clarifying questions before scaffolding
+
+### Search Guidance
+- Enumerate specs: `openspec spec list --long` (or `--json` for scripts)
+- Enumerate changes: `openspec list` (or `openspec change list --json` - deprecated but available)
+- Show details:
+  - Spec: `openspec show <spec-id> --type spec` (use `--json` for filters)
+  - Change: `openspec show <change-id> --json --deltas-only`
+- Full-text search (use ripgrep): `rg -n "Requirement:|Scenario:" openspec/specs`
+
+## Quick Start
+
+### CLI Commands
+
+```bash
+# Essential commands
+openspec list                  # List active changes
+openspec list --specs          # List specifications
+openspec show [item]           # Display change or spec
+openspec diff [change]         # Show spec differences
+openspec validate [item]       # Validate changes or specs
+openspec archive [change] [--yes|-y]      # Archive after deployment (add --yes for non-interactive runs)
+
+# Project management
+openspec init [path]           # Initialize OpenSpec
+openspec update [path]         # Update instruction files
+
+# Interactive mode
+openspec show                  # Prompts for selection
+openspec validate              # Bulk validation mode
+
+# Debugging
+openspec show [change] --json --deltas-only
+openspec validate [change] --strict
+```
+
+### Command Flags
+
+- `--json` - Machine-readable output
+- `--type change|spec` - Disambiguate items
+- `--strict` - Comprehensive validation
+- `--no-interactive` - Disable prompts
+- `--skip-specs` - Archive without spec updates
+- `--yes`/`-y` - Skip confirmation prompts (non-interactive archive)
+
+## Directory Structure
+
+```
+openspec/
+├── project.md              # Project conventions
+├── specs/                  # Current truth - what IS built
+│   └── [capability]/       # Single focused capability
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [niklas-heer/tdx](https://github.com/niklas-heer/tdx) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-06-29 -->
