@@ -1,152 +1,196 @@
 ---
 trigger: always_on
-description: *Enhanced with Pine Script v6 Extension analysis and [TradingView Pine Script v6 Reference](https://www.tradingview.com/pine-script-reference/v6/)*
+description: 1. **KEEP STATEMENTS ON A SINGLE LINE**: The most reliable approach is to keep each statement on a single line, even if it makes lines long.
 ---
 
-# Enhanced Pine Script v6 Rules 
+# Pine Script Syntax Rules
 
-*Enhanced with Pine Script v6 Extension analysis and [TradingView Pine Script v6 Reference](https://www.tradingview.com/pine-script-reference/v6/)*
+## Avoiding "End of Line Without Line Continuation" Errors
 
----
+1. **KEEP STATEMENTS ON A SINGLE LINE**: The most reliable approach is to keep each statement on a single line, even if it makes lines long.
 
-## 🎯 Core Type System & Forms
+2. **NO BACKSLASHES**: Unlike many other languages, Pine Script doesn't use backslashes `\` for line continuation.
 
-### **Rule 1.1: Type Keywords & Forms**
+3. **FUNCTION CALLS**: When calling functions with multiple parameters, keep all parameters on the same line:
+   ```pine
+   line.new(bar_index, price1, bar_index+10, price2, color=color.blue, width=2)
+   ```
 
-| **Keyword** | **Meaning / Usage Rule** | **v6 Examples** |
-|-------------|--------------------------|-----------------|
-| `int`, `float`, `bool`, `string`, `color` | Explicitly declare base types when clarity needed or when initializing with `na` | `int myVar = na` |
-| `line`, `label`, `box`, `table`, `linefill`, `polyline`, `chart.point` | Declare object IDs returned by their respective `*.new()` functions. Always **series form** | `polyline pl = polyline.new()` |
-| `array<type>` or `type[]` | Declare an array holding elements of `type` | `array<float> arr = array.new_float()` |
-| `matrix<type>` | Declare a 2D matrix of elements | `matrix<float> mx = matrix.new<float>(3,3)` |
-| `map<keyType, valueType>` | Declare key-value map structure | `map<string, float> prices = map.new<string, float>()` |
-| `simple` | Use in **exported library functions** to demand a *simple* (non‑series) argument | `export emaRight(float src, simple int len) => ta.ema(src,len)` |
-| `series` | Implicit for most variables; rarely needs explicit statement unless contrasting with `simple` | `series float price = close` |
+4. **TERNARY OPERATORS**: Keep the entire ternary expression on a single line:
+   ```pine
+   bandColor = condition1 ? color.green : condition2 ? color.orange : color.red
+   ```
 
-**Rule 1.2:** Prefer implicit typing unless compilation or readability demands explicit keywords.
+5. **FUNCTION PARAMETERS**: When creating functions, put all parameters on the same line:
+   ```pine
+   myFunction(param1, param2, param3) => 
+       // Function body here
+   ```
 
-**Rule 1.3:** Do **not** mix type forms inside the same expression; both branches of a conditional must resolve to the same type & form.
+6. **OBJECT CREATION**: When creating objects (like lines, labels, boxes), put all parameters on a single line:
+   ```pine
+   box.new(x1, y1, x2, y2, bgcolor=color.blue, border_color=color.black, border_width=1)
+   ```
 
-```pine
-// ✅ Correct - same type forms
-result = condition ? 1 : 2
+7. **ARITHMETIC EXPRESSIONS**: Keep complex arithmetic expressions on a single line rather than splitting them:
+   ```pine
+   result = (price1 * weight1 + price2 * weight2) / (weight1 + weight2)
+   ```
 
-// ❌ Error - mixing type forms  
-result = condition ? 1 : 1.0  // int vs float mismatch
-```
+8. **ARRAY OPERATIONS**: Keep array operations on a single line:
+   ```pine
+   array.push(myArray, newValue)
+   ```
 
----
+9. **CONDITIONAL STATEMENTS**: For conditional statements, keep the condition on one line, and use proper indentation for the code block:
+   ```pine
+   if condition
+       statement1
+       statement2
+   ```
 
-## 🔢 Array, Matrix & Map Handling
+## Variable Declaration and Scope
 
-### **Rule 2.1: Array Operations (Enhanced for v6)**
+1. **DECLARE VARIABLES BEFORE USE**: Always declare variables before using them, especially in functions.
+   ```pine
+   // Correct
+   myVar = 0
+   myVar := myVar + 1
+   
+   // Incorrect
+   myVar := myVar + 1  // Error: undeclared identifier
+   ```
 
-```pine
-// ✅ Array creation with explicit typing
-var array<float> buffer = array.new_float(100, na)
-var array<string> symbols = array.new_string(0, "DEFAULT")
+2. **USE CORRECT ASSIGNMENT OPERATORS**: Use `=` for initial assignment and `:=` for reassignment.
+   ```pine
+   // Initial assignment
+   myVar = 10
+   
+   // Reassignment
+   myVar := 20
+   ```
 
-// ✅ v6 Feature: Negative indices for array access
-if array.size(prices) >= 2
-    lastPrice = array.get(prices, -1)      // Last element
-    secondLast = array.get(prices, -2)     // Second to last
+3. **RESPECT VARIABLE SCOPE**: Variables declared in functions can't modify global variables unless using the `export` keyword.
+   ```pine
+   var global = 0
+   
+   myFunction() =>
+       local = 5  // Local variable
+       // Cannot modify global from function without export
+   ```
 
-// ✅ Safe array access pattern
-safeArrayGet(arr, index) =>
-    if array.size(arr) > math.abs(index)
-        array.get(arr, index)
-    else
-        na
-```
+## Function Definition and Usage
 
-**Rule 2.2:** Arrays are **zero‑based** (`array.get(a,0)` is the first element).
+1. **FUNCTION SYNTAX**: Use the `=>` operator for function declarations with proper indentation:
+   ```pine
+   myFunction(param1, param2) =>
+       result = param1 + param2
+       result
+   ```
 
-**Rule 2.3:** Arrays are reference objects; changes through any reference affect the original.
+2. **CHECK FUNCTION PARAMETERS**: Verify the required parameters for built-in functions:
+   ```pine
+   // Correct
+   input.session("0930-1600", "Session")
+   
+   // Incorrect
+   input.time("0930", "Time")  // Wrong parameter type
+   ```
 
-**Rule 2.4:** **ALWAYS** check `array.size()` before reading to avoid runtime errors.
+3. **PROPER RETURN VALUES**: When a function returns multiple values, use array brackets for assignment:
+   ```pine
+   [value1, value2, value3] = myFunction()
+   ```
 
-### **Rule 2.5: Matrix Operations (v6)**
+4. **DEFAULT PARAMETER VALUES**: You can specify default values for function parameters:
+   ```pine
+   myFunction(param1, param2 = 10) =>
+       param1 + param2
+   ```
 
-```pine
-// Matrix creation and operations
-var matrix<float> priceMatrix = matrix.new<float>(rows=3, cols=3, initial_value=0.0)
+## Type System
 
-// Matrix access and modification
-matrix.set(priceMatrix, row=0, col=0, value=close)
-currentPrice = matrix.get(priceMatrix, row=0, col=0)
+1. **RESPECT TYPE CONSTRAINTS**: Always use the correct type when passing arguments to functions.
+   ```pine
+   // Correct
+   ta.change(close)  // close is series float
+   
+   // Incorrect
+   ta.change("string")  // Error: expected series float
+   ```
 
-// Matrix utility operations
-rows = matrix.rows(priceMatrix)
-cols = matrix.columns(priceMatrix)
-```
+2. **USE TYPE ANNOTATIONS**: When declaring arrays or complex variables, use type annotations:
+   ```pine
+   var array<float> myFloats = array.new_float(0)
+   var array<string> myStrings = array.new_string(0)
+   ```
 
-### **Rule 2.6: Map Operations (v6)**
+3. **TYPE CONSISTENCY**: In conditional statements, ensure both branches return the same type:
+   ```pine
+   // Correct
+   x = if close > open
+       close
+   else
+       open
+   
+   // Incorrect (will not compile)
+   y = if close > open
+       close
+   else
+       "open"
+   ```
 
-```pine
-// Map creation and usage
-var map<string, float> symbolPrices = map.new<string, float>()
+## Conditional Statements
 
-// Map operations
-map.put(symbolPrices, "AAPL", 150.0)
-applePrice = map.get(symbolPrices, "AAPL")
-hasApple = map.contains(symbolPrices, "AAPL")
-```
+1. **IF STATEMENT SYNTAX**: Proper indentation is required for if statements:
+   ```pine
+   if condition
+       statement1
+       statement2
+   else if anotherCondition
+       statement3
+       statement4
+   else
+       statement5
+       statement6
+   ```
 
----
+2. **RETURNING VALUES FROM IF**: Use the assignment form to capture the result of if statements:
+   ```pine
+   result = if condition
+       valueIfTrue
+   else
+       valueIfFalse
+   ```
 
-## 📝 Assignment Operators
+3. **NESTED IF STATEMENTS**: You can nest if statements with proper indentation:
+   ```pine
+   if condition1
+       if condition2
+           statement1
+       else
+           statement2
+   else
+       statement3
+   ```
 
-| **Operator** | **Purpose** | **v6 Usage** |
-|--------------|-------------|--------------|
-| `=`  | Initial declaration & assignment | `myVar = 10` |
-| `:=` | Re‑assignment to an already declared identifier | `myVar := 20` |
-| `+=`, `-=`, `*=`, `/=`, `%=` | Compound arithmetic updates; equivalent to `x = x op y` | `myVar += 5` |
+## Version Declaration
 
-**Rule 3.1:** Use `:=` *only* after variable declaration; never for first assignment.
+1. **ALWAYS SPECIFY VERSION**: Always include the version annotation at the top of your script:
+   ```pine
+   //@version=5
+   indicator("My Indicator")
+   ```
 
-```pine
-// ✅ Correct declaration pattern
-myVar = 0        // Initial declaration
-myVar := myVar + 1   // Reassignment
+2. **CORRECT VERSION PLACEMENT**: Place the version annotation at the beginning of your script for readability.
 
-// ❌ Error pattern  
-myVar := myVar + 1   // Error: 'myVar' not declared
-```
+## Session and Time Handling
 
----
-
-## 🔧 Core Language Operators
-
-| **Operator** | **Notes** | **v6 Enhancements** |
-|--------------|-----------|---------------------|
-| `?:` (ternary) | Forms: `test ? a : b`. Chainable for *switch‑like* logic | Short-circuit evaluation improved |
-| `[]` (series subscript) | Access historical values: `close[1]` is previous bar | Consistent with array negative indexing |
-| `+` `-` `*` `/` `%` | Numeric math (element‑wise when inputs are series) | `+` also concatenates strings |
-| `==` `!=` `>` `<` `>=` `<=` | Comparison; returns `bool` / `series<bool>` | Boolean optimization in v6 |
-
-**Rule 4.1:** Zero, `NaN`, ±`Infinity` evaluate as *false* in boolean contexts.
-
-**Rule 4.2:** Use short-circuit evaluation for performance in v6:
-
-```pine
-// ✅ v6 optimized boolean evaluation
-if array.size(myArray) > 0 and array.first(myArray) > 0
-    // array.first() only evaluated if size > 0
-    process(array.first(myArray))
-```
-
----
-
-## 🎨 Function Calls & Parameters
-
-### **Rule 5.1:** Supply arguments in the exact order shown in the official syntax.
-
-```pine
-// ✅ Correct parameter order and types
-line.new(x1, y1, x2, y2, color=color.blue, width=2)
-
-// ✅ v6 Dynamic requests
-symbols = array.from("AAPL", "GOOGL", "MSFT")
+1. **USE PROPER TIME FUNCTIONS**: For session time inputs, use `input.session` instead of `input.time`:
+   ```pine
+   // Correct
+   sessionInput = input.session("0930-1600", "Trading Session")
+   
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
