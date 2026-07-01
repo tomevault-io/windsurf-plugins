@@ -7,11 +7,11 @@ OpenToggl is a free, private-first, AI-friendly alternative to Toggl
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [isyangTo/OpenToggl](https://github.com/isyangTo/OpenToggl).
+Original source: `CLAUDE.md` in [isyangTo/OpenToggl](https://github.com/isyangTo/OpenToggl).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
