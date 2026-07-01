@@ -7,11 +7,11 @@ Obsidian plugin: configurable mind maps / leveled trees rendered live from your 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [kikocastro/markdown-mindmap](https://github.com/kikocastro/markdown-mindmap).
+Original source: `CLAUDE.md` in [kikocastro/markdown-mindmap](https://github.com/kikocastro/markdown-mindmap).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
