@@ -1,117 +1,174 @@
 ---
 trigger: always_on
-description: OrKa is a YAML-first AI agent orchestration framework that enables complex workflows through declarative configuration instead of procedural code. Think CrewAI/LangChain but with YAML configs, built-in intelligent memory, and first-class local LLM support.
+description: Validates answers for correctness and structures them into memory objects with metadata.
 ---
 
-# OrKa AI Agent Orchestration Framework - Copilot Instructions
+# Agent Types in OrKa
 
-## Project Overview
-OrKa is a YAML-first AI agent orchestration framework that enables complex workflows through declarative configuration instead of procedural code. Think CrewAI/LangChain but with YAML configs, built-in intelligent memory, and first-class local LLM support.
+> **Last Updated:** 03 January 2026  
+> **Status:** 🟢 Current  
+> **Related:** [Advanced Agents](agents-advanced.md) | [Extending Agents](extending-agents.md) | [Agent Index](AGENT_NODE_TOOL_INDEX.md) | [INDEX](index.md)
 
-## Core Architecture Patterns
+In OrKa, **agents** are modular processing units that receive input and return structured output — all orchestrated via a declarative YAML configuration.
 
-### 1. Modular Component System
-- **Orchestrator**: Main workflow engine (`orka/orchestrator.py`) uses multiple inheritance mixins
-- **Agent Factory**: Dynamic agent registration via `AGENT_TYPES` registry (`orka/agents/`)
-- **Memory System**: Redis-based persistent memory with decay and semantic search (`orka/memory/`)
-- **CLI Interface**: Multi-command structure via argparse subcommands (`orka/orka_cli.py`)
+Agents can represent different cognitive functions: classification, decision-making, web search, conditional routing, memory management, and more.
 
-### 2. Agent Implementation Patterns
-```python
-# Modern async pattern (preferred)
-class MyAgent(BaseAgent):
-    async def process(self, input_data: str) -> Dict[str, Any]:
-        # Full async/await, timeout control, structured output
-        
-# Legacy sync pattern (backward compatibility)  
-class MyLegacyAgent(LegacyBaseAgent):
-    def process(self, input_data: str) -> str:
-        # Simple synchronous execution
-```
+The OrKa framework uses a unified agent base implementation that supports both modern asynchronous patterns and legacy synchronous patterns for backward compatibility.
 
-### 3. Configuration-First Approach
-All workflows are YAML files with this structure:
+---
+
+## 🧱 Core Agent Types
+
+### � `brain`
+
+Procedural skill memory — learns abstract, transferable skills from LLM reasoning traces and re-applies them across domains.
+
+**Use case:** Cross-domain knowledge transfer, continuous learning, skill accumulation.
+
+**Operations:**
+- `learn` — Extract a transferable skill from an execution trace
+- `recall` — Find applicable skills for a new context
+- `feedback` — Record whether a transferred skill succeeded
+
+**Example config:**
 ```yaml
-orchestrator:
-  id: workflow_name
-  strategy: sequential|parallel  
-  agents: [agent1, agent2, ...]
+- id: brain_learn
+  type: brain
+  operation: learn
+  prompt: "{{ previous_outputs.llm_reasoner }}"
 
-agents:
-  - id: agent_name
-    type: memory|local_llm|openai-gpt-4|search|router|fork|join|loop|graph-scout
-    prompt: "{{ input }} {{ previous_outputs }}"
-    params: {...}
+- id: brain_recall
+  type: brain
+  operation: recall
+  prompt: "{{ previous_outputs.new_context }}"
+
+- id: brain_feedback
+  type: brain
+  operation: feedback
+  prompt: "{{ previous_outputs.brain_recall }}"
 ```
 
-## Critical Development Workflows
+**📖 [Complete Brain Documentation](./BRAIN_SYSTEM_GUIDE.md)**
 
-### Running & Testing
-```bash
-# Start Redis backend (required for memory)
-orka-start
+### �🧭 `graph-scout`
 
-# Run any workflow
-orka run examples/workflow.yml "input text"
+Intelligent workflow graph inspection and optimal multi-agent path execution. GraphScout automatically discovers, evaluates, and executes the best sequence of agents for any given input.
 
-# Run tests with coverage
-# Note: pytest addopts in pyproject enforces >=80% coverage
-pytest --cov=orka --cov-report=term-missing
+**Use case:** Dynamic routing, intelligent workflow orchestration, adaptive agent selection.
 
-# Memory debugging TUI
-orka memory watch
+**Key Features:**
+- **Intelligent Path Discovery**: Automatically finds optimal agent sequences
+- **Memory-Aware Routing**: Positions memory agents optimally (readers first, writers last)
+- **Multi-Agent Execution**: Executes ALL agents in shortlist sequentially
+- **LLM-Powered Evaluation**: Advanced reasoning for path selection
+- **Budget & Safety Control**: Respects token/latency budgets and safety thresholds
+
+**Example config:**
+```yaml
+- id: smart_router
+  type: graph-scout
+  k_beam: 5                # Top-k candidate paths
+  max_depth: 3             # Maximum path depth
+  commit_margin: 0.15      # Confidence threshold
+  cost_budget_tokens: 1000 # Token budget limit
+  latency_budget_ms: 2000  # Latency budget limit
+  safety_threshold: 0.2    # Lower is safer (0.0-1.0)
+  prompt: "Find the best path for: {{ input }}"
 ```
 
-### Task Briefing Checklist
-- Goal and acceptance criteria (Definition of Done)
-- Priority and budget/time constraints
-- Impacted areas/files and API stability requirements
-- Environment details: OS, Python/conda env, RedisStack URL/availability
-- LLM policy: offline-only vs allowed providers/models; API keys availability
-- Reproduction details: logs, failing tests, minimal repro command, expected vs actual
-- Non-functional targets: latency/memory budgets, token limits, parallelism, timeouts
-- Security/compliance: external network allowed/not, secrets handling
-- Testing expectations: unit vs integration, expected coverage impact, flakiness notes
-- Observability requirements: logging, metrics, tracing
-- Release/PR process: branch, commit style, reviewers, changelog note
-- Documentation scope: docs/examples/landing updates required
-- Feature flags/env vars gating the change
+**Decision Types:**
+- `commit_next`: High confidence single path → Execute immediately
+- `shortlist`: Multiple good options → Execute all sequentially  
+- `no_path`: No suitable path → Fallback to response builder
 
-### Agent Development Workflow
-1. Add agent class to `orka/agents/`.
-2. Register the agent:
-  - Preferred: via entry point in `pyproject.toml` under `[project.entry-points."orka.agents"]`.
-  - Legacy: add to `AGENT_TYPES` in `orka/agents/__init__.py` (if still used by the component).
-3. Add example YAML to `examples/` and ensure it is validated by tests.
-4. Add unit tests in `tests/unit/agents/` and integration tests if applicable.
-5. Update documentation in docstrings and docs/ as needed.
+**📖 [Complete GraphScout Documentation](./GRAPH_SCOUT_AGENT.md)**
 
-## Project-Specific Conventions
+### 🔘 `binary`
 
-### Code Structure
-- **Package imports**: Use relative imports within orka package: `from .base_agent import BaseAgent`
-- **Type hints**: Required for all public methods, use `Dict[str, Any]` for agent outputs
-- **Error handling**: Wrap in `OrkaError` or subclasses, never bare exceptions
-- **Async patterns**: Prefer async/await, use `asyncio.timeout()` for timeouts
+Returns a boolean (`"true"` or `"false"` as strings) based on a question or statement.
 
-### Linting, Formatting, and Types
-- Formatting: Black with line-length 100 and Python 3.11 target (configured in pyproject). Run Black before committing.
-- Linting: Flake8 with repo config (max-line-length 100; extend-ignore E203,W503; Google docstrings). Fix or explicitly justify warnings.
-- Comments: keep code self-explanatory; minimize redundant comments. Provide concise docstrings for public modules/classes/functions.
-- Type checking: mypy is permissive in some parts but constantly work to fix this issue on the long term (fix mypy issue if editing the code) most important do not introduce new type errors in typed modules. Add type hints for new public APIs; prefer `TypedDict`/`Protocol` for structured outputs between agents.
+**Use case:** Fact checking, condition validation, flag triggering.
 
-### YAML Configuration Patterns
-- **Template rendering**: Use Jinja2 syntax: `{{ input }}`, `{{ previous_outputs.agent_id }}`
-- **Agent chaining**: Reference previous agents: `{{ get_agent_response('agent_name') }}`
-- **Conditional routing**: Use `router` agent with `routing_map` for branching logic
-- **Parallel execution**: Use `fork` → `join` pattern with group names
+**Example config:**
+```yaml
+- id: is_fact
+  type: binary
+  prompt: >
+    Is the following statement factually accurate? Return TRUE or FALSE.
+  queue: orka:binary_check
+```
 
-### Memory System Usage
-- **Read operations**: `type: memory, operation: read, prompt: "Find: {{ input }}"`
-- **Write operations**: `type: memory, operation: write, prompt: "Store: {{ input }} -> {{ result }}"`
+### 🧾 `classification`
+
+**⚠️ Deprecated** - kept only for backward compatibility.
+
+This agent no longer performs classification and returns `"deprecated"`.
+
+**Use case:** Basic topic detection (legacy support only).
+
+### 🤖 `openai-binary`
+
+Uses OpenAI's LLM to perform binary classification with sophisticated reasoning.
+
+**Use case:** Complex true/false decisions requiring natural language understanding.
+
+**Example config:**
+```yaml
+- id: content_appropriate
+  type: openai-binary
+  prompt: >
+    Is this content appropriate for a professional environment?
+    Content: {{ input }}
+  queue: orka:moderation
+```
+
+### 🎯 `openai-classification`
+
+Uses OpenAI's LLM to classify input into multiple predefined categories.
+
+**Use case:** Advanced topic classification, sentiment analysis, content categorization.
+
+**Example config:**
+```yaml
+- id: domain_classifier
+  type: openai-classification
+  prompt: >
+    Classify this question into one of the following domains:
+  options: [science, geography, history, technology, general]
+  queue: orka:classify
+```
+
+### 📝 `openai-answer`
+
+Builds comprehensive answers using OpenAI's LLM, typically enriched with context from previous agents.
+
+**Use case:** Question answering, content generation, summarization.
+
+**Example config:**
+```yaml
+- id: answer_builder
+  type: openai-answer
+  prompt: |
+    Based on the search results: {{ previous_outputs.web_search }}
+    And classification: {{ previous_outputs.classifier }}
+    Provide a comprehensive answer to: {{ input }}
+  queue: orka:answer
+```
+
+### 🏠 `local_llm`
+
+Interfaces with locally running large language models (Ollama, LM Studio, etc.) for privacy-preserving AI processing.
+
+**Use case:** Offline processing, privacy-sensitive applications, custom model deployment.
+
+**Supported Providers:**
+- `ollama`: Native Ollama API
+- `lm_studio`: LM Studio OpenAI-compatible endpoint
+- `openai_compatible`: Any OpenAI-compatible API
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [marcosomma/orka-reasoning](https://github.com/marcosomma/orka-reasoning) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-19 -->
+<!-- tomevault:4.0:windsurf_rules:2026-06-29 -->
