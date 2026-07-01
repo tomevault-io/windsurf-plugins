@@ -1,112 +1,154 @@
 ---
 trigger: always_on
-description: This document distills essential language facts and best‑practice rules directly from TradingView's official `pinescript.json` specification. Use it as a quick‑reference checklist when coding in Pine Script v5.
+description: *Enhanced with Pine Script v6 Extension analysis and [TradingView Pine Script v6 Reference](https://www.tradingview.com/pine-script-reference/v6/)*
 ---
 
-# Pine Script Rules (Derived from pinescript.json)
+# Enhanced Pine Script v6 Rules 
 
-This document distills essential language facts and best‑practice rules directly from TradingView's official `pinescript.json` specification. Use it as a quick‑reference checklist when coding in Pine Script v5.
-
----
-
-## 1 Type Keywords & Forms
-
-| Keyword | Meaning / Usage Rule |
-|---------|----------------------|
-| `int`, `float`, `bool`, `string`, `color` | Explicitly declare base types when clarity is needed or when initializing with `na`. |
-| `line`, `label`, `box`, `table`, `linefill`, `polyline`, `chart.point` | Declare object IDs returned by their respective `*.new()` functions. Always **series form**. |
-| `array<type>` or `type[]` | Declare an array holding elements of `type`. Example: `array<float> myFloats = array.new_float()` |
-| `simple` | Use in **exported library functions** to demand a *simple* (non‑series) argument, e.g. `emaRight(float src, simple int len) => ta.ema(src,len)` |
-| `series` | Implicit for most variables; rarely needs to be stated explicitly unless contrasting with `simple`. |
-
-**Rule 1.1** Prefer implicit typing unless compilation or readability demands explicit keywords.
-
-**Rule 1.2** Do **not** mix type forms inside the same expression; both branches of a conditional must resolve to the same type & form.
+*Enhanced with Pine Script v6 Extension analysis and [TradingView Pine Script v6 Reference](https://www.tradingview.com/pine-script-reference/v6/)*
 
 ---
 
-## 2 Array Handling
+## 🎯 Core Type System & Forms
 
-1. **Creation**: Use the family of `array.new_<type>(size, initial_value)` functions. The `size` and `initial_value` arguments are optional.
-   ```pine
-   var array<float> buf = array.new_float(100, na)
-   ```
-2. **Indexing**: Arrays are **zero‑based** (`array.get(a,0)` is the first element).
-3. **Mutability**: Arrays are reference objects; changes through any reference affect the original.
-4. **Size Constants**: `size.auto | tiny | small | normal | large | huge` can be passed as the `size` argument.
-5. **Common Ops**:
-   • `array.push`, `array.pop`
-   • `array.shift`, `array.unshift`
-   • `array.sort`, `array.sum`, `array.slice`
-6. **Rule 2.1** Always check `array.size()` before reading to avoid runtime errors.
+### **Rule 1.1: Type Keywords & Forms**
 
----
+| **Keyword** | **Meaning / Usage Rule** | **v6 Examples** |
+|-------------|--------------------------|-----------------|
+| `int`, `float`, `bool`, `string`, `color` | Explicitly declare base types when clarity needed or when initializing with `na` | `int myVar = na` |
+| `line`, `label`, `box`, `table`, `linefill`, `polyline`, `chart.point` | Declare object IDs returned by their respective `*.new()` functions. Always **series form** | `polyline pl = polyline.new()` |
+| `array<type>` or `type[]` | Declare an array holding elements of `type` | `array<float> arr = array.new_float()` |
+| `matrix<type>` | Declare a 2D matrix of elements | `matrix<float> mx = matrix.new<float>(3,3)` |
+| `map<keyType, valueType>` | Declare key-value map structure | `map<string, float> prices = map.new<string, float>()` |
+| `simple` | Use in **exported library functions** to demand a *simple* (non‑series) argument | `export emaRight(float src, simple int len) => ta.ema(src,len)` |
+| `series` | Implicit for most variables; rarely needs explicit statement unless contrasting with `simple` | `series float price = close` |
 
-## 3 Assignment Operators
+**Rule 1.2:** Prefer implicit typing unless compilation or readability demands explicit keywords.
 
-| Operator | Purpose |
-|----------|---------|
-| `=`  | Initial declaration & assignment. |
-| `:=` | Re‑assignment to an already declared identifier. |
-| `+=`, `-=`, `*=`, `/=`, `%=` | Compound arithmetic updates; equivalent to `x = x op y`. |
+**Rule 1.3:** Do **not** mix type forms inside the same expression; both branches of a conditional must resolve to the same type & form.
 
-**Rule 3.1** Use `:=` *only* after variable declaration; never for first assignment.
-
----
-
-## 4 Core Language Operators
-
-| Operator | Notes |
-|----------|-------|
-| `?:` (ternary) | Forms: `test ? a : b`. Chainable for *switch‑like* logic. Zero, `NaN`, ±`Infinity` evaluate as *false*. |
-| `[]` (series subscript) | Access historical values: `close[1]` is previous bar. `expr2` must be numeric; floats are floored. |
-| `+` `-` `*` `/` `%` | Numeric math (element‑wise when inputs are series). `+` also concatenates strings. |
-| `==` `!=` `>` `<` `>=` `<=` | Comparison; returns `bool` / `series<bool>`. |
-
----
-
-## 5 Function Calls & Parameters
-
-1. **Required vs Optional**: Optional parameters have defaults defined in the spec; omit them rather than passing `na` unless function expects it.
-2. **Allowed Types**: Check `allowedTypeIDs` in the spec to ensure correct form (`series int`, `simple float`, etc.).
-3. **Rule 5.1** Supply arguments in the exact order shown in the official syntax.
-
-Example:
 ```pine
-line.new(x1, y1, x2, y2, color=color.blue, width=2)
+// ✅ Correct - same type forms
+result = condition ? 1 : 2
+
+// ❌ Error - mixing type forms  
+result = condition ? 1 : 1.0  // int vs float mismatch
 ```
 
 ---
 
-## 6 Object Lifecycle
+## 🔢 Array, Matrix & Map Handling
 
-1. **Creation**: `line.new`, `label.new`, `box.new`, `table.new`, `linefill.new`, `polyline.new` return object IDs.
-2. **Deletion**: Use the corresponding `.delete(id)` method to avoid memory leaks on realtime bars.
-3. **Rule 6.1** Guard `.delete()` calls with `barstate.islastconfirmedhistory` when cleaning up batch objects.
+### **Rule 2.1: Array Operations (Enhanced for v6)**
+
+```pine
+// ✅ Array creation with explicit typing
+var array<float> buffer = array.new_float(100, na)
+var array<string> symbols = array.new_string(0, "DEFAULT")
+
+// ✅ v6 Feature: Negative indices for array access
+if array.size(prices) >= 2
+    lastPrice = array.get(prices, -1)      // Last element
+    secondLast = array.get(prices, -2)     // Second to last
+
+// ✅ Safe array access pattern
+safeArrayGet(arr, index) =>
+    if array.size(arr) > math.abs(index)
+        array.get(arr, index)
+    else
+        na
+```
+
+**Rule 2.2:** Arrays are **zero‑based** (`array.get(a,0)` is the first element).
+
+**Rule 2.3:** Arrays are reference objects; changes through any reference affect the original.
+
+**Rule 2.4:** **ALWAYS** check `array.size()` before reading to avoid runtime errors.
+
+### **Rule 2.5: Matrix Operations (v6)**
+
+```pine
+// Matrix creation and operations
+var matrix<float> priceMatrix = matrix.new<float>(rows=3, cols=3, initial_value=0.0)
+
+// Matrix access and modification
+matrix.set(priceMatrix, row=0, col=0, value=close)
+currentPrice = matrix.get(priceMatrix, row=0, col=0)
+
+// Matrix utility operations
+rows = matrix.rows(priceMatrix)
+cols = matrix.columns(priceMatrix)
+```
+
+### **Rule 2.6: Map Operations (v6)**
+
+```pine
+// Map creation and usage
+var map<string, float> symbolPrices = map.new<string, float>()
+
+// Map operations
+map.put(symbolPrices, "AAPL", 150.0)
+applePrice = map.get(symbolPrices, "AAPL")
+hasApple = map.contains(symbolPrices, "AAPL")
+```
 
 ---
 
-## 7 `na` Handling
+## 📝 Assignment Operators
 
-- `na` is valid for **all** base types; for arrays use `na` or omit `initial_value`.
-- Use `nz(value, replacement)` when substituting `na` values safely.
+| **Operator** | **Purpose** | **v6 Usage** |
+|--------------|-------------|--------------|
+| `=`  | Initial declaration & assignment | `myVar = 10` |
+| `:=` | Re‑assignment to an already declared identifier | `myVar := 20` |
+| `+=`, `-=`, `*=`, `/=`, `%=` | Compound arithmetic updates; equivalent to `x = x op y` | `myVar += 5` |
+
+**Rule 3.1:** Use `:=` *only* after variable declaration; never for first assignment.
+
+```pine
+// ✅ Correct declaration pattern
+myVar = 0        // Initial declaration
+myVar := myVar + 1   // Reassignment
+
+// ❌ Error pattern  
+myVar := myVar + 1   // Error: 'myVar' not declared
+```
 
 ---
 
-## 8 Best‑Practice Checklist (Quick‑Fire)
+## 🔧 Core Language Operators
 
-- [ ] Script begins with `//@version=5` + `indicator()` or `strategy()`.
-- [ ] One statement per line; no backslash continuations.
-- [ ] Variables declared before use; correct `=` vs `:=`.
-- [ ] Array indices checked via `array.size()`.
-- [ ] All ternary branches return the same type & form.
-- [ ] Objects created on historical bars cleaned on `barstate.islastconfirmedhistory`.
-- [ ] No compilation warnings in the Pine editor.
+| **Operator** | **Notes** | **v6 Enhancements** |
+|--------------|-----------|---------------------|
+| `?:` (ternary) | Forms: `test ? a : b`. Chainable for *switch‑like* logic | Short-circuit evaluation improved |
+| `[]` (series subscript) | Access historical values: `close[1]` is previous bar | Consistent with array negative indexing |
+| `+` `-` `*` `/` `%` | Numeric math (element‑wise when inputs are series) | `+` also concatenates strings |
+| `==` `!=` `>` `<` `>=` `<=` | Comparison; returns `bool` / `series<bool>` | Boolean optimization in v6 |
+
+**Rule 4.1:** Zero, `NaN`, ±`Infinity` evaluate as *false* in boolean contexts.
+
+**Rule 4.2:** Use short-circuit evaluation for performance in v6:
+
+```pine
+// ✅ v6 optimized boolean evaluation
+if array.size(myArray) > 0 and array.first(myArray) > 0
+    // array.first() only evaluated if size > 0
+    process(array.first(myArray))
+```
 
 ---
 
-### Reference Links
-These rules are summarized from TradingView's official `pinescript.json` API description file (v5). For exhaustive details consult the in‑platform **Pine Script™ Reference Manual**. 
+## 🎨 Function Calls & Parameters
+
+### **Rule 5.1:** Supply arguments in the exact order shown in the official syntax.
+
+```pine
+// ✅ Correct parameter order and types
+line.new(x1, y1, x2, y2, color=color.blue, width=2)
+
+// ✅ v6 Dynamic requests
+symbols = array.from("AAPL", "GOOGL", "MSFT")
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [tradesdontlie/pinescript-development-workspace](https://github.com/tradesdontlie/pinescript-development-workspace) — distributed by [TomeVault](https://tomevault.io).
