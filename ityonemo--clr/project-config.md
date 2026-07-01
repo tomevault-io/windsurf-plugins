@@ -1,111 +1,132 @@
 ---
 trigger: always_on
-description: - `zig/` - Zig compiler submodule (DO NOT MODIFY - all changes must be non-AI)
+description: CLR is a Zig-based static analysis plugin for a forked Zig compiler. The plugin
 ---
 
-# CLR Project
+# AGENTS.md
 
-## Project Structure
+## Project Overview
 
-- `zig/` - Zig compiler submodule (DO NOT MODIFY - all changes must be non-AI)
+CLR is a Zig-based static analysis plugin for a forked Zig compiler. The plugin
+emits `.air.zig` analyzer programs from Zig AIR, and the runtime library in
+`lib/` executes those analyzers to detect memory safety, undefined-value, null,
+variant, fieldParentPtr, and file-descriptor issues.
 
-## Build Commands
+## Important Directories
 
-- `zig/b` - Builds the custom Zig compiler (uses `zig build --zig-lib-dir lib`)
-- `zig/z` - Runs the custom Zig compiler from `zig-out/bin/zig`
-- `zig build -Doptimize=ReleaseFast` - Builds libclr.so (the AIR plugin) **IMPORTANT: Always use ReleaseFast unless you need to do advanced debugging and you have recompiled Zig to be in a different mode**
-- `zig build test` - Runs unit tests for libclr
-- `./run_integration.sh` - Runs BATS integration tests
-- `./run_one.sh <test_file>` - Run a single test case (generates `.air.zig` file in project root)
-- `./dump_air.sh <source_file> <function_name> [num_lines]` - Dump AIR for a specific function
-- `./clear.sh` - Clean up generated `.air.zig` files and other build artifacts
+- `src/`: compiler plugin and AIR-to-Zig code generation.
+- `lib/`: runtime analysis library used by generated analyzers.
+- `lib/analysis/`: individual safety analyses and their focused tests.
+- `test/cases/`: Zig input programs used by integration tests.
+- `test/integration/`: BATS integration tests.
+- `zig/`: forked Zig compiler submodule. Do not modify unless explicitly asked.
+- `vendor/`: vendored validation projects and external inputs.
 
-### Debugging AIR
+## Build And Test Commands
 
-To view the raw AIR for a function:
+- Build plugin: `zig build -Doptimize=ReleaseFast`
+- Codegen/plugin tests: `zig build test`
+- Runtime library tests: `zig test lib/lib.zig`
+- Single test case: `./run_one.sh test/cases/path/to/case.zig`
+- Integration test file: `bats test/integration/name.bats`
+- Full integration suite: `./run_integration.sh`
+- Clean generated analyzer files: `./clear.sh`
+
+Use `ReleaseFast` by default. The vendored Zig compiler and `libclr.so` must be
+built with matching optimization modes or plugin loading may crash.
+
+## Development Workflow
+
+For bug fixes and new analysis behavior:
+
+1. Add or identify a failing test before changing implementation code.
+2. Prefer a focused unit test in `lib/analysis/*_test.zig` or
+   `src/codegen_test.zig` when the bug is localized.
+3. Add a minimal Zig case under `test/cases/`.
+4. Add BATS coverage under the appropriate `test/integration/*.bats` file.
+5. Fix the implementation in `lib/`, `src/`, or both.
+6. Run the narrowest relevant tests first.
+7. Run the full integration suite once before committing broad changes.
+8. Document completed fixes in `FIXES_LOG.md`.
+
+Do not delete, skip, or weaken integration tests to make the suite pass without
+explicit permission. Investigate failures instead of assuming they are
+pre-existing.
+
+## Debugging Generated Analyzers
+
+`./run_one.sh` generates a root-level `.air.zig` file. After generation, run it
+directly for faster iteration:
+
 ```sh
-./dump_air.sh test/cases/undefined/basic/assigned_before_use.zig assigned_before_use.main 40
+zig run --dep clr -Mroot=name.air.zig -Mclr=lib/lib.zig
 ```
 
-This shows the instruction indices, tags, and nesting structure. Block bodies may have indices that are **higher** than post-block instructions (e.g., block at %10 may contain %16-%23, while %11-%15 come after the block).
+It is acceptable to temporarily instrument generated `.air.zig` files while
+debugging. They are ignored by git and can be removed with `./clear.sh`.
 
-**IMPORTANT**: Do NOT use `-femit-air` or `--verbose-air` flags directly. The main Zig compiler is built in ReleaseFast mode which strips AIR emission support. Always use `./dump_air.sh` which uses a debug-mode Zig build.
-
-## Testing
-
-### Unit Tests
-
-There are TWO sets of unit tests in different locations:
-
-**1. Codegen/DLL tests (`src/`)** - Run with:
-```sh
-zig build test
-```
-These test the code generation and DLL infrastructure.
-
-**2. Runtime library tests (`lib/`)** - Run with:
-```sh
-zig test lib/lib.zig
-```
-These test the runtime analysis logic (tag handlers, memory_safety, undefined tracking).
-
-**IMPORTANT**: `zig build test` only runs `src/` tests. Always run BOTH when modifying analysis logic.
-
-### Integration Tests (BATS)
-
-Integration tests use [BATS](https://github.com/bats-core/bats-core) (Bash Automated Testing System).
+For raw AIR around a function, use:
 
 ```sh
-# Install BATS (if needed)
-sudo apt install bats  # Ubuntu/Debian
-brew install bats-core # macOS
-
-# Run all integration tests
-./run_integration.sh
-
-# Run a single test file
-bats test/integration/allocator.bats
-
-# Run tests matching a pattern
-bats test/integration/allocator.bats -f "double-free"
+./dump_air.sh test/cases/path/to/case.zig function.name 80
 ```
 
-**Performance Note**: Full integration tests take ~7 minutes to run. Only run `./run_integration.sh` before commits. During development, use targeted testing:
-- `./run_one.sh <test_file>` - Test a single case quickly
-- `bats test/integration/<file>.bats -f "pattern"` - Run specific tests by pattern
-- `bats test/integration/<file>.bats` - Run one test file
+Do not use `-femit-air` or `--verbose-air` directly; use the helper scripts.
 
-**Avoid Redundant Test Runs**: When verifying a feature works:
-1. Use `./run_one.sh <test_file>` ONCE to check the output
-2. If it works, you're done - don't re-run with BATS or other methods
-3. Don't run the same test multiple ways (run_one.sh, then bats, then run_one.sh again)
-4. Trust the first result unless you changed code between runs
+## Coding Guidelines
 
-**Integration Test Efficiency**: The full test suite is expensive (~7 min). Follow these rules:
-1. Run `./run_integration.sh` only ONCE per feature, right before committing
-2. If the output shows all tests as "ok", they passed - don't re-run to "verify"
-3. **NEVER pipe `./run_integration.sh` to `| tail`, `| head`, `| grep`, etc.** - this wastes the full test run. Instead, use tee to capture and display: `./run_integration.sh 2>&1 | tee /tmp/integration_results.txt; echo "Exit code: $?"`
-4. If you need to check a specific test, use `./run_one.sh` or `bats -f "pattern"` instead of the full suite
-5. NEVER run the full integration suite multiple times in a row for the same set of changes
+- Match existing Zig style and local helper APIs.
+- Keep changes scoped to the affected analysis or codegen path.
+- Avoid broad refactors while fixing a specific false positive or false
+  negative.
+- Commit messages should indicate the commit content contains code written by
+  Codex.
+- Treat `.air.zig` files, `.zig-cache/`, and `zig-out/` as generated artifacts.
+- Do not modify `zig/` unless the task explicitly requires compiler changes.
+- Do not change runtime data-structure types in `lib/` without asking first.
+  This includes adding fields or union/enum cases to analysis state,
+  `Refinements` entities, `Analyte`, `Inst`, or other shared runtime structures.
+  Prefer using existing state representations and stdlib boundary overrides when
+  they fit the compiler-enforced Zig type shape.
+- Be careful with dirty worktrees; preserve user changes and avoid reverting
+  unrelated files.
 
-**Note**: Integration tests are expected to fail during development (the CLR runtime is incomplete). However, if the tests fail due to **compilation errors in the emitted .air.zig analyzer**, that indicates a real problem in codegen that needs to be fixed.
+## Memory Safety Model
 
-**Important**: Always run BATS from the project root directory. The test helper uses relative paths from its location to find the compiler, libclr.so, and test cases.
+Zig-CLR memory analysis is provenance and safety tracking, not Rust-style
+single-owner transfer. More than one value or code path may refer to the same
+allocation root GID. When any path marks that allocation freed, the ambiguous
+safety state collapses around that root and later access/free/leak checks should
+use that state. Aliasing will be tracked separately.
 
-**CRITICAL**: NEVER materially modify, comment out, or skip integration tests to make the test suite pass without permission. Failing tests are intentional - they serve as reminders of work to be done. If a test fails, fix the codegen or runtime - not the test. Minor updates like fixing line numbers after test file changes are fine. Integration tests should simply call `compile_and_run` and check the result.
+- Treat the allocation root GID as the allocation identity.
+- Use `allocator_gid` only for allocator mismatch detection.
+- Do not model allocation responsibility as exclusive ownership transfer.
+- Do not copy a pointer value's `.to` target across `Refinements` tables.
+  Cross-table operations may merge/import structure, but pointer values should
+  point only at GIDs that already exist in their destination table.
+- `ptr_add` and `ptr_sub` both produce derived pointers into the same region.
+  Neither operation proves that a pointer has returned to the allocation base.
+  Freeing memory through such a derived pointer should remain invalid unless an
+  explicit future retag feature, or an internal CLR stdlib override for a known
+  Zig stdlib pattern, reestablishes base-allocation provenance. Pointer
+  arithmetic must operate on a pointer-to-region; non-pointer or single-item
+  pointer inputs should produce a clear analysis error.
 
-**CRITICAL**: NEVER delete, disable, skip, or remove integration tests without explicit permission. If a test is failing:
-1. Fix the underlying bug in codegen or runtime
-2. If the test cannot be fixed yet, ask before skipping it
-3. Skipped tests MUST have a comment explaining why and reference to tracking issue/doc
+## Test Expectations
 
-**CRITICAL**: Do NOT dismiss or report integration test failures as "pre-existing" without verification. When tests fail:
-1. Investigate whether your changes caused the failure
-2. If uncertain, check git history or ask the user
-3. Never assume a failure existed before your changes - investigate properly
+`zig build test` only covers `src/` tests. When changing runtime analysis logic,
+also run `zig test lib/lib.zig`.
+
+Integration tests should assert exit status, error type, function name, source
+location, and relevant context messages where applicable.
+
+## Current Baseline And Risks
+
+The integration baseline after allocator provenance, call-return, test
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [ityonemo/clr](https://github.com/ityonemo/clr) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-18 -->
+<!-- tomevault:4.0:windsurf_rules:2026-06-29 -->
