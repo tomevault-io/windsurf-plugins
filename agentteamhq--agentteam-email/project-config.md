@@ -1,0 +1,154 @@
+---
+trigger: always_on
+description: Agents must keep `AGENTS.md` limited to durable workflows and read or update the
+---
+
+# Agent Requirements
+
+## Documentation
+
+Agents must keep `AGENTS.md` limited to durable workflows and read or update the
+owning documentation before changing documented behavior.
+
+Agents must not edit any `AGENTS.md` file without explicit current-task approval
+for that specific file.
+
+Before work involving authentication, authorization, Better Auth, credentials,
+encryption, sessions, cookies, API keys, tokens, JWT, OAuth, JWKS, secret
+storage, security-sensitive routes, or anything that could be security related,
+agents must stop, read [SECURITY.md](SECURITY.md), and follow it.
+
+## Open Source Boundary
+
+This repository is open source. Repository files must not contain secrets,
+private operational context, private hostnames, private repository names,
+credentials, tokens, absolute paths, or paths that resolve outside the
+repository root.
+
+Every path written into a repository file must be relative to the repository
+root.
+
+Agents must not write developer-machine, worktree-specific, temporary-checkout,
+or local-clone paths into repository files. Do not include the output of
+`git rev-parse --show-toplevel` in committed content.
+
+When the repository root is unclear, agents must run
+`git rev-parse --show-toplevel` to identify it, verify the target path is inside
+that root, and write only the repository-root-relative path.
+
+## Standards And Structured Formats
+
+Standard, protocol, common-format, and syntax-governed functionality must use
+purpose-built structured APIs from well-supported canonical packages.
+
+This applies to all repository code and workflows, including application code,
+tests, scripts, probes, diagnostics, harnesses, generators, containers, and
+tooling.
+
+Agents must not hand-roll behavior covered by this rule. If the required package
+is unavailable, agents must stop and request approval to add it or request an
+explicit exception.
+
+## Type Ownership
+
+Agents must preserve strict types from their owning source instead of redefining
+or weakening them locally.
+
+Code must import upstream package types, generated contract types, or exported
+workspace types from the owning package.
+
+## Authorization
+
+Permissions must be modeled as strict backend-owned TypeScript/Zod contracts and
+enforced through CASL Ability.
+
+Each protected domain object must have its own typed permission schema, CASL
+subject, ability builder, and helper surface when its authorization semantics
+differ.
+
+Frontend labels, Storybook fixtures, OAuth scopes, and ad hoc booleans must not
+define or enforce permission semantics.
+
+## Generated Outputs
+
+Generated outputs must not be manually edited. Agents must update the owning
+source, configuration, or inputs and rerun the process that generates them.
+
+## Definitions And Defaults
+
+Definitions must have one owner.
+
+Consumers must read, reference, derive from, or generate from the owning
+definition.
+
+Required inputs must fail fast with clear errors when missing or invalid.
+
+Defaults must live only in the owning configuration surface.
+
+## Build And Tasks
+
+Agents must use [SETUP.md](SETUP.md) for checkout setup, `WT` worktree identity,
+repo-managed tool installation, and validation command selection.
+
+Before adding or changing containerized workflows, agents must follow
+[SETUP.md](SETUP.md) instructions.
+
+Node and frontend workflows must use Corepack-managed `pnpm` scripts from the
+relevant package.
+
+Root `mise.toml` owns shared tool pins, repo-wide workflows, and broad aggregate
+tasks; scoped app, chart, docs, and test-container workflows are owned by the
+nearest relevant `mise.toml` and invoked with explicit monorepo task paths.
+
+Root `package.json` owns workspace-wide Node workflows; app-specific and
+test-container-specific Node commands live in the owning package and are invoked
+through package filters or the owning `mise` task.
+
+Canonical formatting, build, test, typecheck, lint, dependency, and runtime
+failures must be triaged through the failing workflow.
+
+Direct tool invocations are allowed for debugging, diagnosis, or workflows that
+are not owned by a package script or `mise` task.
+
+## Database
+
+Database schema changes must start in the owning schema package.
+
+Migration or schema generation must be run only through the canonical package
+workflow and only when the current task authorizes generation.
+
+## Dependencies
+
+Dependency changes must follow `PEER-DEPS.md`.
+
+Installing a package requires current-task approval for that specific package.
+
+The root `pnpm-workspace.yaml` owns workspace package boundaries, catalogs, peer
+rules, package-manager strictness, and minimum release age.
+
+DO NOT EDIT `.pnpmfile.cjs` WITHOUT EXPLICIT CURRENT-TASK APPROVAL.
+
+Dependency versions must be exact except where `PEER-DEPS.md` defines a peer or
+workspace protocol.
+
+`pnpm-lock.yaml` and install artifacts must be maintained by normal `pnpm
+install` from the repo root.
+
+Cross-package imports must use the referenced package's declared public exports.
+
+## Runtime And Environment
+
+Shared code must receive environment-specific origins, ports, credentials,
+storage paths, providers, and debug behavior through explicit configuration.
+
+Local database, mail, container, deploy, and service runtime workflows must use
+the repo-owned task or script that owns that lifecycle.
+
+## Testing
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [agentteamhq/agentteam-email](https://github.com/agentteamhq/agentteam-email) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-06-30 -->
