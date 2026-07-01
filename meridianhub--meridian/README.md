@@ -7,11 +7,11 @@ Meridian is a Transaction Integrity Engine
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [meridianhub/meridian](https://github.com/meridianhub/meridian).
+Original source: `CLAUDE.md` in [meridianhub/meridian](https://github.com/meridianhub/meridian).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
