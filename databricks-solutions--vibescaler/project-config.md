@@ -1,6 +1,6 @@
 ---
 trigger: always_on
-description: when running python commands or python executables like pytest use  `uv run python ...` or `uv run <cmd>`
+description: When running things like unit tests, e2e tests, migrations, first look for a corresponding just recipe @justfile
 ---
 
 ---
