@@ -1,328 +1,370 @@
 ---
 trigger: always_on
-description: - 新无人机通过 `spawn_drone(function)` 生成
+description: 本文档详细说明了 The Farmer Was Replaced 游戏中所有排行榜挑战的规则、目标和起始条件。
 ---
 
-# TFWR 游戏机制详解
+# TFWR 排行榜挑战规则
 
-## 巨型农场（Megafarm）- 多无人机系统
+本文档详细说明了 The Farmer Was Replaced 游戏中所有排行榜挑战的规则、目标和起始条件。
 
-### 基础概念
-- 允许使用多架无人机同时工作
-- 每架无人机运行独立的程序
-- 新无人机通过 `spawn_drone(function)` 生成
-- 无人机之间不会碰撞
+## 📋 排行榜类别概览
 
-### 无人机管理函数
+### 主要挑战
+1. **最快重置** (Fastest_Reset) - 从零开始自动化整个游戏
+2. **迷宫** (Maze) - 收获大量金币
+3. **恐龙** (Dinosaur) - 收获大量骨头
+
+### 资源挑战（多无人机）
+4. **仙人掌** (Cactus)
+5. **向日葵** (Sunflowers)
+6. **南瓜** (Pumpkins)
+7. **木材** (Wood)
+8. **胡萝卜** (Carrots)
+9. **干草** (Hay)
+
+### 单无人机挑战
+10. **迷宫（单）** (Maze_Single)
+11. **仙人掌（单）** (Cactus_Single)
+12. **向日葵（单）** (Sunflowers_Single)
+13. **南瓜（单）** (Pumpkins_Single)
+14. **木材（单）** (Wood_Single)
+15. **胡萝卜（单）** (Carrots_Single)
+16. **干草（单）** (Hay_Single)
+
+---
+
+## 🏆 主要挑战
+
+### 1. 最快重置 (Leaderboards.Fastest_Reset)
+
+#### 挑战目标
+从一块空白农田开始，实现游戏完全自动化，直到再次解锁排行榜功能。
+
+#### 起始条件
 ```python
-# 生成新无人机
-drone = spawn_drone(drone_function)
-
-# 获取无人机数量上限
-max_count = max_drones()
-
-# 获取当前无人机数量
-current_count = num_drones()
-
-# 等待无人机完成
-result = wait_for(drone)
-
-# 检查无人机是否完成（不等待）
-if has_finished(drone):
-    pass
+# 初始状态
+unlocks = {}  # 没有任何解锁
+items = {}    # 没有任何物品
+seed = -1     # 随机种子
 ```
 
-### 生成无人机示例
+#### 成功条件
 ```python
-# 示例1：简单的列收割
-def harvest_column():
-    for _ in range(get_world_size()):
-        harvest()
-        move(North)
-
-while True:
-    if spawn_drone(harvest_column):
-        move(East)
-    else:
-        break  # 无法生成更多无人机
-
-# 示例2：传递不同参数
-for dir in [North, East, South, West]:
-    def task():
-        move(dir)
-        do_a_flip()
-    spawn_drone(task)
+num_unlocked(Unlocks.Leaderboard) > 0
 ```
 
-### 实用模式：并行 for_all
+#### 函数调用
 ```python
-# 在整个农场上并行执行函数
-def for_all(f):
-    def row():
-        for _ in range(get_world_size()-1):
-            f()
-            move(East)
-        f()
-    
-    for _ in range(get_world_size()):
-        if not spawn_drone(row):
-            row()  # 如果无法生成无人机，自己执行
-        move(North)
-
-# 使用示例
-for_all(harvest)
+leaderboard_run(Leaderboards.Fastest_Reset, filename, speedup)
 ```
 
-### 条件生成模式
+#### 等效模拟
 ```python
-# 如果有可用无人机就生成，否则自己执行
-if not spawn_drone(task):
-    task()
+unlocks = {}
+items = {}
+globals = {}
+seed = -1  # 负数表示随机种子
+simulate(filename, unlocks, items, globals, seed, speedup)
 ```
 
-### 重要限制
+#### 策略提示
+- 不必解锁全部内容，只需尽快解锁 `Unlocks.Leaderboard`
+- 使用 `num_unlocked(unlock) > 0` 检查某项是否已解锁
+- 使用 `get_cost(unlock)` 查看解锁成本
+- 自动化资源收集以满足解锁需求
+- 优先解锁关键功能：循环、函数、感知、扩展
 
-#### 1. 内存隔离与共享（已验证）
+---
 
-**基本规则：通过闭包捕获的变量会被复制，无人机间不共享**
+### 2. 迷宫 (Leaderboards.Maze)
 
+#### 挑战目标
+从解锁全部内容开始，尽快收获 **9,863,168** 份金币。这是重复使用一个 32×32 迷宫 300 次所能获得的金币数量。
+
+#### 起始条件
 ```python
-# ❌ 错误：无人机不共享全局变量
-x = 0
-
-def increment():
-    global x
-    x += 1
-
-wait_for(spawn_drone(increment))
-print(x)  # 仍然是 0！无人机修改了自己的副本
-
-# ❌ 错误：列表也不共享（会被复制）
-shared_list = [0, 0, 0]
-
-def modify_list():
-    shared_list[0] = 100  # 只修改副本，不影响原列表
-
-drone = spawn_drone(modify_list)
-wait_for(drone)
-print(shared_list)  # 仍然是 [0, 0, 0]！
+unlocks = Unlocks  # 所有解锁项（最高级）
+items = {
+    Items.Weird_Substance: 1000000000,  # 大量奇异物质
+    Items.Power: 1000000000              # 大量能量
+}
+seed = -1
 ```
 
-**高级技巧：通过 wait_for() 实现共享内存（重大发现！）**
-
-多个无人机可以通过 `wait_for()` 同一个源无人机来获取**共享的引用类型对象**！
-
+#### 成功条件
 ```python
-# ✅ 共享内存模式：创建共享数据源
-def create_shared():
-    return []  # 返回一个列表
-
-source = spawn_drone(create_shared)
-
-# 多个工作者通过 wait_for 获取同一个列表引用
-def worker():
-    data = wait_for(source)  # 所有 worker 获得同一个列表！
-    data.append(num_drones())  # 修改会相互可见
-    print(num_drones(), data)
-
-# 启动多个工作者
-for i in range(5):
-    spawn_drone(worker)
-    do_a_flip()
-
-# 输出示例：
-# 2 [2]
-# 3 [2,3]
-# 4 [2,3,4]
-# 5 [2,3,4,5]
-# 6 [2,3,4,5,6]
-# 证明：所有 worker 共享同一个列表！
+num_items(Items.Gold) >= 9863168
 ```
 
-**共享字典示例（更实用）**
-
+#### 函数调用
 ```python
-# 创建共享统计字典
-def create_stats():
-    return {
-        "grass": 0,
-        "trees": 0,
-        "total": 0
-    }
-
-stats_source = spawn_drone(create_stats)
-
-# 工作者更新共享统计
-def count_zone():
-    local_grass = 0
-    local_trees = 0
-    
-    # 扫描区域
-    for i in range(25):
-        entity = get_entity_type()
-        if entity == Entities.Grass:
-            local_grass += 1
-        elif entity == Entities.Tree:
-            local_trees += 1
-        move(East)
-    
-    # 更新共享统计
-    stats = wait_for(stats_source)
-    stats["grass"] += local_grass
-    stats["trees"] += local_trees
-    stats["total"] += 25
-    
-    return local_grass + local_trees
-
-# 启动多个扫描器
-drones = []
-for i in range(4):
-    drone = spawn_drone(count_zone)
-    if drone:
-        drones.append(drone)
-
-# 等待完成
-for drone in drones:
-    wait_for(drone)
-
-# 获取最终统计
-final_stats = wait_for(stats_source)
-quick_print("Total grass:", final_stats["grass"])
-quick_print("Total trees:", final_stats["trees"])
+leaderboard_run(Leaderboards.Maze, filename, speedup)
 ```
 
-**⚠️ 重要警告：竞态条件风险**
-
+#### 等效模拟
 ```python
-# ❌ 危险：竞态条件
-def unsafe():
-    data = wait_for(source)
-    count = data["count"]  # 读取
-    count += 1             # 计算
-    data["count"] = count  # 写入 - 可能覆盖其他无人机的修改
-
-# ✅ 较安全：原子操作
-def safer():
-    data = wait_for(source)
-    data["count"] += 1  # 单步操作
-
-# ✅ 最安全：只追加
-def safest():
-    data = wait_for(source)
-    data.append(result)  # 追加操作
-
-# ✅ 最安全：使用独立键
-def best():
-    data = wait_for(source)
-    drone_id = num_drones()
-    data[drone_id] = result  # 每个无人机有自己的键
+unlocks = Unlocks
+items = {
+    Items.Weird_Substance: 1000000000,
+    Items.Power: 1000000000
+}
+globals = {}
+seed = -1
+simulate(filename, unlocks, items, globals, seed, speedup)
 ```
 
-**使用建议**
+#### 策略提示
+- 使用 32×32 迷宫（最大尺寸）
+- 重复使用迷宫 300 次（在宝藏上继续使用奇异物质）
+- 使用高效的迷宫导航算法（BFS/DFS）
+- 利用多无人机并行处理多个迷宫
+- 确保程序在达到目标时终止
 
-- ✅ **优先使用返回值通信**：大多数情况下更安全简单
-- ⚠️ **谨慎使用共享内存**：只在需要实时协作时使用
-- ✅ **只追加不修改**：使用 `append()` 而不是修改现有值
-- ✅ **使用独立键**：每个无人机操作不同的字典键
-- ❌ **避免读-修改-写**：容易产生竞态条件
+---
 
-#### 2. 竞态条件
+### 3. 恐龙 (Leaderboards.Dinosaur)
+
+#### 挑战目标
+从解锁全部内容开始，尽快收获 **33,488,928** 根骨头。这是用恐龙尾巴填满一片 32×32 区域所能获得的骨头数量。
+
+#### 起始条件
 ```python
-# ❌ 危险：多个无人机可能同时执行
-if get_water() < 0.5:
-    use_item(Items.Water)  # 可能多个无人机都会浇水
-
-# ✅ 正确：避免多个无人机操作同一地块
-# 将农场分区，每个无人机负责不同区域
+unlocks = Unlocks  # 所有解锁项（最高级）
+items = {
+    Items.Cactus: 1000000000,  # 大量仙人掌（购买苹果）
+    Items.Power: 1000000000     # 大量能量
+}
+seed = -1
 ```
 
-#### 3. 生成成本
-- 生成无人机需要时间（约200 ticks）
-- 不要为每个小任务都生成无人机
-- 适合长时间运行的任务
-
-## 迷宫（Mazes）
-
-### 生成迷宫
+#### 成功条件
 ```python
-# 在灌木上使用奇异物质生成迷宫
-plant(Entities.Bush)
-
-# 计算所需的奇异物质数量
-# 基础：n 份奇异物质 = n×n 迷宫
-# 每次升级：需要 2 倍物质，宝藏金币也翻倍
-maze_upgrades = num_unlocked(Unlocks.Mazes) - 1
-substance_needed = get_world_size() * (2 ** maze_upgrades)
-
-use_item(Items.Weird_Substance, substance_needed)
+num_items(Items.Bone) >= 33488928
 ```
 
-### 迷宫特性
-- 无人机无法飞过树篱（`Entities.Hedge`）
-- 宝藏位置：`get_entity_type() == Entities.Treasure`
-- 宝藏金币数 = 迷宫面积（如 5×5 = 25 金币）
-- 首次生成的迷宫无循环
-
-### 导航迷宫
+#### 函数调用
 ```python
-# 检查是否有墙
-if can_move(North):
-    move(North)
-
-# 或者尝试移动并检查结果
-if move(North):
-    # 移动成功
-    pass
-else:
-    # 遇到墙
-
-# 获取宝藏位置
-treasure_x, treasure_y = measure()
+leaderboard_run(Leaderboards.Dinosaur, filename, speedup)
 ```
 
-### 收获宝藏
+#### 等效模拟
 ```python
-# 在宝藏上收获获得金币
-if get_entity_type() == Entities.Treasure:
-    harvest()  # 获得金币，迷宫消失
+unlocks = Unlocks
+items = {
+    Items.Cactus: 1000000000,
+    Items.Power: 1000000000
+}
+globals = {}
+seed = -1
+simulate(filename, unlocks, items, globals, seed, speedup)
 ```
 
-### 重复使用迷宫（高级）
-```python
-# 在宝藏上再次使用奇异物质
-# 宝藏会移动到随机位置，金币增加
-use_item(Items.Weird_Substance, substance_needed)
+#### 策略提示
+- 骨头数量 = 尾巴长度²
+- 32×32 = 1024 格，尾巴长度 1024，骨头 = 1024² = 1,048,576
+- 但目标是 33,488,928 = 约 32 次完整填满
+- 使用哈密尔顿路径填满整个农场
+- 优化路径算法减少 tick 消耗
+- 注意：只有一架无人机可以装备恐龙帽
 
-# 注意：
-# - 重复使用会移除一些墙，可能产生循环
-# - 最多重复 300 次
-# - 金币不会比新建迷宫更多
-# - 仅作为额外挑战
+---
+
+## 🌾 资源挑战（多无人机）
+
+这些挑战从解锁全部内容开始，目标是尽快收获特定数量的资源。
+
+### 通用起始条件
+```python
+unlocks = Unlocks  # 所有解锁项（最高级）
+items = {
+    # 种植该植物所需的资源（大量）
+    Items.Power: 1000000000  # 大量能量
+}
 ```
 
-### 迷宫算法提示
+---
+
+### 4. 仙人掌 (Leaderboards.Cactus)
+
+#### 成功条件
 ```python
-# 推荐使用深度优先搜索（DFS）或广度优先搜索（BFS）
-# 需要记录已访问位置，避免死循环
+num_items(Items.Cactus) >= 33554432
+```
 
-# DFS 示例框架
-visited = set()
+#### 函数调用
+```python
+leaderboard_run(Leaderboards.Cactus, filename, speedup)
+```
 
-def explore(x, y):
-    if (x, y) in visited:
-        return
-    
-    visited.add((x, y))
-    
-    if get_entity_type() == Entities.Treasure:
-        harvest()
-        return
-    
-    # 尝试四个方向
-    for direction in [North, East, South, West]:
-        if can_move(direction):
-            move(direction)
-            new_x, new_y = get_pos_x(), get_pos_y()
+#### 策略提示
+- 使用排序算法（冒泡、插入、快速排序等）
+- 排序收割 n 个仙人掌 = n² 产量
+- 使用多无人机并行排序和收割
+- 最大化单次收割的仙人掌数量
+
+---
+
+### 5. 向日葵 (Leaderboards.Sunflowers)
+
+#### 成功条件
+```python
+num_items(Items.Power) >= 100000
+```
+
+#### 函数调用
+```python
+leaderboard_run(Leaderboards.Sunflowers, filename, speedup)
+```
+
+#### 策略提示
+- 种植至少 10 株向日葵
+- 收割最大花瓣的那株（5× 奖励）
+- 使用多无人机并行管理多个向日葵农场
+- 优化花瓣检测和收割时机
+
+---
+
+### 6. 南瓜 (Leaderboards.Pumpkins)
+
+#### 成功条件
+```python
+num_items(Items.Pumpkin) >= 200000000
+```
+
+#### 函数调用
+```python
+leaderboard_run(Leaderboards.Pumpkins, filename, speedup)
+```
+
+#### 策略提示
+- 种植大面积南瓜（6×6 或更大）
+- 等待全部成熟后合并
+- n×n 南瓜：n < 6 时产量 = n³，n ≥ 6 时产量 = n²×6
+- 及时替换枯萎南瓜
+- 使用多无人机管理多个南瓜田
+
+---
+
+### 7. 木材 (Leaderboards.Wood)
+
+#### 成功条件
+```python
+num_items(Items.Wood) >= 10000000000
+```
+
+#### 函数调用
+```python
+leaderboard_run(Leaderboards.Wood, filename, speedup)
+```
+
+#### 策略提示
+- 种植树（每株 5 个木材）
+- 使用棋盘格种植避免减速
+- 使用浇水和肥料加速生长
+- 多无人机并行管理大量树木
+
+---
+
+### 8. 胡萝卜 (Leaderboards.Carrots)
+
+#### 成功条件
+```python
+num_items(Items.Carrot) >= 2000000000
+```
+
+#### 函数调用
+```python
+leaderboard_run(Leaderboards.Carrots, filename, speedup)
+```
+
+#### 策略提示
+- 胡萝卜生长时间较长（6 秒）
+- 使用浇水（5× 速度）和肥料（-2 秒）
+- 混合种植增加产量
+- 多无人机并行管理
+
+---
+
+### 9. 干草 (Leaderboards.Hay)
+
+#### 成功条件
+```python
+num_items(Items.Hay) >= 2000000000
+```
+
+#### 函数调用
+```python
+leaderboard_run(Leaderboards.Hay, filename, speedup)
+```
+
+#### 策略提示
+- 草生长最快（0.5 秒）
+- 让草自然生长，大面积收割
+- 多无人机并行遍历收割
+- 简单高效，适合新手
+
+---
+
+## 🎯 单无人机挑战
+
+这些挑战限制只能使用**一架无人机**和**8×8 农场**，目标是尽快收获特定数量的资源。
+
+### 通用限制
+```python
+# 农场大小：8×8
+# 无人机数量：1（不能使用 spawn_drone）
+# 其他条件与多无人机版本相同
+```
+
+---
+
+### 10. 迷宫（单）(Leaderboards.Maze_Single)
+
+#### 成功条件
+```python
+num_items(Items.Gold) >= 616448
+```
+
+#### 函数调用
+```python
+leaderboard_run(Leaderboards.Maze_Single, filename, speedup)
+```
+
+#### 策略提示
+- 使用 8×8 迷宫
+- 优化单无人机导航算法
+- 重复使用迷宫
+
+---
+
+### 11. 仙人掌（单）(Leaderboards.Cactus_Single)
+
+#### 成功条件
+```python
+num_items(Items.Cactus) >= 131072
+```
+
+#### 函数调用
+```python
+leaderboard_run(Leaderboards.Cactus_Single, filename, speedup)
+```
+
+#### 策略提示
+- 使用高效排序算法
+- 8×8 = 64 个仙人掌，排序收割 = 64² = 4096
+- 需要重复多次
+
+---
+
+### 12. 向日葵（单）(Leaderboards.Sunflowers_Single)
+
+#### 成功条件
+```python
+num_items(Items.Power) >= 10000
+```
+
+#### 函数调用
+```python
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
