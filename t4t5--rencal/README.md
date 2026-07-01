@@ -7,11 +7,11 @@ Modern, open-source calendar app. Built for Omarchy.
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [t4t5/rencal](https://github.com/t4t5/rencal).
+Original source: `CLAUDE.md` in [t4t5/rencal](https://github.com/t4t5/rencal).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
