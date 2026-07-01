@@ -1,0 +1,106 @@
+---
+trigger: always_on
+description: grove gives coding agents **structural, byte-precise, token-cheap access to a
+---
+
+# grove — developer guide for Claude
+
+grove gives coding agents **structural, byte-precise, token-cheap access to a
+codebase** via tree-sitter, instead of reading whole files. It is a single Rust
+binary with two faces — a human CLI (`grove <verb>`) and an MCP server
+(`grove serve`) — over one engine. Grammars load at runtime from a WASM registry,
+so new languages need no recompile.
+
+Read [`VISION.md`](VISION.md) for the product vision and [`README.md`](README.md)
+for usage. This file is the orientation for *continuing development*.
+
+## Architecture — one engine, two faces
+
+```
+src/main.rs      CLI dispatch (clap) — every verb; thin, delegates to modules
+src/ops.rs       the operations as a library — the shared engine BOTH faces call
+src/mcp.rs       MCP server — newline-delimited JSON-RPC 2.0 over stdio (hand-rolled)
+src/engine.rs    wasm load + Query-based tag extraction + check + position helpers
+src/registry.rs  grammar resolver, cache-location precedence, catalog/index, lockfile
+src/fetch.rs     `grove fetch` — install grammars from the hosted registry
+src/ingest.rs    `grove ingest` — build registry artifacts from upstream releases
+src/init.rs      `grove init [--as mcp|skill|both]` — provision grammars + harness glue
+skills/grove/    SKILL.md — cross-harness skill, routes to MCP-or-CLI (npx skills add)
+```
+
+Data flow: `main`/`mcp` → `ops` → `engine` (+ `registry` for grammar resolution).
+**Never put engine logic in `main` or `mcp`** — they only format. `ops` returns
+typed `Symbol`/`Defect`/etc.; the CLI prints tables, the MCP server emits JSON.
+
+## The tool surface (7 tools, the agent loop)
+
+`outline` (file skeleton) · `symbols` (find across a dir) · `source` (one symbol's
+code) · `check` (ERROR/MISSING nodes — post-edit verify) · `callers` (call sites +
+enclosing fn) · `map` (directory dependency graph — defs + outgoing refs, no bodies) ·
+`definition` (go-to-def by name or `--at file:line:col`, 1-based).
+
+All carry a stable `symbol-id` (`<lang>:<relpath>#<name>@<line>`, line 1-based —
+lines/cols are 1-based across the whole surface, `grep -n` convention). `outline` is
+tiered (`--kind`, `--detail 0|1|2`) so big files stay cheap. `map` is the
+breadth-control tool: it returns a directory's definitions grouped by file, each
+with its outgoing references (which other symbols it calls/uses), replacing many
+`symbols`+`source` round-trips with one call. MCP results are compact JSON; tool
+errors come back as `isError: true` so the model can recover.
+
+## How grammars work (important)
+
+- A grammar = `grammar.wasm` (tree-sitter parser, native **`dylink.0`** module) +
+  `tags.scm` (definition/reference query) + `manifest.json` (extensions,
+  `source` provenance, and a node-kind **`profile`**).
+- **Tags are extracted via the Query engine, NOT `tree-sitter-tags`** — that crate
+  can't drive a wasm-loaded language (it sets a language with no wasm store). See
+  `engine::extract`: it runs `tags.scm` and interprets `@definition.*`/
+  `@reference.*`/`@name` captures, dedups overlapping matches by (range, is_def).
+- The **profile is data in the manifest** (`function_kinds`, `containers`,
+  `identifier_kinds`), not code. It drives `parent` grouping, `callers`' enclosing
+  function, and go-to-def. A new language gets the full surface by dropping a
+  registry dir — no recompile. Languages without a profile still get the core tools.
+- `engine.rs` caches a loaded grammar (wasm store + parser + compiled query) per
+  process in a thread-local, keyed by language name.
+
+## Registry & cache
+
+- **Resolution precedence** (first existing wins): `GROVE_REGISTRY` env →
+  `<project>/.grove/grammars/` → OS cache (`~/.cache/grove/grammars` on Linux, etc.)
+  → dev tree (`registry/` next to the crate). `grove registry` shows it.
+- The repo ships a **3-language dev stub** in `registry/` (rust, python,
+  javascript). The full 27-language registry lives in the **separate
+  `Entelligentsia/grove-registry` repo**, installed via `grove fetch`.
+- **Hosted layout (split host):** small text (`index.json`, per-lang `tags.scm` +
+  `manifest.json`) in the repo (served via `raw.githubusercontent.com`); heavy
+  `grammar.wasm` as **GitHub Release assets** (`grammars-v1`). The catalog
+  (`index.json`, schema 2) has `release_base` + per-file `{sha256, asset?}`;
+  `fetch` routes wasm→release, text→repo, and **verifies every hash** before
+  writing (atomic).
+- `registry-sources.json` is the curated spec (`repo`, `rev`, `wasm_asset`,
+  `extensions`, `profile`) that `grove ingest` builds the registry from.
+
+## Commands
+
+```
+# agent-facing tools
+grove outline <file> [--kind K] [--detail 0|1|2]
+grove symbols <dir> [--kind K] [--name SUB] [--refs]
+grove source  <id> | <file> <name>
+grove check   <file>
+grove callers <name> [-d <dir>]
+grove map     <dir> [--kind K] [--name SUB]
+grove definition <name> [-d <dir>] | --at <file:line:col>   # line/col 1-based
+grove serve                         # MCP server over stdio
+
+# setup / registry
+grove init [path] [--as mcp|skill|both] [--dry-run]  # provision grammars + chosen harness glue
+grove fetch [langs...] [--force]    # install grammars into the OS cache
+grove languages                     # list registry languages
+grove registry                      # show resolved registry root + search order
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [Entelligentsia/grove](https://github.com/Entelligentsia/grove) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-06-29 -->
