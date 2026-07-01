@@ -1,88 +1,66 @@
 ---
 trigger: always_on
-description: MarketMeNow architecture and coding conventions
+description: This package is **platform-agnostic**. It must never import from `src/adapters/` or any platform SDK. The only exception is `core/registry_builder.py` which uses lazy imports inside try/except.
 ---
 
+# Core Framework (src/marketmenow/)
 
-# MarketMeNow Architecture Rules
+This package is **platform-agnostic**. It must never import from `src/adapters/` or any platform SDK. The only exception is `core/registry_builder.py` which uses lazy imports inside try/except.
 
-## Project Layout
+## Module Map
+
+| Module                    | Purpose                                                      |
+|---------------------------|--------------------------------------------------------------|
+| `models/content.py`       | `ContentModality` enum, `BaseContent` and all content variants |
+| `models/campaign.py`      | `Audience`, `ScheduleRule`, `CampaignTarget`, `Campaign`     |
+| `models/result.py`        | `PublishResult`, `SendResult`, `MediaRef`, `AnalyticsSnapshot` |
+| `models/distribution.py`  | `DistributionRoute`, `DistributionMap` (modality → platforms) |
+| `ports/platform_adapter.py` | `PlatformAdapter` protocol                                 |
+| `ports/content_renderer.py` | `ContentRenderer` protocol                                 |
+| `ports/uploader.py`       | `Uploader` protocol                                         |
+| `ports/analytics.py`      | `AnalyticsCollector` protocol                                |
+| `normaliser.py`           | `NormalisedContent` model + `ContentNormaliser` (match/case dispatch) |
+| `registry.py`             | `PlatformBundle` dataclass + `AdapterRegistry`               |
+| `exceptions.py`           | `MarketMeNowError` hierarchy (`AdapterNotFoundError`, `UnsupportedModalityError`, `AuthenticationError`, `PublishError`, `RenderError`, `UploadError`) |
+| `cli.py`                  | Top-level Typer app (`mmn`) — `run`, `workflows`, `auth`, `distribute`, `platforms`, `version`, `heal` + hidden adapter CLI groups for web frontend |
+| `core/workflow.py`        | `WorkflowStep` protocol, `WorkflowContext`, `Workflow` runner, `ParamDef` |
+| `core/workflow_registry.py`| `WorkflowRegistry` + `build_workflow_registry()` — auto-discovers workflows |
+| `steps/*.py`              | Reusable workflow steps (generate_reel, post_to_platform, package_capsule, post_from_capsule, discover_posts, discover_prospects, enrich_profiles, score_prospects, generate_messages, send_messages, etc.) |
+| `workflows/*.py`          | Built-in workflow definitions (instagram_reel, twitter_engage, twitter_outreach, tiktok_reel, post_capsule, etc.) |
+| `outreach/models.py`      | `CustomerProfile`, `UserProfile`, `ScoredProspect`, `OutreachMessage`, rubric models |
+| `outreach/ports.py`       | `DiscoveryVector`, `ProfileEnricher`, `MessageSender` protocols |
+| `outreach/scorer.py`      | `ProspectScorer` — Gemini rubric evaluation (platform-agnostic) |
+| `outreach/message_generator.py` | `OutreachMessageGenerator` — Gemini message generation (platform-agnostic) |
+| `outreach/history.py`     | `OutreachHistory` — JSON tracking of contacted handles |
+| `core/pipeline.py`        | `ContentPipeline` — normalise → render → upload → publish    |
+| `core/orchestrator.py`    | `Orchestrator` + `CampaignResult` — runs campaigns across targets in parallel |
+| `core/distributor.py`     | `ContentDistributor` — resolves platforms from `DistributionMap`, delegates to `Orchestrator` |
+| `core/registry_builder.py`| `build_registry()` — auto-registers adapters (lazy imports, graceful skip on missing config) |
+| `core/text_sanitiser.py`  | `sanitise_text()` — strips em/en-dashes from all text fields (anti-AI-detection) |
+| `core/scheduler.py`       | `Scheduler` — in-process scheduled campaign execution        |
+| `core/capsule.py`         | `ContentCapsule`, `CapsuleManager` — content capsule CRUD, media management, publication tracking, conversion to content models |
+| `core/distribute_cli.py`  | Shared async helper for CLI `distribute` command             |
+| `core/prompt_builder.py`  | `PromptBuilder` — composable prompt assembly from persona + function + ICL blocks |
+| `core/embedding_store.py` | `EmbeddingStore` — Gemini text-embedding-004 wrapper with batch embed and cosine distance |
+| `core/diversity_selector.py` | `select_diverse_examples()` — farthest-point sampling for diverse ICL example selection |
+| `core/reel_id.py`           | Word-based reel ID encoding/decoding for discrete tracking in video descriptions |
+| `core/feedback/models.py`   | `VideoMetrics`, `CommentData`, `ReelIndexEntry`, `ContentGuideline`, `FeedbackReport` |
+| `core/feedback/ports.py`    | `VideoAnalyticsFetcher` protocol                             |
+| `core/feedback/sentiment.py`| `SentimentScorer` — Gemini 0-10 comment sentiment analysis   |
+| `core/feedback/guideline_generator.py` | `GuidelineGenerator` — avoid/replicate rules from reel performance |
+| `core/feedback/orchestrator.py` | `FeedbackOrchestrator` — full fetch→score→analyze→persist cycle |
+| `core/feedback/classifier.py` | `TemplateClassifier` — embedding-based retroactive template classification |
+| `integrations/langchain.py`| LangChain tool/chain integration                            |
+
+## Pipeline Flow
 
 ```
-src/marketmenow/          # Platform-agnostic core (models, ports, core logic, workflows)
-src/marketmenow/steps/    # Reusable workflow steps (generate, post, discover, etc.)
-src/marketmenow/workflows/# Built-in workflow definitions
-src/adapters/             # Platform-specific adapters (instagram, twitter, linkedin, reddit, email)
-tests/                    # Test suite (pytest + pytest-asyncio)
-pyproject.toml            # Single source of truth for deps and config
-```
+BaseContent
+  → ContentNormaliser.normalise()  →  NormalisedContent
+  → bundle.renderer.render()      →  NormalisedContent (platform-adapted)
 
-## Ports and Adapters
-
-- All platform-specific logic MUST live in adapter packages outside `src/marketmenow/`.
-  The `core/`, `models/`, `ports/`, `normaliser.py`, and `registry.py` are
-  platform-agnostic and MUST NOT import any platform SDK or contain any
-  platform-specific branching.
-- Adapters implement `typing.Protocol` interfaces from `ports/`. Never subclass
-  an ABC — use structural subtyping.
-- Register adapters by constructing a `PlatformBundle` and calling
-  `AdapterRegistry.register(bundle)`.
-
-## Adding a New Platform
-
-1. Create a new package (e.g. `adapters/twitter/`).
-2. Implement `PlatformAdapter`, `ContentRenderer`, `Uploader` protocols.
-3. Optionally implement `AnalyticsCollector`.
-4. Bundle into `PlatformBundle` and register with `AdapterRegistry`.
-5. No changes needed in `core/`, `models/`, or `ports/`.
-
-## Adding a New Workflow
-
-1. Create a step in `src/marketmenow/steps/yourstep.py` implementing `WorkflowStep`
-   protocol: `name`, `description`, `async execute(ctx: WorkflowContext)`.
-2. Create `src/marketmenow/workflows/your_workflow.py` composing steps into a
-   `Workflow(name, description, steps, params)`.
-3. Add a `_try_register()` call in `core/workflow_registry.py`.
-4. No changes needed in `core/`, `models/`, `ports/`, or `cli.py`.
-
-## Adding a New Content Modality
-
-1. Add a new variant to `ContentModality` enum in `models/content.py`.
-2. Create the Pydantic model in `models/content.py` inheriting `BaseContent`.
-3. Add a `case` arm in `ContentNormaliser.normalise()`.
-4. Existing adapters gain support by updating their `supported_modalities()`.
-
-## Python Style
-
-- Python >= 3.12. Use `from __future__ import annotations` in every file.
-- All data models: Pydantic `BaseModel` with `frozen=True`.
-- All adapter interfaces: `typing.Protocol` with `@runtime_checkable`.
-- Full type annotations everywhere. Never use `Any`.
-- Async-first: adapter methods are `async def`.
-- Immutable data flow: never mutate models, use `model_copy(update=...)`.
-
-## Dependencies
-
-- `uv` is the package manager. Use `uv sync` / `uv add`.
-- `pyproject.toml` is the single source of truth for all dependencies.
-- Dev/test deps live under `[project.optional-dependencies] dev`.
-
-## Linting
-
-- Ruff is the linter and formatter. Config lives in `pyproject.toml`.
-- Lint: `uv run ruff check src/ tests/`
-- Format: `uv run ruff format src/ tests/`
-- Auto-fix safe issues: `uv run ruff check --fix src/ tests/`
-
-## Testing
-
-- Tests live in `tests/`, one `test_*.py` per module under test.
-- `conftest.py` provides mock adapters and content factory fixtures.
-- pytest-asyncio with `asyncio_mode = "auto"` — async tests need no decorator.
-- Tests must never call external APIs — mock all I/O.
-- `from __future__ import annotations` in every test file.
-- Run tests: `uv run --extra dev pytest`.
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [thearnavrustagi/marketmenow](https://github.com/thearnavrustagi/marketmenow) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-06-29 -->
