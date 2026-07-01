@@ -2,8 +2,6 @@
 
 > Sourced from [hahwul/smugglex](https://github.com/hahwul/smugglex) and converted for every major platform by [TomeVault](https://tomevault.io)
 
-Rust-powered HTTP Request Smuggling Scanner.
-
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
@@ -17,7 +15,7 @@ Original source: `AGENTS.md` in [hahwul/smugglex](https://github.com/hahwul/smug
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
-From [hahwul/smugglex](https://github.com/hahwul/smugglex) — a repo with 117+ stars on GitHub.
+From [hahwul/smugglex](https://github.com/hahwul/smugglex) — a repo with 123+ stars on GitHub.
 
 ---
 
