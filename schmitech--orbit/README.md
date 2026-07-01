@@ -2,8 +2,6 @@
 
 > Tome by [schmitech](https://github.com/schmitech/orbit) — distributed by [TomeVault](https://tomevault.io)
 
-A self-hosted AI infrastructure for private RAG and multi-model applications.
-
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
