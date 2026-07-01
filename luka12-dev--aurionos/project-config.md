@@ -3,7 +3,7 @@ trigger: always_on
 description: This document provides context and guidance for working with the AurionOS codebase. AurionOS is a complete operating system built from scratch in x86 assembly and C - no Linux kernel, no POSIX, no borrowed code.
 ---
 
-# AurionOS - Codex Development Guide
+# AurionOS - Claude Development Guide
 
 This document provides context and guidance for working with the AurionOS codebase. AurionOS is a complete operating system built from scratch in x86 assembly and C - no Linux kernel, no POSIX, no borrowed code.
 
@@ -188,4 +188,4 @@ load_kernel:
 
 ---
 > Source: [Luka12-dev/AurionOS](https://github.com/Luka12-dev/AurionOS) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-10 -->
+<!-- tomevault:4.0:windsurf_rules:2026-06-29 -->
