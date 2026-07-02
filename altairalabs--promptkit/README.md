@@ -7,11 +7,11 @@ Test, red-team, and deploy LLM applications with confidence. Multi-provider supp
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [AltairaLabs/PromptKit](https://github.com/AltairaLabs/PromptKit).
+Original source: `CLAUDE.md` in [AltairaLabs/PromptKit](https://github.com/AltairaLabs/PromptKit).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
