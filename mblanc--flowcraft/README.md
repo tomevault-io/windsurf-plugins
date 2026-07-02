@@ -7,11 +7,11 @@ Open Source - node based generative workflows on Google Cloud
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [mblanc/flowcraft](https://github.com/mblanc/flowcraft).
+Original source: `CLAUDE.md` in [mblanc/flowcraft](https://github.com/mblanc/flowcraft).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
