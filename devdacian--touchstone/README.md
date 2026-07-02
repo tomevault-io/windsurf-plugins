@@ -7,11 +7,11 @@ A lightweight, automated multi-model process for rapid agent-skill improvement w
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [devdacian/touchstone](https://github.com/devdacian/touchstone).
+Original source: `CLAUDE.md` in [devdacian/touchstone](https://github.com/devdacian/touchstone).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
