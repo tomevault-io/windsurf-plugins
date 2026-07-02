@@ -55,6 +55,33 @@ git commit -m "refactor: extract color parsing into helper function"
 git commit -m "chore: add ty type checker and pre-commit hooks"
 ```
 
+## Release Process
+
+HACS detects new versions via GitHub releases. The user creates releases in the GitHub UI (with auto-generated notes); Codex prepares the version bump.
+
+### When the user asks for a version bump (e.g. "bump to 1.0.1", "release a new patch")
+
+1. Determine the new version using semver:
+   - **Patch** (`1.0.0 → 1.0.1`): bug fixes only
+   - **Minor** (`1.0.0 → 1.1.0`): new features, backward-compatible
+   - **Major** (`1.0.0 → 2.0.0`): breaking changes
+2. Update `version` in `custom_components/geekmagic/manifest.json`
+3. Commit on `main` (or a `chore/bump-X.Y.Z` branch if a PR is preferred):
+   ```
+   chore: bump version to X.Y.Z
+   ```
+4. Push, then tell the user to create the release in GitHub UI:
+   - Releases → "Draft a new release"
+   - Tag: `vX.Y.Z` (matches `manifest.json`)
+   - Target: the bump commit on `main`
+   - Click "Generate release notes" → Publish
+
+### Critical rules
+- **Tag must match `manifest.json` version exactly** (HA core reads `manifest.json` and a mismatch breaks update detection)
+- **Tag the bump commit, not an earlier one** — otherwise the tagged tree still has the old version
+- Tag format: `vX.Y.Z` (with leading `v`)
+- Never tag or create the release yourself — the user does that in GitHub UI
+
 ## Project Structure
 
 ```
@@ -111,57 +138,9 @@ class Widget(ABC):
         """Draw widget using the render context (local coordinates)."""
 
     def get_entities(self) -> list[str]:
-        """Return entity IDs this widget depends on."""
-```
-
-### Layout Interface
-```python
-class Layout(ABC):
-    def _calculate_slots(self) -> None:
-        """Calculate slot rectangles."""
-
-    def render(self, renderer, draw, hass) -> None:
-        """Render all widgets in their slots."""
-```
-
-## Device API
-
-GeekMagic devices use a simple HTTP API:
-
-```
-POST /doUpload?dir=/image/   # Upload image (multipart form)
-GET  /set?img=/image/{file}  # Display image
-GET  /set?theme=3            # Set custom image mode
-GET  /set?brt={0-100}        # Set brightness
-GET  /app.json               # Get device state
-```
-
-## Display Constraints
-
-- Resolution: 240x240 pixels
-- Physical size: ~4cm diagonal
-- Minimum font size: 10-12px for readability
-- Use high contrast colors (light on dark)
-- JPEG upload is faster than PNG (~2.5s vs ~5.8s)
-
-## Font Sizing System
-
-Fonts are automatically scaled based on container height. Two naming systems are supported:
-
-### Semantic Sizes (Preferred)
-
-Use these for new widgets - they scale proportionally to container height:
-
-| Size | Ratio | Use Case |
-|------|-------|----------|
-| `primary` | 35% | Main value (clock time, large number) |
-| `secondary` | 20% | Supporting info (date, unit) |
-| `tertiary` | 12% | Labels, captions |
-
-```python
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [adrienbrault/geekmagic-hacs](https://github.com/adrienbrault/geekmagic-hacs) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-20 -->
+<!-- tomevault:4.0:windsurf_rules:2026-06-29 -->
