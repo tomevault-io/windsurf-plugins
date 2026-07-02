@@ -7,11 +7,11 @@ Production-ready C++/TensorRT inference engine for RF-DETR. Object detection and
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [infracv/rf-detr-cpp](https://github.com/infracv/rf-detr-cpp).
+Original source: `CLAUDE.md` in [infracv/rf-detr-cpp](https://github.com/infracv/rf-detr-cpp).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
