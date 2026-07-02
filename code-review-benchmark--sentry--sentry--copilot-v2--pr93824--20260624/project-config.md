@@ -1,30 +1,239 @@
 ---
 trigger: always_on
-description: Guidelines for writing python tests
+description: Rules and guidelines for running *.spec.tsx tests and writing React tests
 ---
 
+# Sentry React Testing Guidelines
 
-# Python tests
+## Running Tests
 
+Always run React tests with the CI flag to use non-interactive mode:
 
-## Use factories instead of directly calling `Model.objects.create`
-
-In Sentry Python tests, prefer using factory methods from `sentry.testutils.factories.Factories` @factories.py or fixture methods (e.g., `self.create_model`) provided by base classes like `sentry.testutils.fixtures.Fixtures` @fixtures.py  instead of directly calling `Model.objects.create`. This promotes consistency, reduces boilerplate, and leverages shared test setup logic defined in the factories.
-
-For example, a diff that uses a fixture instead of the directly calling `Model.objects.create`  would look like:
-
-```diff
-    -        direct_project = Project.objects.create(
-    -            organization=self.organization,
-    -            name="Directly Created",
-    -            slug="directly-created"
-    -        )
-    +        direct_project = self.create_project(
-    +            organization=self.organization,
-    +            name="Directly Created",
-    +            slug="directly-created" # Note: Ensure factory args match
-    +        )
+```bash
+CI=true pnpm test <file_path>
 ```
+
+## Imports
+
+**Always** import from `sentry-test/reactTestingLibrary`, not directly from `@testing-library/react`:
+
+```tsx
+import {
+  render,
+  screen,
+  userEvent,
+  waitFor,
+  within,
+} from 'sentry-test/reactTestingLibrary';
+```
+## Testing Philosophy
+
+- **User-centric testing**: Write tests that resemble how users interact with the app.
+- **Avoid implementation details**: Focus on behavior, not internal component structure.
+
+## Query Priority (in order of preference)
+
+1. **`getByRole`** - Primary selector for most elements
+   ```tsx
+   screen.getByRole('button', { name: 'Save' })
+   screen.getByRole('textbox', { name: 'Search' })
+   ```
+
+2. **`getByLabelText`/`getByPlaceholderText`** - For form elements
+   ```tsx
+   screen.getByLabelText('Email Address')
+   screen.getByPlaceholderText('Enter Search Term')
+   ```
+
+3. **`getByText`** - For non-interactive elements
+   ```tsx
+   screen.getByText('Error Message')
+   ```
+
+4. **`getByTestId`** - Last resort only
+   ```tsx
+   screen.getByTestId('custom-component')
+   ```
+
+## Best Practices
+
+### Avoid mocking hooks, functions, or components
+
+Do not use `jest.mocked()`.
+
+```tsx
+// ❌ Don't mock hooks
+jest.mocked(useDataFetchingHook)
+
+// ✅ Set the response data
+MockApiClient.addMockResponse({
+    url: '/data/',
+    body: DataFixture(),
+})
+
+// ❌ Don't mock contexts
+jest.mocked(useOrganization)
+
+// ✅ Use the provided organization config on render()
+render(<Component />, {organization: OrganizationFixture({...})})
+
+// ❌ Don't mock router hooks
+jest.mocked(useLocation)
+
+// ✅ Use the provided router config
+render(<TestComponent />, {
+  initialRouterConfig: {
+    location: {
+      pathname: "/foo/",
+    },
+  },
+});
+
+// ❌ Don't mock page filters hook
+jest.mocked(usePageFilters)
+
+// ✅ Update the corresponding data store with your data
+PageFiltersStore.onInitializeUrlState(
+    PageFiltersFixture({ projects: [1]}),
+    new Set()
+)
+```
+
+### Use `screen` instead of destructuring
+```tsx
+// ❌ Don't do this
+const { getByRole } = render(<Component />);
+
+// ✅ Do this
+render(<Component />);
+const button = screen.getByRole('button');
+```
+
+### Query selection guidelines
+- Use `getBy...` for elements that should exist
+- Use `queryBy...` ONLY when checking for non-existence
+- Use `await findBy...` when waiting for elements to appear
+
+```tsx
+// ❌ Wrong
+expect(screen.queryByRole('alert')).toBeInTheDocument();
+
+// ✅ Correct
+expect(screen.getByRole('alert')).toBeInTheDocument();
+expect(screen.queryByRole('button')).not.toBeInTheDocument();
+```
+
+### Async testing
+```tsx
+// ❌ Don't use waitFor for appearance
+await waitFor(() => {
+  expect(screen.getByRole('alert')).toBeInTheDocument();
+});
+
+// ✅ Use findBy for appearance
+expect(await screen.findByRole('alert')).toBeInTheDocument();
+
+// ✅ Use waitForElementToBeRemoved for disappearance
+await waitForElementToBeRemoved(() => screen.getByRole('alert'));
+```
+
+### User interactions
+```tsx
+// ❌ Don't use fireEvent
+fireEvent.change(input, { target: { value: 'text' } });
+
+// ✅ Use userEvent
+await userEvent.click(input);
+await userEvent.keyboard('text');
+```
+
+### Testing routing
+```tsx
+const { router } = render(<TestComponent />, {
+  initialRouterConfig: {
+    location: {
+      pathname: "/foo/",
+      query: { page: "1" },
+    },
+  },
+});
+// Uses passes in config to set initial location
+expect(router.location.pathname).toBe("/foo");
+expect(router.location.query.page).toBe("1");
+// Clicking links goes to the correct location
+await userEvent.click(screen.getByRole("link", { name: "Go to /bar/" }));
+// Can check current route on the returned router
+expect(router.location.pathname).toBe("/bar/");
+// Can test manual route changes with router.navigate
+router.navigate("/new/path/");
+router.navigate(-1); // Simulates clicking the back button
+```
+
+If the component uses `useParams()`, the `route` property can be used:
+
+```tsx
+function TestComponent() {
+  const { id } = useParams();
+  return <div>{id}</div>;
+}
+const { router } = render(<TestComponent />, {
+  initialRouterConfig: {
+    location: {
+      pathname: "/foo/123/",
+    },
+    route: "/foo/:id/",
+  },
+});
+expect(screen.getByText("123")).toBeInTheDocument();
+```
+
+### Testing components that make network requests
+
+```tsx
+// Simple GET request
+MockApiClient.addMockResponse({
+  url: "/projects/",
+  body: [{ id: 1, name: "my project" }],
+});
+
+// POST request
+MockApiClient.addMockResponse({
+  url: "/projects/",
+  method: "POST",
+  body: { id: 1, name: "my project" },
+});
+
+// Complex matching with query params and request body
+MockApiClient.addMockResponse({
+  url: "/projects/",
+  method: "POST",
+  body: { id: 2, name: "other" },
+  match: [
+    MockApiClient.matchQuery({ param: "1" }),
+    MockApiClient.matchData({ name: "other" }),
+  ],
+});
+
+// Error responses
+MockApiClient.addMockResponse({
+  url: "/projects/",
+  body: {
+    detail: "Internal Error",
+  },
+  statusCode: 500,
+});
+```
+
+#### Always Await Async Assertions
+
+Network requests are asynchronous. Always use `findBy` queries or properly await assertions:
+
+```tsx
+// ❌ Wrong - will fail intermittently
+expect(screen.getByText('Loaded Data')).toBeInTheDocument();
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [code-review-benchmark/sentry__sentry__copilot-v2__PR93824__20260624](https://github.com/code-review-benchmark/sentry__sentry__copilot-v2__PR93824__20260624) — distributed by [TomeVault](https://tomevault.io).
