@@ -1,237 +1,193 @@
 ---
 trigger: always_on
-description: Rules and guidelines for running *.spec.tsx tests and writing React tests
+description: Sentry is a developer-first error tracking and performance monitoring platform. This repository contains the main Sentry application, which is a large-scale Django application with a React frontend.
 ---
 
-# Sentry React Testing Guidelines
+# Sentry Development Guide for Claude
 
-## Running Tests
+## Overview
 
-Always run React tests with the CI flag to use non-interactive mode:
+Sentry is a developer-first error tracking and performance monitoring platform. This repository contains the main Sentry application, which is a large-scale Django application with a React frontend.
+
+## Tech Stack
+
+### Backend
+
+- **Language**: Python 3.13+
+- **Framework**: Django 5.2+
+- **API**: Django REST Framework with drf-spectacular for OpenAPI docs
+- **Task Queue**: Celery 5.5+
+- **Databases**: PostgreSQL (primary), Redis, ClickHouse (via Snuba)
+- **Message Queue**: Kafka, RabbitMQ
+- **Cloud Services**: Google Cloud Platform (Bigtable, Pub/Sub, Storage, KMS)
+
+### Frontend
+
+- **Language**: TypeScript
+- **Framework**: React 19
+- **Build Tool**: Rspack (Webpack alternative)
+- **State Management**: Reflux, React Query (TanStack Query)
+- **Styling**: Emotion (CSS-in-JS), Less
+- **Testing**: Jest, React Testing Library
+
+### Infrastructure
+
+- **Container**: Docker (via devservices)
+- **Package Management**: pnpm (Node.js), pip (Python)
+- **Node Version**: 22 (managed by Volta)
+
+## Project Structure
+
+```
+sentry/
+├── src/
+│   ├── sentry/           # Main Django application
+│   │   ├── api/          # REST API endpoints
+│   │   ├── models/       # Django models
+│   │   ├── tasks/        # Celery tasks
+│   │   ├── integrations/ # Third-party integrations
+│   │   ├── issues/       # Issue tracking logic
+│   │   └── web/          # Web views and middleware
+│   ├── sentry_plugins/   # Plugin system
+│   └── social_auth/      # Social authentication
+├── static/
+│   ├── app/              # React application
+│   │   ├── components/   # Reusable React components
+│   │   ├── views/        # Page components
+│   │   ├── stores/       # State management
+│   │   └── utils/        # Utility functions
+│   └── fonts/            # Font files
+├── tests/                # Test suite
+├── fixtures/             # Test fixtures
+├── devenv/               # Development environment config
+├── migrations/           # Database migrations
+└── config/               # Configuration files
+```
+
+## Key Commands
+
+### Development Setup
 
 ```bash
-CI=true pnpm test <file_path>
+# Install dependencies and setup development environment
+make develop
+
+# Or use the newer devenv command
+devenv sync
+
+# Start the development server
+pnpm run dev
+
+# Start only the UI development server with hot reload
+pnpm run dev-ui
 ```
 
-## Imports
+### Testing
 
-**Always** import from `sentry-test/reactTestingLibrary`, not directly from `@testing-library/react`:
+```bash
+# Run Python tests
+pytest
 
-```tsx
-import {
-  render,
-  screen,
-  userEvent,
-  waitFor,
-  within,
-} from 'sentry-test/reactTestingLibrary';
-```
-## Testing Philosophy
+# Run JavaScript tests
+pnpm test
 
-- **User-centric testing**: Write tests that resemble how users interact with the app.
-- **Avoid implementation details**: Focus on behavior, not internal component structure.
-
-## Query Priority (in order of preference)
-
-1. **`getByRole`** - Primary selector for most elements
-   ```tsx
-   screen.getByRole('button', { name: 'Save' })
-   screen.getByRole('textbox', { name: 'Search' })
-   ```
-
-2. **`getByLabelText`/`getByPlaceholderText`** - For form elements
-   ```tsx
-   screen.getByLabelText('Email Address')
-   screen.getByPlaceholderText('Enter Search Term')
-   ```
-
-3. **`getByText`** - For non-interactive elements
-   ```tsx
-   screen.getByText('Error Message')
-   ```
-
-4. **`getByTestId`** - Last resort only
-   ```tsx
-   screen.getByTestId('custom-component')
-   ```
-
-## Best Practices
-
-### Avoid mocking hooks, functions, or components
-
-Do not use `jest.mocked()`.
-
-```tsx
-// ❌ Don't mock hooks
-jest.mocked(useDataFetchingHook)
-
-// ✅ Set the response data
-MockApiClient.addMockResponse({
-    url: '/data/',
-    body: DataFixture(),
-})
-
-// ❌ Don't mock contexts
-jest.mocked(useOrganization)
-
-// ✅ Use the provided organization config on render()
-render(<Component />, {organization: OrganizationFixture({...})})
-
-// ❌ Don't mock router hooks
-jest.mocked(useLocation)
-
-// ✅ Use the provided router config
-render(<TestComponent />, {
-  initialRouterConfig: {
-    location: {
-      pathname: "/foo/",
-    },
-  },
-});
-
-// ❌ Don't mock page filters hook
-jest.mocked(usePageFilters)
-
-// ✅ Update the corresponding data store with your data
-PageFiltersStore.onInitializeUrlState(
-    PageFiltersFixture({ projects: [1]}),
-    new Set()
-)
+# Run specific test file
+pytest tests/sentry/api/test_base.py
+pnpm test components/avatar.spec.tsx
 ```
 
-### Use `screen` instead of destructuring
-```tsx
-// ❌ Don't do this
-const { getByRole } = render(<Component />);
+### Code Quality
 
-// ✅ Do this
-render(<Component />);
-const button = screen.getByRole('button');
+```bash
+# Preferred: Run pre-commit hooks on specific files
+pre-commit run --files src/sentry/path/to/file.py
+
+# Run all pre-commit hooks
+pre-commit run --all-files
+
+# Individual linting tools (use pre-commit instead when possible)
+black --check  # Run black first
+isort --check
+flake8
+
+# JavaScript/TypeScript linting
+pnpm run lint:js
+
+# Fix linting issues
+pnpm run fix
 ```
 
-### Query selection guidelines
-- Use `getBy...` for elements that should exist
-- Use `queryBy...` ONLY when checking for non-existence
-- Use `await findBy...` when waiting for elements to appear
+### Database Operations
 
-```tsx
-// ❌ Wrong
-expect(screen.queryByRole('alert')).toBeInTheDocument();
+```bash
+# Run migrations
+sentry django migrate
 
-// ✅ Correct
-expect(screen.getByRole('alert')).toBeInTheDocument();
-expect(screen.queryByRole('button')).not.toBeInTheDocument();
+# Create new migration
+sentry django makemigrations
+
+# Reset database
+make reset-db
 ```
 
-### Async testing
-```tsx
-// ❌ Don't use waitFor for appearance
-await waitFor(() => {
-  expect(screen.getByRole('alert')).toBeInTheDocument();
-});
+## Development Services
 
-// ✅ Use findBy for appearance
-expect(await screen.findByRole('alert')).toBeInTheDocument();
+Sentry uses `devservices` to manage local development dependencies:
 
-// ✅ Use waitForElementToBeRemoved for disappearance
-await waitForElementToBeRemoved(() => screen.getByRole('alert'));
-```
+- **PostgreSQL**: Primary database
+- **Redis**: Caching and queuing
+- **Snuba**: ClickHouse-based event storage
+- **Relay**: Event ingestion service
+- **Symbolicator**: Debug symbol processing
+- **Taskbroker**: Asynchronous task processing
+- **Spotlight**: Local debugging tool
 
-### User interactions
-```tsx
-// ❌ Don't use fireEvent
-fireEvent.change(input, { target: { value: 'text' } });
+## AI Assistant Quick Decision Trees
 
-// ✅ Use userEvent
-await userEvent.click(input);
-await userEvent.keyboard('text');
-```
+### "User wants to add an API endpoint"
 
-### Testing routing
-```tsx
-const { router } = render(<TestComponent />, {
-  initialRouterConfig: {
-    location: {
-      pathname: "/foo/",
-      query: { page: "1" },
-    },
-  },
-});
-// Uses passes in config to set initial location
-expect(router.location.pathname).toBe("/foo");
-expect(router.location.query.page).toBe("1");
-// Clicking links goes to the correct location
-await userEvent.click(screen.getByRole("link", { name: "Go to /bar/" }));
-// Can check current route on the returned router
-expect(router.location.pathname).toBe("/bar/");
-// Can test manual route changes with router.navigate
-router.navigate("/new/path/");
-router.navigate(-1); // Simulates clicking the back button
-```
+1. Check if endpoint already exists: `grep -r "endpoint_name" src/sentry/api/`
+2. Inherit from appropriate base:
+   - Organization-scoped: `OrganizationEndpoint`
+   - Project-scoped: `ProjectEndpoint`
+   - Region silo: `RegionSiloEndpoint`
+3. File locations:
+   - Endpoint: `src/sentry/api/endpoints/{resource}.py`
+   - URL: `src/sentry/api/urls.py`
+   - Test: `tests/sentry/api/endpoints/test_{resource}.py`
+   - Serializer: `src/sentry/api/serializers/models/{model}.py`
 
-If the component uses `useParams()`, the `route` property can be used:
+### "User wants to modify frontend component"
 
-```tsx
-function TestComponent() {
-  const { id } = useParams();
-  return <div>{id}</div>;
-}
-const { router } = render(<TestComponent />, {
-  initialRouterConfig: {
-    location: {
-      pathname: "/foo/123/",
-    },
-    route: "/foo/:id/",
-  },
-});
-expect(screen.getByText("123")).toBeInTheDocument();
-```
+1. Component location: `static/app/components/` (reusable) or `static/app/views/` (page-specific)
+2. ALWAYS use TypeScript
+3. ALWAYS write test in same directory with `.spec.tsx`
+4. Style with Emotion, NOT inline styles or CSS files
+5. State: Use hooks (`useState`), NOT Reflux for new code
 
-### Testing components that make network requests
+### "User wants to add a Celery task"
 
-```tsx
-// Simple GET request
-MockApiClient.addMockResponse({
-  url: "/projects/",
-  body: [{ id: 1, name: "my project" }],
-});
+1. Location: `src/sentry/tasks/{category}.py`
+2. Use `@instrumented_task` decorator
+3. Set appropriate `queue` and `max_retries`
+4. Test location: `tests/sentry/tasks/test_{category}.py`
 
-// POST request
-MockApiClient.addMockResponse({
-  url: "/projects/",
-  method: "POST",
-  body: { id: 1, name: "my project" },
-});
+## Critical Patterns (Copy-Paste Ready)
 
-// Complex matching with query params and request body
-MockApiClient.addMockResponse({
-  url: "/projects/",
-  method: "POST",
-  body: { id: 2, name: "other" },
-  match: [
-    MockApiClient.matchQuery({ param: "1" }),
-    MockApiClient.matchData({ name: "other" }),
-  ],
-});
+### API Endpoint Pattern
 
-// Error responses
-MockApiClient.addMockResponse({
-  url: "/projects/",
-  body: {
-    detail: "Internal Error",
-  },
-  statusCode: 500,
-});
-```
+```python
+# src/sentry/api/endpoints/organization_details.py
+from rest_framework.request import Request
+from rest_framework.response import Response
+from sentry.api.base import region_silo_endpoint
+from sentry.api.bases.organization import OrganizationEndpoint
+from sentry.api.serializers import serialize
+from sentry.api.serializers.models.organization import DetailedOrganizationSerializer
 
-#### Always Await Async Assertions
-
-Network requests are asynchronous. Always use `findBy` queries or properly await assertions:
-
-```tsx
-// ❌ Wrong - will fail intermittently
-expect(screen.getByText('Loaded Data')).toBeInTheDocument();
-
+@region_silo_endpoint
+class OrganizationDetailsEndpoint(OrganizationEndpoint):
+    publish_status = {
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
