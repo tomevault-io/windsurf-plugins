@@ -7,11 +7,11 @@ Loyal — open-source Solana wallet. Smart-account guardrails for AI agents, pri
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [loyal-labs/loyal-app](https://github.com/loyal-labs/loyal-app).
+Original source: `CLAUDE.md` in [loyal-labs/loyal-app](https://github.com/loyal-labs/loyal-app).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
