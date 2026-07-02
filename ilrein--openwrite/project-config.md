@@ -1,106 +1,120 @@
 ---
 trigger: always_on
-description: Ultracite Rules - AI-Ready Formatter and Linter
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
+# CLAUDE.md
 
-# Project Context
-Ultracite enforces strict type safety, accessibility standards, and consistent code quality for JavaScript/TypeScript projects using Biome's lightning-fast formatter and linter.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Key Principles
-- Zero configuration required
-- Subsecond performance
-- Maximum type safety
-- AI-friendly code generation
+## Project Overview
 
-## Before Writing Code
-1. Analyze existing patterns in the codebase
-2. Consider edge cases and error scenarios
-3. Follow the rules below strictly
-4. Validate accessibility requirements
+OpenWrite is a full-stack TypeScript application built with the Better-T-Stack, featuring a Bun-workspaces monorepo (mprocs orchestrates dev processes; see mprocs.yaml). This open-source AI-powered writing platform consists of three main applications:
 
-## Rules
+- **Web App** (`apps/web/`): React frontend with TanStack Router, TailwindCSS, and shadcn/ui components
+- **Server** (`apps/server/`): Hono-based REST server deployed on Cloudflare Workers  
+- **Documentation** (`apps/docs/`): VitePress documentation site
 
-### Accessibility (a11y)
-- Don't use `accessKey` attribute on any HTML element.
-- Don't set `aria-hidden="true"` on focusable elements.
-- Don't add ARIA roles, states, and properties to elements that don't support them.
-- Don't use distracting elements like `<marquee>` or `<blink>`.
-- Only use the `scope` prop on `<th>` elements.
-- Don't assign non-interactive ARIA roles to interactive HTML elements.
-- Make sure label elements have text content and are associated with an input.
-- Don't assign interactive ARIA roles to non-interactive HTML elements.
-- Don't assign `tabIndex` to non-interactive HTML elements.
-- Don't use positive integers for `tabIndex` property.
-- Don't include "image", "picture", or "photo" in img alt prop.
-- Don't use explicit role property that's the same as the implicit/default role.
-- Make static elements with click handlers use a valid role attribute.
-- Always include a `title` element for SVG elements.
-- Give all elements requiring alt text meaningful information for screen readers.
-- Make sure anchors have content that's accessible to screen readers.
-- Assign `tabIndex` to non-interactive HTML elements with `aria-activedescendant`.
-- Include all required ARIA attributes for elements with ARIA roles.
-- Make sure ARIA properties are valid for the element's supported roles.
-- Always include a `type` attribute for button elements.
-- Make elements with interactive roles and handlers focusable.
-- Give heading elements content that's accessible to screen readers (not hidden with `aria-hidden`).
-- Always include a `lang` attribute on the html element.
-- Always include a `title` attribute for iframe elements.
-- Accompany `onClick` with at least one of: `onKeyUp`, `onKeyDown`, or `onKeyPress`.
-- Accompany `onMouseOver`/`onMouseOut` with `onFocus`/`onBlur`.
-- Include caption tracks for audio and video elements.
-- Use semantic elements instead of role attributes in JSX.
-- Make sure all anchors are valid and navigable.
-- Ensure all ARIA properties (`aria-*`) are valid.
-- Use valid, non-abstract ARIA roles for elements with ARIA roles.
-- Use valid ARIA state and property values.
-- Use valid values for the `autocomplete` attribute on input elements.
-- Use correct ISO language/country codes for the `lang` attribute.
+## Architecture
 
-### Code Complexity and Quality
-- Don't use consecutive spaces in regular expression literals.
-- Don't use the `arguments` object.
-- Don't use primitive type aliases or misleading types.
-- Don't use the comma operator.
-- Don't use empty type parameters in type aliases and interfaces.
-- Don't write functions that exceed a given Cognitive Complexity score.
-- Don't nest describe() blocks too deeply in test files.
-- Don't use unnecessary boolean casts.
-- Don't use unnecessary callbacks with flatMap.
-- Use for...of statements instead of Array.forEach.
-- Don't create classes that only have static members (like a static namespace).
-- Don't use this and super in static contexts.
-- Don't use unnecessary catch clauses.
-- Don't use unnecessary constructors.
-- Don't use unnecessary continue statements.
-- Don't export empty modules that don't change anything.
-- Don't use unnecessary escape sequences in regular expression literals.
-- Don't use unnecessary fragments.
-- Don't use unnecessary labels.
-- Don't use unnecessary nested block statements.
-- Don't rename imports, exports, and destructured assignments to the same name.
-- Don't use unnecessary string or template literal concatenation.
-- Don't use String.raw in template literals when there are no escape sequences.
-- Don't use useless case statements in switch statements.
-- Don't use ternary operators when simpler alternatives exist.
-- Don't use useless `this` aliasing.
-- Don't use any or unknown as type constraints.
-- Don't initialize variables to undefined.
-- Don't use the void operators (they're not familiar).
-- Use arrow functions instead of function expressions.
-- Use Date.now() to get milliseconds since the Unix Epoch.
-- Use .flatMap() instead of map().flat() when possible.
-- Use literal property access instead of computed property access.
-- Don't use parseInt() or Number.parseInt() when binary, octal, or hexadecimal literals work.
-- Use concise optional chaining instead of chained logical expressions.
-- Use regular expression literals instead of the RegExp constructor when possible.
-- Don't use number literal object member names that aren't base 10 or use underscore separators.
-- Remove redundant terms from logical expressions.
-- Use while loops instead of for loops when you don't need initializer and update expressions.
-- Don't pass children as props.
-- Don't reassign const variables.
-- Don't use constant expressions in conditions.
-- Don't use `Math.min` and `Math.max` to clamp values when the result is constant.
+### Backend (apps/server/)
+- **Framework**: Hono with Cloudflare Workers runtime
+- **API Layer**: Hono REST API with OpenAPI type safety
+- **Database**: Cloudflare D1 (SQLite) with Drizzle ORM
+- **Authentication**: Better Auth with email/password support
+- **Key Files**:
+  - `src/index.ts`: Main Hono application with CORS, auth handlers, and REST routing setup
+  - `src/lib/context.ts`: Request context creation with session handling
+  - `src/lib/auth.ts`: Better Auth configuration with Drizzle adapter
+
+### Frontend (apps/web/)
+- **Framework**: React 19 with TanStack Router for file-based routing
+- **Styling**: TailwindCSS with shadcn/ui component library
+- **State Management**: TanStack Query for REST calls
+- **Key Files**:
+  - `src/main.tsx`: Application entry point with router and query client setup
+  - `src/routes/`: File-based routing structure
+  - `src/components/`: Reusable UI components
+  - `src/utils/api.ts`: REST API client configuration and utilities
+
+## Development Commands
+
+### Primary Commands (run from project root)
+```bash
+bun dev              # Start both web and server in development
+bun build            # Build all applications
+bun check-types      # TypeScript type checking across all apps
+bun lint             # Code formatting, linting, and import sorting
+bun quality          # Run both type checking and linting (recommended for CI/hooks)
+bun quality:fix      # Auto-fix formatting/linting issues, then run type checking
+```
+
+### Targeted Commands
+```bash
+bun dev:web          # Start only web app (port 3001)
+bun dev:server       # Start only server (port 3000)
+```
+
+### Database Commands
+```bash
+bun db:push          # Apply schema changes to database
+bun db:studio        # Open Drizzle Studio for database management
+bun db:generate      # Generate migration files
+bun db:migrate       # Run database migrations
+```
+
+### Application-Specific Commands
+Navigate to specific app directories for additional commands:
+- `apps/server/`: Wrangler commands for Cloudflare Workers deployment
+- `apps/web/`: Vite commands and Cloudflare Pages deployment
+- `apps/docs/`: VitePress documentation site commands
+
+## Development Setup
+
+1. Install dependencies: `bun install`
+2. Set up environment variables in `apps/server/.dev.vars`
+3. Initialize database: `bun db:push`
+4. Start development: `bun dev`
+
+The web application runs on http://localhost:3001 and the API on http://localhost:3000.
+
+## Frontend Conventions
+
+- **shadcn/ui first.** All UI is built from the primitives in `apps/web/src/components/ui/` (Radix + Tailwind). Never introduce a parallel component kit, custom popover/dropdown primitives, or SCSS — add missing primitives via the shadcn registry instead. The Tiptap editor is headless; its toolbar lives in `components/editor-toolbar.tsx` built on shadcn `Toggle`/`DropdownMenu`/`Dialog`.
+- **Forms:** plain controlled state for simple forms; TanStack Form + zod when validation is non-trivial (see `login-block.tsx`). Don't mix patterns within a feature.
+- **Loading states** use the `Skeleton` component, not hand-rolled `animate-pulse` divs, for new code.
+- **Icons:** lucide-react only.
+- **Theme:** use design tokens (`bg-background`, `text-muted-foreground`, `var(--primary)`), not hardcoded palette classes, in new code.
+
+## Testing
+
+Run `bun test` (Vitest, web + server suites) and `bun check-types` before committing. Add or extend tests alongside new features — pure logic (word counts, encryption, prompt building, type inference) should always have unit coverage.
+
+## Claude Code Integration
+
+This project includes Claude Code hooks configured in `.claude/settings.json`:
+
+- **user-prompt-submit hook**: Runs quality checks before processing user requests
+- **Stop hook**: Runs quality checks automatically when Claude finishes a task
+- **PreToolUse hooks**: Logs commands, edits, and writes for development tracking
+
+The quality check script (`.claude/quality-check.sh`) intelligently runs:
+- Full type checking + linting if TypeScript/JavaScript files are modified
+- Just linting if only other files are modified
+
+Manual commands available:
+```bash
+bun quality          # Full quality check (type checking + linting)
+bun quality:fix      # Auto-fix issues then run quality check
+./.claude/quality-check.sh  # Smart quality check based on git status
+```
+
+To bypass hooks temporarily (not recommended), you can modify `.claude/settings.json`.
+
+## Documentation Strategy
+
+All project documentation is centralized in the `apps/docs/` directory using VitePress:
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
