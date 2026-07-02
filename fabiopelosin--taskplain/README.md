@@ -7,11 +7,11 @@ Task management designed for coding agents, living right in your repo.
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [fabiopelosin/taskplain](https://github.com/fabiopelosin/taskplain).
+Original source: `CLAUDE.md` in [fabiopelosin/taskplain](https://github.com/fabiopelosin/taskplain).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
