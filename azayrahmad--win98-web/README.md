@@ -7,12 +7,12 @@ A pixel-perfect JavaScript recreation of Windows 98 for browser.
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `copilot-instructions.md` in [azayrahmad/win98-web](https://github.com/azayrahmad/win98-web).
+Original source: `AGENTS.md` in [azayrahmad/win98-web](https://github.com/azayrahmad/win98-web).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
+- **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
