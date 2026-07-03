@@ -7,11 +7,11 @@ Unified Home Energy Management System - coordinates multiple battery systems on 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [frahlg/forty-two-watts](https://github.com/frahlg/forty-two-watts).
+Original source: `CLAUDE.md` in [frahlg/forty-two-watts](https://github.com/frahlg/forty-two-watts).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
