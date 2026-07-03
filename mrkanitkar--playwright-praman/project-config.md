@@ -1,50 +1,112 @@
 ---
 trigger: always_on
-description: Praman test writing rules — Vitest unit tests and Playwright integration tests
+description: Agent-First SAP UI5 Test Automation Plugin for Playwright.
 ---
 
+# Praman v1.0 Copilot Instructions
 
-# Test Rules
+## Project
 
-## Unit Tests (Vitest)
+Agent-First SAP UI5 Test Automation Plugin for Playwright.
+Single npm package `playwright-praman` with sub-path exports.
+Ground-up rewrite — NO copy-paste from v2.5.0.
 
-- File pattern: `*.test.ts`
-- Hermetic: no network, no SAP system
-- Use `describe` / `it` pattern
-- Mock bridge with typed test doubles from `tests/helpers/`
-- Coverage ≥ 90% statements, ≥ 85% branches
+## Architecture
 
-## Integration Tests (Playwright)
+- 5-layer architecture: Core → Bridge → Proxy → Fixtures → AI
+- All modules ≤ 300 LOC (warning, not blocking)
+- Layer dependency: lower layers NEVER import from higher layers
 
-- File pattern: `*.spec.ts`
-- Use `test.step()` for each logical step
-- NEVER use `page.waitForTimeout()` — use `waitForUI5Stable()`
-- Require SAP credentials in environment
+## Agent Skills (Read Before Working)
 
-## Correct Pattern
+Load the appropriate skill file based on the task:
 
-```typescript
-import { describe, expect, it, vi } from 'vitest';
+| Task                                               | Skill File                                                                    |
+| -------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Architecture decisions, module boundaries          | `skills/playwright-praman-sap-testing/skills-architect.md`                    |
+| TypeScript implementation, proxy, bridge           | `skills/playwright-praman-sap-testing/skills-implementer.md`                  |
+| Test-driven development (TDD), RED-GREEN-REFACTOR  | `skills/playwright-praman-sap-testing/skills-tdd.md`                          |
+| Unit/integration tests, coverage                   | `skills/playwright-praman-sap-testing/skills-tester.md`                       |
+| Playwright fixtures, selectors, matchers           | `skills/playwright-praman-sap-testing/skills-playwright-expert.md`            |
+| SAP UI5 controls, FLP, OData, RecordReplay         | `skills/playwright-praman-sap-testing/skills-sap-ui5-expert.md`               |
+| SAP UI5 Web Components, Shadow DOM, hybrid testing | `skills/playwright-praman-sap-testing/skills-sap-ui5-webcomponents-expert.md` |
+| SAP Fiori consulting, E2E scenarios, auth testing  | `skills/playwright-praman-sap-testing/skills-sap-fiori-consultant.md`         |
+| OData V2/V4 protocol, Gateway, mock strategies     | `skills/playwright-praman-sap-testing/skills-sap-odata-expert.md`             |
+| PR review, quality gates                           | `skills/playwright-praman-sap-testing/skills-reviewer.md`                     |
+| CI/CD, security, build, release                    | `skills/playwright-praman-sap-testing/skills-security-build.md`               |
+| Team overview, collaboration model                 | `skills/playwright-praman-sap-testing/skills-team-overview.md`                |
 
-describe('MyModule', () => {
-  it('should handle the expected case', () => {
-    const result = myFunction(input);
-    expect(result).toBe(expected);
-  });
+## Code Standards
 
-  it('should throw PramanError on failure', () => {
-    expect(() => myFunction(badInput)).toThrow(PramanError);
-  });
-});
-```
+- TypeScript strict mode, no `any`, no `as unknown as T`
+- ESM only (`import`, not `require`)
+- All public APIs MUST have TSDoc with `@example` (TSDoc only, NOT JSDoc)
+- Use pino logger, NEVER `console.log`
+- Prefer `readonly` for properties that shouldn't change
+- Use `Readonly<T>` for config objects
+- All relative imports must include `.js` extension
+- Node builtins must use `node:` prefix
 
-## Forbidden in Tests
+## Documentation Standard: TSDoc
 
-- `any` type assertions
-- `console.log` (use test assertions)
-- `page.waitForTimeout()` (use `waitForUI5Stable()`)
-- Raw `throw new Error()` (use typed error subclass)
-- `require()` in test source (ESM only)
+- This project uses Microsoft TSDoc exclusively
+- TSDoc config: `tsdoc.json` extends `@microsoft/api-extractor`
+- Validated by: `eslint-plugin-tsdoc` with `tsdoc/syntax: 'error'`
+- Reference: `docs/documentation-standards.md`
+- Every public function: `@param`, `@returns`, `@throws`, `@example`
+
+## ESLint Configuration (11 Plugins)
+
+- `typescript-eslint` — strict type-checked rules
+- `eslint-plugin-tsdoc` — TSDoc syntax enforcement
+- `eslint-plugin-playwright` — Playwright best practices
+- `eslint-plugin-security` — security vulnerability detection
+- `@microsoft/eslint-plugin-sdl` — Microsoft SDL compliance
+- `eslint-plugin-sonarjs` — code smell detection
+- `eslint-plugin-n` — Node.js best practices
+- `eslint-plugin-promise` — async/Promise patterns
+- `eslint-plugin-import-x` + `eslint-plugin-unicorn` — import hygiene & modernization
+- `eslint-plugin-headers` — Apache-2.0 `@license` header enforcement on every source file
+
+## Testing Standards
+
+- Unit tests: Vitest, hermetic (no network, no SAP system)
+- Integration tests: Playwright against SAP demo apps
+- All integration tests must use `test.step()` for readability
+- NEVER use `page.waitForTimeout()` — use waitForUI5Stable()
+- Coverage: Tiered (100% errors/API, 95% core, 90% global), per-file enforced via @vitest/coverage-v8
+- Test files: `*.test.ts` (unit), `*.spec.ts` (integration)
+- Use typed mock factories (mock-page.ts, mock-adapter.ts, mock-config.ts)
+
+## Error Handling
+
+- All errors extend `PramanError`
+- Include: code (ERR\_\*), message, attempted, retryable, details, suggestions[]
+- ControlError adds: lastKnownSelector, availableControls[], suggestedSelector
+- NEVER use raw `throw new Error()` — always use typed error subclass
+
+## Naming Conventions
+
+- Files: kebab-case (e.g., `bridge-error.ts`)
+- Interfaces/Types: PascalCase (e.g., `BridgeAdapter`) — no `I` prefix
+- Functions/methods: camelCase (e.g., `findControl`)
+- Constants: UPPER_CASE (e.g., `MAX_RETRY_COUNT`)
+- Error codes: ERR_SCOPE_DESCRIPTION (e.g., `ERR_BRIDGE_TIMEOUT`)
+- Booleans: `is/has/can/should` prefix (e.g., `isVisible`, `hasError`)
+
+## Import Order
+
+1. Node built-ins (`node:path`, `node:fs`)
+2. External packages (`zod`, `pino`)
+3. Internal (`#core/`, `#bridge/`, `#proxy/`)
+4. Parent (`../`)
+5. Sibling (`./`)
+
+## Commit Messages
+
+- Conventional Commits: `feat(scope): description`
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [mrkanitkar/playwright-praman](https://github.com/mrkanitkar/playwright-praman) — distributed by [TomeVault](https://tomevault.io).
