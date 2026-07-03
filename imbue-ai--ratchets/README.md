@@ -7,11 +7,11 @@ Ratchet enforces that style violations for your project only monotonically decre
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [imbue-ai/ratchets](https://github.com/imbue-ai/ratchets).
+Original source: `AGENTS.md` in [imbue-ai/ratchets](https://github.com/imbue-ai/ratchets).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
