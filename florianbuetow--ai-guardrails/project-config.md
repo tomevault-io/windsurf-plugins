@@ -1,0 +1,86 @@
+---
+trigger: always_on
+description: This file provides guidance to AI agents and AI-assisted development tools when working with code in this repository. This includes Claude Code, Cursor IDE, GitHub Copilot, Windsurf, and any other AI coding assistants.
+---
+
+# AGENTS.md
+
+This file provides guidance to AI agents and AI-assisted development tools when working with code in this repository. This includes Claude Code, Cursor IDE, GitHub Copilot, Windsurf, and any other AI coding assistants.
+
+## Repository Overview
+
+This repository contains Copier templates for Python, Java, Go, Elixir, C++, Rust, Kotlin, and TypeScript (React) that enforce strict validation guardrails on AI-generated code — catching antipatterns, suppressing silent defaults, and providing immediate feedback so AI agents write better, more maintainable code from the start.
+
+## Core Coding Principles
+
+These rules apply everywhere — repo scripts, justfiles, test infrastructure, and all language templates:
+
+1. **Fail fast — never swallow errors.** Always propagate errors and exit with code 1 immediately. No silent fallbacks, no `|| true`, no ignored return codes. Use `set -e` or `&&` chaining in shell scripts.
+2. **No default values — never assume missing values.** Check for required values explicitly and exit 1 if something is missing. Default values mask underlying issues and make them hard to debug.
+3. **Never suppress checks with annotations.** Fix the underlying issue instead. No `@SuppressWarnings`, `# noqa`, `# type: ignore`, `#[allow(...)]`, `NOLINT`, `// noinspection`, `NOSONAR`, `@dialyzer`, `# shellcheck disable`, or any other mechanism that silences a checker.
+4. **Use `printf` for color output — never `echo`.** Some terminals won't render ANSI escape sequences with `echo`. In shell scripts and justfiles, always use `printf` for colored or formatted text output. Plain `echo ""` is acceptable only for blank-line spacing.
+
+## Git Commit Guidelines
+
+**IMPORTANT:** When creating git commits in this repository:
+- NEVER include AI attribution in commit messages
+- NEVER add "Generated with [AI tool name]" or similar phrases
+- NEVER add "Co-Authored-By: [AI name]" or similar attribution
+- NEVER run `git add -A` or `git add .` - always stage files explicitly
+- Keep commit messages professional and focused on the changes made
+- Commit messages should describe what changed and why, without mentioning AI assistance
+- ALWAYS run `git push` after creating a commit to push changes to the remote repository
+
+## Current Contents
+
+- `project-setup/setup-project-python.md` - A comprehensive guide for bootstrapping Python projects using AI agents
+
+### Violation Tests (`violations/`)
+
+- `violations/<language>/<rule-name>/...` contains file overlays that intentionally introduce one forbidden pattern.
+- Each violation case must map to an existing guardrail rule (Semgrep, Credo, or other checker) and use valid, compilable code.
+
+**How violation testing works:**
+
+The key principle is that we test the generated project's own CI justfile targets — the same `just code-semgrep`, `just code-security`, etc. that developers run. We're verifying that the project's built-in guardrails catch forbidden patterns, not running checks some other way.
+
+1. **Generate** a fresh project from the template into a temp directory.
+2. **Baseline** — run the project's full CI (`just ci`) on the clean project. It must pass. This confirms the template itself is valid.
+3. **For each violation:**
+   a. **Inject** — copy the violation's overlay files into the generated project (originals are backed up).
+   b. **Stage** — `git add -A` so tools like semgrep see the new/changed files.
+   c. **Run the project's targeted justfile recipe** — e.g. `just code-security`, `just code-semgrep`. The recipe name is read from a `check` file in the violation directory; if absent, defaults to `code-semgrep`.
+   d. **Expect failure** — the justfile target **must exit non-zero**. If it passes, the project's guardrail failed to catch the violation and the test fails.
+   e. **Restore** — put original files back and reset git state for the next test.
+
+This is an inverted test pattern: a passing test means the project's own CI caught the bad code.
+
+**To add a new violation test:**
+
+1. Create a new subdirectory under the target language (for example `violations/python/no-default-values/`).
+2. Add only the files that must be overlaid onto the generated project.
+3. Optionally add a `check` file containing the justfile recipe name to run (one line, e.g. `code-security`). If omitted, `code-semgrep` is used.
+4. Ensure the injected code triggers the intended rule without relying on placeholder/broken syntax.
+
+### The Python CLI Template (`blueprints/python-cli-base`)
+
+- Python 3.12+ with uv package management
+- Project structure: src/, scripts/, data/
+- Validation: ruff, mypy, pyright, bandit, semgrep, deptry, codespell, pip-audit, pytestarch, pytest
+- Conventions: Justfile workflow, strict directory organization, no pip or python directly
+
+### The Java CLI Template (`blueprints/java-cli-base`)
+
+- Java 21+ with Gradle Kotlin DSL
+- Validation: Spotless, Checkstyle, Error Prone, javac -Xlint:all -Werror, SpotBugs, semgrep, codespell, Gradle Versions Plugin, ArchUnit, JUnit 5
+
+### The Go CLI Template (`blueprints/go-cli-base`)
+
+- Go 1.23+ with Go modules
+- Project structure: cmd/, internal/, scripts/, data/
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [florianbuetow/ai-guardrails](https://github.com/florianbuetow/ai-guardrails) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-03 -->
