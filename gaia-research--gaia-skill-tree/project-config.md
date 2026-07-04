@@ -1,0 +1,88 @@
+---
+trigger: always_on
+description: Guidance for AI coding agents working in this repository.
+---
+
+# CLAUDE.md
+
+Guidance for AI coding agents working in this repository.
+
+## Workflow Discipline
+
+- When user asks for a specific task (merge, monitor, audit), stay focused on that task. Do NOT deviate into debugging or exploration unless explicitly asked.
+- Read key files BEFORE running exploratory bash commands.
+- When asked to monitor/loop CI checks, monitor — do not switch to debugging failures unless instructed.
+
+## Graphify
+
+Graphify is an approved tool for codebase analysis and is used on an as-needed basis (deep architecture audits, dependency mapping, cross-cutting impact assessments). Running it costs real token spend — only invoke it when the task warrants a structural code graph. The valuable outputs (`graph.json`, `graph.html`, `manifest.json`, `GRAPH_REPORT.md`, `cost.json`) are tracked in git; the regenerable cache (`graphify-out/cache/`) is gitignored.
+
+## Git Workflow
+
+Never push directly to main.
+
+### Branch & Worktree Conventions
+
+- Always confirm the target branch/worktree before editing. If user references a specific branch (e.g., `fix/links-3d-graph`), push there — do not create a new design branch.
+- When editing in a worktree, verify CWD matches the requested worktree before making edits.
+
+## Branch Scope — infra/ allowlist
+
+`infra/` branches may touch `docs/badges/` (registry.json, _assets/) in addition to the standard `.github/`, `scripts/`, `*.md`, `docs/*.html`. This is codified in `.github/workflows/branch-scope.yml` and applies permanently — badge restore/guard commits belong on `infra/` branches and must not require `skip-scope-check` every time.
+
+## Branch Scope — schema/ allowlist
+
+`schema/` branches may touch `registry/schema/` **and** `src/gaia_cli/data/registry/schema/` (the bundled snapshot the pip-installed CLI reads) in addition to `*.md`. The two schema directories must move in lockstep — `scripts/validate.py` "Meta sync check" fails when they diverge — so a schema PR that only touches one side always trips CI. Codified in `.github/workflows/branch-scope.yml`; do not require `skip-scope-check` for routine schema bumps.
+
+## Branch Scope — review/meta/ allowlist
+
+`review/meta/` branches may touch `docs/` in addition to `registry/` (excluding `registry/schema/`) and `*.md`. This is required by Guard E: any change to `registry/nodes/` or `registry/named/` MUST include the regenerated Class S artifacts (`docs/graph/*`, `docs/api/v1/*`, per-user profile pages, badges) in the same PR. Codified in `.github/workflows/branch-scope.yml`; do not require `skip-scope-check` on every curation PR just to land the `gaia dev docs` output.
+
+## Redaction Exemptions — ordained, do not re-litigate
+
+The following 8 contributor handles are **permanently exempt** from Section D badge-dir violations (`validate_redaction.py` + `build_docs.py`). Their `docs/badges/_assets/<handle>/` directories are kept intentionally. Do NOT remove them from the exemption list, do NOT delete their dirs, do NOT open issues about them. If any of them reach 2★ their dir becomes valid anyway and the exemption becomes a no-op.
+
+Exempted handles: `0xdarkmatter`, `Taoidle`, `browserbase`, `changkun`, `glincker`, `gooseworks`, `intelligentcode-ai`, `yonatangross`
+
+To add a new exemption: edit `REDACTION_BADGE_DIR_EXEMPTIONS` in **both** `scripts/validate_redaction.py` and `scripts/build_docs.py` (two frozensets, keep in sync).
+
+## Edit Safety
+
+- After Edit/Write operations on JS/HTML, verify no duplication or merged lines were introduced (read the file back, run syntax check if available).
+- Avoid hex color fallbacks; use design tokens only (CI guard rejects hex).
+- When bumping assets, also update cache-bust version strings across all referencing pages.
+
+## Testing
+
+Always run the test suite after making changes and fix any regressions before reporting completion.
+
+## Data & Permissions
+
+Never modify data files (skill levels, slot data, schema fixtures) without explicit approval; ask before treating data as invalid.
+
+## Project Architecture / Data Model
+
+Skill levels are stored in slots, not on skill objects—account for this when computing stats, trees, and breakdowns.
+
+## Commands & Setup
+
+Refer to [DEV.md](file:///Users/marcotiongson/Documents/gaia-skill-tree/DEV.md) for local environment setup (virtualenv, pip, pipx), common commands, and testing instructions.
+
+
+## Current Layout
+
+| Area | Path | Notes |
+|---|---|---|
+| Curated registry | `registry/` | Maintainer-reviewed data and public generated catalogs |
+| Canonical graph | `registry/gaia.json` | Class P (gitignored — regenerated locally by gaia dev docs; bundled in wheels on vX.Y.0 releases). NOT served to browsers directly. |
+| Site graph assets | `docs/graph/` | Class S (tracked in git — served as-is by GitHub Pages from main:/docs at gaia.tiongson.co). Includes gaia.json, named/index.json, gaia.gexf, gaia.svg. Regenerated by `gaia dev docs` alongside registry/gaia.json. |
+| Named skills | `registry/named/` | Markdown implementations grouped by contributor |
+| Named index | `registry/named-skills.json` | Generated by `scripts/generateNamedIndex.py` |
+| Schemas | `registry/schema/` | JSON schemas |
+| Review intake | `registry-for-review/skill-batches/` | `gaia push` writes draft batches here |
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [gaia-research/gaia-skill-tree](https://github.com/gaia-research/gaia-skill-tree) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-04 -->
