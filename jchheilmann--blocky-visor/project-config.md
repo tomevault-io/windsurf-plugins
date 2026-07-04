@@ -99,5 +99,5 @@ Go sidecar (default port 8550), all authenticated routes require `X-API-Key` hea
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Source: [JCHHeilmann/blocky-visor](https://github.com/JCHHeilmann/blocky-visor) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-03 -->
+> Source: [jchheilmann/blocky-visor](https://github.com/jchheilmann/blocky-visor) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-04 -->
