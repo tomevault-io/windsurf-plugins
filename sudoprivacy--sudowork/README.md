@@ -7,11 +7,11 @@ sudowork ai agent
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [sudoprivacy/sudowork](https://github.com/sudoprivacy/sudowork).
+Original source: `CLAUDE.md` in [sudoprivacy/sudowork](https://github.com/sudoprivacy/sudowork).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
