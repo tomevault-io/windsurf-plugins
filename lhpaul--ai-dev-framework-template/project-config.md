@@ -1,54 +1,54 @@
 ---
 trigger: always_on
-description: This is the primary AI agent guidance file for this project. It follows the [AGENTS.md](https://github.com/agentsmd/agents.md) open format and is read by all AI coding assistants (Claude Code, Cursor, Codex, Gemini CLI, etc.).
+description: Documentation conventions. Apply when creating or editing any documentation file.
 ---
 
-# AGENTS.md
 
-This is the primary AI agent guidance file for this project. It follows the [AGENTS.md](https://github.com/agentsmd/agents.md) open format and is read by all AI coding assistants (Claude Code, Cursor, Codex, Gemini CLI, etc.).
+## Documentation Conventions
 
-> **Note for Claude Code users**: `CLAUDE.md` is a symlink to this file.
+### Single source of truth
 
----
+Every piece of information lives in exactly one place. Before adding content:
+1. Check if it already exists somewhere in `docs/`
+2. If it exists, reference it — don't duplicate it
+3. If it doesn't exist, add it in the most appropriate file
 
-## Project Overview
+### Document boundaries
 
-> **TODO**: Fill this section via the project setup agent (`docs/workflow/setup/protocol.md`), or manually describe your project here.
->
-> - What does this project do?
-> - Who are the users?
-> - What problem does it solve?
+| File/Directory | Contains |
+|---|---|
+| `README.md` | Project overview, quick start, repo map |
+| `AGENTS.md` | AI agent guidance, commands, key conventions |
+| `docs/project/` | Project-specific context (domain, architecture, stack, DB) |
+| `docs/best-practices/` | Coding standards and conventions |
+| `docs/workflow/development-workflow/` | Workflow protocols, templates, integrations |
+| `docs/specs/developments/` | Feature specs and implementation plans |
+| `docs/testing/` | Smoke test runbooks |
 
----
+### Cross-referencing
 
-## Repository Structure
+Prefer references over duplication:
 
-> **TODO**: Fill this section after running the project setup. Reference `docs/project/2-repo-architecture.md` for details.
+```markdown
+<!-- Good -->
+For database conventions, see [`docs/best-practices/STACK-SPECIFIC.md`](../best-practices/STACK-SPECIFIC.md).
 
----
+<!-- Bad -->
+[Copying the entire database conventions section here]
+```
 
-## Key Documentation
+### Placeholder discipline
 
-Always refer to these docs for authoritative guidance:
+- Use `> TODO: [specific question]` for content that needs to be filled in
+- Never leave generic placeholder text (e.g., "[Description]") after setup is complete
+- If a section doesn't apply to the project, delete it rather than leaving it empty
 
-| Document                                                                                                                                                       | Purpose                                                                                         |
-| -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| [`docs/project/1-business-domain.md`](docs/project/1-business-domain.md)                                                                                       | Domain entities, business rules, glossary                                                       |
-| [`docs/project/2-repo-architecture.md`](docs/project/2-repo-architecture.md)                                                                                   | Repository structure, packages, apps                                                            |
-| [`docs/project/3-software-architecture.md`](docs/project/3-software-architecture.md)                                                                           | Tech stack, design patterns, architecture decisions                                             |
-| [`docs/project/4-database-model.md`](docs/project/4-database-model.md)                                                                                         | Data model, schema, access patterns (if applicable)                                             |
-| [`docs/best-practices/1-general.md`](docs/best-practices/1-general.md)                                                                                         | General coding standards                                                                        |
-| [`docs/best-practices/2-version-control.md`](docs/best-practices/2-version-control.md)                                                                         | Git conventions                                                                                 |
-| [`docs/best-practices/3-testing.md`](docs/best-practices/3-testing.md)                                                                                         | Testing standards                                                                               |
-| [`docs/best-practices/STACK-SPECIFIC.md`](docs/best-practices/STACK-SPECIFIC.md)                                                                               | Stack-specific conventions                                                                      |
-| [`REVIEW.md`](REVIEW.md)                                                                                                                                       | Canonical review contract for spec, plan, and code review gates                                 |
-| [`docs/workflow/development-workflow/README.md`](docs/workflow/development-workflow/README.md)                                                                 | AI development workflow (master doc)                                                            |
-| [`docs/workflow/development-workflow/protocols/00-add-backlog-item-protocol.md`](docs/workflow/development-workflow/protocols/00-add-backlog-item-protocol.md) | Create backlog work items in a configured tracker (before spec/plan work)                       |
-| [`docs/workflow/development-workflow/agent-model-config.md`](docs/workflow/development-workflow/agent-model-config.md)                                         | Model assignments, tool restrictions, and override guide for all agents                         |
-| [`.ai-dev-workflow.yaml`](.ai-dev-workflow.yaml)                                                                                                               | Repo-level workflow integration manifest (review tools, issue tracker, VCS, browser automation) |
-| [`LLM_RULES.md`](LLM_RULES.md)                                                                                                                                 | Agent commit rules enforced by Haystack pre-commit hooks (when installed)                       |
+### Writing style
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- Write for AI readers as well as humans — be specific and unambiguous
+- Prefer tables over long prose for structured information
+- Use code blocks for commands, file paths, and code examples
+- Keep docs concise — AI agents read these on every task
 
 ---
 > Source: [lhpaul/ai-dev-framework-template](https://github.com/lhpaul/ai-dev-framework-template) — distributed by [TomeVault](https://tomevault.io).
