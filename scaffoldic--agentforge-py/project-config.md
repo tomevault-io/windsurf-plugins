@@ -1,0 +1,105 @@
+---
+trigger: always_on
+description: > Repository conventions for any AI assistant editing this repo.
+---
+
+# AGENTS.md — agentforge-py
+
+> Repository conventions for any AI assistant editing this repo.
+> Tool-agnostic — `CLAUDE.md` and any future tool-specific rules files
+> defer to this one.
+
+## What this repo is
+
+`agentforge-py` is the Python implementation of [AgentForge](https://github.com/Scaffoldic/agentforge-py),
+an open-source plug-and-play framework for building production AI
+agents. The repo is a **uv workspace** with two member packages today:
+
+- `packages/agentforge-core/` — locked contracts (ABCs, value types,
+  production-rails primitives, resolver, testing utilities). No I/O,
+  no third-party SDKs except Pydantic + python-ulid.
+- `packages/agentforge/` — default runtime (`Agent` orchestrator,
+  `InMemoryStore`, configuration loader). Imports from
+  `agentforge-core`; never the reverse.
+
+When new modules ship (provider clients, persistence drivers, MCP,
+observability, safety, etc. — see `CHANGELOG.md`), each lands as a
+new directory under `packages/`. The workspace glob in the root
+`pyproject.toml` already covers them.
+
+## Hard rules
+
+| # | Rule | Reference |
+|---|---|---|
+| 1 | `agentforge-core` imports nothing from `agentforge` or any other module package. It is the leaf of the dependency graph. | dependency policy |
+| 2 | Contracts in `agentforge-core` (every ABC + the `Finding` Protocol + the locked value types) are **stable surface**. Adding a method to an ABC is a major version bump; adding a field with a safe default is a minor bump. | locked contract layer |
+| 3 | Configuration is data, not code. No dynamic imports from YAML; no Jinja inside config. Env-var interpolation only (`${VAR}`, `${VAR:default}`, `${VAR:?error}`, `$$` → `$`). | `agentforge.config` |
+| 4 | No magic numbers in production code. Every threshold / timeout / limit comes from a Pydantic config model with a documented default. | configuration policy |
+| 5 | Test coverage must be ≥ 90% on every commit. Pre-commit blocks below; CI ratchet rejects regressions on `main`. | `.pre-commit-config.yaml` + `.github/workflows/ci-linux.yml` |
+| 6 | One feature = one branch = one PR. Conventional Commits format (`feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `chore:`, `perf:`, `revert:`). | PR template |
+| 7 | Never bypass pre-commit with `--no-verify` unless the user explicitly authorises it for a specific commit (and the bypass is documented in the commit message). | pre-commit policy |
+| 8 | Type hints everywhere. `mypy --strict` is the gate. `Any` only at genuine boundaries (raw provider responses); never to paper over untyped internals. | `pyproject.toml > [tool.mypy]` |
+| 9 | Async-first. Public methods on locked contracts are `async def`. Sync callers use the `*_sync` shims (where exposed) or `asyncio.run()`. | locked contract layer |
+
+## Anti-patterns reviewers will reject
+
+- **Importing another agent framework's primitives** anywhere. Wrong framework.
+- **Hand-written JSON schemas** for tools — use Pydantic models on the
+  `Tool` ABC's `input_schema` class attribute (or the `@tool`
+  decorator once feat-004 ships).
+- **API keys as YAML literals** — use `${ENV_VAR}`.
+- **Catching exceptions to "make robust"** — let them surface; the
+  framework records them as observations and the LLM recovers.
+- **Wrappers around `Agent.run()` to add cross-cutting features** —
+  use the hook system (`on_step` / `on_finish`) once feat-009 ships
+  observability backends.
+- **Module-level singleton config** (`dspy.configure(...)` style) —
+  use dependency injection.
+- **Threading for I/O** — use `asyncio`.
+
+## Workflow
+
+This project is **fully self-contained**: every spec / state /
+standard / checklist / CHANGELOG / design / ADR / workflow rule
+lives inside `agentforge-py/`. A new contributor cloning the repo
+standalone — without seeing any parent directory — has everything
+needed to contribute.
+
+The complete per-feature workflow is captured in this file
+(see *Branch + PR rules* below) plus the project's standards
+(`.claude/standards/`) and checklists (`.claude/checklists/`).
+Don't reference anything outside this repo.
+
+### Reading order on session resume
+
+1. This file (`AGENTS.md`)
+2. `.claude/state/current.md` — the live snapshot. **Local-only,
+   git-ignored** (per-session working state, not published); may be
+   absent on a fresh clone — create it when you start tracking work.
+3. `.claude/state/log.md` — append-only milestone history. Also
+   local-only / git-ignored.
+4. [`docs/features/README.md`](./docs/features/README.md) — feature
+   catalogue
+5. The active feature spec at
+   [`docs/features/feat-NNN-*.md`](./docs/features/) (linked from
+   `state/current.md`)
+6. [`docs/roadmap.md`](./docs/roadmap.md) — shipped + backlog
+   pointer
+7. [`CHANGELOG.md`](./CHANGELOG.md) — release notes
+
+### Branch + PR rules
+
+- Branch from `main`. Conventional branch names:
+  `feat/<NNN>-<slug>`, `fix/<slug>`, `docs/<slug>`, `chore/<slug>`.
+  **`<NNN>` must match the canonical feature number** in
+  `docs/features/feat-NNN-*.md`. If you can't find a canonical spec
+  for the work, the work doesn't have a feat-NNN number — use a
+  `chore/` or `docs/` branch instead, or write a spec first.
+- **Every feature PR updates the matching canonical spec's
+  Implementation section** — what shipped, what was deferred, any
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [Scaffoldic/agentforge-py](https://github.com/Scaffoldic/agentforge-py) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-04 -->
