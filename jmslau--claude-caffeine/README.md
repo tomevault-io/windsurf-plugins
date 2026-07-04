@@ -7,11 +7,11 @@ Keeps your Mac awake while Claude Code is working — even with the lid closed
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [jmslau/claude-caffeine](https://github.com/jmslau/claude-caffeine).
+Original source: `CLAUDE.md` in [jmslau/claude-caffeine](https://github.com/jmslau/claude-caffeine).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
