@@ -1,84 +1,77 @@
 ---
 trigger: always_on
-description: This project uses OpenWolf for context management. Read and follow .wolf/OPENWOLF.md every session. Check .wolf/cerebrum.md before generating code. Check .wolf/anatomy.md before reading files.
+description: This is the ESP8266 firmware for the NodoShop OpenTherm Gateway (OTGW). It provides network connectivity (Web UI, MQTT, REST API, and TCP serial socket) for the OpenTherm Gateway hardware, with a focus on reliable Home Assistant integration.
 ---
 
-# OpenWolf
+# GitHub Copilot Instructions for OTGW-firmware
 
-@.wolf/OPENWOLF.md
+## Project Overview
 
-This project uses OpenWolf for context management. Read and follow .wolf/OPENWOLF.md every session. Check .wolf/cerebrum.md before generating code. Check .wolf/anatomy.md before reading files.
+This is the ESP8266 firmware for the NodoShop OpenTherm Gateway (OTGW). It provides network connectivity (Web UI, MQTT, REST API, and TCP serial socket) for the OpenTherm Gateway hardware, with a focus on reliable Home Assistant integration.
 
+## ADR Workflow Reminder
 
-# OTGW-firmware: Claude Instructions
+**IMPORTANT:** This project maintains Architecture Decision Records (ADRs) as docs-as-code that document key architectural choices. Before making changes that affect architecture, consult the relevant ADRs:
 
----
+- **Platform & Architecture:** See `docs/adr/` directory for complete ADR index
+- **Key decisions documented:** ESP8266 platform, modular .ino files, HTTP-only (no HTTPS), static buffers, PROGMEM strings, WebSocket streaming (OpenTherm messages only), MQTT integration, timer-based scheduling, LittleFS persistence, hardware watchdog, PIC firmware upgrade, Arduino framework, build system, NTP/timezone, command queue, WiFiManager, ArduinoJson, simplified OTA flash (XHR-based, see ADR-029)
+- **ADR Index:** `docs/adr/README.md` provides navigation and decision summaries
+- **ADR Skill:** `.github/skills/adr/SKILL.md` provides comprehensive ADR creation guidance
 
-## Task Management (MANDATORY)
+Treat `docs/adr/README.md` as the **single source of truth** for:
+- when an ADR is required
+- the ADR template and naming conventions
+- lifecycle, immutability, and superseding rules
+- PR and code-review expectations for architectural changes
 
-**Every piece of work must have a backlog task before any code is written. No exceptions.**
+For architecturally significant changes, read the relevant ADRs before coding, follow the existing decisions, and link any applicable ADR in the PR description. Use `.github/skills/adr/SKILL.md` when you need help drafting or checking an ADR.
 
-**Always use the `backlog` CLI for task operations on this project. Do NOT use the `mcp__backlog__*` MCP server.** The MCP server indexes only one worktree at a time and serves stale cached state across worktrees (verified 2026-05-05: MCP returned a pre-edit "In Progress" snapshot of TASK-514 long after the CLI marked it Done on disk in another tree). The "Backlog.md: always use the CLI" section near the bottom of this file is the canonical statement; this paragraph is a reminder so the rule is the first thing seen.
+### ADR Hotspots
 
-```bash
-# Before writing any code:
-backlog search "<topic>" --plain           # 1. Find existing task
-backlog task create "Title" -d "..." --ac "..."  # 2. Create if none
-backlog task edit <id> -s "In Progress" -a @claude  # 3. Start it
-backlog task edit <id> --plan "..."        # 4. Write plan, share with user, WAIT for approval
+The following areas frequently look like "just a bug fix" but often cross into architecture, contracts, or NFRs. When working in these files or subsystems, explicitly ask whether an ADR is affected before coding.
 
-# During implementation:
-backlog task edit <id> --check-ac 1        # Mark ACs done as you go
-backlog task edit <id> --append-notes "..."  # Log progress
+- **OTA / update flow**: `OTGW-ModUpdateServer-impl.h`, `OTGW-ModUpdateServer.h`, `updateServerHtml.h`, `flash_esp.py`, `build.py`
+  - Ask: does this change alter update transport, reboot verification, browser/server coordination, persistence behavior, or operator recovery workflow?
+- **Settings / state model**: `OTGW-firmware.h`, `settingStuff.ino`, settings persistence helpers, boot-time settings load
+  - Ask: does this change alter the configuration model, runtime state ownership, initialization ordering, or persistence format?
+- **Persistence and filesystem behavior**: `LittleFS` usage, `settings.ini`, `version.hash`, streaming file serving, backup/restore during flash
+  - Ask: does this change alter what survives reboot/flash, how files are written, or memory-safety patterns for file handling?
+- **REST API and external contracts**: `restAPI*.ino`, JSON payload shapes, endpoint routing, HTTP status behavior
+  - Ask: does this change alter an API contract, response structure, versioning behavior, or compatibility expectations?
+- **MQTT and Home Assistant integration**: `MQTTstuff.ino`, topic naming, discovery payloads, source-specific topic layout
+  - Ask: does this change alter published topics, retained payload structure, discovery entities, or client compatibility?
+- **Network behavior and protocol choices**: HTTP/WS communication, WebSocket lifecycle, telnet diagnostics, polling/state machines
+  - Ask: does this change alter transport assumptions, security model, concurrency behavior, or service coordination?
+- **Build / tooling / release flow**: `build.py`, `Makefile`, evaluation checks, artifact naming, CI/CD behavior
+  - Ask: does this change alter developer workflow, build guarantees, release artifacts, or policy enforcement?
+- **Memory-safety patterns tied to existing ADRs**: PROGMEM usage, static buffers, file streaming, heap protection, protocol hot paths
+  - Ask: is this only an implementation cleanup, or does it change an established project-wide rule?
 
-# When done:
-backlog task edit <id> --final-summary "..." # PR description
-backlog task edit <id> -s Done
-```
+If the answer is unclear, stop and inspect `docs/adr/README.md` before proceeding. If a change modifies one of these project-wide behaviors, prefer documenting it with an ADR or explicitly recording why no ADR is needed.
 
-**CRITICAL: NEVER edit task files in `backlog/tasks/` directly. Always use the `backlog` CLI.**
+## Technology Stack
 
-Two hooks enforce this contract — they fail closed, you don't have to remember:
+- **Platform**: ESP8266 (NodeMCU / Wemos D1 mini)
+- **Language**: Arduino C/C++ (.ino files)
+- **Core Library**: ESP8266 Arduino Core 2.7.4
+- **Filesystem**: LittleFS
+- **Build System**: Makefile with arduino-cli
+- **Key Libraries**:
+  - WiFiManager - WiFi configuration and connection management
+  - ArduinoJson - JSON parsing and serialization
+  - PubSubClient - MQTT client
+  - TelnetStream - Debug telnet server
+  - AceTime - Time and timezone handling
+  - OneWire/DallasTemperature - Dallas temperature sensors
 
-- `.claude/hooks/backlog-mcp-guard.py` — PreToolUse guard wired in `.claude/settings.json`. Blocks `Edit/Write/MultiEdit` on `backlog/tasks/*.md` (direct file edits are never allowed). Does NOT block `backlog` CLI invocations — CLI is the preferred interface.
-- `.githooks/commit-msg` — git hook that fails the commit if its message references `TASK-NNN` without a matching `backlog/tasks/task-NNN*.md` file in the index. Catches the failure mode where a code commit lands but its task record stays untracked. Install once per clone with `git config core.hooksPath .githooks`. Bypass with `git commit --no-verify` for emergencies (document why in the message).
+## Architecture
 
-For the full CLI reference (all commands, AC management, DoD, multi-line input): read `docs/guides/backlog-cli.md`.
+- **Main firmware**: OTGW-firmware.ino (setup and main loop)
+- **Modular .ino files**: Each module handles a specific feature (MQTT, REST API, settings, etc.)
+- **Communication**: Serial interface to OpenTherm Gateway PIC controller
+- **Integration**: MQTT for Home Assistant Auto Discovery, REST API, TCP socket for OTmonitor
 
-Before marking a task `Done`, run through `docs/guides/pr-checklist.md`. "Builds clean" is the lowest bar; the checklist captures the hardware / browser / MQTT smoke tests that build-clean doesn't see.
-
-**Known bug:** `backlog task list` returns empty. Use `backlog task <id> --plain` or read `backlog/tasks/` directly.
-
-## Task pickup (MANDATORY)
-
-**When picking up any task from the backlog — whether newly created or already existing — the first action before any code, research, or file reading is:**
-
-```bash
-backlog task edit <id> -s "In Progress" -a @claude
-```
-
-This makes the task visible in the correct board column immediately. Skipping this step leaves the task in "To Do" while it is actually being worked on, which creates false visibility for the user and breaks board accuracy.
-
-## Auto-advance to next task (project policy)
-
-After completing a task (or reaching a blocking state with no self-verifiable ACs remaining), **immediately analyse the backlog and pick up the highest-priority actionable task** without waiting for the user to prompt. Apply the following selection order:
-
-1. Highest-priority task with all non-field-validation ACs unblocked (can be started and verified without hardware).
-2. If all open tasks are blocked on field validation or external input, report that state and idle.
-
-Exceptions — do NOT auto-advance:
-- User has explicitly asked you to stop or wait.
-- The next task requires a plan approval checkpoint (per KISS principle: share choices so user decides on complexity).
-- The next task is a cross-worktree master-plan task (requires the one-plan-then-two-agents protocol).
-
----
-
-## MCP Servers
-
-Two MCP servers are wired into Claude Code for this project:
-
-- **`mcp__backlog__*`** — task management. Started locally by Claude Code itself (stdio).
-- **`mcp__discord-mcp__*`** — Discord I/O for `#dev-sat-mqtt` and the support channels. Runs as a long-lived Docker container (`saseq/discord-mcp`) on `http://localhost:8085/mcp`, pre-loaded with `DISCORD_TOKEN` from the Windows user environment. Most-used tools: `read_messages`, `send_message`, `get_server_info`, `read_private_messages`, `send_private_message`. There is no separate login tool — the container handshakes on its own at startup. For attachment contents (logs, screenshots), see `.claude/commands/backlog_discord.md` (Phase 1b) and `.claude/commands/check_otgw_issues.md` (Phase 1d).
+## Architecture Decision Records (ADRs)
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
