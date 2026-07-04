@@ -7,11 +7,11 @@ End-to-End Encrypted Plural System Tracking & Communication Tools
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [prismplural/prism-app](https://github.com/prismplural/prism-app).
+Original source: `CLAUDE.md` in [prismplural/prism-app](https://github.com/prismplural/prism-app).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
