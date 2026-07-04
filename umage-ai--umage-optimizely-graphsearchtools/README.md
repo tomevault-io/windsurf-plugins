@@ -7,11 +7,11 @@ Marketer-facing admin tooling for Optimizely Graph site-search on Optimizely CMS
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [umage-ai/Umage.Optimizely.GraphSearchtools](https://github.com/umage-ai/Umage.Optimizely.GraphSearchtools).
+Original source: `AGENTS.md` in [umage-ai/Umage.Optimizely.GraphSearchtools](https://github.com/umage-ai/Umage.Optimizely.GraphSearchtools).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
