@@ -7,11 +7,11 @@ Bilingual longevity, anti-aging, and healthspan evidence atlas
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [yuyohe/longevity-antiaging-evidence-atlas-EnCn](https://github.com/yuyohe/longevity-antiaging-evidence-atlas-EnCn).
+Original source: `AGENTS.md` in [yuyohe/longevity-antiaging-evidence-atlas-EnCn](https://github.com/yuyohe/longevity-antiaging-evidence-atlas-EnCn).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
