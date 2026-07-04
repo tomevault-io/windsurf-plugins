@@ -1,116 +1,117 @@
 ---
 trigger: always_on
-description: These rules apply to everything inside this repository.
+description: [English](../../../../../../features/dx/cli-compatibility/profiles/gemini.md) | [Tiếng Việt](./gemini.md)
 ---
 
-# AGENTS.md
+[English](../../../../../../features/dx/cli-compatibility/profiles/gemini.md) | [Tiếng Việt](./gemini.md)
 
-## Scope
-These rules apply to everything inside this repository.
+# Gemini CLI Profile
 
-The stable implementation contract lives in:
-- `docs/architecture/architecture-overview.md`
-- `docs/architecture/surface-architecture.md`
-- `docs/architecture/runtime-architecture.md`
-- `docs/architecture/model-taxonomy-and-boundaries.md`
+## Tóm tắt
 
-If implementation conflicts with those docs:
-1. stop
-2. refactor toward the docs if the fix is clear
-3. ask the user before proceeding if the conflict changes behavior, architecture, or scope
+Gemini hiện có startup contract explicit rõ nhất trong bộ ba CLI khởi động đầu tiên.
 
-Do not silently drift away from the architecture docs.
+Điểm yếu lớn nhất của nó không nằm ở session continuity, mà nằm ở environment và auth gating.
 
-If you are asked to code in any repo and that repo or one of its subfolders has `AGENTS.md`, `CLAUDE.md`, or `GEMINI.md`, pick the one that applies to the current folder scope and follow it strictly.
+## Capability mapping
 
-## First Read Order
-Load context in this order unless the task is obviously narrower:
-1. `README.md`
-2. `docs/overview/README.md`
-3. the architecture docs listed above
+### `start`
 
-Then load only the smallest extra context that matches the task:
-- feature work: `docs/features/README.md`, the relevant feature doc, then linked task docs
-- task execution: `docs/tasks/README.md`, `docs/tasks/backlog.md`, then the relevant task doc
-- operator or onboarding or release work: `docs/development/README.md` and the relevant user-guide doc
-- research-heavy questions: the relevant file under `docs/research/`
+Support: `Strong`
 
-Do not front-load the whole docs tree.
+Current basis:
 
-## Documentation Precedence
-When documents disagree, use this order:
-1. `docs/architecture/`
-2. `README.md`, `docs/development/README.md`, and `docs/user-guide/`
-3. `docs/features/`
-4. `docs/tasks/`
-5. `docs/research/` and `docs/lessons/`
+- command: `gemini`
+- startup args gồm:
+  - `--approval-mode=yolo`
+  - `--sandbox=false`
+- trust prompt handling đã bật
+- đã cấu hình explicit startup blocker
 
-`docs/research/` and `docs/lessons/` are supporting context only. They should not silently override architecture or guide docs.
+### `probe`
 
-## Repo Map
-Use this ownership map before editing:
-- `src/channels`: Slack and Telegram surfaces, route handling, rendering, pairing, follow-up behavior
-- `src/agents`: durable agent state, sessions, queueing, loops, attachments, run lifecycle
-- `src/auth`: roles, permissions, owner claim, authorization resolution
-- `src/config`: schema, loading, credentials, templates
-- `src/control`: operator CLI, runtime lifecycle, health, status, logs, bootstrap
-- `src/runners`: execution backends, currently tmux
-- `src/shared`: cross-cutting utilities
-- `test/`: regression and behavior coverage
-- `docs/tests/`: readable validation scenarios when behavior needs explicit ground truth
+Support: `Strong`
 
-## Command Baseline
-Prefer these repo-standard commands:
-- install: `bun install`
-- typecheck: `bunx tsc --noEmit`
-- targeted tests: `bun test <file>`
-- full tests: `bun test`
-- full local gate: `bun run check`
-- local dev start: `bun run start ...`
-- local dev status: `bun run status`
-- local dev logs: `bun run logs`
-- package build: `bun run build`
-- publish: run `npm login`, then run exactly `npm publish --access public`
-- when `npm login`, `npm publish --access public`, or another external auth command returns a browser link, keep the process open, send the link to the user, wait for them to finish auth, then continue the same flow
-- do not switch publish auth into a manual `--otp` handoff; keep the normal interactive publish flow and hand off only the exact link or prompt the tool returns from that same live process
+Current basis:
 
-Do not invent ad hoc verification flows when one of these commands already fits.
+- ready pattern explicit:
+  - `Type your message or @path/to/file`
+- có startup blocker rõ ràng cho OAuth và sign-in recovery flow
 
-## Runtime And Env Precedence
-Repo-local convenience scripts use the repo `.env` and default to:
-- `CLISBOT_HOME=~/.clisbot-dev`
+Hệ quả:
 
-Treat runtime path resolution in this order:
-1. explicit CLI or function parameters
-2. explicit `CLISBOT_*` path env vars
-3. `CLISBOT_HOME`-derived defaults
+- Gemini là ví dụ mạnh nhất hiện tại của một readiness contract đủ cứng
+- `probe` có thể tách `ready` khỏi auth-blocked startup truthful hơn nhiều so với Codex và Claude
 
-If runtime behavior looks wrong, inspect `CLISBOT_HOME`, `CLISBOT_CONFIG_PATH`, `CLISBOT_PID_PATH`, `CLISBOT_LOG_PATH`, and related runtime env vars before assuming the code is wrong.
+### `sessionId`
 
-## Documentation Workflow
-Use the repo doc systems consistently:
-- `docs/overview/README.md` is the top-level project overview
-- `docs/overview/human-requirements.md` is raw human input; do not edit it unless the user explicitly asks
-- `docs/tasks/backlog.md` is the source of truth for task status and priority
-- `docs/features/feature-tables.md` is the source of truth for feature state
-- `docs/research/<feature>/` is for source-driven analysis that is not yet stable contract
-- `docs/features/non-functionals/` is for cross-cutting quality work
-- `docs/lessons/` is for reusable lessons from repeated feedback, delivery struggles, or durable operator preferences
-- keep task docs brief when they mostly track research work; link to `docs/research/` instead of duplicating analysis
-- keep task docs in the task workflow and feature docs in the feature workflow
+Support: `Strong`
 
-Prefer links over repeated context.
+Current basis:
 
-## Design Defaults
-Follow these defaults unless the user explicitly asks for a different tradeoff:
-- KISS: prefer the smallest change that keeps architecture, runtime truthfulness, and operator flow clear
-- DRY: prefer one shared implementation path over parallel wrappers or duplicated mutations
-- backend-facing models must stay resource-oriented and revision-aware
-- do not leak transient runtime state into persistence contracts
-- use `docs/architecture/model-taxonomy-and-boundaries.md` for model naming, ownership, lifecycle, and mapping boundaries
+- create mode: `runner`
+- capture mode: `status-command`
+- status command: `/stats session`
+- capture pattern: session id dạng gần như UUID
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+### `resume`
+
+Support: `Strong`
+
+Current basis:
+
+- command mode resume
+- shape hiện tại:
+  - `gemini --resume {sessionId} --approval-mode=yolo --sandbox=false`
+
+### `recover`
+
+Support: `Strong`
+
+Current basis:
+
+- `agents` persist `sessionKey -> sessionId`
+- runner có thể tạo lại tmux và dùng lại Gemini session id bằng `--resume`
+
+### `attach`
+
+Support: `Strong`
+
+Current basis:
+
+- tmux snapshot capture và observer flow đã có
+- transcript normalization đã nhận ra Gemini snapshot và running timer line hiện tại
+
+### `interrupt`
+
+Support: `Partial`
+
+Current basis:
+
+- interrupt path hiện gửi `Escape`
+- normalization nhận ra running clue:
+  - `Thinking... (esc to cancel, <duration>)`
+
+Vì vậy running-state observation khá explicit, nhưng interrupt confirmation vẫn chỉ là best-effort cho tới khi có confirmation path mạnh hơn.
+
+## Running snapshot signal
+
+- `Thinking... (esc to cancel, <duration>)`
+
+Đây là timer line quan trọng và cần được giữ trong running snapshot.
+
+## Drift risk chính
+
+- auth/setup screen của upstream có thể drift
+- ready pattern hay output của `/stats session` có thể drift
+- routed message-tool behavior của Gemini vẫn yếu hơn mong muốn ở một số live channel flow
+
+## Lưu ý cho operator
+
+Gemini support là có thật, nhưng nó phụ thuộc vào auth usable trong runtime environment.
+
+Nếu Gemini rơi vào OAuth hoặc sign-in flow, normalized state đúng phải là `blocked`, không phải `ready`.
 
 ---
 > Source: [longbkit/clisbot](https://github.com/longbkit/clisbot) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-28 -->
+<!-- tomevault:4.0:windsurf_rules:2026-06-29 -->
