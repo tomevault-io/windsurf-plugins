@@ -7,11 +7,11 @@ Document database with no database server. Tiny, LLM-friendly TypeScript API; DB
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [Gusto/baerly-storage](https://github.com/Gusto/baerly-storage).
+Original source: `AGENTS.md` in [Gusto/baerly-storage](https://github.com/Gusto/baerly-storage).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
