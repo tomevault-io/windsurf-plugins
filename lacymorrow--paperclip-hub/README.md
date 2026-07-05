@@ -7,13 +7,13 @@ Plugin hub and marketplace for Paperclip — discover connectors, automations, a
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `.cursor/rules/*.mdc` in [lacymorrow/paperclip-hub](https://github.com/lacymorrow/paperclip-hub).
+Original source: `CLAUDE.md` in [lacymorrow/paperclip-hub](https://github.com/lacymorrow/paperclip-hub).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
+- **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
