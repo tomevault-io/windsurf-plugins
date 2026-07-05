@@ -7,11 +7,11 @@ build eval for your agent in 10 mins
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [CorrectRoadH/NiceEval](https://github.com/CorrectRoadH/NiceEval).
+Original source: `AGENTS.md` in [CorrectRoadH/NiceEval](https://github.com/CorrectRoadH/NiceEval).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
