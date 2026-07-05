@@ -1,122 +1,206 @@
 ---
 trigger: always_on
-description: Next.js Best Practices and Guidelines
+description: Shipkit conditionally initializes Payload CMS based on environment variables. The **[src/payload.config.ts](mdc:src/payload.config.ts)** file handles graceful degradation when no database is configured.
 ---
 
+# Payload CMS Configuration Patterns
 
-# Next.js Best Practices
+## Overview
 
-`params` should be awaited before using its properties.
-`searchParams` should be awaited before using its properties.
-`headers` should be awaited before using its properties.
+Shipkit conditionally initializes Payload CMS based on environment variables. The **[src/payload.config.ts](mdc:src/payload.config.ts)** file handles graceful degradation when no database is configured.
 
-## Server Components
-- Use Server Components by default
-- Keep client components minimal
-- Don't nest server in client components
-- Use proper data fetching patterns
-- Implement proper caching strategies
-- Handle streaming and suspense
-- Consider SEO implications
+## Conditional Initialization
 
-## Data Fetching
-- Use Server Components for data fetching
-- Don't fetch data in Server Actions
-- Implement proper caching
-- Handle loading states
-- Consider revalidation strategies
-- Use proper error boundaries
-- Optimize for performance
+### Database Requirement Check
 
-## Server Actions
-- Use for data mutations only
-- Keep business logic in services
-- Implement proper validation
-- Handle errors gracefully
-- Use proper typing
-- Consider optimistic updates
-- Document side effects
+Payload CMS only initializes when a database is available:
 
-## Routing
-- Use App Router
-- Implement proper layouts
-- Handle dynamic routes properly
-- Use proper loading UI
-- Implement error boundaries
-- Consider parallel routes
-- Handle intercepting routes
+```typescript
+const isPayloadEnabled = !!process.env.DATABASE_URL && !!process.env.PAYLOAD_SECRET && !envIsTrue("DISABLE_PAYLOAD");
+```
 
-## State Management
-- Use Server Components when possible
-- Keep client state minimal
-- Use hooks appropriately
-- Implement proper caching
-- Consider server state
-- Handle revalidation
-- Document state flow
+### Plugin Array Pattern
 
-## Performance
-- Use proper image optimization
-- Implement proper caching
-- Consider bundle size
-- Use proper code splitting
-- Implement proper loading states
-- Monitor performance metrics
-- Optimize for Core Web Vitals
+Plugins are conditionally added using array spread patterns:
 
-## Security
-- Implement proper authentication
-- Use proper authorization
-- Handle CSRF protection
-- Implement proper headers
-- Use environment variables
-- Handle sensitive data
-- Regular security audits
+```typescript
+plugins: [
+  payloadCloudPlugin(),
 
-## Error Handling
-- Use error boundaries
-- Implement proper logging
-- Handle API errors
-- Consider recovery strategies
-- Document error scenarios
-- Monitor error rates
-- Implement proper fallbacks
+  // S3 Storage - conditional
+  ...(process.env.NEXT_PUBLIC_FEATURE_S3_ENABLED === "true" && isPayloadEnabled
+    ? [
+        s3Storage({
+          collections: { media: true },
+          bucket: process.env.AWS_BUCKET_NAME!,
+          config: {
+            credentials: {
+              accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
+              secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+            },
+            region: process.env.AWS_REGION!,
+          },
+        }),
+      ]
+    : []),
 
-## Testing
-- Test Server Components
-- Test Server Actions
-- Implement E2E tests
-- Consider integration tests
-- Test error scenarios
-- Monitor test coverage
-- Document test strategy
+  // Vercel Blob Storage - conditional
+  ...(process.env.NEXT_PUBLIC_FEATURE_VERCEL_BLOB_ENABLED === "true" && isPayloadEnabled
+    ? [
+        vercelBlobStorage({
+          collections: { media: true },
+          token: process.env.VERCEL_BLOB_READ_WRITE_TOKEN!,
+        }),
+      ]
+    : []),
 
-## Deployment
-- Use proper build process
-- Implement proper CI/CD
-- Consider staging environments
-- Monitor deployment health
-- Handle rollbacks
-- Document deployment process
-- Regular deployment audits
+],
+// Email adapter - conditional (outside plugins array)
+...(buildTimeFeatureFlags.NEXT_PUBLIC_FEATURE_AUTH_RESEND_ENABLED
+  ? {
+      email: resendAdapter({
+        defaultFromAddress: RESEND_FROM_EMAIL,
+        defaultFromName: emailFromName,
+        apiKey: process.env.RESEND_API_KEY || "",
+      }),
+    }
+  : {}),
+],
+```
 
-## Multi-Zone Configuration
-- Configure `basePath` and `assetPrefix` for each zone
-- Use rewrites in main app to route to zones
-- Configure environment variables for zone domains
-- Use anchor tags for cross-zone navigation (not Next.js Link)
-- Implement proper zone-specific optimization
-- Test cross-zone functionality thoroughly
-- Document zone architecture
+## Database Configuration
 
-## Code Organization
-- Follow App Router conventions
-- Keep route handlers clean
-- Separate concerns properly
-- Use proper middleware
-- Implement proper layouts
-- Handle metadata properly
-- Document routing structure
+### Conditional Database Adapter
+
+The database adapter is only added when Payload is enabled:
+
+```typescript
+if (isPayloadEnabled) {
+  config.db = postgresAdapter({
+    schemaName: dbSchemaName,
+    pool: {
+      connectionString: process.env.DATABASE_URL,
+    },
+    beforeSchemaInit: [
+      ({ schema, adapter }) => {
+        // Define relationships between Payload and application tables
+        return {
+          ...schema,
+          tables: {
+            ...schema.tables,
+            // Enhanced relationships
+            users: {
+              ...schema.tables.users,
+              relationships: [
+                {
+                  relationTo: "public.shipkit_user",
+                  type: "oneToOne",
+                  onDelete: "CASCADE",
+                },
+              ],
+            },
+            // Additional table relationships...
+          },
+        };
+      },
+    ],
+    migrationDir: path.resolve(dirname, "migrations"),
+  });
+}
+```
+
+## Environment Variables
+
+### Required for Payload
+
+- `DATABASE_URL` - PostgreSQL connection string
+- `PAYLOAD_SECRET` - Secret key for Payload CMS
+- `DISABLE_PAYLOAD` - Set to "true" to disable Payload (optional)
+
+### Optional Features
+
+- `AWS_BUCKET_NAME`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION` - For S3 storage
+- `VERCEL_BLOB_READ_WRITE_TOKEN` - For Vercel Blob storage
+- `RESEND_API_KEY` - For Resend email adapter
+
+### Build-time Feature Flags
+
+Feature flags from **[src/config/features-config.ts](mdc:src/config/features-config.ts)**:
+
+- `NEXT_PUBLIC_FEATURE_S3_ENABLED`
+- `NEXT_PUBLIC_FEATURE_VERCEL_BLOB_ENABLED`
+- `NEXT_PUBLIC_FEATURE_AUTH_RESEND_ENABLED`
+
+## Auto-Seeding Pattern
+
+### Conditional Seeding
+
+Only seed when Payload is enabled and database exists:
+
+```typescript
+async onInit(payload: any) {
+  try {
+    if (!isPayloadEnabled) {
+      console.info("⏭️ Payload CMS is disabled, skipping seeding");
+      return;
+    }
+
+    if (process.env.PAYLOAD_AUTO_SEED === "false") {
+      console.info("⏭️ Automatic Payload CMS seeding is disabled");
+      return;
+    }
+
+    const shouldSeed = await checkIfSeedingNeeded(payload);
+
+    if (shouldSeed || process.env.PAYLOAD_SEED_FORCE === "true") {
+      console.info("🌱 Seeding Payload CMS with initial data...");
+
+      const { seedAllDirect } = await import("./lib/payload/seed-utils");
+      await seedAllDirect(payload);
+
+      await markSeedingCompleted(payload);
+      console.info("✅ Seeding completed and flag set");
+    }
+  } catch (error) {
+    console.error("❌ Error in Payload CMS onInit hook:", error);
+  }
+},
+```
+
+### Seeding Status Management
+
+Track seeding completion to avoid duplicate seeding:
+
+```typescript
+async function checkIfSeedingNeeded(payload: any): Promise<boolean> {
+  try {
+    const settings = await payload.findGlobal({
+      slug: "settings",
+    });
+
+    if (settings?.seedCompleted) {
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error("Error checking if seeding is needed:", error);
+    return true;
+  }
+}
+
+async function markSeedingCompleted(payload: any): Promise<void> {
+  try {
+    await payload.updateGlobal({
+      slug: "settings",
+      data: {
+        seedCompleted: true,
+        seedCompletedAt: new Date().toISOString(),
+      },
+    });
+  } catch (error) {
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [lacymorrow/paperclip-hub](https://github.com/lacymorrow/paperclip-hub) — distributed by [TomeVault](https://tomevault.io).
