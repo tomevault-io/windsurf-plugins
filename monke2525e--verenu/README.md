@@ -7,11 +7,11 @@ Open-source, local-first AI dictation for Windows and macOS. Hold a hotkey, spea
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [MONKE2525E/Verenu](https://github.com/MONKE2525E/Verenu).
+Original source: `AGENTS.md` in [MONKE2525E/Verenu](https://github.com/MONKE2525E/Verenu).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
