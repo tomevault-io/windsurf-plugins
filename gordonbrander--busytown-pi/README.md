@@ -7,11 +7,11 @@ Multi-agent factory on top of SQLite
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [gordonbrander/busytown-pi](https://github.com/gordonbrander/busytown-pi).
+Original source: `AGENTS.md` in [gordonbrander/busytown-pi](https://github.com/gordonbrander/busytown-pi).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
