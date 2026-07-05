@@ -1,100 +1,141 @@
 ---
 trigger: always_on
-description: Performance Best Practices and Guidelines
+description: Project structure, tech stack, and rules for interacting with the project
 ---
 
 
-# Performance Best Practices
+# Project Overview
 
-## Core Web Vitals
-- Optimize LCP (Largest Contentful Paint)
-- Minimize FID (First Input Delay)
-- Reduce CLS (Cumulative Layout Shift)
-- Monitor Web Vitals
-- Set performance budgets
-- Regular performance audits
-- Document metrics
+This is a Next.js project using:
+- App Router
+- Shadcn/UI
+- Tailwind CSS
+- Resend
+- Builder.io
+- Payload CMS 3
+- NextAuth/AuthJS@v5
+- TypeScript
+- Bun
 
-## Image Optimization
-- Use next/image
-- Implement lazy loading
-- Choose proper formats
-- Optimize image sizes
-- Use responsive images
-- Implement caching
-- Monitor image performance
+## Multi-Zone Architecture Support
 
-## JavaScript
-- Implement code splitting
-- Use dynamic imports
-- Minimize bundle size
-- Tree shake unused code
-- Optimize dependencies
-- Use proper caching
-- Monitor JS performance
+Shipkit supports multi-zone deployment for scalable applications:
 
-## CSS
-- Minimize unused CSS
-- Use CSS modules
-- Implement critical CSS
-- Optimize tailwind usage
-- Reduce CSS bundle size
-- Use proper specificity
-- Monitor CSS performance
+### Zone Configuration
+- Main app serves core functionality (marketing, dashboard, auth)
+- Secondary zones can be deployed for specialized content:
+  - `/docs/*` - Documentation and guides
+  - `/blog/*` - Blog and articles
+  - `/ui/*` - UI component library showcase
+  - `/tools/*` - Developer tools and utilities
 
-## Server-Side
-- Use proper caching
-- Optimize database queries
-- Implement CDN
-- Use edge functions
-- Optimize API responses
-- Monitor server performance
-- Regular optimization
+### Zone Implementation Patterns
+- Each zone uses a full Shipkit installation for consistency
+- Zones are configured with `basePath` and `assetPrefix`
+- Navigation between zones uses anchor tags (`<a>`) instead of Next.js `<Link>`
+- Shared authentication and design system across zones
+- Environment variables control zone routing and deployment
 
-## Client-Side
-- Implement proper caching
-- Use service workers
-- Optimize rendering
-- Reduce reflows/repaints
-- Handle offline support
-- Monitor client performance
-- Regular optimization
+### Zone Development
+```bash
+# Clone Shipkit for each zone
+git clone https://github.com/lacymorrow/shipkit.git shipkit-docs
+git clone https://github.com/lacymorrow/shipkit.git shipkit-blog
+git clone https://github.com/lacymorrow/shipkit.git shipkit-ui
+git clone https://github.com/lacymorrow/shipkit.git shipkit-tools
+```
 
-## Data Loading
-- Use proper fetching
-- Implement caching
-- Handle loading states
-- Optimize payload size
-- Use proper protocols
-- Monitor data loading
-- Regular optimization
+## Directory Structure
+```
+src/
+├── app/                    # Next.js app router pages
+│   ├── (app)/             # Main application routes
+│   ├── (authentication)/  # Auth pages (sign-in, sign-up, etc.)
+│   ├── (dashboard)/       # Protected dashboard routes
+│   ├── (demo)/           # Demo and example pages
+│   ├── (integrations)/   # Third-party integrations
+│   ├── (landing)/        # Marketing pages
+│   ├── (legal)/          # Legal pages (privacy, terms)
+│   ├── (shipkit)/        # Shipkit-specific pages
+│   └── api/              # API routes
+├── components/            # Reusable UI components
+│   ├── ui/               # Shadcn/UI components
+│   ├── primitives/       # Base primitive components
+│   ├── blocks/           # Larger composed components
+│   └── layouts/          # Layout components
+├── lib/                  # Utility functions and shared code
+│   ├── utils/           # General utilities
+│   ├── schemas/         # Validation schemas
+│   ├── payload/         # Payload CMS configuration
+│   └── trpc/            # tRPC configuration
+├── server/               # Server-side code
+│   ├── actions/          # Server actions
+│   ├── services/         # Business logic and data access
+│   └── db/              # Database configuration
+├── content/              # MDX and static content
+│   ├── docs/            # Documentation content
+│   ├── blog/            # Blog content
+│   ├── faq/             # FAQ content
+│   └── features/        # Feature descriptions
+├── styles/               # Global styles and Tailwind config
+└── types/                # TypeScript type definitions
+```
 
-## Build Optimization
-- Optimize build process
-- Minimize asset size
-- Use proper compression
-- Implement caching
-- Monitor build metrics
-- Regular build audits
-- Document optimizations
+## File Naming Conventions
+- Use `kebab-case` for directories and files
+- Use `.tsx` for React components
+- Use `.ts` for TypeScript files
+- Use `.test.tsx` for test files
+- Use `.css` for style files
+- Use `.mdx` for documentation
+- Use `.mdc` for rule documentation
 
-## Monitoring
-- Use performance monitoring
-- Track key metrics
-- Set up alerts
-- Monitor trends
-- Regular analysis
-- Document findings
-- Take action on insights
+## Component Structure
+- One component per file
+- Export as named export (prefer arrow functions)
+- Use TypeScript interfaces for props
+- Keep components focused and small (under 500-700 lines)
+- Follow atomic design principles
+- Use descriptive, explicit variable names
 
-## Documentation
-- Document performance goals
-- Track improvements
-- Document optimizations
-- Keep metrics history
-- Regular reviews
-- Share best practices
-- Maintain documentation 
+## Code Organization Principles
+- Make files small and discrete (under 500 lines when possible)
+- Write concise, technical TypeScript code with accurate examples
+- Use functional and declarative programming patterns; avoid classes
+- Prefer iteration and modularization over code duplication
+- Structure files: exported component, subcomponents, helpers, static content, types
+- Use the simplest solution first and only add complexity when necessary
+
+## State Management Best Practices
+- Minimize 'use client', 'useEffect', and 'setState'
+- Favor React Server Components (RSC)
+- Use functional components with TypeScript interfaces
+- Avoid circular dependencies between state variables
+- Don't update state directly inside useEffect without dependencies
+- Use unidirectional data flow: parent state flowing to children
+- For complex state transitions, implement dedicated functions rather than direct setters
+
+## Navigation Patterns
+- Prefer declarative links over imperative navigation (`router.push`)
+- Use `src/components/primitives/link-with-transition` instead of `next/link`
+- For styled links that look like buttons, use: `<Link className={cn(buttonVariants({ variant: "...", size: "..." }))} ...>`
+- Only use router navigation for complex scenarios (form submissions with redirects)
+- For multi-zone navigation, use anchor tags (`<a>`) between zones
+
+## API Structure and Patterns
+- RESTful endpoints in `app/api`
+- Server actions in `server/actions`
+- Services in `server/services`
+- Type definitions in `types`
+- Environment variables in `.env`
+- Never use server actions to fetch data (use Server Components)
+- Server actions should call services for server-side operations
+
+## Performance Optimization
+- Wrap client components in Suspense with fallback
+- Use dynamic loading for non-critical components
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [lacymorrow/paperclip-hub](https://github.com/lacymorrow/paperclip-hub) — distributed by [TomeVault](https://tomevault.io).
