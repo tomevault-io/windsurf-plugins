@@ -7,11 +7,11 @@ Turn any repo into an agent-ready workspace for Claude Code, Codex, Cursor, and 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [hoangnb24/repository-harness](https://github.com/hoangnb24/repository-harness).
+Original source: `AGENTS.md` in [hoangnb24/repository-harness](https://github.com/hoangnb24/repository-harness).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
