@@ -5,14 +5,14 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `GEMINI.md` in [rkdrn79/research_agent_workspace](https://github.com/rkdrn79/research_agent_workspace).
+Original source: `CLAUDE.md` in [rkdrn79/research_agent_workspace](https://github.com/rkdrn79/research_agent_workspace).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
+- **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
 Available for 6 platforms including Claude Code, Cursor, Windsurf, and more. Source: [github.com/rkdrn79/research_agent_workspace](https://github.com/rkdrn79/research_agent_workspace)
