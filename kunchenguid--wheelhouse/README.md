@@ -7,11 +7,11 @@ Wheelhouse - steer your open-source maintenance from one place. A portable Issue
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [kunchenguid/wheelhouse](https://github.com/kunchenguid/wheelhouse).
+Original source: `CLAUDE.md` in [kunchenguid/wheelhouse](https://github.com/kunchenguid/wheelhouse).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
