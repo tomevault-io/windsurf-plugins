@@ -1,16 +1,19 @@
 ---
 trigger: always_on
-description: Default to Puppetmaster swarms for multi-step exploration, analysis, and implementation; only fall back to native Cursor tooling for narrow cases
+description: Repo-level guidance for AI coding agents (Cursor, Claude Code, Codex, etc.) working in this repository. Cursor users see the same directive via `.cursor/rules/puppetmaster-workflow.mdc`.
 ---
 
+# AGENTS.md
 
-# Puppetmaster is the Default Subagent Runtime
+Repo-level guidance for AI coding agents (Cursor, Claude Code, Codex, etc.) working in this repository. Cursor users see the same directive via `.cursor/rules/puppetmaster-workflow.mdc`.
 
-When this repo is open, Puppetmaster's MCP tools are the **primary** path for fanning out work. Do not roll your own grep/read exploration loops or invoke ad-hoc subagents when a Puppetmaster swarm is available.
+## Default subagent runtime: Puppetmaster
 
-## When you MUST start a Puppetmaster swarm (no permission needed)
+When this repo is open, **Puppetmaster's MCP tools are the primary path for fanning out work**. Do not roll your own grep/read exploration loops or invoke ad-hoc subagents when a Puppetmaster swarm is available.
 
-For any user request that involves more than a single trivial change, start a Puppetmaster swarm **before** spending tokens on your own exploration:
+## When to start a Puppetmaster swarm (do this by default)
+
+For any request that involves more than a single trivial change, start a Puppetmaster swarm **before** spending tokens on your own exploration:
 
 - Broad repo investigation, audit, or risk analysis ("review this", "find issues", "what could break").
 - Multi-file refactors, migrations, or cross-cutting cleanups.
@@ -18,56 +21,49 @@ For any user request that involves more than a single trivial change, start a Pu
 - Planning the next implementation slice when scope or risks are unclear.
 - Comparing approaches, surfacing trade-offs, or producing decision artifacts.
 
-The default routing is:
+Default routing:
 
-1. Call `puppetmaster_start_cursor_swarm` (read-only multi-role analysis) — this is the daily-driver entry point.
-2. For implementation that needs durable patches, logs, and dirty-tree guards, use `puppetmaster_start_implement` in a clean worktree — it routes to whatever platform the lock enables (cursor preferred, then claude-code). `puppetmaster_start_cursor_implement` / `puppetmaster_start_claude_implement` force a specific platform.
-3. For a single fast review or plan pass, `puppetmaster_start_cursor_review` / `puppetmaster_start_cursor_plan` are acceptable lighter alternatives.
+1. `puppetmaster_start_cursor_swarm` — multi-role read-only analysis (the daily-driver entry point).
+2. `puppetmaster_start_implement` — durable, patch-producing implementation that runs on whatever platform the lock enables (cursor preferred, then claude-code). Use this as the default implement verb so it works regardless of platform lock. `puppetmaster_start_cursor_implement` / `puppetmaster_start_claude_implement` force a specific platform.
+3. `puppetmaster_start_cursor_review` / `puppetmaster_start_cursor_plan` — lightweight single-pass review or plan.
+
+Every implement verb runs full-edit in a clean worktree (clean-tree guard; set `allow_dirty` to override) and captures the resulting diff as a `PATCH` artifact.
 
 Start tools return a `job_id` immediately. Do **not** wait inside one long MCP call.
 
-## When you MUST NOT route through Puppetmaster
+## Match the verb to the task shape (single feature ≠ swarm)
 
-Use native Cursor tooling directly for:
+A swarm is for **read-only, decomposable analysis** — explore, review, audit, plan, redteam — where independent roles can run in parallel without touching the same code. It is **not** the right shape for one coupled feature. Fanning out a single tightly-coupled change makes parallel workers re-ingest the same context and land commits that are unaware of each other, which produces conflicts, rework, and broken delivery — and erases any token savings.
+
+So:
+
+- **Implementing one feature / fixing one ticket → a single `puppetmaster_start_implement` worker** in a clean worktree. One worker keeps the change coherent and yields one reviewable `PATCH`. Reserve swarms for the explore/review/audit passes *around* the feature, not the edit itself.
+- **A focused single edit, or any change that builds on uncommitted work → `puppetmaster_edit`** (in-place, `allow_dirty`, cheapest sufficient model + CodeGraph, reviewable `PATCH`). This is the verb for last-mile work — "finish the module I just wrote", "add tests for the code I just added". `puppetmaster_start_implement` branches off HEAD in an isolated worktree, so it **cannot see uncommitted modules** and would clobber or rebuild them; never reach for it when the work depends on dirty-tree state. Keep truly trivial edits (typo/rename/comment) inline.
+- **Genuinely independent slices** (e.g. "add the same header to 30 unrelated endpoints") can fan out — but split by non-overlapping files so workers never collide.
+- **Broad investigation / audit / "find all X" → a read-only swarm.** That is what it is built for.
+
+Puppetmaster's edge is mixed workloads, heavy trivial sub-tasks, long-context horizons, and zero-token artifact recall across sessions — not winning a single hard implementation against one strong steered agent. Output-compression and context-hygiene tools (e.g. RTK) are **additive** to Puppetmaster, not competitors: let them shrink tool-output tokens while Puppetmaster owns orchestration and durable state.
+
+## When NOT to route through Puppetmaster
+
+Use native tooling directly for:
 
 - Trivial single-file edits with obvious intent (rename, add comment, fix typo).
 - Questions answerable from the current visible file or recent context.
 - Conversational follow-ups that don't change repo state.
 - Anything explicitly framed as "just answer me" / "no swarm".
 
-## How to drive a started swarm
+## Browser swarms (live-site QA)
 
-After kicking off a swarm:
+For QA that needs a **real browser against a live site** — capturing actual
+network payloads instead of mocked ones — use the first-class browser verb, not
+a read-only swarm. A read-only swarm can't reach it: the MCP swarm specs hardcode
+a `file,web,vision` toolset list with no `browser`, and the cursor swarm adapter
+has no browser at all. Only the **Hermes** adapter can drive a browser
+(`hermes chat -t browser`).
 
-1. Return the `job_id` to the user immediately, in one line.
-2. Prefer `puppetmaster_live_artifacts_follow` (long-poll, push-style stream) over polling `puppetmaster_status` in a loop. Chain calls with the returned `next_cursor`.
-3. Use `puppetmaster_partial_summary` for a current synthesis without waiting for final stitching.
-4. Summarize concrete file-backed findings, risks, and open questions — never raw worker transcripts.
-5. Ask for approval before implementation unless the user already approved edits.
-
-If the swarm completes with empty findings, only verification artifacts, or a degraded Cursor SDK artifact, report Puppetmaster as **degraded** and do not treat the run as a successful analysis.
-
-## Model routing (auto_route)
-
-Puppetmaster ships a task-aware **model router** that picks the right LLM per task. Prefer it over hardcoding `model` in every spec.
-
-**Auto-routing is the unconditional default for non-trivial work.** Don't wait to be handed a task list — proactively set `payload.auto_route = true` on every worker you dispatch for substantive work so each task lands on the cheapest sufficient model. Pin a `model` only when the user explicitly asks. The trivial-task carve-out still holds (no routed worker for a rename or a one-line answer — that costs more, not less), but for any work that warrants a worker, routing is on, every time.
-
-- User registry lives at `~/.puppetmaster/models.json`. Inspect with `puppetmaster_list_models`. If empty, ask the user to run `python -m puppetmaster models init`.
-- Opt a worker in by setting `payload.auto_route = true`. The orchestrator picks the cheapest sufficient model, stamps `adapter` + `payload.model`, and persists a `ROUTING` artifact tied to the task.
-- Savings are tracked: `python -m puppetmaster savings` prints the read-only, local, numbers-only receipt (routing dollars saved, policy-aware + CodeGraph exploration savings). Nothing is emitted over the network.
-- Call `puppetmaster_route_task` to dry-run a decision when the user asks "how much will this cost" / "what model would this use" / "why did task X run on model Y" — the response includes the picked model, estimated USD cost, and every rejected alternative with the reason.
-- Per-task overrides: `payload.min_capability`, `payload.max_cost_usd`, `payload.required_tags`, `payload.routing_policy` (one of `balanced`/`cheap`/`quality`/`escalating`).
-- Read `ROUTING` artifacts to answer "why this model" — the audit trail is in `payload.rejected`.
-
-## Repo intelligence (CodeGraph)
-
-Puppetmaster auto-injects CodeGraph context into every Cursor and Claude Code worker prompt when `.codegraph/` exists in the target repo. Look for `context:codegraph` in verification artifact evidence to confirm shared context was used.
-
-For quick, direct repo lookups without spinning up a swarm, prefer the bundled tools: `puppetmaster_codegraph_search`, `puppetmaster_codegraph_context`, `puppetmaster_codegraph_affected`, `puppetmaster_codegraph_files`, `puppetmaster_codegraph_status`. If CodeGraph isn't initialized in the target repo, call `puppetmaster_codegraph_init` once before using the other CodeGraph tools.
-
-## Why this is the default
-
+- **Verb:** `puppetmaster_start_browser_swarm` (MCP) / `python -m puppetmaster browser "<task>" ["<task2>" ...]` (CLI). Each task becomes one parallel Hermes worker. Requires the Hermes platform enabled.
+- **Single source of truth:** `puppetmaster/browser.py`. It bakes in three hard-won guardrails so callers don't re-derive them:
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
