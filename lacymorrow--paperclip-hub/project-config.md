@@ -1,231 +1,177 @@
 ---
 trigger: always_on
-description: Shipkit uses browser local storage as a fallback when no database is configured. This provides a zero-config development experience while maintaining feature parity with database mode.
+description: Multi-zone architecture allows Shipkit applications to be split into multiple Next.js applications while appearing as a single domain to users. This pattern is ideal for:
 ---
 
-# Local Storage Implementation Patterns
+# Multi-Zone Architecture Rules
 
 ## Overview
 
-Shipkit uses browser local storage as a fallback when no database is configured. This provides a zero-config development experience while maintaining feature parity with database mode.
+Multi-zone architecture allows Shipkit applications to be split into multiple Next.js applications while appearing as a single domain to users. This pattern is ideal for:
 
-## Core Principles
+- **Scalability**: Different teams can work on different zones independently
+- **Performance**: Each zone can be optimized for its specific use case
+- **Deployment**: Zones can be deployed and updated independently
+- **Technology Freedom**: Each zone can use different technologies while maintaining consistency
 
-### 1. API Consistency
-Local storage services mirror database service APIs exactly:
+## Zone Configuration Patterns
 
-```typescript
-// Database service method
-async createProject(teamId: string, name: string, userId: string): Promise<Project>
-
-// Local storage service method
-createProject(teamId: string, name: string, userId: string): LocalProject
+### Standard Zone Structure
+```
+domain.com/          → Main app (marketing, dashboard, auth)
+domain.com/docs/*    → Documentation zone
+domain.com/blog/*    → Blog zone
+domain.com/ui/*      → UI component library zone
+domain.com/tools/*   → Developer tools zone
 ```
 
-### 2. Data Validation
-All local storage operations include validation:
+### Zone Types
 
-```typescript
-if (!projectName?.trim()) {
-  throw new Error("Project name is required");
-}
+#### 1. Main Zone (Primary Application)
+- **Purpose**: Core application functionality
+- **Contains**: Authentication, dashboard, marketing pages, API routes
+- **Routing**: Handles all routes not claimed by other zones
+- **Configuration**: Standard Shipkit configuration with multi-zone rewrites
+
+#### 2. Documentation Zone
+- **Purpose**: Product documentation, guides, API reference
+- **Features**: Search functionality, versioning, navigation tree
+- **Content**: MDX files, code examples, tutorials
+- **Optimization**: Static generation, fast search indexing
+
+#### 3. Blog Zone
+- **Purpose**: Blog posts, announcements, case studies
+- **Features**: CMS integration, commenting, social sharing
+- **Content**: Articles, author profiles, categories
+- **Optimization**: SEO optimization, RSS feeds
+
+#### 4. UI Component Library Zone
+- **Purpose**: Component showcase, design system documentation
+- **Features**: Interactive component playground, code examples
+- **Content**: Component demos, design tokens, usage guidelines
+- **Optimization**: Component isolation, visual regression testing
+
+#### 5. Developer Tools Zone
+- **Purpose**: Interactive utilities, API explorers, validators
+- **Features**: Real-time tools, code generators, testing utilities
+- **Content**: Interactive forms, API documentation, utilities
+- **Optimization**: Client-side interactivity, tool performance
+
+## Implementation Patterns
+
+### 1. Zone Setup
+
+#### Directory Structure
+```
+project-root/
+├── shipkit/              # Main application
+├── shipkit-docs/         # Documentation zone
+├── shipkit-blog/         # Blog zone
+├── shipkit-ui/           # UI library zone
+└── shipkit-tools/        # Tools zone
 ```
 
-### 3. Referential Integrity
-Local storage maintains relationships between entities:
+#### Zone Creation Commands
+```bash
+# Create zones by cloning Shipkit
+git clone https://github.com/lacymorrow/shipkit.git shipkit-docs
+git clone https://github.com/lacymorrow/shipkit.git shipkit-blog
+git clone https://github.com/lacymorrow/shipkit.git shipkit-ui
+git clone https://github.com/lacymorrow/shipkit.git shipkit-tools
 
-```typescript
-// When deleting a team, remove all associated projects
-const teamProjects = this.getTeamProjects(teamId);
-teamProjects.forEach(project => this.deleteProject(project.id));
+# Install dependencies for each zone
+cd shipkit-docs && bun install --frozen-lockfile
+cd shipkit-blog && bun install --frozen-lockfile
+cd shipkit-ui && bun install --frozen-lockfile
+cd shipkit-tools && bun install --frozen-lockfile
 ```
 
-## Storage Keys
+### 2. Configuration Patterns
 
-Use consistent, namespaced keys for local storage:
-
+#### Main Zone Configuration (next.config.ts)
 ```typescript
-const STORAGE_KEYS = {
-  projects: "shipkit-projects",
-  projectMembers: "shipkit-project-members",
-  teams: "shipkit-teams",
-  teamMembers: "shipkit-team-members",
-  users: "shipkit-users"
-} as const;
-```
+async rewrites() {
+  const multiZoneRewrites = [];
 
-## Utility Functions
-
-### Safe Storage Access
-Always check if we're in a browser environment:
-
-```typescript
-function isClient(): boolean {
-  return typeof window !== "undefined";
-}
-
-function getFromStorage<T>(key: string): T[] {
-  if (!isClient()) return [];
-
-  try {
-    const item = localStorage.getItem(key);
-    return item ? JSON.parse(item) : [];
-  } catch (error) {
-    console.warn(`Failed to parse ${key} from localStorage:`, error);
-    return [];
-  }
-}
-```
-
-### Date Handling
-Convert date strings back to Date objects:
-
-```typescript
-function parseStoredData<T>(data: any[]): T[] {
-  return data.map(item => ({
-    ...item,
-    createdAt: new Date(item.createdAt),
-    updatedAt: new Date(item.updatedAt),
-    deletedAt: item.deletedAt ? new Date(item.deletedAt) : null
-  }));
-}
-```
-
-## Demo Data Initialization
-
-Provide realistic demo data for first-time users:
-
-```typescript
-function initializeDemoData(): void {
-  if (this.getAllProjects().length === 0) {
-    this.createDemoProjects();
-  }
-}
-
-private createDemoProjects(): void {
-  const demoProjects = [
-    { name: "Marketing Website", description: "Company landing page" },
-    { name: "Mobile App", description: "iOS and Android application" },
-    { name: "API Gateway", description: "Microservices backend" }
-  ];
-
-  demoProjects.forEach(project => {
-    this.createProject(demoTeamId, project.name, demoUserId);
-  });
-}
-```
-
-## Error Handling
-
-### Graceful Fallbacks
-Never throw errors that would break the application:
-
-```typescript
-getUserProjects(userId: string): LocalProject[] {
-  try {
-    const projects = this.getAllProjects();
-    return projects.filter(p => this.userHasAccess(userId, p.id));
-  } catch (error) {
-    console.warn("Failed to get user projects:", error);
-    return [];
-  }
-}
-```
-
-### Storage Quota Management
-Handle storage quota exceeded errors:
-
-```typescript
-function saveToStorage<T>(key: string, data: T[]): void {
-  try {
-    localStorage.setItem(key, JSON.stringify(data));
-  } catch (error) {
-    if (error.name === 'QuotaExceededError') {
-      console.warn("Storage quota exceeded, clearing old data");
-      this.clearOldData();
-      localStorage.setItem(key, JSON.stringify(data));
-    } else {
-      throw error;
-    }
-  }
-}
-```
-
-## CRUD Operations
-
-### Create Pattern
-```typescript
-createEntity(data: CreateEntityData): LocalEntity {
-  const entity: LocalEntity = {
-    id: generateId(),
-    ...data,
-    createdAt: new Date(),
-    updatedAt: new Date()
-  };
-
-  const entities = this.getAllEntities();
-  entities.push(entity);
-  this.saveEntities(entities);
-
-  return entity;
-}
-```
-
-### Update Pattern
-```typescript
-updateEntity(id: string, updates: Partial<LocalEntity>): LocalEntity {
-  const entities = this.getAllEntities();
-  const index = entities.findIndex(e => e.id === id);
-
-  if (index === -1) {
-    throw new Error("Entity not found");
+  // Documentation Zone
+  if (process.env.DOCS_DOMAIN) {
+    multiZoneRewrites.push(
+      { source: '/docs', destination: `${process.env.DOCS_DOMAIN}/docs` },
+      { source: '/docs/:path*', destination: `${process.env.DOCS_DOMAIN}/docs/:path*` }
+    );
   }
 
-  entities[index] = {
-    ...entities[index],
-    ...updates,
-    updatedAt: new Date()
-  };
+  // Add other zones similarly...
 
-  this.saveEntities(entities);
-  return entities[index];
+  return multiZoneRewrites;
 }
 ```
 
-### Delete Pattern (Soft Delete)
+#### Zone-Specific Configuration
 ```typescript
-deleteEntity(id: string): void {
-  const entities = this.getAllEntities();
-  const index = entities.findIndex(e => e.id === id);
+// Each zone's next.config.ts
+const nextConfig: NextConfig = {
+  basePath: '/docs', // or /blog, /ui, /tools
+  assetPrefix: '/docs-static', // or /blog-static, etc.
 
-  if (index !== -1) {
-    entities[index].deletedAt = new Date();
-    this.saveEntities(entities);
-  }
-}
+  // Inherit all Shipkit configurations
+  ...existingShipkitConfig,
+};
 ```
 
-## Integration with Services
+### 3. Environment Variables
 
-Services should check for database availability and fallback to local storage:
-
-```typescript
-// In service files like project-service.ts
-import { LocalProjectStorage } from "@/lib/local-storage/project-storage";
-
-async createProject(teamId: string, name: string, userId: string) {
-  if (!db) {
-    return LocalProjectStorage.createProject(teamId, name, userId);
-  }
-
-  // Database implementation
-  return await this.database.createProject(teamId, name, userId);
-}
+#### Development Environment
+```bash
+# Main app .env.local
+DOCS_DOMAIN=http://localhost:3001
+BLOG_DOMAIN=http://localhost:3002
+UI_DOMAIN=http://localhost:3003
+TOOLS_DOMAIN=http://localhost:3004
 ```
 
-## Testing Local Storage
+#### Production Environment
+```bash
+# Main app production environment
+DOCS_DOMAIN=https://docs-shipkit.vercel.app
+BLOG_DOMAIN=https://blog-shipkit.vercel.app
+UI_DOMAIN=https://ui-shipkit.vercel.app
+TOOLS_DOMAIN=https://tools-shipkit.vercel.app
+```
 
-### Unit Tests
+## Navigation Patterns
+
+### Inter-Zone Navigation
+```tsx
+// Use anchor tags for navigation between zones
+<a href="/docs/getting-started" className="nav-link">
+  Documentation
+</a>
+
+// NOT Next.js Link for cross-zone navigation
+// ❌ <Link href="/docs/getting-started">Documentation</Link>
+```
+
+### Intra-Zone Navigation
+```tsx
+// Use Next.js Link within the same zone
+import Link from 'next/link'
+
+<Link href="/docs/advanced-topics">
+  Advanced Topics
+</Link>
+```
+
+### Shared Navigation Components
+```tsx
+// Create zone-aware navigation components
+const NavLink = ({ href, children, ...props }) => {
+  const isExternal = href.startsWith('/docs') ||
+                    href.startsWith('/blog') ||
+                    href.startsWith('/ui') ||
+                    href.startsWith('/tools');
+
+  if (isExternal) {
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
