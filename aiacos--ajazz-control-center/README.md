@@ -7,11 +7,11 @@ Cross-platform Qt6 control center for AJAZZ devices (stream decks, keyboards, mi
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [Aiacos/ajazz-control-center](https://github.com/Aiacos/ajazz-control-center).
+Original source: `AGENTS.md` in [Aiacos/ajazz-control-center](https://github.com/Aiacos/ajazz-control-center).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
