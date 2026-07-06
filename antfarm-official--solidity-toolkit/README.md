@@ -7,14 +7,14 @@ Solidity compiler tooling and smart-contract analysis workspace for Tirixa Web3 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `copilot-instructions.md` in [antfarm-official/solidity-toolkit](https://github.com/antfarm-official/solidity-toolkit).
+Original source: `GEMINI.md` in [antfarm-official/solidity-toolkit](https://github.com/antfarm-official/solidity-toolkit).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
+- **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
-- **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
 Quality verified by TomeVault's automated analysis pipeline. Source: [github.com/antfarm-official/solidity-toolkit](https://github.com/antfarm-official/solidity-toolkit)
