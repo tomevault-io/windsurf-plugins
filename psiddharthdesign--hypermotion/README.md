@@ -7,11 +7,11 @@ Native motion design tool with Figma-style structural layout, semantic keyframes
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [psiddharthdesign/hypermotion](https://github.com/psiddharthdesign/hypermotion).
+Original source: `AGENTS.md` in [psiddharthdesign/hypermotion](https://github.com/psiddharthdesign/hypermotion).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
