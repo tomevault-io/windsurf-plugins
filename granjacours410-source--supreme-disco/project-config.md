@@ -1,161 +1,190 @@
 ---
 trigger: always_on
-description: UI Development Guidelines
+description: Project Guidelines for Unit Testing
 ---
 
 
-# MetaMask Mobile React Native UI Development Guidelines
+Reference: [MetaMask Unit Testing Guidelines](https://github.com/MetaMask/contributor-docs/blob/main/docs/testing/unit-testing.md)
 
-## Core Principle
+# Unit Testing Guidelines
 
-Always prioritize @metamask/design-system-react-native components and Tailwind CSS patterns over custom implementations.
+## Test Naming Rules
 
-## Component Hierarchy (STRICT ORDER)
+- **NEVER use "should" in test names** - this is a hard rule with zero exceptions
+- **Use action-oriented descriptions** that describe what the code does
+- **Be specific about the behavior being tested**
+- **AVOID** weasel words like "handle", "manage", or other non-specific action verbs
+- **AVOID** subjective outcome words like "successfully", "correctly", "invalid" - instead indicate what the actual result should be
+- **BE SPECIFIC** about conditions: use "email without domain" instead of "invalid email"
 
-1. **FIRST**: Use `@metamask/design-system-react-native` components
-2. **SECOND**: Use `app/component-library` components only if design system lacks the component
-3. **LAST RESORT**: Custom components with StyleSheet (avoid unless absolutely necessary)
+```ts
+// ❌ WRONG
+it('should return fixed timestamp', () => { ... });
+it('should ignore events', () => { ... });
+it('should display error when input is invalid', () => { ... });
+it('handles invalid input correctly', () => { ... });
 
-## Required Imports for React Native
-
-```tsx
-// ALWAYS prefer these imports
-import { useTailwind } from '@metamask/design-system-twrnc-preset';
-import {
-  Box,
-  Text,
-  Button,
-  ButtonBase,
-  Icon,
-  TextVariant,
-  BoxFlexDirection,
-  BoxAlignItems,
-  BoxJustifyContent,
-  // ... other design system components
-} from '@metamask/design-system-react-native';
+// ✅ CORRECT
+it('returns fixed timestamp for privacy events', () => { ... });
+it('ignores events without privacy timestamp property', () => { ... });
+it('displays error when email is missing @ symbol', () => { ... });
+it('returns false for email without domain', () => { ... });
 ```
 
-## Styling Rules (ENFORCE STRICTLY)
+## Test Structure and Organization - MANDATORY
 
-### ✅ ALWAYS DO:
+- **EVERY test MUST follow the AAA pattern** (Arrange, Act, Assert) with blank line separation
+- **Each test must cover ONE behavior** and be isolated from others
+- **Use helper functions** for test data creation
+- **Group related tests** in `describe` blocks
 
-- Use `const tw = useTailwind();` hook instead of importing twrnc directly
-- Use `Box` component instead of `View`
-- Use `Text` component with variants instead of raw Text with styles
-- Use `twClassName` prop for static styles
-- Use `tw.style()` function for interactive/dynamic styles
-- Use design system color tokens: `bg-default`, `text-primary`, `border-muted`
-- Use component props first: `variant`, `color`, `size`, etc.
+```ts
+it('returns false for email without domain', () => {
+  const input = 'user@';
 
-### ❌ NEVER SUGGEST:
+  const result = validateEmail(input);
 
-- `import tw from 'twrnc'` (use useTailwind hook instead)
-- `StyleSheet.create()` (use Tailwind classes)
-- Raw `View` or `Text` components (use Box/Text from design system)
-- Arbitrary color values like `bg-[#3B82F6]` or `text-[#000000]`
-- Inline style objects unless for dynamic values
-- Mixing multiple styling approaches unnecessarily
-
-## Code Pattern Templates
-
-### Basic Container:
-
-```tsx
-const MyComponent = () => {
-  const tw = useTailwind();
-
-  return (
-    <Box twClassName="w-full bg-default p-4">
-      <Text variant={TextVariant.HeadingMd}>Title</Text>
-    </Box>
-  );
-};
+  expect(result).toBe(false);
+});
 ```
 
-### Flex Layout:
-
-```tsx
-<Box
-  flexDirection={BoxFlexDirection.Row}
-  alignItems={BoxAlignItems.Center}
-  justifyContent={BoxJustifyContent.Between}
-  twClassName="gap-3"
->
+**Helper Functions**:
+```ts
+const createTestEvent = (overrides = {}) => ({
+  type: EventType.TrackEvent,
+  event: 'Test Event',
+  timestamp: '2024-01-01T12:00:00.000Z',
+  ...overrides,
+});
 ```
 
-### Interactive Element:
+## Mocking Rules - CRITICAL
 
-```tsx
-<ButtonBase
-  twClassName="h-20 flex-1 rounded-lg bg-muted px-0 py-4"
-  style={({ pressed }) =>
-    tw.style(
-      'w-full flex-row items-center justify-center',
-      pressed && 'bg-pressed',
-    )
-  }
->
-  <Text fontWeight={FontWeight.Medium}>Button Text</Text>
-</ButtonBase>
+- **EVERYTHING not under test MUST be mocked** - no exceptions
+- **NO** use of `require` - use ES6 imports only
+- **NO** use of `any` type - use proper TypeScript types
+- **Mock all external dependencies** including APIs, services, hooks
+- **Use realistic mock data** that reflects real usage
+
+```ts
+// ✅ CORRECT
+import { apiService } from '../services/api';
+jest.mock('../services/api');
+const mockApiService = apiService as jest.Mocked<typeof apiService>;
+
+interface MockEvent {
+  type: EventType;
+  event: string;
+  timestamp: string;
+}
+
+// ❌ WRONG
+const mockApi = require('../services/api'); // ❌ no require
+const mockApi: any = jest.fn();             // ❌ no any type
 ```
 
-### Pressable with Tailwind:
+## Test Isolation and Focus - MANDATORY
 
-```tsx
-<Pressable
-  style={({ pressed }) =>
-    tw.style(
-      'w-full flex-row items-center justify-between px-4 py-2',
-      pressed && 'bg-pressed',
-    )
-  }
->
+- **Each test MUST be independent** - no shared state between tests
+- **Use `beforeEach` for setup, `afterEach` for cleanup**
+- **Reset all mocks between tests**
+- **Tests MUST run in any order**
+- **Avoid duplicated or polluted tests**
+- **Use mocks for all external dependencies**
+
+```ts
+// ✅ CORRECT Test Isolation
+describe('MetaMetricsCustomTimestampPlugin', () => {
+  let plugin: MetaMetricsCustomTimestampPlugin;
+
+  beforeEach(() => {
+    plugin = new MetaMetricsCustomTimestampPlugin({
+      timestampStrategy: 'fixed',
+      customTimestamp: '1970-01-01T00:00:00.000Z',
+    });
+    jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    jest.resetAllMocks();
+  });
+
+  it('returns fixed timestamp for privacy events', () => {
+    const event = createTestEvent({ privacyTimestamp: true });
+
+    const result = plugin.execute(event);
+
+    expect(result.timestamp).toBe('1970-01-01T00:00:00.000Z');
+  });
+});
 ```
 
-## Component Conversion Guide
+## Test Coverage (MANDATORY)
 
-| DON'T Use                            | USE Instead                            |
-| ------------------------------------ | -------------------------------------- |
-| `<View>`                             | `<Box>`                                |
-| `<Text style={...}>`                 | `<Text variant={TextVariant.BodyMd}>`  |
-| `StyleSheet.create()`                | `twClassName="..."`                    |
-| `style={{ backgroundColor: 'red' }}` | `twClassName="bg-error-default"`       |
-| `flexDirection: 'row'`               | `flexDirection={BoxFlexDirection.Row}` |
-| Manual padding/margin                | `twClassName="p-4 m-2"`                |
+**EVERY component MUST test:**
+- ✅ **Happy path** - normal expected behavior
+- ✅ **Edge cases** - null, undefined, empty values, boundary conditions
+- ✅ **Error conditions** - invalid inputs, failure scenarios
+- ✅ **Different code paths** - all if/else branches, switch cases
+- ✅ **Method chaining** - for builder patterns
+- ✅ **Side effects** - property changes, state updates, cleanup
 
-## Error Prevention
+```ts
+// ✅ CORRECT Coverage Example
+describe('MetaMetricsCustomTimestampPlugin', () => {
+  describe('execute', () => {
+    it('returns fixed timestamp for privacy events', () => {
+      // Happy path
+    });
 
-When you see these patterns, IMMEDIATELY suggest alternatives:
+    it('ignores events without privacy timestamp property', () => {
+      // Edge case
+    });
 
-- Any `import tw from 'twrnc'` → `import { useTailwind } from '@metamask/design-system-twrnc-preset'`
-- Any `View` component → `Box` from design system
-- Any `StyleSheet` usage → Tailwind classes
-- Any arbitrary color values → Design system tokens
-- Any manual flex properties → Box component props + twClassName
+    it('throws error when strategy is null', () => {
+      // Error condition
+    });
 
-## Design System Priority
+    it('uses event-specific timestamp strategy when provided', () => {
+      // Different code path
+    });
 
-Before suggesting any UI solution:
+    it('removes privacy properties from event', () => {
+      // Side effect
+    });
+  });
+});
+```
 
-1. Check if `@metamask/design-system-react-native` has the component
-2. Use component's built-in props (variant, color, size)
-3. Add layout/spacing with `twClassName`
-4. Add interactions with `tw.style()`
-5. Only suggest component-library or custom components if design system lacks it
+## Parameterized Tests
 
-## Reference Examples
+- Parameterize tests to cover all values (e.g., enums) with type-safe iteration.
 
-Always reference the patterns from `app/component-library/components/design-system.stories.tsx` for proper usage examples.
+```ts
+it.each(['small', 'medium', 'large'] as const)('renders %s size', (size) => {
+  expect(renderComponent(size)).toBeOnTheScreen();
+});
+```
 
-## Enforcement
+## Test Determinism
 
-- REJECT any code suggestions that use StyleSheet.create()
-- REJECT raw View/Text usage when Box/Text components exist
-- REQUIRE useTailwind hook for all Tailwind usage
-- REQUIRE design system components as first choice
-- ENFORCE design token usage over arbitrary values
+- **EVERYTHING** not under test must be mocked - no exceptions.
+- Avoid brittle tests: do not test internal state or UI snapshots for logic.
+- Only test public behavior, not implementation details.
+- Mock time, randomness, and external systems to ensure consistent results.
 
-@app/component-library/components/design-system.stories.tsx
+```ts
+// Mock all external dependencies
+jest.mock('../services/api');
+jest.mock('../utils/date');
+jest.mock('../hooks/useAuth');
+
+jest.useFakeTimers();
+jest.setSystemTime(new Date('2024-01-01'));
+```
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [granjacours410-source/supreme-disco](https://github.com/granjacours410-source/supreme-disco) — distributed by [TomeVault](https://tomevault.io).
