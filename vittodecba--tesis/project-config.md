@@ -1,0 +1,120 @@
+---
+trigger: always_on
+description: Sistema de gestión para producción de cerveza artesanal. Cubre recetas, planificación de lotes, fermentación y stock.
+---
+
+# AtonBeer - Tesis
+
+Sistema de gestión para producción de cerveza artesanal. Cubre recetas, planificación de lotes, fermentación y stock.
+
+## Stack Técnico
+
+- **Backend:** .NET 8 Web API, Entity Framework Core 8, SQL Server
+- **Frontend:** Angular 17+ (standalone components), TailwindCSS
+- **Arquitectura:** Clean Architecture (Domain → Application → Infrastructure → API)
+
+## Estructura del repositorio
+
+```
+Tesis/
+├── AtonBeerTesis/          # Backend .NET
+│   ├── AtonBeerTesis/              # API layer (Controllers, Program.cs)
+│   ├── AtonBeerTesis.Application/  # Services, Interfaces, DTOs
+│   ├── AtonBeerTesis.Domain/       # Entities, Enums, Interfaces
+│   └── AtonBeerTesis.Infrastructure/ # DbContext, Repositories, Migrations
+└── AtonBeerFront/          # Frontend Angular
+    └── src/app/
+        ├── components/     # Feature components
+        ├── services/       # HTTP services
+        └── Interfaces/     # TypeScript interfaces
+```
+
+## Comandos clave
+
+```bash
+# Backend
+cd AtonBeerTesis
+dotnet run --project AtonBeerTesis      # Puerto 5190
+dotnet ef migrations add <Name> --project AtonBeerTesis.Infrastructure --startup-project AtonBeerTesis --configuration Release
+dotnet ef database update --project AtonBeerTesis.Infrastructure --startup-project AtonBeerTesis --configuration Release
+
+# Frontend
+cd AtonBeerFront
+npm install
+ng serve    # Puerto 4200
+```
+
+> **Nota:** Usar `--configuration Release` en migraciones cuando VS tiene el proyecto en Debug abierto (bloquea DLLs).
+
+## Módulos principales
+
+### Recetas (`/recetas`)
+- CRUD completo con ingredientes (`RecetaInsumo`) y pasos de elaboración
+- Duplicado de recetas con versionado automático (V2, V3, V2.1…)
+- Estilos de cerveza como strings en el campo `Estilo`
+- **Al crear una receta con un estilo nuevo → se agrega automáticamente a todos los FormatosEnvase de stock**
+
+### Lotes (`/planificacion`)
+- Ciclo: Planificado → EnProceso → Finalizado / Descartado
+- Vinculado a una Receta y un Fermentador
+- **Sección de Designación de Volumen:** el usuario asigna litros a formatos de envase antes de finalizar
+- **Al finalizar → el sistema genera ingresos de stock automáticamente** para cada designación
+- Registros de fermentación diarios (pH, densidad, temperatura, presión)
+
+### Stock (`/stock`)
+- **FormatoEnvase:** tipos de envase con capacidad en litros (Barril 50L, Lata 473ml, etc.)
+- **ProductoStock:** combinación FormatoEnvase × Estilo, con stock en unidades
+- **MovimientoStock:** historial de ingresos/egresos con trazabilidad al lote
+
+### Fermentadores
+- Estados: Disponible, Ocupado, Sucio
+- Un lote activo por fermentador a la vez
+
+### Planificación de Producción
+- Vincula Lote + Fermentador con fecha de inicio
+- Se sincroniza con el estado del Lote al finalizar
+
+### Clientes (`/clientes`)
+- CRUD completo con filtros por tipo, ubicación y estado
+- **TipoCliente:** `Franquicia` o `Externo`
+- **EstadoCliente:** `Activo` o `Inactivo` (borrado lógico, no físico)
+- CUIT validado y normalizado (`CuitValidator`) — no se puede cambiar con PATCH
+- No se puede desactivar un cliente con pedidos activos (`EstadoId != 2 y != 4`)
+- Campos de métricas: `UltimoPedido`, `UltimaCompra`, `TotalPedidos`
+- Componente: `AtonBeerFront/src/app/components/clientes/clientes.component.ts`
+- Servicio: `AtonBeerFront/src/app/services/clientes-api.ts`
+
+### Pedidos (`/pedidos/registrar`)
+- **Entidades:** `Pedido → DetallePedido → ProductoStock`, vinculado a `Cliente` y `EstadoPedido`
+- **Estados (tabla catálogo):** `1=Pendiente`, `2=Entregado`, `4=Cancelado`
+- **Flujo:** `Pendiente → Entregado` / `Pendiente → Cancelado` / `Entregado → Pendiente` (reversa)
+- Solo pedidos `Pendiente` pueden editarse, cancelarse o entregarse
+- **Al entregar:** descuenta stock (`MovimientoStock` tipo "Egreso") + asigna barriles físicos al cliente (`EstadoBarril.ConCliente`)
+- **Reversa de entrega:** restaura stock + devuelve barriles a `EstadoBarril.Lleno`
+- **Descuento Franquicia:** clientes tipo `Franquicia` reciben 10% de descuento (calculado en frontend)
+- Solo clientes `Activo` aparecen en el selector al crear pedidos
+- El UI tiene un estado "Facturado" en el flujo pero **aún no está implementado en el backend**
+- Componente: `AtonBeerFront/src/app/components/registrar-pedido/registrar-pedido.ts`
+- Servicio: `AtonBeerFront/src/app/core/services/pedido.service.ts`
+
+#### Endpoints Pedidos
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| GET | `/api/pedidos` | Lista todos |
+| GET | `/api/pedidos/{id}` | Detalle para edición |
+| POST | `/api/pedidos` | Crear (`PedidoCreacionDTO`) |
+| PUT | `/api/pedidos` | Actualizar (`PedidoEdicionDTO`) |
+| PATCH | `/api/pedidos/{id}/cancelar` | Cancelar |
+| PATCH | `/api/pedidos/{id}/entregar` | Entregar (body: array barrilIds) |
+| PUT | `/api/pedidos/{id}/deshacer-entrega` | Revertir entrega |
+
+#### DTOs Pedidos
+- **PedidoCreacionDTO:** `IdCliente, Observaciones, TotalPedido, Detalles[], FechaEntregaProgramada`
+- **PedidoDetalleDTO:** `ProductoStockId, Cantidad, Precio, BarrilesAsignados[]`
+- **PedidoEdicionDTO:** `Id, IdCliente, RazonSocial, Fecha, FechaEntregaProgramada, Observaciones, EstadoPedido, Detalles[], TotalPedido`
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [vittodecba/Tesis](https://github.com/vittodecba/Tesis) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-07 -->
