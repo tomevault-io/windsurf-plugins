@@ -1,0 +1,84 @@
+---
+trigger: always_on
+description: Domestique is a TypeScript MCP server integrating Intervals.icu, Whoop, and TrainerRoad. See @README.md for the project overview, feature list, and full environment variable reference.
+---
+
+# Agent Instructions
+
+Domestique is a TypeScript MCP server integrating Intervals.icu, Whoop, and TrainerRoad. See @README.md for the project overview, feature list, and full environment variable reference.
+
+## Development
+
+Run commands inside the dev container:
+
+```bash
+docker compose up                                       # start dev (port 3000, hot reload of src/)
+docker compose exec domestique npm run typecheck
+docker compose logs domestique -f
+```
+
+For commands on the host, run `nvm use` first (version in @.nvmrc).
+
+**On Claude Code Web**, Docker isn't available — run `npm install`, `npm test`, `npm run typecheck`, `npm run build` directly.
+
+## Testing
+
+```bash
+nvm use && npm test
+```
+
+Tests run on the host (or the test Docker target), **not** in the dev container — the dev container only mounts `src/` and `tsconfig.json`, not `tests/`. Always add tests for new functionality.
+
+## Common Tasks
+
+### Adding a tool
+
+1. Implement in `src/tools/{current,historical,planning}.ts`
+2. Define the response shape as a Zod schema in `src/schemas/index.ts` and pass it as `outputSchema` when registering
+3. Register in `src/tools/index.ts` (`registerTools`)
+4. Add any new API methods to the relevant `src/clients/*.ts`
+5. Cover the tool, new client methods, and any new clients with tests
+6. Update tool descriptions, field descriptions, and add a one-sentence entry to @README.md (no implementation details, no exhaustive field lists)
+
+### Adding an API client
+
+1. Create the client in `src/clients/`
+2. Wire up config in `src/auth/middleware.ts` `getConfig()`
+3. Add to `ToolRegistry` constructor in `src/tools/index.ts`
+
+## Code Style
+
+- TypeScript strict mode, async/await, named exports only (no default exports)
+- JSDoc on public APIs
+
+### Logging
+
+- Never call `console.*` directly in `src/` (except inside `src/utils/logger.ts` and operator scripts in `src/scripts/`). Use the helpers from `src/utils/logger.ts`: `logInfo` / `logWarn` / `logError` / `logDebug`, plus `logApiCall(source, path, method?)` for outbound API calls and `logToolCall(name)` for MCP tool entry.
+- Every line is `[scope] message`; pass the service/module as the scope (e.g. `Whoop`, `Intervals`, `WhoopWebhook`, `CurrentTools`). Don't put the scope in the message — the helper adds the bracket.
+- `logError` always emits and reports to Bugsnag (synthesizes an Error if none is passed). Use it only for genuine failures. For best-effort degradations whose underlying API error was already reported at the client layer (`logApiError`), use `logWarn` to avoid double-reporting. `logDebug` is suppressed unless `LOG_LEVEL=debug` — use it for high-volume internal churn (token refresh, lock dance).
+
+### Unit conventions
+
+Tool responses use **unit-in-value** strings.
+
+- Emit `weight: "75.9 kg"`, `max_hr: "165 bpm"`, `recovery_score: "82%"` — **not** `weight_kg: 75.9` or `max_hr: 165`. Field names describe the metric, not the unit.
+- Use the helpers in `src/utils/format-units.ts`: `formatPower`, `formatHR`, `formatWeight`, `formatHeight`, `formatStride`, `formatPercent`, `formatTemperature`, `formatLength`, `formatEnergy`, `formatEnergyKJ`, `formatCadence`, `formatMass`, `formatHRV`, `formatVO2max`, `formatBP`, plus `withUnit` for one-offs. `formatStride` for stride length, `formatHeight` only for athlete stature, `formatLength` for elevation/altitude.
+- Field descriptions in `.describe()` must **not** name units. Describe the metric (`'Average heart rate'`), not the unit. Formatters consult athlete prefs via `runWithUnitPreferences` in `src/utils/unit-context.ts`, so values change per user — unit-named descriptions go stale.
+- Bare numerics only for unitless scores (TSS, CTL/ATL/TSB, IF, RPE, 1–4 wellness scales) and counts (`activities`, `lengths`, `steps`).
+
+## MCP Compatibility
+
+- **`outputSchema` required for every tool.** Define the shape in `src/schemas/index.ts`. Handlers return a JSON object — wrap arrays at the registration site, e.g. `{ strain: await this.currentTools.getStrainHistory(args) }`. The return becomes `structuredContent`; it's also serialized into `content` for older clients. Field descriptions live in `.describe()` and ship via `tools/list`, not in every response.
+- **No underscore-prefixed property names in `outputSchema`.** MCP Inspector treats `_*` as protocol-private and strips them, then flags the value as an unexpected additional property. Use plain names. `_meta` is reserved for genuine out-of-band metadata.
+- **No MCP resources or elicitations.** ChatGPT doesn't support resources; neither client supports elicitations. Don't suggest either. Before adding any non-tool MCP feature, check https://modelcontextprotocol.io/clients.md.
+
+## Project-specific gotchas
+
+- **Whoop OAuth.** Tokens are stored in Redis and refreshed automatically. Initial setup is interactive: `docker compose exec domestique npm run whoop:auth`.
+- **Tool registry is shared** across MCP sessions (created once at server start), but each session gets its own `McpServer`.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [gesteves/domestique](https://github.com/gesteves/domestique) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-07 -->
