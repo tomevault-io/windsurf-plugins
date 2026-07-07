@@ -7,11 +7,11 @@ The specification, reference runtimes, validator, LLM bridge, and conformance su
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [URML-MARS/URML](https://github.com/URML-MARS/URML).
+Original source: `CLAUDE.md` in [URML-MARS/URML](https://github.com/URML-MARS/URML).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
