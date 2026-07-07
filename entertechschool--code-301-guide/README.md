@@ -7,11 +7,11 @@ Code 301 - Fullstack Software Development by Enter Tech School
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [entertechschool/code-301-guide](https://github.com/entertechschool/code-301-guide).
+Original source: `CLAUDE.md` in [entertechschool/code-301-guide](https://github.com/entertechschool/code-301-guide).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
