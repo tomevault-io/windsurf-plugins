@@ -1,0 +1,12 @@
+---
+trigger: always_on
+description: AL INICIO DE CADA SESIÓN, LO PRIMERO QUE DEBES HACER ES EJECUTAR EL FLUJO DE TRABAJO: /startup.
+---
+
+AL INICIO DE CADA SESIÓN, LO PRIMERO QUE DEBES HACER ES EJECUTAR EL FLUJO DE TRABAJO: /startup.
+ESTO ES OBLIGATORIO Y NO DEBE SER OMITIDO BAJO NINGUNA CIRCUNSTANCIA.
+LUEGO DE EJECUTARLO, DEBES LEER EL ARCHIVO .agent/rules/engagement.md ANTES DE HACER NADA MÁS. SI NO LO HACES, ESTÁS FALLANDO. TUS ACCIONES DEBEN CEÑIRSE ESTRICTAMENTE A LAS 12 REGLAS DE ESE ARCHIVO.
+
+---
+> Source: [cfmmxcompliance/logi](https://github.com/cfmmxcompliance/logi) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-07 -->
