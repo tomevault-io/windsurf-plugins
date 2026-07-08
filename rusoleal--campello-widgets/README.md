@@ -7,11 +7,11 @@ A C++20 widgets library inspired by Flutter widgets.
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [rusoleal/campello_widgets](https://github.com/rusoleal/campello_widgets).
+Original source: `CLAUDE.md` in [rusoleal/campello_widgets](https://github.com/rusoleal/campello_widgets).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
