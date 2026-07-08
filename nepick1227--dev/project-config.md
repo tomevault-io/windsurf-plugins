@@ -1,0 +1,193 @@
+---
+trigger: always_on
+description: > Codex가 이 프로젝트에서 코드를 생성할 때 자동으로 참조하는 규칙 파일입니다.
+---
+
+# NePick 프로젝트 — Codex 코드 규칙
+
+> Codex가 이 프로젝트에서 코드를 생성할 때 자동으로 참조하는 규칙 파일입니다.
+
+## 프로젝트 개요
+
+- **서비스**: 맛집·카페 방문 기록 & 추천 앱 (모바일 웹)
+- **스택**: Next.js 16 (App Router) · TypeScript · Tailwind CSS v4 · Supabase · 카카오맵 SDK
+- **배포**: Vercel (nepick.kr)
+- **경로 별칭**: `@/*` → 프로젝트 루트 (`./`)
+
+## 디렉토리 구조
+
+```
+nepick/
+├── app/                    # Next.js App Router (페이지 라우팅만)
+│   ├── layout.tsx
+│   ├── page.tsx            # 랜딩 (→ /auth/login 리다이렉트)
+│   ├── error.tsx           # Next.js 전역 에러 바운더리
+│   ├── api/
+│   │   ├── auth/naver/route.ts           # 네이버 OAuth 시작
+│   │   ├── auth/naver/callback/route.ts  # 네이버 OAuth 콜백
+│   │   └── kakao-search/route.ts         # 카카오 장소 검색 프록시
+│   ├── auth/
+│   │   ├── login/page.tsx
+│   │   ├── callback/route.ts
+│   │   ├── terms/page.tsx
+│   │   ├── signup/page.tsx
+│   │   ├── error/page.tsx       # 인증 오류 안내
+│   │   └── naver/verify/page.tsx
+│   ├── home/page.tsx
+│   ├── record/
+│   │   ├── page.tsx
+│   │   └── [id]/edit/page.tsx
+│   ├── mypick/page.tsx
+│   └── profile/
+│       ├── page.tsx
+│       ├── edit/page.tsx
+│       ├── permissions/page.tsx
+│       ├── withdrawal/page.tsx
+│       └── withdrawal/done/page.tsx
+├── components/             # 공통 UI 컴포넌트
+│   ├── ui/                 # Button, Input, Modal, Toast, Spinner, Badge, Chip, Textarea
+│   ├── layout/             # Header, BottomNav, PageContainer
+│   └── map/                # KakaoMap, MapMarker, BottomSheet
+├── features/               # 페이지별 비즈니스 로직 + 전용 컴포넌트
+│   ├── auth/               # LoginForm, SignupForm, TermsAgreement
+│   ├── home/               # MapView, RankingSheet, StoreCard
+│   ├── record/             # RecordForm, StoreSearch, ImageUpload
+│   ├── mypick/             # Timeline, RecordCard, MonthFilter
+│   └── profile/            # ProfileView, ProfileEditForm
+├── hooks/                  # 커스텀 훅
+│   ├── use-kakao-map.ts    # 카카오맵 인스턴스
+│   └── use-toast.ts        # 토스트 메시지
+├── lib/                    # 외부 서비스 클라이언트
+│   ├── supabase/
+│   │   ├── client.ts       # 브라우저용 (CSR)
+│   │   └── server.ts       # 서버용 (SSR/RSC)
+│   └── kakao/
+│       └── map.ts          # SDK 로드 + 유틸
+├── styles/
+│   └── tokens.ts           # 디자인 토큰 (색상, 폰트, 레이아웃)
+├── types/
+│   ├── database.ts         # Supabase 테이블 타입
+│   └── kakao.d.ts          # 카카오맵 SDK 전역 타입
+└── utils/
+    ├── format.ts           # 날짜·텍스트 포맷
+    └── validation.ts       # 입력값 검증
+```
+
+## 네이밍 규칙
+
+| 대상 | 규칙 | 예시 |
+|------|------|------|
+| 파일/폴더 | kebab-case | `store-card.tsx`, `use-auth.ts` |
+| React 컴포넌트 | PascalCase | `StoreCard`, `BottomSheet` |
+| 함수/변수 | camelCase | `handleSubmit`, `isLoading` |
+| 상수 | UPPER_SNAKE_CASE | `MAX_COMMENT_LENGTH` |
+| 타입/인터페이스 | PascalCase | `Store`, `RecordFormData` |
+| DB 컬럼 | snake_case | `visited_at`, `pick_count` |
+
+## 컴포넌트 작성 패턴
+
+```tsx
+// 1. import 순서: 외부 라이브러리 → 내부 모듈 → 타입
+import { useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import { colors } from "@/styles/tokens";
+import type { Store } from "@/types/database";
+
+// 2. Props 타입은 반드시 interface로 정의
+interface StoreCardProps {
+  store: Store;
+  onClick?: (storeId: number) => void;
+}
+
+// 3. default export 함수형 컴포넌트
+export default function StoreCard({ store, onClick }: StoreCardProps) {
+  // hooks 최상단 선언
+  const [isActive, setIsActive] = useState(false);
+
+  // 핸들러는 useCallback
+  const handleClick = useCallback(() => {
+    onClick?.(store.id);
+  }, [store.id, onClick]);
+
+  // 조건부 early return
+  if (!store) return null;
+
+  return (
+    <div className="flex items-center gap-3 p-4 border-b border-border">
+      ...
+    </div>
+  );
+}
+```
+
+**핵심 규칙:**
+- 파일 당 200줄 이하 권장 → 초과 시 하위 컴포넌트로 분리
+- 인라인 스타일(`style={{}}`) 사용 금지 → Tailwind 클래스 사용
+- `any` 타입 사용 금지 → `unknown` + 타입 가드 사용
+- SVG 아이콘은 `components/ui/icons/` 에 컴포넌트로 분리
+
+## 디자인 토큰 (app/globals.css @theme inline)
+
+색상은 `globals.css`의 `@theme inline {}` 블록에 CSS 변수로 정의됩니다. Tailwind 클래스(`text-primary`, `bg-surface` 등)로 바로 사용할 수 있습니다. 새 색상이 필요하면 `tailwind.config.ts`가 아닌 `globals.css @theme inline`에 추가합니다.
+
+```
+/* 브랜드 */
+primary:         #D32F2F   주요 액션, 에러 상태
+primary-dark:    #B71C1C   호버/강조
+primary-soft:    #FFF1F1   선택된 항목 배경
+primary-border:  #F3B4B4   선택된 항목 테두리
+
+/* 텍스트 */
+text-primary:    #111827   본문
+text-secondary:  #6B7280   보조
+text-tertiary:   #9CA3AF   비활성/플레이스홀더
+
+/* UI */
+border:          #E5E7EB   선/구분선
+bg:              #FAFAFA   페이지 배경
+surface:         #FFFFFF   카드/시트 배경
+
+/* 성공 */
+success:         #10B981   성공 아이콘
+success-text:    #047857   성공 텍스트
+success-border:  #34D399   성공 테두리
+success-soft:    #ECFDF5   성공 배경
+
+/* 비활성 */
+disabled-bg:     #E5E7EB
+disabled-text:   #9CA3AF
+```
+
+### 추천 배지 색상
+
+추천 배지는 별도 색상 토큰 없이 아래 조합을 사용합니다 (`components/ui/Badge.tsx` 참조):
+
+```
+추천(👍):   bg-primary-soft text-primary
+보통(😐):   bg-bg text-text-secondary
+비추(👎):   bg-bg text-text-secondary
+```
+
+### CSS 유틸리티 클래스 (globals.css)
+
+```
+nepick-fade-in   진입 애니메이션 (240ms, translateY 8px→0 + opacity)
+                 stagger는 [animation-delay:Xms] Tailwind 임의값으로 추가
+safe-area-pb     padding-bottom: max(16px, env(safe-area-inset-bottom))
+                 → 탭바·바텀시트 footer 등 iOS 홈 인디케이터 영역에 사용
+safe-area-pb-lg  padding-bottom: calc(24px + env(safe-area-inset-bottom))
+                 → 페이지 고정 CTA 버튼 영역에 사용
+```
+
+## Supabase 데이터 레이어 패턴
+
+```ts
+// features/*/api.ts — 데이터 함수 분리
+// 에러는 throw, 컴포넌트에서 try-catch 처리
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [nepick1227/dev](https://github.com/nepick1227/dev) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-08 -->
