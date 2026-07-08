@@ -1,104 +1,61 @@
 ---
 trigger: always_on
-description: How Supabase works under Lovable Cloud — migrations, grants, edge-function deploy, secrets, and the bundler. Read before writing ANY migration or edge function so it actually works once Lovable applies/deploys it.
+description: Rising Tide OS — a React + Vite + TypeScript SPA for car wash operations management, backed by a hosted Supabase instance (auth, database, edge functions). There is no local backend; all server-side logic runs on Supabase cloud.
 ---
 
+# AGENTS.md
 
-# Supabase on Lovable Cloud — migrations, edge functions & secrets
+## Cursor Cloud specific instructions
 
-This project's backend is a Supabase instance managed by **Lovable Cloud**. Migrations are written here (Cursor) but executed by Lovable's migration runner against the hosted DB. There is **no Supabase dashboard access**, no `SUPABASE_ACCESS_TOKEN`, no `SUPABASE_DB_PASSWORD`, and no local `supabase db push`. If a migration depends on dashboard-only state or missing privileges, it silently breaks the app at runtime (PostgREST returns permission errors and the frontend looks "empty").
+### Project overview
 
-Follow these rules so every migration you author here works the first time Lovable applies it.
+Rising Tide OS — a React + Vite + TypeScript SPA for car wash operations management, backed by a hosted Supabase instance (auth, database, edge functions). There is no local backend; all server-side logic runs on Supabase cloud.
 
-## 1. The non-obvious rule: `public` schema has NO default Data API grants
+### Development commands
 
-Lovable Cloud's PostgREST does **not** inherit default privileges on `public` for `anon`, `authenticated`, or `service_role`. Enabling RLS is **not enough** — without an explicit `GRANT`, every request returns:
+| Task | Command |
+|------|---------|
+| Dev server | `npm run dev` (port 8080) |
+| Lint | `npm run lint` |
+| Test | `npm run test` |
+| Build | `npm run build` |
 
-```
-permission denied for table <name>
-```
+### Key caveats
 
-Every `CREATE TABLE public.<x>` migration MUST include `GRANT` statements **in the same migration**, in this exact order:
+- **Authentication**: The app uses Google OAuth via Lovable's auth proxy, restricted to `@risingtidecarwash.com` accounts. The `/login` page (`src/pages/Login.tsx`) **also has an email/password form** that calls `supabase.auth.signInWithPassword` — for local dev/testing you can sign in directly with the `RISING_TIDE_TEST_EMAIL` / `RISING_TIDE_TEST_PASSWORD` credentials (this is the simplest path and what TestSprite uses). Alternatively, you can bypass auth entirely by running the following in the browser console once the dev server is running at `http://localhost:8080`:
+  ```js
+  const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+  const sb = createClient(
+    'https://kusikfglatxtgcruquks.supabase.co',
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt1c2lrZmdsYXR4dGdjcnVxdWtzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MDgyMzUsImV4cCI6MjA5MTM4NDIzNX0.U_uf-zzFfLrVbUnSqACdUddzNiB9EjExEy41vMS1DTA'
+  );
+  const { data, error } = await sb.auth.signInWithPassword({
+    email: '<TEST_EMAIL>', password: '<TEST_PASSWORD>'
+  });
+  if (data?.session) {
+    localStorage.setItem('sb-kusikfglatxtgcruquks-auth-token', JSON.stringify(data.session));
+    location.reload();
+  }
+  ```
+  Replace `<TEST_EMAIL>` and `<TEST_PASSWORD>` with the values from the `RISING_TIDE_TEST_EMAIL` and `RISING_TIDE_TEST_PASSWORD` secrets. After reload, the app will recognize the session and show authenticated pages.
+- **Localhost OAuth does not work**: The Lovable auth proxy only allows redirects to the production domain. Clicking "Sign in with Google" on `localhost:8080` will 404 on the redirect. Use the email/password form on the login page (or the console-based bypass above) for local testing.
+- **Test user must have an admin role**: The `useRoleAccess` hook returns `false` for all pages when the user has no role (`role` is null). Without a row in the `user_roles` table, dashboard pages render blank. The test account must have `role = 'admin'` in the `user_roles` table to access all pages.
+- **Pre-existing lint errors**: The codebase has ~109 existing ESLint errors (mostly `@typescript-eslint/no-explicit-any`). ESLint exits with code 1 due to these pre-existing issues. Do not attempt to fix them unless specifically asked.
+- **Supabase backend is remote**: The `.env` file contains the Supabase project URL and anon key. No local Supabase setup or Docker is needed for frontend development.
+- **Multiple lockfiles**: The repo contains both `package-lock.json` and `bun.lock`/`bun.lockb`. Use `npm install` (matching `package-lock.json`) for dependency installation.
+- **Vite dev server binds to `::` (all interfaces)** on port 8080 with HMR overlay disabled.
 
-```sql
--- 1. CREATE
-CREATE TABLE public.<table> (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  -- ... domain columns ...
-  created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
-);
+### Member Amenities module (PRD Part B)
 
--- 2. GRANT (REQUIRED — match the roles your policies allow)
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.<table> TO authenticated;
-GRANT ALL ON public.<table> TO service_role;
--- GRANT SELECT ON public.<table> TO anon;   -- ONLY if an anon policy exists
+The Member Amenities system is built slice-by-slice from `docs/amenities/Member Amenities System - PRD.md` (Part B) plus the `Cursor Build Kit/` execution plan, prompt playbook, and verification checklist. When touching anything amenities-related, read these first:
 
--- 3. RLS
-ALTER TABLE public.<table> ENABLE ROW LEVEL SECURITY;
+- **Guardrails live in `.cursor/rules/`** and load automatically: `00-rt-os-conventions.mdc` (always-on repo conventions), `10-amenities-module.mdc` (amenities specifics, scoped by glob), `20-open-holds.mdc` (always-on hard stops), `30-firmware.mdc` (scoped to `firmware/**`).
+- **Three open holds must NOT be resolved in code without Tom's sign-off** (see `20-open-holds.mdc`): (1) the leaderboard blended-score weights/tie-break, (2) ADA / member accessibility dimensions and masked-entry UX, (3) the §8 verification sampling minimum-n / 100%-review policy. Build the surrounding structure and leave a flagged `// HOLD:` stub instead of inventing a value.
+- **Feature flag**: gate all amenities nav/Settings entries behind `featureFlag: "member-amenities"`. The flag is registered in `src/lib/pageRegistry.ts` but is intentionally **default-off** (not in `DEFAULT_FLAGS` in `src/hooks/useFeatureFlags.ts`). Enable it locally with `VITE_FEATURE_FLAGS="member-amenities"`.
+- **Firmware**: the ESP32-S3 post-controller lives at `firmware/amenities-post-controller/` (C++/PlatformIO, not the web stack). It builds in its own CI job (`.github/workflows/firmware-build.yml`, gated on `firmware/**`) — do not mix firmware deps into the web manifests or vice-versa. `docs/server-contract.md` inside it is the shared device↔server contract; any device-endpoint change is one atomic PR touching the contract, the edge function(s), and the firmware. `secrets.h` is git-ignored (only `secrets.example.h` is committed).
 
--- 4. POLICIES
-CREATE POLICY "..." ON public.<table> FOR SELECT TO authenticated USING (...);
-```
+### ESP32-S3 amenities firmware (PlatformIO) — build/test
 
-Rules of thumb for the grant block:
-- **Always** grant `service_role` for tables touched by edge functions, CRON jobs, or admin code (service_role bypasses RLS but still needs the table-level GRANT).
-- **Drop `anon`** when every policy scopes to `auth.uid()`. This repo is authenticated-only except for the `feedback_*` guest-iframe path.
-- Widen `anon` privileges only for fully public tables (none currently exist outside the `feedback-qr` storage bucket).
-
-## 2. Functions — `EXECUTE` is also not automatic
-
-For `SECURITY DEFINER` RPCs callable from the client (`supabase.rpc(...)` or `supabase.functions.invoke` patterns that hit PostgREST):
-
-```sql
-CREATE OR REPLACE FUNCTION public.my_rpc(...) RETURNS ...
-LANGUAGE sql STABLE SECURITY DEFINER
-SET search_path = public
-AS $$ ... $$;
-
-REVOKE ALL ON FUNCTION public.my_rpc(...) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.my_rpc(...) TO authenticated, service_role;
--- Only add `anon` if the function is part of a documented public surface
--- (in this repo: feedback_resolve_location, feedback_submit_response, feedback_iframe_completion).
-```
-
-Linter findings about "function callable by anon" are real — `REVOKE EXECUTE ... FROM anon` unless the function is intentionally public.
-
-## 3. RLS-enabled tables with zero policies
-
-A table with `ENABLE ROW LEVEL SECURITY` and no policies blocks all client access — that's often the intent for tables only touched by `service_role` edge functions (e.g. `livereach_nvr_token_cache`). The linter flags this as INFO. Declare intent explicitly:
-
-```sql
-CREATE POLICY "no client access" ON public.<table>
-  FOR ALL TO anon, authenticated
-  USING (false) WITH CHECK (false);
-```
-
-Service role still bypasses RLS, so edge functions keep working.
-
-## 4. Storage buckets
-
-Bucket policies live in `storage.objects` and follow the same GRANT model. A `public = true` bucket still serves files by direct URL anonymously — but if you also create a permissive `SELECT` policy granting `anon`, you enable **listing/enumeration** of every object. For QR-code-style buckets, scope the listing policy to `authenticated` only:
-
-```sql
-DROP POLICY IF EXISTS "Public can read X" ON storage.objects;
-CREATE POLICY "Authenticated can list X" ON storage.objects
-  FOR SELECT TO authenticated
-  USING (bucket_id = 'X');
-```
-
-## 5. Roles & RBAC (project-specific)
-
-- `app_role` enum is **2 values: `'admin', 'manager'`**. Do NOT add `attendant`, `employee`, or `user`. Floor attendants are not Supabase-auth users.
-- Roles live in `public.user_roles` (never on `user_profiles`).
-- RLS uses `SECURITY DEFINER` helpers `public.has_role(uid, role)` and `public.get_user_location(uid)` / `public.get_user_allowed_locations(uid)`. Reuse them — don't inline `EXISTS (SELECT 1 FROM user_roles ...)` in policies (causes recursion).
-- Pattern: "admin sees all, manager sees own location."
-
-## 6. Forbidden in migrations
-
-- `ALTER DATABASE postgres ...` — rejected by Lovable's runner.
-- Editing `auth`, `storage`, `realtime`, `supabase_functions`, `vault` schemas (except writing policies on `storage.objects`). No triggers on `auth.users` — use the existing `handle_new_user()` trigger pattern.
-- Editing shipped migrations. Migrations are **forward-only**; write a new file.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
