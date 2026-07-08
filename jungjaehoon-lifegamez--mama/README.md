@@ -7,11 +7,11 @@ Local-first operating memory for AI coding agents - Claude Code, Codex, and any 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [jungjaehoon-lifegamez/MAMA](https://github.com/jungjaehoon-lifegamez/MAMA).
+Original source: `AGENTS.md` in [jungjaehoon-lifegamez/MAMA](https://github.com/jungjaehoon-lifegamez/MAMA).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
