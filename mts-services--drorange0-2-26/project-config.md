@@ -3,7 +3,6 @@ trigger: always_on
 description: <laravel-boost-guidelines>
 ---
 
-
 <laravel-boost-guidelines>
 === foundation rules ===
 
