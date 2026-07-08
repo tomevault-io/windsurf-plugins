@@ -1,0 +1,69 @@
+---
+trigger: always_on
+description: <!-- BEGIN:nextjs-agent-rules -->
+---
+
+<!-- BEGIN:nextjs-agent-rules -->
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
+<!-- END:nextjs-agent-rules -->
+
+# RehabAtlas Agent Guidelines
+
+## shadcn/ui v4 Differences
+
+This project uses shadcn/ui v4 which is built on `@base-ui/react` (NOT Radix). Key differences:
+- Button uses `@radix-ui/react-slot` for `asChild` prop (custom implementation)
+- Select wraps `onValueChange` to filter null values
+- Dialog/Sheet use `@base-ui/react/dialog` with different prop names
+- Accordion has no `type="single"` or `value` on items
+
+## Design System: "The Quiet Authority"
+
+- Primary color: `#45636b` (deep teal)
+- Font: Noto Serif (headings) + Inter (body)
+- No hard borders — use `ghost-border` (subtle box-shadow) or surface color shifts
+- Buttons: `rounded-full` pill shape with `gradient-primary` for CTAs
+- Cards: `rounded-2xl` with `shadow-ambient`
+- Nav: `glass-nav` (glassmorphism backdrop-blur)
+- Transitions: 300ms, never bouncy
+
+## Critical Patterns
+
+1. **Supabase clients:**
+   - `src/lib/supabase/client.ts` — browser
+   - `src/lib/supabase/server.ts` — server (with cookies)
+   - `src/lib/supabase/admin.ts` — service role (bypasses RLS)
+
+2. **Leads MUST use service role** — never insert leads from client-side
+
+3. **Partner edits create `center_edit_requests`** — never update centers directly
+
+4. **Blog author tracking** — `author_type` field: 'rehabatlas' or 'partner', with `author_center_id` for backlinks
+
+5. **Commission fields are dormant** — `commission_type`, `commission_rate`, `commission_fixed_amount` on `centers` and `lead_forwards` remain in the schema but are not populated or referenced in active flows under current pricing-deferred policy (see CLAUDE.md business rule 3). Do not gate lead forwarding on them.
+
+6. **No pricing/commission in partner-facing comms (as of 2026-05-17)** — outreach emails, follow-ups, response-handler replies, onboarding messages, and partnership agreements must **not** mention commission, referral fees, tier discounts, or launch-campaign pricing. Position partnership as free listing + admin-vetted leads + author backlinks only. Any future fees will be agreed in writing later and applied forward-only.
+
+7. **Outreach pipeline** — `outreach_pipeline` table tracks center recruitment stages (new → researching → outreach_drafted → outreach_sent → responded → terms_agreed → agreement_sent → active)
+
+8. **Gmail API** — outreach emails sent via direct fetch calls to Gmail REST API (NOT googleapis SDK). Token refresh handled manually. All emails CC'd to info@rehab-atlas.com
+
+9. **PandaDoc** — partnership agreements use template `Ctzua6xmeLzCVnMwsmYR9L` with tokens for center details
+
+10. **Content Creator** — auto-generates blog articles via Claude AI with Unsplash images. 100+ predefined SEO topics across 10 categories. Runs weekdays only. Drafts require admin approval before publishing. Before saving, `auto-linker.ts` injects internal links to `/rehab/[condition]`, `/rehab-in/[country]`, and `/rehab-in/[country]/[city]` hubs (first occurrence only, capped at 6 per article, skips existing links/images/headings/code).
+    - **Family-first voice (default):** System prompt instructs Claude to write for the family member doing the research (~70% of inquiries come from families, not patients). Use second-person "you/your loved one" by default. Three dedicated family categories: `family-recognition` (warning signs), `family-decision` (choosing rehab), `family-during-after` (during stay + post-discharge).
+    - **Pillar architecture (per [CONTENT_STRATEGY.md](CONTENT_STRATEGY.md) §3):** Every blog post maps to one of the 10 `/rehab/[condition]` pillar pages via `inferPillar(topic, category)` in content-creator.ts. The system prompt names the pillar explicitly and requires Claude to link back to it in the first 250 words. If Claude misses the link, `autoLinkArticle()` force-inserts one via `forcePillarLinkInFirstParagraph()`. The `pillar` field is recorded in Claude usage logs.
+    - **Editorial guidelines** are documented in [CONTENT_STRATEGY.md](CONTENT_STRATEGY.md): voice, banned phrases, title formulas, hook style, FAQ section format, internal linking rules, pre-publish checklist. Update that doc first; the system prompt encodes its rules.
+
+11. **Lead outcome tracking** — `lead_forwards.partner_status` (pending/admitted/not_admitted). Partners update at `/partner/leads`. `/partner/commission` and `/admin/commission` pages remain in the codebase for future use but are not promoted to partners while pricing is deferred (see rule 6)
+
+12. **Comparison pages** — `/compare/[slug]` where slug = `center-a-vs-center-b` (separator `-vs-`, supports 2-3 centers). Top ~100 same-country pairs pre-rendered via `generateStaticParams` at build time; other valid combos served via ISR (`revalidate = 86400`). Each page emits `FAQPage` + `ItemList` JSON-LD for AI search citation. Center detail pages auto-link to 3 same-country comparisons as "Compare with Similar" section. Legacy `/compare?ids=` route still active for the saved-list compare flow.
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [chaipipatmc/Rehab-Atlas](https://github.com/chaipipatmc/Rehab-Atlas) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-08 -->
