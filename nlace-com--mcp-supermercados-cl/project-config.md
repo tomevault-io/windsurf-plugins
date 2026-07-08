@@ -1,0 +1,43 @@
+---
+trigger: always_on
+description: Servidor MCP en TypeScript para armar la mejor lista de compra en
+---
+
+# CLAUDE.md — mcp-supermercados-cl
+
+Servidor MCP en TypeScript para armar la mejor lista de compra en
+supermercados chilenos. Foco: profundidad en UNA cadena con la sesión y
+beneficios por RUT del usuario (Jumbo primero), no comparación entre cadenas.
+
+## Documentos fuente
+
+- `docs/PLAN-arquitectura.md` — plan vigente (arquitectura, roadmap por fases, tools). **Fuente de verdad.**
+- `docs/PLAN-referencia-endpoints.md` — plan anterior orientado a comparación; útil solo como referencia de endpoints.
+- `docs/captura-cencosud-2026-07-06.md` — captura verificada del request de Constructor.io, scoping por sucursal (`variations_map`), y dónde vive el precio Prime (estado deshidratado del SSR de la PDP).
+
+## Estado (actualizar al avanzar)
+
+- **Fase 1 completa** (2026-07-06): tools `search_products`, `get_product` y `get_offers` funcionando contra Jumbo con tests de contrato (fixtures reales) y smoke live. `get_product` es la fuente del precio Prime (`memberPrice`).
+- **Fase 3 parcial** (2026-07-07): `build_list` y `suggest_swaps` públicos (ranking por precio por unidad + ofertas, lógica en `src/core/listBuilder.ts`), `adapter_status`, cache TTL 15 min en el adaptador (`src/core/cache.ts`). Falta: priorizar frecuentes (depende de fase 2) y carro.
+- **Fase 2 (frecuentes + precio Prime) completa** (2026-07-07): `get_frequent_purchases` y `get_member_price` implementadas. Captura clave: el token de Jumbo vive en **localStorage** (no solo cookies), así que la sesión se opera desde el navegador del usuario. `build_list` ahora prioriza frecuentes (`matchFrequent` en listBuilder). Parser en `src/adapters/cencosudSession.ts`, puente en `src/adapters/session.ts`, fixture real en `tests/fixtures/frequent-products-2026-07-07.json`. Pendiente fase 2: listas guardadas.
+- Modelo de sesión: el servidor nunca ve credenciales. El cliente (junto al navegador logueado) entrega las cards del DOM de /productos-frecuentes vía el parámetro `cards`/`frequentCards`. Vía de producción para automatizarlo: Playwright con perfil de Chrome (`BrowserBridge.fetchAuthedHtml`).
+- **Fase 3 (carro) completa** (2026-07-07): `add_to_cart` y `get_cart`. Endpoints del BFF verificados con la sesión del usuario: `GET /cart?store={branchId}&simulationTotals=true` y `PATCH /cart/items` (body con skuId+quantity+banderas). Parser en `src/adapters/cencosudCart.ts`, tools en `src/tools/cart.ts`, fixture real en `tests/fixtures/cart-2026-07-07.json`. El `Cart` normalizado expone `total`, `savings` y `primeSavings` (el ahorro socio sale de `totals.itemDiscounts.details` / `simulation.*.discountDetails`, clave PRIME_USER). Las tools no ejecutan la llamada (el server no ve el token): arman el request y normalizan el JSON que devuelve el navegador. `add_to_cart` es reversible; no es compra.
+- **Fases 5-7 completas** (2026-07-07): las cinco cadenas del plan y `compare_stores`.
+  - Unimarc (`src/adapters/unimarc.ts`): `POST bff-unimarc-ecommerce.unimarc.cl/catalog/product/search`. Precio socio "Club Unimarc" en `priceDetail.promotionalTag`.
+  - Tottus (`src/adapters/tottus.ts`): SSR `__NEXT_DATA__` de `/tottus-cl/buscar?Ntt=`. Precios string; `internetPrice`/`normalPrice`/`pum`.
+  - Lider (`src/adapters/lider.ts`): SSR `__NEXT_DATA__` de `/search?query=` (nodos `__typename:Product`). Sin bloqueo PerimeterX en IP residencial; soporta puente de navegador (`session.fetchAuthedHtml`) como fallback.
+  - `compare_stores` (`src/core/compare.ts` + `src/tools/compareStores.ts`): total de la lista por cadena, marca la más barata; resultados parciales si una cadena falla.
+  - HttpClient ganó `postJson` (Unimarc). Helpers `parseClpString`/`parseUnitPriceString`/`normalizeUnit` en normalize.ts.
+  - Unimarc/Tottus/Lider requieren IP residencial (datacenter bloquea); documentado en `docs/captura-otras-cadenas-2026-07-07.md`. Fixtures reales en tests/fixtures.
+  - Publicación: LICENSE MIT, README de lanzamiento con aviso legal. Server v1.0.0, 10 tools, 72 tests de contrato.
+- **Tres mejoras completas** (2026-07-07):
+  1. Listas guardadas de Jumbo: `get_saved_lists` + `adapters/cencosudLists.ts`. Endpoints `/lists`, `/lists/{scope}/{idList}`. Items con misma forma que carro (precio socio en promotions PRIME_USER). Fixture `jumbo-list-2026-07-07.json`.
+  2. Profundidad no-Jumbo: Santa Isabel ganó `get_product` con precio socio; su carro usa el `addToCart`/`getCart` genérico del CencosudAdapter (mismo BFF). Unimarc/Tottus/Lider: carro con login propio, fase futura.
+  3. Detalle de Santa Isabel: `pdpStyle:"bff-pdp"` → `POST bff.santaisabel.cl/catalog/pdp` con `{slug, store}` + headers (apiKey pública `be-reg-groceries-sisa-catalog-wdhhq5a2fken`, x-client-version 2.3.17). Misma forma de item que Jumbo; `mapPdpData` compartido. `store` = sucursal (default "pedrofontova", override con branchId). Fixture `santaisabel-pdp.json`.
+- 12 tools, 80 tests de contrato. Detalle en docs/captura-cencosud-2026-07-06.md §4d.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [NLACE-COM/mcp-supermercados-cl](https://github.com/NLACE-COM/mcp-supermercados-cl) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-08 -->
