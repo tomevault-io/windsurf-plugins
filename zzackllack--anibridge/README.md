@@ -7,12 +7,12 @@ FastAPI service that bridges streaming catalogues (AniWorld, Serienstream/s.to, 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `copilot-instructions.md` in [Zzackllack/AniBridge](https://github.com/Zzackllack/AniBridge).
+Original source: `AGENTS.md` in [Zzackllack/AniBridge](https://github.com/Zzackllack/AniBridge).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
+- **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
