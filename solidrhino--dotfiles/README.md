@@ -7,11 +7,11 @@ Cross-platform dotfiles managed with chezmoi — fish shell, Neovim/LazyVim, and
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [SolidRhino/dotfiles](https://github.com/SolidRhino/dotfiles).
+Original source: `CLAUDE.md` in [SolidRhino/dotfiles](https://github.com/SolidRhino/dotfiles).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
