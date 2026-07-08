@@ -5,11 +5,11 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [NguyenNguyen205/memoi-admin-dashboard-deploy](https://github.com/NguyenNguyen205/memoi-admin-dashboard-deploy).
+Original source: `CLAUDE.md` in [NguyenNguyen205/memoi-admin-dashboard-deploy](https://github.com/NguyenNguyen205/memoi-admin-dashboard-deploy).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
