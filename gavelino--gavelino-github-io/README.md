@@ -7,12 +7,12 @@ Personal Webpage
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `copilot-instructions.md` in [gavelino/gavelino.github.io](https://github.com/gavelino/gavelino.github.io).
+Original source: `AGENTS.md` in [gavelino/gavelino.github.io](https://github.com/gavelino/gavelino.github.io).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
+- **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
