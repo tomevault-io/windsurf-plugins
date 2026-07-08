@@ -1,10 +1,10 @@
 ---
 trigger: always_on
-description: Deploy conventions — see DEPLOYMENT.md
+description: Production log access — see docs/agents/operating-rules.md § Production Log Access
 ---
 
 
-See `DEPLOYMENT.md` for the authoritative deployment documentation.
+See `docs/agents/operating-rules.md` § Production Log Access for the authoritative documentation.
 
 ---
 > Source: [nathanjohnpayne/device-source-of-truth](https://github.com/nathanjohnpayne/device-source-of-truth) — distributed by [TomeVault](https://tomevault.io).
