@@ -7,11 +7,11 @@ Real-estate analytics pipeline: hashed canonical ledger, immutable snapshots, re
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [harrisonwolf/geo-map-v2](https://github.com/harrisonwolf/geo-map-v2).
+Original source: `CLAUDE.md` in [harrisonwolf/geo-map-v2](https://github.com/harrisonwolf/geo-map-v2).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
