@@ -1,40 +1,106 @@
 ---
 trigger: always_on
-description: ESP32-S3 amenities post-controller firmware. Apply when touching firmware/** (PlatformIO C++). Different toolchain and runtime from the web app — do not carry web/TS assumptions in here.
+description: How Supabase works under Lovable Cloud — migrations, grants, edge-function deploy, secrets, and the bundler. Read before writing ANY migration or edge function so it actually works once Lovable applies/deploys it.
 ---
 
 
-# Amenities post-controller firmware (ESP32-S3, PlatformIO)
+# Supabase on Lovable Cloud — migrations, edge functions & secrets
 
-This is the **client side** of the amenities device contract. It lives in `firmware/amenities-post-controller/` in this repo, but it is **C++ on PlatformIO**, not the React/Deno web app — do not assume web tooling, npm, or TypeScript here. Treat the web app and the firmware as two implementations of one shared contract.
+This project's backend is a Supabase instance managed by **Lovable Cloud**. Migrations are written here (Cursor) but executed by Lovable's migration runner against the hosted DB. There is **no Supabase dashboard access**, no `SUPABASE_ACCESS_TOKEN`, no `SUPABASE_DB_PASSWORD`, and no local `supabase db push`. If a migration depends on dashboard-only state or missing privileges, it silently breaks the app at runtime (PostgREST returns permission errors and the frontend looks "empty").
 
-## The shared contract is the source of truth
-- `firmware/amenities-post-controller/docs/server-contract.md` is the **single source of truth** for the device↔server interface. The edge functions (`amenities-activate`, `amenities-member-cache`, `amenities-events-sync`, `amenities-heartbeat`, `amenities-help`) and this firmware must both match it.
-- **Any change to the contract is an atomic PR that touches all three: the contract doc, the edge function(s), and the firmware.** Never change one side silently. If a slice changes a request/response shape, update `server-contract.md` first and call it out.
-- The device speaks **raw HTTPS `POST https://<ref>.supabase.co/functions/v1/<fn>`** with its own bearer key — it does **not** use `supabase.functions.invoke` (that's the JS SDK).
+Follow these rules so every migration you author here works the first time Lovable applies it.
 
-## Device auth (client side of B.7)
-- The device holds a **per-device bearer key**, flashed at provisioning and stored in `secrets.h` (gitignored; `secrets.example.h` is the template). The server stores only `device_key_hash` and checks `amenities_device.revoked` on every call — so a `403` can mean revoked, not just a bad key.
-- **Auth-lockout (review C3):** back off after **5 consecutive** `401/403` responses; reset the counter on any `2xx`.
-- Hold only the minimal cache and never log the bearer key or any phone digits.
+## 1. The non-obvious rule: `public` schema has NO default Data API grants
 
-## Offline-first behavior (the whole point of the post)
-- The post **must work offline** and **must not call FlexWash**. Grants come from the **on-controller flash cache** (LittleFS/KV), an active-member subset.
-- **Member cache (`amenities-member-cache`):** the response is **NDJSON of per-device salted 64-bit hashes** — `SHA-256(cache_salt ‖ national10)` truncated to 8 bytes, hex — **never phone digits**. The stream ends with a trailer line `{"end":true,"count":N}` and a `Content-Length` header (no chunked encoding). **Verify the stream is complete and count-matched before committing the delta** — a dropped connection must never half-apply. An offline grant from the cache is recorded as `offline_granted`.
-- **Offline journal (`amenities-events-sync`):** queue events while offline; on reconnect, batch-upload. Each event carries a device-generated **`event_id` = boot-counter + per-boot sequence**; the server is idempotent on **`(device_id, event_id)`**. Offline activation entries carry **`phone_hash`** (the same salted cache hash), **never plaintext `phone_e164`**. `occurred_at` may be empty before NTP sync (server stamps receipt). **Treat any `2xx` as success** and clear the queue.
-- **Heartbeat (`amenities-heartbeat`, ~5 min):** fire-and-forget, `hb_schema: 2`, includes `last_sync_age_s` and the health counters (`rssi`, `min_rssi`, `channel`, `bssid`, `cache_count`, `queued_count`, `uptime_s`, `wifi_disconnects`, `wan_failures`, `wan_auth_fails`, `last_wan_ok_s`). It is **health-only and never gates a grant** — a missing/forged heartbeat can only mislabel health.
+Lovable Cloud's PostgREST does **not** inherit default privileges on `public` for `anon`, `authenticated`, or `service_role`. Enabling RLS is **not enough** — without an explicit `GRANT`, every request returns:
 
-## Keypad / HELP / display
-- **HELP button:** dedicated **illuminated button on GPIO8** (v0.14) — this replaced the old double-`*` gesture. Keypad: **`*` = per-digit backspace, `#` = submit.** A help press creates a help card only (touches no grant state).
-- **Pin map must stay in sync** across `src/config.h` / `src/hal.h`, the wiring SVG, and the build guides: relays 6/7/15–18, Wiegand 4/5, TFT SPI 9–14, HELP 8. No strapping/USB/flash-pin conflicts. If you change a pin, change all of them in the same PR.
-- **Display:** Newhaven NHD-2.8 (rgb565 assets, `copy.h` strings ↔ the LCD mockup panels). Keep the 14 `copy.h` strings aligned with `Post LCD Screen - Messages & Mockups.html`.
+```
+permission denied for table <name>
+```
 
-## ✋ HOLD 2 — ADA / member accessibility (unresolved)
-Do **not** bake in keypad/HELP **mounting height or reach** (ADA 308/309), one-hand-operation assumptions, or the **low-vision masked-entry UX** on the 2.8″ display without Tom's recorded decision. Leave these as flagged TODO constants. This must be decided **before Margate fabrication.**
+Every `CREATE TABLE public.<x>` migration MUST include `GRANT` statements **in the same migration**, in this exact order:
 
-## Build / CI
-- PlatformIO project; keep its build as a **separate CI job** from the web/Deno pipeline. Don't add firmware deps to the web package manifests or vice-versa.
-- `secrets.h` stays gitignored; commit only `secrets.example.h`.
+```sql
+-- 1. CREATE
+CREATE TABLE public.<table> (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  -- ... domain columns ...
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- 2. GRANT (REQUIRED — match the roles your policies allow)
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.<table> TO authenticated;
+GRANT ALL ON public.<table> TO service_role;
+-- GRANT SELECT ON public.<table> TO anon;   -- ONLY if an anon policy exists
+
+-- 3. RLS
+ALTER TABLE public.<table> ENABLE ROW LEVEL SECURITY;
+
+-- 4. POLICIES
+CREATE POLICY "..." ON public.<table> FOR SELECT TO authenticated USING (...);
+```
+
+Rules of thumb for the grant block:
+- **Always** grant `service_role` for tables touched by edge functions, CRON jobs, or admin code (service_role bypasses RLS but still needs the table-level GRANT).
+- **Drop `anon`** when every policy scopes to `auth.uid()`. This repo is authenticated-only except for the `feedback_*` guest-iframe path.
+- Widen `anon` privileges only for fully public tables (none currently exist outside the `feedback-qr` storage bucket).
+
+## 2. Functions — `EXECUTE` is also not automatic
+
+For `SECURITY DEFINER` RPCs callable from the client (`supabase.rpc(...)` or `supabase.functions.invoke` patterns that hit PostgREST):
+
+```sql
+CREATE OR REPLACE FUNCTION public.my_rpc(...) RETURNS ...
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public
+AS $$ ... $$;
+
+REVOKE ALL ON FUNCTION public.my_rpc(...) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.my_rpc(...) TO authenticated, service_role;
+-- Only add `anon` if the function is part of a documented public surface
+-- (in this repo: feedback_resolve_location, feedback_submit_response, feedback_iframe_completion).
+```
+
+Linter findings about "function callable by anon" are real — `REVOKE EXECUTE ... FROM anon` unless the function is intentionally public.
+
+## 3. RLS-enabled tables with zero policies
+
+A table with `ENABLE ROW LEVEL SECURITY` and no policies blocks all client access — that's often the intent for tables only touched by `service_role` edge functions (e.g. `livereach_nvr_token_cache`). The linter flags this as INFO. Declare intent explicitly:
+
+```sql
+CREATE POLICY "no client access" ON public.<table>
+  FOR ALL TO anon, authenticated
+  USING (false) WITH CHECK (false);
+```
+
+Service role still bypasses RLS, so edge functions keep working.
+
+## 4. Storage buckets
+
+Bucket policies live in `storage.objects` and follow the same GRANT model. A `public = true` bucket still serves files by direct URL anonymously — but if you also create a permissive `SELECT` policy granting `anon`, you enable **listing/enumeration** of every object. For QR-code-style buckets, scope the listing policy to `authenticated` only:
+
+```sql
+DROP POLICY IF EXISTS "Public can read X" ON storage.objects;
+CREATE POLICY "Authenticated can list X" ON storage.objects
+  FOR SELECT TO authenticated
+  USING (bucket_id = 'X');
+```
+
+## 5. Roles & RBAC (project-specific)
+
+- `app_role` enum is **2 values: `'admin', 'manager'`**. Do NOT add `attendant`, `employee`, or `user`. Floor attendants are not Supabase-auth users.
+- Roles live in `public.user_roles` (never on `user_profiles`).
+- RLS uses `SECURITY DEFINER` helpers `public.has_role(uid, role)` and `public.get_user_location(uid)` / `public.get_user_allowed_locations(uid)`. Reuse them — don't inline `EXISTS (SELECT 1 FROM user_roles ...)` in policies (causes recursion).
+- Pattern: "admin sees all, manager sees own location."
+
+## 6. Forbidden in migrations
+
+- `ALTER DATABASE postgres ...` — rejected by Lovable's runner.
+- Editing `auth`, `storage`, `realtime`, `supabase_functions`, `vault` schemas (except writing policies on `storage.objects`). No triggers on `auth.users` — use the existing `handle_new_user()` trigger pattern.
+- Editing shipped migrations. Migrations are **forward-only**; write a new file.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [tderi33/spec-compliant-kit](https://github.com/tderi33/spec-compliant-kit) — distributed by [TomeVault](https://tomevault.io).
