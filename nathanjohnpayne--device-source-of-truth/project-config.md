@@ -1,10 +1,10 @@
 ---
 trigger: always_on
-description: Code review policy — see REVIEW_POLICY.md
+description: Deploy conventions — see DEPLOYMENT.md
 ---
 
 
-See `REVIEW_POLICY.md` for the authoritative code review documentation.
+See `DEPLOYMENT.md` for the authoritative deployment documentation.
 
 ---
 > Source: [nathanjohnpayne/device-source-of-truth](https://github.com/nathanjohnpayne/device-source-of-truth) — distributed by [TomeVault](https://tomevault.io).
