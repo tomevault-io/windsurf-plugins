@@ -1,19 +1,25 @@
 ---
 trigger: always_on
-description: Pneuma Skills is co-creation infrastructure for humans and code agents. The underlying bet: **coding agents already do the actual work against a directory of files; the system's job is to make human observation and optional participation intuitive**. Agents edit files directly through their native tools (Read/Edit/Write) — files remain the canonical collaboration surface and are not abstracted away. Viewers are live **players** for agent output, rendering the work in domain terms (a deck, a boar
+description: > **Single source of truth for agent instructions.** Claude Code reads this via the one-line `@AGENTS.md` import in `CLAUDE.md`; Codex and Kimi read this file directly. Never duplicate content into `CLAUDE.md` — it must stay a single import line.
 ---
 
 # Pneuma Skills
 
+> **Single source of truth for agent instructions.** Claude Code reads this via the one-line `@AGENTS.md` import in `CLAUDE.md`; Codex and Kimi read this file directly. Never duplicate content into `CLAUDE.md` — it must stay a single import line.
+>
+> Per-domain constraints and gotchas live in `.claude/rules/` — **before editing files in a domain, read the matching rule file** (Claude Code auto-loads them by path; other agents must read them explicitly). Index in [Development Toolchain](#development-toolchain-claude).
+
 ## Project Overview
 
-Pneuma Skills is co-creation infrastructure for humans and code agents. The underlying bet: **coding agents already do the actual work against a directory of files; the system's job is to make human observation and optional participation intuitive**. Agents edit files directly through their native tools (Read/Edit/Write) — files remain the canonical collaboration surface and are not abstracted away. Viewers are live **players** for agent output, rendering the work in domain terms (a deck, a board, a project) so humans can watch what's happening, make direct decisions in the UI when needed, and reach for structured command suggestions when deeper guidance helps. Four pillars for isomorphic collaboration: a **visual environment** (live players for agent work with optional human participation), **skills** (domain knowledge + seed templates + session persistence), **continuous learning** (evolution agent for cross-session preference extraction and skill augmentation), and **distribution** (mode marketplace, publishing, sharing). The runtime supports multiple agent backends (Claude Code, Codex) selected at startup.
+Pneuma Skills is co-creation infrastructure for humans and code agents. Agents edit files directly (Read/Edit/Write); files remain the canonical collaboration surface. Viewers are live **players** for agent output, rendering work in domain terms (a deck, a board, a project) so humans can watch, intervene in the UI, or hand structured guidance back. Four pillars: a **visual environment** (live players with optional participation), **skills** (domain knowledge + seed templates + session persistence), **continuous learning** (evolution agent for cross-session preference extraction), and **distribution** (mode marketplace, publishing, sharing). Multiple agent backends (Claude Code, Codex, Kimi CLI) selected at startup.
 
 **Formula:** `ModeManifest(skill + viewer + agent_config) × AgentBackend × RuntimeShell`
 
-**Version:** 2.30.1
+**Version:** 3.24.0
 **Runtime:** Bun >= 1.3.5 (required, not Node.js)
-**Builtin Modes:** `webcraft`, `doc`, `slide`, `draw`, `diagram`, `illustrate`, `remotion`, `gridboard`, `mode-maker`, `evolve`
+**Builtin Modes:** `webcraft`, `doc`, `slide`, `draw`, `diagram`, `illustrate`, `remotion`, `gridboard`, `kami`, `clipcraft`, `cosmos`, `wordtaste`, `mode-maker`, `evolve`, `project-evolve`, `project-onboard`, `project-tidy`
+
+> Modes can set `hidden: true` to disappear from user-pickable lists (launcher grids, ProjectPanel mode-tile picker). Their sessions are also stamped `internal: true` by `scanProjectSessions` and filtered out of user-facing session lists (project panel, project cards, quick-resume). Internal modes (`evolve`, `project-evolve`, `project-onboard`, `project-tidy`) are hidden — triggered by specific UI affordances or programmatically, never by a "what mode to start?" choice.
 
 ## Tech Stack
 
@@ -28,7 +34,7 @@ Pneuma Skills is co-creation infrastructure for humans and code agents. The unde
 | Diagramming | draw.io viewer-static.min.js (CDN) + rough.js 4.6 |
 | Video | remotion 4.0 + @remotion/player + @remotion/web-renderer + @babel/standalone |
 | Desktop | Electron 41 + electron-builder + electron-updater |
-| Agent | Claude Code CLI via `--sdk-url`; Codex CLI via `app-server` stdio JSON-RPC (`node:child_process`) |
+| Agent | Claude Code CLI stdio stream-json; Codex CLI `app-server` stdio JSON-RPC; Moonshot Kimi CLI stdio stream-json (`kimi --print … -y`) — all via `node:child_process` |
 
 ## CLI Commands
 
@@ -36,68 +42,47 @@ Pneuma Skills is co-creation infrastructure for humans and code agents. The unde
 # Development
 bun run dev              # Launcher UI (no mode arg)
 bun run dev doc          # Doc Mode (cwd as workspace)
-bun run dev slide        # Slide Mode
 bun run dev doc --workspace ~/notes --port 17996 --backend claude-code --no-open --debug
 bun run build            # Vite production build
+bun run typecheck        # tsc --noEmit
 bun test                 # All tests (bun:test)
 
 # Skill evolution
-pneuma evolve <mode>     # Launch evolution agent for a mode's skill
+pneuma evolve <mode>
 
 # Mode management
-pneuma mode add <url>    # Install remote mode to ~/.pneuma/modes/
-pneuma mode list         # List published modes on R2
-pneuma mode publish      # Publish current workspace as mode
+pneuma mode add <url>        # Install remote mode (single → ~/.pneuma/modes/; library → ~/.pneuma/libraries/)
+pneuma mode list             # List published modes on R2
+pneuma mode publish          # Publish workspace as mode
 
-# Plugin management
-pneuma plugin add <source>   # Install plugin from path/github/URL to ~/.pneuma/plugins/
-pneuma plugin list           # List builtin + external plugins with enabled status
-pneuma plugin remove <name>  # Remove an external plugin
+# Mode libraries (multi-mode GitHub repos)
+pneuma library init <name> [--github user/repo] [--private]
+pneuma library link <github:user/repo>           # Alias for `mode add`
+pneuma library list
+pneuma library sync <id>                         # Pull latest (git fetch + checkout)
+pneuma library publish <mode> [--to id] [--as name] [--push]
+pneuma library push <id>                         # `git push origin HEAD`
+pneuma library activate|deactivate <id> <mode>
+pneuma library unlink <id>                       # Remove library + clone
 
-# Snapshot
-pneuma snapshot push     # Upload workspace to R2
-pneuma snapshot pull     # Download workspace from R2
+# Project recovery / plugins / snapshot / history
+pneuma project add <path>                        # Register existing project into ~/.pneuma/sessions.json
+pneuma plugin add|list|remove <source>           # Install to ~/.pneuma/plugins/
+pneuma snapshot push|pull                        # R2 workspace snapshot
+pneuma history export [--output FILE]            # Session as .tar.gz
+pneuma history share [--title NAME]              # Export + upload to R2
+pneuma history open <path-or-url>                # Prepare replay package
 
-# History sharing & replay
-pneuma history export [--output FILE]  # Export session as shareable .tar.gz
-pneuma history share [--title NAME]    # Export + upload to R2, return link
-pneuma history open <path-or-url>      # Download/prepare replay package
-```
-
-### CLI Flags
-
-| Flag | Description |
-|------|-------------|
-| `--workspace <path>` | Workspace directory (default: cwd) |
-| `--port <n>` | Server port (default: auto) |
-| `--backend <type>` | Select backend at startup (`claude-code` or `codex`; session stays fixed to it) |
-| `--no-open` | Don't open browser |
-| `--no-prompt` | Non-interactive mode (launcher uses this) |
-| `--skip-skill` | Skip skill installation (session resume without update) |
-| `--debug` | Enable debug mode |
-| `--dev` | Force dev mode (Vite) |
-| `--replay <path>` | Load a replay package on startup (enters replay mode) |
-| `--replay-source <path>` | Source workspace for existing session replay (exports + replays) |
-| `--session-name <name>` | Custom session display name (default: `{mode}-{timeTag}`) |
-| `--viewing` | Start in viewing mode (`editing: false` — skip skill install + agent spawn) |
-
-## Ports
-
-- **17996** — default Vite dev server / production server
-- **17007** — default Hono backend in dev mode
-- Dev: browser → Vite, WebSocket → backend directly (`Vite` WS proxy is bypassed)
-- Launcher child sessions auto-increment both ports when the defaults are occupied
-- Both servers bind `hostname: "0.0.0.0"` to avoid IPv4/IPv6 dual-stack port collision
-
-## Project Structure
-
-```
-pneuma-skills/
-├── bin/                       # CLI entry — mode resolution, agent launch, session registry
-├── core/
+# Agent command distribution (3.10.0)
+pneuma agent-command status [--backend claude-code|codex|all] [--json]
+pneuma agent-command install [--backend claude-code|codex|all] [--force] [--json]
+pneuma agent-command uninstall [--backend claude-code|codex|all] [--force] [--json]
+pneuma agent-command update [--backend claude-code|codex|all] [--json]
+pneuma mode list --local [--json]                # builtins + ~/.pneuma/modes + activated library modes
+pneuma handoff-from-external --intent <text> --mode <name> [--cwd <path>] \
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [pandazki/pneuma-skills](https://github.com/pandazki/pneuma-skills) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-06-29 -->
