@@ -7,11 +7,11 @@ Network throughput as an 80s sunset. A two-sided bar chart of live traffic over 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [yeet-src/netwatch](https://github.com/yeet-src/netwatch).
+Original source: `CLAUDE.md` in [yeet-src/netwatch](https://github.com/yeet-src/netwatch).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
