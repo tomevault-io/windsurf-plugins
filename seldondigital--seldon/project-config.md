@@ -1,89 +1,100 @@
 ---
 trigger: always_on
-description: TypeScript engineering guidance for Seldon
+description: Seldon property value conventions
 ---
 
 
-## Engineering Guidance
+## Seldon Properties
 
-Use the local code first. Follow nearby patterns, public APIs, and domain rules before adding a new abstraction.
+Properties define component appearance and behavior. They flow from catalog defaults through workspace overrides and theme tokens into computed values for rendering and export.
 
-### TypeScript
+Use `packages/core/properties/README.md` as the canonical reference for property shapes, value types, categories, merge behavior, path rules, and adding property content.
 
-- Prefer named exports and pure functions for shared TypeScript modules.
-- Use classes only when matching existing code or when stateful encapsulation is justified.
-- Use descriptive names. Do not force auxiliary verbs on every variable.
-- Avoid `any` in production code unless the boundary is unknown data, migration, legacy compatibility, or a narrow type escape.
-- Allow enums where they are already part of the public or serialized API. Do not apply a blanket `avoid enums` rule.
-- All comments should be about current behavior, not legacy, deprecated, past behavior, or anything that is not relevant going forward. 
-- Do not add comments that are obvious or referential to markdown files. 
-- Add JSDocs as needed.
-- In `*.schema.ts` files, inline every property and `overrides` object literal at its child. Do not hoist shared schema values into a module `const` and reuse it. The only module-level values are the `schema` export and its `exportConfig`. See `.cursor/rules/components.mdc`.
+### Property Shapes
 
-### Naming
+Properties use three primary shapes:
 
-- Match the local filename convention of the area you are editing.
-- Most general TypeScript modules use lowercase kebab-case, such as `set-node-properties.ts`.
-- Component schema files use `PascalCase.schema.ts`.
-- Service and helper modules keep their existing suffix-based names, such as `theme.service.ts` and `workspace-mutation.helper.ts`.
-- Match exported reducer handler names to their file names in camelCase verb+noun form, such as `set-node-properties.ts` -> `setNodeProperties`.
-- Group workspace reducer handlers by action verb, such as `add/`, `remove/`, `set/`, `reset/`, `insert/`, `move/`, `reorder/`, and `duplicate/`. Use support folders such as `shared/`, `normalize/`, and `stubs/` only when the file is not a direct action handler and matches the existing structure.
-- Avoid `handle*` prefixes for reducer handlers unless nearby code already uses that pattern.
+- `atomic`: one stored value is one style decision, such as `color`, `gap`, `opacity`, or `display`.
+- `compound`: related facets live under one property, such as `border.color`, `border.width`, `font.size`, or `board.width`.
+- `shorthand`: one property controls parallel fields, such as `margin.top`, `padding.left`, or `corners.topLeft`.
 
-### Change Scope
+Layered paint properties are stored as arrays of compound layers:
 
-- Keep edits scoped to the requested behavior.
-- Avoid unrelated refactors, formatting churn, and metadata changes.
-- Add abstractions only when they reduce real duplication or match an established local pattern.
+- `background[]`
+- `shadow[]`
 
-### Package Boundaries
+Layer index `0` is topmost. Treat these as ordered stacks. Do not model them as single compound objects. Gradients are not a separate node stack. A gradient paints through a `background[]` layer with `kind: gradient`.
 
-- Put behavior and data in `core`. The editor consumes `core` and must not special-case or re-implement core logic.
-- Keep export concerns in the `factory`. CSS variable refs and language-specific output belong to factory export, not to `core` or the editor.
-- When a value or ordering looks wrong in the editor, fix it in `core` so every consumer gets the same result. Do not patch it in the editor.
-- Persist user edits as workspace actions and reducers. Do not store design state as editor-only side state.
+### Value Types
 
-### Consistency Over Special Cases
+Use the current `ValueType` set:
 
-- Follow existing patterns. A new case should behave the same way as its siblings. A new compound property behaves like other compound properties.
-- Do not add special code or special casing when a general pattern already exists.
-- Prefer the simplest change that fits the existing model. Do not over-complicate a fix.
+- `EMPTY` for unset values.
+- `INHERIT` for explicit parent inheritance.
+- `EXACT` for concrete values.
+- `OPTION` for fixed choices.
+- `COMPUTED` for values derived from other properties.
+- `THEME_CATEGORICAL` for named theme token sets, such as `@swatch.*` and `@font.*`.
+- `THEME_ORDINAL` for ordered theme scales, such as `@fontSize.*`, `@margin.*`, and `@borderWidth.*`.
 
-### Tests And Migrations
+Do not use `PRESET` as a value type. Preset-like choices use `ValueType.OPTION`, or theme references such as `@border.hairline`, `@font.body`, and `@gradient.primary` where the property supports them.
 
-- Do not add or update tests unless explicitly asked.
-- Do not add or update migrations unless explicitly asked.
+### EMPTY, INHERIT, And None
 
-### Debugging And Regressions
+- `EMPTY` means unset. It resolves to the platform or default value. Author it as `{ type: ValueType.EMPTY, value: null }`.
+- Prefer `EMPTY` over `INHERIT` when both produce the same result. Use `INHERIT` only when a property must take the parent value on purpose.
+- `None` is an explicit choice, not the same as `EMPTY`. Author it with `ValueType.OPTION` and a `*.NONE` value, such as `Gap.NONE`.
+- `None` means an explicit absence the user selected. `EMPTY` means the value is unset and falls back to a default. Do not conflate them.
+- For default layered paint, prefer a cleared look such as `@shadow.none` or `@border.none` over a bare `preset: EMPTY` where the property supports it.
 
-- When something that worked breaks, first find the specific recent change that caused it. Prefer the smallest targeted fix over a broad refactor.
-- Do not keep code that breaks existing behavior. If a change regresses atomic, shorthand, or compound behavior, revert that part.
-- Do not spiral into deep rewrites for a small regression.
+### Theme References Over Literals
 
-### Verification
+- Prefer `@token` references and variant styles over hardcoded literals for color, spacing, corners, and shadows.
+- Author theme references with a single prefix, such as `@fontSize.xxlarge`. Never double the prefix, such as `@fontSize.@fontSize.xxlarge`.
 
-- After changes, run `tsc` across the whole repo and resolve all type errors before reporting done.
-- Keep all imports valid and remove dead or redundant code touched by the change.
+### Categories And Ordering
 
-### Workflow
+Use `PROPERTY_DISPLAY_ORDER` and `properties/constants/property-display.ts` for category order:
 
-- Analyze and report a plan before editing. Wait for approval before making file changes.
+1. Attributes
+2. Layout
+3. Appearance
+4. Typography
+5. Effects
+6. Accessibility
 
-### Version Control
+Accessibility properties (`role`, `aria*`) come last, after effects. Behavior, motion, and data sections are documented as future areas. Do not treat them as implemented property surfaces unless code support exists.
 
-- Run inspection commands freely, such as `git status`, `git diff`, `git log`, and `git stash`.
-- Never run a command that changes the working tree, switches or edits a branch, or opens a PR without asking first. This covers `git commit`, `git push`, `git reset`, `git restore`, `git checkout`, `git switch`, `git branch`, `git merge`, `git rebase`, and `gh pr create`.
+### Property Vocabulary And Visibility
 
-### Framework Guidance
+- A property absent from a schema is not part of that component's vocabulary. It cannot be set or overridden.
+- When a control is missing in the editor, confirm the schema exposes the property, set to `EMPTY`. Do not add editor-only property logic.
+- Change property order through `PROPERTY_DISPLAY_ORDER` in core so the editor picks it up. Do not reorder in the editor.
 
-Keep React, Next.js, Web Vitals, image, and URL-state guidance out of this global rule. App-code framework rules live in file-scoped rules.
+### Compound And Layer Behavior
 
-### JSX Authoring (Always Enforced)
+Compound presets copy theme look parameters onto the compound. Applying a preset overwrites every parameter the preset defines. Any parameter not mentioned by the preset is set to `EMPTY`.
 
-Important: When you edit any `.tsx` file under `packages/editor/`, you MUST follow `.cursor/rules/editor-jsx.mdc`. The core rule, repeated here so it is always in scope:
+If a user changes a compound sub-field by hand, treat the compound as custom until it matches a named preset again.
 
-- Returned JSX holds element tags and identifier references only. Compute nothing inside the returned JSX.
-- No expressions in returned JSX. This covers ternaries, `&&`, `||`, comparisons, computed objects or arrays, inline `style` objects, template literals, inline arrow or function handlers, and helper or function calls that build a value, such as `comboboxField={buildFieldStateProps({ selected })}`.
+For layered paint, merge by layer slot when `mergeSubProperties` is enabled. Preserve ordering and treat missing layer facets like missing compound facets.
+
+### Merge And Serialization
+
+Use `mergeProperties(base, patch, options)` for two property snapshots. Pass the earlier or broader source first and the newer or narrower source second. Chain calls when combining defaults, variants, and instances.
+
+Workspace files store raw authoring state only. Node entries persist `template` and `overrides`. Effective merged properties and `ValueType.COMPUTED` results come from read-side compute selectors and are not persisted back into the workspace file.
+
+### Paths And References
+
+Authoritative property key unions live in `types/property-keys.ts`. They cover top-level keys, compound facet names, shorthand sides, and the layered paint keys `background` and `shadow`.
+
+Runtime lookup paths used by `findInObject` are dot-separated, such as `background.0.color`. Schemas do not author computed source paths. Each compute function derives its own source. `getBasedOnValue` resolves an explicit path such as `#self.background.color` or `#parent.buttonSize`, and normalizes schema-style layered paint paths to layer `0` lookup paths.
+
+Theme references are validated by restricted theme key unions where properties opt in. Use `@` token paths that match the property type.
+
+### Debugging Property Values
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
