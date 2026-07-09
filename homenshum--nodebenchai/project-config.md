@@ -1,39 +1,40 @@
 ---
 trigger: always_on
-description: - First focusable element on page: `<a href="#main-content" class="sr-only focus:not-sr-only">Skip to main content</a>`
+description: - Replace blank areas during fetch with skeleton placeholders (gray shapes matching final layout)
 ---
 
 
-# Re-examine: Keyboard Efficiency
+# Re-examine: Visual Polish
 
-## Skip links
-- First focusable element on page: `<a href="#main-content" class="sr-only focus:not-sr-only">Skip to main content</a>`
-- Multiple skip links for complex layouts: "Skip to search", "Skip to results"
-- Target element needs `tabindex="-1"` if it's not natively focusable
+## Skeleton loading
+- Replace blank areas during fetch with skeleton placeholders (gray shapes matching final layout)
+- Shimmer animation: `background: linear-gradient(90deg, #2a2a3a 25%, #3a3a4a 50%, #2a2a3a 75%)`
+- `background-size: 200% 100%; animation: shimmer 1.5s infinite`
+- Respect `prefers-reduced-motion` → static gray background, no shimmer
 
-## Keyboard shortcuts
-- Search: `Ctrl+K` or `/` to focus search input
-- Escape: close modals, dropdowns, lightboxes, cancel operations
-- Arrow keys: navigate within lists, carousels, tab bars
-- Enter/Space: activate buttons and interactive cards
-- Document shortcuts in a help overlay (accessible via `?` key)
+## Staggered fade-ins
+- Cards/list items appear with slight delay cascade: 50ms, 100ms, 150ms per item
+- Use `animation-delay` or `transition-delay` — not JS setTimeout
+- Keep total cascade under 500ms (10 items max before grouping)
+- Disable under `prefers-reduced-motion`
 
-## Tab order
-- Logical reading order: left-to-right, top-to-bottom (matches visual layout)
-- Never use `tabindex` > 0 — it breaks natural flow
-- `tabindex="0"` only on custom interactive elements that need to be in tab order
-- `tabindex="-1"` for programmatically focusable elements (skip link targets, error summaries)
+## Transitions
+- State changes (expand/collapse, show/hide) get 200-300ms ease transitions
+- Use `transition: all 0.2s ease` on the specific properties, not `all` in production
+- Hover effects: subtle scale (1.02), shadow lift, or background shift
+- Don't animate `width`/`height` — use `transform: scale()` or `max-height` for performance
 
-## Focus traps
-- Modals/dialogs: Tab wraps within the dialog (last → first → last)
-- Escape key always closes the trap
-- On close, return focus to the element that opened the modal
-- `aria-modal="true"` + `role="dialog"` on the container
+## Micro-interactions
+- Button press: brief scale-down (0.97) on `:active`
+- Tooltip on hover for truncated text (CSS `text-overflow: ellipsis` + `title` attribute)
+- Copy-to-clipboard: brief "Copied!" feedback toast
+- Empty states: helpful message + action button, not just blank space
 
-## Cards and list items
-- If a card is clickable, the entire card should be a `<button>` or contain a primary `<a>`
-- `Enter` and `Space` should both trigger the card action
-- Keyboard hint on hover: consider showing "(Enter to open)" for non-obvious interactive elements
+## Print stylesheet
+- `@media print`: light background, dark text, visible borders
+- Hide interactive controls (buttons, search, navigation)
+- Severity badges: add borders (colors may not print)
+- Page-break-inside: avoid on cards
 
 ---
 > Source: [HomenShum/NodeBenchAI](https://github.com/HomenShum/NodeBenchAI) — distributed by [TomeVault](https://tomevault.io).
