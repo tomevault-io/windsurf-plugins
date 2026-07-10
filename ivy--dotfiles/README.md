@@ -7,11 +7,11 @@ Agent-managed developer environment. I describe what I want, they do the rest.
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [ivy/dotfiles](https://github.com/ivy/dotfiles).
+Original source: `AGENTS.md` in [ivy/dotfiles](https://github.com/ivy/dotfiles).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
