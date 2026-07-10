@@ -7,11 +7,11 @@ Z Agent — agent-orchestration runtime for Z-Lab robots: plan/route/verify/reco
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [Z-Robotics-Lab/z-agent](https://github.com/Z-Robotics-Lab/z-agent).
+Original source: `AGENTS.md` in [Z-Robotics-Lab/z-agent](https://github.com/Z-Robotics-Lab/z-agent).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
