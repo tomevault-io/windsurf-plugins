@@ -1,105 +1,175 @@
 ---
 trigger: always_on
-description: Project directory structure overview
+description: - 如果要写复杂样式的话用 antd-style ，简单的话可以用 style 属性直接写内联样式
 ---
 
 
-# LobeChat Project Structure
+# react component 编写指南
 
-## Directory Structure
+- 如果要写复杂样式的话用 antd-style ，简单的话可以用 style 属性直接写内联样式
+- 如果需要 flex 布局或者居中布局应该使用 react-layout-kit 的 Flexbox 和 Center 组件
+- 选择组件时优先顺序应该是 src/components > 安装的组件 package > lobe-ui > antd
 
-note: some files are not shown for simplicity.
+## antd-style token system
 
-```plaintext
-lobe-chat/
-├── apps/                           # Applications directory
-│   └── desktop/                    # Electron desktop application
-│       ├── src/                    # Desktop app source code
-│       └── resources/              # Desktop app resources
-├── docs/                           # Project documentation
-│   ├── development/                # Development docs
-│   ├── self-hosting/               # Self-hosting docs
-│   └── usage/                      # Usage guides
-├── locales/                        # Internationalization files (multiple locales)
-│   ├── en-US/                      # English (example)
-│   └── zh-CN/                      # Simplified Chinese (example)
-├── packages/                       # Monorepo packages directory
-│   ├── const/                      # Constants definition package
-│   ├── database/                   # Database related package
-│   ├── electron-client-ipc/        # Electron renderer ↔ main IPC client
-│   ├── electron-server-ipc/        # Electron main process IPC server
-│   ├── model-bank/                 # Built-in model presets/catalog exports
-│   ├── model-runtime/              # AI model runtime package
-│   ├── types/                      # TypeScript type definitions
-│   ├── utils/                      # Utility functions package
-│   ├── file-loaders/               # File processing packages
-│   ├── prompts/                    # AI prompt management
-│   └── web-crawler/                # Web crawling functionality
-├── public/                         # Static assets
-│   ├── icons/                      # Application icons
-│   ├── images/                     # Image resources
-│   └── screenshots/                # Application screenshots
-├── scripts/                        # Build and tool scripts
-├── src/                            # Main application source code (see below)
-├── .cursor/                        # Cursor AI configuration
-├── docker-compose/                 # Docker configuration
-├── package.json                    # Project dependencies
-├── pnpm-workspace.yaml            # pnpm monorepo configuration
-├── next.config.ts                  # Next.js configuration
-├── drizzle.config.ts              # Drizzle ORM configuration
-└── tsconfig.json                   # TypeScript configuration
+### 访问 token system 的两种方式
+
+#### 使用 antd-style 的 useTheme hook
+
+```tsx
+import { useTheme } from 'antd-style';
+
+const MyComponent = () => {
+  const theme = useTheme();
+
+  return (
+    <div
+      style={{
+        color: theme.colorPrimary,
+        backgroundColor: theme.colorBgContainer,
+        padding: theme.padding,
+        borderRadius: theme.borderRadius,
+      }}
+    >
+      使用主题 token 的组件
+    </div>
+  );
+};
 ```
 
-## Core Source Directory (`src/`)
+#### 使用 antd-style 的 createStyles
 
-```plaintext
-src/
-├── app/                            # Next.js App Router routes
-│   ├── (backend)/                  # Backend API routes
-│   │   ├── api/                    # REST API endpoints
-│   │   │   ├── auth/               # Authentication endpoints
-│   │   │   └── webhooks/           # Webhook handlers for various auth providers
-│   │   ├── middleware/             # Request middleware
-│   │   ├── oidc/                   # OpenID Connect endpoints
-│   │   ├── trpc/                   # tRPC API routes
-│   │   │   ├── async/              # Async tRPC endpoints
-│   │   │   ├── desktop/            # Desktop runtime endpoints
-│   │   │   ├── edge/               # Edge runtime endpoints
-│   │   │   ├── lambda/             # Lambda runtime endpoints
-│   │   │   └── tools/              # Tools-specific endpoints
-│   │   └── webapi/                 # Web API endpoints
-│   │       ├── chat/               # Chat-related APIs for various providers
-│   │       ├── models/             # Model management APIs
-│   │       ├── plugin/             # Plugin system APIs
-│   │       ├── stt/                # Speech-to-text APIs
-│   │       ├── text-to-image/      # Image generation APIs
-│   │       └── tts/                # Text-to-speech APIs
-│   ├── [variants]/                 # Page route variants
-│   │   ├── (main)/                 # Main application routes
-│   │   │   ├── chat/               # Chat interface and workspace
-│   │   │   ├── discover/           # Discover page (assistants, models, providers)
-│   │   │   ├── files/              # File management interface
-│   │   │   ├── image/              # Image generation interface
-│   │   │   ├── profile/            # User profile and stats
-│   │   │   ├── repos/              # Knowledge base repositories
-│   │   │   └── settings/           # Application settings
-│   │   └── @modal/                 # Modal routes
-│   └── manifest.ts                 # PWA configuration
-├── components/                     # Global shared components
-│   ├── Analytics/                  # Analytics tracking components
-│   ├── Error/                      # Error handling components
-│   └── Loading/                    # Loading state components
-├── config/                         # Application configuration
-│   ├── featureFlags/               # Feature flags & experiments
-│   └── modelProviders/             # Model provider configurations
-├── features/                       # Feature components (UI Layer)
-│   ├── AgentSetting/               # Agent configuration and management
-│   ├── ChatInput/                  # Chat input with file upload and tools
-│   ├── Conversation/               # Message display and interaction
-│   ├── FileManager/                # File upload and knowledge base
-│   └── PluginStore/                # Plugin marketplace and management
+```tsx
+const useStyles = createStyles(({ css, token }) => {
+  return {
+    container: css`
+      background-color: ${token.colorBgContainer};
+      border-radius: ${token.borderRadius}px;
+      padding: ${token.padding}px;
+      color: ${token.colorText};
+    `,
+    title: css`
+      font-size: ${token.fontSizeLG}px;
+      font-weight: ${token.fontWeightStrong};
+      margin-bottom: ${token.marginSM}px;
+    `,
+    content: css`
+      font-size: ${token.fontSize}px;
+      line-height: ${token.lineHeight};
+    `,
+  };
+});
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+const Card: FC<CardProps> = ({ title, content }) => {
+  const { styles } = useStyles();
+
+  return (
+    <Flexbox className={styles.container}>
+      <div className={styles.title}>{title}</div>
+      <div className={styles.content}>{content}</div>
+    </Flexbox>
+  );
+};
+```
+
+### 一些你经常会忘记使用的 token
+
+请注意使用下面的 token 而不是 css 字面值。可以访问 https://ant.design/docs/react/customize-theme-cn 了解所有 token
+
+- 动画类
+  - token.motionDurationMid
+  - token.motionEaseInOut
+- 包围盒属性
+  - token.paddingSM
+  - token.marginLG
+
+## Lobe UI 包含的组件
+
+- 不知道 @lobehub/ui 的组件怎么用，有哪些属性，就自己搜下这个项目其它地方怎么用的，不要瞎猜，大部分组件都是在 antd 的基础上扩展了属性
+- 具体用法不懂可以联网搜索，例如 ActionIcon 就爬取 https://ui.lobehub.com/components/action-icon
+- 可以阅读 node_modules/@lobehub/ui/es/index.js 了解有哪些组件，每个组件的属性是什么
+
+- General
+  - ActionIcon
+  - ActionIconGroup
+  - Block
+  - Button
+  - DownloadButton
+  - Icon
+- Data Display
+  - Avatar
+  - AvatarGroup
+  - GroupAvatar
+  - Collapse
+  - FileTypeIcon
+  - FluentEmoji
+  - GuideCard
+  - Highlighter
+  - Hotkey
+  - Image
+  - List
+  - Markdown
+  - SearchResultCards
+  - MaterialFileTypeIcon
+  - Mermaid
+  - Typography
+  - Text
+  - Segmented
+  - Snippet
+  - SortableList
+  - Tag
+  - Tooltip
+  - Video
+- Data Entry
+  - AutoComplete
+  - CodeEditor
+  - ColorSwatches
+  - CopyButton
+  - DatePicker
+  - EditableText
+  - EmojiPicker
+  - Form
+  - FormModal
+  - HotkeyInput
+  - ImageSelect
+  - Input
+  - SearchBar
+  - Select
+  - SliderWithInput
+  - ThemeSwitch
+- Feedback
+  - Alert
+  - Drawer
+  - Modal
+- Layout
+  - DraggablePanel
+  - DraggablePanelBody
+  - DraggablePanelContainer
+  - DraggablePanelFooter
+  - DraggablePanelHeader
+  - Footer
+  - Grid
+  - Header
+  - Layout
+  - LayoutFooter
+  - LayoutHeader
+  - LayoutMain
+  - LayoutSidebar
+  - LayoutSidebarInner
+  - LayoutToc
+  - MaskShadow
+  - ScrollShadow
+- Navigation
+  - Burger
+  - Dropdown
+  - Menu
+  - SideNav
+  - Tabs
+  - Toc
+- Theme
+  - ConfigProvider
+  - FontLoader
+  - ThemeProvider
 
 ---
 > Source: [Xiedexiao/lobe-chat_rust](https://github.com/Xiedexiao/lobe-chat_rust) — distributed by [TomeVault](https://tomevault.io).
