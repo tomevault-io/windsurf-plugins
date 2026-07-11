@@ -1,136 +1,56 @@
 ---
 trigger: always_on
-description: Purpose: provide short, actionable guidance so Copilot suggestions match project conventions.
+description: Guidelines for creating and maintaining Cursor rules to ensure consistency and effectiveness.
 ---
 
 
-# Copilot instructions (English — concise)
+- **Required Rule Structure:**
+  ```markdown
+  ---
+  description: Clear, one-line description of what the rule enforces
+  globs: path/to/files/*.ext, other/path/**/*
+  alwaysApply: boolean
+  ---
 
-Purpose: provide short, actionable guidance so Copilot suggestions match project conventions.
+  - **Main Points in Bold**
+    - Sub-points with details
+    - Examples and explanations
+  ```
 
-## Common Development Commands
+- **File References:**
+  - Use `[filename](mdc:path/to/file)` ([filename](mdc:filename)) to reference files
+  - Example: [prisma.mdc](mdc:.cursor/rules/prisma.mdc) for rule references
+  - Example: [schema.prisma](mdc:prisma/schema.prisma) for code references
 
-### Development Server
-- `bin/dev` - Start development server (Rails, Sidekiq, Tailwind CSS watcher)
-- `bin/rails server` - Start Rails server only
-- `bin/rails console` - Open Rails console
+- **Code Examples:**
+  - Use language-specific code blocks
+  ```typescript
+  // ✅ DO: Show good examples
+  const goodExample = true;
+  
+  // ❌ DON'T: Show anti-patterns
+  const badExample = false;
+  ```
 
-### Testing
-- `bin/rails test` - Run all tests
-- `bin/rails test:db` - Run tests with database reset
-- `DISABLE_PARALLELIZATION=true bin/rails test:system` - Run system tests only (use sparingly - they take longer)
-- `bin/rails test test/models/account_test.rb` - Run specific test file
-- `bin/rails test test/models/account_test.rb:42` - Run specific test at line
+- **Rule Content Guidelines:**
+  - Start with high-level overview
+  - Include specific, actionable requirements
+  - Show examples of correct implementation
+  - Reference existing code when possible
+  - Keep rules DRY by referencing other rules
 
-### Linting & Formatting
-- `bin/rubocop` - Run Ruby linter
-- `npm run lint` - Check JavaScript/TypeScript code
-- `npm run lint:fix` - Fix JavaScript/TypeScript issues
-- `npm run format` - Format JavaScript/TypeScript code
-- `bin/brakeman` - Run security analysis
+- **Rule Maintenance:**
+  - Update rules when new patterns emerge
+  - Add examples from actual codebase
+  - Remove outdated patterns
+  - Cross-reference related rules
 
-### Database
-- `bin/rails db:prepare` - Create and migrate database
-- `bin/rails db:migrate` - Run pending migrations
-- `bin/rails db:rollback` - Rollback last migration
-- `bin/rails db:seed` - Load seed data
-
-### Setup
-- `bin/setup` - Initial project setup (installs dependencies, prepares database)
-
-## Pre-PR workflow (run locally before opening PR)
-- Tests: bin/rails test (all), DISABLE_PARALLELIZATION=true bin/rails test:system (when applicable)
-- Linters: bin/rubocop -f github -a; bundle exec erb_lint ./app/**/*.erb -a
-- Security: bin/brakeman --no-pager
-
-## High-Level Architecture
-
-### Application Modes
-The app runs in two modes:
-- **Managed** (Rails.application.config.app_mode = "managed")
-- **Self-hosted** (Rails.application.config.app_mode = "self_hosted")
-
-### Core Domain Model
-The application is built around financial data management with these key relationships:
-- **User** → has many **Accounts** → has many **Transactions**
-- **Account** types: checking, savings, credit cards, investments, crypto, loans, properties
-- **Transaction** → belongs to **Category**, can have **Tags** and **Rules**
-- **Investment accounts** → have **Holdings** → track **Securities** via **Trades**
-
-### API Architecture
-The application provides both internal and external APIs:
-- Internal API: Controllers serve JSON via Turbo for SPA-like interactions
-- External API: `/api/v1/` namespace with Doorkeeper OAuth and API key authentication
-- API responses use Jbuilder templates for JSON rendering.
-- Rate limiting via Rack::Attack with configurable limits per API key
-
-### Sync & Import System
-Two primary data ingestion methods:
-1. **Plaid Integration**: Real-time bank account syncing
-   - `PlaidItem` manages connections
-   - `Sync` tracks sync operations
-   - Background jobs handle data updates
-2. **CSV Import**: Manual data import with mapping
-   - `Import` manages import sessions
-   - Supports transaction and balance imports
-   - Custom field mapping with transformation rules
-
-### Background Processing
-Sidekiq handles asynchronous tasks:
-- Account syncing (`SyncJob`)
-- Import processing (`ImportJob`)
-- AI chat responses (`AssistantResponseJob`)
-- Scheduled maintenance via sidekiq-cron
-
-### Frontend Architecture
-- **Hotwire Stack**: Turbo + Stimulus for reactive UI without heavy JavaScript
-- **ViewComponents**: Reusable UI components in `app/components/`
-- **Stimulus Controllers**: Handle interactivity, organized alongside components
-- **Charts**: D3.js for financial visualizations (time series, donut, sankey)
-- **Styling**: Tailwind CSS v4.x with custom design system
-  - Design system defined in `app/assets/tailwind/sure-design-system.css`
-  - Always use functional tokens (e.g., `text-primary` not `text-white`)
-  - Prefer semantic HTML elements over JS components
-  - Use `icon` helper for icons, never `lucide_icon` directly
-
-### Multi-Currency Support
-- All monetary values stored in base currency (user's primary currency)
-- `Money` objects handle currency conversion and formatting
-- Historical exchange rates for accurate reporting
-
-### Security & Authentication
-- Session-based auth for web users
-- API authentication via:
-  - OAuth2 (Doorkeeper) for third-party apps
-  - API keys with JWT tokens for direct API access
-- Scoped permissions system for API access
-- Strong parameters and CSRF protection throughout
-
-## Key rules
-- Project modes: "managed" or "self_hosted".
-- Domain: User → Accounts → Transactions. Keep business logic in models, controllers thin.
-
-Authentication & context
-- Use Current.user and Current.family (never current_user / current_family).
-
-Testing conventions
-- Use Minitest + fixtures (no RSpec, no FactoryBot).
-- Use mocha for mocks where needed; VCR for external API tests.
-
-Frontend conventions
-- Hotwire-first: Turbo + Stimulus.
-- Prefer semantic HTML, Turbo Frames, server-side formatting.
-- Use the helper icon for icons (do not use lucide_icon directly).
-- Use Tailwind design tokens (text-primary, bg-container, etc.).
-
-Backend & architecture
-- Skinny controllers, fat models.
-- Prefer built-in Rails patterns; add dependencies only with strong justification.
-- Sidekiq for background jobs (e.g., SyncJob, ImportJob, AssistantResponseJob).
-
-API & security
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- **Best Practices:**
+  - Use bullet points for clarity
+  - Keep descriptions concise
+  - Include both DO and DON'T examples
+  - Reference actual code over theoretical examples
+  - Use consistent formatting across rules
 
 ---
 > Source: [Ordi-personal/finance-motor](https://github.com/Ordi-personal/finance-motor) — distributed by [TomeVault](https://tomevault.io).
