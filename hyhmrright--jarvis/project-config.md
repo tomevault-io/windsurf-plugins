@@ -1,127 +1,145 @@
 ---
 trigger: always_on
-description: This document provides Gemini with comprehensive context and operational guidelines for the `JARVIS` monorepo.
+description: This file provides guidance to Codex when working in this repository.
 ---
 
-# Jarvis Project Context / 项目上下文 (Gemini Edition)
+# AGENTS.md — AI Agent Instructions / AI 编程助手指南
 
-This document provides Gemini with comprehensive context and operational guidelines for the `JARVIS` monorepo.
-本文档为 Gemini 提供关于 `JARVIS` monorepo 的全面上下文和操作指南。
+This file provides guidance to Codex when working in this repository.
+本文件为 Codex 在此代码库中工作时提供指导。
 
-## Project Overview / 项目概览
+## Branch Strategy / 分支策略
 
-**Name / 名称**: Jarvis AI Assistant
-**Architecture / 架构**: Multi-service monorepo (FastAPI backend + Vue 3 frontend)
-**Purpose / 目的**: AI assistant platform with RAG knowledge base, multi-LLM support, and streaming conversations.
+- **main**: Release only. Never commit or develop directly here. Only accepts merges from dev or other development branches.
+- **dev**: Primary development branch (GitHub default). All daily development, bugfixes, and feature work go here or on sub-branches.
+- After development is complete: dev → merge → main → push. No steps may be skipped.
 
-**Completed Features (Phase 1-12 + AI OS Epic)**:
-- **Vision & Multimodal**: Support for image upload and analysis in chat.
-- **Branching & Editing**: Tree-based conversation flow with historical message editing.
-- **Public Sharing**: Generate read-only public links for sharing conversations.
-- **Skill Market**: Dynamic skill discovery and 1-click installation from remote registries.
-- **Personas**: Custom system prompt management and selection.
-- **Workflow Engine**: Node-based visual studio for orchestrating complex AI logic (DSL -> LangGraph).
-- **LLMOps Dashboard**: Visual consumption and performance metrics via ECharts.
-- **RAG Knowledge Base**: Qdrant indexing, sliding window chunking, cross-collection search.
-- **Agent Intelligence**: LangGraph ReAct agents with tools: `search`, `code_exec`, `datetime`, `file`, `shell`, `browser`, `rag`.
-- **Infrastructure**: Gateway (Traefik), Cron trigger system, Webhooks, Canvas rendering.
-- **Voice**: Integrated TTS/STT services.
-- **Observability**: Grafana/Loki/Prometheus monitoring stack.
-- **Advanced Ecosystem**: Plugin SDK, multi-agent supervisor, audit logs.
-- **Multitenancy**: Organizations, Workspaces, Invitations, PATs.
+- **main**：仅用于发版，不得直接提交或开发。只接受来自 dev 等开发分支的 merge。
+- **dev**：主开发分支（GitHub 默认分支），所有日常开发、bugfix、功能开发均在此分支或其子分支进行。
+- 开发完成后：dev → merge → main → push，不得跳过。
+
+### Branch Naming / 协作分支命名规范
+
+All feature branches are created from `dev`, named `<type>/<short-description>`:
+所有功能分支从 `dev` 创建，命名格式 `<类型>/<简短描述>`：
+
+| Prefix | Purpose | Example |
+|--------|---------|---------|
+| `feature/` | New features | `feature/rag-agent-integration` |
+| `fix/` | Bug fixes | `fix/sse-disconnect` |
+| `docs/` | Documentation only | `docs/api-reference` |
+| `infra/` | Docker, CI, deployment | `infra/add-healthcheck` |
+
+### Commit Message Format / Commit 消息规范
+
+Follow [Conventional Commits](https://www.conventionalcommits.org/): `<type>: <description>`
+
+遵循 [Conventional Commits](https://www.conventionalcommits.org/)：`<type>: <description>`
+
+Types / 类型：`feat`、`fix`、`docs`、`style`、`refactor`、`test`、`chore`、`ci`
+
+## Worktree Parallel Development / Worktree 并行开发
+
+### When to Use Worktrees / 何时使用 Worktree
+
+- Developing multiple features simultaneously without interference
+- Reviewing a PR without disrupting current work
+- Emergency fix while the current branch has unfinished work
+
+- 需要同时开发多个功能且互不干扰
+- Review 他人 PR 时不想影响当前工作
+- 紧急修复但当前分支有未完成的功能
+
+### Creating and Managing Worktrees / 创建与管理
+
+```bash
+# Create worktree (branch off dev)
+git worktree add .worktrees/<name> -b feature/<name> dev
+
+# Initialize environment in worktree
+cd .worktrees/<name>
+cp ../../.env .                          # Copy environment variables
+cd backend && uv sync && cd ..           # Install backend deps
+cd frontend && bun install && cd ..      # Install frontend deps
+cd backend && uv run alembic upgrade head && cd ..  # DB migration
+
+# List all worktrees
+git worktree list
+
+# Remove worktree (after merge)
+git worktree remove .worktrees/<name>
+
+# Prune deleted worktree references
+git worktree prune
+```
+
+### Using Worktrees in Codex / Codex 中使用 Worktree
+
+```bash
+# Launch isolated Codex session
+Codex --worktree feature-xxx
+
+# Or request in conversation
+> "在 worktree 中开发这个功能"
+```
+
+### Port Assignments / 端口分配
+
+Docker base services (postgres/redis/qdrant/minio) are shared across all worktrees. Dev servers need different ports.
+Docker 基础服务（postgres/redis/qdrant/minio）所有 worktree 共享。开发服务器需分配不同端口：
+
+| Working Directory | Backend Port | Frontend Port |
+|-------------------|-------------|---------------|
+| Main (root) | 8000 | 3000 |
+| Worktree 1 | 8001 | 3100 |
+| Worktree 2 | 8002 | 3200 |
+
+```bash
+# Specify ports when starting in a worktree
+uv run uvicorn app.main:app --reload --port 8001
+bun run dev --port 3100
+```
+
+### Notes / 注意事项
+
+- `.env` is not tracked by git; copy it manually when creating a new worktree.
+- Avoid modifying `alembic/versions/` in multiple worktrees simultaneously (migration conflicts).
+- `.worktrees/` is in `.gitignore` and will not be accidentally committed.
+- The same branch cannot be checked out by two worktrees at the same time.
+
+- `.env` 文件不在 git 中，新建 worktree 需手动复制。
+- 避免多个 worktree 同时修改 `alembic/versions/`（数据库迁移冲突）。
+- `.worktrees/` 已在 `.gitignore` 中，不会被意外提交。
+- 同一分支不能被两个 worktree 同时检出。
+
+## Project Overview / 项目概述
+
+JARVIS is an AI assistant platform with RAG knowledge base, multi-LLM support, and streaming conversations, using a monorepo structure.
+
+**Completed features (Phase 1-6)**: Multi-channel messaging (Slack/Discord/Telegram/Feishu/WhatsApp/Webhook), sandboxed tool execution, LLM failover, RAG knowledge base, dynamic skills (SKILL.md), personal API keys, live Canvas, Voice (TTS/STT), multilingual UI, monitoring stack (Grafana/Loki/Prometheus), Traefik gateway.
+
+JARVIS 是具备 RAG 知识库、多 LLM 支持、流式对话的 AI 助手平台，采用 monorepo 结构。
+
+**已完成功能（Phase 1-6）**：多渠道消息（Slack/Discord/Telegram/Feishu/WhatsApp/Webhook）、工具沙箱执行、LLM 故障切换、RAG 知识库、动态技能（SKILL.md）、个人 API Key、实时 Canvas、语音（TTS/STT）、多语言 UI、监控栈（Grafana/Loki/Prometheus）、Traefik 网关。
 
 ## Core Architecture / 核心架构
 
-### Directory Structure / 目录结构
 ```
 JARVIS/
 ├── backend/           # FastAPI backend (Python 3.13 + uv)
 │   ├── app/
-│   │   ├── main.py    # FastAPI entry point
-│   │   ├── agent/     # LangGraph ReAct agent (graph/llm/state/persona)
-│   │   ├── api/       # HTTP routes
+│   │   ├── main.py    # FastAPI entry point, lifespan manages infra connections
+│   │   ├── agent/     # LangGraph ReAct + expert agents (graph/llm/state/persona)
+│   │   ├── api/       # HTTP routes (auth/chat/conversations/documents/settings/logs/usage/admin/keys)
+│   │   ├── channels/  # Messaging channels (Slack/Discord/Telegram/Feishu/WhatsApp/Webhook)
+│   │   ├── core/      # Config (Pydantic Settings), security (JWT/bcrypt/Fernet), rate limiting, logging (structlog), logging middleware
 │   │   ├── db/        # SQLAlchemy async models and sessions
-│   │   ├── infra/     # Infrastructure client singletons (Qdrant/MinIO/Redis)
-│   │   ├── rag/       # RAG pipeline
-│   │   └── worker.py  # ARQ worker
-│   └── tests/         # pytest test suite
-├── frontend/          # Vue 3 + TypeScript + Vite + Pinia
-│   └── src/
-│       ├── stores/    # Pinia stores (auth / chat / workspace)
-│       └── pages/     # Feature pages
-├── database/          # Docker init scripts
-└── docker-compose.yml # Full-stack orchestration
-```
+│   │   ├── gateway/   # Channel router + session manager
+│   │   ├── infra/     # Infrastructure client singletons (Qdrant/MinIO/Redis/Ollama)
+│   │   ├── plugins/   # Plugin loader + SKILL.md parser/registry
 
-### Backend Highlights / 后端架构要点
-- **LLM Agent**: `agent/graph.py` 使用 LangGraph `StateGraph` 实现 ReAct 循环。每次请求创建新实例，不持久化 checkpoint。
-- **Streaming**: `api/chat.py` 返回 SSE `StreamingResponse`。内部使用独立的 `AsyncSessionLocal`。
-- **RAG**: 滑窗分词 (500/50 overlap) -> `OpenAIEmbeddings` -> Qdrant。每用户/工作区独立 collection。
-- **Models**: 全部使用 UUID 主键，敏感字段（API Key）使用 Fernet 加密。
-
-## Gemini Enhanced Capabilities / Gemini 增强功能
-
-Gemini CLI 提供了专用的工具和技能，应在开发中充分利用：
-
-### 1. Specialized Skills / 专用技能 (`activate_skill`)
-- **`using-superpowers`**: Always active. 引导如何使用其他技能。
-- **`brainstorming`**: 开始任何新功能设计前必须使用。
-- **`test-driven-development`**: 实现新功能或修复 Bug 时使用。
-- **`systematic-debugging`**: 用于处理复杂问题或测试失败。
-- **`chrome-devtools`**: 用于前端 UI 调试和交互自动化。
-- **`using-git-worktrees`**: 必须用于并行开发。
-
-### 2. Sub-Agents / 子代理
-- **`codebase_investigator`**: 用于架构映射和深度影响分析。
-- **`generalist`**: 用于批量重构或大规模文件更新。
-
-## Development Workflow / 开发工作流
-
-### Branch Strategy / 分支策略
-- **main**: 发布分支，禁止直接提交。
-- **dev**: 主要集成分支（默认）。
-- **feature/fix/docs/infra/...**: 从 `dev` 创建，命名格式 `<type>/<short-description>`。
-- **Flow**: feature branch → merge to `dev` → merge to `main` (仅在明确要求时)。
-
-### Worktree Parallel Development / Worktree 并行开发
-使用 `using-git-worktrees` 技能管理多个功能。
-- **端口映射**:
-  - Main (root): Backend 8000 / Frontend 3000
-  - Worktree 1: Backend 8001 / Frontend 3100
-  - Worktree 2: Backend 8002 / Frontend 3200
-
-### Mandatory Quality Loop (Self-Check) / 强制质量循环 (自检流程)
-在每次 `git commit` 或 `git push` 之前，**必须**执行质量循环：
-
-1. **Static Analysis / 静态分析**:
-   - `cd backend && uv run ruff check --fix && uv run ruff format`
-   - `cd backend && uv run mypy app`
-   - `cd frontend && bun run lint && bun run type-check`
-2. **Testing / 测试**:
-   - `cd backend && uv run pytest tests/ -x -q --tb=short`
-   - 若数据库不可用，至少执行 `uv run pytest --collect-only -q`。
-3. **Review & Refinement / 审查与精炼**:
-   - 使用 `activate_skill("requesting-code-review")` 进行自我审查。
-   - 确保所有修改后的代码注释均使用 **中文**。
-
-## Common Commands / 常用命令
-
-### Setup & Run / 设置与运行
-```bash
-bash scripts/init-env.sh         # 初始化环境 (生成 .env)
-uv sync                          # 安装后端依赖
-cd frontend && bun install       # 安装前端依赖
-docker compose up -d postgres redis qdrant minio # 启动基础设施
-```
-
-## Global Memories / 全局记忆 (Gemini Preferences)
-- **Comments / 注释**: 所有的代码注释和文档必须使用 **中文 (Chinese)**。
-- **State Models / 状态模型**: 必须优先使用 `dataclasses.dataclass` 定义 AgentState，以避免 Python 3.13 下的 TypedDict 问题。
-- **Language / 语言**: 始终使用 **简体中文** 回复用户。
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-*For manual navigation or deep research, invoke `codebase_investigator` with your objective.*
-
----
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/hyhmrright) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-09 -->
+> Source: [hyhmrright/JARVIS](https://github.com/hyhmrright/JARVIS) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-11 -->
