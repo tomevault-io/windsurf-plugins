@@ -7,11 +7,11 @@ Local-first macOS Runtime that turns cross-app activity into an inspectable pers
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [Intuition-Lab/personal-model](https://github.com/Intuition-Lab/personal-model).
+Original source: `AGENTS.md` in [Intuition-Lab/personal-model](https://github.com/Intuition-Lab/personal-model).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
