@@ -7,11 +7,11 @@ Charting India's public payment-system data (UPI, IMPS, NEFT, RTGS, cards) from 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [time-series-of-india/tsoi](https://github.com/time-series-of-india/tsoi).
+Original source: `AGENTS.md` in [time-series-of-india/tsoi](https://github.com/time-series-of-india/tsoi).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
