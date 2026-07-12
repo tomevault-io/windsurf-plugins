@@ -7,11 +7,11 @@ Basic on Openysm,QQ:1104823534
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [sdf123098/Fox-Model-Loader](https://github.com/sdf123098/Fox-Model-Loader).
+Original source: `AGENTS.md` in [sdf123098/Fox-Model-Loader](https://github.com/sdf123098/Fox-Model-Loader).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
