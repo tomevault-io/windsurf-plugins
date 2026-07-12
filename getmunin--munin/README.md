@@ -7,11 +7,11 @@ The customer platform for the agentic era. MCP-first, open source, self-hostable
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [getmunin/munin](https://github.com/getmunin/munin).
+Original source: `AGENTS.md` in [getmunin/munin](https://github.com/getmunin/munin).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
