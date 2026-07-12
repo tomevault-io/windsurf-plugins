@@ -7,11 +7,11 @@ Generate Node.js bindings for UniFFI Rust libraries, with ESM output, TypeScript
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [criccomini/uniffi-bindgen-node-js](https://github.com/criccomini/uniffi-bindgen-node-js).
+Original source: `AGENTS.md` in [criccomini/uniffi-bindgen-node-js](https://github.com/criccomini/uniffi-bindgen-node-js).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
