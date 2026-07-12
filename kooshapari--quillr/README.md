@@ -7,11 +7,11 @@ Restored: Quillr
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [KooshaPari/Quillr](https://github.com/KooshaPari/Quillr).
+Original source: `CLAUDE.md` in [KooshaPari/Quillr](https://github.com/KooshaPari/Quillr).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
