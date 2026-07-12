@@ -7,13 +7,13 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `.cursor/rules/*.mdc` in [jarry126/fastapi-langgraph-agent-zh](https://github.com/jarry126/fastapi-langgraph-agent-zh).
+Original source: `AGENTS.md` in [jarry126/fastapi-langgraph-agent-zh](https://github.com/jarry126/fastapi-langgraph-agent-zh).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
+- **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
