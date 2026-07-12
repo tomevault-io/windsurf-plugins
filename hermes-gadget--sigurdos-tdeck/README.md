@@ -7,11 +7,11 @@ Standalone off-grid LoRa mesh messaging firmware for LilyGo T-Deck (ESP32-S3 / S
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [hermes-gadget/SigurdOS-tdeck](https://github.com/hermes-gadget/SigurdOS-tdeck).
+Original source: `AGENTS.md` in [hermes-gadget/SigurdOS-tdeck](https://github.com/hermes-gadget/SigurdOS-tdeck).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
