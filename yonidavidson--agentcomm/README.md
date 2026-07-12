@@ -7,11 +7,11 @@ A tiny mailbox for AI agents — one CLI, six backends (GitHub repo, SQLite, S3,
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [yonidavidson/agentcomm](https://github.com/yonidavidson/agentcomm).
+Original source: `CLAUDE.md` in [yonidavidson/agentcomm](https://github.com/yonidavidson/agentcomm).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
