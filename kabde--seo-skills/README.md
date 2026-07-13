@@ -7,11 +7,11 @@ SEO Blogger Toolkit pour Claude Code - 15 skills pour WordPress : audit, redacti
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [kabde/seo-skills](https://github.com/kabde/seo-skills).
+Original source: `AGENTS.md` in [kabde/seo-skills](https://github.com/kabde/seo-skills).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
