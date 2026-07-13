@@ -3,7 +3,7 @@ trigger: always_on
 description: A cross-platform Rust TUI for managing Azure Service Bus (queues, topics, subscriptions, messages). Built with `ratatui` and direct REST API integration — **no official Azure SDK**.
 ---
 
-# Service Bus Explorer TUI — Claude Instructions
+# Service Bus Explorer TUI — Copilot Instructions
 
 ## Project Overview
 
@@ -48,8 +48,7 @@ src/
     ├── tree.rs          # Entity tree with inline message/DLQ counts
     ├── messages.rs      # Message list + detail view + inline edit rendering
     ├── modals.rs        # Connection, form, confirm, clear-options, peek-count dialogs
-    ├── detail.rs        # Entity properties/runtime info panel + sparkline previews
-    ├── metrics_detail.rs # Full-screen metrics overlay with braille line charts
+    ├── detail.rs        # Entity properties/runtime info panel
     ├── status_bar.rs    # Bottom status bar
     ├── help.rs          # Full keyboard shortcut overlay (`?` key)
     └── sanitize.rs      # Terminal escape injection prevention (CSI/OSC stripping)
@@ -87,5 +86,5 @@ The REST API's `PeekOnly=true` has no cursor (always returns the same first mess
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/CosX) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-09 -->
+> Source: [CosX/service-bus-explorer-tui](https://github.com/CosX/service-bus-explorer-tui) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-13 -->
