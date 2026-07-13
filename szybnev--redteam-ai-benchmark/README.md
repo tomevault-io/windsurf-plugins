@@ -7,11 +7,11 @@ Red Team AI Benchmark: Evaluating LLMs for authorized offensive-security tasks
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [szybnev/redteam-ai-benchmark](https://github.com/szybnev/redteam-ai-benchmark).
+Original source: `AGENTS.md` in [szybnev/redteam-ai-benchmark](https://github.com/szybnev/redteam-ai-benchmark).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
