@@ -1,0 +1,12 @@
+---
+trigger: always_on
+description: Use sempre a skill `caveman`, definida em `.ai-framework\skills\caveman\SKILL.md`.
+---
+
+Use sempre a skill `caveman`, definida em `.ai-framework\skills\caveman\SKILL.md`.
+Não mencione que a skill foi carregada ou aplicada.
+Considere `.ai-framework\RULES.md` como a fonte oficial das regras do sistema.
+
+---
+> Source: [alexishida/Moji](https://github.com/alexishida/Moji) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-13 -->
