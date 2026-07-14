@@ -1,101 +1,105 @@
 ---
 trigger: always_on
-description: 서비스명   : Plannode (plannode.pseries.net)
+description: >
 ---
 
-# AGENTS.md — Plannode
-# Harness Flow v1.0 (Plannode 전용 적용)
-# 역할: 프로젝트 정체성 + 도메인 규칙 선언
 
----
+# Plannode 배지 매핑 지침 (가져오기 파이프라인)
 
-## 🏗️ 프로젝트 정체성
-
-```
-서비스명   : Plannode (plannode.pseries.net)
-성격       : 상용 웹앱 개발계획 협업 서비스 (노드 트리·팀 동기화·PRD/명세/IA/와이어)
-개발방식   : 1인 AI 에이전틱 코딩(운영) | Cursor AI | Harness Flow v1.0
-             ※ 제품·시스템 설계는 상용 협업 기준 — plannode-prd.mdc §1.05~§1.06
-스택       : Vanilla HTML/CSS/JS (index.html + plannode.js) → SvelteKit 이행 중
-             Supabase (PostgreSQL + Auth + RLS) | Vercel | 가비아 DNS
-현재 단계  : 파일럿(Vanilla) 기능 검증 완료 → SvelteKit 포팅·Supabase 연동 진행 중
-```
+**근원:** Cursor 플랜 `가져오기_배지_파이프라인_구현결과_bbe7c690.plan.md`를 규칙용으로 재구성·코드 동기화.  
+**제품 의미의 “학습”:** 머신러닝 학습이 아니라 **규칙 테이블 + 브라우저 누적 저장**이다.
 
 ---
 
-## 🌳 트리뷰 핵심 보호 헌장 (비가역)
+## 0. 표준 배지 풀 기반 배지 매핑 — 기술 지침
 
-Plannode의 **1순위 핵심 기능**은 **트리뷰**에서의 **노드 작성·편집**과 **`parent_id` 기반 트리 구조**(루트·순환 방지·레이아웃 맵)의 **정확성·신뢰성**이다. PRD·IA·기능명세·내보내기·LLM 파이프라인은 **이 위에 얹는 부가 층**이며, 아래를 **모든 변경·에이전트·지침**에 강제한다.
+### 0.1 목표 (제품 정렬)
 
-| 원칙 | 규정 |
+- **표준 배지 풀**이 허용하는 토큼만 최종 칩·저장물에 남긴다: `filterBadgeSetToCanonicalPool`가 최종 게이트.
+- 풀 안에서 **동의어·메타 추론·가져오기 누적 규칙**으로 들어갈 수 있는 것은 최대한 매핑한다(외부 임의 문자열 원문 보존은 제품 범위 밖 — PRD·아키텍처와 동일).
+
+### 0.2 단일 진실·호출 순서 (구현 불변)
+
+| 역할 | 코드 정본 |
+|------|-----------|
+| 런타임 유효 풀(기본 21 + 사용자 확장) | `getEffectiveBadgePool` — `badgePoolConfig.ts` |
+| 원문 토큰 → 트랙·표준 대문자 토큰 | `resolveImportedBadgeToken` — `badgeImportAliases.ts` |
+| 명시 배지 + 메타 힌트 병합 | `getBadgeSetFromNodeInput` → `inferBadgeHintStringsFromMetadata` 병합 순서 **1→4** — `badgePromptInjector.ts`, `badgeMetadataInference.ts` |
+| 저장·가져오기 sanitize | `sanitizeNodeBadgesForTreeV1` / `applySanitizeImportedPlannodeNodeV1` |
+| 협업 배지 송수신·projectId | §6.9 · [`plannode-architecture.mdc`](./plannode-architecture.mdc) §10.10.1 |
+| 노드 카드 표시 | **동일** `getBadgeSetFromNodeInput` 계열 — 단, 파일럿 `render()`는 **표시 전용 게이트**(§6.2)로 `inferHints`를 제한할 수 있음 |
+
+가져오기·아젠다 생성·클라우드 머지 등 **진입점이 달라도** 위 단일 파이프를 깨거나 **둘째 배지 저장소**를 두지 않는다.
+
+**파일럿 표시 게이트**는 `metadata.badges`·`badges[]`·`sanitize` 결과와 **충돌하지 않게** 동작해야 한다(§6).
+
+### 0.3 표준 풀 확대·증식 시 동기화 (필수)
+
+표준 풀은 **지속적으로 확대할 계획**이므로, 토큰을 추가·변경할 때 아래를 **한 세트**로 갱신한다. 누락 시 가져오기 해석·칩·LLM 프롬프트가 어긋난다.
+
+| 단계 | 할 일 |
+|------|--------|
+| 1 | `badgePoolConfig.ts` — 기본 풀 정의·검증·스토리지 키 일관성 |
+| 2 | `badgeImportAliases.ts` — `ALIAS_GROUPS`·신규 토큰으로 들어올 외부 표기 동의어 |
+| 3 | (해당 시) `badgeMetadataInference.ts` — 키워드·extras가 새 도메인 의미를 다루면 정규식·힌트 보강 |
+| 4 | Vitest — `badgeImportAliases.test.ts`, CRAZYSHOT·파이프라인 회귀 샘플 갱신 또는 케이스 추가 |
+| 5 | 아젠다 프롬프트 등 **인라인 풀 문구** — `.cursor/plans/plannode_dev_spec_v1.0.md` §3-1 `BADGE_SPEC`, `agendaPromptAgent.ts` 동기 래퍼 |
+| 6 | UI 칩 라벨·색 — `plannode-ui-identity.mdc`·컴포넌트에서 신규 트랙·토큰 표기 필요 여부 |
+
+제품 공표가 필요하면 **`plannode-prd.mdc`** M1 F1-3 등과 한 줄 교차한다.
+
+### 0.4 지능적 학습 자동화 (향후 고려 — 구현은 TASK·GATE·GP-12)
+
+현재 구현층은 **규칙 기반**: 동의어표·키워드·`mergeLearnedBadgeRulesFromImportedNodes`로 **브라우저에 규칙 누적**. 이것만으로도 풀이 커질수록 **별칭·규칙 테이블 유지 비용**이 늘어난다.
+
+**확대 증식에 맞춘 자동화·지능화 방향(선택·단계적):**
+
+1. **데이터 기반 동의어 후보:** 가져오기 시 `resolveImportedBadgeToken`에 걸리지 않은 원문(또는 빈도)을 개발·디버그 리포트로 모아, `badgeImportAliases` 보강 후보를 만들 수 있다.
+2. **사용자 규칙 UI:** `setUserBadgeInferenceRules`를 콘솔 없이 편집 — 비개발자 튜닝·GP-12 범위 내에서 TASK 승인 후.
+3. **학습 저장소 정리:** `AI_LEARNED_RULES_MAX`·충돌 시 우선순위를 제품 정책으로 문서화.
+4. **진짜 ML·임베딩 매핑**은 PRD·`plan-output`·GATE에 명시되기 전까지 **도입하지 않는다**(오버엔지니어링 견제). 도입 시에도 **구조 골격은 트리·풀 고정**, 모델은 보조 배지 제안 정도로 한정하는 방향이 PRD F2-4·§10.4와 정합하다.
+
+에이전트는 위 **0.3 동기화 표**를 풀 변경 시 1차 체크리스트로 삼고, **0.4**는 설계 메모로만 참고하고 임의 신규 모듈을 추가하지 않는다.
+
+### 0.5 BADGE-ALIGN (2026-05 · DEV 16 · IA 구조 우선)
+
+**목표:** 노드 카드 배지는 **화면 형태(UX)·도메인·구현 조건(DEV)·기획 산출(PRJ)** 만 남기고, 범용 **CRUD·배포 공정**·과광 alias는 기본 풀·추론·프롬프트에서 제거·보수화한다.
+
+| 항목 | 정책 |
 |------|------|
-| **환경 보호** | `#V-TREE`, `#CW`, `#CV`, `#EG`, `#SG`, 파일럿 `render()`·줌·팬·간선·미니맵·노드 DOM 계약은 **최소 침습**으로만 수정한다. 부가 뷰(PRD/기능명세/IA/AI)의 CSS·전역 스타일·이벤트 위임은 **트리 영역을 가리거나** `.view` / `.view.active` 전환을 **깨는 특이도·z-index·overflow**를 두지 않는다. |
-| **저해 요소 최소화** | 노드 데이터의 **단일 진실(SSoT)** 는 `nodes`·스토어·`treeText`·파일럿 상태와 `pilotBridge` 동기 경로다. 부가 기능은 **읽기/동기** 또는 명시된 `metadata` 확장으로만 붙이고, 트리 편집을 우회하는 **둘째 저장소**·암묵적 이중 계약을 만들지 않는다. |
-| **연결 안정성** | Svelte `activeView` ↔ `pilotSetActiveView`, 툴바·뷰 메뉴, `onPersist` / `hydrateFromStore`, 숨은 버튼 id·와이어 싱크는 **쌍으로** 유지한다. DOM id·스토어 계약 변경 시 `docs/PILOT_FUNCTIONAL_SPEC.md` §9~§10·`plannode-architecture.mdc`와 **대조**한다. |
-| **변경 시 재검증** | 트리·파일럿·브리지·스토어·`+page.svelte` 뷰 셸 중 **하나라도** 변경하면 `npm run build`와 **트리 기본 시나리오**(프로젝트 열기·노드 추가/이동·저장·트리↔타 뷰 전환)를 **수동 또는 TASK/GATE C**에 한 줄 이상 명시한다. 하네스 NOW에는 **회귀 범위**를 남긴다. |
+| **기본 DEV 풀** | **16종** — `badgePoolConfig.ts` `DEFAULT_DEV_KEYS` 정본 |
+| **기본 풀에서 제거** | `CRUD`, `LOCAL`, `STAGING`, `PROD`, `DEPLOY`, `HOTFIX`, `PR`, `JSON`, `RENDER` |
+| **가져오기 `crud`** | `badgeImportAliases`에서 `CRUD`로 해석 가능하나 **풀에 없음** → `filterBadgeSetToCanonicalPool` 후 **칩·저장물에서 제거** |
+| **추론** | `keywordHints`에 범용 CRUD·배포 토큰 없음 · **§6.2** 설명 없으면 추론 off 유지 |
+| **구조 우선** | `inferBadgeHintStringsFromMetadata` — `treeImportExtras` → **`iaGrid.screenType`·`path`** → `keywordHints` → 사용자·AI 규칙(§4.4) |
+| **LLM** | `agendaPromptAgent.ts` `BADGE_SPEC` — 16 DEV + UX 26 + PRJ 9, 제거 토큰 예시 없음 |
 
-상위 교차 참조: `.cursor/rules/plannode-core.mdc` **「트리뷰 핵심 보호」**, **GP-13** 아래.
-
----
-
-## 📚 문서 위계 (에이전트·기획·개발 공통)
-
-| 구분 | 문서 | 용도 |
-|------|------|------|
-| **제품 진실(단일 기준)** | `.cursor/rules/plannode-prd.mdc` | M1~M6, F#-#, Phase, IA≠AI, LLM(§10), v2 DB·4-레이어·성공기준(§7) — **“무엇·왜·어느 단계”** |
-| **통합 개발 로드맵** | `.cursor/plans/plannode_integrated_milestone_v3.md` | M1~M5·H1~H4·M2-CORE **단계별 순서** · 하네스 §0·§7과 연동 |
-| **파일럿 기준(동작·포팅)** | `docs/PILOT_FUNCTIONAL_SPEC.md` | `index.html`+`plannode.js` 분해, SvelteKit **정합·갭(§9~§10)** |
-| **배포·인프라** | `.cursor/plans/PLANNODE_INTEGRATED_GUIDE.md` | Git, Supabase, Vercel, DNS |
-| **절차(하네스)** | `AGENTS.md` + `.cursor/harness/*` + `.cursor/agents/*` | @promptor → TASK.md → @harness-executor → @qa, GATE — **“어떻게 작업·검수”** |
-| **워크플로·복붙(가이드)** | `.cursor/plans/harness-workflow_final.md` | **기본·단축** 모드 분리 · GATE · 채팅 **복붙 블록**(G/R/W) — 상세 견제는 아래 표·`harness/README` |
-
-**PRD vs 하네스:** `plannode-prd.mdc`는 제품·범위의 기준; 하네스는 **그 PRD에 맞는 작업을** 분해·승인·로그로 묶는다. `plan-output.md`·`TASK.md`에는 **PRD 연계**로 모듈·기능 ID·(해당 시) PRD 절(예: §3 F2-4, §10)을 적는다.
+프로젝트 **커스텀 `badge_pool`**에 레거시 `CRUD`가 남아 있으면 해당 프로젝트만 예외 허용(문서·BACKLOG). 기본 풀·외부 AI JSON은 **≈51 토큰** 기준.
 
 ---
 
-## ⚖️ 황금 원칙 (모든 에이전트 공통 적용)
+## 1. 학습·매핑 저장 계층 (상위 학습기록)
 
-```
-GP-1.  git 명령어는 Stephen만 직접 실행 (add / commit / push 전부)
-GP-2.  모든 GATE 전환은 Stephen의 명시적 승인 후에만 진행
-GP-3.  AI는 제안·실행, 결정은 Stephen
-GP-4.  DB 스키마 변경은 반드시 신규 마이그레이션 파일 추가 (기존 SQL 수정 금지)
-GP-5.  30분 초과 GSD 태스크는 분해 후 재승인
-GP-6.  불확실하면 즉시 멈추고 Stephen에게 질문
-GP-7.  명시 범위 밖 기능 선제 구현 금지
-GP-8.  컨텍스트 리셋 요청 시 TASK.md·plan-output.md 즉시 재로드
-GP-9.  Supabase anon 키·서비스 키는 절대 클라이언트 코드에 직접 노출 금지
-GP-10. 파일럿(Vanilla) 동작 기준을 SvelteKit 포팅 정합성 체크의 기준으로 삼는다
-       → 기능·UX 불일치 발견 시 docs/PILOT_FUNCTIONAL_SPEC.md §9~§10 체크리스트 참조
-GP-11. 제품 범위·로드맵·“IA(정보 구조) vs LLM(F2-5)” 구분은 .cursor/rules/plannode-prd.mdc 를 우선한다.
-       아젠다·plan-output·TASK.md에는 PRD 추적용으로 M#·F#-# (및 필요 시 PRD 절)을 1줄씩 남긴다.
-       PRD·파일럿·통합 가이드가 충돌하면 불일치를 먼저 밝히고 조정한다.
-GP-12. 오버 엔지니어링·기술부채 누적을 지양한다. 아젠다·PRD·TASK에 없는 “미래용” 추상·래퍼·중복 계층·
-       사용 불명 스크립트·**불필요한 신규 모듈/유틸**을 붙이지 않는다(기존 경로·파일 확장을 우선).
-       TODO·debug 로그·any·무분별 의존성은 @qa 2단계(기술 부채) 기준에 맞출 것.
-       “보상” 문장만 늘리지 말고 **반복 위반**은 **구조·이름·린트**로 고쳐 **AGENTS/규율**을 **얇게** 유지한다(하네스 **누적=과세** — 엔지니어링 문서 일반론).
-GP-13. **트리뷰 핵심 보호:** 제품의 중심은 **트리뷰 노드 작성·트리 구조**다. 관련 로직·모듈·UI 파이프라인은
-       **「트리뷰 핵심 보호 헌장」**·`plannode-core.mdc`를 따른다. 부가 메뉴·뷰·스타일이 캔버스·SSoT·뷰 전환을
-       **저해하거나 가리는 변경**을 하지 않으며, 해당 영역을 수정할 때는 **재검증·회귀**를 TASK/GATE C·@qa에 남긴다.
-GP-14. **상용 협업 포지션:** 제품은 **상용 웹앱 개발계획 협업 서비스** (`plannode-prd.mdc` §1.05). M5·`plannode-architecture.mdc` §10
-       (번들·슬라이스·revision·structure_ops·Presence·충돌)을 **“1인용·미니멀·스킵 가능”**으로 설계·축소하지 않는다.
-       하네스 경량화(GP-12)는 **PRD·TASK 밖 불필요 모듈** 억제이지 **협업 동기화 견고함** 억제가 아니다(§1.06).
-```
+추론 파이프라인은 아래 **브라우저 `localStorage` 키**와 연동된다. 에이전트·구현 시 **동일 키명**을 유지한다.
 
-### 경량화·오버엔지니어링 **견제** 제어 구조 (하네스)
+| 계층 | `localStorage` 키 | 역할 | 누적 |
+|------|-------------------|------|------|
+| **표준 배지 풀** | `plannode.standardBadgePool.v1` | 기본 **DEV 16 · UX 26 · PRJ 9**(합계 ≈51, BADGE-ALIGN 2026-05) 외 커스텀 토큰·트랙 — `getEffectiveBadgePool` | 사용자가 표준 배지 설정에서 저장 시 갱신 |
+| **사용자 추론 규칙** | `plannode.badgeInferenceUserRules.v1` | `UserBadgeInferenceRule[]` — `setUserBadgeInferenceRules` / UI 미구현 시 API·콘솔 | 사용자가 덮어쓰기·초기화 가능 |
+| **AI·외부 트리 누적 학습** | `plannode.badgeInferenceAiLearnedRules.v1` | 가져온 노드의 `metadata.badges`(표준 풀로 해석)로 규칙 생성·병합 — **`name` 전체**, 조건부 **`description` 첫 줄 발췌**, **`metadataHaystack` 한 줄 시그니처** | **누적** — 동일 `(field, contains)`면 `suggestBadges`만 합침; 최대 `AI_LEARNED_RULES_MAX`(400) 초과 시 배열 앞쪽 규칙 드롭 |
 
-하네스는 **스코프 밖 로직·모듈 증가**를 **GATE·스코프·검수**로 끊는다. **협업·동기화(M5)는 상용 핵심 경로**이므로 GP-12로 **축소·생략하지 않는다** (`plannode-prd.mdc` §1.06).
+**AI 학습기록 갱신 트리거 (코드 정본):**
 
-| 제어 층 | 수단 | 역할 |
-|---------|------|------|
-| **0 — 스코프** | `plan-output` **포함/제외**, `TASK` **PRD:** | PRD M#·F#·Phase 밖·“나중에”는 **쓰지 않음**으로 박는다. |
-| **1 — 쪼개기** | `GP-5`·NOW **30분·한 파일** | 큰 뼈대·다중 모듈 **한 턴** 금지 → 쪼개서 GATE B. |
-| **2 — 승인** | **GATE A/B** | 설계/태스크 목록 **사람 승인** 전까지 구현 확대 금지. |
-| **3 — 구현** | `@harness-executor` G-STEP 4, **GP-12** | **확장 전** 동일 요구를 기존 파일·exports로 **만족시킬 수 있는지** 1문장 점검. |
-| **4 — 검수** | `@qa` 1~2단계(범위·부채) | **범위 초과(오버엔지니어링 의심)**·불필요 파일/의존성·잔여 로그/TODO. |
+- `src/lib/stores/projects.ts` — `upsertImportedPlannodeTreeV1` 성공 후 **`mergeLearnedBadgeRulesFromImportedNodes(nodeList)`** (원본 가져오기 노드 기준).
+- 프로그램적 로드: `mergeLearnedBadgeRulesFromPlannodeExportUnknown(obj)` — `{ nodes: [...] }` 형태 JSON 객체.
 
-> **새 `*.ts`/`lib/…` 하위 모듈** — PRD·TASK·plan-output **어느 줄에도 없으면** 먼저 `BACKLOG`·Stephen 확인 없이 **추가하지 않는다**.
+**해석:** 외부 AI(예: Crazyshot `BADGE_FULL` 등)가 채운 `metadata.badges`는 **동의어 해석 후 표준 토큰만** 규칙에 들어간다. 풀에 없는 문자열은 `resolveImportedBadgeToken`에서 탈락 — **표준 배지 풀 확장** 시 이후 가져오기부터 학습에 반영 가능.
 
+### 1.1 재검증 — 「매핑율이 낮다」와 실제 동작
+
+| 확인 항목 | 결과(샘플 파일·코드 기준) |
+|-----------|---------------------------|
+| **CRAZYSHOT `crazyshot_v5_plannode_BADGE_FULL.json`** | 노드 **약 119개** 중 **118개**가 `metadata.badges`에 배지 1개 이상. 파일 내 **고유 토큰 18종**은 모두 기본 풀 표기이거나 `badgeImportAliases` 동의어로 **표준 토큰으로 해석**된다(예: `ANALYSIS`→`API`, `COMPETITIVE`→`USP`). |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
