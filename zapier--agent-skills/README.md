@@ -7,11 +7,11 @@ Agent skills for working with Zapier, maintained by Zapier teams. Indexed by ski
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [zapier/agent-skills](https://github.com/zapier/agent-skills).
+Original source: `AGENTS.md` in [zapier/agent-skills](https://github.com/zapier/agent-skills).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
