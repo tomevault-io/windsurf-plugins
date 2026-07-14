@@ -1,86 +1,83 @@
 ---
 trigger: always_on
-description: Plannode 코어 — 상용 웹앱 개발계획 협업·표준 구조·트리 보호·하네스(협업≠경량화 축소)
+description: Plannode PRD — 상용 웹앱 개발계획 협업·M5·IA·와이어·LLM(§10)·DB·로드맵(§1.05~§1.06)
 ---
 
 
-# Plannode 코어
+# Plannode PRD (Product Requirements Document)
 
-**제품 포지션:** **상용 웹앱 개발계획 협업 서비스** — 정본은 [`plannode-prd.mdc`](./plannode-prd.mdc) **§1.05~§1.06**. “1인 내부 플래닝 도구” 가정은 **문서·에이전트에서 사용하지 않는다**.
+**버전**: 1.4 (1.3 + **상용 웹앱 개발계획 협업 서비스** 포지셔닝 §1.05·§1.06, M5·로드맵 정합)  
+**작성·갱신**: 2026-04-22 (§1.05·§1.06: 2026-06-04)  
+**상태**: Development  
+**제품 포지션(한 줄)**: **상용 웹앱 개발계획 협업 서비스** — 노드 트리 기반 구조 설계·팀 동기화·PRD/명세/IA/와이어 산출  
+**상세 TypeScript/스키마 예시**: `.cursor/plans/plannode-ai-enhancement-v3.md` 참고
 
-**역할:** Cursor에서 **항상 적용(alwaysApply)** 되는 저장소 진입 규칙이다. **`.mdc` 빠른 인덱스·Markdown 편집 규약**은 [`.cursor/rules/README.md`](./README.md)가 정본이고, **본 파일**은 **핵심 표준 구조·트리 보호·하네스·유지보수 원칙**을 고정한다.
+**구현 스택 정합성**: **배포 앱의 UI·라우팅·동기화 껍질**은 SvelteKit+TypeScript(`src/routes`, `src/lib/stores`, `src/lib/supabase`)이며, **트리 캔버스·줌·간선·문서 패널의 실행 단일 축**은 내장 파일럿 `src/lib/pilot/plannodePilot.js` + `pilotBridge.ts`가 담당한다(동작·포팅 기준은 여전히 `docs/PILOT_FUNCTIONAL_SPEC.md`, 루트 `index.html`+`plannode.js`와의 갭은 동 문서 §9~§10). **v2 LLM·DB 목표**(§10·§11)는 제품 방향의 진실로 두되, **클라이언트에 이미 존재하는 모듈**(`src/lib/ai/*` 일부: 직렬화·매트릭스·모델 선택·IA보내 보조 등)과 **Supabase에 실제로 올라간 스키마·RPC**를 우선해 코드·PRD 불일치 시 본문 또는 `plannode-architecture.mdc`에서 명시한다.
 
-- **스택(현재 구현 기준):** **SvelteKit + TypeScript** 앱 셸(`src/routes/*`)과 **내장 파일럿** `src/lib/pilot/plannodePilot.js`가 하이브리드로 동작한다. 루트 **Vanilla** `index.html` + `plannode.js`는 **동작·포팅 정합의 참고 기준**이며, 세부 갭은 `docs/PILOT_FUNCTIONAL_SPEC.md` §9~§10.
-- **구현 아키텍처·모듈·데이터 흐름(유지보수 기준)**: `.cursor/rules/plannode-architecture.mdc` — **「원격선택-null」/`PRESENCE_PEER_MERGE`(§5.1)** — **규칙 폴더 인덱스**: `.cursor/rules/README.md`
-- **UI 색·타이포·반응형·레이어 표준**: `.cursor/rules/plannode-ui-identity.mdc`
-- **제품·기능·로드맵(IA/와이어, LLM §10, v2 DB 등)**: `.cursor/rules/plannode-prd.mdc` — 하네스 `plan-output.md`·`TASK.md`는 **PRD 항목(M#·F#-#)을 1줄씩** 추적한다.
-- **파일럿 정합·포팅 갭**: `docs/PILOT_FUNCTIONAL_SPEC.md` §9~§10.
-- 인프라·배포: `.cursor/plans/PLANNODE_INTEGRATED_GUIDE.md`를 우선한다.
-- **릴리스 노트 UI:** 캔버스 하단 「Release」→ 모달 「Release note」(`+page.svelte`, 정적 `src/lib/plannodeUpdateLog.ts`) — 표준 톤은 `plannode-ui-identity.mdc` §5 캔버스 하단 릴리스 행.
-- 개발 워크플로우: **Harness Flow v1.0** — `AGENTS.md` + `.cursor/harness/` + `.cursor/agents/` 참조.
-- `plannode-prd`·`PILOT_FUNCTIONAL_SPEC`·코드·통합 가이드가 어긋나면 **불일치를 먼저 밝히고** 한쪽을 명시적으로 맞춘다(묵시적 불일치 유지 금지).
+---
 
-## 핵심 표준 구조 (코드 기준 — 위반 시 회귀)
+## 1. 서비스 개요
 
-아래는 `plannode-prd.mdc` §1.0·`plannode-architecture.mdc`와 같은 말을 **에이전트가 바로 따를 수 있는 규칙**으로 압축한 것이다.
+### 1.0 현재 구현된 시스템 (코드 기준 요약)
 
-| 규칙 | 내용 |
+아래는 **요구사항이 아니라 저장소에 존재하는 구현**을 한 장으로 묶은 것이다. 세부 흐름·클라우드 동기·협업 계약은 `.cursor/rules/plannode-architecture.mdc`(특히 **§10**).
+
+| 층 | 구현 내용 |
+|----|-----------|
+| **앱 셸** | `+layout.svelte`: Supabase 환경 가드·스플래시·`LoginGate`·세션(`authSession`) 후 슬롯. 클라우드 설정 시 로그인 뒤 `loadProjectsFromLocalStorage()`. |
+| **메인 오케스트레이션** | `+page.svelte`: 툴바·뷰 전환·모달·클라우드 플러시·Presence 연동. 뷰는 `activeView`: `tree` \| `prd` \| `spec` \| `ia` \| `ai` — 파일럿 `pilotSetActiveView`와 쌍을 맞춘다. |
+| **파일럿 런타임** | `plannodePilot.js` (`initPlannode`): 노드 DOM·SVG 간선·미니맵·PRD/기능명세/IA/AI 패널 갱신. 트리 편집 중 **단일 진실**은 파일럿 상태이며, 저장 시 브리지로 스토어에 반영된다. |
+| **브리지** | `pilotBridge.ts`: `onPersist` → `pilotNodesToStore` → `persistNodesFromPilot`(localStorage + 더티 마킹), `currentProject` 변경 시 `hydrateFromStore`, 필요 시 액세스 토큰·`plan_project_id` 콜백. |
+| **클라이언트 상태** | `projects.ts` 등: `Project`·`Node` 플랫 목록, `activeView`, `plannode_projects_v3` / `plannode_nodes_v3_<id>` / `plannode_current_project_v3`. 루트 노드 규칙은 아키텍처 문서 §4와 동일. |
+| **Supabase(설정 시)** | `client.ts`·`env.ts`: 미설정 시 안전한 플레이스홀더. **워크스페이스**: 사용자별 `plannode_workspace` JSON 번들 업서트/풀, 업로드 전 `mergeRemoteWorkspaceBeforeUpload`(LWW 성격), `workspacePush`·`cloudBackgroundSync` 디바운스·주기·가시성 트리거. **협업**: ACL·공유 프로젝트 슬라이스·revision/lock RPC 경로(`sync.ts` 등). **Presence**: Realtime으로 **선택 노드 등 메타**만 — 노드 본문은 번들·RPC 경로(번들 Realtime 스트리밍 아님). |
+| **데이터 교환** | `plannodeTreeV1.ts`: 트리 v1 스키마 파싱·가져오기/업서트(백업·이식). |
+| **AI / v2 클라이언트(부분)** | `src/lib/ai/*`: `contextSerializer`, `promptMatrix`, `modelSelector`, IA보내·배지 파이프 등 **클라이언트 모듈**이 존재한다. **§11 전면**(예: `ai_generations` 영속, `plan_nodes.path` 트리거 일원화)은 로드맵·DB 마이그레이션과의 **갭**으로 본다 — 구현 시 PRD·SQL·아키텍처를 한 번에 맞출 것. |
+
+**한 줄:** 로컬·파일럿에서 트리를 편집하고, Svelte 스토어·localStorage가 1차 저장이며, Supabase가 켜지면 **워크스페이스 번들 + ACL·슬라이스 + Presence**가 그 위에 얹힌다 — **팀이 같은 프로젝트 구조를 신뢰할 수 있는 협업 층**이 핵심이다.
+
+### 1.05 제품 포지셔닝 (에이전트·기획 공통 — 정본)
+
+| 항목 | 내용 |
 |------|------|
-| **단일 진실(트리 편집 중)** | 노드 캔버스·레이아웃·간선의 진실은 **파일럿 런타임**이다. Svelte 스토어·localStorage·클라우드는 **영속·동기 층**이며, 편집을 우회하는 **둘째 노드 저장소**를 만들지 않는다. |
-| **브리지 계약** | `pilotBridge.ts`: 파일럿 저장 시 `onPersist` → `persistNodesFromPilot`; 프로젝트 전환 시 `hydrateFromStore`. 노드 필드 매핑·깊이 계산 변경 시 스토어·파일럿 **양쪽**을 함께 본다. |
-| **뷰 동기** | Svelte `activeView`와 파일럿 `pilotSetActiveView`는 **같은 값 집합**(`tree` \| `prd` \| `spec` \| `ia` \| `ai`)으로 쌍을 맞춘다. 툴바·숨은 버튼 위임은 `plannode-architecture.mdc` §6. |
-| **타입 단일성** | `Project`·`Node`는 **`$lib/supabase/client`**에서 import해 스토어·브리지·UI가 공유한다. |
-| **로컬 1차 영속** | 키 접두 `plannode_*_v3` — 상세는 아키텍처 §4. 루트 노드 규칙(`makeRootNode` 등)을 깨지 않는다. |
-| **클라우드(설정 시)** | 노드 본문은 **`plannode_workspace` JSON 번들** upsert/풀·머지 경로가 정본이다. **배지 협업:** B축 `update_node` badges/metadata + A축 slice fallback — **§10.10.1** · **badge-mapping §6.9**. **Presence(Realtime)**는 선택 노드 등 **메타**만 — 번들 Realtime 스트리밍 없음. 모달 pull 보류·RPC는 **`plannode-architecture.mdc` §10**. |
-| **클라우드 저장 트리거** | 파일럿 쪽 출력·편집 후 셸에서 클라우드를 태울 때는 `plannode-auto-cloud-sync` 커스텀 이벤트 계약을 따른다(`+page.svelte` 리스너와 쌍). |
-| **트리 교환** | 백업·가져오기는 `plannodeTreeV1.ts` 스키마를 따른다. |
-| **AI 클라이언트** | `src/lib/ai/*`는 §10 방향의 **부분 구현**이다. 서버 영속·§11 DB와 갭이 있으면 PRD·아키텍처에 **명시**하고 일반론으로 메우지 않는다. |
+| **포지션** | **상용 웹앱 개발계획 협업 서비스** — 웹·앱 **기능·화면·요구**를 노드 트리로 설계하고, PRD·기능명세·IA·와이어를 **팀이 동일 구조**로 편집·동기화·보내는 SaaS |
+| **폐기 라벨** | “1인 내부 플래닝 도구”·“개인용 메모 수준” — **PRD·규칙·에이전트 기본 가정에서 사용 금지**. 저장소 **개발 운영**이 1인 에이전틱이어도 **제품·시스템 설계 완성도**는 **상용 협업** 기준을 따른다. |
+| **핵심 가치 축** | (1) 트리 SSoT·구조적 합의 (2) **팀 공유·클라우드 동기화**(M5·§3) (3) 기획문서·IA/와이어 산출 (4) (선택) LLM·하네스 품질(§10) |
+| **현행 코드 상한** | 프로젝트 접근 **최대 5계정**(소유자+멤버 4) — `plannodeCollabLimits.ts`. **베타·상용 확장**에서 인원·역할·충돌 UX는 단계 강화(§6 Phase 2+) |
 
-**트리뷰 핵심 보호:** 캔버스·`#V-TREE`·transform·간선·미니맵·파일럿 DOM 계약 변경은 **최소 침습**. 부가 뷰 CSS가 트리를 가리거나 `.view` 전환을 깨지 않게 한다 — 상세는 **`AGENTS.md`** 헌장·**GP-13**.
+### 1.06 에이전트 구현·설계 기준 (하네스 「경량화」와 구분)
 
-## 하네스 플로우 핵심 참조
+`AGENTS.md` **GP-12**·하네스 **경량화**는 **PRD·TASK·plan-output 밖**의 불필요한 **신규 모듈·추상·미래용 뼈대** 억제이다. **아래는 “경량화”로 생략·축소하지 않는 상용 협업 정상 경로**다.
 
-| 파일 | 역할 |
-|------|------|
-| `.cursor/rules/README.md` | **`.mdc` 통합 인덱스** · Markdown·README 편집 규약 |
-| `.cursor/rules/plannode-architecture.mdc` | SvelteKit·파일럿 브리지·스토어·Supabase 데이터 흐름 |
-| `.cursor/rules/plannode-ui-identity.mdc` | 브랜드 색·타이포·브레이크포인트·모달/배지 패턴 |
-| `.cursor/rules/plannode-prd.mdc` | PRD: M/F/Phase, IA·와이어 vs F2-5 LLM, §10~§11, **§1.0 구현 요약** |
-| `.cursor/rules/plannode-badge-mapping.mdc` | 표준 배지 풀 매핑·풀 확대 동기화·가져오기→칩 파이프 |
-| `AGENTS.md` | 프로젝트 정체성·황금 원칙·에이전트 호출 순서·문서 위계 |
-| `.cursor/harness/README.md` | 폴더 역할·DB 절·운영 원칙·PRD 연계 |
-| `.cursor/harness/TASK.md` | 현재 스프린트 태스크 스택 |
-| `.cursor/harness/plan-output.md` | @promptor 출력 (GATE A 확정본) |
-| `.cursor/harness/context-hook.md` | 컨텍스트 드리프트 방지 훅 |
-| `.cursor/agents/harness-executor.md` | Step4 GSD 실행 에이전트 |
-| `.cursor/agents/promptor.md` | Step2 아젠다 분석·플래너 |
-| `.cursor/agents/qa.md` | Step5 QA 검수 에이전트 |
-| `.cursor/plans/harness-workflow_final.md` | 하네스 **기본·단축** · GATE · 채팅 복붙 블록 |
+| 구분 | 에이전트가 따를 기준 |
+|------|---------------------|
+| **협업·동기화(M5)** | `plannode-architecture.mdc` **§10** — 번들·슬라이스·revision·structure_ops·Presence·모달 편집 중 pull 보류 등 **계약을 온전히** 유지·수정한다. “1인이면 pull/slice/ops 생략해도 됨” 설계 **금지**. |
+| **동기화 결함** | meta drift false-skip·ACL 403·slice 누락 등은 **버그·불변식 위반** — BACKLOG·“나중에”로 미루지 않는다(§7·architecture §10.11~§10.12). |
+| **알려진 한계** | OT/CRDT·필드 단위 병합 없음(LWW)은 **문서화된 제품 한계**이지, **번들/ops/revision 경로 자체를 단순화**할 명분이 아니다. |
+| **오버엔지니어링** | PRD M#·F#·TASK에 **없는** 범용 프레임워크·중복 저장소·v2 LLM 전면 선구현은 여전히 **금지**(GP-12). **협업 경로의 견고함**과 **스코프 밖 확장**을 혼동하지 말 것. |
 
-## 파일럿 갭 원칙
+### 1.1 제품 정의
 
-- SvelteKit 포팅 작업 시 `docs/PILOT_FUNCTIONAL_SPEC.md §9~§10` 갭 분석을 기준으로 삼는다.
-- 파일럿(`index.html` + `plannode.js`) 동작이 SvelteKit 구현의 **정합성 기준**이다.
-- transform 컨테이너·parent_id 체계·루트 노드 생성 등 갭 항목 변경 시 반드시 GATE C에서 체크한다.
+**Plannode**는 **상용 웹앱 개발계획 협업 서비스**(§1.05)로, **AI를 활용하는 기획 보조**(§10, 선택)와 **정보 구조(IA)·문서/와이어 산출**을 **동일한 제품 가치**로 둔다. 제품 기능을 노드 트리로 시각 설계하고, **PRD·기능명세**에 더해 **정보 구조(IA) 문서·와이어프레임(저충실도)**·(확장 시) API/ERD 등으로 **변환·내보내는** **웹 기반** 도구다.
 
-## 최소 구현·기술부채·경량화 (하네스 공통)
+**용어 (혼동 방지, 에이전트·기획자 공통)**  
+- **IA** = *Information Architecture* = **정보 구조** — 내비·화면(또는 모듈) 계층, 라벨, 사용자 이동 경로. **LLM이 아님.** 트리에서 **도출·렌더·내보내기**하는 **구조 기반 산출**이 본질.  
+- **AI** = 본 문서에서 **인공지능/LLM**(Claude 등)으로 **의미**를 통일(§10). “AI 기획” 문구는 **LLM 지원**을 뜻하며 **IA(정보 구조)와 별도**다.
 
-- **오버 엔지니어링 견제:** 아젠다·PRD·TASK에 없는 추상·불필요한 **신규 모듈/파일**·“나중에 쓸” 데드 코드를 넣지 않는다(기존 경로 확장 우선).
-- **협업·동기화는 경량화 대상이 아님:** M5·`plannode-architecture.mdc` §10(번들·슬라이스·revision·ops·Presence·모달 pull 보류)은 **상용 협업 정상 경로**다. PRD §1.06 — **pull/slice/ACL을 “1인용이라 생략”**하는 설계·패치 **금지**.
-- **경량화 제어:** `AGENTS.md` **「경량화·오버엔지니어링 견제 제어 구조」** — **스코프 밖 확장** 억제이지, **협업 로직 미니멀화** 허가가 **아님**. `.cursor/harness/README.md` **「최소 구현·기술부채·경량화」**.
-- **기술부채 누적 지양:** `AGENTS.md` GP-12, `@qa` 검수 2단계(기술 부채), `@harness-executor` G-STEP 4를 함께 본다.
-- **Guides(스펙·GATE) vs Sensors(빌드·QA):** 불필요한 설계(오버엔지니어링)는 **센서만**으로는 부족할 수 있으므로 **PRD·plan-output 포함/제외**를 1차로 둔다(`AGENTS.md` 대외·문헌 정합 단락 참고).
+**핵심 문제 → 해결**
 
-## 유지보수 시
+- 이미지/수동 PRD: 불일치·동기화 비용
+- 팀 협업: 댓글 수준 → 구조적 합의 어려움
+- **AI 개발 기획문서** 입력: **노드 텍스트만 전달 시 맥락 소실** → 일반론적 출력(§10)
 
-**단순 수정 스코프 (경량·단건):** 요청과 무관한 영역은 건드리지 않는다.
+**가치 제안**
 
-- **파일:** 요청에 명시된 경로만 수정한다.
-- **섹션:** 같은 파일이라도 요청한 블록·기능 범위만 변경한다.
-- **전역 스타일:** 공통 레이아웃·전역 CSS·무관 컴포넌트 스타일 변경 금지.
-- **파일럿 DOM id:** 파일럿이 의존하는 **id·숨은 버튼·와이어 싱크** 임의 변경 금지 — 필요 시 `docs/PILOT_FUNCTIONAL_SPEC.md` §9~§10·`plannode-architecture.mdc`와 대조.
+**노드 맵(구조) → 품질 있는 PRD/명세·IA/와이어·(선택) LLM/하네스** — (1) **IA·와이어**는 **트리 구조에서 직접** 도출 가능해야 하고, (2) **기획문서( PRD/명세·하네스) LLM 품질**은 **ContextSerializer(10.2)로 컨텍스트 인코딩**이 핵심(§10).
 
-- 요청 범위 밖 파일은 수정하지 않는다. 스타일·패턴은 기존 파일과 통일한다.
+### 1.2 USP (요지)
+
+- 노드 기반 **자동 PRD/MD** 및 뷰
+- **IA(정보 구조) + 와이어프레임** — 트리 → 화면(또는 모듈) **계층·이동 경로**·**저충실도 블록/구역** 문서(뷰+내보내기, §3 F2-4). *Figma 수준의 시각디자인 도구는 목표가 아님(§1.3).*
+- Supabase **권한·워크스페이스 번들 동기·ACL·Presence**(설정 시); **노드 단위 실시간 공동편집(OT/CRDT)** 및 **§11 DB 전부**는 여전히 로드맵·갭으로 본다(`plannode-architecture.mdc` §10.9 한계).
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
