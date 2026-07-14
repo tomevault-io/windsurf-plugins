@@ -1,0 +1,100 @@
+---
+trigger: always_on
+description: GPU-based vector text rendering using the Slug algorithm. Drop-in replacement for cryoglyph in iced's wgpu text rendering pipeline. Evaluates quadratic bezier curves per-pixel in fragment shaders - resolution-independent, no texture atlas needed.
+---
+
+# sluggrs
+
+GPU-based vector text rendering using the Slug algorithm. Drop-in replacement for cryoglyph in iced's wgpu text rendering pipeline. Evaluates quadratic bezier curves per-pixel in fragment shaders - resolution-independent, no texture atlas needed.
+
+## Project structure
+
+### Library (`src/`)
+- `lib.rs` - Public API, re-exports, cosmic_text re-exports, shader constants
+- `outline.rs` - Glyph outline extraction via `skrifa`, cubic→quadratic subdivision
+- `prepare.rs` - GPU preparation: line segment perturbation, FAKE_ITALIC shear
+- `band.rs` - Band acceleration structure (spatial index for shader curve lookup)
+- `glyph_cache.rs` - GlyphKey, GlyphEntry, GlyphMap for resolution-independent caching
+- `gpu_cache.rs` - Shared GPU state (shader, bind group layouts, pipeline cache)
+- `text_atlas.rs` - Curve + band texture management, glyph upload, texture growth
+- `text_renderer.rs` - prepare() + render() pipeline matching cryoglyph's interface
+- `viewport.rs` - Screen resolution uniform buffer
+- `types.rs` - Resolution, TextBounds, TextArea, ColorMode, error types
+- `simple_shader.wgsl` - Simplified Slug shader (no dilation)
+- `shader.wgsl` - Full Slug shader (with dilation, not yet wired up)
+
+### Other
+- `examples/demo.rs` - Standalone wgpu/winit demo
+- `examples/hotpath.rs` - Profiling binary for brokkr (`brokkr sluggrs hotpath`)
+- `tests/` - Spike tests and unit tests (62 passing, 8 ignored GPU-only)
+- `docs/` - Design docs, investigation log, integration spec
+- `repos/` - gitignored checkouts of iced, cosmic-text, cryoglyph for reference
+
+## Bash rules
+- Never use sed, find, awk, or complex bash commands
+- Never chain commands with &&
+- Never chain commands with ;
+- Never pipe commands with |
+- Never read or write from /tmp. All data lives in the project.
+- Never run raw cargo, curl, pkill. Use `brokkr`. Exception: non-sluggrs projects (iced, etc.).
+
+## brokkr commands
+
+If brokkr reports a lock (`already locked by PID`), another project is using it.
+Wait and retry - the lock exists to prevent concurrent benchmark interference.
+
+### Available in sluggrs
+```sh
+brokkr check                                  # clippy + tests
+brokkr check -- --test glyph_pipeline_test    # run one test file
+brokkr check -- -- --ignored                  # run ignored (GPU-only) tests
+brokkr hotpath                                # timing profile (1 run, stored in results.db)
+brokkr hotpath -n 3                           # 3 runs
+brokkr hotpath --alloc                        # allocation profile
+brokkr hotpath --alloc -n 5                   # 5 alloc runs
+brokkr hotpath --target email                 # email-client-scale benchmark (8k+ glyphs)
+brokkr hotpath --target email2                # mixed-locale inbox (CJK/Arabic/Hindi, 200 messages)
+brokkr hotpath --target email --alloc         # email benchmark with allocation tracking
+brokkr test [snapshot] [--all]                # run visual snapshot tests
+brokkr list                                   # list snapshots and approval state
+brokkr approve <snapshot>                     # record current output as accepted baseline
+brokkr report <run_id>                        # show detailed results for a past run
+brokkr visual-status                          # dashboard: all snapshots vs approved baselines
+brokkr results                                # last 20 results
+brokkr results <uuid>                         # look up by UUID prefix
+brokkr results --compare-last --mode hotpath    # compare two most recent hotpath runs
+brokkr results --commit abc1                  # filter by commit prefix
+brokkr env                                    # show environment info
+brokkr clean                                  # clean build artifacts and scratch data
+brokkr history                                # browse command history
+```
+
+The `--target` flag is a free-form string. `brokkr hotpath --target foo` builds
+`examples/foo_bench.rs` and stores results with variant "foo". To add a new
+benchmark target, create `examples/{name}_bench.rs` and a `[[example]]` entry
+in `Cargo.toml`.
+
+## Profiling
+
+Five functions are instrumented with `#[hotpath::measure]`:
+- `extract_outline()`, `prepare_outline()`, `build_bands()`, `upload_glyph()`, `prepare_with_depth()`
+
+`.brokkr/results.db` is committed to git - always commit it after profiling runs so performance data is tracked alongside the code. Brokkr requires a clean git tree to store results, but allows a dirty `results.db` or markdown file changes - so you don't need to commit CLAUDE.md edits before running profiling.
+
+The hotpath example emits KV pairs to stderr (captured by brokkr):
+`distinct_glyphs`, `curve_texels`, `band_texels`, `cold_prepare_us`,
+`warm_prepare_avg_us`, `mixed_prepare_avg_us`, `curve_texture_bytes`,
+`band_texture_bytes`, `gpu_text_render_us`.
+
+### GPU profiling
+
+Both CPU and GPU profiling run headless - no user interaction needed.
+
+- `brokkr sluggrs hotpath` measures CPU-side prepare AND GPU fragment shader
+  time via wgpu-profiler timestamp queries. Renders to an offscreen 1920x1080
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [folknor/sluggrs](https://github.com/folknor/sluggrs) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-14 -->
