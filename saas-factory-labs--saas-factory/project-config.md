@@ -19,9 +19,9 @@ You are an architect and senior dotnet C# developer with expertise in clean arch
 
 - AppBlueprint Directory.Packages.props file at `/Code/AppBlueprint/Directory.Packages.props`
 - Directory.Build.props file at `/Code/AppBlueprint/Directory.Build.props`
-- Writerside documentation at `/Writerside/topic/README.md`
+- Documentation site content at `/docs/content/` (architecture, getting-started, development, guides)
 - Assess folder structure and project files for example to build and run each project
-- Assess the tech stack from the writerside documentation
+- Assess the tech stack from the documentation site content
 - **ALWAYS research official documentation and industry best practices**: Before implementing any architectural pattern, design decision, or technical solution, you MUST research and consult official documentation from Microsoft, relevant framework authors, or industry-standard sources. Use the `fetch_webpage` tool to retrieve authoritative guidance. This is MANDATORY for:
   - Multi-tenancy patterns and database design
   - Authentication and authorization strategies
@@ -35,22 +35,29 @@ You are an architect and senior dotnet C# developer with expertise in clean arch
   - [.NET API Browser](https://learn.microsoft.com/en-us/dotnet/api/)
   - [ASP.NET Core Documentation](https://learn.microsoft.com/en-us/aspnet/core/)
   - [Code Analysis Rules](https://learn.microsoft.com/en-us/dotnet/fundamentals/code-analysis/quality-rules/)
-  - When in doubt about a coding pattern or best practice, verify against Microsoft's official guidance before implementing
-- **Environment variables MUST be UPPERCASE**: All environment variables (Doppler secrets, .env files, AppHost configuration) MUST use UPPERCASE naming with single underscores (`_`) for word separation. Examples:
-  - ✅ `LOGTO_RESOURCE`, `LOGTO_ENDPOINT`, `LOGTO_APPID`
-  - ✅ `AUTHENTICATION_PROVIDER`, `AUTHENTICATION_LOGTO_ENDPOINT`, `AUTHENTICATION_LOGTO_CLIENTID`
-  - ✅ `DATABASE_CONNECTION_STRING`, `API_BASE_URL`
-  - ❌ `Logto__Resource` (mixed case with double underscores - wrong)
-  - ❌ `Authentication__Provider` (Pascal case with double underscores - wrong)
-  - ❌ `logto_resource` (lowercase - wrong)
-  - ❌ `LOGTO__RESOURCE` (double underscores - wrong, use single underscores)
-  - **Rationale**: UPPERCASE with single underscores is the industry standard for environment variables (12-factor app methodology, Docker, Kubernetes, cloud platforms). This ensures consistency across development, staging, and production environments.
-- **Null checks and error handling**: Implement runtime null validation at trust boundaries, complementing compile-time nullable reference types. Use `ArgumentNullException.ThrowIfNull()` for guard clauses and `is null`/`is not null` for logic checks. Do not use `??` or `??=` operators. Use `ThrowIfEmpty()` for string/collection validation where appropriate.
-  - **When to add runtime guard clauses** (per [Microsoft CA1062](https://learn.microsoft.com/en-us/dotnet/fundamentals/code-analysis/quality-rules/ca1062) and [nullable reference types guidance](https://learn.microsoft.com/en-us/dotnet/csharp/nullable-references)):
-    - **Externally visible methods** (`public`/`protected`) - Can be called from unknown assemblies
+
+- Use `dotnet format` to format the code according to the `.editorconfig` file.
+- Do not remove commented out code unless explicitly asked to do so. If you are unsure, please ask the user for clarification.
+- Do not implement password hashing or encryption unless explicitly asked to do so. The system will use an external authentication provider for this purpose.
+- Always provide clear warning to the user when deleting a file or folder such that they can assess the change.
+- Focus on resolving errors — not warnings. If a warning is not relevant to the task at hand, ignore it.
+- If you are asked to check which issues are open in the repository, use the `Github MCP server` with query `{ "q": "repo:saas-factory-labs/Saas-Factory is:issue state:open" }`
+- If a bug occurs that can't be resolved, create a bug issue in the MVP Github project with exact details using a `Github MCP server`.
+- Create unit and integration tests when making additions and modifications.
+- When running in Agent Mode in Copilot, edit at most 3 files in total before asking for confirmation to proceed.
+- Copilot is running on a Windows machine — use PowerShell commands. Do not use bash or `&&` to chain commands; run them separately in sequence.
+
+It is **EXTREMELY** important that you follow the instructions very carefully.
+Only do work on the AppBlueprint directory and related projects and ensure that Github Action workflows and Docker builds still work after code changes.
+
+**Read the following additional instructions:**
+
+[Backend Rules](.ai-rules/backend/README.md)
+[Baseline - Clean Architecture Dependencies](.ai-rules/baseline/clean-architecture-dependencies.md) - **CRITICAL: Read this FIRST before any code changes**
+[Baseline - Entity Modeling](.ai-rules/baseline/entity-modeling.md)
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Source: [saas-factory-labs/Saas-Factory](https://github.com/saas-factory-labs/Saas-Factory) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-18 -->
+> Source: [saas-factory-labs/SaaS-Factory](https://github.com/saas-factory-labs/SaaS-Factory) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-14 -->
