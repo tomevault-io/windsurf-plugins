@@ -1,63 +1,54 @@
 ---
 trigger: always_on
-description: Guidance for Claude Code working in the BlitzOS repo.
+description: BlitzOS is the managed runtime for Claude cloud sessions. This repository is its free, open-source skill: a thin company-context generator that gives Claude cloud sessions a warm start across multiple repositories.
 ---
 
-# CLAUDE.md — BlitzOS
+# BlitzOS
 
-Guidance for Claude Code working in the BlitzOS repo.
+## What this project is
 
-## What this is (V1 = island-only)
+BlitzOS is the managed runtime for Claude cloud sessions. This repository is its free, open-source skill: a thin company-context generator that gives Claude cloud sessions a warm start across multiple repositories.
 
-BlitzOS is an Electron macOS **dynamic island** (the notch) for human+agent collaboration. The human drives it, and so can an AI agent over the [agent-socket](https://agentsocket.dev) relay (paste a URL / "connect to blitz os", no MCP) or the localhost control server. **The island IS the whole UI** — there is NO canvas, no infinite plane, no surfaces-on-a-canvas, no pan/zoom, no slot lattice, no stages, no workspace switcher, no dock/Sidebar, no Overview, no radial menu, no folders/annotations. (All of that was the pre-V1 desktop; it was cut. See "what got cut" under Gotchas.)
+The skill discovers repository evidence, collects repository and Claude.ai connector declarations in a localhost wizard, drafts one company `CLAUDE.md` for approval, and emits a small private context repository. Users select that repository beside their real work repositories in native multi-repo Claude cloud sessions.
 
-**The island.** A black pill at the notch that opens — on hover, or ⌥Space — into a body-portal chassis: hover shows a **home grid of widget icons** (V1 ships ONE functional icon, **Chat**, flanked by dotted placeholders for the agent-made widgets that come post-V1); ⌥Space just shows/hides the island (restoring the last view+tab), never spawning or mutating state. Chat is the agent session UI: a tab strip (a pen button that spawns a brand-new agent and enters it, plus one tab per live agent — Blitz '0' first), an iMessage-style transcript interleaved with the narrator's plain milestone steps, a live status line, a steer bar, a "Details" expand for raw tool rows, and a "+" attach panel for **connections** (browser/computer use). Web surfaces are GONE — the agent works the user's REAL browser (the connector extension) and native apps (the computer-use helper) instead. **Widgets are DEFERRED** (experimental, post-V1): the agent generating/pinning its own island widgets and apps is not in V1, which ships only Chat.
+## Product contract
 
-**Agent-runtime model (why BlitzOS exists).** BlitzOS is an *OS for an agent*: it turns ANY connected agent (Claude Code today over agent-socket, any agent, a built-in chat client later) into an autonomous one with **zero per-task code**. The agent supplies intelligence; BlitzOS supplies the loop. Four parts: **syscalls** (the agent's tools/hands — chat, connections, terminals, agents, workflows), **perception** (a content-agnostic world stream, the agent's eyes), **a scheduler** (coalesced "moments" that *wake* the agent with a snapshot, the interrupt), and the **agent as swappable policy** (it decides significance and action). The whole point is **out-of-distribution generalization**: perception is dumb-but-rich and the agent decides what matters, so a new task (coach my chess, draft this email, summarize this PDF) needs no new BlitzOS code. **Never hand-build a per-task watch loop** — make perception and wake general, and let the agent's policy handle the task. See "Agent runtime" under Architecture.
+- Keep the generator thin: emitted repositories contain only the approved `CLAUDE.md` and the `sessions/` scaffold.
+- Keep work repositories independent. Do not vendor source, copy Git history, create Git bundles, or rebuild a runtime monorepo.
+- Keep the warm-start loop: sessions read the index and relevant recent records at start, then write one concise factual record after meaningful work.
+- Treat Claude.ai connector choices as declarations. The skill cannot inspect the user's connector accounts.
+- Keep the free skill Claude-only for now. Codex support belongs to a future product iteration.
+- Treat session push-back through the GitHub proxy as experimental until it is verified across supported connected-session paths.
 
-Prototype stage (version 0.0.1); the island/runtime agent doctrine lives in `src/main/blitzos-agents.md` (match its island framing).
+## Platform facts
 
-## Commands
+- Properly connected Claude cloud sessions support native multi-repository selection, full Git history, and private-repository clone authentication through GitHub integration.
+- Network access is configured per cloud environment. Users should select Full for the workflow documented in the README.
+- Network reachability is not credential provisioning. The free skill does not manage deployment credentials or per-task scopes.
+- CLI-dispatched sessions can differ from properly connected web sessions; do not generalize platform limits from the degraded path.
+- Context committed as ordinary files reaches cloud sessions through the platform checkout and is the basis of the warm-start mechanism.
+- Managed Agents API sessions are API-billed and are not interchangeable with subscription-backed Claude cloud sessions.
 
-```bash
-npm run dev        # electron-vite dev (the GUI; macOS only) — predev ensures the native helpers
-npm run build      # electron-vite build → main + preload + renderer to out/
-npm run typecheck  # tsc --noEmit -p tsconfig.json
-npm run check      # typecheck + parity (scripts/check-parity.mjs) + build — the green-it gate
-npm run dist       # package BlitzOS.app (signed+notarized when ~/.zshrc Apple creds present) -> release/*.zip
-```
+## Working rules
 
-There is **no display in CI / headless sandboxes**, so you cannot see the GUI. Verify behavior instead by: launching `npm run dev > /tmp/aos.log 2>&1`, then reading the log for `did-finish-load`, the printed control-API token, and the agent-socket paste URL; and by driving the app via the control API or agent-socket tools (below) and checking `list_state`. Never claim the pixels look right, that's the user's to confirm.
+- Never commit secret values to this repository, generated repositories, fixtures, or logs. Environment evidence is names only.
+- Generated output lives outside this checkout and must remain a private context repository.
+- Preserve the single approval gate for the complete drafted company context before building.
+- Preserve cleanup of temporary files and the localhost wizard on success, failure, or abort.
+- Keep repository discovery origin-deduplicated and do not clone GitHub-only repositories for drafting.
+- Run `tests/build-thin-repo.sh` after changes that could affect generation or validation.
+- Keep documentation honest about experimental push-back and other unverified platform behavior.
 
-## Stack & layout
+## Repository map
 
-electron-vite + React + TypeScript + zustand.
-
-```
-src/main/        Electron main (Node)
-  index.ts         the one BrowserWindow, notch overlay, boot-task seam, wires everything
-  notch-overlay.ts the dynamic-island overlay window + the always-interactive notch hit-window
-  osActions.ts     control plane: IPC mutations + getState, the live-WebContents registry
-  control-server.ts  localhost HTTP control API (trusted local-agent path; mints session.json)
-  agentSocket.ts   connects to the agent-socket relay; tools -> osActions (remote agent path)
-  os-tools.mjs     THE one shared agent-tool registry (both transports — see Architecture)
-  agent-runtime.mjs / terminal-manager.mjs   the managed-agent backends + tmux terminals
-  events.ts / perception-core.mjs   the perception kernel → moments → /events wake
-  blitzos-agents.md   the runtime agent's island doctrine (what an agent reads on connect)
-src/preload/index.ts   contextBridge api: onAction, sendState, onAgentSocketUrl, notch.*
-src/renderer/src/
-  App.tsx          the notch wiring + body-portal of the island; NO canvas render
-  notch/           THE island UI (KEPT): NotchHost / IslandHome / IslandPanel / ChatInput / AttachPanel
-  store.ts         zustand — runtime panels (chat/terminal/inbox) + viewport (mid-migration, see Gotchas)
-  components/{ConnectPicker,Icons}.tsx
-vendor/agent-socket-sdk/   vendored @agent-socket/sdk dist (see "Gotchas")
-```
-
-## Architecture
-
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- `skill/SKILL.md`: Claude-only workflow and safety contract.
+- `skill/scripts/scan.sh`: repository evidence discovery.
+- `skill/scripts/wizard-server.mjs` and `skill/wizard.html`: local selection flow.
+- `skill/scripts/build-monorepo.sh`: validated thin-repository builder.
+- `tests/build-thin-repo.sh`: no-push build and schema test.
+- `docs/architecture.md`: current architecture.
+- `docs/spike-results.md`: historical cloud capability evidence.
 
 ---
-> Source: [blitzdotdev/BlitzOS](https://github.com/blitzdotdev/BlitzOS) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-27 -->
+> Source: [blitzdotdev/blitzos](https://github.com/blitzdotdev/blitzos) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-14 -->
