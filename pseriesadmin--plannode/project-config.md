@@ -1,83 +1,117 @@
 ---
 trigger: always_on
-description: Plannode PRD — 상용 웹앱 개발계획 협업·M5·IA·와이어·LLM(§10)·DB·로드맵(§1.05~§1.06)
+description: Plannode UI 아이덴티티·컴포넌트 패턴·반응형 표준 (Svelte 셸 + 파일럿 시각 일관성)
 ---
 
 
-# Plannode PRD (Product Requirements Document)
+# Plannode UI 아이덴티티 표준
 
-**버전**: 1.4 (1.3 + **상용 웹앱 개발계획 협업 서비스** 포지셔닝 §1.05·§1.06, M5·로드맵 정합)  
-**작성·갱신**: 2026-04-22 (§1.05·§1.06: 2026-06-04)  
-**상태**: Development  
-**제품 포지션(한 줄)**: **상용 웹앱 개발계획 협업 서비스** — 노드 트리 기반 구조 설계·팀 동기화·PRD/명세/IA/와이어 산출  
-**상세 TypeScript/스키마 예시**: `.cursor/plans/plannode-ai-enhancement-v3.md` 참고
+SvelteKit 메인 셸(`+page.svelte` 등)과 파일럿이 그리는 노드·패널이 **같은 브랜드 톤**을 쓰도록 하는 기준이다. 새 화면·모달·배지를 추가할 때 아래를 우선 맞춘다.
 
-**구현 스택 정합성**: **배포 앱의 UI·라우팅·동기화 껍질**은 SvelteKit+TypeScript(`src/routes`, `src/lib/stores`, `src/lib/supabase`)이며, **트리 캔버스·줌·간선·문서 패널의 실행 단일 축**은 내장 파일럿 `src/lib/pilot/plannodePilot.js` + `pilotBridge.ts`가 담당한다(동작·포팅 기준은 여전히 `docs/PILOT_FUNCTIONAL_SPEC.md`, 루트 `index.html`+`plannode.js`와의 갭은 동 문서 §9~§10). **v2 LLM·DB 목표**(§10·§11)는 제품 방향의 진실로 두되, **클라이언트에 이미 존재하는 모듈**(`src/lib/ai/*` 일부: 직렬화·매트릭스·모델 선택·IA보내 보조 등)과 **Supabase에 실제로 올라간 스키마·RPC**를 우선해 코드·PRD 불일치 시 본문 또는 `plannode-architecture.mdc`에서 명시한다.
+**구현 단일 소스:** UI 토큰은 가능하면 `:root` CSS 변수(`--pn-brand`, `--pn-brand-ink` 등)와 본 문서를 함께 맞춘다. 레거시 하드코드 `#6b4ef6` 계열은 **`#631EED`(로고 Primary)** 로 치환하는 방향으로 통일한다.
 
----
+## 1. 브랜드·색 (Color) — 로고 SVG 기준
 
-## 1. 서비스 개요
+공식 로고 팔레트: 배지 **`#631EED`**, 워드마크 **`#2C155A`**. 상호작용·포커스·CTA는 **Primary = `#631EED`** 로 통일한다.
 
-### 1.0 현재 구현된 시스템 (코드 기준 요약)
+| 용도 | 참고 값 | 비고 |
+|------|-----------|------|
+| **Primary (브랜드 보라)** | `#631EED` | 로고 배지색 · CTA·포커스·노드 선택·미니맵 뷰포트·프로젝트 카드 현재 강조 |
+| **Primary 진하게 / 호버** | `#5519D4`, `#4a1499` | 그라데이션·호버·드롭다운 글자 강조 |
+| **Brand ink (워드마크 진보라)** | `#2C155A` | 강조 텍스트·보조 CTA 글자·태그·스플래시 강조 (`#5b21b6` 대체) |
+| **연한 브랜드 배경** | `#ede9fe`, `#f3f1ff`, `#f0ecff` | 아이콘 배경·칩·테두리 없는 보조 버튼 |
+| **배경(웜 라이트)** | `#f5f5f0` | `#R`, html/body, AI 뷰 배경 |
+| **서페이스/카드** | `#fff`, `#faf9f7` | 모달·입력·노드 카드 |
+| **구분선·보더** | `#e0dbd4`, `#e8e4de`, `#ece8e2` | 카드·툴바·표 |
+| **뮤트 텍스트** | `#aaa`, `#888`, `#666` | 보조 라벨·메타 |
+| **시맨틱** | TDD `#fff1f0`/빨강, AI `#f0fdf4`/초록, CRUD `#eff6ff`, 경고 `#fffbeb` | PRD 패널 인라인·배지와 정렬 |
 
-아래는 **요구사항이 아니라 저장소에 존재하는 구현**을 한 장으로 묶은 것이다. 세부 흐름·클라우드 동기·협업 계약은 `.cursor/rules/plannode-architecture.mdc`(특히 **§10**).
+파일럿 전역 클래스(`:global(.nd)`, `:global(.cp0)` …)는 **위 Primary·Brand ink** 와 같은 계열로 유지한다.
 
-| 층 | 구현 내용 |
-|----|-----------|
-| **앱 셸** | `+layout.svelte`: Supabase 환경 가드·스플래시·`LoginGate`·세션(`authSession`) 후 슬롯. 클라우드 설정 시 로그인 뒤 `loadProjectsFromLocalStorage()`. |
-| **메인 오케스트레이션** | `+page.svelte`: 툴바·뷰 전환·모달·클라우드 플러시·Presence 연동. 뷰는 `activeView`: `tree` \| `prd` \| `spec` \| `ia` \| `ai` — 파일럿 `pilotSetActiveView`와 쌍을 맞춘다. |
-| **파일럿 런타임** | `plannodePilot.js` (`initPlannode`): 노드 DOM·SVG 간선·미니맵·PRD/기능명세/IA/AI 패널 갱신. 트리 편집 중 **단일 진실**은 파일럿 상태이며, 저장 시 브리지로 스토어에 반영된다. |
-| **브리지** | `pilotBridge.ts`: `onPersist` → `pilotNodesToStore` → `persistNodesFromPilot`(localStorage + 더티 마킹), `currentProject` 변경 시 `hydrateFromStore`, 필요 시 액세스 토큰·`plan_project_id` 콜백. |
-| **클라이언트 상태** | `projects.ts` 등: `Project`·`Node` 플랫 목록, `activeView`, `plannode_projects_v3` / `plannode_nodes_v3_<id>` / `plannode_current_project_v3`. 루트 노드 규칙은 아키텍처 문서 §4와 동일. |
-| **Supabase(설정 시)** | `client.ts`·`env.ts`: 미설정 시 안전한 플레이스홀더. **워크스페이스**: 사용자별 `plannode_workspace` JSON 번들 업서트/풀, 업로드 전 `mergeRemoteWorkspaceBeforeUpload`(LWW 성격), `workspacePush`·`cloudBackgroundSync` 디바운스·주기·가시성 트리거. **협업**: ACL·공유 프로젝트 슬라이스·revision/lock RPC 경로(`sync.ts` 등). **Presence**: Realtime으로 **선택 노드 등 메타**만 — 노드 본문은 번들·RPC 경로(번들 Realtime 스트리밍 아님). |
-| **데이터 교환** | `plannodeTreeV1.ts`: 트리 v1 스키마 파싱·가져오기/업서트(백업·이식). |
-| **AI / v2 클라이언트(부분)** | `src/lib/ai/*`: `contextSerializer`, `promptMatrix`, `modelSelector`, IA보내·배지 파이프 등 **클라이언트 모듈**이 존재한다. **§11 전면**(예: `ai_generations` 영속, `plan_nodes.path` 트리거 일원화)은 로드맵·DB 마이그레이션과의 **갭**으로 본다 — 구현 시 PRD·SQL·아키텍처를 한 번에 맞출 것. |
+## 2. 타이포·폰트
 
-**한 줄:** 로컬·파일럿에서 트리를 편집하고, Svelte 스토어·localStorage가 1차 저장이며, Supabase가 켜지면 **워크스페이스 번들 + ACL·슬라이스 + Presence**가 그 위에 얹힌다 — **팀이 같은 프로젝트 구조를 신뢰할 수 있는 협업 층**이 핵심이다.
+- **본문 UI:** 한글 **`Pretendard`** (웹폰트), 라틴·숫자 보조 **`Noto Sans KR`** — `app.html`에서 로드 후 `#root`에 스택 적용 (`'Pretendard', 'Noto Sans KR', …`).
+- **시스템 폴백:** `-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif`.
+- **코드·트리 덤프:** `monospace` (PRD 기능 트리 블록 등).
+- **크기 룰 오브 썸:** 라벨 11px, 본문 12–13px, 모달 제목 15px(`h3`), PRD 헤더 20px, 로고 13px + 서브 10px (`by pseries`).
 
-### 1.05 제품 포지셔닝 (에이전트·기획 공통 — 정본)
+## 3. 레이아웃·레이어
 
-| 항목 | 내용 |
+- **루트:** `#root` = `100vw` × `100vh`; 앱 컬럼 `#R` = 세로 flex, 툴바는 `absolute` 상단 `#TB` + 본문 `#VIEWS`.
+- **툴바 `#TB`:** 반투명 화이트 `rgba(255,255,255,0.74)`, **그림자 없음**, `z-index: 50`. 바 자체 `pointer-events: none`, 자식만 `auto`.
+- **모달:** `.mbg` 풀스크린 + 어두운 오버레이, `.mo` 카드 `border-radius: 16px`, `z-index: 6000`대.
+- **토스트:** `#TST` 하단 중앙.
+- **계정 시트:** `z-index: 8000`대.
+
+## 4. 프로젝트 관리 모달 (표준 UI 구조)
+
+진입: `$showProjectModal` · 공통 메뉴 `+` / 「새 프로젝트」 등. **동일 모달**에 **신규 생성 폼** + **이 기기 프로젝트 목록** + (해당 시) **초대/가져오기**가 나온다. **폼·버튼 시각 규격의 기준 구현**은 `src/routes/+page.svelte`(프로젝트 모달 블록·`<style>`)이다.
+
+### 4.1 영역 맵 (클래스)
+
+| 영역 | 클래스·역할 |
+|------|----------------|
+| 오버레이 | `.mbg` — 반투명 보라 틴트 배경, 클릭 시 닫기(self) |
+| 카드 쉘 | `.mo` — 배경 `#fff`, **`border-radius: 16px`**, 패딩 기본 14px, 그림자·최대 높이 스크롤 |
+| 프로젝트용 와이드 쉘 | `.mo.mo-wide.pm-scroll.pm-proj-shell` — 세로 flex, **헤더 고정·본문만 스크롤**, 상하 패딩 **21px**·좌우 **14px** |
+| 헤더 | `.pm-proj-head` — 제목 `h3`「프로젝트 관리」(15px·진한 `#1a1a1a`), 닫기 `.mcl`(연라벤더 배경 `#f0ece8`, radius 6px) |
+| 본문 스크롤 | `.pm-proj-body` — `overflow-y: auto`, 모바일 구간에서 스크롤바 숨김 옵션 |
+| 신규 폼 컬럼 | `.proj-form-col` — 아래 **4.2** |
+| 목록 컬럼 | `.pl` — `#PLT` 섹션 타이틀, `#PLC` 카드 리스트 |
+| 프로젝트 행 | `.prow` → `.pcard` (현재 `.pcard-acp`, 공유 `.pcard-shared`) |
+| 행 내부 | `.pdl`, `.pc`, `.pi`, `.pif`, `.pn2`, `.pm2`, `.ct`, `.pacl` 등 기존 계약 유지 |
+| 초대 블록 | `.inv-panel`, `.inv-row`, `.inv-load`, `.inv-hint` |
+| 모바일 스크롤 힌트 | `.pm-scroll-hint-wrap` |
+
+### 4.2 폼 컬럼 `.proj-form-col` (프로젝트 생성·날짜·설명·노드맵 옵션·배지·가져오기)
+
+| 항목 | 규격 |
 |------|------|
-| **포지션** | **상용 웹앱 개발계획 협업 서비스** — 웹·앱 **기능·화면·요구**를 노드 트리로 설계하고, PRD·기능명세·IA·와이어를 **팀이 동일 구조**로 편집·동기화·보내는 SaaS |
-| **폐기 라벨** | “1인 내부 플래닝 도구”·“개인용 메모 수준” — **PRD·규칙·에이전트 기본 가정에서 사용 금지**. 저장소 **개발 운영**이 1인 에이전틱이어도 **제품·시스템 설계 완성도**는 **상용 협업** 기준을 따른다. |
-| **핵심 가치 축** | (1) 트리 SSoT·구조적 합의 (2) **팀 공유·클라우드 동기화**(M5·§3) (3) 기획문서·IA/와이어 산출 (4) (선택) LLM·하네스 품질(§10) |
-| **현행 코드 상한** | 프로젝트 접근 **최대 5계정**(소유자+멤버 4) — `plannodeCollabLimits.ts`. **베타·상용 확장**에서 인원·역할·충돌 UX는 단계 강화(§6 Phase 2+) |
+| 배치 | 세로 `flex`, **`gap: 15px`** (필드 간 세로 리듬 기준값) |
+| 상단 구역과 목록 구역 | `.pl` 은 위쪽에 **`margin-top: 16px`**, **`padding-top: 14px`** 로 폼과 시각 분리(같은 모달 카드 `#fff` 안) |
 
-### 1.06 에이전트 구현·설계 기준 (하네스 「경량화」와 구분)
+### 4.3 공통 텍스트 필드 `.fi` (input / textarea)
 
-`AGENTS.md` **GP-12**·하네스 **경량화**는 **PRD·TASK·plan-output 밖**의 불필요한 **신규 모듈·추상·미래용 뼈대** 억제이다. **아래는 “경량화”로 생략·축소하지 않는 상용 협업 정상 경로**다.
+모달·다른 화면에서 **한 줄·여러 줄 입력**의 기본 스킨으로 통일한다.
 
-| 구분 | 에이전트가 따를 기준 |
-|------|---------------------|
-| **협업·동기화(M5)** | `plannode-architecture.mdc` **§10** — 번들·슬라이스·revision·structure_ops·Presence·모달 편집 중 pull 보류 등 **계약을 온전히** 유지·수정한다. “1인이면 pull/slice/ops 생략해도 됨” 설계 **금지**. |
-| **동기화 결함** | meta drift false-skip·ACL 403·slice 누락 등은 **버그·불변식 위반** — BACKLOG·“나중에”로 미루지 않는다(§7·architecture §10.11~§10.12). |
-| **알려진 한계** | OT/CRDT·필드 단위 병합 없음(LWW)은 **문서화된 제품 한계**이지, **번들/ops/revision 경로 자체를 단순화**할 명분이 아니다. |
-| **오버엔지니어링** | PRD M#·F#·TASK에 **없는** 범용 프레임워크·중복 저장소·v2 LLM 전면 선구현은 여전히 **금지**(GP-12). **협업 경로의 견고함**과 **스코프 밖 확장**을 혼동하지 말 것. |
+| 속성 | 값 |
+|------|-----|
+| 배경 | `#faf9f7`(웜 서페이스 — 카드 `#fff`와 구분) |
+| 테두리 | **없음**(플랫 필드). 레거시 파일럿 `index.html` 등 **보더형 `.fi`** 와 병행되는 저장소가 있으면, 신규·Svelte 쪽은 **본 표를 우선**한다. |
+| 모서리 | **`border-radius: 8px`** |
+| 글자 | `#1a1a1a`, **13px**, `font-family: inherit` |
+| 안쪽 여백 | **8px 11px** |
+| placeholder | `#9ca3af`, 불투명 유지 |
+| focus | **모달 구현**: 테두리 링 대신 배경만 **`#f3f1ed`** 로 전환(§7 아웃라인 포커스와 병용 가능 — 화면 성격에 맞게 하나 선택). |
 
-### 1.1 제품 정의
+**날짜 두 칸:** `.fg.fg-dates` 그리드 **1fr / 1fr**, 간격 10px · 모바일(`max-width: 560px`)에서는 1열·간격 12px, `input[type=date]` 는 **최소 높이 44px**, **font-size 16px**(iOS 줌 방지).
 
-**Plannode**는 **상용 웹앱 개발계획 협업 서비스**(§1.05)로, **AI를 활용하는 기획 보조**(§10, 선택)와 **정보 구조(IA)·문서/와이어 산출**을 **동일한 제품 가치**로 둔다. 제품 기능을 노드 트리로 시각 설계하고, **PRD·기능명세**에 더해 **정보 구조(IA) 문서·와이어프레임(저충실도)**·(확장 시) API/ERD 등으로 **변환·내보내는** **웹 기반** 도구다.
+### 4.4 공통 버튼 스케일 (프로젝트 모달 = 기준)
 
-**용어 (혼동 방지, 에이전트·기획자 공통)**  
-- **IA** = *Information Architecture* = **정보 구조** — 내비·화면(또는 모듈) 계층, 라벨, 사용자 이동 경로. **LLM이 아님.** 트리에서 **도출·렌더·내보내기**하는 **구조 기반 산출**이 본질.  
-- **AI** = 본 문서에서 **인공지능/LLM**(Claude 등)으로 **의미**를 통일(§10). “AI 기획” 문구는 **LLM 지원**을 뜻하며 **IA(정보 구조)와 별도**다.
+| 역할 | 클래스·예시 | 스펙(요지) |
+|------|-------------|------------|
+| **주요 CTA(전폭)** | `.bcr` | 배경 **`#631EED`**, 글 **`#fff`**, **13px**·**굵게**, **`border-radius: 9px`**, 패딩 **10px**, 테두리 없음 |
+| **주요 CTA 강조(한 구역 대표)** | `.bcr.bcr-create-project` | 같은 색 · 세로 패딩 **14px**, 글 **17px**(생성 하나만 튀게) |
+| **보조(같은 폼 안 2차 액션)** | `.bcr.bcr-badge-settings` | 배경 **`#f3f1ff`**, 글 **`#2C155A`**, 호버 시 **`#e8e4ff`** |
+| **세컨더리(외곽 톤·채우기 아님)** | `#BJI.proj-json-import-btn` | 배경 **`#f5f3ff`**, 글 **`#631EED`**, 호버 **`#ede9fe`** / 글 **`#5519D4`** · 전폭 · radius **9px** |
+| **토글/세그먼트(둘 중 하나)** | `.nm-create-opt` / `.nm-create-opt--on` | 기본: 배경 `#e6e4ff`, 글 `#2C155A` · 선택됨: 배경 `#aaa3ff`, 글 `#fff` · **focus-visible** 시 `outline: 2px solid #631EED` |
+| **작은 보조 버튼** | `.bcr.sm` | `width: auto`, 패딩 **8px 12px**, 12px 글 (초대 불러오기 등) |
+| **비활성** | `.bcr:disabled` | opacity **0.55** |
 
-**핵심 문제 → 해결**
+다른 화면의 **보조/고스트** 버튼은 §7(보더 `#e0dbd4`, 배경 투명~`#fafaf8`)과 조합한다.
 
-- 이미지/수동 PRD: 불일치·동기화 비용
-- 팀 협업: 댓글 수준 → 구조적 합의 어려움
-- **AI 개발 기획문서** 입력: **노드 텍스트만 전달 시 맥락 소실** → 일반론적 출력(§10)
+### 4.5 구역 라벨·내부 가이드 타이포
 
-**가치 제안**
+| 용도 | 클래스 | 규격 |
+|------|--------|------|
+| 폼 위 **섹션 머리글**(목록 위 「이 기기의 프로젝트」 등) | `.plt` | **11px**, **`#aaa`**, **대문자**, `letter-spacing: 0.05em`, **굵게** |
+| 필드 위 라벨(공통 메뉴·모달에서 쓸 때) | `.fl` | **11px**, `#666`, **600**, 하단 여백 4px |
+| 모달 제목 | `h3` | **15px**, `#1a1a1a`, **700** |
 
-**노드 맵(구조) → 품질 있는 PRD/명세·IA/와이어·(선택) LLM/하네스** — (1) **IA·와이어**는 **트리 구조에서 직접** 도출 가능해야 하고, (2) **기획문서( PRD/명세·하네스) LLM 품질**은 **ContextSerializer(10.2)로 컨텍스트 인코딩**이 핵심(§10).
+### 4.6 네이티브 셀렉트·체크·라디오 (표준 권장)
 
-### 1.2 USP (요지)
+저장소에 `<select>` · `checkbox` 전용 스킨이 아직 없으면, 도입 시 아래를 맞춘다.
 
-- 노드 기반 **자동 PRD/MD** 및 뷰
-- **IA(정보 구조) + 와이어프레임** — 트리 → 화면(또는 모듈) **계층·이동 경로**·**저충실도 블록/구역** 문서(뷰+내보내기, §3 F2-4). *Figma 수준의 시각디자인 도구는 목표가 아님(§1.3).*
-- Supabase **권한·워크스페이스 번들 동기·ACL·Presence**(설정 시); **노드 단위 실시간 공동편집(OT/CRDT)** 및 **§11 DB 전부**는 여전히 로드맵·갭으로 본다(`plannode-architecture.mdc` §10.9 한계).
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
