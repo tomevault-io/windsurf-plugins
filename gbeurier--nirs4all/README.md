@@ -7,11 +7,11 @@ A library for Near Infrared Sprectroscopy prediction. NIRS ML. Rebuild of the Pi
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [GBeurier/nirs4all](https://github.com/GBeurier/nirs4all).
+Original source: `CLAUDE.md` in [GBeurier/nirs4all](https://github.com/GBeurier/nirs4all).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
