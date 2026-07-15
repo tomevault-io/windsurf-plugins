@@ -1,142 +1,117 @@
 ---
 trigger: always_on
-description: This rule defines the complete workflow for creating, updating, and maintaining index.md files within the DST core-systems documentation structure. It integrates format standards, templates, and quality assurance procedures.
+description: This rule defines the logical organization structure for the Don't Starve Together core systems documentation based on the comprehensive analysis in [core-systems-structure.md](mdc:dst-api-webdocs/dst-api-webdocs/dst-api-webdocs/core-systems-structure.md).
 ---
 
-# DST Core Systems Index Workflow
+# DST Core Systems Directory Structure
 
-This rule defines the complete workflow for creating, updating, and maintaining index.md files within the DST core-systems documentation structure. It integrates format standards, templates, and quality assurance procedures.
+This rule defines the logical organization structure for the Don't Starve Together core systems documentation based on the comprehensive analysis in [core-systems-structure.md](mdc:dst-api-webdocs/dst-api-webdocs/dst-api-webdocs/core-systems-structure.md).
 
-## Workflow Overview
+## Core Systems Organization
 
-The core-systems index workflow consists of four main phases:
+The `/docs/game-scripts/core-systems/` directory is organized into 12 main categories to reflect logical learning progression and system dependencies:
 
-1. **Analysis Phase**: Understand the system category and its components
-2. **Template Selection**: Choose appropriate format and structure
-3. **Content Development**: Create comprehensive documentation content
-4. **Quality Assurance**: Verify accuracy and integration
+### 1. System Core
+**Location:** `docs/game-scripts/core-systems/system-core/`
+**Purpose:** Engine foundation and runtime systems that power the entire game
+**Contents:**
+- `engine/` - Game initialization, core functions, physics, map utilities
+- `runtime/` - Update loops and runtime execution systems
 
-## Phase 1: Analysis Phase
+### 2. Fundamentals
+**Location:** `docs/game-scripts/core-systems/fundamentals/`
+**Purpose:** Core programming foundation - OOP, entities, utilities, and basic systems
+**Contents:**
+- `core/` - OOP foundation, entity system, metaclass, standard components
+- `utilities/` - Math, string, vector utilities, simulation helpers
+- `actions/` - Player interaction and action systems
+- `ai-systems/` - AI brains, behavior trees, state machines
 
-### System Category Assessment
+### 3. Game Mechanics
+**Location:** `docs/game-scripts/core-systems/game-mechanics/`
+**Purpose:** Core gameplay systems that define how players interact with the game
+**Contents:**
+- `cooking/` - Recipe system, food mechanics, spiced variants
+- `crafting/` - Recipe definitions, tech tree, filtering systems
+- `containers/` - Storage and inventory systems
+- `achievements/` - Achievement system and progression tracking
+- `special-events/` - Seasonal events and limited-time content
 
-Before creating any index.md file, perform these analysis steps:
+### 4. Character Systems
+**Location:** `docs/game-scripts/core-systems/character-systems/`
+**Purpose:** Player character management, customization, and progression
+**Contents:**
+- `core/` - Character utilities, profiles, death tracking
+- `customization/` - Skins, clothing, visual customization
+- `emotes/` - Player expressions and social features
+- `progression/` - Skill trees, character advancement, WX-78 modules
+- `speech/` - Character dialogue (Wilson as master template)
 
-#### 1.1 Directory Structure Analysis
-- Examine the current directory structure using [list_dir](mdc:dst-api-webdocs/dst-api-webdocs/dst-api-webdocs/dst-api-webdocs/dst-api-webdocs) tool
-- Identify all subdirectories and existing documentation files
-- Map the relationship between system components
-- Determine the hierarchical organization
+### 5. World Systems
+**Location:** `docs/game-scripts/core-systems/world-systems/`
+**Purpose:** World generation, terrain management, and entity systems
+**Contents:**
+- `generation/` - World generation, settings, presets, regrowth
+- `tiles-terrain/` - Ground tiles, terrain properties, noise functions
+- `entities/` - Prefab system, world entities, skin mappings
+- `ocean/` - Ocean mechanics and water systems
 
-#### 1.2 Component Inventory
-```bash
-# Use these commands to understand the system structure
-find ./docs/game-scripts/core-systems/[system-category] -name "*.md" -type f
-ls -la ./docs/game-scripts/core-systems/[system-category]/
-```
+### 6. Networking Communication
+**Location:** `docs/game-scripts/core-systems/networking-communication/`
+**Purpose:** Multiplayer networking, chat, and server communication
+**Contents:**
+- `networking/` - Core networking, RPC, shard management
+- `chat-commands/` - Chat system, user commands, voting
+- `multiplayer/` - Server preferences, MOTD, popup management
 
-#### 1.3 Source Code Verification
-- Cross-reference documentation with actual source code in '/dst-scripts' reponsive directory in workspace
-- Verify component existence and current functionality
-- Check for recent changes in build version 676042
-- Identify deprecated or removed components
+### 7. User Interface
+**Location:** `docs/game-scripts/core-systems/user-interface/`
+**Purpose:** UI management, input handling, and visual effects
+**Contents:**
+- `frontend/` - Core UI, data grids, loading tips, split screen
+- `input/` - Input handling, controls, haptic feedback
+- `graphics/` - Visual effects, lighting, particles, post-processing
+- `typography/` - Font system, animation easing
 
-#### 1.4 Dependency Mapping
-- Map dependencies between system categories
-- Identify integration points with other core systems
-- Document cross-system communication patterns
-- Verify API compatibility requirements
+### 8. Game Configuration
+**Location:** `docs/game-scripts/core-systems/game-configuration/`
+**Purpose:** Game settings, balance, modes, and statistics
+**Contents:**
+- `settings/` - Configuration, constants, tuning, global overrides
+- `modes/` - Game modes, logic, event systems
+- `stats/` - Statistics tracking, item blacklists
 
-### System Classification
+### 9. Development Tools
+**Location:** `docs/game-scripts/core-systems/development-tools/`
+**Purpose:** Developer utilities, debugging, and testing tools
+**Contents:**
+- `debugging/` - Debug commands, tools, menu systems, inspection
+- `console/` - Console commands, hot reloading
+- `profiling/` - Performance monitoring, code profiling
+- `utilities/` - Development utilities, serialization, error handling
 
-Classify the system category using this decision tree:
+### 10. Localization Content
+**Location:** `docs/game-scripts/core-systems/localization-content/`
+**Purpose:** String management, translation, and game content
+**Contents:**
+- `strings/` - String management, localization, POT generation
+- `translation/` - Translation system, monkey curse utilities
+- `content/` - Game content, theatrical systems, guitar tabs
 
-```
-Is this the main core-systems index?
-├─ YES → Use Main Index Template
-└─ NO → Analyze system purpose
-    ├─ Character/Player focused → Character Systems Template
-    ├─ Gameplay mechanics → Game Mechanics Template  
-    ├─ Developer tools → Development Tools Template
-    └─ Technical infrastructure → Infrastructure Template
-```
+### 11. Data Management
+**Location:** `docs/game-scripts/core-systems/data-management/`
+**Purpose:** Save systems, asset management, and data utilities
+**Contents:**
+- `saves/` - Save game system, upgrades, shard management
+- `assets/` - Asset loading, JSON support, audio preloading
+- `utilities/` - Task scheduling, platform configuration, legacy redirects
 
-## Phase 2: Template Selection and Customization
-
-### 2.1 Template Selection
-
-Choose the appropriate template from [DST Core Systems Index Templates](mdc:dst-api-webdocs/dst-api-webdocs/dst-api-webdocs/dst-api-webdocs/dst-api-webdocs/.cursor/rules/dst-core-systems-index-templates.mdc):
-
-| System Type | Template | Key Characteristics |
-|-------------|----------|-------------------|
-| Main Overview | Main Index Template | Top-level system organization |
-| Character Systems | Character Systems Template | Player/character functionality |
-| Game Mechanics | Game Mechanics Template | Gameplay features |
-| Development Tools | Development Tools Template | Developer utilities |
-| Infrastructure | Infrastructure Template | Low-level technical systems |
-
-### 2.2 Template Customization
-
-#### Front Matter Customization
-```markdown
----
-id: [system-category]-overview
-title: [System Category Name] Overview
-description: Overview of [specific system functionality] in DST API
-sidebar_position: [determined by system hierarchy]
-
-last_updated: [current date]
-build_version: 676042
-change_status: stable
-category_type: [system-type]
-system_scope: [brief functional scope]
----
-```
-
-#### Content Section Mapping
-1. **System Purpose**: Define the specific role of this system category
-2. **Architecture Overview**: Document the technical organization
-3. **Module Inventory**: List all components with current status
-4. **Integration Patterns**: Show how systems connect
-5. **Development Guidelines**: Provide implementation guidance
-
-### 2.3 Format Compliance
-
-Ensure compliance with [DST Core Systems Index Format](mdc:dst-api-webdocs/dst-api-webdocs/dst-api-webdocs/dst-api-webdocs/dst-api-webdocs/.cursor/rules/dst-core-systems-index-format.mdc):
-
-- Use consistent heading hierarchy (H1 > H2 > H3 > H4)
-- Include required sections in specified order
-- Apply proper markdown formatting for tables and code blocks
-- Maintain cross-reference link consistency
-- Follow established terminology conventions
-
-## Phase 3: Content Development
-
-### 3.1 Content Research and Verification
-
-#### Source Code Analysis
-Use these commands to gather accurate information:
-
-```bash
-# Find relevant source files
-grep -r "component_name" scripts/ --include="*.lua"
-find scripts/ -name "*[system-name]*" -type f
-grep -r "function.*[SystemName]" scripts/ --include="*.lua"
-```
-
-#### Module Documentation Verification
-- Verify each listed module exists in the source code
-- Check component status against actual implementation
-- Validate code examples against current build (676042)
-- Confirm integration patterns with source analysis
-
-#### Cross-Reference Validation
-- Verify all internal links point to existing documentation
-- Check that cross-system references are accurate
-- Validate external links and dependencies
-- Ensure consistent terminology across documentation
-
-### 3.2 Content Writing Guidelines
+### 12. Mod Support
+**Location:** `docs/game-scripts/core-systems/mod-support/`
+**Purpose:** Mod system and DLC support infrastructure
+**Contents:**
+- `core/` - Core mod system, registry, utilities, compatibility
+- `dlc/` - DLC support, strings, world generation
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
