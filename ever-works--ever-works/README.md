@@ -7,12 +7,12 @@ Ever® Works™ - The Workshop for AI. An open agentic runtime that autonomously
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [ever-works/ever-works](https://github.com/ever-works/ever-works).
+Original source: `copilot-instructions.md` in [ever-works/ever-works](https://github.com/ever-works/ever-works).
 
 ## Also available for
 
 - **Claude Code** — `CLAUDE.md`
-- **GitHub Copilot** — `copilot-instructions.md`
+- **Codex** — `AGENTS.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
