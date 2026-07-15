@@ -7,11 +7,11 @@ VSCode Notebook and Tools for RouterOS — a literate way to work with scripts &
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [tikoci/vscode-tikbook](https://github.com/tikoci/vscode-tikbook).
+Original source: `AGENTS.md` in [tikoci/vscode-tikbook](https://github.com/tikoci/vscode-tikbook).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
