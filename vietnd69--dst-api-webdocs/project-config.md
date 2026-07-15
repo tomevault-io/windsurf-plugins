@@ -1,254 +1,173 @@
 ---
 trigger: always_on
-description: This rule provides specific templates for documenting different types of DST script modules.
+description: This rule defines the standardized format for index.md files within the core-systems directory structure. These files serve as navigation hubs and overview pages for each major system category.
 ---
 
-# DST API Documentation Templates
+# DST Core Systems Index Format
 
-This rule provides specific templates for documenting different types of DST script modules.
+This rule defines the standardized format for index.md files within the core-systems directory structure. These files serve as navigation hubs and overview pages for each major system category.
 
-## Component Template
+## File Purpose
 
-Use this template for documenting components:
+Index.md files in core-systems serve multiple purposes:
+- **Navigation Hub**: Provide organized access to all modules within a system category
+- **System Overview**: Explain the purpose and scope of the system category
+- **Integration Guide**: Show how modules within the category work together
+- **Change Tracking**: Document recent changes and updates across the category
+
+## Standard File Structure
+
+### Front Matter Template
+
+All core-systems index.md files must include:
 
 ```markdown
 ---
-id: [Id]
-title: [Component Name]
-description: Component responsible for [primary functionality]
-sidebar_position: [Number]
+id: [system-category-id]
+title: [System Category Name] Overview
+description: Overview of [system category] functionality in DST API
+sidebar_position: 0
 
 last_updated: YYYY-MM-DD
 build_version: 676042
 change_status: stable
+category_type: core-system
+system_scope: [brief scope description]
 ---
-
-# [Component Name]
-
-## Version History
-| Build Version | Change Date | Change Type | Description |
-|---------------|-------------|-------------|-------------|
-| 675312 | 2023-11-15 | stable | Current version |
-
-## Overview
-
-The `[Component Name]` component provides [primary functionality]. It is typically used on [entity types] to enable [behavior/feature].
-
-## Component Properties
-
-### inst.[property_name]
-
-**Type:** `[type]`
-
-**Status:** `stable` | `added in build 675312` | `modified in build 675312` | `deprecated in build 675312`
-
-**Description:** [Property description]
-
-### inst.[property_name2]
-
-**Type:** `[type]`
-
-**Status:** `stable` | `added in build 675312` | `modified in build 675312` | `deprecated in build 675312`
-
-**Description:** [Property description]
-
-## Component Methods
-
-### inst.components.[component_name]:[methodName](mdc:dst-api-webdocs/param1, param2)
-
-**Status:** `stable` | `added in build 675312` | `modified in build 675312` | `deprecated in build 675312`
-
-**Source:** [dst-scripts/components/[component_name].lua](mdc:dst-scripts/components/[component_name].lua)
-
-**Description:**
-[Method description verified against source code]
-
-**Parameters:**
-- `param1` ([type]): [Parameter description]
-- `param2` ([type]): [Parameter description]
-
-**Returns:**
-- ([return_type]): [Return value description]
-
-**Example:**
-```lua
-local entity = TheWorld.entity
-entity.components.[component_name]:[methodName](mdc:dst-api-webdocs/"example", 5)
 ```
 
-## Events
-
-### "[event_name]"
-
-**Status:** `stable` | `added in build 675312` | `modified in build 675312` | `deprecated in build 675312`
-
-**Description:**
-[When this event is triggered and what it signifies]
-
-**Parameters:**
-- `data.param1` ([type]): [Description]
-- `data.param2` ([type]): [Description]
-
-**Example:**
-```lua
-inst:ListenForEvent("[event_name]", function(inst, data)
-    -- Handle event
-end)
-```
-
-## Common Uses
-
-[Explain common scenarios where this component is used]
-
-## Related Components
-
-- [[Related Component]](./[related-component].md): [Relationship description]
-```
-
-## Stategraph Template
-
-Use this template for documenting stategraphs:
+### Document Structure Template
 
 ```markdown
----
-id: [Id]
-title: [Stategraph Name]
-description: Stategraph for [entity/behavior description]
-sidebar_position: [Number]
+# [System Category Name] Overview
 
-last_updated: YYYY-MM-DD
-build_version: 676042
-change_status: stable
----
+## Build Information
+Current documentation based on build version: **676042**
+Last updated: **YYYY-MM-DD**
 
-# [Stategraph Name]
+## System Purpose
 
-## Version History
-| Build Version | Change Date | Change Type | Description |
-|---------------|-------------|-------------|-------------|
-| 675312 | 2023-11-15 | stable | Current version |
+[2-3 paragraph explanation of what this system category provides to DST]
 
-## Overview
+### Key Responsibilities
+- [Primary responsibility 1]
+- [Primary responsibility 2] 
+- [Primary responsibility 3]
 
-The `[Stategraph Name]` defines the behavior and animations for [entity type]. It controls [primary behaviors].
+### System Scope
+[Define what is included and excluded from this system category]
 
-## States
+## Architecture Overview
 
-### "[state_name]"
+### System Components
+[High-level overview of how components in this category work together]
 
-**Status:** `stable` | `added in build 675312` | `modified in build 675312` | `deprecated in build 675312`
+### Data Flow
+[Brief description of how data flows through this system]
 
-**Description:**
-[State description and purpose]
+### Integration Points
+[How this system connects with other core systems]
 
-**Entry Function:**
+## Recent Changes
+
+| Build | Date | Component | Change Type | Description |
+|-------|------|-----------|-------------|-------------|
+| 676042 | 2024-XX-XX | [Component A](mdc:dst-api-webdocs/dst-api-webdocs/subdir/component-a.md) | added | Added new functionality X |
+| 676042 | 2024-XX-XX | [Component B](mdc:dst-api-webdocs/dst-api-webdocs/subdir/component-b.md) | modified | Changed parameter structure |
+| 675312 | 2023-11-15 | [Component C](mdc:dst-api-webdocs/dst-api-webdocs/subdir/component-c.md) | deprecated | Will be removed in build 690000 |
+
+## Core Modules
+
+### [Subcategory 1 Name]
+[Brief description of subcategory purpose]
+
+| Module | Status | Description | Key Features |
+|--------|--------|-------------|--------------|
+| [Module A](mdc:dst-api-webdocs/dst-api-webdocs/subcategory1/module-a.md) | stable | Brief description | Feature 1, Feature 2 |
+| [Module B](mdc:dst-api-webdocs/dst-api-webdocs/subcategory1/module-b.md) | added in 676042 | Brief description | Feature 1, Feature 2 |
+
+### [Subcategory 2 Name]
+[Brief description of subcategory purpose]
+
+| Module | Status | Description | Key Features |
+|--------|--------|-------------|--------------|
+| [Module C](mdc:dst-api-webdocs/dst-api-webdocs/subcategory2/module-c.md) | stable | Brief description | Feature 1, Feature 2 |
+| [Module D](mdc:dst-api-webdocs/dst-api-webdocs/subcategory2/module-d.md) | modified in 676042 | Brief description | Feature 1, Feature 2 |
+
+## Common Usage Patterns
+
+### Pattern 1: [Pattern Name]
 ```lua
-[Entry function code example]
+-- Example showing common usage pattern
+local example = SomeModule.CreateInstance()
+example:Configure(settings)
+example:Initialize()
 ```
 
-**Timeline:**
-[Timeline events, if any]
-
-**Events:**
-[Events that can occur in this state]
-
-**Tags:**
-- `[tag1]`: [Tag purpose]
-- `[tag2]`: [Tag purpose]
-
-**Transitions:**
-- To `[next_state1]`: [Condition]
-- To `[next_state2]`: [Condition]
-
-### "[state_name2]"
-
-[Similar structure for other states]
-
-## Events
-
-### "[event_name]"
-
-**Status:** `stable` | `added in build 675312` | `modified in build 675312` | `deprecated in build 675312`
-
-**Description:**
-[Event purpose and when it's triggered]
-
-**Handler:**
+### Pattern 2: [Pattern Name]
 ```lua
-[Event handler code example]
+-- Example showing integration pattern
+local systemA = CoreSystemA.GetInstance()
+local systemB = CoreSystemB.GetInstance()
+systemA:ConnectTo(systemB)
 ```
 
-## Common State Sequences
+## System Dependencies
 
-[Describe common sequences of state transitions]
+### Required Systems
+- [Required System 1]: [Why it's required]
+- [Required System 2]: [Why it's required]
 
-## Related Stategraphs
+### Optional Systems
+- [Optional System 1]: [How it enhances functionality]
+- [Optional System 2]: [How it enhances functionality]
 
-- [[Related Stategraph]](./[related-stategraph].md): [Relationship description]
-```
+## Performance Considerations
 
-## Brain Template
+### Memory Usage
+[Guidelines for memory efficiency in this system]
 
-Use this template for documenting brain behaviors:
+### Performance Optimizations
+[Key optimization strategies for this system category]
 
-```markdown
----
-id: [Id]
-title: [Brain Name]
-description: AI brain for [entity type]
-sidebar_position: [Number]
+### Scaling Considerations
+[How this system handles increased load or complexity]
 
-last_updated: YYYY-MM-DD
-build_version: 676042
-change_status: stable
----
+## Development Guidelines
 
-# [Brain Name]
+### Best Practices
+- [Best practice 1 for working with this system]
+- [Best practice 2 for working with this system]
+- [Best practice 3 for working with this system]
 
-## Version History
-| Build Version | Change Date | Change Type | Description |
-|---------------|-------------|-------------|-------------|
-| 675312 | 2023-11-15 | stable | Current version |
+### Common Pitfalls
+- [Common mistake 1 and how to avoid it]
+- [Common mistake 2 and how to avoid it]
 
-## Overview
+### Testing Strategies
+[Recommended approaches for testing components in this system]
 
-The `[Brain Name]` defines the AI behavior for [entity type]. It prioritizes [primary behaviors/goals].
+## Related Systems
 
-## Brain Structure
+| System | Relationship | Integration Points |
+|--------|--------------|-------------------|
+| [System A](mdc:dst-api-webdocs/other-category/index.md) | [Type of relationship] | [How they connect] |
+| [System B](mdc:dst-api-webdocs/other-category/index.md) | [Type of relationship] | [How they connect] |
 
-```lua
--- Brain structure example
-BrainCommon.AddNode(
-    WhileNode(function() 
-        return [condition] 
-    end, "Priority Node",
-    PriorityNode({
-        [Node examples...]
-    }))
-)
-```
+## Troubleshooting
 
-## Behaviors
+### Common Issues
+| Issue | Symptoms | Solution |
+|-------|----------|----------|
+| [Issue 1] | [What users see] | [How to fix] |
+| [Issue 2] | [What users see] | [How to fix] |
 
-### [Behavior Name]
+### Debugging Tips
+- [Debugging tip 1]
+- [Debugging tip 2]
+- [Debugging tip 3]
 
-**Status:** `stable` | `added in build 675312` | `modified in build 675312` | `deprecated in build 675312`
-
-**Description:**
-[Behavior description and purpose]
-
-**Conditions:**
-[When this behavior activates]
-
-**Actions:**
-[What actions the entity takes]
-
-**Example:**
-```lua
-[Code example of this behavior node]
-```
-
-## Memory Variables
+## Migration Notes
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
