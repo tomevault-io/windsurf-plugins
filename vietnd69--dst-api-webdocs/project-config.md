@@ -1,174 +1,106 @@
 ---
 trigger: always_on
-description: This rule defines the standardized format for index.md files within the core-systems directory structure. These files serve as navigation hubs and overview pages for each major system category.
+description: Manages all aspects of character behavior, customization, and progression.
 ---
 
-# DST Core Systems Index Format
+# DST Core Systems Index Templates
 
-This rule defines the standardized format for index.md files within the core-systems directory structure. These files serve as navigation hubs and overview pages for each major system category.
+This rule provides specific templates for different types of index.md files within the core-systems directory structure. Each template is optimized for its specific system category and purpose.
 
-## File Purpose
+## Template Selection Guide
 
-Index.md files in core-systems serve multiple purposes:
-- **Navigation Hub**: Provide organized access to all modules within a system category
-- **System Overview**: Explain the purpose and scope of the system category
-- **Integration Guide**: Show how modules within the category work together
-- **Change Tracking**: Document recent changes and updates across the category
+Choose the appropriate template based on your system category:
 
-## Standard File Structure
+| System Category | Template | Purpose |
+|-----------------|----------|---------|
+| Top-level Core Systems | [Main Index Template](mdc:dst-api-webdocs/dst-api-webdocs/#main-index-template) | Overall core-systems overview |
+| Character Systems | [Character Systems Template](mdc:dst-api-webdocs/dst-api-webdocs/#character-systems-template) | Player/character related functionality |
+| Game Mechanics | [Game Mechanics Template](mdc:dst-api-webdocs/dst-api-webdocs/#game-mechanics-template) | Gameplay systems and mechanics |
+| Development Tools | [Development Tools Template](mdc:dst-api-webdocs/dst-api-webdocs/#development-tools-template) | Developer utilities and debugging |
+| Technical Infrastructure | [Infrastructure Template](mdc:dst-api-webdocs/dst-api-webdocs/#infrastructure-template) | Low-level system components |
 
-### Front Matter Template
+## Main Index Template
 
-All core-systems index.md files must include:
+Use this template for the main core-systems/index.md file:
 
 ```markdown
 ---
-id: [system-category-id]
-title: [System Category Name] Overview
-description: Overview of [system category] functionality in DST API
+id: core-systems-overview
+title: Core Systems Overview
+description: Overview of all core systems in the DST API
 sidebar_position: 0
 
-last_updated: YYYY-MM-DD
+last_updated: 2024-XX-XX
 build_version: 676042
 change_status: stable
-category_type: core-system
-system_scope: [brief scope description]
+category_type: main-index
+system_scope: all core systems
 ---
-```
 
-### Document Structure Template
-
-```markdown
-# [System Category Name] Overview
+# Core Systems Overview
 
 ## Build Information
 Current documentation based on build version: **676042**
-Last updated: **YYYY-MM-DD**
+Last updated: **2024-XX-XX**
 
-## System Purpose
+## Core Systems Architecture
 
-[2-3 paragraph explanation of what this system category provides to DST]
+The DST API is organized into several interconnected core systems that provide the foundation for all game functionality. These systems work together to create the complete Don't Starve Together experience.
 
-### Key Responsibilities
-- [Primary responsibility 1]
-- [Primary responsibility 2] 
-- [Primary responsibility 3]
+### System Categories
 
-### System Scope
-[Define what is included and excluded from this system category]
+The core systems are organized into these major categories:
 
-## Architecture Overview
+#### Game Foundation
+Systems that provide the basic building blocks for all game functionality.
 
-### System Components
-[High-level overview of how components in this category work together]
+#### Player Experience  
+Systems that directly impact how players interact with the game world.
 
-### Data Flow
-[Brief description of how data flows through this system]
+#### Content Management
+Systems that handle game assets, data, and content organization.
 
-### Integration Points
-[How this system connects with other core systems]
+#### Development Support
+Systems that assist with development, debugging, and maintenance.
 
-## Recent Changes
+## System Categories
 
-| Build | Date | Component | Change Type | Description |
-|-------|------|-----------|-------------|-------------|
-| 676042 | 2024-XX-XX | [Component A](mdc:dst-api-webdocs/dst-api-webdocs/subdir/component-a.md) | added | Added new functionality X |
-| 676042 | 2024-XX-XX | [Component B](mdc:dst-api-webdocs/dst-api-webdocs/subdir/component-b.md) | modified | Changed parameter structure |
-| 675312 | 2023-11-15 | [Component C](mdc:dst-api-webdocs/dst-api-webdocs/subdir/component-c.md) | deprecated | Will be removed in build 690000 |
+### [Character Systems](mdc:dst-api-webdocs/dst-api-webdocs/character-systems/index.md)
+Manages all aspects of character behavior, customization, and progression.
 
-## Core Modules
+| System | Purpose | Key Components |
+|--------|---------|----------------|
+| [Core Character Systems](mdc:dst-api-webdocs/dst-api-webdocs/character-systems/core/index.md) | Base character functionality | Character utilities, player deaths |
+| [Customization](mdc:dst-api-webdocs/dst-api-webdocs/character-systems/customization/index.md) | Character appearance and clothing | Beefalo clothing, player clothing |
+| [Emotes](mdc:dst-api-webdocs/dst-api-webdocs/character-systems/emotes/index.md) | Character expressions | Emote items, emoji items |
+| [Progression](mdc:dst-api-webdocs/dst-api-webdocs/character-systems/progression/index.md) | Character advancement | Skill trees, progression constants |
+| [Speech](mdc:dst-api-webdocs/dst-api-webdocs/character-systems/speech/index.md) | Character dialogue | Character-specific speech patterns |
 
-### [Subcategory 1 Name]
-[Brief description of subcategory purpose]
+### [Data Management](mdc:dst-api-webdocs/dst-api-webdocs/data-management/index.md)
+Handles all data persistence, assets, and file operations.
 
-| Module | Status | Description | Key Features |
-|--------|--------|-------------|--------------|
-| [Module A](mdc:dst-api-webdocs/dst-api-webdocs/subcategory1/module-a.md) | stable | Brief description | Feature 1, Feature 2 |
-| [Module B](mdc:dst-api-webdocs/dst-api-webdocs/subcategory1/module-b.md) | added in 676042 | Brief description | Feature 1, Feature 2 |
+| System | Purpose | Key Components |
+|--------|---------|----------------|
+| [Assets](mdc:dst-api-webdocs/dst-api-webdocs/data-management/assets/index.md) | Asset loading and management | JSON handling, KLUMP files |
+| [Saves](mdc:dst-api-webdocs/dst-api-webdocs/data-management/saves/index.md) | Save file operations | Save file upgrades, save indexing |
+| [Utilities](mdc:dst-api-webdocs/dst-api-webdocs/data-management/utilities/index.md) | Data processing utilities | Platform post-load, scheduler |
 
-### [Subcategory 2 Name]
-[Brief description of subcategory purpose]
+### [Development Tools](mdc:dst-api-webdocs/dst-api-webdocs/development-tools/index.md)
+Provides debugging, profiling, and development utilities.
 
-| Module | Status | Description | Key Features |
-|--------|--------|-------------|--------------|
-| [Module C](mdc:dst-api-webdocs/dst-api-webdocs/subcategory2/module-c.md) | stable | Brief description | Feature 1, Feature 2 |
-| [Module D](mdc:dst-api-webdocs/dst-api-webdocs/subcategory2/module-d.md) | modified in 676042 | Brief description | Feature 1, Feature 2 |
+| System | Purpose | Key Components |
+|--------|---------|----------------|
+| [Console](mdc:dst-api-webdocs/dst-api-webdocs/development-tools/console/index.md) | Console commands and reload | Console commands, hot reload |
+| [Debugging](mdc:dst-api-webdocs/dst-api-webdocs/development-tools/debugging/index.md) | Debug utilities and helpers | Debug commands, debug keys |
+| [Profiling](mdc:dst-api-webdocs/dst-api-webdocs/development-tools/profiling/index.md) | Performance analysis | Profiler, memory analysis |
+| [Utilities](mdc:dst-api-webdocs/dst-api-webdocs/development-tools/utilities/index.md) | Development utilities | Dumper, string fixes |
 
-## Common Usage Patterns
+### [Fundamentals](mdc:dst-api-webdocs/dst-api-webdocs/fundamentals/index.md)
+Core building blocks that other systems depend on.
 
-### Pattern 1: [Pattern Name]
-```lua
--- Example showing common usage pattern
-local example = SomeModule.CreateInstance()
-example:Configure(settings)
-example:Initialize()
-```
-
-### Pattern 2: [Pattern Name]
-```lua
--- Example showing integration pattern
-local systemA = CoreSystemA.GetInstance()
-local systemB = CoreSystemB.GetInstance()
-systemA:ConnectTo(systemB)
-```
-
-## System Dependencies
-
-### Required Systems
-- [Required System 1]: [Why it's required]
-- [Required System 2]: [Why it's required]
-
-### Optional Systems
-- [Optional System 1]: [How it enhances functionality]
-- [Optional System 2]: [How it enhances functionality]
-
-## Performance Considerations
-
-### Memory Usage
-[Guidelines for memory efficiency in this system]
-
-### Performance Optimizations
-[Key optimization strategies for this system category]
-
-### Scaling Considerations
-[How this system handles increased load or complexity]
-
-## Development Guidelines
-
-### Best Practices
-- [Best practice 1 for working with this system]
-- [Best practice 2 for working with this system]
-- [Best practice 3 for working with this system]
-
-### Common Pitfalls
-- [Common mistake 1 and how to avoid it]
-- [Common mistake 2 and how to avoid it]
-
-### Testing Strategies
-[Recommended approaches for testing components in this system]
-
-## Related Systems
-
-| System | Relationship | Integration Points |
-|--------|--------------|-------------------|
-| [System A](mdc:dst-api-webdocs/other-category/index.md) | [Type of relationship] | [How they connect] |
-| [System B](mdc:dst-api-webdocs/other-category/index.md) | [Type of relationship] | [How they connect] |
-
-## Troubleshooting
-
-### Common Issues
-| Issue | Symptoms | Solution |
-|-------|----------|----------|
-| [Issue 1] | [What users see] | [How to fix] |
-| [Issue 2] | [What users see] | [How to fix] |
-
-### Debugging Tips
-- [Debugging tip 1]
-- [Debugging tip 2]
-- [Debugging tip 3]
-
-## Migration Notes
-
+| System | Purpose | Key Components |
+|--------|---------|----------------|
+| [Actions](mdc:dst-api-webdocs/dst-api-webdocs/fundamentals/actions/index.md) | Player and entity actions | Action system, buffered actions |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
