@@ -7,11 +7,11 @@ QuantumPDF V1.3 enables intelligent conversations with PDF documents. Built with
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [Kedhareswer/QuantumPDF_ChatApp_VectorDB](https://github.com/Kedhareswer/QuantumPDF_ChatApp_VectorDB).
+Original source: `CLAUDE.md` in [Kedhareswer/QuantumPDF_ChatApp_VectorDB](https://github.com/Kedhareswer/QuantumPDF_ChatApp_VectorDB).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
