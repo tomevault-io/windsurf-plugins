@@ -7,11 +7,11 @@ High Performance GWAS Plotting and Annotation
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [weinstocklab/gwasplot](https://github.com/weinstocklab/gwasplot).
+Original source: `CLAUDE.md` in [weinstocklab/gwasplot](https://github.com/weinstocklab/gwasplot).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
