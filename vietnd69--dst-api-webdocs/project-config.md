@@ -1,106 +1,143 @@
 ---
 trigger: always_on
-description: Manages all aspects of character behavior, customization, and progression.
+description: This rule defines the complete workflow for creating, updating, and maintaining index.md files within the DST core-systems documentation structure. It integrates format standards, templates, and quality assurance procedures.
 ---
 
-# DST Core Systems Index Templates
+# DST Core Systems Index Workflow
 
-This rule provides specific templates for different types of index.md files within the core-systems directory structure. Each template is optimized for its specific system category and purpose.
+This rule defines the complete workflow for creating, updating, and maintaining index.md files within the DST core-systems documentation structure. It integrates format standards, templates, and quality assurance procedures.
 
-## Template Selection Guide
+## Workflow Overview
 
-Choose the appropriate template based on your system category:
+The core-systems index workflow consists of four main phases:
 
-| System Category | Template | Purpose |
-|-----------------|----------|---------|
-| Top-level Core Systems | [Main Index Template](mdc:dst-api-webdocs/dst-api-webdocs/#main-index-template) | Overall core-systems overview |
-| Character Systems | [Character Systems Template](mdc:dst-api-webdocs/dst-api-webdocs/#character-systems-template) | Player/character related functionality |
-| Game Mechanics | [Game Mechanics Template](mdc:dst-api-webdocs/dst-api-webdocs/#game-mechanics-template) | Gameplay systems and mechanics |
-| Development Tools | [Development Tools Template](mdc:dst-api-webdocs/dst-api-webdocs/#development-tools-template) | Developer utilities and debugging |
-| Technical Infrastructure | [Infrastructure Template](mdc:dst-api-webdocs/dst-api-webdocs/#infrastructure-template) | Low-level system components |
+1. **Analysis Phase**: Understand the system category and its components
+2. **Template Selection**: Choose appropriate format and structure
+3. **Content Development**: Create comprehensive documentation content
+4. **Quality Assurance**: Verify accuracy and integration
 
-## Main Index Template
+## Phase 1: Analysis Phase
 
-Use this template for the main core-systems/index.md file:
+### System Category Assessment
 
+Before creating any index.md file, perform these analysis steps:
+
+#### 1.1 Directory Structure Analysis
+- Examine the current directory structure using [list_dir](mdc:dst-api-webdocs/dst-api-webdocs/dst-api-webdocs/dst-api-webdocs/dst-api-webdocs) tool
+- Identify all subdirectories and existing documentation files
+- Map the relationship between system components
+- Determine the hierarchical organization
+
+#### 1.2 Component Inventory
+```bash
+# Use these commands to understand the system structure
+find ./docs/game-scripts/core-systems/[system-category] -name "*.md" -type f
+ls -la ./docs/game-scripts/core-systems/[system-category]/
+```
+
+#### 1.3 Source Code Verification
+- Cross-reference documentation with actual source code in '/dst-scripts' reponsive directory in workspace
+- Verify component existence and current functionality
+- Check for recent changes in build version 676042
+- Identify deprecated or removed components
+
+#### 1.4 Dependency Mapping
+- Map dependencies between system categories
+- Identify integration points with other core systems
+- Document cross-system communication patterns
+- Verify API compatibility requirements
+
+### System Classification
+
+Classify the system category using this decision tree:
+
+```
+Is this the main core-systems index?
+├─ YES → Use Main Index Template
+└─ NO → Analyze system purpose
+    ├─ Character/Player focused → Character Systems Template
+    ├─ Gameplay mechanics → Game Mechanics Template  
+    ├─ Developer tools → Development Tools Template
+    └─ Technical infrastructure → Infrastructure Template
+```
+
+## Phase 2: Template Selection and Customization
+
+### 2.1 Template Selection
+
+Choose the appropriate template from [DST Core Systems Index Templates](mdc:dst-api-webdocs/dst-api-webdocs/dst-api-webdocs/dst-api-webdocs/dst-api-webdocs/.cursor/rules/dst-core-systems-index-templates.mdc):
+
+| System Type | Template | Key Characteristics |
+|-------------|----------|-------------------|
+| Main Overview | Main Index Template | Top-level system organization |
+| Character Systems | Character Systems Template | Player/character functionality |
+| Game Mechanics | Game Mechanics Template | Gameplay features |
+| Development Tools | Development Tools Template | Developer utilities |
+| Infrastructure | Infrastructure Template | Low-level technical systems |
+
+### 2.2 Template Customization
+
+#### Front Matter Customization
 ```markdown
 ---
-id: core-systems-overview
-title: Core Systems Overview
-description: Overview of all core systems in the DST API
-sidebar_position: 0
+id: [system-category]-overview
+title: [System Category Name] Overview
+description: Overview of [specific system functionality] in DST API
+sidebar_position: [determined by system hierarchy]
 
-last_updated: 2024-XX-XX
+last_updated: [current date]
 build_version: 676042
 change_status: stable
-category_type: main-index
-system_scope: all core systems
+category_type: [system-type]
+system_scope: [brief functional scope]
 ---
+```
 
-# Core Systems Overview
+#### Content Section Mapping
+1. **System Purpose**: Define the specific role of this system category
+2. **Architecture Overview**: Document the technical organization
+3. **Module Inventory**: List all components with current status
+4. **Integration Patterns**: Show how systems connect
+5. **Development Guidelines**: Provide implementation guidance
 
-## Build Information
-Current documentation based on build version: **676042**
-Last updated: **2024-XX-XX**
+### 2.3 Format Compliance
 
-## Core Systems Architecture
+Ensure compliance with [DST Core Systems Index Format](mdc:dst-api-webdocs/dst-api-webdocs/dst-api-webdocs/dst-api-webdocs/dst-api-webdocs/.cursor/rules/dst-core-systems-index-format.mdc):
 
-The DST API is organized into several interconnected core systems that provide the foundation for all game functionality. These systems work together to create the complete Don't Starve Together experience.
+- Use consistent heading hierarchy (H1 > H2 > H3 > H4)
+- Include required sections in specified order
+- Apply proper markdown formatting for tables and code blocks
+- Maintain cross-reference link consistency
+- Follow established terminology conventions
 
-### System Categories
+## Phase 3: Content Development
 
-The core systems are organized into these major categories:
+### 3.1 Content Research and Verification
 
-#### Game Foundation
-Systems that provide the basic building blocks for all game functionality.
+#### Source Code Analysis
+Use these commands to gather accurate information:
 
-#### Player Experience  
-Systems that directly impact how players interact with the game world.
+```bash
+# Find relevant source files
+grep -r "component_name" scripts/ --include="*.lua"
+find scripts/ -name "*[system-name]*" -type f
+grep -r "function.*[SystemName]" scripts/ --include="*.lua"
+```
 
-#### Content Management
-Systems that handle game assets, data, and content organization.
+#### Module Documentation Verification
+- Verify each listed module exists in the source code
+- Check component status against actual implementation
+- Validate code examples against current build (676042)
+- Confirm integration patterns with source analysis
 
-#### Development Support
-Systems that assist with development, debugging, and maintenance.
+#### Cross-Reference Validation
+- Verify all internal links point to existing documentation
+- Check that cross-system references are accurate
+- Validate external links and dependencies
+- Ensure consistent terminology across documentation
 
-## System Categories
+### 3.2 Content Writing Guidelines
 
-### [Character Systems](mdc:dst-api-webdocs/dst-api-webdocs/character-systems/index.md)
-Manages all aspects of character behavior, customization, and progression.
-
-| System | Purpose | Key Components |
-|--------|---------|----------------|
-| [Core Character Systems](mdc:dst-api-webdocs/dst-api-webdocs/character-systems/core/index.md) | Base character functionality | Character utilities, player deaths |
-| [Customization](mdc:dst-api-webdocs/dst-api-webdocs/character-systems/customization/index.md) | Character appearance and clothing | Beefalo clothing, player clothing |
-| [Emotes](mdc:dst-api-webdocs/dst-api-webdocs/character-systems/emotes/index.md) | Character expressions | Emote items, emoji items |
-| [Progression](mdc:dst-api-webdocs/dst-api-webdocs/character-systems/progression/index.md) | Character advancement | Skill trees, progression constants |
-| [Speech](mdc:dst-api-webdocs/dst-api-webdocs/character-systems/speech/index.md) | Character dialogue | Character-specific speech patterns |
-
-### [Data Management](mdc:dst-api-webdocs/dst-api-webdocs/data-management/index.md)
-Handles all data persistence, assets, and file operations.
-
-| System | Purpose | Key Components |
-|--------|---------|----------------|
-| [Assets](mdc:dst-api-webdocs/dst-api-webdocs/data-management/assets/index.md) | Asset loading and management | JSON handling, KLUMP files |
-| [Saves](mdc:dst-api-webdocs/dst-api-webdocs/data-management/saves/index.md) | Save file operations | Save file upgrades, save indexing |
-| [Utilities](mdc:dst-api-webdocs/dst-api-webdocs/data-management/utilities/index.md) | Data processing utilities | Platform post-load, scheduler |
-
-### [Development Tools](mdc:dst-api-webdocs/dst-api-webdocs/development-tools/index.md)
-Provides debugging, profiling, and development utilities.
-
-| System | Purpose | Key Components |
-|--------|---------|----------------|
-| [Console](mdc:dst-api-webdocs/dst-api-webdocs/development-tools/console/index.md) | Console commands and reload | Console commands, hot reload |
-| [Debugging](mdc:dst-api-webdocs/dst-api-webdocs/development-tools/debugging/index.md) | Debug utilities and helpers | Debug commands, debug keys |
-| [Profiling](mdc:dst-api-webdocs/dst-api-webdocs/development-tools/profiling/index.md) | Performance analysis | Profiler, memory analysis |
-| [Utilities](mdc:dst-api-webdocs/dst-api-webdocs/development-tools/utilities/index.md) | Development utilities | Dumper, string fixes |
-
-### [Fundamentals](mdc:dst-api-webdocs/dst-api-webdocs/fundamentals/index.md)
-Core building blocks that other systems depend on.
-
-| System | Purpose | Key Components |
-|--------|---------|----------------|
-| [Actions](mdc:dst-api-webdocs/dst-api-webdocs/fundamentals/actions/index.md) | Player and entity actions | Action system, buffered actions |
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
