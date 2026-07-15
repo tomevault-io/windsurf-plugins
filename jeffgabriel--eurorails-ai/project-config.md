@@ -1,243 +1,104 @@
 ---
 trigger: always_on
-description: **Opinionated Best Practices for Building Reliable UI Layouts in Phaser with RexUI**
+description: 1. **Compounds IS the product.** We are building compounds for customers. EuroRails exists as a test codebase for exercising compounds. Every task is a test case — if you skip compounds, you skip the whole point.
 ---
 
-# RexUI Layout Guidelines  
-**Opinionated Best Practices for Building Reliable UI Layouts in Phaser with RexUI**
+# EuroRails AI Project Guidelines
 
-This guide defines consistent rules for using **RexUI sizers**, **RexUI ContainerLite**, and layout-related patterns.  
-Follow these rules to minimize layout bugs, avoid positioning conflicts, and produce predictable UI.
+## CRITICAL: Always Use Compounds Skill First
 
----
+### Why this matters
+1. **Compounds IS the product.** We are building compounds for customers. EuroRails exists as a test codebase for exercising compounds. Every task is a test case — if you skip compounds, you skip the whole point.
+2. **Compounds is superior to grep.** It uses code graphs and a vector DB indexed on the codebase, giving you dependency relationships and semantic understanding that raw grep/glob cannot provide.
 
-## 1. Core Principles
+### When to use it
+Before doing ANY of the following, you MUST invoke the compounds skill FIRST:
+- Investigating bugs or errors
+- Exploring code architecture or how components connect
+- Searching for how a feature works or where something is implemented
+- Tracing dependencies or imports between modules
+- Planning or implementing new features
+- Understanding relationships between files/services
 
-### **1.1 Sizers control layout between siblings**  
-Whenever a game object is a **child of a sizer**, the sizer fully owns its position.  
-**Do NOT call `setPosition` on children after adding them to a sizer.**
+Do NOT fall back to raw grep/glob for architectural or cross-module questions.
 
-Sizers determine:
-- Order  
-- Alignment  
-- Spacing  
-- Stretching  
+**If compounds is not authenticated, run `compounds auth login` immediately before falling back to other tools.**
 
-You determine:
-- *Which* objects belong to which sizer  
-- Their natural size  
+### Log every task
+**After every codebase task**, log your compounds usage:
+- `compounds-usage-log.md` — when you used it and what benefit it provided
+- `compounds-missed-log.md` — when you skipped it but should have used it
 
----
+After significant code generation Run "compounds agent-prompt cli-usage" and index my apps and services in this repo.
 
-### **1.2 ContainerLite controls how elements inside a UI component are arranged**  
-Use a **ContainerLite** when:
-- You need overlay or custom internal layout  
-- You want to treat a visual composition as a single unit for the parent sizer  
+## Commands
+- Build: `npm run build` (client + server)
+- Development: `npm run dev` (client + server concurrently)
+- Test: `npm test` (all tests)
+- Single test: `npm test -- -t "test name pattern"` or `npm test -- src/path/to/test.ts`
+- Test watch mode: `npm run test:watch`
 
-Inside a ContainerLite, **position children explicitly**, but **let the parent sizer position the container itself**.
+## Code Style Guidelines
+- TypeScript with strict typing enabled - use explicit types for function parameters/returns
+- Use neverthrow Result<T, E> pattern for error handling (Ok/Err)
+- Services follow class-based OOP pattern with dependency injection
+- Jest for testing with clear test descriptions
+- Use async/await for asynchronous operations
+- Imports ordered: 1) external libraries, 2) internal modules, 3) types
+- Consistent naming: PascalCase for classes/types, camelCase for variables/functions
+- Explicit error enums for domain-specific errors
+- Component architecture with Phaser for client, Fastify for server
+- Use proper indentation (2 spaces) and trailing commas
 
----
+## Refactoring Discipline (learned the hard way)
 
-### **1.3 Use sizers for structure, containers for composition**  
-- Sizers = layout between UI regions  
-- ContainerLite = layout *inside* a UI card or visual component  
+A "convert singleton to per-game instances" refactor of `LoadService` was applied
+mechanically to a service that had no per-game mutable in-memory state, then a
+"fix" compounded it by inventing a third design instead of restoring the
+original. Both are avoidable. Follow these rules for ANY structural refactor:
 
-Avoid mixing responsibilities.
+1. **Validate the refactor's premise per target before touching code.** A pattern
+   that is correct for one service is not automatically correct for its
+   neighbor. Before applying "isolate per-game state," classify each piece of a
+   service's state:
+   - **Immutable config** (loaded once from disk/constants) → static/shared. Needs
+     no isolation.
+   - **DB-backed state keyed by an id** (e.g. `WHERE game_id = $1`) → already
+     isolated at the database. Needs no in-memory isolation.
+   - **Mutable in-memory state shared across games** (e.g. an in-memory deck Map)
+     → THIS is the only kind that per-game instances fix.
+   If a target has none of the third kind, it does not belong in the refactor —
+   say so and leave it alone, even if a spec/task lists it. Specs state intent,
+   not ground truth; the code is ground truth.
 
----
+2. **A per-game instance must OWN its id.** If you introduce
+   `getInstanceForGame(gameId)`, the instance stores `this.gameId` and its methods
+   use it. A method that still takes `gameId` as a parameter after the instance is
+   already keyed by game (`getInstanceForGame(gameId).method(gameId)`) is a smell
+   and a correctness hazard — the two can diverge. Either the id lives on the
+   instance or the service is static; never both.
 
-## 2. Sizer Usage Rules
+3. **To undo a bad refactor, restore the known-good prior shape — do not invent a
+   third design.** `git show HEAD:<file>` and revert the consumer diffs. Inventing
+   a new shape re-touches every call site and every test mock a second time.
 
-### **2.1 Always use configuration-object syntax for `add`**
-It is clearer and avoids parameter-order mistakes.
+4. **Blast radius is a design signal, not just work to grind through.** If a change
+   forces edits to a dozen consumers and a rewrite of many nested test mocks,
+   STOP and question the design before proceeding. Widespread mechanical mock
+   churn (e.g. flattening `getInstanceForGame(() => ({...}))` across 10 files)
+   usually means the abstraction is wrong, not that the tests are wrong.
 
-✔ Preferred:
-```ts
-sizer.add(child, {
-  proportion: 0,
-  align: 'center',
-  padding: 0,
-  expand: false
-});
-```
+Use the following to inform logic for gameplay. These rules inform what is allowed logically.
 
-✘ Avoid:
-```ts
-sizer.add(child, 0, 'center', 0, false);
-```
-
----
-
-### **2.2 Meaning of layout properties**
-
-#### **proportion**  
-Controls how much space a child takes **along the orientation**.
-
-- `0` → keep natural size  
-- `> 0` → stretch to take additional space  
-
-Recommend:
-- Use `0` per default  
-- Only use proportions for flexible regions or scrollable panels  
-
-#### **align**  
-Controls alignment **across** orientation.
-
-Examples:  
-- Vertical sizer → `'left' | 'center' | 'right'`  
-- Horizontal sizer → `'top' | 'center' | 'bottom'`  
-
-Recommend:
-- Default to `'center'` unless you intentionally left/right align elements  
-
-#### **padding**  
-Margin around the child.
-
-Allowable values:
-- Number → uniform  
-- Object → directional  
-
-Recommend:
-- Keep it simple; rely on `space.item` for most spacing  
-
-#### **expand**  
-Stretch child **across** orientation.
-
-- Vertical sizer → stretch width  
-- Horizontal sizer → stretch height  
-
-Recommend:
-- Only set `expand: true` on:
-  - Dropdowns  
-  - Input fields  
-  - Background bars or UI blocks  
-
-For most visual components: `expand: false`.
+## **Game Setup**  
+- **Before playing**, the **Loco cards** should be **separated from the rest of the deck** and **kept with the money**.  
+- The **Demand and Event cards** are **shuffled together** to form the **card deck**.  
 
 ---
 
-## 3. Sizer Organization Rules
-
-### **3.1 Only top-level sizers receive explicit world positioning**
-Examples:
-```ts
-rootSizer.setPosition(x, y);
-```
-or
-```ts
-const rootSizer = rexUI.add.sizer({ x, y });
-```
-
-All child sizers and containers:
-**do not set their world position manually**.  
-Their parent sizer will place them.
-
----
-
-### **3.2 Sizers should represent “regions”, not individual graphic atoms**
-Use sizers at the level of:
-- Horizontal bars  
-- Vertical stacks  
-- Sidebar groups  
-- Card arrangements  
-
-Do NOT use sizers for tiny atomic sub-layouts unless needed.  
-Over-sizer’ing leads to confusion and layout churn.
-
----
-
-### **3.3 Always call `layout()` once the hierarchy is built**
-At end of UI construction:
-
-```ts
-rootSizer.layout();
-```
-
-Call again only when:
-- Text changes
-- Components are added/removed
-- Dimensions change
-
-Avoid calling layout repeatedly unless necessary.
-
----
-
-## 4. ContainerLite Usage Rules
-
-### **4.1 Always add children with `addLocal`**
-This ensures local positioning inside the container behaves predictably.
-
-```ts
-container.addLocal(child);
-```
-
-Avoid `add()` unless you want world-space positioning preserved.
-
----
-
-### **4.2 Always set the container’s size explicitly**
-Parent sizers need to know the footprint.
-
-```ts
-container.setSize(width, height);
-```
-
-Often width/height match a background image.
-
----
-
-### **4.3 Only use explicit coordinates *inside* a ContainerLite**
-Example pattern:
-
-```ts
-const bg = add.image(0, 0, 'cardBG');
-container.addLocal(bg);
-
-const icon = add.image(-20, 30, 'icon');
-container.addLocal(icon);
-
-const label = add.text(10, -40, "Label");
-container.addLocal(label);
-```
-
-Inside the container, these coordinates are relative.  
-Outside the container, never override its position—let the sizer manage it.
-
----
-
-### **4.4 ContainerLite should represent a reusable UI “component”**
-Use containers for things like:
-- Cards  
-- Buttons with layered graphics  
-- Icons with overlays  
-- Composite elements  
-
-If the entity feels like a **reusable single item**, use ContainerLite.
-
----
-
-## 5. General Layout Best Practices
-
-### **5.1 Establish a consistent grid**
-Choosing consistent spacing makes layout predictable:
-- `space.item: 8`, `16`, or `24`  
-- global padding: 8 or 12  
-
----
-
-### **5.2 Limit nesting depth**
-Deeply nested sizers get hard to debug.  
-Aim for:
-
-- 1 root sizer  
-- A few child sizers  
-- Containers for complex visuals inside those  
-
-“Three layers deep” is a good maximum for clarity.
-
----
-
-### **5.3 Never mix manual positioning with sizer-managed positioning**
+## **Demand Cards**  
+Each **Demand card** shows:  
+1. **The city needing the good** (e.g., **Berlin**).  
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
