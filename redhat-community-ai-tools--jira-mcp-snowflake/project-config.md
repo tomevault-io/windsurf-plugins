@@ -1,151 +1,95 @@
 ---
 trigger: always_on
-description: Senior-level Python development practices for jira-mcp-snowflake project with performance and scalability focus
+description: Unit test coverage requirements for code changes
 ---
 
 
-# Senior Python Development Rules for jira-mcp-snowflake
+# Unit Test Coverage Requirements
 
-## Senior Engineer Mindset
+## Mandatory Testing Workflow
 
-**Think like a senior software engineer**: Always consider performance, scalability, maintainability, and long-term implications of every code change. Write code that your future self and teammates will thank you for.
+**CRITICAL**: When making ANY code changes in this project, you MUST follow this testing workflow:
 
-## Package Management - Always Use UV
+### 1. Before Making Changes
+- Run `make test` to establish baseline coverage
+- Note current coverage percentage from the terminal output
 
-This project uses [UV](https://docs.astral.sh/uv/) for Python package management. **ALWAYS** use `uv` commands instead of `pip` or other package managers:
+### 2. After Making Changes
+- **ALWAYS** run `make test` immediately after any code modification
+- Check that all tests pass AND review coverage report
+- Coverage should be maintained or improved, never decreased
 
-- **Install dependencies**: `uv sync --dev` (includes dev dependencies)
-- **Run Python scripts**: `uv run <script>` 
-- **Run tests**: `uv run pytest`
-- **Run linting**: `uv run flake8`
-- **Add new dependencies**: `uv add <package>`
-- **Add dev dependencies**: `uv add --dev <package>`
+### 3. Test Coverage Analysis
+When modifying files in [src/](mdc:src/), ensure corresponding test files exist and are updated:
 
-Reference the project configuration in [pyproject.toml](mdc:pyproject.toml) for dependency management.
+- `src/config.py` ↔ `tests/test_config.py`
+- `src/database.py` ↔ `tests/test_database.py` 
+- `src/mcp_server.py` ↔ `tests/test_mcp_server.py`
+- `src/metrics.py` ↔ `tests/test_metrics.py`
+- `src/tools.py` ↔ `tests/test_tools.py`
 
-## Python Style Guidelines (PEP 8 + Senior Best Practices)
+### 4. When to Add/Remove Tests
 
-### Code Style Standards
-- **Follow PEP 8** religiously with these project-specific extensions:
-- **Line length**: 120 characters max (configured in flake8)
-- **Imports**: Group imports (stdlib, third-party, local) with blank lines between groups
-- **Type hints**: MANDATORY for all function signatures, class attributes, and complex variables
-- **Docstrings**: Use Google-style docstrings for all public functions, classes, and modules
-- **Variable naming**: Use descriptive names that explain intent, not just what they contain
+**Add tests when:**
+- Adding new functions, methods, or classes
+- Adding new code paths or branches (if/else, try/catch)
+- Adding new public APIs or tool functions
+- Adding new configuration options
+- Adding new error handling
 
-### Code Organization
-```python
-# Good: Descriptive, intention-revealing names
-def calculate_jira_issue_metrics_for_timeframe(start_date: datetime, end_date: datetime) -> Dict[str, int]:
-    """Calculate comprehensive JIRA issue metrics for the specified timeframe."""
-    pass
+**Remove/update tests when:**
+- Removing deprecated functions or methods
+- Changing function signatures or behavior
+- Refactoring code that changes expected outputs
+- Removing features or functionality
 
-# Bad: Abbreviated, unclear names
-def calc_metrics(start, end):
-    pass
+**Update tests when:**
+- Modifying existing function behavior
+- Changing return values or data structures
+- Adding new parameters to existing functions
+- Changing error handling or exception types
+
+### 5. Coverage Commands
+
+- **Full test suite**: `make test` (linting + pytest with coverage)
+- **Tests only**: `make pytest` or `uv run pytest tests/ --cov=src --cov-report=xml --cov-report=term -v --tb=short`
+- **Linting only**: `make lint` or `uv run flake8 src/ --max-line-length=120 --ignore=E501,W503`
+
+### 6. Coverage Standards
+
+- **Minimum**: Maintain existing coverage percentage
+- **Target**: Aim for >90% coverage on new code
+- **Critical**: Never commit code that reduces overall coverage
+- **Review**: Check coverage report output for uncovered lines
+
+### 7. Test Quality Requirements
+
+- Tests must cover both success and error scenarios
+- Include edge cases and boundary conditions
+- Mock external dependencies (database, HTTP calls)
+- Test async functions with proper async test setup
+- Verify error messages and exception types
+
+## Example Workflow
+
+```bash
+# Before changes
+make test  # Note coverage: e.g., "90% coverage"
+
+# Make your code changes
+# ... edit src/tools.py ...
+
+# After changes - MANDATORY
+make test  # Verify: tests pass + coverage maintained/improved
+
+# If coverage dropped, add tests:
+# ... edit tests/test_tools.py ...
+
+# Verify again
+make test  # Should show same or better coverage
 ```
 
-### Type Hints and Documentation
-```python
-from typing import Dict, List, Optional, Union, Any
-from datetime import datetime
-
-def process_jira_issues(
-    issues: List[Dict[str, Any]], 
-    filter_criteria: Optional[Dict[str, Union[str, int]]] = None
-) -> Dict[str, List[Dict[str, Any]]]:
-    """
-    Process JIRA issues with optional filtering.
-    
-    Args:
-        issues: List of JIRA issue dictionaries from Snowflake
-        filter_criteria: Optional filtering parameters
-        
-    Returns:
-        Dictionary grouped by issue status with processed issue data
-        
-    Raises:
-        ValueError: If issues list is empty or malformed
-    """
-    pass
-```
-
-## Performance & Scalability Guidelines
-
-### Database Operations
-- **Connection pooling**: Always use connection pools for database operations
-- **Query optimization**: Use LIMIT clauses, proper indexing, and avoid N+1 queries
-- **Batch operations**: Process data in batches, not one-by-one
-- **Async operations**: Use `asyncio` for I/O-bound operations when possible
-
-```python
-# Good: Batch processing with connection pooling
-async def fetch_issues_batch(issue_keys: List[str], batch_size: int = 100) -> List[Dict]:
-    """Fetch issues in batches to avoid memory issues and improve performance."""
-    results = []
-    for i in range(0, len(issue_keys), batch_size):
-        batch = issue_keys[i:i + batch_size]
-        batch_results = await fetch_issues_from_db(batch)
-        results.extend(batch_results)
-    return results
-
-# Bad: Individual queries
-def fetch_issues_one_by_one(issue_keys: List[str]) -> List[Dict]:
-    return [fetch_single_issue(key) for key in issue_keys]  # N+1 problem
-```
-
-### Memory Management
-- **Generators**: Use generators for large datasets to avoid loading everything into memory
-- **Context managers**: Always use context managers for resource management
-- **Lazy evaluation**: Defer expensive computations until actually needed
-
-```python
-# Good: Generator for memory efficiency
-def process_large_dataset(query_results: Iterator[Dict]) -> Iterator[Dict]:
-    """Process large datasets without loading everything into memory."""
-    for row in query_results:
-        yield transform_row(row)
-
-# Bad: Loading everything into memory
-def process_all_at_once(query_results: List[Dict]) -> List[Dict]:
-    return [transform_row(row) for row in query_results]  # Memory intensive
-```
-
-### Caching Strategy
-- **Implement intelligent caching** for expensive operations
-- **Cache invalidation**: Always have a clear cache invalidation strategy
-- **TTL-based caching**: Use time-based expiration for data that changes
-
-```python
-from functools import lru_cache
-from typing import Dict, Any
-import time
-
-@lru_cache(maxsize=128)
-def get_project_metadata(project_key: str) -> Dict[str, Any]:
-    """Cache project metadata as it rarely changes."""
-    return fetch_project_from_db(project_key)
-
-# For time-sensitive data, implement TTL caching
-class TTLCache:
-    def __init__(self, ttl_seconds: int = 300):
-        self.cache = {}
-        self.ttl = ttl_seconds
-    
-    def get_with_ttl(self, key: str, fetch_func) -> Any:
-        now = time.time()
-        if key in self.cache:
-            value, timestamp = self.cache[key]
-            if now - timestamp < self.ttl:
-                return value
-        
-        value = fetch_func()
-        self.cache[key] = (value, now)
-        return value
-```
-
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+**NEVER SKIP** the testing step - it's essential for code quality and preventing regressions.
 
 ---
 > Source: [redhat-community-ai-tools/jira-mcp-snowflake](https://github.com/redhat-community-ai-tools/jira-mcp-snowflake) — distributed by [TomeVault](https://tomevault.io).
