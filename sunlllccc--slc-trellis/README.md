@@ -5,11 +5,11 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [SunLLLccc/slc-trellis](https://github.com/SunLLLccc/slc-trellis).
+Original source: `CLAUDE.md` in [SunLLLccc/slc-trellis](https://github.com/SunLLLccc/slc-trellis).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
