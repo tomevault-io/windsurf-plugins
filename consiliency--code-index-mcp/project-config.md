@@ -1,205 +1,117 @@
 ---
 trigger: always_on
-description: This file defines database design patterns, query optimization strategies, and data management rules for the Code-Index-MCP project.
+description: This file defines the capabilities and constraints for AI agents working with this codebase.
 ---
 
-# Database Rules for Code-Index-MCP
+# MCP Server Agent Configuration
 
-## Overview
-This file defines database design patterns, query optimization strategies, and data management rules for the Code-Index-MCP project.
+This file defines the capabilities and constraints for AI agents working with this codebase.
 
-## Storage Architecture
+## Current State
 
-### Local-First Design
-- **Primary Storage**: SQLite with FTS5 for full-text search
-- **Index Format**: Structured JSON with normalized tables
-- **File-Based**: Each project has its own database file
-- **Portability**: Database files can be copied/moved
+**System Complexity**: 5/5 (High — SQLite FTS5 + Qdrant vector index, 48 language plugins, rerankers, query-intent routing)
+**MCP Status**: Use MCP indexed search when repository readiness is `ready`; STDIO is the primary surface
+**Last Updated**: 2026-04-23
+**Support matrix**: Customer-facing language/runtime support claims live in `docs/SUPPORT_MATRIX.md`.
+**Dependency truth**: Use `uv sync --locked`; `pyproject.toml` and `uv.lock` are canonical.
 
-### Schema Design
-```sql
--- Core tables structure
-CREATE TABLE files (
-    id INTEGER PRIMARY KEY,
-    path TEXT UNIQUE NOT NULL,
-    content TEXT,
-    language TEXT,
-    last_modified INTEGER,
-    hash TEXT
-);
+> **Beta status**: Multi-repo support and the STDIO interface are in beta. STDIO is the primary surface for LLM tool calls; FastAPI is a secondary admin surface for diagnostics and manual operations. Expect API surface changes before stable release.
+>
+> **Public alpha repository model**: v3 supports many unrelated repositories on
+> one machine, with one registered worktree per git common directory. Only the
+> tracked/default branch is indexed automatically. Indexed results are
+> authoritative only when readiness is `ready`; unavailable indexes return
+> `index_unavailable` with `safe_fallback: "native_search"`.
 
-CREATE TABLE symbols (
-    id INTEGER PRIMARY KEY,
-    file_id INTEGER REFERENCES files(id),
-    name TEXT NOT NULL,
-    type TEXT, -- function, class, variable, etc.
-    line_start INTEGER,
-    line_end INTEGER,
-    column_start INTEGER,
-    column_end INTEGER,
-    parent_id INTEGER REFERENCES symbols(id)
-);
+### What's Actually Implemented
+- ✅ STDIO transport (`search_code`, `symbol_lookup`, `summarize_sample`, `reindex` MCP tools)
+- ✅ FastAPI admin surface with endpoints: `/symbol`, `/search`, `/status`, `/plugins`, `/reindex`
+- ✅ Dispatcher with caching and auto-initialization
+- ✅ Python plugin fully functional with Tree-sitter + Jedi
+- ✅ JavaScript/TypeScript plugin fully functional with Tree-sitter
+- ✅ C plugin fully functional with Tree-sitter
+- ✅ SQLite persistence layer with FTS5 search
+- ✅ File watcher auto-starts in `initialize_services()` after dispatcher is ready; stopped in `main()` finally block on exit (EnhancedDispatcher mode only)
+- ✅ Error handling and logging framework
+- ✅ Comprehensive testing framework (pytest with fixtures)
+- ✅ CI/CD pipeline with GitHub Actions
+- ✅ Docker support and build system
 
-CREATE TABLE imports (
-    id INTEGER PRIMARY KEY,
-    file_id INTEGER REFERENCES files(id),
-    module_name TEXT,
-    alias TEXT,
-    line_number INTEGER
-);
+### What's Recently Implemented
+- ✅ C++, HTML/CSS, and Dart plugins fully functional with Tree-sitter
+- ✅ Advanced metrics collection with Prometheus
+- ✅ Security layer with JWT authentication
+- ✅ Comprehensive testing framework with parallel execution
+- ✅ Docker and Kubernetes configurations (beta hardening in progress)
+- ✅ Cache management and query optimization
+- ✅ Real-world repository testing validation
 
--- Full-text search tables
-CREATE VIRTUAL TABLE files_fts USING fts5(
-    path, content, tokenize='porter unicode61'
-);
+## Agent Capabilities
 
-CREATE VIRTUAL TABLE symbols_fts USING fts5(
-    name, type, tokenize='porter unicode61'
-);
-```
+### Code Understanding
+- Parse and understand the intended architecture
+- Navigate plugin structure (though most are stubs)
+- Interpret C4 architecture diagrams
+- Understand the gap between design and implementation
 
-## Query Optimization
+### Code Modification
+- Add new language plugin stubs
+- Extend API endpoint definitions
+- Update architecture diagrams
+- Implement missing functionality
 
-### Indexing Strategy
-```sql
--- Performance indexes
-CREATE INDEX idx_symbols_file ON symbols(file_id);
-CREATE INDEX idx_symbols_name ON symbols(name);
-CREATE INDEX idx_symbols_type ON symbols(type);
-CREATE INDEX idx_imports_file ON imports(file_id);
-CREATE INDEX idx_files_language ON files(language);
-```
+### Testing & Validation
+- Run basic test files (`test_python_plugin.py`, `test_tree_sitter.py`)
+- Validate TreeSitter functionality
+- Check architecture consistency
+- Identify implementation gaps
 
-### Query Patterns
-```python
-# Efficient symbol lookup
-def find_symbol(name: str, file_path: str = None):
-    query = """
-    SELECT s.*, f.path 
-    FROM symbols s
-    JOIN files f ON s.file_id = f.id
-    WHERE s.name = ?
-    """
-    params = [name]
-    
-    if file_path:
-        query += " AND f.path = ?"
-        params.append(file_path)
-    
-    return db.execute(query, params)
+## MCP SEARCH STRATEGY (CRITICAL)
 
-# Full-text search with ranking
-def search_code(query: str):
-    return db.execute("""
-    SELECT path, snippet(files_fts, 1, '<b>', '</b>', '...', 32) as snippet,
-           rank
-    FROM files_fts
-    WHERE files_fts MATCH ?
-    ORDER BY rank
-    LIMIT 50
-    """, [query])
-```
+### Use Indexed Search When Readiness Is Ready
+The codebase can use a pre-built index across 48 languages. Before treating
+indexed results as authoritative, check `mcp__code-index-mcp__get_status()` for
+repository readiness `ready` or honor the query tool response. If `search_code`
+or `symbol_lookup` returns `code: "index_unavailable"` with
+`safe_fallback: "native_search"`, use native `rg`/file tools and follow the
+readiness remediation, usually `reindex`.
 
-## Data Management
+### Tool Priority Order:
+1. **mcp__code-index-mcp__symbol_lookup** - For finding definitions when readiness is `ready`
+   - Use for: Classes, functions, methods, variables
+   - Returns: Exact location, signature, documentation
+   - Speed: <100ms
+   - `result: "not_found"` from a ready index means no symbol match; `index_unavailable` means use `native_search`
+   - Example: `mcp__code-index-mcp__symbol_lookup(symbol="PluginManager")`
 
-### Transaction Handling
-```python
-# Batch insertions with transactions
-def batch_insert_symbols(symbols: List[Dict]):
-    with db.transaction():
-        for symbol in symbols:
-            db.execute(
-                "INSERT INTO symbols (file_id, name, type, line_start) VALUES (?, ?, ?, ?)",
-                [symbol['file_id'], symbol['name'], symbol['type'], symbol['line_start']]
-            )
-```
+2. **mcp__code-index-mcp__search_code** - For pattern/content search when readiness is `ready`
+   - Use for: Code patterns, text search, semantic queries
+   - Supports: Regex, semantic search with semantic=true
+   - Speed: <500ms, returns ranked results with line numbers and `last_indexed` timestamp
+   - `results: []` from a ready index means no code match; `index_unavailable` means use `native_search`
+   - Example: `mcp__code-index-mcp__search_code(query="def.*process", limit=10)`
+   - Semantic: `mcp__code-index-mcp__search_code(query="authentication flow", semantic=true)`
 
-### Migration System
-```python
-# Version-based migrations
-migrations = {
-    1: "CREATE TABLE schema_version (version INTEGER)",
-    2: "ALTER TABLE files ADD COLUMN encoding TEXT DEFAULT 'utf-8'",
-    3: "CREATE INDEX idx_files_hash ON files(hash)"
-}
+3. **Native tools (`rg`, file reads)** - Safe fallback for non-ready indexes
+   - Use when MCP tools are unavailable or return `safe_fallback: "native_search"`
+   - Use for reading specific files after indexed search identifies candidates
+   - Use while `reindex` or other readiness remediation is pending
 
-def run_migrations():
-    current_version = get_schema_version()
-    for version, sql in migrations.items():
-        if version > current_version:
-            db.execute(sql)
-            update_schema_version(version)
-```
+### Examples:
+Check readiness first:
+`mcp__code-index-mcp__get_status()`
 
-## Performance Guidelines
+When readiness is `ready`:
+`mcp__code-index-mcp__search_code(query="class.*Plugin")`
 
-### Memory Management
-- Use WAL mode for better concurrency
-- Configure page cache size appropriately
-- Implement connection pooling
-- Close connections promptly
+When `index_unavailable` is returned:
+use `rg` or file tools and follow the returned remediation.
 
-### Optimization Techniques
-1. **Prepared Statements**: Reuse compiled queries
-2. **Batch Operations**: Group similar operations
-3. **Lazy Loading**: Load data on demand
-4. **Partitioning**: Split large tables by project/language
+### Performance Impact:
+- Traditional grep through 312 files: ~45 seconds
+- MCP indexed search: <0.5 seconds
 
-## Backup and Recovery
-
-### Backup Strategy
-```bash
-# Automated backup script
-#!/bin/bash
-sqlite3 project.db ".backup backup_$(date +%Y%m%d_%H%M%S).db"
-
-# Incremental backup using WAL
-sqlite3 project.db "PRAGMA wal_checkpoint(TRUNCATE)"
-```
-
-### Data Integrity
-- Regular VACUUM operations
-- Integrity checks on startup
-- Automatic corruption recovery
-- Transaction rollback on errors
-
-## Cloud Sync Considerations
-
-### Sync Protocol
-- Track change timestamps
-- Implement conflict resolution
-- Use merkle trees for efficient diff
-- Support partial syncs
-
-### Data Format
-```json
-{
-    "sync_version": "1.0",
-    "project_id": "uuid",
-    "timestamp": 1234567890,
-    "changes": [
-        {
-            "operation": "insert",
-            "table": "symbols",
-            "data": {...}
-        }
-    ]
-}
-```
-
-## Security Rules
-
-### Access Control
-- Read-only mode for untrusted projects
-- Sanitize all inputs
-- Parameterized queries only
-- No dynamic SQL generation
-
-### Sensitive Data
-- Exclude files matching .gitignore
-- Redact detected secrets
-- Encrypt database at rest (optional)
-- Audit log for all modifications
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [Consiliency/Code-Index-MCP](https://github.com/Consiliency/Code-Index-MCP) — distributed by [TomeVault](https://tomevault.io).
