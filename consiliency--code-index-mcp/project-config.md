@@ -1,115 +1,232 @@
 ---
 trigger: always_on
-description: This file defines the capabilities and constraints for AI agents working with this codebase.
+description: This file defines React patterns and best practices for any future web UI components in the Code-Index-MCP project.
 ---
 
-# MCP Server Agent Configuration
+# React Rules for Code-Index-MCP
 
-This file defines the capabilities and constraints for AI agents working with this codebase.
+## Overview
+This file defines React patterns and best practices for any future web UI components in the Code-Index-MCP project.
 
-## Current State
+## Component Structure
 
-**System Complexity**: 5/5 (High — SQLite FTS5 + Qdrant vector index, 48 language plugins, rerankers, query-intent routing)
-**MCP Status**: Use MCP indexed search when repository readiness is `ready`; STDIO is the primary surface
-**Last Updated**: 2026-04-23
-**Support matrix**: Customer-facing language/runtime support claims live in `docs/SUPPORT_MATRIX.md`.
-**Dependency truth**: Use `uv sync --locked`; `pyproject.toml` and `uv.lock` are canonical.
+### Functional Components with TypeScript
+```tsx
+import React, { useState, useCallback, memo } from 'react';
 
-> **Beta status**: Multi-repo support and the STDIO interface are in beta. STDIO is the primary surface for LLM tool calls; FastAPI is a secondary admin surface for diagnostics and manual operations. Expect API surface changes before stable release.
->
-> **Public alpha repository model**: v3 supports many unrelated repositories on
-> one machine, with one registered worktree per git common directory. Only the
-> tracked/default branch is indexed automatically. Indexed results are
-> authoritative only when readiness is `ready`; unavailable indexes return
-> `index_unavailable` with `safe_fallback: "native_search"`.
+interface CodeSearchProps {
+  onSearch: (query: string) => Promise<void>;
+  placeholder?: string;
+  className?: string;
+}
 
-### What's Actually Implemented
-- ✅ STDIO transport (`search_code`, `symbol_lookup`, `summarize_sample`, `reindex` MCP tools)
-- ✅ FastAPI admin surface with endpoints: `/symbol`, `/search`, `/status`, `/plugins`, `/reindex`
-- ✅ Dispatcher with caching and auto-initialization
-- ✅ Python plugin fully functional with Tree-sitter + Jedi
-- ✅ JavaScript/TypeScript plugin fully functional with Tree-sitter
-- ✅ C plugin fully functional with Tree-sitter
-- ✅ SQLite persistence layer with FTS5 search
-- ✅ File watcher auto-starts in `initialize_services()` after dispatcher is ready; stopped in `main()` finally block on exit (EnhancedDispatcher mode only)
-- ✅ Error handling and logging framework
-- ✅ Comprehensive testing framework (pytest with fixtures)
-- ✅ CI/CD pipeline with GitHub Actions
-- ✅ Docker support and build system
+export const CodeSearch = memo<CodeSearchProps>(({ 
+  onSearch, 
+  placeholder = "Search code...",
+  className = ""
+}) => {
+  const [query, setQuery] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
 
-### What's Recently Implemented
-- ✅ C++, HTML/CSS, and Dart plugins fully functional with Tree-sitter
-- ✅ Advanced metrics collection with Prometheus
-- ✅ Security layer with JWT authentication
-- ✅ Comprehensive testing framework with parallel execution
-- ✅ Docker and Kubernetes configurations (beta hardening in progress)
-- ✅ Cache management and query optimization
-- ✅ Real-world repository testing validation
+  const handleSearch = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!query.trim()) return;
 
-## Agent Capabilities
+    setIsSearching(true);
+    try {
+      await onSearch(query);
+    } finally {
+      setIsSearching(false);
+    }
+  }, [query, onSearch]);
 
-### Code Understanding
-- Parse and understand the intended architecture
-- Navigate plugin structure (though most are stubs)
-- Interpret C4 architecture diagrams
-- Understand the gap between design and implementation
+  return (
+    <form onSubmit={handleSearch} className={className}>
+      <input
+        type="text"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder={placeholder}
+        disabled={isSearching}
+      />
+      <button type="submit" disabled={isSearching}>
+        {isSearching ? 'Searching...' : 'Search'}
+      </button>
+    </form>
+  );
+});
 
-### Code Modification
-- Add new language plugin stubs
-- Extend API endpoint definitions
-- Update architecture diagrams
-- Implement missing functionality
+CodeSearch.displayName = 'CodeSearch';
+```
 
-### Testing & Validation
-- Run basic test files (`test_python_plugin.py`, `test_tree_sitter.py`)
-- Validate TreeSitter functionality
-- Check architecture consistency
-- Identify implementation gaps
+## Custom Hooks
 
-## MCP SEARCH STRATEGY (CRITICAL)
+### Data Fetching Hook
+```tsx
+import { useState, useEffect, useCallback } from 'react';
 
-### Use Indexed Search When Readiness Is Ready
-The codebase can use a pre-built index across 48 languages. Before treating
-indexed results as authoritative, check `mcp__code-index-mcp__get_status()` for
-repository readiness `ready` or honor the query tool response. If `search_code`
-or `symbol_lookup` returns `code: "index_unavailable"` with
-`safe_fallback: "native_search"`, use native `rg`/file tools and follow the
-readiness remediation, usually `reindex`.
+interface UseApiOptions<T> {
+  initialData?: T;
+  onError?: (error: Error) => void;
+}
 
-### Tool Priority Order:
-1. **mcp__code-index-mcp__symbol_lookup** - For finding definitions when readiness is `ready`
-   - Use for: Classes, functions, methods, variables
-   - Returns: Exact location, signature, documentation
-   - Speed: <100ms
-   - `result: "not_found"` from a ready index means no symbol match; `index_unavailable` means use `native_search`
-   - Example: `mcp__code-index-mcp__symbol_lookup(symbol="PluginManager")`
+function useApi<T>(
+  apiCall: () => Promise<T>,
+  options: UseApiOptions<T> = {}
+) {
+  const [data, setData] = useState<T | undefined>(options.initialData);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
 
-2. **mcp__code-index-mcp__search_code** - For pattern/content search when readiness is `ready`
-   - Use for: Code patterns, text search, semantic queries
-   - Supports: Regex, semantic search with semantic=true
-   - Speed: <500ms, returns ranked results with line numbers and `last_indexed` timestamp
-   - `results: []` from a ready index means no code match; `index_unavailable` means use `native_search`
-   - Example: `mcp__code-index-mcp__search_code(query="def.*process", limit=10)`
-   - Semantic: `mcp__code-index-mcp__search_code(query="authentication flow", semantic=true)`
+  const execute = useCallback(async () => {
+    setLoading(true);
+    setError(null);
 
-3. **Native tools (`rg`, file reads)** - Safe fallback for non-ready indexes
-   - Use when MCP tools are unavailable or return `safe_fallback: "native_search"`
-   - Use for reading specific files after indexed search identifies candidates
-   - Use while `reindex` or other readiness remediation is pending
+    try {
+      const result = await apiCall();
+      setData(result);
+      return result;
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      setError(error);
+      options.onError?.(error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  }, [apiCall, options.onError]);
 
-### Examples:
-Check readiness first:
-`mcp__code-index-mcp__get_status()`
+  return { data, loading, error, execute };
+}
 
-When readiness is `ready`:
-`mcp__code-index-mcp__search_code(query="class.*Plugin")`
+// Usage
+function SymbolViewer({ symbolName }: { symbolName: string }) {
+  const { data, loading, error, execute } = useApi(
+    () => client.getSymbolDefinition(symbolName),
+    { onError: (err) => console.error('Failed to load symbol:', err) }
+  );
 
-When `index_unavailable` is returned:
-use `rg` or file tools and follow the returned remediation.
+  useEffect(() => {
+    execute();
+  }, [execute]);
 
-### Performance Impact:
-- Traditional grep through 312 files: ~45 seconds
-- MCP indexed search: <0.5 seconds
+  if (loading) return <div>Loading...</div>;
+  if (error) return <div>Error: {error.message}</div>;
+  if (!data) return null;
+
+  return <SymbolDetails symbol={data} />;
+}
+```
+
+### Code Editor Integration Hook
+```tsx
+interface UseCodeNavigationOptions {
+  onNavigate?: (location: CodeLocation) => void;
+}
+
+interface CodeLocation {
+  file: string;
+  line: number;
+  column: number;
+}
+
+function useCodeNavigation(options: UseCodeNavigationOptions = {}) {
+  const navigate = useCallback((location: CodeLocation) => {
+    // Integrate with VS Code or other editors
+    if (window.vscode) {
+      window.vscode.postMessage({
+        command: 'openFile',
+        file: location.file,
+        line: location.line,
+        column: location.column
+      });
+    }
+    
+    options.onNavigate?.(location);
+  }, [options.onNavigate]);
+
+  return { navigate };
+}
+```
+
+## State Management Patterns
+
+### Context for Global State
+```tsx
+interface CodeIndexContextType {
+  client: MCPClient;
+  currentProject: string;
+  setCurrentProject: (project: string) => void;
+}
+
+const CodeIndexContext = React.createContext<CodeIndexContextType | null>(null);
+
+export function CodeIndexProvider({ 
+  children, 
+  apiKey,
+  baseUrl = 'http://localhost:8000'
+}: { 
+  children: React.ReactNode;
+  apiKey: string;
+  baseUrl?: string;
+}) {
+  const [currentProject, setCurrentProject] = useState('');
+  const client = useMemo(
+    () => new MCPClient(baseUrl, apiKey),
+    [baseUrl, apiKey]
+  );
+
+  return (
+    <CodeIndexContext.Provider value={{
+      client,
+      currentProject,
+      setCurrentProject
+    }}>
+      {children}
+    </CodeIndexContext.Provider>
+  );
+}
+
+export function useCodeIndex() {
+  const context = useContext(CodeIndexContext);
+  if (!context) {
+    throw new Error('useCodeIndex must be used within CodeIndexProvider');
+  }
+  return context;
+}
+```
+
+## Performance Optimization
+
+### Virtual Scrolling for Large Lists
+```tsx
+import { FixedSizeList } from 'react-window';
+
+interface SearchResultsProps {
+  results: SearchResult[];
+  onItemClick: (item: SearchResult) => void;
+}
+
+function SearchResults({ results, onItemClick }: SearchResultsProps) {
+  const Row = ({ index, style }: { index: number; style: React.CSSProperties }) => {
+    const item = results[index];
+    
+    return (
+      <div 
+        style={style} 
+        onClick={() => onItemClick(item)}
+        className="search-result-item"
+      >
+        <div className="file-path">{item.file}</div>
+        <div className="line-number">Line {item.line}</div>
+        <pre className="code-snippet">{item.content}</pre>
+      </div>
+    );
+  };
+
+  return (
+    <FixedSizeList
+      height={600}
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
