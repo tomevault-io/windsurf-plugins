@@ -1,201 +1,111 @@
 ---
 trigger: always_on
-description: Testing strategies and patterns for XM Cloud starter applications
+description: - [Repository Overview](#repository-overview)
 ---
 
+# Project Context
 
-# Testing Patterns
+## Table of Contents
 
-## Testing Strategy
+- [Repository Overview](#repository-overview)
+- [Technology Stack](#technology-stack)
+- [Development Principles](#development-principles)
+- [Upstream, forks, and pull request scope](#upstream-forks-and-pull-request-scope)
+- [Constraints and Guidelines](#constraints-and-guidelines)
+- [Code Style](#code-style)
+- [General Coding Principles](#general-coding-principles)
+- [JavaScript/TypeScript Rules](#javascripttypescript-rules)
+- [Sitecore XM Cloud Rules](#sitecore-xm-cloud-rules)
+- [Next.js Development Patterns](#nextjs-development-patterns)
+- [Testing Patterns](#testing-patterns)
+- [Safety Rules](#safety-rules)
 
-Component Testing:
-- Test component rendering with various XM Cloud field configurations
-- Mock XM Cloud services and API calls
-- Test error scenarios (missing fields, API failures)
-- Verify proper handling of editing vs. preview modes
-- Test responsive behavior and accessibility
+## Repository Overview
 
-Integration Testing:
-- Test complete page rendering with XM Cloud data
-- Verify API route functionality
-- Test middleware behavior for XM Cloud integration
-- Validate environment variable handling
-- Test deployment and build processes
+This is the **XM Cloud Front End Application Starter Kits** repository containing multiple Next.js starter applications and SPA examples for Sitecore XM Cloud development.
 
-## Testing Tools
+**Repository Structure:**
+- `/examples/` - Contains starter front-end applications (Next.js and SPA)
+- `/authoring/` - Sitecore content items, templates, and deployment configurations  
+- `/local-containers/` - Docker setup for local development environments
+- `xmcloud.build.json` - Primary configuration for XM Cloud deployment
 
-Recommended Stack:
-- **Jest** or **Vitest** for unit testing
-- **React Testing Library** for component testing
-- **MSW (Mock Service Worker)** for API mocking
-- **Playwright** or **Cypress** for E2E testing
-- **Storybook** for component documentation and testing
+**Available Examples:**
+- `basic-nextjs` - Simple Next.js starter with basic XM Cloud integration
+- `kit-nextjs-article-starter` - **Solterra & Co.** - Editorial-style template for lifestyle brands
+- `kit-nextjs-location-finder` - **Alaris** - Car brand template with location finder functionality
+- `kit-nextjs-product-listing` - **SYNC** - Product-focused template for audio gear companies
+- `kit-nextjs-skate-park` - Simple demo site showcasing component examples
+- `basic-spa` - SPA starter kit with Angular and Node proxy
 
-XM Cloud Mocking:
-- Create mock data that matches XM Cloud field structures
-- Mock layout service responses
-- Simulate both connected and disconnected modes
-- Test with various content scenarios
+Each starter demonstrates:
+- Tailwind-based styling with Shadcn/ui components
+- Personalized homepage via URL parameters
+- Modular component architecture with variants
+- Localization support for English (en) and Canadian English (en-CA)
 
-```typescript
-// Mock XM Cloud field data
-const mockHeroFields = {
-  title: { value: 'Test Hero Title', editable: false },
-  subtitle: { value: 'Test Hero Subtitle', editable: false },
-  backgroundImage: {
-    value: {
-      src: '/test-image.jpg',
-      alt: 'Test Image',
-      width: 1200,
-      height: 600,
-    },
-    editable: false,
-  },
-};
-```
+## Technology Stack
 
-## Component Testing Patterns
+**Core Technologies:**
+- **Next.js 14+** - React framework with App Router (all starters except `basic-nextjs-pages-router`)
+- **TypeScript** - Strict type safety throughout all components
+- **Sitecore XM Cloud** - Headless content management and delivery
+- **Sitecore Content SDK** - Modern SDK for XM Cloud integration
+- **Tailwind CSS** - Utility-first CSS with container queries (@container)
+- **Shadcn/ui** - Modern component library with accessibility features
 
-Field Validation Testing:
-- Test components with missing fields
-- Test components with empty field values
-- Test components with various field types
-- Verify proper fallback rendering
+**Additional Libraries:**
+- **Framer Motion** - Animation library for interactive components
+- **Lucide React** - Icon library for consistent iconography  
+- **next-localization** - Internationalization with dictionary support
+- **change-case** - String case transformation utilities
 
-```typescript
-// Component test example
-describe('Hero Component', () => {
-  it('renders with all fields present', () => {
-    render(<Hero fields={mockHeroFields} />);
-    
-    expect(screen.getByText('Test Hero Title')).toBeInTheDocument();
-    expect(screen.getByText('Test Hero Subtitle')).toBeInTheDocument();
-    expect(screen.getByRole('img')).toHaveAttribute('alt', 'Test Image');
-  });
-  
-  it('handles missing fields gracefully', () => {
-    render(<Hero fields={{}} />);
-    
-    expect(screen.getByText(/content not configured/i)).toBeInTheDocument();
-  });
-});
-```
+**Development Tools:**
+- **Docker** - Containerized local development with Sitecore CM
+- **Node.js LTS** - JavaScript runtime environment
+- **npm** - Package management across all starter applications
 
-## API Testing
+## Development Principles
 
-XM Cloud API Mocking:
-- Mock layout service responses
-- Test error handling for API failures
-- Verify proper caching behavior
-- Test authentication and authorization
+**Multi-Starter Architecture:**
+- Each example is a standalone application
+- Shared patterns and conventions across all starters
+- Independent deployment and development workflows
+- Common XM Cloud integration patterns
 
-```typescript
-// API route test example (App Router)
-import { GET } from '@/app/api/robots/route';
+**Content-First Development:**
+- Components are designed around Sitecore data structures
+- Field-driven rendering with proper fallbacks
+- Support for both connected and disconnected development modes
+- Proper handling of content authoring scenarios
 
-describe('/api/robots', () => {
-  it('returns robots.txt content', async () => {
-    const response = await GET(new Request('http://localhost/api/robots'));
-    
-    expect(response.status).toBe(200);
-    expect(response.headers.get('content-type')).toContain('text/plain');
-  });
-});
-```
+## Upstream, forks, and pull request scope
 
-## E2E Testing
+The official **upstream** repository (this project’s public GitHub home) keeps a **small, fixed** set of starters in `examples/` as **reference examples**, not a catalog of every vertical. Before treating work as an **upstream pull request**, confirm whether the target is **upstream** or a **user fork** / **template** copy.
 
-Page Testing:
-- Test complete user journeys
-- Verify XM Cloud content rendering
-- Test navigation and routing
-- Validate responsive design
-- Test accessibility compliance
+- **Fits upstream PRs:** **Improvements, bug fixes, and broadly useful features** in **existing** starters; **documentation** and **tooling** aligned with the repo’s contribution policy.
+- **Not for upstream PRs:** **New example sites**, **additional** starters, or **product-specific** extensions for one org that should live in a **fork** or separate repo. Use **Use this template** or maintain a **fork** for that work.
+- **Fork or standalone copy:** Add starters and customize freely; do not frame that work as an official upstream change unless maintainers have agreed otherwise.
 
-Performance Testing:
-- Test page load times
-- Verify image optimization
-- Test bundle size impact
-- Monitor Core Web Vitals
+Authoritative human policy: **[CONTRIBUTING.md](CONTRIBUTING.md)** — especially **[What we do not accept](CONTRIBUTING.md#what-we-do-not-accept)**. For Cursor, see **`.cursor/rules/project-context.mdc`**.
 
-```typescript
-// Playwright E2E test example
-test('homepage loads and displays content', async ({ page }) => {
-  await page.goto('/');
-  
-  // Wait for XM Cloud content to load
-  await page.waitForSelector('[data-testid="hero-component"]');
-  
-  // Verify content is displayed
-  await expect(page.locator('h1')).toBeVisible();
-  await expect(page.locator('nav')).toBeVisible();
-});
-```
+## Constraints and Guidelines
 
-## Test Data Management
+**File Organization:**
+- Each starter maintains its own `src/` directory structure
+- Shared utilities should be copied, not shared (no monorepo linking)
+- Configuration files specific to each starter application
+- Independent package.json for each example
 
-XM Cloud Test Data:
-- Create realistic test data that matches XM Cloud structures
-- Use factories for generating test data
-- Maintain test data consistency across tests
-- Update test data when XM Cloud schemas change
+**Development Workflow:**
 
-```typescript
-// Test data factory
-export const createMockLayoutData = (overrides = {}) => ({
-  sitecore: {
-    context: {
-      pageEditing: false,
-      language: 'en',
-      site: { name: 'test-site' },
-    },
-    route: {
-      name: 'Test Page',
-      displayName: 'Test Page',
-      fields: {},
-      placeholders: {},
-      ...overrides,
-    },
-  },
-});
-```
+DMZ git flow will be implemented in the future to support better development practices, scaling, efficiency and developer productivity.
+Below is an outline of the planned workflow and processes that will be followed:
 
-## Testing Commands
+- Has a shared main repo (`upstream repository`) with two key branches: `main` and `dmz`
+- Each contributor uses their own fork as their workspace
 
-Package Scripts:
-- `npm test` - Run unit tests
-- `npm run test:watch` - Run tests in watch mode
-- `npm run test:coverage` - Run tests with coverage report
-- `npm run test:e2e` - Run end-to-end tests
-- `npm run test:ci` - Run all tests in CI mode
-
-Coverage Requirements:
-- Tests should be comprehensive enough to cover business logic and to validate that sites and componenets are working as intended
-- Ensure different rendering options and  scenarios are considered such as Design Library, Page Editor, Preview mode, Hosted Vercel Sites and Local Deployments
-- Test error scenarios and edge cases
-- Maintain test quality over quantity
-
-## Continuous Integration
-
-CI/CD Testing:
-- Run all tests on pull requests
-- Generate coverage reports
-- Test against multiple Node.js versions
-- Validate build processes
-- Check for accessibility violations
-
-Quality Gates:
-- All tests must pass before merging
-- Coverage thresholds must be met
-- No linting errors allowed
-- Performance budgets must be maintained
-- Security scans must pass
-
-Referenced:
-@examples/kit-nextjs-article-starter/src/components/
-@examples/kit-nextjs-location-finder/src/components/
-@examples/kit-nextjs-product-listing/src/components/
-@examples/basic-nextjs/src/
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [sc-nipunaabeywickrama/xmcloud-starter-js-07-08](https://github.com/sc-nipunaabeywickrama/xmcloud-starter-js-07-08) — distributed by [TomeVault](https://tomevault.io).
