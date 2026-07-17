@@ -1,0 +1,227 @@
+---
+trigger: always_on
+description: - **プロジェクト名:** private-sauna-availability
+---
+
+# プロジェクト固有ルール
+
+## Google Cloudプロジェクト
+- **プロジェクト名:** private-sauna-availability
+- **プロジェクトID:** gen-lang-client-0618658411
+- **用途:** サウナアプリ（Cloud Run）
+
+## 共通ルール
+
+### 部屋名の重複禁止
+- 同じ施設内で部屋名が重複しないようにすること
+- 同じ部屋の異なるプラン（午前/午後/ナイト等）は、グループ化して表示するか、プラン名で区別すること
+- データ取得時に部屋名の一意性を確認すること
+
+### 表示必須項目（部屋ごと）
+各部屋には以下の情報を必ず表示すること:
+1. **部屋名** - 一意であること
+2. **空き時間帯** - 利用可能な時間枠
+3. **人数** - 定員（例: 2名、4名）
+4. **分数** - 利用時間（例: 90分、120分）
+5. **価格** - 料金（例: ¥6,600〜）
+
+### 必須リンク（施設ごと）
+各施設には以下のリンクを必ず設定すること:
+1. **公式ホームページ** (`hpUrl`) - 施設の公式サイト
+2. **Googleマップ** (`mapUrl`) - 店舗名で検索したGoogleマップリンク
+   - 形式: `https://www.google.com/maps/search/?api=1&query=店舗名+地域名`
+3. **予約ページ** (`url`) - 予約サイトへの直接リンク
+
+これにより、地域や店舗が増えても統一された形式で対応可能
+
+### ブラウザ自動化ツールの使い分け
+データ検証やサイト確認時のブラウザツール選択:
+
+1. **Claude in Chrome を優先使用**
+   - Cloudflareで保護されたサイト（reserva.be等）の確認
+   - ユーザーのブラウザセッションを使うため、Cloudflareをバイパスできる
+   - 認証済みサイトの操作
+   - 実際のブラウザ画面を見ながらのデバッグ
+
+2. **Puppeteer MCP を使用する場面**
+   - localhost/ローカル開発サーバーのテスト
+   - Cloudflare保護のないサイト
+   - ヘッドレスでの自動処理
+
+3. **判断基準**
+   - Cloudflare保護あり → **Claude in Chrome**
+   - Cloudflare保護なし → Puppeteer MCP（軽量・安定）
+
+### デプロイ方法
+- **mainブランチへのコミット = 自動デプロイ**
+- GitHubとCloud Buildが連携しており、pushすると自動的にCloud Runにデプロイされる
+- デプロイ完了まで約3〜5分
+- デプロイ後、`/api/refresh`でスクレイピングを再実行すると新コードが反映される
+- 本番URL: `https://private-sauna-availability-526007709848.asia-northeast1.run.app`
+
+### ナイトパックの表示形式
+日をまたぐナイトパックの時間帯は、翌日の日付を**先頭**に付与する:
+- 形式: `M/D HH:MM〜HH:MM`
+- 例: `1/14 01:00〜08:30`
+- 全施設で統一すること（GIRAFFE形式）
+
+---
+
+## 脈 MYAKU (spot-ly.jp) のスクレイピング
+
+### 重要なルール
+
+1. **カレンダーの◯✕マークは使用禁止**
+   - 概要カレンダーの◯✕は日単位の空き状況のみで、具体的な時間帯がわからない
+   - 必ずモーダルを開いて時間帯ボタンから取得すること
+
+2. **ボタンのインデックスで直接指定**
+   - ページ上のボタン順序は固定（0〜6）
+   - PLANSのpageIndexでボタンを直接特定する
+
+### スクレイピング手順
+
+1. URLに日付パラメータを付与してアクセス
+   ```
+   https://spot-ly.jp/ja/hotels/176?checkinDatetime=YYYY-MM-DD+00%3A00%3A00&checkoutDatetime=YYYY-MM-DD+00%3A00%3A00
+   ```
+
+2. 各プランの「予約する」ボタン（`button.bg-black`）をクリックしてモーダルを開く
+
+3. モーダル内で:
+   - プラン名を取得してマッチング
+   - 日付を選択
+   - 時間帯ボタンの`disabled`属性で空き判定
+
+### 空き判定方法
+
+- **空いている時間帯**: `<button>` に `disabled` 属性がない
+- **埋まっている時間帯**: `<button disabled="">`
+
+```html
+<!-- 空いている -->
+<button><span>13:00</span><span>-</span><span>14:30</span></button>
+
+<!-- 埋まっている -->
+<button disabled=""><span>21:00</span><span>-</span><span>22:30</span></button>
+```
+
+### 注意事項
+
+- **ナイトパック**: 日をまたぐため、カレンダー上の日付は翌日の予約を意味する
+  - 例: カレンダーで1/14の◯は、1/13夜〜1/14朝のナイトパックが空いていることを示す
+- モーダルのクリーンアップ: 次のプランを開く前に既存モーダルを閉じる
+
+---
+
+## GIRAFFE (reserva.be) のスクレイピング
+
+### 重要なルール
+
+1. **時間文字列の分割は正規表現で**
+   - RESERVAのtimebox要素は`data-time`に時間を持つ（例: `09:40～11:40`）
+   - `～`（全角チルダ U+FF5E）と`〜`（波ダッシュ U+301C）の両方が使われる可能性がある
+   - 分割には正規表現 `/[～〜]/` を使用すること
+
+2. **ページ再アクセス禁止**
+   - 複数日のデータを取得する際、ページを再アクセス（`page.goto()`）しない
+   - 同じページ内で日付をクリックして切り替えること
+   - 再アクセスするとCloudflareチェックがトリガーされ、本番環境で失敗する
+
+### スクレイピング手順
+
+1. FlareSolverrでCloudflare Cookieを取得
+2. 各部屋のURLにアクセス（1部屋1URL）
+3. `input.timebox[data-vacancy="1"]`要素から空き枠を抽出
+4. `data-targetgroup`（日付）と`data-time`（時間）を使用
+
+### データ抽出コード
+
+```javascript
+// 正しい分割方法
+const timeParts = time.split(/[～〜]/);
+const timeRange = timeParts[0].replace(/^0/, '') + '〜' + timeParts[1].replace(/^0/, '');
+```
+
+---
+
+## サウナヨーガン (reserva.be) のスクレイピング
+
+### 重要なルール
+
+1. **ページ再アクセス禁止（最重要）**
+   - 7日分のデータを取得する際、2日目以降でページを再アクセスしない
+   - 1回のアクセスで、日付ラベルをクリックして全日程を取得すること
+   - 再アクセスすると本番環境でCloudflareに弾かれる
+
+### スクレイピング手順
+
+1. FlareSolverrでCloudflare Cookieを取得
+2. 予約ページに1回だけアクセス
+3. 各日付の`label[for="YYYY-MM-DD"]`をクリック
+4. `input.timebox[data-vacancy="1"]`から空き枠を抽出
+5. 次の日付をクリック（ページ再アクセスしない）
+
+---
+
+## サイト別メモ
+
+### spot-ly.jp (脈)
+- 認証: **ログイン不要**
+- **ブラウザ不要**: 予約ページが内部で使うJSON APIを直接呼ぶ（2026-07-07に実証）
+  - 部屋・プラン一覧: `https://api.spot-ly.jp/api/v2/spotly/hotels/176/room_types?checkinDatetime=X+00:00:00&checkoutDatetime=Y+00:00:00&roomTypeCategory=`
+    - checkin < checkout が必須（同一日は422エラー）
+  - 空き時間帯: `https://api.spot-ly.jp/api/v2/spotly/room_types/{部屋ID}/fixed_plans/{プランID}/available_times?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD`
+- 必要ヘッダーは `User-Agent` と `Accept: application/json` のみ（Cookie・認証・FlareSolverr不要）
+- 時刻はUTCで返るため、JSTへ+9時間変換が必要
+- 空き判定: `isAvailable: true`
+- 旧方式（Puppeteer + FlareSolverr + react-select操作）は本番でreact-select描画待ちの失敗、spot-ly側の504エラー、プラン並び順のインデックス依存など複数の脆弱性があり、間欠失敗を起こしていたため使用禁止
+
+#### ナイトパックの日付表示
+- APIは深夜開始（例: `2026-07-08T00:30:00 JST`）で「7/7の夜」の枠として返す
+- アプリ上は前日（=入店する夜の日付）にまとめ、時間帯を「翌M/D H:MM〜H:MM」形式で表示
+
+### reserva.be (GIRAFFE, サウナヨーガン)
+- 認証: **ログイン不要**
+- Cloudflare保護あり → FlareSolverrでCookie取得必須
+- 空き判定: `input.timebox[data-vacancy="1"]`
+- 時間形式: `data-time="09:40～11:40"` → 全角チルダと波ダッシュの両方に対応
+- **重要**: ページ再アクセス禁止（Cloudflareトリガー回避）
+
+#### ⚠️ 継続的な観察が必要（2026-01-26更新）
+
+時間経過でスクレイピングが失敗することがある。
+
+**症状**: 全日程で空き枠0件になる（間欠的に発生）
+
+**根本原因（2026-01-26特定）**:
+1. **Cloud Runタイムアウト不足**: 540秒（9分）→ 8施設の処理に不足
+2. **スクレイピング順序**: RESERVA系が後半にあるとタイムアウトの影響を受けやすい
+
+**対策済み**:
+| 日付 | コミット | 対策 |
+|------|---------|------|
+| 2026-01-22 | 10b8877 | Cookieキャッシュ90分TTL、チャレンジ検出時キャッシュ無効化 |
+| 2026-01-26 | a4635f4 | Cloud Runタイムアウト900秒に延長、RESERVA系を最初に処理 |
+
+**観察結果**:
+- 2026-01-26 02:30頃: 修正デプロイ → 経過観察中
+
+**スクレイピング順序（修正後）**:
+1. GIRAFFE南天神（RESERVA）← 重点監視
+2. GIRAFFE天神（RESERVA）← 重点監視
+3. サウナヨーガン（RESERVA）← 重点監視
+4. 脈 MYAKU（spot-ly）← 重点監視
+5. KUDOCHI（hacomono）
+6. SAKURADO
+7. SAUNA OOO（gflow）
+8. BASE（Coubic）
+
+**確認コマンド**:
+```bash
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [eirinkan/private-sauna-availability](https://github.com/eirinkan/private-sauna-availability) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-17 -->
