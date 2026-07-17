@@ -7,11 +7,11 @@ Devify is an AI-driven development platform created to accelerate R&D workflows 
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [cloud2ai/devify](https://github.com/cloud2ai/devify).
+Original source: `AGENTS.md` in [cloud2ai/devify](https://github.com/cloud2ai/devify).
 
 ## Also available for
 
-- **Codex** — `AGENTS.md`
+- **Claude Code** — `CLAUDE.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
