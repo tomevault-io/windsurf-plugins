@@ -1,0 +1,106 @@
+---
+trigger: always_on
+description: Agentic dual-mode code review platform (PR **gate** + branch **stewardship**) on Codesteward Graph.
+---
+
+# Codesteward Review
+
+Agentic dual-mode code review platform (PR **gate** + branch **stewardship**) on Codesteward Graph.
+
+## Branding / product name (mandatory)
+
+| Correct | Wrong (never use) |
+|---------|-------------------|
+| **Codesteward** | CodeSteward, Code Steward, code-steward (display) |
+| **Codesteward Graph** | CodeSteward Graph |
+| **Codesteward Review** | CodeSteward Review |
+
+- Product/UI/docs/strings/comments: always **Codesteward** (capital **C**, rest lowercase).
+- Package/npm scope stays `@codesteward/*` (already lowercase).
+- Env/prefixes like `STEW_`, CLI `stew` are fine; do not invent `CodeSteward` in new code.
+
+## Identity (Keycloak SoT)
+
+- **`STEW_IDENTITY_MODE=keycloak`** (default when `OIDC_ISSUER` set): Keycloak owns users/groups/roles/orgs.
+- **Login UX:** unauthenticated users are **redirected immediately** to the platform IdP login page
+  (Keycloak + Codesteward theme). The React `/login` page is **not** the normal password UI.
+- **MFA / federated SSO** (Entra, Google, Okta, …) = configure only in Keycloak; no Codesteward code changes.
+- Break-glass local form: `/login?local=1` only.
+- Local DB holds a **shadow** user + membership for product FKs only.
+- Org multi-tenancy claim: Keycloak groups `/orgs/{slug}` → token `groups` claim.
+- Product roles: realm roles `steward-admin` | `steward-reviewer` | `steward-viewer`.
+- Members UI provisions via Keycloak Admin API (`KEYCLOAK_ADMIN_CLIENT_ID` / `SECRET`).
+- Login theme: `deploy/compose/keycloak/themes/codesteward` (`loginTheme: codesteward`).
+- SCIM into Codesteward is optional/legacy; preferred corporate path is IdP → Keycloak.
+
+## Stack
+
+- TypeScript ESM monorepo (pnpm, Node ≥22, `NodeNext`)
+- Packages under `packages/*`; worker at `services/worker` (`@codesteward/worker`)
+- Hono API, Vite+React UI, Commander CLI (`stew`)
+- Graph via MCP HTTP client; `GRAPH_MOCK=1` for offline
+
+## Commands
+
+```bash
+pnpm install && pnpm -r run build
+GRAPH_MOCK=1 pnpm dev:api      # :8081
+GRAPH_MOCK=1 pnpm dev:worker
+pnpm dev:ui                    # :8080
+pnpm dev:docs                  # Docusaurus :3000 (docs/)
+pnpm build:docs                # docs/build → Cloudflare Workers
+pnpm stew -- review -p . -r codesteward
+pnpm stew -- review --tier thorough --depth thorough
+pnpm stew -- config doctor
+pnpm stew -- doctor full
+pnpm stew -- resume <sessionId>
+pnpm stew -- findings export --sarif -s <sessionId>
+```
+
+## Layout
+
+| Package | Role |
+|---------|------|
+| `core` | Zod schemas, IDs, events |
+| `model-router` | OpenAI/Anthropic/SpaceXAI/compat/LiteLLM |
+| `graph-client` | Graph MCP + mock |
+| `policy` | STEWARD.md + `.codesteward/rules` (base branch) |
+| `findings` | Store + fingerprint + SARIF 2.1.0 |
+| `learning` | Reactions 👍/👎, org memories, last_reviewed_sha |
+| `db` | Postgres SoT (sessions, findings, jobs, learning) |
+| `sandbox` | Local/Docker/K8s stub/Null + Prove (LLM test gen) |
+| `scm` | GitHub, GitLab, Bitbucket, Azure DevOps, Gitea |
+| `agents` | Orchestrator, specialists, judge, discourse, noise, diff packing |
+| `api` / `cli` / `mcp-server` / `ui` | Surfaces |
+| `actions/review-action` | GitHub Action for PR gate |
+| `services/worker` | Job consumer |
+| `docs/` | Product/operator docs (Docusaurus; not under `packages/`) |
+
+## Conventions
+
+- ESM only; use `.js` extensions in relative imports
+- Workspace deps: `"@codesteward/*": "workspace:*"`
+- Never commit; policy loads from base branch only
+- Optional peer: `deepagents` via `createDeepAgentRunner`
+- Shared demo state: `.steward-data/` (sessions, jobs, findings, learning, `users.json`, `connectors.json`)
+- Thorough mode (`riskTier` or `depth` = `thorough`) runs discourse (dual correctness + AGREE/CHALLENGE/CONNECT/SURFACE)
+- Incremental gate uses `last_reviewed_sha` in learning store; pass `fullReview` to force full
+- Env SCM tokens: `GITHUB_TOKEN`, `GITLAB_TOKEN`, `BITBUCKET_TOKEN`+`BITBUCKET_USERNAME`, `AZURE_DEVOPS_TOKEN`, `GITEA_TOKEN`
+
+## CI / release gates (do not regress)
+
+Jobs that blocked `v1.0.0`: **Semgrep**, **zizmor**, **Trivy** (CI + release container gate).
+
+- **zizmor**: every `actions/setup-node` must set `package-manager-cache: false` (do not re-add `cache: pnpm`).
+- **Semgrep**: no `curl | sh` installs in workflows; pin Trivy/Syft release tarballs; AES-GCM uses `authTagLength: 16`; keep `.semgrepignore` + `--exclude scripts,evals`.
+- **Trivy**: multi-stage `deploy/compose/Dockerfile.node` (prod reinstall, no global npm, non-root `steward`); scan flags `--scanners vuln --ignore-unfixed --severity HIGH,CRITICAL`; keep `pnpm.overrides` for known HIGH transitive CVEs (`undici`, `picomatch`).
+- Local check: `zizmor --min-severity high .github/workflows/` and  
+  `docker build -f deploy/compose/Dockerfile.node -t codesteward-review:scan . && trivy image --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed --scanners vuln codesteward-review:scan`
+- **Always update `CHANGELOG.md` (`## [Unreleased]`) when a feature, fix, or behavior change is finished** — do not leave release notes for “later”
+- Runtime knobs: install-wide → Platform runtime (`/v1/platform/runtime-config`); org may override only `STEW_SUGGESTED_CODE_FIXES` when platform leaves it Unset
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [Codesteward/codesteward](https://github.com/Codesteward/codesteward) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-18 -->
