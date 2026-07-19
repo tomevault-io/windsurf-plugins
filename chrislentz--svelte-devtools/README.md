@@ -7,11 +7,11 @@ A zero-config Vite plugin that injects a floating devtools panel into your Svelt
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [chrislentz/svelte-devtools](https://github.com/chrislentz/svelte-devtools).
+Original source: `CLAUDE.md` in [chrislentz/svelte-devtools](https://github.com/chrislentz/svelte-devtools).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
