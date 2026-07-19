@@ -7,11 +7,11 @@ Reverse-engineered API for PDDIKTI — Indonesian Higher Education Database.  Pr
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [0xtbug/unofficial-pddikti-api](https://github.com/0xtbug/unofficial-pddikti-api).
+Original source: `CLAUDE.md` in [0xtbug/unofficial-pddikti-api](https://github.com/0xtbug/unofficial-pddikti-api).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
