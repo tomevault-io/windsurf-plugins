@@ -5,7 +5,7 @@ description: Enables **fully automated scoped application development** with zer
 
 # ServiceNow MCP Server v2.0 - Development Guide
 
-**For:** Claude Code (claude.ai/code)
+**For:** Codex (Codex.ai/code)
 **Version:** 2.0
 **Instance:** Multi-instance support enabled
 
@@ -180,4 +180,4 @@ Uses automated background script execution - takes ~2 seconds, fully scriptable!
 
 ---
 > Source: [Happy-Technologies-LLC/happy-platform-mcp](https://github.com/Happy-Technologies-LLC/happy-platform-mcp) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-05 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-20 -->
