@@ -1,273 +1,261 @@
 ---
 trigger: always_on
-description: Guidelines for developing and maintaining Langflow documentation using Docusaurus, including content structure, style, and deployment processes.
+description: Guidelines for frontend development in Langflow, focusing on React/TypeScript UI components, build processes, and frontend testing.
 ---
 
 
-
-# Documentation Development Guidelines
-
-## Purpose
-Guidelines for developing and maintaining Langflow documentation using Docusaurus, including content structure, style, and deployment processes.
-
----
-
-## 1. Documentation Environment Setup
+## 1. Frontend Environment Setup
 
 ### Prerequisites
-- **Node.js:** v22.12 LTS for runtime
-- **Package Manager:** Yarn for dependency management
-- **Documentation Framework:** Docusaurus v3
+- **Node.js:** v22.12 LTS for JavaScript runtime
+- **Package Manager:** npm (v10.9) for dependency management
+- **Development Tools:** Vite for build tooling
 
-### Documentation Service
+### Frontend Service
 ```bash
-cd docs
-yarn install      # Install dependencies
-yarn start        # Start dev server (usually port 3001)
+make frontend  # Start Vite dev server on port 3000
 ```
-- Auto-reloads on documentation changes
-- Access at: http://localhost:3001/
-- Documentation source: `docs/`
+- Hot-reload enabled for UI changes
+- Access at: http://localhost:3000/
+- Frontend source: `src/frontend/`
 
 ---
 
-## 2. Documentation Structure
+## 2. Frontend Structure
 
 ### Directory Layout
 ```
-docs/
-├── docs/                    # Main documentation content
-│   ├── agents/              # Agent and MCP guides
-│   ├── get-started/         # Getting started guides
-│   ├── tutorials/           # Langflow tutorials
-│   ├── components/          # Component documentation
-│   ├── flows/               # Guides to build, run, and test flows
-│   ├── deployment/          # Guides for deploying and hosting a Langflow server
-│   ├── develop/             # Guides for developing apps with Langflow
-│   ├── support/             # Help and release notes
-│   ├── contributing/        # Contribution guidelines
-│   └── api-reference/       # API documentation
-├── src/                     # Custom React components
-├── static/                  # Static assets (images, etc.)
-├── sidebars.js             # Sidebar configuration
-├── docusaurus.config.js    # Main configuration
-└── package.json            # Dependencies
+src/frontend/src/
+├── components/          # Reusable UI components
+├── pages/              # Page-level components
+├── icons/              # Component icons and lazy loading
+├── stores/             # State management (Zustand)
+├── types/              # TypeScript type definitions
+├── utils/              # Utility functions
+├── hooks/              # Custom React hooks
+├── services/           # API service functions
+└── assets/             # Static assets
 ```
 
-### Content Types
-- **Guides:** Step-by-step tutorials (`docs/getting-started/`)
-- **Reference:** API and component reference (`docs/api-reference/`)
-- **How-to:** Problem-solving articles (`docs/components/`)
-- **Concepts:** Explanatory articles about Langflow concepts
-- **Blog:** Release notes, announcements (`blog/`)
+### Key Technologies
+- **React 18** with TypeScript
+- **Vite** for build tooling and dev server
+- **Tailwind CSS** for styling
+- **Zustand** for state management
+- **React Flow** for flow graph visualization
+- **Lucide React** for icons
 
 ---
 
-## 3. Writing Documentation
+## 3. Frontend Code Quality
 
-### Markdown Conventions
-```markdown
----
-title: Page Title
-description: Brief description for SEO
-sidebar_position: 1
----
-
-# Page Title
-
-Brief introduction paragraph.
-
-## Section Header
-
-Content with proper formatting.
-
-### Subsection
-
-More detailed content.
-
-:::tip
-Use admonitions for important information.
-:::
-
-:::warning
-Use warnings for potential issues.
-:::
-
-:::danger
-Use danger for critical warnings.
-:::
-```
-
-### Code Blocks
-````markdown
-```python title="component_example.py"
-from langflow.components.base import Component
-
-class MyComponent(Component):
-    display_name = "My Component"
-    description = "Example component"
-
-    def run(self):
-        return "Hello, World!"
-```
-````
-
-### Images and Assets
-```markdown
-<!-- Images go in static/img/ -->
-![Component Overview](/img/components/overview.png)
-
-<!-- Use descriptive alt text -->
-![Langflow interface showing the flow editor with nodes and connections](/img/flow-editor.png)
-```
-
----
-
-## 4. Component Documentation
-
-### Component Page Template
-```markdown
----
-title: Component Name
-description: Brief description of what the component does
-sidebar_position: 1
----
-
-# Component Name
-
-Brief overview of the component's purpose.
-
-## Overview
-
-What this component does and when to use it.
-
-## Configuration
-
-### Inputs
-
-| Input | Type | Required | Description |
-|-------|------|----------|-------------|
-| `input_text` | String | Yes | The text to process |
-| `model_name` | String | No | Model to use (default: gpt-3.5-turbo) |
-
-### Outputs
-
-| Output | Type | Description |
-|--------|------|-------------|
-| `result` | Message | Processed result |
-
-## Usage Example
-
-```python
-# Example of using the component
-component = MyComponent(
-    input_text="Hello, world!",
-    model_name="gpt-4"
-)
-result = component.run()
-```
-
-## Common Issues
-
-### Issue: Component not loading
-
-**Solution:** Check that all required inputs are provided.
-
-### Issue: API key errors
-
-**Solution:** Ensure your API key is properly configured.
-```
-
-### API Documentation
-```markdown
----
-title: API Endpoint
-description: REST API endpoint documentation
----
-
-# API Endpoint Name
-
-## Endpoint
-
-`POST /api/v1/endpoint`
-
-## Request
-
-### Headers
-```json
-{
-  "Authorization": "Bearer <token>",
-  "Content-Type": "application/json"
-}
-```
-
-### Body
-```json
-{
-  "parameter": "value",
-  "optional_param": "optional_value"
-}
-```
-
-## Response
-
-### Success (200)
-```json
-{
-  "success": true,
-  "data": {
-    "result": "success"
-  }
-}
-```
-
-### Error (400)
-```json
-{
-  "success": false,
-  "error": "Error message"
-}
-```
-
-## Example
-
+### Formatting
 ```bash
-curl -X POST http://localhost:7860/api/v1/endpoint \
-  -H "Authorization: Bearer your-token" \
-  -H "Content-Type: application/json" \
-  -d '{"parameter": "value"}'
-```
+make format_frontend  # Format TypeScript/JavaScript code
 ```
 
+### Linting
+```bash
+make lint  # Run ESLint and TypeScript checks
+```
+
+### Testing
+```bash
+make tests_frontend  # Run frontend tests (requires additional setup)
+```
+
+### Pre-commit Workflow
+1. Run `make format_frontend`
+2. Run `make lint`
+3. Test changes in browser
+4. Commit changes
+
 ---
 
-## 5. Blog Posts and Announcements
+## 4. State Management
 
-### Blog Post Template
-```markdown
+### Zustand Stores
+```typescript
+// stores/myStore.ts
+import { create } from 'zustand';
+
+interface MyState {
+  value: string;
+  setValue: (value: string) => void;
+}
+
+export const useMyStore = create<MyState>((set) => ({
+  value: '',
+  setValue: (value) => set({ value }),
+}));
+```
+
+### Using Stores in Components
+```typescript
+// components/MyComponent.tsx
+import { useMyStore } from '@/stores/myStore';
+
+export function MyComponent() {
+  const { value, setValue } = useMyStore();
+
+  return (
+    <input
+      value={value}
+      onChange={(e) => setValue(e.target.value)}
+    />
+  );
+}
+```
+
 ---
-title: "Release: Langflow v1.1.0"
-description: "New features and improvements in Langflow v1.1.0"
-authors: [author-name]
-date: 2024-01-15
-tags: [release, features]
+
+## 5. API Integration
+
+### Service Functions
+```typescript
+// services/api.ts
+import { api } from '@/controllers/API';
+
+export async function createFlow(flowData: FlowData) {
+  const response = await api.post('/flows/', flowData);
+  return response.data;
+}
+
+export async function getFlows() {
+  const response = await api.get('/flows/');
+  return response.data;
+}
+```
+
+### Error Handling
+```typescript
+// hooks/useApi.ts
+import { useState, useCallback } from 'react';
+
+export function useApi<T>(apiFunction: (...args: any[]) => Promise<T>) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const execute = useCallback(async (...args: any[]) => {
+    try {
+      setLoading(true);
+      setError(null);
+      const result = await apiFunction(...args);
+      return result;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, [apiFunction]);
+
+  return { execute, loading, error };
+}
+```
+
 ---
 
-# Release: Langflow v1.1.0
+## 6. React Flow Integration
 
-Brief introduction to the release.
+### Flow Graph Components
+```typescript
+// components/FlowGraph.tsx
+import ReactFlow, {
+  Node,
+  Edge,
+  Controls,
+  Background
+} from 'reactflow';
 
-## New Features
+interface FlowGraphProps {
+  nodes: Node[];
+  edges: Edge[];
+  onNodesChange: (changes: NodeChange[]) => void;
+  onEdgesChange: (changes: EdgeChange[]) => void;
+}
 
-### Feature 1
-Description of the feature and how to use it.
+export function FlowGraph({
+  nodes,
+  edges,
+  onNodesChange,
+  onEdgesChange
+}: FlowGraphProps) {
+  return (
+    <div className="w-full h-full">
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        fitView
+      >
+        <Controls />
+        <Background />
+      </ReactFlow>
+    </div>
+  );
+}
+```
 
-### Feature 2
-Another feature description.
+### Custom Node Types
+```typescript
+// components/nodes/ComponentNode.tsx
+import { memo } from 'react';
+import { Handle, Position } from 'reactflow';
 
-## Improvements
+interface ComponentNodeProps {
+  data: {
+    label: string;
+    icon?: string;
+  };
+}
 
-- List of improvements
+export const ComponentNode = memo(({ data }: ComponentNodeProps) => {
+  return (
+    <div className="px-4 py-2 shadow-md rounded-md bg-white border">
+      <Handle type="target" position={Position.Top} />
+
+      <div className="flex items-center">
+        {data.icon && (
+          <img src={data.icon} alt="" className="w-4 h-4 mr-2" />
+        )}
+        <span className="text-sm">{data.label}</span>
+      </div>
+
+      <Handle type="source" position={Position.Bottom} />
+    </div>
+  );
+});
+```
+
+---
+
+## 7. Styling with Tailwind
+
+### Component Styling
+```typescript
+// components/Button.tsx
+import { cn } from '@/utils/cn';
+
+interface ButtonProps {
+  variant?: 'primary' | 'secondary';
+  size?: 'sm' | 'md' | 'lg';
+  children: React.ReactNode;
+  onClick?: () => void;
+}
+
+export function Button({
+  variant = 'primary',
+  size = 'md',
+  children,
+  onClick
+}: ButtonProps) {
+  return (
+    <button
+      className={cn(
+        'rounded-md font-medium transition-colors',
+        {
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
