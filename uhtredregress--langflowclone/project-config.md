@@ -1,136 +1,151 @@
 ---
 trigger: always_on
-description: Rules for creating and implementing component icons in Langflow, covering both backend Python component icon attributes and frontend React icon implementation.
+description: Guidelines for testing Langflow components and backend code, with emphasis on async patterns and robust, well-documented testing practices.
 ---
 
 
-# Component Icon Rules
+# Testing Guidelines for Langflow
 
 ## Purpose
-
-To ensure consistent, clear, and functional icon usage for components, covering both backend (Python) and frontend (React/TypeScript) steps.
+Guidelines for testing Langflow components and backend code, with emphasis on async patterns and robust, well-documented testing practices.
 
 ---
 
-## 1. Backend (Python) — Setting the Icon Name
+## 1. Testing Structure
 
-- **Where:** In your component class (e.g., in `src/backend/base/langflow/components/vectorstores/astradb.py`)
-- **How:**
-  Set the `icon` attribute to a string matching the icon you want to use.
+### Backend Tests Location
+- **Unit Tests:** `src/backend/tests/`
+- **Component Tests:** `src/backend/tests/unit/components/` (organized by component subdirectory)
+- **Integration Tests:** Available via `make integration_tests` (requires additional setup)
+
+### Test File Naming
+- Use same filename as component with appropriate test prefix/suffix
+- Example: `my_component.py` → `test_my_component.py`
+
+---
+
+## 2. Built-in Fixtures & Base Classes
+
+### `client` Fixture (FastAPI Test Client)
+- Defined in `src/backend/tests/conftest.py`
+- Provides an **async** `httpx.AsyncClient` connected to the full application via `ASGITransport` + `LifespanManager`.
+- Use it for API tests:
   ```python
-  icon = "AstraDB"
+  async def test_login_endpoint(client):
+      response = await client.post("api/v1/login", data={"username": "foo", "password": "bar"})
+      assert response.status_code == 200
   ```
-- **Tip:**
-  The string must match the frontend icon mapping exactly (case-sensitive).
+- Automatically configured with an **in-memory SQLite database** and mocked environment variables. No additional setup needed in individual tests.
+- Skip client creation by marking the test with `@pytest.mark.noclient`.
+
+### `ComponentTestBase` Family
+Located in `src/backend/tests/base.py`.
+
+| Base Class | Creates `client`? | Typical Use | Notes |
+|------------|------------------|-------------|-------|
+| `ComponentTestBase` | No | Core logic for component version testing | Requires you to provide fixtures described below. |
+| `ComponentTestBaseWithClient` | Yes (`@pytest.mark.usefixtures("client")`) | Components that need API access during `run()` | Inherit when the component interacts with backend services. |
+| `ComponentTestBaseWithoutClient` | No | Pure-logic components with no API calls | Lightweight alternative. |
+
+Required fixtures for subclasses:
+1. `component_class` → the component **class** under test.
+2. `default_kwargs` → dict of kwargs to instantiate the component (can be empty).
+3. `file_names_mapping` → list of `VersionComponentMapping` dicts mapping historical **Langflow versions** to module/file names.
+
+Example skeleton:
+```python
+from tests.base import ComponentTestBaseWithClient, VersionComponentMapping, DID_NOT_EXIST
+from langflow.components.my_namespace import MyComponent
+
+class TestMyComponent(ComponentTestBaseWithClient):
+    @pytest.fixture
+    def component_class(self):
+        return MyComponent
+
+    @pytest.fixture
+    def default_kwargs(self):
+        return {"foo": "bar"}
+
+    @pytest.fixture
+    def file_names_mapping(self):
+        return [
+            VersionComponentMapping(version="1.1.1", module="my_module", file_name="my_component.py"),
+            # Older versions can be mapped or DID_NOT_EXIST
+            VersionComponentMapping(version="1.0.19", module="my_module", file_name=DID_NOT_EXIST),
+        ]
+```
+
+`ComponentTestBase` automatically provides:
+- `test_latest_version` → Instantiates component via `component_class` and asserts `run()` doesn't return `None`.
+- `test_all_versions_have_a_file_name_defined` → Ensures mapping completeness vs `SUPPORTED_VERSIONS` constant (`src/backend/tests/constants.py`).
+- `test_component_versions` (parametrised) → Builds component from source for each supported version and asserts successful execution.
+
+When adding a new component test, **inherit from the correct base class and provide the three fixtures**. This greatly reduces boilerplate and enforces version compatibility.
 
 ---
 
-## 2. Frontend (React/TypeScript) — Adding the Icon
+## 3. Component Testing Requirements
 
-### a. Create the Icon Component
+### Minimum Testing Requirements
+- **Unit Tests:** Create comprehensive unit tests for all new components
+- **Manual Test Documentation:** If unit tests are incomplete, create a Markdown file with manual testing steps
+  - Location: Same directory as unit tests
+  - Filename: Same as component but with `.md` extension
+  - Content: Detailed manual testing steps and expected outcomes
 
-- **Where:**
-  In a new directory for your icon, e.g., `src/frontend/src/icons/AstraDB/`.
-- **How:**
-
-  - Add your SVG as a React component, e.g., `AstraSVG` in `AstraDB.jsx`.
-    ```jsx
-    const AstraSVG = (props) => (
-      <svg {...props}>
-        <path
-        // ...
-        />
-      </svg>
-    );
-    ```
-  - Create an `index.tsx` that exports your icon using `forwardRef`:
-
-    ```tsx
-    import React, { forwardRef } from "react";
-    import AstraSVG from "./AstraDB";
-
-    export const AstraDBIcon = forwardRef<
-      SVGSVGElement,
-      React.PropsWithChildren<{}>
-    >((props, ref) => {
-      return <AstraSVG ref={ref} isDark={isDark} {...props} />;
-    });
-    ```
-
-#### Supporting Light and Dark Mode Icons
-
-- **How:**
-  - In your SVG component (e.g., `AstraDB.jsx`), use the `isDark` prop to switch colors:
-    ```jsx
-    const AstraSVG = (props) => (
-      <svg {...props}>
-        <path
-          fill={props.isDark ? "#ffffff" : "#0A0A0A"}
-          // ...
-        />
-      </svg>
-    );
-    ```
-  - The `isDark` prop is passed from the icon wrapper (see above) and should be used to toggle between light and dark color schemes.
-  - You can use a utility like `stringToBool` to ensure the prop is interpreted correctly.
-
-### b. Add to Lazy Icon Imports
-
-- **Where:**
-  In `src/frontend/src/icons/lazyIconImports.ts`
-- **How:**
-  Add an entry to the `lazyIconsMapping` object:
-  ```ts
-  AstraDB: () =>
-    import("@/icons/AstraDB").then((mod) => ({ default: mod.AstraDBIcon })),
-  ```
-- **Tip:**
-  The key (`AstraDB`) must match the string used in the backend.
+### Testing Best Practices
+- Test both sync and async code paths
+- Mock external dependencies appropriately
+- Test error handling and edge cases
+- Validate input/output behavior
+- Test component initialization and configuration
 
 ---
 
-## 3. Best Practices
+## 4. Async Testing Patterns
 
-- **Naming:**
-  Use clear, recognizable names (e.g., `"AstraDB"`, `"Postgres"`, `"OpenAI"`).
-- **Consistency:**
-  Always use the same icon name for the same service across backend and frontend.
-- **Missing Icon:**
-  If no icon exists, use a [lucide icon](https://lucide.dev/icons)
-- **Light/Dark Mode:**
-  Always support both light and dark mode for custom icons by using the `isDark` prop in your SVG.
+### Async Component Testing
+```python
+import pytest
+import asyncio
 
----
+@pytest.mark.asyncio
+async def test_async_component():
+    # Test async component methods
+    result = await component.async_method()
+    assert result is not None
+```
 
-## 4. Checklist for Adding a New Icon
+### Testing Background Tasks
+```python
+@pytest.mark.asyncio
+async def test_background_task_completion():
+    # Ensure background tasks complete properly
+    task = asyncio.create_task(component.background_operation())
+    result = await asyncio.wait_for(task, timeout=5.0)
+    assert result.success
+```
 
-- [ ] Decide on a clear, descriptive icon name (e.g., `AstraDB`).
-- [ ] In your Python component, set `icon = "YourIconName"`.
-- [ ] Create a new icon directory in `src/frontend/src/icons/YourIconName/`.
-- [ ] Add your SVG as a React component (e.g., `YourIconNameIcon.jsx`).
-- [ ] Create an `index.tsx` that exports your icon using `forwardRef` and passes the `isDark` prop.
-- [ ] Add your icon to `lazyIconsMapping` in `src/frontend/src/icons/lazyIconImports.ts` with the exact same name.
-- [ ] Verify the icon appears correctly in the UI in both light and dark mode.
-- [ ] If no suitable icon exists, use a generic icon and request a new one if needed.
+### Testing Queue Operations
+```python
+@pytest.mark.asyncio
+async def test_queue_operations():
+    # Test queue put/get operations without blocking
+    queue = asyncio.Queue()
 
----
+    # Non-blocking put
+    queue.put_nowait(test_data)
 
-**Example for AstraDB:**
-
-- Backend:
-  ```python
-  icon = "AstraDB"
-  ```
-- Frontend:
-  - `src/icons/AstraDB/AstraDB.jsx` (SVG as React component, uses `isDark` prop)
-  - `src/icons/AstraDB/index.tsx` (exports `AstraDBIcon` and passes `isDark`)
-  - Add to `lazyIconImports.ts`:
-    ```ts
-    AstraDB: () =>
-      import("@/icons/AstraDB").then((mod) => ({ default: mod.AstraDBIcon })),
-    ```
+    # Verify queue processing
+    result = await asyncio.wait_for(queue.get(), timeout=1.0)
+    assert result == test_data
+```
 
 ---
+
+## 5. Special Testing Considerations
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [UhtredRegress/LangFlowClone](https://github.com/UhtredRegress/LangFlowClone) — distributed by [TomeVault](https://tomevault.io).
