@@ -7,13 +7,13 @@ StackPass is a developer network that helps you meet devs and ship in focused ha
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `CLAUDE.md` in [Danproc/SoloPass](https://github.com/Danproc/SoloPass).
+Original source: `.cursor/rules/*.mdc` in [Danproc/SoloPass](https://github.com/Danproc/SoloPass).
 
 ## Also available for
 
+- **Claude Code** — `CLAUDE.md`
 - **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
-- **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
 - **Windsurf** — `project-config.md`
 
