@@ -1,51 +1,180 @@
 ---
 trigger: always_on
-description: This file establishes foundational mandates for Gemini CLI when working on the PANOPTES Observatory Control System (POCS).
+description: manages the entire observation workflow through a state machine architecture.
 ---
 
-# Gemini CLI Mandates for POCS
+# AI Agent Guidelines for POCS
 
-This file establishes foundational mandates for Gemini CLI when working on the PANOPTES Observatory Control System (POCS).
+This document provides guidelines for AI coding agents working with the PANOPTES Observatory Control System (POCS)
+codebase. It is designed to be tool-agnostic and applicable to any AI assistant working on this project.
 
-## Primary Directive
+## Project Overview
 
-**All instructions and guidelines defined in [AGENTS.md](./AGENTS.md) are absolute mandates.** 
+POCS (PANOPTES Observatory Control System) is the main software driver for robotic astronomical observatories designed
+to detect transiting exoplanets. The system controls telescope hardware, schedules observations, captures images, and
+manages the entire observation workflow through a state machine architecture.
 
-Gemini CLI must rigorously adhere to the standards, workflows, and architectural principles detailed in `AGENTS.md`, including but not limited to:
+**Key Characteristics:**
 
-- **Code Style:** Use Ruff for linting and formatting. Use double quotes and 110-character line limits.
-- **Type Safety:** Python 3.12+ type hints are required for all function signatures.
-- **Documentation:** Use Google-style docstrings for all public classes and functions. All documentation must be written in Markdown for MkDocs. Do not use reStructuredText (.rst) or Sphinx.
-- **Testing:** Every change MUST include corresponding `pytest` tests. Maintain high coverage.
-- **Package Management:** Use `uv` for all dependency and environment management.
-- **Logging:** Use `loguru` via `self.logger` (from `PanBase`) or direct import for standalone utilities.
-- **Configuration:** The `panoptes-config-server` MUST be running for POCS or its tests to function correctly.
+- **Language:** Python 3.12+ (type hints expected)
+- **Architecture:** State machine-based observatory control
+- **Domain:** Astronomy, robotics, hardware control
+- **Testing:** pytest with high coverage requirements
+- **Package Manager:** uv (modern Python package manager)
+- **Code Style:** Ruff for linting and formatting
 
-## Project-Specific Workflow Mandates
+## Essential Reading
 
-- **Changelog Requirement:** A `CHANGELOG.md` entry is required for **every feature or bug fix**. All entries must be added under an `## [Unreleased]` section at the top of the file. Minor changes (e.g., documentation tweaks, internal refactoring) do not necessarily require a changelog entry.
-- **Commit Message Format:** Use the format `Brief description (#issue-number)`.
-- **Utility Preference:** ALWAYS check the [`panoptes-utils`](https://github.com/panoptes/panoptes-utils) library for existing functionality before implementing new utilities or importing external libraries.
-- **Simulator-First Testing:** POCS controls physical hardware. Always prioritize safety and use simulators for verification. Never bypass state machine transitions. Use the `--simulator` flag or appropriate configuration to ensure no real hardware commands are sent during development and testing.
+Before making changes, review these documents:
 
-## Research & Validation Commands
+1. **Architecture:** `docs/architecture-for-beginners.md` - Understand the layered architecture
+2. **Contributing:** `CONTRIBUTING.md` - Development workflow and standards
+3. **CLI Guide:** `docs/cli-guide.md` - Command-line interface reference
+4. **Glossary:** `docs/glossary.md` - Domain-specific terminology
+5. **Conceptual Overview:** `docs/conceptual-overview.md` - High-level system design
 
-- **Research:** Use `grep_search` to find existing implementations of similar logic to ensure architectural consistency.
-- **Linting & Formatting:** 
-    - `uv run ruff check .`
-    - `uv run ruff format --check .` (use `uv run ruff format .` to fix)
-- **Testing:** 
-    - `uv run pytest <test_path>`
-    - Always ensure the config server is running (usually on port 6563) before starting tests.
+## Project Structure
 
-## Reference Documents
+```
+POCS/
+├── src/panoptes/pocs/          # Main source code
+│   ├── core.py                 # POCS state machine (the brain)
+│   ├── observatory.py          # Hardware coordinator
+│   ├── scheduler/              # Observation scheduler
+│   ├── camera/                 # Camera drivers
+│   ├── mount/                  # Telescope mount drivers
+│   ├── dome/                   # Dome control
+│   ├── focuser/                # Focus control
+│   └── utils/                  # Utilities and CLI
+├── tests/                      # Test suite
+├── conf_files/                 # Configuration files
+├── docs/                       # Documentation
+└── examples/                   # Example scripts
+```
 
-- **Architecture:** `docs/architecture-for-beginners.md`
-- **Contributing:** `CONTRIBUTING.md`
-- **Glossary:** `docs/glossary.md`
-- **CLI Guide:** `docs/cli-guide.md`
+## Development Workflow
+
+### 1. Understanding Changes
+
+**Before making any changes:**
+
+- Check if an issue exists for the change; reference it in commits/PRs
+- Read relevant architecture documentation to understand affected components
+- Review existing tests to understand expected behavior
+- Check `pyproject.toml` for dependencies and project configuration
+
+### 2. Code Standards
+
+**Style and Formatting:**
+
+- Use Ruff for linting and formatting (configured in `pyproject.toml`)
+- Line length: 110 characters
+- Quote style: double quotes
+- Follow PEP 8 conventions
+
+**Type Hints:**
+
+- Required for all function signatures
+- Use modern Python 3.12+ type syntax
+- Import from `typing` when necessary
+
+**Documentation:**
+
+- Docstrings for all public classes and functions
+- Use Google-style docstrings
+- Include examples in docstrings when helpful
+
+### 3. Testing Requirements
+
+**All code changes must include tests:**
+
+- Unit tests in `tests/` directory
+- Test files named `test_*.py`
+- Use pytest fixtures from `conftest.py`
+- Maintain or improve code coverage
+- Run tests locally before committing: `pytest`
+
+**Testing markers available:**
+
+```python
+@pytest.mark.theskyx  # Tests requiring TheSkyX
+@pytest.mark.with_camera  # Tests requiring camera hardware
+@pytest.mark.without_camera  # Tests that should skip camera
+@pytest.mark.plate_solve  # Tests requiring plate solving
+```
+
+### 4. Dependencies
+
+**Adding Dependencies:**
+
+- Add to `dependencies` in `pyproject.toml` for runtime requirements
+- Add to `[dependency-groups]` for development/testing tools
+- Use `uv add <package>` to install and update lockfile
+- Pin security-sensitive packages (e.g., `certifi>=2024.2.2`)
+
+**Optional Dependencies:**
+
+- `focuser`: Matplotlib and focus-related tools
+- `google`: Google Cloud integration
+- `weather`: Weather station support
+- `all`: All optional features
+
+### 5. Making Changes
+
+**File Editing Best Practices:**
+
+1. Read entire files or large sections before editing
+2. Preserve existing code style and patterns
+3. Make minimal, focused changes
+4. Validate changes by checking for errors after editing
+5. Run relevant tests to confirm functionality
+
+**Commit Messages:**
+
+- Clear, descriptive commit messages
+- Reference issue numbers when applicable
+- Format: `Brief description (#issue-number)`
+
+**Pre-commit Checklist:**
+
+Before every commit, run lint and format to ensure no issues:
+
+```bash
+ruff check .
+ruff format .
+```
+
+Both commands must pass cleanly before committing.
+
+## Architecture Guidelines
+
+### State Machine (POCS Core)
+
+**Location:** `src/panoptes/pocs/core.py`
+
+The POCS state machine orchestrates observations. Key states include:
+
+- `sleeping` → `ready` → `scheduling` → `slewing` → `tracking` → `observing` → `parking`
+
+**When modifying:**
+
+- Understand state transitions (defined by `transitions` library)
+- Respect the state flow logic
+- Add appropriate state validation
+- Update state documentation if adding new states
+
+### Scheduler Component
+
+**Location:** `src/panoptes/pocs/scheduler/`
+
+The scheduler decides WHAT to observe (POCS decides WHEN).
+
+**When modifying:**
+
+- Understand constraints system
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/panoptes)
-> This is a context snippet only. You'll also want the standalone SKILL.md file — [download at TomeVault](https://tomevault.io/claim/panoptes)
-<!-- tomevault:4.0:windsurf_rules:2026-04-08 -->
+> Source: [panoptes/POCS](https://github.com/panoptes/POCS) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-20 -->
