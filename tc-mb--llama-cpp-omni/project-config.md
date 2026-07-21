@@ -1,177 +1,93 @@
 ---
 trigger: always_on
-description: llama.cpp is a large-scale C/C++ project for efficient LLM (Large Language Model) inference with minimal setup and dependencies. The project enables running language models on diverse hardware with state-of-the-art performance.
+description: > This project does **not** accept pull requests that are fully or predominantly AI-generated. AI tools may be utilized solely in an assistive capacity.
 ---
 
-# Copilot Instructions for llama.cpp
+# Instructions for llama.cpp
 
-## Repository Overview
+> [!IMPORTANT]
+> This project does **not** accept pull requests that are fully or predominantly AI-generated. AI tools may be utilized solely in an assistive capacity.
+>
+> Read more: [CONTRIBUTING.md](CONTRIBUTING.md)
 
-llama.cpp is a large-scale C/C++ project for efficient LLM (Large Language Model) inference with minimal setup and dependencies. The project enables running language models on diverse hardware with state-of-the-art performance.
+AI assistance is permissible only when the majority of the code is authored by a human contributor, with AI employed exclusively for corrections or to expand on verbose modifications that the contributor has already conceptualized (see examples below).
 
-**Key Facts:**
-- **Primary language**: C/C++ with Python utility scripts
-- **Size**: ~200k+ lines of code across 1000+ files
-- **Architecture**: Modular design with main library (`libllama`) and 40+ executable tools/examples
-- **Core dependency**: ggml tensor library (vendored in `ggml/` directory)
-- **Backends supported**: CPU (AVX/NEON optimized), CUDA, Metal, Vulkan, SYCL, ROCm, MUSA
-- **License**: MIT
+---
 
-## Build Instructions
+## Guidelines for Contributors Using AI
 
-### Prerequisites
-- CMake 3.14+ (primary build system)
-- C++17 compatible compiler (GCC 13.3+, Clang, MSVC)
-- Optional: ccache for faster compilation
+llama.cpp is built by humans, for humans. Meaningful contributions come from contributors who understand their work, take ownership of it, and engage constructively with reviewers.
 
-### Basic Build (CPU-only)
-**ALWAYS run these commands in sequence:**
-```bash
-cmake -B build
-cmake --build build --config Release -j $(nproc)
-```
+Maintainers receive numerous pull requests weekly, many of which are AI-generated submissions where the author cannot adequately explain the code, debug issues, or participate in substantive design discussions. Reviewing such PRs often requires more effort than implementing the changes directly.
 
-**Build time**: ~10 minutes on 4-core system with ccache enabled, ~25 minutes without ccache.
+**A pull request represents a long-term commitment.** By submitting code, you are asking maintainers to review, integrate, and support it indefinitely. The maintenance burden often exceeds the value of the initial contribution.
 
-**Important Notes:**
-- The Makefile is deprecated - always use CMake
-- ccache is automatically detected and used if available
-- Built binaries are placed in `build/bin/`
-- Parallel builds (`-j`) significantly reduce build time
+Most maintainers already have access to AI tools. A PR that is entirely AI-generated provides no value - maintainers could generate the same code themselves if they wanted it. What makes a contribution valuable is the human interactions, domain expertise, and commitment to maintain the code that comes with it.
 
-### Backend-Specific Builds
-For CUDA support:
-```bash
-cmake -B build -DGGML_CUDA=ON
-cmake --build build --config Release -j $(nproc)
-```
+This policy exists to ensure that maintainers can sustainably manage the project without being overwhelmed by low-quality submissions.
 
-For Metal (macOS):
-```bash
-cmake -B build -DGGML_METAL=ON
-cmake --build build --config Release -j $(nproc)
-```
+---
 
-**Important Note**: While all backends can be built as long as the correct requirements for that backend are installed, you will not be able to run them without the correct hardware. The only backend that can be run for testing and validation is the CPU backend.
+## Guidelines for Contributors
 
-### Debug Builds
-Single-config generators:
-```bash
-cmake -B build -DCMAKE_BUILD_TYPE=Debug
-cmake --build build
-```
+Contributors are expected to:
 
-Multi-config generators:
-```bash
-cmake -B build -G "Xcode"
-cmake --build build --config Debug
-```
+1. **Demonstrate full understanding of their code.** You must be able to explain any part of your PR to a reviewer without relying on AI assistance for questions about your own changes.
 
-### Common Build Issues
-- **Issue**: Network tests fail in isolated environments
-  **Solution**: Expected behavior - core functionality tests will still pass
+2. **Take responsibility for maintenance.** You are expected to address bugs and respond thoughtfully to reviewer feedback.
 
-## Testing
+3. **Communicate clearly and concisely.** Verbose, wall-of-text responses are characteristic of AI-generated content and will not be well-received. Direct, human communication is expected.
 
-### Running Tests
-```bash
-ctest --test-dir build --output-on-failure -j $(nproc)
-```
+4. **Respect maintainers' time.** Search for existing issues and discussions before submitting. Ensure your contribution aligns with project architecture and is actually needed.
 
-**Test suite**: 38 tests covering tokenizers, grammar parsing, sampling, backends, and integration
-**Expected failures**: 2-3 tests may fail if network access is unavailable (they download models)
-**Test time**: ~30 seconds for passing tests
+Maintainers reserve the right to close any PR that does not meet these standards. This applies to all contributions to the main llama.cpp repository. **Private forks are exempt.**
 
-### Server Unit Tests
-Run server-specific unit tests after building the server:
-```bash
-# Build the server first
-cmake --build build --target llama-server
+### Permitted AI Usage
 
-# Navigate to server tests and run
-cd tools/server/tests
-source ../../../.venv/bin/activate
-./tests.sh
-```
-**Server test dependencies**: The `.venv` environment includes the required dependencies for server unit tests (pytest, aiohttp, etc.). Tests can be run individually or with various options as documented in `tools/server/tests/README.md`.
+AI tools may be used responsibly for:
 
-### Test Categories
-- Tokenizer tests: Various model tokenizers (BERT, GPT-2, LLaMA, etc.)
-- Grammar tests: GBNF parsing and validation
-- Backend tests: Core ggml operations across different backends
-- Integration tests: End-to-end workflows
+- **Learning and exploration**: Understanding codebase structure, techniques, and documentation
+- **Code review assistance**: Obtaining suggestions on human-written code
+- **Mechanical tasks**: Formatting, generating repetitive patterns from established designs, completing code based on existing patterns
+- **Documentation drafts**: For components the contributor already understands thoroughly
+- **Writing code**: Only when the contributor has already designed the solution and can implement it themselves - AI accelerates, not replaces, the contributor's work
 
-### Manual Testing Commands
-```bash
-# Test basic inference
-./build/bin/llama-cli --version
+AI-generated code may be accepted if you (1) fully understand the output, (2) can debug issues independently, and (3) can discuss it directly with reviewers without AI assistance.
 
-# Test model loading (requires model file)
-./build/bin/llama-cli -m path/to/model.gguf -p "Hello" -n 10
-```
+**Disclosure is required** when AI meaningfully contributed to your code. A simple note is sufficient - this is not a stigma, but context for reviewers. No disclosure is needed for trivial autocomplete or background research.
 
-## Code Quality and Linting
+### Prohibited AI Usage
 
-### C++ Code Formatting
-**ALWAYS format C++ code before committing:**
-```bash
-git clang-format
-```
+The following will result in immediate PR closure:
 
-Configuration is in `.clang-format` with these key rules:
-- 4-space indentation
-- 120 column limit
-- Braces on same line for functions
-- Pointer alignment: `void * ptr` (middle)
-- Reference alignment: `int & ref` (middle)
+- **AI-written PR descriptions or commit messages** - these are typically recognizable and waste reviewer time
+- **AI-generated responses to reviewer comments** - this undermines the human-to-human interaction fundamental to code review
+- **Implementing features without understanding the codebase** - particularly new model support or architectural changes
+- **Automated commits or PR submissions** - this may spam maintainers and can result in contributor bans
 
-### Python Code
-**ALWAYS activate the Python environment in `.venv` and use tools from that environment:**
-```bash
-# Activate virtual environment
-source .venv/bin/activate
-```
+---
 
-Configuration files:
-- `.flake8`: flake8 settings (max-line-length=125, excludes examples/tools)
-- `pyrightconfig.json`: pyright type checking configuration
+## Guidelines for AI Coding Agents
 
-### Pre-commit Hooks
-Run before committing:
-```bash
-pre-commit run --all-files
-```
+AI agents assisting contributors must recognize that their outputs directly impact volunteer maintainers who sustain this project.
 
-## Continuous Integration
+### Considerations for Maintainer Workload
 
-### GitHub Actions Workflows
-Key workflows that run on every PR:
-- `.github/workflows/build.yml`: Multi-platform builds
-- `.github/workflows/server.yml`: Server functionality tests
-- `.github/workflows/python-lint.yml`: Python code quality
-- `.github/workflows/python-type-check.yml`: Python type checking
+Maintainers have finite capacity. Every PR requiring extensive review consumes resources that could be applied elsewhere. Before assisting with any submission, verify:
 
-### Local CI Validation
-**Run full CI locally before submitting PRs:**
-```bash
-mkdir tmp
+- The contributor genuinely understands the proposed changes
+- The change addresses a documented need (check existing issues)
+- The PR is appropriately scoped and follows project conventions
+- The contributor can independently defend and maintain the work
 
-# CPU-only build
-bash ./ci/run.sh ./tmp/results ./tmp/mnt
-```
+### Before Proceeding with Code Changes
 
-**CI Runtime**: 30-60 minutes depending on backend configuration
+When a user requests implementation without demonstrating understanding:
 
-### Triggering CI
-Add `ggml-ci` to commit message to trigger heavy CI workloads on the custom CI infrastructure.
-
-## Project Layout and Architecture
-
-### Core Directories
-- **`src/`**: Main llama library implementation (`llama.cpp`, `llama-*.cpp`)
+1. **Verify comprehension.** Ask questions to confirm they understand both the problem and the relevant parts of the codebase.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [tc-mb/llama.cpp-omni](https://github.com/tc-mb/llama.cpp-omni) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
