@@ -1,348 +1,173 @@
 ---
 trigger: always_on
-description: This is how to create a registry component
+description: Handles user interaction:
 ---
 
+# Components.build Specification
 
-# Cursor Rules for Adding New UI Components to Cult UI Registry
+**Version 1.0.0**  
+components.build  
+January 2026
 
-## Overview
+> **Note:**  
+> This document is mainly for agents and LLMs to follow when maintaining,  
+> generating, or refactoring UI component libraries. Humans  
+> may also find it useful, but guidance here is optimized for automation  
+> and consistency by AI-assisted workflows.
 
-This document outlines the complete process for adding a new UI component to the Cult UI registry system. Follow these steps in order to ensure proper integration.
+---
 
-## Step-by-Step Process
+## Abstract
 
-### 1. Create the Component File
+Comprehensive guidelines for building modern, composable, and accessible UI components. This specification provides patterns and best practices for creating React components that are composable, accessible, customizable, and well-documented.
 
-**Location**: `apps/www/registry/default/ui/[component-name].tsx`
+---
 
-**Requirements**:
+## Table of Contents
 
-- Use TypeScript with React
-- Include proper TypeScript interfaces for props
-- Use `"use client"` directive if component uses client-side features
-- Export the component with a descriptive name (e.g., `TextureButton`)
-- Include `displayName` for debugging
-- Use proper imports from `@/lib/utils` for `cn` utility
-- Follow existing component patterns for styling and structure
+1. [Overview](#1-overview) — **MEDIUM**
+   - 1.1 [Components.build Overview](#11-componentsbuild-overview)
+2. [Principles](#2-principles) — **HIGH**
+   - 2.1 [Core Component Principles](#21-core-component-principles)
+3. [Definitions](#3-definitions) — **MEDIUM**
+   - 3.1 [Component Artifact Definitions](#31-component-artifact-definitions)
+4. [Composition](#4-composition) — **HIGH**
+   - 4.1 [Component Composition](#41-component-composition)
+5. [Accessibility](#5-accessibility) — **CRITICAL**
+   - 5.1 [Accessibility Guidelines](#51-accessibility-guidelines)
+6. [State](#6-state) — **HIGH**
+   - 6.1 [State Management Patterns](#61-state-management-patterns)
+7. [Types](#7-types) — **HIGH**
+   - 7.1 [Component Types](#71-component-types)
+8. [Polymorphism](#8-polymorphism) — **MEDIUM**
+   - 8.1 [Polymorphism Patterns](#81-polymorphism-patterns)
+9. [As-Child](#9-as-child) — **MEDIUM**
+   - 9.1 [asChild Pattern](#91-aschild-pattern)
+10. [Data Attributes](#10-data-attributes) — **LOW**
+   - 10.1 [Data Attributes for Styling](#101-data-attributes-for-styling)
+11. [Styling](#11-styling) — **HIGH**
+   - 11.1 [Component Styling with Tailwind CSS](#111-component-styling-with-tailwind-css)
+12. [Design Tokens](#12-design-tokens) — **MEDIUM**
+   - 12.1 [Design Tokens](#121-design-tokens)
+13. [Documentation](#13-documentation) — **MEDIUM**
+   - 13.1 [Component Documentation](#131-component-documentation)
+14. [Registry](#14-registry) — **LOW**
+   - 14.1 [Component Registries](#141-component-registries)
+15. [NPM](#15-npm) — **LOW**
+   - 15.1 [Publishing to NPM](#151-publishing-to-npm)
+16. [Marketplaces](#16-marketplaces) — **LOW**
+   - 16.1 [Component Marketplaces](#161-component-marketplaces)
 
-**Example structure**:
+---
+
+## 1. Overview
+
+**Impact: MEDIUM**
+
+Specification scope, goals, and philosophy. Introduction to the
+components.build standard for building modern UI components.
+
+### 1.1 Components.build Overview
+
+**Impact: MEDIUM (Foundation for understanding the specification)**
+
+The components.build specification is an open-source standard for building modern, composable, and accessible UI components. It provides high-level guidelines, best practices, and common terminology for designing UI components that integrate smoothly into any codebase.
+
+**What This Specification Is:**
+
+This spec is **not**:
+
+- A tutorial or course on React
+
+- A promotion for any specific component library or registry
+
+- A replacement for framework documentation
+
+This spec **is**:
+
+- A set of high-level guidelines and best practices
+
+- A common terminology for designing UI components
+
+- A standard for ensuring components meet modern expectations
+
+- A framework for creating components that integrate smoothly across projects
+
+**Who This Is For:**
+
+This specification is written for:
+
+- **Open-source maintainers** building and distributing component libraries
+
+- **Senior front-end engineers** designing component APIs and design systems
+
+- **Developers** familiar with JavaScript/TypeScript and React
+
+**Framework Scope:**
+
+While examples use React (with JSX/TSX) for concreteness, the fundamental concepts apply to other frameworks (Vue, Svelte, Angular). The philosophy is **framework-agnostic**.
+
+**Core Goals:**
+
+The specification aims to help developers create components that are:
+
+1. **Composable** - Components combine and nest to create complex UIs
+
+2. **Accessible** - Usable by everyone, including users with disabilities
+
+3. **Easy to adopt** - Integrate smoothly into any codebase
+
+4. **Consistent** - Follow modern expectations and patterns
+
+5. **Well-documented** - Clear guidelines and terminology
+
+**Key Philosophy:**
+
+- **Composition over configuration** - Build flexible, composable APIs
+
+- **Accessibility by default** - Not an afterthought, but a requirement
+
+- **Developer experience** - Components should be easy to understand, customize, and integrate
+
+- **Transparency** - Source code should be inspectable and modifiable
+
+- **Standards alignment** - Follow web standards and modern best practices
+
+**Example:**
+
+The following examples illustrate the difference between components that don't follow the specification and those that do:
+
+**Incorrect:**
 
 ```tsx
-"use client"
-
-import * as React from "react"
-import { cva } from "class-variance-authority"
-
-import { cn } from "@/lib/utils"
-
-// Component variants using cva
-const componentVariants = cva("base-classes", {
-  variants: {
-    variant: {
-      default: "default-classes",
-      // other variants
-    },
-    size: {
-      default: "default-size",
-      // other sizes
-    },
-  },
-  defaultVariants: {
-    variant: "default",
-    size: "default",
-  },
-})
-
-export interface ComponentProps extends React.HTMLAttributes<HTMLElement> {
-  variant?: "default" | "other"
-  size?: "default" | "other"
-  // other props
-}
-
-const ComponentName = React.forwardRef<HTMLElement, ComponentProps>(
-  ({ className, variant, size, ...props }, ref) => {
-    return (
-      <element
-        className={cn(componentVariants({ variant, size }), className)}
-        ref={ref}
-        {...props}
-      />
-    )
-  }
-)
-
-ComponentName.displayName = "ComponentName"
-
-export { ComponentName }
-```
-
-### 2. Create the Example/Demo File
-
-**Location**: `apps/www/registry/default/example/[component-name]-demo.tsx`
-
-**Requirements**:
-
-- Use `"use client"` directive
-- Import the component from the correct path: `@/registry/default/ui/[component-name]`
-- Create a comprehensive demo showing all variants and use cases
-- Use proper styling with dark mode support
-- Include responsive design considerations
-- Export as default function with descriptive name
-
-**Example structure**:
-
-```tsx
-"use client"
-
-import { ComponentName } from "@/registry/default/ui/component-name"
-
-export default function ComponentNameDemo() {
+// Hard-coded styles, no accessibility, not composable
+function Button() {
   return (
-    <div className="dark:bg-stone-950 py-6 px-4 md:px-0 rounded-md flex justify-center">
-      <div>
-        {/* Demo content showing all variants */}
-        <div className="flex flex-col gap-3 max-w-lg mt-4">
-          <ComponentName variant="default">Default</ComponentName>
-          <ComponentName variant="other">Other Variant</ComponentName>
-        </div>
-      </div>
-    </div>
-  )
+    <button style={{ backgroundColor: '#007bff', color: 'white', padding: '10px' }}>
+      Click me
+    </button>
+  );
 }
 ```
 
-### 3. Create Documentation File
-
-**Location**: `apps/www/content/docs/components/[component-name].mdx`
-
-**Requirements**:
-
-- Include frontmatter with title, description, and component flag
-- Add ComponentPreview with the demo name
-- Include installation instructions (CLI and manual)
-- Provide usage examples
-- Follow existing documentation patterns
-
-**Example structure**:
-
-````mdx
----
-title: ComponentName
-description: Brief description of the component
-component: true
-links:
----
-
-<ComponentPreview
-  name="component-name-demo"
-  className="[&_.preview>[data-orientation=vertical]]:sm:max-w-[70%]"
-  description="All variations"
-/>
-
-## Installation
-
-<CodeTabs>
-
-<TabsList>
-  <TabsTrigger value="cli">CLI</TabsTrigger>
-  <TabsTrigger value="manual">Manual</TabsTrigger>
-</TabsList>
-
-<TabsContent value="cli">
-
-```bash
-npx shadcn@latest add https://cult-ui.com/r/component-name.json
-```
-
-</TabsContent>
-
-<TabsContent value="manual">
-
-<Steps>
-
-<Step>Copy and paste the following code into your project.</Step>
-
-<ComponentSource name="component-name" />
-
-<Step>Update the import paths to match your project setup.</Step>
-
-</Steps>
-
-</TabsContent>
-
-</CodeTabs>
-
-## Usage
-
-
+**Correct:**
 
 ```tsx
-<ComponentName variant="default">Content</ComponentName>
-```
-````
+// Composable, accessible, customizable
+import { cn } from '@/lib/utils';
 
-### 4. Update Registry Files
+interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: 'default' | 'outline';
+}
 
-#### A. Update `apps/www/registry/ui.ts`
+export function Button({ 
+  className, 
+  variant = 'default', 
+  children, 
+  ...props 
 
-Add a new entry to the `ui` array:
-
-```typescript
-{
-  name: "component-name",
-  type: "registry:ui",
-  dependencies: ["dependency1", "dependency2"], // or [""] if no dependencies
-  files: [
-    {
-      path: "registry/default/ui/component-name.tsx",
-      type: "registry:ui",
-    },
-  ],
-},
-```
-
-**Dependencies to consider**:
-
-- `framer-motion` - for animations
-- `@radix-ui/react-slot` - for polymorphic components
-- `react-use-measure` - for measurements
-- `three` - for 3D components
-- `jotai` - for state management
-- `next/image` - for Next.js image optimization
-- `button` - for button dependencies
-- `aspect-ratio` - for aspect ratio components
-
-#### B. Update `apps/www/registry/examples.ts`
-
-Add a new entry to the `examples` array:
-
-```typescript
-{
-  name: "component-name-demo",
-  type: "registry:component",
-  registryDependencies: ["component-name"], // include other dependencies if needed
-  files: [
-    {
-      path: "registry/default/example/component-name-demo.tsx",
-      type: "registry:component",
-    },
-  ],
-},
-```
-
-### 5. Update Documentation Configuration
-
-**File**: `apps/www/config/docs.ts`
-
-Add the new component to the appropriate section in the `sidebarNav` array. Choose the correct category:
-
-- **Buttons & Controls**: For button-like components
-- **Cards & Containers**: For card and container components
-- **Onboarding & Tours**: For onboarding and tutorial components
-- **Layout & Forms**: For layout and form components
-- **Interactive Elements**: For interactive UI elements
-- **Media**: For media-related components
-- **Typography & Text**: For text and typography components
-- **Visual Effects**: For visual effect components
-
-**Example addition**:
-
-```typescript
-{
-  title: "Component Display Name",
-  href: "/docs/components/component-name",
-  items: [],
-  // Optional: label: "new" | "recent"
-},
-```
-
-## Naming Conventions
-
-### File Names
-
-- Use kebab-case for file names: `component-name.tsx`
-- Use kebab-case for demo files: `component-name-demo.tsx`
-- Use kebab-case for documentation: `component-name.mdx`
-
-### Component Names
-
-- Use PascalCase for component names: `ComponentName`
-- Use descriptive, clear names that indicate the component's purpose
-
-### Registry Names
-
-- Use kebab-case for registry entries: `component-name`
-- Use kebab-case for demo registry entries: `component-name-demo`
-
-## Dependencies
-
-### Common Dependencies
-
-- `framer-motion` - Animation library
-- `@radix-ui/react-slot` - Polymorphic component support
-- `react-use-measure` - Element measurement hooks
-- `three` - 3D graphics library
-- `jotai` - State management
-- `next/image` - Next.js image optimization
-- `button` - Button component dependency
-- `aspect-ratio` - Aspect ratio component
-
-### Dependency Guidelines
-
-- Always include `framer-motion` if the component has animations
-- Include `@radix-ui/react-slot` if the component supports polymorphic rendering
-- Include `react-use-measure` if the component needs to measure elements
-- Include `three` and `jotai` for 3D components
-- Include `next/image` if using Next.js image optimization
-- Include other registry components as `registryDependencies` if they're used
-
-## Testing Checklist
-
-Before considering the component complete, verify:
-
-- [ ] Component file created in `apps/www/registry/default/ui/`
-- [ ] Demo file created in `apps/www/registry/default/example/`
-- [ ] Documentation file created in `apps/www/content/docs/components/`
-- [ ] Entry added to `apps/www/registry/ui.ts`
-- [ ] Entry added to `apps/www/registry/examples.ts`
-- [ ] Entry added to `apps/www/config/docs.ts`
-- [ ] Component renders correctly in all variants
-- [ ] Demo shows all component variations
-- [ ] Documentation is complete and accurate
-- [ ] All dependencies are properly declared
-- [ ] TypeScript types are correct
-- [ ] Component follows existing patterns and conventions
-
-## File Structure Summary
-
-```
-apps/www/
-├── registry/
-│   ├── default/
-│   │   ├── ui/
-│   │   │   └── [component-name].tsx          # Component implementation
-│   │   └── example/
-│   │       └── [component-name]-demo.tsx     # Demo/example
-│   ├── ui.ts                                 # Registry entries
-│   └── examples.ts                           # Example registry entries
-├── content/docs/components/
-│   └── [component-name].mdx                  # Documentation
-└── config/
-    └── docs.ts                               # Navigation configuration
-```
-
-## Notes
-
-- Always follow existing patterns and conventions
-- Ensure components are accessible and responsive
-- Test components in both light and dark modes
-- Use proper TypeScript types and interfaces
-- Include comprehensive examples in demos
-- Write clear, helpful documentation
-- Consider the component's placement in the navigation structure
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/nolly-studio)
-> This is a context snippet only. You'll also want the standalone SKILL.md file — [download at TomeVault](https://tomevault.io/claim/nolly-studio)
-<!-- tomevault:4.0:windsurf_rules:2026-04-08 -->
+> Source: [nolly-studio/cult-ui](https://github.com/nolly-studio/cult-ui) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
