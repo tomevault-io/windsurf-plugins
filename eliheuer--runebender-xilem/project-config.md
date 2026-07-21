@@ -1,15 +1,59 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: Context for AI coding agents working on `runebender-xilem`. Evergreen
 ---
 
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Context for AI coding agents working on `runebender-xilem`. Evergreen
+info only — architecture, build, conventions, load-bearing gotchas.
+Task-specific plans live under `.agents/`. New agents: read this
+top-to-bottom before touching code, then check `.agents/` for active
+plans and `.agents/active/` for in-flight claims by other agents.
 
-## Project Overview
+Agent-name-agnostic: Codex (native `AGENTS.md` convention),
+Claude Code (via `CLAUDE.md` → here), and any other human-driven
+agent that reads this file get the same instructions.
 
-Runebender Xilem is a font editor built with Xilem, a Rust reactive UI framework from the Linebender ecosystem. It edits UFO (Unified Font Object) font sources and designspace (variable font) files. Status: very alpha.
+## What this is
+
+Runebender Xilem is a native Rust font editor built with Xilem, the
+Linebender reactive UI framework. It edits UFO (Unified Font Object)
+font sources and designspace (variable-font) files. Status: alpha.
+
+This is the canonical Runebender UI/UX reference. The
+`runebender-comfy` port (WASM/Vue, ComfyUI custom node) mirrors this
+repo's `src/components/*.rs` 1:1 in Vue. When you change a component
+here, expect a comfy follow-up.
+
+## Sister repos
+
+All assumed to be siblings under `~/GH/repos/`:
+
+| Repo | License | Role |
+|---|---|---|
+| `runebender-xilem` | Apache-2.0 | **This repo.** Canonical native editor + UI/UX reference. |
+| `runebender-core` | Apache-2.0 | Shared editing/model crate. Local `path = "../runebender-core"` dep. |
+| `runebender-comfy` | GPL-3.0 | WASM/Vue port for ComfyUI. Mirrors this repo's UI/UX. |
+
+Fresh-clone needs `runebender-core` checked out as a sibling (or
+switch to a git dep before public publish).
+
+## ⚠ Load-bearing gotcha: the kurbo version split
+
+- `runebender-xilem` is pinned to **kurbo 0.12** (via masonry 0.4).
+- `runebender-comfy` is on **kurbo 0.13** (forced by peniko 0.5 /
+  vello 0.8).
+- The `spline` crate uses kurbo 0.9 internally; conversion happens
+  at the boundary.
+
+Sharing kurbo-using modules between xilem and comfy currently
+produces ~289 errors of `masonry::kurbo::X is not kurbo::X`.
+Switching xilem to masonry-2 is a multi-week project.
+
+**Do not naively bump this repo's kurbo.** Only modules with NO kurbo
+types in their public API can move into `runebender-core`. Today
+that's selection, undo, edit_types, entity_id, kerning, category.
 
 ## Build and Development Commands
 
@@ -79,44 +123,9 @@ src/
 │   ├── mod.rs            # Re-exports EntityId
 │   ├── workspace.rs      # UFO font data (Workspace, Glyph, etc.)
 │   ├── designspace.rs    # Variable font designspace support
-│   ├── kerning.rs        # Kerning lookup algorithm
-│   ├── entity_id.rs      # Unique entity identifiers
-│   └── glyph_renderer.rs # Glyph contour → BezPath conversion
-│
-├── data/                 # AppState — central hub
-│   ├── mod.rs            # AppState struct, Tab enum, new(), Default
-│   ├── file_io.rs        # Font loading/saving (open, load, save)
-│   ├── grid.rs           # Glyph grid operations (columns, scroll, filter)
-│   ├── editor.rs         # Editor session management
-│   └── kerning.rs        # Kerning & glyph property updates
-│
-├── components/           # UI components & widgets
-│   ├── editor_canvas/    # Main glyph editor canvas
-│   │   ├── mod.rs        # EditorWidget struct, Widget impl
-│   │   ├── paint.rs      # Paint helpers (background, glyph modes)
-│   │   ├── text_buffer.rs # Text buffer rendering (multi-sort layout)
-│   │   ├── pointer.rs    # Pointer event handlers
-│   │   ├── keyboard.rs   # Keyboard shortcut handlers
-│   │   ├── drawing.rs    # Standalone drawing functions (points, metrics)
-│   │   └── view.rs       # Xilem View wrapper (EditorView)
-│   └── ...               # Other components (toolbars, panels)
-│
-├── views/                # Top-level views (welcome, grid, editor)
-│   ├── editor.rs         # Glyph editing tab
-│   ├── welcome.rs        # Welcome screen
-│   └── glyph_grid/       # Glyph grid tab
-│       ├── mod.rs        # Grid tab view, toolbar panels, grid building
-│       └── glyph_cell.rs # GlyphCellWidget, GlyphCellView wrapper
-├── tools/                # Editing tools (Select, Pen, Knife, etc.)
-├── shaping/              # Text shaping (Arabic joining, etc.)
-└── sort/                 # Multi-glyph text buffer
-```
-
-### UI Layer
-
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [eliheuer/runebender-xilem](https://github.com/eliheuer/runebender-xilem) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-20 -->
