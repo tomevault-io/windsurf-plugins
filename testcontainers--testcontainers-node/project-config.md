@@ -1,0 +1,99 @@
+---
+trigger: always_on
+description: This is a working guide for contributors and coding agents in this repository.
+---
+
+# AGENTS.md
+
+## Purpose
+
+This is a working guide for contributors and coding agents in this repository.
+It captures practical rules that prevent avoidable CI and PR churn.
+
+## Instruction precedence
+
+- Repository-specific instructions in this file override generic coding-agent defaults, skills, and templates.
+- If a generic workflow conflicts with this file, follow this file.
+
+## Repository Layout
+
+- This repository is an npm workspaces monorepo.
+  - root package: `testcontainers-monorepo`
+  - workspaces: `packages/testcontainers` and `packages/modules/*`
+  - shared lockfile: root `package-lock.json` (workspace installs update this single file)
+- For workspace-scoped dependency changes, prefer targeted commands to reduce lockfile churn:
+  - `npm install -w @testcontainers/<module>`
+  - `npm uninstall -w @testcontainers/<module> <package>`
+
+## Development Expectations
+
+- If a public API changes, update the relevant docs in the same PR.
+- If new types are made part of the public API, export them from the package's `index.ts` in the same PR.
+- If new learnings or misunderstandings are discovered, propose an `AGENTS.md` update in the same PR.
+- In docs Markdown, keep `<!--codeinclude-->` blocks tight with no blank lines between the markers and the include line, or the rendered snippet will contain blank lines between code lines.
+- Tests should verify observable behavior changes, not only internal/config state.
+  - Example: for a security option, assert a real secure/insecure behavior difference.
+- When adding a regression test for a bug fix, follow a red-green-refactor workflow.
+  - Run the focused test against the pre-fix implementation and confirm it fails for the expected reason.
+  - Apply the implementation change, rerun the same test, and confirm it passes.
+  - Report the red-green evidence in the PR verification summary.
+- Test-only helper files under `src` (for example `*-test-utils.ts`) must be explicitly excluded from package `tsconfig.build.json` so they are not emitted into `build` and accidentally published.
+- For substantial changes to GitHub Actions, runner images, Node/npm versions, or release/publish automation, consider running the manual `Node.js Package` workflow as a dry-run publish sanity check.
+  - Select the PR branch as the workflow ref to test publish workflow changes before merging.
+  - Use a representative version input, for example the next planned semver.
+- Vitest runs tests concurrently by default (`sequence.concurrent: true` in `vitest.config.ts`).
+  - Tests that rely on shared/global mocks (for example `vi.spyOn` on shared loggers/singletons) can be flaky due to interleaving or automatic mock resets.
+  - Prefer asserting observable behavior instead of shared global mock state when possible.
+  - If a test must depend on shared/global mock state, use `it.sequential(...)` or `describe.sequential(...)`.
+
+## Cross-language Implementations
+
+Testcontainers is a family of libraries that share the same concepts (containers, wait
+strategies, modules, Ryuk/reaper, networks, etc.) across many languages. When you are
+unsure how to design or implement something here, it is often worth checking how the more
+mature implementations solved the same problem. Their behavior is the de-facto reference,
+and aligning with it keeps this port consistent with the rest of the ecosystem.
+
+Use them as a sanity check in both directions:
+
+- If a feature or behavior exists elsewhere, see how it was implemented, what edge cases
+  it handles, and what defaults it chose before designing your own version.
+- If something is conspicuously absent, treat that as a signal. It may have been
+  deliberately omitted (unsupported by the Docker API, a footgun, deprecated, or
+  platform-specific). Investigate why before adding it here.
+
+Implementations, roughly in order of maturity (most mature first):
+
+- Java (the original reference implementation): https://github.com/testcontainers/testcontainers-java
+- Go: https://github.com/testcontainers/testcontainers-go
+- .NET: https://github.com/testcontainers/testcontainers-dotnet
+- Python: https://github.com/testcontainers/testcontainers-python
+- Node.js (this repository): https://github.com/testcontainers/testcontainers-node
+- Rust: https://github.com/testcontainers/testcontainers-rs
+- Ruby: https://github.com/testcontainers/testcontainers-ruby
+- Haskell: https://github.com/testcontainers/testcontainers-hs
+
+When you do borrow a decision from another implementation, note the source in the PR so
+reviewers can follow the reasoning.
+
+## Permission and Escalation
+
+- `npm install` requires escalated permissions for outbound network access to npm registries.
+- `npm test` commands should be run with escalation so tests can access the Docker socket.
+
+### Escalation hygiene
+
+- Use specific commands and clear justifications.
+- Prefer narrow reruns rather than broad full-suite reruns when iterating.
+
+## PR Process
+
+1. Start from `main`.
+2. Create a branch prefixed with `<agent-name>/` (for example `claude/fix-exec-output-truncation`). The PR title must not carry such prefixes (see step 9).
+3. Implement scoped changes only.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [testcontainers/testcontainers-node](https://github.com/testcontainers/testcontainers-node) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-20 -->
