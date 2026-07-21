@@ -3,26 +3,20 @@ trigger: always_on
 description: Welcome! This document guides you through the recommended workflows, conventions, and tooling when working on the **Opilot** VS Code extension project. Follow these instructions strictly to ensure consistency, quality, and smooth collaboration.
 ---
 
-# GitHub Copilot Instructions for Agent: Visual Studio Code Extension Integrating Ollama into GitHub Copilot Chat
+# Agent Instructions: Visual Studio Code Extension Integrating Ollama into GitHub Copilot Chat
 
 Welcome! This document guides you through the recommended workflows, conventions, and tooling when working on the **Opilot** VS Code extension project. Follow these instructions strictly to ensure consistency, quality, and smooth collaboration.
 
 ---
 
-## 1. Before Starting Work: Beans Issue Management
+## Before Starting Work
 
-- **Always start with a bean.** Search for an existing bean relevant to your task using the Beans VS Code extension or `@beans` chat participant.
-- If none exists, create a new bean and set its status to `in-progress`.
-- Maintain all work tracking in the bean's `## Todo` checklist in the bean body.
-- Use the Beans extension or MCP tools for all bean operations; CLI only as last resort.
-- **Create or switch to the issue branch before editing code.**
-- Branch name format: `[type]/[issue-number-without-prefix]-[short-title]` (e.g., `feat/1234-add-ollama-integration`).
-- Add the branch and PR number to the bean’s frontmatter immediately after creation.
-- Commit the bean promptly after creation or updates.
+- **Create or switch to the correct branch before editing code.**
+- Branch name format: `[type]/[short-title]` (e.g., `feat/add-ollama-integration`).
 
 ---
 
-## 2. Project Overview
+## Project Overview
 
 You are working on the **Opilot** extension, which integrates Ollama models into GitHub Copilot Chat inside VS Code.
 
@@ -39,98 +33,104 @@ You are working on the **Opilot** extension, which integrates Ollama models into
 
 ---
 
-## 3. Development Environment Setup
+## Development Environment Setup
 
 - **Prerequisites:**
 
-- Node.js 20+
-- pnpm (version pinned in `package.json`)
-- VS Code 1.109.0 or higher
-- GitHub Copilot Chat extension installed
-- Ollama installed locally or remote access configured
+  - Node.js 20+
+  - pnpm (version pinned in `package.json`)
+  - VS Code 1.109.0 or higher
+  - GitHub Copilot Chat extension installed
+  - Ollama installed locally or remote access configured
 
 - **Installing Ollama:**
 
-- Download from [https://ollama.ai/download](https://ollama.ai/download)
-- Start Ollama app or run `ollama serve`
-- Login to Ollama Cloud if using cloud models (`ollama login`)
+  - Download from [https://ollama.ai/download](https://ollama.ai/download)
+  - Start Ollama app or run `ollama serve`
+  - Login to Ollama Cloud if using cloud models (`ollama login`)
 
 - **Extension Installation:**
 
-- Install from VS Code Marketplace or `.vsix` file
+  - Install from VS Code Marketplace or `.vsix` file
 
 ---
 
-## 4. Task Execution Using Taskfile
+## Code Quality Standards
 
-Use the provided `Taskfile.yml` to run common commands. Run tasks with:
+This project uses **Ultracite**, a zero-config preset built on **Biome** that enforces strict code quality standards through automated formatting and linting. The project has migrated from oxlint/oxfmt to Biome via Ultracite, so `check-formatting` and `format` tasks are no longer needed — `ultracite check` and `ultracite fix` cover both linting and formatting in a single command.
 
-```bash
-task <taskname>
-```
+### Quick Reference
 
-### Common tasks
+- **Lint and format code**: `pnpm dlx ultracite fix`
+- **Check for issues**: `pnpm dlx ultracite check`
+- **Diagnose setup**: `pnpm dlx ultracite doctor`
 
-| Task Name          | Description                                | Usage Example             |
-| ------------------ | ------------------------------------------ | ------------------------- |
-| check-types        | Type checking                              | `task check-types`        |
-| lint               | Run linter                                 | `task lint`               |
-| lint-fix           | Auto-fix linter issues                     | `task lint-fix`           |
-| check-formatting   | Check code formatting                      | `task check-formatting`   |
-| compile            | Compile the extension                      | `task compile`            |
-| unit-tests         | Run unit tests                             | `task unit-tests`         |
-| unit-test-coverage | Unit tests with coverage                   | `task unit-test-coverage` |
-| extension-tests    | Run VS Code extension tests                | `task extension-tests`    |
-| integration-tests  | Run integration tests (pulls models first) | `task integration-tests`  |
-| precommit          | Run pre-commit checks                      | `task precommit`          |
-| release            | Release the extension                      | `task release`            |
-| watch              | Watch source and recompile                 | `task watch`              |
+### Core Principles
 
----
+Write code that is **accessible, performant, type-safe, and maintainable**. Focus on clarity and explicit intent over brevity.
 
-## 5. Code Contribution Workflow
+#### Type Safety & Explicitness
 
-1. **Start or resume work on the correct bean and branch.**
-2. **Update the bean's `## Todo` checklist** to reflect your progress after every meaningful step.
-3. **Run pre-commit tasks before committing:**
+- Use explicit types for function parameters and return values when they enhance clarity
+- Prefer `unknown` over `any` when the type is genuinely unknown
+- Use const assertions (`as const`) for immutable values and literal types
+- Leverage TypeScript's type narrowing instead of type assertions
+- Use meaningful variable names instead of magic numbers - extract constants with descriptive names
 
-   ```bash
-   task precommit
-   ```
+#### Modern JavaScript/TypeScript
 
-4. **Test your changes thoroughly:**
-   - Unit tests: `task unit-tests`
-   - Extension tests: `task extension-tests`
-   - Integration tests: `task integration-tests`
-5. **Build the extension before release or PR:**
+- Use arrow functions for callbacks and short functions
+- Prefer `for...of` loops over `.forEach()` and indexed `for` loops
+- Use optional chaining (`?.`) and nullish coalescing (`??`) for safer property access
+- Prefer template literals over string concatenation
+- Use destructuring for object and array assignments
+- Use `const` by default, `let` only when reassignment is needed, never `var`
 
-   ```bash
-   task compile
-   ```
+#### Async & Promises
 
-6. **Push your branch and update the bean frontmatter with branch and PR info.**
-7. **On completion, add a `## Summary of Changes` section in the bean and mark it `completed`.**
+- Always `await` promises in async functions - don't forget to use the return value
+- Use `async/await` syntax instead of promise chains for better readability
+- Handle errors appropriately in async code with try-catch blocks
+- Don't use async functions as Promise executors
 
----
+#### React & JSX
 
-## 6. Working with Beans (Issues)
+- Use function components over class components
+- Call hooks at the top level only, never conditionally
+- Specify all dependencies in hook dependency arrays correctly
+- Use the `key` prop for elements in iterables (prefer unique IDs over array indices)
+- Nest children between opening and closing tags instead of passing as props
+- Don't define components inside other components
+- Use semantic HTML and ARIA attributes for accessibility:
+  - Provide meaningful alt text for images
+  - Use proper heading hierarchy
+  - Add labels for form inputs
+  - Include keyboard event handlers alongside mouse events
+  - Use semantic elements (`<button>`, `<nav>`, etc.) instead of divs with roles
 
-- Use the Beans VS Code extension UI or `@beans` chat commands for all bean operations.
-- Keep all your todo items inside the bean markdown under `## Todo`.
-- Do not keep separate todo lists or scratchpads.
-- Commit beans frequently to keep the issue tracker in sync.
-- Use the correct branch naming convention and record branch and PR in bean frontmatter.
-- When closing a bean, add a summary or reason for scrapping.
+#### Error Handling & Debugging
 
----
+- Remove `console.log`, `debugger`, and `alert` statements from production code
+- Throw `Error` objects with descriptive messages, not strings or other values
+- Use `try-catch` blocks meaningfully - don't catch errors just to rethrow them
+- Prefer early returns over nested conditionals for error cases
 
-## 7. Extension-Specific Notes
+#### Code Organization
 
-- The extension auto-detects Ollama at `http://localhost:11434` by default.
-- Use VS Code settings to configure Ollama host, models, and completions.
+- Keep functions focused and under reasonable cognitive complexity limits
+- Extract complex conditions into well-named boolean variables
+- Use early returns to reduce nesting
+- Prefer simple conditionals over nested ternary operators
+- Group related code together and separate concerns
+
+#### Security
+
+- Add `rel="noopener"` when using `target="_blank"` on links
+- Avoid `dangerouslySetInnerHTML` unless absolutely necessary
+- Don't use `eval()` or assign directly to `document.cookie`
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [selfagency/opilot](https://github.com/selfagency/opilot) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-09 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-20 -->
