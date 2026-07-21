@@ -1,102 +1,129 @@
 ---
 trigger: always_on
-description: - `main.go` — the only Go file for problems. Always replaced with the current problem template.
+description: algotutor's behaviour lives in `AGENTS.md` and is mirrored to `CLAUDE.md` and
 ---
 
-# Algorithmic Training Project
+# Agent setup
 
-## Project Structure
+algotutor's behaviour lives in `AGENTS.md` and is mirrored to `CLAUDE.md` and
+`GEMINI.md` by `make sync-agents`. Any AI coding agent that can read files, edit
+files, and run shell commands can drive the workflow once it loads those
+instructions.
 
-- `main.go` — the only Go file for problems. Always replaced with the current problem template.
-- `problems/` — one `.md` file per problem, saved as `001.md`, `002.md`, etc.
-- `current.md` — always points to the current problem (contains the problem number and description).
-- `progress.md` — tracks the user's level (0–N) for each concept.
-- `progress.template.md` — blank progress table (all zeros), used for initialization.
-- `cards.json` — spaced repetition review cards (created automatically during practice).
-- `mistakes.json` — log of recurring error categories (created automatically during practice).
-- `resolve.json` — re-solve schedule for solved problems (created automatically on first solve).
-- `mix.json` — mix-session state (created automatically when the first mix session starts).
-- `retention.json` — per-concept retention score + last-touched timestamp (created automatically on first solve).
-- `cmd/review/` — the review TUI program (run with `go run ./cmd/review`).
-- `problem-bank.md` — curated problem bank organized by concept and level.
-- `docs/` — detail files loaded on demand. See pointers below.
-- `claude.md` — this file.
+This page lists per-agent setup tips. Each agent is independent — pick one and go.
 
-Detail files in `docs/` (read these when the relevant flow fires):
+## Quick reference
 
-- `docs/concepts.md` — the 32-concept list with prerequisites and teaching order.
-- `docs/cards.md` — spaced-repetition card format, SuperMemo rules, examples.
-- `docs/mistakes.md` — `mistakes.json` schema, full taxonomy, drill rules.
-- `docs/resolve.md` — re-solve mode: ladder, outcomes, `resolve.json` schema.
-- `docs/mix.md` — mix mode: retention, timing, outcomes, `mix.json` schema.
-- `docs/go-gotchas.md` — Go semantic traps (bytes vs runes, slice aliasing, nil
-  maps, integer division on negatives, etc.). **Consult before writing any
-  problem statement, example, or nudge that touches the affected mechanic.**
+| Agent             | Loads instructions from                                | Model config              | Permissions                                                              |
+| ----------------- | ------------------------------------------------------ | ------------------------- | ------------------------------------------------------------------------ |
+| Claude Code       | `CLAUDE.md` (auto)                                     | `.claude/settings.json`   | `.claude/settings.local.json`, or run with `--dangerously-skip-permissions` |
+| OpenAI Codex CLI  | `AGENTS.md` (auto)                                     | `~/.codex/config.toml`    | `--sandbox <mode>` / `--ask-for-approval <policy>`                       |
+| Cursor            | `AGENTS.md` (auto, recent builds) or `.cursor/rules/`  | IDE settings              | Auto via Composer / Agent mode                                           |
+| Cline / Roo Code  | `AGENTS.md` (auto) or `.clinerules/`                   | Extension settings        | Extension permissions UI                                                 |
+| OpenCode          | `AGENTS.md` (auto)                                     | `~/.config/opencode/`     | Per-launch flag                                                          |
+| Aider             | `AGENTS.md` via `--read` flag                          | `--model <name>`          | `--yes` for auto-approve                                                 |
+| Gemini CLI        | `GEMINI.md` (auto)                                     | Built-in                  | Per-launch flag                                                          |
 
-## Initialization
+## Per-agent setup
 
-On first interaction, if `progress.md`, `current.md`, or `problems/` don't exist:
+### Claude Code
 
-1. Copy `progress.template.md` to `progress.md`.
-2. Create `current.md` with empty content.
-3. Create the `problems/` directory.
+```sh
+claude
+# or, to skip per-tool prompts:
+claude --dangerously-skip-permissions
+```
 
-## Language
+`CLAUDE.md` is auto-loaded on session start. Default model is set in
+`.claude/settings.json` (`claude-sonnet-4-6`). Permission allow-list is in
+`.claude/settings.local.json`.
 
-Always Go. `main` function always comes first. Every file must be a valid, runnable Go program.
+### OpenAI Codex CLI
 
-## Problem Format
+```sh
+codex
+# or, to choose permissions for the session:
+codex --sandbox workspace-write --ask-for-approval on-request
+```
 
-Each problem file (`problems/NNN.md`) contains:
+`AGENTS.md` is auto-loaded from the project root. Model preference goes in
+`~/.codex/config.toml`. Recommend a current reasoning-class model.
 
-- Problem statement
-- Function signature
-- Example inputs/outputs
-- Concept being trained
-- Status: `pending` | `solved`
+### Cursor
 
-`current.md` contains the current problem number, optionally with a mode suffix:
+Open the project folder in Cursor, switch to Agent / Composer mode, and type
+`train` in the chat. Recent Cursor builds auto-load `AGENTS.md`. If yours doesn't,
+add a one-line `.cursor/rules/main.mdc` containing `@AGENTS.md`.
 
-- `003` — normal mode (first solve).
-- `014:resolve` — re-solve mode for problem 014 (see `docs/resolve.md`).
-- `034:mix` — mix mode for problem 034 (see `docs/mix.md`).
+### Cline / Roo Code
 
-## Concepts and Progression
+Open the project in VS Code with the Cline (or Roo Code) extension installed,
+activate the chat panel, and type `train`. Both extensions auto-load `AGENTS.md`.
 
-The 32 concepts and their prerequisites live in `docs/concepts.md`. Read it when you need to pick a candidate concept,
-look up prerequisites, or verify ordering. Track the user's level for each concept in `progress.md`.
+### OpenCode
 
-### Level Progression Within a Concept
+```sh
+opencode
+```
 
-- **Level 0**: Never seen. Start with the simplest possible problem for this concept.
-- **Level 1**: Can do the basic pattern. Give a slightly harder variation.
-- **Level 2**: Comfortable. Introduce edge cases or combine with a previously learned concept.
-- **Level 3**: Strong. Give problems that require this concept as a tool within a larger problem.
-- **Level 4+**: Mastery. Interview-level problems featuring this concept.
+`AGENTS.md` is auto-loaded. Model is configured per-launch or in
+`~/.config/opencode/`.
 
-### Teaching New Concepts (Level 0)
+### Aider
 
-**Assume the user is brand new to algorithms and data structures.** When training a concept at level 0, the user may
-never have heard of it before. Do not jump straight to a LeetCode-style problem.
+```sh
+aider --read AGENTS.md --model <your-model>
+```
 
-- **Introduce the concept first.** Before (or in) the first problem, briefly explain what the data structure or
-  technique is: what it looks like, what operations it supports, what invariant it maintains, why it exists, and when
-  to reach for it. A couple of sentences + a tiny concrete example is enough.
-- **Name the recognition cue explicitly.** When introducing any concept, state the problem signal that tells you to
-  reach for it — e.g., "you reach for sliding window when you see a contiguous subarray or substring problem where
-  you're optimizing over all windows." One sentence. This is how pattern recognition gets trained implicitly across
-  every concept rather than as a separate topic.
-- **Use ASCII art to show structure.** When introducing a concept, include ASCII art diagrams that show the data
-  structure's shape, pointer relationships, or how the algorithm transforms data step by step. Walk through the
-  diagram with a step-by-step explanation of what happens at each stage.
-- **Start with a construction/mechanics problem.** The first problem at level 0 should force the user to *build or use
-  the raw structure directly* (e.g. "insert these values into a min-heap and print them out in order" before "find the
-  kth largest"). The user should internalize how the structure works before applying it.
-- **Progress very gradually within level 0.** If the bank lists a medium-difficulty problem at level 0, it is still too
-  hard for a first-exposure problem — precede it with one or more warmup problems you invent, even if they are not in
+Aider does not auto-discover instruction files — pass `--read AGENTS.md`
+explicitly. Add `--yes` to auto-approve edits.
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+### Gemini CLI
+
+```sh
+gemini
+```
+
+`GEMINI.md` is auto-loaded (it's a byte-identical mirror of `AGENTS.md`).
+
+## Auto-launch from `make`
+
+If you set a default agent during `make init`, `make train` and `make review` will
+auto-launch it for you with the right prompt. Otherwise they print "Open your agent
+and type `train`" and you do the launching.
+
+## If your agent doesn't auto-load
+
+Type this once at session start:
+
+> Read AGENTS.md and follow it.
+
+After that, all algotutor commands (`train`, `check`, `I don't know`, `mistakes`,
+`review`, `reset`, `I want to solve [X]`) work normally.
+
+## Switching agents mid-session
+
+All state lives on disk in JSON / Markdown files: `progress.md`, `current.md`,
+`cards.json`, `mistakes.json`, `resolve.json`, `mix.json`, `retention.json`. Stop
+one agent, start another in the same directory, and the next `train` picks up
+where you left off — same current problem, same concept levels, same mix /
+re-solve schedule, same mistake log. No re-bootstrap is needed.
+
+The only externally visible difference is response style — Sonnet, GPT-5, and
+Gemini phrase things differently. The workflow, rules, and state are identical.
+
+## Keeping mirrors in sync
+
+`AGENTS.md` is the canonical instruction file. `CLAUDE.md` and `GEMINI.md` are
+byte-identical copies. After editing `AGENTS.md`:
+
+```sh
+make sync-agents    # regenerate the mirrors
+make check-agents   # verify mirrors match (use in CI / pre-commit)
+```
+
+If `check-agents` fails, your mirrors have drifted — run `sync-agents`.
 
 ---
 > Source: [zuzuleinen/algotutor](https://github.com/zuzuleinen/algotutor) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-23 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
