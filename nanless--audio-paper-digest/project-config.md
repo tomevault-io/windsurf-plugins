@@ -1,131 +1,88 @@
 ---
 trigger: always_on
-description: >
+description: 自动化"语音/音乐/音频论文速递"流水线：arXiv + HuggingFace 抓取 → LLM 筛选 → 多模态深度分析 → 发布到 Hugo 博客 / 微信公众号 / 小红书 / 飞书。
 ---
 
+# AGENTS.md
 
-**[English](SKILL.en.md)** | 中文
+## 项目概述
 
-# Paper Digest Skill（以当前代码为准）
+自动化"语音/音乐/音频论文速递"流水线：arXiv + HuggingFace 抓取 → LLM 筛选 → 多模态深度分析 → 发布到 Hugo 博客 / 微信公众号 / 小红书 / 飞书。
 
-## 1. 文档定位
+**技术栈**：Node.js（核心流水线）+ Python（发布脚本）。要求 Node ≥ 18。`scripts/config.js` 集中管理 Node 端主要可调参数和当前运行数据文件路径（部分高频参数支持在项目根 `.env` 中用 `PD_*` 覆写）；`scripts/path_config.py` 集中管理 Python 发布/维护脚本共享路径。
 
-- `SKILL.md`：给 Agent 的执行规则与安全约束
-- `README.md`：给人的运行手册（命令、配置、排错）
-- `prompts/filter.md`：筛选阶段 LLM prompt
-- `prompts/deep-analysis.md`：深度分析阶段 LLM prompt（输出格式、标签体系、评分标准）
+详细执行规则见 `SKILL.md`，本文是紧凑版——只保留 Agent 不看代码就容易漏掉的要点。
 
-当文档与代码冲突时，**以 `scripts/*` 当前实现为准，并同步更新文档**。
+## 常用命令
 
----
+```bash
+npm install              # 安装依赖（cheerio + pdf-parse）
+npm test                 # 运行单元测试（node --test tests/*.test.js）
+npm run fetch            # 全流程：抓取 + 筛选 + 深度分析
+npm run deep             # 仅深度分析续跑（跳过已有 analysis；无分析结果时可从 filtered-papers.json 初始化）
+npm run reanalyze        # 强制全量重分析（支持 --concurrency N）
+npm run batch            # 批量分析未分析论文
+npm run validate:data    # 只读校验候选/筛选/分析 JSON 数据、筛选决策缓存一致性和完整候选覆盖
+npm run visual:post-publish -- --date YYYY-MM-DD # 在博客锁内建立 TOP 10 长图和汇总图任务
+npm run visual:prepare -- --date YYYY-MM-DD # 校验 .bin 参考缓存并物化为带正确扩展名的内置生图输入
+npm run visual:status -- --date YYYY-MM-DD # 只读校验 TOP 10 论文长图，不影响已经完成的博客发布
+npm run cover:status -- --date YYYY-MM-DD  # 只读校验发布后的汇总图
+npm run backfill         # 补录历史 paper ID（Python 脚本，不分析）
+npm run blog:generate    # 只生成并安装 Hugo 博客文件
+npm run blog:generate -- --date YYYY-MM-DD --exclude-id <arXiv ID>  # 明确排除单篇，可重复传入
+npm run blog:review      # 只 review 已生成文件并保存 SHA-256 凭证
+npm run blog:push        # 只验证凭证并 commit/push，不生成、不 review
+npm run wechat           # 生成微信公众号草稿
+npm run xiaohongshu      # 生成小红书文案
+npm run visual:archive -- --date YYYY-MM-DD # 仅迁移旧版论文图片到日期/排行榜归档，不创建任务
+npm run cover:archive -- --date YYYY-MM-DD  # 仅迁移旧版汇总封面到日期归档
+npm run xhs-login        # 小红书登录（获取 Cookie）
+npm run xhs-publish      # 小红书自动发布单篇
+npm run xhs-publish-all  # 小红书自动发布全部
 
-## 2. 当前真实流程
+# 直接调用（不在 package.json 中）
+node scripts/quick-test.js              # 快速测试（抓+筛选，不分析）
+node scripts/analyze-single-paper.js <arxiv-id> [--force]  # 单独分析一篇论文（--force 覆盖已有结果）
+node scripts/reanalyze-selected.js <arxivId1> [arxivId2] ...  # 重分析指定论文
+node scripts/refilter-reanalyze-by-date.js <date>  # 按日期重新筛选+分析
+node scripts/validate-scores.js         # 验证并修复评分
+node scripts/test-api-key.js            # 测试 LLM API key 可用性
+python3 scripts/publish-to-feishu.py    # 生成飞书文档
 
-主入口：`./run-full-fetch.sh`（或 `node scripts/full-fetch.js` / `npm run fetch`）
-
-1. **自动归档**：检查 `data/current/deep-analysis-result.json` / `filtered-papers.json` / `analyzed.json`，若时间戳早于今天（北京时间）且 `data/archive/<日期>/` 下不存在，则复制后删除原文件。**`papers.json` 不归档。**
-2. **加载去重库**：读取 `data/current/papers.json` 已有 ID；扫描 Hugo 博客仓库（`PAPER_DIGEST_BLOG_REPO`）中已发布论文的 arXiv ID，两者合并为统一去重集合
-3. **arXiv 抓取**：7 个分类，每类最多 100 篇（可通过 `PD_ARXIV_MAX_RESULTS` 调整），遇连续 20 篇已有 ID 提前停止（去重集合包含 papers.json + 博客已发布 ID）
-4. **HuggingFace 抓取**：`daily_papers` 分页（最多 20 页）+ `papers` API 补充，默认近 7 天，排除去重集合中的已有 ID
-5. **合并去重**：arXiv 优先，HF 补充 7 个特有字段，标记 `sources`；过滤掉博客已发布论文
-6. **LLM 筛选**：按 `PAPER_ANALYZER_*` 配置逐篇判断语音/音乐/音频相关，`batchSize=5`（可通过 `PD_FILTER_BATCH_SIZE` 调整），单篇超时 60 秒，重试 3 次
-7. **保存筛选结果**：`data/current/filtered-papers.json`
-8. **更新去重库**：追加所有爬取论文 ID 到 `data/current/papers.json`（不仅筛选通过的，提前保存防止后续中断丢失）
-9. **深度分析**：`deep-analyzer.js`，全文+图片，并发 3 篇（可通过 `PD_ANALYSIS_CONCURRENCY` 调整），每篇最多重试 2 次（可通过 `PD_ANALYSIS_MAX_RETRIES` 调整）
-10. **增量保存**：每批分析后立即保存到 `data/current/deep-analysis-result.json`，自带失败结果保护（已有成功 analysis 的论文不会被无 analysis 的失败结果覆盖）
-11. **收尾合并**：去重合并历史结果，自动备份 bak 文件（保留最近 10 个）
-
-`full-fetch.js` **不会自动发布博客/微信**，发布需单独运行 Python 脚本。
-
----
-
-## 3. 数据路径规范
-
-### 3.1 优先路径（当前）
-
-| 文件 | 用途 | 归档行为 |
-|------|------|---------|
-| `data/current/papers.json` | 论文去重数据库 | **不归档**，持续累积 |
-| `data/current/filtered-papers.json` | 筛选后的论文元数据 | 每日归档移走后重新生成 |
-| `data/current/deep-analysis-result.json` | 核心分析结果（含 analysis / parsed / imageUrls） | 每日归档移走后重新生成 |
-| `data/current/analyzed.json` | 旧版已分析记录（兼容） | 每日归档移走后重新生成 |
-
-### 3.2 兼容行为
-
-部分脚本在读取时兼容 `data/*.json` 旧路径，但新产物应写入 `data/current/`。
-
-### 3.3 归档目录
-
-`data/archive/<YYYY-MM-DD>/` 按日期子目录存放当日归档文件。`deep-analysis-result-<时间戳>.bak.json` 备份文件也存放在此目录下，自动清理保留最近 10 个。
-
----
-
-## 4. 模型与环境变量
-
-### 4.1 统一存放位置
-
-**所有环境变量统一放在 `项目根目录的 `.env` 文件`。** `.zshrc` 已配置：
-```zsh
-set -a; source 项目根目录的 `.env` 文件 2>/dev/null; set +a
+# ICML 2026 专属流程（仅 icml-2026-analysis 分支可用）
+npm run icml-fetch-openreview   # 从 OpenReview API 抓取论文元数据（需 Chrome Cookie）
+npm run icml-filter             # LLM 筛选音频/语音/音乐相关论文
+npm run icml-download-pdfs      # 下载筛选论文 PDF 并提取文本（含表格）
+npm run icml-analyze            # 批量深度分析（基于 PDF 全文 + 自动注入图片）
+npm run icml-retry              # 重试失败的分析
+npm run icml-reanalyze-pdf      # 基于 PDF 全文重分析
+python3 scripts/extract-icml-images.py   # 提取 PDF 图片到图床
+# 会议博客也须依次运行 generate-blog.py、review-blog.py、push-blog.py；生成阶段传 category/date/data file
 ```
 
-这意味着：
-- shell 启动时自动注入所有变量
-- Python 脚本直接通过 `os.environ` 读取
-- Node 脚本通过 `loadEnvFile()` 二次兜底（仅补未设置的变量）
+未配置 linter、typecheck 或 formatter。CI 会运行 `npm test`、`npm run validate:data`、所有 `scripts/` / `tests/` 下 JS 文件 `node -c` 语法检查、所有 `scripts/` 下 Python 文件 `py_compile` 语法检查、`tests/python` 下 Python 单测，以及所有 `.sh` 的 `bash -n`。
 
-### 4.2 筛选阶段（`fetch-papers.js`）
+## 环境配置
 
-筛选统一调用 `PAPER_ANALYZER_*` 指定的 LLM：
+复制 `env.example` → `.env`（已 gitignore）。
 
-- endpoint: `PAPER_ANALYZER_ENDPOINT`（必填）
-- key: `PAPER_ANALYZER_API_KEY`（必填）
-- model: `PAPER_ANALYZER_MODEL`（必填）
-- **API 协议自动路由**：`scripts/utils.js` 中的 `detectApiType()` 会根据端点和模型名自动判断使用 OpenAI 还是 Anthropic 协议
-  - **MiMo/Kimi Token Plan / Coding Plan**（端点含 `token-plan` 或 `coding`，模型含 `mimo`/`kimi`）→ 自动切换为 **Anthropic 协议**，伪装成 Claude Code 调用
-    - **MiMo**: `https://token-plan-cn.xiaomimimo.com/v1` → `https://token-plan-cn.xiaomimimo.com/anthropic/v1/messages`（替换 `/v1` 为 `/anthropic`）
-    - **Kimi**: `https://api.kimi.com/coding/v1` → `https://api.kimi.com/coding/v1/messages`（直接加 `/messages`，无需 `/anthropic` 中间路径）
-    - Headers: `x-api-key` + `anthropic-version: 2023-06-01` + `User-Agent: claude-cli/<version> (external, cli)`（版本号动态获取自本地 `claude --version`，失败回退到 `2.1.108`）
-    - system message 自动提取为请求体顶级字段（Anthropic 要求）
-  - **其他情况**（包括 MiMo 按量付费、通用 OpenAI 兼容端点）→ 使用标准 **OpenAI 协议**
-    - URL: `/v1/chat/completions`
-    - Headers: `Authorization: Bearer {key}`
-- **agent: `false`** — LLM API 请求明确禁用连接复用，避免全局 agent 连接池被代理污染导致 MiMo 403（详见 9.2）
-- 超时 60 秒，重试 3 次，每次重试独立创建 AbortController
-- 指数退避：抓取 4s/8s/16s（`2^attempt * 2s`，上限 60s），限流 10s/20s/40s（`2^attempt * 5s`，上限 60s）
-- prompt 来源：`prompts/filter.md`，运行时通过 `loadPrompt()` 读取并替换 `{title}`、`{abstract}`、`{categories}` 占位符
-- 判定口径：多模态模型只要明确涉及语音/音乐/音频（输入、输出、训练目标、评测任务或核心能力之一）即判定为相关
-- 冲突处理：若同时满足"多模态涉及语音/音乐/音频"和"其他领域"描述，优先判定为"是"
+**抓取/筛选/分析必需变量**：`PAPER_ANALYZER_API_KEY` / `PAPER_ANALYZER_MODEL` / `PAPER_ANALYZER_ENDPOINT`
 
-### 4.3 深度分析阶段（`deep-analyzer.js`）
+`PD_ANALYSIS_REPAIR_MAX_TOKENS` 控制审校重写、表格补充、方法补充与结构修复的输出上限，默认 16000；主分析仍保留 64000 上限，避免局部修复在推理模型上长期思考并撞到供应商网关超时。
 
-深度分析统一使用 `PAPER_ANALYZER_*` 指定的 LLM，**与筛选阶段共用同一套 API 协议自动路由逻辑**：
+**博客相关变量**：`PAPER_DIGEST_BLOG_REPO` 可覆写 Hugo 博客仓库路径；未设置时使用默认路径，目录不存在会跳过博客已发布去重，真实博客发布仍需要本地仓库存在。
+`PD_BLOG_REVIEW_CONCURRENCY` 控制博客独立论文页的三层 review 并发度，默认为 5；汇总页仍先完成审查。首次 review 失败会保存绑定生成清单、博客 `main` 基线和逐文件 SHA-256 的失败集状态；修复后仅复审已修改的失败文件，已通过文件或基线发生变化时自动退回全量 review。
+`PD_XIAOHONGSHU_ONELINER_CONCURRENCY` 控制小红书 TOP N 一句话亮点的 LLM 并发度，默认 5，限制为 1–5；结果必须按原排名回填，单篇失败独立使用本地摘要回退。
 
-- endpoint: `PAPER_ANALYZER_ENDPOINT`（必填）
-- key: `PAPER_ANALYZER_API_KEY`（必填）
-- model: `PAPER_ANALYZER_MODEL`（必填）
-- `detectApiType()` 自动判断协议类型，行为与 4.2 节一致
-  - **MiMo**: `/v1` → `/anthropic/v1/messages`
-  - **Kimi**: `/coding/v1` → `/coding/v1/messages`
+**双模型（可选，多模态）**：设置 `PAPER_ANALYZER_SECONDARY_MODEL` 即启用副模型做图像筛选与插图计划（主模型仅做纯文本分析）；副模型只输出 JSON 计划，包含目标章节、代码提供的稳定 `paragraph_id`、图前 `lead` 和图后 `explanation`。代码只新增插图及相邻说明，忽略旧 `replacement` / `rewrite` 字段，禁止副模型替换主模型原文；每篇默认最多插入 4 张，非法段落 ID 直接丢弃，旧 `anchor` 格式仅保留兼容。不设置则跳过图片、退回单模型纯文本。`PAPER_ANALYZER_SECONDARY_ENDPOINT` / `PAPER_ANALYZER_SECONDARY_API_KEY` 未设置时默认复用主模型对应值。
 
-API 调用特性：
-- 整体超时 20 分钟（AbortController）
-- max_tokens=64000，temperature=0.7
-- **双层重试**：analysis-engine.js 层面每篇最多重试 2 次（总共最多 3 次尝试）；deep-analyzer.js 内部每次 API 调用再重试最多 3 次（指数退避：第一次 10 秒，之后翻倍，`2^attempt * 5s`）
-- **LLM API 请求明确设置 `agent: false`，强制直连以绕过本地代理（避免 MiMo 403）；arXiv/HuggingFace 等外部抓取仍使用代理自动检测**
-- arXiv HTML 解析使用 **cheerio** 结构化选择器，移除 script/style/nav/header/footer 等噪音元素
-- 图片下载 **并行化（并发 3）**，下载论文全部图片（无数量限制）；单张 base64 上限约 20M 字符（config.js 中 `imageMaxBase64Chars`）；超时后自动降级为纯文本重试
-- 全文上限约 500K 字符（config.js 中 `fullTextMaxChars`）
-- 所有分析配置集中管理于 `scripts/config.js`，支持环境变量覆写
+**Codex 发布后视觉资产**：必须先完成全部论文深度分析，再依次完成博客 generate、全量/失败集 review、push，并由 `push-blog.py` 验证远端 `main` OID。只有发布凭证同时记录 `publicationCommit`、相同的 `remoteVerifiedOid` 和验证时间后，才可建立视觉任务。`push-blog.py` 会自动运行发布后规划器；论文长图只选择最终评分 TOP 10（同分按规范化 arXiv ID），每篇一张纵向 PNG，顶部为完整英文标题、正文为简体中文；另生成一张包含批次标题、热门方向和 TOP 10 排行榜的汇总图。默认成品必须由 Codex 内置 `image_gen` 一次性生成完整带字构图，让标题、中文说明、结构关系、实验数字、论文关键图与纸张拼贴视觉自然配合；禁止再经过确定性文字卡片合成器。Agent 必须逐图目视核对标题、中文正文、箭头/并行分支、指标方向、论文数字与排行榜后才能执行 record，不可读或存在实质错误时必须重生成。两类 manifest 按日期隔离并支持失败项续跑，但图片不进入本轮博客 generation/review/push，也不阻断已经完成的发布。项目脚本不得调用图像 API或读取 `OPENAI_API_KEY`，实际绘图只能由 Codex 内置 `image_gen` 完成；`render-visual-summary.py` 仅用于本地调试和离线兜底。
 
-输出约束：
-- prompt 来源：`prompts/deep-analysis.md`，运行时通过 `loadPrompt()` 读取并替换 `{hasFullText}`、`{title}`、`{authors}`、`{categories}`、`{arxivId}`、`{textForAnalysis}` 占位符
-- 固定一级标题：`## 评分`、`## 机器摘要`、`## 标签`、`## 作者与机构`、`## 毒舌点评`、`## 核心摘要`、`## 方法概述和架构`、`## 核心创新点`、`## 实验结果`、`## 细节详述`、`## 评分理由`、`## 局限与问题`、`## 开源详情`
-- `## 评分` 下先输出总分（X.X/10）
-- **代码后处理**：`parseAnalysis`/`parse_analysis` 会从 `## 评分理由` 中提取八个分项（创新性/2、技术严谨性/1.5、实验充分性/1.5、清晰度/1、影响力/1.5、开源/1.5、可复现性/0.5、工程/实践价值/1.5）重新计算总分，各分项之和上限为 10，四舍五入到 0.1，覆盖 LLM 原始总分
+Node 脚本通过 `scripts/env-loader.js` 加载当前项目根 `.env`：① `scripts/config.js` 模块级最先执行（任何 `require('config')` 即触发）；② `scripts/utils.js` 的 `loadEnvFile()` 二次兜底补漏。Python 脚本通过 `scripts/project_env.py` 加载同一个 `.env`。两端都会先清理继承自 Trae/Codex/shell 的项目同名变量（`PAPER_ANALYZER_*`、`PAPER_DIGEST_*`、`PD_*`、`WECHAT_*`、`FEISHU_*`、`XIAOHONGSHU_*`、`KIMI_API_KEY`）以及大小写代理变量，再写入项目 `.env`；代理不再回退 macOS `scutil`，加载器会把 `.env` 权限收紧为 `0600`。外部命令必须使用最小子进程环境，禁止把 LLM/发布凭据传给 curl、CLI、Git hook 或浏览器进程。
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [nanless/audio-paper-digest](https://github.com/nanless/audio-paper-digest) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-17 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-20 -->
