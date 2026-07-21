@@ -1,11 +1,14 @@
 ---
 trigger: always_on
-description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+description: This file provides guidance to AI coding agents when working with code in this repository.
 ---
 
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to AI coding agents when working with code in this repository.
+
+For contribution conventions — commit-message format, atomic commits, code layout, and
+more — follow the guidelines in [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## Development Commands
 
@@ -50,6 +53,7 @@ This is a Rust workspace implementing an asynchronous Varlink IPC library. The a
 - **zlink-core**: No-std foundation providing core APIs. Not used directly.
 - **zlink-macros**: Contains the attribute and derive macros. Not used directly.
 - **zlink-tokio**: Tokio runtime integration and transport implementations. Not used directly.
+- **zlink-smol**: smol runtime integration and transport implementations. Not used directly.
 - **zlink**: Main unified API crate that re-exports appropriate subcrates based on cargo features.
 
 ### Key Components
@@ -73,7 +77,7 @@ This is a Rust workspace implementing an asynchronous Varlink IPC library. The a
 
 - `idl`: Support for IDL type representations.
 - `introspection`: Enable runtime introspection of service interfaces.
-- `idl-parse`: Parse Varlink IDL files at runtime (requires `std`).
+- `idl-parse`: Parse Varlink IDL at runtime (works in `no_std`).
 
 ### Development Patterns
 - Uses workspace-level package metadata (edition, rust-version, license, repository)
@@ -92,4 +96,4 @@ Use consolidated mock socket utilities from `zlink-core/src/test_utils/mock_sock
 
 ---
 > Source: [z-galaxy/zlink](https://github.com/z-galaxy/zlink) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-20 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-20 -->
