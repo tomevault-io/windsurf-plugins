@@ -1,0 +1,100 @@
+---
+trigger: always_on
+description: This file provides guidance to AI agents when working with code in this repository.
+---
+
+# AGENTS.md
+
+This file provides guidance to AI agents when working with code in this repository.
+
+## Project Overview
+
+checkdmarc is a Python library and CLI tool for validating email security DNS records (SPF, DMARC, BIMI, MTA-STS, SMTP TLS Reporting, MX/STARTTLS, DNSSEC, SOA). Published on PyPI as `checkdmarc`.
+
+## Common Commands
+
+```bash
+# Run tests with coverage
+coverage run -m pytest tests/
+
+# Lint and format
+ruff check --show-fixes
+ruff format .
+
+# Build package
+hatch build
+
+# Build docs
+cd docs && make html
+
+# Full build (format + docs + package)
+./build.sh
+```
+
+Tests use `unittest.TestCase` and are organized under `tests/` with one file per
+module (e.g. `tests/test_spf.py`, `tests/test_dmarc.py`). Run a single test with:
+
+```bash
+python -m pytest tests/ -k "test_name"
+```
+
+Run tests for one module with e.g. `python -m pytest tests/test_spf.py`.
+
+Some tests require network access and are skipped when `GITHUB_ACTIONS` env var is set.
+
+## Architecture
+
+**Entry point:** `checkdmarc/__init__.py` — `check_domains()` orchestrates all checks, returning `DomainCheckResult` TypedDict(s).
+
+**Modules** (each has a primary `check_*()` function):
+
+- `spf.py` — SPF record parsing, DNS lookup counting
+- `dmarc.py` — DMARC/RFC 9989 record parsing with DNS tree walk algorithm
+- `bimi.py` — BIMI record and certificate validation
+- `mta_sts.py` — MTA-STS policy fetching and validation
+- `smtp_tls_reporting.py` — TLSRPT record validation
+- `smtp.py` — MX record lookup and STARTTLS testing
+- `dnssec.py` — DNSSEC validation
+- `soa.py` — SOA record parsing
+- `utils.py` — DNS helpers, exception classes, domain normalization
+
+**CLI:** `_cli.py` (entry point: `checkdmarc._cli:_main`)
+
+**Constants/version:** `_constants.py`
+
+**Output:** `results_to_json()`, `results_to_csv()`, `output_to_file()` in `__init__.py`.
+
+## Key Dependencies
+
+- `dnspython` for DNS queries
+- `pyleri` for grammar parsing
+- `publicsuffixlist` for base domain extraction
+- `cryptography`/`pyopenssl`/`pem` for certificate handling
+- `expiringdict` for DNS result caching
+
+## Code Style
+
+- Formatter/linter: **Ruff**
+  - All code must be linted and formatted
+- Type annotations use `TypedDict` for structured results
+- Supports all currently supported Python versions
+- Modern type annotations across the entire project
+  - Always use the the latest version of pywright for static type checking
+- Testing framework: **pytest**
+- Every bit of code should have a test
+- Build backend: **hatchling**
+
+## Conventions
+
+These rules apply to anyone — human or agent — making changes to this repo. They are intentionally checked in (rather than living in any one agent's private scratch memory) so that every collaborator picks them up the same way.
+
+- **Wait for explicit commit AND push permission on the default branch — these are separate grants.** Finish the implementation, run the tests, summarize the diff, then **stop and ask**. The author decides when a change is ready to land; auto-committing makes review noisier and harder to reverse. "Commit this" mid-session counts as permission for that one commit, not a standing grant — and crucially, permission to commit is NOT permission to push. Pushing publishes the change to the remote where collaborators / CI / production deploys can pick it up, and is much harder to walk back than a local commit. Wait for an explicit "push it" before `git push`. If the prior commit was itself unauthorized, do NOT push it to "tidy up" — surface the situation and let the author decide whether to keep, amend, or reset.
+- **Self-test before every `git commit`:** has the author typed "commit" (or an unambiguous equivalent — "ok to commit", "commit this", "commit and push") in a present-tense imperative since your last commit? If no, **ask**. Conditional phrasings like "if everything works we can push" or "we could commit this" or "if it looks good ..." are NOT authorizations — they are plans you must confirm before acting on. Treat the literal text of the user's last message as the source of truth, not your own interpretation of where the conversation is going.
+  - **Self-test before every `git push`:** has the author typed "push" since your last push? Same rule. Permission to commit is NEVER permission to push.
+  - **Exception — branches you created in-session** When you have explicitly created a feature branch yourself (e.g. `git checkout -b feat/something`) in that session, commit and push to THAT branch freely without per-step permission. The entire branch is reviewed at PR-open, so the per-commit gate adds review noise without adding safety. The exception is scoped to branches Claude created in the current session; it does NOT extend to `main`, to other long-lived branches, or to branches the author created.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [domainaware/checkdmarc](https://github.com/domainaware/checkdmarc) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-20 -->
