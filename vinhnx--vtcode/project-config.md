@@ -1,140 +1,47 @@
 ---
 trigger: always_on
-description: **VT Code**: Rust terminal coding agent with modular architecture, multi-LLM support (OpenAI, Anthropic, Gemini), tree-sitter parsing for 6+ languages.
+description: [Root AGENTS.md](../AGENTS.md) | CLI entrypoint, session bootstrap, agent runloop wiring.
 ---
 
-# VT Code Agent Guidelines
+# vtcode (binary)
 
-**VT Code**: Rust terminal coding agent with modular architecture, multi-LLM support (OpenAI, Anthropic, Gemini), tree-sitter parsing for 6+ languages.
+[Root AGENTS.md](../AGENTS.md) | CLI entrypoint, session bootstrap, agent runloop wiring.
 
-## Build & Test Commands
+## Modules
 
-```bash
-# Preferred (faster with cargo-nextest)
-cargo nextest run           # Run all tests (3-5x faster)
-cargo nextest run -p vtcode-core  # Single package
-cargo t                     # Alias for nextest run
-cargo tq                    # Quick profile (no retries)
+`main.rs` binary entry | `agent/` runloop + subagent dispatch | `cli/` CLI handlers | `startup/` first-run + onboarding | `updater/` self-update | `codex_app_server/` app server bridge | `main_helpers/` tracing + runtime init
 
-# Standard cargo commands
-cargo check                 # Fast compile check
-cargo clippy                # Lint (strict Clippy rules)
-cargo fmt                   # Format code
+## Rules
 
-# Fallback (if nextest unavailable)
-cargo ts                    # Alias for standard cargo test
-```
+- Thin binary — all runtime logic in `vtcode-core`. This crate wires CLI args to `Agent::run()`.
+- Global allocator is `mimalloc` by default; `allocator-jemalloc` opts into
+  `tikv-jemalloc` (background-thread purging, recommended for Linux servers).
+  Selected in `src/allocator.rs` (a `mod allocator;` in `src/main.rs`). See
+  `docs/development/ALLOCATOR_MEMORY.md`.
+- `vtcode bench-allocator` measures RSS under a bursty/sparse Tokio workload to detect
+  allocator memory pinning; use it before changing the default allocator (see Gotchas).
+- `vtcode_ui::tui::panic_hook` installs custom panic handler — must run before any output.
+- `agent/runloop/` contains the single-agent runloop. Multi-agent is in `vtcode-core::subagents`.
+- `agent/runloop/unified/turn/compaction/` is a **thin delegator** — all compaction logic (auto/manual orchestration, memory envelope, dedup, thresholds) lives in `vtcode-core::compaction`. Do not re-implement compaction here; call the shared orchestrator.
 
-## Architecture & Key Modules
+## Gotchas
 
-- **Workspace**: `vtcode-core/` (library) + `src/main.rs` (binary) + 9 workspace crates
-- **Core**: `llm/` (multi-provider), `tools/` (trait-based), `config/` (TOML-based)
-- **Integrations**: Tree-sitter, PTY execution, ACP/MCP protocol, Gemini/OpenAI/Anthropic APIs
-
-## Code Style & Conventions
-
-- **Naming**: snake_case functions/vars, PascalCase types (standard Rust)
-- **Error Handling**: `anyhow::Result<T>` + `anyhow::Context`; NO `unwrap()`
-- **Constants**: Use `vtcode-core/src/config/constants.rs` (never hardcode, especially model IDs)
-- **Config**: Read from `vtcode.toml` at runtime
-- **Docs**: Markdown ONLY in `./docs/`; use `docs/models.json` for latest LLM models
-- **Formatting**: 4-space indentation, early returns, simple variable names
-
-## See Also
-
-For comprehensive guidelines, see `.github/copilot-instructions.md` (detailed patterns, testing strategy, security, additional context).
-
-## Core System Prompt
-
-```rust
-r#"You are VT Code, a coding agent.
-You specialize in understanding codebases, making precise modifications, and solving technical problems.
-
-# Tone and Style
-
-- IMPORTANT: You should NOT answer with unnecessary preamble or postamble (such as explaining your code or summarizing your action), unless the user asks you to.
-- Keep answers concise, direct, and free of filler. Communicate progress without narration.
-- Prefer direct answers over meta commentary. Avoid repeating prior explanations.
-- Only use emojis if the user explicitly requests it. Avoid using emojis in all communication.
-- When you cannot help, do not explain why or what it could lead to—that comes across as preachy.
-
-# Core Principles
-
-<principle>
-Obey system → developer → user → AGENTS.md instructions, in that order.
-Prioritize safety first, then performance, then developer experience.
-Keep answers concise and free of filler.
-</principle>
-
-# Execution Algorithm (Discovery → Context → Execute → Verify → Reply)
-
-**IMPORTANT: Follow this decision tree for every request:**
-
-1. **Understand** - Parse the request once; ask clarifying questions ONLY when intent is unclear
-2. **Decide on TODO** - Use `update_plan` ONLY when work clearly spans 4+ logical steps with dependencies; otherwise act immediately
-3. **Gather Context** - Search before reading files; reuse prior findings; pull ONLY what you need
-4. **Execute** - Perform necessary actions in fewest tool calls; consolidate commands when safe
-5. **Verify** - Check results (tests, diffs, diagnostics) before replying
-6. **Reply** - Single decisive message; stop once task is solved
-
-# Final Response Rules (Critical for UX)
-
-**IMPORTANT: Never repeat code in final summaries:**
-- Do NOT include full code blocks in postamble messages - code is already visible in TUI
-- If completed task involved code changes: reference session log instead
-- Format: "Done. Session log: /Users/vinhnguyenxuan/.vtcode/sessions/session-*.json"
-- Keep final response to 1-3 sentences max
-- Users can view full code via TUI output or `git diff` if needed
-
-<good-example>
-User: "Add error handling to fetch_user"
-→ Search for fetch_user implementation
-→ Identify current error paths
-→ Add error handling in 1-2 calls
-→ Reply: "Done. Added error handling for network + parse errors."
-</good-example>
-
-<bad-example>
-User: "Add error handling to fetch_user"
-→ "Let me create a TODO list first"
-→ "Step 1: Find the function. Step 2: Add error handling. Step 3: Test."
-→ [starts implementation]
-→ [keeps asking to re-assess]
-</bad-example>
-
-<system-reminder>
-You should NOT stage hypothetical plans after work is finished. Instead, summarize what you ACTUALLY did.
-Do not restate instructions or narrate obvious steps.
-Once the task is solved, STOP. Do not re-run the model when the prior step had no tool calls.
-</system-reminder>
-
-# Tool Selection Decision Tree
-
-When gathering context:
-
-```
-
-Explicit "run <cmd>" request?
-└─ ALWAYS use run_pty_cmd with exact command
-   └─ "run ls -a" → {"command": "ls -a"} (do NOT interpret as list_files)
-
-Need information?
-├─ Structure? → list_files
-└─ Text patterns? → grep_file
-
-Modifying files?
-├─ Surgical edit? → edit_file (preferred)
-├─ Full rewrite? → write_file
-└─ Complex diff? → apply_patch
-
-Running commands?
-├─ Interactive shell? → create_pty_session → send_pty_input → read_pty_session
-└─ One-off command? → shell tool
-(Use shell for: git, cargo, shell scripts, etc. AVOID: raw grep/find bash; use Grep instead)
-
+- `main_helpers` handles runtime relaunch context — do not duplicate init logic in `main.rs`.
+- Allocator memory pinning: vtcode's bursty/sparse Tokio workload (semaphore-capped
+  `JoinSet` fans-out, then workers idle) makes both `mimalloc` and `glibc` hold RSS flat
+  after a burst (frees stranded on cross-thread lists, only reconciled by future allocation
+  activity). `jemalloc` only returns memory on idle when its `background_thread` is active —
+  on macOS the jemalloc build prints `background_thread currently supports pthread only` and
+  behaves like mimalloc, so switching the allocator does NOT help on macOS dev. On Linux
+  containers (the article's target) `background_thread` works and jemalloc reclaims memory.
+  Measure with `vtcode bench-allocator` before changing the default; do not switch blindly.
+- `load_dotenv()` must run before config load to pick up `.env` API keys.
+- Provider noise (e.g. MiniMax `]<]minimax[>[`) is stripped centrally in `turn::provider_noise`. Stream-level sanitization (harmony + minimax) lives in `stream_sanitization::StreamSanitizer`. Do not re-implement noise stripping inline.
+- Budget exhaustion (wall-clock via `record_wall_clock_exhaustion_notice`, tool-call via `record_tool_budget_exhaustion_notice`) both follow the same contract: emit the full policy message once, a compact stub for later calls in the batch, then a single "synthesize now" directive via `flush_budget_synthesis_directives` (called after the tool batch so it is never interleaved between tool responses). Do not push the directive inline in `validate_tool_call`, and NEVER make tool-call budget exhaustion `Break` the turn as `Blocked` — that skips the synthesis pass entirely, so plan mode ended with research but no plan and the model looped "I'll synthesize the plan" across continue-turns. The flush also arms `switch_to_tool_free_recovery()` so the next request strips tool definitions at the API level — the directive alone is advisory and models kept emitting rejected tool calls after it (turn_637/turn_647). `tool_budget_exhausted_emitted` joins the wall-clock flags in the plan-mode `mark_recovery_exhausted` gates (`dispatch_post_tool_failure`, turn_loop recovery break).
+- `turn_processing/llm_request/` is split into contract-carrying submodules (`snapshot`, `tool_shaping`, `context_management`, `response_chain`, `prompt_assembly`) with `pub(super)` visibility; go through `mod.rs`'s exports. Prompt section order in `prompt_assembly::build_prompt_output` is prompt-cache-sensitive — reordering sections invalidates provider caches. `tool_shaping.rs` carries the wire invariant: hosted Anthropic/OpenAI payloads keep full deferred tool definitions; only the ClientLocal policy omits them (pinned by tests in `request_builder.rs`). `metrics.rs` emits a per-request `token_budget_breakdown` turn metric (system-prompt / tool-schema / message-history tokens + on-wire tool count) to the `vtcode.turn.metrics` target and trajectory log; cache read/write/miss are not duplicated here (they live in `SessionStats` prompt-cache diagnostics).
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/vinhnx) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-10 -->
+> Source: [vinhnx/vtcode](https://github.com/vinhnx/vtcode) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
