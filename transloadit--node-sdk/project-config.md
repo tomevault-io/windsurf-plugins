@@ -1,0 +1,82 @@
+---
+trigger: always_on
+description: - Favor `async run() {` over `run = async () => {` inside ES6 classes
+---
+
+# Transloadit Repository Guide
+## coding style
+
+Coding style:
+
+- Favor `async run() {` over `run = async () => {` inside ES6 classes
+- Favor `if (!(err instanceof Error)) { throw new Error(`Was thrown a non-error: ${err}`) }` inside
+  `catch` blocks to ensure the `error` is always an instance of `Error`
+- Favor using real paths (`../lib/schemas.ts`) over aliases (`@/app/lib/schemas`).
+- Favor `for (const comment of comments) {` over `comments.forEach((comment) => {`
+- Favor named exports over default exports, with the exception of Next.js pages
+- Avoid namespace `*` imports unless the API is intentionally consumed as a namespace. Prefer named
+  imports so usage is explicit and bundlers can optimize.
+- Avoid broad file-level lint suppressions. Prefer the narrowest scoped suppression on the exact
+  line, with a reason when the exception is not obvious.
+- Preserve existing dependency import paths and module-system interop unless the change is required
+  and explained. Do not rewrite package imports to `node_modules/...`, switch ESM/CJS shapes, or add
+  duplicate export styles just to satisfy local tooling.
+- Do not wrap each function body and function call in `try`/`catch` blocks. It pollutes the code.
+  Assume we will always have an e.g.
+  `main().catch((err) => { console.error(err); process.exit(1) })` to catch us. I repeat: Avoid
+  over-use of try-catch such as
+  `try { // foo } catch (err) { console.error('error while foo'); throw err }`, assume we catch
+  errors on a higher level and do not need the extra explananation.
+- If you must use try/catch, for simple cases, favor `alphalib/tryCatch.ts`
+  (`const [err, data] = await tryCatch(promise)`) over
+  `let data; try { data = await promise } catch (err) { }`
+- Before creating new files and new code, see if we can leverage existing work, maybe slighty adapt
+  that without breaking BC, to keep things DRY.
+- Favor early exits, so quickly `continue`, `return false` (or `throw` if needed), over nesting
+  everything in positive conditions, creating christmas trees.
+- Use Prettier with 100 char line width, single quotes for JS/TS, semi: false
+- Use descriptive names: PascalCase for components/types, camelCase for variables/methods/schemas
+- Alphabetize imports, group by source type (built-in/external/internal)
+- Preserve existing sorted lists and config ordering unless intentionally changing the order.
+- Favor US English over UK English, so `summarizeError` over `summarise Error`
+- Favor `.replaceAll('a', 'b)` over `.replace(/a/g, 'b')` or `.replace(new RegExp('a', 'g'), 'b')` when the only need for regeses was replacing all strings. That's usually both easier to read and more performant.
+- Use typographic characters: ellipsis (`…`) instead of `...`, curly quotes (`'` `"`) instead of straight quotes in user-facing text
+- Generated text files should end with a trailing newline. Do not trim serializer output when the
+  serializer intentionally emits POSIX-style text.
+- Comments should explain why code exists or why an exception is needed, not narrate what the next
+  line already says.
+- Use JSDoc block comments for exported constants, functions, classes, and types when documenting
+  their purpose or contract. Use regular line comments for local quirks, reasoning, or exceptions.
+- Do not put TODOs, internal implementation notes, or future-work placeholders in user-facing text
+  or schema descriptions. Put those in code comments, issues, or docs for maintainers instead.
+- Put API keys and secrets in `.env` files, not hardcoded in components
+- Do not return raw errors, stack traces, third-party responses, payment objects, database errors, or
+  credential data to clients. Show sanitized user-facing messages and log only redacted diagnostic
+  details server-side.
+- When wrapping or rethrowing an error, preserve the original value with `new Error(message, {
+  cause: error })` when possible instead of stringifying it away.
+- Remove temporary debug logging/instrumentation before merge. Keep new logs only when they are
+  intentional, useful in production, and do not expose sensitive data.
+- Check for existing hooks before creating new ones (e.g., `useUppy()` for Uppy functionality)
+
+## general
+
+General:
+
+- Do not touch `.env` files!
+- Favor Yarn (4) over npm
+- Before starting a dev server, first check whether a suitable one is already running and use that
+  if possible. If none is available and local browser/e2e validation needs one, start the documented
+  dev server, capture its log path/pid, and stop it when you are done unless the user asked to keep
+  it running.
+- Avoid blocking the conversation with terminal commands. For example: A) most of my git commands run through pagers, so pipe their output to `cat` to avoid blocking the
+  terminal. B) You can use `tail` for logs, but be smart and use `-n` instead of `-f`, or the conversation will block
+- Use the `gh` tool to interact with GitHub (search/view an Issue, create a PR).
+- When using `fetch()` directly, check `response.ok` before parsing the body, and surface non-2xx
+  responses as errors with enough context for debugging.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [transloadit/node-sdk](https://github.com/transloadit/node-sdk) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
