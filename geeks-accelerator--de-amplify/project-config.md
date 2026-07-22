@@ -1,0 +1,44 @@
+---
+trigger: always_on
+description: Operational guide for working in this repo. For what the project *is* (the thesis, the document structure, the routes), read [README.md](README.md). This file is the conventions and gotchas that keep it from breaking.
+---
+
+# CLAUDE.md
+
+Operational guide for working in this repo. For what the project *is* (the thesis, the document structure, the routes), read [README.md](README.md). This file is the conventions and gotchas that keep it from breaking.
+
+## Standalone repo (hard rule)
+
+This repository is self-contained and public. Do **not** add references to any other, sibling, or private repository: not by relative path (e.g. `../other-repo/...`), not by project name, and not in commit messages. If you need a concept that lives in another project, describe it inline here instead of linking to or naming the source. The git history was scrubbed of such references before this repo went public; keep it that way.
+
+## House style (load-bearing)
+
+- **No em-dashes.** The house style forbids the em-dash and the en-dash used as punctuation. Use commas, colons, parentheses, or restructure the sentence. This applies to content, code comments, and commit messages alike. Curly/smart quotes are also out; use straight quotes. Before committing, grep the changed files for the em-dash character (U+2014) and curly quotes.
+- **Commit messages**: lowercase, colon-prefixed by area (`site:`, `content:`, `docs:`, `scorecard:`, `proposal:`), imperative mood, body wrapped. End with the `Co-Authored-By:` trailer when co-authored. Commit and push only when asked; the repo is maintained directly on `main`.
+- **Voice**: the copy is confessional, direct, terminal/mono in feel (Geist Mono, the void / brake-red palette). Match the surrounding text; do not turn it into marketing.
+
+## Content pipelines (know which one you are in)
+
+- **Policy paper and appendix.** `content/proposal.md` and `content/notes.md` are the frontmatter-stripped *bodies* of the review copies in `docs/proposals/`. Edit the review copy, then regenerate the body. Do not add nav links or frontmatter to `content/*.md` (react-markdown renders them raw).
+- **Lawsuits and hearings are ledger-first.** `docs/distillations/*.md` are the evidence-tiered claim ledgers and are the source of truth. `content/lawsuits/*.md` (the case files), `content/lawsuits.md` (the hub), and `content/hearings.md` (the hearings hub) are *seeded from* the ledgers, curated, not a 1:1 render. Corrections land in the ledger first (verified against a primary source), then the page is re-seeded on a dated pass. Never fix a fact only on the page.
+- **The ledgers are also published directly.** `/distillations/<slug>` (plus a raw `/distillations/<slug>.md` per ledger, and inclusion in `/llms-full.txt`) renders each ledger via the section whitelist in `src/lib/distillations.ts`: reader summary, brake-integrity relevance, the tiered claims, the full quote-bank, tensions, plus Sources rebuilt from frontmatter and the lawsuit ledgers' own Tier key paragraph. The TLDR block, Discrepancies, and Coverage note stay out (authoring/QA scaffolding). So a ledger correction publishes to `/distillations` automatically with no re-seed; only the curated pages need the dated pass. New ledgers must be registered in the `DISTILLATIONS` list in that lib file.
+- **Verbatim TLDR surfaces.** Each ledger has a TLDR block (label / search-snippet / one-sentence / one-paragraph). Those exact strings are wired verbatim into consumers: label -> hub card, search-snippet -> meta description, one-sentence -> JSON-LD description, one-paragraph -> page opener. The `/distillations` pages consume search-snippet and one-sentence the same way, parsed at build by `src/lib/distillations.ts`. Copy verbatim; do not hand-adapt a summary (an adapted copy is a third unvalidated variant and reopens drift). If a consumer needs a length the ledger lacks, add that budgeted variant to the ledger, not to the page.
+- **Hand-built React** (not markdown): the homepage, `/report`, `/scorecard`, `/for`, `/remixes`, and `/distillations` (which renders the ledgers).
+
+## Evidence discipline (this is a public legal site)
+
+- A legal or factual claim must trace to a **primary source** (a court order or filing, the docket, an official government release) to be stated as fact. Secondary coverage gets tiered down and flagged.
+- **Posture precision.** "Announced intent" is not "filed" is not "affirmed"; a summary-judgment ruling is not a motion to dismiss; a jury verdict is not "upheld on appeal." The project was burned once by a "$6M upheld on appeal" error; do not repeat that class.
+- **Event date is not coverage date.** An order "filed June 29" may be "announced June 30"; record the event date, note the coverage date. This error recurred repeatedly, so watch for it.
+- Everything carries an **as-of date**. Figures date quickly.
+
+## Adding or changing a route
+
+Wire it into every discovery surface or it drifts out of sync:
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [geeks-accelerator/de-amplify](https://github.com/geeks-accelerator/de-amplify) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
