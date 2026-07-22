@@ -70,4 +70,4 @@ For docs, explore ./docs directory and put it to the right place, and update ind
 
 ---
 > Source: [tyrchen/rust-lib-template](https://github.com/tyrchen/rust-lib-template) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-20 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
