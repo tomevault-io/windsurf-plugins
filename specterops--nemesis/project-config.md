@@ -1,9 +1,11 @@
 ---
 trigger: always_on
-description: **NEVER read, open, or access `.env` files under any circumstances.** This includes:
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-# Repository Guidelines
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## File Restrictions
 
@@ -19,15 +21,6 @@ If you need environment variable information, refer to `env.example` instead.
 ## Project Overview
 
 Nemesis is an open-source, centralized data processing platform (v2.0) that ingests, enriches, and enables collaborative analysis of files collected during offensive security assessments. Built on Docker with Dapr integration, it functions as an "offensive VirusTotal."
-
-## Project Structure & Module Organization
-
-Nemesis is organized as a multi-service monorepo:
-- `projects/`: deployable services (for example `web_api`, `file_enrichment`, `frontend`, `agents`), each typically with its own `pyproject.toml` and `tests/`.
-- `libs/`: shared Python libraries (`common`, `file_linking`, `nemesis_dpapi`, `file_enrichment_modules`).
-- `infra/`: Docker, Dapr, Traefik, and observability configuration.
-- `tools/`: repo-level developer scripts (`install_dev_env.sh`, `lint.sh`, `test.sh`, `nemesis-ctl.sh`).
-- `docs/`: MkDocs content and generated API documentation assets.
 
 ## Common Commands
 
@@ -62,10 +55,9 @@ cd projects/web_api && uv sync
 
 ### Package Management
 
-For adding, upgrading, or removing packages, use the `$managing-packages` skill.
+For adding, upgrading, or removing packages, use the `/managing-packages` skill.
 
 ### Linting & Formatting (Ruff)
-
 Run linting/formatting after each fix/change.
 ```bash
 # Check all Python code (configured in root pyproject.toml)
@@ -91,8 +83,12 @@ cd projects/web_api && uv run pytest tests/test_specific.py
 cd projects/web_api && uv run pytest tests/test_file.py::test_function_name
 ```
 
-### Docker Commands
+### Testing Guidelines
+- **Write tests for every new feature.** New functionality must include tests before it is considered complete.
+- **Cover both happy path and unhappy path cases.** Tests should verify correct behavior with valid inputs (positive cases) and proper error handling with invalid inputs, missing data, edge cases, and failure conditions (negative cases).
+- **Mock external services.** Do not make real calls to external dependencies (Dapr, SeaweedFS, PostgreSQL, RabbitMQ, etc.) in unit tests. Use mocks or fakes to isolate the code under test.
 
+### Docker Commands
 Information about building dev/prod container images can be found in the [docker compose docs](./docs/docker_compose.md).
 
 General instructions for dev docker containers/images:
@@ -109,12 +105,6 @@ docker compose up -d --build web-api web-api-dapr
 ```
 
 **Note:** Services using Dapr (file-enrichment, web-api, alerting, etc.) have a companion `-dapr` sidecar container. When rebuilding these services, always restart both the service and its Dapr sidecar to ensure proper communication.
-
-## Testing Guidelines
-
-- **Write tests for every new feature.** New functionality must include tests before it is considered complete.
-- **Cover both happy path and unhappy path cases.** Tests should verify correct behavior with valid inputs (positive cases) and proper error handling with invalid inputs, missing data, edge cases, and failure conditions (negative cases).
-- **Mock external services.** Do not make real calls to external dependencies (Dapr, SeaweedFS, PostgreSQL, RabbitMQ, etc.) in unit tests. Use mocks or fakes to isolate the code under test.
 
 ## Architecture
 
@@ -150,9 +140,22 @@ libs/               # Shared Python libraries
 ├── common/         # DB connections, logging, models, Dapr wrappers
 ├── file_enrichment_modules/ # 20+ enrichment module implementations
 ├── chromium/       # Chrome/Edge data extraction
+├── file_linking/   # File association logic
+└── nemesis_dpapi/  # Windows DPAPI credential handling
+
+infra/              # Infrastructure configuration
+├── dapr/           # Dapr components and workflows
+├── postgres/       # Database schema (01-schema.sql)
+├── grafana/        # Monitoring dashboards
+└── ...
+```
+
+### Data Flow
+1. Files uploaded via **web_api** or **cli** → stored in **SeaweedFS**
+2. **file_enrichment** receives file events via Dapr pub/sub
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [SpecterOps/Nemesis](https://github.com/SpecterOps/Nemesis) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-20 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
