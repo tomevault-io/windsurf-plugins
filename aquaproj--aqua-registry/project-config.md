@@ -1,149 +1,134 @@
 ---
 trigger: always_on
-description: Please add a newline at the end of file.
+description: This file is for AI coding agents (Claude Code, Codex CLI, Gemini CLI, etc.).
 ---
 
-# Common Style
+@CONTRIBUTING.md
 
-## Add a newline at the end of file
+# Agent Guide
 
-Please add a newline at the end of file.
-Note that this doesn't mean add an empty line at the end of file.
+This file is for AI coding agents (Claude Code, Codex CLI, Gemini CLI, etc.).
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the human contributor guide and the
+canonical style references under [`docs/`](docs/).
 
-# Guide
+## If you're helping a mise user: reproduce with `aqua` first
 
-## Do Not Change the Source of Existing Packages to a Fork
+aqua-registry is consumed by mise as a backend, but it is an aqua project.
+Bug reports that only reproduce through mise (or asdf) get closed and
+redirected to the mise community.
 
-Even if maintenance of an existing package’s source has stalled or the repository has been archived, **do not change the package source to point to a fork**.
-Instead, create a **new package** that points to the forked source.
+Before opening an issue or PR for a bug, install `aqua`, write a minimal
+`aqua.yaml`, and reproduce the failure with `aqua` directly. In the report,
+include:
 
-For example, development of [99designs/aws-vault](https://github.com/99designs/aws-vault) has slowed down, and a fork, [ByteNess/aws-vault](https://github.com/ByteNess/aws-vault), was created.
-[Homebrew switched to using the forked repository](https://github.com/Homebrew/homebrew-core/pull/226185), but in the aqua registry, we decided to keep the original package as-is and add a new package instead.
+- `aqua` version
+- OS and CPU architecture
+- the `aqua.yaml`
+- the exact command and its output (expected vs. actual)
 
-- https://github.com/99designs/aws-vault/issues/1269
-- https://github.com/aquaproj/aqua-registry/pull/45430
+Background: [aquaproj/aqua-registry#30430](https://github.com/aquaproj/aqua-registry/issues/30430).
 
-This is to prevent the maintainer of a package’s source from changing without users’ knowledge.
-Whether or not to switch to a fork should be a decision made by users, not by the maintainers of the aqua registry.
-By adding a new package, users can explicitly choose to switch packages themselves.
+## Before you open a PR: rejection screens
 
-## Modifying Existing Packages
+The most common reasons the maintainer closes PRs without merging. Check
+each before starting work.
 
-When modifying existing packages, you need to modify code under `pkgs/<package name>`.
-There are several modification methods:
+- **Duplicates.** Search open and recently-closed PRs for the package name
+  before opening one:
 
-1. Manually modify the code
-2. Regenerate the code from scratch with commands
-3. Auto-generate code for the latest version and manually modify based on that
+  ```sh
+  gh pr list --repo aquaproj/aqua-registry --search "<package>" --state all
+  ```
 
-Which method to use depends on the state of the original code.
-Code auto-generation has been improved many times.
-Therefore, there is low-quality code generated before improvements.
-Such code may be better regenerated from scratch rather than manually fixed.
+- **Doesn't install as a single binary on `$PATH`.** aqua installs commands
+  into `AQUA_ROOT_DIR/bin`. Out of scope: tools that expect a different
+  install location (e.g., Helm plugins, Vim/Neovim plugins, Gauge plugins),
+  `libexec/` layouts, env-var-based install roots, and anything installed
+  via `pip` / `npm` / `gem`. **In scope:** standalone binaries that act as
+  plugins for another tool by naming convention — e.g., `kubectl-foo`
+  binaries are supported because kubectl just looks for `kubectl-*` on
+  `$PATH`. See [docs/support_policy.md](docs/support_policy.md).
+- **Upstream repo doesn't resolve.** `github.com/<owner>/<repo>` must be a
+  real GitHub repo whose tags match release versions. The maintainer will
+  not repoint an existing package to a fork — submit the fork as a new
+  package instead.
+- **Unsigned commits.** Auto-flagged by CI and won't merge. Set up commit
+  signing before pushing. See [docs/manner.md](docs/manner.md).
+- **Manual `pkg.yaml` version bumps.** `pkg.yaml` is test data, not a
+  version source. The Renovate bot owns version updates; manual bumps get
+  reverted or closed.
 
-One characteristic to identify if code is old is how `version_constraint` and `version_overrides` are written.
-In the new style, it basically looks like this:
+## Before you start
 
-```yaml
-version_constraint: "false" # Root version_constraint is "false"
-version_overrides:
-  - version_constraint: semver("<= 0.1.0") # Version constraints use <, <= not >, >= (basically <=)
-    # ...
-  # ...
-  - version_constraint: "true" # End with "true" for latest version configuration
-    # ...
-```
-
-In the old style, `version_overrides` is often not defined.
-In this case, it's likely better to regenerate from scratch.
-However, as mentioned earlier, auto-generation doesn't support package types other than `github_release` or `cargo`, so manual modification will be necessary.
-
-Also, [aliases](https://aquaproj.github.io/docs/reference/registry-config/aliases) and [files](https://aquaproj.github.io/docs/reference/registry-config/files) cannot be auto-generated, so you need to modify the auto-generated code referring to the original code.
-
-`3. Auto-generate code for the latest version and manually modify based on that` is effective when the package no longer installs with the latest version but you want to reuse existing code (don't want to regenerate from scratch).
-Running the following command generates code for the latest version:
+### 1. Clone the upstream `aqua` repository for offline spec reference
 
 ```sh
-aqua gr -l 1 "<package name>"
+mkdir -p .ai
+if [ ! -d .ai/aqua ]; then
+  git clone https://github.com/aquaproj/aqua .ai/aqua
+fi
+git -C .ai/aqua pull origin main
 ```
 
-Fix this and add it to the end of `version_overrides` in the original code and modify version_constraint.
+Key paths:
 
-# Style Style Guide of pkgs/\*\*/pkg.yaml
+- `.ai/aqua/website/docs/reference/registry-config/*.md` — every field in `registry.yaml`.
+- `.ai/aqua/json-schema/registry.json` — JSON Schema for `registry.yaml`.
 
-## What's pkgs/\*\*/pkg.yaml for?
+When the project docs link to `https://aquaproj.github.io/docs/<path>`, the
+source markdown is at `.ai/aqua/website/docs/<path>`.
 
-`pkgs/**/pkg.yaml` are test data.
-`pkgs/**/pkg.yaml` are used to test if packages can be installed properly.
+### 2. Use `argd s` to scaffold packages — do not hand-write `registry.yaml`
 
-Note that `pkgs/**/pkg.yaml` aren't lists of available versions.
-You can install any versions not listed in `pkgs/**/pkg.yaml`.
+For `github_release` and `cargo` packages, run:
 
-## packages must not be empty
-
-:thumbsdown:
-
-```yaml
-packages: []
+```sh
+argd s "<owner>/<repo>"      # e.g. argd s cli/cli
 ```
 
-If `cmdx s` fails to fetch versions, packages may become empty.
+For other types, `argd s -l 1 "<package>"` generates a stub. The maintainer
+rejects PRs that hand-write configuration the scaffolder could have generated,
+because manual code reliably misses old versions and uncommon platforms. See
+[docs/add_package.md](docs/add_package.md) for details and edge cases.
 
-## Test multiple versions
+### 3. Verify with `argd t` before opening the PR
 
-If the package has the field [version_overrides](/docs/reference/registry-config/version-overrides),
-please add not only the latest version but also old versions in `pkg.yaml` to test if old versions can be installed properly.
+Run `argd t <package>` and paste the command + a snippet of the output into the
+PR description. "I tested it" without evidence delays review.
 
-```yaml
-packages:
-  - name: scaleway/scaleway-cli@v2.12.0
-  - name: scaleway/scaleway-cli
-    version: v2.4.0
-```
+## Common corrections to avoid
 
-## Don't use the short syntax `<package name>@<version>` for the old versions
+These come up repeatedly on PR review. Check each before submitting.
 
-Don't use the short syntax `<package name>@<version>` for the old version to prevent aqua-registry-updater from updating the old version.
+### `registry.yaml`
 
-:thumbsup:
-
-```yaml
-packages:
-  - name: scaleway/scaleway-cli@v2.12.0
-  - name: scaleway/scaleway-cli
-    version: v2.4.0
-```
-
-:thumbsdown:
-
-```yaml
-packages:
-  - name: scaleway/scaleway-cli@v2.12.0
-  - name: scaleway/scaleway-cli@v2.4.0
-```
-
-# Style Guide of pkgs/\*\*/registry.yaml
-
-## Tool Naming Convention
-
-To avoid name conflicts, tool names must include `/` (namespace-like meaning).
-
-- NG: `terraform`
-- OK: `hashicorp/terraform`
-
-If the tool code is managed on GitHub, match the repository name.
-If multiple tools are managed in that repository, change the name for each tool.
-
-e.g. [winebarrel/cronplan](https://github.com/winebarrel/cronplan)
-
-- `winebarrel/cronplan/cronmatch`
-- `winebarrel/cronplan/cronplan`
-- `winebarrel/cronplan/cronviz`
-
-`aqua-renovate-config` assumes that if the package name does not contain a period, it begins with a GitHub repository name and attempts to obtain the version from GitHub Releases or Tags.
+- **End the file with a single trailing newline.**
+- **Don't quote strings unless YAML requires it.** `description: foo`, not
+  `description: "foo"`. Same for `src`, `asset`, etc.
+- **`description` is one short sentence.** No leading/trailing whitespace, no
+  trailing `.` or `!`, no emojis. Aim for ~80 characters.
+- **`format: raw` ⇒ omit `files[].src`.** The `files` block is unnecessary
+  when there's no archive to extract.
+- **`supported_envs`: list arch-qualified entries when arch coverage is
+  partial.** Bare `linux` implies both `linux/amd64` and `linux/arm64`. If
+  only one arch is supported, write it out: `[darwin, linux/amd64, windows]`.
+- **Use `amd64`/`arm64`, not `x64`/`aarch64`.** CI will fail otherwise.
+- **`version_prefix` must match the actual tag prefix.** If releases are
+  tagged `lychee-v0.15.0`, use `version_prefix: lychee-v`, not `lychee-`.
+- **`version_filter` is not for dropping support for old versions.** Use
+  `version_constraint` + `no_asset` / `error_message` for that. `version_filter`
+  only excludes versions from `argd s` scaffolding.
+- **Drop empty `replacements:` blocks.** If you're not transforming the
+  template, the field shouldn't be there.
+- **Prefer `{{.Asset}}.sha256` over repeating the full asset template** when
+  the checksum URL is just the asset URL with a suffix.
+- **`aliases` is for renames only.** Use `search_words` for discoverability —
+  don't put marketing terms or alternate spellings in `aliases`.
+- **Pick `type:` per the precedence in
+  [docs/registry_yaml.md](docs/registry_yaml.md).** Prefer `github_release` >
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Converted and distributed by [TomeVault](https://tomevault.io/claim/aquaproj) — claim your Tome and manage your conversions.
-<!-- tomevault:4.0:windsurf_rules:2026-04-10 -->
+> Source: [aquaproj/aqua-registry](https://github.com/aquaproj/aqua-registry) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
