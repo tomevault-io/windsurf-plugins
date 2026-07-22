@@ -1,0 +1,102 @@
+---
+trigger: always_on
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+---
+
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+# Customer.io iOS SDK - Developer Guide
+
+After completing planned changes to the code, ALWAYS build the code to make sure it's working, before continuing to the next step.
+After making changes to Unit Tests, ALWAYS test the changed test classes. Avoid testing the whole module or the whole SDK, unless absolutely necessary.
+
+## Commands
+- Build single module: `xcodebuild -scheme MessagingPushAPN -configuration Debug -workspace ./.swiftpm/xcode/package.xcworkspace -destination 'platform=iOS Simulator,id=SIMULATOR_ID' -allowProvisioningUpdates build`
+  - More details in the section `Building` below
+- Test single file (with xcodebuild): `xcodebuild test-without-building -workspace ./.swiftpm/xcode/package.xcworkspace -destination 'platform=iOS Simulator,id=SIMULATOR_ID' -scheme Customer.io-Package -only-testing:TestSuiteName/TestClassName`
+  - More details in section `Testing` below
+- Format: `make format` (run before lint)
+- Lint: `make lint`
+- Generate code and mocks: `make generate`
+  - After `make generate`, always run `make format` first and then `make lint`
+
+## Code Style
+- Swift 5.3+ with protocol-oriented design
+- Naming: CamelCase for types, camelCase for properties/methods
+- Descriptive method names (e.g., `identify`, `registerDeviceToken`)
+- Always use a constructor-based dependency injection pattern, and use `DIGraphShared` only for top-level module initialization
+- Modular architecture (Common, DataPipeline, MessagingPush, etc.)
+- Document public APIs with doc comments
+- Always add doc comments to Protocol, no matter if those are public or internal. When component implements protocol, do not repeat the same docs.
+- Error handling: prefer `throws`/`do-try-catch`, but use Result types when existing code is using it
+- Avoid force unwrapping (!) except in tests
+- Always prefer `weak` over `unowned` for weak type of references. `unowned` could easily produce a crash if the lifecycle between components is changed.
+- Keep classes/structs/enums/actors small and with a single responsibility
+- Keep methods small and focused
+
+## Prohibited Actions
+- DO NOT manually edit any `.generated.swift` files
+- DO NOT expose internal modules to end users
+- DO NOT modify Package.swift unless asked for
+- DO NOT commit configuration files with actual credentials
+- DO NOT include files with credentials in the context sent to the model
+- DO NOT put credentials in generated code, and instead always put a placeholder (even when credentials are available from some other files)
+- DO NOT use iOS features unavailable in iOS 13 unless compatibility fallback is included. Always point out when a post iOS 13 feature is added.
+
+## Memory considerations
+- In the capture list, for closures, be explicit and capture only what is needed, not the entire `self`
+- Type usages:
+  - Use structs (value types) for data models when possible
+  - Use classes (reference types) when identity or inheritance is needed
+  - Prefer value semantics for API boundaries to avoid unexpected side effects
+- Resources clean up:
+  - Implement `deinit` for classes that need cleanup
+  - Cancel any async operations in `deinit`
+  - Dispose of resources explicitly when needed (e.g., file handles, network connections)
+- Document memory ownership expectations in public APIs
+- Design APIs to make the correct memory pattern obvious to users
+
+## Thread safety
+- Prefer high-level concurrency models (Swift Concurrency) over low-level ones (GCD)
+- Avoid `sync` operation in GDC unless no alternative. Always point out when `sync` is included in generated code.
+- Prefer Actor over DispatchQueue unless it produces significant performance degradation
+- Ensure UI operations happen on the main thread
+- Design with immutability in mind for concurrent operation
+- Create clear boundaries between thread-safe and thread-unsafe components
+- Design APIs that help prevent thread safety issues
+- When testing concurrent code, include stress tests
+- Document the threading model clearly, especially for the SDK's public APIs
+
+## Committing and Pushing with Git
+- Use `lefthook` for git hooks
+  - Install with `brew install lefthook`
+  - Configure with `lefthook install`
+- Before doing a commit, ensure that pre-commit from `.lefthook.yml` is installed
+- Before doing a push, ensure that pre-push from `.lefthook.yml` is installed
+
+## Project Structure
+- `Sources/` - Main SDK code organized by modules:
+  - `Common/` - Shared core functionality
+  - `DataPipeline/` - Customer identification and event tracking
+  - `MessagingPush/` - Base push notification functionality
+  - `MessagingPushAPN/` - Apple Push Notification implementation
+  - `MessagingPushFCM/` - Firebase Cloud Messaging implementation
+  - `MessagingInApp/` - In-app messaging functionality
+  - `Migration/` - Migration tools for version upgrades
+  - `Templates/` - Sourcery templates for code generation
+- `Tests/` - Test files organized by module
+- `Apps/` - Sample applications demonstrating SDK usage
+
+## Architecture
+
+### Module Architecture
+- Each module exposes a public-facing facade extending `ModuleTopLevelObject`
+- Implementation classes are hidden from SDK users
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [customerio/customerio-ios](https://github.com/customerio/customerio-ios) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
