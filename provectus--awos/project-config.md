@@ -1,107 +1,83 @@
 ---
 trigger: always_on
-description: **DO NOT install the AWOS package during codebase contributions.** The command `npx @provectusinc/awos` should ONLY be run by end users who are setting up AWOS in their own projects, NOT by GitHub Copilot during development or when working on this repository.
+description: This repo contains **two distinct things** that live side-by-side:
 ---
 
-# IMPORTANT: Package Installation Restrictions
+# CLAUDE.md
 
-**DO NOT install the AWOS package during codebase contributions.** The command `npx @provectusinc/awos` should ONLY be run by end users who are setting up AWOS in their own projects, NOT by GitHub Copilot during development or when working on this repository.
+## What This Repo Is
 
-**Rationale:** The AWOS package installation process copies files and creates directories in the user's project workspace. This installation is intended for end users adopting the AWOS framework in their own projects, not for contributors working on the AWOS framework itself.
+This repo contains **two distinct things** that live side-by-side:
 
-**When to avoid installation:**
-- During any codebase contributions to this repository
-- When reviewing or testing changes to the AWOS framework
-- When debugging or fixing issues in the framework code
+1. **The AWOS framework** — markdown files in `commands/`, `templates/`, `claude/`, `scripts/`, and `plugins/`. These are the actual product: AI-agent prompts, document templates, and a Claude Code plugin. They never execute as code in this repo; they get copied into a user's project.
+2. **The installer** — JavaScript code in `src/` and `index.js` (entry point). Published to npm as `@provectusinc/awos` and runnable via either Node (`npx`) or Bun (`bunx`). Its only job is to copy framework files into a user's project. See `src/CLAUDE.md` for installer internals.
 
-**When installation is appropriate:**
-- Only when an end user wants to adopt AWOS in their own separate project
-- Only when explicitly requested by a user for their own project setup
+When working here, identify which layer your change touches. Editing a prompt under `commands/foo.md` is product work; editing `src/services/file-copier.js` is installer work.
 
----
+## Critical Rule: Do Not Run the Installer Here
 
-# AWOS: Agentic Workflow Operating System
+**Never run the installer inside this repo** — neither `npx @provectusinc/awos` / `npx ./index.js` nor `bunx @provectusinc/awos` / `bun index.js`. The installer creates `.awos/`, `.claude/`, and `context/` directories — running it here pollutes the source tree with copies of files that already exist as originals. To test installer changes, run it against a separate scratch project as described in `CONTRIBUTING.md`.
 
-This is a framework for spec-driven development using AI agents. It provides structured workflows that guide users from product vision to implementation through a series of specialized AI commands.
+## Common Commands
 
-## Architecture Overview
+```sh
+# Format check — CI-enforced quality gate (pick one runner):
+npx prettier . --check
+bunx prettier . --check
+npx prettier --write .     # auto-format before committing
+bunx prettier --write .
 
-**Core Components:**
-- **Installer (`index.js`)**: NPM package that copies workflow templates and commands to user projects
-- **Commands (`/commands/*.md`)**: AI agent prompts that guide users through development stages
-- **Templates (`/templates/*.md`)**: Structured document templates for specifications and planning
+# Run the test suite (no npm deps; node --test built-in):
+npm test                   # all four layers (markdown lint, installer, fixtures, engine)
+npm run test:lint          # Layer 1 — static prompt linter
+npm run test:installer     # Layer 2 — installer unit tests
+npm run test:fixtures      # Layer 3 — fixture-project end-to-end
+npm run test:coverage      # prints per-file coverage table for src/
+npm run test:coverage:gate # fails if coverage drops below env thresholds
+bun test --coverage tests/ # local cross-runtime coverage (Bun version)
 
-**Installation Flow:**
-```
-npx @provectusinc/awos
-├── Creates `.claude/commands/awos/` (copies all commands/*.md files)
-├── Creates `.awos/templates/` (copies templates/*.md files)
-└── Creates `.awos/scripts/` (copies scripts/*.sh files)
-```
+# Behavioral / session-log E2E lives in the awos-qa repository
+# (sibling to this one). See its README for how to run.
 
-## Document-Driven State Management
-
-AWOS uses a **document-centric approach** where all project state lives in structured markdown files, making the system **idempotent**. AI agents can restore full context from files alone, regardless of chat history.
-
-**Key Document Types:**
-- `context/product/product-definition.md` - Business vision and requirements
-- `context/roadmap/roadmap.md` - Feature prioritization and planning
-- `context/architecture/architecture.md` - Technical blueprint and decisions
-- `context/spec/[feature]/functional-spec.md` - Feature requirements (what/why)
-- `context/spec/[feature]/technical-considerations.md` - Implementation plan (how)
-- `context/spec/[feature]/tasks.md` - Checklist of implementable tasks
-
-## Command Workflow Pattern
-
-Each command follows a consistent structure:
-1. **ROLE** - Defines the AI agent's persona and expertise
-2. **TASK** - Specific responsibility and outputs
-3. **INPUTS/OUTPUTS** - Expected files and data flow
-4. **PROCESS** - Step-by-step execution logic
-
-**Sequential Workflow:**
-```
-/awos:product → /awos:roadmap → /awos:architecture →
-/awos:spec → /awos:tech → /awos:tasks → /awos:implement
+# Test installer against a separate project (pick one runner; $AWOS_REPO is the absolute path to this repo):
+cd ~/some-scratch-project
+npx $AWOS_REPO/index.js
+bunx $AWOS_REPO/index.js
+bun $AWOS_REPO/index.js          # direct exec also works
+npx $AWOS_REPO/index.js --dry-run   # preview only
 ```
 
-## Agent Delegation Pattern
+The installer runs on **Node 22+ or any recent Bun**. It uses only standard JS built-ins (`fs`, `path`) via CommonJS `require`, which both runtimes support — do not add npm dependencies or runtime-specific APIs without strong justification, as that would break cross-runtime compatibility.
 
-The `/awos:implement` command acts as an **engineering manager** that:
-- Reads task lists from `context/spec/[feature]/tasks.md`
-- Loads full context from functional specs and technical considerations
-- **Delegates** actual coding to specialized subagents (never writes code itself)
-- Tracks progress by updating task checkboxes
+## Testing
 
-**Critical Rule:** Implementation agents MUST delegate to subagents rather than writing code directly.
+The repo has a three-layer test suite under `tests/`, all built on Node's `node:test` built-in — no npm dependencies. See `tests/README.md` for the detailed reference.
 
-## Development Conventions
+1. **Static prompt linter** (`tests/lint-prompts.test.js`) — symmetry, frontmatter, marker presence, cross-references, dimension DAG, copy-table consistency, and grep-style checks for required substrings inside prompt bodies.
+2. **Installer unit tests** (`tests/installer/*.test.js`) — exercises the installer services against temp directories.
+3. **Fixture projects** (`tests/fixtures.test.js` + `tests/fixtures/<name>/`) — real installer runs against representative pre-install trees, with manifest-based assertions.
 
-**File Structure:**
-- All AWOS workflow files use `.md` format for AI readability
-- Commands are executable prompts stored as markdown files
-- Templates contain placeholder sections marked with `[brackets]`
-- Each spec gets its own directory under `context/spec/`
+All three layers run in CI via `npm test`, which also runs the engine test layer (see "Running the engine tests" below).
 
-**Template Population:**
-- Commands guide users through interactive sessions to populate templates
-- Support both "Creation Mode" (new documents) and "Update Mode" (existing documents)
-- Generate a single output document per command
+### Coverage
 
-**Task Granularity:**
-- Each task in `tasks.md` must be **runnable and testable**
-- Application should remain functional after each completed task
-- Tasks are atomic units that produce intermediate, visible results
+`npm run test:coverage` runs the full suite under Node 22's built-in `--experimental-test-coverage` and prints a per-file table for `src/**` (the installer entry point `src/index.js` is excluded — it's just CLI plumbing). `npm run test:coverage:gate` adds three threshold flags that fail the run when coverage drops below the configured floor.
 
-## Key Implementation Notes
+CI runs both: a non-blocking **coverage-report** job that just prints the table, and a **coverage-gate** job that enforces hardcoded thresholds. To raise the floor, edit `COVERAGE_LINES` / `COVERAGE_FUNCTIONS` / `COVERAGE_BRANCHES` in `.github/workflows/quality-check.yml`.
 
-- The main entry point is `index.js` with shebang for CLI execution
-- Package is published as `@provectusinc/awos` with binary configuration
-- Uses Node.js built-in modules (no external dependencies)
-- Copies files only if they don't exist (never overwrites user customizations)
+Local Bun fallback: `bun test --coverage tests/` produces an equivalent table (slightly different column set) when Node isn't installed.
 
-When working with this codebase, remember that you're building **AI agent orchestration framework**, not end-user applications. Focus on clear prompt engineering, structured document templates, and maintainable command workflows.
+Behavioral end-to-end tests — the ones that run a real Claude Code session against a seeded scratch project and assert on the actual tool-call trace — live in the separate **`awos-qa`** repository (sibling to this one). See its README for how to run them.
+
+### Tests must narrate what they checked
+
+Output that says `N events found` or `M pass` tells you the suite ran, not what was validated. `assert.*` failure messages should name the contract being violated, not just dump a diff. Anyone reading the test output should understand which contracts were verified without opening the test source.
+
+### Adding tests for new contracts
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [provectus/awos](https://github.com/provectus/awos) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-05-05 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
