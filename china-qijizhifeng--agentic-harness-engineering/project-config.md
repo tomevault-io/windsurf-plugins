@@ -1,0 +1,17 @@
+---
+trigger: always_on
+description: - System Rules → AGENTS.md
+---
+
+# AGENTS.md
+
+> 遵循 HARNESS.md v1.0
+
+## 组件概述
+- System Rules → AGENTS.md
+- Tool Descriptions → tool_descriptions/
+- Tool Implementations → tools/
+
+---
+> Source: [china-qijizhifeng/agentic-harness-engineering](https://github.com/china-qijizhifeng/agentic-harness-engineering) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
