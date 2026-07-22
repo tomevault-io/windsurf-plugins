@@ -38,13 +38,13 @@ pytest tests/test_deepgemm_fp8_linear_correctness.py -v
 pytest tests/test_grouped_linear_correctness.py -v
 pytest tests/test_ep_dedup_dispatch.py -v
 pytest tests/test_silu_mul.py tests/test_clamped_swiglu.py tests/test_indexed_bias_add.py -v
-pytest tests/operators/test_ring_attention.py tests/test_layer_partition.py -v
+pytest tests/operators/test_ring_attention.py -v
 
 # Single test function
 pytest tests/test_fp8_quantize_kernels.py::test_name -v
 
 # Multi-GPU integration test — boots DualPipeV with FSDP, ~4 GPUs, pp=2 ep=2
-bash tests/test_fsdp.sh
+bash tests/test_dualpipev.sh
 ```
 
 ### Benchmarks
@@ -88,28 +88,24 @@ The core pipeline assigns each rank two model chunks in a V-shape (the model is 
 4. **Combine** — All-to-all gather expert outputs (async on comm stream)
 5. **Aggregate** — Weighted expert output + residual connection
 
+Stages 1, 3, and 5 are the layer's compute entry points — `forward_stage1`, `forward_stage3`, `forward_stage5` on `LayerProtocol` (`pithtrain/models/interface.py`); stages 2 and 4 are all-to-all communication driven by the execution machinery (`pithtrain/dualpipe/execution.py`), not layer methods.
+
 Key files:
-- `dualpipev.py` — Main scheduler: `DualPipeV.step()` orchestrates overlapped F/B across modules. Supports `forward_only=True` for inference.
+- `dualpipev.py` — Main scheduler: `DualPipeV.step()` orchestrates overlapped F/B across modules (supports `forward_only=True` for inference), plus `layer_partition()`, which distributes decoder layers across pipeline stages — edge stages (which hold `embed_tokens` / `norm`+`lm_head`) get fewer layers to balance memory.
 - `overlap.py` — `overlapped_forward_backward()` interleaved loop for one pair of micro-batches
-- `execution.py` — Stage implementations (`stage1_f`, `stage1_b`, etc.) and `ExecutionCtx`
-- `modeling.py` — `decoder_layer_forward/backward` autograd wrappers, dispatch/combine helpers
-- `layer_partition.py` — Distributes decoder layers across pipeline stages; edge stages (which hold `embed_tokens` / `norm`+`lm_head`) get fewer layers to balance memory.
+- `execution.py` — Stage implementations (`stage1_f`, `stage1_b`, etc.), `ExecutionCtx`, and the dispatch/combine helpers
 - `comm.py` — P2P communication setup between pipeline ranks
 - `utils.py` — `FP8WeightCacheControl` (cache quantized weights across micro-batches), `WeightGradStore` (deferred wgrad for zero-bubble scheduling)
 
 ### FP8 Training
 
-`ModelImplMode.fp8_training` in `pithtrain/layers/factory.py` selects the linear-layer backend (currently `"deep-gemm"` or BF16 fallback). The DeepGEMM path (`pithtrain/layers/deepgemm_fp8_linear.py`) uses 128-element block scaling with E8M0 scale format, backed by custom Triton quantization kernels in `pithtrain/operators/deepgemm_fp8_quantize.py`. The BF16 grouped linear layer is in `pithtrain/layers/group_linear.py`.
+`TrainingCfg.fp8` selects the linear-layer backend: at training setup it binds `training.Linear` / `training.GroupedLinear` to the FP8 or BF16 classes. The DeepGEMM path (`pithtrain/operators/linear.py`) uses 128-element block scaling with E8M0 scale format, backed by custom Triton quantization kernels in `pithtrain/operators/deepgemm_quantize.py`. The BF16 grouped linear layer is in `pithtrain/operators/grouped_linear.py`.
 
 ### Distributed Parallelism (`pithtrain/modules/distributed.py`)
-
-Four dimensions: Pipeline Parallel (PP), Expert Parallel (EP), Context Parallel (CP, ring attention), Data Parallel (DP via FSDP2 `fully_shard`). PP/CP/EP are configured through `DistributedCfg`; DP is inferred from the world size. The `(PP, DP, CP, EP)` device mesh and process groups are built in `setup_device_mesh`/`setup_default_process_group`. The same module installs a fail-fast excepthook plus an NCCL heartbeat timeout (driven by `DistributedCfg.timeout`, default 15 min) so a failed rank does not make peers wait on the watchdog.
-
-### Model Layer Protocol (`pithtrain/models/interface.py`)
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Source: [mlc-ai/pith-train](https://github.com/mlc-ai/pith-train) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-14 -->
+> Source: [mlc-ai/Pith-Train](https://github.com/mlc-ai/Pith-Train) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
