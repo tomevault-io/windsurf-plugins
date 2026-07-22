@@ -1,109 +1,86 @@
 ---
 trigger: always_on
-description: This file is the authoritative operating procedure for AI agents working in this repository.
+description: make                      # build gopherbot binary
 ---
 
-# AGENTS.md — Gopherbot
+# Gopherbot Rules
 
-This file is the authoritative operating procedure for AI agents working in this repository.
+## Build and Test
 
-If any ad-hoc instruction conflicts with this file, this file wins.
+```bash
+make                      # build gopherbot binary
+make test                 # unit + integration tests
+TEST=JSFull make test     # JS full suite
+TEST=LuaFull make test    # Lua full suite
+TEST=ShFull make test     # Gopherbot shell full suite
+TEST=GoFull make test     # External Go (Yaegi) full suite
+RUN_FULL=all make test    # all full suites
+```
 
-## Authority Boundary
+Always redirect verbose test output to a file, then grep for summary:
+```bash
+make test > /tmp/gopherbot-test.txt 2>&1; echo "EXIT:$?"
+grep -E "^(--- (PASS|FAIL)|FAIL\t|ok\t)" /tmp/gopherbot-test.txt
+```
 
-- `AGENTS.md` is the single source of policy and required process.
-- Skills may provide workflows/templates, but must not redefine repository policy.
-
-## Local Tool Availability
-
-- If a task requires a local tool, command, interpreter, or development utility that is not installed or not available on `PATH`, pause and ask the project owner to install it.
-- Do not install missing local tools, vendor replacements, or silently substitute a different workflow unless the project owner explicitly approves that change.
-- For `.lua`, `.js`, `.gsh`, and interpreted `.go` extension work, standalone language runtimes are not required. Use `./gopherbot syntax` and `./gopherbot script`; see `aidocs/TESTING_CURRENT.md` and `aidocs/INTERPRETERS.md`.
-
-## Phase 0 — Orientation (Two-Tier Model)
-
-### Tier A: Default Orientation (required for all tasks)
+## Orientation
 
 Before proposing or implementing changes, read:
-1. `aidocs/README.md`
-2. `aidocs/COMPONENT_MAP.md`
+1. `aidocs/README.md` — doc index and tiers
+2. `aidocs/COMPONENT_MAP.md` — top-level directory/file map
+3. `GOALS_v3.md` — project roadmap
 
-Then load only the canonical docs needed for the task scope.
+Then load only the aidocs relevant to the task scope.
 
-### Tier B: Escalated Orientation (hard requirement when triggered)
+### Escalated orientation (required when touching these areas)
 
-In addition you must run full architecture preflight before coding when **any** trigger applies.
+If a change touches **any** of these, read the full set (`aidocs/README.md`, `COMPONENT_MAP.md`, `STARTUP_FLOW.md`, `GOALS_v3.md`, `TESTING_CURRENT.md`) before coding:
 
-Read in order:
-1. `aidocs/STARTUP_FLOW.md`
-2. `aidocs/TESTING_CURRENT.md`
-
-Then summarize in your own words:
-- core architectural invariants
-- startup ordering constraints
-- connector assumptions
-- message routing model
-- identity model
-
-### Escalation Triggers (hard)
-
-Escalated orientation is mandatory if a change touches or may affect:
-- startup/config load order (`bot/start.go`, `bot/bot_process.go`, `bot/config_load.go`, `bot/conf.go`)
-- message routing/pipeline ordering (`bot/dispatch.go`, `bot/run_pipelines.go`, scheduler flow)
-- connector runtime/behavior (`connectors/*`, connector runtime orchestration)
-- identity/authz semantics (username mapping, roster gates, authorization/elevation)
-- root/default robot config structure (`conf/robot.yaml`, `robot.skel/conf/robot.yaml`)
-- cross-protocol behavior/contracts
-- privilege separation or task execution (`bot/privsep.go`, `bot/calltask.go`, `bot/task_execution.go`)
-- user permission checks, admin/auth/elevation logic (`bot/available.go`, `bot/authorize.go`, `bot/elevate.go`)
-- pre-pipeline user filtering or message context (`bot/handler.go`)
+- startup/config load order: `bot/start.go`, `bot/bot_process.go`, `bot/config_load.go`, `bot/conf.go`
+- message routing/pipeline ordering: `bot/dispatch.go`, `bot/run_pipelines.go`
+- connector runtime/behavior: `connectors/*`, `bot/connector_runtime.go`
+- identity/authz semantics: username mapping, roster gates, authorization/elevation
+- root/default config structure: `conf/robot.yaml`, `robot.skel/conf/robot.yaml`
+- privilege separation or task execution: `bot/privsep.go`, `bot/calltask.go`, `bot/task_execution.go`
+- user permission checks: `bot/available.go`, `bot/authorize.go`, `bot/elevate.go`
+- pre-pipeline user filtering: `bot/handler.go`
 
 If uncertain, escalate.
 
-## Phase 1 — Impact Analysis (Required for Cross-Cutting Changes)
+For subsystem-specific docs, see `aidocs/README.md` — read the relevant aidocs file before modifying that subsystem.
 
-For changes affecting connectors, routing, startup, configuration, identity, or compatibility:
-- produce an Impact Surface Report before modifying code
-- include subsystems, invariants, cross-cutting concerns, concurrency, compatibility, docs updates
-- do not implement until report is shared, unless explicitly waived by user
+## Documentation Update Mapping
 
-## Architectural Invariants
+When behavior changes, update canonical docs in the same change:
 
-Unless explicitly updated in canonical docs, these must hold:
-- startup sequence is deterministic and traceable
-- control flow is explicit, not implicit
-- shared authorization/business policy remains in engine flows, not connectors
-- permission/policy decisions are username-authoritative
-- message routing order is preserved within a connector
-- configuration precedence is explicit and documented
-- engine-shipped extension defaults remain authoritative; custom robot extension config stays delta-only unless behavior is intentionally redefined
-- multi-connector isolation prevents cascading failure
-- secret access is explicit and scope-based: unprivileged extensions must not discover shared secrets through generic robot methods
+| Changed area | Update |
+|---|---|
+| startup/config loading | `aidocs/STARTUP_FLOW.md` |
+| pipeline routing/execution | `aidocs/PIPELINE_LIFECYCLE.md` |
+| scheduled job behavior | `aidocs/SCHEDULER_FLOW.md` |
+| connector behavior/identity | connector-specific `aidocs/` doc + `COMPONENT_MAP.md` if boundaries moved |
+| execution security / privsep | `aidocs/EXECUTION_SECURITY_MODEL.md` |
+| extension API/runtime | `aidocs/EXTENSION_API.md` and/or `aidocs/EXTENSION_SURFACES.md` |
+| compatibility/config migration | `aidocs/V3_COMPATIBILITY_CONTRACT.md` + `UPGRADING-v3.md` |
+| test harness assumptions | `aidocs/TESTING_CURRENT.md` |
 
-## Connector Rules (Critical for Multi-Protocol)
+Run `helpers/check-docs-hygiene.sh` for any change touching `aidocs/`, `devdocs/`, `AGENTS.md`, or `UPGRADING-v3.md`.
 
-- connectors own transport concerns and protocol-local behavior
-- connectors must not bypass shared engine policy/authorization logic
-- connectors map transport identity to canonical username deterministically
-- cross-protocol identity equivalence is canonical username, not heuristic transport-ID matching
-- connector failure isolation must be preserved when multiple connectors are enabled
+## Change Discipline
 
-## Extension Secret Boundary
+- One logical change per branch
+- No silent refactors — preserve behavior unless explicitly redefining it
+- Planning before implementation for cross-cutting changes
+- Extension API behavior compatibility is priority (`aidocs/V3_COMPATIBILITY_CONTRACT.md`)
+- Classify every integration test failure as regression vs. intentional change before updating expectations
 
-- secrets may be exposed to an extension only through explicit administrator configuration for that extension, or through memory/brain state owned by that extension's authorized namespace
-- unprivileged robot methods must not reveal shared secret-bearing configuration, nor provide indirect discovery of secrets outside the caller's granted scope
-- do not add or document extension APIs that return provider registries, parameter-set contents, or other broad configuration objects containing secrets
+## Post-Task Checklist
 
-## Security Model Invariants — Privilege Separation (setuid nobody)
-
-These apply to `bot/privsep.go`, `bot/calltask.go`, `bot/task_execution.go`, `bot/run_pipelines.go`, and `bot/robot_pipecmd.go`. All are hard escalation triggers.
-
-**Process privilege invariants:**
-- There are no normal mid-process privilege transitions. Do not reintroduce `raiseThreadPriv`, `raiseThreadPrivExternal`, `dropThreadPriv`, or thread-pinned credential switching.
-- The parent engine runs as the invoking robot user after privsep startup initialization. If it does not, startup/privsep initialization is broken.
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+1. Re-validate architectural invariants for the affected subsystem
+2. Update required canonical docs (see mapping above)
+3. Run applicable tests; redirect output to file, grep summary
+4. On failure: classify before fixing expectations
 
 ---
 > Source: [lnxjedi/gopherbot](https://github.com/lnxjedi/gopherbot) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-20 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
