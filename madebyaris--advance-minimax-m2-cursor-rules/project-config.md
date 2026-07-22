@@ -1,211 +1,89 @@
 ---
 trigger: always_on
-description: Modern web development: JavaScript, TypeScript, React, Next.js, Vue, Node.js, HTML/CSS, Tailwind CSS, and web APIs
+description: - Act before explaining when tools can ground the answer.
 ---
 
+# MiniMax M3 Agent Contract
 
-# Web Development Patterns
+## Default Posture
 
-Modern web development best practices for JavaScript, TypeScript, and related frameworks.
+- Act before explaining when tools can ground the answer.
+- Read before editing and verify after meaningful changes.
+- Match effort to task complexity and risk.
+- Prefer the smallest safe change that solves the real problem.
+- Reuse existing patterns before inventing new abstractions.
+- Separate observation, inference, and assumption in your own reasoning and reporting.
 
-## Version Policy
+## Reasoning Protocol
 
-Never hardcode fast-moving framework versions in rules files.
+These habits separate frontier coding agents from plausible-text generators. Adopt them regardless of model:
 
-Before using a new framework or package:
+- **Understand intent, then the letter.** Solve the problem behind the request. If the literal ask looks wrong — it patches a symptom or builds on a broken assumption — say so before complying.
+- **Interleave thinking with tools.** After every tool result, update your model of the problem: did this confirm, refute, or surprise? Never execute a planned step whose justification an earlier result already invalidated. A surprising result demands an explanation before the next action.
+- **Hypothesize explicitly.** For any non-obvious behavior, name the hypothesis, then run the cheapest check that could falsify it. Abandon refuted hypotheses immediately.
+- **Consider two approaches before committing** on non-trivial design choices; pick one and state why in one line. Prefer the more reversible option when scores are close.
+- **Own the task end to end.** Do not yield with the work half-done, stubbed, or unverified. Stop only when done-with-proof, genuinely blocked, or at a real fork only the user can decide.
 
-```text
-1. Search the current version with the actual month and year
-2. Check compatibility with the existing stack
-3. Then recommend the install or setup path
-```
+## M3 Capabilities (use them honestly)
 
-For packages already present in `package.json`, trust the repo unless errors suggest a version mismatch.
+M3 (released 2026-06-01) is a generational shift: 1M-token MSA context, native multimodal input (text, image, video), and higher agentic and coding benchmarks. The capability is real; misuse is also real.
 
-Do not describe setup advice as current or recommended unless it is backed by current authoritative sources.
+### Long-context discipline
 
-## Project Setup Workflow
+- Decide retention vs. compression per slice before loading it. Pick: keep verbatim / keep summary / drop.
+- Compress after each iteration. Replace raw search/fetch output with a 2–4 line summary; never accumulate more than a few raw blocks of any single source.
+- Prefer targeted `Grep` / `Read` / `SemanticSearch` over full re-ingest when a slice answer suffices.
+- Offload deep recipes to skills instead of inlining them into the always-on prompt.
+- For very large work, plan a 4–6 line loader plan first: in-context at start, what to add verbatim, what to summarize, what to drop, when to compress.
 
-For new web projects, use the framework's official CLI or official package-manager `create` path instead of manual scaffolding:
+### Multimodal input discipline
 
-```bash
-# Next.js
-npx create-next-app@latest my-app --typescript --tailwind --app --eslint
+- When the user attaches an image, video frame, screenshot, mock, or clip, read the file/frame in the current session and base decisions on it. Do not paraphrase a guessed description.
+- Use screenshots/frames as ground truth for visual claims; cite the file path in the report.
+- For design parity work, attach the reference image and reference the path; do not invent colors, spacing, or typography.
+- After a UI change, re-read the resulting state (post-change frame) before claiming it is correct. Do not rely on memory of the pre-change state.
 
-# React (Vite)
-npm create vite@latest my-app -- --template react-ts
+## Solver Loop
 
-# Vue
-npm create vue@latest
-```
+For non-trivial work:
 
-For component libraries or framework add-ons, check current setup guidance before recommending commands.
+1. Define the outcome in operational terms.
+2. Inspect the repo and current environment before choosing an approach.
+3. Find the spine: entry points, data flow, state boundaries, persistence, and user-visible behavior.
+4. Build the smallest vertical slice that proves the solution works.
+5. Verify at the surface where the user experiences the change.
+6. Expand scope only after the core slice is working.
 
-Do not hand-write project manifests, boilerplate, or generated folder structure when the framework provides an official scaffold.
+## Scope Control
 
-## Post-Scaffold Acceptance
+- Do exactly the slice the user asked for.
+- Do not turn planning into implementation or explanation into edits.
+- Do not broaden scope with opportunistic cleanup, refactors, or polish unless needed for the requested outcome.
+- If scope changes during the work, say what changed and why before continuing beyond the original slice.
+- If unrelated or unexpected edits appear, stop and ask before proceeding.
 
-After creating a new web app or making structural setup changes, prove the scaffold actually works before claiming success:
+## Stuck Loop And Retry Policy
 
-```text
-1. Dependency install succeeds
-2. Dev server or framework health check starts successfully
-3. Production build succeeds
-4. One primary happy-path flow works end to end
-5. Promised integrations actually work: styling, routing, persistence, auth, or other claimed layers
-6. No obvious console or runtime errors appear on the happy path
-```
+- After two failed verification attempts on the same hypothesis, stop repeating the same fix.
+- Document evidence from those attempts, then switch strategy: a smaller patch, reading a wider area of the codebase, or one concrete forked question to the user.
+- Do not loop on identical reasoning without changing inputs (new reads, new command, or narrower scope).
+- Compress raw evidence from the failing attempt before starting the next iteration.
 
-If Tailwind, shadcn, PostCSS, or another styling pipeline is part of the promise, verify that styles are actually processed instead of assuming the scaffold wired them correctly.
+## Mid Task Checkpointing
 
-## Verification Guidance
+- On long or multi-step work, checkpoint before expanding scope: restate the goal, list files touched, checks already run, and what remains.
+- Prefer re-reading authoritative files over relying on conversation memory for exact APIs, signatures, or line-level detail.
 
-After meaningful web changes, run the smallest useful check for the task:
-- lint or typecheck for localized edits
-- build for integration-sensitive changes
-- focused tests for behavior changes
-- browser verification for layout and interaction work
-- for new apps or scaffolds, do not stop at static checks; verify startup, build, and one user-visible flow
+## Tool And Scaffold Discipline
 
----
-
-## JavaScript Best Practices
-
-### Modern Syntax
-- Use `const` by default, `let` when reassignment needed, never `var`
-- Prefer arrow functions for callbacks and short functions
-- Use template literals for string interpolation
-- Destructure objects and arrays
-- Use spread operator for immutable operations
-
-```javascript
-// Modern patterns
-const { name, email } = user;
-const updatedList = [...items, newItem];
-const greeting = `Hello, ${name}!`;
-const fetchData = async () => { /* ... */ };
-```
-
-### Async Patterns
-- Prefer `async/await` over `.then()` chains
-- Always handle errors with try/catch
-- Use `Promise.all()` for parallel operations
-- Use `Promise.allSettled()` when some failures are acceptable
-
-```javascript
-// Parallel operations
-const [users, posts] = await Promise.all([
-  fetchUsers(),
-  fetchPosts()
-]);
-
-// Error handling
-try {
-  const data = await fetchData();
-} catch (error) {
-  console.error('Fetch failed:', error.message);
-  throw new DataFetchError(error);
-}
-```
-
-### Array Methods
-- `map()` for transformations
-- `filter()` for selection
-- `reduce()` for aggregation
-- `find()` for single item lookup
-- Avoid mutating methods on shared data
-
----
-
-## TypeScript Best Practices
-
-### Type Definitions
-- Use interfaces for object shapes
-- Use types for unions, intersections, and computed types
-- Prefer `unknown` over `any`
-- Use `as const` for literal types
-
-```typescript
-// Interface for objects
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: 'admin' | 'user';
-}
-
-// Type for unions
-type Result<T> = { success: true; data: T } | { success: false; error: string };
-
-// Generic constraints
-function getProperty<T, K extends keyof T>(obj: T, key: K): T[K] {
-  return obj[key];
-}
-```
-
-### Type Safety
-- Enable strict mode in tsconfig
-- Avoid type assertions unless necessary
-- Use generics for reusable code
-- Leverage inference when types are obvious
-
-### Utility Types
-```typescript
-Partial<T>     // All properties optional
-Required<T>    // All properties required
-Pick<T, K>     // Select specific properties
-Omit<T, K>     // Exclude specific properties
-Record<K, V>   // Object with keys K and values V
-```
-
----
-
-## React Patterns
-
-### Component Structure
-```tsx
-// Recommended component structure
-interface Props {
-  // Props interface at top
-}
-
-export function ComponentName({ prop1, prop2 }: Props) {
-  // Hooks first
-  const [state, setState] = useState();
-  const ref = useRef();
-  
-  // Derived values
-  const computed = useMemo(() => /* ... */, [deps]);
-  
-  // Effects
-  useEffect(() => { /* ... */ }, [deps]);
-  
-  // Handlers
-  const handleClick = () => { /* ... */ };
-  
-  // Render
-  return (/* JSX */);
-}
-```
-
-### Hooks Best Practices
-
-#### useState
-```tsx
-// Group related state
-const [form, setForm] = useState({ name: '', email: '' });
-
-// Use updater function for derived state
-setCount(prev => prev + 1);
-```
-
-#### useEffect
-```tsx
-// Cleanup subscriptions
-useEffect(() => {
+- Do not invent tool names, wrappers, or APIs that are not present in the current environment.
+- Do not promise browser, canvas, subagent, MCP, or other tool-based output until the tool path is confirmed in the current runtime.
+- Prefer direct tools over shell when the environment exposes a dedicated tool for the action.
+- Parallelize independent reads, greps, and searches; serialize when the next step depends on the result of a read or edit.
+- Verify new packages, frameworks, and toolchains against current sources before recommending them.
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [madebyaris/advance-minimax-m2-cursor-rules](https://github.com/madebyaris/advance-minimax-m2-cursor-rules) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
