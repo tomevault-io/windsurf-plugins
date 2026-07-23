@@ -1,105 +1,111 @@
 ---
 trigger: always_on
-description: This guide captures the conventions and non-obvious patterns used across this codebase. It focuses on project-specific and uncommon conventions rather than generic Java best practices.
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-# Coding Style Guide (concise)
+# CLAUDE.md
 
-This guide captures the conventions and non-obvious patterns used across this codebase. It focuses on project-specific and uncommon conventions rather than generic Java best practices.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
----
+## Build and Test Commands
 
-## Project layout & build systems
-- Multi-module Java project:
-  - `cli` is built with Maven (traditional `pom.xml`).
-  - IntelliJ plugin uses Gradle Kotlin DSL (`build.gradle.kts`) and the `org.jetbrains.intellij` Gradle plugin.
-- Gradle IntelliJ plugin configuration is declared in Kotlin DSL. Set JVM compatibility in `tasks.withType<JavaCompile>` and Kotlin target via `KotlinCompile.kotlinOptions.jvmTarget`.
-- Use environment variables for secret values in Gradle tasks (e.g. `System.getenv("PUBLISH_TOKEN")`, `CERTIFICATE_CHAIN`, `PRIVATE_KEY`).
+### Primary Build
+```bash
+# Build entire project (shared library + CLI)
+./build_and_test.sh
 
----
+# Build shared library only
+cd shared && mvn clean install
 
-## Dependency Injection
-- Use `javax.inject.Inject` + `javax.inject.Singleton` for constructor injection and singleton scopes.
-- Central DI entrypoint: `DIContext.getInstance()` used to fetch singletons in places where constructor injection is not available (tests, builders).
-- Constructors are used to declare dependencies; fields for injected dependencies are `private final`.
+# Build CLI only  
+cd cli && mvn clean package
 
----
+# Run integration tests
+cd tests && bash test.sh
+```
 
-## Builders & Fluent Params pattern
-- Builders implement an interface (e.g. `ProjectGeneratorRequest.Params`) and return that interface from setters for fluent chaining.
-- Public getters on builders lazily derive values from multiple inputs (e.g. `magicArg`, `projectName`, `githubRepository`) rather than requiring callers to populate every field.
-- Builders may embed CLI metadata as annotations on fields (see Command Line Parser section).
+### Maven Commands
+```bash
+# Test with Maven
+mvn test
 
-Example pattern:
-- setX(...) returns `ProjectGeneratorRequest.Params` so callers can chain.
-- getX() returns either explicitly-set value or an inferred default computed from other fields.
+# Build with Ant (root project uses NetBeans Ant)
+ant clean && ant jar
+```
 
----
+### Environment Variables
+- `JDEPLOY_SKIP_INTEGRATION_TESTS` - Set to skip integration tests during build
 
-## Command-line metadata on fields
-- Use a custom `CommandLineParser` annotation set on builder fields:
-  - `@CommandLineParser.Alias("x")` for short flags
-  - `@CommandLineParser.Help("...")` to document flags
-  - `@CommandLineParser.PositionalArg(n)` for positional args
-- These annotations are placed on private fields rather than on methods.
+## Architecture Overview
 
----
+jDeploy is a Java desktop app deployment tool with a multi-module architecture:
 
-## Template + replacement conventions
-- Template placeholders use Mustache-like double-brace tokens: `{{ foo }}` (e.g. `{{ packagePath }}`, `{{ mainClass }}`).
-- Replacement occurs for many text file types (explicit list in code): .java, .properties, .xml, .gradle, .json, .yml, .yaml, .md, .adoc.
-- File names are also processed for placeholder replacements (not only file contents).
-- Placeholder substitution is performed by sequential String#replace calls (simple token replacement, not a template engine).
-- `packagePath` placeholder is expected to be a `/`-separated path (derived from `packageName.replace(".", "/")`).
+### Core Modules
+- **`cli/`** - Main jDeploy CLI application (Maven project)
+- **`shared/`** - Shared libraries used by CLI and installer (Maven project)  
+- **`installer/`** - Native installer generation (Maven project)
+- **Root project** - Uses Ant/NetBeans build system
 
----
+### Key Components
+- **CLI (`cli/src/main/java/ca/weblite/jdeploy/`)** - Main application logic
+  - `JDeploy.java` - Main entry point
+  - `services/` - Core services (publishing, packaging, project generation)
+  - `publishing/` - GitHub and NPM publishing drivers
+  - `packaging/` - JAR packaging and bundling
+  - `gui/` - Swing GUI components
 
-## File & directory handling
-- Use Apache Commons IO `FileUtils` for copying, moving, reading/writing files and directories.
-- When creating project directories:
-  - Create with `mkdirs()` and then verify existence; throw `IOException` if creation failed.
-- When iterating template files:
-  - Copy directories with `FileUtils.copyDirectory(...)` and files with `FileUtils.copyFileToDirectory(...)`.
-- When processing files recursively:
-  - Recurse into directories, process files, then apply rename/move operations (so moved/renamed entries are returned by helper methods).
+- **Shared (`shared/src/main/java/ca/weblite/jdeploy/`)** - Common utilities
+  - `models/` - Data models (AppManifest, JDeployProject)
+  - `services/` - Shared services (signing, verification)
+  - `appbundler/` - Native app bundling
+  - `jvmdownloader/` - JVM embedding functionality
 
----
+### Build System Details
+- Root project uses **Ant** with NetBeans project structure
+- Individual modules use **Maven** with Java 8 compatibility  
+- Custom build hooks in `build.xml` embed jar-runner utility
+- Local Maven repository at `maven-repository/` for custom dependencies
 
-## Extension merging
-- Project extensions are applied by a `ProjectDirectoryExtensionMerger` (merge extension directories into project directory). Treat extensions as additive overlays on a template.
+### Publishing Targets
+- **GitHub Actions** - Automated installer generation via GitHub workflow
+- **NPM** - CLI tool distribution
+- **Maven Central** - Plugin and archetype distribution
 
----
+### Platform Support
+- Windows (x64, ARM64 with new ShellLink_ARM64.dll)
+- macOS (x64, ARM64) 
+- Linux (x64)
 
-## Naming & derived defaults
-- Many values are computed from inputs in the following precedence order:
-  - explicit value set on builder
-  - derived from `githubRepository` if provided (e.g. `groupId` → `com.github.[user]`)
-  - derived from `magicArg` when it contains `package.Class` form
-  - fallbacks such as `my-app`, `My App`, `com.example.myapp`
-- Use helper `StringUtils` for:
-  - camelCase ↔ lower-case-with-separator conversions
-  - `ucFirst`, `ucWords`, `lowerCaseWithSeparatorToCamelCase`
-  - `isValidJavaClassName`, `countCharInstances`
+### Test Structure
+- Unit tests in each module's `src/test/java/`
+- Integration tests in `tests/projects/` with individual test scenarios
+- Mock projects for testing different deployment configurations
 
-Naming conventions used by helpers:
-- artifactId/project-name → lower case with `-` separator
-- class names → CamelCase; package names → dot-separated lowercase
+## Important Files
+- `package.json` files - NPM metadata for deployable apps
+- `jdeploy.js` - JavaScript shim for running Java apps via NPM
+- `action.yml` - GitHub Action definition
+- `build_and_test.sh` - Main build script
 
----
+## Git Commit Conventions
 
-## GitHub & git conventions
-- GitHub repo operations:
-  - Creating repository via REST `POST https://api.github.com/user/repos` using `HttpURLConnection` and a JSON body (`{"name": "...", "private": true/false}`).
-  - Use a token from `GithubTokenService` in `Authorization: Bearer <token>`.
-- Git operations use JGit:
-  - Initialize repo with `Git.init().setDirectory(localPath).call()`.
-  - Manage `origin` remote via JGit `RemoteConfig` and `URIish`, checking for existing URIs and adding if absent.
-  - Commit with `git.add().addFilepattern(".").call()` and `git.commit().setMessage(...).call()`.
-  - Push with `git.push().setRemote("origin").setCredentialsProvider(new UsernamePasswordCredentialsProvider(token, ""))`. (token passed as username and empty password)
-- When dealing with releases for private repos:
+- Do NOT add Co-Authored-By lines or any Claude/AI attribution to commit messages
+- Use conventional commit format: `type: description` (e.g., `feat:`, `fix:`, `refactor:`, `docs:`, `test:`)
+- Keep commit messages concise and descriptive
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+## Current Implementation Projects
+
+### .jdpignore File Support Implementation
+**Status**: In Progress  
+**Plan Document**: `rfc/jdpignore-implementation-plan.md`  
+**Description**: Migrating from `nativeNamespaces` in package.json to `.jdpignore` files for platform-specific native library filtering.
+
+**Important**: When working on platform-specific bundles or native library filtering:
+1. ALWAYS read `rfc/jdpignore-implementation-plan.md` first to understand the current plan and progress
+2. Update the status tracking in that document as work is completed
+3. Add implementation notes and decisions to the plan document
+4. Follow the phase-by-phase approach outlined in the plan
 
 ---
 > Source: [shannah/jdeploy](https://github.com/shannah/jdeploy) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
