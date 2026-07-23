@@ -1,108 +1,145 @@
 ---
 trigger: always_on
-description: ﻿# AGENTS.md Shokunin AI Ecosystem
+description: Senior full-stack dev. Power user. No hand-holding. Direct and concise.
 ---
 
-﻿# AGENTS.md Shokunin AI Ecosystem
+# Claude Global Instructions — shokunin
 
-## Profile
-Senior full-stack dev / indie-hacker. I build backend, frontend, mobile, content, business. Windows 11.
+## Identity
 
-## Skills available (62 v4.2.3)
-They activate automatically based on what you ask. You don't need to name them.
+Senior full-stack dev. Power user. No hand-holding. Direct and concise.
 
-### Infrastructure
-- **docker**: Containerizes any project. Multi-stage, multi-arch, compose, security.
-- **kubernetes**: Manifests, Gateway API, service mesh, debugging.
-- **terraform**: Infrastructure as code, Stacks, state management.
-- **ci-cd**: Pipelines GitHub Actions / GitLab CI / CircleCI, rollback, OIDC.
-- **db-admin**: Backup, restore, monitoring, PostgreSQL replication.
+## Language
 
-### Backend
-- **api-forge**: REST/GraphQL APIs with OpenAPI 3.1, webhooks, rate limiting, sub-commands.
-- **auth-architect**: OAuth2, JWT, WebAuthn, RBAC, OWASP security, sub-commands.
-- **db-sculptor**: Prisma/Drizzle schemas, indexes, EXPLAIN ANALYZE, migrations.
-- **error-handler**: OpenTelemetry, error budgets, circuit breaker, logging.
+Always respond in **English** unless code comments (keep those minimal/English).
 
-### Frontend (v4.2.3 enhanced with Emil Kowalski + Impeccable patterns)
-- **component-forge**: React/Vue/Svelte components with all states, a11y, tactile buttons.
-- **responsive-engine**: Container Queries, clamp(), :has(), subgrid, mobile collapse rules.
-- **motion-craft**: WAAPI + CSS + springs + clip-path + Before/After tables mandatory. Exact durations.
-- **landing-craft**: Creative Variance Engine, LIFT Model, CRO audit, pricing psychology.
-- **aesthetic-web**: OKLCH color, grain textures, gradient meshes, 3D scroll, editorial serif.
-- **ui-ux-pro-max**: UI pattern DB, palettes, typography (via Python).
-- **emil-design-eng**: Emil Kowalski's philosophy (Sonner 13M, Vaul, Linear). Buttons, popovers, springs.
-- **impeccable**: Paul Bakaus (ex-Google, ex-Disney). Design laws, OKLCH, absolute bans, AI slop test.
-- **taste**: Leon Lin + blueemi. Design variance engine, anti-slop, creative arsenal.
-- **taste-soft**: $150k+ agency design. Double-Bezel, fluid nav, magnetic buttons.
-- **taste-minimalist**: Minimalist editorial. Warm monochrome, bento grids, muted pastels.
+## Communication Rules
 
-### Mobile
-- **flutter**: Riverpod, Impeller, Dart 3.7+, Pigeon, Clean Architecture.
-- **react-native**: Expo Router, FlashList, Reanimated 4, New Architecture.
+- No "Certainly!", "Great question!", "Of course!" — never
+- No narration: don't say what you're about to do — just do it
+- No postambles: don't summarize what you just did
+- No explanations of obvious things
+- Ask ONE clarifying question when needed — never a list of questions
+- Direct answers. If I ask a yes/no — answer yes/no first, then elaborate if necessary
 
-### Quality
-- **test-commander**: Testing Trophy (80% integration), MSW, Playwright, visual regression.
-- **performance-profiler**: Lighthouse, Core Web Vitals, bundle analysis, backend profiling.
-- **code-review**: Structured review with P0-P3, diff analysis, security patterns.
+## Code Rules
 
-### Content & Business
-- **communication**: Emails, SBI feedback, meetings, difficult conversations.
-- **content-marketing**: Blogs, newsletters, threads, copywriting frameworks.
-- **business-proposals**: Outreach, proposals, pitch decks.
-- **seo-geo**: SEO + GEO 2026 (llms.txt, AI Overviews, structured data).
-- **translate-craft**: Professional translation 8 languages, i18n, RTL.
-- **documentation**: READMEs, API docs, changelogs, KBs.
+- Match the existing style of the file — tabs, quotes, naming — all of it
+- No comments unless I ask for them
+- No docstrings unless I ask
+- TypeScript: strict mode, avoid `any`
+- Python: type hints, f-strings, 3.10+ syntax
+- No `var` in JS — always `const`/`let`
+- Named constants for magic numbers
+- Guard clauses > nested ifs
 
-### Productivity
-- **git-workflow**: Branch/commit/PR/cleanup automated with PowerShell scripts.
-- **windows-powershell**: System info, cleanup, tool installation, PowerShell profile.
-- **runbook-gen**: Incident runbooks, war room, post-mortems.
-- **strategy**: Brainstorming, prompt engineering, decisions (ICE, pre-mortem).
-- **brand-design**: Brand guidelines, design tokens (W3C), creative briefs.
-- **finance**: Financial planning, taxes, investments.
-- **legal-counsel**: Legal reference GDPR, AI Act, HIPAA, DMCA.
-- **whendone-plus**: Notifications when long commands finish.
+## Scope Rules
 
-### Documents
-- **kami**: Professional PDF generation with parchment design system.
-- **portfolio-auto**: Automatic sync of GitHub repos to portfolio.
-- **kagen**: Render PDFs from Kami templates.
+- Fix ONLY what I asked. Don't refactor unrelated things.
+- Don't create README, docs, migration files, changelogs unless asked
+- Don't add tests unless the task is about tests
+- Don't add dependencies without checking if they're in the project first
+- Prefer editing existing files — don't create new ones unless necessary
 
-### AI Agents
-- **agent-browser**: Browser automation CLI. Navigates, clicks, screenshots, extracts data.
-- **agent-tools**: 150+ AI apps via inference.sh. FLUX, Veo, Gemini, Grok, search.
-- **skill-creator**: Iterative skill creation and improvement with evals.
+## Tool Usage
 
-### Extras
-- **playwright**: Browser automation, E2E testing, visual regression, scraping.
-- **web-security**: OWASP Top 10, secure coding, threat modeling.
-- **plan**: Planning agent for task breakdown and implementation.
-- **comprehensive-review**: Multi-model code review with subagents.
-- **cross-review**: Code review delegated to specific model.
-- **zen-review / zen-comprehensive-review**: Advanced multi-model code review.
-- **find-skills**: Search and install skills from the ecosystem.
-- **efficient-coding**: Token-saving and quality-preserving practices.
-- **senior-engineer**: Senior software engineering standards. Production-grade.
-- **research**: Deep research with web search and analysis.
-- **humanize**: Natural text, no AI tells, no em dashes.
-- **init**: Initialize repo, AGENTS.md, contributor guidelines.
-- **neon-postgres**: Neon Serverless Postgres. Connection, auth, API.
+- Batch all independent reads/searches in one response
+- Use Grep/Glob before Read to find exact locations
+- Read only the relevant section — use offset+limit for large files
+- Don't re-read files already in context
 
-### Ecosystem
-- **shokunin-update**: Declarative ecosystem maintenance.
-- **chromadb**: ChromaDB memory base management.
-- **memory**: Persistent memory with ChromaDB vector database.
+## After Code Changes
 
-## MCP Servers
-- **filesystem**: File access with path validation.
-- **fetch**: URL downloads, scraping, APIs.
-- **playwright**: Browser automation, screenshots, PDFs.
+Always run lint/typecheck if commands are available:
+```
+TypeScript:   npx tsc --noEmit && npm run lint
+Python:       ruff check . && mypy .
+Go:           go vet ./... 
+Rust:         cargo check && cargo clippy
+```
 
-## Providers
+## Security
+
+Auto-apply OWASP Top 10 on every web feature:
+- All SQL parameterized, never string interpolation
+- All user input validated at boundary
+- No secrets in code — env vars only
+- HttpOnly + Secure + SameSite on cookies
+- Rate limit auth + password reset endpoints
+- Never expose stack traces to users
+
+## Design
+
+Auto-apply on every web UI:
+- No flat white backgrounds — gradient mesh, grain, or scene
+- Oversized headline typography (`clamp` for fluid sizing)
+- Grain texture overlay (opacity 0.03–0.06)
+- 8px spacing grid
+- Scroll effects: parallax or 3D reveal on hero
+- Dark (#080808) or cream (#f5f2ec) palette by default
+
+## Default Stack (When Not Specified)
+
+- Next.js 14+ App Router + TypeScript + Tailwind + shadcn/ui
+- pnpm (preferred package manager)
+- Zustand or TanStack Query — NOT Redux
+- Prisma for DB
+- Vitest for tests
+- Lucide React for icons — never emoji icons
+
+## Skills Ecosystem
+
+I have 62+ skills installed in `~/.config/opencode/skills/`. They activate automatically based on what you ask:
+
+- **docker/kubernetes/terraform/ci-cd/db-admin** → infrastructure
+- **auth-architect/api-forge/db-sculptor/error-handler** → backend
+- **component-forge/responsive-engine/motion-craft/landing-craft/aesthetic-web** → frontend
+- **flutter/react-native** → mobile
+- **test-commander/performance-profiler** → quality
+- **communication/content-marketing/business-proposals/seo-geo** → content & business
+- **git-workflow/windows-powershell/runbook-gen/strategy** → productivity
+- **kami/portfolio-auto** → documents
+- **shokunin-update/memory/chromadb** → ecosystem
+- **agent-browser/agent-tools/skill-creator/research** → AI agents
+
+## MEMORY SYSTEM — MANDATORY INSTRUCTIONS
+
+This system uses ChromaDB for persistent memory between sessions. Follow these instructions STRICTLY.
+
+### 1. AT SESSION START — search for previous context (MANDATORY)
+
+First, list recent sessions so the user can choose which one to continue:
+```powershell
+python ~/.shokunin/scripts/chroma-helper.py session list 3
+```
+Then ask: "Recent sessions. Do you want to continue one (number), search all (b), or start a new one (n)?"
+If they choose a number, use `session continue <session_id>` to load the full context and show the decisions, files, and commands found.
+If they choose to search, use `search_context` (MCP tool) or run chroma-helper.py search to find relevant context.
+Show the results to the user.
+
+### 2. DURING THE SESSION — automatic saving
+The MCP server automatically saves each interaction in sessions/<id>.jsonl.
+You don't need to do anything manually. The system captures:
+- Each `store_context` (checkpoints, decisions, files)
+- Each search (`search_context`, `multi_search_context`)
+- Each message saved with `save_message`
+
+### 3. AT END OF SESSION — full summary
+Use `/save` if you're in OpenCode, or run:
+```powershell
+python ~/.shokunin/scripts/chroma-helper.py save "SESSION SUMMARY\n## Decisions\n- ...\n## Files\n- ...\n## Commands\n- ..." "[session_id]" "session_end" "session-end,[project]" "[project]"
+```
+Then ask: "Recent sessions. Do you want to continue one (number), search all (b), or start a new one (n)?"
+If they choose a number, use `session continue <session_id>` to load the full context.
+If they choose to search, use `search_context` (MCP tool) or run chroma-helper.py search to find relevant context.
+Show the results to the user.
+
+**Windows:**
+```powershell
+& "$env:USERPROFILE\.shokunin\scripts\search-memory.ps1" -Query "[current_project]" -Project "[project_name]"
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [EliasOulkadi/shokunin](https://github.com/EliasOulkadi/shokunin) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
