@@ -1,216 +1,196 @@
 ---
 trigger: always_on
-description: This document contains detailed explanations, code examples, and implementation guidance for all Inertia Rails best practices.
+description: This file provides guidance for Claude Code on how to use the Inertia Rails skills effectively.
 ---
 
-# Inertia Rails Best Practices - Complete Reference
+# Claude Instructions for Inertia Rails Skills
 
-This document contains detailed explanations, code examples, and implementation guidance for all Inertia Rails best practices.
+This file provides guidance for Claude Code on how to use the Inertia Rails skills effectively.
 
----
+## When to Use These Skills
 
-## 1. Server-Side Setup & Configuration (CRITICAL)
+### Automatic Activation
 
-These rules establish the foundation for all Inertia functionality. Proper setup ensures reliable operation and maintainability.
+These skills should be referenced when the user is:
 
----
+- Working with Inertia.js and Ruby on Rails
+- Building single-page applications with Rails backends
+- Using `inertia_rails` gem
+- Creating React, Vue, or Svelte frontends with Rails
+- Asking about forms, navigation, or data passing in Inertia
 
-### setup-01: Use the Rails generator for initial setup
+### Trigger Phrases
 
-**Impact:** CRITICAL - Ensures correct configuration and avoids common setup errors
+Activate skills when you detect:
 
-**Problem:** Manual setup can miss important configuration steps, leading to subtle bugs.
+- "Inertia", "inertia_rails", "InertiaRails"
+- "render inertia:", "inertia_share"
+- "useForm", "@inertiajs"
+- References to React/Vue/Svelte with Rails
+- "modern monolith" architecture discussions
 
-**Solution:** Use the built-in Rails generator for consistent setup:
+## Skill Usage Guidelines
 
-```bash
-# Add the gem
-bundle add inertia_rails
+### inertia-rails-best-practices
 
-# Run the generator
-bin/rails generate inertia:install
-```
+**Use for:** General guidance, code review, refactoring decisions
 
-The generator handles:
-- Vite Rails detection and installation
-- TypeScript configuration
-- Frontend framework selection (React, Vue, or Svelte)
-- Tailwind CSS integration (optional)
-- Example controller and view files
-- Application configuration
+**Key points to emphasize:**
+- Always return minimal props data (security + performance)
+- Use `as_json(only: [...])` to whitelist fields
+- Never expose sensitive data (password_digest, tokens, etc.)
+- Use deferred props for non-critical data
+- Follow the PRG pattern for form submissions
 
-**When manual setup is needed:**
+### inertia-rails-setup
 
-```erb
-<!-- app/views/layouts/application.html.erb -->
-<!DOCTYPE html>
-<html>
-  <head>
-    <meta name="viewport" content="width=device-width,initial-scale=1">
-    <%= csp_meta_tag %>
-    <%= inertia_ssr_head %>
-    <%= vite_client_tag %>
-    <%= vite_javascript_tag 'application' %>
-  </head>
-  <body>
-    <%= yield %>
-  </body>
-</html>
-```
+**Use for:** New projects, adding Inertia to existing apps
 
----
+**Recommend for NEW projects:**
+1. Clone the official starter kit:
+   - React: `git clone https://github.com/inertia-rails/react-starter-kit myapp`
+   - Vue: `git clone https://github.com/inertia-rails/vue-starter-kit myapp`
+   - Svelte: `git clone https://github.com/inertia-rails/svelte-starter-kit myapp`
+2. Run `bin/setup` to install dependencies
+3. Customize from there (auth, shadcn/ui, layouts included)
 
-### setup-02: Configure asset versioning for cache busting
+**For EXISTING Rails apps:**
+1. Use the Rails generator: `bin/rails generate inertia:install`
+2. Configure asset versioning with ViteRuby
+3. Set up shared data in ApplicationController
+4. Create proper initializer configuration
 
-**Impact:** CRITICAL - Ensures users receive updated assets after deployments
+### inertia-rails-forms
 
-**Problem:** Without version tracking, users may see stale JavaScript after deployments.
+**Use for:** Form implementation, validation, file uploads
 
-**Solution:** Configure version in your initializer:
+**Key patterns:**
+- Always use `useForm` helper for state management
+- Handle errors with `form.errors`
+- Use redirect pattern after successful submission
+- Preserve scroll on validation errors
+- Use error bags for multiple forms on same page
 
-```ruby
-# config/initializers/inertia_rails.rb
-InertiaRails.configure do |config|
-  # Using ViteRuby digest (recommended)
-  config.version = -> { ViteRuby.digest }
+### inertia-rails-auth
 
-  # Or using a custom version string
-  # config.version = Rails.application.config.assets_version
+**Use for:** Authentication, authorization, permissions
 
-  # Or using Git commit hash
-  # config.version = -> { `git rev-parse HEAD`.strip }
-end
-```
+**Critical points:**
+- Auth is handled server-side (no special OAuth needed)
+- Pass permissions as props, not helpers
+- Use history encryption for sensitive pages
+- Clear history on logout
 
-**How it works:** When the version changes, Inertia triggers a full page visit instead of an XHR request, ensuring fresh assets are loaded.
+### inertia-rails-testing
 
----
+**Use for:** Writing tests for Inertia responses
 
-### setup-03: Set up proper layout inheritance
+**Key matchers (RSpec):**
+- `expect(inertia).to be_inertia_response`
+- `expect(inertia).to render_component('path/component')`
+- `expect(inertia).to have_props(key: value)`
+- `expect(inertia).to have_flash(notice: 'message')`
 
-**Impact:** HIGH - Enables flexible layout management across controllers
+### inertia-rails-performance
 
-**Problem:** All Inertia pages using the same layout limits design flexibility.
+**Use for:** Optimization, slow pages, large datasets
 
-**Solution:** Configure default layout and override per-controller:
+**Optimization priorities:**
+1. Minimize props data
+2. Use deferred props for expensive queries
+3. Implement partial reloads
+4. Add prefetching for likely navigation
+5. Use code splitting for large apps
 
-```ruby
-# config/initializers/inertia_rails.rb
-InertiaRails.configure do |config|
-  config.layout = 'application'  # default
-end
+## Code Review Checklist
 
-# app/controllers/admin/base_controller.rb
-class Admin::BaseController < ApplicationController
-  layout 'admin'
-end
+When reviewing Inertia Rails code, check for:
 
-# Or use inertia_config for controller-specific settings
-class MarketingController < ApplicationController
-  inertia_config(layout: 'marketing')
-end
-```
+### Props (CRITICAL)
+- [ ] Only necessary fields returned
+- [ ] No sensitive data exposed
+- [ ] Using `as_json(only: [...])` or serializers
+- [ ] Large datasets paginated or deferred
 
----
+### Controllers
+- [ ] Following redirect pattern after POST/PUT/DELETE
+- [ ] Errors passed via `inertia: { errors: ... }`
+- [ ] Shared data set up properly
+- [ ] Authorization checked before data access
 
-### setup-04: Configure flash keys appropriately
+### Frontend
+- [ ] Using `Link` component for navigation (not `<a>`)
+- [ ] Using `useForm` for form state
+- [ ] Handling `form.processing` state
+- [ ] Displaying validation errors
 
-**Impact:** MEDIUM - Ensures proper flash message delivery to frontend
+### Performance
+- [ ] Expensive queries deferred
+- [ ] Partial reloads for filtered data
+- [ ] Appropriate prefetching configured
 
-**Problem:** Custom flash keys may not be passed to the frontend by default.
+## Common Mistakes to Catch
 
-**Solution:** Configure allowed flash keys:
+1. **Exposing entire models:**
+   ```ruby
+   # BAD
+   render inertia: { user: User.find(id) }
 
-```ruby
-# config/initializers/inertia_rails.rb
-InertiaRails.configure do |config|
-  # Default: %i[notice alert]
-  config.flash_keys = %i[notice alert success error warning info]
-end
-```
+   # GOOD
+   render inertia: { user: User.find(id).as_json(only: [:id, :name]) }
+   ```
 
-For custom flash data beyond allowlisted keys:
+2. **Rendering instead of redirecting after forms:**
+   ```ruby
+   # BAD
+   render inertia: { user: @user }
 
-```ruby
-# Controller
-flash.inertia[:custom_data] = { message: 'Success!', type: 'toast' }
+   # GOOD
+   redirect_to user_url(@user)
+   ```
 
-# Or for current request only
-flash.inertia.now[:custom_data] = { message: 'Success!' }
-```
+3. **Using `<a>` tags for internal links:**
+   ```jsx
+   // BAD
+   <a href="/users">Users</a>
 
----
+   // GOOD
+   <Link href="/users">Users</Link>
+   ```
 
-### setup-05: Use environment variables for configuration
+4. **Not handling form errors:**
+   ```jsx
+   // BAD
+   <input type="email" value={data.email} onChange={e => setData('email', e.target.value)} />
 
-**Impact:** MEDIUM - Enables deployment flexibility without code changes
+   // GOOD
+   <input type="email" value={data.email} onChange={e => setData('email', e.target.value)} />
+   {errors.email && <span>{errors.email}</span>}
+   ```
 
-**Problem:** Hardcoded configuration limits deployment options.
+## Framework-Specific Notes
 
-**Solution:** Inertia Rails supports `INERTIA_` prefixed environment variables:
+### React
+- Use `setData('field', value)` instead of direct assignment
+- Destructure from useForm: `{ data, setData, post, errors, processing }`
 
-```bash
-# .env or deployment config
-INERTIA_SSR_ENABLED=true
-INERTIA_SSR_URL=http://localhost:13714
-INERTIA_ENCRYPT_HISTORY=true
-INERTIA_DEEP_MERGE_SHARED_DATA=true
-```
+### Vue 3
+- Use `v-model` directly: `v-model="form.email"`
+- Access via `form.errors.email`
 
-Boolean values must be exactly `"true"` or `"false"` (case-sensitive).
+### Svelte 5
+- Direct property access: `form.email` (no `$` prefix in Svelte 5 runes)
+- Access errors via `form.errors.email`
 
----
+## Response Format
 
-### setup-06: Set up default render behavior thoughtfully
+When explaining Inertia concepts:
 
-**Impact:** MEDIUM - Reduces boilerplate while maintaining explicitness
-
-**Problem:** Overly implicit rendering can make code harder to understand.
-
-```ruby
-# config/initializers/inertia_rails.rb
-InertiaRails.configure do |config|
-  # Enable convention-based rendering
-  config.default_render = true
-
-  # Customize component path resolution
-  config.component_path_resolver = ->(path:, action:) do
-    "#{path.camelize}/#{action.camelize}"
-  end
-end
-```
-
-**Incorrect - implicit rendering without clear conventions:**
-```ruby
-class UsersController < ApplicationController
-  def show
-    @user = User.find(params[:id])
-    # What component gets rendered? Unclear.
-  end
-end
-```
-
-**Correct - explicit rendering:**
-```ruby
-class UsersController < ApplicationController
-  def show
-    user = User.find(params[:id])
-    render inertia: { user: user.as_json(only: [:id, :name, :email]) }
-  end
-end
-```
-
----
-
-## 2. Props & Data Management (CRITICAL)
-
-Proper props management is crucial for performance and security. These rules can provide 2-5× performance improvements.
-
----
-
+1. Start with the **why** (the problem it solves)
+2. Show **incorrect** approach first (if applicable)
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [cole-robertson/inertia-rails-skills](https://github.com/cole-robertson/inertia-rails-skills) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
