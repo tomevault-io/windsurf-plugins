@@ -1,268 +1,197 @@
 ---
 trigger: always_on
-description: > 本文档从 C++ 中文周刊（第1期~第196期）中提炼的编码规范、设计模式、性能优化和避坑指南。
+description: C++ 中文周刊，从 reddit/hackernews/lobsters/meetingcpp 等渠道摘选 C++ 相关文章，用中文进行总结点评。目前已更新 196 期。每期覆盖：资讯、文章、视频、开源项目介绍。
 ---
 
-# C++ 开发技能指南
+# C++ 中文周刊 写作风格指南
 
-> 本文档从 C++ 中文周刊（第1期~第196期）中提炼的编码规范、设计模式、性能优化和避坑指南。
-> 适用于日常 C++ 开发参考。
+## 项目概述
 
+C++ 中文周刊，从 reddit/hackernews/lobsters/meetingcpp 等渠道摘选 C++ 相关文章，用中文进行总结点评。目前已更新 196 期。每期覆盖：资讯、文章、视频、开源项目介绍。
+
+## 整体风格定位
+
+**有人味、接地气、技术硬核但不端着。** 不是学术翻译，是一个老C++程序员给同行写的技术八卦周报。
+
+## 文章结构模板
+
+每期固定结构（参考 `posts/template.md`）：
+
+```
 ---
+layout: post
+title:  第NNN期
+---
+# C++ 中文周刊 YYYY-MM-DD 第NNN期
 
-## 一、现代 C++ 编码规范
-
-### 1.1 优先使用 range-based for 和 Ranges 库
-
-传统 for 循环"过于灵活"，容易引入 off-by-one、修改错误变量等 bug。编译器无法防止这些问题。
-
-```cpp
-// ❌ 经典错误
-for (auto i = 0; i <= vec.size(); ++i)   // 应该是 <
-  use(vec[i]);
-
-for (auto i = vec.size() - 1; i >= 0; --i)  // 无符号数永远 >= 0，死循环！
-  use(vec[i]);
-
-// ✅ 现代写法
-for (auto const& rec : records)
-  use(rec);
-
-// 反向迭代（C++20）
-for (auto const& rec : std::views::reverse(records))
-  use(rec);
-
-// 带索引迭代（C++23）
-for (auto [i, rec] : std::views::enumerate(records))
-  use(i, rec);
-
-// 多序列同时迭代（C++23）
-for (auto [name, rec] : std::views::zip(names, records))
-  use(name, rec);
-```
-
-*来源：第190期*
-
-### 1.2 用 `std::source_location` 替代 `__FILE__` / `__LINE__` 宏
-
-```cpp
-// ❌ 传统宏方法
-#define ASSERT(cond, msg) Assert(cond, msg, __FUNCTION__, __LINE__)
-
-// ✅ C++20
-void Assert(bool condition, std::string_view msg,
-            std::source_location loc = std::source_location::current()) {
-  if (!condition) {
-    std::clog << loc.function_name() << ':' << loc.line() << ": " << msg << '\n';
-  }
-}
-// 调用时不需要宏：
-Assert(1 != 2, "Not met");
-```
-
-关键：`std::source_location::current()` 作为默认参数，在调用侧求值。
-
-*来源：第190期*
-
-### 1.3 `constexpr` + `consteval` 双路径设计
-
-```cpp
-consteval size_t strlen_ct(const char* s) {  // 纯编译期
-    size_t n = 0;
-    for (; s[n] != '\0'; ++n);
-    return n;
-}
-
-size_t strlen(const char* s);  // 纯运行期
-
-constexpr size_t strlen_dual(const char* s) {  // 双路径
-    if consteval {
-        return strlen_ct(s);  // 编译期路径
-    } else {
-        return strlen(s);     // 运行期路径
-    }
-}
-```
-
-`constexpr` 函数最好两种分支都实现，避免意外问题。
-
-*来源：第150期*
-
-### 1.4 用 `std::expected` 替代异常做错误处理（C++23）
-
-```cpp
-std::expected<int, std::string> convertToInt(const std::string& input) {
-    int value{};
-    auto [ptr, ec] = std::from_chars(input.data(), input.data() + input.size(), value);
-    if (ec == std::errc())
-        return value;
-    if (ec == std::errc::invalid_argument)
-        return std::unexpected("Invalid number format");
-    if (ec == std::errc::result_out_of_range)
-        return std::unexpected("Number out of range");
-    return std::unexpected("Unknown conversion error");
-}
-```
-
-*来源：第150期*
-
-### 1.5 Concepts 和 `requires` 的正确用法
-
-```cpp
-// 基本 requires
-template <typename T>
-    requires std::integral<T>
-auto debug_output(const T& t);
-
-// requires requires（检测成员函数）
-template <typename T>
-    requires requires(const T& t) { t.debug_output(); }
-auto debug_output(const T& t);
-
-// if constexpr + requires（编译期检测能力）
-template <typename Cont, typename Rng>
-void cont_assign(Cont& cont, Rng&& rng) {
-    cont.clear();
-    if constexpr (requires { cont.reserve(std::ranges::size(rng)); }) {
-        cont.reserve(std::ranges::size(rng));
-    }
-    for (auto&& elem : std::forward<Rng>(rng)) {
-        cont.push_back(std::forward<decltype(elem)>(elem));
-    }
-}
-```
-
-*来源：第170期*
-
-### 1.6 `deducing this` 消除成员函数重复（C++23）
-
-```cpp
-// ❌ 传统写法：4个重载
-struct Foo {
-    void bar() &;
-    void bar() &&;
-    void bar() const &;
-    void bar() const &&;
-};
-
-// ✅ C++23
-template <typename T>
-class Optional {
-    template <typename Self>
-    constexpr auto operator->(this Self&& self) {
-        return addressof(self.m_value);
-    }
-};
-```
-
-*来源：第50期*
-
-### 1.7 inline namespace 做版本控制
-
-```cpp
-namespace gem {
-    inline namespace v1 {
-        struct Point { int x; int y; };
-    }
-    namespace v2 {
-        struct Point { int y; int x; };  // v2 改了布局
-    }
-}
-// 默认用 v1，需要时显式 gem::v2::Point
-```
-
-*来源：第160期*
-
-### 1.8 小对象直接传值，不要 const T&
-
-`string_view`、`span`、`int`、`chrono::duration` 等小对象，直接传值比传引用更高效。
-
-*来源：第50期*
+[固定头部：项目地址、公众号二维码、qq群、RSS链接、投稿说明]
+[赞助致谢（如有）]
 
 ---
 
-## 二、性能优化指南
+## 资讯
+标准委员会动态/编译器/IDE信息
 
-### 2.1 火焰图驱动优化
+## 文章
+### [文章标题](原文链接)
+中文总结 + 代码 + 点评
 
-RocksDB 优化案例（180s → 7.8s，23倍加速），每步用火焰图验证：
+## 视频
+### [视频标题](链接)
 
-1. **Transaction Put → SST Writer**（180s → 19.5s）：消除锁和排序开销
-2. **关掉导入阶段不需要的过滤器和压缩**（19.5s → 14.3s）
-3. **fast_float 替换 sscanf**（14.3s → 12s，16%提速）
-4. **std::string → vector\<char\>**（12s → 10.6s）：消除 null terminator 维护开销
-5. **去掉热路径的运行期检查**（10.6s → 8.7s）
-6. **消除 key 的隐藏拷贝**（8.7s → 7.8s）
+## 开源项目介绍
 
-**Key takeaways：**
-- 避免热路径中的虚函数
-- 别不必要地拷贝字符串
-- 运行期检查能改 assert 就改 assert
+## 互动环节（可选）
 
-*来源：第196期*
-
-### 2.2 编译器比你聪明，不要手动"优化"
-
-编译器将代码转换为 IR，相同操作的不同实现会被转换为规范形式。多种计算加法的方式（循环、递归、复杂逻辑）都会编译为单个 ARM 指令 `add w0, w1, w0`。
-
-常量乘法也一样：手动优化 `522` 为 `(x << 9) + (x << 3) + (x << 1)`，编译器仍然会恢复为 `imul`。
-
-**优先考虑代码清晰性而不牺牲性能。**
-
-*来源：第190期*
-
-### 2.3 `__builtin_unreachable()` 消除分支
-
-```cpp
-uint8_t sum_with_constraints(const uint8_t *data, size_t len) {
-    if (len % 32 != 0) __builtin_unreachable();  // len 一定是32的倍数
-    if (len == 0) __builtin_unreachable();         // len 一定非零
-    return std::accumulate(data, data + len, uint8_t(0));
-}
+---
+[上一期/本期/下一期 链接]
 ```
 
-注意：把 `data*` 换成 `vector`，gcc 下可能不能优化。
+## 文章总结写法核心原则
 
-*来源：第180期*
+### 1. 保留原始代码，大段贴
 
-### 2.4 TLS 性能优化清单
+这是本周刊的核心卖点。**代码一定要保留，而且尽可能完整**。读者来看周刊就是想看代码的，不要只写文字描述。
 
-thread_local 对象在有类构造函数 + `-fPIC` 共享库时需要额外调用 `__tls_get_addr`，成为性能瓶颈。
+- 关键代码段要完整贴出（不要省略号代替）
+- 对比性质的代码（优化前后、传统写法vs现代写法）都要给出
+- 如果原文代码太长，选最精华的部分，但宁多勿少
+- 代码块用 ````cpp` 标记
 
-优化指南：
-- TLS 对象尽可能合并
-- 不要为 TLS 写构造函数（用 trivial 类型）
-- 频繁访问的对象用 `__attribute__((visibility("hidden")))`
-- 关键变量用 `__attribute__((tls_model("initial-exec")))`
-- 非共享库不要用 `-fPIC`
-- 考虑 `-mtls-dialect=gnu2`
+### 2. 中文总结要精炼有力
 
-*来源：第180期*
+- 先一句话概括文章在讲什么（让人快速判断要不要细看）
+- 用加粗标题分段，如 `**背景设定：**`、`**解决方案：**`、`**核心观点：**`
+- 技术细节用条目列表，不要写大段落
+- 专业术语保留英文，如 UB、RAII、CRTP、SIMD，不要强行翻译
 
-### 2.5 `-O3 -flto` 是免费午餐
+### 3. 点评要有人味，风趣幽默
 
-Redis 测试：`-O3 -flto` 性能至少提升 5%。PGO（Profile-Guided Optimization）值得进一步研究。
+这是本周刊区别于机器翻译的灵魂所在。点评风格参考：
 
-*来源：第100期*
+**口语化、接地气的表达：**
+- "省流：可以"
+- "我谢谢你"
+- "又是WinAPI，我看不懂不多逼逼"
+- "家人们还是看看远处的boost实现吧"
+- "胖友们帮帮忙"
+- "embed赶紧来吧"
+- "花里胡哨用处不大"
+- "用户会暴动"
+- "简直不忍直视"
+- "直接打脸"
 
-### 2.6 低延迟编程：减少分支和跳转
+**自嘲/吐槽类：**
+- "我记得gcc也有一个类似的找不到了"
+- "悲报，我尝试了一下claude整理周刊，发现比我写的快很多。本周刊正式自动化"
+- "我又被替代了"
+- "值得复现一下（我没看）"
 
-- 勤用 `&&` `||` 利用短路特性
-- 关注能生成 `cmov` 的写法（三元表达式、简单 if 赋值）
-- 减少虚函数使用（但 `variant` + `visit` 某些场景比虚函数好）
-- 善用 `[[gnu::always_inline]]` / `__builtin_expect`
-- 字符串比较的 if-else 链改 switch
+**辛辣点评时政/行业：**
+- "要我说这就是美帝不行的原因，从上到下都没有耐性我靠"
+- "就像个想离婚的在这里埋怨不想过了，死鬼你也不改你看人家xx语言"
 
-*来源：第150期*
+**对文章质量的直接评价：**
+- "值得一看"
+- "值得复现一下"
+- "感兴趣的可以点进去看看"
+- "了解一下还是可以的。抽象程度很高"
+- "真心贵"
 
-### 2.7 查表法替代除法/取模
+### 4. 加粗与排版
 
-除法指令很慢。整数转字符串（itoa）用查表法替代循环除 10：
+- 关键概念、核心结论用 **加粗**
+- 段落用 `**标题：**` 做小节分隔
+- 数字、性能数据要突出，如 "**23倍加速**"
+- 对比数据用箭头："180s → 7.8s"
 
-```cpp
+### 5. 不同类型文章的处理策略
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+**深度技术文章（如协程实现、性能优化）：**
+- 完整展现技术推导过程
+- 代码要大段保留
+- 用加粗标题分步骤讲
+- 最后给"Key takeaways"式总结
+
+**知识性短文（如 tip of the week）：**
+- 直接贴代码
+- 一两句话点评够了
+- "记住这段代码就行了"
+
+**工具/库介绍：**
+- 简要说明用途
+- 给个最小示例代码
+- 附上 GitHub 链接
+
+**争议/吐槽类（如白宫发文、UB讨论）：**
+- 可以多发挥个人观点
+- 吐槽要有趣但不要太过分
+- 该说"我看不懂"就说
+
+**Windows API / 不熟悉的领域：**
+- 诚实说"看不懂不多逼逼"
+- 不要强行总结不懂的东西
+
+### 6. 读者评论/投稿内容
+
+- 标注投稿人："YexuanXiao 投稿"
+- 补充信息以引用或说明形式给出
+- 评论区有价值的讨论也要收录
+
+## 语言规范
+
+### 用词习惯
+- 用"简单来说"而不是"总之"
+- 用"其实就是"解释复杂概念
+- 用"显然"引出推导
+- 用"考虑一种场景"引出问题
+- 中英文混排时英文前后不加空格（随意即可）
+- 标准名词用英文：range-based for、expression template、coroutine
+- 尽量口语化，避免"上述"、"综上所述"、"鉴于此"等论文腔
+
+### 标点符号
+- 中文标点为主
+- 代码内用英文标点
+- 破折号用中文"——"
+- 问号可以多用，制造对话感："这点东西不应该卡啊"
+
+### 避免的写法
+- ❌ 不要写"本文介绍了xxx，让我们来看看" — 太官方
+- ❌ 不要写"总结：" — 太教科书
+- ❌ 不要所有文章都用一样的开头模式
+- ❌ 不要把每篇文章都写成同样长度，短文就简短处理
+- ❌ 不要过度翻译 — 有些概念英文更清晰就用英文
+
+## AI 协助写作注意事项（190期起）
+
+从第190期开始引入 AI（Claude）辅助整理，但要注意：
+
+1. **保持人味** — AI 总结后必须加入个人点评和口语化表达，不能全篇都是AI味
+2. **代码完整性** — AI 可能会省略代码，要确保关键代码都保留
+3. **不要过度总结** — AI 倾向于写"总结"和"结论"段落，适度即可
+4. **吐槽不能丢** — 哪怕AI写的很全面，也要加入吐槽/点评让文章有温度
+5. **篇幅控制** — AI 写的可能太长，该短的短，该详的详，不要所有文章一样篇幅
+
+## 特殊栏目说明
+
+### 开源项目介绍
+- asteria 是固定项目，长期招人
+- 新项目/版本更新简要说明即可
+- 附上 GitHub 链接
+
+### 热门库更新
+- 列出 commit 链接
+- 涵盖 seastar、folly、fmt、brpc、async_simple 等
+
+### 赞助致谢
+- 有赞助商时在头部致谢
+- 风格随意，如"他们送了我好多书，在此表示感谢"
+
+## 文件命名
+
+- 每期文件：`posts/NNN.md`（三位数字，如 001.md、196.md）
+- 新一期从 template.md 复制，替换 NNN、日期等占位符
 
 ---
 > Source: [wanghenshui/cppweeklynews](https://github.com/wanghenshui/cppweeklynews) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-06-17 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
