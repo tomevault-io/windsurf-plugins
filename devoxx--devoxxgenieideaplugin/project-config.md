@@ -1,19 +1,60 @@
 ---
 trigger: always_on
-description: This file provides guidance to AI agents when working with code in this repository.
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-# AGENTS.md
+# CLAUDE.md
 
-This file provides guidance to AI agents when working with code in this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
 
-DevoxxGenie is a Java-based LLM Code Assistant plugin for IntelliJ IDEA that integrates with both local LLM providers (Ollama, LMStudio, GPT4All, Llama.cpp, Exo) and cloud-based LLMs (OpenAI, Anthropic, Mistral, Groq, Gemini, DeepInfra, DeepSeek, OpenRouter, Azure OpenAI, Amazon Bedrock). The plugin supports advanced features like RAG (Retrieval-Augmented Generation), MCP (Model Context Protocol) servers, web search, and agentic programming capabilities.
+DevoxxGenie is a Java-based LLM Code Assistant plugin for IntelliJ IDEA that integrates with both local LLM providers (
+Ollama, LMStudio, GPT4All, Llama.cpp, Exo) and cloud-based LLMs (OpenAI, Anthropic, Mistral, Groq, Gemini, DeepInfra,
+DeepSeek, OpenRouter, Azure OpenAI, Amazon Bedrock). The plugin supports advanced features like RAG (Retrieval-Augmented
+Generation), MCP (Model Context Protocol) servers, web search, and agentic programming capabilities.
+
+## Best Practices
+
+Add at the top of CLAUDE.md under ## Project Context\n\nThis is a JetBrains/IntelliJ plugin project (DevoxxGenie).
+Primary language is Java with some TypeScript. Be aware of EDT (Event Dispatch Thread) constraints — UI operations must
+run on EDT, and long-running operations must NOT block EDT. Use `ApplicationManager.getApplication().invokeLater()` or
+`ReadAction`/`WriteAction` as appropriate.
+¬
+Add under a top-level ## Workflow Rules section in CLAUDE.md\n\nWhen asked to investigate or fix an issue, do NOT deeply
+explore the entire codebase autonomously. Start focused on the specific area mentioned, and ask before expanding scope.
+Avoid unnecessary web searches unless explicitly requested.
+
+Add under ## Git Workflow section in CLAUDE.md\n\nAlways create a feature/fix branch BEFORE making any code changes.
+Never edit code on the current branch without confirming the branch strategy first.
+
+Add under ## Testing section in CLAUDE.md\n\nWhen asked to investigate a bug, write a reproducing test FIRST before
+applying any fix, unless told otherwise.
+
+Add under ## Release Process section in CLAUDE.md\n\nFor version bumps, always ask the user what the target version
+should be. Do not assume the next version number.
+
+Create a branch fix/issue-XXX from develop, investigate the bug described in issue #XXX, write a reproducing test first,
+then implement the fix, run all tests, and create a PR.
+
+Investigate GitHub issue #[NUMBER]. First, read the issue and explore the relevant code. Then write a minimal failing
+test that reproduces the exact bug. Run the test to confirm it fails. Now implement the fix. Run the full test suite
+repeatedly, iterating on your implementation until ALL tests pass — including your new regression test. Do not ask me
+for feedback until you have a green test suite. Then create a feature branch, commit everything with a descriptive
+message, and show me a summary of what you changed and why.
 
 ## Build & Development Commands
 
+### Java Version Requirement
+
+**IMPORTANT**: This project requires **JDK 21** for building. JDK 25 causes Gradle build script failures. Always set `JAVA_HOME` before running Gradle commands:
+
+```bash
+export JAVA_HOME=~/.sdkman/candidates/java/21-zulu
+```
+
 ### Building
+
 ```bash
 ./gradlew buildPlugin              # Build plugin (creates ZIP in build/distributions/)
 ./gradlew clean                    # Clean build artifacts
@@ -21,20 +62,25 @@ DevoxxGenie is a Java-based LLM Code Assistant plugin for IntelliJ IDEA that int
 ```
 
 ### Testing
+
+**IMPORTANT**: Always pipe test output to grep for failures so you can immediately focus on what failed:
+
 ```bash
-./gradlew test                                    # Run all tests
-./gradlew test --tests ClassName                  # Run specific test class
-./gradlew test --tests ClassName.methodName      # Run single test method
+./gradlew test 2>&1 | grep -E "FAILED|failed"
+./gradlew test --tests ClassName 2>&1 | grep -E "FAILED|failed"
+./gradlew test --tests ClassName.methodName 2>&1 | grep -E "FAILED|failed"
 ./gradlew verifyPlugin                            # Verify plugin (includes tests)
 ```
 
 ### Running & Publishing
+
 ```bash
 ./gradlew runIde                   # Run IntelliJ IDEA with plugin for testing
 ./gradlew publishPlugin            # Publish to JetBrains Marketplace (requires PUBLISH_TOKEN env var)
 ```
 
 ### Task Automation (using Taskfile)
+
 ```bash
 task build                         # Build the plugin
 task test                          # Run tests
@@ -46,6 +92,7 @@ task preview-changes VERSION=0.8.0     # Preview changelog without committing
 ## Core Architecture
 
 ### Multi-Module Structure
+
 - **Root module**: Main IntelliJ plugin code (`src/main/java/com/devoxx/genie/`)
 - **Core module**: Shared utilities being refactored (see `core/README.md` - issue #564)
 - **Docusaurus**: Documentation website (`docusaurus/`)
@@ -53,76 +100,32 @@ task preview-changes VERSION=0.8.0     # Preview changelog without committing
 ### Key Architectural Components
 
 #### 1. Prompt Execution Flow
+
 The plugin processes user prompts through a layered architecture:
 
 **Entry Point**:
-- `UserPromptPanel` → `PromptSubmissionListener.onPromptSubmitted()` → `PromptExecutionController.handlePromptSubmission()`
+
+- `UserPromptPanel` → `PromptSubmissionListener.onPromptSubmitted()` →
+  `PromptExecutionController.handlePromptSubmission()`
 
 **Processing Layer**:
+
 - `PromptExecutionService.executeQuery()` - Handles token calculations, RAG, and GitDiff settings
 - `ChatPromptExecutor.executePrompt()` - Dispatches to appropriate LLM provider
 - `LLMProviderService.getAvailableModelProviders()` - Retrieves model from ChatModelFactory
 
 **Execution Strategies**:
+
 - `StreamingPromptExecutor` - Token-by-token streaming responses
 - `NonStreamingPromptExecutionService` - Full response mode
 - `WebSearchPromptExecutionService` - Web search augmented prompts
 
 **Response Rendering**:
+
 - `ChatStreamingResponsePanel` - Real-time streaming UI updates
-- `ChatResponsePanel` - Final response display with code highlighting
-- `ResponseHeaderPanel`, `ResponseDocumentPanel`, `MetricExecutionInfoPanel` - Modular response components
-
-#### 2. LLM Provider System
-**Factory Pattern Implementation**:
-- `ChatModelFactory` (interface) - Base factory for all providers
-- `ChatModelFactoryProvider` - Provider registry and lookup
-- Provider-specific factories under:
-  - `chatmodel/cloud/` - Cloud providers (OpenAI, Anthropic, Gemini, etc.)
-  - `chatmodel/local/` - Local providers (Ollama, GPT4All, LMStudio, etc.)
-
-**Cloud Providers**: anthropic, azureopenai, bedrock, deepinfra, deepseek, google, grok, groq, mistral, openai, openrouter
-
-**Local Providers**: ollama, gpt4all, lmstudio, llamacpp, jan, customopenai
-
-**Adding New Providers**:
-1. Create factory class implementing `ChatModelFactory` under `chatmodel/cloud/` or `chatmodel/local/`
-2. Implement `createChatModel()` and `createStreamingChatModel()` methods
-3. Register in `ChatModelFactoryProvider`
-4. Add provider to `ModelProvider` enum in `model/enumarations/`
-
-#### 3. RAG (Retrieval-Augmented Generation) System
-**Components**:
-- `ProjectIndexerService` - Indexes project files for semantic search
-- `ChromaEmbeddingService` - Stores embeddings in ChromaDB (Docker-based, v0.6.2)
-- `SemanticSearchService` - Retrieves relevant code based on similarity
-- Uses Ollama with Nomic Text embeddings for vector generation
-- `RAGValidatorService` - Validates Docker, ChromaDB, and Ollama setup
-
-**Validators**:
-- `DockerValidator` - Checks Docker availability
-- `ChromeDBValidator` - Validates ChromaDB connection
-- `OllamaValidator` - Verifies Ollama and embedding model
-- `NomicEmbedTextValidator` - Checks nomic-embed-text model
-
-#### 4. MCP (Model Context Protocol) Support
-**Key Services**:
-- `MCPService` - Core MCP server management
-- `MCPExecutionService` - Executes MCP tool calls
-- `MCPListenerService` - Implements ChatModelListener for MCP integration
-- `MCPCallbackLogger` - Logs MCP requests/responses for debugging
-
-**Configuration**:
-- MCP servers configured in Settings UI (`ui/settings/mcp/`)
-- Supports stdio and HTTP SSE transports
-- Tools are automatically exposed to LLM conversations when MCP is enabled
-
-#### 5. Service Layer Organization
-Key services under `service/`:
-- `ChatService` - Manages chat conversations
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [devoxx/DevoxxGenieIDEAPlugin](https://github.com/devoxx/DevoxxGenieIDEAPlugin) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
