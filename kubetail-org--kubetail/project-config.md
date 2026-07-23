@@ -139,4 +139,4 @@ Keep commits minimal and focused. Multiple commits to accomplish a task are fine
 
 ---
 > Source: [kubetail-org/kubetail](https://github.com/kubetail-org/kubetail) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-20 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
