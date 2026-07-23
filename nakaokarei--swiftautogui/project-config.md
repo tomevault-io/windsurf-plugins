@@ -1,15 +1,95 @@
 ---
 trigger: always_on
-description: The canonical repository instructions live in [CLAUDE.md](./CLAUDE.md).
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-# AGENTS.md
+# CLAUDE.md
 
-The canonical repository instructions live in [CLAUDE.md](./CLAUDE.md).
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Codex agents should read and follow `CLAUDE.md` instead of duplicating the
-same guidance here, so the project has a single source of truth.
+## Project Overview
+
+SwiftAutoGUI is a Swift library for programmatically controlling the mouse and keyboard on macOS. It's inspired by pyautogui and provides low-level access to system input events through CoreGraphics. It also includes AI-powered action generation from natural language.
+
+## Development Commands
+
+### Build and Test
+```bash
+swift build                    # Build the package
+swift build -c release         # Build in release mode
+swift test                     # Run safe tests (does not generate mouse/keyboard input)
+swift test --parallel          # Run safe tests in parallel (used in CI)
+SWIFTAUTOGUI_RUN_INPUT_TESTS=1 swift test  # Explicitly run tests that generate real input
+swift test --filter KeyboardTests  # Run safe tests in a single test suite
+swift package --allow-writing-to-package-directory build-metal-library
+                               # Rebuild the bundled Metal shader library
+```
+
+Rebuilding the Metal library requires Xcode's optional Metal Toolchain
+component. Package consumers use the committed `.metallib` and do not need the
+component installed.
+
+### Documentation
+```bash
+swift package generate-documentation
+swift package --disable-sandbox preview-documentation --target SwiftAutoGUI
+```
+
+### sagui CLI Tool
+```bash
+swift run sagui key shortcut command c    # Keyboard shortcut
+swift run sagui mouse move --x 100 --y 200  # Mouse movement
+swift run sagui screen screenshot --output capture.png  # Screenshot
+```
+
+### Sample App
+Located at `Sample/Sample.xcodeproj`. Open in Xcode and run (⌘+R).
+
+## Architecture
+
+### Two SPM Targets
+- **SwiftAutoGUI** (library) — the core automation library
+- **sagui** (executable) — CLI tool wrapping the library via swift-argument-parser
+
+### Core Library (`Sources/SwiftAutoGUI/`)
+
+- `Core/` — Main `SwiftAutoGUI` namespace and low-level mouse/keyboard operations.
+- `Input/` — Key codes, keyboard layouts, and tweening functions.
+- `Accessibility/` — Accessibility element lookup, attributes, actions, and matching types.
+- `Actions/` — Declarative actions and agent orchestration.
+- `AI/` — Action-generation protocols, model backends, and screen context.
+- `Screen/` — Screen capture and image-recognition integration.
+- `System/` — AppleScript and system-dialog helpers.
+- `Documentation.docc/` — DocC catalog for the library.
+
+The separate `ImageRecognition` target provides GPU template matching using
+normalized cross-correlation.
+
+### CLI (`Sources/sagui/`)
+Three subcommands: `KeyCommand`, `MouseCommand`, `ScreenCommand`, each in their own file.
+
+## Important Technical Details
+
+- **Platform**: macOS 26.0+, Swift 6.2
+- **Permissions**: Requires Accessibility permissions in System Settings
+- **Event Posting**: Uses `CGEventTapLocation.cghidEventTap` for event injection
+- **Coordinate System**: CGWindow coordinates (origin at top-left)
+- **Thread Safety**: `Thread.sleep(0.01)` after events for timing
+- **Dependencies**: swift-argument-parser (CLI), swift-docc-plugin (docs)
+
+## CI
+
+GitHub Actions workflow (`build.yml`) runs on `macos-26` with four parallel jobs: build, test, docs (xcodebuild docbuild), and sample app build. PRs get automated test result comments.
+
+## Releases
+
+Run the `Release` workflow from GitHub Actions and enter the new semantic
+version without a `v` prefix (for example, `0.24.0`). The workflow updates
+`plugins/swift-auto-gui/.claude-plugin/plugin.json`, commits the change to
+`master`, creates the matching git tag, and publishes a GitHub Release.
+
+The Claude Code plugin version is intentionally kept in sync with the library tag — if `plugin.json` `version` doesn't change between releases, existing marketplace users won't receive plugin updates (Claude Code caches by version string).
 
 ---
 > Source: [NakaokaRei/SwiftAutoGUI](https://github.com/NakaokaRei/SwiftAutoGUI) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
