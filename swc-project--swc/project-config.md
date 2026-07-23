@@ -1,7 +1,15 @@
 ---
 trigger: always_on
-description: -   Read the codebase - the codebase is source of truth, and you should prefer reading lots of source code over searching.
+description: When working in a specific directory, apply the rules from that directory and all parent directories up to the root.
 ---
+
+# AI Agent Rules
+
+When working in a specific directory, apply the rules from that directory and all parent directories up to the root.
+
+## While working on `.`
+
+*Source: `AGENTS.md`*
 
 # Instructions
 
@@ -11,45 +19,22 @@ description: -   Read the codebase - the codebase is source of truth, and you sh
 -   Do not search web unless explicitly asked to do so. Web search does not help in general for our project.
 -   Write performant code. Always prefer performance over other things.
 -   Use `gh` CLI tool for fetching data from `github.com`.
--   Do not let sandbox constraints stall progress. If sandbox restrictions block required work, request escalation promptly and continue.
 
 ## Code style
 
 -   Write comments and documentations in English.
 -   Write documentation for your code.
--   When introducing a workaround, leave sufficient comments explaining why it is needed and any known limitations.
 -   Commit your work as frequent as possible using git. Do NOT use `--no-verify` flag.
 -   Prefer multiple small files over single large file.
--   Prefer enum (or dedicated type) based modeling over raw string literals whenever possible.
 
 ---
 
 -   When creating Atom instances, it's better to use `Cow<str>` or `&str` instead of `String`. Note that `&str` is better than `Cow<str>` here.
 
-## Debugging and logging
-
--   Do not guess behavior. Verify assumptions by reading source, fixtures, and tests.
--   Debug with logs when behavior is unclear.
--   Write sufficient logs for debugging and operational troubleshooting.
--   Prefer structured logging in Rust (`tracing`) over ad-hoc plain text logs when feasible.
-
-## Shell safety
-
--   For shell commands or scripts, prefer `$(...)` over legacy backticks for command substitution.
--   Quote and escape all dynamic shell values strictly.
-
-## Git workflow
-
--   Run `git commit` only after `git add`.
--   Once changes are staged, commit without unnecessary delay so staged history is preserved.
--   When creating or updating a pull request, follow the repository pull request template.
--   After addressing pull request review comments and pushing updates, resolve the corresponding review threads.
-
 ## Testing
 
 -   Write unit tests for your code.
 -   Prefer fixture tests over inline (`#[test]`) tests.
--   Before running tests, run `git submodule update --init --recursive` to initialize and update all submodules.
 -   You can do `UPDATE=1 cargo test` to get test outputs updated for fixture tests.
 -   When instructed to fix tests, do not remove or modify existing tests.
 
@@ -79,8 +64,106 @@ description: -   Read the codebase - the codebase is source of truth, and you sh
 ## Compatibility rule
 
 -   Do not use unstable, nightly only features of rustc.
--   Respect the project's MSRV. Do not rely on Rust language features or standard library APIs newer than the MSRV unless the change intentionally raises the MSRV.
+
+
+---
+
+## While working on `crates/jsdoc`
+
+*Source: `crates/jsdoc/AGENTS.md`*
+
+### Fixture Test Addition Guide
+
+- Preferred fixture roots in this crate: tests/fixtures.
+- Update generated fixture outputs with: UPDATE=1 cargo test -p jsdoc.
+- Verify without UPDATE before finishing: cargo test -p jsdoc.
+
+
+---
+
+## While working on `crates/swc`
+
+*Source: `crates/swc/AGENTS.md`*
+
+### Fixture Test Addition Guide
+
+- Preferred fixture roots in this crate: tests/fixture, tests/errors, tests/exec, tests/minify, tests/typescript, tests/vercel, tests/stacktrace, tests/babel-exec.
+- Update generated fixture outputs with: UPDATE=1 cargo test -p swc.
+- Verify without UPDATE before finishing: cargo test -p swc.
+
+
+---
+
+## While working on `crates/swc_bundler`
+
+*Source: `crates/swc_bundler/AGENTS.md`*
+
+### Fixture Test Addition Guide
+
+- Preferred fixture roots in this crate: tests/fixture, tests/deno-exec.
+- Update generated fixture outputs with: UPDATE=1 cargo test -p swc_bundler.
+- Verify without UPDATE before finishing: cargo test -p swc_bundler.
+
+
+---
+
+## While working on `crates/swc_core`
+
+*Source: `crates/swc_core/AGENTS.md`*
+
+### Fixture Test Addition Guide
+
+- Preferred fixture roots in this crate: tests/fixture.
+- Update generated fixture outputs with: UPDATE=1 cargo test -p swc_core.
+- Verify without UPDATE before finishing: cargo test -p swc_core.
+
+
+---
+
+## While working on `crates/swc_css_codegen`
+
+*Source: `crates/swc_css_codegen/AGENTS.md`*
+
+### Fixture Test Addition Guide
+
+- Preferred fixture roots in this crate: tests/fixture, tests/options, ../swc_css_parser/tests/fixture.
+- Update generated fixture outputs with: UPDATE=1 cargo test -p swc_css_codegen.
+- Verify without UPDATE before finishing: cargo test -p swc_css_codegen.
+
+
+---
+
+## While working on `crates/swc_css_compat`
+
+*Source: `crates/swc_css_compat/AGENTS.md`*
+
+### Fixture Test Addition Guide
+
+- Preferred fixture roots in this crate: tests/nesting, tests/custom-media-query, tests/media-query-ranges, tests/color-hex-alpha, tests/color-legacy, tests/selector-not, tests/color-hwb, tests/all.
+- Update generated fixture outputs with: UPDATE=1 cargo test -p swc_css_compat.
+- Verify without UPDATE before finishing: cargo test -p swc_css_compat.
+
+
+---
+
+## While working on `crates/swc_css_lints`
+
+*Source: `crates/swc_css_lints/AGENTS.md`*
+
+### Fixture Test Addition Guide
+
+- Preferred fixture roots in this crate: tests/rules/pass, tests/rules/fail.
+- Update generated fixture outputs with: UPDATE=1 cargo test -p swc_css_lints.
+- Verify without UPDATE before finishing: cargo test -p swc_css_lints.
+
+
+---
+
+## While working on `crates/swc_css_minifier`
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [swc-project/swc](https://github.com/swc-project/swc) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
