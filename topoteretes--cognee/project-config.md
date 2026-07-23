@@ -1,131 +1,179 @@
 ---
 trigger: always_on
-description: This document summarizes how to work with the cognee repository: how it’s organized, how to build, test, lint, and contribute. It mirrors our actual tooling and CI while providing quick commands for local development.
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-## Repository Guidelines
+# CLAUDE.md
 
-This document summarizes how to work with the cognee repository: how it’s organized, how to build, test, lint, and contribute. It mirrors our actual tooling and CI while providing quick commands for local development.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Project Structure & Module Organization
+## Project Overview
 
-- `cognee/`: Core Python library and API.
-  - `api/`: FastAPI application and versioned routers (add, cognify, memify, search, delete, users, datasets, responses, visualize, settings, sync, update, checks).
-  - `cli/`: CLI entry points and subcommands invoked via `cognee` / `cognee-cli`.
-  - `infrastructure/`: Databases, LLM providers, embeddings, loaders, and storage adapters.
-  - `modules/`: Domain logic (graph, retrieval, ontology, users, processing, observability, etc.).
-  - `tasks/`: Reusable tasks (e.g., code graph, web scraping, storage). Extend with new tasks here.
-  - `eval_framework/`: Evaluation utilities and adapters.
-  - `shared/`: Cross-cutting helpers (logging, settings, utils).
-  - `tests/`: Unit, integration, CLI, and end-to-end tests organized by feature.
-  - `__main__.py`: Entrypoint to route to CLI.
-- `cognee-mcp/`: Model Context Protocol server exposing cognee as MCP tools (SSE/HTTP/stdio). Contains its own README and Dockerfile.
-- `cognee-frontend/`: Next.js UI for local development and demos.
-- `distributed/`: Utilities for distributed execution (Modal, workers, queues).
-- `examples/`: Example scripts demonstrating the public APIs and features (graph, code graph, multimodal, permissions, etc.).
-- `notebooks/`: Jupyter notebooks for demos and tutorials.
-- `alembic/`: Database migrations for relational backends.
+Cognee is an open-source AI memory platform that transforms raw data into persistent knowledge graphs for AI agents. It replaces traditional RAG (Retrieval-Augmented Generation) with an ECL (Extract, Cognify, Load) pipeline combining vector search, graph databases, and LLM-powered entity extraction.
 
-Notes:
-- Co-locate feature-specific helpers under their respective package (`modules/`, `infrastructure/`, or `tasks/`).
-- Extend the system by adding new tasks, loaders, or retrievers rather than modifying core pipeline mechanisms.
+**Requirements**: Python 3.10 - 3.14
 
-## Build, Test, and Development Commands
+## Development Commands
 
-Python (root) – requires Python >= 3.10 and < 3.14. We recommend `uv` for speed and reproducibility.
-
-- Create/refresh env and install dev deps:
+### Setup
 ```bash
-uv sync --dev --all-extras --reinstall
+# Create virtual environment (recommended: uv)
+uv venv && source .venv/bin/activate
+
+# Install with pip, poetry, or uv
+uv pip install -e .
+
+# Install with dev dependencies
+uv pip install -e ".[dev]"
+
+# Install with specific extras
+uv pip install -e ".[postgres,neo4j,docs,chromadb]"
+
+# Set up pre-commit hooks
+pre-commit install
 ```
 
-- Run the CLI (examples):
+### Available Installation Extras
+- **postgres** / **postgres-binary** - PostgreSQL + PGVector support (also enables the Postgres session-cache backend, `CACHE_BACKEND=postgres`)
+- **neo4j** - Neo4j graph database support
+- **neptune** - AWS Neptune support
+- **chromadb** - ChromaDB vector database
+- **docs** - Document processing (unstructured library)
+- **scraping** - Web scraping (Tavily, BeautifulSoup, Playwright)
+- **langchain** - LangChain integration
+- **llama-index** - LlamaIndex integration
+- **anthropic** - Anthropic Claude models
+- **gemini** - Google Gemini models
+- **ollama** - Ollama local models
+- **mistral** - Mistral AI models
+- **groq** - Groq API support
+- **llama-cpp** - Llama.cpp local inference
+- **huggingface** - HuggingFace transformers
+- **aws** - S3 storage backend
+- **redis** - Redis caching
+- **graphiti** - Graphiti-core integration
+- **baml** - BAML structured output
+- **dlt** - Data load tool (dlt) integration
+- **docling** - Docling document processing
+- **codegraph** - Code graph extraction
+- **evals** - Evaluation tools
+- **deepeval** - DeepEval testing framework
+- **posthog** - PostHog analytics
+- **tracing** - OpenTelemetry tracing
+- **distributed** - Modal distributed execution
+- **dev** - All development tools (pytest, ty, ruff, etc.)
+- **debug** - Debugpy for debugging
+
+### Testing
 ```bash
-uv run cognee-cli add "Cognee turns documents into AI memory."
-uv run cognee-cli cognify
-uv run cognee-cli search "What does cognee do?"
-uv run cognee-cli -ui   # Launches UI, backend API, and MCP server together
+# Run all tests
+pytest
+
+# Run with coverage
+pytest --cov=cognee --cov-report=html
+
+# Run specific test file
+pytest cognee/tests/test_custom_model.py
+
+# Run specific test function
+pytest cognee/tests/test_custom_model.py::test_function_name
+
+# Run async tests
+pytest -v cognee/tests/integration/
+
+# Run unit tests only
+pytest cognee/tests/unit/
+
+# Run integration tests only
+pytest cognee/tests/integration/
 ```
 
-- Start the FastAPI server directly:
+### Code Quality
 ```bash
-uv run python -m cognee.api.client
+# Run ruff linter
+ruff check .
+
+# Run ruff formatter
+ruff format .
+
+# Run both linting and formatting (pre-commit)
+pre-commit run --all-files
+
+# Type checking with ty
+ty check .
 ```
 
-- Run tests (CI mirrors these commands):
+### Running Cognee
 ```bash
-uv run pytest cognee/tests/unit/ -v
-uv run pytest cognee/tests/integration/ -v
+# Using Python SDK
+uv run python examples/demos/simple_cognee_example.py
+
+# Using CLI
+cognee-cli add "Your text here"
+cognee-cli cognify
+cognee-cli search "Your query"
+cognee-cli delete --all
+
+# Launch full stack with UI
+cognee-cli -ui
 ```
 
-- Lint and format (ruff):
-```bash
-uv run ruff check .
-uv run ruff format .
+## Architecture Overview
+
+### Core Workflow: add → cognify → search/memify
+
+1. **add()** - Ingest data (files, URLs, text) into datasets
+2. **cognify()** - Extract entities/relationships and build knowledge graph
+3. **search()** - Query knowledge using various retrieval strategies
+4. **memify()** - Enrich graph with additional context and rules
+
+### Key Architectural Patterns
+
+#### 1. Pipeline-Based Processing
+All data flows through task-based pipelines (`cognee/modules/pipelines/`). Tasks are composable units that can run sequentially or in parallel. Example pipeline tasks: `classify_documents`, `extract_graph_from_data`, `add_data_points`.
+
+#### 2. Interface-Based Database Adapters
+Multiple backends are supported through adapter interfaces:
+- **Graph**: Ladybug (default), Neo4j, Neptune, Postgres via `GraphDBInterface`
+- **Vector**: LanceDB (default), ChromaDB, PGVector via `VectorDBInterface`
+- **Relational**: SQLite (default), PostgreSQL
+
+Key files:
+- `cognee/infrastructure/databases/graph/graph_db_interface.py`
+- `cognee/infrastructure/databases/vector/vector_db_interface.py`
+
+#### 3. Multi-Tenant Access Control
+User → Dataset → Data hierarchy with permission-based filtering. Enable with `ENABLE_BACKEND_ACCESS_CONTROL=True`. Each user+dataset combination can have isolated graph/vector databases (when using supported backends: Ladybug, LanceDB, SQLite, Postgres).
+
+### Layer Structure
+
+```
+API Layer (cognee/api/v1/)
+    ↓
+Main Functions (add, cognify, search, memify)
+    ↓
+Pipeline Orchestrator (cognee/modules/pipelines/)
+    ↓
+Task Execution Layer (cognee/tasks/)
+    ↓
+Domain Modules (graph, retrieval, ingestion, etc.)
+    ↓
+Infrastructure Adapters (LLM, databases)
+    ↓
+External Services (OpenAI, Ladybug, LanceDB, etc.)
 ```
 
-- Optional static type checks (ty):
-```bash
-uv run ty check .
-```
+### Critical Data Flow Paths
 
-MCP Server (`cognee-mcp/`):
+#### ADD: Data Ingestion
+`add()` → `resolve_data_directories` → `ingest_data` → `save_data_item_to_storage` → Create Dataset + Data records in relational DB
 
-- Install and run locally:
-```bash
-cd cognee-mcp
-uv sync --dev --all-extras --reinstall
-uv run python src/server.py               # stdio (default)
-uv run python src/server.py --transport sse
-uv run python src/server.py --transport http --host 127.0.0.1 --port 8000 --path /mcp
-```
+Key files: `cognee/api/v1/add/add.py`, `cognee/tasks/ingestion/ingest_data.py`
 
-- API Mode (connect to a running Cognee API):
-```bash
-uv run python src/server.py --transport sse --api-url http://localhost:8000 --api-token YOUR_TOKEN
-```
-
-- Docker quickstart (examples): see `cognee-mcp/README.md` for full details
-```bash
-docker run -e TRANSPORT_MODE=http --env-file ./.env -p 8000:8000 --rm -it cognee/cognee-mcp:main
-```
-
-Frontend (`cognee-frontend/`):
-```bash
-cd cognee-frontend
-npm install
-npm run dev     # Next.js dev server
-npm run lint    # ESLint
-npm run build && npm start
-```
-
-## Coding Style & Naming Conventions
-
-Python:
-- 4-space indentation, modules and functions in `snake_case`, classes in `PascalCase`.
-- Public APIs should be type-annotated where practical. Make sure type defined in API signature will be properly displayed in Swagger UI docs. For example this definition: content_type: Optional[str] = Form(default=None) maps to "string" as the default in Swagger docs for content_type, but it should be None/null instead.
-- Use `ruff format` before committing; `ruff check` enforces import hygiene and style (line-length 100 configured in `pyproject.toml`).
-- Prefer explicit, structured error handling. Use shared logging utilities in `cognee.shared.logging_utils`.
-
-MCP server and Frontend:
-- Follow the local `README.md` and ESLint/TypeScript configuration in `cognee-frontend/`.
-
-## Testing Guidelines
-
-- Place Python tests under `cognee/tests/`.
-  - Unit tests: `cognee/tests/unit/`
-  - Integration tests: `cognee/tests/integration/`
-  - CLI tests: `cognee/tests/cli_tests/`
-- Name test files `test_*.py`. Use `pytest.mark.asyncio` for async tests.
-- Avoid external state; rely on test fixtures and the CI-provided env vars when LLM/embedding providers are required. See CI workflows under `.github/workflows/` for expected environment variables.
-- When adding public APIs, provide/update targeted examples under `examples/python/`.
-
-## Commit & Pull Request Guidelines
-
-- Use clear, imperative subjects (≤ 72 chars) and conventional commit styling in PR titles. Our CI validates semantic PR titles (see `.github/workflows/pr_lint`). Examples:
+#### COGNIFY: Knowledge Graph Construction
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [topoteretes/cognee](https://github.com/topoteretes/cognee) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
