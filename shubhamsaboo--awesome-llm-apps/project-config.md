@@ -1,68 +1,165 @@
 ---
 trigger: always_on
-description: - Frontend (Next.js + TypeScript): `src/app/**` (pages: `page.tsx`, `layout.tsx`, styles: `globals.css`). API route for CopilotKit: `src/app/api/copilotkit/route.ts`.
+description: This repository serves as both a **showcase** and **template** for building AI agents with CopilotKit and LangGraph. It demonstrates how CopilotKit can drive interactive UI beyond just chat, using a **collaborative todo list** as the primary example.
 ---
 
-# Repository Guidelines
+# CopilotKit + LangGraph Todo Demo
 
-## Project Structure & Module Organization
+## Purpose
 
-- Frontend (Next.js + TypeScript): `src/app/**` (pages: `page.tsx`, `layout.tsx`, styles: `globals.css`). API route for CopilotKit: `src/app/api/copilotkit/route.ts`.
-- Agent (ADK/Python): `agent/agent.py`, virtual env in `agent/.venv`, deps in `agent/requirements.txt`.
-- Public assets: `public/`. Config: `next.config.ts`, `tsconfig.json`, `eslint.config.mjs`.
-- Scripts: `scripts/run-agent.sh`, `scripts/setup-agent.sh`.
+This repository serves as both a **showcase** and **template** for building AI agents with CopilotKit and LangGraph. It demonstrates how CopilotKit can drive interactive UI beyond just chat, using a **collaborative todo list** as the primary example.
 
-## Build, Test, and Development
+**Target audience:** Developers evaluating CopilotKit or starting new projects with AI agents.
 
-- `npm run dev` — runs UI (`next dev --turbopack`) and the Python agent concurrently.
-- `npm run dev:ui` — frontend only; useful for UI iteration.
-- `npm run dev:agent` — agent only; activates `.venv` and runs `agent.py`.
-- `npm run build` — production build for the Next.js app.
-- `npm start` — serve the built app.
-- `npm run lint` — lint the frontend with Next/ESLint.
-- First-time setup installs the agent via `postinstall` (creates `.venv` and installs Python deps).
+## Core Concept
 
-## Coding Style & Naming Conventions
+The todo list demonstrates **agent-driven UI** where:
 
-- TypeScript/React: 2-space indent, PascalCase components, camelCase variables, file-based routing under `src/app/**`.
-- Python agent: follow PEP 8; keep modules small and composable.
-- Linting: Next.js ESLint config (`npm run lint`). Prefer explicit types in exported APIs.
-- Components: colocate with usage; export from an `index.ts` when creating reusable modules.
+- The agent can manipulate application state (adding todos, updating status, organizing tasks)
+- Users can interact with the same state (editing titles, checking off tasks, deleting todos)
+- Both agent and user changes update the same shared state
+- The UI reactively updates based on agent state changes
 
-## Testing Guidelines
+This uses CopilotKit's **v2 agent state pattern** where state lives in the agent and syncs to the frontend.
 
-- Currently no test harness. When adding tests:
-  - Frontend: Jest/Vitest in `src/__tests__/` with `*.test.ts(x)`.
-  - Agent: `pytest` in `agent/tests/` with `test_*.py`.
-  - Aim for high coverage on data shaping (dashboard spec generation, adapters).
+## Architecture
 
-## Commit & Pull Request Guidelines
+This is a **flat npm project** with a Next.js frontend at the root and a Python agent in `agent/`.
 
-- Conventional Commits: `type(scope): message`.
-  - Types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `ci`.
-  - Example: `feat(charts): support pie charts`.
-- PRs: clear description, linked issue, before/after screenshots or JSON spec samples, and testing notes.
-- Keep PRs focused; call out env/config changes explicitly.
+### Repository Structure
 
-## Environment, Security & Config
+```
+├── src/
+│   ├── app/
+│   │   ├── page.tsx              # Main page - wires up all components
+│   │   └── api/copilotkit/       # CopilotKit API route
+│   ├── components/
+│   │   ├── canvas/               # Todo list UI
+│   │   │   ├── index.tsx         # Canvas container
+│   │   │   ├── todo-list.tsx     # Todo list with columns
+│   │   │   ├── todo-column.tsx   # Column (pending/completed)
+│   │   │   └── todo-card.tsx     # Individual todo card
+│   │   ├── example-layout/       # Layout: chat + canvas side-by-side
+│   │   └── generative-ui/        # Example generative UI components
+│   └── hooks/
+│       ├── use-generative-ui-examples.tsx  # Example CopilotKit patterns
+│       └── use-example-suggestions.tsx     # Chat suggestions
+├── agent/                         # LangGraph Python agent
+│   ├── main.py                    # Agent entry point
+│   └── src/
+│       ├── todos.py               # Todo tools and state schema
+│       └── query.py               # Example data query tool
+├── scripts/                       # Agent setup and run scripts
+│   ├── setup-agent.sh / .bat
+│   └── run-agent.sh / .bat
+├── package.json                   # Root project config (npm + concurrently)
+└── next.config.ts
+```
 
-- Place secrets in `.env.local` (frontend) and `agent/.env` (agent). Never commit secrets.
-- Example keys (adjust to your provider):
-  - Frontend: `NEXT_PUBLIC_CPK_ENDPOINT=/api/copilotkit`.
-  - Agent: `GOOGLE_API_KEY=...` (Gemini), or `OPENAI_API_KEY=...` if applicable.
-- Validate/sanitize prompts; avoid logging PII. Prefer `INFO` logs with redaction.
+## Key Pattern: Agent State with CopilotKit v2
 
-## Charts & CopilotKit Tips
+The todo list uses **CopilotKit v2's agent state pattern** where state lives in the agent backend and syncs bidirectionally with the frontend.
 
-- Dashboard spec (example): `{ "type": "line", "title": "Revenue", "x": "date", "y": "revenue" }`.
-- Supported types to target in UI: `line`, `bar`, `pie`
-- Naming: use singular `x`/`y` for series
-- Recharts via CPK: map spec→props; e.g., `LineChart` with `dataKey={spec.y}` and `XAxis dataKey={spec.x}`;
+### How It Works
 
-## Architecture Overview
+1. **Agent defines state schema and tools** (Python)
 
-- Next.js app hosts CopilotKit UI and API route; Python agent performs ADK/Gemini orchestration. `npm run dev` runs both together.
+   ```python
+   # agent/src/todos.py
+   class Todo(TypedDict):
+       id: str
+       title: str
+       description: str
+       emoji: str
+       status: Literal["pending", "completed"]
+
+   class AgentState(TypedDict):
+       todos: list[Todo]
+
+   @tool
+   def manage_todos(todos: list[Todo], runtime: ToolRuntime) -> Command:
+       """Manage the current todos."""
+       return Command(update={"todos": todos, ...})
+   ```
+
+2. **Frontend reads from agent state**
+
+   ```typescript
+   // src/components/canvas/index.tsx
+   const { agent } = useAgent();
+
+   return (
+     <TodoList
+       todos={agent.state?.todos || []}
+       onUpdate={(updatedTodos) => agent.setState({ todos: updatedTodos })}
+       isAgentRunning={agent.isRunning}
+     />
+   );
+   ```
+
+3. **User interactions update agent state**
+
+   ```typescript
+   // User clicks checkbox → frontend calls agent.setState()
+   const toggleStatus = (todo) => {
+     const updated = todos.map((t) =>
+       t.id === todo.id
+         ? { ...t, status: t.status === "completed" ? "pending" : "completed" }
+         : t,
+     );
+     agent.setState({ todos: updated });
+   };
+   ```
+
+4. **Agent can manipulate state via tools**
+   - The agent calls `manage_todos` tool to update the todo list
+   - Both user and agent changes update the same `agent.state.todos`
+   - Frontend automatically re-renders when state changes
+
+### Why This Pattern?
+
+- **Single source of truth**: State lives in the agent, not duplicated in frontend
+- **Bidirectional sync**: User changes → agent state, Agent changes → UI update
+- **Simple**: No need for separate frontend state management
+- **Observable**: Agent has full visibility into state changes
+
+## Implementation Details
+
+### Agent Backend
+
+**Agent Definition** (`agent/main.py`):
+
+```python
+from langchain.agents import create_agent
+from copilotkit import CopilotKitMiddleware
+from src.todos import todo_tools, AgentState
+
+agent = create_agent(
+    model="gpt-5.5",
+    tools=[*todo_tools, ...],  # manage_todos, get_todos
+    middleware=[CopilotKitMiddleware()],
+    state_schema=AgentState,  # Defines state shape
+    system_prompt="You are a helpful assistant..."
+)
+```
+
+**Todo Tools** (`agent/src/todos.py`):
+
+```python
+@tool
+def manage_todos(todos: list[Todo], runtime: ToolRuntime) -> Command:
+    """Manage the current todos."""
+    # Ensure todos have unique IDs
+    for todo in todos:
+        if "id" not in todo or not todo["id"]:
+            todo["id"] = str(uuid.uuid4())
+
+    # Update agent state
+    return Command(update={
+        "todos": todos,
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [Shubhamsaboo/awesome-llm-apps](https://github.com/Shubhamsaboo/awesome-llm-apps) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
