@@ -1,91 +1,193 @@
 ---
 trigger: always_on
-description: Cursor / coding agents: start here. Full architecture and module map live in [CLAUDE.md](./CLAUDE.md).
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository. For a shorter Cursor / agent entry point, see [AGENTS.md](./AGENTS.md).
 ---
 
-# AgentSociety — Agent Guide
+# CLAUDE.md
 
-Cursor / coding agents: start here. Full architecture and module map live in [CLAUDE.md](./CLAUDE.md).
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository. For a shorter Cursor / agent entry point, see [AGENTS.md](./AGENTS.md).
 
-## Active scope
+## Project Overview
 
-Only these paths are in active CI, security scanning, and Dependabot scope:
+AgentSociety is a framework for building LLM-based agent simulations in urban environments and research workflows. The repository contains two main packages:
 
-| Path | Role |
-| ---- | ---- |
-| `packages/agentsociety2/` | Python SDK (primary) |
-| `extension/` | VS Code extension |
-| `frontend/` | React web UI |
+- **`packages/agentsociety`** (v1.x): City simulation framework with gRPC-based environment integration (legacy)
+- **`packages/agentsociety2`** (v2.x): Modernized, LLM-native agent simulation platform with research skills (current focus)
 
-Legacy (`packages/agentsociety`, `agentsociety-community`, `agentsociety-benchmark`, `packages/agentsociety/docs`) is reference-only. See [`.github/agentsociety2-scope.yml`](./.github/agentsociety2-scope.yml).
+## Workspace Structure
 
-## Repository layout
+This is a uv workspace with Python packages in `packages/`:
+- `packages/agentsociety2/` - Primary development package
+- `packages/agentsociety/` - Legacy city simulation package
+- `packages/agentsociety-community/` - Community contributions
+- `packages/agentsociety-benchmark/` - Benchmarking utilities
 
-```text
-AgentSociety/
-├── packages/agentsociety2/   # v2 SDK — import as agentsociety2
-├── extension/                # VS Code extension (ai-social-scientist)
-├── frontend/                 # React + Vite dashboard
-├── pyproject.toml + uv.lock  # uv workspace root
-├── Makefile                  # extension build + Sphinx docs
-├── CONTRIBUTING.md           # setup, PR checklist, release
-├── CHANGELOG.md              # Keep a Changelog (AS2)
-└── CLAUDE.md                 # deep architecture reference
-```
+The frontend is a separate React application in `frontend/`.
+VSCode extension is in `extension/`.
 
-Primary remote is GitLab (`git.fiblab.net`); GitHub is a public mirror with Dependabot / CodeQL.
+## Development Commands
 
-## Setup
+### Python Package (agentsociety2)
 
 ```bash
-# Python (workspace root)
+# Install dependencies (in workspace root)
 uv sync
+
+# Install with dev dependencies
 cd packages/agentsociety2 && uv sync --extra dev
 
-# Extension
-cd extension && npm ci && npm run lint && npm run build
+# Run tests
+cd packages/agentsociety2 && uv run pytest
 
-# Frontend
-cd frontend && npm ci && npm run lint && npm run build
+# Linting
+uv run ruff check packages/agentsociety2/
+
+# Format code
+uv run ruff format packages/agentsociety2/
+
+# Type checking
+uv run mypy packages/agentsociety2/tests/ --follow-imports=skip
 ```
 
-Required env vars: `AGENTSOCIETY_LLM_API_KEY`, `AGENTSOCIETY_LLM_API_BASE`. Default model when unset: `gpt-5.5`. See `.env.example`.
-
-## Before you change code
-
-1. **Scope** — stay inside AS2 paths unless explicitly asked for legacy.
-2. **Import** — use `import agentsociety2`; do not treat `packages/agentsociety2/` as a runtime path.
-3. **Tests** — `cd packages/agentsociety2 && uv run pytest` for behavior changes.
-4. **Lockfiles** — run `uv lock` at repo root when Python deps change; use `npm ci` (not `npm install`) in extension/frontend.
-5. **Telemetry** — set `MEM0_TELEMETRY=False` and `ANONYMIZED_TELEMETRY=False` in tests.
-6. **Commits** — Conventional Commits (`feat`, `fix`, `docs`, `chore`, `ci`, …). Release tag: `agentsociety2-vX.Y.Z`.
-
-## Key subsystems (pointers)
-
-| Area | Entry | Notes |
-| ---- | ----- | ----- |
-| Simulation CLI | `agentsociety2/society/cli.py` | `--log-file` required for background runs |
-| PersonAgent | `agentsociety2/agent/` | metadata-first skill loop; built-in: daily-guidance |
-| Env routers | `agentsociety2/env/` | ReAct, PlanExecute, CodeGen, TwoTier variants |
-| Analysis harness | `agentsociety2/skills/analysis/harness/` | phase gates, EDA embed, experience memory (`draft-reflection` / `promote-reflection`) |
-| Backend API | `agentsociety2/backend/run.py` | FastAPI on `:8001`, separate from CLI |
-| Paper workflow | external `paper-toolkit` plugin | built-in `paper` skill removed in 2.5.2 |
-
-## Local verification (pre-push)
+### Running Experiments (CLI)
 
 ```bash
-make check
+# Get PYTHON_PATH from workspace .env
+PYTHON_PATH=$(grep "^PYTHON_PATH=" .env | cut -d'=' -f2)
+PYTHON_PATH=${PYTHON_PATH:-.venv/bin/python}
+
+# Run an experiment (--log-file REQUIRED for background execution)
+$PYTHON_PATH -m agentsociety2.society.cli \
+    --config hypothesis_1/experiment_1/init/init_config.json \
+    --steps hypothesis_1/experiment_1/init/steps.yaml \
+    --run-dir hypothesis_1/experiment_1/run \
+    --experiment-id "1_1" \
+    --log-level INFO \
+    --log-file hypothesis_1/experiment_1/run/output.log &
+
+# Or run in foreground (logs to console)
+$PYTHON_PATH -m agentsociety2.society.cli \
+    --config init_config.json \
+    --steps steps.yaml \
+    --run-dir run
 ```
 
-Or run each stack separately — see [CONTRIBUTING.md](./CONTRIBUTING.md).
+### Backend Service (FastAPI)
 
-## Docs
+```bash
+# Start backend (from packages/agentsociety2)
+cd packages/agentsociety2
+python -m agentsociety2.backend.run
 
-- User docs (v2): [agentsociety2.readthedocs.io](https://agentsociety2.readthedocs.io/) — config in `packages/agentsociety2/.readthedocs.yaml`
-- v1 docs: root `.readthedocs.yaml` → `packages/agentsociety/docs/` (legacy)
-- Authoring guide: [READTHEDOCS.md](./READTHEDOCS.md)
-- Changelog: `git-cliff --unreleased` (see `cliff.toml`)
+# Backend runs on: http://localhost:8001
+# API docs available at: http://localhost:8001/docs
+# ReDoc available at: http://localhost:8001/redoc
+```
+
+### Frontend (React + Vite)
+
+```bash
+cd frontend
+npm ci               # Install dependencies (lockfile-pinned)
+npm run dev          # Start dev server (http://localhost:5173)
+npm run build        # Production build
+npm run lint         # ESLint
+```
+
+### Documentation (Sphinx)
+
+```bash
+# Build Chinese docs (default)
+make html
+
+# Build English docs
+make html-en
+
+# Build all languages
+make html-all
+```
+
+## Architecture
+
+### System Architecture Overview
+
+```mermaid
+graph TB
+    subgraph "User Interfaces"
+        CLI[CLI<br/>agentsociety2.society.cli]
+        Frontend[React Frontend<br/>localhost:5173]
+        VSCode[VSCode Extension]
+    end
+
+    subgraph "Backend Layer"
+        API[FastAPI Backend<br/>localhost:8001]
+    end
+
+    subgraph "Core Simulation"
+        Society[AgentSociety<br/>Orchestrator]
+        Router[Environment Router<br/>ReAct/PlanExecute/CodeGen]
+        Storage[(ReplayWriter<br/>SQLite)]
+    end
+
+    subgraph "Agents"
+        Agent1[PersonAgent 1]
+        Agent2[PersonAgent 2]
+        AgentN[PersonAgent N]
+    end
+
+    subgraph "Environment Modules"
+        Env1[SimpleSocialSpace]
+        Env2[EconomyModule]
+        EnvN[Custom Modules...]
+    end
+
+    subgraph "Research Skills"
+        Lit[literature]
+        Exp[experiment]
+        Hyp[hypothesis]
+        Paper[paper]
+        Analysis[analysis]
+        Agent[agent]
+    end
+
+    subgraph "External Services"
+        LLM[LLM Provider<br/>OpenAI/Claude/etc]
+    end
+
+    CLI --> Society
+    Frontend --> API
+    VSCode --> API
+    API --> Society
+    API --> Skills
+
+    Society --> Router
+    Society --> Storage
+    Society --> Agent1
+    Society --> Agent2
+    Society --> AgentN
+
+    Router --> Env1
+    Router --> Env2
+    Router --> EnvN
+
+    Agent1 --> Router
+    Agent2 --> Router
+    AgentN --> Router
+
+    Skills --> Society
+    Skills --> LLM
+    Society --> LLM
+```
+
+### agentsociety2 Core Components
+
+#### Agent System (`agentsociety2/agent/`)
+- **AgentBase** (`agent/base/`): base class that directly owns workspace binding, skill runtime (`AgentSkillRuntime`), the ReAct tool loop, LLM calls, TODO state, trace, and `AGENT.json` persistence. No mixins / no multiple inheritance.
+- **PersonAgent** (`agent/person.py`): a thin orchestrator on top of `AgentBase` implementing person-specific behavior. Agents are **workspace-bound stateless records** built via `create()` / `from_workspace()` / `restore()` / `to_workspace()`.
+- Services (env / trace / replay plus LLM access) are injected via a single **`ServiceProxy`** (`agent/service_proxy.py`); agents are driven as **Ray Tasks** (`agent/runner.py`) so memory is decoupled from agent count N.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [tsinghua-fib-lab/agentsociety](https://github.com/tsinghua-fib-lab/agentsociety) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
