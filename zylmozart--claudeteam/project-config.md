@@ -1,0 +1,128 @@
+---
+trigger: always_on
+description: Read this file before making changes.  See README.md for what the
+---
+
+# Working in this repo (Claude Code context)
+
+Read this file before making changes.  See README.md for what the
+project is and how a user runs it.
+
+For deployment (host or Docker), follow `docs/DEPLOYMENT.md`.
+
+## Where things live
+
+Business logic lives in `src/claudeteam/` only.  There is **no** parallel
+`scripts/` shim layer.  Every command is a Python module under
+`src/claudeteam/commands/` registered in `src/claudeteam/cli.py`.
+
+```
+src/claudeteam/cli.py           ← top-level dispatch + COMMANDS registry
+src/claudeteam/commands/X.py    ← one module per subcommand, ~30 LOC each
+src/claudeteam/store/           ← file-backed local state (no DB)
+src/claudeteam/runtime/         ← config / paths / tmux / watchdog
+src/claudeteam/feishu/          ← lark-cli wrapper + router pipeline
+src/claudeteam/agents/          ← CliAdapter base + per-CLI adapters
+```
+
+Tests are in `tests/unit/test_*.py` (per-module),
+`tests/integration/test_*.py` (end-to-end in-process; auto gate),
+and `tests/scenarios/*.md` (operator-run regression playbooks).
+
+## Building rules (READ BEFORE WRITING CODE)
+
+1. **Every new module ships its own unit test in the same commit.**
+   Touching `commands/X.py`?  Write `tests/unit/test_commands_X.py`.
+
+2. **Every new public command ships an operator playbook (markdown) in
+   `tests/scenarios/` in the same commit.**  Given/When/Then template,
+   for human regression checks against a real deployment.
+
+3. **Keep it small.**  Prefer the smallest thing that works — avoid
+   speculative `CliCapabilities`-style dataclasses or deeply decomposed
+   multi-file trees.  If a function looks too short to need its own
+   file, it probably is.
+
+4. **No compatibility wrappers.**  Don't keep a shim around just because
+   an old call site might break — update the call site instead.
+
+5. **Test fixtures live in `tests/helpers.py`.**  Use `isolated_env()`
+   and `run_cli()`.  Don't copy-paste a new `_isolated_state()` per
+   test file.
+
+## Simplicity gate (read before opening a PR)
+
+Inspired by `forrestchang/andrej-karpathy-skills` CLAUDE.md.  Before
+merging a refactor or new module, walk this checklist:
+
+- **Two-use rule.**  Helpers, dataclasses, and base classes only earn
+  their own existence at the *third* call site.  Two similar blocks
+  inline beats one premature abstraction.
+- **Dead code = delete.**  An unused private function isn't
+  "documentation" — it's noise that drifts.  If `grep -rn '\b_fn\b'`
+  shows only the definition, remove it.
+- **Match the canonical command.**  `commands/health.py` is the
+  reference shape: `_check_*` helpers + `HealthReport` accumulator +
+  `_emit_text` / `_emit_json` + `main(argv)`.  New commands that look
+  drastically different need a one-line "why" in their docstring.
+- **No compatibility shims for unreleased work.**  If you renamed a
+  function nobody outside the repo calls, just rename it everywhere;
+  don't leave a wrapper.
+
+## Test gate (must stay green)
+
+```bash
+python3 tests/run.py        # needs Python 3.10+
+```
+
+Stdlib-only runner (no pytest required).  Should report
+`tests: N passed, 0 failed`.  Failing tests block commits.  If the
+`python3` on your machine is older than 3.10, invoke an explicit
+interpreter, e.g. `python3.12 tests/run.py`.
+
+That gate (unit + in-process end-to-end) verifies a *code change* — no deploy
+needed; it's what an agent runs to check its own work.  To verify the
+*deployed product* end-to-end like a real user (send Feishu messages → watch
+agents respond), drive `tests/scenarios/host_smoke.md`: an agent runs the
+`lark-cli --as user` sends + verifies responses itself; only three one-time
+steps (Feishu app, user OAuth, CLI login) need a human.  Install first via
+`docs/DEPLOYMENT.md`.  The other `tests/scenarios/*.md` are the same shape.
+
+## How modules cooperate (the message flow)
+
+```
+Feishu chat               feishu/subscribe.py    ←─── node scripts/feishu_channel/sidecar.js run (Popen)
+   │                              │
+   │ user types in group          │ NDJSON line
+   ▼                              ▼
+       ┌─────────────────────────────────────────────┐
+       │ feishu/router.py                            │  pure decision:
+       │   classify_event(event, agents, …)          │  DROP / ROUTE
+       └─────────────────────┬───────────────────────┘
+                             │ Decision
+                             ▼
+       ┌─────────────────────────────────────────────┐
+       │ feishu/deliver.py                           │  side-effects:
+       │   apply(decision, …) → DeliveryReport       │  inbox + tmux inject
+       └────────┬───────────────────────────┬────────┘
+                │                           │
+                ▼                           ▼
+   store/local_facts                 runtime/tmux + agents/
+       inbox.json                    inject text into pane
+       status.json                   using each adapter's submit_keys
+       logs.jsonl
+```
+
+`commands/router.py` is the daemon entry that wraps `subscribe.process_lines`
+around `node scripts/feishu_channel/sidecar.js run` stdout (official
+`@larksuite/channel` WebSocket → NDJSON; lark-cli is now egress-only).
+Tests use a list-of-lines fixture instead of a real subprocess.
+
+## Patterns that show up everywhere
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [zylMozart/ClaudeTeam](https://github.com/zylMozart/ClaudeTeam) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
