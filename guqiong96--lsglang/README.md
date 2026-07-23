@@ -5,11 +5,11 @@
 ## Windsurf Config
 
 The `project-config.md` file in this directory is the project config converted for Windsurf.
-Original source: `AGENTS.md` in [guqiong96/Lsglang](https://github.com/guqiong96/Lsglang).
+Original source: `CLAUDE.md` in [guqiong96/Lsglang](https://github.com/guqiong96/Lsglang).
 
 ## Also available for
 
-- **Claude Code** — `CLAUDE.md`
+- **Codex** — `AGENTS.md`
 - **GitHub Copilot** — `copilot-instructions.md`
 - **Cursor** — `project-config.mdc`
 - **Gemini CLI** — `GEMINI.md`
