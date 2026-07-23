@@ -3,11 +3,11 @@ trigger: always_on
 description: **Be extremely concise. Sacrifice grammar for concision. Terse responses preferred. No fluff.**
 ---
 
-# AGENTS.md
+# CLAUDE.md
 
 **Be extremely concise. Sacrifice grammar for concision. Terse responses preferred. No fluff.**
 
-This file provides guidance to AI coding assistants when working with code in this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Overview
 
@@ -119,34 +119,20 @@ We handle ONLY the most important cases. Don't add functionality unless it's sma
 | In main unreleased | Preferred         | Minimize friction for other developers   |
 | Released           | Required          | Prevent breaking downstream integrations |
 
-## Code Review
+## Tips for Claude Code Sessions
 
-For code review guidelines, see `REVIEW.md`.
-
-### PR Review Comment Format
-
-**Use inline comments** for specific feedback on code changes. Use the GitHub API to post reviews:
-
-```bash
-gh api repos/{owner}/{repo}/pulls/{pr}/reviews --input - << 'EOF'
-{
-  "event": "COMMENT",
-  "body": "Overall summary (optional)",
-  "comments": [
-    {"path": "file.ts", "line": 42, "body": "Specific issue here"},
-    {"path": "file.ts", "start_line": 10, "line": 15, "body": "Multi-line comment"}
-  ]
-}
-EOF
-```
-
-| Feedback Type        | Where                                   |
-| -------------------- | --------------------------------------- |
-| Specific code issue  | Inline comment on that line             |
-| Repeated pattern     | Inline on first, mention others in body |
+1. **Run tests incrementally** - `pnpm run build && mocha` for specific test files
+2. **Check existing patterns** - Search codebase for similar implementations
+3. **YAML keys alphabetical** - ESLint enforces sorted keys in YAML files
+4. **Registry is source of truth** - Chain metadata, addresses, warp routes all here
+5. **Keep changes minimal** - Only modify what's necessary; avoid scope creep
+6. **No Node.js in main src/** - Only `src/fs/` can import Node.js modules
+7. **Warp ID format** - Must be `{SYMBOL}/{label}`, e.g., `USDC/ethereum-arbitrum`
+8. **Address provenance** - When adding/changing addresses, note the source (PR, tx hash)
+9. **Deterministic ordering** - Sort arrays/maps before processing for consistent output
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [hyperlane-xyz/hyperlane-registry](https://github.com/hyperlane-xyz/hyperlane-registry) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
