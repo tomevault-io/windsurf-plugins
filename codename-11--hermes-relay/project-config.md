@@ -1,94 +1,54 @@
 ---
 trigger: always_on
-description: Universal agent instructions for **Hermes-Relay**. This is the entry point for any
+description: > Read [AGENTS.md](AGENTS.md) first. It is the provider-neutral canonical agent
 ---
 
-# AGENTS.md
+# Hermes-Relay — Claude Code Adapter
 
-Universal agent instructions for **Hermes-Relay**. This is the entry point for any
-coding agent (Claude Code, Codex, Cursor, etc.).
+> Read [AGENTS.md](AGENTS.md) first. It is the provider-neutral canonical agent
+> context. Branch, release, staging, and hotfix rules live in `AGENTS.md` and
+> [RELEASE.md](RELEASE.md); this file only adds Claude-specific project and tool
+> guidance. Then read `docs/spec.md` and `docs/decisions.md`.
 
-## Read this first
+## What This Is
 
-This file is the provider-neutral canonical agent context. Read it before
-touching code, then `docs/spec.md` and `docs/decisions.md`. Provider adapters
-such as **[CLAUDE.md](CLAUDE.md)** may add tool-specific guidance, but they do
-not redefine the branch, release, or hotfix policy here and in `RELEASE.md`.
+A native Android app (Kotlin + Jetpack Compose) paired with an optional Python relay plugin/server (aiohttp) for the Hermes agent platform. Vanilla Hermes chat, Manage, and dashboard voice work against unmodified upstream Hermes. The Relay plugin adds phone control, terminal, remote desktop tooling, extra voice engines, and dashboard Relay management via the official Hermes web dashboard.
 
-- Release process → **[RELEASE.md](RELEASE.md)**
-- Contributor setup → **[CONTRIBUTING.md](CONTRIBUTING.md)**
-- `android_*` toolset + MCP → **[docs/mcp-tooling.md](docs/mcp-tooling.md)**
-- Follow-ups / deferred work / known gaps → **[TODO.md](TODO.md)** (the single home for "what's next" — never DEVLOG, never scattered code comments)
+**Current state:** Reference latest released version for stable state and current dev branch for working state. The default no-plugin path supports chat, Manage, and voice on vanilla upstream Hermes. Chat auto-prefers the dashboard `/api/ws` gateway transport when Manage auth is ready, then falls back to API-server SSE routes. Vanilla Hermes voice uses dashboard `/api/audio/*` with the Manage session. Relay remains an additive power path for terminal, bridge/device control, notification companion, extra/provider-native voice, remote access, and desktop tooling. Two Android product flavors ship: `googlePlay` (conservative, no unattended Device Control surface) and `sideload` (full-capability).
 
-## Branch contract
+## Architecture
 
-| Contract item | Canonical source or target |
-|---|---|
-| Integration branch | `dev`; normal feature, fix, docs, and chore PRs target `dev` |
-| Release branch | `main`; release history and hotfix integration only |
-| Tag source | The new `main` tip after an approved `dev` → `main` release PR, or after an approved hotfix PR to `main` |
-| Staging source | An exact tested `dev` SHA or release-candidate tag; staging is an environment, never a branch |
-| Production source | Immutable `android-v*`, `server-v*`, or `desktop-v*` tags, selected by surface |
-| Hotfix base | The immutable production tag for the affected surface |
-| Back-merge target | `dev`; merge `main` back immediately after every hotfix |
+```
+Phone (WS)       -> Hermes dashboard (:9119)     [vanilla Hermes gateway chat, live thinking]
+Phone (HTTP/SSE) -> Hermes API Server (:8642)    [vanilla Hermes chat fallback, sessions, runs]
+Phone (HTTP)     -> Hermes dashboard (:9119)     [vanilla Hermes Manage + voice]
+Phone (WSS/HTTP) -> Relay plugin/server (:8767)  [optional bridge, terminal, relay voice, remote tools]
+```
 
-Feature completion means merged and verified on `dev`; it does not mean
-released. A release train is separate work owned by a Forge release
-issue/session: reconcile only the affected surface version and notes on `dev`,
-open the `dev` → `main` release PR, tag the resulting `main` tip, publish the
-surface artifacts, deploy or roll out, and verify the live result. Never create
-a staging branch.
+The Vanilla Hermes path must stay upstream-only. API-server bearer auth and dashboard cookie auth are separate. Terminal and bridge require Relay pairing; Vanilla Hermes chat, Manage, and dashboard voice must not.
 
-## Non-negotiables (the short list)
+### Upstream Hermes API Reference
 
-- **Vanilla Hermes path = upstream-only.** The standard (no-plugin) connection
-  uses the upstream Dashboard/Gateway for chat, authentication, Manage, sessions,
-  and Vanilla Hermes voice. The API server is an optional automatic fallback and
-  advanced headless-compatibility surface; Relay adds optional extensions. This
-  path must work against unmodified upstream hermes-agent. Server-side needs go
-  through upstream PRs or the optional relay plugin, never fork patches.
-- **Verify endpoints against upstream** (`gateway/platforms/api_server.py` /
-  `tui_gateway/server.py` in hermes-agent) before assuming a route exists.
-- **Conventional Commits + `main`/`dev` branching.** Normal branches start at
-  `dev` and PR back to `dev`; merge commits/no-ff are the repository policy.
-  Version bumps happen only during release preparation on `dev`, and production
-  tags are cut only from `main`.
-- **Android:** Jetpack Compose only (no XML), kotlinx.serialization (no Gson),
-  OkHttp (no Ktor), `wss://` only. Run `./gradlew lint` before pushing Kotlin.
-- **Plugin (Python 3.11+):** aiohttp + asyncio (no threading), type hints
-  everywhere, structured `logging` (no `print`). **Desktop CLI (Node ≥21):**
-  zero runtime deps, strict TS + ES modules, ship compiled `dist/`. Full
-  per-language style and the dev loop live in CLAUDE.md → "Code Style".
+**IMPORTANT:** Always verify endpoints against the actual hermes-agent source (`gateway/platforms/api_server.py`). The upstream repo is the source of truth — not our docs, not our memory, not assumptions from other frontends.
 
-## Review guidelines
+**Vanilla Hermes endpoints (confirmed in hermes-agent source):**
 
-- Report only actionable correctness, security, compatibility, or release-risk
-  findings; avoid stylistic preferences unless they violate a documented rule.
-- Treat the vanilla Hermes upstream boundary as release-critical. Flag any
-  default-path dependency on relay-only or fork-only server behavior.
-- Check that changes preserve public-repo writing hygiene and do not expose
-  secrets, private infrastructure, or personal information.
-- Use the affected surface's CI result as evidence, but do not imply Android UI
-  or device behavior was proven without an explicit on-device verification.
-- Prioritize findings that warrant holding the merge. State the impacted path
-  and the concrete failure mode.
 
-## Public-repo writing hygiene
+| Endpoint                                | Purpose                                                  | Tool Call Format                                                                                                               |
+| --------------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `POST /v1/chat/completions`             | OpenAI-compatible chat (stream=true for SSE)             | Inline markdown text (``💻 terminal``) — no separate tool events                                                               |
+| `POST /v1/runs`                         | Start an agent run                                       | Returns `run_id`                                                                                                               |
+| `GET /v1/runs/{run_id}/events`          | SSE stream of run lifecycle events                       | **Structured events**: `tool.started`, `tool.completed`, `message.delta`, `reasoning.available`, `run.completed`, `run.failed` |
+| `POST /v1/responses`                    | OpenAI Responses API format                              | Structured `function_call` objects (non-streaming only)                                                                        |
+| `GET /v1/capabilities`                  | Machine-readable feature + endpoint discovery            | Use before assuming optional surfaces exist                                                                                    |
+| `GET /v1/models`                        | List available models                                    | —                                                                                                                              |
+| `GET /v1/skills`                        | Read-only skill list for the API-server agent            | `{"object":"list","data":[...]}`                                                                                               |
+| `GET /v1/toolsets`                      | Read-only API-server toolset inventory                   | `{"object":"list","platform":"api_server","data":[...]}`                                                                       |
+| `GET/POST/PATCH/DELETE /api/sessions/*` | Native session CRUD, messages, fork, sync chat, SSE chat | Upstream merged via NousResearch/hermes-agent PR #33134                                                                        |
+| `GET /health`                           | Health check                                             | —                                                                                                                              |
 
-Everything committed is public. In CHANGELOG, DEVLOG, README, docs, and release
-notes:
-
-- **No personal names** — attribute impersonally; identity lives in git + the
-  signing cert.
-- **No private infrastructure** — real hostnames/IPs, internal deployment names,
-  `~/SYSTEM.md`. (Generic example IPs in setup docs are fine.)
-- **No AI/assistant process self-narration** ("I should have…", course
-  corrections) — state the technical conclusion only.
-- **No internal jargon or fork/branch plumbing** in user-facing notes.
-- **CHANGELOG** uses Keep-a-Changelog grouping; condense the version block to
-  crisp public bullets at release-prep (see RELEASE.md §2 "Scrub for public
-  distribution"). **DEVLOG** is a depersonalized, factual engineering log.
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [Codename-11/hermes-relay](https://github.com/Codename-11/hermes-relay) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
