@@ -1,214 +1,152 @@
 ---
 trigger: always_on
-description: > This document is mainly for agents and LLMs to follow when maintaining,
+description: Aquário is a university portal for UFPB (Universidade Federal da Paraíba) students. It provides guides, job listings, entity directories, and user profiles.
 ---
 
-# React Composition Patterns
+# Aquário - AI Assistant Guidelines
 
-**Version 1.0.0**  
-Engineering  
-January 2026
+## Project Overview
 
-> **Note:**  
-> This document is mainly for agents and LLMs to follow when maintaining,  
-> generating, or refactoring React codebases using composition. Humans  
-> may also find it useful, but guidance here is optimized for automation  
-> and consistency by AI-assisted workflows.
+Aquário is a university portal for UFPB (Universidade Federal da Paraíba) students. It provides guides, job listings, entity directories, and user profiles.
 
----
+## Tech Stack
 
-## Abstract
+- **Framework**: Next.js 15 (App Router) with React 18
+- **Language**: TypeScript (strict mode)
+- **Database**: PostgreSQL with Prisma ORM
+- **Styling**: Tailwind CSS + shadcn/ui components
+- **State**: TanStack Query (React Query) for server state
+- **Auth**: JWT tokens with automatic refresh
 
-Composition patterns for building flexible, maintainable React components. Avoid boolean prop proliferation by using compound components, lifting state, and composing internals. These patterns make codebases easier for both humans and AI agents to work with as they scale.
+## Project Structure
 
----
+```
+src/
+├── app/                    # Next.js App Router pages and API routes
+│   ├── api/               # API route handlers
+│   └── (pages)/           # Page components
+├── components/            # React components
+│   ├── ui/               # shadcn/ui base components
+│   └── [feature]/        # Feature-specific components
+├── lib/
+│   ├── client/           # Client-side code (runs in browser)
+│   │   ├── api/          # API service functions (use apiClient)
+│   │   ├── hooks/        # React hooks
+│   │   └── errors.ts     # Client error handling (throwApiError)
+│   ├── server/           # Server-side code (runs on server only)
+│   │   ├── api/          # API route utilities
+│   │   ├── container/    # Dependency injection container
+│   │   ├── db/           # Database repositories (Prisma)
+│   │   └── services/     # Business logic services
+│   └── shared/           # Code shared between client and server
+│       ├── types/        # TypeScript types and interfaces
+│       ├── errors/       # Error codes and types
+│       └── config/       # Constants and configuration
+```
 
-## Table of Contents
+## Key Patterns
 
-1. [Component Architecture](#1-component-architecture) — **HIGH**
-   - 1.1 [Avoid Boolean Prop Proliferation](#11-avoid-boolean-prop-proliferation)
-   - 1.2 [Use Compound Components](#12-use-compound-components)
-2. [State Management](#2-state-management) — **MEDIUM**
-   - 2.1 [Decouple State Management from UI](#21-decouple-state-management-from-ui)
-   - 2.2 [Define Generic Context Interfaces for Dependency Injection](#22-define-generic-context-interfaces-for-dependency-injection)
-   - 2.3 [Lift State into Provider Components](#23-lift-state-into-provider-components)
-3. [Implementation Patterns](#3-implementation-patterns) — **MEDIUM**
-   - 3.1 [Create Explicit Component Variants](#31-create-explicit-component-variants)
-   - 3.2 [Prefer Composing Children Over Render Props](#32-prefer-composing-children-over-render-props)
-4. [React 19 APIs](#4-react-19-apis) — **MEDIUM**
-   - 4.1 [React 19 API Changes](#41-react-19-api-changes)
+### API Client
+All frontend API calls use `apiClient` from `@/lib/client/api/api-client`. It automatically:
+- Prepends the API_URL
+- Handles JWT token injection
+- Refreshes tokens on 401 errors
 
----
+```typescript
+// Correct - just pass the endpoint
+const response = await apiClient("/guias", { method: "GET" });
 
-## 1. Component Architecture
+// Wrong - don't include API_URL
+const response = await apiClient(`${API_URL}/guias`, ...);
+```
 
-**Impact: HIGH**
+### Error Handling
+- **Backend**: Throw `ApiError` from `@/lib/server/api/errors` with machine-readable `ErrorCode`
+- **Frontend**: Use `throwApiError(response)` to convert API errors to exceptions
 
-Fundamental patterns for structuring components to avoid prop
-proliferation and enable flexible composition.
+```typescript
+// Backend route
+if (!user) {
+  throw new ApiError("User not found", 404, "USER_NOT_FOUND");
+}
 
-### 1.1 Avoid Boolean Prop Proliferation
-
-**Impact: CRITICAL (prevents unmaintainable component variants)**
-
-Don't add boolean props like `isThread`, `isEditing`, `isDMThread` to customize
-
-component behavior. Each boolean doubles possible states and creates
-
-unmaintainable conditional logic. Use composition instead.
-
-**Incorrect: boolean props create exponential complexity**
-
-```tsx
-function Composer({
-  onSubmit,
-  isThread,
-  channelId,
-  isDMThread,
-  dmId,
-  isEditing,
-  isForwarding,
-}: Props) {
-  return (
-    <form>
-      <Header />
-      <Input />
-      {isDMThread ? (
-        <AlsoSendToDMField id={dmId} />
-      ) : isThread ? (
-        <AlsoSendToChannelField id={channelId} />
-      ) : null}
-      {isEditing ? (
-        <EditActions />
-      ) : isForwarding ? (
-        <ForwardActions />
-      ) : (
-        <DefaultActions />
-      )}
-      <Footer onSubmit={onSubmit} />
-    </form>
-  )
+// Frontend service
+if (!response.ok) {
+  await throwApiError(response);
 }
 ```
 
-**Correct: composition eliminates conditionals**
+### Repository Pattern
+Database access uses repositories via dependency injection:
 
-```tsx
-// Channel composer
-function ChannelComposer() {
-  return (
-    <Composer.Frame>
-      <Composer.Header />
-      <Composer.Input />
-      <Composer.Footer>
-        <Composer.Attachments />
-        <Composer.Formatting />
-        <Composer.Emojis />
-        <Composer.Submit />
-      </Composer.Footer>
-    </Composer.Frame>
-  )
-}
+```typescript
+import { getContainer } from "@/lib/server/container";
 
-// Thread composer - adds "also send to channel" field
-function ThreadComposer({ channelId }: { channelId: string }) {
-  return (
-    <Composer.Frame>
-      <Composer.Header />
-      <Composer.Input />
-      <AlsoSendToChannelField id={channelId} />
-      <Composer.Footer>
-        <Composer.Formatting />
-        <Composer.Emojis />
-        <Composer.Submit />
-      </Composer.Footer>
-    </Composer.Frame>
-  )
-}
-
-// Edit composer - different footer actions
-function EditComposer() {
-  return (
-    <Composer.Frame>
-      <Composer.Input />
-      <Composer.Footer>
-        <Composer.Formatting />
-        <Composer.Emojis />
-        <Composer.CancelEdit />
-        <Composer.SaveEdit />
-      </Composer.Footer>
-    </Composer.Frame>
-  )
-}
+const container = getContainer();
+const user = await container.usuarioRepository.findById(id);
 ```
 
-Each variant is explicit about what it renders. We can share internals without
+### API Routes
+Use the `createApiHandler` wrapper for consistent error handling:
 
-sharing a single monolithic parent.
+```typescript
+import { createApiHandler } from "@/lib/server/api/route-handler";
 
-### 1.2 Use Compound Components
-
-**Impact: HIGH (enables flexible composition without prop drilling)**
-
-Structure complex components as compound components with a shared context. Each
-
-subcomponent accesses shared state via context, not props. Consumers compose the
-
-pieces they need.
-
-**Incorrect: monolithic component with render props**
-
-```tsx
-function Composer({
-  renderHeader,
-  renderFooter,
-  renderActions,
-  showAttachments,
-  showFormatting,
-  showEmojis,
-}: Props) {
-  return (
-    <form>
-      {renderHeader?.()}
-      <Input />
-      {showAttachments && <Attachments />}
-      {renderFooter ? (
-        renderFooter()
-      ) : (
-        <Footer>
-          {showFormatting && <Formatting />}
-          {showEmojis && <Emojis />}
-          {renderActions?.()}
-        </Footer>
-      )}
-    </form>
-  )
-}
+export const GET = createApiHandler(async (req) => {
+  // Your logic here
+  return NextResponse.json(data);
+});
 ```
 
-**Correct: compound components with shared context**
+## Domain Terminology (Portuguese)
 
-```tsx
-const ComposerContext = createContext<ComposerContextValue | null>(null)
+The codebase uses Portuguese for domain terms:
+- `Guia` = Guide
+- `Secao` = Section
+- `SubSecao` = Subsection
+- `Centro` = Academic Center
+- `Curso` = Course/Major
+- `Entidade` = Entity (student organizations, labs, etc.)
+- `Usuario` = User
+- `Vaga` = Job listing
+- `Membro` = Member
 
-function ComposerProvider({ children, state, actions, meta }: ProviderProps) {
-  return (
-    <ComposerContext value={{ state, actions, meta }}>
-      {children}
-    </ComposerContext>
-  )
-}
+## Code Style
 
-function ComposerFrame({ children }: { children: React.ReactNode }) {
-  return <form>{children}</form>
-}
+- Use TypeScript strict mode
+- Prefer `type` over `interface` for object types
+- Use Zod for runtime validation
+- Keep components focused and small
+- Use React Query for data fetching, not useEffect
 
-function ComposerInput() {
-  const {
-    state,
+## Commands
 
-<!-- Content truncated to meet Windsurf 6KB limit -->
+```bash
+npm run dev          # Start development server
+npm run build        # Build for production
+npm run check-all    # Run lint + format check + type check
+npm run db:migrate   # Create/run database migrations
+npm run db:studio    # Open Prisma Studio
+npm run setup        # First-time project setup
+```
+
+## Testing
+
+- **Unit tests**: Jest (`npm run test`)
+- **Integration tests**: Vitest (`npm run test:integration`)
+- **All tests**: `npm run test:all`
+
+## Changelog
+
+**Always update `CHANGELOG.md` when completing work.** Add entries under `[Unreleased]` in the appropriate category:
+
+- **Added** — New features
+- **Changed** — Changes in existing functionality
+- **Removed** — Removed features
+- **Fixed** — Bug fixes
+
+Keep entries concise but descriptive. Reference the feature/component affected.
 
 ---
 > Source: [aquario-ufpb/aquario](https://github.com/aquario-ufpb/aquario) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
