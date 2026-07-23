@@ -130,5 +130,5 @@ When the user wants to "see", "check", "test", or "debug" something:
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
-> Source: [ConstantineB6/comfy-pilot](https://github.com/ConstantineB6/comfy-pilot) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-04-21 -->
+> Source: [ConstantineB6/Comfy-Pilot](https://github.com/ConstantineB6/Comfy-Pilot) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
