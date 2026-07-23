@@ -98,4 +98,4 @@ Use the `mps-mcp-workflow` skill whenever the task involves MPS project structur
 
 ---
 > Source: [JetBrains/MPS](https://github.com/JetBrains/MPS) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
