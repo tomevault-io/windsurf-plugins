@@ -1,7 +1,20 @@
 ---
 trigger: always_on
-description: <laravel-boost-guidelines>
+description: This is the **free** version (`outhebox/laravel-translations`). The pro version lives at `../laravel-translations-pro` and depends on this package — never introduce breaking changes without checking the pro version.
 ---
+
+# Free & Pro Architecture
+
+This is the **free** version (`outhebox/laravel-translations`). The pro version lives at `../laravel-translations-pro` and depends on this package — never introduce breaking changes without checking the pro version.
+
+## How Pro Extends Free
+
+- **Composer**: Pro requires `outhebox/laravel-translations` via a path symlink and uses a separate namespace (`Outhebox\TranslationsPro`).
+- **Backend**: Pro never overrides free classes. It adds its own controllers, services, models, and commands. It hooks into free via event listeners (`TranslationSaved`, `ImportCompleted`).
+- **Frontend**: Pro's Vite config defines a `@free` alias pointing to `../laravel-translations/resources/js`. Pro components either re-export from `@free/...` (when no changes needed) or provide their own implementation.
+- **Types**: Pro re-exports `@free/types/translations` and extends as needed.
+- **Database**: Free models already include pro-ready fields (`ai_generated`, `ai_provider`, `needs_review`, `priority`, `context_note`). Pro adds its own migration tables (revisions, activity_logs, glossary, etc.).
+- **Tests**: Each package has its own `tests/Pest.php` and `TestCase`. Pro references free routes from its vendor directory.
 
 <laravel-boost-guidelines>
 === .ai/testing rules ===
@@ -88,45 +101,9 @@ This project has domain-specific skills available. You MUST activate the relevan
 
 ## Frontend Bundling
 
-- If the user doesn't see a frontend change reflected in the UI, it could mean they need to run `npm run build`, `npm run dev`, or `composer run dev`. Ask them.
-
-## Documentation Files
-
-- You must only create documentation files if explicitly requested by the user.
-
-## Replies
-
-- Be concise in your explanations - focus on what's important rather than explaining obvious details.
-
-=== boost rules ===
-
-# Laravel Boost
-
-- Laravel Boost is an MCP server that comes with powerful tools designed specifically for this application. Use them.
-
-## Artisan
-
-- Use the `list-artisan-commands` tool when you need to call an Artisan command to double-check the available parameters.
-
-## URLs
-
-- Whenever you share a project URL with the user, you should use the `get-absolute-url` tool to ensure you're using the correct scheme, domain/IP, and port.
-
-## Tinker / Debugging
-
-- You should use the `tinker` tool when you need to execute PHP to debug code or query Eloquent models directly.
-- Use the `database-query` tool when you only need to read from the database.
-
-## Reading Browser Logs With the `browser-logs` Tool
-
-- You can read browser logs, errors, and exceptions using the `browser-logs` tool from Boost.
-- Only recent browser logs will be useful - ignore old logs.
-
-## Searching Documentation (Critically Important)
-
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [MohmmedAshraf/laravel-translations](https://github.com/MohmmedAshraf/laravel-translations) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
