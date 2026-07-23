@@ -1,0 +1,176 @@
+---
+trigger: always_on
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+---
+
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## What This Is
+
+Trust Wallet Core is a cross-platform C++ library implementing cryptographic wallet functionality for 130+ blockchains. The C++ core exposes a strict C ABI (`TW*` functions in `include/TrustWalletCore/`) from which language bindings for Swift, Kotlin, TypeScript/WASM, and Rust are auto-generated.
+
+---
+
+## Commands
+
+### C++ (primary)
+
+```bash
+# First-time setup
+./bootstrap.sh
+
+# Full build + test (standard dev loop)
+tools/build-and-test
+
+# Or step by step:
+tools/generate-files native          # must run after any .proto or registry.json change
+cmake -H. -Bbuild -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
+make -Cbuild -j12 tests TrezorCryptoTests
+
+# Run all C++ tests
+./build/tests/tests
+
+# Run a single test or filter
+./build/tests/tests --gtest_filter="*Bitcoin*"
+./build/tests/tests --gtest_filter="*Ethereum*SignTest*"
+
+# Run TrezorCrypto tests (low-level crypto primitives)
+export CK_TIMEOUT_MULTIPLIER=4
+./build/trezor-crypto/crypto/tests/TrezorCryptoTests
+
+# Lint changed files (clang-tidy, diffs against master)
+tools/lint
+```
+
+### Rust
+
+```bash
+# Build and test all Rust crates
+tools/rust-test
+
+# Run a specific Rust test
+cd rust && cargo test -p tw_bitcoin test_name
+cd rust && cargo test -p tw_solana -- solana_sign_transfer
+
+# Rust lint (fmt + clippy)
+tools/rust-lint
+
+# Rust WASM tests
+tools/install-wasm-dependencies
+tools/rust-test wasm
+
+# Doc tests
+tools/rust-test doc
+```
+
+### Android / Kotlin
+
+```bash
+# Build Kotlin/KMP library
+tools/kotlin-build
+
+# Run Kotlin JVM tests
+tools/kotlin-test
+# Equivalent: cd kotlin && ./gradlew :wallet-core-kotlin:jvmTest
+
+# Android instrumented tests (requires connected device/emulator)
+cd android && ./gradlew connectedAndroidTest
+```
+
+### iOS / Swift
+
+```bash
+tools/ios-test
+# Requires: xcodegen, xcbeautify
+# Runs on: iPhone 17 simulator, iOS 26.2
+```
+
+### WASM / TypeScript
+
+```bash
+tools/install-wasm-dependencies
+tools/generate-files wasm
+tools/wasm-build
+cd wasm && npm install && npm run build-and-test
+```
+
+### Code generation
+
+```bash
+# MUST run after modifying: registry.json, any .proto file, or include/TrustWalletCore/ headers
+tools/generate-files native     # C++, Swift, Java
+tools/generate-files android    # Android JNI
+tools/generate-files ios        # iOS Swift
+tools/generate-files wasm       # WASM bindings
+tools/generate-files            # all targets
+```
+
+### Scaffold a new blockchain
+
+```bash
+tools/new-blockchain MyChain     # general blockchain
+tools/new-evmchain MyEVMChain    # EVM-compatible chain (less work)
+```
+
+Note that `tools/new-blockchain` and `tools/new-evmchain` are not fully automated and will require manual adjustments after running, especially for non-EVM chains. They create boilerplate files and insert necessary stubs in the C++ layer, but you will need to implement the actual logic in Rust and define the protobuf messages.
+
+---
+
+## Architecture
+
+### Layer model
+
+```
+Language Bindings        (swift/, kotlin/, wasm/, rust/)
+     ↓
+C Interface              (include/TrustWalletCore/TW*.h)   ← public API surface
+     ↓
+C++ Core                 (src/)
+     ↓
+     ├─→ Rust Core       (rust/)                           ← migrated chain impl, secp256k1, ed25519, hashing
+     │
+     └─→ TrezorCrypto    (trezor-crypto/)                  ← secp256k1, ed25519, hashing
+```
+
+The C interface is the contract. Language bindings are generated from it — never hand-edit files in `swift/Sources/Generated/`, `jni/java/wallet/core/jni/`, or `kotlin/wallet-core-kotlin/src/commonMain/generated/`.
+
+**Note on Rust layer:** Some blockchain implementations have been migrated to Rust for improved memory safety and performance. For these chains, the C++ core delegates to Rust implementations via C FFI (`src/rust/RustCoinEntry.h`). Legacy chains remain pure C++. The Rust layer is transparent to language bindings above the C interface.
+
+### Coin plugin system (`src/CoinEntry.h`)
+
+Each blockchain implements the `CoinEntry` interface and registers in **three** `// #coin-list#`-marked locations in `src/Coin.cpp`:
+
+1. `#include "{Blockchain}/Entry.h"` — include
+2. `{Blockchain}::Entry fooDP;` — static instance
+3. `case TWBlockchain{Name}: entry = &fooDP; break;` — dispatcher
+
+The `// #coin-list#` comments are markers that `codegen-v2` uses to insert new entries. `TWBlockchain` enum lives in `include/TrustWalletCore/TWBlockchain.h`.
+
+**Mandatory overrides in `CoinEntry`:**
+- `validateAddress()` — address validation
+- `deriveAddress()` — derive address from public key
+- `sign()` — serialize a `SigningInput` proto → sign → serialize `SigningOutput` proto
+
+### Signing data flow
+
+All transaction signing uses Protocol Buffers. Each chain has `src/proto/{Blockchain}.proto` defining `SigningInput` and `SigningOutput`. The universal entry point is `TWAnySigner`:
+
+```
+caller builds SigningInput (protobuf bytes)
+    → TWAnySignerSign(inputData, coinType)
+    → coinDispatcher(coinType)->sign()
+    → SigningOutput.encoded = signed raw tx bytes
+```
+
+UTXO chains (Bitcoin family) additionally support `TWAnySignerPlan()` to compute fees before signing.
+
+### registry.json
+
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
+
+---
+> Source: [trustwallet/wallet-core](https://github.com/trustwallet/wallet-core) — distributed by [TomeVault](https://tomevault.io).
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
