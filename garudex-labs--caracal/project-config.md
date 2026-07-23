@@ -80,4 +80,4 @@ Verify behavior against documentation before planning or writing integration cod
 
 ---
 > Source: [Garudex-Labs/caracal](https://github.com/Garudex-Labs/caracal) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
