@@ -117,4 +117,4 @@ alex/
 
 ---
 > Source: [ed-donner/alex](https://github.com/ed-donner/alex) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-20 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
