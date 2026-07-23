@@ -5,7 +5,7 @@ description: ⚠️ AUTO-GENERATED FILE — DO NOT EDIT
 
 <!--
 ⚠️ AUTO-GENERATED FILE — DO NOT EDIT
-Source: template/pages/AGENTS.tpl.md · Run `make docs` to regenerate.
+Source: template/pages/CLAUDE.tpl.md · Run `make docs` to regenerate.
 -->
 
 # Agent Guidelines for go-crypto-wallet
@@ -138,4 +138,4 @@ For detailed documentation, see [llms.txt](./llms.txt) and [ARCHITECTURE.md](./A
 
 ---
 > Source: [hiromaily/go-crypto-wallet](https://github.com/hiromaily/go-crypto-wallet) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
