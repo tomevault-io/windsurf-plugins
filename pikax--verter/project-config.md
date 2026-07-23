@@ -1,61 +1,60 @@
 ---
 trigger: always_on
-description: This repository keeps most reusable agent context in shared markdown files. Some of those files live under Claude-named paths for historical reasons, but they are project documentation, not Claude-only data.
+description: Verter is a Vue compiler and Language Server Protocol (LSP) implementation. It converts Vue Single File Components (SFCs) to valid TSX (leveraging TypeScript for type checking) and compiles templates to optimized render functions. Unlike Volar, Verter generates actual valid TSX code rather than virtual files.
 ---
 
-# Verter Agent Guide
+# Verter
 
-This repository keeps most reusable agent context in shared markdown files. Some of those files live under Claude-named paths for historical reasons, but they are project documentation, not Claude-only data.
+Verter is a Vue compiler and Language Server Protocol (LSP) implementation. It converts Vue Single File Components (SFCs) to valid TSX (leveraging TypeScript for type checking) and compiles templates to optimized render functions. Unlike Volar, Verter generates actual valid TSX code rather than virtual files.
 
-Use this file as the neutral entry point. Reuse the shared sources below instead of creating duplicate agent-specific copies.
+The project is a hybrid Rust + TypeScript monorepo: Rust crates handle template compilation (exposed via NAPI-RS native bindings and wasm-bindgen WASM) and the LSP server (`verter_lsp` binary, communicates over stdio), while TypeScript packages handle the SFC-to-TSX transformation and IDE integration.
 
-## Shared Sources
+## Architecture
 
-- `CLAUDE.md`
-  - Canonical high-level reference for architecture, repository structure, critical invariants, build commands, testing rules, and commit conventions.
-- `.claude/skills/architecture/SKILL.md`
-  - Module map, package responsibilities, plugin system, LSP structure, and key file locations.
-- `.claude/skills/position-encoding/SKILL.md`
-  - Span types, encoding conversions, and path normalization details.
-- `.claude/skills/build-and-profiling/SKILL.md`
-  - Build order, rebuild strategy, profiling workflow, and MCP server setup.
-- `.claude/skills/testing/SKILL.md`
-  - Rust and TypeScript test patterns, sourcemap checks, and VS Code extension testing guidance.
-- `.claude/skills/rust-performance/SKILL.md`
-  - Rust optimization guidance, allocation patterns, and `CodeTransform` usage notes.
-- `docs/`
-  - User-facing and contributor-facing documentation.
+### Shared Optimized Codebase (CRITICAL)
 
-## Neutrality Rules
+Verter is one shared optimized codebase, not separate semantic implementations per consumer.
 
-- Treat `CLAUDE.md` and `.claude/skills/` as shared project references for any coding agent.
-- Keep durable project knowledge in shared docs such as `CLAUDE.md`, `docs/`, or the relevant reference file under `.claude/skills/`.
-- Keep agent-specific files thin. They should point at shared documentation, not become separate sources of truth.
-- `.claude/settings.local.json` is local tool configuration, not repository policy.
-- `.claude/feedback/` contains optional working notes and is not committed project documentation.
+- Improvements should land in the lowest reusable owner crate that can correctly serve all consumers.
+- `verter_host` and shared workspace/VFS integration are the authority for host-backed loading, invalidation, dependency tracking, and cache reuse.
+- `verter_analysis` and `verter_core` own reusable semantics and type-resolution logic.
+- `verter_ffi` owns shared boundary DTOs between native bindings and WASM bindings.
+- Consumer packages such as `@verter/component-meta`, the LSP, MCP, unplugin, and playground should consume the shared substrate rather than carrying their own semantic forks.
 
-## Working Rules
+Architectural consequence:
 
-- Follow TDD for code changes: write failing tests first, implement the minimum fix, rerun tests, then refactor.
-- Update documentation when public behavior, module paths, or APIs change.
-- Use conventional commits: `<type>(<scope>): <description>`.
-- Load only the specific reference material needed for the task instead of bulk-reading every file.
-- For `component-meta` type work, use cached lookup/eval state only. Do not add AST/source-walk fallback to recover or expand types after the cache-owning pass.
-- For `component-meta` registry publication, stay shallow and demand-driven: load only the symbols required by the current query, and expand only when a cached lookup result is actually needed.
-- For `component-meta` cross-file resolution, deepen in one place only: follow the active declaration route for the requested symbol/query and do not branch into unrelated sibling symbols/files.
-- For `component-meta` companion/type-target selection, keep canonicalization shallow too: choosing between runtime and declaration companions may probe cached raw source existence, but must not build export analysis, snapshots, or eval envs just to pick the target file.
-- For `component-meta` metadata or fallthrough projection, reuse the already-resolved state and the captured store/session view. Do not bounce back out to a fresh top-level snapshot/query when a resolved query is already in hand.
-- For `component-meta` imported-type hydration, treat the imported dependency cache as the only source of file state after shallow seeding. Resolver paths must not call raw snapshot/source builders to recover missing imported data; if the cache does not own the needed snapshot/env yet, stay shallow and stop.
-- For `component-meta` imported-eval collection, keep one strategy only: lazy/BFS over the active symbol route. Do not add eager collector modes, source-text fallback parsing, or alternate collection branches that widen traversal.
+- A performance or correctness fix discovered in one surface should be implemented in the shared owner layer whenever that behavior is reusable.
+- Consumer-local wrappers should stay thin and should not bypass shared parsing, analysis, resolution, or cache ownership.
 
-## Task Routing
+### Macro Type Traversal Rule (CRITICAL)
 
-- Architecture or ownership questions: start with `CLAUDE.md`, then `.claude/skills/architecture/SKILL.md`.
-- Span, offset, URI, or source map work: load `.claude/skills/position-encoding/SKILL.md` before editing.
-- Build, release, profiling, or MCP work: load `.claude/skills/build-and-profiling/SKILL.md`.
-- Test design or verification planning: load `.claude/skills/testing/SKILL.md`.
-- Rust hot paths or allocation-sensitive work: load `.claude/skills/rust-performance/SKILL.md`.
+When resolving cross-file macro types (`defineProps<T>()`, `defineEmits<T>()`, component-meta deep expansion, etc.), only follow the import graph reachable from the requested type's declaration graph.
+
+- There is one shared cross-file type resolver for host-backed component-meta and analysis work. Do not add consumer-specific resolver forks.
+- That resolver has exactly two modes:
+  - `Type`: resolve the requested symbol identity and canonical source location only. Do not expand the shape.
+  - `Expanded`: resolve the same symbol through the same traversal, then materialize the expanded shape / expanded text.
+- Component-meta uses the shared resolver in `Expanded` mode for every macro-facing surface. This includes all script-setup macros and all Options API surfaces that contribute metadata, such as props, data, computed, emits, slots, and expose-like members.
+- Do not walk unrelated imports from the same file.
+- Do not treat plain imports as implicit exports.
+- Keep direct re-exports (`export { X } from`, `export * from`) as an explicit separate path.
+- Parsing a `.ts`/`.js`/declaration file for type resolution must cache discovered symbol name → canonical location mappings.
+- Re-exported names and barrel hops must also be cached once discovered. If traversal follows `export * from './foo'`, cache that result so later lookups do not rescan the same barrel chain.
+
+If a file imports 20 modules but the requested macro type only references `AvatarProps` and `IconProps`, external resolution must only traverse those reachable dependencies.
+
+**TS-first resolution priority:** TypeScript types always take priority over JavaScript files when resolving ambiguous dependency candidates. Verter is a type-strict compiler that relies on TS typing for correctness. JS files should only be used as a last resort when no TS type definition is available. When `DependencyResolution.possible_canonical_ids` contains multiple candidates, use `effective_target()` which selects the single highest-priority candidate: `.d.ts` > `.d.cts` > `.d.mts` > `.ts` > `.tsx` > `.js` > `.jsx` > `.cjs` > `.mjs`. Do not try remaining candidates if the selected one lacks the needed type — treat as not found.
+
+### Canonical Dependency Cache Rule (CRITICAL)
+
+Host-backed type/import resolution must treat the canonical file ID as the cache identity. The cache contract is:
+
+- Load a dependency source at most once per canonical ID per workspace content generation. Parse it immediately and cache the raw source, parsed/OXC snapshot, and any reusable eval/build state right away.
+- When the host materializes an imported dependency on a cold miss, derive the AST-backed bundle from that single parse and cache it together: file snapshot, eval env, external-type analysis, symbol/export lookup tables, and any other reusable per-file analysis. Do not let later resolver stages trigger a second parse of the same canonical file just to build another artifact.
+- Cache named declarations from that parsed file by name, not just exported entrypoints. Internal named types/interfaces/aliases still matter because exported declarations in the same file may depend on them later.
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [pikax/verter](https://github.com/pikax/verter) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
