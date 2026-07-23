@@ -1,159 +1,67 @@
 ---
 trigger: always_on
-description: Guidelines for AI coding agents (Copilot, Cursor, Claude Code, etc.) working in this repository.
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-# AGENTS.md
+# CLAUDE.md
 
-Guidelines for AI coding agents (Copilot, Cursor, Claude Code, etc.) working in this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Project Overview
+## Code Quality Standards
 
-LMCache is a KV cache management engine for LLM serving that reduces Time To First Token (TTFT) and increases throughput. It stores KV caches across multiple tiers (GPU, CPU, disk, S3) and integrates with vLLM and SGLang.
+The authoritative reference for coding quality, review process, and PR expectations is
+**[docs/coding_standards.md](docs/coding_standards.md)**. Read it before writing or reviewing code.
 
-## Repository
+Key principles (see the full doc for details and rationale):
 
-The default branch is `dev`. Base all new branches and pull requests against `dev`.
+- **Strong typing**: All functions have type hints. No `Any`, no bare generics. Avoid `Optional` -- initialize objects even if empty.
+- **Docstrings**: Every public function has a complete docstring (summary, args, returns, raises). Docstrings must match actual current behavior.
+- **Encapsulation**: Never access private members (`_`-prefixed) of other classes. Minimize public interfaces.
+- **Interface design**: No ambiguous return values. No boolean parameters (use enums or split functions). Document schemas for dict/container params.
+- **Testing**: New features and bug fixes require tests. Tests verify the public interface, not implementation details.
+- **No `assert` for validation**: Use `if/raise ValueError` for runtime checks.
+- **PR scope**: Keep PRs small and focused. Break large changes into multiple PRs.
 
-## Python Environment
+For the quick-reference checklist and build/test/lint commands, see **[AGENTS.md](AGENTS.md)**.
 
-We recommend using [uv](https://docs.astral.sh/uv/) to manage Python environments and dependencies:
+## Design Docs
 
-```bash
-# Create and activate a virtual environment
-uv venv --python 3.12
-source .venv/bin/activate
+Design docs live under **`docs/design/`**, which **mirrors the `lmcache/` package tree**.
+A design doc for code at `lmcache/<path>/` is located at `docs/design/<path>/`:
 
-# Install dependencies
-uv pip install torch               # pre-requisite for CUDA extensions
-uv pip install -e . --no-build-isolation
-```
+- `lmcache/cli/commands/ping.py` → `docs/design/cli/commands/ping.md`
+- `lmcache/v1/distributed/l2_adapters/` → `docs/design/v1/distributed/l2_adapters/`
+- `lmcache/v1/mp_observability/` → `docs/design/v1/mp_observability/`
 
-## Build & Install
+When investigating a module, always check the mirrored `docs/design/<path>/` first for
+design rationale, contracts, and extension guides. When adding or updating a design
+doc, place it at the path matching the module it describes. See
+[docs/design/README.md](docs/design/README.md) for the full convention.
 
-```bash
-# Standard install with CUDA extensions (requires torch pre-installed)
-pip install -e . --no-build-isolation
+Module `README.md` files stay co-located with code (symlinked from `docs/design/`); do
+not relocate them.
 
-# Source-only (no native extensions)
-NO_NATIVE_EXT=1 pip install -e .
+## PR Review Instructions
 
-# CPU-only (common C++ extensions, no GPU backend)
-NO_GPU_EXT=1 pip install -e . --no-build-isolation
+When asked to review a PR, use the `/pr-review` skill which implements the full review
+process from `docs/coding_standards.md` Section 9.
 
-# HIP/ROCm build
-BUILD_WITH_HIP=1 pip install -e .
-```
+The review covers:
 
-## Testing
+1. **Design doc compliance** -- check implementation against documented contracts (table format).
+2. **Coding quality** -- typing, docstrings, naming, interface design per Sections 2-4.
+3. **Correctness** -- logic bugs, error handling paths, resource management.
+4. **Thread safety** -- shared state, lock protocols, concurrent access patterns.
+5. **Test coverage** -- especially failure paths and concurrent access.
+6. **PR structure** -- is the scope appropriate, or should it be broken down?
 
-### Running Tests
+Issues are grouped by severity:
+- **error**: Must fix before merge (missing types/docstrings, no tests, architectural problems).
+- **warning**: Should fix (naming, modularity, test quality).
+- **info**: Suggestion only, non-blocking.
 
-```bash
-# Run standard test suite (mirrors CI)
-pytest -xvs --ignore=tests/disagg \
- --ignore=tests/v1/multiprocess/ \
- --ignore=tests/v1/distributed/ \
- --ignore=tests/skipped \
- --ignore=tests/v1/storage_backend/test_eic.py
-
-# Run a single test file
-pytest -xvs tests/v1/test_cache_engine.py
-
-# Run a single test
-pytest -xvs tests/v1/test_cache_engine.py::test_function_name
-```
-
-Test dependencies: `uv pip install -r requirements/test.txt`
-
-Pytest marker: `@pytest.mark.no_shared_allocator` disables the shared-allocator monkeypatch for a test.
-
-### Testing Practices
-
-- Write tests against the **public interface and docstring contract**, not the implementation. Test as if you don't know the internals — verify that behavior matches what the docstring describes.
-- Avoid accessing private members in tests unless strongly needed.
-- All new features and bug fixes should include corresponding tests.
-- Ensure existing tests still pass before submitting changes.
-
-## Linting & Code Quality
-
-```bash
-# Run all checks (mirrors CI exactly)
-pre-commit run --all-files
-
-# Individual tools
-ruff check .              # Lint (E, F, B, SLF rules)
-ruff format .             # Format (line-length 88)
-isort .                   # Import sorting (black profile, from_first=true)
-mypy --config-file=pyproject.toml   # Type checking
-codespell --toml pyproject.toml     # Spell checking
-```
-
-C++/CUDA files use clang-format (Google style, 80-col). Rust code in `rust/` uses `cargo fmt` and `cargo clippy`.
-
-All Python files require an `# SPDX-License-Identifier: Apache-2.0` header as the first line.
-
-### Import Ordering
-
-Imports must follow this section-heading convention:
-
-```python
-# Standard
-import os
-
-# Third Party
-import torch
-
-# First Party
-from lmcache.v1.config import LMCacheEngineConfig
-
-# Local
-from .utils import helper
-```
-
-### SLF (Private Member Access)
-
-SLF lint rules are currently enforced by CI only in `lmcache/v1/multiprocess/` and `lmcache/v1/distributed/`. However, **all new code should follow SLF discipline regardless of location** — never access private members (prefixed with `_`) of other classes. Treat this as a project-wide coding standard for any new or modified code.
-
-## Coding Conventions
-
-### Type Hints
-
-All functions and methods must have type hints for their arguments and return values.
-
-### Docstrings
-
-Every public function and method must have a clear docstring covering:
-- What the function does
-- Arguments (with types and descriptions)
-- Return values
-- Raised exceptions (if any)
-- Additional notes when behavior is non-obvious
-
-### Writing Documentation
-
-LMCache has three documentation surfaces:
-
-1. **User-facing docs** (`docs/source/`, reStructuredText, Sphinx-built). When adding
-   or modifying user docs, place them in the appropriate subdirectory under
-   `docs/source/` (e.g., `developer_guide/`, `getting_started/`, `kv_cache/`) and link
-   new pages from a `toctree` so they appear in the built site.
-2. **Design docs** (`docs/design/`, Markdown). **`docs/design/` mirrors the `lmcache/`
-   package tree** — a design doc for `lmcache/<path>/` lives at `docs/design/<path>/`.
-   For example, `lmcache/v1/distributed/l2_adapters/` → `docs/design/v1/distributed/l2_adapters/`.
-   When adding a design doc, place it at the path matching the module it describes;
-   when touching existing docs, find them at the mirrored location. See
-   `docs/design/README.md` for the full convention.
-3. **Module READMEs** (`README.md` next to code). Stay in place as user-entry-points;
-   they are symlinked from `docs/design/<path>/README.md`. Do not move them.
-
-When writing or updating documentation, follow these principles:
-
-- **Be concrete and concise.** State exactly what something does and why — avoid vague, hand-wavy descriptions. One precise sentence beats a paragraph of generalities.
-- **Include examples.** Show concrete code snippets, command invocations, or data formats so the reader can immediately see how things work in practice.
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+See `docs/coding_standards.md` Section 9 for the full severity calibration and reviewer guidelines.
 
 ---
 > Source: [LMCache/LMCache](https://github.com/LMCache/LMCache) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
