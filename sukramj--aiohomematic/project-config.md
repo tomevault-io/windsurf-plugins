@@ -1,49 +1,135 @@
 ---
 trigger: always_on
-description: - `aiohomematic/` hosts the async library (`central/`, `client/`, `model/`, `store/`) plus assets in `rega_scripts/` and `translations/`.
+description: Transforms paramset descriptions into typed data points; supports generic, custom, calculated
 ---
 
-# Repository Guidelines
+# CLAUDE.md - AI Assistant Guide for aiohomematic
 
-## Project Structure & Module Organization
+This document is the entry point for AI assistants (like Claude) working on the aiohomematic codebase.
+It intentionally stays **concise** and delegates deep details to `docs/` — treat the linked documents
+as the source of truth and only fall back to this file for orientation.
 
-- `aiohomematic/` hosts the async library (`central/`, `client/`, `model/`, `store/`) plus assets in `rega_scripts/` and `translations/`.
-- `aiohomematic_test_support/` supplies fixtures, playback data, and factories; prefer these over bespoke mocks.
-- `tests/` contains the pytest suite with `helpers/` and `fixtures/`; keep new tests adjacent to related code.
-- `docs/` collects architecture, migration, and naming references; automation scripts live in `script/` for prek use.
+## Table of Contents
 
-## Build, Test, and Development Commands
+1. [CUxD / CCU-Jack Special Handling](#-critical-cuxdccu-jack-special-handling) (critical)
+2. [Project Overview](#project-overview)
+3. [Codebase Structure](#codebase-structure)
+4. [Development Environment](#development-environment)
+5. [Code Quality & Standards](#code-quality--standards)
+6. [Testing Guidelines](#testing-guidelines)
+7. [Architecture & Design Patterns](#architecture--design-patterns)
+8. [Common Development Tasks](#common-development-tasks)
+9. [Git Workflow](#git-workflow)
+10. [Key Conventions](#key-conventions)
+11. [Implementation Policy](#implementation-policy)
+12. [Interaction Protocol](#interaction-protocol)
+13. [Tips for AI Assistants](#tips-for-ai-assistants)
 
-- `python -m pip install -r requirements.txt -r requirements_test.txt` installs runtime and tooling dependencies.
-- `prek run --all-files` mirrors CI hooks (`sort-class-members`, `check-i18n`, `ruff`, `mypy`, `pylint`, `codespell`, `bandit`, `yamllint`).
-- `ruff format` then `ruff check --fix` applies the required formatting, import order, and alias rules.
-- `mypy aiohomematic aiohomematic_test_support` runs strict type checks; justify any `# type: ignore[code]`.
-- `pytest tests/` runs the suite; use `./cov.sh` for HTML coverage and `pytest -k pattern -vv` for focused runs.
-- `pylint -j 0 aiohomematic` covers the remaining lint gate; reuse the project virtualenv or `script/run-in-env.sh`.
+---
 
-## Coding Style & Naming Conventions
+## ⚠️ CRITICAL: CUxD/CCU-Jack Special Handling
 
-- Start every Python module with `from __future__ import annotations`, use 4-space indentation, and maintain curated `__all__`.
-- Let `ruff` manage import order and aliases; do not hand-sort or introduce new shortcuts.
-- Public surfaces require docstrings consistent with `docs/docstring_standards.md`.
-- Reuse helpers for device/channel naming (`docs/naming.md`) and shared enums or dataclasses from `aiohomematic.const`.
-- Keep async APIs cancellable and prefer keyword-only signatures for multi-parameter functions.
+> **STOP AND READ THIS BEFORE ANY REFACTORING**
+>
+> CUxD and CCU-Jack are **NOT** normal Homematic interfaces. They require special handling that has been broken multiple times during AI-assisted refactoring. Before making any changes, run:
+>
+> ```bash
+> pytest tests/contract/test_cuxd_ccu_jack_contract.py -v
+> ```
 
-## Testing Guidelines
+### What Makes CUxD/CCU-Jack Different
 
-- Use pytest with `@pytest.mark.asyncio`; lean on factories in `aiohomematic_test_support.factory` and fixtures from `tests/conftest.py`.
-- Place new playback data in `aiohomematic_test_support/data` and document schema updates alongside the change.
-- Sustain ≥90 % coverage on core logic and ≥85 % overall; inspect `htmlcov/index.html` after `./cov.sh`.
-- Name new test modules `test_<feature>.py` and park shared utilities in `tests/helpers/`.
+| Aspect            | Standard Interfaces (HmIP-RF, BidCos-RF) | CUxD / CCU-Jack                             |
+| ----------------- | ---------------------------------------- | ------------------------------------------- |
+| **Protocol**      | XML-RPC                                  | JSON-RPC                                    |
+| **Ports**         | 2001, 2010, 2000, 2002                   | 80 (HTTP) / 443 (HTTPS)                     |
+| **Events**        | XML-RPC Server (push)                    | Polling (default) or MQTT (optional via HA) |
+| **Ping/Pong**     | ✅ Yes                                   | ❌ No                                       |
+| **Backend Class** | `CcuBackend` or `HomegearBackend`        | `JsonCcuBackend`                            |
+| **XML-RPC Proxy** | Required                                 | **NOT used**                                |
+| **Capabilities**  | `CCU_CAPABILITIES`                       | `JSON_CCU_CAPABILITIES`                     |
 
-## Commit & Pull Request Guidelines
+### Key Constants to Check
 
-- Branch from `main` using `feature/<slug>` or `fix/<slug>`; AI sessions use `claude/claude-md-<session-id>`.
-- Adopt the conventional commit format `type(scope): subject`; supported types are `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`.
-- Describe intent in the body and reference issues when applicable (e.g., `Closes #123`).
-- Target PRs at `main`, include a brief summary plus test/type results, and supply evidence for behavioral changes.
-- Update `changelog.md` for user-visible impact and call out configuration or migration notes in the PR description.
+```python
+# In aiohomematic/const.py:
+
+# CUxD/CCU-Jack MUST be in this set:
+INTERFACES_REQUIRING_JSON_RPC_CLIENT = frozenset({Interface.CUXD, Interface.CCU_JACK, ...})
+
+# CUxD/CCU-Jack MUST NOT be in these sets:
+INTERFACES_REQUIRING_XML_RPC = frozenset({Interface.HMIP_RF, Interface.BIDCOS_RF, ...})
+INTERFACES_SUPPORTING_RPC_CALLBACK = frozenset({...})  # Same as XML_RPC
+```
+
+### Critical Capability Flags
+
+```python
+# In aiohomematic/client/backends/capabilities.py:
+
+JSON_CCU_CAPABILITIES = BackendCapabilities(
+    ping_pong=False,      # ❌ NO ping/pong - events via MQTT
+    rpc_callback=False,   # ❌ NO XML-RPC callback server
+    push_updates=True/False,    # ✅, if Events arrive via MQTT, otherwise ❌
+    # All other feature flags = False (no programs, sysvars, etc.)
+)
+```
+
+### Common Regression Patterns
+
+- **❌ Adding CUxD to XML-RPC interfaces** — breaks CUxD (tries to create XML-RPC proxies)
+- **❌ Enabling `ping_pong=True` for JSON backends** — causes false disconnects after 180 s without events
+- **❌ Requiring XML-RPC proxy in the factory** — fails for CUxD (no proxy exists)
+- **❌ Using a dedicated port** — CUxD/CCU-Jack use JSON-RPC on 80/443, **not** a dedicated port
+- **✅ Correct**: check `INTERFACES_REQUIRING_JSON_RPC_CLIENT` first; for those interfaces return a `JsonCcuBackend` and do not require a proxy.
+
+### Refactoring Checklist for CUxD/CCU-Jack
+
+Before committing any changes that touch:
+
+- `aiohomematic/const.py` (interface constants)
+- `aiohomematic/client/backends/` (backend factory or capabilities)
+- `aiohomematic/client/interface_client.py` (connection checks)
+- `aiohomematic/central/coordinators/connection_recovery.py` (recovery logic)
+
+**Run these commands:**
+
+```bash
+# 1. CUxD/CCU-Jack contract tests
+pytest tests/contract/test_cuxd_ccu_jack_contract.py -v
+
+# 2. Capability contract tests
+pytest tests/contract/test_capability_contract.py -v
+
+# 3. Verify interface classification
+python -c "from aiohomematic.const import *; print('JSON-RPC only:', INTERFACES_REQUIRING_JSON_RPC_CLIENT - INTERFACES_REQUIRING_XML_RPC)"
+# Expected output: JSON-RPC only: frozenset({<Interface.CUXD: 'CUxD'>, <Interface.CCU_JACK: 'CCU-Jack'>})
+```
+
+See also: `docs/architecture/protocol_selection_guide.md`.
+
+---
+
+## Project Overview
+
+**aiohomematic** is a modern, async Python library for controlling and monitoring Homematic and HomematicIP
+devices. It powers the Home Assistant integration "Homematic(IP) Local".
+
+### Key Characteristics
+
+- **Language**: Python 3.14+
+- **Framework**: AsyncIO-based
+- **Status**: Production/Stable
+- **Type Safety**: Fully typed, mypy strict mode
+- **License**: MIT
+- **Version**: single source of truth is `aiohomematic/const.py:VERSION` (matches the top entry of `changelog.md`)
+
+### Core Dependencies
+
+```python
+
+<!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [SukramJ/aiohomematic](https://github.com/SukramJ/aiohomematic) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
