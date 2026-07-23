@@ -26,4 +26,4 @@ author and that you are contributing your changes under the Zlib license.
 
 ---
 > Source: [libsdl-org/SDL_mixer](https://github.com/libsdl-org/SDL_mixer) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-20 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
