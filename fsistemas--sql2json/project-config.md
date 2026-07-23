@@ -1,120 +1,99 @@
 ---
 trigger: always_on
-description: > **Working on this repository?** Coding agents and maintainers should read
+description: This file provides guidance to Claude Code (claude.ai/code) and other coding agents when working with code in this repository.
 ---
 
-# Using `sql2json` with AI Agents and LLMs
+# CLAUDE.md
 
-> **Working on this repository?** Coding agents and maintainers should read
-> `WORKFLOW.md` and `WORKFLOW.local.md` first. They define the public-safe
-> branch/PR lifecycle, francisco-boards usage, validation gates, and release
-> discipline for this repo (`S2J`, base branch `master`). The rest of this file
-> explains how agents should use `sql2json` as a CLI/library.
+This file provides guidance to Claude Code (claude.ai/code) and other coding agents when working with code in this repository.
 
-`sql2json` runs SQL queries via SQLAlchemy and outputs JSON or CSV to stdout. It is invoked as a CLI tool or imported as a Python package — no framework coupling, no MCP server required.
+## Read this first
 
-> **Invocation:** examples below use the `sql2json` command, available **since v0.2.1**. On `0.2.0` and earlier — or when the package's scripts directory is not on `PATH` — substitute the equivalent `python -m sql2json ...` form (on Windows, `py -m sql2json ...`).
+1. Follow `WORKFLOW.md` and `WORKFLOW.local.md` for board usage, branch naming, PR lifecycle, validation gates, and release discipline.
+2. This is a public repository. Keep commits, PR bodies, and checked-in docs public-safe: no secrets, local-only absolute paths, private board details, or agent-generated footers.
+3. Use `francisco-boards` for maintainer/agent task status. Project key: `S2J`; base branch: `master`; branch format: `feature/S2J-N`.
 
----
-
-## Install & upgrade (for agents)
-
-Install `sql2json` as an isolated tool, **with the database drivers bundled** so
-queries against PostgreSQL/MySQL work without a follow-up step:
+## Commands
 
 ```bash
-uv tool install "sql2json[postgres,mysql]"
-# or
-pipx install "sql2json[postgres,mysql]"
+# Install dependencies
+uv sync
+
+# Run all tests (fast, in-memory SQLite — no Docker)
+uv run pytest
+
+# Run a single test
+uv run pytest tests/test_parameter.py::test_parse_parameter
+
+# Run the real-database integration suite (PostgreSQL + MySQL via docker compose)
+# Provisions services, runs the `integration`-marked tests, then tears down.
+./scripts/test-integration.sh
+
+# Lint
+uv run flake8
+
+# Format
+uv run black .
+
+# Type check
+uv run --extra dev mypy
+
+# Tests with coverage (gated at 90% via fail_under in pyproject.toml)
+uv run --extra dev pytest --cov
+
+# Run the CLI tool (since 0.2.1; `python -m sql2json ...` is equivalent)
+sql2json --name default --query default
+
+# Run the official Docker Hub image (multi-arch linux/amd64 + linux/arm64)
+podman run --rm docker.io/fsistemas/sql2json --query "SELECT 1 AS a, 2 AS b"
+# Docker equivalent:
+docker run --rm docker.io/fsistemas/sql2json --query "SELECT 1 AS a, 2 AS b"
+# Docker Hub: https://hub.docker.com/r/fsistemas/sql2json
+
+# Build the Docker image (installs sql2json from PyPI; pass VERSION to pin a
+# release, omit it for the latest). `podman build ...` works identically.
+docker build -t sql2json .                      # latest PyPI release
+docker build --build-arg VERSION=0.3.0 -t sql2json .
+# The official image is published at docker.io/fsistemas/sql2json (see RELEASING.md).
 ```
 
-Why these methods matter in a sandbox:
+## Architecture
 
-- They work on **externally-managed** environments (Manjaro/Arch, Debian 12+,
-  Ubuntu 23.04+, Homebrew Python), where a plain `pip install` is refused with
-  `error: externally-managed-environment` ([PEP 668](https://peps.python.org/pep-0668/)).
-- They expose `sql2json` on `PATH` (in `~/.local/bin`; run `pipx ensurepath` if
-  it is missing) without mutating any project environment.
+`sql2json` is a CLI tool that runs SQL queries via SQLAlchemy and outputs JSON, CSV, or Excel. Since 0.2.1 it is invoked as the `sql2json` console command (declared in `[project.scripts]`, target `sql2json.__main__:main`); the equivalent `python -m sql2json` form still works. Both dispatch through `fire`.
 
-**Quote the extras.** In bash/zsh the brackets are glob characters, so the spec
-must be quoted — `"sql2json[postgres,mysql]"` — or the shell expands it and the
-install fails before the installer runs. In PowerShell use single quotes:
-`'sql2json[postgres,mysql]'`.
+### One command: autocommit by default, `--read-only` for safe mode
 
-**Selecting drivers:** `[postgres]` (psycopg2) or `[mysql]` (pymysql) for a
-single database; bare `sql2json` is **SQLite only** — connecting to
-Postgres/MySQL without the extras raises `ModuleNotFoundError: psycopg2` /
-`pymysql`. For other databases (e.g. MS SQL Server's `pyodbc`), install the
-driver alongside: `uv tool install "sql2json" --with pyodbc`.
+There is a single command (no subcommands). It runs any SQL and **commits by default** (autocommit). It branches on `result.returns_rows`: row-returning statements (SELECT, `... RETURNING`) return rows through the transform pipeline; non-row statements (INSERT/UPDATE/DELETE/DDL) persist and return `{"rowcount": N}`. The rowcount is clamped to `0` (`max(rowcount, 0)`) so a DDL / "count unknown" statement — which drivers report as `-1` on SQLite/PostgreSQL but `0` on MySQL — yields a consistent `{"rowcount": 0}` across databases; real DML counts are `>= 1` and pass through.
 
-If `sql2json` already exists but lacks a driver, reinstall with the extras
-(`uv tool install "sql2json[postgres,mysql]" --force`) or inject it
-(`pipx inject sql2json psycopg2-binary pymysql`).
+`--read-only` (default false) is an opt-in safe mode: the statement still runs but nothing is persisted. Enforcement is hybrid — a real DB read-only transaction is requested where supported (SQLite `PRAGMA query_only = ON`; PostgreSQL/MySQL `SET TRANSACTION READ ONLY`) so a write is rejected up front (reported as `{"rowcount": 0}`, not an error), with an unconditional `con.rollback()` as the portable backstop. A write under `--read-only` prints a notice to stderr and is not persisted; SELECT returns rows normally. `--read-only`/`--read_only` accepts a bare flag or truthy strings (`true/t/yes/y/1/on`) via `_coerce_bool`.
 
-**Inside a project/venv** (library use), add it as a dependency instead, keeping
-the extras: `uv add "sql2json[postgres,mysql]"` or, in an activated venv,
-`pip install "sql2json[postgres,mysql]"`.
+`main()` parses bare flags through `fire`; the only special-cased token is `--version`/`-v`, which prints the version and exits before any query runs.
 
-**Upgrade** (carry the extras so drivers stay installed):
+### Data flow
 
-```bash
-uv tool upgrade sql2json                              # or: uv tool install "sql2json[postgres,mysql]" --force
-pipx upgrade sql2json
-pip install --upgrade "sql2json[postgres,mysql]"      # inside a venv
+```
+CLI args (fire) → handle_run_query2json() [__main__.py]
+  → run_query2json(..., read_only=<bool>) [sql2json.py]   # apply transforms; warn on a read-only write
+    → run_query_by_name(..., read_only=<bool>)            # resolves config, loads query by name or from .sql file
+      → run_query(..., read_only=<bool>)                  # executes via SQLAlchemy; commits (or rolls back when read_only); returns rows or {"rowcount": N}
+        → parse_parameter() per kwarg                      # translates date variable strings to real dates
 ```
 
-Check the installed version with `uv tool list`, `pipx list`, or
-`python -c "import importlib.metadata as m; print(m.version('sql2json'))"`.
+Extra `**kwargs` passed on the CLI (e.g. `--date_from CURRENT_DATE-1`) flow through as both SQL bind parameters (`:date_from` in the query) and are resolved by `parse_parameter` before execution.
 
----
+### Date variable system (`parameter/parameter_parser.py`)
 
-## Strategy for Agents
+CLI parameter values that match built-in variables are resolved before being passed to the database:
 
-Map a natural language request to these parameters:
+- `CURRENT_DATE`, `START_CURRENT_MONTH`, `END_CURRENT_MONTH`, `START_CURRENT_YEAR`, `END_CURRENT_YEAR`
+- Arithmetic: `CURRENT_DATE-10`, `START_CURRENT_MONTH+1` (days for DATE, months for MONTH vars, years for YEAR vars)
+- Custom format via `|` separator: `CURRENT_DATE|%Y-%m-%d 00:00:00`
 
-1. **Identify the connection** (`--name`): which database to use.
-2. **Select the query** (`--query`): prefer a named query from `config.json`, using connection-scoped queries when available; otherwise use raw inline SQL or a path to a `.sql` file prefixed with `@`.
-3. **Resolve named-query precedence**: for `--name <conn> --query <name>`, sql2json checks `connection_queries.<conn>.<name>` first, then falls back to `queries.<name>`, then treats the value as raw SQL or `@file` when no named query exists.
-4. **Supply parameters**: date variables and SQL bind parameters as extra `--key value` flags.
-5. **Shape the output**: use `--first`, `--key`, `--value`, `--wrapper`, `--jsonkeys` to transform results.
-
----
-
-## Discovery — orient before querying
-
-Before calling a query, an agent can inspect what is configured:
-
-```bash
-# List available database connections
-sql2json --list-connections --config /path/to/config.json
-# → ["default", "mysql", "reporting"]
-
-# List available named queries, grouped by scope
-sql2json --list-queries --config /path/to/config.json
-# → {"global": ["default", "sales_monthly"], "connections": {"mysql": ["table_sizes"], "reporting": ["total_users"]}}
-
-# Request the old flat global-query list when integrating with legacy callers
-sql2json --list-queries legacy --config /path/to/config.json
-# → ["default", "sales_monthly"]
-```
-
-`--list-connections` prints a JSON array to stdout and exits 0. `--list-queries` prints the scoped discovery object by default; `--list-queries legacy` prints the old flat global query array. If `--config` is omitted the tool uses its normal config lookup order.
-
-When selecting a named query for a connection, prefer a query listed under `connections.<connection>`; if none matches, use the matching name from `global`. Runtime lookup follows the same precedence: scoped query first, global query fallback, then raw SQL/`@file` behavior.
-
----
-
-## Config file lookup order
-
-When `--config` is not supplied, the tool searches in this order:
-
-1. `./sql2json.json` (current working directory)
-2. `./.sql2json/config.json` (current working directory)
-3. `~/.sql2json/config.json` (user home directory)
+"Today" is resolved in the local system timezone by default. Pass `--timezone <IANA name>` (e.g. `--timezone UTC`, `--timezone America/New_York`) to pin resolution to a specific timezone. This matters when the tool runs in a different timezone than the intended date boundary.
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [fsistemas/sql2json](https://github.com/fsistemas/sql2json) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
