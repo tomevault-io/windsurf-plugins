@@ -108,4 +108,4 @@ This application is a Laravel application and its main Laravel ecosystems packag
 
 ---
 > Source: [sib-swiss/glittr](https://github.com/sib-swiss/glittr) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
