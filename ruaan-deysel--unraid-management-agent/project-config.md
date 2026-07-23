@@ -1,118 +1,136 @@
 ---
 trigger: always_on
-description: > Single source of truth for all AI coding assistants working on this project.
+description: > **Read [`AGENTS.md`](./AGENTS.md) first** — it is the single source of truth for this project.
 ---
 
-# AGENTS.md — AI Agent Instructions
+# CLAUDE.md
 
-> Single source of truth for all AI coding assistants working on this project.
-> Individual tool files (CLAUDE.md, GEMINI.md, copilot-instructions.md, .cursorrules) point here.
+> **Read [`AGENTS.md`](./AGENTS.md) first** — it is the single source of truth for this project.
 
-## Project Identity
+## 1. Think Before Coding
 
-| Key          | Value                                                                  |
-| ------------ | ---------------------------------------------------------------------- |
-| **Name**     | Unraid Management Agent                                                |
-| **Language** | Go 1.26                                                                |
-| **Target**   | Linux/amd64 (Unraid OS)                                                |
-| **Type**     | Third-party community plugin (not official Unraid)                     |
-| **Purpose**  | REST API + WebSocket + MCP interface for system monitoring and control |
-| **Repo**     | `github.com/ruaan-deysel/unraid-management-agent`                      |
+**Don't assume. Don't hide confusion. Surface tradeoffs.**
 
-## Project Structure
+Before implementing:
 
-```text
-/
-├── daemon/                     # Application source code
-│   ├── cmd/                    # CLI entry points (boot command)
-│   ├── constants/              # System paths, binary locations, collection intervals
-│   ├── domain/                 # Core domain types (Context, Config)
-│   ├── dto/                    # Data Transfer Objects (shared structs)
-│   ├── lib/                    # Utilities: shell exec, parsing, validation
-│   ├── logger/                 # Logging wrapper (lumberjack)
-│   ├── platform/               # OS-resilience: source-health registry, capability detection, path/binary resolution
-│   └── services/
-│       ├── api/                # HTTP server, REST handlers, WebSocket hub
-│       ├── agent/              # Embedded autonomous agent (LLM loop, tools, sessions)
-│       ├── alerting/           # Alert engine, evaluation, dispatch
-│       ├── collectors/         # Data collection goroutines
-│       ├── controllers/        # Control operations (Docker, VM, Array, etc.)
-│       ├── mcp/                # Model Context Protocol server for AI agents
-│       ├── mqtt/               # MQTT client for Home Assistant integration
-│       └── watchdog/           # Health probes, remediation, runner
-├── docs/                       # Documentation (API, MCP, WebSocket, guides)
-│   └── integrations/           # AI/automation guides: mcp, claude/, chatgpt/, mqtt, grafana
-├── skills/                     # Agent Skill (Agent Skills standard) — unraid-management-agent/
-├── .claude-plugin/             # Claude Code plugin marketplace manifest for the skill
-├── meta/                       # Plugin metadata (XML, page files, scripts)
-├── scripts/                    # Developer setup helpers
-├── tests/                      # Integration tests
-├── .github/
-│   ├── instructions/           # Path-specific AI instructions (applyTo globs)
-│   └── prompts/                # Reusable task prompts for common workflows
-├── Makefile                    # Build automation
-├── go.mod / go.sum             # Go dependencies
-├── CHANGELOG.md                # Release notes (MUST be updated with every change)
-├── VERSION                     # Current version (YYYY.MM.DD format)
-└── CONTRIBUTING.md             # Contribution guidelines
+- State your assumptions explicitly. If uncertain, ask.
+- If multiple interpretations exist, present them - don't pick silently.
+- If a simpler approach exists, say so. Push back when warranted.
+- If something is unclear, stop. Name what's confusing. Ask.
+
+## 2. Simplicity First
+
+**Minimum code that solves the problem. Nothing speculative.**
+
+- No features beyond what was asked.
+- No abstractions for single-use code.
+- No "flexibility" or "configurability" that wasn't requested.
+- No error handling for impossible scenarios.
+- If you write 200 lines and it could be 50, rewrite it.
+
+Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
+
+## 3. Surgical Changes
+
+**Touch only what you must. Clean up only your own mess.**
+
+When editing existing code:
+
+- Don't "improve" adjacent code, comments, or formatting.
+- Don't refactor things that aren't broken.
+- Match existing style, even if you'd do it differently.
+- If you notice unrelated dead code, mention it - don't delete it.
+
+When your changes create orphans:
+
+- Remove imports/variables/functions that YOUR changes made unused.
+- Don't remove pre-existing dead code unless asked.
+
+The test: Every changed line should trace directly to the user's request.
+
+## 4. Goal-Driven Execution
+
+**Define success criteria. Loop until verified.**
+
+Transform tasks into verifiable goals:
+
+- "Add validation" → "Write tests for invalid inputs, then make them pass"
+- "Fix the bug" → "Write a test that reproduces it, then make it pass"
+- "Refactor X" → "Ensure tests pass before and after"
+
+For multi-step tasks, state a brief plan:
+
+```
+1. [Step] → verify: [check]
+2. [Step] → verify: [check]
+3. [Step] → verify: [check]
 ```
 
-## Architecture
+Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
 
-### Event-Driven PubSub Design
+---
 
+## Quick Reference
+
+```bash
+make deps && make local       # Setup and build
+make test                     # Run all tests
+make pre-commit-run           # Lint + security checks
+make swagger                  # Regenerate Swagger docs
+
+# Deploy to Unraid hardware (Ansible — preferred)
+ansible-playbook -i ansible/inventory.yml ansible/deploy.yml
 ```
-Collectors → Event Bus (github.com/cskr/pubsub) → API Server Cache → REST Endpoints
-                                                 ↓                   ↓
-                                          WebSocket Hub        MCP Server → AI Agents
-                                                 ↓
-                                          Connected Clients
-```
 
-### Critical Initialization Order
+## Key Paths
 
-In `daemon/services/orchestrator.go`:
+| Path                              | Purpose                                           |
+| --------------------------------- | ------------------------------------------------- |
+| `daemon/services/orchestrator.go` | Application lifecycle (init order is critical)    |
+| `daemon/services/collectors/`     | Data collection goroutines                        |
+| `daemon/services/api/`            | REST handlers, WebSocket hub, cache               |
+| `daemon/services/controllers/`    | Control operations (Docker/VM/Array)              |
+| `daemon/services/mcp/`            | MCP server for AI agents                          |
+| `daemon/lib/validation.go`        | Input validation functions                        |
+| `daemon/constants/const.go`       | System paths, intervals, binary locations         |
+| `skills/unraid-management-agent/` | Agent Skill (MCP/REST usage) — reference material |
+| `docs/integrations/`              | AI/automation guides (mcp, claude, chatgpt, mqtt) |
 
-1. API server creates subscriptions via `Hub.Sub()` **FIRST**
-2. 100ms delay ensures subscriptions are ready
-3. Then collectors start publishing via `Hub.Pub(data, "topic_name")`
+## Path-Specific Instructions
 
-**Never change this order** — collectors publishing before subscriptions causes lost events.
+The `.github/instructions/` directory contains context-aware instructions auto-applied by GitHub Copilot based on file globs. These are useful reference for any AI agent:
 
-### Native API Integration
+- `go.instructions.md` — Go style, error handling, imports
+- `collectors.instructions.md` — Collector pattern, panic recovery
+- `api-handlers.instructions.md` — Cache mutex, response helpers
+- `controllers.instructions.md` — Validate-execute-return pattern
+- `mcp.instructions.md` — MCP tool registration
+- `dto.instructions.md` — Struct conventions, JSON tags
+- `tests.instructions.md` — Table-driven tests, security cases
+- `yaml-markdown.instructions.md` — YAML/markdown formatting
 
-Prefer native Go libraries over shell commands:
+## Reusable Prompts
 
-| Component | Library                              | Purpose                 |
-| --------- | ------------------------------------ | ----------------------- |
-| Docker    | `github.com/moby/moby/client`        | Docker Engine SDK       |
-| VMs       | `github.com/digitalocean/go-libvirt` | Native libvirt bindings |
-| System    | Direct `/proc`, `/sys` access        | Kernel interfaces       |
+The `.github/prompts/` directory contains step-by-step task guides:
 
-### Data Flow Example
+- `Add Collector.prompt.md`
+- `Add REST Endpoint.prompt.md`
+- `Add MCP Tool.prompt.md`
+- `Add Controller.prompt.md`
+- `Debug Collector Issue.prompt.md`
+- `Add WebSocket Event.prompt.md`
 
-1. **System Collector** reads CPU/RAM from `/proc/meminfo`, `/proc/stat`
-2. Publishes `dto.SystemInfo` to event bus topic `system_update`
-3. **API Server** receives event, updates `systemCache`
-4. **WebSocket Hub** receives event, broadcasts to all clients
-5. **REST endpoint** `/api/v1/system` returns cached `systemCache` data
+## graphify
 
-### Core Components
+This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
 
-#### Domain Layer (`daemon/domain/`)
+Rules:
 
-- `Context`: Application runtime context holding the PubSub hub and configuration
-- `Config`: Configuration settings (version, port)
-
-#### Data Transfer Objects (`daemon/dto/`)
-
-All data structures shared between collectors, API, and WebSocket clients:
-
-- `SystemInfo`, `ArrayStatus`, `DiskInfo`, `NetworkInfo`
-- `ContainerInfo`, `VMInfo`, `UPSStatus`, `GPUMetrics`
-
-<!-- Content truncated to meet Windsurf 6KB limit -->
+- For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
+- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
+- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
+- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
 
 ---
 > Source: [ruaan-deysel/unraid-management-agent](https://github.com/ruaan-deysel/unraid-management-agent) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-22 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
