@@ -1,163 +1,134 @@
 ---
 trigger: always_on
-description: This file provides guidance to Codex and other agentic coding tools working in this repository. It is intended to complement, not replace, [`CLAUDE.md`](CLAUDE.md).
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-# AGENTS.md
+# CLAUDE.md
 
-This file provides guidance to Codex and other agentic coding tools working in this repository. It is intended to complement, not replace, [`CLAUDE.md`](CLAUDE.md).
-
-## Scope
-
-- Use this file for agent-specific operating guidance.
-- Use [`CLAUDE.md`](CLAUDE.md) for the main repository workflow, architecture, and QA expectations.
-- If the two documents overlap, follow the stricter rule.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
 
-Dora is a Rust-first framework for real-time robotics and AI applications. It uses zero-copy shared memory, Apache Arrow data, and supports Rust, Python, C, and C++ nodes.
+Dora (AI-Dora, Agentic Dataflow-Oriented Robotic Architecture) is a 100% Rust framework for building real-time robotics and AI applications. It provides 10-17x faster latency than ROS2 via zero-copy shared memory and Apache Arrow data format. Supports Rust, Python (PyO3), C, and C++ nodes.
 
-Primary architecture:
-
-```text
-CLI -> Coordinator -> Daemon(s) -> Nodes / Operators
-```
-
-Key communication paths:
-
-- CLI <-> Coordinator: WebSocket
-- Coordinator <-> Daemon: WebSocket
-- Daemon <-> Daemon: Zenoh
-- Daemon <-> Node: shared memory for large payloads, TCP for small payloads
-
-## Workspace Facts
-
-- Rust edition: 2024
-- MSRV: 1.88.0
-- Shared workspace versioning
-- Python packages are built with `maturin`, not normal `cargo` flows
-- The repository is in an `adora` -> `dora` consolidation transition. Prefer `dora` names for new code, but preserve documented compatibility paths unless the change is explicitly a breaking cleanup.
-
-Important packages:
-
-- `binaries/cli`: `dora` CLI
-- `binaries/daemon`: local process manager and transport bridge
-- `binaries/coordinator`: distributed orchestration
-- `binaries/runtime`: in-process operator runtime
-- `libraries/core`: descriptor parsing and shared build/runtime utilities
-- `libraries/message`: protocol and message definitions
-- `apis/rust/node`: Rust node API
-- `apis/rust/operator`: Rust operator API
-- `apis/python/node`: Python node API
-
-## Rename Transition Rules
-
-- Default to `dora` naming in code, docs, examples, and user-facing text.
-- The `adora` → `dora` rename is a clean break in 1.0: env vars, YAML virtual inputs, CLI/crate/package names, and the PyPI surface are `dora` only. There is no compat shim or alias to preserve.
-
-## Agent Working Rules
-
-- Do not make up architecture details. Read the affected crate(s) first.
-- Prefer minimal, targeted changes over broad refactors.
-- Preserve existing style and naming in the touched area.
-- Do not fix unrelated warnings or unrelated formatting drift.
-- Never revert user changes you did not author.
-- For non-trivial changes, keep behavior aligned with docs, examples, and tests.
-- When touching CLI, coordinator, daemon, dataflow parsing, or transport behavior, assume smoke or integration validation is needed.
-- For large mechanical rename or migration changes, review compatibility promises in issues/docs before changing behavior.
-
-## Build And Test Commands
-
-Normal workspace commands:
+## Build Commands
 
 ```bash
+# Build all (Python packages require maturin, exclude them for normal builds)
 cargo build --all --exclude dora-node-api-python --exclude dora-operator-api-python --exclude dora-ros2-bridge-python
 
+# Build specific package
+cargo build -p dora-cli
+cargo build -p dora-daemon
+
+# Check all
 cargo check --all
 
-cargo test --all \
-  --exclude dora-node-api-python \
-  --exclude dora-operator-api-python \
-  --exclude dora-ros2-bridge-python \
-  --exclude dora-cli-api-python \
-  --exclude dora-examples
+# Test all (excluding Python)
+cargo test --all --exclude dora-node-api-python --exclude dora-operator-api-python --exclude dora-ros2-bridge-python
 
-cargo clippy --all \
-  --exclude dora-node-api-python \
-  --exclude dora-operator-api-python \
-  --exclude dora-ros2-bridge-python \
-  -- -D warnings
+# Test single package
+cargo test -p dora-core
 
+# Lint
+cargo clippy --all
+
+# Format
+cargo fmt --all
+
+# Format check (CI uses this)
 cargo fmt --all -- --check
-```
 
-Useful targeted commands while iterating:
-
-```bash
-cargo test -p <crate>
-cargo test -p <crate> <test_name>
-cargo clippy -p <crate> -- -D warnings
-```
-
-Examples and local runs:
-
-```bash
+# Run examples
 cargo run --example rust-dataflow
+cargo run --example benchmark --release
+
+# Install CLI locally
+cargo install --path binaries/cli --locked
+
+# Run a dataflow
 dora run examples/rust-dataflow/dataflow.yml
 dora run examples/python-dataflow/dataflow.yml --uv --stop-after 10s
 ```
 
-## Required Development Workflow
+## Workspace Layout
 
-Follow RED-GREEN-IMPROVE:
+- **Rust edition 2024; MSRV and default workspace package metadata live in `[workspace.package]` in the root `Cargo.toml`.** Most crates inherit the workspace version via `version.workspace = true`, but a few (e.g. `apis/rust/operator/types`, the `examples/error-propagation/*` samples) pin their own version independently.
+- Python packages use PyO3 0.28 and are built with **maturin**, not cargo
 
-1. Add or update a failing test that captures the intended behavior.
-2. Implement the smallest change that makes the test pass.
-3. Refactor only while keeping tests green.
+### Key crates
 
-Default test selection:
+| Path | Crate | Role |
+|------|-------|------|
+| `binaries/cli` | dora-cli | CLI binary (`dora` command) - build, run, stop dataflows |
+| `binaries/daemon` | dora-daemon | Spawns nodes, manages local shared-memory/TCP communication |
+| `binaries/coordinator` | dora-coordinator | Orchestrates distributed multi-daemon deployments |
+| `binaries/runtime` | dora-runtime | In-process operator execution runtime |
+| `libraries/message` | dora-message | All inter-component message types and protocol definitions |
+| `libraries/core` | dora-core | Dataflow descriptor parsing, build utilities, Zenoh config |
+| `apis/rust/node` | dora-node-api | Rust API for writing custom nodes |
+| `apis/rust/operator` | dora-operator-api | Rust API for writing in-process operators |
+| `apis/python/node` | dora-node-api-python | Python node API (PyO3) |
+| `libraries/extensions/mavlink2-bridge` | dora-mavlink2-bridge | MAVLink 2 ↔ Apache Arrow conversion (common dialect) |
+| `binaries/mavlink2-bridge-node` | dora-mavlink2-bridge-node | Daemon-spawnable MAVLink 2 bridge (TCP/UDP/serial) |
 
-- Library logic: unit test near the code
-- Coordinator/daemon behavior: integration test
-- CLI flags or commands: smoke or integration test
-- Dataflow behavior: smoke tests in both local and networked modes
-- Bug fixes: regression test at the narrowest useful layer
+## Architecture
 
-Relevant test entry points:
+```
+CLI  -->  Coordinator  -->  Daemon(s)  -->  Nodes / Operators
+              (distributed)    (per machine)    (user code)
+```
 
-- `tests/example-smoke.rs`
-- `tests/ws-cli-e2e.rs`
-- `tests/fault-tolerance-e2e.rs`
-- `scripts/smoke-all.sh`
+- **CLI <-> Coordinator**: WebSocket (port 6013) for build/run/stop commands
+- **Coordinator <-> Daemon**: WebSocket for node spawning and dataflow lifecycle
+- **Daemon <-> Daemon**: Zenoh for distributed cross-machine communication
+- **Daemon <-> Node**: Shared memory for messages >4KB (zero-copy), TCP for small messages
+- **Data format**: Apache Arrow columnar format throughout (zero serialization overhead)
 
-## Validation Expectations
+### Dataflow specification
 
-> The per-class policy (Class A low-risk / Class B behavior change /
-> Class C high-risk subsystem) lives in
-> [`docs/agentic-qa-policy.md`](docs/agentic-qa-policy.md). The
-> commands below are what the policy asks for; this section is the
-> agent-facing cheat sheet.
+Dataflows are defined in YAML files. Nodes declare inputs (subscribing to other nodes' outputs) and outputs. Built-in timer nodes: `dora/timer/millis/<N>`, `dora/timer/hz/<N>`.
 
-Before finishing substantial code changes, run the smallest set that proves correctness:
+### Communication patterns
 
-- Always: targeted tests for touched crates or behavior
-- Usually: `cargo fmt --all -- --check`
-- Usually: `cargo clippy -p <crate> -- -D warnings` or workspace clippy if cross-cutting
-- When changing CLI/coordinator/daemon/dataflow flows: relevant smoke or integration tests
+User-facing patterns (see `docs/patterns.md`):
+- **Topic**: default pub/sub dataflow
+- **Service**: request/reply via `request_id` metadata key; helpers: `send_service_request()`, `send_service_response()`
+- **Action**: goal/feedback/result via `goal_id`/`goal_status` metadata keys; supports cancellation
 
-Before a branch is ready to push, the expected local baseline is:
+Internal transport:
+- **flume** channels: bounded MPSC for internal event routing
+- **tokio** async runtime with full features
+- **Zenoh**: pub-sub for remote/distributed nodes
+- **UHL Clock** (`uhlc`): hybrid logical clock for distributed causality
+
+## Pre-commit Quality Gates (MANDATORY)
+
+**Every commit MUST pass these gates before pushing.** This is a BLOCKING REQUIREMENT — do not skip any step. Remote CI is slower than your laptop and has limited capacity; catching failures locally saves 5-15 minutes per round-trip.
+
+> The bar below is the **Class A** (low-risk) baseline. Behavior
+> changes and high-risk subsystem edits have additional requirements
+> — see [`docs/agentic-qa-policy.md`](docs/agentic-qa-policy.md)
+> (#1634) for the per-class expectations and the PR validation
+> summary template.
+
+### Step 1: Run /review
+
+Run the `/review` skill on your changes before committing. This catches structural issues, security problems, and logic errors that tests and clippy miss.
+
+### Step 2: Run /simplify
+
+Run the `/simplify` skill to check for unnecessary complexity, code duplication, or inefficiency in the changed code.
+
+### Step 3: Local CI (fmt + clippy + tests)
 
 ```bash
+# 1. Format — CI rejects formatting diffs
 cargo fmt --all -- --check
-cargo clippy --all \
-  --exclude dora-node-api-python \
-  --exclude dora-operator-api-python \
-  --exclude dora-ros2-bridge-python \
-  -- -D warnings
-cargo test --all \
+
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [dora-rs/dora](https://github.com/dora-rs/dora) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
