@@ -1,182 +1,191 @@
 ---
 trigger: always_on
-description: Instructions for AI agents working with the HeroUI v3 repository.
+description: This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ---
 
-# AGENTS.md
+# CLAUDE.md
 
-Instructions for AI agents working with the HeroUI v3 repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Repository Overview
 
-HeroUI v3 is a modern React UI library built with **Tailwind CSS v4**, organized as a **pnpm monorepo** managed by **Turborepo**. Components are built on top of [React Aria Components](https://react-spectrum.adobe.com/react-aria/) and follow a compound component pattern similar to Radix UI.
+HeroUI v3 is a modern React UI library built with Tailwind CSS v4, using a pnpm monorepo structure managed by Turborepo.
 
-### Tech Stack
+### Key Technical Stack
 
-| Technology | Version | Purpose |
-|---|---|---|
-| Node.js | 22+ | Runtime |
-| pnpm | 10.26.2 | Package manager (via corepack) |
-| React | 19+ | UI framework |
-| Tailwind CSS | 4.x | Styling |
-| TypeScript | 5.x | Type safety |
-| Turborepo | 2.x | Build orchestration |
-| Storybook | Latest | Component development |
-| Vitest | 4.x | Testing |
-| React Aria Components | Latest | Accessibility primitives |
-| tailwind-variants | Latest | Variant-based styling (includes twMerge) |
+- **Node.js**: v22+ required
+- **pnpm**: v10.9.0 (package manager)
+- **React**: v19+
+- **Tailwind CSS**: v4.1.4
+- **TypeScript**: v5.8.3
+- **Turborepo**: Build orchestration
+- **Storybook**: Component development
+- **Vitest**: Testing framework
+
+## Development Commands
+
+### Core Development Commands
+
+```bash
+# Install dependencies (use --hoist flag)
+pnpm i --hoist
+
+# Start Storybook for component development
+pnpm dev
+
+# Start documentation site
+pnpm dev:docs
+
+# Build all packages
+pnpm build
+
+# Build specific package
+pnpm build --filter=@heroui/react
+
+# Run linting
+pnpm lint
+
+# Run tests
+pnpm test
+
+# Test specific component
+pnpm test button
+
+# Run formatting
+pnpm run format
+
+# Run type checking
+pnpm typecheck
+```
+
+### Package-Specific Commands
+
+- Use `--filter` flag with package name: `pnpm build --filter=@heroui/react`
+- Main packages: `@heroui/react`, `@heroui/docs`, `@heroui/storybook`
+
+## Git Commit Convention
+
+**IMPORTANT**: This repository uses conventional commits with strict validation. All commits must follow this format:
+
+```
+<type>(<scope>): <message>
+```
+
+### Allowed Types:
+
+- `feat` / `feature`: New features
+- `fix`: Bug fixes
+- `refactor`: Code refactoring
+- `docs`: Documentation changes
+- `build`: Build system changes
+- `test`: Test changes
+- `ci`: CI configuration changes
+- `chore`: Other changes
+
+### Examples:
+
+```bash
+git commit -m "feat(components): add new prop to avatar component"
+git commit -m "fix(button): resolve click handler issue"
+git commit -m "docs: update installation guide"
+git commit -m "ci: add Claude Code GitHub Action workflow"
+```
+
+**Note**: Commits without proper format will be rejected by git hooks.
+
+## Repository Architecture
 
 ### Monorepo Structure
 
 ```
 /
 ├── apps/
-│   └── docs/              # Documentation site (Next.js + Fumadocs)
+│   └── docs/          # Documentation site (Next.js + Fumadocs)
 ├── packages/
-│   ├── react/             # Main UI library (@heroui/react)
-│   │   ├── src/components/  # All components
-│   │   ├── src/utils/       # Shared utilities
-│   │   └── scripts/         # Build & codegen scripts
-│   ├── styles/            # CSS styles & variants (@heroui/styles)
-│   │   └── src/components/  # Per-component .css files
-│   ├── standard/          # Shared ESLint, Prettier, TS configs
-│   ├── storybook/         # Storybook configuration
-│   └── vitest/            # Shared Vitest configurations
-├── turbo.json
-└── pnpm-workspace.yaml
+│   ├── react/         # Main UI component library
+│   ├── standard/      # Shared ESLint, Prettier, TypeScript configs
+│   ├── storybook/     # Storybook configuration
+│   └── vitest/        # Shared Vitest configurations
+├── turbo.json         # Turborepo configuration
+└── pnpm-workspace.yaml # Workspace definition
 ```
 
-## Commands
+### Component Architecture Pattern
 
-| Action | Command |
-|---|---|
-| Install dependencies | `pnpm i --hoist` |
-| Build all packages | `pnpm build` |
-| Build specific package | `pnpm build --filter=@heroui/react` |
-| Dev (Storybook, port 6006) | `pnpm dev` |
-| Dev (Docs site, port 3000) | `pnpm dev:docs` |
-| Lint | `pnpm lint` |
-| Typecheck | `pnpm typecheck` |
-| Test all | `pnpm test` |
-| Test one component | `pnpm test button` |
-| Format | `pnpm run format` |
-| Bump version | `pnpm version:bump` |
-| Scaffold a new component | `cd packages/react && pnpm add:component ComponentName` |
-
-## Git Commit Convention
-
-All commits must follow [Conventional Commits](https://www.conventionalcommits.org/) and are validated by Husky + commitlint. Pre-commit also runs `lint-staged`.
-
-```
-<type>(<scope>): <message>
-```
-
-**Allowed types:** `feat`, `feature`, `fix`, `refactor`, `docs`, `build`, `test`, `ci`, `chore`
-
-Examples:
-
-```
-feat(components): add select component
-fix(button): resolve disabled state not applying
-docs: update installation guide
-```
-
-## Component Architecture
-
-### File Structure
-
-Each component lives in `packages/react/src/components/<component-name>/`:
+Each component in `packages/react/src/components/` follows this structure:
 
 ```
 component-name/
-├── component-name.tsx          # Component implementation (uses React Aria)
-├── component-name.styles.ts    # Tailwind Variants styling
-├── component-name.stories.tsx  # Storybook stories
-└── index.ts                    # Barrel exports
+├── component-name.tsx      # Main component (uses React Aria)
+├── component-name.styles.ts # Tailwind Variants styling
+├── component-name.stories.tsx # Storybook stories (title: "Components/ComponentName")
+└── index.ts               # Barrel exports
 ```
 
-CSS styles live in `packages/styles/src/components/<component-name>/`.
+**IMPORTANT**: All Storybook stories must use the "Components" group in their title. For example: `title: "Components/Card"`, `title: "Components/Button"`, etc.
 
-### Creating a New Component
+### CSS Class Naming Convention
 
-Always use the scaffold script:
+**IMPORTANT**: HeroUI v3 uses BEM (Block Element Modifier) style for CSS classes to ensure predictable and maintainable styling:
 
-```bash
-cd packages/react
-pnpm add:component ComponentName
+- **Block**: The main component class (e.g., `button`, `card`, `alert`)
+- **Modifier**: Variations of the component using double dashes (e.g., `button--primary`, `button--lg`, `button--icon-only`)
+- **Element**: Child elements within a component (e.g., `card__header`, `alert__icon`)
+
+**Migration to CSS-based Styling**:
+
+- The `button` component has been migrated to use CSS styles from `@heroui/styles/src/components/button.css`
+- This approach allows for better customization through CSS utilities and `@utility` directives
+- Other components will gradually be migrated to follow this CSS-based pattern
+- Components use `tv()` from `tailwind-variants` to map variant props to BEM class names
+
+**Default Size Pattern**:
+
+**CRITICAL**: All components MUST include default sizes in their base classes to prevent broken appearances when no size modifier is specified. Following the following pattern:
+
+- **Base classes** include default dimensions (equivalent to the `--md` variant)
+- **Medium variants** (`--md`) are empty with explanatory comments
+- **Size modifiers** override the defaults when specified
+
+Example implementation:
+
+```css
+/* Base component with default size */
+.avatar {
+  @apply relative flex size-10 shrink-0 overflow-hidden rounded-full;
+  /* size-10 is the default, equivalent to --md */
+}
+
+/* Size variants */
+.avatar--sm {
+  @apply size-8; /* Override default */
+}
+
+.avatar--md {
+  /* No styles as this is the default size */
+}
+
+.avatar--lg {
+  @apply size-12; /* Override default */
+}
 ```
 
-Then build to update package.json exports:
+This ensures components work properly without explicit size classes:
 
-```bash
-pnpm build
-```
+- `<div className="avatar">` → Works perfectly (size-10)
+- `<div className="avatar avatar--lg">` → Override to large (size-12)
 
-### Compound Component Pattern
+### Core Component Design Principles
 
-HeroUI uses a compound component pattern. Each component exports its sub-parts so users can compose and style them independently.
+**IMPORTANT**: HeroUI v3 follows a compound component pattern similar to Radix UI, built on top of React Aria Components primitives. This enables maximum flexibility and customization for users.
 
-```tsx
-// Context shares state/styles across parts
-const ComponentContext = createContext<{slots?: ReturnType<typeof componentVariants>}>({});
+### React Aria Components Integration
 
-// Root wraps children with context
-const ComponentRoot = forwardRef(({children, className, ...props}, ref) => {
-  const slots = useMemo(() => componentVariants({...}), [...]);
-  return (
-    <ComponentContext value={{slots}}>
-      <ReactAriaPrimitive ref={ref} className={composeTwRenderProps(className, slots.base())}>
-        {children}
-      </ReactAriaPrimitive>
-    </ComponentContext>
-  );
-});
-
-// Child parts consume context
-const ComponentItem = forwardRef(({className, ...props}, ref) => {
-  const {slots} = useContext(ComponentContext);
-  return (
-    <ReactAriaPrimitive ref={ref} className={composeTwRenderProps(className, slots?.item())}>
-      {props.children}
-    </ReactAriaPrimitive>
-  );
-});
-```
-
-Compound components are exported via `Object.assign` as the default export:
-
-```tsx
-const CompoundComponent = Object.assign(ComponentRoot, {
-  Item: ComponentItem,
-  Trigger: ComponentTrigger,
-});
-export default CompoundComponent;
-```
-
-### Export Strategy
-
-```tsx
-// Named exports for compound components
-export * as ComponentName from "./component-name";
-
-// Direct exports for simple components
-export {Component, type ComponentProps} from "./component";
-
-// Always export variants
-export {componentVariants, type ComponentVariants} from "./component.styles";
-```
-
-### Styling Rules
-
-1. **Styles go in `.styles.ts` files**, never in `.tsx` files. Use `tv()` from `tailwind-variants`.
-2. **Import from `tailwind-variants`**, never from `@heroui/standard`.
-3. **Never use `twMerge` manually** — `tailwind-variants` already includes it.
-4. **Add `"use client"` directive** at the top of every component `.tsx` file.
-5. **Display names** follow: `HeroUI.ComponentName` or `HeroUI.Component.SubPart`.
+**CRITICAL**: Before implementing any component, you MUST:
 
 
 <!-- Content truncated to meet Windsurf 6KB limit -->
 
 ---
 > Source: [heroui-inc/heroui](https://github.com/heroui-inc/heroui) — distributed by [TomeVault](https://tomevault.io).
-<!-- tomevault:4.0:windsurf_rules:2026-07-21 -->
+<!-- tomevault:4.0:windsurf_rules:2026-07-23 -->
